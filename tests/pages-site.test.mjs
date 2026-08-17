@@ -47,6 +47,7 @@ test("the site manifest declares the intro page at the root and solitaire under 
   assert.deepEqual(siteSections[0].assets, [
     "app.js",
     "content.js",
+    "demo-solitaire.png",
     "index.html",
     "preferences.js",
     "proof-diff.png",
@@ -71,6 +72,7 @@ test("the build publishes only browser runtime assets, byte-identical to the sou
     ".nojekyll",
     "app.js",
     "content.js",
+    "demo-solitaire.png",
     "index.html",
     "preferences.js",
     "proof-diff.png",

@@ -10,6 +10,10 @@ serve:
 contract:
     node --test page.test.mjs
 
+# デモセクションの solitaire 静止画を seed から撮り直す (手動撮影の代替)
+demo-still:
+    node capture-demo-still.mjs
+
 # GitHub Pages にアップロードするサイト全体をリポジトリルートの .pages に生成する
 # (紹介ページは `/`、solitaire は `/solitaire/`)
 pages:

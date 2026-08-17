@@ -39,6 +39,7 @@ test("the intro page has a stable semantic product story", async () => {
   assert.match(html, /data-i18n="hero\.line2">Verified in the browser\.<\/span>/);
   assert.match(html, /id="workflow"/);
   assert.match(html, /id="proof"/);
+  assert.match(html, /id="demo"/);
   assert.match(html, /id="commands"/);
   assert.match(html, /id="skills"/);
   assert.match(html, /id="start"/);
@@ -80,6 +81,76 @@ test("the page proves the VLM loop with real screenshots and measured outcomes",
   assert.match(html, /7 viewports/);
   assert.match(html, /docs\/reports\/2026-07-27-auto-markup-skill-haiku-proof\.md/);
   assert.match(html, /docs\/reports\/2026-04-01-tailwind-migration-blind-test\.md/);
+});
+
+/**
+ * The playable-demo section: the one route on this page to a thing you can operate rather than
+ * look at, and the only place the release the page advertises is explained.
+ *
+ * The counts are asserted against the sources that produce them, not typed twice. `52/52` and the
+ * ply count are solitaire's own claims, `57` is what `vitest run examples/solitaire/` reports, and
+ * the three gate commands are the ones `deploy-pages.yml` actually runs against `/solitaire/` —
+ * a marketing number nobody can rederive is the failure mode here, and the gate list is the part
+ * most likely to drift, because it lives in a workflow file this section never mentions.
+ */
+test("the playable-demo section routes to the game and states what proves it", async () => {
+  const [html, workflow] = await Promise.all([
+    read("index.html"),
+    readFile(join(exampleDir, "../../.github/workflows/deploy-pages.yml"), "utf8"),
+  ]);
+  const section = html.slice(html.indexOf('id="demo"'), html.indexOf('id="workflow"'));
+
+  assert.match(section, /data-testid="demo-solitaire"/);
+  assert.match(section, /src="\.\/demo-solitaire\.png"/);
+  // The reserved box has to match the FILE, not just be internally consistent — re-shooting the
+  // still at another size (`capture-demo-still.mjs --height ...`) would otherwise leave the
+  // section reflowing as the image decodes, which no other check here would notice. PNG IHDR
+  // carries the dimensions at a fixed offset, so this needs no image library.
+  const still = await readFile(join(exampleDir, "demo-solitaire.png"));
+  assert.equal(still.subarray(1, 4).toString("ascii"), "PNG");
+  const [stillWidth, stillHeight] = [still.readUInt32BE(16), still.readUInt32BE(20)];
+  assert.match(section, new RegExp(`width="${stillWidth}"\\s+height="${stillHeight}"`));
+  assert.deepEqual([stillWidth, stillHeight], [1024, 660]);
+  assert.match(section, /href="\.\/solitaire\/"/, "the demo section must link to the demo");
+  assert.match(section, /52\/52/);
+  assert.match(section, /<strong>144<\/strong>/);
+  assert.match(section, /<strong>57<\/strong>/);
+  assert.match(section, /NEW IN 0\.11/);
+  assert.match(section, /href="https:\/\/github\.com\/mizchi\/vlmkit\/blob\/main\/CHANGELOG\.md"/);
+
+  // Scoped to the solitaire step, so a gate the workflow runs against the INTRO page cannot
+  // satisfy a claim made about the demo. The step wraps its commands across continuation lines
+  // (`--level AAA` sits on the line after the verb), so join those back up first.
+  const solitaireStep = workflow.slice(
+    workflow.indexOf("Run vlmkit gates on the solitaire demo"),
+    workflow.indexOf("Build the Pages artifact"),
+  );
+  assert.ok(solitaireStep.length > 0, "the deploy workflow no longer has a solitaire gate step");
+  const runLines = solitaireStep.replace(/\\\n\s*/g, " ").split("\n");
+  for (const gate of [
+    "vlmkit check integrity",
+    "vlmkit check a11y focus",
+    "vlmkit check a11y touch --level AAA",
+  ]) {
+    assert.ok(section.includes(`<code>${gate}</code>`), `${gate} is missing from the demo section`);
+    const tokens = gate.split(" ").slice(1);
+    assert.ok(
+      runLines.some((line) => tokens.every((token) => line.includes(token))),
+      `${gate} is advertised but the deploy workflow does not run it against the demo`,
+    );
+  }
+});
+
+/**
+ * Section numbers are copy, written in the markup, so inserting a section renumbers every one
+ * below it by hand. Asserting the sequence turns a missed renumber into a failed test instead of
+ * two "04"s on a public page — which is what nearly shipped when the demo section landed.
+ */
+test("the section numbers run in order with no gaps or repeats", async () => {
+  const html = await read("index.html");
+  const numbers = [...html.matchAll(/class="section-number[^"]*">(\d+) \/ /g)].map((m) => m[1]);
+
+  assert.deepEqual(numbers, ["01", "02", "03", "04", "05", "06", "07"]);
 });
 
 test("the hero display type keeps readable size and tracking", async () => {
@@ -313,6 +384,7 @@ test("the local server serves both pages with usable content types", async () =>
     ["/proof-target.png", "image/png"],
     ["/proof-implementation.png", "image/png"],
     ["/proof-diff.png", "image/png"],
+    ["/demo-solitaire.png", "image/png"],
     ["/solitaire/", "text/html"],
     ["/solitaire/game.js", "text/javascript"],
     ["/solitaire/rules.js", "text/javascript"],

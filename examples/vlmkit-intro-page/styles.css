@@ -886,6 +886,186 @@ dd {
   overflow-wrap: anywhere;
 }
 
+/*
+ * The playable-demo band. `--surface-3` rather than `--surface` or `--surface-2`, because it sits
+ * between the two of them (`.proof` then `.workflow`) and would otherwise read as one long
+ * section. It is the fourth light surface `--surface-muted` was tuned against, so the muted text
+ * below still clears 4.5:1 here — see the token comment at the top of this file.
+ */
+.demo {
+  background: var(--surface-3);
+  color: var(--surface-text);
+}
+
+.demo > * {
+  max-width: var(--max);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.demo-heading {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 0.65fr);
+  gap: clamp(40px, 8vw, 120px);
+  align-items: start;
+}
+
+.demo-release {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin-bottom: 22px;
+  color: var(--surface-muted-strong);
+  font-size: 13px;
+}
+
+.demo-release > span:first-child {
+  padding: 3px 8px;
+  border: 1px solid var(--green-text);
+  color: var(--green-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+/* 28px, not 26: `check design` flagged the one-off as a scale outlier next to the 28px this page
+   uses 17 times, which is exactly the kind of drift the gate exists to catch. */
+.demo-heading > div > p:last-child {
+  max-width: 660px;
+  margin-top: 28px;
+  color: var(--surface-muted-strong);
+  font-size: 16px;
+}
+
+.demo-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
+  gap: clamp(26px, 4vw, 52px);
+  align-items: start;
+  margin-top: clamp(48px, 7vw, 84px);
+}
+
+.demo-shot {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* The still is 1024x660 and scales by width, so there is no letterbox to fill — the wrapper is
+   here for the border between image and caption, and to clip the image's own corners. */
+.demo-frame {
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.demo-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.demo-shot figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 18px;
+  padding: 14px 18px;
+}
+
+.demo-shot figcaption span:first-child {
+  color: var(--green-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.demo-shot figcaption span:last-child {
+  color: var(--surface-muted);
+  font-size: 11px;
+}
+
+.demo-facts {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.demo-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
+
+.demo-metrics li {
+  display: grid;
+  min-height: 104px;
+  align-content: center;
+  gap: 4px;
+  padding: 18px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.demo-metrics strong {
+  font-size: clamp(24px, 2.4vw, 32px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.demo-metrics span {
+  color: var(--surface-muted);
+  font-size: 11px;
+}
+
+.demo-gates {
+  display: grid;
+  gap: 7px;
+}
+
+.demo-gate-label {
+  color: var(--green-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.demo-gates code {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--surface-muted-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+}
+
+.demo-changelog {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  text-underline-offset: 4px;
+}
+
 .section-heading > p:last-child,
 .commands-intro > p:last-child {
   max-width: 540px;
@@ -1515,11 +1695,19 @@ dd {
 
   .hero-grid,
   .proof-heading,
+  .demo-heading,
+  .demo-layout,
   .workflow,
   .principle-grid,
   .skills-layout,
   .start {
     grid-template-columns: 1fr;
+  }
+
+  /* The still leads on a narrow screen, so cap it rather than letting a 1024px-wide image set
+     the column and stretch the facts beside it. */
+  .demo-shot {
+    width: min(100%, 620px);
   }
 
   .hero-grid {

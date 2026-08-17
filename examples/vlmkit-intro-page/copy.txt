@@ -21,6 +21,20 @@ A small model rebuilt the page from pixels alone.
 It found defects the existing VRT suite missed.
 A visual migration reached zero drift.
 
+# Playable demo
+NEW IN 0.11
+The interaction gates stopped reading markup and started performing the gesture.
+Some defects only exist
+while you are dragging.
+52/52 two seeds played to a win in CI
+144 plies, with the DOM audited after each one
+57 tests: the rules headless, the view in Chromium
+6 interaction families the 0.11 probes drive
+vlmkit check integrity
+vlmkit check a11y focus
+vlmkit check a11y touch --level AAA
+Play the demo
+
 # Workflow
 Turn visual opinions
 into fixable facts.

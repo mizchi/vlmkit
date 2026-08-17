@@ -44,6 +44,22 @@ just --justfile examples/vlmkit-intro-page/justfile pages
 `main` にサンプルまたは Pages workflow の変更を push すると、契約テストを通過した
 実行時ファイルだけが GitHub Pages に自動デプロイされます。
 
+## デモ静止画 (`demo-solitaire.png`)
+
+「02 / PLAYABLE PROOF」セクションが載せている solitaire の静止画は手動撮影ではなく、
+`capture-demo-still.mjs` が生成します。カードゲームのスクリーンショットは配りと手順で
+変わるため、手で撮ると再現できません。このスクリプトは `../solitaire/solve.mjs` の
+勝ち筋を探索し、その先頭 N 手をページ自身の `commit` で再生してから撮るので、
+画像は (seed, 手数) の関数になります。
+
+```sh
+node examples/vlmkit-intro-page/capture-demo-still.mjs                  # seed 1, 60手, 1024x660
+node examples/vlmkit-intro-page/capture-demo-still.mjs --seed 4 --plies 80
+```
+
+`index.html` の `<img>` の `width` / `height` は出力サイズと一致させてください
+(ずれると読み込み中に確保される領域が変わり、セクションがずれます)。
+
 観測済み UI から plan・Playwright テスト生成・VRT をやり直す場合は
 `OPENROUTER_API_KEY` を設定して markup loop を実行します。
 

@@ -67,6 +67,22 @@ export const messages = Object.freeze({
     "proof.caseMigrationBody":
       "エージェントが VRT のフィードバックだけで Tailwind を素の CSS へ移行し、3ラウンドで7ビューポートすべて 0.0% のピクセル差分に到達しました。",
     "proof.readMigration": "移行レポートを読む",
+    "demo.release":
+      "0.11 の interaction gate は、マークアップを読むのをやめて、ジェスチャーを実際に打つようになりました。",
+    "demo.line1": "ドラッグ中だけ",
+    "demo.line2": "存在する不具合がある。",
+    "demo.lead":
+      "始まらないドラッグ、間違った山に落ちたカード、出てこない勝利バナーは、ピクセル差分には写りません。だからこのサイトは実際に遊べるゲームを公開し、振る舞いの証明を振る舞いで行います。つまり、プレイして確かめます。",
+    "demo.shotAlt": "60手進んだ Klondike solitaire。組札に6枚が上がっている",
+    "demo.shotNote": "seed から再現可能。同じ配り、同じ60手、アニメーションはオフ。",
+    "demo.metricsLabel": "遊べるデモで測定した結果",
+    "demo.metricWin": "CI で勝ちまで指した seed 2つ",
+    "demo.metricPlies": "手。毎手ごとに DOM を監査",
+    "demo.metricTests": "テスト。ルールはブラウザなし、表示は Chromium",
+    "demo.metricFamilies": "0.11 の probe が打つ操作系統",
+    "demo.gatesLabel": "どれかが赤ければデプロイは止まる",
+    "demo.play": "デモを遊ぶ",
+    "demo.changelog": "0.11 の変更点を読む",
     "workflow.line1": "目視の感想を、",
     "workflow.line2": "修正できる事実へ。",
     "workflow.leadBefore": "壊れた場所と測定値を返す",
@@ -106,7 +122,7 @@ export const messages = Object.freeze({
     "skills.line2": "あとは自然に頼むだけ。",
     "skills.lead":
       "vlmkit をひとつ追加すれば、スキル名を覚える必要はありません。作りたい結果を伝えると、AI が依頼と素材を分類し、必要なワークフローを読み込んで、検証が通るまで実行します。",
-    "skills.note": "1 インストール · 自動ルーティング · 11 ワークフロー",
+    "skills.note": "1 インストール · 自動ルーティング · 13 ワークフロー",
     "skills.metaLabel": "メタエントリー",
     "skills.metaDescription":
       "フロントエンドの依頼で自動的に起動し、専門ワークフローを選択。利用者にスキル選択を求めず、CLI と Chromium も必要になった時だけ準備します。",
@@ -209,6 +225,23 @@ export const messages = Object.freeze({
     "proof.caseMigrationBody":
       "An agent migrated Tailwind markup to vanilla CSS using only VRT feedback, reaching 0.0% pixel diff across 7 viewports in 3 rounds.",
     "proof.readMigration": "Read the migration report",
+    "demo.release":
+      "The interaction gates stopped reading markup and started performing the gesture.",
+    "demo.line1": "Some defects only exist",
+    "demo.line2": "while you are dragging.",
+    "demo.lead":
+      "A pixel diff cannot see a drag that never starts, a card that lands in the wrong pile, or a win banner that never appears. So the site publishes a real game, and proves it the way behavior has to be proved: by playing it.",
+    "demo.shotAlt":
+      "Klondike solitaire mid-game, 60 moves in, with six cards on the foundations",
+    "demo.shotNote": "Reproducible from the seed: same deal, same 60 moves, animations off.",
+    "demo.metricsLabel": "Measured outcomes for the playable demo",
+    "demo.metricWin": "two seeds played to a win in CI",
+    "demo.metricPlies": "plies, with the DOM audited after each one",
+    "demo.metricTests": "tests: the rules headless, the view in Chromium",
+    "demo.metricFamilies": "interaction families the 0.11 probes drive",
+    "demo.gatesLabel": "Red on any of these blocks the deploy",
+    "demo.play": "Play the demo",
+    "demo.changelog": "Read what 0.11 changed",
     "workflow.line1": "Turn visual opinions",
     "workflow.line2": "into fixable facts.",
     "workflow.leadBefore": "A",
@@ -249,7 +282,7 @@ export const messages = Object.freeze({
     "skills.line2": "Ask naturally.",
     "skills.lead":
       "Add vlmkit once—there are no skill names to learn. Describe the outcome, and the AI classifies the request and artifacts, loads the right workflow, and runs it until the checks pass.",
-    "skills.note": "1 install · automatic routing · 11 workflows",
+    "skills.note": "1 install · automatic routing · 13 workflows",
     "skills.metaLabel": "Meta entry",
     "skills.metaDescription":
       "Activates automatically for frontend work and selects the matching workflow. It never asks you to pick a skill, and prepares the CLI and Chromium only when needed.",
