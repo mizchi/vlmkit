@@ -714,16 +714,24 @@ export const PROBE_DRAG_SCRIPT = `
         // has no legal destination at all, so every target refused it correctly and the rule
         // fired anyway. A selective drop handler refuses everything for an unlucky source, and an
         // unlucky source is not evidence about the handler.
+        //
+        // 96 pairs, which is 8 sources x 12 targets -- the product of the two per-side caps above,
+        // so within them the search is EXHAUSTIVE and "no pair cancels" is a claim about all of
+        // them. It was 40, and 40 is a fraction of what a board offers: on solitaire mid-game the
+        // search stopped there and the rule reported a container that cancels for every legal move
+        // as one that never cancels. Anything short of the product leaves the answer sitting in the
+        // untried remainder, which is why the rule now stands down when dragoverCapped is set.
+        const MAX_PAIRS = 96;
         const sources = own.has("dragstart") ? sourcesFor(el) : [source];
         const pairs = [];
         let cancelled = false;
         let preventedOn = null;
         for (const from of sources) {
-          if (cancelled || pairs.length >= 40) break;
+          if (cancelled || pairs.length >= MAX_PAIRS) break;
           // Re-open the gesture per source, so the page's own drag state points at THIS one.
           if (own.has("dragstart")) fire("dragstart", from);
           for (const target of targetsFor(el, from)) {
-            if (pairs.length >= 40) { row.dragoverCapped = true; break; }
+            if (pairs.length >= MAX_PAIRS) { row.dragoverCapped = true; break; }
             pairs.push(describe(from) + " -> " + describe(target));
             if (fire("dragover", target) === false) {
               cancelled = true;
@@ -910,13 +918,36 @@ async function probePointerDrags(
 export interface RealDragProbe {
   /** `path` of the surface entry this belongs to — a source with a `dragstart` handler. */
   path: string;
-  /** True when the gesture made the browser start a drag whose source was this element. */
+  /**
+   * True when the gesture made the browser start a drag that THIS element's handler receives.
+   *
+   * Not "whose source was this element", which is what it used to mean and what made every
+   * delegated board read as inert: the handler sits on the container, the browser starts drags only
+   * on draggable elements, and the draggable elements are the container's children. The drag is
+   * credited to the element that was pressed — `pressedOn` names it when it is not this one.
+   */
   dragstartFired: boolean;
   /** Target paths the gesture was aimed at, in order. Empty when the page declares none. */
   targetsTried: string[];
   /** Where a `drop` actually landed, if any. Absent means no target accepted the drag. */
   droppedOn?: string;
-  /** Drag sources other than this element that the gesture started, if any. */
+  /**
+   * The descendant the press landed on, when the handler is delegated and so this row's outcome
+   * belongs to a child rather than to the element holding the handler.
+   *
+   * The driven counterpart of `DragProbe.dispatchedFrom`. Absent means the element holding the
+   * handler is the element that was pressed. Several cards may be tried; this names the one whose
+   * drop is reported in `droppedOn`, or the first one that lifted when nothing accepted a drop —
+   * so the two fields always describe the same gesture.
+   */
+  pressedOn?: string;
+  /**
+   * Drag sources OUTSIDE this element that the gesture started, if any.
+   *
+   * A delegated card is not one of these — it is inside, its `dragstart` bubbles to this handler,
+   * and it lands in `dragstartFired`. What this catches is a gesture that picked up something else
+   * entirely: leftover selected text, or a draggable ancestor taking the press.
+   */
   startedOn?: string[];
   /**
    * Drag event types the recorder actually saw during this source's gestures.
@@ -1056,6 +1087,16 @@ const DRAG_RECORDER_SCRIPT = String.raw`
           ? "(non-element)"
           : el === document.body ? "body" : el === document.documentElement ? "html" : (describe(el) || "body");
         const row = { type: t, path: path };
+        // Whether THIS source entry's handler receives the dragstart: it fired on the element the
+        // probe is measuring, or on a descendant of it, which is the same thing for a listener.
+        //
+        // Identity, not the path string, and that is not fussiness. describe() stops at four
+        // segments and carries no index, so a card moved from one pile to another comes back under
+        // a different path -- the probe's own drop handler does exactly that, and a path check
+        // filed the second gesture's dragstart as "some other element was picked up instead".
+        if (t === "dragstart") {
+          row.fromEntry = !!(w.__vlmkitDragEntry && el && w.__vlmkitDragEntry.contains(el));
+        }
         // dropEffect, on dragend ONLY. It is the browser's verdict on the whole drag -- "none"
         // means nothing accepted it, which is what Escape produces -- and it is the one place the
         // value discriminates: on dragover it read "copy" both for a zone that accepts the drop
@@ -1184,6 +1225,160 @@ const EXTRA_TARGET_VISITS = 3;
 const MAX_CANCEL_GESTURES = 4;
 
 /**
+ * Where a real press should land for one drag source, and where the drag should be aimed.
+ *
+ * **The element holding the `dragstart` handler is not always the element to press.** Under
+ * delegation — one handler on the container, `event.target.closest(".card")` inside it — the
+ * container is not draggable and never needs to be, and the browser starts a drag only on a
+ * draggable element. Pressing the container therefore measures nothing: on
+ * `examples/solitaire` the centre happened to land on a card and the drag was credited to the
+ * wrong element; on a board whose centre is bare it started no drag at all. Both read as
+ * `drag-source-inert` for a page whose drag works — its own playthrough wins the game through
+ * real `dragAndDrop` calls.
+ *
+ * `PROBE_DRAG_SCRIPT` already resolves this for the dispatched probe (`sourceFor` / `sourcesFor` /
+ * `targetsFor`, added for the same page). This is the same policy for the driven one, and the
+ * reasons carry over unchanged:
+ *
+ *   - **Several press candidates, not one.** Which card has a legal destination right now is page
+ *     state the probe cannot read. On solitaire the first draggable in the deal is a red Queen
+ *     with nowhere to go, so betting on it reports a board that refuses every drop.
+ *   - **Aim inside the container, never at it.** The container is the only entry with
+ *     `dragover`/`drop` on a delegated page, so the declared-target list aims the gesture back at
+ *     the card it just picked up. Every board refuses a card onto its own pile — correctly — and
+ *     the refusal reads as a broken drop target. The sibling piles are the destinations; an empty
+ *     pile is often the only legal one and holds no draggable to be found by.
+ *
+ * Takes its element through `window.__vlmkitDragEntry` rather than as an argument because the
+ * script has to inline `DESCRIBE_PATH_FN`: the path a press is reported under has to come from the
+ * one shared walk, and a second copy of it is what broke the probe-to-surface join once already.
+ */
+const DRAG_PLAN_SCRIPT = String.raw`
+(() => {
+  ${DESCRIBE_PATH_FN}
+  const el = window.__vlmkitDragEntry;
+  if (!el || !el.tagName) return null;
+  const own = { el: el, path: describe(el), aims: [] };
+  // A source that is itself draggable is its own press point, and its aim list stays the page's
+  // declared targets -- the non-delegated shape, unchanged.
+  if (el.draggable === true) return { delegated: false, presses: [own] };
+  const inner = Array.from(el.querySelectorAll('[draggable="true"]')).slice(0, 3);
+  if (inner.length === 0) return { delegated: false, presses: [own] };
+
+  // Six, measured rather than picked: on solitaire's six sibling piles a cap of four missed the
+  // seed-5 deal, whose only reachable legal move is onto the FIFTH pile. Six lands 3 of 6 seeds
+  // against 2 at four, costs 19 gestures of the 24-per-page budget in the worst case, and going
+  // higher spends the budget on a board where the remaining seeds are unreachable for a different
+  // reason (their legal source is the fourth card or later, which the press cap excludes).
+  const MAX_AIMS = 6;
+  const shapeOf = (node) =>
+    node.tagName + "." + String(node.className || "").trim().split(/\s+/)[0];
+  const aimsFor = (source) => {
+    const seen = new Set();
+    const home = source.parentElement;
+    // The containers of the OTHER draggables: the sibling piles of a board. Never the source's
+    // own container, and never one that contains it -- that pair is the self-drop.
+    //
+    // The shape set collects what a pile LOOKS like from every holder including the excluded ones:
+    // a board with one card has no other holder to learn from, and dropping the source's own
+    // container from the lesson left a single-card board with no destinations at all.
+    // (No backticks in this comment. It is inside a String.raw template, where one ends the script.)
+    const holders = [];
+    const shapes = new Set();
+    for (const other of el.querySelectorAll('[draggable="true"]')) {
+      const holder = other.parentElement;
+      if (!holder || !el.contains(holder)) continue;
+      shapes.add(shapeOf(holder));
+      if (seen.has(holder) || holder === home || holder.contains(source)) continue;
+      seen.add(holder);
+      holders.push(holder);
+    }
+    // An empty pile holds no draggable, so the loop above cannot see it -- and on a board it is
+    // frequently the only legal destination there is.
+    //
+    // Recognised by LOOKING LIKE THE OCCUPIED PILES (same tag + first class), not merely by being
+    // an empty box. "Childless, textless, at least 16px" was the first version and it matches a
+    // FACE-DOWN CARD exactly: measured on solitaire, where the stock's backs come first in document
+    // order, so the two reserved slots went to a card back and the empty waste while the four
+    // foundations -- the actual destination for the Ace that deal turns up -- were never aimed at.
+    const empties = [];
+    for (const node of el.querySelectorAll("*")) {
+      if (node === source || node.contains(source) || node.children.length > 0 || seen.has(node)) continue;
+      if (node.textContent && node.textContent.trim()) continue;
+      if (!shapes.has(shapeOf(node))) continue;
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 16 || rect.height < 16) continue;
+      seen.add(node);
+      empties.push(node);
+    }
+    // The empty zones get a reserved share rather than the leftovers. Appended last they were never
+    // reached at all: six sibling piles fill the cap on their own, and on solitaire's seed-4 deal
+    // the ONE legal move is an Ace onto an empty foundation. An empty pile is frequently the only
+    // legal destination on a board, which is the opposite of a tiebreak.
+    const room = Math.min(empties.length, 2);
+    return [
+      ...holders.slice(0, MAX_AIMS - room),
+      ...empties.slice(0, room),
+      ...holders.slice(MAX_AIMS - room),
+    ].slice(0, MAX_AIMS);
+  };
+
+  return {
+    delegated: true,
+    presses: inner.map((press) => ({
+      el: press,
+      path: describe(press),
+      aims: aimsFor(press).map((target) => ({ el: target, path: describe(target) })),
+    })),
+  };
+})()
+`;
+
+/** What `boundingBox()` returns, minus the null. */
+type Box = { x: number; y: number; width: number; height: number };
+
+/** One element to press, with the destinations to aim at from it. Empty `aims` = not delegated. */
+type DragPressPlan = {
+  handle: ElementHandle<Element>;
+  path: string;
+  aims: { handle: ElementHandle<Element>; path: string }[];
+};
+
+/**
+ * Read `DRAG_PLAN_SCRIPT` back as element handles.
+ *
+ * Handles rather than paths, because `describe()` stops at four segments and carries no positional
+ * index: a board's cards derive to ONE path between them, so re-resolving a path would collapse
+ * every press candidate onto the first card. The paths come back too, but only to report with.
+ *
+ * Array items are read by index off `length` rather than through `getProperties()`, which also
+ * yields `length` itself for an array and would be read as a fifth press candidate.
+ */
+async function readDragPlan(page: Page): Promise<{ delegated: boolean; presses: DragPressPlan[] }> {
+  const plan = await page.evaluateHandle(DRAG_PLAN_SCRIPT);
+  const items = async (list: JSHandle): Promise<JSHandle[]> => {
+    const length = Number(await (await list.getProperty("length")).jsonValue());
+    const out: JSHandle[] = [];
+    for (let i = 0; i < length; i++) out.push(await list.getProperty(String(i)));
+    return out;
+  };
+  const delegated = Boolean(await (await plan.getProperty("delegated")).jsonValue());
+  const presses: DragPressPlan[] = [];
+  for (const press of await items(await plan.getProperty("presses"))) {
+    const handle = (await press.getProperty("el")).asElement();
+    if (!handle) continue;
+    const aims: DragPressPlan["aims"] = [];
+    for (const aim of await items(await press.getProperty("aims"))) {
+      const aimHandle = (await aim.getProperty("el")).asElement();
+      if (!aimHandle) continue;
+      aims.push({ handle: aimHandle, path: String(await (await aim.getProperty("path")).jsonValue()) });
+    }
+    presses.push({ handle, path: String(await (await press.getProperty("path")).jsonValue()), aims });
+  }
+  return { delegated, presses };
+}
+
+/**
  * Drag each source onto the page's declared targets and report what the browser did.
  *
  * Two short-circuits, and both are about spending gestures where they answer something:
@@ -1217,6 +1412,8 @@ async function probeRealDrags(
     prevented?: boolean;
     dropEffect?: string;
     received?: { type: string; value: string }[];
+    /** `dragstart` only: the recorder's answer to "is this drag one this entry's handler gets". */
+    fromEntry?: boolean;
   };
   /**
    * One gesture, and — when a target element is given — what its pixels did while hovered.
@@ -1271,21 +1468,53 @@ async function probeRealDrags(
   for (const src of sources) {
     const row: RealDragProbe = { path: src.path, dragstartFired: false, targetsTried: [], gestures: 0 };
     try {
-      const handle = (await handleForPath(page, src.path)).asElement();
-      if (!handle) { row.error = "element not found for its own path"; out.push(row); continue; }
-      const box = await handle.boundingBox();
-      if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
+      const entryHandle = (await handleForPath(page, src.path)).asElement();
+      if (!entryHandle) { row.error = "element not found for its own path"; out.push(row); continue; }
+      /*
+       * The element under measurement, published to the page for the rest of this iteration.
+       * `DRAG_PLAN_SCRIPT` reads it to resolve the press candidates, and `DRAG_RECORDER_SCRIPT`
+       * reads it on every `dragstart` to answer "is this a drag this entry's handler receives" —
+       * one definition of "this element", so the plan and the verdict cannot disagree about it.
+       */
+      await page.evaluate((el) => {
+        (window as unknown as { __vlmkitDragEntry?: Element }).__vlmkitDragEntry = el;
+      }, entryHandle);
+      const plan = await readDragPlan(page);
+      // Press candidates with their boxes. One entry — the element holding the handler — unless
+      // the handler is delegated, in which case they are its draggable descendants.
+      const presses: (DragPressPlan & { box: Box })[] = [];
+      for (const press of plan.presses) {
+        const box = await press.handle.boundingBox();
+        if (box && box.width >= 4 && box.height >= 4) presses.push({ ...press, box });
+      }
+      if (presses.length === 0) { row.error = "no usable box"; out.push(row); continue; }
+
       const startedOn = new Set<string>();
       const timeline: DragTimelineStep[] = [];
-      const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      const offCentre = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.25 };
+      const centreOf = (b: Box) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+      const offCentreOf = (b: Box) => ({ x: b.x + b.width * 0.25, y: b.y + b.height * 0.25 });
       const aimAt = async (target: HandlerSurfaceEntry) => {
         const handle = (await handleForPath(page, target.path)).asElement();
         const tb = await handle?.boundingBox();
-        return tb ? { at: { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 }, handle } : null;
+        return tb ? { at: centreOf(tb), handle } : null;
       };
-      // With no declared target, move off the element so the gesture is still a drag.
-      const elsewhere = { x: centre.x + 60, y: centre.y + 60 };
+      /**
+       * Where to aim from a given press, in the order to try.
+       *
+       * INSIDE the container when the handler is delegated — the container is the only entry with
+       * `dragover`/`drop` on such a page, so the declared-target list would aim the gesture back at
+       * the card it just picked up. Otherwise the page's declared targets, resolved one at a time
+       * so a page with a dozen zones does not pay for boxes the gesture never reaches.
+       */
+      const aimsFrom = (press: DragPressPlan) => plan.delegated
+        ? press.aims.map((aim) => ({
+          path: aim.path,
+          resolve: async () => {
+            const b = await aim.handle.boundingBox();
+            return b ? { at: centreOf(b), handle: aim.handle } : null;
+          },
+        }))
+        : targets.map((t) => ({ path: t.path, resolve: () => aimAt(t) }));
 
       const run = async (
         from: { x: number; y: number },
@@ -1313,7 +1542,7 @@ async function probeRealDrags(
             });
           }
           if (r.type !== "dragstart") continue;
-          if (r.path === src.path) row.dragstartFired = true;
+          if (r.fromEntry) row.dragstartFired = true;
           else startedOn.add(r.path);
         }
         return log;
@@ -1321,38 +1550,71 @@ async function probeRealDrags(
 
       const hoverFeedback: { target: string; ratio: number }[] = [];
 
-      const first = targets.length > 0 ? await aimAt(targets[0]!) : null;
-      const firstAim = first?.at ?? elsewhere;
-      const firstAimed = first && targets[0] ? { path: targets[0].path, handle: first.handle } : undefined;
       if (budget <= 0) { row.capped = true; out.push(row); continue; }
-      let log = await run(centre, firstAim, firstAimed);
-      if (targets.length > 0) row.targetsTried.push(targets[0]!.path);
-      if (!row.dragstartFired && budget > 0) log = await run(offCentre, firstAim, firstAimed);
 
-      if (row.dragstartFired) {
-        const dropped = log.find((r) => r.type === "drop");
-        if (dropped) row.droppedOn = dropped.path;
-        // Only now is trying other targets informative: the source does pick up, and the
-        // question becomes whether anything on the page accepts it.
-        //
-        // The loop used to stop at the first drop, and that hid the target-side facts for every
-        // zone after it: whether a real drag reaches it, whether it advertises itself, whether it
-        // would accept. Those are the questions this probe answers, and a lucky first success
-        // made the rest unanswerable. So a source that has already dropped keeps going for a few
-        // more targets — bounded, because each gesture runs the page's own drop logic.
-        let extra = row.droppedOn ? EXTRA_TARGET_VISITS : Infinity;
-        for (const t of targets.slice(1)) {
-          if (extra <= 0) { row.capped = true; break; }
-          if (budget <= 0) { row.capped = true; break; }
-          extra--;
-          const aim = await aimAt(t);
-          if (!aim) continue;
-          row.targetsTried.push(t.path);
-          const again = await run(centre, aim.at, { path: t.path, handle: aim.handle });
-          const drop = again.find((r) => r.type === "drop");
-          // The FIRST target that accepted it is the answer to "can this be dropped"; a later
+      // ---- Which press starts a drag, and does its first destination accept it? --------------
+      let chosen: (DragPressPlan & { box: Box }) | null = null;
+      let chosenAim: { at: { x: number; y: number }; handle: ElementHandle<Element> | null } | null = null;
+      /*
+       * Each press candidate against each of its destinations, and the two short-circuits from this
+       * function's own contract:
+       *
+       *   - a press the browser refuses to pick up is not aimed anywhere else. Where the gesture
+       *     was heading has nothing to do with whether the element lifts, so the next destination
+       *     would re-measure the same fact. It gets ONE retry from a different point instead.
+       *   - once something has accepted a drop, a few more destinations are still visited — that is
+       *     where the target-side facts come from, and stopping at the first success left every
+       *     zone after it unmeasured — but not the whole board, because each gesture runs the page's
+       *     own drop logic for real.
+       *
+       * The nesting is what the delegated case needs and the direct case never sees: a board's
+       * cards each have their own legal destinations, so "no target accepted it" is only earned
+       * after several cards have been offered several piles. Measured on solitaire's seed-1 deal,
+       * where the legal move is the SECOND card onto the FOURTH pile — one destination per card
+       * reported a board that refuses everything.
+       */
+      let visitsAfterDrop = 0;
+      const startedHere = (log: LogRow[]) => log.some((r) => r.type === "dragstart" && r.fromEntry);
+      candidates: for (const [index, press] of presses.entries()) {
+        const aims = aimsFrom(press);
+        // `[null]` = no declared destination: one gesture to a point 60px away, because whether the
+        // browser picks the element up is worth measuring on its own.
+        for (const aim of (aims.length > 0 ? aims : [null])) {
+          if (budget <= 0) { row.capped = true; break candidates; }
+          if (row.droppedOn && visitsAfterDrop++ >= EXTRA_TARGET_VISITS) { row.capped = true; break candidates; }
+          // Re-read, because a previous gesture may have MOVED the source: a board's drop handler
+          // appends the card to another pile, and a point captured before that is over the hole the
+          // card left. Gone entirely means stop measuring rather than press where it used to be.
+          const box = await press.handle.boundingBox();
+          if (!box || box.width < 4 || box.height < 4) break;
+          const centre = centreOf(box);
+          const resolved = aim ? await aim.resolve() : null;
+          const to = resolved?.at ?? { x: centre.x + 60, y: centre.y + 60 };
+          const aimed = aim && resolved ? { path: aim.path, handle: resolved.handle } : undefined;
+          if (aim) row.targetsTried.push(aim.path);
+          let log = await run(centre, to, aimed);
+          // The retry, for the first attempt on the first candidate only: a card whose only
+          // draggable part is a handle, or one with a `draggable="false"` child under the centre,
+          // would otherwise read as inert. A second point on a card the plan already resolved as
+          // draggable answers nothing new, so under delegation the next CARD is the better spend.
+          if (!startedHere(log) && index === 0 && budget > 0) {
+            log = await run(offCentreOf(box), to, aimed);
+          }
+          if (!startedHere(log)) break;
+          chosen = press;
+          chosenAim = resolved;
+          // The first card that lifted, so the row says which one it measured even if nothing
+          // accepts a drop. Replaced below by the card whose drop is the one being reported: the
+          // two have to name the same gesture, or the line reads "pressed card-b … dropped
+          // card-a" — measured on the delegated fixture, where a later card lifts after the drop.
+          if (plan.delegated && !row.pressedOn) row.pressedOn = press.path;
+          const dropped = log.find((r) => r.type === "drop");
+          // The FIRST destination that accepted it is the answer to "can this be dropped"; a later
           // one does not overwrite it, so the reported target stays the one a user would hit.
-          if (drop && !row.droppedOn) row.droppedOn = drop.path;
+          if (dropped && !row.droppedOn) {
+            row.droppedOn = dropped.path;
+            if (plan.delegated) row.pressedOn = press.path;
+          }
         }
       }
       // ---- The cancel: Escape mid-flight, and does the page put things back ----------------
@@ -1367,10 +1629,16 @@ async function probeRealDrags(
       // The region is clipped from a PAGE screenshot rather than taken from the element: the
       // element is `visibility: hidden` in exactly the failing case, and `elementHandle
       // .screenshot()` waits for it to become visible and then times out after 30s. Measured.
-      if (row.dragstartFired && cancelBudget > 0 && budget > 0) {
+      //
+      // The clip is the PRESSED element's box, re-read: on a delegated board that is the card, not
+      // the container, and "did the page put it back" is a question about the card. A container-
+      // sized clip would average the answer across a whole board.
+      if (chosen && cancelBudget > 0 && budget > 0) {
         cancelBudget--;
         budget--;
         row.gestures++;
+        const box = (await chosen.handle.boundingBox()) ?? chosen.box;
+        const centre = centreOf(box);
         const clip = {
           x: Math.max(0, Math.floor(box.x)),
           y: Math.max(0, Math.floor(box.y)),
@@ -1378,7 +1646,7 @@ async function probeRealDrags(
           height: Math.max(1, Math.ceil(box.height)),
         };
         const before = await page.screenshot({ clip }).catch(() => null);
-        const { log: cancelLog } = await gesture(centre, firstAim, null, true);
+        const { log: cancelLog } = await gesture(centre, chosenAim?.at ?? { x: centre.x + 60, y: centre.y + 60 }, null, true);
         await page.waitForTimeout(150);
         const after = before ? await page.screenshot({ clip }).catch(() => null) : null;
         const end = cancelLog.find((r) => r.type === "dragend");
@@ -2415,7 +2683,10 @@ export const HANDLER_SURFACE_RULES = [
       docs:
         "Probed, not read: the static check cannot see this, because a dragover handler DOES"
         + " exist — it just does not cancel, so the browser rejects the drop and the wired"
-        + " drop handler never runs. Requires --probe-drag (or `check interactions --handlers`).",
+        + " drop handler never runs. Requires --probe-drag (or `check interactions --handlers`)."
+        + " Reported only when the pair search ran to completion: a selective handler cancels for"
+        + " SOME source/target pairs, so a search that hit its cap has not established that none"
+        + " of them cancels.",
     },
     {
       id: "pointer-drag-intercepted",
@@ -2706,7 +2977,19 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         + ` advertises itself as a drop zone and then rejects the drop — the user is told it will`
         + ` work.`
       : "";
-    if (probe?.dragoverUnprevented === true) {
+    /*
+     * Not when the pair search was TRUNCATED. "No listener cancelled it" is a claim about every
+     * pair, and a capped search tried 40 of them — on a board with seven sources and a dozen
+     * destinations that is a fraction, and a handler which cancels only for a legal move (every
+     * board's) is exactly the shape that hides in the untried remainder.
+     *
+     * Measured on `examples/solitaire`: with the pairs exhausted the rule is silent, and with the
+     * search capped at 40 on a mid-game position it reported the board as never cancelling. The
+     * page had passed before only because a legal pair happened to sit inside the first 40 of a
+     * fresh deal — a lucky measurement, which is the same class of unearned verdict this file
+     * refuses for a zero-gesture drag row.
+     */
+    if (probe?.dragoverUnprevented === true && probe.dragoverCapped !== true) {
       // The static `drop-without-dragover` check passes this: a dragover handler DOES
       // exist. It just does not cancel, so the default action rejects the drop and the
       // wired `drop` never runs. Measured — `dispatchEvent` returned true for a dragover
@@ -3546,8 +3829,12 @@ export function formatHandlerSurface(
             : row.cancel.ratio >= 0.02
               ? ` ${RED}(Escape cancelled it and ${(row.cancel.ratio * 100).toFixed(0)}% of it stayed changed)${RESET}`
               : ` ${DIM}(Escape reverted it cleanly)${RESET}`;
+      // Which element the press landed on, when it is not the one holding the handler. A reader
+      // seeing `main#table: dragstart fired` for a board wants to know WHICH card moved, and the
+      // route below is only printed when the drag failed.
+      const pressed = row.pressedOn ? ` ${DIM}(pressed ${row.pressedOn})${RESET}` : "";
       lines.push(
-        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${tried} — ${landed}${cancelNote}`
+        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${pressed}${tried} — ${landed}${cancelNote}`
         + (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
       );
       // The route, printed only when the drag did not complete. That is when the question is
