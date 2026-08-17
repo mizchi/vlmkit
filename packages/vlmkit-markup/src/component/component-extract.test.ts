@@ -7,7 +7,7 @@
  * the comment quietly going stale.
  */
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -239,12 +239,12 @@ describe("runComponentExtract option resolution", () => {
   let dir = "";
   let hudPath = "";
 
-  before(async () => {
+  beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), "vlmkit-extract-"));
     hudPath = join(dir, "hud.png");
     await writeFile(hudPath, PNG.sync.write(buildHud(320, 240, 1).png));
   });
-  after(async () => {
+  afterAll(async () => {
     await rm(dir, { recursive: true, force: true });
   });
 

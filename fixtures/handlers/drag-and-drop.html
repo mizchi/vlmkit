@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HTML5 drag and drop — correct and broken pairs</title>
+<!--
+  What `vlmkit scan handlers` is expected to say about this page.
+
+  Every element here is wired with drag handlers, and a plain inventory lists them all
+  identically. Two of them can NEVER FIRE, which is the point of the fixture:
+
+    #ok / #zone            a correct source/target pair — no finding
+    #not-draggable         dragstart on an element whose `draggable` is false, so the
+                           browser starts no drag           -> drag-source-not-draggable
+    #zone-no-dragover      drop with no dragover to preventDefault on, so the drop is
+                           rejected by the default action    -> drop-without-dragover
+    #delegated-list > li   drop on the child, dragover on the container: correct, because
+                           dragover bubbles                  -> no finding
+    #native-source         an <a href>, draggable by default with no attribute, so
+                           reading the attribute alone would flag it   -> no finding
+    #prop-target           ondragover assigned as a DOM property, which the on* sweep
+                           has to see (it did not, before the drag props were added)
+    #attr-source           the same through an ondragstart *attribute*, the other half of
+                           that sweep
+
+  Two more are invisible to any static read and need `--probe-drag`, which fires the
+  sequence and watches what happens:
+
+    #zone-forgot-prevent   a dragover handler that never calls preventDefault. The static
+                           check passes it -- a handler IS registered -- and the browser
+                           still rejects the drop      -> dragover-not-prevented
+    every source here      none of them fills the DataTransfer except #ok, so a target
+                           calling getData() reads ""  -> dragstart-transfers-nothing
+
+  And two are invisible even to that, because dispatching a `dragstart` runs the handler
+  whatever the element's state -- so the synthetic probe reports both of these as working.
+  Only a REAL gesture (`mouse.down` / `mouse.move` / `mouse.up`, which Chromium turns into a
+  genuine HTML5 drag) shows that the browser refuses to start one:
+
+    #user-drag-none        draggable="true", and `-webkit-user-drag: none` in CSS. The DOM
+                           says draggable, the browser starts nothing  -> drag-source-inert
+    #veiled-source         draggable="true" with a transparent SIBLING over it, so the press
+                           never reaches it                            -> drag-source-inert
+
+  Measured, since the pair only makes sense as a contrast: a plain draggable source fires
+  `dragstart` and lands its drop on #zone; these two fire nothing at all. Both keep their
+  `draggable` property true, which is exactly why `drag-source-not-draggable` cannot see them.
+
+  Every visible drag source also reports `drag-without-keyboard-alternative` unless it or
+  an ancestor has a keyboard handler — #ok deliberately has one, so the fixture shows both
+  sides. Drag has no keyboard equivalent in any browser, so that finding is about the page
+  needing another route to the same result, not about tabindex.
+
+  There is no `dragmove` event. The continuous ones are `drag` (on the source) and
+  `dragover` (on the target); both appear below.
+
+  The container class is `rows`, with the `s`, and that letter is load-bearing. A probe row is
+  joined back to its surface entry by comparing derived paths, and the two derivations were
+  separate copies of the same walk -- one of which reached the browser as `split(/s+/)` because
+  a template literal ate the backslash in `\s`. It split the class list on the letter `s`, so
+  `class="rows"` produced `div.row>` in one copy and `div.rows>` in the other, the join failed,
+  and every probe-derived finding on this page silently disappeared. When the class was `row`
+  the fixture passed either way. Keep an `s` in it.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; }
+  .rows { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .item { background: #1a6ed8; color: #fff; padding: 8px 12px; cursor: grab; }
+  .broken { background: #b3261e; }
+  .zone { width: 180px; min-height: 64px; background: #eceff4; padding: 8px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  /* Cancels the drag the `draggable` attribute asks for. Nothing in the DOM reflects this. */
+  .no-user-drag { -webkit-user-drag: none; user-drag: none; }
+</style>
+</head>
+<body>
+
+<div class="rows">
+  <div class="item" id="ok" draggable="true" tabindex="0">correct source</div>
+  <div class="item broken" id="not-draggable">dragstart, not draggable</div>
+  <a class="item" id="native-source" href="#x">native draggable anchor</a>
+  <div class="item" id="attr-source" draggable="true" ondragstart="void 0" tabindex="0"
+       onkeydown="void 0">source via ondragstart attribute</div>
+</div>
+
+<div class="rows">
+  <div class="item broken no-user-drag" id="user-drag-none" draggable="true">draggable, user-drag none</div>
+  <div style="position:relative">
+    <div class="item broken" id="veiled-source" draggable="true">draggable, covered</div>
+    <!-- A SIBLING, not a child: a child would let the press through to the source. -->
+    <div id="veil" style="position:absolute;inset:0;background:rgba(0,0,0,0.001)"></div>
+  </div>
+</div>
+
+<div class="rows">
+  <div class="zone" id="zone">correct target (dragover + drop)</div>
+  <div class="zone broken" id="zone-no-dragover">drop only, no dragover</div>
+  <div class="zone" id="prop-target">target via ondragover property</div>
+  <div class="zone broken" id="zone-forgot-prevent">dragover, forgot preventDefault</div>
+</div>
+
+<ul class="zone" id="delegated-list">
+  <li id="delegated-item">delegated target (dragover on the list)</li>
+</ul>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // A correct source: draggable, and reachable by keyboard for the alternative path.
+  $("ok").addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "ok"); });
+  $("ok").addEventListener("drag", () => {});
+  $("ok").addEventListener("dragend", () => {});
+  $("ok").addEventListener("keydown", (e) => { if (e.key === "Enter") { /* move via keyboard */ } });
+
+  // Cannot fire: no draggable attribute.
+  $("not-draggable").addEventListener("dragstart", () => {});
+
+  // Draggable by default, so this is fine with no attribute.
+  $("native-source").addEventListener("dragstart", () => {});
+
+  // A correct target: both halves of the drop contract.
+  $("zone").addEventListener("dragenter", () => {});
+  $("zone").addEventListener("dragover", (e) => { e.preventDefault(); });
+  $("zone").addEventListener("dragleave", () => {});
+  $("zone").addEventListener("drop", (e) => { e.preventDefault(); });
+
+  // Cannot fire: dragover's default action rejects the drop.
+  $("zone-no-dragover").addEventListener("drop", () => {});
+
+  // The on* property route, which the DOM sweep has to cover.
+  $("prop-target").ondragover = (e) => e.preventDefault();
+  $("prop-target").ondrop = (e) => e.preventDefault();
+
+  // Delegation: dragover on the container, drop on the child. Correct — dragover bubbles.
+  $("delegated-list").addEventListener("dragover", (e) => { e.preventDefault(); });
+  $("delegated-item").addEventListener("drop", () => {});
+
+  // Registered, so the static drop-without-dragover check is satisfied -- and useless,
+  // because it never cancels, so the browser still rejects the drop. Only the probe sees it.
+  $("zone-forgot-prevent").addEventListener("dragover", () => {});
+  $("zone-forgot-prevent").addEventListener("drop", () => {});
+
+  // Runs, transfers nothing: a target calling getData() reads "". Chromium starts the drag
+  // anyway, Firefox and Safari do not. Only the probe sees this too.
+  $("not-draggable").addEventListener("dragstart", () => {});
+
+  // Both of these look identical to #ok from the DOM: draggable is true, a dragstart handler
+  // is registered, and dispatching one runs it. A real gesture starts no drag on either.
+  $("user-drag-none").addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "u"); });
+  $("veiled-source").addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "v"); });
+</script>
+</body>
+</html>

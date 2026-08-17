@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -79,6 +79,32 @@ describe("scaffoldConfig", () => {
     const { config, urlSources } = scaffoldConfig(["http://localhost:5173/"], []);
     assert.deepEqual(urlSources, ["http://localhost:5173/"]);
     assert.deepEqual(config.defaults!.gates, [`check integrity ${URL_SCAFFOLD_FLAGS}`]);
+  });
+
+  it("scaffolds a webServer for a localhost URL, which cannot be gated without one", () => {
+    // v7's agent-l: "`gates init` diagnosed the `networkidle` trap for me but didn't
+    // scaffold `webServer` for a localhost URL." The same reasoning that adds the
+    // page-load flags applies: a local URL means a server has to be running for the
+    // config to work at all.
+    const { config, localSources } = scaffoldConfig(["http://localhost:5173/"], []);
+    assert.deepEqual(localSources, ["http://localhost:5173/"]);
+    assert.equal(config.webServer!.url, "http://localhost:5173/");
+    // A placeholder command, not a guess: a wrong command that looks configured
+    // would start something unrelated and gate whatever answered.
+    assert.equal(config.webServer!.command, "npm run dev");
+    assert.doesNotThrow(() => parseGateConfig(JSON.stringify(config)));
+  });
+
+  it("recognises 127.0.0.1 and ::1 as local too", () => {
+    assert.equal(scaffoldConfig(["http://127.0.0.1:3000/"], []).localSources.length, 1);
+    assert.equal(scaffoldConfig(["http://[::1]:3000/"], []).localSources.length, 1);
+  });
+
+  it("adds no webServer for a remote URL, which nobody here can start", () => {
+    const { config, urlSources, localSources } = scaffoldConfig(["https://staging.example.com/"], []);
+    assert.deepEqual(urlSources, ["https://staging.example.com/"]);
+    assert.deepEqual(localSources, []);
+    assert.equal(config.webServer, undefined);
   });
 
   it("leaves a file source alone, where the default milestone is reachable", () => {

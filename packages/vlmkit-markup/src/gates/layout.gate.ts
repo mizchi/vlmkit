@@ -27,23 +27,10 @@ import {
   type LayoutReport,
   type LayoutVerifyOptions,
   formatLayoutReport,
+  layoutCheckRule,
   runLayoutVerify,
 } from "../inspect/layout-contract.ts";
-import { firstPositional } from "./arg-helpers.ts";
-
-/** `evaluateLayoutRule` names its checks in camelCase; rule ids are slugs. */
-const CHECK_RULE_IDS: Record<string, string> = {
-  visible: "visible",
-  count: "count",
-  width: "width",
-  minWidth: "min-width",
-  maxWidth: "max-width",
-  minHeight: "min-height",
-  fullWidth: "full-width",
-  perRow: "per-row",
-  above: "above",
-  "(no assertion)": "no-assertion",
-};
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 /**
  * The gate's own options: the contract is a *file path* on the command line
@@ -90,6 +77,12 @@ machine-checkable contract (DOM math, no VLM).`,
       title: "Requested URL redirected elsewhere",
       severity: "suspect",
       docs: "Every rule was evaluated against a page the caller did not ask for, so even an all-pass is not a pass.",
+    },
+    {
+      id: "invalid-selector",
+      title: "Contract names a selector that is not valid CSS",
+      severity: "suspect",
+      docs: "The browser refused the selector, so any rule naming it measured nothing — and `visible: false` is satisfied by measuring nothing, which is how a typo used to pass. Fix the selector; there is no threshold that makes an unparseable one meaningful.",
     },
   ],
   inputs: [
@@ -142,11 +135,19 @@ machine-checkable contract (DOM math, no VLM).`,
     if (report.redirected) {
       findings.push({ rule: "redirected", severity: "suspect", message: report.redirected });
     }
+    for (const selector of report.invalidSelectors ?? []) {
+      findings.push({
+        rule: "invalid-selector",
+        severity: "suspect",
+        message: `\`${selector}\` is not valid CSS, so every rule naming it measured nothing`,
+        selector,
+      });
+    }
     for (const result of report.results) {
       for (const check of result.checks) {
         if (check.passed) continue;
         findings.push({
-          rule: CHECK_RULE_IDS[check.name] ?? "no-assertion",
+          rule: layoutCheckRule(check.name),
           severity: "suspect",
           message: `${check.name}: expected ${check.expected}, measured ${check.measured}`,
           selector: result.rule.selector,

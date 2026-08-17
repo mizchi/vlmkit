@@ -26,6 +26,10 @@ import { fileURLToPath } from "node:url";
 import { type Browser } from "playwright";
 import { ALL_BROWSER_ENGINES, BROWSER_ENGINES, type BrowserEngine } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+// The ninth copy of this predicate, missed when the other eight were collapsed in
+// b03f849 — its use is "is this a URL, so do not readFile it", which is exactly
+// `isUrlSource`. It already agreed on `(https?|file)`, so this is a dedupe, not a fix.
+import { isUrlSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
@@ -75,8 +79,6 @@ export interface CrossBrowserReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
-
 function parseArgs(argv: string[]) {
   let outputDir = "";
   let report = "";
@@ -112,6 +114,47 @@ function parseArgs(argv: string[]) {
  * engine off the error path instead of assuming chromium: it is the one launch
  * site in the repo that launches firefox and webkit.
  */
+/**
+ * What "fewer than two engines rendered" means, given how many were asked for.
+ *
+ * The condition used to be `usable < 2` alone, in two places (the terminal summary and
+ * the markdown report), and it never asked how many engines were *wanted*. Two unrelated
+ * situations therefore shared one verdict:
+ *
+ *   - engines were expected and are missing — an under-configured CI runner, worth
+ *     flagging and worth failing a gate over;
+ *   - the caller narrowed `--engines` themselves, in which case nothing is missing.
+ *
+ * Measured: `vlmkit diff browsers a.html --engines chromium` printed `✓ chromium`, no `✗`
+ * anywhere, then "Only 1 engine(s) usable — Install missing engines with playwright
+ * install firefox webkit", and exited non-zero. It did exactly what it was told and
+ * graded that as a misconfiguration.
+ *
+ * One function so the two call sites cannot drift, which is how they got here.
+ *
+ * @param requested how many engines the run attempted — `options.engines` or all of them.
+ * @param usable how many actually rendered.
+ */
+export function parityShortfall(requested: number, usable: number):
+  | null
+  | { kind: "narrowed"; failsRun: false; message: string }
+  | { kind: "missing-engines"; failsRun: true; message: string }
+{
+  if (usable >= 2) return null;
+  if (requested < 2) {
+    return {
+      kind: "narrowed",
+      failsRun: false,
+      message: "a single engine was requested — render check only; cross-engine parity needs at least two",
+    };
+  }
+  return {
+    kind: "missing-engines",
+    failsRun: true,
+    message: `only ${usable} of ${requested} engine(s) usable — no cross-engine comparison performed`,
+  };
+}
+
 export function engineInstallCommand(...engines: EngineName[]): string {
   if (engines.length === 0) engines = [...ALL_ENGINES];
   const target = resolvePlaywrightInstallTarget();
@@ -162,7 +205,7 @@ async function captureWithEngine(
   try {
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
-    if (isUrl(source)) {
+    if (isUrlSource(source)) {
       await page.goto(source, { waitUntil: "networkidle", timeout: 30000 });
     } else {
       await page.setContent(html!, { waitUntil: "networkidle" });
@@ -192,7 +235,7 @@ export async function runCrossBrowser(
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const threshold = options.threshold ?? 0.03;
   const engines = options.engines ?? ALL_ENGINES;
-  const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
+  const html = isUrlSource(options.source) ? null : await readFile(resolve(options.source), "utf-8");
 
   const engineResults: EngineResult[] = [];
   let reference: EngineName | undefined;
@@ -276,13 +319,25 @@ export async function runCrossBrowser(
   if (reference) {
     console.log(`  ${DIM}reference: ${reference}${RESET}`);
   }
-  if (usable < 2) {
-    console.log(`  ${YELLOW}!${RESET} Only ${usable} engine(s) usable — no cross-engine comparison performed. Install missing engines with \`${engineInstallCommand("firefox", "webkit")}\`.`);
-    // Set a warning exit code so CI matrices using cross-browser as a
-    // gate don't silently pass on an under-configured runner. Use 2
-    // (warning) not 1 (hard fail) — the run *did* succeed, just on
-    // fewer engines than intended. Override with --allow-skipped.
-    if (!options.allowSkipped) process.exitCode = 2;
+  const shortfall = parityShortfall(engines.length, usable);
+  if (shortfall) {
+    if (shortfall.kind === "narrowed") {
+      // Not a warning: the caller asked for this. Still said out loud, because "no parity
+      // comparison happened" must never be mistaken for "compared and fine".
+      console.log(`  ${DIM}${shortfall.message}.${RESET}`);
+    } else {
+      console.log(`  ${YELLOW}!${RESET} ${shortfall.message}. Install missing engines with \`${engineInstallCommand("firefox", "webkit")}\`.`);
+      // Non-zero so a CI matrix using this as a gate does not silently pass on an
+      // under-configured runner; `--allow-skipped` is the opt-out.
+      //
+      // 1, not the 2 this used to set. `gate-exit.ts` and
+      // docs/design/gate-plugin-architecture.md removed exit 2 from the contract — "The
+      // shared contract has two outcomes" — and `check perf` was migrated off it, but this
+      // leaf was missed. The two survivors emitted 2 with *incompatible* meanings: this one
+      // for "fewer engines than intended", `png-diff` for a malformed flag value. `skill
+      // run` then read any 2 as "warned", so a usage error rendered as ⚠ in its report.
+      if (!options.allowSkipped) process.exitCode = 1;
+    }
   }
   for (const r of engineResults) {
     if (r.status === "skipped") {
@@ -322,9 +377,15 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
     lines.push(`⚠ **${skipped.length} engine(s) skipped** — install with \`${engineInstallCommand(...skipped.map((s) => s.engine))}\` to get full parity coverage.`);
     lines.push("");
   }
-  const usable = r.engines.filter((e) => e.status === "ok").length;
-  if (usable < 2) {
-    lines.push(`⚠ **No cross-engine comparison was performed** — only ${usable} engine(s) usable. The report below confirms render success on those engines but cannot detect parity bugs across browsers.`);
+  // `r.engines.length` is what was attempted, so one attempted row means one was wanted —
+  // the same question the terminal summary asks, through the same function, so the two
+  // cannot drift again.
+  const shortfall = parityShortfall(r.engines.length, r.engines.filter((e) => e.status === "ok").length);
+  if (shortfall) {
+    const prefix = shortfall.kind === "narrowed" ? "" : "⚠ ";
+    lines.push(`${prefix}**No cross-engine comparison was performed** — ${shortfall.message}. `
+      + `The report below confirms the render succeeded where it ran, and says nothing about `
+      + `parity across browsers.`);
     lines.push("");
   }
 
@@ -396,7 +457,12 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
+  // Remembered BEFORE the erase. Blanking argv is what routes `--help` to the usage
+  // branch, and it is also what made `--help` indistinguishable from "you forgot the
+  // arguments" — so the usage branch exited 1 either way. Asking for help is a request
+  // that succeeded.
+  const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
+  if (askedForHelp) argv = [];
   const { positional, outputDir, report, engines, threshold, allowSkipped } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vlmkit diff browsers <html-or-url> [options]");
@@ -406,7 +472,9 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --report <path>     Markdown report path");
     console.log("  --threshold <0..1>  Pixel diff threshold (default: 0.03)");
     console.log("  --allow-skipped     Exit 0 even when missing engines skipped the comparison");
-    process.exit(1);
+    // 0 when help was asked for, 1 when the arguments are simply missing. Same two
+    // lines of usage, two different answers to "did this invocation succeed".
+    process.exit(askedForHelp ? 0 : 1);
   }
   await runCrossBrowser({
     source: positional[0]!,

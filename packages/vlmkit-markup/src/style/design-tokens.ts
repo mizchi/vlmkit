@@ -30,6 +30,8 @@ import { fileURLToPath } from "node:url";
 import { type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
@@ -58,6 +60,15 @@ export interface DesignTokensOptions extends PageLoadOptions {
   reportPath?: string;
   viewport?: { width: number; height: number };
   config?: DesignTokenConfig;
+  /**
+   * `--strict` — the gate emits its findings as `suspect` instead of `warn`.
+   *
+   * The measurement does not use it; it is echoed into the report so `formatDesignTokensReport`
+   * can mark the rows at the severity they were actually emitted at. The rule table says
+   * `warn`, and the rule view reads the table, so without this the prose printed a yellow `!`
+   * over a run that exits 1.
+   */
+  strict?: boolean;
 }
 
 export interface ScaleViolation {
@@ -80,6 +91,8 @@ export interface ShadowFinding {
 
 export interface DesignTokensReport {
   source: string;
+  /** Echo of `--strict`: the severity the gate's findings were emitted at. */
+  strict?: boolean;
   viewport: { width: number; height: number };
   config: Required<DesignTokenConfig>;
   inspectedCount: number;
@@ -109,6 +122,32 @@ const SAMPLE_SCRIPT = `
     const n = parseFloat(v);
     return isFinite(n) ? n : 0;
   }
+  /*
+   * Is this margin the used value of "auto"?
+   *
+   * getComputedStyle RESOLVES auto margins to pixels: a centred block reports
+   * "margin-left: 144px" and a flex item with margin-left:auto reported 1048.12px on the
+   * solitaire toolbar. Compared against a spacing scale those read as enormous violations,
+   * and they fired on the three most ordinary layout idioms there are - margin:0 auto,
+   * max-width centring, and auto as a flex spacer. An auto margin is a layout instruction,
+   * not a spacing token, and has no business in this report.
+   *
+   * Typed OM answers exactly rather than by guess: computedStyleMap() keeps auto as a
+   * CSSKeywordValue where getComputedStyle has already thrown it away. Absent (non-Chromium),
+   * every margin is kept, so the gate degrades to its old noisier self rather than to silence.
+   */
+  function autoMargins(el) {
+    const flags = { top: false, right: false, bottom: false, left: false };
+    if (typeof el.computedStyleMap !== "function") return flags;
+    try {
+      const map = el.computedStyleMap();
+      for (const side of ["top", "right", "bottom", "left"]) {
+        const v = map.get("margin-" + side);
+        if (v && String(v) === "auto") flags[side] = true;
+      }
+    } catch (_) { /* Typed OM present but refused this property; keep every margin. */ }
+    return flags;
+  }
   const out = [];
   const allEls = document.body.querySelectorAll("*");
   let n = 0;
@@ -119,6 +158,14 @@ const SAMPLE_SCRIPT = `
     if (cs.display === "none" || cs.visibility === "hidden") continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
+    /*
+     * The sr-only / visually-hidden box: 2px or less on BOTH axes. Same threshold and same
+     * reasoning as the srOnlyShaped predicate in integrity-check, which already exempts these
+     * from its clipped-text rule. A 1x1 box that exists for a screen reader has no design to
+     * conform to, and the idiom reaches the scale by way of margin:-1px, so it reported three
+     * violations per live region.
+     */
+    if (r.width <= 2 && r.height <= 2) continue;
     n++;
     out.push({
       path: shortPath(el),
@@ -137,6 +184,7 @@ const SAMPLE_SCRIPT = `
         top: px(cs.marginTop), right: px(cs.marginRight),
         bottom: px(cs.marginBottom), left: px(cs.marginLeft),
       },
+      marginAuto: autoMargins(el),
       zIndex: cs.zIndex,
       boxShadow: cs.boxShadow,
     });
@@ -151,6 +199,12 @@ interface RawSample {
   borderRadius: { tl: number; tr: number; br: number; bl: number };
   padding: { top: number; right: number; bottom: number; left: number };
   margin: { top: number; right: number; bottom: number; left: number };
+  /**
+   * Which margins were specified `auto`, which `getComputedStyle` has already resolved to px.
+   * Optional so a sample captured before this field existed still parses; absent reads as "no
+   * margin was auto", which keeps every margin in the report rather than silently dropping some.
+   */
+  marginAuto?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
   zIndex: string;
   boxShadow: string;
 }
@@ -237,6 +291,8 @@ export async function runDesignTokens(
       for (const side of ["top", "right", "bottom", "left"] as const) {
         const v = s[prop][side];
         if (v === 0) continue;
+        // An `auto` margin is a layout instruction, not a spacing token — see `autoMargins`.
+        if (prop === "margin" && s.marginAuto?.[side]) continue;
         if (!isOnScale(v, config.spacing, config.tolerance)) {
           violations.push({
             property: prop, path: s.path, tag: s.tag,
@@ -286,6 +342,7 @@ export async function runDesignTokens(
   return {
     source: options.source, viewport, config,
     inspectedCount: byPath.size, violations, shadow, reportPath,
+    ...(options.strict ? { strict: true } : {}),
   };
 }
 
@@ -295,20 +352,40 @@ export async function runDesignTokens(
  * from the MCP server or a test without capturing stdout, and it is why the
  * gate contract keeps `run` and `format` apart.
  */
-export function formatDesignTokensReport(report: DesignTokensReport): string {
+export function formatDesignTokensReport(report: DesignTokensReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check tokens${RESET}`);
   lines.push(`  ${DIM}source: ${report.source}  inspected: ${report.inspectedCount} element(s)${RESET}`);
+  // Two rules, and this gate is the one most likely to have one of them turned off: a scale is
+  // the project's own choice, so `--rule scale-violation=off` with `shadow-tier-excess` left on
+  // is an ordinary configuration. It used to print all 29 scale violations either way.
+  // `--strict` emits the findings as suspect, and the rule table says warn, so the declared
+  // severity has to come from the run rather than from the table — otherwise the marker
+  // disagrees with the exit code on exactly the runs someone turned strict on for.
+  const declared = report.strict ? "suspect" : "warn";
+  const scaleTier = ruleTier(rules, "scale-violation", declared);
+  const shadowTier = ruleTier(rules, "shadow-tier-excess", declared);
   const byProperty = new Map<string, number>();
-  for (const v of report.violations) byProperty.set(v.property, (byProperty.get(v.property) ?? 0) + 1);
+  if (scaleTier !== "off") {
+    for (const v of report.violations) byProperty.set(v.property, (byProperty.get(v.property) ?? 0) + 1);
+  }
   const shadowOver = report.shadow.distinctShadows.length > report.shadow.allowedTiers;
-  const totalFindings = report.violations.length + (shadowOver ? 1 : 0);
-  const icon = totalFindings === 0 ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
+  const shownShadow = shadowOver && shadowTier !== "off";
+  const totalFindings = (scaleTier === "off" ? 0 : report.violations.length) + (shownShadow ? 1 : 0);
+  const worst = [scaleTier, shadowTier].includes("suspect") ? "suspect" : "warn";
+  const icon = totalFindings === 0
+    ? `${GREEN}\u2713${RESET}`
+    : worst === "suspect" ? `${RED}\u2717${RESET}` : `${YELLOW}!${RESET}`;
   lines.push(`  ${icon} ${totalFindings} finding(s)`);
+  const hidden = new Map<string, number>();
+  if (scaleTier === "off" && report.violations.length > 0) hidden.set("scale-violation", report.violations.length);
+  if (shadowTier === "off" && shadowOver) hidden.set("shadow-tier-excess", 1);
+  const note = hiddenByRuleNote(hidden);
+  if (note) lines.push(`    ${DIM}${note}${RESET}`);
   for (const [prop, n] of byProperty) {
     lines.push(`    ${DIM}${prop.padEnd(15)} ${n} violation(s)${RESET}`);
   }
-  if (shadowOver) {
+  if (shownShadow) {
     lines.push(
       `    ${DIM}box-shadow      ${report.shadow.distinctShadows.length} distinct`
       + ` (allowed: ${report.shadow.allowedTiers})${RESET}`,

@@ -32,7 +32,7 @@ import {
   formatMultiPageConsistencyReport,
   runMultiPageConsistency,
 } from "../stress/multi-page-consistency.ts";
-import { firstPositional, runOutputDir } from "./arg-helpers.ts";
+import { firstPositional, runOutputDir } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 const DEFAULT_THRESHOLD = 0.03;
 
@@ -202,6 +202,20 @@ Pass either --urls or --files, each repeatable.`,
       severity: "suspect",
       docs: "Raise the pass line with --threshold rather than disabling the rule. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
     },
+    {
+      /**
+       * The most severe drift there is, and until v7 it was the one case that
+       * passed. A candidate page with no match gets `diffRatio: NaN`, and
+       * `NaN > threshold` is false, so `page-drift` never fired: the gate exited 0
+       * while its own markdown row read "_(selector missing)_". No threshold can
+       * express "absent" either, which is why this is a separate rule rather than
+       * a ratio of 1.
+       */
+      id: "selector-missing",
+      title: "Selector is not on this page at all",
+      severity: "warn",
+      docs: "Either the shared component was dropped from this route, or the selector is wrong for it. If the page legitimately has no such component, drop it from --files / --urls rather than turning the rule off — an absent component cannot be compared, and a run that silently skips it is not measuring the pages you named.",
+    },
   ],
   inputs: [
     { name: "selector", placeholder: "sel", kind: "string", description: "CSS selector present on every page", required: true },
@@ -238,9 +252,22 @@ Pass either --urls or --files, each repeatable.`,
   },
   run: (options) => runMultiPageConsistency(options),
   findings: (report, options): Finding[] =>
-    report.deltas
-      .filter((d) => d.diffRatio > options.threshold)
-      .map((d) => ({
+    report.deltas.flatMap((d): Finding[] => {
+      // Absent, not different: there is no ratio to compare to the pass line, so
+      // this branch must come first — `NaN > threshold` is false and would drop it.
+      if (Number.isNaN(d.diffRatio)) {
+        return [{
+          rule: "selector-missing",
+          severity: "warn",
+          message:
+            `${report.selector} is not on ${d.candidate}, so it could not be compared`
+            + ` against ${report.reference}`,
+          selector: report.selector,
+          evidence: { candidate: d.candidate, matched: false },
+        }];
+      }
+      if (d.diffRatio <= options.threshold) return [];
+      return [{
         rule: "page-drift",
         severity: "suspect",
         message:
@@ -248,7 +275,8 @@ Pass either --urls or --files, each repeatable.`,
           + ` by ${(d.diffRatio * 100).toFixed(2)}% (threshold ${(options.threshold * 100).toFixed(2)}%)`,
         selector: report.selector,
         evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
-      })),
+      }];
+    }),
   format: formatMultiPageConsistencyReport,
   ledger: (report, options) => ({
     tool: "check-drift-pages",
@@ -257,6 +285,9 @@ Pass either --urls or --files, each repeatable.`,
       selector: report.selector,
       pages: report.pages.length,
       drifting: report.deltas.filter((d) => d.diffRatio > options.threshold).length,
+      // Counted separately, because a page the selector is absent from is neither
+      // drifting nor agreeing — folding it into either number loses it.
+      missing: report.deltas.filter((d) => Number.isNaN(d.diffRatio)).length,
       report: report.reportPath,
     },
   }),

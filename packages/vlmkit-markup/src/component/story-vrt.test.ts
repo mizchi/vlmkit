@@ -15,7 +15,7 @@
  * attempt; and copying to a temp dir keeps baseline PNGs out of the checkout.
  */
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -88,13 +88,13 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
     ...overrides,
   });
 
-  before(() => {
+  beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), "vlmkit-story-"));
     cpSync(EXAMPLE, join(dir, "index.html"));
     gallery = pathToFileURL(join(dir, "index.html")).href;
   });
 
-  after(() => rmSync(dir, { recursive: true, force: true }));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   it("captures the component, not the viewport", async () => {
     const report = await runStoryVrt(options({ stories: ["components/Button/Primary", "Card/Default"] }));

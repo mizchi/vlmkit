@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { parseFlakerVrtReportAdapterArgs } from "./flaker-vrt-report-adapter.ts";
 
 describe("parseFlakerVrtReportAdapterArgs", () => {

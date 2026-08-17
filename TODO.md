@@ -554,10 +554,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ライブラリ呼び出し(MCP / API / 直接 import)には一度も届いていなかった。
   出荷 bin が `console.error(error)` していた問題は別件で、issue #112 item 2
   として既に修正済み(`tests/cli-entry-parity.test.mjs` が守っている)。
-- [ ] **ページオープン統一の残り(純粋な整理)** — `waitUntil` は
-  networkidle 72 / load 8 / domcontentloaded 1。
-  **verdict を変える差は上記で解消済み**。残るのは
-  fonts.ready 待ちの平準化で、こちらは実際に装飾。
+- [x] **ページオープン統一の残り** — 2026-08-16 完了。
+  残っていた**手書きの settle 3箇所**(`check integrity` / `check design` /
+  font-determinism-probe。どれも `fonts.ready` + `waitForTimeout` を自前で並べ、
+  待ち時間も 250/250/150 とバラバラ)を `settlePage` に寄せた。
+  - 装飾ではなかった: settle の改良(rAF 待ちを足す、idle timeout を伸ばす等)は
+    `settlePage` にしか届かず、手書きの3箇所を黙って外す。
+  - `tests/settle-page-single-definition.test.mjs` が5個目を落とす。
+    **「文字列 `document.fonts` の禁止」ではなく「待つことの禁止」**にした —
+    `integrity-check.ts` は壊れたフォントを報告するために `document.fonts` を
+    *読む*(`status === "error"`)ので、文字列で禁じるとあの probe を
+    本来あるべきファイルから追い出すことになる。コメントも除外(過去の変換記録が読める)。
+  - `waitUntil` は意図的に不問(networkidle 56 / load 11 / domcontentloaded 10)。
+    `goto(load)` + `settlePage` は結局 idle を待つので等価 — 効いていたのは常に settle 側。
 
 ### 差分監査 3 軸(2026-08-02)
 レポート: `docs/reports/2026-08-02-differential-audit-three-axes.md`
@@ -688,7 +697,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     `projectName: "vrt"`(Playwright プロジェクト名 = スナップショットパスに出る)、
     plan スキーマの `vrt?:` **フィールド名**(既存 plan ファイルが壊れる)、
     `"X-Title": "vrt"`(OpenRouter へ送る HTTP ヘッダ)、
-    `title: "vlmkit HTTP API"`(公開 OpenAPI)、
+    (`title` = 公開 OpenAPI はこの一覧から外した — `src/api/openapi.ts` は
+    すでに `"vlmkit HTTP API"` で、据え置き対象ではなく完了済み)
     `~/.../vrt/deprecated.log`。改名は既存ユーザーの state / config / CI を孤児化する。
   - **素の製品名 404 箇所**: ただし **VRT は業界一般の略語**(Visual Regression
     Testing)でもあり、大文字の「VRT vendors」「VRT service」は技術一般を指す。
@@ -725,16 +735,28 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   無意味だった: ヘッダは `\x1b[36mvrt a11y-contrast` で、エスケープが `m`
   (単語文字)で終わるため `vlmkit` の前に単語境界が無く、**拒否するために書いた出力に
   対して pass** していた。ANSI を除去してから照合するよう修正。
-- [ ] **`vlmkit` 名の残存 ~250 箇所 / ~80 フレーズ(次の作業)** — 実測: 4 ゲートは
-  リリース diff に既に入っていたので直したが、全体は `vlmkit snapshot` /
-  `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline` など。`vlmkit` バイナリは存在せず
-  (`bin` は `vlmkit` のみ)、旧サブコマンド名は deprecated なので
-  `Re-run \`vlmkit check a11y contrast\`` は**二重に誤り**。大半はバイナリ名の置換だけで
-  済むが、`vlmkit diff html` / `vlmkit diff elements` / `vlmkit inspect smoke` は**すでに削除された
-  コマンド**への参照で、`vrt itself` / `vrt toolkit` のような散文も混ざる。
-  リリースコミットに 250 箇所の改名を混ぜず、レビュー可能な独立した diff にする。
-  正解表は `src/cli/cli.ts` の `newName` マップ(15 エントリ)。
-  CHANGELOG 0.9.0 の Known issues に明記済み。
+- [x] **旧バイナリ名 `vrt` + コマンドの残存 — 2026-08-16 完了(残り 12、すべて正当)**
+
+  **この項目自身が同じ掃除で裏返っていた(5 回目)。** 上の「4 回目」で追加した検出ゲートは
+  英語形 `` no `vlmkit` binary `` だけを見るので、日本語の「`vrt` バイナリは存在せず」を
+  通していた。裏返っていた記述と、実際の値:
+
+  | 裏返った記述 | 実際 |
+  |---|---|
+  | 「`vlmkit` バイナリは存在せず(`bin` は `vlmkit` のみ)」 | 存在しないのは **`vrt`**。`bin` は `vlmkit` のみ、で正しい |
+  | 「`Re-run \`vlmkit check a11y contrast\`` は二重に誤り」 | 二重に誤りなのは **`vrt a11y-contrast`**(死んだバイナリ + 廃止済みサブコマンド名) |
+  | 「`vlmkit diff html` / `vlmkit diff elements` / `vlmkit inspect smoke` は**すでに削除された**」 | **3 つとも現役でルーティングされる**。削除されたのは旧フラット形 `compare` / `elements` / `smoke` |
+  | 残存例として挙げた「`vlmkit snapshot` / `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline`」 | いずれも**現在の正しい名前**。残存していたのは `vrt snapshot` などの形 |
+
+  自信のあるドキュメントとして読めるまま真逆を言う、というのがこの失敗の毎回の形で、
+  今回は**現役コマンドを「削除済み」と書いていた**ので、読んだ人を確実に誤らせる。
+  検出ゲートを日本語形にも広げた(`binary-name.test.ts`、アブレーション済み)。
+
+  **作業自体は完了。** 実測 12 箇所が残り、内訳はすべて正当:
+  `TODO.md`(この項目 = 旧名を説明する文)、`fixtures/**`(日付付きドッグフード成果物と、
+  a11y ベースラインが取り込んだ fixture のページ内容)、`binary-name.test.ts` /
+  `json-contract.test.ts` / `smoke-commands.test.ts`(旧名を意図的に引用するテスト)。
+  経緯は CHANGELOG 0.11.0 と `docs/reports/2026-08-16-*`。
 - [x] リリース検証: tsc クリーン / `pnpm test` 1813 pass / `smoke-dist.sh` 11 pass /
   ビルド済みバイナリで `check design`・`batch`・`gates`・`--allow`(免除不可 kind の
   エラー含む)・`--json` 4 本を実走。
@@ -813,9 +835,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   (乖離すると**有効な**フローを弾き始める)。
 
 ### ドキュメント刷新(2026-08-02)
-- [x] **`docs/introduce.ja.md` が 7/27 の `vlmkit` 時代のまま(248 行)だった** —
-  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vlmkit diff html` /
+- [x] **`docs/introduce.ja.md` が 7/27 の `vrt` 時代のまま(248 行)だった** —
+  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vrt compare` /
   `elements` / `smoke` / `serve` / `discover`)を手順として書いており、
+  (この 2 箇所も同じ掃除で裏返っていた: 削除されたのは `vrt compare` で、
+  `vlmkit diff html` は現役。上の「旧バイナリ名の残存」項目の表と同じ形)
   ディレクトリ構成もフラットな `src/` のまま。読者が写して実行すると必ず失敗する
   状態だったので、`introduce.md` と同じ構成の**独立した日本語版**として全面改稿。
   同日追加分(`check design`、`batch` / `gates`、`--allow`、`--json`、
@@ -1015,10 +1039,37 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### 連番画像 / strip の残件(2026-08-10)
 
-- [ ] **animated WebP 出力(`snapshot strip --animated` / `check animation --strip x.webp --animated`)**
-  - 目的: 現在の strip は**静止シート**(1 枚に並べる)。「連番アニメーションを 1 枚に」の
-    もう一方の解として、実際に動く 1 ファイルが欲しい場面がある(PR に貼って再生させる、
-    flipbook の HTML を配れない文脈)。
+- [x] **動く 1 ファイル出力 — 2026-08-16 実装。ただし WebP ではなく APNG**
+  - 目的(PR に貼って再生させる / flipbook の HTML を配れない文脈)はそのまま達成。
+    `snapshot strip --animated [--delay ms] [--loops N]` と
+    `check animation --strip out.png --strip-animated`。
+  - **WebP にできなかった理由を測った上で APNG にした**: 既にある optional peer
+    `@jsquash/webp` は libwebp の**単画像**エンコーダのラッパで `WebPAnimEncoder` を
+    露出していない。`sharp` なら可能だが `webp.ts` が同じ出力バイトで 29MB vs 1.1MB と
+    測って却下済み — アニメのために全員にあの重さを負わせる話になる。
+    APNG は**依存ゼロ**(zlib + 自前のチャンク組み立て)、可逆、フルカラー、
+    ブラウザと GitHub コメントで再生され、非対応ビューアでは frame 0 が出る = 静止画として使える。
+    コストは正直に: フレーム間圧縮が無いので 6 フレームなら概ね PNG 6 枚分。
+  - `check animation --strip-animated` は**ページ全体**をタイムラインで動かす。
+    これは下の「空間配置が消える」項目への答えでもある(クロップしないので3枚のカードが
+    横並びであることが残る)。ディレイは実測サンプル時刻の差分を使う(均等割りは
+    「いつ動いたか」を偽る)。
+  - `.webp` パス + animated は理由付きで拒否。実測: dashboard で 265KB(4フレーム全画面)、
+    静止シートは 123KB。
+
+- [x] **filmstrip の均一セル → ragged レイアウト — 実装して測って却下(2026-08-16)**
+  - **記録されていた診断が間違っていた**。実測: 1532x781 のシートは **49.0% が背景**だが、
+    4 行は全部 393px 高で、幅が 916/664/412/244。つまり縦ではなく**横**の余白。
+  - per-row 高さは実装しても**バイト単位で同一出力**(行の高さが揃っているので)。
+    per-row 幅も効かない: シート幅は最も広い行に合わせるしかないので、
+    狭い行の灰色がセル間から右側に移るだけ(合成3幅シートで 37.1% → 36.2%)。
+    さらに column label(= 各行で同じ時刻)が ragged 幅だと別サンプルのセルの上に来る。
+  - 結論: 余白は**構図の性質**(1グリッド + 幅が大きく違う行)で、セル規則の問題ではない。
+    直すなら別の絵が必要 = 下の「空間配置」項目と同じ結論。`--strip-animated` がその片方の答え。
+  - 副産物として実バグ1件: `composeFilmstrip({ maxWidth: 0 })` は
+    「上限なし」のはずが 0px に収まるスケールを解こうとして 64 段ガードに当たり、
+    **1832px のストリップを 132px のサムネイルにしていた**。CLI は 0 のときフラグを
+    省いて回避していたので、ライブラリ利用者だけが踏む。修正 + テスト。
   - **現状の 3 案は全て静止画のみ**(2026-08-10 実測、`docs/cli-reference.md` の表と
     `packages/vlmkit-core/src/webp.ts` ヘッダに記録):
     `@jsquash/webp` は libwebp の still encode のみ、`sharp` の `.webp()` も入力が
@@ -1037,22 +1088,38 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 代替案(依存ゼロ): animated GIF を自前 mux する / `snapshot flipbook`(既存の HTML
     プレイヤー)で足りるならそれ。前者は品質と実装量が見合わない見込み。
 
-- [ ] **`check animation` の `evaluated` が時刻依存(2026-08-10 に判明、コードにも明記)**
-  - `fill: none` の短いアニメは終了と同時に `getAnimations()` から消えるため、開始時記録
-    (`RECORD_ANIMATION_STARTS_SCRIPT`)で `animationCount` / `settleMs` / reduced-motion は
-    決定的になったが、**フレーム標本化できるのは収集時点で生存しているものだけ**。
-    dashboard.html は `animationCount` が 4 で固定される一方 `evaluated` は 0 か 1 で揺れ、
-    `no-visible-effect` もそれに従う。
-  - 正しい直し方: 記録ではなく**開始位置で保持**する(init script で `animationstart` 時に
-    pause)。ただし `playState` の「作者が止めたのか我々が止めたのか」の区別が消え、
-    `restTimeForAnimation` がそれに依存しているので、フィルタ変更ではなく再設計。
-  - 着手条件: `no-visible-effect` の揺れが実際に誤判定を生んだら。
+- [x] **`check animation` の `evaluated` が時刻依存 — 解決済み(2026-08-14 に実測で確認)**
+  - この項目が「正しい直し方」として書いていた再設計(**開始位置で保持** = init script で
+    `animationstart` 時に pause)は、**同じ 2026-08-10 の commit 19c5c8d で既に入っていた**。
+    `RECORD_ANIMATION_STARTS_SCRIPT` は記録と同時に `window.__vlmkitHeld` へ push して
+    `anim.pause()` しており、コードのコメントも「Pausing at the start keeps every animation
+    alive and seekable」と明記している。項目が残っていたのは単に消し忘れ。
+  - 懸念されていた副作用も回避済み: `authorPlayState` を **pause の前に**取得し(`:488`)、
+    評価時に `held ? held.authorPlayState : anim.playState` と読み戻す(`:529`)。
+    「作者が止めたのか我々が止めたのか」の区別は残っており `restTimeForAnimation` も壊れていない。
+  - 実測(2026-08-14):
+    - `dashboard.html` 10 連続実行 → `animationCount=4` / `evaluated=4` / `visible=4` /
+      `settleMs=450` / findings `reduced-motion-ignored` が**完全に一定**。「0 か 1 で揺れる」は
+      再現しない。
+    - 危険ケースを作って確認: 40ms・`animation-fill-mode: none` のアニメ(収集より前に
+      終わるはずのもの)を含むページで 8 連続 → `evaluated=3` で一定、かつ当該要素に
+      **frames が 4 点、`maxFrameRatio` 付きで標本化されている**。つまり
+      「フレーム標本化できるのは収集時点で生存しているものだけ」という残存課題の記述も
+      現状では偽。
 
-- [ ] **filmstrip の均一セル → ragged レイアウト(cosmetic)**
-  - `composeFilmstrip` はシート全体で最大サイズのセルを使うため、1 行だけ motion bbox が
-    広いと他の行の右側に灰色余白が出る(3 アニメ fixture で実測)。行ごとに独立幅にすると
-    詰まるが、現在の「均一グリッド」という単純さを崩す。読みやすさは損なわれていないので
-    優先度低。
+- [x] **filmstrip の均一セル → ragged レイアウト — 2026-08-16 実装して計測し、不採用**
+  - 記録されていた診断(「1 行だけ広いと他の行の右に余白が出る」)が**どこに余白があるか
+    を間違えていた**。実測は `packages/vlmkit-core/src/filmstrip.ts` の
+    「Why the cell stays uniform」に残してある:
+    `dashboard.html` の実シートは 1532x781 で **49.0% が背景**だが、4 行はすべて高さ 393px
+    (行ごと高さでは**バイト単位で同一出力**)、幅は 916/664/412/244px。
+    シートは最も広い行の幅を持たざるを得ないので、狭い行の灰色は**セル間から右側へ移るだけ**
+    — 合成三幅シートで 37.1%(均一)対 36.2%(ragged)。
+  - しかも**正しさを損なう**: 列ラベルは全行で同一の瞬間を指すので、ragged 幅では
+    `150ms` が別サンプルのセルの上に印字される。
+  - 結論: 余白は「1 つのグリッドに幅の大きく違う行を並べる」という**構成**の性質で、
+    セル規則の性質ではない。直すなら別の絵(下の spatial-arrangement 項目と同じ結論)。
+    `--strip-animated`(グリッドを持たない)がその答えの半分。
 
 - [ ] **strip は行ごとに切り出すので「要素の空間的な並び」が消える(2026-08-10 dogfood v4)**
   - agent-h の指摘: 「3 枚のカードが**横並び**であるという事実がシートから失われる。
@@ -1063,6 +1130,948 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     (例: 各列をビューポート全体の縮小 + 行を motion bbox クロップの 2 段組)。
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
+  - **2026-08-16 追記**: `--strip-animated` が「クロップしない・グリッド無し」の側から
+    この問題の半分を解いた(ページ全体をそのまま動かすので空間配置は保たれる)。
+    残るのは「時間軸 × 行」と「空間配置」を**1枚の静止画**に収める構図で、
+    着手条件は据え置き — 動く方で足りるなら静止画の新構図は要らない。
+
+### 2つのパターンで探した欠陥(2026-08-14)— **全件修正済み**
+
+「同じものが2箇所にあって片方だけ直る」「計測していない状態を clean として報告する」の
+2パターンで repo を掃いた結果。**全件、読んで見つけたのではなく測って確認し、
+修正後は fix を壊して新テストが赤くなることまで確認**している。
+
+**パターン1(重複)で見つけたもの:**
+
+- [x] **`isUrlSource` が `file://` を URL と見なしていなかった**(`b03f849`)
+  - core の共有ヘルパが `/^https?:\/\//`、**自前で書いた8モジュールは全部
+    `/^(https?|file):\/\//`**。8つが正しく、置き換え先が間違っていた。
+  - 結果として **`openSource` / `sourceToUrl` を使う「推奨された書き方」の側が壊れ**、
+    自前判定を持つ側は動いていた(`check story --gallery "file://$PWD/index.html"` は無事)。
+    片方だけ直す修正が原理的に存在しない形。
+  - 実測: `check a11y contrast "file:///…/page.html"` →
+    `error: file not found: /repo/file:/repo/…/page.html`。同じ fixture をパスで渡すと
+    31要素・2件検出。`check a11y touch` / `check theme` / `stress i18n` / `check tokens` でも同様。
+  - choke point を直し、**8コピーを1つに畳んだ**。各呼び出し箇所は逐語的に `sourceToUrl` と
+    同一だったので挙動不変。
+
+**パターン2(未計測を clean として報告)で見つけたもの — 全て `src/diff-pr.ts`:**
+
+- [x] **宣言したポリシーが crash したら route が pass になる**(`4bad20a`)
+  - `catch` で warn を出して result を `undefined` にしていた。`undefined` は
+    「config に宣言されていない」と同義に読まれる:
+    `mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false`。
+  - 実測: `media-variants` の出力先にファイルを置いて `mkdir` を投げさせると
+    `home pass desktop=0.00%` / `PASS` / exit 0、かつ **`summary.md` は
+    ポリシーが通った run とバイト同一**。PR コメントから消える。
+- [x] **`waitFor` の timeout が `.catch(() => {})`**(`9259556`)
+  - route の readiness contract なのに、一致しないセレクタと一致するセレクタが区別できない。
+  - 実測(セレクタを1文字間違えた fixture): `pin` が 2.1s → **12.3s**(10秒は黙って待機)、
+    しかも baseline を書き、gate は `pass` / exit 0。
+  - throw するようにした。**screenshot の前に落ちる**ので、ready state に達していない
+    ページから baseline が焼かれることがなくなる(汚染された baseline は無い baseline より悪い —
+    以後の run が全部それに同意する)。
+- [x] **`pin` が緑の `ok` を出して exit 0、PNG は0枚**(`9259556`)
+  - 実測: 到達不能 URL で `app ok (0/1 viewport(s))` → "Baselines pinned." → exit 0。
+    件数は目の前にあり、色がそれを否定していた。`cmdPin` が `void` を返していたので
+    exit code に届く経路もなかった。
+- [x] **render できなかった viewport が「100% の pixel breach」として報告される**(`9259556`)
+  - `diffRatio: 1` は fail を強制するための値で、pixel の記述ではない。`totalPixels` が 0 の
+    viewport が markdown で `100.00%` / **Worst offenders の `99.00pp over threshold`** に載る。
+    落ちること自体は正しいが**理由が偽**で、config の typo なのにレビュアーを screenshot に送る。
+- [x] **`diff-pr post` が投稿せずに exit 0**(`a983d54`)
+  - `gh` 不在時に markdown を印字して 0 を返す。端末では正しい(人が貼るのが仕事の完了)。
+    **CI では偽の緑** — 誰も stdout を読まず、step が緑ならレビュアーは summary が PR に
+    届いたと解釈する。`CI` で分岐するようにした。
+  - 副産物: 既存4テストが素の `{...process.env}` で spawn していた。GitHub runner では
+    `CI=1` が入るので、**ローカルの挙動を assert しながら CI の挙動で走る**状態だった。
+    両方向を明示的に pin した。
+
+**パターン2の変種 — 「適用したと表示するが適用されていない」:**
+
+- [x] **`--mask` の1つが不正なセレクタだと、それ以降の mask が全部無効になる**(`6a49a96`)
+  - 全 mask を1つの stylesheet に `sel { visibility: hidden !important; }` で並べていた。
+    CSS のエラー回復は不正セレクタから**再同期できる位置まで消費する**ので、後続のルールも食う。
+  - 実測(実ブラウザ、`[".a", ".b:not(", ".c"]`): ブラウザが保持したルールは **`.a` の1つだけ**、
+    `.b` と `.c` の**両方**が visible。シェルのクォートで括弧が1つ混ざれば起きる。
+    その間 CLI は `Mask: .a, .b:not(, .c` と**3つ全部適用したかのように**表示する。
+  - セレクタごとに style tag を分け、`querySelectorAll` で page 内検証するようにした。
+  - **warn に留めた**(上の false green 群と違って害の向きが逆): mask が効かないと
+    dynamic な領域が diff に入って**落ちる** = 声が大きい。静かになるのは
+    「オペレータが threshold を上げて対処したとき」で、その一手を防ぐための warn。
+
+### 別の軸で探した欠陥(2026-08-14、2パターンが枯れた後)— **全件修正済み**
+
+軸を「環境依存の挙動をテストが pin していない」「エラーメッセージが調べていない原因を名指しする」に
+変えた結果。**最大の収穫は死んだコマンド2本**で、それを生かしていたのは `catch (e)` の `e` 破棄。
+
+- [x] **`vlmkit workflow init` / `workflow capture` が一度も動いたことがない**(`b27aeb6`)
+  - `catch (e)` が `e` を捨て、固定文 `Playwright capture failed. Is the server running?` +
+    ハードコードの `127.0.0.1:4174` を出していた。**無関係な4原因(存在しない `--config` /
+    壊れた JSON / 不正な `VLMKIT_CAPTURE_ROUTES` / 正しい config + サーバ無し)が
+    全部この2行**、しかもどれも真の原因ではなかった。
+  - 背後に成功不可能な理由が3つ:
+    1. spec 名が `vrt-capture.spec.*` のまま(実体 `e2e/vlmkit-capture.spec.ts`)。
+       **throw 自身のメッセージは正しい名前を書いていた** = リネームでパスリテラル2本だけ漏れた証拠。
+    2. `dist/e2e/**` を優先。`playwright.config.ts` は `testDir: "./e2e"` なので収集対象外 → `No tests found`。
+    3. spawn が `cwd = PROJECT_ROOT`(ユーザーのプロジェクト)を継承。config も
+       `@playwright/test` も別解決 → `two different versions of @playwright/test`。
+  - `HARNESS_ROOT` で走らせて解決。**外部プロジェクトから実測で `init` → `capture` → `verify` 通過**
+    (2 tests 収集、baselines / snapshots 生成、exit 0)。
+  - テストは option 解析だけを見ていた。ブラウザ不要な事実(spec パスリテラル / `testDir` /
+    config エラー経路 / env 配線)は全部カバーした。
+    **なお最初に書いた spec パステストは vacuous だった** — 不正 `--config` は spec 解決前に
+    return するので、ファイル名を壊しても緑。壊して確かめて気づき、ソース текст から
+    リテラルを読んで fs を見る形に変えた。
+- [x] **`VLMKIT_CAPTURE_ROUTES` を読むコードが存在しない**(`b27aeb6`)
+  - `buildCaptureEnv` が `envRoutes` を渡していなかった。`vlmkit workflow --help` と
+    `docs/cli-reference.md` が**最優先の route ソース**と書いているのに黙って無視。
+  - `capture-config.test.ts` は `envRoutes` を関数に直接渡して検証していた =
+    **関数はテストしていたが機能はテストしていなかった**。
+- [x] **指定していない LLM provider が、実際に持っているキーを無視する**(`5286f88`)
+  - `?? "gemini"` でキーの有無を見ずに確定。実測: `ANTHROPIC_API_KEY` だけ /
+    `OPENROUTER_API_KEY` だけ、どちらも `GEMINI_API_KEY … is required` で落ちる。
+    同じファイル20行下の `createLLMProvider` は両方で動く。
+  - **ユーザーに見える経路は無い** — 6つの呼び出し元が**全部**回避策を持っていた。しかも4通り:
+    byte-identical な retry ループ2つ(`createLLMProvider` / `reasoning-pipeline.ts`)と
+    byte-identical な `resolveDefaultProvider` 2つ(`vlmkit-plan` / `vlmkit-generate`)。
+    **1つの欠けた挙動に対する回避策が4つあるのは共有関数が間違っている証拠**で、払うのは5人目。
+  - 明示指定は厳密に尊重(黙って別 provider にすり替えるのは別種の誤答)。だから
+    意図的にすり替える `createLLMProvider` の retry は残す。
+
+- [x] **`<command> --help` が7コマンドで exit 1**(`--help` スイープ由来)
+  - `diff html` / `diff browsers` / `inspect smoke` / `scan component` /
+    `scan breakpoints` / `watch` / `skill`。gate 系は plugin runner 経由で必ず 0
+    (`GATE_EXIT_HELP` が契約を明記)なので、**同じ CLI に2つの契約**が同居していた。
+    `set -e` スクリプトや `vlmkit <cmd> --help` を叩く CI smoke が半分のコマンドで落ちる。
+  - 原因は3種類、**うち2つは区別しようとして失敗している**:
+    - `if (argv[0] === "--help") argv = []` — help を usage 分岐に送るその行が、
+      help を要求された証拠を消す。`skill.ts` の `process.exit(sub ? 0 : 1)` は
+      **意図は正しいのに `sub` が既に消えていて発火しない**。
+    - help 分岐が無い(`diff html` / `inspect smoke` / `watch`)。`--help` はファイルでも
+      URL でもないので「入力なし」分岐の exit 1 を貰う。
+    - `runDiscover` の `if (!file) process.exit(1)` — 「help にファイルが付いていたか」で
+      分けていて、「help を要求されたか」で分けていない。
+  - **スイープテストは存在していて、exit code を意図的に除外していた**。docstring に
+    「several leaves print usage and exit 1 … which is fine」と書いてあった =
+    **欠陥の記述を仕様として書き留めていた**。今は exit code を assert する。
+  - テスト自身の穴も2つ塞いだ: top-level コマンド(`watch` / `skill` はテストから完全に不可視)と、
+    `legacySpecLeaves()` が `spec` で絞って落としていた唯一の `run:` leaf
+    (`scan breakpoints` — 7件のうちの1つ)。**1件しかない母集団はこの種の穴が生き残る大きさ**。
+
+- [x] **exit 2 は契約から削除済みなのに3箇所が出し続け、意味が非互換に分岐していた**
+  - `gate-exit.ts` と `docs/design/gate-plugin-architecture.md` が二値契約に統一し
+    (「exit code 2 で分岐するスクリプトは `--json` の `counts.warn` を読め」)、
+    `check perf` は移行済み。**非 gate の leaf が取り残された**。
+  - 結果、exit 2 の意味が `diff browsers`「engine が想定より少ない」/
+    `png-diff`「フラグ値が不正」の2通りになり、`skill run` は**どの 2 も warn として読んでいた**。
+  - 実測(`{"tool": "diff png", "ignore-region": "0,300,640"}` の skill):
+    端末 `! diff png exit 2`、レポート行 `⚠ 2`、`skill run` 自身も exit 2。
+    **skill ファイルの不正な値が warn として報告される**。
+  - `checkStatus` 1つに集約(ran して非0は fail / did-not-run は独立 / warn は `--json` 経由)。
+    `png-diff` の「2 = usage error」は単独では筋の通った慣習なので手を付けず記録に留めた。
+- [x] **`diff browsers --engines chromium` が「言われた通りにした」ことで run を失敗させる**
+  - 「engine が*動いた*数」だけを見て「*欲しかった*数」を見ていなかった。しかも2箇所に同じ判定。
+  - 実測: `✓ chromium` / `✗` 皆無 / なのに「Only 1 engine(s) usable — Install missing engines
+    with playwright install firefox webkit」+ 非0 exit。
+  - `parityShortfall` 1つに集約。明示的に絞った場合は install 誘導も失敗も無し、
+    要求した engine が欠けている場合は従来通り失敗(`--allow-skipped` が opt-out)。
+- [x] **`diff elements` が missing flag に9行のスタックトレース**
+  - 正しい1文の後に `parseArgs` / `main` / `delegate` / `runGroupLeaf` / `runCli` の8フレーム。
+  - `UsageError` + `handleCliError` に。`diff-pr` / `baseline` を先に直したのと同じ型で、この leaf が漏れていた。
+- [x] **`isUrl` の9個目のコピー**(`cross-browser.ts`)— `b03f849` で8個畳んだときに漏れていた。
+  用途は「URL なら readFile しない」= `isUrlSource` そのもの。値は一致していたので dedupe のみ。
+
+### DnD(HTML5 drag and drop)を他のハンドラと同じように検査可能にした(2026-08-15)
+
+`addEventListener` パッチは型に依存しないので drag 型は**元から一覧されていた**。足りなかったのは
+「一覧できる」と「間違いを教えられる」の差で、DnD は**配線済みなのに絶対に発火しない**形が2つある。
+
+- [x] **`drag-source-not-draggable`**(suspect)— `dragstart` があるのに `draggable` が false。
+  `el.draggable`(DOM プロパティ = 実効値)で判定するので、`<a href>` / `<img>` のような
+  既定で draggable な要素は無指摘。属性だけ見ると両方誤検知する。
+- [x] **`drop-without-dragover`**(suspect)— `drop` があるのに自身も祖先も
+  `dragover`/`dragenter` を持たない。`dragover` の既定動作が drop を拒否するので発火しない。
+  **祖先を数えるのが要点**: container に `dragover` を1つ置く委譲パターンは正しいので無指摘。
+- [x] **`drag-without-keyboard-alternative`**(warn)— drag はどのブラウザでもキーボード等価物が
+  無いので mouse-only(WCAG 2.1.1 / 2.5.7)。**意図的に `POINTER_TYPES` に入れなかった**:
+  `pointer-only-control` の処方(tabindex + キーハンドラ)では drag は開始できないので、
+  助言が違う。warn にしたのは代替経路がページの別の場所にあることが多く、要素ローカルな
+  この視点からは見えないから。
+- [x] **`on*` sweep に drag ファミリが無かった** — `el.ondragover = fn` と
+  `<div ondragstart="...">` が完全に不可視。実測: プロパティ代入した要素は surface に
+  1行も出ていなかった(registrations 8、修正後 9)。
+- `fixtures/handlers/drag-and-drop.html` が契約(正しい組と壊れた組を並べ、期待値を
+  ファイル内コメントに記述)。E2E テストはコピーではなくその fixture を駆動する。
+- **`dragmove` という DOM イベントは存在しない**。連続系は `drag`(source 側)と
+  `dragover`(target 側)で、両方収集している。
+
+**probing まで進めた(同日)** — drag 型が `unprobed-handler-types` に載り続けるのを解消。
+**設計前に「合成 `DragEvent` が実ハンドラを動かすか」を実測**して、4つのシグナルが全部
+観測可能だと確認してから作った(VLM も OS レベルの drag も不要 — 後者は CDP で駆動できない):
+
+- `dispatchEvent` の戻り値が **`preventDefault` を呼んだかを教える**(`false` = 呼んだ)
+- `dragstart` 後の `dataTransfer.types` で **source が実際に何を積んだか**が取れる
+
+- [x] **`dragover-not-prevented`**(suspect)— `dragover` はあるのに cancel しない。
+  **静的チェックは通してしまう**(ハンドラは登録されている)のに、ブラウザは drop を拒否するので
+  配線済みの `drop` は走らない。**最も多い形**(listener は書いたが preventDefault を忘れた)。
+- [x] **`dragstart-transfers-nothing`**(warn)— ハンドラは走ったが `DataTransfer` が空。
+  target の `getData()` は `""`。Chromium は drag を開始するが Firefox / Safari はしないので
+  クロスブラウザの欠陥。`text/plain` 固定で聞かない(`application/json` の転送を「何も無い」と
+  呼ばないため)。
+- `scan handlers` は**既定 off**(inventory であり、dispatch はページのロジックを走らせる —
+  POST する drop ハンドラは POST する)。`check interactions --handlers` は**無条件で on**
+  (あの gate は既に全コントロールにキーを打っているので、drag だけ触らないのが不自然)。
+- rule 総数 137 → 141。
+
+**「OS レベルの drag は CDP で駆動できない」は誤りだった(同日、実測で否定)** —
+`mouse.down` / `mouse.move` / `mouse.up` で Chromium は本物の HTML5 drag を出す
+(`dragstart, drag, dragenter, dragover, drop, dragend`、`DataTransfer` も生きている)。
+合成 dispatch は **`dragstart` をハンドラに届けてしまう**ので「ブラウザがそもそも掴むか」を
+答えられない。これが唯一の grade 対象になった:
+
+- [x] **`drag-source-inert`**(suspect)— `draggable === true` で `dragstart` も登録済みなのに、
+  実 gesture(中心 + 25% の2回)で `dragstart` が一度も出ない。`-webkit-user-drag: none` と
+  透明な sibling の被せが該当し、**どちらも DOM からは見えず、合成 dispatch は「正常」と報告する**。
+  `draggable === false` は除外(`drag-source-not-draggable` の方が原因と直し方を名指しできる)。
+- **grade しないもの**: どの target が受け取ったか。source と target の正しい組はページの都合で、
+  壊れている組と区別できないので `dropped on <target>` / `no target accepted it` の証拠止まり。
+- **未計測を欠陥として報告しない**が3回とも設計を変えた:
+  - 最初のループは掴めない source が target 全部を retry して budget を食い切り、
+    document 順で後ろにいた**正常な source 2つが inert と報告された**。
+    掴めない source は別の点から1回だけ retry して打ち切る。gesture 0 回の行は grade しない。
+  - `unprobed-handler-types` は **recorder が観測した型**だけを消す。
+    「drop が着いたなら dragleave も出たはず」は不成立(入って出ずに drop できる)。
+  - **毎 gesture で選択を消す**。掴めない要素を押して動かすと**テキスト選択**になり、
+    選択テキスト自体が draggable なので次の source の gesture に持ち越す。
+    実測した症状は直感と逆で、壊れた source が正常に見えるのではなく
+    **正常な source が drag しなくなる**(`native-source` が落ちた)。
+- rule 総数 141 → 143 → 145 → 147。
+
+- [x] **`drop-target-unreachable`**(suspect)— `drag-source-inert` の drop target 側。
+  **完全に正しい契約**(`dragover` で `preventDefault`、`drop` 配線済み)の zone が透明な sibling で
+  覆われていると、drag イベントは全部 veil に行き zone は何も受け取らないのに、**run 全体が
+  無報告**だった。静的検査は両ハンドラを見るし、合成 dispatch は要素に直接投げるので走ってしまう。
+  finding は**何が奪ったか**(`div>div#veil`)を名指しする — 上に何があるかが行動可能な情報。
+  drag が始まった gesture からのみ判定する(掴めない source の gesture にはイベントが無く、
+  狙った target を責めるのは source の欠陥を target に転嫁する)。
+  fixture は `fixtures/handlers/drop-target-covered.html`(覆われた zone + 同一契約の対照)。
+  **判定はヒットテストに書き換えた**(gesture ログ版は誤検知した): 3点(中心/25%/75%)を
+  `elementFromPoint` に渡し、target 自身**または子孫**に当たれば到達可能。
+  - 子孫を数えるのが要点 — イベントはバブリングする。gesture ログ版は fixture の delegated `<ul>`
+    を「到達不能」と報告した(狙点が子の `<li>` に当たるため)。対照 `#filled-list` を追加。
+  - 3点にするのも要点 — 中心だけを覆う 40px の badge は zone を使えなくしない。対照 `#badged`。
+  - どちらの ablation も対照で落ちることを確認済み。イベントを出さないので `--probe-drag` 不要。
+
+- [x] **飛行中(mid-flight)の欠陥2つ** — どちらも結果は正しい(drop は成立し、データも届く)。
+  - `drag-source-detached-mid-drag`(suspect): drag 中に source が DOM から外れると `dragend` が
+    来ない。成否に関係なく必ず通る場所なので、そこに書いた後処理が全部飛ぶ。実測: `remove()` を
+    `dragstart` で呼ぶ source は `dragstart, dragover, drop` のみで `dragend` 無し(対照は有り)。
+  - `dragover-handler-slow`(warn): `dragover` は pointer が target 上にある間毎フレーム発火するので、
+    80ms のハンドラは滞在中ずっと drag をガタつかせる。
+  - **タイミングはリスナ内部で測る。最初の版は誤りだった**: イベント間隔から推定すると
+    **即 return するハンドラが 68ms** と出た — hover screenshot(60–80ms)の待ちが間隔に入るため。
+    **fixture の fast zone が私の計測器の汚染を捕まえた**。リスナ wrapper で各呼び出しを直接計測し、
+    slow 80ms / fast <2ms。`addEventListener` のみ対象(`ondragover=` プロパティは未計測扱い)。
+  - **到達不能と判明したガードは残さず削除**: `dragend` 欠落時の 120ms 再読み込みは不要。
+    ログを読む evaluate はページのメインスレッド作業の後ろに直列化されるので、`dragend` を遅らせる
+    ものは読み取りも同じだけ遅らせる(300ms busy-wait で検証、初回読み取り時点で既に存在)。
+
+**インタラクション family を6つ追加した(`--probe <families>` / `--probe all`)** — 未知の family は
+silent no-op ではなくエラー(黙って何も probe しないのが、この gate の「absent は未計測」原則を壊す形)。
+
+- [x] **wheel** — 200px の wheel。スクロール量は**報告のみ**(wheel を食うのは地図・カルーセルの正しい実装)。
+  判定するのは `passive-listener-cannot-cancel`: `preventDefault()` が**何もしなかった**こと。
+  実測: 同じハンドラが `{passive:true}` で無効、`{passive:false}` と指定なしで有効。
+  条件は「passive か」ではなく「無効だったか」— `scroll` は cancelable でないので同じ欠陥・別の理由。
+- [x] **hover** — hover してから同じ要素を focus し、**ページ全体**の可視差分を取る
+  (出てくるのは箱の外なので要素 screenshot では見えない)。トリガはスタイルシートの `:hover` からも集める
+  (CSS だけのトリガにはリスナが無く、それが一般形)。**CSS Nesting 以降 `CSSStyleRule` にも `cssRules`
+  (空 = truthy)があり**、`if (rule.cssRules) {recurse; continue;}` がセレクタを一度も読んでいなかった。
+  finding は probe 行から出す(CSS トリガは surface に行が無い)。
+- [x] **menu** — 右クリック。`defaultPrevented` はページのハンドラ実行後に読む(capture 段では全部 false)。
+  `contextmenu-not-prevented`(suspect)/ `contextmenu-replaces-nothing`(warn、置き換えが canvas 等
+  見えない場所にある可能性)。
+- [x] **touch** — 専用ページ。emulation は `maxTouchPoints` 0→1、`"ontouchstart" in window` を変えるので
+  共有すると他 family が別ページを測ることになる(実測)。`touch-handlers-not-invoked` は
+  `pointer-drag-intercepted` の touch 版。swipe は CDP 直叩き(Playwright の touchscreen は tap のみ)。
+- [x] **input** — ASCII / 日本語 / 日本語(IME 変換経由)の3回。判定は
+  `text-input-rejects-non-ascii`(warn): **ASCII は保持して日本語を落とす**もの。
+  ASCII の drive が帰属を可能にする対照(数字専用フィールドは両方落とすので除外)。
+  対象はページ側で列挙する(半分のフィールドにハンドラが無く、surface からでは3/6 が漏れた)。
+- **IME 固有の判定は測定で否定された**(3仮説すべて): 値の破壊は変換なしでも同一で IME 固有でない、
+  確定 Enter は CDP の合成 composition が実 IME のように消費しないため探査器の汚染、
+  `value` 書き換えによる破壊は identity/trim/slice/nospace すべてで再現しない。
+  変換は**網羅と証拠**のために駆動し、そこからは何も grade しない。
+- rule 総数 155 → 157 → 163 → 165。
+
+- [x] **キャンセル(Escape)** — driven drag は Escape で中断する(`dragend` の `dropEffect: "none"`、
+  drop 無し)。`drag-cancel-not-reverted`(suspect)は**2つの証拠が両方**必要:
+  ブラウザが「中断した」と言っていること、かつピクセルがまだ違うこと。
+  片方だけでは欠陥ではない(成功した drop は変えるのが正しく、綺麗に戻った中断は正常)。
+  - 捕まえる形は sortable の楽観更新: `dragstart` で隠し、`drop` で戻す。中断は `drop` に到達しない。
+    `dragend` は成否に関係なく発火するので、undo はそこに置く。
+    fixture `fixtures/handlers/drag-cancel.html` 実測: `dragend` で戻す card は 0.00%、
+    `drop` でだけ戻す card は 99.03%。
+  - **要素 screenshot は使えない**: 失敗ケースの要素は `visibility: hidden` で、
+    `elementHandle.screenshot()` は可視化を待って **30秒でタイムアウト**する(実測)。
+    ページ screenshot の clip で撮る。
+  - `dropEffect` は **`dragend` だけ**記録する。`dragover` では受け入れる zone も拒否する zone も
+    `copy` で区別しない(実測)が、`dragend` では drag 全体の判定になる。
+  - 専用 budget(4 source)。多数の source があるページで drop 探索を食い潰さないため。
+
+- [x] **hover 中のピクセル**を測る(mid-drag screenshot、実測 60–80ms/枚)。
+  `dragenter` でハイライトする zone は自分の box の 99%、しないゾーンは 0.00%(バイト同一)。
+  **drag が始まってからのみ**撮る(ログを gesture 中に読んで判定)ので、掴めない source では
+  screenshot 2枚の代わりに evaluate 1回で済む。
+  - **新ルールは作らない**: 「ハイライトして拒否」は既存 `dragover-not-prevented` そのものなので、
+    その message に測定値を差し込む(1つの根本原因を2件報告しない)。
+  - 受け入れたのに無反応な zone は `(no visible change while hovering)` の**証拠**止まり
+    (feedback が zone の box 外に描かれる — sibling の list に placeholder が開く形 — があるため)。
+  - 最初の drop で打ち切ると後続の zone が永久に測れないので、drop 済み source も
+    `EXTRA_TARGET_VISITS`(3)だけ追加訪問する。budget 16 → 24(実測 ~0.2s/gesture)。
+
+**途中経過(route)まで出せるようにした** — 集約値だけでは drag のデバッグにならないため。
+7型の順序付き timeline を source ごとに持ち、**drop しなかった source のみ** route を印字する
+(成功したものまで出すと、失敗した1件が埋まる)。
+
+- [x] **`prevented` はページのハンドラ実行後に読む**。capture 段は「ハンドラ前」の値なので
+  「ページがどう決めたか」を表さない。実測: `preventDefault` を呼ぶ target は `true` で drop が続き、
+  忘れている target は `false` で **drop イベントが1つも出ない**。
+- [x] **`stopPropagation` は `false` ではなく `null`(不明)**。cancel してから stop する zone は
+  `defaultPrevented` を読むリスナに届かないが、**drop は成立する**(実測)。`false` と書けば
+  正しく実装した target を誤って責める。
+- [x] **target が実際に受け取った payload**。protected mode により `getData()` は
+  dragstart/dragenter/dragover では `""`、**drop でだけ**実値を返す(実測)。
+  fixture の3 source で3通り: `#ok` はページが設定、`#native-source` は
+  `text/plain`/`text/uri-list`/`text/html` を**ブラウザ**が供給、`#attr-source` は空。
+- [x] **`dragstart-transfers-nothing` の誤検知を実測で反証**。`<a href>` は合成 dispatch では
+  「空」だが実 drop では URL が届く。drop で観測された payload があれば warn を出さない
+  (drop が無ければ証拠が無いので warn は残す)。
+- **`dropEffect` は記録しない**: 受け入れる target と拒否する target で両方 `copy` だった。
+  区別しない値を列に足すのはノイズ。
+- **`drag` は JSON には残し print からは落とす**: source 上で `dragover` と交互に連続発火するため
+  coalesce が効かず、1 gesture が7行になった。経路情報も持たない。
+
+**`PROBED_TYPES` が「probe 済み」を静的に主張していた(両方向に誤り)**:
+
+- [x] **`scan handlers` は何も probe しない**のに、`click`/`keydown`/`focus`/`blur`/`keyup`/`keypress`
+  が登録されていれば `unprobed-handler-types` から除外していた。6ハンドラのページで
+  `registrations: 6` かつ **`status: ok`**、一度も実行していないことの開示ゼロ。
+- [x] **`check interactions` は click しない**。`interaction-map.ts` に `.click()` は1つも無く、
+  focus してから role の activation key を押すだけ。ブラウザが click を合成するのは
+  ネイティブ要素のみで、`div[role=button]` では合成されない — **`pointer-only-control` が
+  探している要素クラスそのもの**。実測: `<button>`/`<a href>`/`input[type=submit|button|reset]`
+  は Enter で click、`input[type=checkbox|radio]`/`<summary>` も click、
+  `div[role=button]`/`div[role=checkbox]`/`a`(href 無し)/`input[type=text]`/`select`/`textarea` は
+  click しない。
+- 対応: coverage を**要素ごと**に「この run が実際に何をしたか」から決める。
+  `check interactions` は自分の interaction map から evidence を渡す(tab walk が止まった要素 =
+  focus/blur、key を押した要素 = keyboard、click はさらに native のみ)。`scan handlers` は渡さず、
+  warn の文面も専用にする。型リストは prose ではなく `HandlerIssue.types` としてデータで運ぶ
+  (テストが `--probe-drag` の "drag" や "the probe focuses" の "focus" に当たって空虚になったため)。
+- gate 側の配線は `packages/vlmkit-markup/src/gates/interactions-coverage.test.ts` が pin する。
+  外しても他の全テストが緑だったので専用ファイルにした。
+
+- [x] **テンプレートリテラルが食う `\s` を検出するテスト**(`src/util/browser-script-escapes.test.ts`)
+  - `PROBE_DRAG_SCRIPT` の `split(/\s+/)` が**ブラウザには `split(/s+/)` として届いていた**。
+    class 名を空白でなく**文字 s** で分割するので、最初の class(または祖先の class)に `s` を
+    含む要素は path が collector と食い違い、`row.path === e.path` の join が黙って外れ、
+    **probe 由来の findings が全部消えていた**。fixture の container class を
+    `row` → `rows` に変えるだけ(挙動は不変)で 4件 → 0件。`sortable` / `list` / `cards` は
+    普通の class 名なので、**実ページでは壊れている方が通常**だった。
+  - 原因は同じ walk が**3箇所にコピーされていた**こと(collector / probe / TS 側の要素引き当て)で、
+    間違っていたのは probe のコピーだけ。`DESCRIBE_PATH_FN` 1つに統合し `String.raw` で宣言。
+  - テストは `*SCRIPT` / `*_FN` / `*SOURCE` に束縛されたテンプレートリテラル28個を走査し、
+    `String.raw` でない裸の `\s` 系を拒否する。ablation で正しく落ちることを確認。
+    **20個未満しかマッチしなくなったら失敗**させる(命名規約が変わって sweep が空になる事故防止)。
+
+- [x] **browser script 定数22個を構文チェックするテスト**(`rules.test.ts`)
+  - TypeScript が中を見ないテンプレートリテラルなので、タイポは `page.evaluate` で初めて落ちる
+    (= gate が不透明に throw するか、**何も返さず clean に見える**)。`new Function` は
+    実行せずコンパイルするので、どの定数のどこが壊れているか1ms未満で言える。
+  - **意図的に入れなかった検査**: stray backtick。**値からは判定できない** — 正しい書き方は
+    `\`` のエスケープで、評価後は普通のバックティックになり stray と区別がつかない。
+    `COLLECT_DESIGN_SAMPLES` は10個持っていて全部正しい(assert したら即誤検知した)。
+    未エスケープはコンパイルエラーなのでコンパイラの担当で、**担当外なのは文字列の中身**。
+
+- [x] **`pnpm typecheck` が存在しなかった**(このセッション最大の自分のミス)
+  - 存在しないスクリプトを `pnpm -s <name>` で呼ぶと**無出力で exit 254**。
+    私はセッション中ずっとこれを走らせ、無出力を「型は通っている」と読んでいた。
+    `| tail -N` が終了コードを隠していたので気づけなかった。**全部 vacuous だった**。
+  - 本物(`tsc -p tsconfig.json`、~9秒)を走らせたら**実エラー1件**: 私が同セッションで書いた
+    テストで、2つのオブジェクトリテラルの union が `keydown?: undefined` になり
+    `Record<string, number>` に代入不可。**vitest は型チェックしないので緑だった**。
+  - `typecheck` スクリプトを追加し、壊した型で exit 2 になることを確認。
+  - 教訓は2つ: **無出力を成功と読むな(終了コードを見ろ)**、そして
+    **`| tail` は終了コードを隠す**。
+
+**バックティックの罠を4回踏んだ**: `COLLECT_SURFACE_SCRIPT`、`PROBE_DRAG_SCRIPT`、
+`handlers.gate.ts` の `usage:`、そして `DRAG_RECORDER_SCRIPT`。
+最後のは `String.raw` なので**エスケープした `\`` も使えない**
+(バックスラッシュが値に残り、ブラウザに壊れたコードが届く)。**`usage:` もテンプレートリテラル**で、
+そこに散文をバックティック付きで書くと文字列が閉じる。コンパイラは毎回捕まえるが
+メッセージが原因を名指ししない(`Expected `,` or `}` but found `Identifier`` が散文を指す)。
+パーサを二重化するテストは書かず、値からは判定不能な理由を `rules.test.ts` に記録した。
+
+### 実サイト dogfood: Moonlight SVG Editor(2026-08-15)
+
+レポート: `docs/reports/2026-08-15-dogfood-moonlight-svg-editor.md`。
+
+**環境の制約を先に実測した**: このサンドボックスの **Chromium は外部ホストに一切到達できない**
+(`example.com` でも proxy 3通りすべて `ERR_CONNECTION_RESET`、agent proxy 側は
+`recentRelayFailures: []` = リクエストが届いていない)。curl は通るので**ローカルミラー**で実施。
+バンドルに API `fetch` も追加 chunk も無く完全に client-side なので、ミラーは代用ではなく実物。
+
+- [x] **pointer ベースのドラッグを drag として認識する**
+  - このアプリは `[draggable]` が **0**、`dragstart` も皆無。キャンバスは
+    `pointerdown`/`pointermove`/`pointerup` でドラッグする。**今日追加した HTML5 DnD ルールは
+    何も見つけられない**。
+  - vlmkit は `pointer-only-control` として「role + tabindex + キーハンドリングを付けろ」と助言。
+    **指摘は正しく処方が間違い** — tabindex ではキャンバスはドラッグできない。
+  - `down + move`(同一要素)で pointer-drag と判定し、`drag-without-keyboard-alternative` を
+    両ファミリ対応に。`pointer-only-control` は drag surface では引っ込む(**助言が矛盾するため**)。
+  - **意図的な限界(両方実測)**: `pointerdown` が要素・`pointermove` が `window` の分割パターンは
+    未対応(global move と組ませると、カーソル追従エフェクトのあるページの `pointerdown` 全部が
+    drag になる)。`setPointerCapture` は samples が80文字上限 + 実アプリは minified で見えない。
+  - **severity 変更**: drag surface は suspect → warn(HTML5 側と同じ理由 — 代替経路はページの
+    別の場所にあることが多く、要素ローカルには見えない)。
+- [x] **アイコンのみのコントロールが自分を名乗るようになった**
+  - 8行が `div>div>div>button ""`。**同定手段が同時に2つ空**だった(テキスト無し + id/class 無しで
+    `describe()` が全部同じパス)。実際の `aria-label` は "Zoom Out" / "Fit to Canvas" /
+    "Import SVG (Ctrl+Shift+V)"。
+  - `text` を accessible name に fallback(`aria-label` → `title` → 子 `img[alt]` →
+    `placeholder`/`value`)。finding 本文も `"${e.text}"` を引くので一緒に直る。
+  - **アプリ側には名前の無いボタンは1つも無かった**(18/18 が命名済み)。vlmkit が読む属性を
+    間違えていただけ。
+
+- [x] **pointer-drag を実ジェスチャで駆動して証拠を出す**(`--probe-drag`)
+  - HTML5 drag と違い pointer drag は **Playwright で本物の入力を送れる**
+    (`mouse.down`/`move`/`up`)。実エディタのキャンバスで
+    `feedback while held 8.14%, changed after release 8.53%`。
+  - **`unprobed-handler-types` が 8型 → 5型**。あの warn は「interaction probes で未カバー」と
+    言っており、実際に駆動した3型についてはもう真ではなかった。
+  - **DOM ではなくピクセルで比較**。`fixtures/handlers/pointer-drag.html` の `#canvas-works` は
+    `<canvas>` に描くので **DOM が一切変わらない** — DOM 比較だと canvas エディタ全部が
+    「死んだドラッグ」になる。実測の分離: works ~3%/~3%、feedback-only ~3%/0.00%、
+    dead 0.00%/0.00%、canvas-works ~1%/~2%。
+  - **数値は出すがグレードしない**(意図的)。実ページでの 0% は「ハンドラが死んでいる」
+    「掴む位置が違った」「フィードバックが要素の外」を区別できず、finding にすると
+    **確立していない状態を報告することになる**。
+  - **曖昧さの無い変種は測ったうえで今回は入れていない**: ページ自身のリスナを包めば
+    「呼ばれたか」が分かり、オーバーレイがジェスチャを食っているケースだけは説明が一意
+    (透明な兄弟要素の下では呼び出し `{}`、working と dead はどちらも三点セット完走)。
+    ただし安全にやるには `removeEventListener` も同時に patch する必要があり
+    (wrapper は参照一致を壊すので、**計測対象のページを書き換えてしまう**)、別作業にした。
+- [x] **`pointer-drag-intercepted`** — probe の中で**唯一グレードする**結果
+  - `#dead` と `#swallowed` はピクセルでは区別不能(両方 0.00%/0.00%)で、別の欠陥。
+    **ページ自身のリスナ呼び出し回数**で分離できる: dead は三点セット完走(到達可能で無反応)、
+    swallowed は **0**(透明な兄弟要素が全イベントを取る)。
+  - 「登録済み + ジェスチャは box に届いた + 一度も呼ばれない」は説明が一意 =
+    オーバーレイ / 祖先の `pointer-events` / detached ノード。よって suspect。
+  - **安全にするのが作業の大半**。2点を推論せず実測:
+    - wrapper は `removeEventListener` の参照一致を壊す → add-then-remove が毎回リスナを
+      漏らし、**計測対象のページを書き換える**。WeakMap で解決。patch 有無でページ自身の
+      ログを diff して同一を要求するテストを入れた(参照除去 / `once` / `handleEvent` /
+      `this` / capture だけ除去 / throw が後続を止めない)。
+      `removeEventListener` 側を外すと `+ "REMOVED-FIRED"` で落ちる。
+    - **install 順序が本質的**: 計測 patch を `HANDLER_PATCH_SCRIPT` より**先**に入れないと、
+      登録記録側が `"function () { bump(this); return invoke.apply(…"` を拾い、
+      **全ハンドラの snippet が静かに wrapper のソースになる**。両順序を実行して diff した。
+  - rule 総数 141 → 143。
+
+  - **自分のコメントを1つ訂正した**: `steps: 4` の理由に「デルタを積算する実装が動かない」と
+    書いたが、fixture は全部 `clientX` から絶対位置を出すので単発 move でも通る(壊して確認)。
+    実測した内容だけを書くように直した。
+
+**アプリ側の findings**(vlmkit の欠陥ではない、記録として): `page-overflow-x` 8px(全 viewport)、
+375px で `78%` ズーム表示が完全に隠れる(`occluded-text`、glyph サンプル100%が遮蔽物にヒット)、
+`No elements` が `#999` on white = 2.85:1(11px で AA 未満)。
+
+**副産物 — 先行して存在した欠陥**: `check interactions --handlers` は
+`deriveHandlerIssues` の kind を finding として出しているのに、handler 系 rule を
+1つも宣言していなかった。`--rule pointer-only-control=off` が bind 先を持たず、
+毎回 `emitted undeclared rule id(s)` を出していた。**runner 自身のチェックが
+drag rule 追加中に教えてくれた**(追加すると悪化するところだった)。
+`HANDLER_SURFACE_RULES` を1つにして両 gate が spread する形にした
+(rule 総数 127 → 137 = 新規3 + 宣言漏れ7)。
+
+**踏んだ罠**: `draggable` 収集のコメントをバックティック付きで書いたら、それが
+`COLLECT_SURFACE_SCRIPT` のテンプレートリテラル内だったため文字列が途中で閉じてビルドが
+PARSE_ERROR。browser script 文字列の中にバックティックと `${` は書けない。
+
+**作業中に踏んだ罠(記録)**: root の `pnpm build` の出力を `| head` で切ったら
+ビルドが SIGPIPE で途中死し、`packages/vlmkit-markup/dist/` が半分消えた状態になった。
+CLI は `@mizchi/vlmkit-*` を dist 解決するので、**修正が効いていないように見えるのは
+たいてい stale/破損 dist**。ログはファイルに落として tail する。
+
+**この軸で健全だったもの**(掘って外れた記録): `design-policy.ts` の `--exclude` は
+named error を投げていて正しい。`flow-verify.ts` の `q()` は不正セレクタで throw する。
+`createVlmClient` は model id からキーを導くので推測しない。`withCleanEnv` は既にあり、
+純粋関数は `env` を引数で受けている(規律は悪くない)。
+
+**未着手で残す判断をしたもの**: `package.json` の `files` が `!dist/e2e/**` なので、
+npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はどちらの候補も見つけられない。
+ソースチェックアウトでは動く。**spec を publish するか、この2コマンドを廃止するかは
+設計判断**でタイポ修正ではないので、ここでは変えていない。
+→ 設計判断は依然として未着手。**メッセージだけ 2026-08-15 に直した**(下の節)。
+
+**残した重複(まだ同期していて実害がない)**: `determineMigrationSubagentExitStatus` /
+`determineSnapshotReportEvaluationExitStatus`(566文字が同一)、`overlapArea` /
+`intersectionArea`。byte-identical な重複は「まだ分岐していない」= 将来のリスクであって
+今のバグではない。今回見つかった実害はすべて**片方だけ直った近似重複**の側にあった。
+→ rect 系は 2026-08-15 に畳んだ(下の節)。**「重複ペア」ではなく5箇所5名前**だった。
+
+### 既知の問題を対象にした修正ループ(2026-08-15)
+
+「新しい欠陥を探す」ではなく **TODO に記録済みの既知項目**を対象にした回。
+記録した見積りが実態と違っていたものが2件、掘る途中で見つかった隣接欠陥が2件。
+
+- [x] **rect の重複は「ペア」ではなく5箇所5名前**(`181eff0`)
+  - 記録は `overlapArea` / `intersectionArea` の2つだったが、実際は
+    `rectIntersectionArea`(`diff-for-agent`)と `iouOf` **2つ**(`component-bbox` /
+    `page-compose-diff`、ローカル変数名以外 byte-identical)を含む5箇所。
+    どれもテストが1つも無かった。
+  - `packages/vlmkit-core/src/rect-overlap.ts` に集約し、**どの写しでも暗黙だった2性質を
+    テストで pin**: 掛ける**前**に軸ごとに 0 でクランプする(負×負が正になるので、斜めに
+    離れた box が重なりを報告してしまう)、union が 0 なら `NaN` ではなく 0 を返す
+    (`NaN > threshold` は false なので、呼び出し側では「似ていない」と読まれたり黙って
+    落とされたりする)。両方を壊すとテストが落ちる(実測: 7件中4件)。
+  - **意図的に残した3箇所**を helper の docstring に名前で書いた: `copy-check.ts` は
+    browser script 内で import できない、`integrity-check.ts` / `font-determinism-probe.ts`
+    は面積ではなく**軸ごとの overlap** が必要(どの軸で衝突したかを報告する)。
+- [x] **npm install したユーザーに、効かないビルドを勧めていた**(`dist/e2e` 項目の一部)
+  - 記録は「packaging の設計判断」。実測すると**判断が要るのは publish 可否だけ**で、
+    メッセージは今日直せる: `Run \`pnpm build\` (source checkout), or restore
+    \`e2e/vlmkit-capture.spec.ts\`` は node_modules から**両方とも実行不能**
+    (走らせるビルドが無く、失われたものも無い)。原因も局所的な破損ではなく
+    published `files` の `!dist/e2e/**` という**意図的な除外**。
+    → 場所で言い分けるようにした(installed = clone が必要 + 他コマンドは動くと明言、
+    checkout = `git checkout --` で戻せ)。`captureSpecMissingMessage` を export して
+    ブラウザ無しでテスト。**実測でも確認**(spec を退避して `workflow capture` を実行)。
+  - **候補リストから `dist/e2e/*.mjs` を削除**。`testDir: "./e2e"` の外なので選ばれると
+    `No tests found` になり、この関数が置き換えるはずの不親切な失敗そのもの。
+    到達するのはソース spec が無い時 = 明確なメッセージが必要な状態だけ。
+- [x] **docs が存在しない flag を2つ documented していた**
+  - `docs/cli-reference.md` の `"workflow": { "captureSpec": … }` と `--capture-spec <path>`
+    は**コードのどのバージョンにも存在しない**(例の名前は `vrt-capture.spec.ts` = リネーム前)。
+    削除し、「無い」ことと「spec を差し替え可能にするのは TODO 側の選択肢」を明記。
+- [x] **`capture.baseUrl` が黙って捨てられていた**
+  - 上を実測する過程で普通に書いた config で発覚: `routes` は top-level と `capture` の
+    **両方**から読むのに、`baseUrl` は top-level だけ。両方を `capture` に並べて書くと
+    routes は効き、URL は既定値 `127.0.0.1:4174` に落ちる。**入力を無視して受理と表示する**形。
+  - `pickCaptureKey` に一般化して両キーで対称にした。**キー探索を wrap して返す**のは、
+    `"routes": null` を「不在」と区別し続けるため(`??` にすると null が top-level に
+    フォールバックして黙殺され、直そうとしている形そのものになる)。
+  - 実測: `capture.baseUrl: 9999` で `page.goto` が `9999` に行く(修正前は `4174`)。
+
+- [x] **workspace パッケージ8つ全部の `test` script が死んでいた**
+  - vitest 移行時に**root の script だけ**直され、各パッケージは
+    `node --test 'src/**/*.test.ts'` のまま。`packages/` 配下の **148 テストファイル全部**が
+    `from "vitest"` を import するので、`pnpm --filter @mizchi/vlmkit-core test` は
+    **38 files / 0 pass / 38 fail**(`Vitest failed to find the current suite`)。
+    `CLAUDE.md` が案内しているコマンドがこれ。
+  - **root の `pnpm test` は緑のままだった**から生き延びた。CI で走る方は正しく、
+    ドキュメントに書いてある方が死んでいる = 死んだ `workflow` コマンド2本と同じ形。
+  - `pnpm --dir ../.. exec vitest run packages/<pkg>/src` に統一(build script が既に使う
+    `pnpm --dir ../.. exec tsdown` と同じイディオム。root の vitest.config.ts を拾わせるため)。
+    **8つ全部を実測**: ai 5 / capture 10 / core 38 / generate 3 / heal 9 / markup 79 /
+    mcp 2 / plan 2 files、全パス。
+  - `tests/package-test-scripts.test.mjs` で pin。script の**形**だけを見る
+    (8スイートは走らせない = root の `pnpm test`)。`node --test` に戻す / パスを
+    間違える、両方の改変で落ちることを確認した。
+- [x] **gate の prose が rule 設定を読まない問題を 3/27 → 11/27 に**
+  - 対象は fixture ページで実際に finding を出す8つ(`bench gates` で確認):
+    a11y touch(45) / tokens(29) / theme(9) / media(3) / a11y contrast(2) / a11y focus(2) /
+    i18n(2) / design(1)。`--rule x=off` が exit code だけ変えて画面は変わらない状態だった
+    (touch は 45件を赤い ✗ で全部出したまま verdict は緑)。
+  - **計測値は残し、grade だけ落とす**方針。「45件は誰も見たくないから消える」わけではないし、
+    数字を消すと**意図的な設定が黙って測定を減らしたように見える**。行と ✗ は消える。
+  - `src/cli/gate-registry.test.ts` に **migrated / not-migrated を名前で両方 assert**。
+    片方だけだと移行時に静かに数字が動く。
+- [x] **その作業で、先行して rule-aware だった `check integrity` の欠陥が出た**
+  - post-load throw のページで、隣り合う2行が矛盾:
+    `verdict: DEFECTS (1 fail, 0 warn)` の直下に `exits 0 — 1 warn(s)`。
+  - 原因は `RuleView.effective` が**gate の宣言テーブルにフォールバック**すること。
+    `applyRuleSettings` は「明示設定がある時だけ re-tune」= 証拠で severity を決める gate の
+    判断を残す設計で、integrity は `js-error`(構築中 fail / load後 warn)、`text-clipped`、
+    `degenerate-render` の3つがそれをやる。formatter だけが宣言値に戻していた。
+  - `RuleView` に `setting(ruleId)`(明示設定 or undefined)を追加。**`effective` では
+    「未設定」を表現できない**のが本質。共通化して `plugin/rule-tier.ts`
+    (`ruleTier` / `applyRuleTiers` / `hiddenByRuleNote` / `ruleViewFrom`)。
+  - **テストが1度 vacuous だった**: 最初に書いた js-error テストは、stub の fallback を
+    `warn` にしていたので ablation で緑のまま。fallback は**テーブルの値**(= suspect)を
+    渡さなければ意味がない。直して ablation で赤を確認。
+  - 副産物: tokens / theme が warn 相当の finding を赤 ✗ で出していた(runner は
+    `exits 0 — N warn(s)` と書く)。tokens `--strict` は逆に赤に戻す必要があり、
+    report に `strict` を echo(テーブルに無い severity で emit する唯一の gate)。
+- [x] **`CLAUDE.md` の cross-package import 指示が解決しないパッケージ名だった**
+  - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
+    この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
+
+- [x] **カバレッジ 63.1% → 70.0% statements (64.7% → 71.8% lines)**、と書いてる途中で見つけた欠陥5件
+  - **測り方を変えた分**: import されていない research / demo runner 15ファイルを分母から外した
+    (API key か 30-trial ループが必要、`node src/...` で叩く entry、bundle にも入らない)。
+    基準は機械的に「非テストファイルから import されていないこと」だけで、
+    `tests/coverage-exclusions.test.mjs` が強制する。だから `migration-compare.ts` は
+    CLI entry を持っていても 40% のまま分母に残る(6モジュールが import している)。
+  - **実際に書いたテスト62件**: vlm-client (7% → 3プロバイダのリクエスト整形と
+    レスポンス解析。`fetch` は stub、Gemini SDK は `vi.mock`)、`diff-for-agent` の
+    optional セクション群(forced-state / palette / shift-origin / region-diff = agent が読む後半全部)、
+    `snapshot` の subcommand を dispatch 経由で、`scaffoldStoryGallery`、
+    `runSmokeTest` の再現性契約、`markup-loop` の CLI。
+  - **テストが見つけた欠陥**:
+    1. OpenRouter の `total_tokens` は optional。直読みしていたので
+       **bench レポートが引用する token 数に `undefined` が入っていた**(Anthropic/Gemini は合算していた)。
+    2. `resolveModel("vision-")` が**id の長さで別ベンダーのモデルを黙って選んでいた**。
+       → セグメント完全一致を要求、曖昧なら候補を並べて throw。
+    3. モデル一覧のキャッシュに出口が無かった。長命プロセス(API server)が
+       値上げ後のモデルを見られない問題でもある → `resetVisionModelCache`。
+    4. `snapshot <url> stability` が subcommand を URL 扱いして
+       `Cannot navigate to invalid URL`。→ 位置違いの subcommand を UsageError に。
+    5. `markup-loop init --config /elsewhere/...` が config だけそこに書き、
+       **starter 6ファイルをカレントに散らしていた**(このリポジトリに散らして発覚)。
+  - **`page.evaluate` の中身は node 側 v8 coverage から永遠に見えない**ので、
+    statements が lines より ~2pp 低いのは構造的(integrity の collector、
+    semantic-drilldown の landmark walk、computed-style-capture)。
+    threshold は floor として設定(statements 69 / lines 70、実測より ~1pp 下)。
+    連続実行で 0.05pp 揺れるので、実測値に置くと noise で落ちる。
+
+- [x] **`dist/e2e` の packaging 判断: spec 自体を廃止した**(publish もしない、command も残す)
+  - 「publish するか 2 command を廃止するか」の二択で聞いたが、**廃止側のコストが見えていなかった**:
+    `verify` / `approve` / `report` / `introspect` / `spec-verify` / `expect` は
+    capture が書く `.a11y.json` を読んでいて、他に producer が無い
+    (`vlmkit snapshot` は multi-viewport PNG だけ、a11y tree は書かない)。
+    2 command 消すと 6 command が入力を失う。
+  - なので**廃止したのは spec ファイル**。中身は 135 行の
+    `goto` / `screenshot` / `getFullAXTree` / write で、fixture も snapshot assertion も無い
+    = test runner が要らない。`captureRoutes`
+    (`packages/vlmkit-capture/src/route-capture.ts`, gate と同じ `withBrowser`)に移した。
+  - 一緒に消えたもの: `e2e/`, root の `playwright.config.ts`, `vrt` / `vrt-update` task,
+    `files` の `!dist/e2e/**`, tsdown の e2e entry, `resolveCaptureSpecPath`,
+    `captureSpecMissingMessage`(存在しなくてよくなったファイルについての丁寧な説明文)。
+    → **installed package から動く**ようになった。
+  - **port で出た欠陥3つ**:
+    1. `playwright.config.ts` の 2 project (1280x720 / 375x812) が同じ spec を走らせ、
+       同じ `<name>.png` に書いていた = **baseline が desktop か mobile か非決定的**。
+       → 1 viewport に固定して出力に明記。
+    2. subprocess の exit code では**どの route が落ちたか言えない**ので、
+       caller は file 数で推測して「(some tests had warnings...)」を出していた。
+       → route ごとに status / waitFor 不一致 / 空 body / a11y の degrade を報告。
+    3. `page.goto` は 4xx で throw しない = **path 間違いの route が
+       エラーページを baseline にして exit 0**。→ 非 2xx を報告して exit 1。
+  - test 14件追加(browser 6 + pure 4 + retirement guard 2 + 既存置換)。
+    実サーバで init → capture → verify → PASS、404 route、server 停止も手で確認。
+
+- [x] **実アプリ dogfood v9: vite.dev (VitePress docs + marketing)** —
+  `docs/reports/2026-08-16-dogfood-vite-dev-docs-site.md`
+  - Chromium は今日も outbound network 無し(`example.com` すら ERR_CONNECTION_RESET)。
+    curl で 4 ページ + 93 ファイルを mirror。**first-party の request failure ゼロまで
+    詰めてから**計測した(third-party 9件だけ到達不可、これ自体が finding 4)。
+  - **3つの gate が正しい markup を fail させていた。3つ全部「幾何ヒューリスティックが
+    次元を1つ見ていない」型**:
+    - `text-collision` は clip を見ていなかった。`overflow: clip` + `mask-image` の
+      fade wall が次セクションに 57px 被って 3 fail。**同じファイルの occlusion probe は
+      最初から ancestor clip に clamp していた**(「そこを hit-test したら別物を犯人にする」)。
+      → 両方 clamp。部分 clip は見える部分で判定、全部 clip は理由付き exempt(切った祖先を名指し)。
+    - `check theme` は `prefers-color-scheme` しか回していなかった。vite.dev の CSS に
+      それは**0回**、`.dark` は**47回**。class / attribute strategy を検出して適用、
+      どちらを回したか印字、`--dark-selector` で上書き。
+    - `check a11y focus` は multi-column footer を全部 `reverse` と言っていた。
+      MoonBit 側に prev_width を渡して `column-advance` を追加(optional = 未計測なら従来判定)。
+  - **この app では決着しなかった点を報告書に明記**: VitePress は inline script で
+    media query を class にブリッジするので、旧実装でも `/guide/` は 95.4% を出す。
+    defect の証明は bridge の無い fixture (`fixtures/theme-strategy/class-only.html`) で行った。
+  - 直さず記録した1件: third-party 1本の失敗が `js-error` 7件になり、
+    first-party/third-party の区別が無い。console message に URL が無いので
+    `requestfailed` stream との相関が必要 = 一行では直らない。
+  - fixture 2件 + test 13件追加(3078 → 3119)。
+
+- [x] **残り16 gates を rule-aware 化して 27/27 完了**
+  - 7つは `issues[]` 形が共通なので `packages/vlmkit-markup/src/rule-prose.ts`
+    (`tierIssues` / `retuneNote`) に畳んだ。同じ15行を7回書いた時点で、
+    過去の migration が踏んだ2つのミス(tier 後に `issue.severity` を読む /
+    全部 off なのに緑の "No X detected." を残す)を7回作り直すことになると分かった。
+  - 残り9つは report 形が個別。**verdict を出す2つが一番ひどかった**:
+    `check layout` は `VIOLATED`、`verify markup` は `NOT DONE` を
+    runner の `exits 0` の上に印字していた。両方 verdict を「まだ報告する rule」から
+    再計算し、raw report と食い違う理由を添える。
+  - **貫いた原則: rule を off にしても測定値は消えない**。
+    `check breakpoints` の `768px: 1 spike(s)`、`check perf` の CLS 値、
+    `check story` の `4.00% diff`、`check layout` の各 check の measured は全部残す。
+    変わるのは marker / failure claim / verdict と、「何を落としたか」の1行。
+  - 副産物: `check animation` が `settle: 4500ms [long-settle]` の rule タグを
+    off の時に出さなくなった(dogfood agent が「status 行が rule を指しているのに
+    その rule は何も報告していない」と指摘した箇所)、`check equivalence` が
+    `pending-review` off の時に人間レビュー要求ブロックを出さなくなった、
+    `check story --update-baseline` が `new-baseline` off の時に
+    「操作者が頼んだこと」への黄色い警告を出さなくなった。
+  - **`--rule` の verification は fixture が要る、という前提が半分外れた**:
+    prose test は literal report で projection だけを見るので browser 不要
+    (16 gate 分で 26 test)。実出力でも `check motion` / `check animation`
+    (dashboard.html)、`check story` (examples/story-gallery)、
+    `check drift component` (fixtures/component-consistency) の4つを確認できた。
+  - **また dist の罠**: 8 gate が「まだ blind」と出たのは `pnpm build` 前だったから。
+    registry は dist 経由で gate を読む(CLAUDE.md 1541行と同じ)。
+  - `src/cli/gate-registry.test.ts` は aware 27件を名前で、blind を `[]` で assert。
+    明日 1-param formatter の gate を足したらそこで名前付きで落ちる。
+
+- [x] **docs ↔ CLI の乖離を恒久テストにした** (`tests/docs-cli-parity.test.mjs`)
+  - reference docs(README / cli-reference / configuration / markup-assist)が書く
+    **flag と command verb** が実装に存在するかを検査。`--capture-spec` を捕まえる形。
+  - **走査を先に信じなかったのが正解だった**: 素朴な grep は21件を「存在しない」と報告したが、
+    実際に実在しなかったのは `--capture-spec` **1件だけ**。偽陽性の原因4つを全部 pattern に
+    畳んだ: `hasFlag(args, "no-baseline-sanity")`(ソースは `--` を書かない)、
+    `Taskfile.pkl` の task param(`name = "scenario"`)、gate の `{ name: "level" }`、
+    prose の `--var`(CSS 変数の話 = design/plan docs を対象外にした理由)。
+  - **意図的に「存在しない」と書いている記述**は allowlist に理由付きで置く
+    (`--capture-spec` の否定文、`vlmkit serve -> vlmkit api serve` のリネーム表)。
+    これがあると live corpus では検査が効かないので、**修正前の doc 行を合成して
+    「当時なら捕まえた」ことを別テストで示す**。
+  - scope を明記: **存在検査であって「その command が受け付けるか」ではない**。
+    ペアリングには per-command parser が必要で、欠陥が出たのは存在側。
+  - command verb 側は現時点で**実在しない verb ゼロ**。それでも入れたのは
+    `tests/workflow-commands.test.mjs` の由来(`vlmkit compare` / `vlmkit smoke` が
+    リネーム後も CI に残り、片方は `|| true` で緑のまま何も測らなかった)が docs 側に
+    未カバーだったから。
+  - **config キー側は測って入れなかった**: documented JSON キー15件のうちソースに無いのは
+    `mcpServers` 1件で、これは Claude Code の `.mcp.json` スキーマ = vlmkit のものではない。
+    15件・実質例外1件のテストは、検査ではなく例外の記録になるので書いていない。
+
+**罠(再発)**: dist 解決なので、`packages/` を直して CLI で確認すると**直っていないように
+見える**。`pnpm build` を挟むまで `4174` のままだった(1541行の記録と同じ罠)。
+`src/cli/cli.ts` を直接 node で実行すると**出力ゼロで exit 0**、entry は `src/cli/vlmkit.ts`。
+
+### テストカバレッジ 70% への道筋(2026-08-13 測定)
+
+vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバレッジを導入。
+`pnpm test:coverage` で計測。**現在 statements 61.23%**(開始 56.1%、Phase 2 後 57.99%、Phase 1 後 60.14%)。tests 2859、全パス。
+
+**70% には +3,865 statements 必要**(現時点の残りは **+2,675**)。既存の 2662 tests が網羅的なのに 57% な理由は
+構造的で、純粋ロジックは**すでにカバー済み**だから。実測:
+
+| 書いたテストの種類 | 1ファイルあたりの獲得 |
+|---|---|
+| 純粋関数のユニットテスト | ~40 statements(ある回は **+1** — 既に browser 経由でカバー済みだった) |
+| gate runner の in-process browser テスト | **~115 statements** |
+
+未カバーの 13,000 statements の内訳(near-zero の 21ファイル、4,231 statements):
+
+- **11ファイル / 2,244 statements は export された関数を1つも持たない** — トップレベル
+  `main()` の CLI スクリプト(`snapshot.ts` 318, `css-challenge.ts` 285, `demo/*` 717,
+  `detection-report.ts` 203, `benchmark.ts` 195 …)。import すると実行されるので、
+  **`runX()` を export する形にリファクタしない限りテスト不可能**。
+- **10ファイル / 1,987 statements は callable** — `interact.ts` 275, `explore.ts` 230,
+  `cross-browser.ts` 185(複数ブラウザ必要), `vlm-client.ts` 139(API キー必要),
+  `multi-page-consistency.ts` 114 など。
+
+#### フェーズ(独立に実行可能)
+
+- [x] **Phase 1: callable な gate runner に in-process browser テスト** — **5ファイル完了**
+  (2026-08-14)。**statements 57.99% → 60.14%**、全 5 ファイルが 0% から:
+
+  | ファイル | before | after | 備考 |
+  |---|---|---|---|
+  | `stress/multi-page-consistency.ts` | 0% | **88.6%** | browser 必要 |
+  | `inspect/interact.ts` | 0% | **68.6%** | browser 必要 |
+  | `inspect/explore.ts` | 0% | **66.8%** | browser 必要 |
+  | `cli/workflow/spec.ts` | 0% | **94.0%** | browser 不要、13 tests 0.5s |
+  | `cli/workflow.ts` | 0% | **46.2%** | browser 不要。残りは `npx playwright` を spawn する `init`/`capture` |
+
+  tests 2753 → 2795(+42)。suite 全体は +75s(browser 3ファイル分)。
+
+  - **予測より安かった**: `spec.ts` / `workflow.ts` は browser を必要とせず、
+    `process.exit()` を return に変えるだけでテスト可能になった(合わせて 21 tests、~1s)。
+    「callable だが未テスト」の原因が browser ではなく **`process.exit` だった**ケース。
+  - **回帰価値の予想は当たった**。書いた 4 スイートが実欠陥 4 件を出した:
+    1. `check drift pages` — セレクタが**存在しないページ**が唯一 pass するケースだった
+       (`NaN > threshold` は false)。`selector-missing` ルールを追加(rules 125 → 126)。
+    2. `inspect explore` — **仮想マウスが setContent を越えて残る**ため、各アクションの
+       baseline が「1つ前のアクションがクリックした要素の hover ハイライト」を含んでいた。
+       dead action(このゲートの存在理由)が alive に見えていた。span 0.28% / button 0.42%
+       → 修正後どちらも 0.00%。
+    3. `inspect interact` — 失敗した step を**print して捨てていた**。下流には
+       「delta ほぼ 0 の transition」だけが見え、レポート自身の文が
+       「セレクタ不一致のサイン」と説明していた。理由を持っていて捨てていた。
+    4. `workflow spec-verify` — 非 git ディレクトリで git の usage 40 行を吐いていた
+       (`execSync` は stderr を inherit する)。
+  - **自分の思い込みが3件テストに直された**(コードではなくテストを直した):
+    block 要素の `width: auto` は padding を吸収する(outer width は変わらない) /
+    button の `hover` は UA スタイルで 0.25% paint する /
+    `waitForSelector` は dead 判定から意図的に除外されている。
+  - **副作用**: `isCliEntry(import.meta.url, …)` という新しい綴りを使ったため、
+    `gate-entry-isolation.test.ts` の CLI-entry 検出(文字列 `__VLMKIT_DISPATCHER_LEAF__ ===`
+    を探す)が **12ファイルを見落としていた**。両方の綴りを見るよう修正し、
+    vacuity テストに各綴り1件ずつ + negative を追加。
+- [x] **Phase 2: CLI スクリプトを `runX()` export にリファクタ** — **11ファイル完了**
+  - 8ファイルは**ガードが無く**、末尾で `main().catch(...)` を無条件に呼んでいた。
+    つまり **import すると実行される**。これが 0% の理由(import で実行されるものは
+    テストできない)。
+  - 確立したパターン(`snapshot.ts` の docstring に3点明記):
+    **argv は引数** / **exit code は return(代入しない)** / **cwd は引数**。
+    `process.exitCode` はプロセスの所有物で、リグレッションを正しく報告した snapshot が
+    それを頼んだテストスイートを落としてはいけない。`process.chdir` はプロセス全体なので
+    vitest の共有ワーカーを壊す。
+  - リファクタ中に実バグ2件: `runStability` がヘルパー内から `process.exitCode` を代入
+    (呼び出し元のプロセスを落とす)、`resolve(outputDir)` が `process.cwd()` 基準で
+    パーサのデフォルトだけ cwd 基準だった(明示 `--output` と既定値が別ディレクトリに落ちる)。
+  - **共有 `isCliEntry(import.meta.url, name?)` を core に追加**。30ファイルが2つの綴りで
+    手書きしていて、緩い方(`argv[1]?.endsWith("fix-loop.ts")`)は名前が接尾辞として
+    重なるファイルを区別できず、`.mjs` にビルドすると黙って一致しなくなる。
+  - **テストは別作業**。リファクタは「テスト可能にする」だけで測定値は動かない(+0.29pp)。
+    実際にテストを書いた2ファイルで 0% → 32% / 58%。
+  - 残り9ファイルのうち `demo/*` 4件はデモの実行そのもの、
+    `benchmark`/`vlm-bench`/`css-challenge`/`fix-loop`/`migration-fix-loop` 5件は
+    VLM/API が必要(Phase 3)。**リファクタ済みなので import は安全**になった。
+- [x] **Phase 1.5: 未テストの純粋モジュール**(2026-08-14)。**60.14% → 61.23%**。
+  Phase 1 の続きとして、browser 不要で未カバーの大きい純粋モジュールを 3 本:
+
+  | ファイル | before | after | tests |
+  |---|---|---|---|
+  | `component/component-report-format.ts` | 52.9% | **82.4%** | +22(0.55s) |
+  | `util/skill.ts` | 0% | **58.6%** | 24(2.4s、1件だけ実 CLI を spawn) |
+  | `experiments/css-challenge/css-challenge-core.ts` | 33% | **42.1%** | +21(0.02s) |
+
+  ここでも**実欠陥が 4 件**出た。未テストのモジュールにはバグがある、という
+  この作業の一貫した所見:
+  1. **`vlmkit skill run` は 0.9.0 以降ずっと全チェックが失敗していた** —
+     `src/vrt.ts` を spawn していた(リネームで消えたパス)。しかもレポートは
+     `MODULE_NOT_FOUND` を `exit 1` として「チェックが問題を見つけた」ように描画。
+     `KNOWN_TOOLS`(コマンド表の手書きコピー)も 0.9 前の単一トークン名のままで、
+     **検証を通ってから spawn で落ちる**構造だった。検証は CLI に委譲し、
+     legacy 名は alias として維持。
+  2. **`removeCssProperty` がプロパティ名をトークン途中でマッチ** —
+     `.card { border-color: red; color: red; }` → `.card { border- color: red; }`。
+     指定されていないプロパティを壊し、指定されたものを残す。つまり**実験の
+     ground truth が壊れる**(クラッシュではなく)。
+  3. **`applyCssFix` が末尾セミコロンなしの body に連結** —
+     `.card { color: red }` → `.card { color: red padding: 4px; }`。
+     既存 declaration が消える。
+     - 2 と 3 は**現コーパスでは発火しない**ことを実測(10 fixtures / 2,391
+       declarations で修正前後バイト一致)。よって**記録済みのベンチ数値は変わらない**。
+       ただし `.tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }` は
+       順序が逆なら発火する。
+  4. **`inspect interact --help` が exit 1** — help と引数不足が同じコードだった。
+
+  **`as any` フィクスチャの害も実証された**: `component-report-format.test.ts` の
+  既存フィクスチャは `as any` で、typed に書き直したら tsc が即座に 3 件見つけた
+  (`LandscapeDiffResult` の `width`/`height` 欠落、`ComponentGoalEvaluation` の
+  閾値 4 フィールド欠落、`nearest` → 実際は `nearestNeighborDistance` + `count`)。
+  どれもレポートに `undefined` が出るがテストは通る組み合わせ。
+
+- [x] **Phase 3: VLM/API 経路に録画フィクスチャ** — 2026-08-16 完了。
+  `vlm-client.ts` 7.3% → **89.5%**、`reasoning-pipeline.ts` 10.7% → **90.2%**。
+  - 録画は `fixtures/vlm-recordings/` (4本 + README)。**ワイヤから採ったものではなく
+    プロバイダの形に合わせて手で書いた**(この環境に認証がない)ので、README で
+    各フィールドの出所をコードとレポートに紐付けて明記した。
+    「プロバイダが今もこの形を返すこと」は offline では証明できず、
+    それは `docs/reports/` の日付付きベンチの仕事 — **ここが緑でも live run の保証にはならない**。
+  - 固定できたのは実際に価値がある部分: CHANGE 行のパースと重複排除、
+    SUMMARY / REGRESSION、画像の優先順位(selector crop > heatmap > current)、
+    shift 情報がプロンプトに入ること、FIX 行のパース、
+    **prose だけ返すモデルで changes/fixes が空になること**(ベンチで頻出)、
+    そして escalation ladder(low confidence かつ change 1件以下のときだけ、
+    maxResolution まで、adaptive off なら上げない、上げる画像が無ければ上げない)。
+  - **項目の前提が1つ違っていた**: `component-from-image.ts` (404 未カバー) は
+    VLM をまったく使っていない(`withBrowser` + ピクセル演算のみ)。
+    あれは API 経路ではなく **browser orchestrator** の穴なので、この項目では閉じない。
+
+#### 残り +2,675 の所在(2026-08-14 実測)
+
+**純粋モジュールの安い獲得はほぼ枯れた**。残る大きい未カバーは全部 browser
+オーケストレータか実験ハーネス:
+
+| missing | pct | ファイル | 性質 |
+|---|---|---|---|
+| 647 | 40.2% | `experiments/migration/migration-compare.ts` | browser |
+| 477 | 3.8% | `experiments/css-challenge/css-challenge-bench.ts` | browser + fixture |
+| 404 | 18.1% | `component/component-from-image.ts` | browser |
+| 391 | 12.9% | `src/diff-pr.ts` | browser(CI ゲート) |
+| 274 | 0% | `experiments/css-challenge/css-challenge.ts` | LLM 必要 |
+| 264 | 70.9% | `vrt/compare/diff-for-agent.ts` | 純粋だが既に 24 tests あり |
+| 462 | 0% | `demo/demo-scenarios.ts` + `demo-fix-loop.ts` | デモ実行そのもの |
+| 219 | 31.8% | `vrt/snapshot/snapshot.ts` | browser |
+| 217 | 38.2% | `contract/introspect-contract.ts` | browser |
+| 185 | 5.1% | `stress/cross-browser.ts` | 複数 browser エンジン必要 |
+
+つまり **70% に行くには browser orchestrator を実測レートで 15-20 スイート**
+書くことになる(Phase 1 実績: browser スイート 1 本 ≒ 100-200 statements、
+20-40s)。suite 全体に +10 分程度。`diff-pr.ts` は CI ゲートなので
+**カバレッジ目的とは別に**テストする価値が高い(12.9% は低すぎる)。
+
+#### 分母を狭める案(単独では 70% に届かない)
+
+`src/demo`(717, 0%)と `src/experiments`(6,023, 42%)を除外しても **61.9%**。
+published packages のみでも **65.5%**。つまり**除外だけでは 70% に到達しない** —
+どの道でも実テストが必要。除外するなら理由を書いた上で両方の数字を報告すべき。
+
+### dogfood v7(2026-08-13、既存3シナリオの再評価)— **全件修正済み**
+
+レポートは `docs/reports/2026-08-13-dogfood-reevaluation-v7.md`。
+修正済み4件: `2892b5b`(batch が新規 untracked パスを報告)/ `a079a76`(未判定 role が
+`NOT JUDGED` を出す)/ `de9de2f`(`page-overflow-x` が blame 対象を selector に載せる)/
+`73dc7ef`(passing run の warn 数を summary に出す)/ `2c171c1`(webServer の stdout → stderr)。
+**うち2件は前日に入れたコードの欠陥で、両方ともそのコードのための作業をしたエージェントが見つけた。**
+**記録した8件も同日すべて修正**(`62ffb3d` a11y touch dedupe+help / `32936c3` scan handlers /
+`c2007a4` 必須フラグ検証 + init webServer / `b9487fc` ledger 一本化 + rule 展開 /
+`3f2cb3d` a11y --allow / `3f533e6` gates run --json)。
+
+**8件のうち3件は指摘自身が過小評価だった。3件とも読んでは分からず、測って初めて崩れた**:
+`.vlmkit/` の「ディレクトリが違う」は実は**ledger が2つ**(親と子で別、各々が実行の半分を保持)、
+`--level AA` の「ヘルプと矛盾」は実は**誰にも見えないマークアップの差で計測が変わる**、
+`gates list` の「実行できないプランを表示」は1ゲートの話ではなく**7ゲート**。
+エージェントは外から見える症状を報告し、**それを実装するのではなく何がそれを生んでいるかを探すのが保守側の仕事**。
+3件とも額面通りに直したら、小さい修正で本当の欠陥を残していた。
+
+指摘文はエージェントの言葉のまま残す。
+
+- [x] **`gates run --json` が構造化された findings を返さない**
+  - > "findings arrive as one ANSI-escaped `output` string, not structured."
+  - warn の**件数**は summary に出るようになったが、findings 自体を欲しい CI ジョブは
+    ターミナル文字列をパースすることになる。
+  - 直し方: batch が子プロセスを `--json` で起動して envelope をマージする。失敗表示用の
+    prose 経路は残す(失敗時に読むのはそちら)。
+
+- [x] **`scan handlers` が `registrations: 0 across 0 element(s)` で status `ok`**
+  - > "zero listeners on a 3-button page is the finding."
+  - agent-l は別途3つのボタンが全部 inert であることを `inert-control` で見つけている。
+    つまり情報は他のゲートにある。このゲート自身の 0 が誤った verdict。
+
+- [x] **`check a11y touch` / `check a11y contrast` に `--exclude` も selector `--allow` も無い**
+  - `check design` と `check integrity` にはある。
+  - > "Vendor DOM is a page-level fact, not a per-gate one. The only exit is turning the
+    > one rule off page-wide, which also stops checking our own buttons."
+  - > (contrast について) "red CI or contrast off, nothing between."
+  - **ページレベルの `--exclude` を全ゲート共有**にするのが筋。per-gate フラグを増やす話ではない。
+
+- [x] **`check a11y touch --level AA` がヘルプと矛盾する可能性**
+  - > "Help: *'Clustered targets (within 24px of a sibling) are flagged…'* The vendor
+    > buttons are 24x24 with a 4px gap; at `--level AA` it reported `✓ 0 undersized
+    > target(s)`. Either the clustering check doesn't run at AA, or the help is wrong."
+  - どちらなのか未確定。どちらでも欠陥で、**どちらかを確定させることが修正内容を決める**。
+
+- [x] **`gates list` が実行できないプランを表示する**
+  - > "It listed `check layout … http://localhost:5311/` as job 4 of 7; only `gates run`
+    > revealed `did not run: error: --contract <contract.json> is required`. `list`
+    > validates rule names but not required flags."
+  - 必須フラグの検証は registry に情報がある(`inputs[].required`)ので `list` でできる。
+
+- [x] **rule settings が全ゲートのコマンドラインに展開される**(agent-l / agent-m 独立に指摘)
+  - `--rule check.a11y.touch/target-undersized=off` が `check copy` にも付く。
+    typo したキーは**ゲート数と同じ回数**同じ設定エラーを出す。
+  - `assertKnownRuleOverrides` の設計(他ゲートのキーは黙って通す)は意図的だが、
+    コマンドラインのノイズと重複エラーは別問題。
+
+- [x] **`.vlmkit/` と `test-results/` が cwd に書かれる。config のディレクトリではない**
+  - v5 で**入力**パスは config 基準に直した。出力はまだ cwd 基準。
+  - agent-l は自分で書いた `.gitignore` にこの差異をコメントとして書いている
+    (`vlmkit writes both of these into the directory it is run from (cwd, not the
+    directory the config lives in)`)。実在するギャップの最も明確な兆候。
+
+- [x] **`gates init` が localhost URL に `webServer` を足さない**
+  - URL source には既に `--wait-until load` を足している。`localhost` は「dev サーバがある」を
+    含意するので同じ理屈が通る。
 
 ### dogfood v6 の残件(2026-08-12、adoption シナリオ)
 
@@ -1233,6 +2242,44 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     見つけた clobber と同じで、あのときは drift だけ直していた。
   - 修正:`runOutputDir()` を `arg-helpers.ts` に共有ヘルパーとして置き、a11y の3ゲート
     (contrast / touch / focus)と drift が使う。drift のローカル `runSlug` は削除。
+
+- [x] **dogfood v10: Bootstrap dashboard example(2026-08-16)** —
+  `docs/reports/2026-08-16-dogfood-bootstrap-dashboard.md`
+  - v9(vite.dev = 暗い docs/marketing)と**あらゆる軸で違うページ**を選んだ:
+    ライトテーマ / データテーブル / サイドバー / フォーム / canvas チャート /
+    `data-bs-theme` 属性テーマ。しかも何千ものプロジェクトがほぼそのまま出荷している markup。
+    mirror は third-party(Chart.js CDN)もローカルに落として書き換えたので
+    **failed request ゼロ**(v9 は 9件残っていた)。
+  - **欠陥1: `check a11y contrast` が 11件ある失敗を「0件」と報告していた**。
+    見つかったのは `check integrity` が同じページで同じ欠陥を
+    「4.27:1、11 element(s)」と正しく報告していたから = **1つのツール内で2つのゲートが矛盾**。
+    原因2つ: (a) dedup キーが `path` だけで、`shortPath` は各祖先のクラス2つまでしか持たないので
+    サイドバーの12リンクが全部同じパスに潰れ、**最初の1つ(`.active`、`#2470dc` でちょうど 4.50 = 合格)**
+    が残って11件が消えた。(b) **同じロジックが2箇所**にあり、export された
+    `analyzeA11yContrastSamples`(`diff-pr` が呼ぶ)を直しても CLI は変わらなかった
+    — `runA11yContrast` が inline で再実装していた。リポジトリが記録している
+    「同じものが2箇所にあって片方だけ直る」パターンを現行犯で捕まえた形。
+    → dedup キーを**判定の入力**(path + 前景/背景/サイズ/ウェイト)に変更、
+    `elements: 11` を finding に持たせ、CLI は共有関数を呼ぶ。
+    `inspected 10` → `105`(dedup map のサイズを「element(s)」と称していた = 10倍の過小申告)。
+    **旧挙動を名前で固定していたテスト**(`dedupes by path — first sample wins`)は
+    欠陥を意図として書き留めたものだったので理由付きで置き換え。
+  - **欠陥2: `position: fixed` のコントロールが focus-order 欠陥として報告されていた**。
+    Bootstrap のテーマ切替は `fixed bottom-0 end-0` で DOM 11番目 = 最初に Tab が当たり、
+    次のステップで navbar(y=0)へ → `[reverse] 662px up`、exit 1。
+    片方は**画面上の y**、もう片方は**文書内の y** で、比較しても読み順の証拠にならない。
+    しかも skip link と同じイディオム。→ sampler が fixed/sticky を記録し、
+    pinned を挟む reverse / skip-row は報告しない(**trap は報告する** — 同一性の話で、
+    pinned なダイアログは実際に詰まる場所)。**方針が適用されたことは明示**する。
+    v9 の vite.dev で 4 findings が全部残ることも確認。
+  - **2ラウンドで3件目の「幾何ヒューリスティックが次元を1つ見ていない」**:
+    collision が clip を、focus が列境界を、focus が配置コンテキストを。偶然ではなくパターン。
+  - **theme strategy fix はまだ実アプリで証明できていない**: Bootstrap も
+    `color-modes.js` で media query を属性にブリッジしているので旧実装でも 94.2% 出る
+    (VitePress と同じ)。**実アプリ2連続でブリッジしていた**のは生態系についての事実として記録。
+  - **2回目の目撃で正式に起票**: `check a11y touch` が AAA 既定で 17/18 を undersized と言う
+    (`.btn-sm` 58x31、`.nav-link` 211x37 = Bootstrap 既定)。v9 でも 37/38。
+    WCAG 2.5.8 の AA は 24x24 + inline 例外なので、必要なのは静かな既定ではなく **AA レベルと例外**。
 
 - [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
   - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。

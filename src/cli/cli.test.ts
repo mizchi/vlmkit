@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -39,7 +39,7 @@ function runVrt(args: string[]): { stdout: string; stderr: string; status: numbe
 }
 
 describe("vlmkit CLI tree (cac-based)", () => {
-  it("`vrt --version` matches the package release", () => {
+  it("`vlmkit --version` matches the package release", () => {
     const r = runVrt(["--version"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, new RegExp(`vlmkit/${PACKAGE_VERSION.replaceAll(".", "\\.")}`));
@@ -55,7 +55,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /snapshot/);
   });
 
-  it("`vrt diff` (group, no leaf) prints group usage", () => {
+  it("`vlmkit diff` (group, no leaf) prints group usage", () => {
     const r = runVrt(["diff"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit diff <subcommand>/);
@@ -66,14 +66,14 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /component.*selector comparison/);
   });
 
-  it("`vrt diff matrix --help` delegates to the presence-matrix helper", () => {
+  it("`vlmkit diff matrix --help` delegates to the presence-matrix helper", () => {
     const r = runVrt(["diff", "matrix", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit diff matrix --viewport/);
     assert.match(r.stdout, /presence matrix/i);
   });
 
-  it("`vrt check` (group) prints group usage including a11y / drift", () => {
+  it("`vlmkit check` (group) prints group usage including a11y / drift", () => {
     const r = runVrt(["check"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /a11y contrast/);
@@ -106,7 +106,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(bench.stdout, /--trials/);
   });
 
-  it("`vrt diff png --help` delegates to the png-diff module's help", () => {
+  it("`vlmkit diff png --help` delegates to the png-diff module's help", () => {
     const r = runVrt(["diff", "png", "--help"]);
     // png-diff exits 0 after printing help
     assert.match(r.stdout, /vlmkit diff png <baseline\.png> <current\.png>/);
@@ -118,7 +118,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stderr, /Unknown diff subcommand: region/);
   });
 
-  it("`vrt diff component --help` delegates to element-level comparison help", () => {
+  it("`vlmkit diff component --help` delegates to element-level comparison help", () => {
     const r = runVrt(["diff", "component", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit diff component/);
@@ -140,13 +140,13 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stderr, /Unknown command/);
   });
 
-  it("`vrt workflow help` prints workflow usage", () => {
+  it("`vlmkit workflow help` prints workflow usage", () => {
     const r = runVrt(["workflow", "help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit workflow <command>/);
   });
 
-  it("`vrt markup-loop help` prints the drop-in agent loop usage", () => {
+  it("`vlmkit markup-loop help` prints the drop-in agent loop usage", () => {
     const r = runVrt(["markup-loop", "help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit markup-loop <command>/);
@@ -156,26 +156,26 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /run/);
   });
 
-  it("`vrt diff --help` prints diff group usage (regression: HELP_SENTINEL leaked through)", () => {
+  it("`vlmkit diff --help` prints diff group usage (regression: HELP_SENTINEL leaked through)", () => {
     const r = runVrt(["diff", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit diff <subcommand>/);
     assert.match(r.stdout, /png.*Compare existing PNG/);
   });
 
-  it("`vrt check -h` prints check group usage", () => {
+  it("`vlmkit check -h` prints check group usage", () => {
     const r = runVrt(["check", "-h"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check <subcommand>/);
     assert.match(r.stdout, /a11y contrast/);
   });
 
-  it("`vrt snapshot flipbook` routes to flipbook-cli (not snapshot.ts)", () => {
+  it("`vlmkit snapshot flipbook` routes to flipbook-cli (not snapshot.ts)", () => {
     const r = runVrt(["snapshot", "flipbook", "--help"]);
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 
-  it("`vrt snapshot strip` routes to strip-cli", () => {
+  it("`vlmkit snapshot strip` routes to strip-cli", () => {
     // The still-image sibling of `flipbook`; both are special-cased under
     // `snapshot` because snapshot.ts has no such mode.
     const r = runVrt(["snapshot", "strip", "--help"]);
@@ -184,7 +184,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 
-  it("`vrt snapshot record-har` routes to record-har-cli", () => {
+  it("`vlmkit snapshot record-har` routes to record-har-cli", () => {
     // `--har` was the documented reproducibility answer with no way to produce one;
     // v5's CI agent wrote its own recorder to finish the task it was given.
     const r = runVrt(["snapshot", "record-har", "--help"]);
@@ -193,7 +193,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 
-  it("`vrt contract` prints contract group usage", () => {
+  it("`vlmkit contract` prints contract group usage", () => {
     const r = runVrt(["contract"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit contract <subcommand>/);
@@ -201,13 +201,13 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /validate.*Validate UI Contract/);
   });
 
-  it("`vrt contract introspect --help` delegates to the introspector", () => {
+  it("`vlmkit contract introspect --help` delegates to the introspector", () => {
     const r = runVrt(["contract", "introspect", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit contract introspect <html-file-or-url>/);
   });
 
-  it("`vrt build gallery --help` delegates to the story-gallery scaffolder", () => {
+  it("`vlmkit build gallery --help` delegates to the story-gallery scaffolder", () => {
     const r = runVrt(["build", "gallery", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit build gallery <html-file-or-url>/);
@@ -216,42 +216,42 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--noise-pixels/);
   });
 
-  it("`vrt check motion --help` delegates to motion detection help", () => {
+  it("`vlmkit check motion --help` delegates to motion detection help", () => {
     const r = runVrt(["check", "motion", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check motion <html-or-url>/);
     assert.match(r.stdout, /--fail-on-suspect/);
   });
 
-  it("`vrt scan mock --help` delegates to the mock intake help", () => {
+  it("`vlmkit scan mock --help` delegates to the mock intake help", () => {
     const r = runVrt(["scan", "mock", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit scan mock <image.png>/);
     assert.match(r.stdout, /--width <px>/);
   });
 
-  it("`vrt check scroll --help` delegates to the scroll-behavior help", () => {
+  it("`vlmkit check scroll --help` delegates to the scroll-behavior help", () => {
     const r = runVrt(["check", "scroll", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check scroll <html-or-url>/);
     assert.match(r.stdout, /snap containers must land/);
   });
 
-  it("`vrt check copy --help` delegates to the copy-fidelity help", () => {
+  it("`vlmkit check copy --help` delegates to the copy-fidelity help", () => {
     const r = runVrt(["check", "copy", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check copy <html-or-url>/);
     assert.match(r.stdout, /--manifest <file>/);
   });
 
-  it("`vrt verify markup --help` delegates to the markup verifier help", () => {
+  it("`vlmkit verify markup --help` delegates to the markup verifier help", () => {
     const r = runVrt(["verify", "markup", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit verify markup <attempt.html>/);
     assert.match(r.stdout, /--reference <html>/);
   });
 
-  it("`vrt check animation --help` delegates to the animation evaluator help", () => {
+  it("`vlmkit check animation --help` delegates to the animation evaluator help", () => {
     const r = runVrt(["check", "animation", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check animation <html-or-url>/);
@@ -259,14 +259,14 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--skip-reduced-motion/);
   });
 
-  it("`vrt scan scroll --help` delegates to the scroll inventory help", () => {
+  it("`vlmkit scan scroll --help` delegates to the scroll inventory help", () => {
     const r = runVrt(["scan", "scroll", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit scan scroll <html-or-url>/);
     assert.match(r.stdout, /expectedScrollports/);
   });
 
-  it("`vrt check breakpoints --help` delegates to the boundary quickcheck help", () => {
+  it("`vlmkit check breakpoints --help` delegates to the boundary quickcheck help", () => {
     const r = runVrt(["check", "breakpoints", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check breakpoints <html-or-url>/);
@@ -274,7 +274,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--breakpoints <list>/);
   });
 
-  it("`vrt check crater --help` delegates to Crater smoke help", () => {
+  it("`vlmkit check crater --help` delegates to Crater smoke help", () => {
     const r = runVrt(["check", "crater", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check crater/);

@@ -1,0 +1,49 @@
+{
+  "//": "CI gate config for the ops dashboard. Checked as served, never as a saved copy.",
+
+  "//webServer": "gates run starts this and stops it after, so CI needs no shell wrapper.",
+  "webServer": {
+    "command": "node serve.mjs 5311",
+    "url": "http://localhost:5311/",
+    "timeout": 30000,
+    "reuseExistingServer": true
+  },
+
+  "defaults": {
+    "//gates": "--wait-until load on every navigating gate: /api/live is an EventSource held open for the life of the page, so the default `networkidle` milestone never fires and every gate times out at 30s having reported nothing.",
+    "gates": [
+      "check integrity --wait-until load --timeout 15000",
+      "check copy --wait-until load --timeout 15000",
+      "check breakpoints --wait-until load --timeout 15000 --rule overflow-at-boundary=suspect",
+      "check a11y contrast --wait-until load --timeout 15000",
+      "check a11y touch --wait-until load --timeout 15000",
+      "check design --wait-until load --timeout 15000 --exclude \".vendorchart-ctrl-group\" --min-instances 2 --min-reuse 2 --rule component-drift=suspect"
+    ],
+
+    "//rules": "check.a11y.touch has no --exclude and no per-selector --allow, so a vendor subtree can only be handled by turning the single rule off page-wide. Recorded here so `gates suppressions` can audit and expire it.",
+    "rules": {
+      "check.a11y.touch/target-undersized": {
+        "setting": "off",
+        "reason": "The only undersized targets are the charting library's own 24x24 zoom/reset buttons (.vendorchart-ctrl), which we do not own and will not fork. Our own .btn controls are min-height 44px. Revisit when check a11y touch gains a subtree exclusion, or when the library ships larger controls.",
+        "owner": "ops-dashboard",
+        "expires": "2026-11-30"
+      }
+    }
+  },
+
+  "pages": [
+    {
+      "id": "ops-dashboard",
+      "source": "http://localhost:5311/",
+      "suppressions": [
+        {
+          "gate": "check design",
+          "flag": "--allow \"button#acknowledge;Acknowledge is the deliberate primary action and carries the accent fill\"",
+          "reason": "One deliberate variant in a 3-button role averages 1.5x reuse, which no --min-reuse threshold can express; named per instance instead. NOTE: allowing it drops the role to 2 instances, which is below the default --min-instances 3 and silently stops the role being judged at all — hence --min-instances 2 --min-reuse 2 on the gate, without which this gate reports COHERENT no matter what our own buttons do.",
+          "owner": "ops-dashboard",
+          "expires": "2026-11-30"
+        }
+      ]
+    }
+  ]
+}

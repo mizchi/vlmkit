@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-plan",
-  "version": "0.9.1",
+  "version": "0.11.0",
   "description": "Planner contract for Playwright test generation: turns a user story, seed test, PRD, and UI observations into a Markdown test plan.",
   "license": "MIT",
   "author": "mizchi",
@@ -28,7 +28,7 @@
   "scripts": {
     "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-plan",
     "prepack": "pnpm build",
-    "test": "node --test 'src/**/*.test.ts'"
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-plan/src"
   },
   "bin": {
     "vlmkit-plan": "./dist/cli.mjs"

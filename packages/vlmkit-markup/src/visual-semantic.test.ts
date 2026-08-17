@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { classifyVisualDiff } from "./visual-semantic.ts";
 import type { VrtDiff, DiffRegion } from "@mizchi/vlmkit-core/types.ts";

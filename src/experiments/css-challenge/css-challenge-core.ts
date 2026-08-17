@@ -313,16 +313,47 @@ export function removeSelectorBlock(css: string, block: CssSelectorBlock): strin
   return lines.join("\n");
 }
 
+/**
+ * Delete one declaration from the line it was parsed from.
+ *
+ * The property name is guarded on both sides, and that is load-bearing rather than
+ * defensive. `\s*color\s*:\s*red\s*;?` — the pattern this used — matches inside
+ * `border-color: red`, and `String.replace` takes the FIRST match, so on
+ * `.card { border-color: red; color: red; }` it produced
+ * `.card { border- color: red; }`: it mangled a property the caller never named and
+ * left the one it did name in place. The recorded trial would then claim `color` was
+ * removed when it was not, so the corruption lands in the experiment's own ground
+ * truth rather than in a crash.
+ *
+ * Not observed on the current corpus — 2,391 declarations across ten fixtures, zero
+ * mis-removals — because it needs the shorter name to appear *after* the longer one
+ * containing it with the same value, and the fixtures happen never to order them that
+ * way. `.tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }` is one
+ * character of authoring away from it.
+ */
 export function removeCssProperty(css: string, declaration: CssDeclaration): string {
   const lines = css.split("\n");
   const line = lines[declaration.index];
   const propPattern = new RegExp(
-    `\\s*${escapeRegex(declaration.property)}\\s*:\\s*${escapeRegex(declaration.value)}\\s*;?`,
+    // `(?<![\w-])` so the name cannot start mid-token; `(?![\w-])` so `red` does not
+    // match the head of `redwood`.
+    `(?<![\\w-])\\s*${escapeRegex(declaration.property)}\\s*:\\s*${escapeRegex(declaration.value)}(?![\\w-])\\s*;?`,
   );
   lines[declaration.index] = line.replace(propPattern, "");
   return lines.join("\n");
 }
 
+/**
+ * Append a declaration to the one-line rule matching `fix.selector`.
+ *
+ * The body is terminated before appending. A trailing semicolon is optional in CSS,
+ * so `.card { color: red }` is legal — and concatenating onto it produced
+ * `.card { color: red padding: 4px; }`, destroying the declaration that was already
+ * there. In the fix loop the apply-and-rollback gate would catch the resulting diff
+ * explosion, but it would blame the model's proposed fix rather than the applier.
+ *
+ * @returns the CSS unchanged when no one-line rule matches the selector.
+ */
 export function applyCssFix(css: string, fix: { selector: string; property: string; value: string }): string {
   const lines = css.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -332,7 +363,8 @@ export function applyCssFix(css: string, fix: { selector: string; property: stri
       const selector = oneLineMatch[1].trim();
       if (selector === fix.selector) {
         const body = oneLineMatch[2].trim();
-        const newBody = `${body} ${fix.property}: ${fix.value};`;
+        const terminated = body === "" || body.endsWith(";") ? body : `${body};`;
+        const newBody = `${terminated} ${fix.property}: ${fix.value};`.trim();
         lines[i] = `${selector} { ${newBody} }`;
         return lines.join("\n");
       }

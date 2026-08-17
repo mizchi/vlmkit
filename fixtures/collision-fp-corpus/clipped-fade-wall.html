@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Clipped fade wall over the next section</title>
+<!--
+  The construct: a "wall" of cards, given a fixed height with `overflow: clip` and faded out
+  with a `mask-image` gradient, immediately followed by the next section. Content past the clip
+  keeps its layout box, so its boxes land ON TOP of the following section's real headings — but
+  no glyph is painted there.
+
+  Found on vite.dev's front page (2026-08-16 dogfood): three `text-collision` FAILS at 375 and
+  768, every one of them a testimonial clipped by `div.pt-14.sm:pt-30.h-[50rem]` colliding with
+  the "Free & open source" heading 57px past the clip edge.
+
+  Must stay CLEAN. `COLLECT_OCCLUSIONS` already clamped its sampling to the ancestor clip for
+  exactly this reason; the collision collector did not.
+-->
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #0b0f19; color: #e5e7eb; }
+  .wall {
+    height: 220px;
+    overflow: clip;
+    mask-image: linear-gradient(#000 60%, transparent 100%);
+    padding: 16px;
+  }
+  .card { background: #1f2937; padding: 12px; margin-bottom: 12px; border-radius: 6px; }
+  .next { background: #111827; padding: 28px 16px; text-align: center; }
+  .next h2 { margin: 0 0 8px; font-size: 24px; }
+</style>
+<div class="wall">
+  <div class="card"><p>The build times are absurd. Ten seconds to a cold start.</p><span>@one</span></div>
+  <div class="card"><p>Community is amazing too. Every plugin I needed already existed.</p><span>@two</span></div>
+  <div class="card"><p>It's also a great platform to build a framework on top of.</p><span>@three</span></div>
+  <div class="card"><p>Swapped our whole toolchain in an afternoon and nothing broke.</p><span>@four</span></div>
+  <div class="card"><p>This one is entirely past the clip edge and paints nothing at all.</p><span>@five</span></div>
+</div>
+<div class="next">
+  <h2>Free &amp; open source</h2>
+  <p>MIT licensed, and always will be.</p>
+</div>

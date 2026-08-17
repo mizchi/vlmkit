@@ -6,6 +6,11 @@ markup loop、決定論的ゲート、Playwright VRT で検証します。ヘッ
 
 GitHub Pages: <https://mizchi.github.io/vlmkit/>
 
+このリポジトリの Pages サイトは複数ページで構成されています。紹介ページが `/`、
+DnD とアニメーションのドッグフード対象である Klondike solitaire が `/solitaire/` です。
+公開されるファイルの一覧と URL は `scripts/build-pages.mjs` の `siteSections` が唯一の定義で、
+`tests/pages-site.test.mjs` が検証します。
+
 まずリポジトリルートで vlmkit をビルドします。
 
 ```sh
@@ -27,6 +32,10 @@ just --justfile examples/vlmkit-intro-page/justfile gates
 just --justfile examples/vlmkit-intro-page/justfile test
 just --justfile examples/vlmkit-intro-page/justfile pages
 ```
+
+`serve` と `pages` はどちらもサイト全体を対象にします。`serve` のルーティングは
+`siteSections` から生成されるので、`/solitaire/` もローカルでそのまま開けます
+(以前はハードコードされた一覧に無いパスが `/` に 302 されていました)。
 
 `gates` は `vlmkit.gates.json` に宣言した英語／日本語 × Light／Dark の4状態を
 すべて `check integrity` と `check a11y contrast` で検証します。テーマ切替後だけ

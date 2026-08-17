@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { UsageError } from "../cli-error.ts";
 import { defineGate, definePlugin, ruleRef } from "./contract.ts";
 import type { Finding, GateDefinition } from "./contract.ts";
@@ -373,6 +373,60 @@ describe("runGate", () => {
     assert.equal(outcome.exitCode, 0);
     assert.match(outcome.text, /1 finding\(s\) suppressed by rule settings/);
     assert.match(outcome.text, /bad-thing x1/);
+  });
+
+  it("says when the prose above the note disagrees with the verdict", async () => {
+    // `format(report, rules)` lets a gate render suppression itself, and one of the 27 does.
+    // For the rest the prose comes from the raw report, so `--rule x=off` printed a red status
+    // line, listed the suppressed findings, and exited 0. Measured on `check a11y contrast`:
+    // `✗ 2 contrast failure(s)` with `exit=0` and a note saying both were suppressed. A reader
+    // cannot tell which half to believe unless the output says.
+    const blind = await runGate(
+      fakeGate(), // format: (report) => … — one parameter
+      ["page.html", "--strict", "--rule", "bad-thing=off"],
+      { ledger: false },
+    );
+    assert.match(blind.text, /rendered before those settings were applied/);
+
+    // A gate that takes the rule view is trusted to have applied it, and gets no disclaimer.
+    const aware = await runGate(
+      fakeGate({ format: (report, rules) => `fake: ${report.hits.length} hit(s), off=${rules?.effective("bad-thing")}` }),
+      ["page.html", "--strict", "--rule", "bad-thing=off"],
+      { ledger: false },
+    );
+    assert.match(aware.text, /1 finding\(s\) suppressed by rule settings/, "the note itself still prints");
+    assert.doesNotMatch(aware.text, /rendered before those settings were applied/);
+    assert.match(aware.text, /off=off/, "and the view really reaches the formatter");
+
+    // No suppression, no note and no disclaimer — this must not fire on every run.
+    const clean = await runGate(fakeGate(), ["page.html"], { ledger: false });
+    assert.doesNotMatch(clean.text, /rendered before those settings were applied/);
+    assert.doesNotMatch(clean.text, /suppressed by rule settings/);
+  });
+
+  it("the rule view tells an EXPLICIT setting apart from the gate's own table", async () => {
+    // The distinction the view was missing, and it is the one a formatter needs. `effective`
+    // answers for every rule by falling back to the table, so a formatter using it renders a
+    // finding at the DECLARED severity — while the runner keeps the severity the finding was
+    // EMITTED at unless a setting says otherwise. `odd-thing` below is declared warn and
+    // emitted warn; `bad-thing` is declared suspect. Only the flag'd one has a `setting`.
+    let seen: { setting: unknown; effective: unknown } | undefined;
+    const outcome = await runGate(
+      fakeGate({
+        format: (_report, rules) => {
+          seen = {
+            setting: [rules?.setting("bad-thing"), rules?.setting("odd-thing")],
+            effective: [rules?.effective("bad-thing"), rules?.effective("odd-thing")],
+          };
+          return "fake";
+        },
+      }),
+      ["page.html", "--strict", "--rule", "bad-thing=info"],
+      { ledger: false },
+    );
+    assert.equal(outcome.exitCode, 0);
+    assert.deepEqual(seen?.setting, ["info", undefined], "only the flag'd rule has a setting");
+    assert.deepEqual(seen?.effective, ["info", "warn"], "effective invents one from the table");
   });
 
   it("rejects a --rule naming this gate and a rule it does not have", async () => {

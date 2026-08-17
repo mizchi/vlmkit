@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
-import test from "node:test";
+import { existsSync } from "node:fs";
+import { test } from "vitest";
 
 type LegacyImport = {
   file: string;
@@ -9,7 +10,14 @@ type LegacyImport = {
 };
 
 const legacyScope = "@mizchi/" + "vrt-";
-const sourceRoots = ["src", "packages", "e2e"] as const;
+/**
+ * `e2e` was here until the capture spec was retired (it is now
+ * `packages/vlmkit-capture/src/route-capture.ts`, already covered by `packages`). Filtered
+ * rather than just shortened: `readdir` throws ENOENT on a missing root, so this file failed
+ * with a scandir error about a directory instead of reporting anything about imports.
+ */
+const sourceRoots = (["src", "packages", "e2e"] as const)
+  .filter((root) => existsSync(new URL(`../../${root}`, import.meta.url)));
 const ignoredDirectories = new Set(["node_modules", "dist", "_build"]);
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 

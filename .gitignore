@@ -42,4 +42,5 @@ result-*
 # heal flaky-test counter (transient)
 _flaky_count.txt
 .vlmkit/
-/examples/vlmkit-intro-page/.pages/
+# composed GitHub Pages artifact (scripts/build-pages.mjs)
+/.pages/

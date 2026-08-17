@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import {
   DEFAULT_FLAKER_VRT_CONFIG_FILE,
   loadFlakerVrtConfig,

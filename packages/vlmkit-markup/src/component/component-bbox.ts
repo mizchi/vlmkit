@@ -24,6 +24,7 @@
  */
 import { PNG } from "pngjs";
 import { readFile } from "node:fs/promises";
+import { iou } from "@mizchi/vlmkit-core/rect-overlap.ts";
 
 export interface ComponentBbox {
   top: number;
@@ -373,18 +374,6 @@ export async function extractComponentsFromFile(
   return extractComponentsFromRgba(png.data, png.width, png.height, options);
 }
 
-function iouOf(a: ComponentBbox, b: ComponentBbox): number {
-  const ix = Math.max(a.left, b.left);
-  const iy = Math.max(a.top, b.top);
-  const ax = Math.min(a.left + a.width, b.left + b.width);
-  const ay = Math.min(a.top + a.height, b.top + b.height);
-  const interW = Math.max(0, ax - ix);
-  const interH = Math.max(0, ay - iy);
-  const inter = interW * interH;
-  const union = a.width * a.height + b.width * b.height - inter;
-  return union > 0 ? inter / union : 0;
-}
-
 /**
  * Pair components by rank-after-sort-by-area. Returns matched pairs +
  * per-axis deltas. Designed for visual hierarchies that survive a
@@ -433,7 +422,7 @@ export function matchComponents(
       deltaLeft: v.left - b.left,
       deltaWidth: v.width - b.width,
       deltaHeight: v.height - b.height,
-      iou: Number(iouOf(b, v).toFixed(3)),
+      iou: Number(iou(b, v).toFixed(3)),
     });
   }
   return out;

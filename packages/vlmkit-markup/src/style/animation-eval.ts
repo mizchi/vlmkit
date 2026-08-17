@@ -27,16 +27,20 @@
  *   vlmkit check animation <html-or-url> --json --frames out/frames
  */
 import { mkdir, writeFile } from "node:fs/promises";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { composeFilmstrip, scalePngData } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -168,10 +172,12 @@ export interface AnimationEvalReport {
     windowMs: number;
     /** The instant each column was taken at, in ms from the animations' start. */
     times: number[];
-    /** Row order, top to bottom. */
+    /** Row order, top to bottom. Empty for an animated strip, which has no rows. */
     rowSelectors: string[];
   width: number;
     height: number;
+    /** True when this is an animated PNG of the whole page rather than a cropped still sheet. */
+    animated?: boolean;
   };
 }
 
@@ -205,6 +211,16 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   /** Cap the strip's width, downscaling frames to fit. Default 1600. */
   stripMaxWidth?: number;
   /**
+   * Write `stripPath` as an animated PNG of the whole page instead of a cropped still sheet.
+   *
+   * A different artifact for a different reader, not a better one. The still sheet crops each
+   * animation to its motion bbox, which is what makes a small element legible — and is exactly
+   * why a dogfood reviewer could not tell that three cards sit side by side ("each row reads as
+   * one column in 3 states"). The animated version keeps the page's real arrangement and pays for
+   * it in element size, so both stay available.
+   */
+  stripAnimated?: boolean;
+  /**
    * Page-timeline span the strip's columns cover, in ms. Defaults to when the last
    * finite animation ends, so the columns cover the part someone is reviewing rather
    * than an infinite animation's period.
@@ -223,9 +239,6 @@ interface RgbaFrame {
   data: Uint8Array;
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 /**
  * Pixel delta between two same-size RGBA frames: count, ratio, and the
@@ -396,20 +409,7 @@ export function deriveAnimationIssues(
  * the dedupe between them silently fails.
  */
 const ANIMATION_HELPERS_JS = `
-  function stableSelector(el) {
-    if (!el || !el.tagName) return "(no target)";
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
-    return el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
+  ${STABLE_SELECTOR_JS}
 
   function describeTiming(anim) {
     let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal" };
@@ -614,7 +614,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   // about:blank base URL and evaluate an unstyled page.
   const pageUrl = options.html !== undefined
     ? undefined
-    : isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+    : sourceToUrl(options.source);
   // Both passes (normal + reduced-motion emulation) go through this, so
   // --timeout / --wait-until / --har apply to both. Loading the two under
   // different rules would make the reduced-motion comparison meaningless.
@@ -845,6 +845,47 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         columns.push(await shot(`t-${timeMs}ms`));
       }
 
+      if (options.stripAnimated) {
+        // The whole page over the shared clock, as one playing file. No cropping and no grid:
+        // the point of this variant is the spatial arrangement that per-row bbox crops remove,
+        // which is what a v4 dogfood reviewer said the sheet cost them — "the fact that 3 cards
+        // are side by side is lost from the sheet".
+        if (imageFormatForPath(options.stripPath) === "webp") {
+          throw new UsageError(
+            "--strip-animated writes APNG, so --strip cannot be a .webp path.\n"
+            + "  Animated WebP needs libwebp's animation encoder, which the optional\n"
+            + "  `@jsquash/webp` does not expose. Use a .png name.",
+          );
+        }
+        // The same downscale the sheet would apply, through the same helper — two
+        // nearest-neighbour implementations would disagree about which pixel wins.
+        const cap = options.stripMaxWidth ?? 1600;
+        const factor = cap > 0 && columns[0]!.width > cap ? Math.ceil(columns[0]!.width / cap) : 1;
+        const played = factor === 1 ? columns : columns.map((frame) => scalePngData(frame, factor));
+        // Delays from the sampled instants, not a uniform value: these columns sit at 0 / 150 /
+        // 400ms on the page timeline, and playing them evenly misrepresents when the motion
+        // happened. The last frame holds for the average of the gaps before it.
+        const gaps = times.slice(1).map((t, i) => t - times[i]!);
+        const holdMs = gaps.length > 0 ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 200;
+        const bytes = encodeApng(played, { delaysMs: [...gaps, holdMs], delayMs: holdMs });
+        await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
+        await writeFile(resolve(options.stripPath), bytes);
+        strip = {
+          path: resolve(options.stripPath),
+          columns: played.length,
+          rows: 1,
+          omitted: 0,
+          outOfScope: matched === null ? 0 : evaluated.filter((a) => !matched.has(a.index)).length,
+          windowMs,
+          times,
+          // No rows to name: every animation on the page is in every frame, which is the
+          // difference this variant exists for.
+          rowSelectors: [],
+          width: played[0]!.width,
+          height: played[0]!.height,
+          animated: true,
+        };
+      } else {
       // Crop each row out of those shared frames. Every cell in a row shares ONE
       // rect: cropping per cell would re-centre the element and subtract the motion
       // the row exists to show, the same reason `composeFilmstrip` aligns top-left.
@@ -895,6 +936,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         width: sheet.width,
         height: sheet.height,
       };
+      }
     }
 
     await page.close();
@@ -962,11 +1004,9 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   });
 }
 
-export function formatAnimationEvalReport(report: AnimationEvalReport): string {
+export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((issue) => issue.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check animation${RESET}`);
   lines.push(`${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${RESET}`);
   lines.push("");
@@ -980,7 +1020,10 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
   // status line mapped to which rule." Each line now names the rule that carries it —
   // and says so explicitly when nothing does, which is the `settle: never` case
   // (`long-settle` compares a number, and there is no number when it is infinite).
-  const firedKinds = new Set(report.issues.map((issue) => issue.kind));
+  // Built from the SHOWN rows, not every issue: a `[long-settle]` tag next to `settle: 5000ms`
+  // points the reader at a rule that, with the rule off, is no longer reporting anything. The
+  // number stays — it was measured — but nothing claims a rule is carrying it.
+  const firedKinds = new Set(shown.map((entry) => entry.row.kind));
   const ruleTag = (kind: AnimationEvalIssueKind) => firedKinds.has(kind) ? ` ${DIM}[${kind}]${RESET}` : "";
   if (report.settleMs === null) {
     lines.push(
@@ -1024,17 +1067,22 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
       );
     }
   }
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+    for (const entry of shown) {
+      const issue = entry.row;
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
       const selector = issue.selector ? ` ${issue.selector}` : "";
-      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}`);
+      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No animation issues detected.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   if (report.framePaths && report.framePaths.length > 0) {
     lines.push("");

@@ -21,7 +21,7 @@ import {
   formatMotionDetectionReport,
   runMotionDetection,
 } from "../style/motion-detect.ts";
-import { firstPositional, optionalInt } from "./arg-helpers.ts";
+import { firstPositional, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const motionGate = defineGate<MotionDetectionReport, MotionDetectionOptions>({
   id: "check.motion",

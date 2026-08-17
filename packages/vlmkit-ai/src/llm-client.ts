@@ -309,26 +309,42 @@ const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set([
  *
  * Returns a config, or describes why no config was available. The
  * factory decides whether to throw based on `throwIfMissing`.
+ *
+ * ## An unrequested provider is chosen from the keys you have
+ *
+ * This used to be `options?.provider ?? readEnv("LLM_PROVIDER") ?? "gemini"` with no
+ * regard for which keys existed, so a caller that expressed no preference got gemini and
+ * then a `MISSING_KEY` naming a key it did not need. Measured with exactly one key set:
+ *
+ *     ANTHROPIC_API_KEY only  → MISSING_KEY: GEMINI_API_KEY (or GOOGLE_AI_API_KEY) is required
+ *     OPENROUTER_API_KEY only → MISSING_KEY: GEMINI_API_KEY (or GOOGLE_AI_API_KEY) is required
+ *
+ * while `createLLMProvider`, twenty lines further down this same file, returned a working
+ * client for both. Being told to obtain a key you do not need, while the one you have is
+ * ignored, sends the reader to the wrong fix.
+ *
+ * Every caller had already worked around it, in four different ways, which is what made
+ * this worth changing rather than leaving: `createLLMProvider` and
+ * `reasoning-pipeline.ts` each carry a byte-identical `["gemini", "anthropic",
+ * "openrouter"]` retry loop, and `vlmkit-plan` and `vlmkit-generate` each carry a
+ * byte-identical `resolveDefaultProvider` that picks by key presence before calling in.
+ * Four workarounds for one missing behaviour is the shared function being wrong, and the
+ * fifth caller is the one that pays for it — the same shape as eight modules hand-rolling
+ * `isUrlSource`.
+ *
+ * **An explicit request is still honoured exactly.** `{ provider: "gemini" }` or
+ * `VLMKIT_LLM_PROVIDER=gemini` with no Gemini key is a `MISSING_KEY` for *gemini*, not a
+ * silent substitution — asking for a specific provider and quietly getting another is its
+ * own kind of wrong answer. `createLLMProvider` deliberately does substitute, which is
+ * why its retry loop survives this change and is not redundant.
+ *
+ * The documented default is unchanged: gemini is first in the preference order, so a
+ * Gemini key present still means gemini.
  */
 function resolveProviderConfig(options?: LLMClientOptions):
   | { ok: true; provider: LLMProviderName; key: string; model?: string }
   | { ok: false; code: "INVALID_PROVIDER" | "MISSING_KEY"; message: string }
 {
-  const rawProvider = options?.provider
-    ?? readEnv("LLM_PROVIDER")
-    ?? "gemini";
-
-  if (!VALID_PROVIDERS.has(rawProvider as LLMProviderName)) {
-    return {
-      ok: false,
-      code: "INVALID_PROVIDER",
-      message: `Unknown VLMKIT_LLM_PROVIDER "${rawProvider}". Expected: gemini | anthropic | openrouter.`,
-    };
-  }
-  const provider = rawProvider as LLMProviderName;
-
-  const model = options?.model ?? readEnv("LLM_MODEL") ?? undefined;
-
   const keyMap: Record<LLMProviderName, string | undefined> = {
     gemini: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY,
     anthropic: process.env.ANTHROPIC_API_KEY,
@@ -339,9 +355,41 @@ function resolveProviderConfig(options?: LLMClientOptions):
     anthropic: "ANTHROPIC_API_KEY",
     openrouter: "OPENROUTER_API_KEY",
   };
+  /** Gemini first, so the documented default wins whenever its key is present. */
+  const PREFERENCE: readonly LLMProviderName[] = ["gemini", "anthropic", "openrouter"];
+
+  const requested = options?.provider ?? readEnv("LLM_PROVIDER");
+  const model = options?.model ?? readEnv("LLM_MODEL") ?? undefined;
+
+  if (requested === undefined) {
+    // Nothing was asked for, so any keyed provider is a correct answer and the preference
+    // order decides. Only when none of them has a key is this a MISSING_KEY, and then the
+    // message names all three rather than pointing at gemini alone.
+    const provider = PREFERENCE.find((p) => keyMap[p]);
+    if (!provider) {
+      return {
+        ok: false,
+        code: "MISSING_KEY",
+        message: `No LLM API key found. Set one of: ${PREFERENCE.map((p) => envVarName[p]).join(", ")}`
+          + ` — or pick a provider explicitly with VLMKIT_LLM_PROVIDER.`,
+      };
+    }
+    return { ok: true, provider, key: keyMap[provider]!, model };
+  }
+
+  if (!VALID_PROVIDERS.has(requested as LLMProviderName)) {
+    return {
+      ok: false,
+      code: "INVALID_PROVIDER",
+      message: `Unknown VLMKIT_LLM_PROVIDER "${requested}". Expected: gemini | anthropic | openrouter.`,
+    };
+  }
+  const provider = requested as LLMProviderName;
 
   const key = keyMap[provider];
   if (!key) {
+    // Named explicitly, so name what it needs — substituting silently would answer a
+    // question the caller did not ask.
     return {
       ok: false,
       code: "MISSING_KEY",

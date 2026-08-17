@@ -16,7 +16,7 @@ import {
   formatAssetCheckReport,
   runAssetCheck,
 } from "../asset/asset-check.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const assetGate = defineGate<AssetCheckReport, AssetCheckOptions>({
   id: "check.asset",

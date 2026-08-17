@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-mcp",
-  "version": "0.9.1",
+  "version": "0.11.0",
   "type": "module",
   "private": true,
   "exports": {
@@ -8,7 +8,7 @@
     "./*.ts": "./src/*.ts"
   },
   "scripts": {
-    "test": "node --test 'src/**/*.test.ts'"
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-mcp/src"
   },
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",

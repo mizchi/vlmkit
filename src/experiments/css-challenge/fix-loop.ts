@@ -11,6 +11,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
@@ -35,7 +36,7 @@ const TMP = join(process.cwd(), "test-results", "fix-loop");
 
 // ---- Main ----
 
-async function main() {
+export async function runCssFixLoop() {
   await mkdir(TMP, { recursive: true });
 
   const fixturePath = getCssChallengeFixturePath(FIXTURE);
@@ -209,13 +210,24 @@ async function main() {
         const match = trimmed.match(/^([^{]+)\{([^}]+)\}\s*$/);
         if (match && match[1].trim() === f.selector) {
           const body = match[2];
-          const propRegex = new RegExp(`${escapeRegex(f.property)}\\s*:[^;]+;?`);
+          // `(?<![\\w-])` so `color` cannot match inside `border-color`. Without it,
+          // `String.replace` takes the first match, so a proposed fix for `color` on
+          // `.card { border-color: red; color: blue; }` rewrote `border-color` and left
+          // `color` alone — the wrong property patched AND `border-` left dangling. The
+          // apply-and-rollback gate then sees the diff get worse and blames the model's
+          // fix rather than this line. Same defect as `removeCssProperty` carried until
+          // 2026-08-14; this is a separate hand-rolled copy of it.
+          const propRegex = new RegExp(`(?<![\\w-])${escapeRegex(f.property)}\\s*:[^;]+;?`);
           if (propRegex.test(body)) {
             const newBody = body.replace(propRegex, `${f.property}: ${f.value};`);
             lines[i] = `${f.selector} { ${newBody.trim()} }`;
           } else {
-            const newBody = `${body.trim()} ${f.property}: ${f.value};`;
-            lines[i] = `${f.selector} { ${newBody} }`;
+            // Terminate first: a trailing semicolon is optional in CSS, so appending to
+            // `.card { color: red }` produced `.card { color: red padding: 4px; }` and
+            // destroyed the declaration already there.
+            const existing = body.trim();
+            const terminated = existing === "" || existing.endsWith(";") ? existing : `${existing};`;
+            lines[i] = `${f.selector} { ${`${terminated} ${f.property}: ${f.value};`.trim()} }`;
           }
           patched = true;
           applied++;
@@ -291,7 +303,8 @@ async function main() {
   process.exit(fixed ? 0 : 1);
 }
 
-// CLI guard
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "fix-loop" || process.argv[1]?.endsWith("fix-loop.ts")) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded via the shared helper: the old suffix match could not tell
+// `fix-loop.ts` from another file ending in the same name.
+if (isCliEntry(import.meta.url, "fix-loop")) {
+  runCssFixLoop().catch((e) => { console.error(e); process.exitCode = 1; });
 }

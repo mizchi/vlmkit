@@ -7,11 +7,12 @@
  *   vlmkit snapshot http://localhost:3000/ http://localhost:3000/luna/ --output snapshots/sol/
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { applyMask } from "@mizchi/vlmkit-core/mask.ts";
+import { applyMask, formatMaskProblems, MaskTally } from "@mizchi/vlmkit-core/mask.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { approveSnapshotsFromReport } from "./approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
@@ -213,6 +214,9 @@ async function runStability(options: {
 
   const browser = await options.backend.launch();
   const iterations: StabilityIterationResult[] = [];
+  // Accumulated across pages × viewports: an invalid selector is said once, and
+  // "matched nothing" is only worth saying for a selector that matched nothing anywhere.
+  const maskTally = new MaskTally();
 
   try {
     for (let iter = 0; iter < options.iterations; iter++) {
@@ -224,7 +228,10 @@ async function runStability(options: {
         for (const vp of VIEWPORTS) {
           const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
           await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-          await applyMask(page, options.maskSelectors);
+          maskTally.add(await applyMask(page, options.maskSelectors));
+          for (const bad of maskTally.takeNewInvalid()) {
+            console.log(`  ${YELLOW}warn: --mask ${bad} is not valid CSS — it masks nothing.${RESET}`);
+          }
 
           const currentPath = iter === 0
             ? join(options.outputDir, `${label}-${vp.label}-baseline.png`)
@@ -284,6 +291,11 @@ async function runStability(options: {
     await options.backend.close(browser);
   }
 
+  // The `Mask: <selectors>` line above claims every selector was applied. Say where that
+  // claim did not hold, once, now that every page has been seen.
+  const maskProblems = formatMaskProblems(maskTally.takeNewInvalid(), maskTally.neverMatched());
+  if (maskProblems) console.log(`  ${YELLOW}warn: --mask ${maskProblems}${RESET}`);
+
   const report = buildStabilityReport({
     iterations: options.iterations,
     urls: options.urls,
@@ -340,11 +352,14 @@ async function runStability(options: {
   }
   console.log();
 
+  // Returned, not assigned: a helper that reaches for `process.exitCode` fails the
+  // whole process, including a test runner that called it to check this very branch.
   if (options.failAboveRate !== undefined && report.overallFalsePositiveRate > options.failAboveRate) {
     console.log(`  ${RED}FP rate ${(report.overallFalsePositiveRate * 100).toFixed(2)}% exceeds --fail-above-rate ${(options.failAboveRate * 100).toFixed(2)}%${RESET}`);
     console.log();
-    process.exitCode = 1;
+    return 1;
   }
+  return 0;
 }
 
 async function runStabilityHistory(options: {
@@ -446,21 +461,47 @@ async function runDiffFlipbook(options: {
   console.log();
 }
 
-async function main() {
-  const cliArgs = process.argv.slice(2);
+/**
+ * `vlmkit snapshot` end to end.
+ *
+ * Exported, argv-taking, exit-code-returning — the same shape every gate has, and
+ * for the same three reasons. This was a bare `main()` reading `process.argv` and
+ * assigning `process.exitCode` until v7, which made 318 statements of a shipped
+ * command reachable only by spawning a subprocess:
+ *
+ *   1. **argv is an argument**, so a caller can drive a mode without building a
+ *      command line and re-parsing it.
+ *   2. **the exit code is RETURNED**, never assigned. A test that ran this
+ *      in-process would otherwise inherit the failure — `process.exitCode` is the
+ *      whole process's, and a snapshot that legitimately reports a regression
+ *      would fail the test suite that asked it to.
+ *   3. **cwd is an argument**, because `process.chdir` is process-wide and vitest
+ *      runs files in shared workers. A test needing a temp directory cannot use it
+ *      without corrupting whatever runs alongside.
+ */
+export async function runSnapshotCli(
+  cliArgs: readonly string[],
+  options: { cwd?: string } = {},
+): Promise<number> {
   if (cliArgs.length === 0 || cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
     console.log(formatSnapshotUsage());
-    process.exit(cliArgs.length === 0 ? 1 : 0);
+    return cliArgs.length === 0 ? 1 : 0;
   }
 
-  const cwd = process.cwd();
-  const { config, configPath } = await loadSnapshotConfigForCli(cliArgs, cwd);
-  const parsed = parseSnapshotCliArgs(cliArgs, config, cwd);
-  const outputDir = resolve(parsed.outputDir);
+  const cwd = options.cwd ?? process.cwd();
+  const { config, configPath } = await loadSnapshotConfigForCli([...cliArgs], cwd);
+  const parsed = parseSnapshotCliArgs([...cliArgs], config, cwd);
+  // Against `cwd`, not the process's. The parser already resolves its DEFAULT
+  // against cwd (`${cwd}/test-results/snapshots`) while an explicit `--output`
+  // arrives as written, so a bare `resolve()` honoured the cwd for one and ignored
+  // it for the other. Invisible while cwd was always `process.cwd()`; a real
+  // inconsistency the moment it became a parameter, and `resolve` is a no-op on the
+  // absolute default either way.
+  const outputDir = resolve(cwd, parsed.outputDir);
 
   if (parsed.mode === "approve") {
     await approve({ outputDir, labels: parsed.labels, configPath });
-    return;
+    return 0;
   }
 
   if (parsed.mode === "fix-prompt") {
@@ -470,7 +511,7 @@ async function main() {
       fixPrompt: parsed.fixPrompt!,
       configPath,
     });
-    return;
+    return 0;
   }
 
   if (parsed.mode === "flipbook") {
@@ -481,7 +522,7 @@ async function main() {
       flipbookOutDir: parsed.flipbook!.outDir,
       configPath,
     });
-    return;
+    return 0;
   }
 
   if (parsed.mode === "stability-history") {
@@ -489,7 +530,7 @@ async function main() {
       reportPaths: parsed.urls,
       outPath: parsed.stabilityHistory?.outPath,
     });
-    return;
+    return 0;
   }
 
   const { backend: captureBackend, source: backendSource } = resolveCaptureBackend({
@@ -497,7 +538,7 @@ async function main() {
   });
 
   if (parsed.mode === "stability") {
-    await runStability({
+    return await runStability({
       urls: parsed.urls,
       labels: parsed.labels,
       outputDir,
@@ -510,7 +551,7 @@ async function main() {
       backend: captureBackend,
       flipbook: parsed.stability!.flipbook,
     });
-    return;
+    return 0;
   }
 
   const urls = parsed.urls;
@@ -538,6 +579,7 @@ async function main() {
 
   const browser = await captureBackend.launch();
   const results: SnapshotResult[] = [];
+  const maskTally = new MaskTally();
 
   try {
     for (const [index, url] of urls.entries()) {
@@ -547,7 +589,10 @@ async function main() {
       for (const vp of VIEWPORTS) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-        await applyMask(page, parsed.maskSelectors);
+        maskTally.add(await applyMask(page, parsed.maskSelectors));
+        for (const bad of maskTally.takeNewInvalid()) {
+          console.log(`  ${YELLOW}warn: --mask ${bad} is not valid CSS — it masks nothing.${RESET}`);
+        }
 
         const currentPath = join(outputDir, `${label}-${vp.label}-current.png`);
         await page.screenshot({ path: currentPath, fullPage: true });
@@ -622,6 +667,14 @@ async function main() {
   hr();
   console.log();
 
+  // Above the diff numbers, because a mask that did not apply is the reason some of them
+  // are non-zero — and the run's `Mask:` line claimed otherwise.
+  const maskProblems = formatMaskProblems(maskTally.takeNewInvalid(), maskTally.neverMatched());
+  if (maskProblems) {
+    console.log(`  ${YELLOW}warn: --mask ${maskProblems}${RESET}`);
+    console.log();
+  }
+
   const compared = results.filter((r) => !r.isNew);
   const newBaselines = results.filter((r) => r.isNew);
   const falsePositives = compared.filter((r) => (r.diffRatio ?? 0) > 0);
@@ -692,11 +745,18 @@ async function main() {
     for (const reason of exitStatus.reasons) {
       console.log(`    ${RED}- ${reason}${RESET}`);
     }
-    process.exitCode = exitStatus.exitCode;
+    console.log();
+    return exitStatus.exitCode;
   }
   console.log();
+  return 0;
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "snapshot" || process.argv[1]?.endsWith("snapshot.ts")) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+if (isCliEntry(import.meta.url, "snapshot")) {
+  // The guard owns `process.exitCode`; the function above only reports what it
+  // should be. Assigning rather than `process.exit` so buffered stdout still
+  // flushes — the defect `applyGateExit` exists for.
+  runSnapshotCli(process.argv.slice(2))
+    .then((code) => { process.exitCode = code; })
+    .catch((e) => { console.error(e); process.exitCode = 1; });
 }

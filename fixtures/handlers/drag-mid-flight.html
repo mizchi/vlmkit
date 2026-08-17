@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What happens during the drag</title>
+<!--
+  Two defects that only exist while the drag is in flight. Both pages "work": the drop lands, the
+  data arrives, and nothing about the outcome is wrong.
+
+    #vanishes   removes itself from the document in `dragstart` — the optimistic update done with
+                `remove()` instead of a class. `dragend` fires on the element being dragged, and a
+                detached element never gets it, so every cleanup wired there is skipped
+                                                             -> drag-source-detached-mid-drag
+    #slow-zone  a `dragover` handler that spends 80ms per event. `dragover` fires every frame while
+                the pointer is over the target, so the drag stutters for as long as it stays
+                                                             -> dragover-handler-slow
+
+  Measured with `--probe-drag`:
+
+    source        dragend seen
+    #plain        yes                       (the control — same drag, node stays in the document)
+    #vanishes     NO
+
+    zone          gap between consecutive dragovers
+    #fast-zone    1.3-1.7ms                 (the control — a handler that returns immediately)
+    #slow-zone    82.1-82.2ms               (stable across three runs)
+
+  The 1-2ms floor is the injected mouse moves, not the page, which is why the threshold sits at
+  50ms — far above the driver and far below the defect.
+
+  #plain is dragged first and #vanishes second, deliberately: the probe drags each source in
+  document order, and a source that deletes itself must not be the one that decides what the
+  controls measure.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; display: flex; gap: 16px; }
+  .card { background: #1a6ed8; color: #fff; padding: 8px 12px; width: 140px; height: 40px; cursor: grab; }
+  .card.broken { background: #b3261e; }
+  .zone { width: 150px; height: 90px; background: #eceff4; padding: 8px; }
+  .zone.broken { background: #fbeaea; }
+</style>
+</head>
+<body>
+
+<div class="card" id="plain" draggable="true" tabindex="0" onkeydown="void 0">stays in the DOM</div>
+<div class="card broken" id="vanishes" draggable="true" tabindex="0" onkeydown="void 0">removes itself</div>
+
+<div class="zone" id="fast-zone">fast dragover</div>
+<div class="zone broken" id="slow-zone">dragover spends 80ms</div>
+
+<script>
+  for (const id of ["plain", "vanishes"]) {
+    document.getElementById(id).addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", id);
+    });
+  }
+  // Deferred a tick, as real code must: removing the source synchronously inside dragstart
+  // cancels the drag before it begins.
+  document.getElementById("vanishes").addEventListener("dragstart", () => {
+    setTimeout(() => document.getElementById("vanishes").remove(), 0);
+  });
+  // The cleanup that never runs for #vanishes.
+  document.getElementById("vanishes").addEventListener("dragend", () => {
+    document.body.classList.remove("dragging");
+  });
+
+  const fast = document.getElementById("fast-zone");
+  fast.addEventListener("dragover", (e) => e.preventDefault());
+  fast.addEventListener("drop", (e) => e.preventDefault());
+
+  const slow = document.getElementById("slow-zone");
+  slow.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    // Stands in for the real thing: a layout read per frame, a full list re-render, a hit test
+    // over every item to decide the insertion point.
+    const until = performance.now() + 80;
+    while (performance.now() < until);
+  });
+  slow.addEventListener("drop", (e) => e.preventDefault());
+</script>
+</body>
+</html>

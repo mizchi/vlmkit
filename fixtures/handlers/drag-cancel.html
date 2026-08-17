@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A drag the user cancels</title>
+<!--
+  Both cards below make the optimistic change every sortable list makes: on `dragstart` they hide
+  themselves, because the item is "leaving". One of them undoes it on `dragend`, and one only
+  undoes it on `drop`.
+
+  A user who presses Escape gets the second one wrong — the drag is cancelled, no `drop` ever
+  runs, and the card is gone for good. `dragend` fires either way, which is why it is the place
+  to undo an optimistic change.
+
+    #restores   removes the class in `dragend`  -> nothing to report
+    #strands    removes it in `drop` only       -> drag-cancel-not-reverted
+
+  Measured with `--probe-drag`, which presses Escape mid-flight and compares the card's own box
+  either side of the gesture: #restores reads 0.00%, #strands reads 99.03%. Both report `dragend`
+  carrying `dropEffect: "none"`, the browser's own statement that the drag was cancelled — the
+  finding needs that as well as the pixels, so a drag that legitimately completed and changed the
+  page cannot be mistaken for this.
+
+  Note the two signals are read from different places and neither is enough alone. `dropEffect`
+  says "the drag was cancelled" and nothing about the page; the pixels say "this box changed" and
+  nothing about why.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; display: flex; gap: 16px; }
+  .card { background: #1a6ed8; color: #fff; padding: 8px 12px; width: 150px; height: 40px; cursor: grab; }
+  .card.broken { background: #b3261e; }
+  .gone { visibility: hidden; }
+  .zone { width: 170px; height: 90px; background: #eceff4; padding: 8px; }
+</style>
+</head>
+<body>
+
+<div class="card" id="restores" draggable="true" tabindex="0" onkeydown="void 0">undone in dragend</div>
+<div class="card broken" id="strands" draggable="true" tabindex="0" onkeydown="void 0">undone in drop only</div>
+<div class="zone" id="zone">zone</div>
+
+<script>
+  for (const [id, undoInDragEnd] of [["restores", true], ["strands", false]]) {
+    const card = document.getElementById(id);
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", id);
+      // Deferred a tick: hiding the source synchronously inside dragstart cancels the drag in
+      // some browsers, so real code defers it. Same reason it is done that way here.
+      setTimeout(() => card.classList.add("gone"), 0);
+    });
+    if (undoInDragEnd) {
+      card.addEventListener("dragend", () => card.classList.remove("gone"));
+    }
+  }
+
+  const zone = document.getElementById("zone");
+  zone.addEventListener("dragover", (e) => e.preventDefault());
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    // The undo that only runs on a successful drop, which is the defect for #strands.
+    for (const id of ["restores", "strands"]) document.getElementById(id).classList.remove("gone");
+  });
+</script>
+</body>
+</html>

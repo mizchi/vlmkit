@@ -406,7 +406,12 @@ export function smallFrameHintSection(
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
+  // Remembered BEFORE the erase. Blanking argv is what routes `--help` to the usage
+  // branch, and it is also what made `--help` indistinguishable from "you forgot the
+  // arguments" — so the usage branch exited 1 either way. Asking for help is a request
+  // that succeeded.
+  const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
+  if (askedForHelp) argv = [];
   const { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vlmkit scan component <screenshot.png> [options]");
@@ -423,7 +428,9 @@ async function main(argv = process.argv.slice(2)) {
     console.log("                          for low-resolution / high-contrast frames");
     console.log("  --output-dir <dir>      Default: ./test-results/component-extract");
     console.log("  --report <path>         Markdown report path");
-    process.exit(1);
+    // 0 when help was asked for, 1 when the arguments are simply missing. Same two
+    // lines of usage, two different answers to "did this invocation succeed".
+    process.exit(askedForHelp ? 0 : 1);
   }
   await runComponentExtract({
     source: positional[0]!,

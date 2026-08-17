@@ -2,6 +2,31 @@
 # Smoke test for the markup-assistance toolkit.
 # Runs every CLI on a canonical fixture and verifies it produces a
 # report file. Run from the repo root.
+#
+# ## What "pass" means here, and why it is not exit 0
+#
+# Most of these fixtures are DELIBERATELY BROKEN — `low-contrast/page.html`,
+# `button-overflow/page.html`, `reversed/page.html`, `hostile.html`, `inline-leak/page.html`.
+# A gate that finds their defects exits 1, and that is the gate working. Requiring exit 0
+# marked six working gates as failures, and the previous version of this file had already
+# hit the problem once and papered over that one case with `|| true`.
+#
+# So the pass condition is **the report file was written**. That separates the two outcomes
+# the smoke actually cares to distinguish:
+#
+#   ran, found defects   exit 1 + report written   -> PASS (the CLI works)
+#   broken invocation    exit 1 + NO report        -> FAIL (usage error, crash, dead command)
+#
+# A usage error dies before measuring anything, so it cannot write a report. That is what
+# makes the file the right discriminator rather than the exit code.
+#
+# ## Every command here was renamed in 0.6
+#
+# The flat forms this file used — `a11y-contrast`, `component-from-image`, `png-diff` — were
+# grouped (`check a11y contrast`, `build component`, `diff png`). None of them route any
+# more, so the script was 0/22 for an unknown number of releases while `Taskfile.pkl`
+# advertised it as the `smoke-all` gate. `src/cli/smoke-commands.test.ts` now asserts every
+# command named below still routes, so this cannot rot silently again.
 set -u
 
 PASS=()
@@ -13,15 +38,17 @@ run() {
   shift 2
   local outdir="$OUT_BASE/$label"
   rm -rf "$outdir"
-  if "$@" > "$OUT_BASE/$label.log" 2>&1; then
-    # `-` means stdout-only (no file output to check).
-    if [[ "$expected_file" == "-" ]] || [[ -e "$outdir/$expected_file" ]]; then
-      PASS+=("$label")
-    else
-      FAIL+=("$label (no $expected_file)")
-    fi
+  "$@" > "$OUT_BASE/$label.log" 2>&1
+  local status=$?
+  # `-` means stdout-only (no file output to check), so there exit 0 is all we have.
+  if [[ "$expected_file" == "-" ]]; then
+    if [[ $status -eq 0 ]]; then PASS+=("$label"); else FAIL+=("$label (exit $status)"); fi
+    return
+  fi
+  if [[ -e "$outdir/$expected_file" ]]; then
+    PASS+=("$label")
   else
-    FAIL+=("$label (exit $?)")
+    FAIL+=("$label (exit $status, no $expected_file)")
   fi
 }
 
@@ -29,115 +56,117 @@ mkdir -p "$OUT_BASE"
 
 # Markup-assistance commands (new)
 run "component-from-image" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts component-from-image \
+  node --experimental-strip-types src/cli/vlmkit.ts build component \
     fixtures/wireframe/pricing-card/target-desktop.png \
     fixtures/wireframe/pricing-card/blank.html \
     --output-dir "$OUT_BASE/component-from-image"
 
 run "multi-page-consistency" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts multi-page-consistency \
+  node --experimental-strip-types src/cli/vlmkit.ts check drift pages \
     --selector .footer \
-    --files fixtures/multi-page/footer-drift/about.html fixtures/multi-page/footer-drift/blog.html fixtures/multi-page/footer-drift/pricing.html \
+    --files fixtures/multi-page/footer-drift/about.html \
+    --files fixtures/multi-page/footer-drift/blog.html \
+    --files fixtures/multi-page/footer-drift/pricing.html \
     --output-dir "$OUT_BASE/multi-page-consistency"
 
 run "component-consistency" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts component-consistency \
+  node --experimental-strip-types src/cli/vlmkit.ts check drift component \
     fixtures/component-consistency/inline-leak/page.html \
     --selector .card \
     --output-dir "$OUT_BASE/component-consistency"
 
 run "theme-parity" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts theme-parity \
+  node --experimental-strip-types src/cli/vlmkit.ts check theme \
     fixtures/theme-parity/card-with-bug/buggy.html \
     --output-dir "$OUT_BASE/theme-parity"
 
 run "i18n-stress" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts i18n-stress \
+  node --experimental-strip-types src/cli/vlmkit.ts stress i18n \
     fixtures/i18n-stress/button-overflow/page.html \
     --output-dir "$OUT_BASE/i18n-stress"
 
 run "a11y-contrast" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts a11y-contrast \
+  node --experimental-strip-types src/cli/vlmkit.ts check a11y contrast \
     fixtures/a11y-contrast/low-contrast/page.html \
     --output-dir "$OUT_BASE/a11y-contrast"
 
 run "a11y-touch" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts a11y-touch \
+  node --experimental-strip-types src/cli/vlmkit.ts check a11y touch \
     fixtures/a11y-touch/small-targets/page.html \
     --output-dir "$OUT_BASE/a11y-touch"
 
 run "a11y-focus-order" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts a11y-focus-order \
+  node --experimental-strip-types src/cli/vlmkit.ts check a11y focus \
     fixtures/a11y-focus-order/reversed/page.html \
     --output-dir "$OUT_BASE/a11y-focus-order"
 
 run "component-from-image-typo" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts component-from-image \
+  node --experimental-strip-types src/cli/vlmkit.ts build component \
     fixtures/typography/wrong-size-weight/target.png \
     fixtures/typography/wrong-size-weight/buggy.html \
     --output-dir "$OUT_BASE/component-from-image-typo"
 
 run "interact" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts interact \
+  node --experimental-strip-types src/cli/vlmkit.ts inspect interact \
     fixtures/interact/dropdown-form/page.html \
     --sequence fixtures/interact/dropdown-form/sequence.json \
     --output-dir "$OUT_BASE/interact"
 
 run "form-validation-diff" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts interact \
+  node --experimental-strip-types src/cli/vlmkit.ts inspect interact \
     fixtures/interact/form-validation/page.html \
     --sequence fixtures/interact/form-validation/sequence.json \
     --output-dir "$OUT_BASE/form-validation-diff"
 
 run "media-variants" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts media-variants \
+  node --experimental-strip-types src/cli/vlmkit.ts stress media \
     fixtures/media-variants/card/hostile.html \
     --output-dir "$OUT_BASE/media-variants"
 
 run "cross-browser" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts cross-browser \
+  node --experimental-strip-types src/cli/vlmkit.ts diff browsers \
     fixtures/wireframe/pricing-card/reference.html \
     --allow-skipped \
     --output-dir "$OUT_BASE/cross-browser"
 
 run "design-tokens" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts design-tokens \
+  node --experimental-strip-types src/cli/vlmkit.ts check tokens \
     fixtures/design-tokens/off-scale/page.html \
     --output-dir "$OUT_BASE/design-tokens"
 
 run "perf" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts perf \
+  node --experimental-strip-types src/cli/vlmkit.ts check perf \
     fixtures/perf/cls-bug/page.html \
     --output-dir "$OUT_BASE/perf"
 
 run "explore" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts explore \
+  node --experimental-strip-types src/cli/vlmkit.ts inspect explore \
     fixtures/explore/declarative/page.html \
     --output-dir "$OUT_BASE/explore"
 
-# --strict-timing flags the byte-identical-PNG silent-handler case
-# (#8). The fixture deliberately triggers a silent handler so the
-# exit code is 1 — wrap with `|| true` so the smoke survives. The
-# log assertion stays on `report.md` being emitted.
+# --strict-timing flags the byte-identical-PNG silent-handler case (#8). The fixture
+# deliberately triggers a silent handler, so exit 1 is the finding — no longer wrapped in
+# `bash -c "... || true"`, because the report-file criterion above covers every gate that
+# fails a broken fixture rather than just this one.
 run "explore-strict-timing" "report.md" \
-  bash -c "node --experimental-strip-types src/cli/vlmkit.ts explore \
+  node --experimental-strip-types src/cli/vlmkit.ts inspect explore \
     fixtures/explore/byte-identical-bug/silent-listener.html \
-    --output-dir '$OUT_BASE/explore-strict-timing' \
-    --strict-timing || true"
+    --output-dir "$OUT_BASE/explore-strict-timing" \
+    --strict-timing
 
 # --heal-all probes the selector healer on every successful selector
 # step in an `interact` sequence, surfacing "did you mean" siblings
 # (#11). Fixture has a btn-primary / btn-secondary pair that fires
 # the healer with confidence ~13%.
 run "interact-heal-all" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts interact \
+  node --experimental-strip-types src/cli/vlmkit.ts inspect interact \
     fixtures/interact/heal-all-demo/page.html \
     --sequence fixtures/interact/heal-all-demo/sequence.json \
     --output-dir "$OUT_BASE/interact-heal-all" \
     --heal-all
 
 run "component-extract" "report.md" \
-  node --experimental-strip-types src/cli/vlmkit.ts component-extract \
+  node --experimental-strip-types src/cli/vlmkit.ts scan component \
     fixtures/wireframe/pricing-card/target-desktop.png \
     --crop 0 \
     --output-dir "$OUT_BASE/component-extract"
@@ -152,7 +181,7 @@ run "skill-pricing-card" "report.md" \
 
 # Migration mode (existing) — uses the shadcn fixture
 run "compare" "diff-report.json" \
-  node --experimental-strip-types src/cli/vlmkit.ts compare \
+  node --experimental-strip-types src/cli/vlmkit.ts migration compare \
     --dir fixtures/migration/shadcn-to-luna \
     --baseline before.html --variants after-blank.html \
     --output-dir "$OUT_BASE/compare" \
@@ -160,7 +189,7 @@ run "compare" "diff-report.json" \
 
 # Existing image tools
 run "png-diff" "-" \
-  node --experimental-strip-types src/cli/vlmkit.ts png-diff \
+  node --experimental-strip-types src/cli/vlmkit.ts diff png \
     fixtures/wireframe/pricing-card/target-desktop.png \
     fixtures/wireframe/pricing-card/target-desktop.png \
     --output-dir "$OUT_BASE/png-diff"

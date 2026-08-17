@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -62,9 +62,20 @@ describe("package manifest for publishable CLI", () => {
     const scripts = pkg.scripts as Record<string, string> | undefined;
 
     assert.ok(scripts, "package.json should define scripts");
-    assert.match(scripts.test, /examples\/\*\*\/\*\.test\.mjs/);
-    assert.equal(scripts["test:examples"], "node --test 'examples/**/*.test.mjs'");
+    assert.equal(scripts["test:examples"], "vitest run examples");
     assert.equal(scripts["dogfood:markup-vrt:offline"], "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs");
+  });
+
+  it("keeps the example tests inside the default suite, wherever the globs live", async () => {
+    // This used to read `assert.match(scripts.test, /examples.*test\.mjs/)`, which
+    // stopped meaning anything the moment the runner moved: `vitest run` names no
+    // globs at all. The guard's intent — an example that breaks fails `pnpm test` —
+    // now has to be checked where the globs actually are.
+    const config = await readFile(new URL("../../vitest.config.ts", import.meta.url), "utf8");
+    assert.match(config, /"examples\/\*\*\/\*\.test\.mjs"/);
+    assert.match(config, /"src\/\*\*\/\*\.test\.ts"/);
+    assert.match(config, /"packages\/\*\/src\/\*\*\/\*\.test\.ts"/);
+    assert.match(config, /"tests\/\*\*\/\*\.test\.mjs"/);
   });
 
   it("keeps the packed markup-loop install smoke explicit and out of unit tests", async () => {

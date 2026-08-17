@@ -139,7 +139,45 @@ Gates that identify by DOM path (`check interactions`, `scan handlers`) or by
 role (`check design`) put that in `evidence` instead, rather than filling
 `selector` with a string nothing can query.
 
-### Rule settings
+### The public surface
+
+The contract above is only usable if an author can find it. Two subpaths are the
+API; everything else in these packages is internal and may move.
+
+| Subpath | Contains | Costs |
+|---|---|---|
+| `@mizchi/vlmkit-core/plugin` | `defineGate` / `definePlugin`, the types, the page-load inputs, argv helpers, `UsageError`, colours, project paths, `PLUGIN_API_VERSION` | ~25ms to import |
+| `@mizchi/vlmkit-core/plugin/browser` | `withBrowser`, `openSource`, `applyHar`, auth state, the run ledger | ~441ms more |
+| `@mizchi/vlmkit-markup/rules` | 33 pure judges + 14 `COLLECT_*` scripts + both exemption forms | no browser, ever |
+
+Three decisions worth keeping:
+
+**The first entry's contents were counted, not chosen.** They are exactly what
+the 27 bundled gates import — 40 of the contract, 18 of `page-load`, 15 of
+`arg-reader`, 11 of `cli-error`, 1 of `terminal-colors`. A surface picked by
+taste drifts from what gates need; one derived from what they import cannot. A
+plugin that needs something absent is evidence of a gap in the entry rather than
+a licence to reach past it, and `examples/gate-plugin/` is guarded to prove the
+entry stays sufficient.
+
+**The browser half is separate because it is 17x the cost.** Measured: the entry
+loads in ~25ms, adding `browser-launch` costs ~441ms, and Playwright itself is
+not even loaded — that is the capture chain alone. A gate that reads a file (the
+house-brand example) would pay it for nothing.
+
+**`@mizchi/vlmkit-markup/rules` declares a split that already existed.** Every
+gate is `COLLECT_*` (a string evaluated in a page) → samples (plain JSON) → a
+pure judge → findings. Making both halves importable means a project can run a
+rule from any driver, test one without a browser, or reuse one inside its own
+gate. Purity is enforced by a test that inspects `process.moduleLoadList` after
+importing the barrel, not by convention — and it was verified to fail by
+injecting a browser import into a judge.
+
+The `./*.ts` export pattern still resolves every internal module. Removing it
+would break this repo's own deep imports and any consumer already using them, so
+it stays — as a capability, not a promise.
+
+## Rule settings
 
 eslint-shaped, and validated against the declared table:
 
@@ -179,6 +217,64 @@ must be enumerable (`vlmkit rules`, `vlmkit gates suppressions`), and a silenced
 finding is *reported as silenced* rather than dropped — the runner prints
 `N finding(s) suppressed by rule settings (text-collision x3)` next to the
 verdict.
+
+#### Whether the gate's own prose knows
+
+Suppression happens on the runner's normalized finding list; a gate's prose is
+rendered from its raw report. A formatter that does not take the rule view
+therefore prints findings that were suppressed and counts them on its own status
+line, above a verdict and an exit code that do not. `format.length < 2` is how the
+runner detects that, and it appends a disclaimer ("The report above was rendered
+before those settings were applied…") rather than letting the two halves disagree
+silently.
+
+**All 27 gates render their settings themselves** — the last 16 landed together.
+`src/cli/gate-registry.test.ts` asserts the aware list by name and the blind list as
+empty, so a gate added tomorrow with a one-parameter formatter fails there and gets
+named rather than silently restarting the backlog. The disclaimer branch stays live
+for gates outside this repo: a project's own gate follows the one-parameter form in
+`docs/authoring-gates.md` and hits it on its first `--rule x=off`.
+
+Two projections do the work. Seven gates share a report shape — `issues[]` with a
+`kind` and a `severity` — and go through `tierIssues` / `retuneNote` in
+`packages/vlmkit-markup/src/rule-prose.ts`; the rest call `applyRuleTiers` or
+`ruleTier` directly, because a helper covering `check layout`'s per-viewport checks,
+`check story`'s outcomes and `verify markup`'s targets would need more configuration
+than the code it replaced.
+
+One rule survived all 27 migrations and is worth stating on its own: **a measurement
+does not stop existing because a rule was turned off**. `check breakpoints` still
+prints `768px: 1 spike(s)`, `check perf` still prints the CLS number, `check story`
+still prints `4.00% diff`, `check layout` still prints `1/2 rules` and every failing
+check's measured value. What a setting changes is the marker, the failure claim and
+the verdict word — and a line naming what was dropped, so a smaller screen is never
+mistaken for a cleaner page. Two gates state a verdict recomputed from what still
+reports (`check layout`'s `SATISFIED`, `verify markup`'s `DONE`), each annotated with
+why it disagrees with the raw report.
+
+A migrated formatter asks `rules.setting(id)`, **never `rules.effective(id)`**:
+
+| | |
+|---|---|
+| `setting(id)` | the explicit project setting, or `undefined` when nobody set one |
+| `effective(id)` | the same, falling back to the severity the gate *declared* |
+
+The fallback is the trap, and it is not hypothetical. `applyRuleSettings` re-tunes a
+finding only when a setting exists — a gate is free to emit a severity that differs
+from its table, and `check integrity` does: `js-error` is a fail during construction
+and a warn after load; `text-clipped` and `degenerate-render` grade the same way. A
+formatter reading `effective` upgrades those back to the declared severity, which is
+how the gate that pioneered rule-aware prose came to print
+
+```
+verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+  exits 0 — 1 warn(s) did not fail this command.
+```
+
+on a page whose script throws after load — two adjacent lines, one from the gate and
+one from the runner. `ruleTier(rules, id, emittedSeverity)` in
+`@mizchi/vlmkit-core/plugin/rule-tier.ts` is the shared version of the correct rule,
+with `applyRuleTiers` for row lists and `hiddenByRuleNote` for the disclosure line.
 
 ### Rule settings vs. `--allow` vs. suppressions
 
@@ -280,32 +376,32 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 27 gates (123 tunable rules)
+## The 27 gates (165 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
 | `check integrity` | 19 | markup |
-| `check layout` | 11 | markup |
+| `check layout` | 12 | markup |
 | `check copy` | 6 | markup |
-| `check interactions` | 15 | markup |
+| `check interactions` | 36 | markup |<!-- 15 of its own + the 21 shared HANDLER_SURFACE_RULES it emits under --handlers -->
 | `check a11y contrast` | 1 | markup |
 | `check a11y touch` | 1 | markup |
 | `check a11y focus` | 3 | markup |
 | `check breakpoints` | 5 | markup |
 | `check scroll` | 4 | markup |
 | `scan scroll` | 4 | markup |
-| `scan handlers` | 3 | markup |
+| `scan handlers` | 21 | markup |
 | `check motion` | 3 | markup |
 | `check animation` | 5 | markup |
 | `stress i18n` | 3 | markup |
 | `stress media` | 2 | markup |
 | `check tokens` | 2 | markup |
-| `check design` | 3 | markup |
+| `check design` | 4 | markup |
 | `check story` | 4 | markup |
 | `check theme` | 2 | markup |
 | `check asset` | 7 | markup |
 | `check drift component` | 2 | markup |
-| `check drift pages` | 1 | markup |
+| `check drift pages` | 2 | markup |
 | `verify markup` | 3 | markup |
 | `verify flow` | 2 | markup |
 | `check equivalence` | 4 | markup |
@@ -361,6 +457,16 @@ Deliberate, and each one aligns a straggler with the documented contract:
   (exit 1), `needs-improvement` is a warn (exit 0). **A script branching on
   exit code 2 must read `counts.warn` from `--json` instead.** `--strict` is an
   accepted no-op.
+
+  This was applied to the gates and missed the non-gate leaves, so for a while
+  exit 2 survived in two places with *incompatible* meanings: `diff browsers`
+  used it for "fewer engines than intended" and `png-diff` uses it for a
+  malformed flag value — and `skill run` read any 2 as "warned", so a bad value
+  in a skill file was reported as a warning. `diff browsers` now exits 1 and
+  `skill run` treats every non-zero from a check that ran as a failure.
+  `png-diff` keeps 2 for usage errors: on its own that is a coherent
+  convention, it is simply not this contract, and nothing now reads it as a
+  warning.
 - **`--json` payloads are the shared envelope**: `{ gate, command, verdict,
   counts, findings, suppressed, retuned, report }`. A gate's previous JSON is
   nested under `report` verbatim. Clients that parsed the old top-level shape

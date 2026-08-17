@@ -41,6 +41,8 @@ import {
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
@@ -254,17 +256,38 @@ export async function runMultiPageConsistency(
  * must not print — the core runner owns output and decides between prose and
  * `--json`.
  */
-export function formatMultiPageConsistencyReport(report: MultiPageConsistencyReport): string {
+export function formatMultiPageConsistencyReport(report: MultiPageConsistencyReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check drift pages${RESET}`);
   lines.push(`  ${DIM}selector: ${report.selector}${RESET}`);
   lines.push(`  ${DIM}reference: ${report.reference}${RESET}`);
+  // A NaN ratio is the selector not being on the page (`selector-missing`, warn); anything else
+  // that differs is `page-drift`. Same split as `../gates/drift.gate.ts` makes in `findings`,
+  // where the NaN branch comes first for the same reason — `NaN > threshold` is false.
+  const offRules = new Map<string, number>();
   for (const d of report.deltas) {
     const pct = Number.isNaN(d.diffRatio) ? "n/a" : (d.diffRatio * 100).toFixed(2) + "%";
-    const icon = Number.isNaN(d.diffRatio)
+    const ruled = Number.isNaN(d.diffRatio)
+      ? { rule: "selector-missing", emitted: "warn" as const }
+      : { rule: "page-drift", emitted: "suspect" as const };
+    const tier = ruleTier(rules, ruled.rule, ruled.emitted);
+    const reportable = Number.isNaN(d.diffRatio) || d.diffRatio > 0;
+    if (tier === "off" && reportable) offRules.set(ruled.rule, (offRules.get(ruled.rule) ?? 0) + 1);
+    const icon = tier === "off" && reportable
+      ? `${DIM}-${RESET}`
+      : Number.isNaN(d.diffRatio)
       ? `${YELLOW}!${RESET}`
-      : d.diffRatio === 0 ? `${GREEN}✓${RESET}` : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
-    lines.push(`  ${icon} ${d.candidate.padEnd(40)} ${pct}`);
+      : d.diffRatio === 0
+        ? `${GREEN}✓${RESET}`
+        : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : (tier === "suspect" ? `${RED}✗${RESET}` : `${YELLOW}~${RESET}`);
+    const retuned = tier !== "off" && reportable && tier !== ruled.emitted
+      ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
+      : "";
+    lines.push(`  ${icon} ${d.candidate.padEnd(40)} ${pct}${retuned}`);
+  }
+  if (offRules.size > 0) {
+    const detail = [...offRules].map(([rule, n]) => `${rule} x${n}`).join(", ");
+    lines.push(`  ${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} page(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");

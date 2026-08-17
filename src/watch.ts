@@ -19,6 +19,7 @@
  */
 
 import { watch as fsWatch } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, relative} from "node:path";
 import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
@@ -276,10 +277,14 @@ async function runOnce(compareArgs: string[], outputDir: string): Promise<RoundS
 
 export async function runWatch(rawArgs: string[]): Promise<void> {
   const { compareArgs, watchPathOverride } = parseWatchArgs(rawArgs);
-  if (compareArgs.length < 2) {
-    console.error("Usage: vlmkit watch <baseline> <variant> [vlmkit diff html flags...]");
-    console.error("       (or --url + --current-url for URL mode)");
-    process.exit(1);
+  const askedForHelp = rawArgs.includes("--help") || rawArgs.includes("-h");
+  if (askedForHelp || compareArgs.length < 2) {
+    // stdout when it was asked for, stderr when it is a complaint. A `--help` piped to a
+    // pager should not need 2>&1 to be readable.
+    const say = askedForHelp ? console.log : console.error;
+    say("Usage: vlmkit watch <baseline> <variant> [vlmkit diff html flags...]");
+    say("       (or --url + --current-url for URL mode)");
+    process.exit(askedForHelp ? 0 : 1);
   }
   const baseline = compareArgs[0];
   const variant = compareArgs[1];
@@ -352,9 +357,8 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "watch" || (process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1]);
-if (isCliEntry) {
+
+if (isCliEntry(import.meta.url, "watch")) {
   runWatch(process.argv.slice(2)).catch((err) => {
     console.error(err);
     process.exit(1);

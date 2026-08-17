@@ -39,6 +39,8 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
@@ -80,7 +82,6 @@ export interface MediaVariantsReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
 
 /**
  * Always navigate. The file branch used to `setContent` the read bytes, which
@@ -349,17 +350,33 @@ export async function runMediaVariants(
  * must not print — the core runner owns output and decides between prose and
  * `--json`.
  */
-export function formatMediaVariantsReport(report: MediaVariantsReport): string {
+export function formatMediaVariantsReport(report: MediaVariantsReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit stress media${RESET}`);
   lines.push(`  ${DIM}source: ${report.source}${RESET}`);
+  // Every variant keeps its row — the delta is a measurement, and a row per variant is what
+  // makes "this one did not respond" legible. What the rule settings change is the verdict
+  // character and whether the row still reads as a finding. Dropping rows here would hide the
+  // variant itself, not just the judgement, so `applyRuleTiers` is deliberately not used.
+  const tierOf = (verdict: MediaVariantsReport["variants"][number]["verdict"]) =>
+    verdict === "suspect"
+      ? ruleTier(rules, "variant-broken", "suspect")
+      : verdict === "warn" ? ruleTier(rules, "variant-ignored", "warn") : undefined;
+  const silenced = new Map<string, number>();
   for (const v of report.variants) {
-    const icon = v.verdict === "ok" ? `${GREEN}✓${RESET}`
-      : v.verdict === "warn" ? `${YELLOW}!${RESET}`
-      : v.verdict === "suspect" ? `${RED}✗${RESET}`
-      : `${DIM}-${RESET}`;
+    const tier = tierOf(v.verdict);
+    if (tier === "off") silenced.set(v.verdict === "suspect" ? "variant-broken" : "variant-ignored",
+      (silenced.get(v.verdict === "suspect" ? "variant-broken" : "variant-ignored") ?? 0) + 1);
+    const icon = v.verdict === "ok"
+      ? `${GREEN}✓${RESET}`
+      : v.verdict === "skip" || tier === "off"
+        ? `${DIM}-${RESET}`
+        : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
     lines.push(`  ${icon} ${v.variant.padEnd(16)} Δ ${(v.deltaRatio * 100).toFixed(2).padStart(6)}%  ${DIM}${v.note}${RESET}`);
   }
+  const note = hiddenByRuleNote(silenced);
+  // Reworded from the shared "not shown": the rows ARE shown here, with a neutral marker.
+  if (note) lines.push(`  ${DIM}${note.replace("not shown — rule turned off", "no longer graded — rule turned off")}${RESET}`);
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
 }

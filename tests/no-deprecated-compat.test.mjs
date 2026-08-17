@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const sourceFiles = execFileSync("git", ["ls-files", "src/**/*.ts", "packages/*/src/**/*.ts"], {

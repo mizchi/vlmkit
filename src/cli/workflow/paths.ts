@@ -7,7 +7,9 @@ import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
  * Shared paths for `vlmkit workflow` commands.
  *
  * - `HARNESS_ROOT` is the installed vlmkit package root (used to locate
- *   `dist/e2e/vrt-capture.spec.mjs` or `e2e/vrt-capture.spec.ts`).
+ *   `e2e/vlmkit-capture.spec.ts` — the name here said `vrt-capture.spec.*`,
+ *   which is what `workflow.ts` looked for while both commands were dead, so
+ *   this comment is kept honest deliberately).
  *   Resolved by walking up from the CLI entry until a `package.json` is
  *   found, so it works in both the source layout (`src/cli/vlmkit.ts`) and
  *   the bundled CLI (`dist/vlmkit.mjs`).

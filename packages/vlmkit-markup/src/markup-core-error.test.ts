@@ -6,7 +6,7 @@
  * broken.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { describeMoonBitError } from "./markup-core-error.ts";
 
 /** Builds an object whose constructor name is `name`, as the MoonBit output does. */

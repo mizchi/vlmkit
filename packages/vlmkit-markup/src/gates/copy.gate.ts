@@ -40,7 +40,7 @@ import {
   firstPositionalOrUndefined,
   vlmFlag,
   withoutOptionalValue,
-} from "./arg-helpers.ts";
+} from "@mizchi/vlmkit-core/plugin/args.ts";
 
 /** Options plus the unresolved `--vlm` request; `run` turns it into a reader. */
 export interface CopyGateOptions extends CopyCheckOptions {

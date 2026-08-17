@@ -18,6 +18,7 @@
  * "did it pass" but "how long, and how do I shard it".
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { glob } from "node:fs/promises";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -33,7 +34,12 @@ import {
   readPositionals,
   tokenizeCommand,
 } from "@mizchi/vlmkit-core/arg-reader.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import {
+  VLMKIT_IGNORE_ENTRIES,
+  appendRunLedger,
+  isGitIgnored,
+  isGitRepo,
+} from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface BatchJob {
@@ -52,10 +58,49 @@ export interface BatchJob {
   cwd?: string;
 }
 
+/**
+ * A gate's own `--json` envelope, when the run asked for one.
+ *
+ * v7's agent-l: "findings arrive as one ANSI-escaped `output` string, not
+ * structured." A CI job that wants the findings had to parse terminal text out of
+ * a field meant for humans; the gates have emitted a structured envelope all along
+ * and the batch runner simply never asked for it.
+ */
+export interface GateEnvelope {
+  gate?: string;
+  command?: string;
+  verdict?: string;
+  counts?: Record<string, number>;
+  findings?: unknown[];
+  suppressed?: unknown[];
+  retuned?: unknown[];
+  report?: unknown;
+}
+
+/**
+ * Read a child's envelope, or null when it did not produce one.
+ *
+ * Null on anything unparseable rather than throwing: a gate that died in
+ * navigation prints an error, and losing the whole run's JSON because one job
+ * failed early would make the machine path less reliable than the prose one.
+ */
+export function parseGateEnvelope(stdout: string): GateEnvelope | null {
+  const text = stdout.trim();
+  if (!text.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return typeof parsed === "object" && parsed !== null ? parsed as GateEnvelope : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface BatchJobResult extends BatchJob {
   exitCode: number;
   durationMs: number;
   output: string;
+  /** The gate's own `--json` envelope, when the run was asked for JSON. */
+  envelope?: GateEnvelope | null;
 }
 
 export interface BatchSummary {
@@ -68,6 +113,15 @@ export interface BatchSummary {
   serialMs: number;
   concurrency: number;
   shard?: { index: number; total: number };
+  /**
+   * Artifact directories this run brought into existence that git is not ignoring.
+   *
+   * The per-gate notice cannot serve this path: gates run as child processes whose
+   * stdout the runner suppresses. It also never covered `test-results/` at all —
+   * a gate prints `report: <path>` but nothing says the directory is new and
+   * untracked, which was half of the original complaint.
+   */
+  createdArtifacts?: string[];
 }
 
 /** `1/3` → `{index: 1, total: 3}`. Throws on anything else, loudly. */
@@ -160,6 +214,11 @@ export interface BatchOptions {
   shard?: { index: number; total: number };
   output?: string;
   quiet?: boolean;
+  /**
+   * Ask each child for its `--json` envelope, so the run's machine output carries
+   * structured findings rather than the gates' terminal text.
+   */
+  json?: boolean;
   /** Injected in tests; defaults to the CLI entry this process was started from. */
   cliEntry?: string;
 }
@@ -177,11 +236,19 @@ function cliEntryPath(explicit?: string): string {
   return resolve(fileURLToPath(import.meta.url), "../../vlmkit.ts");
 }
 
-function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
+function runJob(job: BatchJob, cliEntry: string, json = false): Promise<BatchJobResult> {
   // Quote-aware: a gate flag can legitimately carry a value with spaces
   // (`--manifest "copy/press kit.txt"`, `--mask ".hero, .promo"`), and a plain
   // whitespace split would hand those to the gate as several arguments.
-  const args = [...process.execArgv, cliEntry, ...tokenizeCommand(job.gate), job.page];
+  const args = [
+    ...process.execArgv,
+    cliEntry,
+    ...tokenizeCommand(job.gate),
+    job.page,
+    // Under `--json` the children are asked for JSON too, so the run's machine
+    // output carries the gates' own envelopes instead of their terminal text.
+    ...(json ? ["--json"] : []),
+  ];
   const started = Date.now();
   return new Promise((resolveJob) => {
     const child = spawn(process.execPath, args, {
@@ -191,8 +258,13 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
       // tells a leaf module "you are the CLI entry".
       env: { ...process.env, __VLMKIT_DISPATCHER_LEAF__: "" },
     });
+    // Merged for display, and kept SEPARATE for parsing. `output` interleaves both
+    // streams the way a terminal would; a JSON envelope has to be read from stdout
+    // alone or a stderr diagnostic lands in the middle of it — which is exactly how
+    // the webServer's greeting corrupted `--json` before this.
     let output = "";
-    child.stdout.on("data", (d) => { output += d; });
+    let stdout = "";
+    child.stdout.on("data", (d) => { output += d; stdout += d; });
     child.stderr.on("data", (d) => { output += d; });
     child.on("error", (err) => {
       resolveJob({ ...job, exitCode: 127, durationMs: Date.now() - started, output: `${output}${err.message}\n` });
@@ -203,6 +275,7 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
         exitCode: code ?? (signal ? 129 : 1),
         durationMs: Date.now() - started,
         output,
+        ...(json ? { envelope: parseGateEnvelope(stdout) } : {}),
       });
     });
   });
@@ -235,9 +308,23 @@ export async function runJobs(
   if (jobs.length === 0) throw new Error("No jobs to run");
   const concurrency = options.concurrency ?? defaultConcurrency();
   const cliEntry = cliEntryPath(options.cliEntry);
+  // Which artifact directories already existed. Each gate runs as a CHILD process
+  // and its own first-write notice goes to a stdout this runner suppresses, so a
+  // `gates run` — the path an adopter actually uses — announced nothing at all.
+  // Snapshotting first keeps the report to what THIS run created, rather than
+  // nagging on every run about directories the reader has already seen.
+  // Every job in a `gates run` shares one cwd (the config's directory) and a bare
+  // `batch` sets none, so the common case is a single directory. If they ever
+  // disagree, fall back to this process's — reporting one directory's artifacts as
+  // another's would be worse than reporting none.
+  const jobCwds = new Set(jobs.map((j) => j.cwd ?? process.cwd()));
+  const artifactCwd = jobCwds.size === 1 ? [...jobCwds][0]! : process.cwd();
+  const preexisting = new Set(
+    VLMKIT_IGNORE_ENTRIES.filter((entry) => existsSync(join(artifactCwd, entry.replace(/\/+$/, "")))),
+  );
   const started = Date.now();
   let done = 0;
-  const results = await runPool(jobs, concurrency, (job) => runJob(job, cliEntry), (result) => {
+  const results = await runPool(jobs, concurrency, (job) => runJob(job, cliEntry, options.json === true), (result) => {
     done++;
     if (options.quiet) return;
     const status = result.exitCode === 0 ? `${GREEN}pass${RESET}` : `${RED}fail${RESET}`;
@@ -254,6 +341,13 @@ export async function runJobs(
     serialMs: results.reduce((sum, r) => sum + r.durationMs, 0),
     concurrency,
     ...(options.shard ? { shard: options.shard } : {}),
+    ...(() => {
+      const created = VLMKIT_IGNORE_ENTRIES
+        .filter((entry) => !preexisting.has(entry))
+        .filter((entry) => existsSync(join(artifactCwd, entry.replace(/\/+$/, ""))))
+        .filter((entry) => !isGitIgnored(artifactCwd, join(artifactCwd, entry.replace(/\/+$/, ""))));
+      return created.length > 0 && isGitRepo(artifactCwd) ? { createdArtifacts: created } : {};
+    })(),
   };
   if (options.output) {
     await mkdir(options.output, { recursive: true });
@@ -263,6 +357,14 @@ export async function runJobs(
       JSON.stringify({ ...summary, jobs: summary.jobs.map(({ output: _output, ...rest }) => rest) }, null, 2),
     );
   }
+  // Into the SAME ledger the children write, not this process's cwd.
+  //
+  // v7's agent-l noticed the outputs were not where the config was, and the precise
+  // defect turned out to be worse than "wrong directory": the children run with the
+  // config's directory as their cwd, so `test-results/` and their ledger lines went
+  // there, while this append used `process.cwd()`. One `gates run --config
+  // ../proj/...` from a sibling directory therefore produced TWO ledgers, in two
+  // places, each holding half the run.
   appendRunLedger({
     tool: "batch",
     source: [...new Set(jobs.map((j) => j.page))].join(" ").slice(0, 200),
@@ -273,7 +375,7 @@ export async function runJobs(
       wallMs: summary.wallMs,
       concurrency,
     },
-  });
+  }, { cwd: artifactCwd });
   return summary;
 }
 
@@ -302,6 +404,39 @@ export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
  * `verdict:` or `status:` line, or a JSON report under `--json`. A harness failure
  * prints an `error:` line and nothing else.
  */
+/**
+ * Warns a passing job reported, from the runner's own exit-intent line.
+ *
+ * `gates run` printed `ALL PASS (6/6)` and nothing else, so an adopting project
+ * saw none of the findings. v7's agent-l: "Adopt it naively and you learn
+ * nothing. Only `--output` preserves them."
+ *
+ * Read from `exits 0 — N warn(s) did not fail this command`, which `runGateCli`
+ * emits for EVERY gate exactly when it exits 0 with warns — verified across the
+ * gate set rather than assumed, after `gateReported` was built on a convention
+ * only 8 of 12 gates followed. A gate with no warns prints no line and
+ * contributes 0, which is correct by construction; a FAILING job prints none
+ * either, and its warns stay behind the re-run hint the failure block already
+ * gives.
+ */
+/**
+ * `check design --wait-until load --timeout 15000` -> `check design`.
+ *
+ * Everything before the first flag. Slicing to a fixed token count split the
+ * command mid-flag, and filtering flags out afterwards kept `load` — a flag's
+ * value reading as part of the command name.
+ */
+export function gateVerb(gate: string): string {
+  const tokens = gate.trim().split(/\s+/);
+  const firstFlag = tokens.findIndex((t) => t.startsWith("-"));
+  return (firstFlag === -1 ? tokens : tokens.slice(0, firstFlag)).join(" ");
+}
+
+export function reportedWarns(output: string): number {
+  const m = /exits 0 [—-] (\d+) warn\(s\)/.exec(stripAnsi(output));
+  return m ? Number.parseInt(m[1]!, 10) : 0;
+}
+
 export function gateReported(output: string): boolean {
   // The banner, not the verdict line. The first version of this keyed on
   // `verdict:` / `status:`, and I justified that by saying the convention was already
@@ -386,8 +521,54 @@ export function formatBatchSummary(
     + ` (avg ${(busy / Math.max(wall, 0.001)).toFixed(1)} jobs in flight),`
     + ` slowest job ${((slowest?.durationMs ?? 0) / 1000).toFixed(1)}s${RESET}`,
   );
+  // Warns a passing job found, said on the summary. Without this the adoption path
+  // reported `ALL PASS (6/6)` and showed none of ten findings — the one number an
+  // adopting project is running the tool to get.
+  if (!options.showOutput) {
+    const warned = summary.jobs
+      .filter((j) => j.exitCode === 0)
+      .map((j) => ({ gate: gateVerb(j.gate), warns: reportedWarns(j.output) }))
+      .filter((j) => j.warns > 0);
+    const total = warned.reduce((sum, j) => sum + j.warns, 0);
+    if (total > 0) {
+      lines.push("");
+      lines.push(
+        `${YELLOW}${total} warn(s)${RESET} in ${warned.length} passing gate(s) — not shown above,`
+        + ` and they did not fail the run:`,
+      );
+      for (const j of warned) lines.push(`${DIM}    ${String(j.warns).padStart(3)}  ${j.gate}${RESET}`);
+      lines.push(
+        `${DIM}See them: --show-output, or --output <dir> to keep every log.`
+        + ` Gate on one: --rule <id>=suspect.${RESET}`,
+      );
+    }
+  }
   // A run can never finish faster than its slowest single job: that is the
   // floor more concurrency cannot buy through, and the number to shard against.
+  //
+  // Where the run wrote, said ONCE for the whole run. The per-gate first-write
+  // notice cannot reach here — each gate is a child process whose stdout this
+  // runner suppresses — so a `gates run`, which is the path an adopter actually
+  // uses, announced nothing. It also covers `test-results/`, which the per-gate
+  // notice never did: a gate prints `report: <path>` but nothing says the
+  // directory is new and untracked.
+  if (summary.createdArtifacts && summary.createdArtifacts.length > 0) {
+    lines.push("");
+    lines.push(`${DIM}This run created ${summary.createdArtifacts.length} untracked path(s):${RESET}`);
+    for (const entry of summary.createdArtifacts) {
+      // Described per entry, because they are different things and only one of
+      // them is announced anywhere else: a gate prints `report: <path>` for what
+      // it writes under test-results/, while the ledger prints nothing here.
+      const what = entry === ".vlmkit/"
+        ? "an append-only record of every gate run, one line each"
+        : "the gates' own reports and screenshots";
+      lines.push(`${DIM}    ${entry.padEnd(15)} ${what}${RESET}`);
+    }
+    lines.push(
+      `${DIM}${summary.createdArtifacts.length === 1 ? "It is not" : "Neither is"} in .gitignore.`
+      + ` \`vlmkit gates init\` writes ${summary.createdArtifacts.length === 1 ? "that entry" : "those entries"} for you.${RESET}`,
+    );
+  }
   lines.push("");
   const failures = summary.jobs.filter((j) => j.exitCode !== 0);
   if (failures.length > 0) {

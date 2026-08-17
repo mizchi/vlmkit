@@ -34,13 +34,4 @@ export default defineConfig([
     outDir: "dist",
     clean: false,
   },
-  {
-    entry: {
-      "e2e/vlmkit-capture.spec": "e2e/vlmkit-capture.spec.ts",
-    },
-    format: ["esm"],
-    platform: "node",
-    outDir: "dist",
-    clean: false,
-  },
 ]);

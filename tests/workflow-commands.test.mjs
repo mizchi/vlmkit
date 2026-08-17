@@ -26,7 +26,7 @@ import { spawnSync } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowDir = join(repoRoot, ".github/workflows");
@@ -184,4 +184,56 @@ describe("workflow expression contexts", async () => {
       }
     });
   }
+});
+
+/**
+ * No workflow may run a vitest test file with `node --test`.
+ *
+ * This shipped THREE times. The suite moved to vitest on 2026-08-13, and every test file gained
+ * `import { test } from "vitest"` — which throws on import outside the vitest runner
+ * ("Vitest failed to find the current suite"). `deploy-pages.yml`, `heal-test.yml` and
+ * `skill-package.yml` all still said `node --test`, so all three steps could not pass at all:
+ *
+ *   - deploy-pages was invisible because the workflow had not run since 2026-08-07, and
+ *     `page.test.mjs`'s own assertion pinned the broken command in place.
+ *   - heal-test and skill-package failed on the first PR that touched their paths, which is how
+ *     this got found — after the deploy-pages one had already been "fixed" in isolation.
+ *
+ * Fixing the occurrence you found and not sweeping for siblings is the mistake this encodes. A
+ * step that cannot run is worse than a missing step: the workflow claims the contract is verified.
+ *
+ * Matched on `run:` lines only, so a comment explaining why `node --test` is wrong does not trip
+ * it — that exact false positive happened while writing the deploy-pages fix.
+ */
+describe("test runners in workflows", async () => {
+  const files = (await readdir(workflowDir)).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"));
+
+  for (const file of files) {
+    it(`${file} does not run a vitest file with node --test`, async () => {
+      const yaml = await readFile(join(workflowDir, file), "utf8");
+      const offenders = yaml
+        .split("\n")
+        .map((line, index) => ({ line: index + 1, text: line }))
+        .filter(({ text }) => /^\s*-?\s*run:.*\bnode\s+--test\b/.test(text));
+
+      assert.deepEqual(
+        offenders.map(({ line, text }) => `${file}:${line} ${text.trim()}`),
+        [],
+        `use \`pnpm exec vitest run <paths>\`. Every test file in this repo imports from vitest,`
+        + ` which throws when imported outside its runner, so \`node --test\` cannot pass.`,
+      );
+    });
+  }
+
+  it("would catch a reintroduced node --test line", () => {
+    // The extractor, proven against a sample rather than trusted: a regex that matches nothing
+    // passes every file vacuously, which is the failure mode this whole file exists to prevent.
+    const sample = [
+      "      - run: node --test 'src/**/*.test.ts'",
+      "      # `vitest run`, not `node --test` — a comment must not trip the rule",
+      "        run: pnpm exec vitest run packages/vlmkit-heal/src",
+    ];
+    const matched = sample.filter((text) => /^\s*-?\s*run:.*\bnode\s+--test\b/.test(text));
+    assert.deepEqual(matched, ["      - run: node --test 'src/**/*.test.ts'"]);
+  });
 });

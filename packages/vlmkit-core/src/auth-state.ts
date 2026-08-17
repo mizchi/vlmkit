@@ -84,11 +84,37 @@ export function withAuthState<T extends object>(base: T, explicit?: string): T &
   const path = storageStatePath(explicit);
   if (!path) return base;
   readStorageState(path); // throw before we navigate, not after
-  return { ...base, storageState: resolve(path) };
+  const abs = resolve(path);
+  appliedPath = abs;
+  return { ...base, storageState: abs };
 }
 
-/** One-line notice so a run that used auth says so in its output. */
-export function authStateNotice(explicit?: string): string | null {
-  const path = storageStatePath(explicit);
-  return path ? `auth: storage state from ${resolve(path)}` : null;
+/**
+ * Set by `withAuthState` when a session was actually applied, and read by whoever
+ * prints — the same module-level choke point the run ledger uses, for the same
+ * reason: the fact worth announcing is discovered deep inside a measurement, and
+ * the thing that announces it is the runner.
+ *
+ * `withAuthState` is the only place a storage state reaches Playwright, so a gate
+ * cannot acquire a session without passing through here.
+ */
+let appliedPath: string | null = null;
+
+/** Forget any session applied by a previous run. Called per gate invocation. */
+export function resetAuthStateNotice(): void {
+  appliedPath = null;
+}
+
+/**
+ * One line naming the session a run used, or `null` when it ran unauthenticated.
+ *
+ * This existed and was never called, which left the gates able to measure a
+ * logged-in page while saying nothing about it. `VLMKIT_STORAGE_STATE` makes that
+ * the easy case rather than the exotic one: no flag appears on the command line, so
+ * neither the terminal output nor the markdown report distinguished "the dashboard"
+ * from "the login wall it redirected to". Reported from what was applied rather than
+ * from what was configured, so a gate that ignores auth never claims to have used it.
+ */
+export function authStateNotice(): string | null {
+  return appliedPath ? `auth: storage state from ${appliedPath}` : null;
 }

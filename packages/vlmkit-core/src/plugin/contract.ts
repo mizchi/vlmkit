@@ -180,8 +180,26 @@ export const GATE_CATEGORY_ORDER: readonly GateCategory[] = [
  * would invite it to re-derive the runner's decisions and disagree with them.
  */
 export interface RuleView {
-  /** Effective setting for a rule id, after project config and `--rule`. */
+  /**
+   * Effective setting for a rule id, after project config and `--rule`, falling back to the
+   * severity the gate DECLARED for it.
+   *
+   * That fallback is why `setting` exists. `applyRuleSettings` re-tunes a finding only when
+   * there is an explicit setting — a gate is free to emit a severity that differs from its
+   * table (integrity emits `js-error` as a warn after load and a fail during construction),
+   * and that judgement survives. A formatter reading only `effective` cannot reproduce this,
+   * and `check integrity` printed the proof: a post-load `js-error` rendered as
+   * `DEFECTS (1 fail, 0 warn)` directly above the runner's `exits 0 — 1 warn(s)`.
+   */
   effective(ruleId: string): "off" | FindingSeverity;
+  /**
+   * The EXPLICIT project setting for a rule id, or `undefined` when nobody set one.
+   *
+   * This is the one a formatter wants: `setting(rule) ?? theSeverityTheFindingWasEmittedAt`
+   * is exactly what the runner does to the finding list, so the prose and the exit code
+   * cannot disagree.
+   */
+  setting(ruleId: string): "off" | FindingSeverity | undefined;
 }
 
 export interface GateDefinition<Report = unknown, Options = unknown> {

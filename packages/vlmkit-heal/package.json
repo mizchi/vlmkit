@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-heal",
-  "version": "0.9.1",
+  "version": "0.11.0",
   "description": "Cost-optimized self-healing loop for Playwright tests — escalates from cheap to strong models, edits tests/baselines, re-verifies.",
   "license": "MIT",
   "author": "mizchi",
@@ -29,7 +29,7 @@
   "scripts": {
     "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-heal",
     "prepack": "pnpm build",
-    "test": "node --test 'src/**/*.test.ts'"
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-heal/src"
   },
   "exports": {
     ".": {

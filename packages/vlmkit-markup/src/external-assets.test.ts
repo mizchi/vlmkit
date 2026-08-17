@@ -24,7 +24,7 @@
  * that stops resolving assets breaks it immediately.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -71,15 +71,19 @@ describe("gates resolve a file's relative assets", () => {
     const external = await runA11yTouch({ source: EXTERNAL, outputDir: outDir() });
     const inlined = await runA11yTouch({ source: INLINED, outputDir: outDir() });
     assert.equal(external.inspectedCount, inlined.inspectedCount);
-    // The 20x20 anchor is inline with no intrinsic size until CSS applies, so
-    // an unstyled load does not even see it as a target.
+    // Every target the gate MEASURED as undersized, whether or not a WCAG exception
+    // excused it. This test is about the stylesheet being resolved — the 20x20 anchor is
+    // inline with no intrinsic size until CSS applies, so an unstyled load does not even
+    // see it as a target — and it must not also depend on the verdict: the anchor is
+    // isolated, so 2.5.8's spacing exception legitimately excuses it at the AA default.
+    const measured = (r: typeof external) => [...r.failures, ...(r.wcagExempt ?? [])];
     assert.ok(
-      external.failures.some((f) => f.path.includes("tiny-tap")),
-      `expected the CSS-sized tap target, got ${JSON.stringify(external.failures.map((f) => f.path))}`,
+      measured(external).some((f) => f.path.includes("tiny-tap")),
+      `expected the CSS-sized tap target, got ${JSON.stringify(measured(external).map((f) => f.path))}`,
     );
     assert.deepEqual(
-      external.failures.map((f) => `${f.path}:${f.minSide}`).sort(),
-      inlined.failures.map((f) => `${f.path}:${f.minSide}`).sort(),
+      measured(external).map((f) => `${f.path}:${f.minSide}`).sort(),
+      measured(inlined).map((f) => `${f.path}:${f.minSide}`).sort(),
     );
   });
 

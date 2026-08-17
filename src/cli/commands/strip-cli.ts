@@ -17,18 +17,21 @@
  * them explicitly.
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { decodePng, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
+import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 function usage(): string {
   return [
     "Usage:",
     "  vlmkit snapshot strip <frame1.png> [frame2.png ...] [--out strip.png] [--columns N] [--gap px] [--scale N] [--max-width px]",
+    "  vlmkit snapshot strip <frame1.png> [frame2.png ...] --animated [--delay ms] [--loops N] [--out anim.png]",
     "",
     "Options:",
     "  --out <file>        Output PNG (default strip.png)",
@@ -40,13 +43,21 @@ function usage(): string {
     "  --label <text>      Column label, repeatable, in order. Drawn into the image itself",
     "  --row-label <text>  Row label, repeatable, in order (needs --columns)",
     "  --label-scale <n>   Label size, 1 unit = 5x7px (default 2)",
+    "  --animated          Write an animated PNG that plays the frames instead of a still sheet",
+    "  --delay <ms>        Per-frame delay for --animated (default 200)",
+    "  --loops <n>         Loop count for --animated; 0 = forever (default 0)",
     "",
     "  A `.webp` output extension encodes WebP (needs the optional @jsquash/webp).",
+    "  --animated writes APNG, which needs no extra dependency and plays in browsers and",
+    "  in GitHub comments. A viewer without APNG support shows frame 0, so the file is",
+    "  still a usable still. Not compatible with a .webp output: animated WebP needs an",
+    "  encoder this repo does not ship (see packages/vlmkit-core/src/apng.ts).",
     "",
     "Examples:",
     "  vlmkit snapshot strip frames/anim-*.png --out strip.png",
     "  vlmkit snapshot strip round-0.png round-1.png round-2.png --columns 3 --out rounds.png",
     "  vlmkit snapshot strip f-0.png f-1.png --label 0ms --label 250ms --out strip.png",
+    "  vlmkit snapshot strip frames/anim-*.png --animated --delay 120 --out anim.png",
   ].join("\n");
 }
 
@@ -66,6 +77,10 @@ interface StripArgs {
   labels: string[];
   rowLabels: string[];
   labelScale?: number;
+  /** Write an animated PNG that plays the frames, instead of compositing a still sheet. */
+  animated?: boolean;
+  delayMs?: number;
+  loops?: number;
 }
 
 function readNumber(argv: string[], index: number, flag: string): number {
@@ -88,6 +103,9 @@ function parseArgs(argv: string[]): StripArgs {
   const labels: string[] = [];
   const rowLabels: string[] = [];
   let labelScale: number | undefined;
+  let animated = false;
+  let delayMs: number | undefined;
+  let loops: number | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -120,6 +138,15 @@ function parseArgs(argv: string[]): StripArgs {
       case "--label-scale":
         labelScale = readNumber(argv, ++i, "--label-scale");
         break;
+      case "--animated":
+        animated = true;
+        break;
+      case "--delay":
+        delayMs = readNumber(argv, ++i, "--delay");
+        break;
+      case "--loops":
+        loops = readNumber(argv, ++i, "--loops");
+        break;
       case "-h":
       case "--help":
         console.log(usage());
@@ -142,6 +169,9 @@ function parseArgs(argv: string[]): StripArgs {
     labels,
     rowLabels,
     ...(labelScale !== undefined ? { labelScale } : {}),
+    ...(animated ? { animated } : {}),
+    ...(delayMs !== undefined ? { delayMs } : {}),
+    ...(loops !== undefined ? { loops } : {}),
   };
 }
 
@@ -198,6 +228,46 @@ async function main(): Promise<void> {
   }
 
   const frames = await Promise.all(parsed.paths.map((p) => decodePng(resolve(p))));
+
+  if (parsed.animated) {
+    // The other answer to "a numbered sequence in one file". A still sheet is for a reader who
+    // cannot press play (a model, a diff by eye); this is for a reviewer who can, in a place the
+    // flipbook's HTML cannot go — a PR comment.
+    if (imageFormatForPath(parsed.out) === "webp") {
+      throw new UsageError(
+        "--animated writes APNG, so the output cannot be .webp.\n"
+        + "  Animated WebP needs libwebp's animation encoder, which `@jsquash/webp` does not\n"
+        + "  expose and `sharp` would cost 29 MB for (see packages/vlmkit-core/src/webp.ts).\n"
+        + "  Use a .png name — APNG plays in browsers and in GitHub comments, and a viewer\n"
+        + "  without APNG support shows frame 0.",
+      );
+    }
+    const sizes = new Set(frames.map((f) => `${f.width}x${f.height}`));
+    if (sizes.size > 1) {
+      // A still sheet tolerates this by sizing the cell to the largest frame. An animation cannot:
+      // the canvas is one size, so a mixed sequence is a wrong glob rather than a layout choice.
+      throw new UsageError(
+        `--animated needs every frame the same size, got ${[...sizes].join(", ")}.\n`
+        + "  Drop --animated for a still sheet, which places mixed sizes top-left in a uniform cell.",
+      );
+    }
+    const bytes = encodeApng(frames, {
+      ...(parsed.delayMs !== undefined ? { delayMs: parsed.delayMs } : {}),
+      ...(parsed.loops !== undefined ? { loops: parsed.loops } : {}),
+    });
+    await mkdir(dirname(resolve(parsed.out)), { recursive: true });
+    await writeFile(resolve(parsed.out), bytes);
+    const delay = parsed.delayMs ?? 200;
+    console.log();
+    console.log(`${BOLD}${CYAN}Animated strip${RESET}`);
+    console.log(`  ${DIM}Frames: ${frames.length} at ${delay}ms each (${(frames.length * delay / 1000).toFixed(1)}s per loop)${RESET}`);
+    console.log(`  ${DIM}Canvas: ${frames[0]!.width}x${frames[0]!.height} apng${RESET}`);
+    console.log(`  ${DIM}Loops:  ${parsed.loops === undefined || parsed.loops === 0 ? "forever" : parsed.loops}${RESET}`);
+    console.log(`  ${GREEN}Wrote ${parsed.out}${RESET} ${DIM}(${(bytes.length / 1024).toFixed(1)} KB)${RESET}`);
+    console.log(`  ${DIM}Plays in a browser and in a GitHub comment; other viewers show frame 0.${RESET}`);
+    return;
+  }
+
   // `--max-width 0` means "do not cap", which is not the same as omitting the
   // flag (that takes the 1600 default).
   const cap = parsed.maxWidth ?? 1600;
@@ -237,10 +307,7 @@ async function main(): Promise<void> {
   console.log();
 }
 
-if (
-  process.env.__VLMKIT_DISPATCHER_LEAF__ === "strip-cli"
-  || (process.argv[1] && (process.argv[1].endsWith("strip-cli.ts") || process.argv[1].endsWith("strip-cli.mjs")))
-) {
+if (isCliEntry(import.meta.url, "strip-cli")) {
   const { handleCliError } = await import("@mizchi/vlmkit-core/cli-error.ts");
   main().catch(handleCliError);
 }

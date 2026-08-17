@@ -19,7 +19,7 @@
  * introduced the bug and through the change that fixed it.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { adaptiveRegionCellSize } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
   matchRegionBboxToElement,

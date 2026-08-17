@@ -8,6 +8,8 @@
  */
 import { resolve } from "node:path";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import {
   CraterClient,
   DEFAULT_BIDI_URL,
@@ -264,16 +266,27 @@ export async function runCraterBidiSmoke(
   return { status: reportStatus(checks), url, checks, elapsedMs: now() - start };
 }
 
-export function formatCraterSmokeReport(report: CraterSmokeReport): string {
+export function formatCraterSmokeReport(report: CraterSmokeReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const color = report.status === "pass" ? GREEN : report.status === "skip" ? YELLOW : RED;
+  // `unavailable` is the rule most likely to be off on this gate: a project that runs Crater
+  // only in one CI job wants the other jobs to say "skipped", not to colour it yellow. The
+  // `--require` flag is the opposite request and raises the severity in `findings`, so the
+  // emitted severity is what this reads back rather than the table's `info`.
+  const checkFailedOff = ruleTier(rules, "check-failed", "suspect") === "off";
+  const unavailableOff = ruleTier(rules, "unavailable", "info") === "off";
+  const failsShown = report.checks.some((c) => c.status === "fail") && !checkFailedOff;
+  const color = report.status === "pass" || (!failsShown && report.status === "fail") ? GREEN
+    : report.status === "skip" ? (unavailableOff ? DIM : YELLOW)
+    : RED;
   lines.push(`${BOLD}${CYAN}vlmkit check crater${RESET}`);
   lines.push(`${DIM}url: ${report.url}${RESET}`);
   lines.push("");
-  lines.push(`status: ${color}${report.status}${RESET}`);
+  lines.push(`status: ${color}${report.status}${RESET}`
+    + (report.status === "fail" && !failsShown ? ` ${DIM}(check-failed off — the failures below are measured, not reported)${RESET}` : ""));
   for (const check of report.checks) {
     const icon = check.status === "pass" ? `${GREEN}PASS${RESET}`
-      : check.status === "skip" ? `${YELLOW}SKIP${RESET}`
+      : check.status === "skip" ? (unavailableOff ? `${DIM}SKIP${RESET}` : `${YELLOW}SKIP${RESET}`)
+      : checkFailedOff ? `${DIM}FAIL${RESET}`
       : `${RED}FAIL${RESET}`;
     lines.push(`  ${icon} ${check.name.padEnd(22)} ${String(check.elapsedMs).padStart(5)}ms  ${DIM}${check.message}${RESET}`);
   }

@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { createModelRouter, type Budget } from "./router.ts";
 import type { ModelTier } from "./types.ts";

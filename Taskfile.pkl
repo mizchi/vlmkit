@@ -1,4 +1,4 @@
-/// vrt task definitions for pkfire.
+/// vlmkit task definitions for pkfire.
 ///
 /// Replaces the previous bash justfile. Each task is a typed `Task`
 /// with declared inputs so pkfire can
@@ -6,17 +6,17 @@
 ///
 /// Usage:
 ///   pkf list                  # show all tasks
-///   pkf run vrt-test          # run a task
+///   pkf run vlmkit-test          # run a task
 ///   pkf run smoke-all         # full smoke
-///   pkf run --watch vrt-test  # re-run on src changes
+///   pkf run --watch vlmkit-test  # re-run on src changes
 ///
 /// Cache directory: $PKFIRE_CACHE_DIR or ~/.cache/pkfire.
 amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.10.0#/Taskfile.pkl"
 
 // ---- Core ----
 
-local vrtTest = new Task {
-  name = "vrt-test"
+local vlmkitTest = new Task {
+  name = "vlmkit-test"
   cmd = "node --test src/**/*.test.ts"
   inputs { "src/**/*.ts" }
 }
@@ -41,23 +41,23 @@ local introspectBench = new Task {
 
 // ---- Demos ----
 
-local vrtDemo = new Task {
-  name = "vrt-demo"
+local vlmkitDemo = new Task {
+  name = "vlmkit-demo"
   cmd = "node src/demo/demo.ts"
   inputs { "src/demo/demo.ts" }
 }
-local vrtDemoFix = new Task {
-  name = "vrt-demo-fix"
+local vlmkitDemoFix = new Task {
+  name = "vlmkit-demo-fix"
   cmd = "node src/demo/demo-fix-loop.ts"
   inputs { "src/demo/demo-fix-loop.ts" }
 }
-local vrtDemoMulti = new Task {
-  name = "vrt-demo-multi"
+local vlmkitDemoMulti = new Task {
+  name = "vlmkit-demo-multi"
   cmd = "node src/demo/demo-scenarios.ts"
   inputs { "src/demo/demo-scenarios.ts" }
 }
-local vrtDemoMultistep = new Task {
-  name = "vrt-demo-multistep"
+local vlmkitDemoMultistep = new Task {
+  name = "vlmkit-demo-multistep"
   cmd = "node src/demo/demo-multistep.ts"
   inputs { "src/demo/demo-multistep.ts" }
 }
@@ -296,19 +296,15 @@ local falsePositive = new Task {
 }
 
 // ---- Playwright ----
-
-local vrtPlaywright = new Task {
-  name = "vrt"
-  cmd = "playwright test"
-}
-local vrtUpdate = new Task {
-  name = "vrt-update"
-  cmd = "playwright test --update-snapshots"
-}
+//
+// `vrt` / `vrt-update` (`playwright test`) are gone with `e2e/vlmkit-capture.spec.ts` and the
+// root `playwright.config.ts`. Route capture is `vlmkit workflow init` / `workflow capture`,
+// which run in-process now; the only remaining playwright configs belong to fixtures
+// (`packages/vlmkit-heal/fixtures/`) and to user projects that vlmkit generates tests for.
 
 // ---- Markup-assistance suite (new this PR) ----
 //
-// The 19 markup-assistance CLIs registered under `vrt <command>`.
+// The 22 markup-assistance gates the smoke drives, under `vlmkit <group> <leaf>`.
 // `smoke-all` runs the existing bash script (single source of truth
 // for fixture wiring); individual CLI verifies are covered by
 // pkspec/Test.pkl so we don't duplicate them here.
@@ -325,10 +321,10 @@ local smokeAll = new Task {
   }
 }
 
-local vrtHelp = new Task {
-  name = "vrt-help"
+local vlmkitHelp = new Task {
+  name = "vlmkit-help"
   cmd = "node --experimental-strip-types src/cli/vlmkit.ts help"
-  inputs { "src/cli/vlmkit.ts"; "src/cli/router.ts" }
+  inputs { "src/cli/vlmkit.ts"; "src/cli/cli.ts" }
 }
 
 // ---- Spec gates (pkspec) ----
@@ -365,13 +361,13 @@ local specRun = new Task {
 // ---- Aggregate ----
 
 tasks {
-  vrtTest
+  vlmkitTest
   bench
   introspectBench
-  vrtDemo
-  vrtDemoFix
-  vrtDemoMulti
-  vrtDemoMultistep
+  vlmkitDemo
+  vlmkitDemoFix
+  vlmkitDemoMulti
+  vlmkitDemoMultistep
   cssBench
   cssBenchSelector
   cssBenchAll
@@ -400,10 +396,8 @@ tasks {
   dogfoodLuna
   dogfoodSol
   falsePositive
-  vrtPlaywright
-  vrtUpdate
   smokeAll
-  vrtHelp
+  vlmkitHelp
   specCheck
   specLint
   specRender

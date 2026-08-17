@@ -30,6 +30,8 @@ import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-loa
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractComponentsFromFile, type ComponentBbox } from "../component/component-bbox.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
@@ -40,7 +42,115 @@ export interface ThemeParityOptions extends PageLoadOptions {
   viewport?: { width: number; height: number };
   /** Per-axis RGB delta threshold below which two colors are "the same". Default 16. */
   unchangedColorThreshold?: number;
+  /**
+   * How the page turns dark, when auto-detection gets it wrong: a class on the root
+   * (`dark`, `.theme-dark`) or an attribute (`data-theme=dark`).
+   *
+   * Auto-detection reads the stylesheets, so it needs no flag on any of the common setups.
+   * The override exists for the case it cannot see: a dark rule injected by script after
+   * measurement, or a class the site applies to something other than `<html>`.
+   */
+  darkSelector?: string;
 }
+
+/**
+ * How a page expresses dark mode. Not a preference — a fact about its CSS, measured.
+ *
+ * Flipping `prefers-color-scheme` is the only strategy this gate exercised for its first year,
+ * and it is not the common one. Measured on vite.dev: `prefers-color-scheme` appears ZERO times
+ * in its stylesheets while `.dark` appears 47, including `:root.dark`. The gate reported
+ * `theme pixel delta: 0.0% (page barely responds to color scheme)` and
+ * `unthemed components: 8 of 8` for a site with a working theme toggle — a false claim about
+ * the majority strategy (Tailwind `darkMode: "class"`, VitePress, next-themes, Docusaurus's
+ * `data-theme`).
+ */
+export type ThemeStrategy = "media" | "class" | "attribute" | "none";
+
+export interface ThemeStrategyDetection {
+  strategy: ThemeStrategy;
+  /** `prefers-color-scheme: dark` rule count found in readable stylesheets. */
+  mediaRules: number;
+  /** The root class or attribute the dark render applied, when not `media`. */
+  darkSelector?: string;
+  /** Stylesheets the browser refused to expose (cross-origin) — the blind spot in the count. */
+  unreadableSheets: number;
+}
+
+/**
+ * Read the page's own CSS and report which dark-mode strategy it uses.
+ *
+ * Counting rules rather than trusting one match: a single stray `.dark` in a vendor reset must
+ * not outvote a page built on the media query. Class candidates are checked against what is
+ * actually in the stylesheets, so a page with no dark styling at all still reports `none` and
+ * gets today's advice.
+ */
+export const DETECT_THEME_STRATEGY = `(() => {
+  // Written without a single regex built from a string, and with no nested quote characters.
+  // The first version used new RegExp("...\\\\s...") inside this template literal and shipped a
+  // broken script twice over: the backslashes collapsed, so the emitted pattern was
+  // [s,>+~] (matching a literal "s") and the attribute test did not even parse. Plain string
+  // work is longer here and cannot be silently mangled by one more layer of escaping.
+  const CLASS_CANDIDATES = ["dark", "dark-mode", "theme-dark", "dark-theme"];
+  const ATTR_CANDIDATES = ["data-theme", "data-mode", "data-color-scheme", "data-bs-theme"];
+  const DELIMS = [" ", ">", "+", "~", ":", "[", ".", ""];
+  // A selector themes the PAGE when the class sits on the root (or on nothing, i.e. a bare
+  // descendant scope). A component called .dark-badge says nothing about the strategy, which is
+  // why this is prefix-plus-delimiter rather than a substring test.
+  const themesPage = (selector, cls) => selector.split(",").some((part) => {
+    const p = part.trim();
+    for (const prefix of ["." + cls, "html." + cls, ":root." + cls, "body." + cls]) {
+      if (!p.startsWith(prefix)) continue;
+      if (DELIMS.indexOf(p.charAt(prefix.length)) !== -1) return true;
+    }
+    return false;
+  });
+  const namesDarkAttr = (selector, attr) => selector.split(",").some((part) => {
+    const p = part.trim();
+    const at = p.indexOf("[" + attr);
+    if (at === -1) return false;
+    const close = p.indexOf("]", at);
+    return close !== -1 && p.slice(at, close).indexOf("dark") !== -1;
+  });
+  let mediaRules = 0, unreadable = 0;
+  const classHits = new Map(), attrHits = new Map();
+  const walk = (rules) => {
+    for (const rule of rules) {
+      const condition = String(rule.conditionText || (rule.media && rule.media.mediaText) || "");
+      if (condition && condition.split(" ").join("").indexOf("prefers-color-scheme:dark") !== -1) {
+        mediaRules += rule.cssRules ? rule.cssRules.length : 1;
+      }
+      const sel = rule.selectorText;
+      if (sel) {
+        for (const c of CLASS_CANDIDATES) {
+          if (themesPage(sel, c)) classHits.set(c, (classHits.get(c) || 0) + 1);
+        }
+        for (const a of ATTR_CANDIDATES) {
+          if (namesDarkAttr(sel, a)) attrHits.set(a + "=dark", (attrHits.get(a + "=dark") || 0) + 1);
+        }
+      }
+      if (rule.cssRules) walk(rule.cssRules);
+    }
+  };
+  for (const sheet of Array.from(document.styleSheets)) {
+    try { walk(Array.from(sheet.cssRules)); } catch (e) { unreadable++; }
+  }
+  const best = (m) => Array.from(m.entries()).sort((a, b) => b[1] - a[1])[0];
+  const topClass = best(classHits), topAttr = best(attrHits);
+  const classCount = topClass ? topClass[1] : 0;
+  const attrCount = topAttr ? topAttr[1] : 0;
+  // Counting rules rather than trusting one match: a stray .dark in a vendor reset must not
+  // outvote a page built on the media query, and a page can carry both.
+  if (mediaRules > 0 && mediaRules >= classCount && mediaRules >= attrCount) {
+    return { strategy: "media", mediaRules: mediaRules, unreadableSheets: unreadable };
+  }
+  if (classCount > 0 && classCount >= attrCount) {
+    return { strategy: "class", mediaRules: mediaRules, darkSelector: topClass[0], unreadableSheets: unreadable };
+  }
+  if (attrCount > 0) {
+    return { strategy: "attribute", mediaRules: mediaRules, darkSelector: topAttr[0], unreadableSheets: unreadable };
+  }
+  return { strategy: "none", mediaRules: mediaRules, unreadableSheets: unreadable };
+})()`;
 
 export interface UnthemedBbox {
   rank: number;
@@ -61,6 +171,13 @@ export interface ThemeParityReport {
   unthemed: UnthemedBbox[];
   /** All matched bboxes (for transparency). */
   totalMatched: number;
+  /**
+   * Which strategy the dark render actually exercised.
+   *
+   * Printed next to the delta, because what a 0.0% delta MEANS depends entirely on this: with
+   * `media` on a class-themed page it means the gate flipped something the page ignores.
+   */
+  themeStrategy: ThemeStrategyDetection;
   reportPath: string;
 }
 
@@ -135,17 +252,38 @@ export async function runThemeParity(
         animation: none !important;
       }`,
     });
+    // Read the page's own CSS before screenshotting it: which strategy the dark render should
+    // use is a fact about the stylesheets, and getting it wrong is how this gate came to report
+    // `0.0% delta, 8 of 8 unthemed` for a site whose theme toggle works.
+    const detected = options.darkSelector
+      ? {
+        strategy: (options.darkSelector.includes("=") ? "attribute" : "class") as ThemeStrategy,
+        mediaRules: 0,
+        darkSelector: options.darkSelector,
+        unreadableSheets: 0,
+      }
+      : await lightPage.evaluate(DETECT_THEME_STRATEGY) as ThemeStrategyDetection;
     const lightPath = join(outputDir, "light.png");
     await lightPage.screenshot({ path: lightPath, fullPage: false });
     await lightPage.close();
 
-    // Dark render.
+    // Dark render. `colorScheme: "dark"` stays on for every strategy — it is what a
+    // media-query page reads, it costs nothing on a class-themed one, and a page can use both.
     const { page: darkPage } = await openSource(browser, htmlPath, {
       viewport,
       colorScheme: "dark",
       settleMs: 0,
       ...pickPageLoad(options),
     });
+    if (detected.strategy === "class" && detected.darkSelector) {
+      // On the root element, which is where every class-strategy library puts it
+      // (`document.documentElement.classList`). Applied after load so the site's own
+      // preference script has already run and cannot overwrite it.
+      await darkPage.evaluate((cls) => document.documentElement.classList.add(cls), detected.darkSelector);
+    } else if (detected.strategy === "attribute" && detected.darkSelector) {
+      const [name, value = "dark"] = detected.darkSelector.split("=");
+      await darkPage.evaluate(([n, v]) => document.documentElement.setAttribute(n!, v!), [name, value]);
+    }
     await darkPage.addStyleTag({
       content: `*, *::before, *::after {
         transition: none !important;
@@ -201,6 +339,7 @@ export async function runThemeParity(
       themePixelDelta,
       unthemed,
       totalMatched,
+      themeStrategy: detected,
     });
     await writeFile(reportPath, md);
 
@@ -212,6 +351,7 @@ export async function runThemeParity(
       themePixelDelta,
       unthemed,
       totalMatched,
+      themeStrategy: detected,
       reportPath,
     };
   });
@@ -220,19 +360,57 @@ export async function runThemeParity(
 /** Terminal summary, extracted from `runThemeParity` so `run` stops printing. */
 export const THEME_INERT_DELTA = 0.02;
 
-export function formatThemeParityReport(report: ThemeParityReport): string {
+export function formatThemeParityReport(report: ThemeParityReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check theme${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
+  // Two independent rules, and the pixel-delta line is the one worth keeping when
+  // `theme-inert` is off: the DELTA is a measurement either way. Only its verdict character
+  // changes, from a warning to a plain reading.
+  const inertTier = ruleTier(rules, "theme-inert", "warn");
+  const unthemedTier = ruleTier(rules, "unthemed-component", "warn");
   const pct = (report.themePixelDelta * 100).toFixed(1);
   const inert = report.themePixelDelta < THEME_INERT_DELTA;
+  const strategy = report.themeStrategy;
+  const inertIcon = !inert
+    ? `${GREEN}\u2713${RESET}`
+    : inertTier === "off"
+      ? `${DIM}-${RESET}`
+      : inertTier === "suspect" ? `${RED}\u2717${RESET}` : inertTier === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
   lines.push(
-    `  ${inert ? `${YELLOW}!${RESET}` : `${GREEN}\u2713${RESET}`} theme pixel delta: ${pct}%`
-    + ` (page ${inert ? "barely" : "broadly"} responds to color scheme)`,
+    `  ${inertIcon} theme pixel delta: ${pct}%`
+    + ` (page ${inert ? "barely" : "broadly"} responds to ${strategy?.strategy === "media" || strategy === undefined
+      ? "color scheme"
+      : strategy.strategy === "none" ? "either dark-mode strategy" : `\`${strategy.darkSelector}\``})`
+    + (inert && inertTier === "off" ? `${DIM} \u2014 theme-inert is off, reported as a reading only${RESET}` : ""),
   );
-  const unthemedIcon = report.unthemed.length === 0 ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
-  lines.push(`  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}`);
-  for (const u of report.unthemed.slice(0, 5)) {
+  // Next to the delta, not in a footnote: what a 0.0% means depends on which strategy was
+  // exercised, and the gate spent a year flipping the media query at pages that theme by class.
+  if (strategy) {
+    lines.push(strategy.strategy === "none"
+      ? `    ${DIM}strategy: none found in the readable CSS — no \`prefers-color-scheme\` rule,`
+        + ` no root \`.dark\` / \`[data-theme=dark]\` selector`
+        + (strategy.unreadableSheets > 0 ? `; ${strategy.unreadableSheets} cross-origin sheet(s) could not be read` : "")
+        + `${RESET}`
+      : `    ${DIM}strategy: ${strategy.strategy}`
+        + (strategy.strategy === "media"
+          ? ` (${strategy.mediaRules} \`prefers-color-scheme: dark\` rule(s))`
+          : ` — the dark render applied \`${strategy.darkSelector}\` to the root element`
+            + (strategy.mediaRules > 0 ? `, and the page also has ${strategy.mediaRules} media rule(s)` : ""))
+        + (strategy.unreadableSheets > 0 ? `; ${strategy.unreadableSheets} cross-origin sheet(s) unreadable` : "")
+        + `${RESET}`);
+  }
+  const unthemedOff = unthemedTier === "off";
+  const unthemedIcon = unthemedOff
+    ? `${DIM}-${RESET}`
+    : report.unthemed.length === 0
+      ? `${GREEN}\u2713${RESET}`
+      : unthemedTier === "suspect" ? `${RED}\u2717${RESET}` : unthemedTier === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
+  lines.push(
+    `  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}`
+    + (unthemedOff ? `${DIM} \u2014 measured and NOT reported, unthemed-component is off${RESET}` : ""),
+  );
+  for (const u of unthemedOff ? [] : report.unthemed.slice(0, 5)) {
     lines.push(
       `    ${DIM}#${u.rank} ${u.bbox.left},${u.bbox.top} ${u.bbox.width}\u00d7${u.bbox.height}`
       + ` fill ${u.lightFill.hex} (\u0394 ${u.fillDelta.toFixed(1)})${RESET}`,
@@ -249,11 +427,36 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
   lines.push(`HTML: \`${r.html}\` at ${r.viewport.width}×${r.viewport.height}`);
   lines.push("");
   const pct = (r.themePixelDelta * 100).toFixed(2);
+  const strat = r.themeStrategy;
+  const flipped = strat === undefined || strat.strategy === "media" || strat.strategy === "none"
+    ? "`prefers-color-scheme` from `light` to `dark`"
+    : `\`${strat.darkSelector}\` on the root element (${strat.strategy} strategy)`;
   lines.push(`**Theme pixel delta**: ${pct}% — fraction of pixels that changed when switching ` +
-    `\`prefers-color-scheme\` from \`light\` to \`dark\`.`);
+    `${flipped}.`);
   lines.push("");
+  if (strat) {
+    lines.push(`**Dark-mode strategy detected**: \`${strat.strategy}\`` +
+      (strat.strategy === "media" ? ` (${strat.mediaRules} \`prefers-color-scheme: dark\` rule(s) in the readable CSS)`
+        : strat.strategy === "none" ? " — neither a `prefers-color-scheme` rule nor a root `.dark` / `[data-theme=dark]` selector is in the readable CSS"
+        : ` — root \`${strat.darkSelector}\`, applied by this gate for the dark render` +
+          (strat.mediaRules > 0 ? `; the page also carries ${strat.mediaRules} media rule(s)` : "")));
+    if (strat.unreadableSheets > 0) {
+      lines.push("");
+      lines.push(`> ${strat.unreadableSheets} cross-origin stylesheet(s) could not be read, so the ` +
+        "strategy count is a lower bound. If the page themes from one of those, pass " +
+        "`--dark-selector` to name the class or attribute directly.");
+    }
+    lines.push("");
+  }
   if (r.themePixelDelta < 0.02) {
-    lines.push("> The page barely responds to the color-scheme toggle. Either dark-mode " +
+    lines.push(strat && (strat.strategy === "class" || strat.strategy === "attribute")
+      // Reaching this line under a class strategy means the class WAS applied and the pixels
+      // still did not move, which is a real finding rather than the gate testing the wrong knob.
+      ? "> The page barely responds to its own dark-mode " + strat.strategy +
+        " (`" + strat.darkSelector + "` was applied to the root and the render hardly changed). " +
+        "Either the dark rules are not reaching these elements, or the values behind them are " +
+        "the same in both themes."
+      : "> The page barely responds to the color-scheme toggle. Either dark-mode " +
       "styles are missing entirely, or the page doesn't use the standard " +
       "`@media (prefers-color-scheme: dark)` query.");
     lines.push("");

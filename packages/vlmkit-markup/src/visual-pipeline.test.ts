@@ -6,7 +6,7 @@
  *
  * Playwright 不要: Canvas API の代わりに pngjs で直接 PNG を生成する。
  */
-import { describe, it, before, after } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -49,11 +49,11 @@ async function savePng(path: string, png: { width: number; height: number; data:
   await encodePng(path, png);
 }
 
-before(async () => {
+beforeAll(async () => {
   await mkdir(TMP, { recursive: true });
 });
 
-after(async () => {
+afterAll(async () => {
   await rm(TMP, { recursive: true, force: true });
 });
 

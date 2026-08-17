@@ -7,7 +7,7 @@
  * show up as a gate failing on a real page.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { gateTool, gateToolArgv, gateToolName, gateToolSummary } from "./gate-tool.ts";
 import { TOOLS } from "./tools.ts";

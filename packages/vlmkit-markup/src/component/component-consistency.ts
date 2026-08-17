@@ -37,6 +37,8 @@ import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes } from "../style/palette-diff.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 
@@ -266,8 +268,17 @@ export async function runComponentConsistency(
  * must not print — the core runner owns output and decides between prose and
  * `--json`.
  */
-export function formatComponentConsistencyReport(report: ComponentConsistencyReport): string {
+export function formatComponentConsistencyReport(report: ComponentConsistencyReport, rules?: RuleView): string {
   const lines: string[] = [];
+  // Which rule a row would be reported under, decided the same way `../gates/drift.gate.ts`
+  // decides it: tracked properties differ -> `instance-drift`, otherwise the pixels differ for
+  // some other reason -> `instance-content-differs`. The gate additionally drops rows below
+  // `--threshold`, and this cannot see that number; dimming a sub-threshold row whose rule is
+  // off is still true — nothing under an off rule is being reported either way.
+  const ruleOf = (d: InstanceDelta) => d.styleDeltas.length > 0
+    ? { rule: "instance-drift", emitted: "suspect" as const }
+    : { rule: "instance-content-differs", emitted: "info" as const };
+  const offRules = new Map<string, number>();
   lines.push(`  ${BOLD}${CYAN}vlmkit check drift component${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}  selector: ${report.selector}${RESET}`);
   lines.push(`  ${DIM}${report.instanceCount} instance(s), reference = #${report.referenceIndex}${RESET}`);
@@ -283,8 +294,15 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
     // tell "this instance is styled differently" from "this instance holds different
     // copy", and marking the second one ✗ is what made this gate unpassable on a page
     // with real content.
-    const icon = d.styleDeltas.length > 0
-      ? `${RED}✗${RESET}`
+    const ruled = ruleOf(d);
+    const tier = ruleTier(rules, ruled.rule, ruled.emitted);
+    if (tier === "off" && !(d.styleDeltas.length === 0 && d.diffRatio === 0)) {
+      offRules.set(ruled.rule, (offRules.get(ruled.rule) ?? 0) + 1);
+    }
+    const icon = tier === "off"
+      ? `${DIM}-${RESET}`
+      : d.styleDeltas.length > 0
+      ? (tier === "suspect" ? `${RED}✗${RESET}` : `${YELLOW}!${RESET}`)
       : d.diffRatio === 0
         ? `${GREEN}✓${RESET}`
         : `${YELLOW}~${RESET}`;
@@ -298,7 +316,10 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
           ? "identical"
           : "no tracked property differs";
     const whDelta = `Δ ${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
-    lines.push(`  ${icon} instance #${d.candidateIndex}  ${verdict.padEnd(30)}  ${DIM}${pct.padStart(6)}% px  ${whDelta}${RESET}`);
+    const retuned = tier !== "off" && tier !== ruled.emitted && d.styleDeltas.length > 0
+      ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
+      : "";
+    lines.push(`  ${icon} instance #${d.candidateIndex}  ${verdict.padEnd(30)}  ${DIM}${pct.padStart(6)}% px  ${whDelta}${RESET}${retuned}`);
     if (d.styleDeltas.length > 0) {
       // The properties are the actionable part: an agent told to "replace the inline
       // markup with the shared component invocation" on markup that was already
@@ -330,6 +351,10 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
         : `      ${DIM}every property on the instance root matches and the palettes agree —`
           + ` this looks like different content${RESET}`);
     }
+  }
+  if (offRules.size > 0) {
+    const detail = [...offRules].map(([rule, n]) => `${rule} x${n}`).join(", ");
+    lines.push(`  ${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} instance(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
   }
   // The escape hatch was documented only in `--help`, which is not where a reader of a
   // failing run is looking. v4's repair agent found it there and said what it cost:

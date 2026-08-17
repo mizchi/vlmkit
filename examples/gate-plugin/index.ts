@@ -1,3 +1,6 @@
+import {
+  definePlugin,
+} from "@mizchi/vlmkit-core/plugin";
 /**
  * The plugin this example directory registers — both worked gates in one
  * module.
@@ -15,7 +18,6 @@
  * silently letting one win.
  */
 
-import { definePlugin } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { domBudgetGate } from "./dom-budget.gate.ts";
 import { houseBrandGate } from "./house-gates.ts";
 

@@ -11,6 +11,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vlmkit-ai/reasoning.ts";
 import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
@@ -213,7 +214,7 @@ function generateFixPlan(chain: ReasoningChain, issues: ReturnType<typeof verify
 
 // ---- Main Demo ----
 
-async function main() {
+export async function runDemoFixLoop() {
   await mkdir(TMP, { recursive: true });
 
   console.log();
@@ -488,4 +489,9 @@ function quickIntrospect(testId: string, tree: A11yNode) {
   };
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded, so importing this module does not RUN the command. Without it a
+// test — or any tool reaching for a helper here — triggers a full run, which is
+// why this file had 0% coverage.
+if (isCliEntry(import.meta.url)) {
+  runDemoFixLoop().catch((e) => { console.error(e); process.exitCode = 1; });
+}

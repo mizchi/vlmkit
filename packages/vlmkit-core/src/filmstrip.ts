@@ -45,6 +45,8 @@ export interface FilmstripOptions {
   /**
    * Cap the sheet's width in px by downscaling further. Applied after `scale`.
    * A 4-sample strip of 1280x720 frames is 5192px wide untouched.
+   *
+   * `0` disables the cap, matching `snapshot strip --max-width 0`.
    */
   maxWidth?: number;
   /**
@@ -65,7 +67,12 @@ export interface FilmstripOptions {
 }
 
 export interface FilmstripLayout {
-  /** Cell box, i.e. the largest frame after scaling. */
+  /**
+   * Cell box, i.e. the largest frame after scaling.
+   *
+   * Uniform across the sheet, and a per-row box was tried and rejected — see the measurement in
+   * `composeFilmstrip`'s header.
+   */
   cell: { width: number; height: number };
   columns: number;
   rows: number;
@@ -85,7 +92,11 @@ const DEFAULT_LABEL_COLOR = [240, 240, 240] as const;
 const LABEL_PAD = 3;
 
 /** Nearest-neighbour, matching `image-resize.ts`: hard edges stay legible small. */
-function scalePngData(src: PngData, factor: number): PngData {
+/**
+ * Exported for the animated-strip path, which downscales the same frames the sheet would and must
+ * shrink them the same way — two nearest-neighbour implementations would drift on which pixel wins.
+ */
+export function scalePngData(src: PngData, factor: number): PngData {
   if (factor === 1) return src;
   const width = Math.max(1, Math.round(src.width / factor));
   const height = Math.max(1, Math.round(src.height / factor));
@@ -123,7 +134,11 @@ export function filmstripLayout(
 
   let scale = Math.max(1, options.scale ?? 1);
   const cellWidthAt = (s: number) => Math.max(...frames.map((f) => Math.max(1, Math.round(f.width / s))));
-  if (options.maxWidth !== undefined) {
+  // `maxWidth: 0` means "do not cap", which is what `snapshot strip --max-width 0` documents.
+  // Taken literally it solved for a scale that fits a zero-width sheet, hit the 64-step guard, and
+  // returned a 132px thumbnail of a 1832px strip. The CLI dodged it by omitting the option
+  // entirely; any other caller got the thumbnail.
+  if (options.maxWidth !== undefined && options.maxWidth > 0) {
     // Solve for the scale that fits, rather than scaling twice: two successive
     // nearest-neighbour passes lose more detail than one pass at the final factor.
     const sheetWidthAt = (s: number) => padding * 2 + columns * cellWidthAt(s) + gap * (columns - 1);
@@ -159,6 +174,26 @@ export function filmstripLayout(
 
 /**
  * One image containing every frame, in order.
+ *
+ * ## Why the cell stays uniform (measured 2026-08-16, closing the "ragged layout" item)
+ *
+ * A real sheet is half padding: `check animation --strip` on
+ * `fixtures/css-challenge/dashboard.html` is 1532x781 and **49.0% background**. The recorded fix
+ * was per-row cell sizes. Implemented and measured, it recovers almost nothing, because the
+ * recorded diagnosis was wrong about where the padding is:
+ *
+ *   - The four rows are all 393px TALL and 916 / 664 / 412 / 244px WIDE, so per-row height changes
+ *     nothing on this sheet (byte-identical output).
+ *   - Per-row WIDTH cannot help either: the sheet must be as wide as its widest row, so a narrow
+ *     row's grey moves from between its cells to the right of them. Measured on a synthetic
+ *     three-width sheet: 37.1% uniform against 36.2% ragged.
+ *   - And it costs correctness where it does apply: a column label names one instant across every
+ *     row, so ragged widths print `150ms` over a cell from a different sample.
+ *
+ * So the padding is a property of the composition — one grid, rows of very different widths — and
+ * not of the cell rule. Fixing it means a different picture (item: "time axis x rows" plus "spatial
+ * arrangement" in one artifact), which is the same conclusion the spatial-arrangement item reached.
+ * `--strip-animated` is the other half of that answer: no grid at all.
  *
  * Frames of different sizes are placed **top-left inside a uniform cell**, never
  * centred. That matters for the case this exists for: an animation filmstrip of
@@ -227,6 +262,7 @@ export function composeFilmstrip(
   if (layout.rowLabelBand > 0) {
     // Row labels get the full sheet width, not one cell: a row label names the whole
     // row, and there is nothing to its right to collide with.
+    //
     const rowWidth = width - padding * 2;
     options.rowLabels!.slice(0, layout.rows).forEach((label, row) => {
       const y = padding + layout.columnLabelBand

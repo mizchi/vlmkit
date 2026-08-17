@@ -19,7 +19,7 @@ import {
   formatBreakpointCheckReport,
   runBreakpointCheck,
 } from "../stress/breakpoint-check.ts";
-import { firstPositional, numberList, optionalInt } from "./arg-helpers.ts";
+import { firstPositional, numberList, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const breakpointsGate = defineGate<BreakpointCheckReport, BreakpointCheckOptions>({
   id: "check.breakpoints",

@@ -53,6 +53,9 @@
  */
 
 import { existsSync } from "node:fs";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, rename, rm, readdir, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
@@ -70,20 +73,13 @@ import {
 } from "./vrt/snapshot/approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
-function getArg(args: string[], name: string): string | undefined {
-  const i = args.indexOf(`--${name}`);
-  if (i < 0 || i === args.length - 1) return undefined;
-  const v = args[i + 1];
-  return v.startsWith("--") ? undefined : v;
-}
-
 function configBaseDirFor(config: DiffPrConfig): string {
   return config.configPath ? resolve(config.configPath, "..") : process.cwd();
 }
 
 async function cmdList(args: string[]): Promise<number> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
@@ -119,7 +115,7 @@ async function cmdList(args: string[]): Promise<number> {
 
 async function cmdRm(args: string[]): Promise<number> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
@@ -188,7 +184,7 @@ function archiveTimestamp(): string {
 
 async function cmdUpdate(args: string[]): Promise<number> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
@@ -232,7 +228,7 @@ async function cmdUpdate(args: string[]): Promise<number> {
   // PNGs instead of falling back to a browser the caller may not have.
   const forwarded: string[] = [];
   for (const flag of ["config", "from-dir", "from-png", "route", "viewport"]) {
-    const value = getArg(args, flag);
+    const value = readFlag(args, flag);
     if (value !== undefined) forwarded.push(`--${flag}`, value);
   }
   const { main: diffPrMain } = await import("./diff-pr.ts");
@@ -279,18 +275,18 @@ function parseRegionArg(value: string): ApprovalRegionMatch {
 }
 
 async function cmdApprove(args: string[]): Promise<number> {
-  const selector = getArg(args, "selector");
-  const regionRaw = getArg(args, "region");
-  const reason = getArg(args, "reason");
+  const selector = readFlag(args, "selector");
+  const regionRaw = readFlag(args, "region");
+  const reason = readFlag(args, "reason");
   if ((!selector && !regionRaw) || !reason) {
     console.error(`${RED}error:${RESET} a --selector or --region, plus --reason, are required`);
     console.error(`\n  vlmkit baseline approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]") --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
     return 1;
   }
-  const maxPxRaw = getArg(args, "max-px");
-  const maxRatioRaw = getArg(args, "max-ratio");
+  const maxPxRaw = readFlag(args, "max-px");
+  const maxRatioRaw = readFlag(args, "max-ratio");
   const dryRun = args.includes("--dry-run");
-  const manifestPath = resolve(getArg(args, "manifest") ?? "approval.json");
+  const manifestPath = resolve(readFlag(args, "manifest") ?? "approval.json");
 
   let rule;
   try {
@@ -300,9 +296,9 @@ async function cmdApprove(args: string[]): Promise<number> {
       reason,
       ...(maxPxRaw !== undefined ? { maxPx: Number(maxPxRaw) } : {}),
       ...(maxRatioRaw !== undefined ? { maxRatio: Number(maxRatioRaw) } : {}),
-      ...(getArg(args, "expires") ? { expires: getArg(args, "expires")! } : {}),
-      ...(getArg(args, "acknowledged-by") ? { acknowledgedBy: getArg(args, "acknowledged-by")! } : {}),
-      ...(getArg(args, "kind") ? { kind: approvalKind(getArg(args, "kind")) } : {}),
+      ...(readFlag(args, "expires") ? { expires: readFlag(args, "expires")! } : {}),
+      ...(readFlag(args, "acknowledged-by") ? { acknowledgedBy: readFlag(args, "acknowledged-by")! } : {}),
+      ...(readFlag(args, "kind") ? { kind: approvalKind(readFlag(args, "kind")) } : {}),
       createdAt: new Date().toISOString().slice(0, 10),
     });
   } catch (error) {
@@ -423,13 +419,12 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "baseline-cli" || (process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1]);
-if (isCliEntry) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+
+if (isCliEntry(import.meta.url, "baseline-cli")) {
+  // `handleCliError`, not `console.error(err)`: `readFlag` throws `UsageError` for a
+  // malformed flag, and that message already names the flag and the fix — a stack trace
+  // only buries it.
+  main().catch(handleCliError);
 }
 
 export { main };

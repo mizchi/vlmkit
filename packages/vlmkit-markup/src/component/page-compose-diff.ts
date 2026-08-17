@@ -18,6 +18,7 @@ import {
   type ExtractComponentsOptions,
 } from "./component-bbox.ts";
 import { classifyRegion, kindsCanPair, type ComponentKindInfo } from "./component-classify.ts";
+import { iou } from "@mizchi/vlmkit-core/rect-overlap.ts";
 
 export interface PageComponent extends ComponentBbox {
   /** Index in the extraction order (area-desc) of its own side. */
@@ -109,16 +110,6 @@ function toPageComponents(bboxes: ComponentBbox[]): PageComponent[] {
 
 function center(c: ComponentBbox): [number, number] {
   return [c.left + c.width / 2, c.top + c.height / 2];
-}
-
-function iouOf(a: ComponentBbox, b: ComponentBbox): number {
-  const x0 = Math.max(a.left, b.left);
-  const y0 = Math.max(a.top, b.top);
-  const x1 = Math.min(a.left + a.width, b.left + b.width);
-  const y1 = Math.min(a.top + a.height, b.top + b.height);
-  const inter = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
-  const union = a.width * a.height + b.width * b.height - inter;
-  return union <= 0 ? 0 : inter / union;
 }
 
 /**
@@ -225,7 +216,7 @@ export function matchPageComponents(
     deltaLeft: c.left - t.left,
     deltaWidth: c.width - t.width,
     deltaHeight: c.height - t.height,
-    iou: Number(iouOf(t, c).toFixed(3)),
+    iou: Number(iou(t, c).toFixed(3)),
     fillDistance: Number(fillDistance(t, c).toFixed(1)),
   }));
   matches.sort((a, b) => a.target.top - b.target.top || a.target.left - b.target.left);

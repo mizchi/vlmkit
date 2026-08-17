@@ -30,6 +30,9 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -72,6 +75,18 @@ interface PerViewportResult {
   totalPixels: number;
   threshold: number;
   pass: boolean;
+  /**
+   * The render or copy threw, so nothing was compared.
+   *
+   * The catch already set `diffRatio: 1` to force the failure, and with no other marker
+   * the markdown then reported the viewport as `100.00%` and listed it under **Worst
+   * offenders** as `99.00pp over threshold`. Measured with an unmet `waitFor`: the PR
+   * comment claimed a total visual regression on a viewport where `totalPixels` was 0,
+   * and the actual cause — a selector typo — appeared nowhere in it. The run failed
+   * either way; what was wrong was the reason it gave, which sends the reader to look at
+   * screenshots instead of at their config.
+   */
+  error?: string;
   baselinePath?: string;
   variantPath?: string;
   heatmapPath?: string;
@@ -101,6 +116,42 @@ interface PerRouteResult {
   failed: boolean;
   error?: string;
   /**
+   * Declared viewports with no baseline PNG to compare against.
+   *
+   * These used to be a bare `continue`, and `perVp.some((v) => !v.pass)` is `false`
+   * for an empty array — so a route whose baselines did not cover its viewports
+   * PASSED, having compared nothing. Measured: two declared viewports, one baseline
+   * deleted, the current PNG for the unpinned one 100% different (red against green),
+   * and the gate printed `home pass a=0.00%` / `PASS` / exit 0 without naming the
+   * second viewport at all. With a stray PNG under a renamed label so the
+   * `pinned.length === 0` check passes, ZERO pixels were compared and it still said
+   * pass.
+   *
+   * This is not a breach — nothing was measured, which is worse — so it is reported
+   * as its own thing and fails the route, the same way a missing baseline
+   * *directory* already did.
+   */
+  unpinned?: string[];
+  /**
+   * Declared policies that threw instead of producing a verdict.
+   *
+   * Both the media-variants and cross-browser blocks used to `catch` and only
+   * `console.log` a yellow line, leaving their result `undefined` — and `undefined`
+   * reads as "not declared", which is the same as "nothing to fail on":
+   * `mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false`.
+   *
+   * Measured with `mediaVariants` declared and a file sitting where the gate's output
+   * directory should be, so `mkdir` threw: the route printed `home pass desktop=0.00%`,
+   * the run printed `PASS`, it exited 0, and `summary.md` — the artifact that gets
+   * pasted into the PR — did not mention media-variants at all. The policy the config
+   * asked for simply vanished, and the only trace was a warning line in a log nobody
+   * reads on a green build.
+   *
+   * Same shape as `unpinned`: not a breach, worse — nothing was measured — so it is
+   * reported as its own thing and fails the route.
+   */
+  policyErrors?: Array<{ policy: string; message: string }>;
+  /**
    * Media-variants emulation summary. Run once per route at the
    * default viewport when `mediaVariants` is declared in config.
    */
@@ -124,13 +175,6 @@ interface PerRouteResult {
     maxOver: number;
     pass: boolean;
   };
-}
-
-function getArg(args: string[], name: string): string | undefined {
-  const i = args.indexOf(`--${name}`);
-  if (i < 0 || i === args.length - 1) return undefined;
-  const v = args[i + 1];
-  return v.startsWith("--") ? undefined : v;
 }
 
 function pctStr(n: number): string {
@@ -160,14 +204,14 @@ interface FileSourceFlags {
 }
 
 function fileSourceFlags(args: string[]): FileSourceFlags {
-  const fromDir = getArg(args, "from-dir");
-  const fromPng = getArg(args, "from-png");
+  const fromDir = readFlag(args, "from-dir");
+  const fromPng = readFlag(args, "from-png");
   return {
     active: Boolean(fromDir || fromPng),
     fromDir,
     fromPng,
-    routeOverride: getArg(args, "route"),
-    viewportOverride: getArg(args, "viewport"),
+    routeOverride: readFlag(args, "route"),
+    viewportOverride: readFlag(args, "viewport"),
   };
 }
 
@@ -247,7 +291,34 @@ async function renderViewport(
   try {
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
     if (waitFor) {
-      await page.locator(waitFor).first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+      // This used to be `.catch(() => {})`, and swallowing it is the same false green as
+      // the two above. `waitFor` exists so the gate does not measure a pre-render state;
+      // if the selector never becomes visible, the screenshot is of whatever WAS on
+      // screen, and the number reported for it is a number about the wrong document.
+      //
+      // The only case the old code caught was the two sides happening to differ. A typo
+      // — `.app-rooot` for `.app-root` — was invisible: measured on a client-rendered
+      // fixture, `pin` took 12.3s instead of ~1.5s (ten of those spent silently waiting)
+      // and the gate then reported `app pass desktop=0.00%` / `PASS` / exit 0. Nothing
+      // anywhere said the declared condition never held. The same class of failure is
+      // recorded three times over in `page-open.ts`'s `settlePage` docstring.
+      //
+      // Throwing rather than recording a flag, because both callers already handle a
+      // throw correctly and neither should keep the pixels: the per-viewport `catch` in
+      // `cmdRun` marks the viewport failed, and in `cmdPin` the throw lands before the
+      // screenshot is written, so a baseline is never pinned from a page that did not
+      // reach its declared ready state. A poisoned baseline is worse than a missing one
+      // — it makes every later run agree with it.
+      try {
+        await page.locator(waitFor).first().waitFor({ state: "visible", timeout: 10000 });
+      } catch {
+        throw new Error(
+          `waitFor selector never became visible within 10s: ${waitFor}. `
+          + `The page loaded, so this is a selector that does not match (a typo, or an `
+          + `element that is present but not visible) or a view that failed to render. `
+          + `Fix the selector, or drop \`waitFor\` if the page needs no readiness gate.`,
+        );
+      }
     }
     await page.screenshot({ path: outputPath, fullPage: true });
     if (a11y) {
@@ -312,12 +383,12 @@ async function pinFromFiles(
   return 0;
 }
 
-async function cmdPin(args: string[]): Promise<void> {
+async function cmdPin(args: string[]): Promise<number> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
-    process.exit(1);
+    return 1;
   }
   const config = loadDiffPrConfig(configPath);
 
@@ -331,16 +402,14 @@ async function cmdPin(args: string[]): Promise<void> {
     if (unknown.length > 0) {
       console.error(`${RED}error:${RESET} unknown route(s): ${unknown.join(", ")}`);
       console.error(`Known routes: ${config.routes.map((r) => r.name).join(", ")}`);
-      process.exit(1);
+      return 1;
     }
     routesToPin = config.routes.filter((r) => requestedRouteNames.includes(r.name));
   }
 
   const files = fileSourceFlags(args);
   if (files.active) {
-    const code = await pinFromFiles(config, configPath, routesToPin, files);
-    if (code !== 0) process.exit(code);
-    return;
+    return await pinFromFiles(config, configPath, routesToPin, files);
   }
 
   console.log(`${BOLD}${CYAN}vlmkit diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
@@ -351,6 +420,8 @@ async function cmdPin(args: string[]): Promise<void> {
   console.log();
 
   const viewports = viewportSpecsFor(config);
+  /** `<route>/<viewport>` for every baseline that was asked for and not written. */
+  const unwritten: string[] = [];
   await withBrowser(async (browser) => {
     for (const route of routesToPin) {
       process.stdout.write(`  ${route.name.padEnd(20)} ${DIM}${route.url}${RESET} ...`);
@@ -370,24 +441,43 @@ async function cmdPin(args: string[]): Promise<void> {
           success++;
         } catch (err) {
           console.log(`\n    ${RED}${vp.label}: ${String(err)}${RESET}`);
+          unwritten.push(`${route.name}/${vp.label}`);
         }
       }
-      console.log(` ${GREEN}ok${RESET} ${DIM}(${success}/${viewports.length} viewport(s))${RESET}`);
+      // `ok` was printed green unconditionally, so a route that pinned NOTHING read as
+      // `app ok (0/1 viewport(s))` — measured with an unreachable URL, followed by
+      // "Baselines pinned." and exit 0 with zero PNGs on disk. The count was right there
+      // and the color contradicted it.
+      const tag = success === viewports.length
+        ? `${GREEN}ok${RESET}`
+        : success === 0 ? `${RED}nothing pinned${RESET}` : `${YELLOW}partial${RESET}`;
+      console.log(` ${tag} ${DIM}(${success}/${viewports.length} viewport(s))${RESET}`);
     }
   });
   console.log();
+  if (unwritten.length > 0) {
+    // Exit non-zero, because the whole point of `pin` is to leave baselines behind and
+    // the next `diff-pr` run is what discovers it did not. A green pin step followed by a
+    // red gate run sends the reader to the gate, which is not where the problem is.
+    console.error(`${RED}${BOLD}FAIL${RESET} — ${unwritten.length} baseline(s) were not written: `
+      + `${unwritten.join(", ")}.`);
+    console.error(`${DIM}Nothing was pinned for these, so \`vlmkit diff-pr\` will report them as `
+      + `not compared. Fix the errors above and re-run.${RESET}`);
+    return 1;
+  }
   console.log(`${DIM}Baselines pinned. Run \`vlmkit diff-pr\` in CI to gate against them.${RESET}`);
+  return 0;
 }
 
 async function cmdRun(args: string[]): Promise<number> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
   }
   const config = loadDiffPrConfig(configPath);
-  const outputDir = resolve(cwd, getArg(args, "output") ?? ".vlmkit/runs/diff-pr");
+  const outputDir = resolve(cwd, readFlag(args, "output") ?? ".vlmkit/runs/diff-pr");
   await mkdir(outputDir, { recursive: true });
 
   // Optional approval manifest — suppresses both visual (existing
@@ -490,9 +580,16 @@ async function cmdRun(args: string[]): Promise<number> {
       // above and not evaluated here.
       const a11yPolicy = fileSources ? undefined : resolveA11yPolicy(config, route);
       const perVp: PerViewportResult[] = [];
+      /** Declared, but nothing pinned to compare against. Fails the route below. */
+      const unpinned: string[] = [];
+      /** Declared, but the measurement threw. Also fails the route below. */
+      const policyErrors: Array<{ policy: string; message: string }> = [];
       for (const vp of viewports) {
         const baselinePath = join(baselineDir, `${vp.label}.png`);
-        if (!existsSync(baselinePath)) continue;
+        if (!existsSync(baselinePath)) {
+          unpinned.push(vp.label);
+          continue;
+        }
         const suppliedFile = fileSources?.get(`${route.name}/${vp.label}`);
         // In file mode a viewport with no supplied PNG is out of scope
         // (--from-png names exactly one pair); --from-dir already enforced
@@ -514,6 +611,7 @@ async function cmdRun(args: string[]): Promise<number> {
             );
           }
         } catch (err) {
+          const what = suppliedFile ? "copy" : "render";
           perVp.push({
             viewport: vp.label,
             diffRatio: 1,
@@ -521,8 +619,8 @@ async function cmdRun(args: string[]): Promise<number> {
             totalPixels: 0,
             threshold: resolveThreshold(config, route, vp.label),
             pass: false,
+            error: `${what} error: ${err instanceof Error ? err.message : String(err)}`,
           });
-          const what = suppliedFile ? "copy" : "render";
           console.log(`  ${route.name.padEnd(20)} ${vp.label} ${RED}${what} error: ${String(err)}${RESET}`);
           continue;
         }
@@ -635,7 +733,10 @@ async function cmdRun(args: string[]): Promise<number> {
             pass: suspectCount <= maxSuspects && warnCount <= maxWarns,
           };
         } catch (err) {
-          console.log(`  ${YELLOW}media-variants error (${route.name}): ${String(err)}${RESET}`);
+          // Recorded, not just logged: leaving `mediaVariantsResult` undefined made a
+          // declared policy that crashed indistinguishable from one never declared.
+          console.log(`  ${RED}media-variants error (${route.name}): ${String(err)}${RESET}`);
+          policyErrors.push({ policy: "media-variants", message: String(err) });
         }
       }
 
@@ -675,16 +776,25 @@ async function cmdRun(args: string[]): Promise<number> {
             pass: overCount <= maxOver && !skipFails,
           };
         } catch (err) {
-          console.log(`  ${YELLOW}cross-browser error (${route.name}): ${String(err)}${RESET}`);
+          console.log(`  ${RED}cross-browser error (${route.name}): ${String(err)}${RESET}`);
+          policyErrors.push({ policy: "cross-browser", message: String(err) });
         }
       }
 
       const visualFailed = perVp.some((v) => !v.pass);
       const mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false;
       const xbFailed = crossBrowserResult ? !crossBrowserResult.pass : false;
-      const failed = visualFailed || mvFailed || xbFailed;
+      // `some` on an empty array is false, so without this a route with no comparable
+      // viewport reports pass. An unpinned viewport is not "within threshold"; it was
+      // never measured. Neither is a policy that threw — `mvFailed`/`xbFailed` are
+      // false for an absent result, and an absent result is exactly what a crash left.
+      const failed = visualFailed || mvFailed || xbFailed
+        || unpinned.length > 0 || policyErrors.length > 0;
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
       const breakdown = perVp.map((v) => {
+        // Same reason as the markdown row: `100.00%` for zero compared pixels reads as a
+        // total visual regression rather than as "this viewport never rendered".
+        if (v.error) return `${RED}${v.viewport}=error${RESET}`;
         const tag = v.pass ? GREEN : RED;
         const a11ySuffix = v.a11y
           ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}/f=${v.a11y.focusOrderFailures.length}/s=${v.a11y.semanticFailures.length}]${RESET}`
@@ -697,9 +807,21 @@ async function cmdRun(args: string[]): Promise<number> {
       const xbSuffix = crossBrowserResult
         ? ` ${DIM}[xb over=${crossBrowserResult.overCount}/${crossBrowserResult.maxOver} skip=${crossBrowserResult.skippedCount}]${RESET}`
         : "";
-      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${mvSuffix}${xbSuffix}`);
+      // Ahead of the deltas, because a reader who sees `a=0.00%` and nothing else has
+      // no way to know a second viewport was declared.
+      const unpinnedSuffix = unpinned.length > 0
+        ? ` ${RED}not compared: ${unpinned.join(", ")} (no baseline — \`vlmkit diff-pr pin\`)${RESET}`
+        : "";
+      // Same reasoning as `unpinnedSuffix`: a suffix that says nothing leaves the reader
+      // to infer from a missing `[mv …]` tag that a declared policy crashed.
+      const erroredSuffix = policyErrors.length > 0
+        ? ` ${RED}not evaluated: ${policyErrors.map((e) => e.policy).join(", ")} (errored)${RESET}`
+        : "";
+      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${unpinnedSuffix}${erroredSuffix}${mvSuffix}${xbSuffix}`);
       results.push({
         route, viewports: perVp, failed,
+        ...(unpinned.length > 0 ? { unpinned } : {}),
+        ...(policyErrors.length > 0 ? { policyErrors } : {}),
         mediaVariants: mediaVariantsResult,
         crossBrowser: crossBrowserResult,
       });
@@ -720,7 +842,11 @@ async function cmdRun(args: string[]): Promise<number> {
   console.log();
   console.log(`${DIM}Summary written to ${summaryPath}${RESET}`);
   if (anyFail) {
-    console.log(`${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.`);
+    const unpinnedCount = results.reduce((n, r) => n + (r.unpinned?.length ?? 0), 0);
+    const erroredCount = results.reduce((n, r) => n + (r.policyErrors?.length ?? 0), 0);
+    console.log(`${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.`
+      + (unpinnedCount > 0 ? ` ${unpinnedCount} declared viewport(s) had no baseline and were not compared.` : "")
+      + (erroredCount > 0 ? ` ${erroredCount} declared policy run(s) errored and produced no verdict.` : ""));
     return 1;
   }
   console.log(`${GREEN}${BOLD}PASS${RESET} — all routes within threshold.`);
@@ -766,13 +892,28 @@ export function buildMarkdownSummary(
     lines.push("|---|---|---|---|---|");
   }
   for (const r of results) {
-    if (r.viewports.length === 0) {
+    if (r.viewports.length === 0 && (r.unpinned ?? []).length === 0) {
       const filler = anyA11y ? " | —" : "";
       lines.push(`| \`${r.route.name}\` | — | — | —${filler} | ❌ ${r.error ?? "no result"} |`);
       continue;
     }
+    // A row per declared-but-unpinned viewport, so the table accounts for every
+    // viewport the config names. Without these the reader counts the rows, gets fewer
+    // than they declared, and has nothing telling them why.
+    for (const label of r.unpinned ?? []) {
+      const filler = anyA11y ? " | —" : "";
+      lines.push(`| \`${r.route.name}\` | ${label} | — | —${filler} | ❌ not compared: no baseline |`);
+    }
     for (const vp of r.viewports) {
       const icon = vp.pass ? "✅" : "❌";
+      // A viewport that threw has no percentage to report — `diffRatio: 1` is there to
+      // force the failure, not to describe pixels. Say what happened instead of printing
+      // `100.00%` for zero compared pixels.
+      if (vp.error) {
+        const filler = anyA11y ? " | —" : "";
+        lines.push(`| \`${r.route.name}\` | ${vp.viewport} | — | ${pctStr(vp.threshold)}${filler} | ❌ ${vp.error} |`);
+        continue;
+      }
       if (anyA11y) {
         const a11yCell = vp.a11y
           ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch} · ${vp.a11y.focusOrderFailures.length}/${vp.a11y.maxFocusOrder} · ${vp.a11y.semanticFailures.length}/${vp.a11y.maxSemantic}`
@@ -783,10 +924,50 @@ export function buildMarkdownSummary(
       }
     }
   }
+  const unpinnedRoutes = results.filter((r) => (r.unpinned ?? []).length > 0);
+  if (unpinnedRoutes.length > 0) {
+    // Its own section rather than a table row alone, for the same reason the
+    // skipped-gates note is at the top: this markdown is what gets pasted into a PR,
+    // and "not compared" is the one status a reader must not mistake for "compared and
+    // fine".
+    lines.push("");
+    lines.push("## Not compared — no baseline");
+    lines.push("");
+    lines.push("These viewports are declared in config but have no pinned PNG, so nothing "
+      + "was measured for them. That is why the run failed; it is not a pixel breach.");
+    lines.push("");
+    for (const r of unpinnedRoutes) {
+      lines.push(`- \`${r.route.name}\`: ${r.unpinned!.join(", ")}`);
+    }
+    lines.push("");
+    lines.push("Pin them with `vlmkit diff-pr pin` (or `pin <route>` for one), or drop the "
+      + "viewport from `viewports` if it is no longer wanted.");
+  }
+
+  const erroredRoutes = results.filter((r) => (r.policyErrors ?? []).length > 0);
+  if (erroredRoutes.length > 0) {
+    // The old code left these out of the markdown entirely, so the PR comment on a run
+    // whose media-variants gate crashed was byte-identical to one where it passed.
+    lines.push("");
+    lines.push("## Not evaluated — the policy errored");
+    lines.push("");
+    lines.push("These policies are declared in config and their run threw, so they "
+      + "produced no verdict. That is why the run failed; it is not a pixel breach, and "
+      + "it is not a clean result either.");
+    lines.push("");
+    for (const r of erroredRoutes) {
+      for (const e of r.policyErrors!) {
+        lines.push(`- \`${r.route.name}\` — **${e.policy}**: ${e.message.replace(/\s+/g, " ").slice(0, 300)}`);
+      }
+    }
+  }
+
   // Surface the worst visual offenders for quick eyeballing.
   const overThreshold = results
     .flatMap((r) => r.viewports
-      .filter((v) => v.diffRatio > v.threshold)
+      // `!v.error`: a viewport that never rendered is not an offender, and it used to top
+      // this list at "99.00pp over threshold" with zero pixels compared.
+      .filter((v) => !v.error && v.diffRatio > v.threshold)
       .map((v) => ({ route: r.route.name, vp: v })))
     .sort((a, b) => (b.vp.diffRatio - b.vp.threshold) - (a.vp.diffRatio - a.vp.threshold))
     .slice(0, 5);
@@ -898,9 +1079,20 @@ interface PostPrOptions {
  *      <summary>` (overwrites any prior vrt-marked comment via the
  *      `marker` HTML comment).
  *   2. Otherwise print the markdown with copy-paste instructions
- *      so the operator can post it manually. Returns the exit code
- *      from gh on success, 0 when we successfully printed the
- *      fallback, or 1 on a hard error.
+ *      so the operator can post it manually.
+ *
+ * Exit code: gh's own on the first path; 1 on a hard error; and on the fallback it
+ * depends on `CI`, because who is watching changes what "success" means.
+ *
+ * At a terminal, printing the markdown for a human to paste IS the job done, so 0.
+ * In CI nobody reads it: the comment was not posted, the step goes green, and the
+ * reviewer concludes there was nothing to report — the same false green as a gate
+ * passing on a measurement it never took. So under `CI` the fallback exits 1 and says
+ * what it did not do.
+ *
+ * `process.env.CI` as the discriminator follows `gate-config.ts`, which defaults
+ * `reuseExistingServer` the same way. It is pinned in both directions by the tests
+ * rather than left to whatever the ambient environment happens to be.
  */
 async function postPrComment(opts: PostPrOptions): Promise<number> {
   if (!existsSync(opts.summaryPath)) {
@@ -917,6 +1109,7 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
   await writeFile(decoratedPath, body);
 
   if (!ghAvailable()) {
+    const inCi = Boolean(process.env.CI);
     console.log(`${YELLOW}gh CLI not available — printing markdown for manual posting.${RESET}`);
     console.log(`${DIM}Target PR: ${opts.prRef}${RESET}`);
     console.log(`${DIM}Marker:    ${opts.marker} (use to locate / overwrite later)${RESET}`);
@@ -929,6 +1122,15 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
     console.log(`${DIM}─────────────────────────────────────────────────────${RESET}`);
     process.stdout.write(body);
     console.log(`${DIM}─────────────────────────────────────────────────────${RESET}`);
+    if (inCi) {
+      // A green step here would tell the reviewer the summary reached the PR. It did not.
+      console.error();
+      console.error(`${RED}not posted${RESET} — no comment was added to ${opts.prRef}, and `
+        + `CI is set, so nothing here will be read by a human.`);
+      console.error(`Install the gh CLI in this job (\`gh\` must be on PATH and `
+        + `authenticated — GH_TOKEN / GITHUB_TOKEN), or drop the \`post\` step.`);
+      return 1;
+    }
     return 0;
   }
 
@@ -947,17 +1149,17 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
 }
 
 async function cmdPost(args: string[]): Promise<number> {
-  const prRef = getArg(args, "pr");
+  const prRef = readFlag(args, "pr");
   if (!prRef) {
     console.error(`${RED}error:${RESET} --pr <ref> is required (e.g. owner/repo#123 or 123 inside the repo)`);
     return 1;
   }
   const cwd = process.cwd();
-  const summaryFlag = getArg(args, "summary");
+  const summaryFlag = readFlag(args, "summary");
   const summaryPath = summaryFlag
     ? resolve(cwd, summaryFlag)
     : resolve(cwd, ".vlmkit/runs/diff-pr/summary.md");
-  const marker = getArg(args, "marker") ?? "vrt-diff-pr-summary";
+  const marker = readFlag(args, "marker") ?? "vrt-diff-pr-summary";
   return postPrComment({ prRef, summaryPath, marker });
 }
 
@@ -982,9 +1184,11 @@ Subcommands:
                               files are an error, never a partial pin.
   post   --pr <ref> [--summary <path>] [--marker <id>]
                               Post the most recent summary.md to a PR
-                              via gh CLI. Falls back to printing the
-                              markdown with copy-paste instructions
-                              when gh is not on PATH.
+                              via gh CLI. When gh is not on PATH it
+                              prints the markdown with copy-paste
+                              instructions: exit 0 at a terminal, and
+                              exit 1 when CI is set, because nothing
+                              was posted and no one is reading stdout.
   (none) [--config vlmkit.config.json] [--output <dir>]
          [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
                               Diff every route's current rendering
@@ -1016,7 +1220,10 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (command === "pin") {
-    await cmdPin(argv.slice(1));
+    // Carried, not discarded. `cmdPin` used to return void and a pin that wrote no
+    // baselines at all still exited 0.
+    const code = await cmdPin(argv.slice(1));
+    if (code !== 0) process.exit(code);
     return;
   }
   if (command === "post") {
@@ -1029,13 +1236,12 @@ async function main(argv = process.argv.slice(2)) {
   if (code !== 0) process.exit(code);
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "diff-pr" || (process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1]);
-if (isCliEntry) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+
+if (isCliEntry(import.meta.url, "diff-pr")) {
+  // `handleCliError`, not `console.error(err)`: `readFlag` throws `UsageError` for a
+  // malformed flag, and that message already names the flag and the fix — a stack trace
+  // only buries it.
+  main().catch(handleCliError);
 }
 
 export { main };

@@ -55,8 +55,22 @@ jobs:
       - name: Install APM
         run: python -m pip install "apm-cli==${{ matrix.apm-version }}"
 
+      # `vitest run`, not `node --test` — both files import from vitest, which throws on import
+      # outside its runner, so this step could not pass at all after the suite migrated on
+      # 2026-08-13. Third workflow to carry that invocation; `tests/workflow-commands.test.mjs`
+      # fails on it now so there is not a fourth.
+      #
+      # This needs pnpm and node_modules, which the job did not have — the two files it runs are
+      # deliberately browser-free (the live-browser half lives in `site-links.test.mjs`), so
+      # dependencies are enough and no Playwright download is needed.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - run: pnpm install --frozen-lockfile
+
       - name: Verify skill package contracts
-        run: node --test tests/skill-package.test.mjs examples/vlmkit-intro-page/page.test.mjs
+        run: pnpm exec vitest run tests/skill-package.test.mjs examples/vlmkit-intro-page/page.test.mjs
 
       - name: Install with APM and skills CLI
         run: node scripts/smoke-skill-installers.mjs

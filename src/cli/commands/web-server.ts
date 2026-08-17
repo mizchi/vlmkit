@@ -102,16 +102,27 @@ export async function startWebServer(
   const child = spawn(server.command, {
     cwd,
     shell: true,
-    // Inherited, so the server's own startup errors reach the terminal. A dev
-    // server that fails to boot has already explained why; swallowing that and
-    // printing a timeout would replace the answer with a symptom.
-    stdio: ["ignore", "inherit", "inherit"],
+    // The server's output must reach the terminal — a dev server that fails to boot
+    // has already explained why, and swallowing that to print a timeout would replace
+    // the answer with a symptom. But it goes to STDERR, not stdout.
+    //
+    // v7's agent-l, on the first version of this, which inherited stdout:
+    //
+    //   "`gates run --json` is unparseable — the child server's stdout lands first:
+    //    `orders console on http://localhost:4310/\n{`. vlmkit's own `webServer:`
+    //    lines go to stderr correctly; the server's don't."
+    //
+    // stdout is the command's RESULT and `--json` is a contract other tools parse.
+    // A server's greeting is diagnostics, so it belongs on the same stream as every
+    // other diagnostic this module writes.
+    stdio: ["ignore", "pipe", "inherit"],
     env: { ...process.env, ...server.env },
     // Its own group, so `stop` can take the whole tree down. `npm run dev` is a
     // shell that spawns a bundler that spawns a watcher; killing the shell alone
     // leaves the port held and the next run reusing a server nobody started.
     detached: true,
   });
+  child.stdout?.pipe(process.stderr);
   let stopped = false;
   const stop = async (): Promise<void> => {
     if (stopped) return;

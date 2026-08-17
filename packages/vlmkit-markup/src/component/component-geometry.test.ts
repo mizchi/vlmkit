@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { buildGeometryProfiles } from "./component-geometry.ts";
 import type { MatchedBbox } from "./component-bbox.ts";
 

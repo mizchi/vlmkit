@@ -11,7 +11,7 @@
  * be compared to the gate median printed beside it.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { BenchGatesReport } from "./bench-gates.ts";

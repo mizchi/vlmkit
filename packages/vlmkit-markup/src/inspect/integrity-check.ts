@@ -35,7 +35,8 @@
  *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
  */
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
+import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import {
@@ -43,7 +44,7 @@ import {
   type IntegrityAllowRule,
 } from "./integrity-exemption.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { applyHar } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyHar, settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -133,34 +134,143 @@ export interface IntegrityReport {
 // ---------------------------------------------------------------------------
 // A1 — runtime errors
 
+/**
+ * Which origin an error came from.
+ *
+ * `unknown` is not `first`. A console message with no location — and the browser omits one
+ * for some internal notices — must not be attributed to the page's own code just because
+ * nothing contradicted it.
+ */
+export type RuntimeParty = "first" | "third" | "unknown";
+
 export interface RuntimeEvent {
   type: "pageerror" | "console-error";
   text: string;
   /** Whether the error fired before or after the window load event. */
   phase: "construction" | "post-load";
+  /**
+   * The script or document URL the browser attributed the error to — a `pageerror`'s first
+   * stack frame, or a console message's own location. Absent when it reported none.
+   */
+  sourceUrl?: string;
+  /**
+   * First- or third-party, by origin. Optional: an event recorded before this field
+   * existed, or built by hand, is treated as `first` and keeps its old severity — the
+   * conservative direction, since `third` is what downgrades a fail to a warn.
+   */
+  party?: RuntimeParty;
+}
+
+/**
+ * The first URL in a stack trace — the frame the exception was thrown from.
+ *
+ * Exported and pure because the alternative is asserting on it through a browser. Matches
+ * `http(s)` and `file` because a `check integrity` run on a local HTML file gets `file://`
+ * frames, and treating those as "no source" would leave every local run unattributed.
+ */
+export function firstStackUrl(stack: string | undefined): string | undefined {
+  if (!stack) return undefined;
+  const match = /(?:https?|file):\/\/[^\s)'"]+/.exec(stack);
+  return match?.[0];
+}
+
+/**
+ * First- or third-party, by comparing origins.
+ *
+ * `file://` URLs have origin `"null"` in the URL parser, so a local run is compared on the
+ * directory prefix instead — otherwise every frame of a `file://` page reads as
+ * third-party and the gate stops failing on the page's own broken script.
+ */
+export function classifyRuntimeParty(url: string | undefined, pageUrl: string): RuntimeParty {
+  if (!url) return "unknown";
+  if (url.startsWith("file://") || pageUrl.startsWith("file://")) {
+    if (!url.startsWith("file://") || !pageUrl.startsWith("file://")) return "third";
+    const dir = (u: string) => u.slice(0, u.lastIndexOf("/") + 1);
+    return dir(url) === dir(pageUrl) ? "first" : "third";
+  }
+  try {
+    return new URL(url).origin === new URL(pageUrl).origin ? "first" : "third";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Drop console errors that are the browser narrating a request failure already reported
+ * from the wire.
+ *
+ * Chromium logs `Failed to load resource: …` with the failed URL as the message's own
+ * location, and `judgeNetworkFailures` reports that same URL with the resource type, the
+ * reason, and the right severity. Keeping both produced the vite.dev dogfood's seven warns
+ * for one cause, with the useful row buried among the echoes.
+ *
+ * Only the exact-URL matches go: a console error thrown from *inside* a third-party script
+ * whose fetch failed is a different fact and stays, now attributed to that script's origin.
+ */
+export function correlateRuntimeEvents(
+  events: readonly RuntimeEvent[],
+  netFailures: readonly NetworkFailure[],
+): { events: RuntimeEvent[]; suppressed: RuntimeEvent[] } {
+  const failedUrls = new Set(netFailures.map((f) => f.url));
+  const kept: RuntimeEvent[] = [];
+  const suppressed: RuntimeEvent[] = [];
+  for (const e of events) {
+    const echoesAFailedRequest = e.type === "console-error"
+      && e.sourceUrl !== undefined
+      && failedUrls.has(e.sourceUrl)
+      && /failed to load resource|net::ERR_|ERR_[A-Z_]+/i.test(e.text);
+    (echoesAFailedRequest ? suppressed : kept).push(e);
+  }
+  return { events: kept, suppressed };
+}
+
+/** `cdn.example.com` from a URL, for a message that has to stay one line. */
+function hostOf(url: string | undefined): string {
+  if (!url) return "unknown origin";
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
 }
 
 export function classifyRuntimeEvents(events: RuntimeEvent[], viewport: number): IntegrityFinding[] {
   const findings: IntegrityFinding[] = [];
   for (const e of events) {
+    // Absent party means "not measured", which keeps the pre-attribution severity. Only an
+    // explicit `third` downgrades, and only `third` because that is the one case where the
+    // page's own code is demonstrably not at fault.
+    const third = e.party === "third";
+    const from = third ? ` from third-party script ${hostOf(e.sourceUrl)}` : "";
+    const evidence = {
+      phase: e.phase,
+      text: e.text,
+      ...(e.sourceUrl !== undefined ? { sourceUrl: e.sourceUrl } : {}),
+      ...(e.party !== undefined ? { party: e.party } : {}),
+    };
     if (e.type === "pageerror") {
-      const fatal = e.phase === "construction";
+      // A third-party throw during construction is NOT a fail. It is the vendor's bug or a
+      // blocked request, and the page's own build is what this gate is for — the same call
+      // `judgeNetworkFailures` already makes for a cross-origin script that 404s.
+      const fatal = e.phase === "construction" && !third;
       findings.push({
         kind: "js-error",
         severity: fatal ? "fail" : "warn",
         viewport,
         message: fatal
           ? `Uncaught exception during construction (before load): ${e.text} — the UI likely failed to build; fix the script before styling.`
-          : `Uncaught exception after load: ${e.text} — initial render survived, but interactions may be broken.`,
-        evidence: { phase: e.phase, text: e.text },
+          : third
+            ? `Uncaught exception${from} during ${e.phase}: ${e.text} — the page's own scripts are unaffected; check whether the request was blocked before blaming your code.`
+            : `Uncaught exception after load: ${e.text} — initial render survived, but interactions may be broken.`,
+        evidence,
       });
     } else {
       findings.push({
         kind: "js-error",
         severity: "warn",
         viewport,
-        message: `console.error during ${e.phase}: ${e.text}`,
-        evidence: { phase: e.phase, text: e.text, channel: "console" },
+        message: `console.error${from} during ${e.phase}: ${e.text}`,
+        evidence: { ...evidence, channel: "console" },
       });
     }
   }
@@ -404,6 +514,24 @@ export interface IntegrityTextBlock {
    * the metrics were unavailable.
    */
   inkInset?: number;
+  /**
+   * The box before ancestor clipping, when clipping removed area from it.
+   *
+   * `x/y/width/height` above are the box of the parts that are actually
+   * PAINTED — intersected with every `overflow != visible` ancestor, the same
+   * clamp `COLLECT_OCCLUSIONS` applies and for the same reason. Without it a
+   * text run clipped away by a masked "fade out" container still overlapped
+   * whatever section is laid out below it, and the pair was reported as a
+   * `fail`. Measured on vite.dev's front page: 3 fails at 375/768, every one
+   * of them a testimonial wall clipped by `overflow: clip` + a
+   * `mask-image: linear-gradient(...)` at 800px, overlapping the next
+   * section's real headings 57px past the clip.
+   */
+  unclipped?: { x: number; y: number; width: number; height: number };
+  /** Nearest clipping ancestor that removed area, for the exemption line. */
+  clippedBy?: string;
+  /** Nothing of this text is painted — every rect fell outside the clip. */
+  clippedAway?: boolean;
 }
 
 export interface TextCollisionOptions {
@@ -440,9 +568,33 @@ export function findTextCollisions(
   const raw: { a: IntegrityTextBlock; b: IntegrityTextBlock; ox: number; oy: number; area: number }[] = [];
   const exempted: IntegrityExemption[] = [];
 
-  for (let i = 0; i < blocks.length; i++) {
-    for (let j = i + 1; j < blocks.length; j++) {
-      const a = blocks[i]!, b = blocks[j]!;
+  // Clipped-away text is not painted anywhere, so it cannot collide with anything — but
+  // dropping it silently would make this gate quietly measure less than it says. Each such
+  // block that WOULD have collided on its pre-clip box gets one exemption naming the clipper,
+  // which is the reviewable form: the reader sees the pair was considered and why it is not a
+  // finding. One per block rather than one per pair, because a single clipped testimonial wall
+  // overlaps every heading laid out beneath it.
+  const painted = blocks.filter((b) => !b.clippedAway);
+  const clippedAway = blocks.filter((b) => b.clippedAway);
+  const boxesOverlap = (a: IntegrityTextBlock, b: IntegrityTextBlock) => {
+    const ab = a.unclipped ?? a, bb = b.unclipped ?? b;
+    return Math.min(ab.x + ab.width, bb.x + bb.width) - Math.max(ab.x, bb.x) >= minPx
+      && Math.min(ab.y + ab.height, bb.y + bb.height) - Math.max(ab.y, bb.y) >= minPx;
+  };
+  for (const gone of clippedAway) {
+    if (!painted.some((other) => boxesOverlap(gone, other))) continue;
+    exempted.push({
+      kind: "text-collision",
+      viewport,
+      selector: gone.selector,
+      reason: `clipped away by ${gone.clippedBy ?? "an ancestor"} (overflow is not visible) — `
+        + `its box still overlaps text below the clip, but no glyph is painted there`,
+    });
+  }
+
+  for (let i = 0; i < painted.length; i++) {
+    for (let j = i + 1; j < painted.length; j++) {
+      const a = painted[i]!, b = painted[j]!;
       // One block containing the other is nesting (a wrapper block whose
       // own text and a child block both bucketed), not a collision.
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
@@ -902,22 +1054,6 @@ export function judgeAlignment(
 // ---------------------------------------------------------------------------
 // In-page collectors
 
-const STABLE_SELECTOR_FN = `
-  function stableSelector(el) {
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
-    return stableSelector(parent) + " > " + el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
-`;
-
 /** Text blocks with the stacking metadata the collision exemptions need. */
 // ---------------------------------------------------------------------------
 // A13 — occluded text (z-index / paint-order cover)
@@ -965,7 +1101,7 @@ export interface OcclusionCandidate {
 }
 
 export const COLLECT_OCCLUSIONS = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const alphaOf = (color) => {
     const m = /rgba?\\(([^)]+)\\)/.exec(color || "");
@@ -1143,7 +1279,7 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
       return Math.max(0, Math.min((lh - ink) / 2, fontSize * 0.5));
     } catch { return 0; }
   };
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const buckets = new Map();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -1173,6 +1309,34 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
     range.selectNodeContents(node);
     const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
     if (rects.length === 0) continue;
+    // The clip clamp. COLLECT_OCCLUSIONS computes the same intersection for the same
+    // reason — glyphs are only painted inside every clipping ancestor — and this collector
+    // not doing it is what made a masked "fade out" section collide with the section below.
+    // Includes overflow auto/scroll, matching that collector: content scrolled out of a
+    // scrollport is not painted where its box says either. The cost is a genuine collision
+    // hidden inside a scrollport going unreported, which is the right side of the trade for a
+    // fail-severity rule — a false fail on a real page is what makes a gate get turned off.
+    let clipL = -Infinity, clipT = -Infinity, clipR = Infinity, clipB = Infinity;
+    // Which ancestor owns each binding edge. Naming merely the nearest clipping ancestor sent
+    // the reader to the wrong element: on vite.dev the innermost testimonial card also has
+    // non-visible overflow, while the edge that actually cut the text is the masked wall
+    // 800px up. The exemption names the element whose edge did the cutting.
+    let ownerL = null, ownerT = null, ownerR = null, ownerB = null;
+    for (let p = block; p && p !== document.documentElement; p = p.parentElement) {
+      const pcs = getComputedStyle(p);
+      const clipsX = pcs.overflowX !== "visible";
+      const clipsY = pcs.overflowY !== "visible";
+      if (!clipsX && !clipsY) continue;
+      const pb = p.getBoundingClientRect();
+      if (clipsX) {
+        if (pb.left + scrollX > clipL) { clipL = pb.left + scrollX; ownerL = p; }
+        if (pb.right + scrollX < clipR) { clipR = pb.right + scrollX; ownerR = p; }
+      }
+      if (clipsY) {
+        if (pb.top + scrollY > clipT) { clipT = pb.top + scrollY; ownerT = p; }
+        if (pb.bottom + scrollY < clipB) { clipB = pb.bottom + scrollY; ownerB = p; }
+      }
+    }
     let b = buckets.get(block);
     if (!b) {
       let overlay = false;
@@ -1185,36 +1349,72 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
         if (!zFound && ps.zIndex !== "auto") { zIndex = Number(ps.zIndex) || 0; zFound = true; }
         if (p.getAttribute && p.getAttribute("aria-hidden") === "true") ariaHidden = true;
       }
-      b = { el: block, parts: [], x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity, overlay, zIndex, ariaHidden };
+      b = { el: block, parts: [], x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity,
+        ux1: Infinity, uy1: Infinity, ux2: -Infinity, uy2: -Infinity,
+        overlay, zIndex, ariaHidden, clip: { l: clipL, t: clipT, r: clipR, b: clipB },
+        owners: { l: ownerL, t: ownerT, r: ownerR, b: ownerB } };
       buckets.set(block, b);
     }
     b.parts.push(raw);
     for (const r of rects) {
-      b.x1 = Math.min(b.x1, r.left + scrollX);
-      b.y1 = Math.min(b.y1, r.top + scrollY);
-      b.x2 = Math.max(b.x2, r.right + scrollX);
-      b.y2 = Math.max(b.y2, r.bottom + scrollY);
+      const x1 = r.left + scrollX, y1 = r.top + scrollY, x2 = r.right + scrollX, y2 = r.bottom + scrollY;
+      // Unclipped box first: it is what decides whether a clipped-away block would have been
+      // reported, which is the exemption the Node side prints.
+      b.ux1 = Math.min(b.ux1, x1);
+      b.uy1 = Math.min(b.uy1, y1);
+      b.ux2 = Math.max(b.ux2, x2);
+      b.uy2 = Math.max(b.uy2, y2);
+      const vx1 = Math.max(x1, clipL), vy1 = Math.max(y1, clipT);
+      const vx2 = Math.min(x2, clipR), vy2 = Math.min(y2, clipB);
+      // A rect can be clipped to nothing while its siblings survive — a paragraph straddling
+      // the fade line — so this is per-rect rather than per-block.
+      if (vx2 - vx1 <= 0 || vy2 - vy1 <= 0) continue;
+      b.x1 = Math.min(b.x1, vx1);
+      b.y1 = Math.min(b.y1, vy1);
+      b.x2 = Math.max(b.x2, vx2);
+      b.y2 = Math.max(b.y2, vy2);
     }
   }
   return Array.from(buckets.values())
-    .map((b) => ({
-      selector: stableSelector(b.el),
-      text: b.parts.join(" ").replace(/\\s+/g, " ").trim(),
-      x: Math.round(b.x1),
-      y: Math.round(b.y1),
-      width: Math.round(b.x2 - b.x1),
-      height: Math.round(b.y2 - b.y1),
-      overlay: b.overlay,
-      zIndex: b.zIndex,
-      ariaHidden: b.ariaHidden,
-      inkInset: inkInsetOf(b.el, b.parts.join(" ")),
-    }))
+    .map((b) => {
+      const clippedAway = !(b.x2 - b.x1 > 1 && b.y2 - b.y1 > 1);
+      const uw = Math.round(b.ux2 - b.ux1), uh = Math.round(b.uy2 - b.uy1);
+      const clipped = clippedAway
+        || Math.round(b.x2 - b.x1) !== uw || Math.round(b.y2 - b.y1) !== uh;
+      // The binding edge: how far past each clip boundary the pre-clip box reaches. The
+      // largest overrun is the edge a reader has to go and look at.
+      const overruns = [
+        { px: b.clip.t - b.uy1, el: b.owners.t },
+        { px: b.uy2 - b.clip.b, el: b.owners.b },
+        { px: b.clip.l - b.ux1, el: b.owners.l },
+        { px: b.ux2 - b.clip.r, el: b.owners.r },
+      ].filter((o) => o.el && Number.isFinite(o.px) && o.px > 0).sort((x, y) => y.px - x.px);
+      const clipper = overruns.length > 0 ? overruns[0].el : null;
+      return {
+        selector: stableSelector(b.el),
+        text: b.parts.join(" ").replace(/\\s+/g, " ").trim(),
+        // A clipped-away block reports its pre-clip box: the Node side needs a box to decide
+        // whether it would have collided, and zero-size rows would just be dropped by the
+        // filter below with nothing said about them.
+        x: Math.round(clippedAway ? b.ux1 : b.x1),
+        y: Math.round(clippedAway ? b.uy1 : b.y1),
+        width: clippedAway ? uw : Math.round(b.x2 - b.x1),
+        height: clippedAway ? uh : Math.round(b.y2 - b.y1),
+        overlay: b.overlay,
+        zIndex: b.zIndex,
+        ariaHidden: b.ariaHidden,
+        inkInset: inkInsetOf(b.el, b.parts.join(" ")),
+        ...(clipped ? { unclipped: { x: Math.round(b.ux1), y: Math.round(b.uy1), width: uw, height: uh } } : {}),
+        ...(clipped && clipper ? { clippedBy: stableSelector(clipper) } : {}),
+        ...(clippedAway ? { clippedAway: true } : {}),
+      };
+    })
     .filter((t) => t.text.length > 0 && t.width > 1 && t.height > 1)
     .sort((a, b) => a.y - b.y || a.x - b.x);
 })()`;
 
 export const COLLECT_CLIP_CANDIDATES = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const CLIPPING = /^(hidden|clip)$/;
   const out = [];
   for (const el of Array.from(document.querySelectorAll("body *"))) {
@@ -1262,7 +1462,7 @@ export const COLLECT_CLIP_CANDIDATES = `(() => {
 })()`;
 
 export const COLLECT_COLLAPSE_CANDIDATES = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const out = [];
   for (const el of Array.from(document.querySelectorAll("body *"))) {
     if (el.children.length === 0) continue;
@@ -1294,7 +1494,7 @@ export const COLLECT_COLLAPSE_CANDIDATES = `(() => {
 })()`;
 
 export const COLLECT_RESOURCES = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const brokenImages = [];
   for (const img of Array.from(document.images)) {
     const src = img.getAttribute("src") || "";
@@ -1311,7 +1511,7 @@ export const COLLECT_RESOURCES = `(() => {
 })()`;
 
 export const COLLECT_PROTRUSIONS = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const out = [];
   const hasAlpha = (bg) => {
     const m = (bg || "").match(/rgba?\\(([^)]+)\\)/);
@@ -1371,25 +1571,8 @@ export const COLLECT_PROTRUSIONS = `(() => {
 })()`;
 
 export const COLLECT_TEXT_CONTRAST = `(() => {
-  ${STABLE_SELECTOR_FN}
-  const parseColor = (s) => {
-    const m = (s || "").match(/rgba?\\(([^)]+)\\)/);
-    if (!m) return null;
-    const p = m[1].split(",").map(parseFloat);
-    return [p[0], p[1], p[2], p[3] === undefined ? 1 : p[3]];
-  };
-  const blend = (bg, c) => {
-    const a = c[3];
-    return [bg[0] * (1 - a) + c[0] * a, bg[1] * (1 - a) + c[1] * a, bg[2] * (1 - a) + c[2] * a];
-  };
-  const lum = (c) => {
-    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
-  };
-  const ratio = (a, b) => {
-    const l1 = lum(a), l2 = lum(b);
-    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-  };
+  ${STABLE_SELECTOR_JS}
+  ${CONTRAST_BACKGROUND_JS}
   const candidates = [];
   let skippedComposite = 0;
   for (const el of Array.from(document.querySelectorAll("body *"))) {
@@ -1430,29 +1613,15 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
       if (ix < 2 || iy < 2) { clippedByAncestor = true; break; }
     }
     if (clippedByAncestor) continue;
-    let composite = false;
-    const chain = [];
-    for (let p = el; p; p = p.parentElement) {
-      const ps = getComputedStyle(p);
-      if (ps.backgroundImage !== "none") { composite = true; break; }
-      const c = parseColor(ps.backgroundColor);
-      if (c && c[3] > 0) chain.push(c);
-      if (c && c[3] >= 1) break;
-    }
-    if (composite) { skippedComposite++; continue; }
-    let bg = [255, 255, 255];
-    for (const c of chain.reverse()) bg = blend(bg, c);
-    let opacity = 1;
-    for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
-      // parseFloat(...) || 1 would turn an ancestor's opacity: 0 into 1 —
-      // opacity is not inherited, so this chain is the only place a
-      // fully-transparent ancestor can be seen. Preserve finite zeros.
-      const po = parseFloat(getComputedStyle(p).opacity);
-      opacity *= Number.isFinite(po) ? po : 1;
-    }
+    // Shared with check a11y contrast via CONTRAST_BACKGROUND_JS. It used to be inline here and
+    // reimplemented, differently and worse, in the other gate — which reported the inverse of
+    // the truth on a gradient. One resolution, one answer.
+    const resolved = resolveTextBackground(el);
+    if (resolved.composite) { skippedComposite++; continue; }
+    const bg = resolved.bg;
     const fgColor = parseColor(style.color) || [0, 0, 0, 1];
-    const fg = blend(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * opacity]);
-    const r = ratio(fg, bg);
+    const fg = blendColor(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * inheritedOpacity(el)]);
+    const r = contrastRatio(fg, bg);
     // WCAG's floor depends on the text's size, and this used to be a flat 3:1 —
     // which is the LARGE-text floor applied to everything. A dogfood agent found
     // what that means in practice: 13px body text at 3.03:1 is a WCAG AA failure,
@@ -1483,7 +1652,7 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
 })()`;
 
 export const COLLECT_ALIGN_GROUPS = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const groups = [];
   for (const parent of Array.from(document.querySelectorAll("body *"))) {
     if (groups.length >= 40) break;
@@ -1572,9 +1741,6 @@ export const DEFAULT_INTEGRITY_VIEWPORTS = [
   { width: 375, height: 700 },
 ];
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 function dedupeKey(f: IntegrityFinding): string {
   const extra = f.kind === "js-error"
@@ -1614,7 +1780,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   };
 
   await withBrowser(async (browser) => {
-    const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
@@ -1630,7 +1796,16 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       let loaded = false;
       page.on("load", () => { loaded = true; });
       page.on("pageerror", (err) => {
-        events.push({ type: "pageerror", text: String(err?.message ?? err).slice(0, 200), phase: loaded ? "post-load" : "construction" });
+        // The stack's first frame, so a throw from inside a vendor bundle is attributed to
+        // the vendor rather than to the page that loaded it.
+        const sourceUrl = firstStackUrl(err?.stack);
+        events.push({
+          type: "pageerror",
+          text: String(err?.message ?? err).slice(0, 200),
+          phase: loaded ? "post-load" : "construction",
+          ...(sourceUrl !== undefined ? { sourceUrl } : {}),
+          party: classifyRuntimeParty(sourceUrl, url),
+        });
       });
       page.on("console", (msg) => {
         if (msg.type() !== "error") return;
@@ -1641,7 +1816,17 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         // fixture. Only skipped when there IS a fixture miss to explain it, so a real
         // broken resource on a HAR-less run still reports.
         if (harReplay && harReplay.misses().length > 0 && /Failed to load resource/i.test(text)) return;
-        events.push({ type: "console-error", text, phase: loaded ? "post-load" : "construction" });
+        // `msg.location().url` is the script the console.error was called from — and for
+        // the browser's own resource notices it is the URL that failed, which is what
+        // `correlateRuntimeEvents` matches against the wire to drop the echo.
+        const sourceUrl = msg.location()?.url || undefined;
+        events.push({
+          type: "console-error",
+          text,
+          phase: loaded ? "post-load" : "construction",
+          ...(sourceUrl !== undefined ? { sourceUrl } : {}),
+          party: classifyRuntimeParty(sourceUrl, url),
+        });
       });
       const pageOrigin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
       const originOf = (u: string) => { try { return new URL(u).origin; } catch { return pageOrigin; } };
@@ -1663,13 +1848,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         waitUntil: options.waitUntil ?? "networkidle",
         timeout: options.timeout ?? 30000,
       });
-      // Network idle is not font-ready: with `font-display: swap` the text
-      // reflows AFTER idle, so every geometry probe below would measure
-      // fallback metrics on some runs and webfont metrics on others — the
-      // exact non-determinism the gate promises not to have. Cheap when
-      // there are no webfonts (already-resolved promise).
-      await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
-      await page.waitForTimeout(250); // let post-load timers throw before judging
+      // `settlePage`, not a hand-rolled pair, and the reason this gate needs all three parts is
+      // worth keeping at the call site: network idle is not font-ready — with `font-display: swap`
+      // the text reflows AFTER idle, so every geometry probe below would measure fallback metrics
+      // on some runs and webfont metrics on others, which is the exact non-determinism this gate
+      // promises not to have. The trailing 250ms is what lets a post-load timer throw before
+      // anything is judged. Cheap when there are no webfonts: an already-resolved promise.
+      await settlePage(page, 250);
 
       // Never report on a URL we did not measure. An auth-walled route
       // 302s to /login and everything below would judge the login page —
@@ -1683,8 +1868,11 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         }
       }
 
-      // A1
-      push(classifyRuntimeEvents(events, viewport.width));
+      // A1. Correlated against the wire first: both streams are complete by now (the
+      // navigation and `settlePage` above have finished), which is why this cannot be done
+      // inside the console handler — Playwright does not guarantee `requestfailed` arrives
+      // before the console line describing it.
+      push(classifyRuntimeEvents(correlateRuntimeEvents(events, netFailures).events, viewport.width));
 
       // A3 (+A8 fingerprint on the first viewport — layout-independent)
       const resources = await page.evaluate(COLLECT_RESOURCES) as ResourceSample;
@@ -1847,9 +2035,22 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
   //
   // `severityFor` maps a finding kind to what the settings made of it. A gate finding
   // kind IS the rule id here, which is what makes this a lookup rather than a guess.
-  const severityFor = (kind: string, declared: "fail" | "warn"): "fail" | "warn" | "info" | "off" => {
-    if (!rules) return declared;
-    const effective = rules.effective(kind);
+  const severityFor = (kind: string, emitted: "fail" | "warn"): "fail" | "warn" | "info" | "off" => {
+    // `setting`, NOT `effective`. `effective` falls back to the gate's rule TABLE, and this
+    // gate deliberately emits some kinds at either severity depending on evidence —
+    // `js-error` is a fail during construction and a warn after load, and `text-clipped` and
+    // `degenerate-render` do the same. The runner keeps the emitted severity unless a setting
+    // says otherwise ("only an explicit setting re-tunes"), so reading the table here printed
+    // this, two adjacent lines, on a page that throws after load:
+    //
+    //     verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+    //       exits 0 — 1 warn(s) did not fail this command.
+    //
+    // The rule-aware prose this function exists for was fixing the suppression half of the
+    // contradiction while introducing an upgrade half.
+    const setting = rules?.setting(kind);
+    if (!setting) return emitted;
+    const effective = setting;
     if (effective === "off") return "off";
     // The runner's vocabulary is suspect/warn/info; this gate's is fail/warn. `suspect`
     // is this gate's `fail`. `info` gets its own tier rather than collapsing into

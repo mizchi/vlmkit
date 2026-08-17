@@ -5,7 +5,7 @@
 
 ## Current Problems
 
-- 8 CLIs exist but naming is inconsistent (`css-challenge`, `migration-compare`, `demo`, `vrt-demo-fix` ...)
+- 8 CLIs exist but naming is inconsistent (`css-challenge`, `migration-compare`, `demo`, `vlmkit-demo-fix` ...)
 - 15+ library modules exist but public API is unclear
 - `css-challenge-core.ts` mixes Playwright dependency, crater dependency, CSS parser, and LLM client
 - Type definitions scattered across `types.ts` and individual modules
@@ -137,15 +137,16 @@ vlmkit scan breakpoints page.html
 #     ...
 ```
 
-### `vrt demo`
+### Demos
 
-Demo execution.
+There is no `demo` CLI verb — this section documented one under the pre-0.6 binary name and
+`vlmkit demo` does not route either. The demos are pkfire tasks over `src/demo/*.ts`:
 
 ```bash
-vlmkit demo              # Basic demo
-vlmkit demo fix          # Fix loop
-vlmkit demo multi        # Multi-scenario
-vlmkit demo multistep    # Multi-step
+pkf run vlmkit-demo            # src/demo/demo.ts
+pkf run vlmkit-demo-fix        # src/demo/demo-fix-loop.ts
+pkf run vlmkit-demo-multi      # src/demo/demo-scenarios.ts
+pkf run vlmkit-demo-multistep  # src/demo/demo-multistep.ts
 ```
 
 ## Library API
@@ -445,6 +446,13 @@ PR via `gh pr comment`. If `gh` isn't on PATH the command prints
 the markdown with copy-paste instructions instead — useful for
 operators inspecting the gate output before committing to a
 public post.
+
+That fallback exits **0 at a terminal and 1 when `CI` is set**. At a
+terminal, printing markdown for a human to paste is the job done; in
+CI nobody reads stdout, so exiting 0 would tell the reviewer the
+summary reached the PR when no comment was posted at all. The markdown
+is still printed in both cases — failing the step must not also lose
+the content.
 
 The body is tagged with an HTML-comment marker
 (`<!-- vrt-diff-pr-summary -->`) so a later iteration can find /

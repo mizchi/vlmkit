@@ -7,7 +7,7 @@
 ### `Spec.pkl`
 
 - [ ] **200 percent browser zoom usability** — verifies: F8
-  > `media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom.
+  > `stress media --variants zoom-200` flags scrollWidth regressions at 2× zoom.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -24,7 +24,7 @@
   - body: _not yet implemented_
 
 - [ ] **Accordion expand or collapse** — verifies: E10
-  > `interact` drives the toggle and snapshots both states.
+  > `inspect interact` drives the toggle and snapshots both states.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -60,12 +60,12 @@
   - body: correctness remains out of scope; detection exists as `vlmkit check motion`, which samples CSSOM animation / transition declarations and running vs paused animation state.
 
 - [ ] **Asset 404 or broken images** (minor) [draft] — verifies: K6
-  > Partial: `render-sanity` in `compare` flags pages with missing-image placeholders; no dedicated network-error gate.
+  > Partial: `render-sanity` in `migration compare` flags pages with missing-image placeholders; no dedicated network-error gate.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Bug-repro fixture auto-generation** (minor) [draft] — verifies: O11
-  > Not implemented: could combine `component-extract` with a `compare` baseline + delta, but no command stitches them today.
+  > Not implemented: could combine `scan component` with a `migration compare` baseline + delta, but no command stitches them today.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
@@ -158,7 +158,7 @@
   - body: _not yet implemented_
 
 - [ ] **Color blindness simulation** (minor) [draft] — verifies: F7
-  > Not implemented: could be added via a CSS-filter wrapper around `compare`.
+  > Not implemented: could be added via a CSS-filter wrapper around `migration compare`.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -183,7 +183,7 @@
   - body: _not yet implemented_
 
 - [ ] **Cross-browser parity across Chromium / Firefox / WebKit** — verifies: H1
-  > `vlmkit diff browsers` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed.
+  > `vlmkit diff browsers` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed. Narrowing `--engines` yourself is not a shortfall: a single requested engine is a render check, reported as such and exiting 0.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -216,12 +216,12 @@
   - body: _not yet implemented_
 
 - [ ] **Disabled state** (minor) [draft] — verifies: E3
-  > Scriptable via `interact` (set the attribute then snapshot); no first-class disabled-sweep CLI.
+  > Scriptable via `inspect interact` (set the attribute then snapshot); no first-class disabled-sweep CLI.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
 - [ ] **Dropdown or menu open** — verifies: E7
-  > Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state.
+  > Trigger the toggle via `inspect interact` or `inspect explore`; both engines diff the open vs closed state.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -233,7 +233,7 @@
   - body: implemented as `vlmkit diff elements` and `vlmkit diff component` in `packages/vlmkit-core/src/element-compare.ts`
 
 - [ ] **Empty state** (minor) [draft] — verifies: E6
-  > Scriptable via `interact` (set state then snapshot); no first-class empty-state CLI.
+  > Scriptable via `inspect interact` (set state then snapshot); no first-class empty-state CLI.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -251,7 +251,7 @@
   - body: _not yet implemented_
 
 - [ ] **Focus and focus-visible state** — verifies: E2
-  > `component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility.
+  > `build component --states focus-visible` plus `check a11y focus` verify focus visibility.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -262,7 +262,7 @@
   - body: _not yet implemented_
 
 - [ ] **Form autofill state** (minor) [draft] — verifies: N5
-  > Partial: `interact` plus scripted fill drives the values; the browser autofill UI itself is not capturable in headless.
+  > Partial: `inspect interact` plus scripted fill drives the values; the browser autofill UI itself is not capturable in headless.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -292,7 +292,7 @@
   - body: _not yet implemented_
 
 - [ ] **Hover state diff** — verifies: E1
-  > `component-from-image --states hover` plus `interact` cover hover-state diffs.
+  > `build component --states hover` plus `inspect interact` cover hover-state diffs.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -302,7 +302,7 @@
   - body: _not yet implemented_
 
 - [ ] **Infinite scroll** (minor) [draft] — verifies: N7
-  > Partial: `interact` scroll plus repeated snapshots covers the visible work; no scroll-load timing harness.
+  > Partial: `inspect interact` scroll plus repeated snapshots covers the visible work; no scroll-load timing harness.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -312,7 +312,7 @@
   - body: _not yet implemented_
 
 - [ ] **Keyboard navigation Tab Esc Enter** — verifies: F6
-  > `interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal.
+  > `inspect interact` press actions drive keyboard sequences; `check a11y focus` verifies the resulting traversal.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -322,7 +322,7 @@
   - body: _not yet implemented_
 
 - [ ] **LLM judgment on rendered output** (minor) [draft] — verifies: O12
-  > Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vrt judge` user-facing surface.
+  > Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vlmkit judge` user-facing surface.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
@@ -351,7 +351,7 @@
   - body: _not yet implemented_
 
 - [ ] **Loading state** (minor) [draft] — verifies: E4
-  > Scriptable via `interact` (snapshot before resolve); no spinner / skeleton dedicated CLI.
+  > Scriptable via `inspect interact` (snapshot before resolve); no spinner / skeleton dedicated CLI.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -385,7 +385,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: BEM to utility-first** — verifies: B8
-  > Same `vlmkit diff html` engine with class-rename map.
+  > Same `vlmkit migration compare` engine with class-rename map.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -395,7 +395,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: CSS-in-JS to CSS modules** — verifies: B2
-  > Same `vlmkit diff html` engine; class-rename map maps auto-generated to semantic class names.
+  > Same `vlmkit migration compare` engine; class-rename map maps auto-generated to semantic class names.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -405,7 +405,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: Tailwind to vanilla CSS** — verifies: B1
-  > `vlmkit diff html` migration mode handles utility-first → vanilla CSS by ignoring class-name churn.
+  > `vlmkit migration compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -415,12 +415,12 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: custom to standardized component library** — verifies: B7
-  > `vlmkit diff html` plus `component-consistency` catches missed instances.
+  > `vlmkit migration compare` plus `check drift component` catches missed instances.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
 - [ ] **Migration: float-based to Flex or Grid layout** (minor) [draft] — verifies: B6
-  > Partial: `compare` catches result; `grid-ratio` infers fr units but doesn't suggest the float-vs-flex decision itself.
+  > Partial: `migration compare` catches result; `grid-ratio` infers fr units but doesn't suggest the float-vs-flex decision itself.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -445,12 +445,12 @@
   - body: _not yet implemented_
 
 - [ ] **Mobile tablet desktop breakpoint sweep** — verifies: D1
-  > `vlmkit diff html` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints.
+  > `vlmkit migration compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Modal or dialog open** — verifies: E8
-  > `interact` drives the open click + backdrop + close sequence.
+  > `inspect interact` drives the open click + backdrop + close sequence.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -478,7 +478,7 @@
   - body: _not yet implemented_
 
 - [ ] **Overflow or clipping detection** — verifies: K3
-  > `vlmkit stress i18n` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping.
+  > `vlmkit stress i18n` flags overflow / wrap regressions; `migration compare` plus heatmap catches generic clipping.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -516,22 +516,22 @@
   - body: _not yet implemented_
 
 - [ ] **Pluralization 1 item vs N items** (minor) [draft] — verifies: I6
-  > Scriptable via `interact`; no first-class pluralization-sweep command.
+  > Scriptable via `inspect interact`; no first-class pluralization-sweep command.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Pre-commit visual check** — verifies: L1
-  > `vlmkit diff html` plus `vlmkit workflow approve` slot into a pre-commit hook for baseline-driven visual gating.
+  > `vlmkit migration compare` plus `vlmkit workflow approve` slot into a pre-commit hook for baseline-driven visual gating.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
   - body: _not yet implemented_
 
 - [ ] **Radius / spacing / z-index / shadow-tier conformance** — verifies: M4-M6
-  > Same `design-tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales.
+  > Same `check tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
 - [x] **Reduced motion compliance** — verifies: F9
-  > `media-variants --variants reduced-motion` does the static-stylesheet sweep; `vlmkit check motion` adds CSSOM motion sampling and flags active motion without `prefers-reduced-motion: reduce`.
+  > `stress media --variants reduced-motion` does the static-stylesheet sweep; `vlmkit check motion` adds CSSOM motion sampling and flags active motion without `prefers-reduced-motion: reduce`.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: implemented by `packages/vlmkit-markup/src/stress/media-variants.ts` and `packages/vlmkit-markup/src/style/motion-detect.ts`
 
@@ -575,7 +575,7 @@
   - body: _not yet implemented_
 
 - [ ] **Short or empty content** (minor) [draft] — verifies: I2
-  > Scriptable via `interact` (set content then snapshot); no first-class CLI.
+  > Scriptable via `inspect interact` (set content then snapshot); no first-class CLI.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -585,7 +585,7 @@
   - body: _not yet implemented_
 
 - [ ] **Slot composition** (minor) [draft] — verifies: J5
-  > Partial: `interact` plus `compare` can drive each slot fill; no slot-aware CLI.
+  > Partial: `inspect interact` plus `migration compare` can drive each slot fill; no slot-aware CLI.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -613,7 +613,7 @@
   - body: _not yet implemented_
 
 - [ ] **Sortable or sticky table** (minor) [draft] — verifies: N6
-  > Partial: `interact` drives sort clicks and scroll; no table-specific signal.
+  > Partial: `inspect interact` drives sort clicks and scroll; no table-specific signal.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -623,7 +623,7 @@
   - body: _not yet implemented_
 
 - [ ] **Special chars and emoji rendering** (minor) [draft] — verifies: I3
-  > Partial: `compare` plus `i18n-stress` can drive this but no emoji-specific assertion.
+  > Partial: `migration compare` plus `stress i18n` can drive this but no emoji-specific assertion.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -644,7 +644,7 @@
   - body: _not yet implemented_
 
 - [ ] **Tab switch** — verifies: E13
-  > `interact` drives the tab-click sequence and pixel-diffs each panel state.
+  > `inspect interact` drives the tab-click sequence and pixel-diffs each panel state.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -655,17 +655,17 @@
   - body: _not yet implemented_
 
 - [ ] **Tooltip on hover with delay** (minor) [draft] — verifies: E11
-  > Partial: `interact` hover + wait does the job; no tooltip-specific helper yet.
+  > Partial: `inspect interact` hover + wait does the job; no tooltip-specific helper yet.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
 - [ ] **Touch target size meets WCAG 2.5.5 AAA / 2.5.8 AA** (critical) — verifies: F2
-  > `vlmkit check a11y touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area.
+  > `vlmkit check a11y touch` flags interactive elements below the 24px AA (default) / 44px AAA minimum hit area, applying each criterion's Inline and (at AA) Spacing exceptions.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
 - [ ] **Touchscreen-on-desktop affordances** (minor) [draft] — verifies: D5
-  > Partial: `a11y-touch` + `a11y-focus-order` cover the discoverable parts; no first-class CLI.
+  > Partial: `check a11y touch` + `check a11y focus` cover the discoverable parts; no first-class CLI.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -677,12 +677,12 @@
   - body: `src/api/client.ts` mirrors the current Hono surface, including dashboard review endpoints, Cloudflare Quick Actions, and `craterLayout()` for the layout-only Crater JS/WASM backend.
 
 - [ ] **Typography scale compliance** — verifies: M3
-  > Typography hints surface the size and weight buckets observed; comparison against the declared scale catches off-scale glyphs.
+  > Partial: `check tokens` covers radius / spacing / z-index / shadow tiers (M4-M6). A dedicated typography-hints module (size/weight bucket surfacing) is not yet implemented — track via this entry.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
 - [ ] **VLM benchmarking: cost / latency / CHANGE count per model** (minor) — verifies: AIFIX-003
-  >   `vrt vlm-bench` queries OpenRouter for candidate VLMs and
+  >   `pkf run vlm-bench` queries OpenRouter for candidate VLMs and
   >   runs each against the fix-loop hard case (seed 11). Outputs
   >   a Markdown comparison table used to choose the default model.
   - contributes to: GOAL-AI-FIX-LOOP
@@ -708,7 +708,7 @@
   - body: `src/experiments/migration/migration-compare.ts`
 
 - [ ] **Variant rendering across props** (minor) [draft] — verifies: J3
-  > Partial: combine `interact` (drive prop changes) with `component-consistency` (diff each variant) — no first-class props-matrix CLI.
+  > Partial: combine `inspect interact` (drive prop changes) with `check drift component` (diff each variant) — no first-class props-matrix CLI.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -723,12 +723,12 @@
   - body: _not yet implemented_
 
 - [ ] **WebMCP-native discovery when spec ships** (minor) [draft] — verifies: O8
-  > Partial: the discovery layer in `explore` abstracts the source, but the WebMCP wire format itself is not yet implemented.
+  > Partial: the discovery layer in `inspect explore` abstracts the source, but the WebMCP wire format itself is not yet implemented.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
 - [ ] **White-label theming: brand color swap** (minor) [draft] — verifies: C5
-  > Partial: `theme-parity` + `palette-diff` together catch brand-token drift; no dedicated white-label CLI.
+  > Partial: `check theme` + `check palette` together catch brand-token drift; no dedicated white-label CLI.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -757,7 +757,7 @@
   - body: _not yet implemented_
 
 - [ ] **iOS Safari vs Android Chrome parity** (minor) [draft] — verifies: H2
-  > Partial via `cross-browser webkit`; no mobile-emulation profile bundling.
+  > Partial via `diff browsers --engines webkit`; no mobile-emulation profile bundling.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -780,7 +780,7 @@
 - **A8** — Extract a single component from a page screenshot
   - _No active implementation._
 - **AIFIX-001** — VLM-extracted structured diff from before/after PNG
-  - code: `src/experiments/migration/vlm-region-diff.ts`
+  - code: `packages/vlmkit-ai/src/reasoning-pipeline.ts`
 - **AIFIX-002** — LLM-synthesised CSS patch from structured diff
   - code: `src/experiments/css-challenge/fix-loop.ts`
 - **AIFIX-003** — VLM benchmarking: cost / latency / CHANGE count per model
@@ -790,29 +790,29 @@
 - **API-002** — TypeScript client mirrors the HTTP surface
   - code: `src/api/client.ts`
 - **B1** — Migration: Tailwind to vanilla CSS
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B10** — Migration: removing browser prefixes
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B11** — Migration: class-name rename
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B12** — Migration: floats or clearfix to Grid
   - _No active implementation._
 - **B2** — Migration: CSS-in-JS to CSS modules
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B3** — Migration: Bootstrap to Tailwind
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B4** — Migration: shadcn to custom design system
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B5** — Migration: inline styles to CSS classes
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B6** — Migration: float-based to Flex or Grid layout
   - _No active implementation._
 - **B7** — Migration: custom to standardized component library
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B8** — Migration: BEM to utility-first
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **B9** — Migration: SASS to vanilla CSS
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **BENCH-001** — CSS challenge bench delete-and-detect
   - code: `src/experiments/css-challenge/css-challenge-bench.ts`
 - **BENCH-002** — Detection report aggregates accumulated bench runs
@@ -838,7 +838,7 @@
 - **CORE-005** — Paint tree diff via Crater BiDi backend
   - code: `src/experiments/migration/migration-paint-tree.ts`
 - **D1** — Mobile tablet desktop breakpoint sweep
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **D2** — Landscape orientation
   - _No active implementation._
 - **D3** — Foldable or dual-screen rendering ⊘ deprecated
@@ -938,7 +938,7 @@
 - **K1** — Reproduce user bug from screenshot
   - code: `packages/vlmkit-markup/src/component/component-extract.ts`
 - **K2** — Off-by-one-pixel hunt
-  - code: `src/compare.ts`
+  - code: `src/experiments/migration/migration-compare.ts`
 - **K3** — Overflow or clipping detection
   - code: `packages/vlmkit-markup/src/stress/i18n-stress.ts`
 - **K4** — Z-index stacking issues
@@ -950,7 +950,7 @@
 - **K7** — Subtle font-render regression
   - _No active implementation._
 - **L1** — Pre-commit visual check
-  - code: `src/workflow-cli.ts`
+  - code: `src/cli/workflow.ts`
 - **L2** — PR visual diff
   - _No active implementation._
 - **L3** — Live monitoring of production regressions ⊘ deprecated
@@ -958,13 +958,12 @@
 - **L4** — Hot-reload validation ⊘ deprecated
   - _No active implementation._
 - **L5** — Bundled per-target check via skill run
-  - code: `src/skill-cli.ts`
+  - code: `src/util/skill.ts`
 - **M1** — Color tokens conform to declared palette
   - _No active implementation._
 - **M2** — Spacing scale conformance
   - code: `packages/vlmkit-markup/src/style/design-tokens.ts`
 - **M3** — Typography scale compliance
-  - code: `src/typography-hints.ts`
 - **M4-M6** — Radius / spacing / z-index / shadow-tier conformance
   - _No active implementation._
 - **MIG-001** — Migration compare across viewports
@@ -1020,4 +1019,4 @@
 - **SNAP-004** — Snapshot stability measures false-positive rate
   - code: `src/vrt/snapshot/stability.ts`
 - **WORKFLOW-001** — Workflow init / capture / verify / approve loop
-  - code: `src/cli/router.ts:WORKFLOW_ALIAS_COMMANDS`
+  - code: `src/cli/workflow.ts`

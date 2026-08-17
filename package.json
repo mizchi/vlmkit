@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit",
-  "version": "0.9.1",
+  "version": "0.11.0",
   "description": "VLM-driven frontend toolkit: visual regression (snapshot / diff / regression-watch), markup synthesis from screenshots, design-token / theme / a11y / i18n audits, and a 2-stage VLM+LLM CSS auto-repair loop.",
   "license": "MIT",
   "author": "mizchi",
@@ -38,7 +38,6 @@
   },
   "files": [
     "dist/**",
-    "!dist/e2e/**",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -54,8 +53,9 @@
     "smoke:bundled-json": "node scripts/smoke-bundled-json.mjs",
     "smoke:pack:markup-loop": "node scripts/smoke-packed-markup-loop.mjs",
     "smoke:pack:workspaces": "node scripts/smoke-packed-workspaces.mjs",
-    "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts' 'worker/**/*.test.ts' 'examples/**/*.test.mjs' 'tests/**/*.test.mjs'",
-    "test:examples": "node --test 'examples/**/*.test.mjs'",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "test:examples": "vitest run examples",
     "dogfood:markup-vrt:offline": "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs",
     "demo": "node src/demo/demo.ts",
     "demo:fix": "node src/demo/demo-fix-loop.ts",
@@ -75,9 +75,9 @@
     "motion:kagura-runtime:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs",
     "motion:kagura-runtime-calibrated:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs --calibration-contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-calibration-handoff.json",
     "motion:kagura-runtime-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/game-asset-motion-core.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-smoke-utils.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-batch-utils.test.mjs",
-    "vrt": "playwright test",
-    "vrt:update": "playwright test --update-snapshots",
-    "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js"
+    "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@jsquash/webp": "^1.5.0",
@@ -93,10 +93,12 @@
     "@types/node": "^25.5.2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "playwright": "1.61.1",
     "three": "^0.184.0",
     "tsdown": "^0.21.7",
-    "tsx": "^4.22.4"
+    "tsx": "^4.22.4",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.12",

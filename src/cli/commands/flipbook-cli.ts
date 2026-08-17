@@ -11,6 +11,7 @@
  * (`vlmkit snapshot flipbook`) that auto-discover the right frames.
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { resolve } from "node:path";
 import { framesFromPaths, writeFlipbook, type FlipbookFrame } from "../../vrt/compare/flipbook.ts";
 import { DIM, RESET, GREEN, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -123,7 +124,7 @@ async function main() {
   console.log();
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "flipbook-cli" || (process.argv[1] && (process.argv[1].endsWith("flipbook-cli.ts") || process.argv[1].endsWith("flipbook-cli.mjs")))) {
+if (isCliEntry(import.meta.url, "flipbook-cli")) {
   main().catch((err) => {
     console.error(String(err.message ?? err));
     process.exit(1);

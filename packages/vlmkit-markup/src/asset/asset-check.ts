@@ -39,6 +39,8 @@ import { PNG } from "pngjs";
 import { extractPaletteFromFile, extractPaletteFromRgba, type PaletteColor } from "../style/palette-extract.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 
 export type AssetIssueKind =
   | "aspect-mismatch"
@@ -303,11 +305,9 @@ export async function runAssetCheck(options: AssetCheckOptions): Promise<AssetCh
   return report;
 }
 
-export function formatAssetCheckReport(report: AssetCheckReport): string {
+export function formatAssetCheckReport(report: AssetCheckReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check asset${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
@@ -317,16 +317,20 @@ export function formatAssetCheckReport(report: AssetCheckReport): string {
   lines.push(`occupancy: ${(report.occupancy * 100).toFixed(1)}%${report.contentBox ? ` — content ${report.contentBox.w}x${report.contentBox.h} at (${report.contentBox.x},${report.contentBox.y})` : ""}`);
   if (report.edgeContrast !== undefined) lines.push(`figure-ground contrast: ${report.edgeContrast.toFixed(2)}:1`);
   if (report.paletteHarmony !== undefined) lines.push(`palette harmony: ${(report.paletteHarmony * 100).toFixed(0)}% of dominant colors near the page palette`);
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.kind}: ${issue.message}`);
+    for (const entry of shown) {
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+      lines.push(`  ${icon} ${entry.row.kind}: ${entry.row.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No asset issues detected.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   return lines.join("\n");
 }

@@ -30,11 +30,18 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import {
+  type SelectorAllowRule,
+  parseSelectorAllowRules,
+} from "../inspect/selector-exemption.ts";
 
 /** One visible element's style signature within its inferred role. */
 export interface DesignSample {
@@ -98,7 +105,7 @@ export interface DesignPolicyInput {
   excludedElements?: number;
 }
 
-export type DesignFindingKind = "component-drift" | "scale-outlier" | "redirected";
+export type DesignFindingKind = "component-drift" | "scale-outlier" | "redirected" | "nothing-judged";
 
 export interface DesignFinding {
   kind: DesignFindingKind;
@@ -127,6 +134,14 @@ export interface DesignPolicyReport {
     singletons: number;
     /** Instances an `--allow` rule declared deliberate, excluded from the arithmetic. */
     allowed?: number;
+    /**
+     * Too few instances to judge against the reuse floor, so no finding can come
+     * from this role. Reported rather than silent: an unjudged role used to render
+     * exactly like a coherent one.
+     */
+    notJudged?: true;
+    /** …and it would have been judged if `--allow` had not removed instances. */
+    unjudgedByAllow?: true;
   }[];
   findings: DesignFinding[];
   skipped: number;
@@ -160,7 +175,14 @@ export interface DesignPolicyReport {
    * the verdict said COHERENT.
    */
   thresholds: { minReuse: number; minInstances: number };
-  verdict: "coherent" | "drift";
+  /**
+   * `not-judged` when no role had enough instances to be judged at all.
+   *
+   * A third state rather than a rendering tweak, because `--json` is what CI
+   * reads: reporting `coherent` for a page nothing was measured on is the same
+   * lie in the machine-readable path, where nobody is there to notice it.
+   */
+  verdict: "coherent" | "drift" | "not-judged";
 }
 
 export interface DesignPolicyOptions {
@@ -441,50 +463,17 @@ function looksLikeVendorChrome(sample: DesignSample): boolean {
   return zeroPadding && noRadius && noBackground;
 }
 
-interface DesignAllowRule {
-  /** Substring the instance's selector must contain. */
-  selector: string;
-  reason: string;
-  /** As written, so an unused rule is reported back verbatim. */
-  raw: string;
-}
-
 /**
  * Parse `--allow ".btn--primary;the primary action is deliberately distinct"`.
  *
- * Same syntax and same two properties as `check integrity --allow` and `check drift
- * component --allow`: a reason is required, and a rule that matches nothing is reported.
- * `;` delimits the reason rather than `#`, because `#` is part of an ID selector and
- * splitting on it silently produces a broader exemption than the one written.
+ * Thin wrapper over the shared `<selector>;<reason>` parser — this gate's form is
+ * that form exactly, and `check a11y touch` / `check a11y contrast` gained the same
+ * one in v7. `check integrity` and `check drift component` keep their own parsers
+ * because their syntax carries more than a selector (a rule kind and viewport; a
+ * computed property).
  */
-export function parseDesignAllowRules(specs: readonly string[]): DesignAllowRule[] {
-  const rules: DesignAllowRule[] = [];
-  for (const spec of specs) {
-    if (!spec.trim()) continue;
-    const cut = spec.indexOf(";");
-    if (cut < 0) {
-      throw new UsageError(
-        `--allow needs a reason: <selector>;<reason> (got "${spec}").`
-        + (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "")
-        + ` An exemption without a stated reason cannot be reviewed.`,
-      );
-    }
-    const selector = spec.slice(0, cut).trim();
-    const reason = spec.slice(cut + 1).trim();
-    if (!selector) throw new UsageError(`--allow needs a selector: <selector>;<reason> (got "${spec}").`);
-    if (!reason) throw new UsageError(`--allow reason is empty in "${spec}". Say why this instance is intentional.`);
-    // A bare `*` would exempt every instance, which is `--rule component-drift=off`
-    // wearing a disguise — and unlike that flag it would not show up in the re-tuned
-    // line the runner prints.
-    if (selector === "*") {
-      throw new UsageError(
-        `--allow "*" would exempt every instance, which is \`--rule component-drift=off\`.`
-        + ` Name the instances that are deliberately different, or turn the rule off explicitly.`,
-      );
-    }
-    rules.push({ selector, reason, raw: spec });
-  }
-  return rules;
+export function parseDesignAllowRules(specs: readonly string[]): SelectorAllowRule[] {
+  return parseSelectorAllowRules(specs, { ruleId: "component-drift" });
 }
 
 export const DESIGN_ALLOW_HELP = `Declare one instance's deviation deliberate, repeatable. Syntax:
@@ -494,9 +483,14 @@ Use the selector AS PRINTED in the finding — it is an id-preferring path, so
 reported, so the mistake is loud rather than silent).
 e.g. --allow "button#export;the primary action is deliberately distinct"
 A reason is required; a bare \`*\` is refused because that is \`--rule component-drift=off\`;
-an allowed instance leaves the reuse arithmetic and is still listed; a rule matching
-nothing is reported. Use this rather than --min-reuse: the metric is instances/styles, so
-a 3-element role with one deliberate variant averages 1.5x and no threshold reaches it.`
+an allowed instance leaves the reuse arithmetic and is still listed.
+Prefer this over raising --min-reuse: reuse is instances/styles, an AVERAGE, so a
+3-element role with one deliberate variant sits at 1.5x and no threshold reaches it.
+ON A SMALL ROLE, PASS --min-instances TOO. Allowing 1 of 3 leaves 2, under the default
+--min-instances 3, and the role then stops being judged at all: the run reports
+\`NOT JUDGED\` and a real drift among the remaining instances would not be found. For a
+3-element role that is \`--min-instances 2 --min-reuse 2\` — both, because 2 instances
+cannot reach 3x however low the instance floor goes.`
 
 export function judgeDesignPolicy(
   input: DesignPolicyInput,
@@ -578,6 +572,24 @@ export function judgeDesignPolicy(
     const signatures = counts.size;
     const reuse = signatures === 0 ? 0 : Math.round((judged.length / signatures) * 100) / 100;
     const singletons = [...counts.values()].filter((v) => v.length === 1).length;
+    // A role with too few instances to have a "system" is not judged: with a 3x
+    // reuse floor, two elements sharing one style still only average 2.0 and could
+    // never clear it. Skipping is defensible. Skipping SILENTLY is not — and until
+    // `--allow` existed, nothing could push a role under this floor at runtime.
+    //
+    // v7's agent-m found the consequence, having followed this gate's own help:
+    //
+    //   "Allowing one of 3 buttons leaves 2, below the default --min-instances 3, so
+    //    the role stops being judged and a skipped role prints identically to a
+    //    coherent one. […] I then broke #snooze on purpose — COHERENT again. So both
+    //    documented configurations reproduce the exact complaint I was sent to fix —
+    //    a verdict that never moves."
+    //
+    // That is a false negative, which is worse than the false positive `--allow` was
+    // added to remove. The arithmetic stays; what changes is that an unjudged role
+    // says so, on its own row and on the verdict line, and names `--allow` when
+    // `--allow` is what put it there.
+    const notJudged = judged.length < minInstances;
     roles.push({
       role,
       instances: judged.length,
@@ -585,9 +597,20 @@ export function judgeDesignPolicy(
       reuse,
       singletons,
       ...(allowedHere.length > 0 ? { allowed: allowedHere.length } : {}),
+      ...(notJudged
+        ? {
+          notJudged: true as const,
+          // Would it have been judged without the exemptions? That distinction is
+          // the difference between "this page is small" and "your config silenced
+          // the only role on the page".
+          ...(allowedHere.length > 0 && judged.length + allowedHere.length >= minInstances
+            ? { unjudgedByAllow: true as const }
+            : {}),
+        }
+        : {}),
     });
 
-    if (judged.length < minInstances) continue;
+    if (notJudged) continue;
     if (signatures === 0 || reuse >= minReuse) continue;
 
     const ranked = [...counts.entries()].sort((a, b) => b[1].length - a[1].length);
@@ -687,6 +710,35 @@ export function judgeDesignPolicy(
     }
   }
 
+  // How many roles the drift check actually ran on. `roles.length` counts the
+  // unjudged ones too, so it was reported as `roles judged: 2` for a page where
+  // the number was zero.
+  const judgedRoles = roles.filter((r) => !r.notJudged).length;
+  if (judgedRoles === 0 && roles.length > 0) {
+    // A finding, not just a verdict word, so a project can gate on it:
+    // `--rule nothing-judged=suspect` makes "the design gate must actually judge
+    // something" enforceable. Default `info` — a genuinely small page is not a
+    // defect, and turning one into a build failure would be its own bad message.
+    //
+    // v7's agent-m: "A tool whose job is telling you when a number stops moving
+    // should not be able to stop moving in silence."
+    const byAllow = roles.filter((r) => r.unjudgedByAllow);
+    findings.push({
+      kind: "nothing-judged",
+      severity: "info",
+      message:
+        `No role had ${minInstances} or more instances, so the reuse check ran on nothing`
+        + ` and this verdict rests on no component evidence`
+        + ` (roles seen: ${roles.map((r) => `${r.role} (${r.instances})`).join(", ")}).`
+        + (byAllow.length > 0
+          ? ` --allow took ${byAllow.map((r) => r.role).join(", ")} under the floor, so a real`
+            + ` drift there would not be reported.`
+          : "")
+        + ` To judge them: --min-instances 2 --min-reuse 2 — both, because a 2-instance role`
+        + ` cannot reach ${minReuse}x.`,
+    });
+  }
+
   return {
     roles,
     findings,
@@ -712,7 +764,11 @@ export function judgeDesignPolicy(
     thresholds: { minReuse, minInstances },
     // `info` rows do not move the verdict, and `redirected` is a navigation
     // problem rather than a design one (it still exits non-zero, being suspect).
-    verdict: findings.some((f) => f.severity === "warn") ? "drift" : "coherent",
+    verdict: findings.some((f) => f.severity === "warn")
+      ? "drift"
+      : judgedRoles === 0 && roles.length > 0
+        ? "not-judged"
+        : "coherent",
   };
 }
 
@@ -728,8 +784,10 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
       waitUntil: options.waitUntil ?? "networkidle",
       timeout: options.timeout ?? 30000,
     });
-    await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
-    await page.waitForTimeout(250);
+    // One definition of "settled" (`@mizchi/vlmkit-core/page-open.ts`): network idle, fonts
+    // ready, then a frame. This gate judges spacing and component signatures, so measuring
+    // before the webfont resolves reports the fallback face's metrics as the design system's.
+    await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
     const input = await page.evaluate(buildDesignSampleScript(options.exclude)) as DesignPolicyInput;
     const judged = judgeDesignPolicy(input, options);
@@ -750,23 +808,46 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
   });
 }
 
-export function formatDesignReport(report: DesignPolicyReport): string {
+export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit check design${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
-  const bad = report.findings.filter((f) => f.severity === "suspect").length;
+  // A finding's `kind` is the rule id on this gate, and its declared severity travels with it,
+  // so the settings apply row by row. Everything above the Findings block — coverage, role
+  // reuse, exclusions, allowances — is measurement and stays whatever the settings say.
+  const tiers = applyRuleTiers(report.findings, (f) => ({ rule: f.kind, emitted: f.severity }), rules);
+  const shownFindings = tiers.shown;
+  const bad = shownFindings.filter((f) => f.tier === "suspect").length;
   // The size of the blind spot goes ON the verdict line, the way `check
   // integrity` prints `(2 fail, 1 warn, 5 exempted)`. A reader deciding how much
   // a COHERENT verdict is worth has to see how much of the page it covered
   // without scrolling for it.
   lines.push(
-    `verdict: ${report.verdict === "coherent" ? `${GREEN}COHERENT${RESET}` : `${YELLOW}DRIFT${RESET}`}`
-    + ` (${report.findings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
+    `verdict: ${
+      report.verdict === "coherent"
+        ? `${GREEN}COHERENT${RESET}`
+        : report.verdict === "drift"
+          ? `${YELLOW}DRIFT${RESET}`
+          : `${YELLOW}NOT JUDGED${RESET}`
+    }`
+    + ` (${shownFindings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
     + `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
   );
-  lines.push(`${DIM}  roles judged: ${report.roles.length}, spacing values: ${report.spacingValues}${RESET}`);
+  // The verdict WORD still comes from `report.verdict` — it is the JSON contract, the same
+  // choice `check integrity` made. So a page whose only drift rule is off can print DRIFT
+  // above zero findings, and this line is what keeps that from reading as a bug.
+  const hiddenNote = hiddenByRuleNote(tiers.hiddenByRule);
+  if (hiddenNote) lines.push(`${DIM}  ${hiddenNote} — the verdict word above predates the settings${RESET}`);
+  // `roles.length` counted the unjudged ones, so this said `roles judged: 2` for a
+  // page where the reuse check ran on nothing at all.
+  const judgedRoleCount = report.roles.filter((r) => !r.notJudged).length;
+  lines.push(
+    `${DIM}  roles judged: ${judgedRoleCount}`
+    + `${judgedRoleCount < report.roles.length ? ` of ${report.roles.length} seen` : ""}`
+    + `, spacing values: ${report.spacingValues}${RESET}`,
+  );
   // `skipped: 28 (no inferable role)` was the whole of this before, and v6's
   // adopting agent could not act on it: "28 of 30 elements skipped means the
   // verdict rests on almost nothing, and nothing says whether that is normal."
@@ -813,9 +894,39 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     );
     const { minReuse, minInstances } = report.thresholds;
     for (const r of report.roles.slice(0, 10)) {
-      const flag = r.instances >= minInstances && r.reuse < minReuse ? `${YELLOW}drift${RESET}` : `${GREEN}ok${RESET}`;
+      // `not judged` is its own state, never `ok`. It used to render as `ok`, so a
+      // role sitting at `reuse 1x, 2 one-off` printed green next to numbers that
+      // contradicted it — the row carried its own refutation.
+      const flag = r.notJudged
+        ? `${YELLOW}not judged${RESET}`
+        : r.reuse < minReuse
+          ? `${YELLOW}drift${RESET}`
+          : `${GREEN}ok${RESET}`;
       lines.push(`  ${r.role.padEnd(14)} ${String(r.instances).padStart(3)} inst  ${String(r.signatures).padStart(3)} styles`
         + `  reuse ${String(r.reuse).padStart(5)}x  ${r.singletons} one-off  ${flag}`);
+    }
+    const unjudged = report.roles.filter((r) => r.notJudged);
+    if (unjudged.length > 0) {
+      lines.push(
+        `${DIM}  not judged: ${unjudged.map((r) => `${r.role} (${r.instances})`).join(", ")}`
+        + ` — under --min-instances ${minInstances}, so no finding can come from`
+        + ` ${unjudged.length === 1 ? "it" : "them"}.${RESET}`,
+      );
+      // The remedy has to name both flags. Lowering --min-instances alone leaves a
+      // 2-instance role unable to clear a 3x floor, so the run would still never
+      // move — which is the failure this whole block exists to stop.
+      const byAllow = unjudged.filter((r) => r.unjudgedByAllow);
+      if (byAllow.length > 0) {
+        lines.push(
+          `${YELLOW}  --allow took ${byAllow.map((r) => r.role).join(", ")} under that floor.`
+          + ` A real drift there would NOT be reported.${RESET}`,
+        );
+      }
+      lines.push(
+        `${DIM}  To keep judging ${unjudged.length === 1 ? "it" : "them"}:`
+        + ` --min-instances 2 --min-reuse 2 (both — a 2-instance role cannot reach`
+        + ` ${minReuse}x however many instances the floor allows).${RESET}`,
+      );
     }
     lines.push("");
   }
@@ -849,26 +960,29 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     }
     lines.push("");
   }
-  if (report.findings.length === 0) {
-    lines.push(`${GREEN}No design drift detected.${RESET}`);
+  if (shownFindings.length === 0) {
+    // Not "No design drift detected" when the drift was found and silenced: that sentence
+    // would be false, and it is the one line a reader quotes back.
+    lines.push(tiers.hiddenByRule.size > 0
+      ? `${DIM}No design drift reported — every finding's rule is off.${RESET}`
+      : `${GREEN}No design drift detected.${RESET}`);
     return lines.join("\n");
   }
-  const carried = report.findings.filter((f) => f.severity !== "info");
-  const informational = report.findings.filter((f) => f.severity === "info");
-  const mark = (f: DesignFinding) =>
-    f.severity === "suspect" ? `${RED}x${RESET}` : f.severity === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  const carried = shownFindings.filter((f) => f.tier !== "info");
+  const informational = shownFindings.filter((f) => f.tier === "info");
+  const mark = (tier: DesignFinding["severity"]) =>
+    tier === "suspect" ? `${RED}x${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  const row = ({ row: f, tier }: { row: DesignFinding; tier: DesignFinding["severity"] }) =>
+    `  ${mark(tier)} [${f.kind}]${f.role ? ` ${f.role}` : ""}${tier === f.severity ? "" : ` (re-tuned to ${tier})`}`
+    + `: ${f.message}`;
   if (carried.length > 0) {
     lines.push(`${BOLD}Findings${RESET}`);
-    for (const f of carried) {
-      lines.push(`  ${mark(f)} [${f.kind}]${f.role ? ` ${f.role}` : ""}: ${f.message}`);
-    }
+    for (const f of carried) lines.push(row(f));
   }
   if (informational.length > 0) {
     if (carried.length > 0) lines.push("");
     lines.push(`${BOLD}Informational${RESET} ${DIM}(true, but does not carry the verdict)${RESET}`);
-    for (const f of informational) {
-      lines.push(`  ${mark(f)} [${f.kind}]${f.role ? ` ${f.role}` : ""}: ${f.message}`);
-    }
+    for (const f of informational) lines.push(row(f));
   }
   return lines.join("\n");
 }

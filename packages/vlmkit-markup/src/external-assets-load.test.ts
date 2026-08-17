@@ -30,7 +30,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { runFocusOrder } from "./a11y-focus-order.ts";
 import { runComponentConsistency } from "./component/component-consistency.ts";
 

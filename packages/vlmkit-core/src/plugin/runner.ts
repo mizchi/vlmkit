@@ -19,6 +19,8 @@
 
 import { relative } from "node:path";
 import { UsageError } from "../cli-error.ts";
+import { GATE_EXIT_HELP } from "../gate-exit.ts";
+import { authStateNotice, resetAuthStateNotice } from "../auth-state.ts";
 import type { LedgerWrite } from "../run-ledger.ts";
 import {
   LEDGER_RELATIVE_PATH,
@@ -30,7 +32,7 @@ import {
   isGitRepo,
 } from "../run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "../terminal-colors.ts";
-import type { AnyGateDefinition, Finding, GateContext, GateDefinition } from "./contract.ts";
+import type { AnyGateDefinition, Finding, GateContext, GateDefinition, RuleView } from "./contract.ts";
 import { gateCommandString } from "./contract.ts";
 import type { AppliedRules, FindingCounts, RuleSettings } from "./rules.ts";
 import { RULE_SETTINGS, applyRuleSettings, countFindings, resolveRules } from "./rules.ts";
@@ -235,6 +237,10 @@ export async function runGate<Report, Options>(
     ...(shared.ledgerPath ? { path: shared.ledgerPath } : {}),
     ...(shared.noLedger ? { disabled: true } : {}),
   });
+  // Same reason, same place: `withAuthState` records the session it applied from
+  // inside the measurement, and a stale value from a previous gate in the same
+  // process would make this one claim an authentication it never used.
+  resetAuthStateNotice();
 
   const tParse = performance.now();
   const parsed = gate.parse(gateArgv, ctx);
@@ -279,10 +285,17 @@ export async function runGate<Report, Options>(
   // The view, not the raw AppliedRules: a formatter should ask "what is this rule worth
   // now", not re-derive the runner's decisions and risk disagreeing with them.
   const resolved = resolveRules(gate, settings);
-  const ruleView = {
+  const ruleView: RuleView = {
     effective: (ruleId: string) => resolved.decisions.get(ruleId)?.effective
       ?? gate.rules.find((r) => r.id === ruleId)?.severity
       ?? "warn",
+    // `via` is what makes a decision explicit — `resolveRules` sets it only when a config key
+    // or a `--rule` flag matched. Without it the decision is just the gate's own table, which
+    // a formatter must NOT prefer over the severity its finding was emitted at.
+    setting: (ruleId: string) => {
+      const decision = resolved.decisions.get(ruleId);
+      return decision?.via ? decision.effective : undefined;
+    },
   };
   const prose = shared.json ? "" : [gate.format(report, ruleView), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
   timing.formatMs = round(performance.now() - tFormat);
@@ -331,6 +344,27 @@ function round(ms: number): number {
  * `check integrity` prints its exemptions and `gates suppressions` exists.
  * A gate that passes because three rules were turned off must say so on the
  * same screen as the verdict.
+ *
+ * It also has to say when the prose above it disagrees. `format(report, rules)` lets a gate
+ * render suppression into its own output. All 27 built-ins now do; when only `check integrity`
+ * did, the other 26 rendered from the raw report and `--rule x=off` produced a screen that
+ * contradicted itself. Measured on `scan handlers` at the time:
+ *
+ *     status: 5 suspect issue(s), 7 warn      <- red, and rendered pre-suppression
+ *     ... five suspect lines ...
+ *     5 finding(s) suppressed by rule settings
+ *     $ echo $?  ->  0
+ *
+ * A reader has to know which half to believe. `gate.format.length < 2` says the formatter never
+ * received the rule view — its declared arity, so no gate has to be listed here — and that is
+ * when the disclaimer is printed. It is not dead code with the built-ins migrated: a project's
+ * own gate, or one from a third-party plugin, is written against the one-parameter form in
+ * `docs/authoring-gates.md` and reaches this branch on its first `--rule x=off`.
+ *
+ * The count line stays even for a rule-aware gate, which does mean a gate's own
+ * "N finding(s) not shown" and this line can appear on one screen with the same number. That is
+ * deliberate: this one is the runner's accounting, tied to the exit code, and a formatter that
+ * forgets to render its own note must not be able to make the suppression invisible.
  */
 export function formatRuleNotes(gate: AnyGateDefinition, applied: AppliedRules): string {
   const lines: string[] = [];
@@ -342,6 +376,13 @@ export function formatRuleNotes(gate: AnyGateDefinition, applied: AppliedRules):
       `${YELLOW}${applied.suppressed.length} finding(s) suppressed by rule settings${RESET}`
       + ` ${DIM}(${[...byRule].map(([rule, n]) => `${rule} x${n}`).join(", ")})${RESET}`,
     );
+    if (gate.format.length < 2) {
+      lines.push(
+        `${DIM}  The report above was rendered before those settings were applied, so it still`
+        + ` lists them and its own status line still counts them. The verdict and exit code do`
+        + ` not.${RESET}`,
+      );
+    }
   }
   if (applied.retuned.length > 0) {
     const byRule = new Map<string, RetuneNote>();
@@ -413,7 +454,11 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   lines.push("");
   lines.push("Shared options (every gate):");
   lines.push("  --json                  Print the JSON report");
-  lines.push("  --advisory              Print findings but exit 0 (default: a suspect exits 1)");
+  // `GATE_EXIT_HELP`, not a copy of it. The constant exists so every gate documents
+  // the exit-code contract identically, and this — its only call site — held a
+  // byte-identical duplicate instead, which is precisely the divergence it was
+  // introduced to prevent.
+  lines.push(GATE_EXIT_HELP);
   lines.push("  --rule <ref>=<setting>  Re-tune or disable one rule (off|suspect|warn|info), repeatable");
   lines.push("  --rules                 List this gate's rules and exit");
   lines.push("  --timing                Add the per-phase ms breakdown to the output");
@@ -602,6 +647,12 @@ export async function runGateCli<Report, Options>(
     if (unpinned) out(unpinned);
     const created = newOutputNotice(outcome.ledgerWrite, options.cwd ?? process.cwd());
     if (created) out(created);
+    // Whether the measurement was authenticated is provenance too, and it is the
+    // piece a reader cannot recover from the report: `VLMKIT_STORAGE_STATE` puts no
+    // flag on the command line, so without this line "the dashboard" and "the login
+    // wall it redirected to" look identical.
+    const auth = authStateNotice();
+    if (auth) out(`  ${DIM}${auth}${RESET}`);
   }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.
@@ -635,9 +686,3 @@ export function formatGateTiming(outcome: GateOutcome): string {
   ].join("\n");
 }
 
-/** One-line verdict for aggregate runners (`verify markup`, `batch`, MCP). */
-export function formatGateVerdict(outcome: GateOutcome): string {
-  const state = outcome.verdict === "pass" ? `${GREEN}ok${RESET}` : `${RED}${outcome.counts.suspect} suspect${RESET}`;
-  const warns = outcome.counts.warn > 0 ? `, ${outcome.counts.warn} warn` : "";
-  return `${outcome.command}: ${state}${warns}`;
-}

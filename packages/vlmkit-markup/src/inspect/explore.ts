@@ -32,8 +32,8 @@
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { type Page } from "playwright";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
@@ -51,8 +51,6 @@ export interface ExploreOptions {
   threshold?: number;
   /** ms to wait after each action before snapshot. Default 200. */
   waitAfterAction?: number;
-  /** Exit non-zero when any declared action induced 0 diff (dead action). */
-  strict?: boolean;
   /**
    * Disambiguate the Δ-0% case by also counting DOM mutations between
    * the click and the after-screenshot. When 0 mutations *and* 0
@@ -111,6 +109,24 @@ export interface ExploreReport {
   silentFloor: number;
   /** Whether --strict-timing was on; controls the report's Mut. column. */
   strictTiming: boolean;
+  /**
+   * Actions that ran and painted nothing (`diffRatio < silentFloor`).
+   *
+   * These three counts exist so the caller can decide what a run is worth.
+   * `runExplore` used to assign `process.exitCode = 1` itself under `--strict`,
+   * which meant a measurement reached out and set the exit status of whatever
+   * process happened to be hosting it — a test runner, the API server, a batch
+   * driver. The exit code belongs to whoever owns the process; `main()` sets it.
+   */
+  deadActions: number;
+  /**
+   * Dead actions that also produced 0 DOM mutations, so the handler is a no-op or
+   * unwired rather than off-screen. Always 0 without `--strict-timing`, because
+   * without mutation counts the two cases are indistinguishable.
+   */
+  silentHandlers: number;
+  /** Actions whose invocation threw. */
+  failedActions: number;
 }
 
 function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
@@ -169,6 +185,42 @@ const DISCOVER_SCRIPT = `
 })()
 `;
 
+/**
+ * Put the pointer where it will be when the "after" screenshot is taken, BEFORE
+ * the baseline is captured, so that hover paint is in both images and the measured
+ * delta is the handler's effect alone.
+ *
+ * Two artifacts made this necessary, and both were measured rather than guessed:
+ *
+ *   1. **Cross-talk.** The virtual mouse is a property of the page, not the
+ *      document, so it survives the `setContent` that resets state between
+ *      actions. Action N's baseline therefore still carried the hover highlight
+ *      left on whatever element action N-1 clicked, and the "delta" was that
+ *      highlight *disappearing* — attributed to action N. In the test fixture a
+ *      dead action on a `<span>` measured 0.28%, and the heatmap put the changed
+ *      region squarely on a different element: the button clicked before it.
+ *
+ *   2. **The target's own hover-in.** Clicking necessarily hovers first, so a
+ *      hoverable element with no handler at all reported the arrival of the mouse
+ *      as a change — 0.42% for an inert `<button>`. A dead action that reads as
+ *      alive is the exact failure this gate exists to catch.
+ *
+ * A focus ring is deliberately NOT suppressed: it is a real visual consequence of
+ * the click, and the silent floor is small precisely so that a focus paint counts
+ * as "not dead".
+ */
+async function settleHover(page: Page, action: DiscoveredAction): Promise<void> {
+  if (action.origin === "data-vrt-action" && action.selector) {
+    // Hover the element the click will land on. A failure here is not the
+    // action's verdict — let `invokeAction` produce the real error.
+    await page.hover(action.selector, { timeout: 5000 }).catch(() => {});
+    return;
+  }
+  // A JS action never touches the pointer, so any fixed point will do; what
+  // matters is that it is the same for the baseline and the after shot.
+  await page.mouse.move(0, 0);
+}
+
 async function invokeAction(page: Page, action: DiscoveredAction): Promise<void> {
   if (action.origin === "window.__vrtActions") {
     await page.evaluate(async (name) => {
@@ -220,10 +272,6 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
 
     actions = await page.evaluate(DISCOVER_SCRIPT) as DiscoveredAction[];
 
-    if (actions.length === 0) {
-      console.log(`  ${YELLOW}!${RESET} no declared actions found — page exposes neither \`window.__vrtActions\` nor \`data-vrt-action\` attributes`);
-    }
-
     // Capture a baseline used as the "before" reference for EACH
     // action. We reset state between actions by reloading the page.
     // For richer flows the page should use a single multi-step action
@@ -238,6 +286,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       await page.addStyleTag({
         content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
       });
+      await settleHover(page, action);
 
       const safe = action.name.replace(/[^a-z0-9._-]+/gi, "_");
       const baselineShot = join(outputDir, `${safe}-before.png`);
@@ -344,43 +393,67 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vlmkit inspect explore${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}${RESET}`);
-  console.log(`  ${DIM}discovered ${actions.length} action(s)${RESET}`);
-  let deadCount = 0;
-  let silentHandlerCount = 0;
-  for (const f of findings) {
-    const isSilent = options.strictTiming && f.executed
-      && f.diffRatio < silentFloor && f.mutationCount === 0;
+  return {
+    source: options.source, viewport, actions, findings, reportPath,
+    silentFloor, strictTiming: !!options.strictTiming,
+    deadActions: findings.filter((f) => f.executed && f.diffRatio < silentFloor).length,
+    silentHandlers: findings.filter((f) => isSilentHandler(f, silentFloor)).length,
+    failedActions: findings.filter((f) => !f.executed).length,
+  };
+}
+
+/**
+ * Ran, painted nothing, and mutated nothing — so the handler is a no-op or was
+ * never wired up, rather than having changed something off-screen.
+ *
+ * `mutationCount` is `undefined` unless `--strict-timing` installed the observer,
+ * and `undefined === 0` is false, which is the point: without mutation data the
+ * two cases are indistinguishable and nothing may be called silent.
+ */
+function isSilentHandler(f: ExploreFinding, silentFloor: number): boolean {
+  return f.executed && f.diffRatio < silentFloor && f.mutationCount === 0;
+}
+
+/**
+ * The terminal summary. Extracted from `runExplore` alongside the exit code: a
+ * measurement that prints cannot be composed, and this one was printing five
+ * lines per run into whatever stdout it found.
+ */
+export function formatExploreReport(report: ExploreReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit inspect explore${RESET}`);
+  lines.push(`  ${DIM}source: ${report.source}${RESET}`);
+  if (report.actions.length === 0) {
+    lines.push(`  ${YELLOW}!${RESET} no declared actions found — page exposes neither \`window.__vrtActions\` nor \`data-vrt-action\` attributes`);
+    lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+    return lines.join("\n");
+  }
+  lines.push(`  ${DIM}discovered ${report.actions.length} action(s)${RESET}`);
+  for (const f of report.findings) {
+    const isSilent = isSilentHandler(f, report.silentFloor);
     const icon = !f.executed ? `${RED}✗${RESET}`
       : isSilent ? `${RED}!${RESET}`
-      : f.diffRatio < silentFloor ? `${YELLOW}~${RESET}`
+      : f.diffRatio < report.silentFloor ? `${YELLOW}~${RESET}`
       : `${GREEN}✓${RESET}`;
     const pct = (f.diffRatio * 100).toFixed(2);
     const mut = f.mutationCount !== undefined ? `, ${f.mutationCount} mut` : "";
     const detail = !f.executed ? `failed: ${f.error}`
       : isSilent ? `Δ ${pct}% — silent handler (0 DOM mutations)`
       : `Δ ${pct}%${mut}`;
-    console.log(`  ${icon} ${f.action.name.padEnd(24)} ${DIM}${detail}${RESET}`);
-    if (f.executed && f.diffRatio < silentFloor) deadCount++;
-    if (isSilent) silentHandlerCount++;
+    lines.push(`  ${icon} ${f.action.name.padEnd(24)} ${DIM}${detail}${RESET}`);
   }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-
-  if (options.strict && (deadCount > 0 || findings.some((f) => !f.executed))) {
-    process.exitCode = 1;
-  }
-  if (options.strictTiming && silentHandlerCount > 0) {
-    process.exitCode = 1;
-  }
-
-  return {
-    source: options.source, viewport, actions, findings, reportPath,
-    silentFloor, strictTiming: !!options.strictTiming,
-  };
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
-function renderReport(r: Omit<ExploreReport, "reportPath">): string {
+/**
+ * Named fields rather than `Omit<ExploreReport, "reportPath">`: the markdown is
+ * rendered before the counts are derived, and widening the parameter to the whole
+ * report would force the caller to compute them twice or fake them.
+ */
+type RenderInput = Pick<ExploreReport, "source" | "viewport" | "actions" | "findings" | "silentFloor" | "strictTiming">;
+
+function renderReport(r: RenderInput): string {
   const lines: string[] = [];
   lines.push("# Explore report");
   lines.push("");
@@ -508,28 +581,48 @@ function printUsage(): void {
   console.log("  window.__vrtActions = [{ name: 'open-menu', run: () => ... }]");
 }
 
-async function main(argv = process.argv.slice(2)) {
+/**
+ * The command. Returns its exit code rather than assigning `process.exitCode`,
+ * for the same reason `runExplore` no longer does: the process belongs to
+ * whoever started it, and this module is importable now.
+ *
+ * @param cwd resolved against for the default output directory. An argument
+ *   rather than a `process.chdir`, which is process-wide.
+ */
+export async function runExploreCli(
+  cliArgs: readonly string[],
+  options: { cwd?: string } = {},
+): Promise<number> {
+  const argv = [...cliArgs];
   if (argv.includes("--help") || argv.includes("-h")) {
     printUsage();
-    return;
+    return 0;
   }
   const { positional, outputDir, report, threshold, waitAfter, strict, strictTiming } = parseArgs(argv);
   if (positional.length === 0) {
     printUsage();
-    process.exit(1);
+    return 1;
   }
-  await runExplore({
+  const cwd = options.cwd ?? process.cwd();
+  const result = await runExplore({
     source: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "explore"),
+    outputDir: outputDir || join(cwd, "test-results", "explore"),
     reportPath: report || undefined,
     threshold,
     waitAfterAction: waitAfter,
-    strict,
     strictTiming,
   });
+  console.log(formatExploreReport(result));
+
+  // `--strict` fails on any action that painted nothing or threw; `--strict-timing`
+  // fails only on the narrower silent-handler case it can actually distinguish.
+  if (strict && (result.deadActions > 0 || result.failedActions > 0)) return 1;
+  if (strictTiming && result.silentHandlers > 0) return 1;
+  return 0;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "explore" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
+if (isCliEntry(import.meta.url, "explore")) {
+  runExploreCli(process.argv.slice(2))
+    .then((code) => { process.exitCode = code; })
+    .catch(handleCliError);
 }

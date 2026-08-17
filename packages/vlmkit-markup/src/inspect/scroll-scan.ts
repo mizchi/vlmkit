@@ -24,13 +24,16 @@
  *   vlmkit scan scroll <html-or-url> --json
  */
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export type ScrollAxis = "x" | "y" | "both";
 
@@ -146,9 +149,6 @@ export interface ScrollScanOptions extends PageLoadOptions {
   maxFindings?: number;
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 function scrollable(overflow: string): boolean {
   return overflow === "auto" || overflow === "scroll";
@@ -267,6 +267,24 @@ export function analyzeScrollSamples(
     issues.push({
       kind: "page-overflow-x",
       severity: "suspect",
+      // The blamed element travels as the SELECTOR, not only inside the prose.
+      //
+      // v7's agent-l tried to scope an exemption to the one element the message
+      // named and could not: "`--allow` can't scope `page-overflow-x`. `@table.orders`
+      // → `1 --allow rule(s) matched nothing` though the message says *"caused by:
+      // table.orders"*; there's no `selector` in the JSON. […] So the only working
+      // form is page-wide — I added a 1400px panel and got `NO DEFECTS … EXIT=0`.
+      // CI is now blind to new overflow."
+      //
+      // That is the worst shape a suppression can have: the only expressible form
+      // silenced the whole rule, so accepting one known overflow meant accepting
+      // every future one. With the selector attached, an exemption names one element
+      // and a NEW offender has a different selector, so it still reports.
+      //
+      // Only when a single element was actually blamed. When no element relieves the
+      // overflow (rigid siblings in one row), there is nothing honest to put here and
+      // the `unaccounted` note already says so.
+      ...(causes[0]?.selector ? { selector: causes[0].selector } : {}),
       message: `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
         detail + clearedNote + ".",
     });
@@ -328,19 +346,7 @@ export function analyzeScrollSamples(
 
 /** In-page collector shared with `check integrity` (A7 delegation). */
 export const COLLECT_SCROLL_SCRIPT = `(() => {
-  function stableSelector(el) {
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
-    return stableSelector(parent) + " > " + el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
+  ${STABLE_SELECTOR_JS}
 
   const SCROLLABLE = /^(auto|scroll)$/;
   const CLIPPING = /^(hidden|clip)$/;
@@ -451,13 +457,13 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
     } else {
       // file: URL navigation so relative stylesheets/scripts/images resolve —
       // setContent gives the document an about:blank base URL.
-      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
-    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
+    const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
     await page.close();
     const report = analyzeScrollSamples(
@@ -473,11 +479,9 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
   });
 }
 
-export function formatScrollScanReport(report: ScrollScanReport): string {
+export function formatScrollScanReport(report: ScrollScanReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit scan scroll${RESET}`);
   lines.push(`${DIM}source: ${report.source} (${report.page.viewportWidth}x${report.page.viewportHeight})${RESET}`);
   lines.push("");
@@ -501,17 +505,24 @@ export function formatScrollScanReport(report: ScrollScanReport): string {
       lines.push(`  - ${d.selector} (overflow: ${d.overflowX} ${d.overflowY})`);
     }
   }
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+    for (const entry of shown) {
+      const issue = entry.row;
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
       const selector = issue.selector ? ` ${issue.selector}` : "";
-      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}`);
+      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No scroll issues detected.${RESET}`);
+  }
+  // Under the rows when some survived, in place of the green line when none did — a page whose
+  // only findings were turned off is not a page with no findings.
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   if (report.expectedScrollports.length > 0) {
     lines.push("");

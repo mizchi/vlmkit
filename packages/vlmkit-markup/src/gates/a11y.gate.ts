@@ -19,7 +19,8 @@
  */
 
 import { join } from "node:path";
-import { readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { parseSelectorAllowRules, selectorAllowHelp } from "../inspect/selector-exemption.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -42,9 +43,9 @@ import {
   formatFocusOrderReport,
   runFocusOrder,
 } from "../a11y-focus-order.ts";
-import { firstPositional, optionalInt, runOutputDir, viewportFlag } from "./arg-helpers.ts";
+import { firstPositional, optionalInt, runOutputDir, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 
-const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport"];
+const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport", "--allow"];
 
 /**
  * Flags every a11y gate shares. `quiet` is forced: the runner owns output.
@@ -94,13 +95,30 @@ threshold for its font size and weight.`,
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "allow",
+      placeholder: "<selector>;<reason>",
+      kind: "string",
+      repeatable: true,
+      description: selectorAllowHelp({
+        ruleId: "contrast-below-aa",
+        example: "p.hint;brand grey signed off pending the palette refresh",
+        extra:
+          "`check integrity` reports the same colours as a warn and has had a per-selector"
+          + " exemption for a while; this gate reports them as a fail, so without one an"
+          + " approved brand grey forced the whole rule off.",
+      }),
+    },
     ...REPORT_INPUTS("a11y-contrast"),
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const htmlPath = firstPositional(argv, "vlmkit check a11y contrast <html-or-url>", A11Y_VALUE_FLAGS);
+    const allow = readAll(argv, "allow");
+    parseSelectorAllowRules(allow, { ruleId: "contrast-below-aa" });
     return {
       htmlPath,
+      ...(allow.length > 0 ? { allow } : {}),
       ...reportFlags(argv, "a11y-contrast", htmlPath),
       ...parsePageLoad(argv),
     };
@@ -127,10 +145,39 @@ export const a11yTouchGate = defineGate<TouchReport, TouchCheckOptions>({
   title: "Touch-target size check",
   summary: "Touch-target size check",
   category: "correctness",
-  usage: `Measures every interactive element's rendered box and reports targets
-below the WCAG minimum — AAA is 44x44, AA is 24x24 with spacing. Clustered
-targets (within 24px of a sibling) are flagged, because adjacency is what
-makes an undersized target unusable.`,
+  usage: `Measures every interactive element's rendered box and reports targets whose
+SHORTER SIDE is under the level's floor: 24px at AA (default, WCAG 2.5.8),
+44px at AAA (WCAG 2.5.5). A target at or above the floor is never reported,
+whatever its spacing.
+
+AA is the default because it is the level conformance is defined against, W3C
+advises against requiring AAA as a general policy, and \`vlmkit diff-pr\` was
+already running this check at AA — so the CLI and CI could disagree about one
+page. --level AAA is one flag away and reports far more: 2.5.5 has no spacing
+exception, so on a Bootstrap or vite.dev page nearly every target fails it.
+
+Two of each criterion's own exceptions are applied, because they are decidable
+from the page:
+
+  inline   The target is in a sentence — computed \`display: inline\` with text
+           beside it in the same block — so the line-height sizes it and the
+           author cannot grow it without breaking the prose. Both levels.
+  spacing  A 24px circle centered on the target intersects neither another
+           target's box nor another undersized target's circle. AA only: 2.5.5
+           has no spacing exception, so --level AAA still reports these.
+
+Excused targets are LISTED, not dropped — the report has its own section for
+them, so you can disagree with the call. The criterion's other three exceptions
+(Equivalent, User-agent control, Essential) need intent rather than
+measurement: declare those with --allow "<selector>;<reason>", which also
+scopes out a vendor widget's controls.
+
+\`clustered\` on a finding means another below-floor target sits within 24px
+center-to-center. It ANNOTATES; it never causes a finding, and it no longer
+suppresses one either — the spacing exception above is what acts on adjacency.
+
+If the level's floor is right but a failing build is not,
+--rule target-undersized=warn keeps the findings without failing.`,
   rules: [
     {
       id: "target-undersized",
@@ -144,18 +191,35 @@ makes an undersized target unusable.`,
     {
       name: "level",
       kind: "string",
-      description: "WCAG threshold — AAA is 44px, AA is 24px-with-spacing",
+      description: "Shorter-side floor — AA is 24px (WCAG 2.5.8), AAA is 44px (2.5.5)",
       choices: ["AAA", "AA"],
-      defaultDescription: "AAA",
+      defaultDescription: "AA",
+    },
+    {
+      name: "allow",
+      placeholder: "<selector>;<reason>",
+      kind: "string",
+      repeatable: true,
+      description: selectorAllowHelp({
+        ruleId: "target-undersized",
+        example: "button.vendor-zoom-in;MapLibre's own control, sized by the library",
+        extra:
+          "Use it for a vendor widget's controls, which are a page-level fact this gate"
+          + " cannot infer. Turning the rule off page-wide would also stop checking your own.",
+      }),
     },
     ...REPORT_INPUTS("a11y-touch"),
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check a11y touch <html-or-url>", A11Y_VALUE_FLAGS);
+    const allow = readAll(argv, "allow");
+    // Parsed before the browser starts, so a typo'd exemption fails in milliseconds.
+    parseSelectorAllowRules(allow, { ruleId: "target-undersized" });
     return {
       source,
-      level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AAA") as WcagTouchLevel,
+      level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AA") as WcagTouchLevel,
+      ...(allow.length > 0 ? { allow } : {}),
       ...reportFlags(argv, "a11y-touch", source),
       ...parsePageLoad(argv),
     };
@@ -179,6 +243,11 @@ makes an undersized target unusable.`,
       level: report.level,
       inspected: report.inspectedCount,
       failures: report.failures.length,
+      // On the ledger because it moves the failure count: a run reporting 0 failures
+      // over 18 targets reads very differently once you know 7 of them are undersized
+      // and excused. Without it, comparing two runs across a level change looks like
+      // the page got better.
+      wcagExempt: report.wcagExempt?.length ?? 0,
       report: report.reportPath,
     },
   }),

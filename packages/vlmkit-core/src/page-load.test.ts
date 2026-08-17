@@ -10,7 +10,7 @@
  */
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { Page } from "playwright";
 import { UsageError } from "./cli-error.ts";
 import {

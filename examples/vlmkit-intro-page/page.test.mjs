@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "node:test";
+import { onTestFinished, test } from "vitest";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
 const apmBootstrapCommand = "curl -sSL https://aka.ms/apm-unix | sh";
@@ -233,16 +233,100 @@ test("the page is self-contained and includes responsive and keyboard states", a
   assert.match(css, /:focus-visible/);
 });
 
-test("the local server exposes every browser module as JavaScript", async () => {
-  const server = await read("server.mjs");
+/**
+ * This used to read `server.mjs` as text and match for `["/app.js"` — which stopped meaning
+ * anything once the routes were derived from the site manifest instead of listed. Booting the
+ * server and asking it answers the same question with evidence: a module served as
+ * `application/octet-stream` is refused by the browser, and the source text never showed that.
+ *
+ * The unknown-path case is here on purpose. The server 302s to `/`, so a mistyped or unlisted
+ * route comes back 200 with the intro page in it — which is why `/solitaire/` is asserted by its
+ * CONTENT and not by its status code.
+ */
+/**
+ * The route to the demo — the static half. Its live half is in `site-links.test.mjs`.
+ *
+ * Split because this file must stay BROWSER-FREE: `skill-package.yml` runs it on any change under
+ * `.claude/skills/**` (the page lists all 13 specialised skills, so a skills change can break it),
+ * and that job has no Playwright. Adding a `chromium.launch()` here quietly made the file
+ * unrunnable in one of the two workflows that run it.
+ */
+test("the demo link is marked as leaving the page, and survives the mobile collapse", async () => {
+  const [html, css] = await Promise.all([read("index.html"), read("styles.css")]);
 
-  for (const moduleName of ["app.js", "content.js", "preferences.js", "scenarios.js"]) {
-    assert.match(server, new RegExp(`\\["/${moduleName.replace(".", "\\.")}"`));
+  // The arrow lives INSIDE the link, beside the translated span, not as a sibling of it —
+  // `data-i18n` is applied with `textContent`, which would destroy a sibling on locale switch.
+  assert.match(
+    html,
+    /<a class="nav-demo" href="\.\/solitaire\/"\s*><span data-i18n="nav\.demo">[^<]+<\/span> <span aria-hidden="true">→<\/span><\/a>/,
+  );
+  // The mobile collapse hides the scroll-spy anchors only, not the cross-page link.
+  assert.match(css, /\.site-nav a:not\(\.nav-demo\)\s*\{\s*display: none;/);
+  assert.doesNotMatch(css, /\.site-nav\s*\{\s*display: none;/);
+});
+
+/**
+ * The version the page advertises has to be the version the repo ships. It read `v0.9.0` while
+ * `package.json` said 0.11.0 — a public page quietly two releases stale, because the eyebrow is
+ * three words in the middle of a hero and nobody rereads it.
+ *
+ * Root `package.json` is the reference rather than `VLMKIT_VERSION`: this page is a
+ * dependency-free static example and importing a `.ts` constant into it would need a loader.
+ * Both are already pinned to each other by `src/cli/version.test.ts`.
+ */
+test("the intro page advertises the shipped version", async () => {
+  const [html, manifest] = await Promise.all([
+    read("index.html"),
+    readFile(join(exampleDir, "../../package.json"), "utf8"),
+  ]);
+  const { version } = JSON.parse(manifest);
+
+  assert.match(html, new RegExp(`<span>v${version.replace(/\./g, "\\.")}</span>`));
+});
+
+test("the local server serves both pages with usable content types", async () => {
+  const { spawn } = await import("node:child_process");
+  const port = 4291;
+  const child = spawn(process.execPath, [join(exampleDir, "server.mjs")], {
+    env: { ...process.env, PORT: String(port) },
+    stdio: "ignore",
+  });
+  onTestFinished(() => child.kill());
+
+  const base = `http://127.0.0.1:${port}`;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      await fetch(`${base}/`);
+      break;
+    } catch {
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
-  for (const imageName of ["proof-target.png", "proof-implementation.png", "proof-diff.png"]) {
-    assert.match(server, new RegExp(`\\["/${imageName.replace(".", "\\.")}"`));
+
+  const expected = [
+    ["/", "text/html"],
+    ["/styles.css", "text/css"],
+    ["/app.js", "text/javascript"],
+    ["/content.js", "text/javascript"],
+    ["/preferences.js", "text/javascript"],
+    ["/scenarios.js", "text/javascript"],
+    ["/proof-target.png", "image/png"],
+    ["/proof-implementation.png", "image/png"],
+    ["/proof-diff.png", "image/png"],
+    ["/solitaire/", "text/html"],
+    ["/solitaire/game.js", "text/javascript"],
+    ["/solitaire/rules.js", "text/javascript"],
+    ["/solitaire/solitaire.css", "text/css"],
+  ];
+  for (const [path, type] of expected) {
+    const response = await fetch(`${base}${path}`);
+    assert.equal(response.status, 200, path);
+    assert.match(response.headers.get("content-type") ?? "", new RegExp(type), path);
   }
-  assert.match(server, /image\/png/);
+
+  const solitaire = await (await fetch(`${base}/solitaire/`)).text();
+  assert.match(solitaire, /<title>Klondike Solitaire/, "/solitaire/ must not fall through to /");
+  assert.match(solitaire, /href="\.\.\/"/, "the demo must link back to the site root");
 });
 
 test("the command deck exposes deterministic scenarios", async () => {
@@ -288,45 +372,11 @@ test("locale content and display preferences have strict contracts", async () =>
   assert.equal(resolveTheme("unknown"), "light");
 });
 
-test("the Pages build publishes only browser runtime assets", async (context) => {
-  const { buildPages, pageAssets } = await import("./build-pages.mjs");
-  const temporaryDir = await mkdtemp(join(tmpdir(), "vlmkit-pages-"));
-  const outputDir = join(temporaryDir, ".pages");
-  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+// What the Pages build publishes, and at which URL, is asserted by `tests/pages-site.test.mjs`.
+// It moved there when solitaire joined the site: the layout stopped being this page's business
+// the moment this page stopped being the whole site.
 
-  await buildPages({ sourceDir: exampleDir, outputDir });
-
-  assert.deepEqual(pageAssets, [
-    "app.js",
-    "content.js",
-    "index.html",
-    "preferences.js",
-    "proof-diff.png",
-    "proof-implementation.png",
-    "proof-target.png",
-    "scenarios.js",
-    "styles.css",
-  ]);
-  assert.deepEqual((await readdir(outputDir)).sort(), [
-    ".nojekyll",
-    "app.js",
-    "content.js",
-    "index.html",
-    "preferences.js",
-    "proof-diff.png",
-    "proof-implementation.png",
-    "proof-target.png",
-    "scenarios.js",
-    "styles.css",
-  ]);
-
-  for (const asset of pageAssets) {
-    assert.deepEqual(await readFile(join(outputDir, asset)), await readFile(join(exampleDir, asset)));
-  }
-  assert.equal(await readFile(join(outputDir, ".nojekyll"), "utf8"), "");
-});
-
-test("the GitHub Pages workflow validates and deploys the isolated site", async () => {
+test("the GitHub Pages workflow validates and deploys the composed site", async () => {
   const workflow = await readFile(
     join(exampleDir, "../../.github/workflows/deploy-pages.yml"),
     "utf8",
@@ -340,11 +390,29 @@ test("the GitHub Pages workflow validates and deploys the isolated site", async 
   assert.match(workflow, /actions\/checkout@v6/);
   assert.match(workflow, /actions\/setup-node@v6/);
   assert.match(workflow, /node-version: 24/);
-  assert.match(workflow, /node --test examples\/vlmkit-intro-page\/page\.test\.mjs/);
-  assert.match(workflow, /node examples\/vlmkit-intro-page\/build-pages\.mjs/);
+  /**
+   * `vitest run`, NOT `node --test`. This test asserted `node --test` for as long as
+   * `page.test.mjs` was a `node:test` file; the suite moved to vitest on 2026-08-13 and this
+   * file's own `import { test } from "vitest"` made the workflow's command fail on import
+   * ("Vitest failed to find the current suite"). The workflow last ran on 2026-08-07, so the
+   * breakage was invisible — and this assertion was pinning it in place.
+   *
+   * Matching the runner and not just the path is the point: a step that cannot run is worse
+   * than a missing step, because the workflow claims the contract is verified.
+   */
+  // The directory, so `site-links.test.mjs` is covered too — the live-browser half of this
+  // page's contract, split out of this file to keep it runnable in `skill-package.yml`.
+  assert.match(workflow, /pnpm exec vitest run examples\/vlmkit-intro-page\/(?!page)/);
+  // Anchored to a `run:` line, not to the string anywhere in the file — the workflow's own
+  // comment explains why `node --test` is wrong here, and a bare /node --test/ matched that.
+  assert.doesNotMatch(workflow, /^\s*(?:run:|- run:).*node --test/m);
+  assert.match(workflow, /node scripts\/build-pages\.mjs/);
+  // Solitaire ships on the same site, so its own tests and gates run in the same job.
+  assert.match(workflow, /pnpm exec vitest run examples\/solitaire\//);
+  assert.match(workflow, /examples\/solitaire\/\*\*/);
   assert.match(workflow, /actions\/configure-pages@v5/);
   assert.match(workflow, /actions\/upload-pages-artifact@v4/);
-  assert.match(workflow, /path: examples\/vlmkit-intro-page\/\.pages/);
+  assert.match(workflow, /path: \.pages/);
   assert.match(workflow, /needs: build/);
   assert.match(workflow, /if: github\.event_name != 'pull_request'/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
@@ -389,7 +457,13 @@ test("the dogfood gate covers every locale and theme before Pages deploys", asyn
   );
   assert.ok(
     workflow.indexOf("Run vlmkit dogfood state matrix")
-      < workflow.indexOf("Build isolated Pages artifact"),
+      < workflow.indexOf("Build the Pages artifact"),
     "the state matrix must block artifact creation",
+  );
+  // Same for solitaire: its gates are only worth running if a red one stops the deploy.
+  assert.ok(
+    workflow.indexOf("Run vlmkit gates on the solitaire demo")
+      < workflow.indexOf("Build the Pages artifact"),
+    "the solitaire gates must block artifact creation",
   );
 });

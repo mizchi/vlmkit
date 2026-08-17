@@ -72,7 +72,7 @@ import {
 import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type { ShiftRegion, VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
-import { applyMask, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
+import { applyMask, formatMaskProblems, MaskTally, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import {
   evaluateRenderSanity,
@@ -849,10 +849,14 @@ async function writeMigrationRegionDiffArtifacts(options: {
 // ---- Main ----
 
 async function main(cliArgs = process.argv.slice(2)) {
+  // `--help` had no branch here at all: it is not a file, so it fell through to "no input"
+  // and printed the usage with exit 1. The usage text is the right output; the exit code was
+  // answering a different question than the one asked.
+  const askedForHelp = cliArgs.includes("--help") || cliArgs.includes("-h");
   const options = parseMigrationCompareArgs(cliArgs);
   const hasFileInput = options.baseline && options.variants.length > 0;
   const hasUrlInput = options.baselineUrl && options.variantUrls && options.variantUrls.length > 0;
-  if (!hasFileInput && !hasUrlInput) {
+  if (askedForHelp || (!hasFileInput && !hasUrlInput)) {
     console.log(`Usage: vlmkit diff html <before.html> <after.html>`);
     console.log(`       vlmkit diff html --dir <dir> --baseline <file> --variants <file1> <file2> ...`);
     console.log(`       vlmkit diff html --url <baseline-url> --current-url <current-url>`);
@@ -861,7 +865,7 @@ async function main(cliArgs = process.argv.slice(2)) {
     console.log(`Options: [--output-dir path] [--approval approval.json] [--strict]`);
     console.log(`         [--discover-backend auto|regex|crater] [--no-paint-tree] [--no-discover]`);
     console.log(`         [--region-diff] [--region-diff-format json|markdown|both] [--region-diff-max-viewports n]`);
-    process.exit(1);
+    process.exit(askedForHelp ? 0 : 1);
   }
   await runMigrationCompare(options);
 }
@@ -881,6 +885,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     paintTreeUrl,
     enablePaintTree,
   } = options;
+  // Accumulated across every page and viewport this run masks, so an invalid selector is
+  // reported once rather than per page, and "matched nothing" is only reported for a
+  // selector that matched nothing anywhere.
+  const maskTally = new MaskTally();
   const regionDiffEnabled = options.regionDiff ?? false;
   const regionDiffFormat = options.regionDiffFormat ?? "both";
   const regionDiffModel = options.regionDiffModel ?? DEFAULT_REGION_DIFF_MODEL;
@@ -1106,7 +1114,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       } else {
         await page.setContent(baselineHtml, { waitUntil: "networkidle" });
       }
-      if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+      if (options.maskSelectors?.length) maskTally.add(await applyMask(page, options.maskSelectors));
       const path = join(outputDir, `${baselineName}-${vp.label}.png`);
       await page.screenshot({ path, fullPage: true });
       baselineScreenshots.set(vp.label, path);
@@ -1309,7 +1317,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         } else {
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
-        if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+        if (options.maskSelectors?.length) maskTally.add(await applyMask(page, options.maskSelectors));
 
         if (variantSanityEnabled) {
           try {
@@ -2233,7 +2241,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             } else {
               await baselinePage.setContent(baselineHtml, { waitUntil: "networkidle" });
             }
-            if (options.maskSelectors?.length) await applyMask(baselinePage, options.maskSelectors);
+            if (options.maskSelectors?.length) maskTally.add(await applyMask(baselinePage, options.maskSelectors));
             let baselineApplied: AppliedForcedState;
             try {
               baselineApplied = await applyForcedPseudoState(baselinePage, { state });
@@ -2256,7 +2264,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             } else {
               await variantPage.setContent(variantHtml, { waitUntil: "networkidle" });
             }
-            if (options.maskSelectors?.length) await applyMask(variantPage, options.maskSelectors);
+            if (options.maskSelectors?.length) maskTally.add(await applyMask(variantPage, options.maskSelectors));
             let variantApplied: AppliedForcedState;
             try {
               variantApplied = await applyForcedPseudoState(variantPage, { state });
@@ -2456,6 +2464,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         console.log(`  ${YELLOW}--against-previous failed: ${String(err)}${RESET}`);
         console.log();
       }
+    }
+
+    // Before the strict throws below, so it is said even on a run that then fails: an
+    // unapplied mask is a candidate explanation for the diffs the caller is about to read.
+    const maskProblems = formatMaskProblems(maskTally.takeNewInvalid(), maskTally.neverMatched());
+    if (maskProblems) {
+      console.log(`  ${YELLOW}warn: --mask ${maskProblems}${RESET}`);
+      console.log();
     }
 
     if (options.strictDomEquivalence) {

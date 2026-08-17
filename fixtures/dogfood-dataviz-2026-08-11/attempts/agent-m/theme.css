@@ -1,0 +1,95 @@
+/* Ops dashboard theme.
+ *
+ * Every declared defect lives in this file or in the markup's own text. Nothing
+ * is annotated as wrong — the point of the exercise is whether the tool says so.
+ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, sans-serif;
+  color: #222;
+  background: #fff;
+}
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.topbar h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.region { margin: 0; font-size: 14px; color: #666; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 240px));
+  gap: 24px;
+  padding: 24px;
+}
+
+.panel {
+  padding: 16px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.panel h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.metric { margin: 0 0 8px; font-size: 32px; font-weight: 700; }
+
+.status {
+  margin: 0;
+  font-size: 13px;
+  color: #6b6b6b;
+}
+
+.vendorchart-ctrl-group {
+  padding: 0 24px 24px;
+}
+
+.vendorchart-ctrl {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.vendorchart-ctrl button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0);
+  color: #222;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  padding: 0 24px 24px;
+}
+
+.btn {
+  min-height: 44px;
+  padding: 10px 18px;
+  font: inherit;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  cursor: pointer;
+}
+
+.btn--primary {
+  border-color: #2255cc;
+  background: #2255cc;
+  color: #fff;
+}
+
+@media (max-width: 767px) {
+  .grid { grid-template-columns: 1fr; }
+  .actions { flex-wrap: wrap; }
+}

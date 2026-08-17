@@ -22,9 +22,9 @@ import {
   formatThemeParityReport,
   runThemeParity,
 } from "../style/theme-parity.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
-const THEME_VALUE_FLAGS = ["--output-dir", "--report", "--threshold"];
+const THEME_VALUE_FLAGS = ["--output-dir", "--report", "--threshold", "--dark-selector"];
 
 export const themeGate = defineGate<ThemeParityReport, ThemeParityOptions>({
   id: "check.theme",
@@ -32,11 +32,19 @@ export const themeGate = defineGate<ThemeParityReport, ThemeParityOptions>({
   title: "Theme parity",
   summary: "Theme parity (hard-coded color scan in dark mode)",
   category: "design-system",
-  usage: `Renders the page twice — prefers-color-scheme light and dark — and
-reports components whose dominant fill did not change. Those carry
+  usage: `Renders the page twice — light, then dark by whichever strategy the
+page's own CSS uses — and reports components whose dominant fill did not
+change. Those carry
 hard-coded colors instead of theme variables, which is the classic
 dark-mode regression. Also reports the overall theme pixel delta, so a
 page with no dark-mode styles at all is visible as such.
+
+The dark render is produced by reading the stylesheets first: a page with
+@media (prefers-color-scheme: dark) gets the media flip, and a page that
+themes by a root class or attribute (Tailwind darkMode: "class",
+VitePress, next-themes, data-theme=dark) gets that class applied
+instead. The strategy is printed next to the delta, because what a 0.0%
+delta means depends on it. --dark-selector overrides the detection.
 
 Findings are warn-level by default (this command previously never failed);
 promote them in vlmkit.gates.json to gate CI on theme parity.`,
@@ -65,6 +73,13 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
       description: "RGB distance below which a fill counts as unchanged",
       defaultDescription: "16",
     },
+    {
+      name: "dark-selector",
+      placeholder: "class|attr=value",
+      kind: "string",
+      description: "Root class or attribute that turns the page dark, when detection gets it wrong",
+      defaultDescription: "detected from the page's CSS",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -72,11 +87,13 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
     const threshold = readNumber(argv, "threshold", { min: 0 });
+    const darkSelector = readFlag(argv, "dark-selector");
     return {
       htmlPath,
       outputDir: outputDir ?? join(process.cwd(), "test-results", "theme-parity"),
       ...(reportPath ? { reportPath } : {}),
       ...(threshold !== undefined ? { unchangedColorThreshold: threshold } : {}),
+      ...(darkSelector ? { darkSelector } : {}),
       ...parsePageLoad(argv),
     };
   },

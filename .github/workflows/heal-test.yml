@@ -29,5 +29,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mizchi/vlmkit-heal... run build
-      - run: node --test 'src/**/*.test.ts'
-        working-directory: packages/vlmkit-heal
+      # `vitest run`, not `node --test`. Every file under `src` imports `describe`/`it` from
+      # vitest, which throws on import outside the vitest runner, so this step could not pass at
+      # all after the suite migrated on 2026-08-13. Filtered to the package rather than run from
+      # its directory: the vitest config lives at the repo root.
+      - run: pnpm exec vitest run packages/vlmkit-heal/src

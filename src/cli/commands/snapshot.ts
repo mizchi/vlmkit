@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -168,6 +169,12 @@ export function parseSnapshotConfig(raw: string): SnapshotConfig {
     mask,
   };
 }
+
+/**
+ * Every non-capture mode, in one place, so the "misplaced subcommand" check below cannot drift
+ * from the dispatch that reads `positional[0]`.
+ */
+const SNAPSHOT_SUBCOMMANDS = ["approve", "fix-prompt", "stability", "stability-history", "flipbook"];
 
 export function parseSnapshotCliArgs(
   cliArgs: string[],
@@ -440,6 +447,20 @@ export function parseSnapshotCliArgs(
         outPath: fixOutPath,
       },
     };
+  }
+
+  // A subcommand name anywhere but first is a misplaced subcommand, not a URL.
+  //
+  // `vlmkit snapshot <url> stability --iterations 2` used to reach the browser and fail with
+  // `page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL` — navigating to
+  // the literal string "stability". The mode dispatch only ever looks at `positional[0]`, so
+  // every other position silently became a capture target.
+  const misplaced = positional.slice(1).filter((value) => SNAPSHOT_SUBCOMMANDS.includes(value));
+  if (misplaced.length > 0) {
+    throw new UsageError(
+      `\`${misplaced[0]}\` is a subcommand and has to come first: `
+      + `vlmkit snapshot ${misplaced[0]} ${positional.filter((p) => !misplaced.includes(p)).join(" ")}`.trim(),
+    );
   }
 
   const configuredUrls = positional.length > 0

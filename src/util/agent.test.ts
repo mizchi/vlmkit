@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { runVerificationLoop, generateReport } from "./agent.ts";
 import type { VrtDiff, ChangeIntent, QualityCheckResult } from "@mizchi/vlmkit-core/types.ts";

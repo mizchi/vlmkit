@@ -18,7 +18,7 @@
  * source while measuring a different page.
  */
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,12 +57,12 @@ describe("gates refuse to pass on a login wall", () => {
   let server: Server;
   let walled = "";
 
-  before(async () => {
+  beforeAll(async () => {
     const started = await startWall();
     server = started.server;
     walled = `${started.base}/app`;
   });
-  after(() => server.close());
+  afterAll(() => server.close());
 
   const REDIRECT = /redirected: requested \/app but measured .*\/login/;
 

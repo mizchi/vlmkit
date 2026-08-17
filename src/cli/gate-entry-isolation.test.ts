@@ -31,9 +31,10 @@
  * Walking imports tests the invariant rather than the symptom, needs no build, and
  * names the offending edge — which is what someone who just added the import needs.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -90,8 +91,29 @@ function staticImportsOf(source: string): string[] {
   return out;
 }
 
+/**
+ * Both spellings of the guard, because there are two.
+ *
+ * The original was a hand-rolled `process.env.__VLMKIT_DISPATCHER_LEAF__ === "x" ||
+ * resolve(process.argv[1]) === fileURLToPath(import.meta.url)`. Twelve modules now
+ * call the shared `isCliEntry(import.meta.url, "x")` instead, and matching only the
+ * literal made every one of them invisible here — the check would have gone quiet
+ * about exactly the modules most recently touched. Matching the source text at all
+ * is the compromise: this walker reads files rather than importing them, precisely
+ * because importing a CLI-entry module runs its command.
+ */
 function isCliEntryModule(source: string): boolean {
-  return source.includes("__VLMKIT_DISPATCHER_LEAF__ ===");
+  return source.includes("__VLMKIT_DISPATCHER_LEAF__ ===")
+    || /isCliEntry\(\s*import\.meta\.url/.test(source);
+}
+
+/**
+ * Comments removed, so the guard check below reads code rather than prose. Crude on
+ * purpose: it does not understand a `//` inside a string literal, which is fine because
+ * the only thing it feeds is a search for two specific expressions.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
 }
 
 /** Every module statically reachable from `entry`, with the path that got there. */
@@ -138,12 +160,56 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
     });
   }
 
+  it("no module hand-rolls the entry guard", () => {
+    // `argv[1]?.endsWith("thing.ts")` is a suffix match, so it cannot tell
+    // suffix-sharing files apart — `src/vrt/snapshot/snapshot.ts`'s guard also matched
+    // `src/cli/commands/snapshot.ts` — and it silently stops matching once the file is
+    // built to `.mjs`. That second half was live: `node dist/png-diff.mjs --help`
+    // printed nothing at all, because the guard tested for `png-diff.ts`.
+    //
+    // Fifteen modules carried it. `isCliEntry(import.meta.url, name)` resolves both
+    // sides, so it is exact in both directions.
+    const files = execSync("git ls-files '*.ts'", { cwd: REPO_ROOT, encoding: "utf8" })
+      .trim().split("\n").filter(Boolean);
+    assert.ok(files.length > 200, `git ls-files returned ${files.length} — the listing is broken, not the code`);
+    const offenders: string[] = [];
+    for (const rel of files) {
+      if (rel.endsWith(".test.ts")) continue;
+      // Comments stripped first, so a file that *explains* the bad spelling is not
+      // flagged for naming it — `cli-entry.ts` documents both wrong forms, and
+      // `workflow.ts` says which one it replaced. Excluding those by filename would have
+      // worked today and gone stale the moment a third file explained it.
+      const source = stripComments(readFileSync(resolve(REPO_ROOT, rel), "utf8"));
+      // Two wrong spellings, both measured rather than reasoned about:
+      //   `argv[1].endsWith("x.ts")` — a suffix match; `node dist/png-diff.mjs` printed
+      //   nothing because the guard tested for `png-diff.ts`.
+      //   `new URL(import.meta.url).pathname === argv[1]` — a URL pathname is
+      //   percent-encoded and argv is not, so any path with a space fails.
+      const suffixMatch = /process\.argv\[1\][^;]{0,200}?\.endsWith\(/s.test(source);
+      const urlPathname = /new URL\(import\.meta\.url\)\.pathname\s*===\s*process\.argv\[1\]/s.test(source)
+        || /process\.argv\[1\]\s*===\s*new URL\(import\.meta\.url\)\.pathname/s.test(source);
+      if (suffixMatch || urlPathname) offenders.push(rel);
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      "hand-rolled entry guard — use `isCliEntry(import.meta.url, \"<dispatcher-name>\")` "
+      + "from @mizchi/vlmkit-core/plugin/cli-entry.ts",
+    );
+  });
+
   it("the walker actually finds CLI entries, or the check above is vacuous", () => {
     // `page-compose.ts` is a CLI entry and reachable from `page-compose-diff.ts`'s
     // neighbourhood; assert the two primitives work rather than trusting a green
     // result that could just mean the regex matched nothing.
     const entry = resolve(REPO_ROOT, "packages/vlmkit-markup/src/component/page-compose.ts");
     assert.ok(isCliEntryModule(readFileSync(entry, "utf8")), "page-compose.ts should read as a CLI entry");
+    // And one of each spelling, so neither branch of the detector can rot unnoticed.
+    assert.ok(
+      isCliEntryModule(readFileSync(resolve(REPO_ROOT, "packages/vlmkit-markup/src/inspect/explore.ts"), "utf8")),
+      "explore.ts uses the shared isCliEntry() guard and must still read as an entry",
+    );
+    assert.ok(!isCliEntryModule("export const x = 1;\n"), "a plain module is not an entry");
     const reached = reachableFrom(entry);
     assert.ok(reached.size > 3, `walker resolved only ${reached.size} modules from a real entry`);
     assert.ok(

@@ -23,7 +23,7 @@
  * call sites that did not, not to rewrite any load state.
  */
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -93,14 +93,14 @@ describe("gates settle before reading a client-rendered page", () => {
   let url = "";
   let file = "";
 
-  before(async () => {
+  beforeAll(async () => {
     const started = await startServer();
     server = started.server;
     url = started.url;
     file = join(mkdtempSync(join(tmpdir(), "settle-consistency-")), "page.html");
     writeFileSync(file, HTML);
   });
-  after(() => server.close());
+  afterAll(() => server.close());
 
   it("verify flow agrees with check layout on how many cards exist", async () => {
     // These two disagreed: 0 vs 2, same page, same instant. `verify flow`

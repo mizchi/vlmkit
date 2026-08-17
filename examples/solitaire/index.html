@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Klondike Solitaire — vlmkit DnD / animation example</title>
+<!--
+  Klondike solitaire, the Windows sol.exe layout, in plain HTML/CSS/JS.
+
+  It exists to exercise the two things a pixel diff cannot see on its own — DRAG AND DROP and
+  ANIMATION — against a page that is a real application rather than a fixture: seven tableau
+  piles, four foundations, a stock and a waste, full rules, keyboard play, and the bouncing
+  win cascade.
+
+    rules.js      the rules, pure and DOM-free (tested by rules.test.mjs, no browser)
+    solitaire.css layout, card faces, and the four animations
+    game.js       DOM, HTML5 drag and drop, keyboard, animation wiring
+
+  No build step, no dev server, no external assets: classic scripts and a linked stylesheet, so
+  every gate runs straight off the filesystem.
+
+    vlmkit check integrity  examples/solitaire/index.html
+    vlmkit scan handlers    examples/solitaire/index.html --probe-drag
+    vlmkit check animation  examples/solitaire/index.html --strip strip.png
+    vlmkit check a11y focus examples/solitaire/index.html
+
+  URL parameters, which exist for those gates as much as for players:
+
+    ?seed=N     fix the deal. The shuffle is a seeded PRNG, so seed 1 is the same game on
+                every machine — without it a screenshot differs every run and a VRT baseline
+                is meaningless.
+    ?draw=1|3   Windows' "Draw one" / "Draw three".
+    ?animate=0  skip every animation. The opening deal is a ~960ms staggered flight (measured:
+                `check animation` reports `settle: 962ms`), so a gate that screenshots on load
+                catches the table mid-air — and a card at `opacity: 0.2` mid-flight measures as
+                a contrast failure that does not exist once it lands. The alternative is to wait
+                for `document.body[data-deal-complete="true"]`.
+
+  Rules, in full: build the four foundations up from the Ace in suit; build the tableau down in
+  alternating colours; only a King starts an empty column; a face-up descending run moves as
+  one unit; the stock deals to the waste and the waste turns back over IN ORDER when it runs
+  out (a reshuffle there would make the game unlosable).
+-->
+<link rel="stylesheet" href="solitaire.css">
+</head>
+<body>
+
+<header class="toolbar">
+  <!--
+    Back to the site this page is published under, FIRST in the toolbar.
+    Relative: on GitHub Pages this page lives at /vlmkit/solitaire/ and the intro page at
+    /vlmkit/, so "../" is the site root — an absolute "/" would leave the project site entirely.
+    Locally it resolves to `examples/`, which is the honest answer to "up one level" when there
+    is no site around it.
+
+    It sat last, after the status, for exactly one screenshot: the toolbar is full at 1280px, so
+    it wrapped to a second row and landed at the far left under the title, reading as a stray
+    link rather than a back button. No gate reported that — the link was present, focusable,
+    44px and contrast-clean on both rows. Looking at it was the only way to find it.
+  -->
+  <a class="site-link" href="../">← vlmkit</a>
+  <h1>Klondike Solitaire</h1>
+  <button id="new-game" type="button">New game</button>
+  <button id="restart" type="button">Restart this deal</button>
+  <button id="auto-finish" type="button">Auto-finish</button>
+  <!--
+    A real toggle, so it carries aria-pressed. `check interactions` probes controls for an ARIA
+    state transition and reports one that changes the page while announcing nothing.
+  -->
+  <button id="toggle-animation" type="button" aria-pressed="true">Animations: on</button>
+  <!--
+    Label and control in one wrapper so they wrap TOGETHER. At 375px the toolbar breaks over four
+    rows and "Deal" ended a row with its `<select>` starting the next one — a label visually
+    separated from the control it names. The association is still correct for a screen reader
+    (`for`/`id`), which is why no a11y gate reported it and why a screenshot did.
+  -->
+  <span class="draw-field">
+    <label for="draw-count">Deal</label>
+    <select id="draw-count">
+      <option value="1">Draw one</option>
+      <option value="3">Draw three</option>
+    </select>
+  </span>
+
+  <div class="status">
+    <span>Moves <output id="moves">0</output></span>
+    <!--
+      "Left 52" read as the number of cards left in the STOCK, which is what a player looks at
+      next to a stock pile that visibly has cards in it. It counts the cards not yet on a
+      foundation, so it says 52 until the first Ace is placed and 0 when the game is won.
+      Naming the foundations and showing it as progress removes the guess.
+    -->
+    <span>Foundations <output id="remaining">0</output>/52</span>
+  </div>
+</header>
+
+<main class="table" id="table">
+  <!--
+    Stock and waste on the left, foundations on the right, one empty column between — the
+    Windows arrangement, done with `grid-column` so the gap is not a meaningless empty node in
+    the accessibility tree.
+  -->
+  <div class="row row-top">
+    <!--
+      The stock is a button: it is clicked to deal, so it has to be reachable and operable by
+      keyboard. A `div` with a click handler is what `scan handlers` reports as a
+      pointer-only control.
+    -->
+    <button class="slot stock-slot" id="stock" type="button" aria-label="Stock"></button>
+    <div class="slot waste-slot" id="waste" tabindex="0" aria-label="Waste"></div>
+
+    <!--
+      Every pile is a tab stop. The hint below says "Tab to a pile", and without `tabindex` the
+      piles were not focusable at all — the keyboard flow was documented and unreachable, which
+      a browser test caught. Twelve extra stops on a card game is the cost of being playable
+      without a pointer.
+
+      A real container, because game.js addresses the four foundations by index. It is
+      `display: contents` so the four slots still participate in the row's seven-column grid —
+      a normal wrapper would become one grid item and collapse the four into a single column.
+    -->
+    <!--
+      Four GENERIC foundations, not one per suit.
+      Each slot used to carry a fixed suit — `data-hint="♠"`, `aria-label="Foundation, spades"` —
+      and the rules never honoured it: `canPlaceOnFoundation` takes any Ace on any empty
+      foundation, which is standard Klondike and what Windows does. So the second Ace to be
+      played landed on the slot marked ♥ whatever its suit was. Screenshotting a progressed game
+      showed A♠ A♦ A♥ A♣ sitting under hints reading ♠ ♥ ♦ ♣ — a drop target promising something
+      it does not enforce, which is the exact failure this page's README warns about, committed
+      by the page itself. No gate could see it: the markup was valid, labelled and reachable, and
+      only the *game* knows the promise is empty.
+
+      A suit claims a foundation when its Ace lands; `game.js` names it in `aria-label` from then
+      on, which tells a screen reader more than a fixed suit ever did.
+    -->
+    <div class="foundations" id="foundations">
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 1, empty"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 2, empty"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 3, empty"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 4, empty"></div>
+    </div>
+  </div>
+
+  <div class="row" id="tableau">
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 1"></div>
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 2"></div>
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 3"></div>
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 4"></div>
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 5"></div>
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 6"></div>
+    <div class="slot tableau-slot" tabindex="0" aria-label="Tableau 7"></div>
+  </div>
+
+  <p class="win-banner" id="win-banner" hidden>You win.</p>
+</main>
+
+<p class="hint">
+  Drag a card onto a pile, or <strong>double-click</strong> to send it to a foundation.
+  Keyboard: <kbd>Tab</kbd> to a card, <kbd>Enter</kbd> to pick it up, <kbd>Tab</kbd> to a pile,
+  <kbd>Enter</kbd> to place, <kbd>Esc</kbd> to put it back.
+</p>
+
+<!--
+  The live region for move announcements. Outside `.table` so a re-render of the table cannot
+  replace the node itself — a live region that gets recreated stops being announced.
+-->
+<div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
+
+<script src="rules.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

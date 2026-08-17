@@ -28,7 +28,7 @@
  *     runtime declares, and a run against the injected global actually answers a JSON
  *     command. Reading source alone would pass against a bridge that was never rebuilt.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

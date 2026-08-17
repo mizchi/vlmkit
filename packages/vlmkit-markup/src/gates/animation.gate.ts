@@ -10,14 +10,14 @@
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { hasFlag, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import {
   type AnimationEvalOptions,
   type AnimationEvalReport,
   formatAnimationEvalReport,
   runAnimationEval,
 } from "../style/animation-eval.ts";
-import { firstPositional, optionalInt, viewportFlag } from "./arg-helpers.ts";
+import { firstPositional, optionalInt, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOptions>({
   id: "check.animation",
@@ -29,6 +29,10 @@ export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOption
   usage: `Frame-sampled animation evaluation: pause every animation, seek through
 deterministic sample points, and verify each one visibly moves pixels,
 when the page settles, and whether prefers-reduced-motion is honored.
+
+\`--strip out.png --strip-animated\` writes an animated PNG of the whole page over
+the same timeline: it keeps the spatial arrangement the cropped sheet cannot show,
+and plays in a browser or a GitHub comment. Needs no extra dependency.
 
 \`--strip out.png\` (or \`.webp\`) writes the sampled frames as ONE image, a row per
 animation, cropped to the motion each one produced — the form to paste into a
@@ -64,6 +68,11 @@ review. \`--frames dir\` writes them as separate files instead.`,
     { name: "strip-max-width", placeholder: "px", kind: "number", description: "Cap the strip width, downscaling to fit", defaultDescription: "1600" },
     { name: "strip-window", placeholder: "ms", kind: "number", description: "Page-timeline span the strip's columns cover", defaultDescription: "when the last finite animation ends" },
     { name: "strip-selector", placeholder: "css", kind: "string", description: "Restrict the strip's rows to animations on elements matching this selector" },
+    {
+      name: "strip-animated",
+      kind: "boolean",
+      description: "Write --strip as an animated PNG of the whole page instead of a cropped still sheet",
+    },
     { name: "settle-threshold", placeholder: "ms", kind: "number", description: "long-settle threshold", defaultDescription: "3000" },
     { name: "skip-reduced-motion", kind: "boolean", description: "Skip the reduced-motion emulation pass" },
     ...PAGE_LOAD_INPUTS,
@@ -78,6 +87,7 @@ review. \`--frames dir\` writes them as separate files instead.`,
     const stripMaxWidth = optionalInt(argv, "strip-max-width", { min: 1 });
     const stripWindowMs = optionalInt(argv, "strip-window", { min: 1 });
     const stripSelector = readFlag(argv, "strip-selector");
+    const stripAnimated = hasFlag(argv, "strip-animated");
     const viewport = viewportFlag(argv);
     return {
       source,
@@ -87,6 +97,7 @@ review. \`--frames dir\` writes them as separate files instead.`,
       ...(settleThresholdMs !== undefined ? { settleThresholdMs } : {}),
       ...(framesDir ? { framesDir } : {}),
       ...(stripPath ? { stripPath } : {}),
+      ...(stripAnimated ? { stripAnimated } : {}),
       ...(stripMaxWidth !== undefined ? { stripMaxWidth } : {}),
       ...(stripWindowMs !== undefined ? { stripWindowMs } : {}),
       ...(stripSelector ? { stripSelector } : {}),

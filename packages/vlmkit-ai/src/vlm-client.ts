@@ -42,6 +42,18 @@ export interface VlmClient {
 
 let _cachedModels: VlmModel[] | null = null;
 
+/**
+ * Drop the cached OpenRouter model list.
+ *
+ * The cache is process-wide and had no way out, which matters beyond tests: the API server
+ * (`src/api/`) and a `--loop` run are long-lived, so a model added or repriced upstream is
+ * invisible to them until restart. Named after `resetGateRegistryCache`, which exists for the
+ * same reason on the same kind of lazily-built module state.
+ */
+export function resetVisionModelCache(): void {
+  _cachedModels = null;
+}
+
 export async function fetchVisionModels(): Promise<VlmModel[]> {
   if (_cachedModels) return _cachedModels;
 
@@ -103,15 +115,24 @@ export async function resolveModel(idOrIndex: string): Promise<VlmModel> {
   const partial = models.filter((m) => m.id.includes(idOrIndex));
   if (partial.length === 1) return partial[0];
   if (partial.length > 1) {
-    // Prefer shortest match (most specific)
-    const sorted = partial.sort((a, b) => a.id.length - b.id.length);
-    // If the shortest is a clear prefix match, use it
-    if (sorted[0].id.endsWith(idOrIndex) || sorted[0].id.includes(`/${idOrIndex}`)) {
-      return sorted[0];
-    }
+    // The escape hatch: a query that names a whole segment (`qwen3-vl` against
+    // `qwen/qwen3-vl` and `qwen/qwen3-vl-30b-a3b-instruct`) means the exact one.
+    //
+    // It has to be UNIQUE to be an answer. It used to sort by id length and take the shortest
+    // if that one happened to be a segment match, which silently picks between vendors: with
+    // `a/vision-pro` and `b/vision-max`, the query `vision-` resolved to `a/vision-pro` because
+    // its id is one character shorter. Those are different models at different prices, and a
+    // model chosen by string length is not a choice the caller made.
+    // A WHOLE path segment, not a prefix of one. `includes("/" + q)` was the old spelling and it
+    // matches `qwen/qwen3-vl-30b-a3b-instruct` for the query `qwen3-vl` too, so both candidates
+    // "matched the segment" and the tie was broken by id length.
+    const segmentMatches = partial.filter((m) => m.id.split("/").includes(idOrIndex));
+    if (segmentMatches.length === 1) return segmentMatches[0];
+    const shown = (segmentMatches.length > 1 ? segmentMatches : partial)
+      .slice(0, 5).map((m) => m.id).join(", ");
     throw new VrtConfigError(
       "MULTIPLE_MATCHES",
-      `Ambiguous model "${idOrIndex}". Matches: ${partial.slice(0, 5).map((m) => m.id).join(", ")}\nTip: use more specific ID, e.g. "${partial[0].id}"`,
+      `Ambiguous model "${idOrIndex}". Matches: ${shown}\nTip: use more specific ID, e.g. "${(segmentMatches[0] ?? partial[0]).id}"`,
     );
   }
 
@@ -447,11 +468,11 @@ export async function createVlmClient(
 
     const data = await res.json() as {
       choices: Array<{ message: { content: string } }>;
-      usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+      usage?: { prompt_tokens: number; completion_tokens: number; total_tokens?: number };
     };
 
     const latencyMs = Date.now() - start;
-    const usage = data.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    const usage = data.usage ?? { prompt_tokens: 0, completion_tokens: 0 };
     const costUsd = (usage.prompt_tokens / 1000) * model.promptCostPer1k +
                     (usage.completion_tokens / 1000) * model.completionCostPer1k;
 
@@ -460,7 +481,13 @@ export async function createVlmClient(
       model: model.id,
       promptTokens: usage.prompt_tokens,
       completionTokens: usage.completion_tokens,
-      totalTokens: usage.total_tokens,
+      // Summed rather than read: `total_tokens` is optional in the OpenAI-compatible shape
+      // OpenRouter serves, and several models omit it. Reading it directly put `undefined` into
+      // `totalTokens`, which then reaches the bench reports that quote token counts — the
+      // Anthropic and Gemini paths in this file have always summed. Kept as a fallback rather
+      // than replaced, because a provider that reports a total including reasoning tokens is
+      // more right than the sum of the other two fields.
+      totalTokens: usage.total_tokens ?? (usage.prompt_tokens + usage.completion_tokens),
       costUsd,
       latencyMs,
     };

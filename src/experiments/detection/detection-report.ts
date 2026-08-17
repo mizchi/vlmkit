@@ -10,6 +10,7 @@ import { readAllRecords, getDbStats } from "./detection-db.ts";
 import { isOutOfScope } from "./detection-classify.ts";
 import { getBenchGoalProgress, getBenchHistoryStats, readBenchHistory } from "../benchmark/bench-history.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 
 function hr() { _hr(76); }
 
@@ -32,9 +33,19 @@ function pct(ratio: number): string {
 
 // ---- Main ----
 
-async function main() {
-  const records = await readAllRecords();
-  const benchHistory = await readBenchHistory();
+/**
+ * Render the aggregate detection report.
+ *
+ * Both data paths are parameters with the production default, because both
+ * readers already accepted one — the runner simply never passed it through. That
+ * is what makes 203 statements of report rendering testable against a fixture
+ * instead of against whatever happens to be in the developer's `.vlmkit/`.
+ */
+export async function runDetectionReport(
+  options: { dbPath?: string; historyPath?: string } = {},
+) {
+  const records = await readAllRecords(options.dbPath);
+  const benchHistory = await readBenchHistory(options.historyPath);
 
   if (records.length === 0 && benchHistory.length === 0) {
     console.log(`\n  ${YELLOW}No data found.${RESET} Run ${BOLD}just css-bench${RESET} first.\n`);
@@ -290,4 +301,9 @@ async function main() {
   console.log();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded, so importing this module does not RUN the command. Without it a
+// test — or any tool reaching for a helper here — triggers a full run, which is
+// why this file had 0% coverage.
+if (isCliEntry(import.meta.url, "detection-report")) {
+  runDetectionReport().catch((e) => { console.error(e); process.exitCode = 1; });
+}

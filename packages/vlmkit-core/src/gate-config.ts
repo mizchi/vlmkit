@@ -359,6 +359,21 @@ export function resolveRuleSetting(
 
 export interface ResolveOptions {
   now?: Date;
+  /**
+   * Which of the resolved rule settings belong on THIS gate's command line.
+   *
+   * Every setting used to be appended to every gate, so a `check copy` invocation
+   * carried `--rule check.a11y.touch/target-undersized=off` and a single typo'd key
+   * printed the same config error once per gate. v7's agent-l and agent-m reported
+   * it independently.
+   *
+   * A callback rather than logic here, because deciding it needs the gate registry
+   * (which rules a gate declares) and this module deliberately does not depend on
+   * it. Omitted keeps the old behaviour, which is what a library caller with no
+   * registry should get: over-passing is harmless to the gate, since a `--rule`
+   * naming another gate is accepted and ignored by design.
+   */
+  rulesForGate?: (baseGate: string, rules: RuleSettings) => RuleSettings;
   /** Page ids or sources to keep. Substring match, so `admin` selects a subtree. */
   only?: string[];
 }
@@ -429,7 +444,11 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
         // Rule settings travel as `--rule` flags so the spawned gate needs no
         // config access of its own: whatever the plan says is exactly what
         // the child receives, and `gates list` shows the real command line.
-        gate: [baseGate, ...applied.map((s) => s.flag), ...ruleFlags(rules)].join(" "),
+        gate: [
+          baseGate,
+          ...applied.map((s) => s.flag),
+          ...ruleFlags(options.rulesForGate ? options.rulesForGate(baseGate, rules) : rules),
+        ].join(" "),
         appliedSuppressions: applied,
         rules,
       });

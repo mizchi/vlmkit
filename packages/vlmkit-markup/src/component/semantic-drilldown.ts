@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 import type { LandscapeCellDiff } from "../landscape-diff.ts";
 import type { HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
+import { overlapArea } from "@mizchi/vlmkit-core/rect-overlap.ts";
 import {
   computeSemanticDrilldownPolicy,
   selectMarkupCoreSemanticDrilldownIndex,
@@ -175,14 +176,6 @@ export function normalizeLandmarkRole(input: {
 
 function area(rect: Rect): number {
   return Math.max(0, rect.width) * Math.max(0, rect.height);
-}
-
-function overlapArea(a: Rect, b: Rect): number {
-  const left = Math.max(a.left, b.left);
-  const top = Math.max(a.top, b.top);
-  const right = Math.min(a.left + a.width, b.left + b.width);
-  const bottom = Math.min(a.top + a.height, b.top + b.height);
-  return Math.max(0, right - left) * Math.max(0, bottom - top);
 }
 
 function cellRect(cell: LandscapeCellDiff): Rect {

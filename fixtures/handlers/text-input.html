@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Text typed in, three ways</title>
+<!--
+  `vlmkit scan handlers <this> --probe input` types into every visible text field three times: an
+  ASCII sample, the same thing in Japanese, and the Japanese one through an IME composition (kana
+  composed, kanji committed).
+
+    field              ASCII in / out         CJK in / out      verdict
+    #plain             vlmkit7  vlmkit7       日本語  日本語        -
+    #stripsNonAscii    vlmkit7  vlmkit7       日本語  ""          text-input-rejects-non-ascii
+    #digitsOnly        vlmkit7  "7"           日本語  ""          - (excluded: ASCII mangled too)
+    #maxlen            vlmkit7  "vlmk"        日本語  日本語        - (excluded: a length rule)
+    #area              vlmkit7  vlmkit7       日本語  日本語        -
+    #changeCounter     vlmkit7  vlmkit7       日本語  日本語        -
+    #insideClosedDetails  --  not driven, because it cannot take focus at all
+    #translit          vlmkit7  vlmkit7       日本語  NIHONGO     - (transformed, not dropped)
+
+  **The ASCII drive is the control, and it is what makes the finding attributable.** `#digitsOnly`
+  loses the Japanese text as well, and that says nothing about the script — the field filters by its
+  own rules, as a phone number or an amount does. Only a field that keeps the ASCII and drops the
+  Japanese is reported. `#maxlen` is the other exclusion: it truncates the ASCII, so its rule is
+  about length.
+
+  **Half of these fields have no handler at all**, so the targets are enumerated in the page rather
+  than taken from the handler surface. A filter is not always on the field: `maxlength` and `pattern`
+  are attributes, and a form-level submit handler is somewhere else entirely. Reading targets off the
+  surface left `#plain`, `#maxlen` and `#area` unprobed — including two of the controls a reader
+  needs to interpret the finding.
+
+  **The composition is driven and nothing is graded from it.** Three IME-specific hypotheses were
+  measured and none survived: a field that destroys the committed text destroys it identically with
+  no composition (so it is not IME-specific); the confirming Enter cannot be judged, because a CDP
+  composition does not consume it the way a real IME does and the native form submission fires
+  either way; and a handler that rewrites `value` on every `input` — the shape most likely to
+  corrupt composing text — gave the same result composed or not, across identity, trim, slice and
+  space-stripping rewrites. So the committed value is printed as evidence and the composition types
+  stop being listed as never exercised.
+-->
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; padding: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+  input, textarea { padding: 6px; width: 190px; font: inherit; }
+  .broken { background: #fbeaea; }
+</style>
+</head>
+<body>
+
+<input id="plain" placeholder="no handler at all">
+<input id="stripsNonAscii" class="broken" placeholder="strips non-ASCII on input">
+<input id="digitsOnly" placeholder="digits only, by design">
+<input id="maxlen" maxlength="4" placeholder="maxlength 4">
+<textarea id="area" placeholder="textarea, no handler"></textarea>
+<input id="changeCounter" placeholder="counts change events">
+<input id="translit" placeholder="kana to romaji, as a furigana field does">
+
+<!--
+  Inside a CLOSED <details>: it passes the size and display filter and then takes no text at all.
+  Found on a real page, where a textarea in this position reported `"vlmkit7" became ""` for a drive
+  that never happened — the ASCII control kept it from becoming a false positive, and a genuine
+  non-ASCII defect in the same place would have been unreportable. The probe now checks that the
+  field actually took focus, and reports `not driven` when it did not.
+-->
+<details>
+  <summary>a closed section</summary>
+  <input id="insideClosedDetails" placeholder="cannot be typed into">
+</details>
+
+<script>
+  // The defect: a filter that runs on every input event and drops everything outside ASCII. A name
+  // or an address typed in Japanese disappears as it is typed.
+  document.getElementById("stripsNonAscii").addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/[^\x20-\x7e]/g, "");
+  });
+
+  // Not a defect, and the reason the ASCII control exists: this field is meant to hold digits, so it
+  // drops the ASCII sample too and the Japanese loss is not attributable to the script.
+  document.getElementById("digitsOnly").addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/[^0-9]/g, "");
+  });
+
+  // TRANSFORMED is not DROPPED. A furigana field that transliterates kana to romaji as you type is
+  // ordinary on Japanese sites, and with only a "does the value still contain it" check this
+  // reported `lost "日本語" — typing it left "NIHONGO"`, contradicting itself in its own message. A
+  // field that drops text returns LESS than went in; this returns more. MUST stay silent.
+  const KANA_TO_ROMAJI = { "に": "ni", "ほ": "ho", "ん": "n", "ご": "go", "日": "NI", "本": "HON", "語": "GO" };
+  document.getElementById("translit").addEventListener("input", (e) => {
+    e.target.value = [...e.target.value].map((c) => KANA_TO_ROMAJI[c] ?? c).join("");
+  });
+
+  // `change` fires on blur, not per keystroke, which is why each drive ends by blurring.
+  window.changeCount = 0;
+  document.getElementById("changeCounter").addEventListener("change", () => { window.changeCount++; });
+</script>
+</body>
+</html>

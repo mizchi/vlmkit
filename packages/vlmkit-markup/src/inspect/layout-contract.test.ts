@@ -1,9 +1,10 @@
 import assert from "node:assert";
-import { test, describe } from "node:test";
+import { test, describe } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import {
   evaluateLayoutRule,
+  formatLayoutReport,
   modalRowSize,
   runLayoutVerify,
   type LayoutRect,
@@ -106,4 +107,56 @@ test("minHeight checks EVERY visible match (touch-target rule)", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+describe("a selector the browser refuses", () => {
+  test("is reported, and does not satisfy `visible: false` by measuring nothing", { timeout: 240_000 }, async () => {
+    // `querySelectorAll` throws on exactly one thing: a selector that is not valid CSS.
+    // Swallowing that made an invalid selector indistinguishable from one that matched
+    // nothing — and "matched nothing" SATISFIES `visible: false`, so a typo in the
+    // contract passed the gate. Measured before the fix on this very shape:
+    // `verdict: SATISFIED (3/3 rules)`, exit 0.
+    const report = await runLayoutVerify({
+      source: STRESS,
+      contract: {
+        rules: [
+          { selector: ".sidebar", at: 1280, visible: true },
+          { selector: ".modal:not(", at: 1280, visible: false },
+          // A VALID selector that matches nothing must keep passing: no such element
+          // genuinely is not visible, and that is the assertion doing its job.
+          { selector: ".no-such-element-anywhere", at: 1280, visible: false },
+        ],
+      },
+    });
+
+    assert.deepEqual(report.invalidSelectors, [".modal:not("]);
+    // Every rule "passed" its own checks, and the run is still not done — the same
+    // shape as `redirected`, where an all-pass is not a pass.
+    assert.equal(report.passed, report.total);
+    assert.equal(report.done, false, "an unevaluated rule cannot leave the contract satisfied");
+
+    const text = formatLayoutReport(report).replace(/\u001b\[[0-9;]*m/g, "");
+    assert.match(text, /VIOLATED/);
+    assert.match(text, /`\.modal:not\(` is not valid CSS/);
+    // Named above the per-rule list, because below it reads as "no match" and sends the
+    // reader to their markup rather than their contract.
+    assert.ok(
+      text.indexOf("not valid CSS") < text.indexOf(".sidebar @1280"),
+      "the contract error has to come before the rules it invalidated",
+    );
+  });
+
+  test("one typo is reported once, not once per viewport", { timeout: 240_000 }, async () => {
+    const report = await runLayoutVerify({
+      source: STRESS,
+      contract: {
+        rules: [
+          { selector: ".modal:not(", at: 1280, visible: false },
+          { selector: ".modal:not(", at: 768, visible: false },
+          { selector: ".modal:not(", at: 375, visible: false },
+        ],
+      },
+    });
+    assert.deepEqual(report.invalidSelectors, [".modal:not("]);
+  });
 });

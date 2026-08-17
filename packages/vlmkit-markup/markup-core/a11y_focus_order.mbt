@@ -48,6 +48,40 @@ pub fn focus_order_classify(
   "ok"
 }
 
+
+///|
+/// The same classification, plus the one fact the five-argument form cannot express: how wide
+/// the element focus came FROM was.
+///
+/// A multi-column footer tabs down column one, then jumps back to the top of column two. By
+/// `dy` alone that is `reverse-up` at suspect severity, and vite.dev's front page produced four
+/// of them (columns at x=113 / 245 / 391, each ending at y=696 and the next starting at y=616)
+/// — exit 1 on an idiomatic layout. When the new element starts at or right of the previous
+/// one's right edge, the two are in different columns and reading order says the jump is
+/// forward, so this reports `column-advance` and lets the caller decide.
+///
+/// A jump back up in the SAME column stays `reverse-up`: on that same page, two stacked lists
+/// at x=391 are tabbed lower-first, which is a real finding and must survive this.
+pub fn focus_order_classify_boxes(
+  same_path : Bool,
+  prev_x : Double,
+  prev_y : Double,
+  prev_width : Double,
+  cur_x : Double,
+  cur_y : Double,
+) -> String {
+  let base = focus_order_classify(same_path, prev_x, prev_y, cur_x, cur_y)
+  if base != "reverse-up" {
+    return base
+  }
+  // `prev_width <= 0` means the caller did not measure a width (the legacy positional path, or
+  // a zero-size element). Nothing can be concluded about columns then, so the verdict stands.
+  if prev_width > 0.0 && cur_x >= prev_x + prev_width {
+    return "column-advance"
+  }
+  base
+}
+
 ///|
 fn abs(value : Double) -> Double {
   if value < 0.0 {

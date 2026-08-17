@@ -34,6 +34,7 @@ import {
   resolveGatePlan,
   summarizeSuppressions,
 } from "@mizchi/vlmkit-core/gate-config.ts";
+import type { RuleSettings } from "@mizchi/vlmkit-core/plugin/rules.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { formatWebServerPlan, withWebServer } from "./web-server.ts";
 import {
@@ -224,22 +225,108 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
  * `contract` and friends are artifact producers, not gates, and a config may
  * legitimately list one.
  */
-async function validateAgainstRegistry(plan: GatePlan, configPath: string): Promise<void> {
-  const { loadGateRegistry } = await import("../gate-registry.ts");
-  const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
-  const registry = await loadGateRegistry();
+/**
+ * Which rule settings belong on one gate's command line.
+ *
+ * Every setting was appended to every gate, so `check copy` carried
+ * `--rule check.a11y.touch/target-undersized=off` and a typo'd key printed the
+ * same config error once per gate. Both v7 agents reported it independently:
+ * "rule settings are broadcast to every gate."
+ *
+ * A key belongs when it names this gate (`<gateId>` or `<gateId>/<ruleId>`) or is
+ * a bare rule id this gate declares. Anything unresolvable is PASSED THROUGH
+ * rather than dropped: a key naming no known gate is a config error that
+ * `validateRuleSettings` reports with the whole catalog in view, and silently
+ * dropping it here would turn that error into a setting that quietly does nothing
+ * — the exact failure rule settings exist to remove.
+ */
+export function rulesForGateFactory(
+  registry: { resolve: (argv: readonly string[]) => { gate: { id: string; rules: readonly { id: string }[] } } | null | undefined },
+): (baseGate: string, rules: RuleSettings) => RuleSettings {
+  return (baseGate, rules) => {
+    const gate = registry.resolve(baseGate.split(/\s+/).filter(Boolean))?.gate;
+    if (!gate) return rules;
+    const declared = new Set(gate.rules.map((r) => r.id));
+    const out: Record<string, RuleSettings[string]> = {};
+    for (const [key, setting] of Object.entries(rules)) {
+      const slash = key.indexOf("/");
+      if (slash > 0) {
+        if (key.slice(0, slash) === gate.id) out[key] = setting;
+        continue;
+      }
+      // A bare key is either a gate id (this gate or another) or a rule id.
+      if (key === gate.id || declared.has(key)) out[key] = setting;
+      else if (!key.includes(".")) out[key] = setting; // unknown bare id: let the gate rule on it
+    }
+    return out;
+  };
+}
 
+async function validateAgainstRegistry(
+  plan: GatePlan,
+  configPath: string,
+  registry: Awaited<ReturnType<typeof import("../gate-registry.ts")["loadGateRegistry"]>>,
+): Promise<void> {
+  const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
+
+  // A QUALIFIED key (`<gateId>/<ruleId>`) or a gate-id key is a config-level fact:
+  // whether it names a real rule has nothing to do with which page carries it. It
+  // used to be validated once per job, so one typo printed the same error once per
+  // gate — v7's agent-l: "the typo test printed the same config error six times —
+  // once per gate — for one key."
+  //
+  // A BARE rule id is different: it means "this rule, on whichever gate receives
+  // this settings block", so it can only be judged against a gate. Those stay
+  // per-job, and the job is named because it is the thing that disambiguates them.
   const ruleProblems: string[] = [];
+  const allRules: Record<string, RuleSettings[string]> = {};
+  for (const job of plan.jobs) Object.assign(allRules, job.rules);
+  const qualified = Object.fromEntries(Object.entries(allRules).filter(([key]) => key.includes("/") || key.includes(".")));
+  const bare = Object.entries(allRules).filter(([key]) => !key.includes("/") && !key.includes("."));
+  ruleProblems.push(...validateRuleSettings(registry, qualified));
   for (const job of plan.jobs) {
-    if (Object.keys(job.rules).length === 0) continue;
+    const mine = bare.filter(([key]) => key in job.rules);
+    if (mine.length === 0) continue;
     const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
     ruleProblems.push(
-      ...validateRuleSettings(registry, job.rules, gate).map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
+      ...validateRuleSettings(registry, Object.fromEntries(mine), gate)
+        .map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
     );
   }
   if (ruleProblems.length > 0) {
     throw new UsageError(
       `${configPath}: invalid rule setting(s):\n${[...new Set(ruleProblems)].map((p) => `  - ${p}`).join("\n")}`,
+    );
+  }
+
+  // Required FLAGS, not just known commands. v7's agent-l: "`gates list` prints
+  // plans that cannot run. It listed `check layout … http://localhost:5311/` as job
+  // 4 of 7; only `gates run` revealed `did not run: error: --contract
+  // <contract.json> is required`. `list` validates rule names but not required
+  // flags." Seven gates declare one, and `check equivalence` declares two.
+  //
+  // Checked against `job.gate` — the resolved command line, suppression flags and
+  // all — so a suppression that supplies the flag counts as supplying it.
+  const missingFlags: string[] = [];
+  for (const job of plan.jobs) {
+    const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
+    if (!gate) continue;
+    const tokens = new Set(job.gate.split(/\s+/));
+    for (const input of gate.inputs ?? []) {
+      if (input.positional !== undefined || input.required !== true) continue;
+      if (tokens.has(`--${input.name}`)) continue;
+      missingFlags.push(
+        `${job.pageId} / ${job.baseGate}: --${input.name} is required`
+        + `${input.placeholder ? ` <${input.placeholder}>` : ""} — ${input.description}`,
+      );
+    }
+  }
+  if (missingFlags.length > 0) {
+    throw new UsageError(
+      `${configPath}: ${missingFlags.length} gate(s) cannot run as configured:\n`
+      + [...new Set(missingFlags)].map((p) => `  - ${p}`).join("\n")
+      + `\nA plan that lists a job it cannot start is worse than a config error —`
+      + ` the failure would otherwise arrive after the browser work, as "did not run".`,
     );
   }
 
@@ -279,12 +366,30 @@ export const URL_SCAFFOLD_FLAGS = "--wait-until load --timeout 15000";
 export function scaffoldConfig(
   patterns: readonly string[],
   gates: readonly string[],
-): { config: GateConfig; urlSources: string[] } {
+): { config: GateConfig; urlSources: string[]; localSources: string[] } {
   const sources = patterns.length > 0 ? [...patterns] : ["index.html"];
   const urlSources = sources.filter((source) => /^https?:\/\//.test(source));
+  // A localhost source means a dev server has to be running for the config to work
+  // at all — the same reasoning that already scaffolds the page-load flags for a URL.
+  // v7's agent-l: "`gates init` diagnosed the `networkidle` trap for me but didn't
+  // scaffold `webServer` for a localhost URL."
+  //
+  // The command is left as a placeholder rather than guessed. `npm run dev` is the
+  // common case but a wrong command that LOOKS configured is worse than an obvious
+  // blank: the run would start something unrelated and gate whatever answered.
+  const localSources = urlSources.filter((source) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(source));
   const declared = gates.length > 0 ? [...gates] : [STARTER_GATE];
   return {
     config: {
+      ...(localSources[0]
+        ? {
+          webServer: {
+            command: "npm run dev",
+            url: localSources[0],
+            timeout: 60000,
+          },
+        }
+        : {}),
       defaults: {
         gates: urlSources.length > 0
           ? declared.map((gate) => `${gate} ${URL_SCAFFOLD_FLAGS}`)
@@ -293,6 +398,7 @@ export function scaffoldConfig(
       pages: sources.map((source) => ({ source })),
     },
     urlSources,
+    localSources,
   };
 }
 
@@ -335,7 +441,7 @@ async function initConfig(args: string[]): Promise<void> {
   }
   const patterns = readAll(args, "pages");
   const gates = readAll(args, "gate");
-  const { config, urlSources } = scaffoldConfig(patterns, gates);
+  const { config, urlSources, localSources } = scaffoldConfig(patterns, gates);
   // Parse what we are about to write: a scaffold that its own validator
   // rejects would be a rough first impression.
   parseGateConfig(JSON.stringify(config));
@@ -359,6 +465,17 @@ async function initConfig(args: string[]): Promise<void> {
   if (ignored.length > 0) {
     console.log(`\n  Added to .gitignore: ${ignored.join(", ")} — a run writes gate reports`);
     console.log(`  under test-results/ and appends one line per gate to .vlmkit/run-ledger.jsonl.`);
+  }
+  if (localSources.length > 0) {
+    console.log(
+      `\n  Added a webServer block because ${localSources[0]} is local: a config that says`
+      + ` which URLs to gate but not how to bring them up needs a wrapper script to run at all.`,
+    );
+    console.log(
+      `  ${YELLOW}Replace its \`command\`${RESET} — the scaffold says \`npm run dev\` because guessing`
+      + ` wrong is worse than an obvious blank: the run would start something unrelated and`
+      + ` gate whatever answered. Delete the block if the server is already up in CI.`,
+    );
   }
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
   console.log(`      vlmkit gates run     (run it)`);
@@ -408,8 +525,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const { path, config } = await loadConfig(readFlag(args, "config"));
   const only = readAll(args, "only");
-  const declared = resolveGatePlan(config, only.length > 0 ? { only } : {});
-  await validateAgainstRegistry(declared, path);
+  // The registry decides which rule settings belong on which gate's command line —
+  // see `rulesForGateFactory`. Loaded once here and reused for validation.
+  const { loadGateRegistry } = await import("../gate-registry.ts");
+  const registry = await loadGateRegistry();
+  const declared = resolveGatePlan(config, {
+    ...(only.length > 0 ? { only } : {}),
+    rulesForGate: rulesForGateFactory(registry),
+  });
+  await validateAgainstRegistry(declared, path, registry);
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
   // Everything relative inside the config — a `source` glob, a `--har` or
@@ -491,10 +615,26 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
         ...(shard ? { shard } : {}),
         ...(output ? { output } : {}),
         quiet: hasFlag(args, "quiet") || json,
+        ...(json ? { json: true } : {}),
       },
     ));
   const stale = sharded.expired.length;
-  if (json) console.log(JSON.stringify({ config: path, expiredSuppressions: stale, ...summary }, null, 2));
+  if (json) {
+    // Structured findings, not the child's terminal text. v7's agent-l: "findings
+    // arrive as one ANSI-escaped `output` string, not structured." Each job now
+    // carries the gate's own envelope, and `output` is dropped from the JSON —
+    // keeping both would leave a consumer guessing which one is authoritative, and
+    // the prose copy is the one that is only readable by a human.
+    console.log(JSON.stringify({
+      config: path,
+      expiredSuppressions: stale,
+      ...summary,
+      jobs: summary.jobs.map(({ output, envelope, ...rest }) => ({
+        ...rest,
+        ...(envelope ? { gateReport: envelope } : { unparsedOutput: output }),
+      })),
+    }, null, 2));
+  }
   else {
     console.log(formatBatchSummary(summary, {
       showOutput: hasFlag(args, "show-output"),

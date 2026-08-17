@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { readStorageState, STORAGE_STATE_ENV, storageStatePath, withAuthState } from "./auth-state.ts";
+import { authStateNotice, readStorageState, resetAuthStateNotice, STORAGE_STATE_ENV, storageStatePath, withAuthState } from "./auth-state.ts";
 
 const withEnv = async (value: string | undefined, fn: () => Promise<void> | void) => {
   const prev = process.env[STORAGE_STATE_ENV];
@@ -85,6 +85,55 @@ test("env-configured auth applies without an explicit flag", async () => {
       const opts = withAuthState({ viewport: { width: 800, height: 600 } });
       assert.equal(opts.storageState, resolve(file));
     });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The notice existed and was never called, so the gates could measure a logged-in
+ * page while saying nothing about it. `VLMKIT_STORAGE_STATE` makes that the easy case
+ * rather than the exotic one: no flag reaches the command line, so without a notice
+ * "the dashboard" and "the login wall it redirected to" produce indistinguishable
+ * reports.
+ */
+test("the notice reports what was applied, not what was configured", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-auth-notice-"));
+  const file = join(dir, "auth.json");
+  await writeFile(file, JSON.stringify({
+    cookies: [{ name: "s", value: "v", domain: "127.0.0.1", path: "/" }],
+    origins: [],
+  }));
+  try {
+    resetAuthStateNotice();
+    assert.equal(authStateNotice(), null, "an unauthenticated run must say nothing");
+
+    // Configured but never applied: a gate that ignores auth must not claim to have
+    // used it. This is why the notice reads from `withAuthState` rather than from
+    // `storageStatePath`.
+    await withEnv(file, () => {
+      resetAuthStateNotice();
+      assert.equal(storageStatePath(), file, "the env var is configured");
+      assert.equal(authStateNotice(), null, "configured is not applied");
+    });
+
+    // Applied through the env var, with no explicit argument — the silent case.
+    await withEnv(file, () => {
+      resetAuthStateNotice();
+      const options = withAuthState({ viewport: { width: 800, height: 600 } });
+      assert.equal(options.storageState, resolve(file));
+      assert.equal(authStateNotice(), `auth: storage state from ${resolve(file)}`);
+    });
+
+    // Applied explicitly.
+    resetAuthStateNotice();
+    withAuthState({}, file);
+    assert.match(authStateNotice() ?? "", /^auth: storage state from \//, "the path is absolute");
+
+    // A reset between gates clears it, so the second gate in one process does not
+    // inherit the first one's session in its output.
+    resetAuthStateNotice();
+    assert.equal(authStateNotice(), null);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

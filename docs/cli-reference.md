@@ -38,7 +38,10 @@ for options.
 - **2-stage AI pipeline** — VLM (image → structured diff) + LLM (diff → CSS fix)
 - **Migration VRT** — compare HTML before/after across responsive viewports
 - **Snapshot** — URL-based multi-viewport capture with baseline diff
-- **Mask** — selector-based masking for dynamic content (animations, counters)
+- **Mask** — selector-based masking for dynamic content (animations, counters). Each
+  `--mask` selector is validated in the page and injected on its own, so a malformed one
+  cannot take the others with it, and the run warns about any that were invalid CSS or
+  matched no element anywhere
 - **Crater integration** — lightweight prescanner via BiDi (1.66x speedup,
   0% false positive) plus a layout-only JS/WASM backend.
 - **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,
@@ -189,7 +192,7 @@ pkf list
 
 # Run a task (mirrors any old `just <name>` invocation)
 pkf run smoke-all
-pkf run vrt-test
+pkf run vlmkit-test
 
 # Spec gates
 pkf run spec-check    # pkspec check Spec.pkl Test.pkl
@@ -458,12 +461,12 @@ on a canvas that overdraws, which the collision and protrusion rules cover.
 
 ```bash
 vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
-vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
+vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 AA default, 2.5.5 AAA via --level)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
-vlmkit check theme         <html|url>          # prefers-color-scheme dark / unthemed components
+vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check drift component <html> --selector .card
 vlmkit check drift pages     --selector .footer --files A.html B.html C.html
@@ -837,15 +840,14 @@ Minimal `vlmkit.config.json`:
   "outputDir": "test-results/snapshots/sample-webapp-2026",
   "threshold": 0.1,
   "failOnDiff": true,
-  "maxDiffRatio": 0.01,
-  "workflow": {
-    "captureSpec": "./e2e/vrt-capture.spec.ts"
-  }
+  "maxDiffRatio": 0.01
 }
 ```
 
 When `vlmkit.config.json` exists in the current directory, `vlmkit snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
-`vlmkit workflow init` and `vlmkit workflow capture` also auto-load the same file, reuse `baseUrl`/`routes`, and accept `workflow.captureSpec` or `--capture-spec <path>` when you want a custom Playwright entrypoint.
+`vlmkit workflow init` and `vlmkit workflow capture` also auto-load the same file and reuse `baseUrl`/`routes` — either at the top level or under `capture`.
+
+A `"workflow": { "captureSpec": … }` key and a `--capture-spec <path>` flag were documented here and **have never existed** in any version of the code; the example even named `vrt-capture.spec.ts`, a filename nothing has had since the rename. There is no capture spec to point at any more either: capture used to spawn `npx playwright test e2e/vlmkit-capture.spec.ts`, which is why these two commands needed a source checkout (the published package excluded the spec), and it now runs in-process from the installed package like every other command. Each route is captured at 1280x720 and reports its own outcome — HTTP status, an unmatched `waitFor`, an empty body, a degraded a11y tree — instead of one subprocess exit code for the whole run. A non-2xx route exits 1 rather than quietly baselining the server's error page.
 
 #### Subagent-ready fix prompt
 
@@ -1008,7 +1010,25 @@ vlmkit snapshot strip round-0.png round-1.png round-2.png --out rounds.png
 
 # Wrap into a grid, cap the sheet width (default 1600; 0 disables)
 vlmkit snapshot strip frames/*.png --columns 4 --max-width 1200 --out sheet.png
+
+# The other answer: one file that actually plays (animated PNG)
+vlmkit snapshot strip frames/anim-*.png --animated --delay 120 --out anim.png
+vlmkit check animation page.html --strip anim.png --strip-animated
 ```
+
+`--animated` writes **APNG**, not animated WebP: `@jsquash/webp` wraps libwebp's
+single-image encoder, and the alternative that can animate costs 29 MB installed
+for identical static output. APNG needs no dependency, plays in a browser and in a
+GitHub comment, and shows frame 0 in a viewer that does not know it — so the file
+is still usable as a still. It has no inter-frame compression, so six frames are
+roughly six PNGs. A `.webp` output path with `--animated` is refused rather than
+silently written as APNG bytes.
+
+`check animation --strip-animated` animates the **whole page** over the sampled
+timeline instead of cropping each animation to its own row, with per-frame delays
+taken from the real sample instants. Use it when the spatial arrangement matters
+(three cards side by side stay side by side); use the still sheet when a small
+element needs to be legible.
 
 Frames are composited **in the order given**, and a glob expands
 lexicographically — so `anim-0-100.png` lands before `anim-0-20.png` and the strip
@@ -1220,9 +1240,20 @@ Drop a `vlmkit.config.json` next to your app with a `capture` block:
 ```
 
 Each route accepts `name` (defaults to a sanitized form of `path`), `path`, and
-an optional `waitFor` CSS selector. Resolution order:
+an optional `waitFor` CSS selector.
 
-1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array)
+`waitFor` is a readiness contract, not a hint: if the selector does not become
+visible within 10s, `diff-pr` and `diff-pr pin` both fail that viewport and say
+which selector did not match. `pin` writes no PNG in that case — a baseline
+captured before the page rendered is worse than a missing one, because every
+later run agrees with it. It used to be swallowed, so a typo cost 10 silent
+seconds per viewport and then reported a green comparison of two placeholders.
+
+Resolution order:
+
+1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array) — outranks `--config`, and the
+   run prints a line saying so when both are set, so a flag you typed is never silently
+   ignored
 2. `--config <path>` flag or `VLMKIT_CONFIG_PATH` env var
 3. `vlmkit.config.json` auto-discovered in the working directory
 4. Built-in defaults (vlmkit's own UI — useful only when developing vlmkit itself)

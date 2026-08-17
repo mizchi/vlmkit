@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -68,12 +68,24 @@ describe("judgeDesignPolicy — --allow", () => {
     assert.equal(drifting.verdict, "drift");
 
     const allowed = judgeDesignPolicy(input({ samples }), { allow: ["button#export;primary is deliberate"] });
-    assert.equal(allowed.verdict, "coherent");
     const role = allowed.roles.find((r) => r.role === "button")!;
     // The allowed instance left the figures, rather than being counted and forgiven.
     assert.equal(role.instances, 2);
     assert.equal(role.allowed, 1);
     assert.equal(role.reuse, 2);
+    // This assertion used to read `verdict === "coherent"`, which is the defect v7's
+    // agent-m found: 2 remaining instances are under the default --min-instances 3, so
+    // nothing was judged and "coherent" claimed evidence there was none of. The
+    // exemption still works — see the run at the thresholds it now recommends below.
+    assert.equal(allowed.verdict, "not-judged");
+    assert.equal(
+      judgeDesignPolicy(input({ samples }), {
+        allow: ["button#export;primary is deliberate"],
+        minInstances: 2,
+        minReuse: 2,
+      }).verdict,
+      "coherent",
+    );
   });
 
   it("reports a rule that matched nothing, so a wrong selector is loud", () => {
@@ -99,6 +111,73 @@ describe("judgeDesignPolicy — --allow", () => {
     assert.throws(() => parseDesignAllowRules(["*;everything"]), /--rule component-drift=off/);
     // `#` is part of an ID selector, so splitting on it would silently broaden the rule.
     assert.throws(() => parseDesignAllowRules(["button#export#why"]), /part of an ID selector/);
+  });
+});
+
+describe("judgeDesignPolicy — a role too small to judge", () => {
+  // v7's agent-m followed this gate's own help and got a config that reports green
+  // forever: "Allowing one of 3 buttons leaves 2, below the default --min-instances 3,
+  // so the role stops being judged and a skipped role prints identically to a coherent
+  // one. […] I then broke #snooze on purpose — COHERENT again. So both documented
+  // configurations reproduce the exact complaint I was sent to fix."
+  /** save + snooze matching, export deliberately blue — the case `--allow` is for. */
+  const withDeliberatePrimary = () => [
+    styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#save" }),
+    styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#snooze" }),
+    styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "button#export" }),
+  ];
+  /** …and snooze broken too: a real drift among the instances that remain after the allow. */
+  const withDeliberatePrimaryAndRealDrift = () => [
+    styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#save" }),
+    styled("button", "2|4|2|4|0|1|white", "9|400", { selector: "button#snooze" }),
+    styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "button#export" }),
+  ];
+
+  it("marks a role under --min-instances as not judged rather than leaving it to read as ok", () => {
+    const report = judgeDesignPolicy(
+      input({ samples: withDeliberatePrimary() }),
+      { allow: ["button#export;primary is deliberate"] },
+    );
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.notJudged, true);
+    assert.equal(role.unjudgedByAllow, true, "--allow is what took it under the floor");
+    assert.equal(report.verdict, "not-judged", "COHERENT would claim evidence there is none of");
+  });
+
+  it("reports a real drift among the remaining instances instead of swallowing it", () => {
+    // The false negative in full: allow one, break another, and the old build said
+    // COHERENT while the row printed `reuse 1x, 2 one-off` beside it.
+    const report = judgeDesignPolicy(
+      input({ samples: withDeliberatePrimaryAndRealDrift() }),
+      { allow: ["button#export;primary is deliberate"] },
+    );
+    assert.equal(report.verdict, "not-judged");
+    const nothing = report.findings.find((f) => f.kind === "nothing-judged")!;
+    assert.ok(nothing, "the run must say the check measured nothing");
+    assert.match(nothing.message, /--allow took button under the floor/);
+    assert.match(nothing.message, /--min-instances 2 --min-reuse 2/);
+    // Both flags, because lowering only the instance floor leaves a 2-instance role
+    // unable to reach 3x — the run would still never move.
+    assert.match(nothing.message, /cannot reach 3x/);
+  });
+
+  it("judges the role again, in both directions, at the thresholds it recommends", () => {
+    const opts = { minInstances: 2, minReuse: 2, allow: ["button#export;primary"] };
+    assert.equal(judgeDesignPolicy(input({ samples: withDeliberatePrimary() }), opts).verdict, "coherent");
+    assert.equal(
+      judgeDesignPolicy(input({ samples: withDeliberatePrimaryAndRealDrift() }), opts).verdict,
+      "drift",
+      "a real drift must still be reported once the role is judged",
+    );
+  });
+
+  it("does not blame --allow for a role that was too small anyway", () => {
+    const report = judgeDesignPolicy(input({
+      samples: [styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#only" })],
+    }));
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.notJudged, true);
+    assert.equal(role.unjudgedByAllow, undefined);
   });
 });
 
@@ -209,14 +288,20 @@ describe("judgeDesignPolicy — component drift", () => {
     assert.equal(report.roles[0]!.reuse, 8);
   });
 
-  it("refuses to judge a role below the instance floor", () => {
+  it("refuses to judge a role below the instance floor, and says that it did", () => {
     // 2 buttons / 2 styles is reuse 1.0, but "every style is unique" is
-    // trivially true at n=2 and says nothing about the design system.
+    // trivially true at n=2 and says nothing about the design system. The
+    // refusal stands; what changed in v7 is that it is no longer silent —
+    // it used to leave `findings` empty and a `coherent` verdict, which reads
+    // as "measured and fine" for a role nothing was measured on.
     const report = judgeDesignPolicy(input({
       samples: [sample("button", "a"), sample("button", "b")],
     }));
-    assert.deepEqual(report.findings, []);
+    assert.deepEqual(report.findings.map((f) => f.kind), ["nothing-judged"]);
+    assert.equal(report.findings[0]!.severity, "info", "a small page is not a defect");
+    assert.equal(report.verdict, "not-judged");
     assert.equal(report.roles[0]!.instances, 2);
+    assert.equal(report.roles[0]!.notJudged, true);
   });
 
   it("names the dominant style and the deviations, never a correct value", () => {

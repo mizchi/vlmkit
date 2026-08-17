@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Class-only dark mode</title>
+<!--
+  The pattern `check theme` could not see: dark mode lives entirely in a root class, with NO
+  `prefers-color-scheme` rule and NO script listening to that media query. This is Tailwind's
+  `darkMode: "class"` default, next-themes with `enableSystem: false`, and any app whose theme
+  comes from a stored user choice.
+
+  VitePress (vite.dev) looks like this in its CSS — 47 `.dark` selectors, zero
+  `prefers-color-scheme` — but its own inline script mirrors the media query onto the class, so
+  emulating the media query happens to work there. Remove that bridge, as this page does, and a
+  media-only gate reports a fully themed page as having no dark mode at all.
+-->
+<style>
+  :root { --bg: #ffffff; --fg: #1a1a1a; --card: #f3f4f6; --accent: #2563eb; }
+  :root.dark { --bg: #0b0f19; --fg: #e5e7eb; --card: #1f2937; --accent: #60a5fa; }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 32px; }
+  .card { background: var(--card); padding: 24px; border-radius: 8px; margin-bottom: 16px; }
+  .cta { background: var(--accent); color: #fff; padding: 12px 20px; border: 0; border-radius: 6px; font-size: 16px; }
+  h1 { margin: 0 0 16px; font-size: 28px; }
+  /* Deliberately hard-coded: one component that does NOT follow the theme, so the gate has a
+     real `unthemed-component` finding to make once it can see the themed ones. */
+  .legacy { background: #fde68a; color: #78350f; padding: 24px; border-radius: 8px; }
+</style>
+<h1>Dashboard</h1>
+<div class="card"><p>Revenue is up 12% this quarter.</p><button class="cta">View report</button></div>
+<div class="card"><p>Three deploys pending review.</p></div>
+<div class="legacy"><p>Legacy banner — hard-coded amber, identical in both themes.</p></div>

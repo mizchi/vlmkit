@@ -5,6 +5,7 @@
  * across two iterations.
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { formatCompareRunsMarkdown, type CrReport } from "../../vrt/compare/compare-runs.ts";
@@ -106,7 +107,7 @@ async function main() {
   }
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "compare-runs-cli" || (process.argv[1] && (process.argv[1].endsWith("compare-runs-cli.ts") || process.argv[1].endsWith("compare-runs-cli.mjs")))) {
+if (isCliEntry(import.meta.url, "compare-runs-cli")) {
   main().catch((err) => {
     console.error(String(err?.message ?? err));
     process.exit(1);

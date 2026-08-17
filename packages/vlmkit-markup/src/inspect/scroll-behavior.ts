@@ -23,12 +23,15 @@
  *   vlmkit check scroll <html-or-url> [--json]
  */
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface StickyFixedSample {
   selector: string;
@@ -173,19 +176,7 @@ export function analyzeScrollBehavior(
 }
 
 const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
-  function stableSelector(el) {
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((s) => s.tagName === el.tagName);
-    return el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
+  ${STABLE_SELECTOR_JS}
   const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const box = (el) => {
     const b = el.getBoundingClientRect();
@@ -274,9 +265,6 @@ const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
   };
 })()`;
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise<ScrollBehaviorReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
@@ -285,13 +273,13 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     if (options.html !== undefined) {
       await page.setContent(options.html, navigationOptions(options));
     } else {
-      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
-    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
+    const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCRIPT(options.maxElements ?? 20)) as
       Omit<ScrollBehaviorInput, "source">;
     await page.close();
@@ -308,11 +296,9 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
   });
 }
 
-export function formatScrollBehaviorReport(report: ScrollBehaviorReport): string {
+export function formatScrollBehaviorReport(report: ScrollBehaviorReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check scroll${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
@@ -334,16 +320,21 @@ export function formatScrollBehaviorReport(report: ScrollBehaviorReport): string
       lines.push(`  - ${s.selector}: ${s.axis} ${s.strictness}, settled at ${s.settledOffset}px (${s.childCount} snap-aligned children)`);
     }
   }
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.kind} ${issue.selector}: ${issue.message}`);
+    for (const entry of shown) {
+      const issue = entry.row;
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+      lines.push(`  ${icon} ${issue.kind} ${issue.selector}: ${issue.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No scroll-behavior issues detected.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   return lines.join("\n");
 }

@@ -29,6 +29,7 @@
  */
 import { writeFile } from "node:fs/promises";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { hasFlag, readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { glob } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -193,8 +194,10 @@ export async function measure(options: MeasureOptions): Promise<ProbeFingerprint
             + `body, body * { font-family: ${options.fontStack} !important; }`,
         });
       }
-      await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
-      await page.waitForTimeout(150);
+      // After the style injection, so the substituted stack's faces are the ones waited for.
+      // `settlePage` also waits for idle, which matters here: an injected `@font-face` with a
+      // real `src` starts a request, and this probe's whole subject is font metrics.
+      await settlePage(page, 150);
       const blocks = await page.evaluate(COLLECT_INTEGRITY_TEXT) as IntegrityTextBlock[];
       const gate = findTextCollisions(blocks, width);
       const reportedPairs = gate.findings

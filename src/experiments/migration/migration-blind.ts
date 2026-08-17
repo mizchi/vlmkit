@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { basename, dirname, resolve } from "node:path";
 import { extractCss, replaceCss } from "../css-challenge/css-challenge-core.ts";
 import {
@@ -656,7 +657,7 @@ function parseFormat(value: string | undefined): "markdown" | "json" {
   return format;
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-blind" || process.argv[1]?.endsWith("migration-blind.ts")) {
+if (isCliEntry(import.meta.url, "migration-blind")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

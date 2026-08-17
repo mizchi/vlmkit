@@ -28,7 +28,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { AnyGateDefinition, GateInput } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { loadGateRegistry, resetGateRegistryCache } from "./gate-registry.ts";
 import { PAGE_LOAD_INPUTS } from "@mizchi/vlmkit-core/page-load.ts";

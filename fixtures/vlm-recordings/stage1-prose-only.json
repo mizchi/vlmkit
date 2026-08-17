@@ -1,0 +1,11 @@
+{
+  "note": "A model that ignored the CHANGE format. Observed on kimi-k2.5 / k2.6 per docs/knowledge.md.",
+  "choices": [
+    {
+      "message": {
+        "content": "Looking at the heatmap, the differences appear concentrated in the upper region of the page. I would investigate the code block styling, though I cannot determine exact values from this image."
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 1180, "completion_tokens": 44, "total_tokens": 1224 }
+}

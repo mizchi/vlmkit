@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { basename, dirname, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { extractCss } from "../css-challenge/css-challenge-core.ts";
@@ -367,7 +368,7 @@ function optionalNumber(args: string[], flag: string): number | undefined {
   return parsed;
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-subagent" || process.argv[1]?.endsWith("migration-subagent.ts")) {
+if (isCliEntry(import.meta.url, "migration-subagent")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

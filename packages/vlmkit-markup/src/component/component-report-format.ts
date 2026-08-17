@@ -141,7 +141,13 @@ function expectedScrollportStatus(
 }
 
 function expectedScrollportLabel(expected: UiExpectedScrollportContract, index: number): string {
-  return expected.name ?? expected.id ?? scrollportNameFromSelector(expected.selector) ?? `expected-${index + 1}`;
+  // `??` treats an empty string as present, so a contract entry with `id: ""` — which
+  // the type permits, `id` being required — produced a BLANK label and the report read
+  // `1 expected missing` with nothing named. The positional fallback exists for exactly
+  // that case and was unreachable.
+  const named = [expected.name, expected.id, scrollportNameFromSelector(expected.selector)]
+    .find((candidate) => candidate !== undefined && candidate.trim() !== "");
+  return named ?? `expected-${index + 1}`;
 }
 
 function scrollportNameFromSelector(selector: string | undefined): string | undefined {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { gateExitCode, parseGateExitFlags } from "./gate-exit.ts";
 
 test("a suspect fails by default — the contract the audit demanded", () => {

@@ -24,11 +24,20 @@ async function listFiles(dir: string, suffix: string): Promise<string[]> {
   }
 }
 
-export async function runIntrospect(paths: SpecPaths) {
+/**
+ * Every command here returns its exit code.
+ *
+ * They called `process.exit()` — six times across three functions — which made the
+ * module untestable (a `process.exit` in a vitest worker ends the file, not the
+ * assertion) and hid the most important verdict in the file: `runSpecVerify` exits
+ * 1 when an invariant fails, and a caller had no way to see that other than by
+ * dying.
+ */
+export async function runIntrospect(paths: SpecPaths): Promise<number> {
   const dir = existsSync(paths.snapshotsDir) ? paths.snapshotsDir : paths.baselinesDir;
   if (!existsSync(dir)) {
     console.error("No snapshots or baselines found. Run `vlmkit workflow init` or `vlmkit workflow capture` first.");
-    process.exit(1);
+    return 1;
   }
 
   console.log(`=== Introspect: ${dir} ===\n`);
@@ -47,18 +56,19 @@ export async function runIntrospect(paths: SpecPaths) {
   await writeFile(paths.specPath, JSON.stringify(spec, null, 2));
   console.log(`Spec written to: ${paths.specPath}`);
   console.log(`${spec.pages.length} page(s), ${spec.pages.reduce((s, p) => s + p.invariants.length, 0)} invariants`);
+  return 0;
 }
 
-export async function runSpecVerify(paths: SpecPaths) {
+export async function runSpecVerify(paths: SpecPaths): Promise<number> {
   if (!existsSync(paths.specPath)) {
     console.error("No spec.json found. Run `vlmkit workflow introspect` first.");
-    process.exit(1);
+    return 1;
   }
 
   const dir = existsSync(paths.snapshotsDir) ? paths.snapshotsDir : paths.baselinesDir;
   if (!existsSync(dir)) {
     console.error("No snapshots or baselines found.");
-    process.exit(1);
+    return 1;
   }
 
   console.log("=== Spec Verify ===\n");
@@ -81,10 +91,19 @@ export async function runSpecVerify(paths: SpecPaths) {
 
   let changedFiles: string[] | undefined;
   try {
-    const diff = execSync("git diff --name-only HEAD", { cwd: paths.projectRoot, encoding: "utf-8" });
+    // stderr ignored, not inherited. `execSync` inherits it by default, so in a
+    // directory that is not a git repository this printed git's entire `diff`
+    // usage block — forty lines of unrelated help — above the verification the
+    // user actually asked for. The `catch` already handles the case; it just
+    // could not un-print what git had written straight to the terminal.
+    const diff = execSync("git diff --name-only HEAD", {
+      cwd: paths.projectRoot,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
     changedFiles = diff.trim().split("\n").filter(Boolean);
   } catch {
-    // no git
+    // Not a git repo, or no HEAD yet: the dep-graph skip is simply unavailable.
   }
 
   const result = verifySpec(spec, pageData, changedFiles);
@@ -113,21 +132,19 @@ export async function runSpecVerify(paths: SpecPaths) {
 
   console.log(`\nTotal: ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`);
 
-  if (totalFailed > 0) {
-    process.exit(1);
-  }
+  return totalFailed > 0 ? 1 : 0;
 }
 
-export async function runExpect(paths: SpecPaths) {
+export async function runExpect(paths: SpecPaths): Promise<number> {
   console.log("=== Generate expectation.json from current state ===\n");
 
   if (!existsSync(paths.baselinesDir)) {
     console.error("No baselines found. Run `vlmkit workflow init` first.");
-    process.exit(1);
+    return 1;
   }
   if (!existsSync(paths.snapshotsDir)) {
     console.error("No snapshots found. Run `vlmkit workflow capture` first.");
-    process.exit(1);
+    return 1;
   }
 
   // 1. Infer intent from git diff
@@ -211,4 +228,5 @@ export async function runExpect(paths: SpecPaths) {
     console.log(`  [${icon}] ${p.testId}: ${p.changes.length} change(s)`);
   }
   console.log(`\nReview and edit as needed, then run: vlmkit workflow verify`);
+  return 0;
 }

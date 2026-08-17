@@ -417,8 +417,6 @@ fn dispatch(args : Array[String]) -> String raise {
       let rows = @core.landscape_default_grid_rows(w, h)
       "\{cols}|\{rows}"
     }
-    ["landscape-clamp-byte", value] =>
-      @core.landscape_clamp_byte(parse_double(value)).to_string()
     [
       "landscape-cell-score",
       r1,

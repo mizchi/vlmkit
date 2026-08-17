@@ -14,14 +14,18 @@
  * auditable, never silent.
  */
 import assert from "node:assert";
-import { test, describe } from "node:test";
+import { test, describe } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import {
   classifyRuntimeEvents,
+  classifyRuntimeParty,
+  correlateRuntimeEvents,
   findTextCollisions,
+  firstStackUrl,
   formatIntegrityReport,
   judgeAlignment,
   judgeClippedText,
@@ -69,6 +73,101 @@ describe("pure judges", () => {
     ], 1280);
     assert.deepEqual(findings.map((f) => f.severity), ["fail", "warn", "warn"]);
     assert.ok(findings[0]!.message.includes("before load"));
+  });
+
+  test("firstStackUrl: the frame the exception was thrown from", () => {
+    assert.equal(
+      firstStackUrl("TypeError: x\n    at fn (https://cdn.example.com/rive.js:1:2)\n    at https://site.test/app.js:3:4"),
+      "https://cdn.example.com/rive.js:1:2",
+    );
+    // A local run has `file://` frames, and treating those as "no source" would leave
+    // every `check integrity` on an HTML file unattributed.
+    assert.equal(
+      firstStackUrl("Error\n    at file:///tmp/page.html:5:1"),
+      "file:///tmp/page.html:5:1",
+    );
+    assert.equal(firstStackUrl(undefined), undefined);
+    assert.equal(firstStackUrl("Error: no frames here"), undefined);
+  });
+
+  test("classifyRuntimeParty: unknown is not first", () => {
+    const page = "https://site.test/index.html";
+    assert.equal(classifyRuntimeParty("https://site.test/app.js:1:1", page), "first");
+    assert.equal(classifyRuntimeParty("https://cdn.jsdelivr.net/rive.js", page), "third");
+    // The distinction that keeps a locationless console notice off the page's own record.
+    assert.equal(classifyRuntimeParty(undefined, page), "unknown");
+    // `file://` has origin "null" in the URL parser, so comparing origins would call the
+    // page's OWN script third-party and stop the gate failing on a broken local build.
+    assert.equal(classifyRuntimeParty("file:///tmp/x/app.js:1:1", "file:///tmp/x/page.html"), "first");
+    assert.equal(classifyRuntimeParty("file:///other/vendor.js", "file:///tmp/x/page.html"), "third");
+    assert.equal(classifyRuntimeParty("https://cdn.test/a.js", "file:///tmp/x/page.html"), "third");
+  });
+
+  test("classifyRuntimeEvents: a third-party throw during construction warns, and says whose", () => {
+    // The vite.dev dogfood: a blocked CDN wasm produced seven warns and nothing said the
+    // cause was cross-origin, so a reader could not tell "your app throws" from "your
+    // sandbox blocked a CDN". A vendor's exception is not the page's build failing.
+    const findings = classifyRuntimeEvents([
+      { type: "pageerror", text: "wasm compile failed", phase: "construction", sourceUrl: "https://cdn.jsdelivr.net/rive.js:1:2", party: "third" },
+      { type: "pageerror", text: "our bug", phase: "construction", sourceUrl: "https://site.test/app.js:1:2", party: "first" },
+      { type: "console-error", text: "Aborted()", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.js:9:9", party: "third" },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.severity), ["warn", "fail", "warn"]);
+    assert.match(findings[0]!.message, /third-party script cdn\.jsdelivr\.net/);
+    assert.match(findings[0]!.message, /page's own scripts are unaffected/);
+    assert.equal(findings[0]!.evidence?.party, "third");
+    assert.equal(findings[0]!.evidence?.sourceUrl, "https://cdn.jsdelivr.net/rive.js:1:2");
+    // The page's own construction error keeps its fail and its wording.
+    assert.match(findings[1]!.message, /before load/);
+    assert.doesNotMatch(findings[1]!.message, /third-party/);
+    assert.match(findings[2]!.message, /console\.error from third-party script cdn\.jsdelivr\.net/);
+  });
+
+  test("classifyRuntimeEvents: an event with no party keeps the pre-attribution severity", () => {
+    // Compatibility direction. `third` is what downgrades, so an unmeasured event must not
+    // get the downgrade — a recorded run from before the field existed keeps its fail.
+    const findings = classifyRuntimeEvents([
+      { type: "pageerror", text: "boom", phase: "construction" },
+      { type: "pageerror", text: "boom", phase: "construction", party: "unknown" },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.severity), ["fail", "fail"]);
+    assert.doesNotMatch(findings[1]!.message, /third-party/);
+  });
+
+  test("correlateRuntimeEvents: drops the console echo of a failed request, keeps the real error", () => {
+    // One cause, seven warns. The browser's "Failed to load resource" line carries the
+    // failed URL as its own location, and `judgeNetworkFailures` reports that same URL with
+    // the resource type and reason — so the console copy is an echo, not a second finding.
+    const netFailures = [
+      { url: "https://cdn.jsdelivr.net/rive.wasm", resourceType: "fetch", reason: "net::ERR_CONNECTION_RESET" },
+    ];
+    const { events, suppressed } = correlateRuntimeEvents([
+      { type: "console-error", text: "Failed to load resource: net::ERR_CONNECTION_RESET", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.wasm", party: "third" },
+      // Thrown from INSIDE the vendor script whose fetch failed. Different fact, stays.
+      { type: "console-error", text: "Aborted(both async and sync fetching of the wasm failed)", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.js", party: "third" },
+      // The page's own console.error at a URL that also happens to have failed: kept,
+      // because the text is not the browser narrating a request.
+      { type: "console-error", text: "checkout total mismatch", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.wasm", party: "third" },
+    ], netFailures);
+    assert.equal(suppressed.length, 1);
+    assert.equal(suppressed[0]!.text, "Failed to load resource: net::ERR_CONNECTION_RESET");
+    assert.deepEqual(events.map((e) => e.text), [
+      "Aborted(both async and sync fetching of the wasm failed)",
+      "checkout total mismatch",
+    ]);
+  });
+
+  test("correlateRuntimeEvents: a resource notice with no matching wire failure is kept", () => {
+    // The suppression must be a correlation, not a text filter — otherwise a real broken
+    // resource on a run where the wire saw nothing would vanish.
+    const { events, suppressed } = correlateRuntimeEvents([
+      { type: "console-error", text: "Failed to load resource: 404", phase: "post-load", sourceUrl: "https://site.test/missing.js", party: "first" },
+      // A pageerror is never suppressed: a script that failed to load cannot throw, so this
+      // is the page's own code reacting to the failure.
+      { type: "pageerror", text: "Failed to load resource", phase: "post-load", sourceUrl: "https://site.test/gone.js", party: "first" },
+    ], [{ url: "https://site.test/gone.js", resourceType: "script", reason: "404" }]);
+    assert.equal(suppressed.length, 0);
+    assert.equal(events.length, 2);
   });
 
   test("findTextCollisions: same-layer overlap fails, overlay/aria-hidden exempt, containment skipped", () => {
@@ -254,9 +353,11 @@ describe("pure judges", () => {
         { kind: "low-contrast-text", severity: "warn" as const, viewport: 1280, message: "2.81:1" },
       ],
     };
-    const view = (setting: "off" | "info" | "warn" | "suspect") => ({
-      effective: (ruleId: string) => (ruleId === "low-contrast-text" ? setting : "suspect") as never,
-    });
+    // Only `low-contrast-text` is set. Every other rule is unset, which is the case the old
+    // stub could not express — it answered `suspect` for all of them, so the formatter read the
+    // table instead of the emitted severity and nothing here noticed.
+    const view = (setting: "off" | "info" | "warn" | "suspect") =>
+      ruleViewFrom({ "low-contrast-text": setting });
 
     const off = plain(formatIntegrityReport(report as never, view("off")));
     assert.doesNotMatch(off, /low-contrast-text/, "an `off` rule must not be printed");
@@ -275,6 +376,42 @@ describe("pure judges", () => {
     const bare = plain(formatIntegrityReport(report as never));
     assert.match(bare, /1 fail, 1 warn/);
     assert.match(bare, /low-contrast-text/);
+  });
+
+  test("a finding emitted below its rule's declared severity is printed at the severity it was emitted at", () => {
+    // Measured, on a page whose script throws inside a post-load `setTimeout`:
+    //
+    //     verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+    //       exits 0 — 1 warn(s) did not fail this command.
+    //
+    // Two adjacent lines, one from this formatter and one from the runner. `js-error` is
+    // DECLARED suspect and this measurement deliberately emits it as a warn after load (the
+    // initial render survived); `applyRuleSettings` keeps that judgement because no setting
+    // overrode it, while the formatter asked the rule view for the rule's *effective*
+    // severity — which falls back to the declared one. `text-clipped` and `degenerate-render`
+    // grade the same way, so this was three rules wide.
+    const report = {
+      source: "page.html",
+      verdict: "defects" as const,
+      viewports: [],
+      exempted: [],
+      findings: [
+        { kind: "js-error", severity: "warn" as const, viewport: 1280, message: "Uncaught after load" },
+      ],
+    };
+    // `"suspect"` is the fallback because it is what `js-error` is DECLARED as in the gate's
+    // rule table, and `RuleView.effective` falls back to exactly that. A stub defaulting to
+    // `warn` here would agree with the emitted severity by accident and let the bug back in —
+    // checked by reverting the formatter to `effective` and watching this stay green.
+    const shown = plain(formatIntegrityReport(report as never, ruleViewFrom({}, "suspect")));
+    assert.match(shown, /0 fail, 1 warn/, "the emitted severity survives an empty rule view");
+    assert.match(shown, /NO DEFECTS, 1 WARN/);
+    assert.match(shown, /^\s+! \[js-error\]/m, "and the row is marked as a warning");
+
+    // An explicit setting still wins — that is the half that was already right.
+    const promoted = plain(formatIntegrityReport(report as never, ruleViewFrom({ "js-error": "suspect" })));
+    assert.match(promoted, /1 fail, 0 warn/);
+    assert.match(promoted, /DEFECTS/);
   });
 
   test("judgeTextContrast: one finding per colour pair, not per element", () => {
@@ -702,6 +839,48 @@ describe("S14c false-positive audit", () => {
     assert.equal(
       clean.findings.filter((f) => f.kind === "text-collision").length, 0,
       JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+  });
+
+  // Found by dogfooding vite.dev (2026-08-16): a "wall" of testimonials given a fixed height
+  // with `overflow: clip` and faded out with a `mask-image` gradient keeps layout boxes for the
+  // cards past the clip, and those boxes land on the NEXT section's real headings. Three fails
+  // at 375 and 768 on a page with nothing wrong with it.
+  //
+  // `COLLECT_OCCLUSIONS` had clamped its sampling to the ancestor clip since it was written —
+  // "hit-testing those points would blame whatever happens to be painted there" — and the
+  // collision collector had never done the same, so the two probes in one gate disagreed about
+  // where text is.
+  test("text clipped away by an ancestor is not a collision, and says so", { timeout: 120_000 }, async () => {
+    const report = await runIntegrityCheck({
+      source: "fixtures/collision-fp-corpus/clipped-fade-wall.html",
+      viewports: [{ width: 375, height: 700 }],
+    });
+    assert.equal(
+      report.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+    // Not silently: a gate that drops a candidate without saying so measures less than it
+    // claims to. The clipper named must be the element whose edge did the cutting.
+    const exempt = report.exempted.filter((e) => e.kind === "text-collision");
+    assert.ok(exempt.length > 0, "the pair was considered and exempted, not invisible");
+    assert.match(exempt[0]!.reason, /clipped away by div\.wall \(overflow is not visible\)/);
+  });
+
+  test("a partially clipped run still collides on the part that is painted", { timeout: 120_000 }, async () => {
+    // The other half of the clamp: clipping shrinks a block to its visible part rather than
+    // removing it, so a run half inside a scrollport that overlaps something in the visible
+    // half is still a finding. Without this the fix would trade one blind spot for another.
+    const file = page("half-clipped-collision.html", `
+      <div style="height:40px;overflow:hidden;position:relative;font:16px ui-monospace,monospace">
+        <span style="position:absolute;left:0;top:10px;white-space:nowrap">Total: 1,240,000 EUR</span>
+        <span style="position:absolute;left:168px;top:10px;white-space:nowrap">Refunds: 80 EUR</span>
+        <span style="position:absolute;left:0;top:120px;white-space:nowrap">Past the clip entirely</span>
+      </div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.equal(
+      report.findings.filter((f) => f.kind === "text-collision").length, 1,
+      JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector} ${f.message}`)),
     );
   });
 

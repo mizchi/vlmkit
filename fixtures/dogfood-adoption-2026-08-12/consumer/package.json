@@ -6,6 +6,8 @@
   "scripts": {
     "test": "node --experimental-strip-types --test \"src/**/*.{test,spec}.ts\" \"*.{test,spec}.ts\" \"skills/**/*.{test,spec}.ts\" \".agents/**/*.{test,spec}.ts\"",
     "e2e": "playwright test",
+    "//verify:ui": "vlmkit gate plan; config is ./vlmkit.gates.json (auto-discovered from cwd). vlmkit is not published yet, so this points at the checkout; once it is on npm the body is just `vlmkit gates run --output test-results/vlmkit`.",
+    "verify:ui": "node --experimental-strip-types ../../../src/cli/vlmkit.ts gates run --output test-results/vlmkit",
     "serve": "node serve.mjs"
   },
   "devDependencies": {

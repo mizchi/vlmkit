@@ -32,6 +32,10 @@ import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
+import { CONTRAST_BACKGROUND_JS } from "./contrast-background.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 
 export interface A11yContrastOptions extends PageLoadOptions {
   /**
@@ -42,6 +46,16 @@ export interface A11yContrastOptions extends PageLoadOptions {
    * running the built CLI rather than the run function.
    */
   quiet?: boolean;
+  /**
+   * `--allow "<selector>;<reason>"` — text whose contrast is signed off.
+   *
+   * v7's agent-l: "same data as integrity but fail-level, one rule, no `--allow`:
+   * red CI or contrast off, nothing between." `check integrity` reports the same
+   * colours as a warn with a per-selector exemption; this gate reports them as a
+   * fail with no exemption at all, so a single approved brand grey forced the whole
+   * rule off.
+   */
+  allow?: readonly string[];
   htmlPath: string;
   outputDir: string;
   reportPath?: string;
@@ -66,6 +80,15 @@ export interface ContrastFinding {
   /** Required threshold based on font size/weight. 4.5 for normal text, 3.0 for large. */
   requiredAA: number;
   level: WcagLevel;
+  /**
+   * How many elements share this exact case (same selector, colours and type size).
+   *
+   * Reported because the dedup is by case, not by element: Bootstrap's sidebar has ELEVEN links at
+   * `#0d6efd` on `#f8f9fa`, and "1 contrast failure" reads as one link to fix. `check integrity`'s
+   * own contrast rule says "11 element(s)" for the same defect, and the two gates should not
+   * describe one page differently.
+   */
+  elements: number;
 }
 
 export interface A11yContrastReport {
@@ -74,32 +97,26 @@ export interface A11yContrastReport {
   screenshot: string;
   totalText: number;
   failures: ContrastFinding[];
+  /**
+   * Text whose background could not be resolved from computed style — a `background-image` or
+   * gradient in the stack, so what is behind it is a pixel question.
+   *
+   * On the report because it is coverage, not a detail: "0 failures over 59 elements" and "0
+   * failures over 59, of which 26 were unmeasurable" are different claims, and only the second
+   * one is honest. `check integrity` has always stated this; this gate used to guess white and
+   * report the inverse of the truth.
+   */
+  unmeasuredComposite?: number;
+  /** Findings an `--allow` rule declared deliberate. Listed, never merely subtracted. */
+  exempted?: { finding: ContrastFinding; reason: string; rule: string }[];
+  /** `--allow` rules that matched nothing. */
+  unusedAllow?: string[];
   reportPath: string;
 }
 
 export const A11Y_CONTRAST_SAMPLE_SCRIPT = `
 (function a11ySample(minLen) {
-  function parseColor(s) {
-    if (!s) return null;
-    const m = s.match(/rgba?\\(([^)]+)\\)/);
-    if (!m) return null;
-    const parts = m[1].split(",").map((x) => parseFloat(x.trim()));
-    const r = parts[0], g = parts[1], b = parts[2], a = parts.length >= 4 ? parts[3] : 1;
-    return { r: r|0, g: g|0, b: b|0, a };
-  }
-  function effectiveBg(el) {
-    let cur = el;
-    while (cur && cur !== document.documentElement) {
-      const cs = getComputedStyle(cur);
-      const c = parseColor(cs.backgroundColor);
-      if (c && c.a >= 0.5) return c;
-      cur = cur.parentElement;
-    }
-    // Fallback to html background or white.
-    const htmlBg = parseColor(getComputedStyle(document.documentElement).backgroundColor);
-    if (htmlBg && htmlBg.a >= 0.5) return htmlBg;
-    return { r: 255, g: 255, b: 255, a: 1 };
-  }
+${CONTRAST_BACKGROUND_JS}
   function shortPath(el) {
     const parts = [];
     let cur = el;
@@ -128,19 +145,44 @@ export const A11Y_CONTRAST_SAMPLE_SCRIPT = `
     if (cs.visibility === "hidden" || cs.display === "none" || parseFloat(cs.opacity) < 0.5) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
-    const fg = parseColor(cs.color);
-    if (!fg) continue;
-    const bg = effectiveBg(el);
+    const fgColor = parseColor(cs.color);
+    if (!fgColor) continue;
+    const resolved = resolveTextBackground(el);
     const fontSize = parseFloat(cs.fontSize) || 16;
     const fontWeight = parseInt(cs.fontWeight, 10) || 400;
+    // A composite background is REPORTED, not guessed at. The old sampler had no notion of a
+    // background image and returned white, which turned near-white text on a dark gradient into
+    // a 1.08:1 "failure" — the inverse of the truth. The analyzer surfaces these as a stated
+    // exemption, because silently dropping the elements a check cannot read is
+    // indistinguishable from finding them acceptable.
+    if (resolved.composite) {
+      out.push({
+        path: shortPath(el),
+        tag: el.tagName.toLowerCase(),
+        text: text.slice(0, 60),
+        fontSize, fontWeight,
+        bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
+        foreground: { r: fgColor[0]|0, g: fgColor[1]|0, b: fgColor[2]|0 },
+        background: { r: 255, g: 255, b: 255 },
+        composite: true,
+      });
+      if (out.length > 500) break;
+      continue;
+    }
+    // The text's own alpha and every ancestor opacity, composited onto the resolved
+    // background, so a translucent colour and a faded ancestor read as the colour a person
+    // actually sees rather than as the colour the author typed.
+    // (No backticks in here: this comment lives inside a template literal, and a backtick
+    // would end the script. Third time this session — see theme.gate.ts and integrity-check.ts.)
+    const fg = blendColor(resolved.bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * inheritedOpacity(el)]);
     out.push({
       path: shortPath(el),
       tag: el.tagName.toLowerCase(),
       text: text.slice(0, 60),
       fontSize, fontWeight,
       bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
-      foreground: { r: fg.r, g: fg.g, b: fg.b },
-      background: { r: bg.r, g: bg.g, b: bg.b },
+      foreground: { r: Math.round(fg[0]), g: Math.round(fg[1]), b: Math.round(fg[2]) },
+      background: { r: Math.round(resolved.bg[0]), g: Math.round(resolved.bg[1]), b: Math.round(resolved.bg[2]) },
     });
     if (out.length > 500) break;
   }
@@ -157,6 +199,12 @@ export interface A11yContrastRawSample {
   bbox: { x: number; y: number; width: number; height: number };
   foreground: { r: number; g: number; b: number };
   background: { r: number; g: number; b: number };
+  /**
+   * The background could not be resolved from computed style — a `background-image` or gradient
+   * is in the stack, so what is behind the text is a pixel question. Optional: a sample without
+   * it was measured normally, which keeps recorded runs and hand-built samples working.
+   */
+  composite?: boolean;
 }
 
 function toHex(c: { r: number; g: number; b: number }): string {
@@ -172,10 +220,35 @@ function toHex(c: { r: number; g: number; b: number }): string {
  * browser instance per route).
  */
 export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): ContrastFinding[] {
+  /**
+   * Deduped by the path AND the values the verdict is computed from, not by the path alone.
+   *
+   * `shortPath` keeps a tag plus its first two classes per ancestor, so Bootstrap's sidebar links
+   * all serialize to `…>li.nav-item>a.nav-link.d-flex` — including the `.active` one, which is
+   * white on blue and passes. Keying on the path kept whichever came first and dropped the rest,
+   * and on the Bootstrap dashboard example that meant this gate reported **0 contrast failures on a
+   * page with 11**: `#0d6efd` on `#f8f9fa` at 4.27:1, which `check integrity`'s own contrast rule
+   * reported correctly at the same moment. Two gates in one toolkit disagreeing about WCAG on one
+   * page, and the one whose whole subject is contrast was the wrong one.
+   *
+   * The key is the finding's identity: same selector, same colours, same type size is the same
+   * case and worth collapsing; same selector with different colours is two cases.
+   */
   const byPath = new Map<string, A11yContrastRawSample>();
-  for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
+  const identity = (s: A11yContrastRawSample) =>
+    `${s.path}|${toHex(s.foreground)}|${toHex(s.background)}|${s.fontSize}|${s.fontWeight}`;
+  for (const s of samples) {
+    const key = identity(s);
+    if (!byPath.has(key)) byPath.set(key, s);
+  }
   const findings: ContrastFinding[] = [];
-  for (const s of byPath.values()) {
+  const counts = new Map<string, number>();
+  for (const s of samples) counts.set(identity(s), (counts.get(identity(s)) ?? 0) + 1);
+  for (const [key, s] of byPath) {
+    // A background the style walk could not resolve is not measured, and not silently dropped
+    // either — `unmeasuredComposite` carries the count so the caller can state it. Measuring it
+    // anyway is what produced 9 failures at 1.08:1 for near-white text on a dark gradient.
+    if (s.composite) continue;
     const evaluation = evaluateA11yContrast({
       foreground: s.foreground,
       background: s.background,
@@ -195,6 +268,7 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
       ratio: evaluation.ratio,
       requiredAA: evaluation.requiredAA,
       level: evaluation.level,
+      elements: counts.get(key) ?? 1,
     });
   }
   findings.sort((a, b) => a.ratio - b.ratio);
@@ -233,56 +307,51 @@ export async function runA11yContrast(
     return { samples, screenshotPath };
   });
 
-  // Dedupe by path — many text nodes from the same element produce
-  // identical findings.
-  const byPath = new Map<string, A11yContrastRawSample>();
-  for (const s of samples) {
-    if (!byPath.has(s.path)) byPath.set(s.path, s);
-  }
-
-  const findings: ContrastFinding[] = [];
-  for (const s of byPath.values()) {
-    const evaluation = evaluateA11yContrast({
-      foreground: s.foreground,
-      background: s.background,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-    });
-    if (evaluation.level !== "fail") continue;
-    findings.push({
-      path: s.path,
-      tag: s.tag,
-      text: s.text,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-      bbox: s.bbox,
-      foreground: { ...s.foreground, hex: toHex(s.foreground) },
-      background: { ...s.background, hex: toHex(s.background) },
-      ratio: evaluation.ratio,
-      requiredAA: evaluation.requiredAA,
-      level: evaluation.level,
-    });
-  }
-  findings.sort((a, b) => a.ratio - b.ratio);  // worst first
+  // `analyzeA11yContrastSamples`, not a second copy of it.
+  //
+  // This function used to re-implement the dedup and the finding construction inline, and the two
+  // copies drifted in the way that pattern always does: the exported one is what
+  // `vlmkit diff-pr` calls, this one is what `check a11y contrast` calls, and a fix to either left
+  // the other reporting something else about the same page. Found on the Bootstrap dashboard
+  // example (2026-08-16), where this gate reported **0 contrast failures on a page with 11**.
+  const findings = analyzeA11yContrastSamples(samples);
+  const compositeCount = samples.filter((s) => s.composite).length;
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
     html: htmlPath,
     viewport,
     screenshot: screenshotPath,
-    totalText: byPath.size,
+    // The samples, not the deduped cases. The label reads "inspected N text-bearing element(s)",
+    // and `byPath.size` made that 10 on a page with 105 — a coverage claim off by 10x, in the
+    // reassuring direction.
+    totalText: samples.length,
     failures: findings,
+    ...(compositeCount > 0 ? { unmeasuredComposite: compositeCount } : {}),
   });
   await writeFile(reportPath, md);
 
 
 
+  const allowRules = parseSelectorAllowRules(options.allow ?? [], { ruleId: "contrast-below-aa" });
+  const applied = applySelectorAllowRules(findings, allowRules, (f) => f.path);
   return {
     html: htmlPath,
     viewport,
     screenshot: screenshotPath,
-    totalText: byPath.size,
-    failures: findings,
+    totalText: samples.length,
+    failures: applied.kept,
+    ...(compositeCount > 0 ? { unmeasuredComposite: compositeCount } : {}),
+    ...(applied.exempted.length > 0
+      ? {
+        exempted: applied.exempted.map((e) => ({
+          finding: e.finding,
+          reason: e.rule.reason,
+          rule: e.rule.raw.split(";")[0] ?? e.rule.raw,
+        })),
+      }
+      : {}),
+    ...(applied.unused.length > 0 ? { unusedAllow: applied.unused.map((r) => r.raw) } : {}),
     reportPath,
   };
 }
@@ -292,22 +361,60 @@ export async function runA11yContrast(
  * measurement function. A gate's `run` must not print: the core runner owns
  * output, and `--json` is its decision to make, not the measurement's.
  */
-export function formatA11yContrastReport(report: A11yContrastReport): string {
+export function formatA11yContrastReport(report: A11yContrastReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
-  lines.push(`  ${DIM}inspected ${report.totalText} text-bearing element(s)${RESET}`);
-  const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  lines.push(`  ${icon} ${report.failures.length} contrast failure(s)`);
+  lines.push(
+    `  ${DIM}inspected ${report.totalText} text-bearing element(s)`
+    // Stated on the coverage line, not buried: "0 failures over 59" and "0 failures over 59, 26
+    // of them unmeasurable" are different claims and only the second is honest.
+    + (report.unmeasuredComposite
+      ? `, ${report.unmeasuredComposite} not measurable (background-image/gradient behind the text)`
+      : "")
+    + `${RESET}`,
+  );
+  // `--rule contrast-below-aa=off` used to change the exit code and nothing on this screen.
+  // The measured count survives the rule being off, because the ratios were still measured;
+  // what changes is that they are not reported as failures.
+  const tier = ruleTier(rules, "contrast-below-aa", "suspect");
+  const off = tier === "off";
+  const icon = off
+    ? `${DIM}-${RESET}`
+    : report.failures.length === 0
+      ? `${GREEN}✓${RESET}`
+      : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  lines.push(
+    `  ${icon} ${report.failures.length} contrast failure(s)`
+    + (off
+      ? `${DIM} measured and NOT reported — contrast-below-aa is off${RESET}`
+      : tier === "suspect" ? "" : `${DIM} [contrast-below-aa re-tuned to ${tier}]${RESET}`)
+    + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
+  );
   const CONSOLE_ROWS = 5;
-  for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
-    lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+  for (const f of off ? [] : report.failures.slice(0, CONSOLE_ROWS)) {
+    const shared = f.elements > 1 ? ` ${f.elements} element(s)` : "";
+    lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${shared}${RESET}`);
   }
   // Disclose the cut: a headline count above a five-row list reads as "here they
   // are", and a reader has no way to know seven more exist. Same wording as
   // `check breakpoints` and `check integrity`.
-  if (report.failures.length > CONSOLE_ROWS) {
+  if (!off && report.failures.length > CONSOLE_ROWS) {
     lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  // Listed, never merely subtracted.
+  for (const e of report.exempted ?? []) {
+    lines.push(
+      `    ${DIM}- ${e.finding.path} — ${e.finding.ratio.toFixed(2)}:1:`
+      + ` user exemption (${e.rule}): ${e.reason}${RESET}`,
+    );
+  }
+  if (report.unusedAllow?.length) {
+    lines.push(
+      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:`
+      + ` ${report.unusedAllow.join(", ")}${RESET}`,
+    );
+    lines.push(`    ${DIM}Delete them: an exemption kept past what it covered only widens the blind spot.${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
@@ -321,6 +428,16 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
   lines.push("");
   lines.push(`Inspected **${r.totalText}** unique text-bearing elements. ` +
     `Screenshot: \`${r.screenshot}\`.`);
+  if (r.unmeasuredComposite) {
+    lines.push("");
+    lines.push(
+      `**${r.unmeasuredComposite}** of them were NOT measured: a \`background-image\` or gradient`
+      + " sits behind the text, so the colour underneath varies across the element and is not"
+      + " derivable from computed style. Guessing white there is how near-white text on a dark"
+      + " gradient gets reported as a 1.08:1 failure. Sampling the rendered pixels would answer"
+      + " it; a style walk cannot.",
+    );
+  }
   lines.push("");
   if (r.failures.length === 0) {
     lines.push("## All text passes WCAG AA contrast");

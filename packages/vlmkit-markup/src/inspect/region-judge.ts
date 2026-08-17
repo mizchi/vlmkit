@@ -33,6 +33,8 @@ import { dirname, join, resolve } from "node:path";
 import { PNG } from "pngjs";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 
 export interface JudgeRegion {
   left: number;
@@ -247,20 +249,34 @@ export async function runRegionJudge(options: RegionJudgeOptions): Promise<Regio
   return { source: options.source, target: options.targetPath, verdicts };
 }
 
-export function formatRegionJudgeReport(report: RegionJudgeReport): string {
+export function formatRegionJudgeReport(report: RegionJudgeReport, rules?: RuleView): string {
   const lines: string[] = [];
+  // The outcome IS the rule id here — `different`, `contradicted`, `refuted`, `pending-review`
+  // are both, which is why the mapping is a lookup and not a decision. `../gates/equivalence.gate.ts`
+  // emits the first two as suspect and the rest as warn.
+  const tierOf = (outcome: string) =>
+    ruleTier(rules, outcome, outcome === "different" || outcome === "contradicted" ? "suspect" : "warn");
+  const offOutcomes = new Map<string, number>();
   lines.push(`${BOLD}${CYAN}vlmkit check equivalence${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push(`${DIM}target: ${report.target}${RESET}`);
   lines.push("");
   for (const v of report.verdicts) {
     const where = `(${v.region.left},${v.region.top}) ${v.region.width}x${v.region.height}`;
+    const tier = v.outcome === "same" ? undefined : tierOf(v.outcome);
+    if (tier === "off") offOutcomes.set(v.outcome, (offOutcomes.get(v.outcome) ?? 0) + 1);
     const color = v.outcome === "same"
       ? GREEN
-      : v.outcome === "pending-review"
+      : tier === "off"
+      ? DIM
+      : tier === "warn"
       ? YELLOW
       : RED;
-    lines.push(`${where}: ${color}${v.outcome.toUpperCase()}${RESET} — measured mean channel delta ${v.measuredDelta.toFixed(2)}`);
+    const retuned = tier !== undefined && tier !== "off" && tier !== (v.outcome === "different" || v.outcome === "contradicted" ? "suspect" : "warn")
+      ? ` ${DIM}[${v.outcome} re-tuned to ${tier}]${RESET}`
+      : "";
+    lines.push(`${where}: ${color}${v.outcome.toUpperCase()}${RESET} — measured mean channel delta ${v.measuredDelta.toFixed(2)}${retuned}`
+      + (tier === "off" ? ` ${DIM}— NOT reported (${v.outcome} off)${RESET}` : ""));
     if (v.vlmEvidence) lines.push(`  ${DIM}vlm: ${v.vlmEvidence}${RESET}`);
     if (v.outcome === "refuted") {
       lines.push(`  ${DIM}the measured pixels refute the VLM's difference claim (delta < ${REFUTE_FLOOR}) — treat as same${RESET}`);
@@ -270,7 +286,16 @@ export function formatRegionJudgeReport(report: RegionJudgeReport): string {
     }
     lines.push(`  pair: ${v.pairImage}`);
   }
-  const pending = report.verdicts.filter((v) => v.outcome === "pending-review").length;
+  if (offOutcomes.size > 0) {
+    const detail = [...offOutcomes].map(([outcome, n]) => `${outcome} x${n}`).join(", ");
+    lines.push("");
+    lines.push(`${DIM}${[...offOutcomes.values()].reduce((a, b) => a + b, 0)} region verdict(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
+  }
+  // `pending-review` off means the project accepts unjudged regions, so the block demanding a
+  // human reader would be asking for work it has said it does not want.
+  const pending = tierOf("pending-review") === "off"
+    ? 0
+    : report.verdicts.filter((v) => v.outcome === "pending-review").length;
   if (pending > 0) {
     lines.push("");
     lines.push(`${BOLD}ACTION REQUIRED — keyless mode:${RESET} ${pending} pair image(s) need a reader. Version A is above the gray bar, B below. The reader must not be the author of the pixels being judged (S9-fresh: same-eyes review misses its own errors).`);

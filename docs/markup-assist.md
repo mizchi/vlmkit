@@ -188,6 +188,8 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Animations visibly animate, settle, respect reduced-motion | `vlmkit check animation page.html` (declared-CSS view: `check motion`) |
 | Keyboard-operable controls: probe every interactive element, map ARIA state transitions | `vlmkit check interactions page.html` (`--reference ref.html` turns it into a behavioral contract) |
 | Every wired event callback + pointer-only-control detection (clickable `<div>`s) | `vlmkit scan handlers page.html` |
+| Drag and drop: a `dragstart` source that is not draggable, a `drop` target with no `dragover` — both are handlers that can never fire | `vlmkit scan handlers page.html` (same gate; see `fixtures/handlers/drag-and-drop.html`) |
+| Drag and drop that *looks* wired: a `dragover` that forgets `preventDefault`, a `dragstart` that transfers nothing | `vlmkit scan handlers page.html --probe-drag` (fires the sequence; runs the page's handlers) |
 | A scripted user flow with deterministic post-condition asserts | `vlmkit verify flow page.html --flow flow.json` |
 
 ### Compare, repair, maintain

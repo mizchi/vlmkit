@@ -13,6 +13,7 @@
 
 import { cac } from "cac";
 import { BOLD, CYAN, DIM, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { VLMKIT_VERSION } from "@mizchi/vlmkit-core/version.ts";
 import { loadGateRegistry } from "./gate-registry.ts";
 
 const HELP_SENTINEL = "__VLMKIT_HELP_PASSTHROUGH__";
@@ -70,9 +71,13 @@ async function delegate(s: Spec, args: string[]): Promise<void> {
 
 async function runDiscover(args: string[]): Promise<void> {
   const file = args.find((a) => !a.startsWith("-") && a !== HELP_SENTINEL);
-  if (!file || args.includes(HELP_SENTINEL) || args.includes("--help") || args.includes("-h")) {
+  const askedForHelp = args.includes(HELP_SENTINEL) || args.includes("--help") || args.includes("-h");
+  if (askedForHelp || !file) {
     console.log("Usage: vlmkit scan breakpoints <html-file>");
-    if (!file) process.exit(1);
+    // `if (!file) process.exit(1)` split on the wrong axis: it distinguished "help with a
+    // file" from "help without a file", so plain `--help` still exited 1. What matters is
+    // whether help was asked for, not whether a file came with it.
+    if (!askedForHelp) process.exit(1);
     return;
   }
   const { readFile } = await import("node:fs/promises");
@@ -112,7 +117,11 @@ async function runApiStatus(args: string[]): Promise<void> {
 
 async function runWorkflow(args: string[]): Promise<void> {
   const { runWorkflowCli } = await import("./workflow.ts");
-  await runWorkflowCli(args.map((a) => (a === HELP_SENTINEL ? "--help" : a)));
+  // `runWorkflowCli` returns its code now rather than calling `process.exit`, so the
+  // failure has to be carried here or `vlmkit workflow verify` exits 0 on a failed
+  // verification — which is the whole point of the command.
+  const code = await runWorkflowCli(args.map((a) => (a === HELP_SENTINEL ? "--help" : a)));
+  if (code !== 0) process.exitCode = code;
 }
 
 const SPECS: Record<string, Spec> = {
@@ -215,6 +224,22 @@ export function legacySpecLeaves(): [string, string][] {
     Object.entries(leaves)
       .filter(([, info]) => info.spec !== undefined)
       .map(([leaf]): [string, string] => [group, leaf]),
+  );
+}
+
+/**
+ * Every group leaf, `spec`- and `run`-based alike.
+ *
+ * `legacySpecLeaves` filters to `spec` because the failure it guards — a module whose
+ * evaluation *is* the command — only exists for delegated leaves. Invariants about what a
+ * command *does*, like `--help` exiting 0, apply to both, and filtering by `spec` quietly
+ * excluded them: `scan breakpoints` is the only `run:` leaf today, it exited 1 for
+ * `--help`, and the sweep that should have caught it never ran it. One leaf is exactly the
+ * size at which a gap like that survives.
+ */
+export function legacyGroupLeaves(): [string, string][] {
+  return Object.entries(GROUPS).flatMap(([group, leaves]) =>
+    Object.keys(leaves).map((leaf): [string, string] => [group, leaf]),
   );
 }
 
@@ -444,7 +469,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
   }
 
   const cli = cac("vlmkit");
-  cli.version("0.9.1");
+  cli.version(VLMKIT_VERSION);
 
   cli.usage(`<command> [options]
 

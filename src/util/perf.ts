@@ -24,6 +24,8 @@ import { fileURLToPath } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { type PageLoadWaitUntil, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface PerfOptions {
@@ -299,15 +301,30 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
  * must not print — the core runner owns output and decides between prose and
  * `--json`.
  */
-export function formatPerfReport(report: PerfReport): string {
+export function formatPerfReport(report: PerfReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check perf${RESET}`);
   lines.push(`  ${DIM}source: ${report.source}  observed: ${report.observeMs}ms${RESET}`);
-  const icon = (v: "good" | "needs-improvement" | "poor") =>
-    v === "good" ? `${GREEN}✓${RESET}` : v === "needs-improvement" ? `${YELLOW}!${RESET}` : `${RED}✗${RESET}`;
-  lines.push(`  ${icon(report.verdicts.cls)} CLS  ${report.cls.toString().padStart(6)}  ${DIM}(good ≤ 0.1, poor > 0.25)${RESET}`);
-  lines.push(`  ${icon(report.verdicts.lcp)} LCP  ${report.lcp.toString().padStart(6)}  ${DIM}ms (good ≤ 2500, poor > 4000)${RESET}`);
-  lines.push(`  ${icon(report.verdicts.fcp)} FCP  ${report.fcp.toString().padStart(6)}  ${DIM}ms (good ≤ 1800, poor > 3000)${RESET}`);
+  // Two rules per metric — `cls-poor` and `cls-needs-improvement` — so the rule id is the
+  // metric plus the verdict, exactly as `src/gates/perf.gate.ts` builds it. A number is always
+  // printed: turning a rule off is a statement about what gates CI, not about what was measured.
+  const off = new Map<string, string>();
+  const icon = (metric: "cls" | "lcp" | "fcp", v: "good" | "needs-improvement" | "poor") => {
+    if (v === "good") return `${GREEN}✓${RESET}`;
+    const rule = `${metric}-${v}`;
+    const tier = ruleTier(rules, rule, v === "poor" ? "suspect" : "warn");
+    if (tier === "off") {
+      off.set(metric, rule);
+      return `${DIM}-${RESET}`;
+    }
+    return tier === "suspect" ? `${RED}✗${RESET}` : `${YELLOW}!${RESET}`;
+  };
+  lines.push(`  ${icon("cls", report.verdicts.cls)} CLS  ${report.cls.toString().padStart(6)}  ${DIM}(good ≤ 0.1, poor > 0.25)${RESET}`);
+  lines.push(`  ${icon("lcp", report.verdicts.lcp)} LCP  ${report.lcp.toString().padStart(6)}  ${DIM}ms (good ≤ 2500, poor > 4000)${RESET}`);
+  lines.push(`  ${icon("fcp", report.verdicts.fcp)} FCP  ${report.fcp.toString().padStart(6)}  ${DIM}ms (good ≤ 1800, poor > 3000)${RESET}`);
+  if (off.size > 0) {
+    lines.push(`  ${DIM}${off.size} metric(s) measured and NOT reported — rule turned off (${[...off.values()].join(", ")})${RESET}`);
+  }
   if (report.shiftSources.length > 0) {
     lines.push(`  ${DIM}top shift source: ${report.shiftSources[0]!.path} (${report.shiftSources[0]!.value.toFixed(4)})${RESET}`);
   }

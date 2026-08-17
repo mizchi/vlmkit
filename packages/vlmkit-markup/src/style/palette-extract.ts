@@ -16,6 +16,7 @@
  */
 import { PNG } from "pngjs";
 import { readFile } from "node:fs/promises";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export interface PaletteColor {
   /** Quantized RGB at full 8-bit precision (bucket center). */
@@ -105,11 +106,28 @@ export function extractPaletteFromRgba(
   return entries.slice(0, topK);
 }
 
+/**
+ * PNG magic number. Checked before handing the buffer to `pngjs`, because on anything else it
+ * throws `unrecognised content at end of stream` from inside its own reader — a stack trace with
+ * `node_modules` paths in it, printed at a user who passed an HTML file to a gate that wants an
+ * image. The byte check turns that into a sentence naming the file and what was expected.
+ */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 export async function extractPaletteFromFile(
   path: string,
   options: ExtractPaletteOptions = {},
 ): Promise<PaletteColor[]> {
   const buf = await readFile(path);
+  if (!buf.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    // `UsageError` and not a bare Error: `handleCliError` prints recognised errors as one
+    // `error: …` line and falls back to `console.error(e)` — a full stack — for everything else.
+    // A wrong argument is the caller's, not a crash, and should not read like one.
+    throw new UsageError(
+      `${path} is not a PNG. \`check palette\` reads rendered images, not markup — `
+      + `screenshot the page first (\`vlmkit snapshot <url>\`) and pass the PNG.`,
+    );
+  }
   const png = PNG.sync.read(buf);
   return extractPaletteFromRgba(png.data, png.width, png.height, options);
 }
