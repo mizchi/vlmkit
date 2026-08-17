@@ -59,8 +59,11 @@ jobs:
       # `vitest run`, not `node --test`. These files import `test` from vitest, and `node --test`
       # fails on the import — which is how this step passed for months and then silently could
       # not run at all after the suite migrated. `page.test.mjs` asserts the runner named here.
+      # The whole directory, not just `page.test.mjs`: the live-browser half of the intro page's
+      # contract is in `site-links.test.mjs`, split out so `page.test.mjs` stays runnable in
+      # `skill-package.yml`, which has no Playwright.
       - name: Verify intro page contracts
-        run: pnpm exec vitest run examples/vlmkit-intro-page/page.test.mjs
+        run: pnpm exec vitest run examples/vlmkit-intro-page/
 
       # The solitaire rules without a browser, then the view WITH one: real drag and drop,
       # keyboard play, the stock, all four animations, and two games PLAYED to 52/52 with the

@@ -244,69 +244,25 @@ test("the page is self-contained and includes responsive and keyboard states", a
  * CONTENT and not by its status code.
  */
 /**
- * The route to the demo, which the gates cannot check because both of its defects were about
- * *reachability under a condition*, not about the link itself.
+ * The route to the demo — the static half. Its live half is in `site-links.test.mjs`.
  *
- * `.site-nav { display: none }` at 900px took the demo link with it, so the playable demo had no
- * route from a phone — the device most likely to want it. And the `→` marking it as the one nav
- * entry that changes page was destroyed the first time the locale was switched, because
- * `data-i18n` is applied with `textContent` and the arrow was a sibling of the translated text.
+ * Split because this file must stay BROWSER-FREE: `skill-package.yml` runs it on any change under
+ * `.claude/skills/**` (the page lists all 13 specialised skills, so a skills change can break it),
+ * and that job has no Playwright. Adding a `chromium.launch()` here quietly made the file
+ * unrunnable in one of the two workflows that run it.
  */
-test("the demo link is reachable at every width and survives a locale switch", async () => {
+test("the demo link is marked as leaving the page, and survives the mobile collapse", async () => {
   const [html, css] = await Promise.all([read("index.html"), read("styles.css")]);
 
-  // The arrow lives INSIDE the link, beside the translated span, not as a sibling of it.
+  // The arrow lives INSIDE the link, beside the translated span, not as a sibling of it —
+  // `data-i18n` is applied with `textContent`, which would destroy a sibling on locale switch.
   assert.match(
     html,
     /<a class="nav-demo" href="\.\/solitaire\/"\s*><span data-i18n="nav\.demo">[^<]+<\/span> <span aria-hidden="true">→<\/span><\/a>/,
   );
-  // The mobile collapse hides the scroll-spy anchors only.
+  // The mobile collapse hides the scroll-spy anchors only, not the cross-page link.
   assert.match(css, /\.site-nav a:not\(\.nav-demo\)\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.site-nav\s*\{\s*display: none;/);
-
-  const { spawn } = await import("node:child_process");
-  const port = 4292;
-  const child = spawn(process.execPath, [join(exampleDir, "server.mjs")], {
-    env: { ...process.env, PORT: String(port) },
-    stdio: "ignore",
-  });
-  onTestFinished(() => child.kill());
-  for (let attempt = 0; attempt < 60; attempt++) {
-    try { await fetch(`http://127.0.0.1:${port}/`); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
-  }
-
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  onTestFinished(() => browser.close());
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await page.goto(`http://127.0.0.1:${port}/?lang=en&theme=light`, { waitUntil: "networkidle" });
-
-  for (const width of [1280, 900, 768, 375, 320]) {
-    await page.setViewportSize({ width, height: 820 });
-    const box = await page.locator(".nav-demo").boundingBox();
-    assert.ok(box && box.width > 0 && box.height >= 44, `demo link is not tappable at ${width}px`);
-    assert.equal(
-      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
-      0,
-      `the header overflows at ${width}px`,
-    );
-  }
-
-  await page.setViewportSize({ width: 1280, height: 900 });
-  assert.match(await page.locator(".nav-demo").textContent(), /Playable demo\s*→/);
-  await page.locator("[data-locale-toggle]").click();
-  assert.match(await page.locator(".nav-demo").textContent(), /遊べるデモ\s*→/, "the arrow did not survive ja");
-  await page.locator("[data-locale-toggle]").click();
-  assert.match(await page.locator(".nav-demo").textContent(), /Playable demo\s*→/, "the arrow did not survive the round trip");
-
-  // And it actually goes there, in a real browser, from a real click.
-  await page.locator(".nav-demo").click();
-  await page.waitForLoadState("load");
-  assert.match(page.url(), /\/solitaire\/$/);
-  assert.match(await page.title(), /Klondike Solitaire/);
-  await page.locator(".site-link").click();
-  await page.waitForLoadState("load");
-  assert.match(await page.title(), /vlmkit — VLM-assisted UI verification/);
 });
 
 /**
@@ -444,7 +400,9 @@ test("the GitHub Pages workflow validates and deploys the composed site", async 
    * Matching the runner and not just the path is the point: a step that cannot run is worse
    * than a missing step, because the workflow claims the contract is verified.
    */
-  assert.match(workflow, /pnpm exec vitest run examples\/vlmkit-intro-page\/page\.test\.mjs/);
+  // The directory, so `site-links.test.mjs` is covered too — the live-browser half of this
+  // page's contract, split out of this file to keep it runnable in `skill-package.yml`.
+  assert.match(workflow, /pnpm exec vitest run examples\/vlmkit-intro-page\/(?!page)/);
   // Anchored to a `run:` line, not to the string anywhere in the file — the workflow's own
   // comment explains why `node --test` is wrong here, and a bare /node --test/ matched that.
   assert.doesNotMatch(workflow, /^\s*(?:run:|- run:).*node --test/m);

@@ -676,6 +676,18 @@ reports far fewer targets.
   command in place. It now asserts the runner and not just the path — a step that cannot run
   is worse than a missing step, because the workflow claims the contract is verified.
 
+  **Three workflows carried that invocation, not one.** `heal-test.yml` and `skill-package.yml`
+  had it too, and both failed on the first PR that touched their paths — after the deploy-pages
+  occurrence had already been "fixed" in isolation. Fixing the one you found without sweeping for
+  siblings is the mistake, so `tests/workflow-commands.test.mjs` now fails on any `run:` line
+  invoking `node --test`, with its extractor proven against a sample rather than trusted.
+
+  `skill-package.yml` needed pnpm and dependencies to run vitest at all, and it runs
+  `page.test.mjs` on purpose — the intro page lists all 13 specialised skills, so a skills change
+  can break it. That job has no Playwright, so the live-browser half of the intro page's contract
+  moved to `examples/vlmkit-intro-page/site-links.test.mjs` and `page.test.mjs` went back to being
+  browser-free. `deploy-pages.yml` runs the whole example directory so both halves are covered.
+
 - **21 real WCAG AA contrast failures on the intro page**, unmasked by the dedup fix above:
   the gates config was authored while the gate reported 0 on a page with 21. Sixteen came
   from one token (`--surface-muted`, 3.83:1 on `--surface-2`); the rest were hard-coded
