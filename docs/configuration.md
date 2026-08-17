@@ -98,9 +98,9 @@ agent the task routing and the fix-loop discipline (assumes only that
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `VLMKIT_LLM_PROVIDER` | LLM provider | gemini |
-| `VLMKIT_LLM_MODEL` | LLM model | provider default |
-| `VLMKIT_VLM_MODEL` | VLM model (OpenRouter) | qwen/qwen3-vl-8b-instruct |
+| `VLMKIT_LLM_PROVIDER` | LLM provider — `gemini` \| `anthropic` \| `openrouter` | gemini |
+| `VLMKIT_LLM_MODEL` | LLM model | provider default (`openrouter`: qwen/qwen3-vl-8b-instruct) |
+| `VLMKIT_VLM_MODEL` | VLM model (OpenRouter id, or `gemini:` / `claude:` for a direct call) | bytedance/ui-tars-1.5-7b |
 | `VLMKIT_BASE_URL` | Base URL for workflow capture | — |
 | `VLMKIT_CAPTURE_BACKEND` | Capture backend override | playwright |
 | `VLMKIT_CONFIG_PATH` / `VLMKIT_CONFIG_FILE` | Config path override | — |
@@ -115,6 +115,24 @@ agent the task routing and the fix-loop discipline (assumes only that
 Only the `VLMKIT_*` names are supported. Project state is written below
 `.vlmkit/`, and snapshot/workflow configuration is loaded from
 `vlmkit.config.json` or `vlmkit.config.toml`.
+
+### Reaching an OpenAI model
+
+There is no `openai` provider and no `OPENAI_API_KEY`: OpenAI models are served through OpenRouter,
+which is what the `openai/` prefix on the id means. `VLMKIT_LLM_PROVIDER=openai` fails with
+`INVALID_PROVIDER` — the message names this route.
+
+```sh
+export OPENROUTER_API_KEY=...
+export VLMKIT_LLM_PROVIDER=openrouter
+export VLMKIT_LLM_MODEL=openai/gpt-5.6-luna
+export VLMKIT_VLM_MODEL=openai/gpt-5.6-luna
+```
+
+`openai/gpt-5.6-luna` is the default this project uses for OpenAI, and an OpenAI-based agent should
+set it for itself — see [`AGENTS.md`](../AGENTS.md). A half-name is an error rather than a guess:
+`gpt-5.6-luna` resolves (one whole path segment) and `gpt-5.6` does not (Luna, Luna Pro, Terra, Sol
+and their `:batch` variants all match it).
 
 ## Snapshot / CI configuration
 

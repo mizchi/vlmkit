@@ -81,7 +81,7 @@
           <div class="hero-copy">
             <!-- Kept in step with the published package by `page.test.mjs`; this said v0.9.0
                  through two releases because nothing was checking it. -->
-            <p class="eyebrow"><span>vlmkit / UI verification</span><span>Node.js 24+</span><span>v0.11.0</span></p>
+            <p class="eyebrow"><span>vlmkit / UI verification</span><span>Node.js 24+</span><span>v0.11.1</span></p>
             <h1 id="hero-title">
               <span data-i18n="hero.line1">VLM-assisted UI.</span><br />
               <span data-i18n="hero.line2">Verified in the browser.</span>
@@ -193,9 +193,75 @@
         </div>
       </section>
 
+      <!--
+        The playable half of the proof, and the one thing on this page that is not a still.
+        `/solitaire/` is published from this same repo by `scripts/build-pages.mjs`, so the link is
+        relative for the same reason the nav one is: an absolute "/solitaire/" 404s on a project
+        site served from /vlmkit/.
+
+        Placed second, directly after the static proof gallery, because the argument runs
+        still-image proof → behavioural proof → the loop that produces both. Every section number
+        below this one moved up by one when it landed; `page.test.mjs` pins the whole sequence, so
+        a missed renumber fails a test instead of shipping two "04"s to a public page.
+      -->
+      <section class="demo section" id="demo" aria-labelledby="demo-title">
+        <div class="demo-heading">
+          <p class="section-number">02 / PLAYABLE PROOF</p>
+          <div>
+            <p class="demo-release">
+              <span>NEW IN 0.11</span>
+              <span data-i18n="demo.release">The interaction gates stopped reading markup and started performing the gesture.</span>
+            </p>
+            <h2 id="demo-title">
+              <span data-i18n="demo.line1">Some defects only exist</span><br />
+              <span data-i18n="demo.line2">while you are dragging.</span>
+            </h2>
+            <p data-i18n="demo.lead">A pixel diff cannot see a drag that never starts, a card that lands in the wrong pile, or a win banner that never appears. So the site publishes a real game, and proves it the way behavior has to be proved: by playing it.</p>
+          </div>
+        </div>
+
+        <div class="demo-layout" data-testid="demo-solitaire">
+          <figure class="demo-shot">
+            <div class="demo-frame">
+              <img
+                src="./demo-solitaire.png"
+                width="1024"
+                height="660"
+                loading="lazy"
+                alt="Klondike solitaire mid-game, 60 moves in, with six cards on the foundations"
+                data-i18n-alt="demo.shotAlt"
+              />
+            </div>
+            <figcaption>
+              <span>SEED 1 · PLY 60 · ANIMATIONS OFF</span>
+              <span data-i18n="demo.shotNote">Reproducible from the seed: same deal, same 60 moves, animations off.</span>
+            </figcaption>
+          </figure>
+
+          <div class="demo-facts">
+            <ul class="demo-metrics" aria-label="Measured outcomes for the playable demo" data-i18n-aria-label="demo.metricsLabel">
+              <li><strong>52/52</strong><span data-i18n="demo.metricWin">two seeds played to a win in CI</span></li>
+              <li><strong>144</strong><span data-i18n="demo.metricPlies">plies, with the DOM audited after each one</span></li>
+              <li><strong>57</strong><span data-i18n="demo.metricTests">tests: the rules headless, the view in Chromium</span></li>
+              <li><strong>6</strong><span data-i18n="demo.metricFamilies">interaction families the 0.11 probes drive</span></li>
+            </ul>
+            <div class="demo-gates">
+              <p class="demo-gate-label" data-i18n="demo.gatesLabel">Red on any of these blocks the deploy</p>
+              <code>vlmkit check integrity</code>
+              <code>vlmkit check a11y focus</code>
+              <code>vlmkit check a11y touch --level AAA</code>
+            </div>
+            <div class="demo-actions">
+              <a class="button button-dark" href="./solitaire/"><span data-i18n="demo.play">Play the demo</span> <span aria-hidden="true">→</span></a>
+              <a class="demo-changelog" href="https://github.com/mizchi/vlmkit/blob/main/CHANGELOG.md"><span data-i18n="demo.changelog">Read what 0.11 changed</span> <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="workflow section" id="workflow" aria-labelledby="workflow-title">
         <div class="section-heading">
-          <p class="section-number">02 / THE LOOP</p>
+          <p class="section-number">03 / THE LOOP</p>
           <h2 id="workflow-title">
             <span data-i18n="workflow.line1">Turn visual opinions</span><br />
             <span data-i18n="workflow.line2">into fixable facts.</span>
@@ -237,7 +303,7 @@
 
       <section class="commands section" id="commands" aria-labelledby="commands-title">
         <div class="commands-intro">
-          <p class="section-number section-number-light">03 / ROUTE THE TASK</p>
+          <p class="section-number section-number-light">04 / ROUTE THE TASK</p>
           <h2 id="commands-title">
             <span data-i18n="commands.line1">Route the task</span><br />
             <span data-i18n="commands.line2">with one command.</span>
@@ -267,7 +333,7 @@
       </section>
 
       <section class="principle section" aria-labelledby="principle-title">
-        <p class="section-number">04 / PRINCIPLE</p>
+        <p class="section-number">05 / PRINCIPLE</p>
         <div class="principle-grid">
           <h2 id="principle-title">
             <span data-i18n="principle.line1">Vision proposes.</span><br />
@@ -303,7 +369,7 @@
       <section class="skills section" id="skills" aria-labelledby="skills-title">
         <div class="skills-layout">
           <div class="skills-intro">
-            <p class="section-number">05 / AGENT SKILL</p>
+            <p class="section-number">06 / AGENT SKILL</p>
             <h2 id="skills-title">
               <span data-i18n="skills.line1">Install once.</span><br />
               <span data-i18n="skills.line2">Ask naturally.</span>
@@ -395,7 +461,7 @@
 
       <section class="start section" id="start" aria-labelledby="start-title">
         <div>
-          <p class="section-number section-number-dark">06 / START NOW</p>
+          <p class="section-number section-number-dark">07 / START NOW</p>
           <h2 id="start-title">
             <span data-i18n="start.line1">Measure the page</span><br />
             <span data-i18n="start.line2">you have now.</span>

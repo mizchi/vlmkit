@@ -428,7 +428,10 @@ test("E2E: drag handlers are collected through both routes, and only the broken 
 //
 // `dispatchEvent` returns false when a listener cancelled, which is exactly question one.
 
-function probed(path: string, over: Partial<{ dragoverUnprevented: boolean; transferredTypes: string[] }>) {
+function probed(
+  path: string,
+  over: Partial<{ dragoverUnprevented: boolean; dragoverCapped: boolean; transferredTypes: string[] }>,
+) {
   return { path, ran: [], ...over };
 }
 
@@ -449,6 +452,25 @@ test("a dragover that does cancel is not reported", () => {
   const s = surface(entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }));
   s.dragProbe = [probed("div#zone", { dragoverUnprevented: false })];
   assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "dragover-not-prevented").length, 0);
+});
+
+test("a capped pair search cannot conclude that nothing cancels", () => {
+  // "No listener cancelled it" is a claim about EVERY source/target pair, and a handler that
+  // cancels only for a legal move — every drag board's — hides in whichever pairs went untried.
+  // Measured on `examples/solitaire`: the search hit its 40-pair cap on a mid-game position and the
+  // rule reported a container that cancels for every legal move as one that never cancels. The
+  // page had passed before only because a legal pair sat inside the first 40 of a fresh deal.
+  const s = surface(entry({ path: "div#board", text: "board", types: { dragover: 1, drop: 1 } }));
+  s.dragProbe = [probed("div#board", { dragoverUnprevented: true, dragoverCapped: true })];
+  assert.equal(
+    deriveHandlerIssues(s).filter((i) => i.kind === "dragover-not-prevented").length,
+    0,
+    "a truncated search must not be reported as an exhausted one",
+  );
+
+  // The same row with the search exhausted is the finding it always was.
+  s.dragProbe = [probed("div#board", { dragoverUnprevented: true })];
+  assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "dragover-not-prevented").length, 1);
 });
 
 test("an empty DataTransfer after dragstart is a warn, not a suspect", () => {
@@ -932,6 +954,78 @@ test("E2E: an inert source is retried, and the source after it is still measured
   assert.match(kinds[0]!, /#dead-src/);
 });
 
+/**
+ * The shape every drag board is written in: one delegated handler, and the draggables are its
+ * descendants.
+ *
+ * The real-gesture probe used to press the element that HOLDS the handler and ask whether THAT
+ * element got picked up. Neither is right under delegation — the container is not draggable and
+ * the cards are — so the probe reported "started no drag" for a board whose drag works, and
+ * everything gated on `dragstartFired` (the drop, the extra targets, the Escape-cancel gesture)
+ * was skipped without saying so. Measured on `examples/solitaire`, whose 144-ply playthrough wins
+ * the game through real `dragAndDrop` calls while the probe called the same page inert.
+ *
+ * The two boards separate the two faces of it — see the fixture's own comment. Both must end with
+ * the card on a DIFFERENT pile: aiming at the source's own container measures a correct refusal.
+ */
+test("E2E: a delegated drag board is pressed on its cards, not on its container", { timeout: 180_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/handlers/drag-delegated.html");
+  const s = await buildHandlerSurface({ source, probeDrag: true });
+  const row = (id: string) => s.realDragProbe?.find((r) => r.path === `div#${id}`);
+
+  for (const id of ["board", "lucky"]) {
+    const probed = row(id);
+    assert.ok(probed, `#${id} must be probed — it carries the dragstart handler`);
+    assert.ok(probed.gestures > 0, `#${id} must have been driven`);
+    assert.equal(probed.dragstartFired, true, `#${id} must start a real drag: ${JSON.stringify(probed)}`);
+    // The container is not draggable and never becomes so; the drag is its card's.
+    assert.match(probed.pressedOn ?? "", /card/, `#${id} must report which card was pressed`);
+    // `startedOn` means "a drag on something OUTSIDE this element" — a delegated card is not that.
+    assert.equal(probed.startedOn, undefined, `#${id} must not file its own card as a foreign drag`);
+    assert.ok(probed.droppedOn, `#${id} must land a drop somewhere: ${JSON.stringify(probed.targetsTried)}`);
+  }
+
+  // `pressedOn` and `droppedOn` have to name the same gesture. A later card lifts after the drop
+  // has landed (the probe keeps visiting destinations), and taking the last press produced
+  // "pressed card-b … dropped card-a", with the payload naming a third thing.
+  const board = row("board")!;
+  assert.equal(board.pressedOn, "div#board>div#pile-a>div#card-a", "the card whose drop is reported");
+  const payload = board.timeline?.find((step) => step.type === "drop")?.received;
+  assert.deepEqual(payload, [{ type: "text/plain", value: "card-a" }], "and the page's own payload agrees");
+
+  // Every destination aimed at is pile-shaped. `#pile-back`'s face-down card is childless, textless
+  // and card-sized — every clause of the first rule for finding empty piles — and it is not a drop
+  // target. On solitaire the stock's backs are first in document order, so they took the reserved
+  // slots and the foundations, which is where that deal's only legal move goes, were never aimed at.
+  assert.ok(board.targetsTried.length > 0);
+  for (const aimed of board.targetsTried) {
+    assert.match(aimed.split(">").pop()!, /^div(#pile|\.pile)/, `aimed at a non-pile: ${aimed}`);
+  }
+
+  // The card moved. Nothing else here proves the page's own drop handler ran for real.
+  const moved = await (async () => {
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.goto(`file://${source}`);
+      return await page.evaluate(() => document.getElementById("pile-a")?.children.length);
+    } finally {
+      await browser.close();
+    }
+  })();
+  assert.equal(moved, 1, "the fixture starts with one card in #pile-a — the probe moves it out");
+
+  // And no rule reports the board. Every one of these has a delegation exemption already; this
+  // pins that they hold together on one page rather than one at a time.
+  const kinds = deriveHandlerIssues(s)
+    .filter((i) => /div#(board|lucky)/.test(i.element))
+    .map((i) => i.kind);
+  for (const kind of ["drag-source-inert", "drag-source-not-draggable", "dragover-not-prevented"] as const) {
+    assert.equal(kinds.includes(kind), false, `${kind} is a false positive on a delegated board`);
+  }
+});
+
 test("the report obeys rule settings instead of contradicting the verdict", async () => {
   const { formatHandlerSurface } = await import("./handler-map.ts");
   // `ix` set and a keydown handler present, so `pointer-only-control` and
@@ -1099,7 +1193,17 @@ test("E2E: the drop payload is read at the drop, where it is the only place read
   // `text/uri-list` (both the URL) plus `text/html` (the serialized element).
   const native = received("native-source") ?? [];
   assert.deepEqual(native.map((r) => r.type), ["text/plain", "text/uri-list", "text/html"]);
-  assert.match(native[0]!.value, /^file:.*drag-and-drop\.html#x$/);
+  /*
+   * A PREFIX of the resolved href, not the whole thing: the recorder truncates every received
+   * value at 80 characters (a target may be handed a whole serialized model), and
+   * `file://` + this repo's absolute path + `#x` is 84 in this checkout. Anchoring on `$` made the
+   * test pass or fail on how deep the clone happens to sit, which is not what it is about.
+   */
+  const href = `file://${join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html")}#x`;
+  assert.ok(
+    href.startsWith(native[0]!.value) && native[0]!.value.length >= 40,
+    `text/plain must be the resolved href (got ${JSON.stringify(native[0]!.value)}, want a prefix of ${href})`,
+  );
   assert.match(native[2]!.value, /^<a /);
   // Nobody set anything: `ondragstart="void 0"` on a plain div.
   assert.deepEqual(received("attr-source"), []);

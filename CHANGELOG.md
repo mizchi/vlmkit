@@ -3,29 +3,45 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## 0.11.0 — 2026-08-16
+## 0.11.1 — 2026-08-18
 
-The interaction gates stopped reading markup and started performing the
-interaction. `scan handlers --probe <families>` now drives real gestures — HTML5
-drag and drop, pointer-drag, wheel, hover, touch, context menu, text input — and
-grades what the page actually did with them, including the states that exist only
-while a gesture is in flight and the ones a browser refuses to start at all. Six
-families, each with its own fixture page, its own rules, and an ablation that has
-to fail when the rule is removed.
+A dogfood round on what 0.11 published, and two defects it shipped in the feature it led with.
 
-Two dogfood rounds against real applications (vite.dev's docs site, Bootstrap's
-dashboard example) drove the second theme. Both rounds found the same shape of
-defect three times over — **a geometric heuristic missing one dimension**: text
-collision that ignored ancestor clipping, focus order that ignored column
-boundaries, focus order that ignored `position: fixed`. One of them was hiding 11
-WCAG AA failures behind a lossy dedup key, and the CLI and the CI path disagreed
-about the answer because the same analysis existed in two copies.
+The Pages site stopped being one page: `scripts/build-pages.mjs` owns a manifest, the Klondike
+solitaire board is deployed at `/solitaire/`, and it exists to exercise what a pixel diff cannot see
+— so it is now proved to be winnable, played to 52/52 through the real UI with the DOM audited after
+every ply. Pointing the drag probes at it is what found the rest.
 
-0.10.0's plugin architecture finished: all 27 gates now render their own rule
-settings in their own prose, so `--rule x=warn` reads back on every gate rather
-than on eleven of them. The Playwright-spec capture path is retired in favour of
-an in-process one, coverage moved 63.1% → 70.0% statements (five defects found in
-the writing of it), and the long `- **The Pages site publishes more than one page.** `scripts/build-pages.mjs` owns a
+**`--probe-drag` called every delegated drag board inert.** It pressed the element holding the
+`dragstart` handler and asked whether that element got picked up; under delegation — one handler on
+the container, which is how a board that rebuilds its children has to be written — the answer is
+always no. The row read `no dragstart … started no drag` directly above a route that opens with a
+dragstart, and everything gated on that verdict (the drop, the remaining destinations, the
+Escape-cancel gesture) was skipped without saying so. Fixed, and measured across six deals rather
+than the one that prompted it.
+
+**`dragover-not-prevented` reported a truncated search as an exhausted one**, which is how a
+container that cancels for every legal move was called a container that never cancels.
+
+And the first instructions for an agent that is not Claude Code: there was no `AGENTS.md`, so an
+OpenAI-based agent guessed `VLMKIT_LLM_PROVIDER=openai`, got a list of three names that did not
+include it, and stopped.
+
+### Behaviour changes
+
+Neither is a rule rename or a flag change, but both move a verdict, and a CI pinned to `--probe-drag`
+can see it:
+
+- **Two findings can now fire on a delegated board where they were structurally impossible.**
+  `drag-source-detached-mid-drag` and the Escape-cancel finding are both gated on `dragstartFired`,
+  which was never true for a delegated source — so a board that loses its `dragend` mid-drag, or
+  fails to revert on Escape, went unreported. A run that passed may newly report.
+- **`dragover-not-prevented` no longer reports when the pair search hit its cap.** A run that failed
+  on a board may newly pass. The cap is also 96 rather than 40 now (8 sources × 12 targets, the
+  product of the per-side caps), so within them the search is exhaustive.
+
+
+- **The Pages site publishes more than one page.** `scripts/build-pages.mjs` owns a
   `siteSections` manifest — the intro page at `/`, the Klondike solitaire DnD/animation
   dogfood target at `/solitaire/` — replacing the intro-page-only builder. Assets stay an
   explicit allowlist per section rather than a directory walk, so a test file or a
@@ -114,7 +130,120 @@ the writing of it), and the long `- **The Pages site publishes more than one pag
   nested beside the translated span rather than next to it, because `data-i18n` is applied with
   `textContent` and destroyed the arrow on the first locale switch.
 
-### Fixed` list below is mostly CLI-contract
+- **An OpenAI-based agent had no project instructions in this repo, and dead-ended on the provider
+  name.** `.claude/CLAUDE.md` names benchmarked Claude models, so Claude Code reaches for
+  `claude:claude-haiku-4-5-20251001` and works; there was no `AGENTS.md`, so Codex read nothing,
+  guessed `VLMKIT_LLM_PROVIDER=openai`, got `Expected: gemini | anthropic | openrouter`, and stopped.
+  Nothing in the message said where OpenAI models live, and a missing file has no test to fail.
+
+  `AGENTS.md` now exists — a pointer to `.claude/CLAUDE.md` plus the one thing it cannot answer,
+  which model to use when the agent is not Claude. **OpenAI defaults to `openai/gpt-5.6-luna`**,
+  reached through OpenRouter, since there is no `api.openai.com` client and no `OPENAI_API_KEY` in
+  the codebase — the `openai/` in the id is an OpenRouter catalogue prefix, not a provider. The id
+  is written once, as `OPENAI_DEFAULT_MODEL` in `packages/vlmkit-ai/src/llm-client.ts`, and
+  `tests/agent-model-defaults.test.mjs` pins `AGENTS.md`, `.claude/CLAUDE.md`,
+  `docs/configuration.md` and `docs/ja/README.md` to it — plus that none of them tells an agent to
+  set a provider or a key that does not exist.
+
+  `INVALID_PROVIDER` now carries the route when the name asked for reads as OpenAI (`openai`, `gpt`,
+  `codex`, `o3`, `o4`…): the exact `VLMKIT_LLM_PROVIDER=openrouter VLMKIT_LLM_MODEL=…` pair and the
+  key it needs. A misspelling of a real provider does not get the OpenAI hint — "did you mean
+  OpenRouter" is the wrong answer to someone who meant Gemini.
+
+  Both paths were verified with real calls rather than by construction: the VLM read a screenshot
+  through `openai/gpt-5.6-luna` and the LLM completed through `openrouter` + the same id. Also fixed
+  while in the tables: `VLMKIT_VLM_MODEL`'s default was documented as `qwen/qwen3-vl-8b-instruct` in
+  `docs/configuration.md` and `docs/ja/README.md` — that is the `openrouter` **LLM** default; the VLM
+  default is `bytedance/ui-tars-1.5-7b`, and a test has been asserting it as "the documented default"
+  while the documents said otherwise.
+
+- **`--probe-drag`'s real gesture called every delegated drag board inert, and 0.11 shipped that
+  way.** The probe pressed the element HOLDING the `dragstart` handler and credited the drag only
+  when the recorded dragstart's path equalled that element's. Under delegation — one handler on the
+  container, `closest(".card")` inside it, which is how a board that rebuilds its children has to be
+  written — the container is never draggable, so the browser starts the drag on a descendant and the
+  paths never match. `examples/solitaire` reported `no dragstart … started no drag` on a line
+  directly above a route that opens with a dragstart, while its own harness wins the game through
+  real `dragAndDrop` calls.
+
+  The silent half was worse: everything gated on `dragstartFired` — the drop, the remaining
+  destinations, the Escape-cancel gesture — was skipped for every delegated page, so
+  `drag-source-detached-mid-drag` and the cancel-restore finding could not fire on a board at all.
+
+  `DRAG_PLAN_SCRIPT` now resolves where to press (the container's draggable descendants, three of
+  them, because which card has a legal destination is state the probe cannot read) and where to aim
+  (the sibling piles and the empty ones — never the container, which is the self-drop every board is
+  right to refuse). `dragstartFired` is decided by element identity in the page rather than by a path
+  string, because `describe()` carries no positional index and a card that has just been dropped
+  comes back under a different path. Solitaire goes from `started no drag` to a real drop with the
+  page's own payload, `pressedOn` naming the card, and Escape measured. New fixture
+  `fixtures/handlers/drag-delegated.html`, whose two boards separate the two faces of the defect.
+
+  Measured on solitaire seeds 1-6 rather than on the one deal that prompted it: the drag starts on
+  **all six** (it started on none before), and the drop lands on three, up from zero. Two of the
+  three misses are the honest answer — those deals have no legal move from any card the probe
+  presses — and one is a real miss whose destination sits past the aim cap. Blind search with a
+  gesture budget cannot be made complete on a board; the way past it is a dispatch-only dragover
+  sweep to pick the pair before driving one real gesture at it, which is not built.
+
+  **A face-down card is not an empty pile.** Empty destinations were recognised as "childless,
+  textless, at least 16px" and a card back satisfies every clause — on solitaire the stock's backs
+  are first in document order, so they took the reserved destination slots and the foundations, where
+  that deal's only legal move goes, were never aimed at. They are recognised by looking like the
+  occupied piles now (same tag + first class), learned from every holder including the source's own,
+  because a board with one card has no other holder to learn from.
+
+- **`dragover-not-prevented` reported a capped pair search as an exhausted one.** "No listener
+  cancelled it" is a claim about every source/target pair, and the search stopped at 40 — a fraction
+  of what a board offers, and a handler that cancels only for a legal move is exactly what hides in
+  the remainder. The cap is 96 now (8 sources × 12 targets, the product of the per-side caps, so the
+  search is exhaustive within them) and the rule stands down when `dragoverCapped` is set. Found by
+  the fix above: once the driven probe started landing drops for real, the dispatched probe that runs
+  after it measured a mid-game board and the rule fired on a container that cancels for every legal
+  move. Full write-up: `docs/reports/2026-08-17-real-drag-probe-delegation.md`.
+
+- **The landing page explains the release it advertises, and routes to the demo from the page
+  body rather than only from the nav.** A new "02 / PLAYABLE PROOF" section states what 0.11
+  changed (the interaction gates perform the gesture now), shows a still of the game, and lists
+  the three gates the deploy actually runs against `/solitaire/` — `page.test.mjs` reads those
+  three back out of `deploy-pages.yml`, scoped to its solitaire step, so a gate the page claims
+  and the workflow drops fails a test. Every section number below 02 moved up by one and the
+  sequence is asserted, because they are copy and a missed renumber ships two "04"s.
+
+  The still is generated, not photographed: `examples/vlmkit-intro-page/capture-demo-still.mjs`
+  searches the same winning line `playthrough.mjs` uses, replays its first 60 plies through the
+  page's own `commit`, and shoots with `animate=0` — so the image is a function of (seed, plies)
+  and a solitaire restyle can be re-shot to the identical position. Its dimensions are read from
+  the PNG header and matched against the `<img>` box, which is the drift a re-shoot at another
+  size would otherwise cause.
+
+  Two things the gates found while writing it, both fixed: a 26px margin `check design` called a
+  scale outlier next to the 28px the page uses 17 times, and the skill note claiming "11
+  workflows" when the router has bundled 13 since 0.10.
+
+## 0.11.0 — 2026-08-16
+
+The interaction gates stopped reading markup and started performing the
+interaction. `scan handlers --probe <families>` now drives real gestures — HTML5
+drag and drop, pointer-drag, wheel, hover, touch, context menu, text input — and
+grades what the page actually did with them, including the states that exist only
+while a gesture is in flight and the ones a browser refuses to start at all. Six
+families, each with its own fixture page, its own rules, and an ablation that has
+to fail when the rule is removed.
+
+Two dogfood rounds against real applications (vite.dev's docs site, Bootstrap's
+dashboard example) drove the second theme. Both rounds found the same shape of
+defect three times over — **a geometric heuristic missing one dimension**: text
+collision that ignored ancestor clipping, focus order that ignored column
+boundaries, focus order that ignored `position: fixed`. One of them was hiding 11
+WCAG AA failures behind a lossy dedup key, and the CLI and the CI path disagreed
+about the answer because the same analysis existed in two copies.
+
+0.10.0's plugin architecture finished: all 27 gates now render their own rule
+settings in their own prose, so `--rule x=warn` reads back on every gate rather
+than on eleven of them. The Playwright-spec capture path is retired in favour of
+an in-process one, coverage moved 63.1% → 70.0% statements (five defects found in
+the writing of it), and the long `### Fixed` list below is mostly CLI-contract
 work: `--help` exiting 1, exit 2 surviving its own removal, flags read from
 nowhere, and green verdicts printed over work that never happened.
 

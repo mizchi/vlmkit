@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HTML5 drag through one delegated handler</title>
+<!--
+  Source-side DELEGATION: the shape `drag-and-drop.html` does not have.
+
+  There, every source carries its own `dragstart` and is itself `draggable`. Here one handler on
+  the container serves every card, guards on `event.target.closest(".card")`, and the container is
+  not draggable and never needs to be. That is how a board that rebuilds its children on every
+  move has to be written — `examples/solitaire` is exactly this — and it is the shape that broke
+  the real-gesture probe: it pressed the CONTAINER and asked whether the CONTAINER got picked up,
+  so the answer was "started no drag" for a board whose drag works.
+
+  Two boards, because the defect has two faces and one fixture geometry cannot show both:
+
+    #board   the container's centre is bare (the 20px gutter between its two rows). Pressing the
+             centre starts nothing at all: `dragstart` only fires on a draggable element, so the
+             log is empty and the probe reports an inert source with no evidence in it.
+
+    #lucky   a card sits exactly under the container's centre. The press DOES start a drag — on
+             the card — and an exact-path check files it under `startedOn` ("some other element
+             was picked up instead") and still grades the source inert. This is the face
+             `examples/solitaire` shows, where the centre happens to land on a card.
+
+  What both boards must report: the drag starts, and the drop lands on a pile that is NOT the one
+  the card came from. Every pile refuses its own card — a board that lets you drop a card back
+  where it started is not a board — so a probe that aims at the source's own container measures a
+  correct refusal and calls it a broken drop target.
+
+  Geometry is absolute rather than flex so the two claims above are facts about this file and not
+  about how a layout engine happened to resolve a gap.
+
+    #board  720x420, centre (360, 210). Piles occupy y 0-200 and y 220-420, so the centre is in
+            the 20px gutter — bare container.
+    #lucky  300x120, centre (150, 60). Its card spans x 90-210, y 0-100, so the centre is inside
+            the card. Deliberately short, because the centre has to reach the card and a card
+            sits at the TOP of its pile.
+
+  Both boards hold a second destination, or "the drop lands somewhere" would be untestable: the
+  only pile that could accept a card would be the one it came from, which every pile refuses.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; }
+  .board { position: relative; background: #dfe4ea; margin-bottom: 24px; }
+  #board { width: 720px; height: 420px; }
+  #lucky { width: 300px; height: 120px; }
+  .pile { position: absolute; width: 120px; height: 200px; background: #f4f6f8; }
+  .card { width: 120px; height: 60px; background: #1a6ed8; color: #fff; cursor: grab; }
+</style>
+</head>
+<body>
+
+<div class="board" id="board">
+  <div class="pile" id="pile-a" style="left: 0; top: 0"><div class="card" id="card-a" draggable="true">A</div></div>
+  <div class="pile" id="pile-b" style="left: 600px; top: 0"><div class="card" id="card-b" draggable="true">B</div></div>
+  <!-- Second row, so the container's centre stays in the gutter. Empty: a board's empty pile is
+       often the only legal destination, and it holds no draggable for a probe to find it by. -->
+  <div class="pile" id="pile-empty" style="left: 300px; top: 220px"></div>
+  <!--
+    A FACE-DOWN card: childless, textless, card-sized, and not a drop target at all. It is here
+    because "childless and textless and at least 16px" was the first rule for finding empty piles,
+    and a card back satisfies every clause of it. On solitaire the stock's backs come first in
+    document order, so they took the reserved destination slots and the four foundations were never
+    aimed at. An empty pile is recognised by looking like the OCCUPIED piles instead, and this
+    element is what tells the difference.
+  -->
+  <div class="pile" id="pile-back" style="left: 600px; top: 220px"><div class="card back"></div></div>
+</div>
+
+<div class="board" id="lucky">
+  <div class="pile" id="lucky-pile" style="left: 90px; top: 0; height: 120px">
+    <div class="card" id="lucky-card" draggable="true" style="height: 100px">L</div>
+  </div>
+  <div class="pile" id="lucky-empty" style="left: 220px; top: 0; width: 70px; height: 120px"></div>
+</div>
+
+<script>
+  // One handler per event, on the container. No card has a listener of its own.
+  for (const board of document.querySelectorAll(".board")) {
+    let held = null;
+
+    board.addEventListener("dragstart", (event) => {
+      const card = event.target.closest(".card");
+      if (!card) return;
+      held = card;
+      event.dataTransfer.setData("text/plain", card.id);
+    });
+
+    // Refuses the pile the card came from, accepts any other. The refusal is the correct
+    // behaviour that a self-aimed probe misreads as "this target never calls preventDefault".
+    board.addEventListener("dragover", (event) => {
+      const pile = event.target.closest(".pile");
+      if (!held || !pile || pile === held.parentElement) return;
+      event.preventDefault();
+    });
+
+    board.addEventListener("drop", (event) => {
+      const pile = event.target.closest(".pile");
+      if (!held || !pile || pile === held.parentElement) return;
+      event.preventDefault();
+      pile.appendChild(held);
+    });
+
+    board.addEventListener("dragend", () => { held = null; });
+
+    // A keyboard route to the same move, so `drag-without-keyboard-alternative` is not what this
+    // fixture is about.
+    board.addEventListener("keydown", () => {});
+  }
+</script>
+</body>
+</html>

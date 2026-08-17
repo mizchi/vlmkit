@@ -13,6 +13,7 @@ export { VrtConfigError, type VrtConfigErrorCode } from "./errors.ts";
 export {
   createUnifiedLLMClient,
   createLLMProvider,
+  OPENAI_DEFAULT_MODEL,
   type CreateLLMProviderOptions,
   type LLMClientOptions,
   type LLMResponse,

@@ -43,4 +43,7 @@ result-*
 _flaky_count.txt
 .vlmkit/
 # composed GitHub Pages artifact (scripts/build-pages.mjs)
-/.pages/
+# Unanchored: an older builder wrote `.pages/` next to the example it was run from, and a
+# root-anchored pattern left that copy tracked-able — one `git add -A` from publishing a stale
+# duplicate of the whole site.
+.pages/

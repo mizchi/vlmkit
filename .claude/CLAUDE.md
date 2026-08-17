@@ -253,6 +253,22 @@ VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page -
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
 | `DEBUG_VLMKIT` | Enable debug logs | — |
 
+### Which model to set, by who is asking
+
+Set your own family's model so a run is reproducible from the transcript. The same table is in
+[`AGENTS.md`](../AGENTS.md), which is what a non-Claude agent reads, and
+`tests/agent-model-defaults.test.mjs` pins the two to each other and to the code.
+
+- **Claude Code** (this file's reader): `VLMKIT_VLM_MODEL=claude:claude-haiku-4-5-20251001`,
+  `VLMKIT_LLM_PROVIDER=anthropic` — the benchmarked recommendations above.
+- **Codex / any OpenAI-based agent**: `VLMKIT_VLM_MODEL=openai/gpt-5.6-luna` and
+  `VLMKIT_LLM_PROVIDER=openrouter VLMKIT_LLM_MODEL=openai/gpt-5.6-luna`.
+
+`openai` is **not** a provider name — there is no `api.openai.com` client and no `OPENAI_API_KEY`
+in this codebase, and the `openai/` in the id is an OpenRouter catalogue prefix. Setting
+`VLMKIT_LLM_PROVIDER=openai` fails with `INVALID_PROVIDER`; the message now names the route, and
+`OPENAI_DEFAULT_MODEL` in `packages/vlmkit-ai/src/llm-client.ts` is the one place the id is written.
+
 ## Package Layout
 
 This repository is a pnpm workspace.
