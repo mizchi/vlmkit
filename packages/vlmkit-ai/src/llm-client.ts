@@ -302,6 +302,31 @@ const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set([
 ]);
 
 /**
+ * The OpenAI model this project reaches for by default, and the one place its id is written.
+ *
+ * OpenAI is **not** a provider name here — there is no `api.openai.com` client and no
+ * `OPENAI_API_KEY` anywhere in the codebase. Its models are served through OpenRouter, which is
+ * why the id carries the `openai/` prefix: that string is an OpenRouter catalogue id, not an
+ * OpenAI one.
+ *
+ * Exported so the docs can be pinned to it. `tests/agent-model-defaults.test.mjs` asserts that
+ * `AGENTS.md`, `.claude/CLAUDE.md` and `docs/configuration.md` all name this exact model, because
+ * the defect this constant came from was an agent reading a document and picking something the
+ * code does not accept.
+ */
+export const OPENAI_DEFAULT_MODEL = "openai/gpt-5.6-luna";
+
+/**
+ * Names an agent reaches for when it wants OpenAI and finds no `openai` provider.
+ *
+ * Measured, not guessed: an OpenAI-based agent working in this repo set
+ * `VLMKIT_LLM_PROVIDER=openai`, got `Expected: gemini | anthropic | openrouter`, and stopped —
+ * the message listed the three valid names and said nothing about where OpenAI models live, so
+ * there was nothing to act on. `o\d` covers the reasoning line (`o3`, `o4-mini`).
+ */
+const OPENAI_SHAPED_NAME = /^(openai|oai|gpt|chatgpt|codex|o\d)/i;
+
+/**
  * Resolve provider and key from environment variables.
  *
  * VLMKIT_LLM_PROVIDER: gemini (default) | anthropic | openrouter
@@ -378,10 +403,18 @@ function resolveProviderConfig(options?: LLMClientOptions):
   }
 
   if (!VALID_PROVIDERS.has(requested as LLMProviderName)) {
+    // A name that reads as OpenAI gets the route rather than just the rejection. Listing the three
+    // valid providers is a complete answer only to someone who already knows OpenAI is served
+    // through one of them; to everyone else it is a dead end, which is what it measured as.
+    const route = OPENAI_SHAPED_NAME.test(String(requested))
+      ? ` OpenAI models are served through OpenRouter, not by a provider of their own:`
+        + ` VLMKIT_LLM_PROVIDER=openrouter VLMKIT_LLM_MODEL=${OPENAI_DEFAULT_MODEL}`
+        + ` (needs OPENROUTER_API_KEY).`
+      : "";
     return {
       ok: false,
       code: "INVALID_PROVIDER",
-      message: `Unknown VLMKIT_LLM_PROVIDER "${requested}". Expected: gemini | anthropic | openrouter.`,
+      message: `Unknown VLMKIT_LLM_PROVIDER "${requested}". Expected: gemini | anthropic | openrouter.${route}`,
     };
   }
   const provider = requested as LLMProviderName;

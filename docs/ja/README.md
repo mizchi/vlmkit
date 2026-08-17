@@ -69,12 +69,22 @@ vlmkit api status [--url http://localhost:3456]   # サーバーヘルスチェ�
 
 | 変数 | 用途 | デフォルト |
 |------|------|----------|
-| `VLMKIT_LLM_PROVIDER` | LLM プロバイダ | gemini |
-| `VLMKIT_LLM_MODEL` | LLM モデル | プロバイダのデフォルト |
-| `VLMKIT_VLM_MODEL` | VLM モデル (OpenRouter) | qwen/qwen3-vl-8b-instruct |
+| `VLMKIT_LLM_PROVIDER` | LLM プロバイダ — `gemini` \| `anthropic` \| `openrouter` | gemini |
+| `VLMKIT_LLM_MODEL` | LLM モデル | プロバイダのデフォルト (`openrouter` は qwen/qwen3-vl-8b-instruct) |
+| `VLMKIT_VLM_MODEL` | VLM モデル (OpenRouter の id、直接呼ぶなら `gemini:` / `claude:`) | bytedance/ui-tars-1.5-7b |
 | `OPENROUTER_API_KEY` | OpenRouter API キー | — |
 | `GEMINI_API_KEY` | Google AI API キー | — |
 | `ANTHROPIC_API_KEY` | Anthropic API キー | — |
+
+`openai` というプロバイダは存在せず、`OPENAI_API_KEY` も使いません。OpenAI のモデルは
+OpenRouter 経由で、id の `openai/` はその接頭辞です。`VLMKIT_LLM_PROVIDER=openai` は
+`INVALID_PROVIDER` になります（エラーメッセージが下の経路を案内します）。
+
+```sh
+export VLMKIT_LLM_PROVIDER=openrouter
+export VLMKIT_LLM_MODEL=openai/gpt-5.6-luna
+export VLMKIT_VLM_MODEL=openai/gpt-5.6-luna
+```
 
 ## ライセンス
 

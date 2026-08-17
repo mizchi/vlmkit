@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { VrtConfigError } from "./errors.ts";
-import { createUnifiedLLMClient, createLLMProvider } from "./llm-client.ts";
+import { createUnifiedLLMClient, createLLMProvider, OPENAI_DEFAULT_MODEL } from "./llm-client.ts";
 import { createReasoningPipeline } from "./reasoning-pipeline.ts";
 
 const ENV_KEYS = [
@@ -63,6 +63,44 @@ describe("createUnifiedLLMClient", () => {
         () => createUnifiedLLMClient(),
         (err: Error) => err instanceof VrtConfigError && err.code === "INVALID_PROVIDER",
       );
+    });
+  });
+
+  /*
+   * The rejection has to carry the route, because listing the three valid providers is a complete
+   * answer only to a reader who already knows OpenAI is served through one of them.
+   *
+   * Measured: an OpenAI-based agent set `VLMKIT_LLM_PROVIDER=openai`, read
+   * `Expected: gemini | anthropic | openrouter`, and stopped. There was nothing in the message to
+   * act on and — until `AGENTS.md` — nothing in the repo either.
+   */
+  it("names the OpenRouter route when the provider asked for reads as OpenAI", () => {
+    for (const name of ["openai", "OpenAI", "gpt-5.6-luna", "codex", "o4-mini"]) {
+      withCleanEnv({ VLMKIT_LLM_PROVIDER: name }, () => {
+        try {
+          createUnifiedLLMClient();
+          assert.fail(`${name} must not resolve to a provider`);
+        } catch (err) {
+          assert.ok(err instanceof VrtConfigError && err.code === "INVALID_PROVIDER");
+          assert.match(err.message, /VLMKIT_LLM_PROVIDER=openrouter/, name);
+          assert.ok(err.message.includes(OPENAI_DEFAULT_MODEL), `${name}: ${err.message}`);
+          assert.match(err.message, /OPENROUTER_API_KEY/, name);
+        }
+      });
+    }
+  });
+
+  it("does not offer the OpenAI route for a provider that is simply misspelled", () => {
+    // A hint for every wrong name is noise, and "did you mean OpenRouter" is the wrong answer to
+    // someone who meant Gemini.
+    withCleanEnv({ VLMKIT_LLM_PROVIDER: "gemni" }, () => {
+      try {
+        createUnifiedLLMClient();
+        assert.fail("gemni must not resolve");
+      } catch (err) {
+        assert.ok(err instanceof VrtConfigError && err.code === "INVALID_PROVIDER");
+        assert.doesNotMatch(err.message, /openrouter VLMKIT_LLM_MODEL/);
+      }
     });
   });
 
