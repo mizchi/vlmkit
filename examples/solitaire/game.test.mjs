@@ -253,6 +253,114 @@ describe("double-click", () => {
   });
 });
 
+/**
+ * The foundations, whose labels were WRONG for as long as this page existed and stayed wrong
+ * through 50 passing tests and every gate. The markup gave each slot a fixed suit (`data-hint`
+ * plus `aria-label="Foundation, spades"`) and the rules take any Ace on any empty foundation, so
+ * after two Aces the slot marked ♥ held the Ace of diamonds. Nothing automated could see it: the
+ * markup was valid, labelled, focusable and contrast-clean, and only the game knows the promise
+ * is empty. A screenshot of a progressed board found it.
+ */
+describe("the foundations", () => {
+  it("claims no suit until a card is on it", async () => {
+    const { page } = await open(still());
+
+    const labels = await page.$$eval("#foundations .slot", (els) =>
+      els.map((e) => e.getAttribute("aria-label")),
+    );
+    assert.deepEqual(labels, [
+      "Foundation 1, empty",
+      "Foundation 2, empty",
+      "Foundation 3, empty",
+      "Foundation 4, empty",
+    ]);
+    // No suit word anywhere on an empty foundation, in the label or in a `data-hint`.
+    for (const suit of ["spade", "heart", "diamond", "club"]) {
+      assert.doesNotMatch(labels.join(" "), new RegExp(suit, "i"));
+    }
+    assert.deepEqual(
+      await page.$$eval("#foundations .slot", (els) => els.map((e) => e.dataset.hint ?? null)),
+      [null, null, null, null],
+    );
+    await page.close();
+  });
+
+  it("names the suit that actually landed on it, not the one the markup guessed", async () => {
+    const { page } = await open(still());
+    // Deal and auto-finish repeatedly: enough passes to place all four Aces.
+    for (let i = 0; i < 20; i++) {
+      await page.locator("#stock").click();
+      await page.locator("#auto-finish").click();
+    }
+
+    const state = await page.evaluate(() =>
+      window.solitaire.state.foundations.map((p) => (p.at(-1) ? p.at(-1).suit : null)),
+    );
+    const labels = await page.$$eval("#foundations .slot", (els) =>
+      els.map((e) => e.getAttribute("aria-label")),
+    );
+    assert.ok(state.every(Boolean), "20 deal+auto-finish passes place all four Aces on seed 1");
+
+    state.forEach((suit, i) => {
+      assert.match(labels[i], new RegExp(`^Foundation ${i + 1}, ${suit},`), labels[i]);
+    });
+    // The bug in one line: the suits do NOT arrive in the markup's old fixed order.
+    assert.notDeepEqual(state, ["spades", "hearts", "diamonds", "clubs"]);
+    await page.close();
+  });
+
+  it("counts placed cards up toward 52 rather than down from it", async () => {
+    const { page } = await open(still());
+
+    // "Left 52" sat beside a stock pile that visibly held cards and read as the stock count.
+    assert.equal(await page.locator("#remaining").textContent(), "0");
+    assert.match(await page.locator(".status").textContent(), /Foundations\s*0\/52/);
+
+    for (let i = 0; i < 20; i++) {
+      await page.locator("#stock").click();
+      await page.locator("#auto-finish").click();
+    }
+    const placed = await page.evaluate(() =>
+      window.solitaire.state.foundations.reduce((n, p) => n + p.length, 0),
+    );
+    assert.ok(placed > 0);
+    assert.equal(await page.locator("#remaining").textContent(), String(placed));
+    await page.close();
+  });
+});
+
+/**
+ * The toolbar, because both defects it had were layout-only: a link that wrapped to its own row
+ * and read as stray content, and a `<label>` that ended one row while its `<select>` started the
+ * next. Both were valid, labelled and reachable, so both were invisible to the a11y gates.
+ */
+describe("the toolbar layout", () => {
+  const sameRow = (a, b) => a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1;
+
+  it("keeps the back link beside the title at every width", async () => {
+    const { page } = await open(still());
+    for (const width of [1280, 900, 768, 430, 375, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      const link = await page.locator(".site-link").boundingBox();
+      const title = await page.locator(".toolbar h1").boundingBox();
+      assert.ok(sameRow(link, title), `link left the title's row at ${width}px`);
+      assert.ok(link.x < title.x, `link is not before the title at ${width}px`);
+    }
+    await page.close();
+  });
+
+  it("keeps the Deal label beside its select at every width", async () => {
+    const { page } = await open(still());
+    for (const width of [1280, 900, 768, 430, 375, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      const label = await page.locator('label[for="draw-count"]').boundingBox();
+      const select = await page.locator("#draw-count").boundingBox();
+      assert.ok(sameRow(label, select), `"Deal" left its select's row at ${width}px`);
+    }
+    await page.close();
+  });
+});
+
 describe("animation", () => {
   it("flies the deal in and reports when the table is still", async () => {
     // `data-deal-complete` is the signal a VRT gate needs: the staggered deal outlives any

@@ -63,7 +63,9 @@ body {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: var(--gap);
+  /* Its OWN gap, not `--gap`: that variable is the tableau column gap and shrinks with the card
+     on narrow screens, which has nothing to do with the space between two buttons. */
+  gap: 0.7rem;
   flex-wrap: wrap;
   padding: 0.75rem 1rem;
   background: rgba(0, 0, 0, 0.28);
@@ -105,11 +107,21 @@ body {
   outline-offset: 2px;
 }
 
+/* Secondary information, so it is set smaller than the controls rather than at body size.
+ *
+ * It still drops to a second toolbar row at 1280px — measured 29.6px short of fitting — and that
+ * is left alone deliberately. Closing a 30px gap by shaving button padding would make the
+ * one-row layout true at exactly 1280 and false at 1279, and false again on a machine whose
+ * font metrics differ by a hair. Right-aligned on its own row it reads as a status bar, which is
+ * what it is. `white-space: nowrap` is the part that matters: "Moves 0" breaking across lines is
+ * a defect, wrapping as a unit is not. */
 .status {
   margin-left: auto;
   display: flex;
-  gap: 1.25rem;
+  gap: 0.85rem;
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .status output { font-weight: 600; }
@@ -117,15 +129,26 @@ body {
 /* Sized like the buttons rather than left as bare inline text. A link is `display: inline` and
    would take the WCAG 2.5.5 inline exception — except a flex item is blockified, so the
    exception does not apply and `check a11y touch --level AAA` would report it as a 20px-tall
-   target. `inline-flex` + the same 44px floor keeps that gate clean. */
+   target. `inline-flex` + the same 44px floor keeps that gate clean.
+
+   `padding-left: 0` because it is the first thing in the toolbar: 0.75rem of padding put the
+   arrow visibly further from the edge than the `h1` used to be, so the row's left edge looked
+   ragged next to the table below it. */
 .site-link {
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
-  padding: 0 0.75rem;
+  padding: 0 0.75rem 0 0;
   color: #f2f7f2;
   text-decoration-color: rgba(242, 247, 242, 0.5);
   border-radius: 0.3rem;
+}
+
+/* Keeps `Deal` beside its `<select>` when the toolbar wraps. */
+.draw-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .site-link:hover { text-decoration-color: currentColor; }
@@ -211,15 +234,22 @@ body {
 
 .slot.tableau-slot { min-height: calc(var(--card-h) + 6 * var(--fan-up)); }
 
-/* The empty-foundation suit hint, drawn from the slot's own data so there is no extra node. */
+/*
+ * An empty foundation is marked as a place to build UP, with no suit in it.
+ *
+ * It used to draw a fixed suit glyph from `data-hint`, one per slot — and the rules take any Ace
+ * on any empty foundation, so a slot marked ♥ would sit under the Ace of diamonds. The mark is
+ * now suit-free: an arrow, meaning "build up from the Ace here", true of all four. Windows draws
+ * nothing at all; an affordance that says which pile does what is worth the one glyph.
+ */
 .foundation-slot::after {
-  content: attr(data-hint);
+  content: "↑";
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 2.4rem;
-  color: rgba(255, 255, 255, 0.22);
+  font-size: 1.9rem;
+  color: rgba(255, 255, 255, 0.26);
   pointer-events: none;
 }
 
@@ -493,7 +523,15 @@ body {
     --fan-up: 1rem;
   }
   /* No `center-pip` override here any more — the card face scales with `--card-w` on its own. */
-  .toolbar h1 { width: 100%; }
+
+  /* `flex: 1`, not `width: 100%`. `width: 100%` gave the title a row to itself, which left the
+     back link alone on the row above it — two rows each holding one short item. Taking the rest
+     of the first row instead puts "← vlmkit  Klondike Solitaire" together and pushes the buttons
+     down, which is the same intent without the orphan. */
+  .toolbar h1 {
+    flex: 1 1 auto;
+    margin-right: 0;
+  }
 }
 
 /*

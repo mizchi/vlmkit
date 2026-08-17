@@ -41,9 +41,46 @@ the writing of it), and the long `- **The Pages site publishes more than one pag
   instead of matching the source text for `["/app.js"`, which stopped meaning anything once
   the routes were derived.
 
-- `deploy-pages.yml` runs solitaire's own 50 tests (31 rules cases with no browser, 19 in
+- `deploy-pages.yml` runs solitaire's own 55 tests (31 rules cases with no browser, 24 in
   Chromium) plus `check integrity`, `check a11y focus` and `check a11y touch --level AAA`
   against it, ordered before the artifact build so a red gate blocks the deploy.
+
+- **Four defects that every gate passed, found by looking at screenshots.** Recorded because
+  they mark where a deterministic gate stops: each was valid, labelled, reachable and
+  contrast-clean markup that *meant* the wrong thing.
+  - The four foundations advertised a suit each (`data-hint="♠"`,
+    `aria-label="Foundation, spades"`) and the rules honour none of it — any Ace goes on any
+    empty foundation, as in Windows. A progressed board showed `A♠ A♦ A♥ A♣` under hints
+    reading `♠ ♥ ♦ ♣`. The slots are generic now and `game.js` names the suit that landed.
+  - The `← vlmkit` back link wrapped to a second toolbar row and landed at the far left under
+    the title, reading as stray content.
+  - `Deal` ended one toolbar row while its `<select>` began the next. The `for`/`id`
+    association was correct, so no a11y gate had anything to say.
+  - `Left 52` sat beside a stock pile that visibly held cards and read as the stock count. It
+    counted cards *not yet* on a foundation; it is `Foundations 0/52` and counts up.
+
+  All four are pinned by new cases in `game.test.mjs`, each verified to fail on the old markup.
+
+- **`check tokens` reported resolved `auto` margins as spacing violations.** `getComputedStyle`
+  resolves `margin: auto` to pixels, so `margin: 0 auto` on a centred block reported 144px and a
+  flex item with `margin-left: auto` reported **1048.12px** against a scale topping out at 96 —
+  the gate was noisiest on the most conventional CSS there is. Typed OM's `computedStyleMap()`
+  keeps `auto` as a keyword where `getComputedStyle` has already thrown it away, so the
+  exclusion is exact rather than a magnitude heuristic; absent Typed OM every margin is kept.
+  The sr-only idiom's `margin: -1px` is skipped too, at the same ≤2px-on-both-axes threshold
+  `integrity-check` already uses. On the solitaire page 19 findings → 10, all ten genuinely
+  off-scale.
+
+- **`check palette` printed a `pngjs` stack trace** when handed anything that is not a PNG —
+  `node_modules` paths and all, at a caller who passed an HTML file to a gate that reads images.
+  It checks the PNG signature first and raises a `UsageError`, which prints as one line.
+
+- The intro page's demo link was `display: none` on a phone, because `.site-nav { display: none }`
+  at 900px took it with the scroll-spy anchors — the playable demo had no route from the device
+  most likely to want it. It keeps a full-width row of its own there (measured: brand + link +
+  controls need 400px in a 375px viewport, so the three cannot share a row). Its `→` marker is
+  nested beside the translated span rather than next to it, because `data-i18n` is applied with
+  `textContent` and destroyed the arrow on the first locale switch.
 
 ### Fixed` list below is mostly CLI-contract
 work: `--help` exiting 1, exit 2 surviving its own removal, flags read from

@@ -11,7 +11,7 @@ interaction and motion gates get pointed at.
 
 **Play it: <https://mizchi.github.io/vlmkit/solitaire/>** — it is published as part of this
 repo's Pages site, next to the intro page at `/`. The section list lives in
-`scripts/build-pages.mjs`; `deploy-pages.yml` runs the 50 tests below plus `check integrity`,
+`scripts/build-pages.mjs`; `deploy-pages.yml` runs the 55 tests below plus `check integrity`,
 `check a11y focus` and `check a11y touch --level AAA` against this page before the artifact is
 built, so a red gate blocks the deploy rather than shipping past it.
 
@@ -25,7 +25,7 @@ vlmkit scan handlers     "file://$PWD/examples/solitaire/index.html?animate=0" -
 vlmkit check animation   "file://$PWD/examples/solitaire/index.html?seed=1"
 vlmkit check interactions "file://$PWD/examples/solitaire/index.html?animate=0"
 
-# Its own tests: 31 rules cases with no browser, 19 view cases in Chromium
+# Its own tests: 31 rules cases with no browser, 24 view cases in Chromium
 pnpm vitest run examples/solitaire/
 ```
 
@@ -35,7 +35,7 @@ pnpm vitest run examples/solitaire/
 | `rules.test.mjs` | 31 cases, no browser. Loads `rules.js` the way the page does, via `runInThisContext` |
 | `solitaire.css` | layout, drawn card faces, and the four animations |
 | `game.js` | DOM, HTML5 drag and drop, keyboard, animation wiring |
-| `game.test.mjs` | 19 cases in Chromium: real `dragAndDrop`, keyboard, stock, all four animations |
+| `game.test.mjs` | 24 cases in Chromium: real `dragAndDrop`, keyboard, stock, all four animations, the foundation labels, and the toolbar's wrap behaviour |
 
 ## URL parameters, which exist for the gates as much as for players
 
@@ -68,6 +68,13 @@ the table is still with the animation intact.
 
 Run against this page, four gates were clean or right and three findings were false positives.
 Both halves are the point.
+
+**And a third half: four defects survived all of it and a screenshot found each one** — see the
+table at the bottom. Every one was invisible to the gates for the same reason, that the markup was
+valid, labelled, reachable and contrast-clean while *meaning* the wrong thing. A suit hint the
+rules ignore, a link that wrapped somewhere absurd, a label separated from its control, a counter
+that reads as something it is not. That is the boundary of what a deterministic gate can see, and
+it is worth knowing where it runs.
 
 ### Right: `check animation`, `check a11y focus`, `check a11y touch`, `check interactions`
 
@@ -169,3 +176,8 @@ Kept as a record of what the loop is worth, because none of these were visible i
 | screenshot | the victory animation was a *fall*, not a bounce. It now hits the floor three times with a decaying rebound, with per-keyframe easing — a fall accelerates, a rebound decelerates, and one easing for the whole animation cannot do both |
 | `check integrity @375` | **14px of horizontal scroll on a phone.** The narrow-screen card width was a hand-picked `3.3rem` and the comment above it claimed no overflow. It is now derived from the constraint — seven columns, six gaps and the table's padding have to fit — and measures 0px from 320px to 1280px |
 | `check integrity @375` | the centre pip was a fixed `1.5rem` on a card that shrinks, so it collided with the corner index at 375px — ten `text-collision` pairs, exempted only because the pip is `aria-hidden`. Card typography is now a fraction of `--card-w`, which is what the file's own "one card size, everything else derived" already claimed |
+| screenshot | **the four foundations advertised a suit each and the rules honoured none of it.** `canPlaceOnFoundation` takes any Ace on any empty foundation — standard Klondike, what Windows does — while the markup fixed `♠ ♥ ♦ ♣` per slot. A progressed board showed `A♠ A♦ A♥ A♣` under hints reading `♠ ♥ ♦ ♣`: a drop target promising something it does not enforce, which is the exact failure this README warns about, committed by the page itself. The slots are generic now and `game.js` names the suit that actually landed |
+| screenshot | the back link wrapped to a second toolbar row and landed at the far left under the title, reading as stray content. It is first in the toolbar now. Nothing automated could see it — the link was present, focusable, 44px and contrast-clean on either row |
+| screenshot | `Deal` ended one toolbar row while its `<select>` began the next. The `for`/`id` association was correct, so no a11y gate had anything to report |
+| screenshot | `Left 52` sat beside a stock pile that visibly held cards and read as the stock count. It counted cards *not yet* on a foundation; it is `Foundations 0/52` and counts up |
+| `check tokens` | not a page defect but a tool one, found by pointing the gate here: `getComputedStyle` resolves `auto` margins to pixels, so `margin: 0 auto` and a flex `margin-left: auto` reported as 144px and **1048px** spacing violations. 13 of its 19 findings were structural. Fixed in `design-tokens.ts` via Typed OM |

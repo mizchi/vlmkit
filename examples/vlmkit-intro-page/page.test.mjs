@@ -244,6 +244,72 @@ test("the page is self-contained and includes responsive and keyboard states", a
  * CONTENT and not by its status code.
  */
 /**
+ * The route to the demo, which the gates cannot check because both of its defects were about
+ * *reachability under a condition*, not about the link itself.
+ *
+ * `.site-nav { display: none }` at 900px took the demo link with it, so the playable demo had no
+ * route from a phone — the device most likely to want it. And the `→` marking it as the one nav
+ * entry that changes page was destroyed the first time the locale was switched, because
+ * `data-i18n` is applied with `textContent` and the arrow was a sibling of the translated text.
+ */
+test("the demo link is reachable at every width and survives a locale switch", async () => {
+  const [html, css] = await Promise.all([read("index.html"), read("styles.css")]);
+
+  // The arrow lives INSIDE the link, beside the translated span, not as a sibling of it.
+  assert.match(
+    html,
+    /<a class="nav-demo" href="\.\/solitaire\/"\s*><span data-i18n="nav\.demo">[^<]+<\/span> <span aria-hidden="true">→<\/span><\/a>/,
+  );
+  // The mobile collapse hides the scroll-spy anchors only.
+  assert.match(css, /\.site-nav a:not\(\.nav-demo\)\s*\{\s*display: none;/);
+  assert.doesNotMatch(css, /\.site-nav\s*\{\s*display: none;/);
+
+  const { spawn } = await import("node:child_process");
+  const port = 4292;
+  const child = spawn(process.execPath, [join(exampleDir, "server.mjs")], {
+    env: { ...process.env, PORT: String(port) },
+    stdio: "ignore",
+  });
+  onTestFinished(() => child.kill());
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try { await fetch(`http://127.0.0.1:${port}/`); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
+  }
+
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  onTestFinished(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.goto(`http://127.0.0.1:${port}/?lang=en&theme=light`, { waitUntil: "networkidle" });
+
+  for (const width of [1280, 900, 768, 375, 320]) {
+    await page.setViewportSize({ width, height: 820 });
+    const box = await page.locator(".nav-demo").boundingBox();
+    assert.ok(box && box.width > 0 && box.height >= 44, `demo link is not tappable at ${width}px`);
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      0,
+      `the header overflows at ${width}px`,
+    );
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  assert.match(await page.locator(".nav-demo").textContent(), /Playable demo\s*→/);
+  await page.locator("[data-locale-toggle]").click();
+  assert.match(await page.locator(".nav-demo").textContent(), /遊べるデモ\s*→/, "the arrow did not survive ja");
+  await page.locator("[data-locale-toggle]").click();
+  assert.match(await page.locator(".nav-demo").textContent(), /Playable demo\s*→/, "the arrow did not survive the round trip");
+
+  // And it actually goes there, in a real browser, from a real click.
+  await page.locator(".nav-demo").click();
+  await page.waitForLoadState("load");
+  assert.match(page.url(), /\/solitaire\/$/);
+  assert.match(await page.title(), /Klondike Solitaire/);
+  await page.locator(".site-link").click();
+  await page.waitForLoadState("load");
+  assert.match(await page.title(), /vlmkit — VLM-assisted UI verification/);
+});
+
+/**
  * The version the page advertises has to be the version the repo ships. It read `v0.9.0` while
  * `package.json` said 0.11.0 — a public page quietly two releases stale, because the eyebrow is
  * three words in the middle of a hero and nobody rereads it.

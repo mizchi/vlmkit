@@ -1489,8 +1489,28 @@ dd {
     grid-template-columns: 1fr auto;
   }
 
-  .site-nav {
+  /*
+   * The scroll-spy anchors collapse; the cross-page link does not.
+   *
+   * `.site-nav { display: none }` used to take the demo link with it, which left the playable
+   * demo with no route from a phone — the device most likely to want it.
+   *
+   * It gets its own full-width row rather than a third slot beside the brand and the controls.
+   * Measured at 375px: brand ~90px + link ~100px + controls ~170px + 40px of gutter is 400px in
+   * a 375px viewport, so the three cannot share a row, and leaving it to `flex-wrap` put the
+   * controls on row 2 looking displaced. A row of its own is also the better tap target.
+   */
+  .site-nav a:not(.nav-demo) {
     display: none;
+  }
+
+  .site-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    gap: 0;
+    margin-top: -4px;
+    padding-bottom: 8px;
+    font-size: 12px;
   }
 
   .hero-grid,
@@ -1749,4 +1769,21 @@ dd {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * The one nav entry that changes page, marked as such.
+ *
+ * The `→` follows this page's own convention for it — the GitHub link carries `↗` in a real
+ * `aria-hidden` span, so this does too rather than inventing a CSS `::after`, whose content some
+ * screen readers announce as "right arrow". It is nested INSIDE the link beside the `data-i18n`
+ * span, not on the link itself: `data-i18n` is applied with `textContent`, so an arrow placed as
+ * a sibling of the translated text would be wiped the first time the locale was switched.
+ */
+.nav-demo {
+  gap: 6px;
+}
+
+.nav-demo span[aria-hidden] {
+  opacity: 0.7;
 }

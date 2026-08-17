@@ -122,6 +122,32 @@ const SAMPLE_SCRIPT = `
     const n = parseFloat(v);
     return isFinite(n) ? n : 0;
   }
+  /*
+   * Is this margin the used value of "auto"?
+   *
+   * getComputedStyle RESOLVES auto margins to pixels: a centred block reports
+   * "margin-left: 144px" and a flex item with margin-left:auto reported 1048.12px on the
+   * solitaire toolbar. Compared against a spacing scale those read as enormous violations,
+   * and they fired on the three most ordinary layout idioms there are - margin:0 auto,
+   * max-width centring, and auto as a flex spacer. An auto margin is a layout instruction,
+   * not a spacing token, and has no business in this report.
+   *
+   * Typed OM answers exactly rather than by guess: computedStyleMap() keeps auto as a
+   * CSSKeywordValue where getComputedStyle has already thrown it away. Absent (non-Chromium),
+   * every margin is kept, so the gate degrades to its old noisier self rather than to silence.
+   */
+  function autoMargins(el) {
+    const flags = { top: false, right: false, bottom: false, left: false };
+    if (typeof el.computedStyleMap !== "function") return flags;
+    try {
+      const map = el.computedStyleMap();
+      for (const side of ["top", "right", "bottom", "left"]) {
+        const v = map.get("margin-" + side);
+        if (v && String(v) === "auto") flags[side] = true;
+      }
+    } catch (_) { /* Typed OM present but refused this property; keep every margin. */ }
+    return flags;
+  }
   const out = [];
   const allEls = document.body.querySelectorAll("*");
   let n = 0;
@@ -132,6 +158,14 @@ const SAMPLE_SCRIPT = `
     if (cs.display === "none" || cs.visibility === "hidden") continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
+    /*
+     * The sr-only / visually-hidden box: 2px or less on BOTH axes. Same threshold and same
+     * reasoning as the srOnlyShaped predicate in integrity-check, which already exempts these
+     * from its clipped-text rule. A 1x1 box that exists for a screen reader has no design to
+     * conform to, and the idiom reaches the scale by way of margin:-1px, so it reported three
+     * violations per live region.
+     */
+    if (r.width <= 2 && r.height <= 2) continue;
     n++;
     out.push({
       path: shortPath(el),
@@ -150,6 +184,7 @@ const SAMPLE_SCRIPT = `
         top: px(cs.marginTop), right: px(cs.marginRight),
         bottom: px(cs.marginBottom), left: px(cs.marginLeft),
       },
+      marginAuto: autoMargins(el),
       zIndex: cs.zIndex,
       boxShadow: cs.boxShadow,
     });
@@ -164,6 +199,12 @@ interface RawSample {
   borderRadius: { tl: number; tr: number; br: number; bl: number };
   padding: { top: number; right: number; bottom: number; left: number };
   margin: { top: number; right: number; bottom: number; left: number };
+  /**
+   * Which margins were specified `auto`, which `getComputedStyle` has already resolved to px.
+   * Optional so a sample captured before this field existed still parses; absent reads as "no
+   * margin was auto", which keeps every margin in the report rather than silently dropping some.
+   */
+  marginAuto?: { top: boolean; right: boolean; bottom: boolean; left: boolean };
   zIndex: string;
   boxShadow: string;
 }
@@ -250,6 +291,8 @@ export async function runDesignTokens(
       for (const side of ["top", "right", "bottom", "left"] as const) {
         const v = s[prop][side];
         if (v === 0) continue;
+        // An `auto` margin is a layout instruction, not a spacing token — see `autoMargins`.
+        if (prop === "margin" && s.marginAuto?.[side]) continue;
         if (!isOnScale(v, config.spacing, config.tolerance)) {
           violations.push({
             property: prop, path: s.path, tag: s.tag,

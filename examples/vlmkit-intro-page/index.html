@@ -32,8 +32,14 @@
           The only nav entry that leaves this document. Relative, so it resolves under
           /vlmkit/solitaire/ on Pages and next to this file locally — an absolute "/solitaire/"
           would 404 on a project site served from a subpath.
+
+          `nav-demo` keeps it visible when `.site-nav` collapses at 900px. The three anchors above
+          it are scroll-spy for this page and are redundant on a phone; a link to another page is
+          not, and a *playable* demo is more likely to be tapped on a phone than clicked on a
+          desktop. It was display:none there for exactly one screenshot.
         -->
-        <a href="./solitaire/" data-i18n="nav.demo">Playable demo</a>
+        <a class="nav-demo" href="./solitaire/"
+           ><span data-i18n="nav.demo">Playable demo</span> <span aria-hidden="true">→</span></a>
       </nav>
       <div class="header-actions">
         <div class="display-controls" role="group" aria-label="Display preferences" data-i18n-aria-label="controls.label">

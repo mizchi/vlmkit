@@ -46,6 +46,19 @@
 <body>
 
 <header class="toolbar">
+  <!--
+    Back to the site this page is published under, FIRST in the toolbar.
+    Relative: on GitHub Pages this page lives at /vlmkit/solitaire/ and the intro page at
+    /vlmkit/, so "../" is the site root — an absolute "/" would leave the project site entirely.
+    Locally it resolves to `examples/`, which is the honest answer to "up one level" when there
+    is no site around it.
+
+    It sat last, after the status, for exactly one screenshot: the toolbar is full at 1280px, so
+    it wrapped to a second row and landed at the far left under the title, reading as a stray
+    link rather than a back button. No gate reported that — the link was present, focusable,
+    44px and contrast-clean on both rows. Looking at it was the only way to find it.
+  -->
+  <a class="site-link" href="../">← vlmkit</a>
   <h1>Klondike Solitaire</h1>
   <button id="new-game" type="button">New game</button>
   <button id="restart" type="button">Restart this deal</button>
@@ -55,24 +68,30 @@
     state transition and reports one that changes the page while announcing nothing.
   -->
   <button id="toggle-animation" type="button" aria-pressed="true">Animations: on</button>
-  <label for="draw-count">Deal</label>
-  <select id="draw-count">
-    <option value="1">Draw one</option>
-    <option value="3">Draw three</option>
-  </select>
+  <!--
+    Label and control in one wrapper so they wrap TOGETHER. At 375px the toolbar breaks over four
+    rows and "Deal" ended a row with its `<select>` starting the next one — a label visually
+    separated from the control it names. The association is still correct for a screen reader
+    (`for`/`id`), which is why no a11y gate reported it and why a screenshot did.
+  -->
+  <span class="draw-field">
+    <label for="draw-count">Deal</label>
+    <select id="draw-count">
+      <option value="1">Draw one</option>
+      <option value="3">Draw three</option>
+    </select>
+  </span>
 
   <div class="status">
     <span>Moves <output id="moves">0</output></span>
-    <span>Left <output id="remaining">52</output></span>
+    <!--
+      "Left 52" read as the number of cards left in the STOCK, which is what a player looks at
+      next to a stock pile that visibly has cards in it. It counts the cards not yet on a
+      foundation, so it says 52 until the first Ace is placed and 0 when the game is won.
+      Naming the foundations and showing it as progress removes the guess.
+    -->
+    <span>Foundations <output id="remaining">0</output>/52</span>
   </div>
-
-  <!--
-    Back to the site this page is published under. Relative: on GitHub Pages this page lives at
-    /vlmkit/solitaire/ and the intro page at /vlmkit/, so "../" is the site root — an absolute
-    "/" would leave the project site entirely. Locally it resolves to `examples/`, which is the
-    honest answer to "up one level" when there is no site around it.
-  -->
-  <a class="site-link" href="../">← vlmkit</a>
 </header>
 
 <main class="table" id="table">
@@ -100,11 +119,25 @@
       `display: contents` so the four slots still participate in the row's seven-column grid —
       a normal wrapper would become one grid item and collapse the four into a single column.
     -->
+    <!--
+      Four GENERIC foundations, not one per suit.
+      Each slot used to carry a fixed suit — `data-hint="♠"`, `aria-label="Foundation, spades"` —
+      and the rules never honoured it: `canPlaceOnFoundation` takes any Ace on any empty
+      foundation, which is standard Klondike and what Windows does. So the second Ace to be
+      played landed on the slot marked ♥ whatever its suit was. Screenshotting a progressed game
+      showed A♠ A♦ A♥ A♣ sitting under hints reading ♠ ♥ ♦ ♣ — a drop target promising something
+      it does not enforce, which is the exact failure this page's README warns about, committed
+      by the page itself. No gate could see it: the markup was valid, labelled and reachable, and
+      only the *game* knows the promise is empty.
+
+      A suit claims a foundation when its Ace lands; `game.js` names it in `aria-label` from then
+      on, which tells a screen reader more than a fixed suit ever did.
+    -->
     <div class="foundations" id="foundations">
-      <div class="slot foundation-slot" tabindex="0" data-hint="&#9824;" aria-label="Foundation, spades"></div>
-      <div class="slot foundation-slot" tabindex="0" data-hint="&#9829;" aria-label="Foundation, hearts"></div>
-      <div class="slot foundation-slot" tabindex="0" data-hint="&#9830;" aria-label="Foundation, diamonds"></div>
-      <div class="slot foundation-slot" tabindex="0" data-hint="&#9827;" aria-label="Foundation, clubs"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 1, empty"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 2, empty"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 3, empty"></div>
+      <div class="slot foundation-slot" tabindex="0" aria-label="Foundation 4, empty"></div>
     </div>
   </div>
 

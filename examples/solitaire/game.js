@@ -188,7 +188,18 @@
 
   function render() {
     for (let i = 0; i < 4; i++) {
-      renderPile(el.foundations.children[i], state.foundations[i], "foundation", i);
+      const slot = el.foundations.children[i];
+      renderPile(slot, state.foundations[i], "foundation", i);
+      // A foundation has no suit until an Ace claims it, so the label follows the pile rather
+      // than being fixed in the markup. Fixed suits were a promise the rules do not keep — any
+      // Ace goes on any empty foundation.
+      const top = state.foundations[i][state.foundations[i].length - 1];
+      slot.setAttribute(
+        "aria-label",
+        top
+          ? `Foundation ${i + 1}, ${SUIT_NAME[top.suit]}, up to ${K.RANK_LABELS[top.rank]}`
+          : `Foundation ${i + 1}, empty`,
+      );
     }
     for (let i = 0; i < K.TABLEAU_COUNT; i++) {
       renderPile(el.tableau.children[i], state.tableau[i], "tableau", i);
@@ -206,7 +217,9 @@
     renderPile(el.waste, state.waste, "waste", 0);
 
     el.moves.textContent = String(state.moves);
-    el.remaining.textContent = String(52 - state.foundations.reduce((n, p) => n + p.length, 0));
+    // Counts UP to 52 now, not down from it. The old "Left 52" was 52 minus this number, which
+    // sat beside a stock pile and read as the stock count — see the comment in index.html.
+    el.remaining.textContent = String(state.foundations.reduce((n, p) => n + p.length, 0));
     el.stock.setAttribute(
       "aria-label",
       state.stock.length > 0
