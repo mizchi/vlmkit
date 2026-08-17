@@ -10,9 +10,10 @@ serve:
 contract:
     node --test page.test.mjs
 
-# GitHub Pages にアップロードする静的成果物だけを .pages に生成する
+# GitHub Pages にアップロードするサイト全体をリポジトリルートの .pages に生成する
+# (紹介ページは `/`、solitaire は `/solitaire/`)
 pages:
-    node build-pages.mjs
+    node ../../scripts/build-pages.mjs
 
 # ローカルサーバーを起動して key-free な vlmkit ゲートを実行する
 gates:

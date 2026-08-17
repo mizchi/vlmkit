@@ -1,14 +1,22 @@
-name: Deploy vlmkit intro page
+name: Deploy vlmkit Pages site
+
+# The site is composed from several examples (scripts/build-pages.mjs): the intro page at the
+# root and the solitaire demo at /solitaire/. Every section's own contract tests and gates run
+# before the artifact is built, so nothing reaches the public site unverified.
 
 on:
   push:
     branches: [main]
     paths:
       - "examples/vlmkit-intro-page/**"
+      - "examples/solitaire/**"
+      - "scripts/build-pages.mjs"
       - ".github/workflows/deploy-pages.yml"
   pull_request:
     paths:
       - "examples/vlmkit-intro-page/**"
+      - "examples/solitaire/**"
+      - "scripts/build-pages.mjs"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -18,7 +26,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -48,8 +56,20 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Verify page contracts
-        run: node --test examples/vlmkit-intro-page/page.test.mjs
+      # `vitest run`, not `node --test`. These files import `test` from vitest, and `node --test`
+      # fails on the import — which is how this step passed for months and then silently could
+      # not run at all after the suite migrated. `page.test.mjs` asserts the runner named here.
+      - name: Verify intro page contracts
+        run: pnpm exec vitest run examples/vlmkit-intro-page/page.test.mjs
+
+      # The solitaire rules without a browser, then the view WITH one: real drag and drop,
+      # keyboard play, the stock, and all four animations. This page exists to exercise what a
+      # pixel diff cannot see, so a screenshot check would not be a substitute.
+      - name: Verify solitaire rules and view
+        run: pnpm exec vitest run examples/solitaire/
+
+      - name: Verify the composed site layout
+        run: pnpm exec vitest run tests/pages-site.test.mjs
 
       - name: Run vlmkit dogfood state matrix
         shell: bash
@@ -70,13 +90,28 @@ jobs:
             --output test-results/vlmkit-intro-page-gates \
             --show-output
 
-      - name: Build isolated Pages artifact
-        run: node examples/vlmkit-intro-page/build-pages.mjs
+      # Gated with `?animate=0&seed=1`: the deal is a ~960ms staggered flight and the shuffle is
+      # seeded, so without both the gate measures a different page on every run.
+      - name: Run vlmkit gates on the solitaire demo
+        shell: bash
+        run: |
+          set -euo pipefail
+          still="file://$PWD/examples/solitaire/index.html?seed=1&animate=0"
+          node --experimental-strip-types src/cli/vlmkit.ts check integrity "$still"
+          node --experimental-strip-types src/cli/vlmkit.ts check a11y focus "$still" \
+            --output-dir test-results/solitaire-a11y-focus
+          # AAA, not the AA default: the toolbar meets the 44px floor on purpose (see the
+          # min-height comment in solitaire.css), and gating at AA would not hold that claim.
+          node --experimental-strip-types src/cli/vlmkit.ts check a11y touch "$still" \
+            --level AAA --output-dir test-results/solitaire-a11y-touch
+
+      - name: Build the Pages artifact
+        run: node scripts/build-pages.mjs
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: examples/vlmkit-intro-page/.pages
+          path: .pages
 
   deploy:
     if: github.event_name != 'pull_request'

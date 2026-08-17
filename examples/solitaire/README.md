@@ -9,8 +9,14 @@ A screenshot of this page proves nothing about whether a card can be dragged ont
 and a screenshot taken *during* the deal is different every run. So this is the page the
 interaction and motion gates get pointed at.
 
+**Play it: <https://mizchi.github.io/vlmkit/solitaire/>** — it is published as part of this
+repo's Pages site, next to the intro page at `/`. The section list lives in
+`scripts/build-pages.mjs`; `deploy-pages.yml` runs the 50 tests below plus `check integrity`,
+`check a11y focus` and `check a11y touch --level AAA` against this page before the artifact is
+built, so a red gate blocks the deploy rather than shipping past it.
+
 ```bash
-# Play it — no server, no build step
+# Play it locally — no server, no build step
 open examples/solitaire/index.html          # or: xdg-open / start
 
 # The gates
@@ -161,3 +167,5 @@ Kept as a record of what the loop is worth, because none of these were visible i
 | `rules.test.mjs` | `autoMoveTarget` offered a lone King a move to *another empty pile* — legal, useless, and it counted a move. Windows' double-click is foundations-only, and the faithful behaviour is the correct one |
 | `rules.test.mjs` | `availableFoundationMoves` returned three Aces all targeting foundation 0, so "auto-finish" silently dropped two of every three moves |
 | screenshot | the victory animation was a *fall*, not a bounce. It now hits the floor three times with a decaying rebound, with per-keyframe easing — a fall accelerates, a rebound decelerates, and one easing for the whole animation cannot do both |
+| `check integrity @375` | **14px of horizontal scroll on a phone.** The narrow-screen card width was a hand-picked `3.3rem` and the comment above it claimed no overflow. It is now derived from the constraint — seven columns, six gaps and the table's padding have to fit — and measures 0px from 320px to 1280px |
+| `check integrity @375` | the centre pip was a fixed `1.5rem` on a card that shrinks, so it collided with the corner index at 375px — ten `text-collision` pairs, exempted only because the pip is `aria-hidden`. Card typography is now a fraction of `--card-w`, which is what the file's own "one card size, everything else derived" already claimed |

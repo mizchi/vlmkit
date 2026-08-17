@@ -14,7 +14,12 @@
   --surface-2: #ecefeb;
   --surface-3: #e2e6e1;
   --surface-text: #17201d;
-  --surface-muted: rgba(23, 32, 29, 0.57);
+  /* 0.66, not 0.57: blended over --surface (#f5f6f3) the old value measured 3.93:1 and over
+     --surface-2 (#ecefeb) 3.83:1, both under the 4.5:1 AA floor this page gates on. The
+     computed minimum across all four light surfaces is 0.64. `check a11y contrast` reported
+     16 elements on this one token — it read clean for months only because the gate had a
+     dedup defect that dropped every failure after the first. */
+  --surface-muted: rgba(23, 32, 29, 0.66);
   --surface-muted-strong: rgba(23, 32, 29, 0.7);
   --chrome: #111715;
   --chrome-soft: #161d1a;
@@ -360,7 +365,9 @@ dd {
 
 .hero-install-grid span,
 .hero-bootstrap {
-  color: rgba(241, 240, 232, 0.48);
+  /* 4.50:1 rounded, under the floor unrounded — the hero card adds 2.5% white over
+     --chrome, which lifts the background just enough to matter. */
+  color: rgba(241, 240, 232, 0.52);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 9px;
   letter-spacing: 0.06em;
@@ -988,7 +995,9 @@ dd {
 }
 
 .command-tabs button .tab-index {
-  color: rgba(241, 240, 232, 0.48);
+  /* 0.52: 0.48 measured 4.48:1 on --chrome-soft. The floor is 0.50 across the dark
+     backgrounds this sits on, including the 2.5%-white hero card. */
+  color: rgba(241, 240, 232, 0.52);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 10px;
 }
@@ -999,7 +1008,9 @@ dd {
 }
 
 .command-tabs button[aria-selected="true"] .tab-index {
-  color: rgba(16, 18, 15, 0.55);
+  /* On --acid, so this one is dark-on-light and fails in BOTH themes: 0.55 measured 3.47:1.
+     0.66 against the accent (#9cc9c2) is the floor plus a little. */
+  color: rgba(16, 18, 15, 0.66);
 }
 
 .command-terminal {
@@ -1452,7 +1463,9 @@ dd {
 }
 
 .site-footer p {
-  color: rgba(241, 240, 232, 0.46);
+  /* 0.46 measured 4.25:1. Nine-pixel monospace is exactly the text that needs the floor
+     most, not least. */
+  color: rgba(241, 240, 232, 0.52);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 9px;
   letter-spacing: 0.04em;

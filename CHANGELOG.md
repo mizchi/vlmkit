@@ -25,7 +25,27 @@ about the answer because the same analysis existed in two copies.
 settings in their own prose, so `--rule x=warn` reads back on every gate rather
 than on eleven of them. The Playwright-spec capture path is retired in favour of
 an in-process one, coverage moved 63.1% → 70.0% statements (five defects found in
-the writing of it), and the long `### Fixed` list below is mostly CLI-contract
+the writing of it), and the long `- **The Pages site publishes more than one page.** `scripts/build-pages.mjs` owns a
+  `siteSections` manifest — the intro page at `/`, the Klondike solitaire DnD/animation
+  dogfood target at `/solitaire/` — replacing the intro-page-only builder. Assets stay an
+  explicit allowlist per section rather than a directory walk, so a test file or a
+  Playwright baseline is never published by default, and a missing file fails the build
+  instead of deploying a page with a 404 stylesheet. `tests/pages-site.test.mjs` owns the
+  layout, including that no published page links an asset host-absolutely and that the two
+  pages link to each other.
+
+- The intro page's dev server derives its routes from that same manifest, so `/solitaire/`
+  opens locally. It previously 302'd every unlisted path back to `/`, which would have made
+  the new nav link silently return you to the page you were already on — worse than a 404,
+  because nothing reports it. Its test now boots the server and reads the content types
+  instead of matching the source text for `["/app.js"`, which stopped meaning anything once
+  the routes were derived.
+
+- `deploy-pages.yml` runs solitaire's own 50 tests (31 rules cases with no browser, 19 in
+  Chromium) plus `check integrity`, `check a11y focus` and `check a11y touch --level AAA`
+  against it, ordered before the artifact build so a red gate blocks the deploy.
+
+### Fixed` list below is mostly CLI-contract
 work: `--help` exiting 1, exit 2 surviving its own removal, flags read from
 nowhere, and green verdicts printed over work that never happened.
 
@@ -579,6 +599,36 @@ reports far fewer targets.
   string.
 
 ### Fixed
+
+- **The Pages deploy could not run its own verification step.** The workflow ran
+  `node --test examples/vlmkit-intro-page/page.test.mjs`, and that file imports `test` from
+  vitest, which throws on import outside the vitest runner. The suite migrated on 2026-08-13,
+  the workflow last ran on 2026-08-07, and `page.test.mjs`'s own assertion pinned the broken
+  command in place. It now asserts the runner and not just the path — a step that cannot run
+  is worse than a missing step, because the workflow claims the contract is verified.
+
+- **21 real WCAG AA contrast failures on the intro page**, unmasked by the dedup fix above:
+  the gates config was authored while the gate reported 0 on a page with 21. Sixteen came
+  from one token (`--surface-muted`, 3.83:1 on `--surface-2`); the rest were hard-coded
+  alphas on the command-tab index, the footer and the hero install cards, one of which fails
+  in both themes because it sits on the accent colour. Each new alpha is the computed floor
+  across every background the rule lands on, plus headroom. This changes rendered colours, so
+  the example's committed macOS VRT baselines need `just vrt-update` on a Mac; CI does not run
+  that VRT.
+
+- **The solitaire page scrolled horizontally by 14px at 375px** — found by `check integrity`,
+  whose sweep includes a mobile width nobody had pointed at the page. The narrow-screen card
+  width was a hand-picked `3.3rem` under a comment claiming no overflow; it is now derived
+  from the constraint (seven columns, six gaps and the table's padding have to fit) and
+  measures 0px from 320px to 1280px. Shrinking the card exposed a second finding: the centre
+  pip was a fixed `1.5rem` and collided with the corner index, ten `text-collision` pairs
+  exempted only because the pip is `aria-hidden`. Card typography is now a fraction of
+  `--card-w`, which is what that file's own "one card size, everything else derived" already
+  claimed.
+
+- The intro page advertised `v0.9.0` while the repo shipped 0.11.0 — a public page two
+  releases stale because three words in the middle of a hero go unread. Now pinned to root
+  `package.json` by a test.
 
 - **Every gate measured whatever animation frame it happened to catch.** `settlePage` waited for
   network idle, `fonts.ready` and a frame — and a page that animates itself in outlives all
