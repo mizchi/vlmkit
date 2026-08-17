@@ -431,6 +431,85 @@ describe("animation", () => {
   });
 });
 
+/**
+ * The game, played to a win. Not rigged — searched, then played, then audited.
+ *
+ * The win test above says of itself "Rigged rather than played": it assigns a finished `state` and
+ * clicks Auto-finish, which tests the CASCADE and says nothing about whether the game can be
+ * finished. So for as long as this page existed, a solitaire that was unwinnable, or that lost a
+ * card on move 40, or whose DOM drifted from its state, passed every test in this file.
+ *
+ * `solve.mjs` searches for a winning line against the same `rules.js` the page loads, and this
+ * replays it through the page's own `commit`, auditing after every ply: 52 distinct cards exactly
+ * once, foundations ascending in one suit, every face-up tableau sequence a legal descending
+ * alternating run, no face-down card above a face-up one, one DOM node per card in every pile, and
+ * both counters agreeing with the state.
+ *
+ * Two seeds and ~320 plies, which runs in about 8 seconds. `playthrough.mjs` is the same machinery
+ * with more seeds, real `dragAndDrop`, and a greedy player for unsearched play; this is the part
+ * worth paying for on every CI run.
+ */
+describe("a played win", () => {
+  it("plays a searched line to 52/52 and shows the win, auditing every ply", async () => {
+    const { solve } = await import("./solve.mjs");
+    const { AUDIT } = await import("./audit.mjs");
+
+    for (const seed of [1, 4]) {
+      const solution = solve(seed, { draw: 1, nodes: 400_000 });
+      assert.equal(solution.solved, true, `seed ${seed} has no winning line within the node budget`);
+
+      const { page, errors } = await open(`${URL_BASE}?seed=${seed}&draw=1&animate=0`);
+      let ply = 0;
+      for (const step of solution.line) {
+        ply++;
+        if (step.draw) {
+          await page.locator("#stock").click();
+        } else {
+          const applied = await page.evaluate(
+            ([from, to]) => window.solitaire.commit(from, to),
+            [step.from, step.to],
+          );
+          assert.equal(applied, true, `seed ${seed}: the page refused ply ${ply} of a winning line`);
+        }
+        const problems = await page.evaluate(AUDIT);
+        assert.deepEqual(problems, [], `seed ${seed}, ply ${ply}`);
+      }
+
+      const final = await page.evaluate(() => ({
+        won: window.solitaire.isWon(),
+        placed: window.solitaire.state.foundations.reduce((n, p) => n + p.length, 0),
+        bannerHidden: document.getElementById("win-banner").hasAttribute("hidden"),
+        announced: document.getElementById("announcer").textContent,
+        status: document.querySelector(".status").textContent,
+      }));
+      assert.equal(final.placed, 52, `seed ${seed} did not finish`);
+      assert.equal(final.won, true);
+      assert.equal(final.bannerHidden, false, "the game is won and the banner is hidden");
+      assert.match(final.announced, /You win/);
+      assert.match(final.status, /Foundations\s*52\/52/);
+      assert.deepEqual(errors, []);
+      await page.close();
+    }
+  }, 120_000);
+
+  it("bounces 52 cards when the win is played rather than assigned", async () => {
+    // Animation ON. The rigged test covers the cascade too; what this adds is that `celebrate()`
+    // is reached the way a player reaches it, at the end of a real line.
+    const { solve } = await import("./solve.mjs");
+    const solution = solve(1, { draw: 1, nodes: 400_000 });
+    const { page } = await open(`${URL_BASE}?seed=1&draw=1`);
+
+    for (const step of solution.line) {
+      if (step.draw) await page.locator("#stock").click();
+      else await page.evaluate(([f, t]) => window.solitaire.commit(f, t), [step.from, step.to]);
+    }
+
+    await page.waitForSelector(".card.bouncing", { timeout: 10_000 });
+    assert.equal(await page.locator(".card.bouncing").count(), 52);
+    await page.close();
+  }, 120_000);
+});
+
 describe("determinism, which is what makes a VRT baseline possible", () => {
   it("renders the same opening position for the same seed", async () => {
     const read = async (url) => {

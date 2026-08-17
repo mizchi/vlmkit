@@ -45,6 +45,38 @@ the writing of it), and the long `- **The Pages site publishes more than one pag
   Chromium) plus `check integrity`, `check a11y focus` and `check a11y touch --level AAA`
   against it, ordered before the artifact build so a red gate blocks the deploy.
 
+- **The solitaire example can now be proved to work, which no test did before.** Its win test
+  says of itself "Rigged rather than played" — it assigns a finished `state` and clicks
+  Auto-finish, so it covers the cascade and says nothing about whether the game can be finished.
+  A solitaire that was unwinnable, or that lost a card on move 40, or whose DOM drifted from its
+  state, passed all 55 tests.
+
+  Three new files close it. `solve.mjs` searches for a winning line (DFS memoised on the position
+  signature, against the same `rules.js` the page loads; seeds 1-6 solve in 145–24k nodes, under
+  300ms each). `playthrough.mjs` replays that line through the real UI — `commit`, or actual
+  `page.dragAndDrop` with `--gestures` — and runs the audit after every ply. `audit.mjs` holds the
+  audit once, shared by the harness and by two new cases in `game.test.mjs`, which play seeds 1
+  and 4 to 52/52 in CI. Seed 1: 144 plies, 8s through `commit`, 14s through real drags, ending
+  with the banner visible, the win announced and 52 cards bouncing. The workflow wins a third seed
+  by dragging before it builds the artifact.
+
+  The audit reads the **DOM against the state** — 52 distinct cards exactly once, foundations
+  ascending from the Ace in one suit, every face-up tableau pair a legal descending alternating
+  run, no face-down card above a face-up one, one DOM node per card per pile, both counters
+  agreeing. Validated by injecting four bugs and checking it names each: skipping `render()` on
+  every 7th move → "ply 14 — tableau 4 holds 9 cards and renders 8"; dropping a card in one
+  `applyMove` → "move 13 — the table holds 51 distinct cards, not 52"; letting
+  `canStackOnTableau` ignore colour → "move 1 — tableau 0 stacks hearts-11 on hearts-12, which is
+  not a descending alternating run"; never calling `celebrate()` → "the game is won and the win
+  banner is still hidden".
+
+- **The solitaire debug surface exposed `deal`, which starts a NEW GAME.** In solitaire "deal" is
+  overwhelmingly the stock deal — the page's own select is labelled "Deal" for the draw count and
+  the stock's aria-label says "deal 1" — so a harness calling `solitaire.deal()` to turn the stock
+  over silently reset the table on every pass and reported eight seeds stuck at "0/52 in 0 moves".
+  It is `solitaire.newGame` now. There is deliberately still no draw on the surface: clicking
+  `#stock` is the only route and exercises the real handler.
+
 - **Four defects that every gate passed, found by looking at screenshots.** Recorded because
   they mark where a deterministic gate stops: each was valid, labelled, reachable and
   contrast-clean markup that *meant* the wrong thing.

@@ -587,9 +587,20 @@
 
   // For the smoke test and for anyone poking at it from the console. Not the play interface —
   // the play interface is the DOM.
+  /*
+   * The debug surface, used by `game.test.mjs` and `playthrough.mjs`.
+   *
+   * `newGame`, NOT `deal`. It was exposed as `deal` and that is a trap: in solitaire "deal" is
+   * overwhelmingly the STOCK deal — this page's own select is labelled "Deal" for the draw count
+   * and the stock's aria-label says "deal 1" — while this function throws the game away and starts
+   * another. `playthrough.mjs` called it expecting to turn the stock over and silently reset the
+   * table on every pass; it reported eight seeds stuck at "0/52 in 0 moves" and the cause took a
+   * trace to find. There is no draw here on purpose: clicking `#stock` is the only route, which is
+   * the real handler and the better thing for a harness to exercise.
+   */
   globalThis.solitaire = {
     get state() { return state; },
-    deal,
+    newGame: deal,
     commit,
     isWon: () => K.isWon(state),
     get dealing() { return dealing; },

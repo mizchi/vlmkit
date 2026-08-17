@@ -63,10 +63,17 @@ jobs:
         run: pnpm exec vitest run examples/vlmkit-intro-page/page.test.mjs
 
       # The solitaire rules without a browser, then the view WITH one: real drag and drop,
-      # keyboard play, the stock, and all four animations. This page exists to exercise what a
-      # pixel diff cannot see, so a screenshot check would not be a substitute.
+      # keyboard play, the stock, all four animations, and two games PLAYED to 52/52 with the
+      # table audited after every ply. This page exists to exercise what a pixel diff cannot see,
+      # so a screenshot check would not be a substitute.
       - name: Verify solitaire rules and view
         run: pnpm exec vitest run examples/solitaire/
+
+      # A third seed, won entirely through real `dragAndDrop` rather than through `commit`. The
+      # suite above proves the game finishes; this proves the DRAG path finishes it, which is the
+      # half a published game is actually played with. ~15s.
+      - name: Win a game of solitaire by dragging
+        run: node examples/solitaire/playthrough.mjs --solve --seed 7 --gestures --verbose
 
       - name: Verify the composed site layout
         run: pnpm exec vitest run tests/pages-site.test.mjs

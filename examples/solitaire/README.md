@@ -11,9 +11,10 @@ interaction and motion gates get pointed at.
 
 **Play it: <https://mizchi.github.io/vlmkit/solitaire/>** — it is published as part of this
 repo's Pages site, next to the intro page at `/`. The section list lives in
-`scripts/build-pages.mjs`; `deploy-pages.yml` runs the 55 tests below plus `check integrity`,
-`check a11y focus` and `check a11y touch --level AAA` against this page before the artifact is
-built, so a red gate blocks the deploy rather than shipping past it.
+`scripts/build-pages.mjs`. Before the artifact is built, `deploy-pages.yml` runs the 57 tests
+below, wins a game by dragging, and runs `check integrity`, `check a11y focus` and
+`check a11y touch --level AAA` against this page — so a red gate blocks the deploy rather than
+shipping past it.
 
 ```bash
 # Play it locally — no server, no build step
@@ -25,9 +26,49 @@ vlmkit scan handlers     "file://$PWD/examples/solitaire/index.html?animate=0" -
 vlmkit check animation   "file://$PWD/examples/solitaire/index.html?seed=1"
 vlmkit check interactions "file://$PWD/examples/solitaire/index.html?animate=0"
 
-# Its own tests: 31 rules cases with no browser, 24 view cases in Chromium
+# Its own tests: 31 rules cases with no browser, 26 view cases in Chromium —
+# two of which PLAY the game to 52/52, auditing the table after every ply
 pnpm vitest run examples/solitaire/
+
+# Prove it is winnable and that the page finishes it, over more seeds
+node examples/solitaire/solve.mjs --seeds 20                    # is each deal solvable at all?
+node examples/solitaire/playthrough.mjs --solve --seeds 8 -v    # replay the lines through the UI
+node examples/solitaire/playthrough.mjs --solve --seed 1 --gestures   # win it by real dragging
+node examples/solitaire/playthrough.mjs --seeds 12 --trace      # greedy play, for the audit alone
 ```
+
+## Proving the game works, which the unit tests do not
+
+The win test in `game.test.mjs` says of itself *"Rigged rather than played"* — it assigns a
+finished `state` and clicks Auto-finish, because a real win is ~150 plies. It tests the **cascade**
+and says nothing about whether the game can be finished. So for a while, a solitaire that was
+unwinnable, or that lost a card on move 40, or whose DOM drifted from its state, passed every test
+here.
+
+Three files close that gap, and the split between them is the idea: **`solve.mjs` answers "is this
+deal winnable at all"** (depth-first search with a memo on the position signature, against the same
+`rules.js` the page loads — seeds 1-6 solve in 145–24k nodes, under 300ms each), and
+**`playthrough.mjs` answers "does the page play it correctly"** by replaying that line through the
+real UI. A disagreement between them is itself a finding.
+
+The audit checks, per ply: 52 distinct cards exactly once across stock/waste/tableau/foundations;
+every foundation ascending from the Ace in one suit; every consecutive face-up tableau pair a legal
+descending alternating run; no face-down card above a face-up one; one DOM node per card in every
+pile; and both counters agreeing with the state. It reads the **DOM against the state**, because a
+state that is internally perfect while the screen shows something else is exactly the bug a player
+reports as "it stopped working".
+
+Verified by injecting four bugs and checking the report names each one:
+
+| injected | reported |
+|---|---|
+| skip `render()` on every 7th move | `ply 14 — tableau 4 holds 9 cards and renders 8` |
+| drop a card during one `applyMove` | `move 13 — the table holds 51 distinct cards, not 52` |
+| let `canStackOnTableau` ignore colour | `move 1 — tableau 0 stacks hearts-11 on hearts-12, which is not a descending alternating run` |
+| never call `celebrate()` | `the game is won and the win banner is still hidden` |
+
+Seed 1 plays to 52/52 in 144 plies, 8s through `commit` and 14s through real drags, ending with the
+banner visible, the win announced, and 52 cards bouncing.
 
 | file | what it is |
 |---|---|
@@ -35,7 +76,10 @@ pnpm vitest run examples/solitaire/
 | `rules.test.mjs` | 31 cases, no browser. Loads `rules.js` the way the page does, via `runInThisContext` |
 | `solitaire.css` | layout, drawn card faces, and the four animations |
 | `game.js` | DOM, HTML5 drag and drop, keyboard, animation wiring |
-| `game.test.mjs` | 24 cases in Chromium: real `dragAndDrop`, keyboard, stock, all four animations, the foundation labels, and the toolbar's wrap behaviour |
+| `game.test.mjs` | 26 cases in Chromium: real `dragAndDrop`, keyboard, stock, all four animations, the foundation labels, the toolbar's wrap behaviour, and two games played to a win |
+| `solve.mjs` | finds a winning line for a seed (DFS, no browser) — so a playthrough can prove the game is winnable |
+| `playthrough.mjs` | plays a game through the real UI and audits the table after every ply |
+| `audit.mjs` | the audit itself, shared by the harness and the tests |
 
 ## URL parameters, which exist for the gates as much as for players
 
