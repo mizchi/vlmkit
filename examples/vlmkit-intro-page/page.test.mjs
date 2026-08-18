@@ -242,13 +242,28 @@ test("one install lets the agent route natural-language UI work automatically", 
   );
   assert.match(rootSkill, /## Automatic routing contract/);
   assert.match(rootSkill, /Do not ask the user to choose or name a specialized skill/);
-  assert.match(rootSkill, /relative to the directory containing\s+this `SKILL\.md`/);
-  assert.match(rootSkill, /Default to `markup-assist`/);
+  /*
+   * The router's instructions, matched WRAP-INSENSITIVELY.
+   *
+   * These are prose assertions — "the router still tells the agent to detect the package manager
+   * from the lockfile" — and the literal spaces in them made every one of them an assertion about
+   * line breaks too. Editing the sentence before it, which re-wrapped "from its lockfile" across a
+   * newline, failed the test without changing a word of what it checks. One `\s+` had already been
+   * hand-placed at each wrap point that existed when they were written, which is the same bug
+   * being patched one instance at a time.
+   */
+  const says = (phrase) => assert.match(
+    rootSkill,
+    new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")),
+    `the router no longer says: ${phrase}`,
+  );
+  says("relative to the directory containing this `SKILL.md`");
+  says("Default to `markup-assist`");
   assert.match(rootSkill, /## Automatic tool bootstrap/);
-  assert.match(rootSkill, /detect the existing package manager\s+from its lockfile/);
-  assert.match(rootSkill, /add\s+`@mizchi\/vlmkit` as a development dependency/);
-  assert.match(rootSkill, /Install Chromium only when Playwright reports\s+that it is missing/);
-  assert.match(rootSkill, /translate source-repo invocations to the published\s+`vlmkit` binary/);
+  says("detect the existing package manager from its lockfile");
+  says("`@mizchi/vlmkit` as a development dependency");
+  says("Install Chromium only when Playwright reports that it is missing");
+  says("translate source-repo invocations to the published `vlmkit` binary");
 
   for (const skill of specializedSkills) {
     const bundledReference = `./workflows/${skill}/SKILL.md`;

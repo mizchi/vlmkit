@@ -37,14 +37,42 @@ running a loop to detect and repair regressions.
 
 ## Automatic tool bootstrap
 
-The skill install is the user's setup step. When the selected workflow needs
-the CLI, prepare it as part of the task instead of sending the user a setup
-checklist:
+### The version these workflows are written against: 0.11.1
 
-1. Reuse an existing `@mizchi/vlmkit` dependency when present. Otherwise,
-   detect the existing package manager from its lockfile and add
-   `@mizchi/vlmkit` as a development dependency with that package manager.
-   Do not install a second package manager or add a global CLI.
+Recorded here, once. The workflows do not repeat it, and
+`tests/skill-package.test.mjs` pins this line to the package's own version so the
+two cannot drift. Every workflow is reached through this file, so this is the one
+place an agent has already read before it runs a gate.
+
+Read what is installed before the first gate of a task:
+
+```sh
+npx vlmkit --version     # vlmkit/0.11.1 darwin-arm64 node-v24.14.1
+```
+
+- **Older, or not installed** → install `@mizchi/vlmkit@0.11.1` and use that.
+  A workflow that names a verb or a flag the installed CLI does not have fails
+  with "unknown option", which reads as the user's mistake rather than as a
+  version skew. Recent releases add gates and probe families that older CLIs
+  refuse: `check story` and `--probe <families>` did not exist two releases ago.
+- **Exactly this** → proceed.
+- **Newer** → proceed with what is installed, and say which version the run used
+  once in the result. Do not downgrade a project to match a skill: the recorded
+  version is a FLOOR, and a newer CLI has every verb these workflows use. If a
+  newer CLI rejects something a workflow asks for, the workflow is out of date —
+  report that rather than working around it.
+- **The registry does not have that version yet** — a release stamped in the repo
+  and not published, which is a state this project passes through → install the
+  latest published version, and say in the result which version ran and that the
+  workflows were written against a newer one. Do not treat the 404 as a broken
+  setup.
+
+Then:
+
+1. Reuse an existing `@mizchi/vlmkit` dependency when its version is not older
+   than the one above. Otherwise, detect the existing package manager from its
+   lockfile and add `@mizchi/vlmkit` as a development dependency with that
+   package manager. Do not install a second package manager or add a global CLI.
 2. Run the project-local binary (`pnpm exec vlmkit`, `npx vlmkit`, or the
    equivalent for the detected package manager).
 3. Attempt the chosen gate first. Install Chromium only when Playwright reports
