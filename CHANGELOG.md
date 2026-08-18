@@ -40,6 +40,94 @@ can see it:
   on a board may newly pass. The cap is also 96 rather than 40 now (8 sources × 12 targets, the
   product of the per-side caps), so within them the search is exhaustive.
 
+### Solitaire dogfood, round two — three defects a person found by playing
+
+In this section rather than in one of its own because 0.11.1 had not reached npm when it landed, so
+whatever ships as 0.11.1 contains it. The interesting part of every one of these is why no gate had
+said anything.
+
+- **The probes were suppressing the defect they should have reported.** Every interaction probe
+  clears the text selection before its gesture — it has to, because selected text is itself draggable
+  and a leftover range changes the next measurement — and clearing was all any of them did. A round
+  of play on solitaire turned into a range selection over the board, and the harness had been wiping
+  that condition away once per gesture for as long as it existed. It reads it now, before clearing.
+
+  Two rules came out of it. `drag-selects-text`: a press-and-drag over a surface left a range behind,
+  named on the element the range anchors in, which is where the `user-select: none` belongs and is
+  usually a hint line or a status readout rather than the surface itself. `dblclick-selects-text`: a
+  new `--probe dblclick` family double-clicks each `dblclick` handler at a point its own handler does
+  NOT apply to — the miss — and reports what got selected. That is the gesture that produced the
+  reported defect: double-click sends a card to a foundation, the handler is on the board, and a
+  double-click on the bare table selects a word out of the hint line under it.
+
+  The drag half also drives one **stray press** per delegated surface: a press that starts on the
+  surface's own prose rather than on an item. Without it the rule cannot see the gesture a player
+  makes, because every other gesture presses a card and any real board sets `user-select: none` on
+  the cards. Delegated surfaces only — running it on direct sources spent a gesture that changed two
+  measurements with nothing to do with selection.
+
+  Fixed on solitaire with `user-select: none` on the shell. `.card` already had it and it was never
+  enough: none of the ranges started on a card. Verified in both directions — the rule fires before
+  the fix and is silent after, and all five gestures found by hand now select 0 characters.
+
+- **`drag-ghost-illegible`: what the drag does to the readability of the thing being dragged.** "The
+  drag source goes translucent and combined with what is behind it you cannot tell which card it is."
+  The element is now shot at rest and again mid-flight, and the WCAG ratio between its darkest 2% and
+  lightest 10% of pixels is reported for both, with the computed `opacity` read rather than inferred.
+  Solitaire measured 7.59:1 → 5.01:1 at `opacity: 0.55`, a 34% loss.
+
+  Graded on the fall AND the floor, never either alone: a page that dims 15:1 to 9:1 loses the same
+  proportion and is still perfectly readable, and an element with low contrast at rest is
+  `check a11y contrast`'s business. Which means solitaire's own case — a 34% fall that lands at
+  5.01:1 — is **printed and not graded**, because a human called it a defect by looking at it and a
+  rule may not claim to have proved that. The report line carries the pair either way.
+
+  The ink quantile is 2% rather than a decile because it was measured: a card face is >90% paper, so
+  the darkest decile is mostly antialiasing and read 4.06:1 where the 2% quantile read 6.17:1 on the
+  same card. Fixed on solitaire by marking the PLACE instead of dimming the card — the face stays
+  opaque at 0.92 with a dashed outline, which measures 7.59:1 → 7.54:1.
+
+- **An empty stock said it could be turned over only to a screen reader.** Its `aria-label` read
+  "Stock empty — turn the waste over" while the pixels showed an outline identical to a pile with
+  nothing left to do. No gate could have caught it: the accessible name was correct. `render()` now
+  derives one `stockState` and writes both the label and a `[data-state]` the stylesheet draws a `↻`
+  from, so the two cannot drift apart again.
+
+  Recorded rather than solved: the general rule here would be "an element that is operable and shows
+  nothing", and a static gate cannot see it, because the stock is only empty after two dozen clicks.
+  Reaching that state is `verify flow`'s job, not a gate's.
+
+- **The skills say which vlmkit they were written against, and what to do when it differs.** A
+  workflow that names a verb the installed CLI does not have fails with "unknown option", which
+  reads as the user's mistake rather than as version skew — `check story` and `--probe <families>`
+  are both younger than two releases. The router's bootstrap section now records the version,
+  tells the agent to read `vlmkit --version` before its first gate, and says what to do in each
+  case.
+
+  The recorded version is a **floor**, not an equality: older or absent installs that version,
+  newer proceeds with what is there and says so in the result. Downgrading a project to match a
+  skill is the larger harm, and the failure being prevented is one-directional — a newer CLI has
+  every verb these workflows use. There is also a branch for "the registry does not have it yet",
+  which is the state 0.11.1 is in right now.
+
+  Written in the router only. Thirteen copies of a version number is thirteen chances to ship a
+  stale one, and every workflow is reached through the router by contract;
+  `tests/skill-package.test.mjs` pins the heading, the install line and the sample `--version`
+  output to the package's own version, so a bump that fixes one of the three still fails.
+
+- **A test with a hard-coded future date went off.** `manifest check` warns about anything expiring
+  within 14 days, and `src/manifest-cli.test.ts` seeded a rule expiring `2026-09-01`, so on
+  2026-08-18 the "nothing is expired" case started reading `expiring` and failing. Nothing had
+  changed; the date arrived. The expiry is computed relative to the run now, which is what a test
+  asking a question about the future needs, and the assertion prints the output it got.
+
+- **The canvas pointer-drag assertion had a 1.4x margin and no diagnostics.** The probe drags across
+  ~40% of the pad, and a 3px stroke changed 0.709% of the element's pixels against a 0.5% floor —
+  which passed every run in isolation and failed twice in six full runs, where browsers run in
+  parallel. The fixture strokes at 12px now (2.181%, a 4.4x margin) and the assertion prints the two
+  ratios and the handler-call count when it trips, because the failures are **still unexplained**:
+  six concurrent probes reproduced nothing, so the thicker line removes the thin margin without
+  claiming to have found the cause. Three full runs green since.
 
 - **The Pages site publishes more than one page.** `scripts/build-pages.mjs` owns a
   `siteSections` manifest — the intro page at `/`, the Klondike solitaire DnD/animation

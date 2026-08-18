@@ -72,6 +72,45 @@ test("the repository exposes one lightweight public vlmkit skill", async () => {
   }
 });
 
+/**
+ * The router states which vlmkit the workflows are written against, and it has to be THIS one.
+ *
+ * A skill that names a verb the installed CLI does not have fails with "unknown option", which
+ * reads as the user's mistake rather than as version skew — `check story` and `--probe <families>`
+ * are both younger than two releases. So the router tells the agent to check `vlmkit --version` and
+ * install the recorded version when what it finds is older.
+ *
+ * Recorded ONCE, in the router, because every workflow is reached through it: thirteen copies of a
+ * version number is thirteen chances to ship a stale one, and this file exists because three copies
+ * of a skill drifted. This test is the other half of that decision — a number written down once
+ * still goes stale unless something fails when it does.
+ */
+test("the router pins the vlmkit version the workflows are written against", async () => {
+  const [skill, manifest] = await Promise.all([
+    readFile(join(skillsPackage, "SKILL.md"), "utf8"),
+    readFile(join(repoRoot, "package.json"), "utf8"),
+  ]);
+  const { version } = JSON.parse(manifest);
+  const heading = skill.match(/^### The version these workflows are written against: (\S+)$/m);
+  assert.ok(heading, "the router must state the version in its bootstrap section");
+  assert.equal(
+    heading[1],
+    version,
+    `the router says ${heading[1]} and the package is ${version} — bump the router with the release`,
+  );
+  // The install line an agent will actually run, and the sample `--version` output it compares
+  // against. Both carry the number, and a bump that fixes only the heading leaves the instruction
+  // telling the agent to install the previous release.
+  assert.ok(
+    skill.includes(`@mizchi/vlmkit@${version}`),
+    `the install instruction must name ${version}`,
+  );
+  assert.ok(
+    skill.includes(`vlmkit/${version} `),
+    `the sample --version output must show ${version}`,
+  );
+});
+
 test("the APM package is an exact, bounded mirror of the skills CLI package", async () => {
   const skillsFiles = await listFiles(skillsPackage);
   const apmFiles = await listFiles(apmPackage);
