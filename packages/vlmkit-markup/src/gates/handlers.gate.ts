@@ -106,6 +106,12 @@ which runs the page's own handlers:
           Japanese one through an IME composition, into every visible
           text field. Grades a field that keeps the ASCII and drops
           the Japanese; the ASCII drive is the control.
+  dblclick
+          double-clicks each dblclick handler at a point its own
+          handler does NOT apply to -- the miss -- and reports what got
+          selected. On a page where double-click means something, the
+          miss is ordinary play, the handler is silent about it, and the
+          browser leaves a range selection behind.
 
 --probe all for every family. An unknown name is an error rather
 than a silent no-op.

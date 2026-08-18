@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pointer gestures that select text where they should not</title>
+<!--
+  Unintended text selection, which is the DnD defect nothing here could see.
+  Reported by hand against `examples/solitaire/`: "some sequence of operations turned into a range
+  selection, then dragging several cards did nothing and there was no way back."
+
+  A selection is not cosmetic on a drag surface. Selected text is itself draggable, so the next
+  press may drag the SELECTION instead of the thing under the cursor; the highlight sits over the
+  board and obscures it; and on a page whose double-click means something, the miss that produced
+  the selection also fired an action the player did not ask for.
+
+  The probes clear the selection before every gesture — they have to, or a leftover selection from
+  one gesture changes the next one — which is exactly why this went unreported for so long: the
+  harness suppressed the condition it should have been measuring. It reads it now, before clearing.
+
+  Two shapes, so the rules are graded against a page that gets it right as well as one that does
+  not. Both halves are identical except for one declaration.
+
+    #loose          a drag surface with selectable prose inside it and no `user-select`. A press
+                    that starts on the prose and drags across the surface selects it.
+                        -> drag-selects-text
+    #loose-dblclick a dblclick handler whose own background is selectable. A double-click that
+                    MISSES the target selects a word — the shape solitaire hit, where the handler
+                    is on the board and the board carries a hint line.
+                        -> dblclick-selects-text
+    #tight          the same surface with `user-select: none`. Silent.
+    #tight-dblclick the same dblclick target, guarded. Silent.
+
+  The card-shaped children are `draggable="true"` so the drag probe treats these as real drag
+  surfaces and drives them the way it drives a board.
+-->
+<style>
+  body { margin: 0; padding: 20px; font: 15px/1.5 system-ui, sans-serif; }
+  .surface { position: relative; width: 420px; height: 190px; margin-bottom: 18px; background: #e7ecf1; }
+  .tight { user-select: none; }
+  .pile { position: absolute; top: 8px; width: 90px; height: 120px; background: #f7f9fb; }
+  .item { width: 90px; height: 46px; background: #2f6db5; color: #fff; cursor: grab; }
+  /* The prose a stray press lands on. Inside the surface, because that is where it is on a real
+     board: a hint line under the table, a status readout above it. */
+  .prose { position: absolute; bottom: 6px; left: 8px; right: 8px; font-size: 13px; color: #21303d; }
+  h2 { font-size: 13px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+
+<h2>Unguarded</h2>
+<div class="surface" id="loose">
+  <div class="pile" id="loose-a" style="left: 8px"><div class="item" id="loose-card" draggable="true">A</div></div>
+  <div class="pile" id="loose-b" style="left: 160px"></div>
+  <p class="prose">Drag an item onto a pile, or double-click to send it home. This sentence is what a stray press selects.</p>
+</div>
+
+<div class="surface" id="loose-dblclick">
+  <div class="pile" id="loose-d-a" style="left: 8px"></div>
+  <p class="prose">Double-click here and a word is selected instead of an item being sent home.</p>
+</div>
+
+<h2>Guarded with user-select: none</h2>
+<div class="surface tight" id="tight">
+  <div class="pile" id="tight-a" style="left: 8px"><div class="item" id="tight-card" draggable="true">A</div></div>
+  <div class="pile" id="tight-b" style="left: 160px"></div>
+  <p class="prose">Drag an item onto a pile, or double-click to send it home. This sentence cannot be selected.</p>
+</div>
+
+<div class="surface tight" id="tight-dblclick">
+  <div class="pile" id="tight-d-a" style="left: 8px"></div>
+  <p class="prose">Double-click here and nothing is selected, because the surface declines selection.</p>
+</div>
+
+<script>
+  /*
+   * Drag handlers on the two surfaces that HAVE draggable items, and nowhere else.
+   *
+   * The dblclick-only pair carried them too at first, and the fixture then reported
+   * `drag-source-not-draggable`, `dragover-not-prevented` and `dragstart-transfers-nothing` on
+   * surfaces with nothing to drag — all true, none of them what this file is about, and enough
+   * noise to bury the two rules under test.
+   */
+  for (const surface of [document.getElementById("loose"), document.getElementById("tight")]) {
+    let held = null;
+
+    surface.addEventListener("dragstart", (event) => {
+      const item = event.target.closest(".item");
+      if (!item) return;
+      held = item;
+      event.dataTransfer.setData("text/plain", item.id);
+    });
+
+    surface.addEventListener("dragover", (event) => {
+      const pile = event.target.closest(".pile");
+      if (!held || !pile || pile === held.parentElement) return;
+      event.preventDefault();
+    });
+
+    surface.addEventListener("drop", (event) => {
+      const pile = event.target.closest(".pile");
+      if (!held || !pile || pile === held.parentElement) return;
+      event.preventDefault();
+      pile.append(held);
+    });
+
+    surface.addEventListener("dragend", () => { held = null; });
+
+    // A keyboard route, so `drag-without-keyboard-alternative` is not what this fixture is about.
+    surface.addEventListener("keydown", () => {});
+  }
+
+  /*
+   * The gesture that produces the selection by MISSING, on all four surfaces.
+   *
+   * Double-click means "send it home", the handler addresses an item and returns early on anything
+   * else, and a double-click that lands on the surface rather than on an item selects a word of the
+   * prose instead. Solitaire is this exact shape: double-click sends a card to a foundation, the
+   * handler is on the board, and the board has a hint line under it.
+   */
+  for (const surface of document.querySelectorAll(".surface")) {
+    surface.addEventListener("dblclick", (event) => {
+      const item = event.target.closest(".item");
+      if (!item) return;
+      surface.querySelector(".pile:empty")?.append(item);
+    });
+    // A keyboard route on every surface, not only the two with items: a `dblclick` handler with no
+    // keyboard path is `pointer-only-control`, which is a true finding and not this fixture's
+    // subject. It reported on the dblclick-only pair until this moved out of the drag loop.
+    surface.addEventListener("keydown", () => {});
+  }
+</script>
+</body>
+</html>

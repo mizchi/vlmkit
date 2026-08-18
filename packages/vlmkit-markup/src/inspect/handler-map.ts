@@ -152,6 +152,8 @@ export interface HandlerSurface {
   touchProbe?: TouchProbe[];
   /** Present only when the `input` family was driven. Absent means "not measured". */
   textInputProbe?: TextInputProbe[];
+  /** Present only when the `dblclick` family was driven. Absent means "not measured". */
+  doubleClickProbe?: DoubleClickProbe[];
   /** Text fields beyond the cap that were not typed into. */
   textInputCapped?: number;
   /** Stylesheets the hover probe could not read (another origin), and triggers left unvisited. */
@@ -942,6 +944,35 @@ export interface RealDragProbe {
    */
   pressedOn?: string;
   /**
+   * What a drag gesture over this surface left SELECTED, when it selected anything.
+   *
+   * A range on a drag surface is not cosmetic. Selected text is itself draggable, so the next press
+   * may drag the selection rather than the thing under the cursor; the highlight sits over the
+   * board; and the gesture that produced it — commonly a double-click that missed — fired an action
+   * the user did not ask for. `anchor` is the element the range starts in, which is where the
+   * `user-select: none` belongs and is usually not the surface itself but a hint line or a status
+   * readout inside it.
+   */
+  selectedText?: {
+    text: string;
+    anchor: string | null;
+    /** What the press landed on, when the selecting gesture was the stray press rather than a card. */
+    from?: string;
+  };
+  /**
+   * What the drag does to the dragged element's own readability, measured from its pixels.
+   *
+   * `rest` and `dragging` are `inkPaperContrast` — the WCAG ratio between the element's darkest and
+   * lightest deciles — before the press and while the drag is in the air. `opacity` is what the page
+   * computed for it mid-flight, read rather than inferred.
+   *
+   * The pair is the point. Every sortable ghosts its source, and a ghost is a good affordance right
+   * up to where the thing being carried stops being identifiable: reported by hand against
+   * `examples/solitaire`, where a card at `opacity: 0.55` over green felt "becomes hard to tell
+   * what card it is". One number cannot say that; the drop from one to the other can.
+   */
+  dragLegibility?: { rest: number; dragging: number; opacity?: number };
+  /**
    * Drag sources OUTSIDE this element that the gesture started, if any.
    *
    * A delegated card is not one of these — it is inside, its `dragstart` bubbles to this handler,
@@ -1049,6 +1080,92 @@ export interface DragTimelineStep {
    */
   received?: { type: string; value: string }[];
 }
+
+/**
+ * A legibility proxy for one element's own pixels: the WCAG ratio between its darkest and lightest
+ * deciles.
+ *
+ * **A proxy, not a text-contrast measurement.** It knows nothing about which pixels are glyphs; it
+ * asks how far apart the extremes of the element's own image are. On a playing card that is exactly
+ * the question — black pips on a white face read ~15:1, and the same card at `opacity: 0.55` over a
+ * green felt reads ~2:1 — and the number is directly comparable to the WCAG floors this project
+ * already gates on, which is why it is expressed as a ratio rather than as a standard deviation.
+ *
+ * Quantiles rather than min/max: a single dark antialiased pixel or one white speck would otherwise
+ * decide the answer for the whole element. Fully transparent pixels are skipped — they are neither
+ * ink nor paper, and counting them as black inverts the result on a rounded corner.
+ *
+ * **The ink quantile is 2%, not 10%, and that was measured rather than chosen.** A card face is
+ * >90% paper, so the darkest DECILE is mostly antialiasing and the border: on solitaire's J♥ it read
+ * 4.06:1 at rest where the 2% quantile read 6.17:1, and the drop the drag caused shrank from 31% to
+ * 21% with it. The paper quantile stays at 10% because paper is the majority of the element and any
+ * high quantile agrees (p10/p25/p50 differed by 0.02 on the same card).
+ */
+function inkPaperContrast(png: Buffer): number {
+  const img = PNG.sync.read(png);
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const lum: number[] = [];
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3]! < 8) continue;
+    lum.push(
+      0.2126 * channel(img.data[i]!)
+      + 0.7152 * channel(img.data[i + 1]!)
+      + 0.0722 * channel(img.data[i + 2]!),
+    );
+  }
+  // Too few pixels to have deciles worth the name. 1 reads as "no contrast measured" and the
+  // caller drops the row rather than grading it.
+  if (lum.length < 64) return 1;
+  lum.sort((a, b) => a - b);
+  const mean = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
+  const ink = Math.max(1, Math.round(lum.length * 0.02));
+  const paper = Math.max(1, Math.round(lum.length * 0.1));
+  return (mean(lum.slice(-paper)) + 0.05) / (mean(lum.slice(0, ink)) + 0.05);
+}
+
+/**
+ * When a mid-drag legibility pair becomes a finding: the ratio fell below the WCAG text floor AND
+ * the drag is what took it there.
+ *
+ * Both, because either alone reports the wrong pages. A card whose ink is red starts at ~6:1 and a
+ * page that dims it to 4.3:1 has made it materially worse — but a page that dims 15:1 to 9:1 has
+ * lost the same PROPORTION and is still perfectly readable, so the drop alone would report it. And
+ * an element that simply has low contrast at rest is `check a11y contrast`'s business, not this
+ * rule's, so the floor alone would report a defect that has nothing to do with dragging.
+ */
+const DRAG_LEGIBILITY_FLOOR = 4.5;
+const DRAG_LEGIBILITY_DROP = 0.25;
+
+/**
+ * What a pointer gesture left selected, read after the gesture and before the next reset.
+ *
+ * Unintended text selection is the DnD defect this file could not see, and the reason is in the
+ * file: every probe clears the selection before its gesture — it has to, because selected text is
+ * itself draggable and a leftover range changes the next measurement — and clearing was all it did.
+ * A hand-played round on `examples/solitaire` turned into a range selection across the board, and
+ * the probe had been wiping that condition away once per gesture for as long as it existed.
+ *
+ * The anchor element matters as much as the text: a selection produced by a press on a board
+ * usually anchors in a hint line or a status readout the surface happens to contain, and that is
+ * the element the `user-select: none` belongs on. Trimmed and capped because a selection can be the
+ * whole page.
+ */
+const READ_SELECTION = String.raw`(() => {
+  const s = window.getSelection && window.getSelection();
+  if (!s || s.rangeCount === 0 || s.isCollapsed) return { text: "", anchor: null };
+  const node = s.anchorNode;
+  const anchor = !node ? null : (node.nodeType === 1 ? node : node.parentElement);
+  const label = anchor && anchor.tagName
+    ? anchor.tagName.toLowerCase()
+      + (anchor.id ? "#" + anchor.id : "")
+      + (typeof anchor.className === "string" && anchor.className.trim()
+        ? "." + anchor.className.trim().split(/\s+/)[0] : "")
+    : null;
+  return { text: String(s).replace(/\s+/g, " ").trim().slice(0, 120), anchor: label };
+})()`;
 
 /**
  * Records every drag event on `document`, in both phases.
@@ -1430,9 +1547,17 @@ async function probeRealDrags(
     to: { x: number; y: number },
     target?: ElementHandle<Element> | null,
     cancel = false,
+    /**
+     * The element being dragged, when this gesture should also measure what the drag does to its
+     * own legibility. Shot mid-flight and compared against a rest shot the caller takes, because
+     * the half-transparent ghost every sortable applies is only visible while the drag is in the
+     * air.
+     */
+    source?: ElementHandle<Element> | null,
   ) => {
     // Selected text is draggable, so a leftover selection starts a text drag instead of this
-    // one — measured, and it made the same two gestures disagree between runs.
+    // one — measured, and it made the same two gestures disagree between runs. What the gesture
+    // itself selects is read at the END, before the next clear: see `READ_SELECTION`.
     await page.evaluate("(() => { window.__vlmkitDragLog = []; const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
     await page.mouse.move(from.x, from.y);
     await page.mouse.down();
@@ -1451,6 +1576,20 @@ async function probeRealDrags(
     // separates a zone that highlights on dragenter (99% of its own box changed) from one that
     // does not (0.00%, byte-identical).
     const during = before ? await target!.screenshot().catch(() => null) : null;
+    /*
+     * The dragged element, in the air. Its own opacity is read here rather than inferred from the
+     * pixels, because "the page set opacity" and "the result is unreadable" are two facts and the
+     * finding needs both: 0.9 is a hint, 0.55 over a coloured surface is a card you cannot name.
+     */
+    let sourceDuring: Buffer | null = null;
+    let sourceOpacity: number | undefined;
+    if (source) {
+      sourceOpacity = await page.evaluate(
+        (node) => Number(getComputedStyle(node as Element).opacity),
+        source,
+      ).catch(() => undefined) as number | undefined;
+      sourceDuring = await source.screenshot().catch(() => null);
+    }
     // Escape before the release, which is the order a user produces and the order measured to
     // cancel: `dragend` arrives with `dropEffect: "none"` and no `drop` fires.
     if (cancel) await page.keyboard.press("Escape");
@@ -1462,7 +1601,16 @@ async function probeRealDrags(
     // already in the log on the first read and the second changed nothing. Removing the guard also
     // left every test green, which is how it came up for checking.
     const log = await page.evaluate("window.__vlmkitDragLog") as LogRow[];
-    return { log, hoverRatio: before && during ? pixelDelta(before, during) : undefined };
+    // What the gesture left selected. Read here rather than at the next gesture's reset, so the
+    // range is attributable to the drag that produced it instead of to the one after it.
+    const selected = await page.evaluate(READ_SELECTION) as { text: string; anchor: string | null };
+    return {
+      log,
+      hoverRatio: before && during ? pixelDelta(before, during) : undefined,
+      selected: selected.text ? selected : undefined,
+      sourceDuring,
+      sourceOpacity,
+    };
   };
 
   for (const src of sources) {
@@ -1520,11 +1668,30 @@ async function probeRealDrags(
         from: { x: number; y: number },
         to: { x: number; y: number },
         aimed?: { path: string; handle: ElementHandle<Element> | null },
+        /** Measure what the drag does to this element's own legibility while it is in the air. */
+        legibilityOf?: { handle: ElementHandle<Element>; rest: Buffer | null },
       ) => {
         budget--;
         row.gestures++;
-        const { log, hoverRatio } = await gesture(from, to, aimed?.handle);
+        const { log, hoverRatio, selected, sourceDuring, sourceOpacity } = await gesture(
+          from,
+          to,
+          aimed?.handle,
+          false,
+          legibilityOf?.handle,
+        );
+        if (legibilityOf?.rest && sourceDuring && !row.dragLegibility) {
+          const rest = inkPaperContrast(legibilityOf.rest);
+          const dragging = inkPaperContrast(sourceDuring);
+          // 1 from either shot means the element was too small to have deciles — not a measurement.
+          if (rest > 1 && dragging > 1) {
+            row.dragLegibility = { rest, dragging, ...(sourceOpacity !== undefined ? { opacity: sourceOpacity } : {}) };
+          }
+        }
         if (aimed && hoverRatio !== undefined) hoverFeedback.push({ target: aimed.path, ratio: hoverRatio });
+        // The FIRST gesture that selected something is kept: later ones say the same thing about the
+        // same surface, and the first is the one whose from/to a reader can still reconstruct.
+        if (selected && !row.selectedText) row.selectedText = selected;
         for (const r of log) {
           // Coalesce consecutive repeats: `drag` fires per mouse move and `dragover` per frame
           // over the same element, and a hundred identical lines is not a timeline anyone reads.
@@ -1592,7 +1759,17 @@ async function probeRealDrags(
           const to = resolved?.at ?? { x: centre.x + 60, y: centre.y + 60 };
           const aimed = aim && resolved ? { path: aim.path, handle: resolved.handle } : undefined;
           if (aim) row.targetsTried.push(aim.path);
-          let log = await run(centre, to, aimed);
+          /*
+           * The rest shot for the legibility measurement, taken before the press and only for the
+           * first attempt that has a chance of lifting: the pair only means something when both
+           * halves are the same element in the same place, and after one drop the card has moved.
+           * A failure to shoot is not a failure of the gesture — `null` simply means the pair
+           * cannot be formed and no legibility is reported.
+           */
+          const legibility = !row.dragLegibility
+            ? { handle: press.handle, rest: await press.handle.screenshot().catch(() => null) }
+            : undefined;
+          let log = await run(centre, to, aimed, legibility);
           // The retry, for the first attempt on the first candidate only: a card whose only
           // draggable part is a handle, or one with a `draggable="false"` child under the centre,
           // would otherwise read as inert. A second point on a card the plan already resolved as
@@ -1614,6 +1791,45 @@ async function probeRealDrags(
           if (dropped && !row.droppedOn) {
             row.droppedOn = dropped.path;
             if (plan.delegated) row.pressedOn = press.path;
+          }
+        }
+      }
+      /*
+       * ---- The stray press: a drag that starts where the handler does not apply -------------
+       *
+       * Every gesture above presses a draggable item, which on a well-built board is
+       * `user-select: none` and cannot select anything. The gesture that produced the reported
+       * defect is the other one: a press that lands on the surface's own prose — a hint line, a
+       * status readout — and crosses the board from there. It is ordinary clumsiness, it selects
+       * the sentence, and no amount of `user-select: none` on the CARDS prevents it.
+       *
+       * One gesture, and only while nothing has selected yet: this asks a question about the
+       * surface, and one answer settles it.
+       *
+       * DELEGATED surfaces only, and that is not a shortcut. The question is about a container that
+       * holds both the items and the prose — press one, hit the other. Where the source IS the
+       * draggable element, the ordinary gestures already press it, and a press somewhere else is a
+       * question about some other element. Running it everywhere also spent a gesture on every
+       * direct source, which changed two measurements that had nothing to do with selection: the
+       * inert-source retry count, and the Escape-cancel result on a card that hides itself on
+       * `dragstart` and was no longer there by the time the cancel gesture ran.
+       */
+      if (plan.delegated && !row.selectedText && budget > 0) {
+        const box = await entryHandle.boundingBox();
+        if (box && box.width >= 24 && box.height >= 24) {
+          await page.evaluate((node) => {
+            (window as unknown as { __vlmkitMissTarget?: Element }).__vlmkitMissTarget = node;
+          }, entryHandle);
+          const points = await page.evaluate(MISS_POINTS_SCRIPT) as { x: number; y: number; over: string }[];
+          const stray = points.find((p) => p.over !== "the surface itself") ?? points[0];
+          if (stray) {
+            budget--;
+            row.gestures++;
+            const { selected } = await gesture(
+              { x: stray.x, y: stray.y },
+              { x: box.x + box.width * 0.6, y: box.y + box.height * 0.35 },
+            );
+            if (selected) row.selectedText = { ...selected, from: stray.over };
           }
         }
       }
@@ -1646,7 +1862,10 @@ async function probeRealDrags(
           height: Math.max(1, Math.ceil(box.height)),
         };
         const before = await page.screenshot({ clip }).catch(() => null);
-        const { log: cancelLog } = await gesture(centre, chosenAim?.at ?? { x: centre.x + 60, y: centre.y + 60 }, null, true);
+        const { log: cancelLog, selected: cancelSelected } = await gesture(centre, chosenAim?.at ?? { x: centre.x + 60, y: centre.y + 60 }, null, true);
+        // This is a gesture like any other, so it can be the one that selects — and on a surface
+        // whose earlier gestures all landed on a card, it is the only one that presses anywhere else.
+        if (cancelSelected && !row.selectedText) row.selectedText = cancelSelected;
         await page.waitForTimeout(150);
         const after = before ? await page.screenshot({ clip }).catch(() => null) : null;
         const end = cancelLog.find((r) => r.type === "dragend");
@@ -1946,6 +2165,137 @@ export interface MenuProbe {
   /** Elements that became visible, as `path|text` labels. */
   revealed: string[];
   error?: string;
+}
+
+/**
+ * What a double-click that MISSED left behind.
+ *
+ * The gesture, not the element, is the subject. A page whose double-click means something — send
+ * this card home, open this row, rename this file — has a handler that addresses a child and
+ * returns early on anything else, so the miss is silent as far as the page is concerned. The
+ * browser is not silent: a double-click selects a word, and on `examples/solitaire` a double-click
+ * on the bare table selected a word out of the hint line under it. The player is then holding a
+ * range selection they did not ask for, over a board, with selected text being itself draggable.
+ */
+export interface DoubleClickProbe {
+  path: string;
+  text: string;
+  /** How many miss points were double-clicked. Zero means the element had none to find. */
+  pointsTried: number;
+  /** What the miss selected, when it selected anything. */
+  selected?: { text: string; anchor: string | null };
+  /**
+   * How many of the element's own listeners the miss invoked.
+   *
+   * Reported, not graded. A delegated handler that returns early still counts as invoked, so this
+   * cannot tell "ran and declined" from "ran and did something" — what it does settle is that the
+   * gesture reached the element.
+   */
+  handlerCalls: number;
+  error?: string;
+}
+
+/**
+ * Points inside an element where a pointer gesture misses whatever its handler addresses.
+ *
+ * A 5x5 interior grid, hit-tested, keeping the first point over TEXT and the first point over the
+ * bare surface. Text first because that is the point that selects a word outright; the bare point
+ * second because a double-click on empty space still extends to the nearest text node — which is
+ * how solitaire's table selected a word of a paragraph the click never touched.
+ *
+ * A point counts as a miss only when the hit test lands on the element itself or on a descendant
+ * that is not what a delegated handler would address: not draggable, not a control, no role and no
+ * tabindex. Probing a hit would measure the page working.
+ */
+const MISS_POINTS_SCRIPT = String.raw`(() => {
+  const el = window.__vlmkitMissTarget;
+  if (!el || !el.getBoundingClientRect) return [];
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8) return [];
+  const ADDRESSED = 'a,button,input,select,textarea,summary,[role],[tabindex],[draggable="true"]';
+  const isAddressed = (node) => {
+    for (let n = node; n && n !== el; n = n.parentElement) {
+      if (n.draggable === true) return true;
+      if (n.matches && n.matches(ADDRESSED)) return true;
+    }
+    return false;
+  };
+  const hasText = (node) => {
+    if (node === el) return false;
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3 && child.textContent && child.textContent.trim()) return true;
+    }
+    return false;
+  };
+  let overText = null;
+  let overBare = null;
+  for (let ix = 1; ix <= 5 && !(overText && overBare); ix++) {
+    for (let iy = 1; iy <= 5 && !(overText && overBare); iy++) {
+      const x = r.left + (r.width * ix) / 6;
+      const y = r.top + (r.height * iy) / 6;
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || !el.contains(hit) || isAddressed(hit)) continue;
+      const label = hit === el ? "the surface itself" : (hit.tagName.toLowerCase()
+        + (hit.id ? "#" + hit.id : "")
+        + (typeof hit.className === "string" && hit.className.trim()
+          ? "." + hit.className.trim().split(/\s+/)[0] : ""));
+      if (!overText && hasText(hit)) overText = { x: x, y: y, over: label };
+      else if (!overBare) overBare = { x: x, y: y, over: label };
+    }
+  }
+  return [overText, overBare].filter(Boolean);
+})()`;
+
+/**
+ * Double-click where the page's own handler would miss, and report what got selected.
+ *
+ * Only elements that HAVE a `dblclick` handler, because the premise is a page for which
+ * double-click is a gesture with a meaning. A page that binds none has nothing to miss.
+ */
+async function probeDoubleClicks(
+  page: Page,
+  elements: readonly HandlerSurfaceEntry[],
+): Promise<DoubleClickProbe[]> {
+  const targets = elements.filter((e) => e.visible && e.types["dblclick"]);
+  if (targets.length === 0) return [];
+  const out: DoubleClickProbe[] = [];
+  for (const entry of targets) {
+    const row: DoubleClickProbe = { path: entry.path, text: entry.text, pointsTried: 0, handlerCalls: 0 };
+    try {
+      const el = (await handleForPath(page, entry.path)).asElement();
+      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      await page.evaluate((node) => {
+        (window as unknown as { __vlmkitMissTarget?: Element }).__vlmkitMissTarget = node;
+      }, el);
+      const points = await page.evaluate(MISS_POINTS_SCRIPT) as { x: number; y: number; over: string }[];
+      for (const point of points) {
+        row.pointsTried++;
+        // Clear first, so what is read afterwards is this gesture's and not the page's own
+        // start-up selection or a previous probe's leftovers.
+        await page.evaluate("(() => { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
+        await page.evaluate((node) => (window as unknown as {
+          __vlmkitResetCalls?: (n: Element) => void;
+        }).__vlmkitResetCalls?.(node as Element), el);
+        await page.mouse.dblclick(point.x, point.y);
+        await page.waitForTimeout(60);
+        const calls = await page.evaluate((node) => (window as unknown as {
+          __vlmkitCallCount?: (n: Element) => number;
+        }).__vlmkitCallCount?.(node as Element) ?? 0, el) as number;
+        row.handlerCalls = Math.max(row.handlerCalls, calls);
+        const selected = await page.evaluate(READ_SELECTION) as { text: string; anchor: string | null };
+        if (selected.text) {
+          row.selected = selected;
+          break;
+        }
+      }
+      // Leave nothing behind for the probes that run after this one.
+      await page.evaluate("(() => { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    out.push(row);
+  }
+  return out;
 }
 
 /** Records `contextmenu` in the bubble phase, where `defaultPrevented` is the page's answer. */
@@ -2323,7 +2673,7 @@ function pixelDelta(a: Buffer, b: Buffer): number {
  * and `wheel` fire the page's own handlers; `input` puts text into fields. A page whose drop
  * handler POSTs will POST, so the default stays an inventory that presses nothing.
  */
-export const PROBE_FAMILIES = ["drag", "wheel", "hover", "menu", "touch", "input"] as const;
+export const PROBE_FAMILIES = ["drag", "wheel", "hover", "menu", "touch", "input", "dblclick"] as const;
 export type ProbeFamily = typeof PROBE_FAMILIES[number];
 
 export interface HandlerSurfaceOptions extends PageLoadOptions {
@@ -2398,6 +2748,11 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     const hover = probes.has("hover") ? await probeHovers(page, raw.elements) : undefined;
     const menuProbe = probes.has("menu") ? await probeMenus(page, raw.elements) : undefined;
     const textInput = probes.has("input") ? await probeTextInputs(page) : undefined;
+    // After the drag family on purpose: it double-clicks the page, and a page whose double-click
+    // means "send this home" would otherwise change the board the drag probe is about to measure.
+    const doubleClickProbe = probes.has("dblclick")
+      ? await probeDoubleClicks(page, raw.elements)
+      : undefined;
     // A separate page, because touch emulation changes what the page sees: `navigator
     // .maxTouchPoints` goes 0 -> 1 and `"ontouchstart" in window` false -> true, both of which real
     // apps branch on. Measured, and the reason this does not just add `hasTouch` to the page every
@@ -2457,6 +2812,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ...(textInput && textInput.rows.length > 0 ? { textInputProbe: textInput.rows } : {}),
       ...(textInput && textInput.capped > 0 ? { textInputCapped: textInput.capped } : {}),
       ...(touchProbe && touchProbe.length > 0 ? { touchProbe } : {}),
+      ...(doubleClickProbe && doubleClickProbe.length > 0 ? { doubleClickProbe } : {}),
       ...(hover && (hover.unreadableSheets > 0 || hover.capped > 0)
         ? { hoverProbeLimits: { unreadableSheets: hover.unreadableSheets, capped: hover.capped } }
         : {}),
@@ -2616,7 +2972,8 @@ export interface HandlerIssue {
     | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
     | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel"
     | "hover-only-reveal" | "contextmenu-not-prevented" | "contextmenu-replaces-nothing"
-    | "touch-handlers-not-invoked" | "text-input-rejects-non-ascii";
+    | "touch-handlers-not-invoked" | "text-input-rejects-non-ascii"
+    | "drag-selects-text" | "dblclick-selects-text" | "drag-ghost-illegible";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -2698,6 +3055,41 @@ export const HANDLER_SURFACE_RULES = [
         + " The one unambiguous outcome of the pointer-drag probe: the pixel numbers beside it"
         + " are reported rather than graded, because 0% pixels has several explanations and"
         + " 0 invocations has one. Requires --probe-drag.",
+    },
+    {
+      id: "drag-selects-text",
+      title: "A drag gesture over this surface selected text",
+      severity: "suspect",
+      docs:
+        "Driven: a real press-and-drag over the surface left a range selection behind. Selected"
+        + " text is itself draggable, so the next press may drag the SELECTION rather than the"
+        + " thing under the cursor; the highlight sits over the surface; and the gesture that"
+        + " produced it was aimed at the surface, not at the text. `user-select: none` belongs on"
+        + " the element the range anchors in, which the finding names — usually not the surface"
+        + " itself but a hint line or a status readout inside it. Requires --probe-drag.",
+    },
+    {
+      id: "drag-ghost-illegible",
+      title: "The dragged element becomes unreadable while it is in the air",
+      severity: "suspect",
+      docs:
+        "Driven: the element was shot at rest and again mid-flight, and the WCAG ratio between its"
+        + " darkest 2% and lightest 10% of pixels fell below 4.5:1 with the drag responsible for at"
+        + " least a quarter of the fall. The usual cause is the `opacity` every sortable applies to"
+        + " its source, composited over whatever the surface behind it happens to be — the finding"
+        + " reports the computed opacity alongside the two ratios. A proxy, not a text-contrast"
+        + " measurement: it does not know which pixels are glyphs. Requires --probe-drag.",
+    },
+    {
+      id: "dblclick-selects-text",
+      title: "A double-click that missed selected a word",
+      severity: "suspect",
+      docs:
+        "Driven: the page binds `dblclick` as a gesture with a meaning, and a double-click at a"
+        + " point where its handler does not apply selected a word instead. The handler is silent"
+        + " — it addresses a child and returns early — but the browser is not, so the user is left"
+        + " holding a selection they did not ask for. The fix is `user-select: none` on the"
+        + " surface, not a change to the handler. Requires --probe dblclick.",
     },
     {
       id: "drag-source-inert",
@@ -2906,6 +3298,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       if (!row.error && row.handlerCalls > 0) probedThisRun.add("contextmenu");
     }
   }
+  if (surface.doubleClickProbe) {
+    for (const row of surface.doubleClickProbe) {
+      // A gesture that reached the element counts it as exercised. `pointsTried > 0` alone would
+      // not: a double-click nothing received says the type is still uncovered, which is what
+      // `unprobed-handler-types` exists to disclose.
+      if (!row.error && row.handlerCalls > 0) probedThisRun.add("dblclick");
+    }
+  }
   if (surface.touchProbe) {
     for (const row of surface.touchProbe) {
       if (row.error) continue;
@@ -3082,6 +3482,64 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `press, or \`draggable\` set on a different node than the handler. Note the element `
           + `IS draggable as far as the DOM is concerned, which is why the static check passes `
           + `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
+      });
+    }
+
+    /*
+     * A drag gesture that left a range selection behind.
+     *
+     * The defect the probes were suppressing: every one of them clears the selection before its
+     * gesture, and clearing was all they did, so a range produced BY a drag over a board was wiped
+     * before anything could report it. Found by hand on `examples/solitaire`, where a press that
+     * starts on the hint line and crosses the table selects the whole sentence.
+     *
+     * Graded on the surface that was dragged, named on the element the range anchors in — those are
+     * usually different elements, and the second one is where the fix goes.
+     */
+    if (realProbe?.selectedText && !realProbe.error) {
+      const anchor = realProbe.selectedText.anchor;
+      issues.push({
+        kind: "drag-selects-text",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `A real drag over ${e.path} left text selected: `
+          + `${JSON.stringify(realProbe.selectedText.text)}`
+          + `${anchor ? `, anchored in ${anchor}` : ""}. Selected text is itself draggable, so the `
+          + `next press can drag the selection instead of the element under it, and the highlight `
+          + `sits over the surface. Set \`user-select: none\` on `
+          + `${anchor ?? "the selectable content inside this surface"} — a drag surface that `
+          + `contains prose needs it on the prose, not only on the items.`,
+      });
+    }
+
+    /*
+     * The dragged element stopped being identifiable while it was in the air.
+     *
+     * Reported by hand against `examples/solitaire`: "while dragging, the source's background goes
+     * translucent and combined with what is behind it you cannot tell which card it is." Measured on
+     * that card: 6.17:1 at rest, 4.27:1 mid-flight at `opacity: 0.55` — a 31% fall, through the
+     * 4.5:1 floor.
+     */
+    const legibility = realProbe?.dragLegibility;
+    if (
+      legibility && !realProbe?.error
+      && legibility.dragging < DRAG_LEGIBILITY_FLOOR
+      && legibility.dragging < legibility.rest * (1 - DRAG_LEGIBILITY_DROP)
+    ) {
+      const drop = Math.round((1 - legibility.dragging / legibility.rest) * 100);
+      issues.push({
+        kind: "drag-ghost-illegible",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `The element being dragged from ${e.path} loses ${drop}% of its own contrast while `
+          + `the drag is in the air: ${legibility.rest.toFixed(2)}:1 at rest, `
+          + `${legibility.dragging.toFixed(2)}:1 mid-flight`
+          + `${legibility.opacity !== undefined ? ` at \`opacity: ${legibility.opacity}\`` : ""}, `
+          + `below the 4.5:1 the rest of this project gates text on. Whatever is behind the surface `
+          + `is now showing through the thing being carried. Ghost the SOURCE'S POSITION rather than `
+          + `the source — a dashed outline, a gap, a placeholder — or raise the opacity until the `
+          + `face survives the composite. Measured from the element's own pixels (darkest 2% against `
+          + `lightest 10%), so it is a legibility proxy and not a text-contrast reading.`,
       });
     }
 
@@ -3337,6 +3795,33 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `offscreen until placed, this cannot see it; if there is no replacement, do not cancel.`,
       });
     }
+  }
+  /*
+   * A double-click that missed and selected a word instead.
+   *
+   * Iterated outside the per-element loop for the same reason the hover rule is: the element the
+   * finding is ABOUT is the one carrying the `dblclick` handler, and the range it produced usually
+   * anchors somewhere else entirely — a hint line, a status readout — which may have no handlers and
+   * therefore no entry in the surface at all.
+   *
+   * This is the gesture that produced the reported defect on `examples/solitaire`: double-click is
+   * how a card is sent to a foundation, the handler is on the board, and a double-click that lands
+   * on the bare table selects a word out of the hint line under it.
+   */
+  for (const row of surface.doubleClickProbe ?? []) {
+    if (row.error || !row.selected) continue;
+    const anchor = row.selected.anchor;
+    issues.push({
+      kind: "dblclick-selects-text",
+      severity: "suspect",
+      element: `${row.path} "${row.text}"`,
+      message: `A double-click on ${row.path} at a point its own handler does not apply to selected `
+        + `${JSON.stringify(row.selected.text)}${anchor ? ` from ${anchor}` : ""}. Double-click is a `
+        + `gesture with a meaning on this page, so the miss is ordinary play — and the handler is `
+        + `silent about it while the browser leaves a range selection behind. Set `
+        + `\`user-select: none\` on ${anchor ?? "the selectable content in this surface"}; the `
+        + `handler is not the thing to change.`,
+    });
   }
   for (const row of surface.touchProbe ?? []) {
     if (row.error || row.tapCalls > 0) continue;
@@ -3833,8 +4318,21 @@ export function formatHandlerSurface(
       // seeing `main#table: dragstart fired` for a board wants to know WHICH card moved, and the
       // route below is only printed when the drag failed.
       const pressed = row.pressedOn ? ` ${DIM}(pressed ${row.pressedOn})${RESET}` : "";
+      /*
+       * What the drag did to the dragged thing's own readability. PRINTED whenever it fell
+       * materially, and graded only when it also broke the 4.5:1 floor — the gap between those two
+       * is deliberate and this line is what lives in it. Measured on solitaire: 7.59:1 to 5.01:1 at
+       * `opacity: 0.55`, a 34% loss that stays above the floor, which is exactly the case a human
+       * reported by looking at it and a rule should not claim to have proved.
+       */
+      const legibility = row.dragLegibility;
+      const dimmed = legibility && legibility.dragging < legibility.rest * (1 - DRAG_LEGIBILITY_DROP)
+        ? ` ${legibility.dragging < DRAG_LEGIBILITY_FLOOR ? RED : DIM}(mid-drag contrast `
+          + `${legibility.rest.toFixed(1)}:1 → ${legibility.dragging.toFixed(1)}:1`
+          + `${legibility.opacity !== undefined ? ` at opacity ${legibility.opacity}` : ""})${RESET}`
+        : "";
       lines.push(
-        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${pressed}${tried} — ${landed}${cancelNote}`
+        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${pressed}${tried} — ${landed}${cancelNote}${dimmed}`
         + (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
       );
       // The route, printed only when the drag did not complete. That is when the question is

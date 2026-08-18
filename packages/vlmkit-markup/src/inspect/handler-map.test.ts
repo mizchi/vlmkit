@@ -1026,6 +1026,142 @@ test("E2E: a delegated drag board is pressed on its cards, not on its container"
   }
 });
 
+/**
+ * Unintended text selection, in both directions on one page.
+ *
+ * The defect class the probes could not see BECAUSE of how they were written: each one clears the
+ * selection before its gesture — it has to, since selected text is itself draggable and a leftover
+ * range changes the next measurement — and clearing was all any of them did. Reported by hand
+ * against `examples/solitaire`: a round of play turned into a range selection over the board, and
+ * the harness had been wiping that condition away once per gesture for as long as it existed.
+ *
+ * Graded against a page that gets it right as well as one that does not, because a rule that fires
+ * on the broken half proves nothing on its own. `#tight` and `#loose` differ by one declaration.
+ */
+test("E2E: a gesture that selects text where it should not is reported, and user-select silences it", { timeout: 180_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/handlers/selection-on-drag.html");
+  const s = await buildHandlerSurface({ source, probeDrag: true, probes: ["drag", "dblclick"] });
+  const kinds = (id: string) => deriveHandlerIssues(s)
+    .filter((i) => i.element.startsWith(`div#${id} `))
+    .map((i) => i.kind);
+
+  // The stray press: a drag that starts on the surface's own prose rather than on an item. Every
+  // other gesture presses a draggable item, which is `user-select: none` on any real board — so
+  // without this one the rule cannot see the gesture a player actually makes.
+  const dragRow = s.realDragProbe?.find((r) => r.path === "div#loose");
+  assert.ok(dragRow?.selectedText, "the stray press must be measured");
+  // The prose it landed on, as far as the 120-character cap carries it.
+  assert.match(dragRow.selectedText.text, /Drag an item onto a pile/, "it selects the prose it landed on");
+  assert.equal(dragRow.selectedText.anchor, "p.prose", "named where the user-select belongs");
+  assert.ok(kinds("loose").includes("drag-selects-text"));
+
+  // The miss: double-click is a gesture with a meaning here, and a double-click that lands where
+  // the handler does not apply selects a word instead. This is the shape solitaire hit.
+  const dblRow = s.doubleClickProbe?.find((r) => r.path === "div#loose-dblclick");
+  assert.ok(dblRow, "a dblclick handler must be probed");
+  assert.ok(dblRow.pointsTried > 0, "and a miss point must have been found");
+  assert.ok(dblRow.selected, `the miss must select something: ${JSON.stringify(dblRow)}`);
+  assert.ok(kinds("loose-dblclick").includes("dblclick-selects-text"));
+
+  // The other direction. One declaration apart from the halves above.
+  for (const id of ["tight", "tight-dblclick"]) {
+    assert.deepEqual(
+      kinds(id).filter((k) => k.endsWith("selects-text")),
+      [],
+      `${id} declines selection, so neither rule may fire on it`,
+    );
+  }
+  assert.equal(s.realDragProbe?.find((r) => r.path === "div#tight")?.selectedText, undefined);
+  assert.equal(s.doubleClickProbe?.find((r) => r.path === "div#tight")?.selected, undefined);
+  // And the guarded halves were actually driven, or the silence is unearned.
+  assert.ok((s.doubleClickProbe?.find((r) => r.path === "div#tight")?.pointsTried ?? 0) > 0);
+
+  // Absent without the family, because absent has to mean "not measured".
+  const noProbe = await buildHandlerSurface({ source, probeDrag: true, probes: ["drag"] });
+  assert.equal(noProbe.doubleClickProbe, undefined);
+  assert.equal(
+    deriveHandlerIssues(noProbe).some((i) => i.kind === "dblclick-selects-text"),
+    false,
+  );
+});
+
+/**
+ * What the drag does to the readability of the thing being dragged.
+ *
+ * Reported by hand against `examples/solitaire`: at `opacity: 0.55` the felt shows through the card
+ * face and a red J and a red 4 differ by a smudge. The pair of ratios is the measurement — one
+ * number cannot say "the drag made this worse" — and the rule needs the fall to also cross the
+ * 4.5:1 floor, so a page that dims 15:1 to 9:1 is measured and not graded.
+ */
+test("mid-drag legibility is graded on the fall AND the floor, never on either alone", () => {
+  const s = surface(entry({ path: "div#src", text: "card", types: { dragstart: 1 }, draggable: true }));
+  const fired = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-ghost-illegible").length;
+
+  // Through the floor, and the drag is what took it there.
+  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 7.6, dragging: 4.2, opacity: 0.55 } })];
+  assert.equal(fired(), 1);
+  assert.match(
+    deriveHandlerIssues(s).find((i) => i.kind === "drag-ghost-illegible")!.message,
+    /7\.60:1 at rest, 4\.20:1 mid-flight at `opacity: 0\.55`/,
+  );
+
+  // A big proportional fall that lands somewhere still readable. Measured and not graded — this is
+  // solitaire's own case at 7.59:1 → 5.01:1, which a human called a defect and a rule may not.
+  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 7.6, dragging: 5.0, opacity: 0.55 } })];
+  assert.equal(fired(), 0, "above the floor is reported in the reportline, not graded");
+
+  // Low contrast the drag had nothing to do with belongs to `check a11y contrast`.
+  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 4.2, dragging: 4.2, opacity: 1 } })];
+  assert.equal(fired(), 0);
+});
+
+test("E2E: a translucent ghost over a coloured surface is measured, and an opaque one is not", { timeout: 180_000 }, async () => {
+  // Two real pages rather than a hand-built row, because the number this grades on comes out of
+  // screenshots: what the composite of `opacity` over a background actually looks like is exactly
+  // what a synthetic row cannot tell you.
+  const dir = mkdtempSync(join(tmpdir(), "handlers-ghost-"));
+  const page = (opacity: string) => {
+    const file = join(dir, `ghost-${opacity.replace(".", "")}.html`);
+    writeFileSync(file, `<!doctype html><html><head><title>t</title><style>
+      body { margin: 0; background: #0b6623; }
+      #zone { position: absolute; left: 200px; top: 0; width: 120px; height: 160px; background: #0e7a2a; }
+      /* A card: white face, near-black glyph, on a green table. The pair the rule is about. */
+      #src { position: absolute; left: 20px; top: 20px; width: 110px; height: 150px;
+             background: #fff; color: #111; font: 700 92px/150px system-ui; text-align: center; }
+      #src.dragging { opacity: ${opacity}; }
+    </style></head><body>
+      <div id="src" draggable="true">7</div><div id="zone"></div>
+      <script>
+        const src = document.getElementById("src"), zone = document.getElementById("zone");
+        src.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "7"); src.classList.add("dragging"); });
+        src.addEventListener("dragend", () => src.classList.remove("dragging"));
+        zone.addEventListener("dragover", (e) => e.preventDefault());
+        zone.addEventListener("drop", (e) => e.preventDefault());
+        src.addEventListener("keydown", () => {});
+      </script></body></html>`);
+    return file;
+  };
+
+  const translucent = await buildHandlerSurface({ source: page("0.35"), probeDrag: true });
+  const ghost = translucent.realDragProbe?.[0]?.dragLegibility;
+  assert.ok(ghost, "the pair must be measured");
+  assert.ok(ghost.rest > ghost.dragging, `the drag must dim it: ${JSON.stringify(ghost)}`);
+  assert.equal(ghost.opacity, 0.35, "and the opacity is read, not inferred");
+  assert.ok(
+    deriveHandlerIssues(translucent).some((i) => i.kind === "drag-ghost-illegible"),
+    `0.35 over green must report: ${JSON.stringify(ghost)}`,
+  );
+
+  const opaque = await buildHandlerSurface({ source: page("1"), probeDrag: true });
+  const same = opaque.realDragProbe?.[0]?.dragLegibility;
+  assert.ok(same, "an opaque ghost is still measured — absent would mean unmeasured");
+  assert.equal(
+    deriveHandlerIssues(opaque).some((i) => i.kind === "drag-ghost-illegible"),
+    false,
+    `nothing changed, so nothing to report: ${JSON.stringify(same)}`,
+  );
+});
+
 test("the report obeys rule settings instead of contradicting the verdict", async () => {
   const { formatHandlerSurface } = await import("./handler-map.ts");
   // `ix` set and a keydown handler present, so `pointer-only-control` and

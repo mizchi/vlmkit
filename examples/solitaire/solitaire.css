@@ -58,6 +58,21 @@ body {
   font: 400 16px/1.4 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
   color: #f2f7f2;
   background: radial-gradient(circle at 50% 0%, var(--felt) 0%, var(--felt-dark) 100%);
+  /*
+   * Nothing on this page is prose to be copied, and every gesture it uses is a pointer gesture that
+   * the browser also reads as "select text". `.card` had `user-select: none` and that was not
+   * enough, because the ranges never started on a card:
+   *
+   *   - a double-click that misses a card — which is the gesture for sending one to a foundation —
+   *     selects a word out of the hint line under the table;
+   *   - a press that starts on the hint or the toolbar and crosses the board selects all of it;
+   *   - the highlight then sits over the felt, and selected text is itself DRAGGABLE, so the next
+   *     press can drag the selection instead of the card under it.
+   *
+   * Reported by hand, then reproduced and caught by `scan handlers --probe dblclick`
+   * (`dblclick-selects-text`), which is the rule this defect produced.
+   */
+  user-select: none;
 }
 
 .toolbar {
@@ -255,6 +270,40 @@ body {
 
 .foundation-slot:has(.card)::after { content: none; }
 
+/*
+ * An empty stock that can still be turned over says so.
+ *
+ * It used to say it only to a screen reader: the `aria-label` read "Stock empty — turn the waste
+ * over" while the pixels showed an empty outline identical to a pile with nothing left to do. A
+ * player reported exactly that — "when the stock is empty, make it obvious it can be reset" — and no
+ * gate could have caught it, because the accessible name was CORRECT and the box was not blank
+ * enough to look broken.
+ *
+ * Brighter than the foundation's hint arrow and with a dashed ring, because these are different
+ * kinds of mark: the arrow is a label for an empty place, this is an action that is available right
+ * now. `[data-state]` is set by `render()` from the same value that writes the label, so the two
+ * cannot drift apart again.
+ */
+#stock[data-state="recycle"]::after {
+  content: "↻";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 2.1rem;
+  color: rgba(255, 255, 255, 0.82);
+  pointer-events: none;
+}
+
+#stock[data-state="recycle"]::before {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+
+/* Nothing left to do here, so the pile recedes rather than inviting a click. */
+#stock[data-state="spent"]::before {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
 /* The drop-target highlight, applied on dragover ONLY when the rules accept the card. A target
    that lights up for a move it will reject is a lie the player acts on. */
 .slot.drop-ok::before { box-shadow: inset 0 0 0 3px #8ff08f, 0 0 1.1rem rgba(143, 240, 143, 0.55); }
@@ -329,9 +378,26 @@ body {
 .card.face-down .corner,
 .card.face-down .center-pip { visibility: hidden; }
 
-/* The card being dragged. Kept visible rather than hidden: the browser's drag image is a
-   snapshot, and hiding the source makes the column look like it lost a card mid-gesture. */
-.card.dragging { opacity: 0.55; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
+/*
+ * The card being dragged. Kept visible rather than hidden: the browser's drag image is a snapshot,
+ * and hiding the source makes the column look like it lost a card mid-gesture.
+ *
+ * `opacity: 0.55` was the first version and it made the card unidentifiable, which is what a player
+ * reported: at 55% the FELT SHOWS THROUGH THE FACE, so a red J and a red 4 differ by a smudge.
+ * Measured by `scan handlers --probe-drag`: the card's own ink-to-paper contrast fell 7.59:1 → 5.01:1
+ * while the drag was in the air, a 34% loss.
+ *
+ * What replaces it marks the PLACE rather than dimming the thing. The face stays opaque, so it stays
+ * readable, and the outline says "this one is in the air" without putting the background into it.
+ * 0.92 rather than 1.0 keeps a hint of the old signal for anyone who was reading the transparency —
+ * measured at 7.32:1, inside noise of the resting card.
+ */
+.card.dragging {
+  opacity: 0.92;
+  outline: 2px dashed var(--focus);
+  outline-offset: -4px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
 
 /* A card the keyboard has picked up. Distinct from :focus-visible, because "focused" and
    "in hand" are different states and a keyboard player needs to see which is which. */

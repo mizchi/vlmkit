@@ -220,11 +220,24 @@
     // Counts UP to 52 now, not down from it. The old "Left 52" was 52 minus this number, which
     // sat beside a stock pile and read as the stock count — see the comment in index.html.
     el.remaining.textContent = String(state.foundations.reduce((n, p) => n + p.length, 0));
+    /*
+     * ONE state value behind both the accessible name and the visible mark.
+     *
+     * They were separate, and the visible half did not exist: an empty stock rendered as a bare
+     * outline while its `aria-label` said "turn the waste over". A screen-reader user was told the
+     * pile was still actionable and a sighted player was not — reported as "when the stock is empty,
+     * make it obvious that it can be reset". Deriving both from `stockState` is what stops the two
+     * from disagreeing again; `solitaire.css` draws the glyph off the attribute.
+     */
+    const stockState = state.stock.length > 0
+      ? "dealable"
+      : state.waste.length > 0 ? "recycle" : "spent";
+    el.stock.dataset.state = stockState;
     el.stock.setAttribute(
       "aria-label",
-      state.stock.length > 0
+      stockState === "dealable"
         ? `Stock, ${state.stock.length} card${state.stock.length === 1 ? "" : "s"} — deal ${state.drawCount}`
-        : state.waste.length > 0
+        : stockState === "recycle"
           ? "Stock empty — turn the waste over"
           : "Stock and waste both empty",
     );

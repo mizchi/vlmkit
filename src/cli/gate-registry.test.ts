@@ -168,8 +168,17 @@ describe("composed built-in registry", () => {
     //       through an IME composition — and a field that keeps the ASCII and loses the Japanese is
     //       reported. The ASCII drive is the control that makes it attributable: a digits-only field
     //       loses both and says nothing about the script.
+    // 165 → 171: three rules about a gesture selecting text or dimming what it carries, counted
+    //       twice each because they live in the shared `HANDLER_SURFACE_RULES` that both
+    //       `scan handlers` and `check interactions --handlers` declare. `drag-selects-text` and
+    //       `dblclick-selects-text` — a press-and-drag, or a double-click that missed, leaving a
+    //       range selection on a surface where selected text is itself draggable. Both came from a
+    //       defect the probes could not see because every one of them CLEARED the selection before
+    //       its gesture and did nothing else with it. `drag-ghost-illegible` — the dragged element
+    //       measured at rest and again in the air, graded only when the fall crosses 4.5:1, because
+    //       a page that dims 15:1 to 9:1 has lost the same proportion and is still readable.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 165);
+    assert.equal(total, 171);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
