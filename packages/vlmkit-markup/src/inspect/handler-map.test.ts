@@ -653,8 +653,21 @@ test("E2E: the pointer-drag gesture separates a working drag from a dead one, ca
   // Wired and inert.
   assert.equal(row("dead")!.feedbackRatio, 0);
   assert.equal(row("dead")!.committedRatio, 0);
-  // The canvas: pixels move, the DOM does not.
-  assert.ok(row("canvas-works")!.feedbackRatio > 0.005, "a canvas drag must register as feedback");
+  /*
+   * The canvas: pixels move, the DOM does not.
+   *
+   * The numbers are in the message because this is the one assertion here with a thin margin — the
+   * stroke covers 0.709% of the pad against a 0.5% floor — and it has failed in a full parallel run
+   * while passing every time in isolation. `handlerCalls` separates the two explanations that a bare
+   * "it did not register" cannot: a gesture that never reached the canvas (0 calls) is a different
+   * defect from one that ran the handlers and drew too little to count.
+   */
+  const canvas = row("canvas-works")!;
+  assert.ok(
+    canvas.feedbackRatio > 0.005,
+    `a canvas drag must register as feedback: feedback=${(canvas.feedbackRatio * 100).toFixed(3)}% `
+    + `committed=${(canvas.committedRatio * 100).toFixed(3)}% handlerCalls=${canvas.handlerCalls}`,
+  );
 
   // Evidence, not a verdict: the inert pad gets NO finding, because 0% is ambiguous on a real
   // page — dead handlers, a bad start point and offscreen feedback all look like this.

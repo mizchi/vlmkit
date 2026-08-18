@@ -43,11 +43,24 @@ describe("vlmkit manifest CLI", () => {
     assert.equal(raw.rules[0].reason, "animated content");
   });
 
+  /*
+   * The expiry date is computed, not written down.
+   *
+   * It was the literal `2026-09-01`, and `check` warns about anything expiring within 14 days — so
+   * on 2026-08-18 this manifest started reading `expiring` and the "nothing is expired" case below
+   * failed. Nothing had changed; the date had arrived. A fixed future date in a test that asks a
+   * question ABOUT the future is a time bomb with a fuse the length of the gap.
+   *
+   * Far enough out to stay outside the 14-day window on any day this runs, and still a real date the
+   * CLI parses.
+   */
+  const farFuture = new Date(Date.now() + 1000 * 60 * 60 * 24 * 400).toISOString().slice(0, 10);
+
   it("add: encodes tolerance flags into the rule.tolerance object", async () => {
     const r = cli(
       "add", "--selector", ".hero__body",
       "--max-px", "2", "--max-ratio", "0.01",
-      "--reason", "AA artifact", "--expires", "2026-09-01",
+      "--reason", "AA artifact", "--expires", farFuture,
       "--path", manifestPath,
     );
     assert.equal(r.status, 0);
@@ -56,7 +69,7 @@ describe("vlmkit manifest CLI", () => {
     assert.ok(rule, "rule should be present");
     assert.equal(rule.tolerance.pixels, 2);
     assert.equal(rule.tolerance.ratio, 0.01);
-    assert.equal(rule.expires, "2026-09-01");
+    assert.equal(rule.expires, farFuture);
   });
 
   it("add: refuses a rule with no matcher", () => {
@@ -105,7 +118,7 @@ describe("vlmkit manifest CLI", () => {
   it("check: exits 0 when nothing is expired", () => {
     const r = cli("check", "--path", manifestPath);
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /healthy/);
+    assert.match(r.stdout, /healthy/, `expiry window reached? stdout: ${r.stdout}`);
   });
 
   it("check: exits 1 when a rule has expired", async () => {

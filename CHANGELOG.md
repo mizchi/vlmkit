@@ -115,6 +115,20 @@ said anything.
   `tests/skill-package.test.mjs` pins the heading, the install line and the sample `--version`
   output to the package's own version, so a bump that fixes one of the three still fails.
 
+- **A test with a hard-coded future date went off.** `manifest check` warns about anything expiring
+  within 14 days, and `src/manifest-cli.test.ts` seeded a rule expiring `2026-09-01`, so on
+  2026-08-18 the "nothing is expired" case started reading `expiring` and failing. Nothing had
+  changed; the date arrived. The expiry is computed relative to the run now, which is what a test
+  asking a question about the future needs, and the assertion prints the output it got.
+
+- **The canvas pointer-drag assertion had a 1.4x margin and no diagnostics.** The probe drags across
+  ~40% of the pad, and a 3px stroke changed 0.709% of the element's pixels against a 0.5% floor —
+  which passed every run in isolation and failed twice in six full runs, where browsers run in
+  parallel. The fixture strokes at 12px now (2.181%, a 4.4x margin) and the assertion prints the two
+  ratios and the handler-call count when it trips, because the failures are **still unexplained**:
+  six concurrent probes reproduced nothing, so the thicker line removes the thin margin without
+  claiming to have found the cause. Three full runs green since.
+
 - **The Pages site publishes more than one page.** `scripts/build-pages.mjs` owns a
   `siteSections` manifest — the intro page at `/`, the Klondike solitaire DnD/animation
   dogfood target at `/solitaire/` — replacing the intro-page-only builder. Assets stay an
