@@ -841,6 +841,26 @@ async function handleForPath(page: Page, path: string): Promise<JSHandle> {
   })()`);
 }
 
+/**
+ * One rendered frame, awaited in the page.
+ *
+ * `page.mouse.move` resolves when the input has been DISPATCHED, not when the result has been
+ * painted, so a screenshot taken straight after it races the compositor. Idle machines win that race
+ * and hide it; a loaded one does not. Measured on the pointer-drag fixture, whose canvas draws nine
+ * stroke segments across the gesture: the mid-drag shot reported 2.181% of the element's pixels
+ * changed on every quiet run and 0.250% in a full parallel suite — one segment of nine — with the
+ * page's own listeners invoked the normal eleven times, so the gesture had arrived and only the
+ * PICTURE was behind.
+ *
+ * Double `requestAnimationFrame` is the "after the next paint" idiom: the first callback runs before
+ * the frame is composited, the second after it.
+ */
+async function nextPaintedFrame(page: Page): Promise<void> {
+  await page.evaluate(
+    "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+  ).catch(() => {});
+}
+
 async function probePointerDrags(
   page: Page,
   elements: readonly HandlerSurfaceEntry[],
@@ -868,6 +888,10 @@ async function probePointerDrags(
       await page.mouse.move(...at(0.3, 0.3));
       await page.mouse.down();
       await page.mouse.move(...at(0.5, 0.5), { steps: 4 });
+      // The picture has to be current or the ratio under-reports what the drag did — see
+      // `nextPaintedFrame`. This is the number a reader acts on, so a stale frame is a wrong answer
+      // and not merely a flaky test.
+      await nextPaintedFrame(page);
       const during = await el.screenshot();
       await page.mouse.move(...at(0.7, 0.7), { steps: 4 });
       await page.mouse.up();
@@ -1575,6 +1599,7 @@ async function probeRealDrags(
     // Mid-drag, with the mouse still down. Measured as workable: ~60-80ms per shot, and it
     // separates a zone that highlights on dragenter (99% of its own box changed) from one that
     // does not (0.00%, byte-identical).
+    if (before || source) await nextPaintedFrame(page);
     const during = before ? await target!.screenshot().catch(() => null) : null;
     /*
      * The dragged element, in the air. Its own opacity is read here rather than inferred from the

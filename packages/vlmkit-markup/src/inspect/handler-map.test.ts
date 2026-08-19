@@ -656,11 +656,12 @@ test("E2E: the pointer-drag gesture separates a working drag from a dead one, ca
   /*
    * The canvas: pixels move, the DOM does not.
    *
-   * The numbers are in the message because this is the one assertion here with a thin margin — the
-   * stroke covers 0.709% of the pad against a 0.5% floor — and it has failed in a full parallel run
-   * while passing every time in isolation. `handlerCalls` separates the two explanations that a bare
-   * "it did not register" cannot: a gesture that never reached the canvas (0 calls) is a different
-   * defect from one that ran the handlers and drew too little to count.
+   * The numbers are in the message, and they are what found the cause. This assertion failed in full
+   * parallel runs while passing every time in isolation, and printing them said why:
+   * `feedback=0.250% committed=0.500% handlerCalls=11` — the page had received the whole gesture and
+   * drawn a ninth of the stroke, which is a screenshot racing the compositor rather than a drag that
+   * did not happen. `probePointerDrags` awaits a painted frame now. `handlerCalls` is what made it
+   * legible: 0 would have meant the gesture never arrived, which is a different defect entirely.
    */
   const canvas = row("canvas-works")!;
   assert.ok(
