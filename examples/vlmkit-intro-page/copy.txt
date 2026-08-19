@@ -29,7 +29,8 @@ while you are dragging.
 52/52 two seeds played to a win in CI
 144 plies, with the DOM audited after each one
 57 tests: the rules headless, the view in Chromium
-6 interaction families the 0.11 probes drive
+7 interaction families the probes drive
+Playing this page by hand found three defects no gate reported. Each is a rule now:
 vlmkit check integrity
 vlmkit check a11y focus
 vlmkit check a11y touch --level AAA

@@ -243,7 +243,7 @@
               <li><strong>52/52</strong><span data-i18n="demo.metricWin">two seeds played to a win in CI</span></li>
               <li><strong>144</strong><span data-i18n="demo.metricPlies">plies, with the DOM audited after each one</span></li>
               <li><strong>57</strong><span data-i18n="demo.metricTests">tests: the rules headless, the view in Chromium</span></li>
-              <li><strong>6</strong><span data-i18n="demo.metricFamilies">interaction families the 0.11 probes drive</span></li>
+              <li><strong>7</strong><span data-i18n="demo.metricFamilies">interaction families the probes drive</span></li>
             </ul>
             <div class="demo-gates">
               <p class="demo-gate-label" data-i18n="demo.gatesLabel">Red on any of these blocks the deploy</p>
@@ -251,6 +251,16 @@
               <code>vlmkit check a11y focus</code>
               <code>vlmkit check a11y touch --level AAA</code>
             </div>
+            <!--
+              What playing it produced. The page is a dogfood site, so the demo's strongest claim is
+              not that it exists but that using it found defects the gates could not — and that each
+              one became a rule the toolkit now ships. `page.test.mjs` reads these three names out of
+              the rule table, so a renamed rule fails a test instead of leaving a stale claim here.
+            -->
+            <p class="demo-produced">
+              <span data-i18n="demo.produced">Playing this page by hand found three defects no gate reported. Each is a rule now:</span>
+              <code>drag-selects-text</code><code>dblclick-selects-text</code><code>drag-ghost-illegible</code>
+            </p>
             <div class="demo-actions">
               <a class="button button-dark" href="./solitaire/"><span data-i18n="demo.play">Play the demo</span> <span aria-hidden="true">→</span></a>
               <a class="demo-changelog" href="https://github.com/mizchi/vlmkit/blob/main/CHANGELOG.md"><span data-i18n="demo.changelog">Read what 0.11 changed</span> <span aria-hidden="true">↗</span></a>

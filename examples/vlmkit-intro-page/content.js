@@ -79,7 +79,9 @@ export const messages = Object.freeze({
     "demo.metricWin": "CI で勝ちまで指した seed 2つ",
     "demo.metricPlies": "手。毎手ごとに DOM を監査",
     "demo.metricTests": "テスト。ルールはブラウザなし、表示は Chromium",
-    "demo.metricFamilies": "0.11 の probe が打つ操作系統",
+    "demo.metricFamilies": "probe が打つ操作系統",
+    "demo.produced":
+      "このページを手で遊んで、どのゲートも報告しなかった不具合が3件見つかりました。いずれも今はルールです:",
     "demo.gatesLabel": "どれかが赤ければデプロイは止まる",
     "demo.play": "デモを遊ぶ",
     "demo.changelog": "0.11 の変更点を読む",
@@ -238,7 +240,9 @@ export const messages = Object.freeze({
     "demo.metricWin": "two seeds played to a win in CI",
     "demo.metricPlies": "plies, with the DOM audited after each one",
     "demo.metricTests": "tests: the rules headless, the view in Chromium",
-    "demo.metricFamilies": "interaction families the 0.11 probes drive",
+    "demo.metricFamilies": "interaction families the probes drive",
+    "demo.produced":
+      "Playing this page by hand found three defects no gate reported. Each is a rule now:",
     "demo.gatesLabel": "Red on any of these blocks the deploy",
     "demo.play": "Play the demo",
     "demo.changelog": "Read what 0.11 changed",
