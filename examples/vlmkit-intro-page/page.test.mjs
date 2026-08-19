@@ -139,6 +139,31 @@ test("the playable-demo section routes to the game and states what proves it", a
       `${gate} is advertised but the deploy workflow does not run it against the demo`,
     );
   }
+
+  /*
+   * The two claims in this section that go stale on their own, pinned to the code that decides them.
+   *
+   * The family count was written as 6 and the seventh (`dblclick`) landed a release later, which is
+   * the shape of every number on a marketing page: true when typed, silently wrong afterwards. Read
+   * out of the source as TEXT rather than imported — this file has to stay dependency-free, because
+   * `skill-package.yml` runs it with no pnpm install and no Playwright.
+   */
+  const handlerMap = await readFile(
+    join(exampleDir, "../../packages/vlmkit-markup/src/inspect/handler-map.ts"),
+    "utf8",
+  );
+  const families = handlerMap.match(/export const PROBE_FAMILIES = \[(.*?)\]/)[1].split(",").length;
+  assert.match(
+    section,
+    new RegExp(`<strong>${families}</strong><span data-i18n="demo\\.metricFamilies"`),
+    `the page advertises a different number of probe families than the ${families} that exist`,
+  );
+  // The rules this demo produced. A renamed rule has to fail here rather than leave the page
+  // naming something the toolkit no longer ships.
+  for (const rule of ["drag-selects-text", "dblclick-selects-text", "drag-ghost-illegible"]) {
+    assert.ok(section.includes(`<code>${rule}</code>`), `${rule} is missing from the demo section`);
+    assert.ok(handlerMap.includes(`id: "${rule}"`), `${rule} is not a rule this project declares`);
+  }
 });
 
 /**

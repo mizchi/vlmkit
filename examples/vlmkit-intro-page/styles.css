@@ -1049,6 +1049,30 @@ dd {
   overflow-wrap: anywhere;
 }
 
+/*
+ * The rules this demo produced. Chips rather than prose: they are identifiers a reader copies into
+ * `--rule <id>=off` or greps the docs for, and running them into a sentence makes them unselectable
+ * by eye. Wraps as a unit with its lead-in so a narrow screen does not orphan one name.
+ */
+.demo-produced {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  color: var(--surface-muted-strong);
+  font-size: 12px;
+}
+
+.demo-produced code {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--green-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
 .demo-actions {
   display: flex;
   flex-wrap: wrap;
