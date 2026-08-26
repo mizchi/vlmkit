@@ -121,6 +121,19 @@ said anything.
   changed; the date arrived. The expiry is computed relative to the run now, which is what a test
   asking a question about the future needs, and the assertion prints the output it got.
 
+- **A mid-gesture screenshot was racing the compositor, so the pixel probes under-reported.**
+  `page.mouse.move` resolves when the input has been DISPATCHED, not when the result has been
+  painted, and both drag probes screenshot straight after it. Idle machines win that race and hide
+  it. Found by the diagnostics added below: the canvas assertion printed
+  `feedback=0.250% committed=0.500% handlerCalls=11` — the page had received the whole gesture and
+  the shot showed one stroke segment of nine, on a fixture that measured 2.181% on every quiet run.
+
+  A wrong number, not only a flaky test: `feedbackRatio` and the `drag-ghost-illegible` pair are
+  evidence a reader acts on, and a stale frame under-reports both — in the legibility rule's case
+  toward a false negative, since the ghost has not been painted yet. Both probes await a painted
+  frame (double `requestAnimationFrame`) before every mid-flight shot. Idle values are unchanged to
+  three decimals; four consecutive full runs green.
+
 - **The canvas pointer-drag assertion had a 1.4x margin and no diagnostics.** The probe drags across
   ~40% of the pad, and a 3px stroke changed 0.709% of the element's pixels against a 0.5% floor —
   which passed every run in isolation and failed twice in six full runs, where browsers run in
