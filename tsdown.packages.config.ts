@@ -8,6 +8,7 @@ const publicWorkspacePackages = [
   "vlmkit-plan",
   "vlmkit-markup",
   "vlmkit-heal",
+  "vlmkit-anim",
 ] as const;
 
 export default defineConfig(

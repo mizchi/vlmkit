@@ -1,0 +1,7 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "heap",
+  "title": "Min-heap push and pop",
+  "type": "min",
+  "ops": [{ "push": 5 }, { "push": 3 }, { "push": 8 }, { "push": 1 }, { "pop": true }, { "pop": true }]
+}

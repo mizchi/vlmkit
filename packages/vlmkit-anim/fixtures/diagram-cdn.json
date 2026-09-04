@@ -1,0 +1,24 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "How a CDN serves a request",
+  "layout": "lr",
+  "nodes": [
+    { "id": "browser", "label": "Browser" },
+    { "id": "edge", "label": "CDN edge" },
+    { "id": "origin", "label": "Origin server", "hidden": true }
+  ],
+  "edges": [
+    { "from": "browser", "to": "edge", "label": "GET /logo.png" },
+    { "from": "edge", "to": "origin", "label": "cache miss", "hidden": true }
+  ],
+  "sequence": [
+    { "flow": "browser->edge", "caption": "The browser asks the nearest edge" },
+    { "highlight": "edge", "caption": "The edge checks its cache: miss" },
+    { "show": "origin", "caption": "Only on a miss does the origin get involved" },
+    { "flow": "edge->origin" },
+    { "flow": "origin->edge", "caption": "Origin responds; the edge stores a copy" },
+    { "unhighlight": "edge" },
+    { "flow": "edge->browser", "caption": "Next time, the edge answers alone" }
+  ]
+}

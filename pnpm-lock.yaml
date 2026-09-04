@@ -36,6 +36,9 @@ importers:
       '@mizchi/vlmkit-ai':
         specifier: workspace:*
         version: link:packages/vlmkit-ai
+      '@mizchi/vlmkit-anim':
+        specifier: workspace:*
+        version: link:packages/vlmkit-anim
       '@mizchi/vlmkit-capture':
         specifier: workspace:*
         version: link:packages/vlmkit-capture
@@ -96,6 +99,15 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
+
+  packages/vlmkit-anim:
+    dependencies:
+      '@mizchi/vlmkit-core':
+        specifier: workspace:*
+        version: link:../vlmkit-core
+      playwright:
+        specifier: '>=1.61 <2'
+        version: 1.61.1
 
   packages/vlmkit-capture:
     dependencies:

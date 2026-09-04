@@ -1,0 +1,14 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "state-machine",
+  "title": "TCP client handshake",
+  "states": ["CLOSED", "SYN_SENT", { "id": "ESTABLISHED", "label": "ESTAB-\nLISHED" }, { "id": "FIN_WAIT", "final": true }],
+  "initial": "CLOSED",
+  "transitions": [
+    { "from": "CLOSED", "to": "SYN_SENT", "on": "connect", "note": "/ send SYN" },
+    { "from": "SYN_SENT", "to": "ESTABLISHED", "on": "SYN+ACK", "note": "/ send ACK" },
+    { "from": "SYN_SENT", "to": "CLOSED", "on": "timeout" },
+    { "from": "ESTABLISHED", "to": "FIN_WAIT", "on": "close" }
+  ],
+  "trace": ["connect", "timeout", "connect", "SYN+ACK", "close"]
+}

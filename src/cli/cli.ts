@@ -164,6 +164,7 @@ const SPECS: Record<string, Spec> = {
   watch: spec("watch", () => import("../watch.ts")),
   diffPr: spec("diff-pr", () => import("../diff-pr.ts")),
   baseline: spec("baseline-cli", () => import("../baseline-cli.ts")),
+  anim: spec("anim", () => import("@mizchi/vlmkit-anim/cli.ts")),
 };
 
 const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]) => Promise<void>; desc: string }>> = {
@@ -667,6 +668,10 @@ Options:
   cli.command("baseline [...args]", "Approve / inspect snapshot baselines")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.baseline, passThrough(argv, ["baseline"])));
+
+  cli.command("anim [...args]", "Explanatory animation IR: check / compile / render / html (SVG + Web Animations)")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.anim, passThrough(argv, ["anim"])));
 
   // Mask --help/-h so cac doesn't intercept; passThrough restores it.
   const maskedArgv = argv.map((a) => (a === "--help" || a === "-h" ? HELP_SENTINEL : a));
