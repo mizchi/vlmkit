@@ -1,0 +1,24 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "queue",
+  "title": "Print jobs",
+  "initial": [
+    "report.pdf",
+    "photo.png"
+  ],
+  "ops": [
+    {
+      "enqueue": "memo.txt"
+    },
+    {
+      "dequeue": true,
+      "caption": "The printer takes the oldest job first"
+    },
+    {
+      "peek": true
+    },
+    {
+      "dequeue": true
+    }
+  ]
+}

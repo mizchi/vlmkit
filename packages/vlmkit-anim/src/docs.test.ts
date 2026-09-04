@@ -19,7 +19,7 @@ describe("docs/anim-ir.md", () => {
   const blocks = [...md.matchAll(/```json\n([\s\S]*?)```/g)].map((m) => m[1]);
 
   it("has one example per kind plus the timeline", () => {
-    assert.ok(blocks.length >= 12, `found ${blocks.length} json blocks`);
+    assert.ok(blocks.length >= 15, `found ${blocks.length} json blocks`);
   });
 
   it("every json block validates, compiles, and passes the semantic checks with no errors", () => {
@@ -39,7 +39,8 @@ describe("docs/anim-ir.md", () => {
   });
 
   it("mentions every kind by heading", () => {
-    for (const kind of ["sort", "array", "state-machine", "heap", "tree", "distributed", "matrix", "graph", "chart", "diagram", "vector"]) assert.match(md, new RegExp(`^## kind: ${kind}$`, "m"));
+    for (const kind of ["sort", "array", "state-machine", "heap", "tree", "list", "distributed", "matrix", "graph", "chart", "diagram", "vector"]) assert.match(md, new RegExp(`^## kind: ${kind}$`, "m"));
+    assert.match(md, /^## kind: stack, kind: queue$/m);
     assert.ok(md.includes(SCENE_FORMAT));
   });
 });

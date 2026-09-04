@@ -293,6 +293,34 @@ function checkArray(scene: Extract<Scene, { kind: "array" }>, tl: Timeline): Dia
   return out;
 }
 
+function checkCollection(scene: Extract<Scene, { kind: "stack" | "queue" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const meta = tl.meta as { finalContents?: (number | string)[]; slots?: [number, number][]; refused?: (number | string)[] } | undefined;
+  if (!meta?.finalContents || !meta.slots) return out;
+  const frame = sampleFrame(tl, timelineDuration(tl));
+  const visible = tl.nodes.filter((n) => n.id.startsWith("v-")).map((n) => ({ st: frame.get(n.id)! })).filter((n) => n.st.opacity > 0.5);
+  const inSlot = visible.map((n) => ({ text: n.st.text ?? "", i: meta.slots!.findIndex((s) => Math.hypot(s[0] - n.st.pos[0], s[1] - n.st.pos[1]) < 1) })).filter((n) => n.i >= 0).sort((a, b) => a.i - b.i);
+  const read = inSlot.map((n) => n.text);
+  if (JSON.stringify(read) !== JSON.stringify(meta.finalContents.map(String))) out.push(error("timeline", `final frame holds ${read.join(", ") || "nothing"} in slot order; the ops end with ${meta.finalContents.join(", ") || "nothing"}`));
+  if (new Set(inSlot.map((n) => n.i)).size !== inSlot.length) out.push(error("timeline", "two values occupy one slot in the final frame"));
+  for (const v of meta.refused ?? []) out.push(warn("ops", `${scene.kind === "stack" ? "push" : "enqueue"} ${v} was refused: the ${scene.kind} was at capacity ${scene.capacity}`, "raise capacity, or remove something first — unless overflow is the point of the story"));
+  return out;
+}
+
+function checkList(scene: Extract<Scene, { kind: "list" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const meta = tl.meta as { finalOrder?: (number | string)[]; slotX?: number[]; finds?: { value: number | string; found: boolean }[] } | undefined;
+  if (!meta?.finalOrder || !meta.slotX) return out;
+  const frame = sampleFrame(tl, timelineDuration(tl));
+  const visible = tl.nodes.filter((n) => n.id.startsWith("n-")).map((n) => frame.get(n.id)!).filter((st) => st.opacity > 0.5).sort((a, b) => a.pos[0] - b.pos[0]);
+  const read = visible.map((st) => st.text ?? "");
+  if (JSON.stringify(read) !== JSON.stringify(meta.finalOrder.map(String))) out.push(error("timeline", `final frame reads ${read.join(" → ") || "∅"}; the ops end with ${meta.finalOrder.join(" → ") || "∅"}`));
+  const arrows = tl.nodes.filter((n) => /^arr-\d+$/.test(n.id)).filter((n) => frame.get(n.id)!.opacity > 0.5).length;
+  if (arrows !== Math.max(0, visible.length - 1)) out.push(error("timeline", `${arrows} arrow(s) drawn for ${visible.length} node(s): a link is missing or dangling`));
+  for (const f of meta.finds ?? []) if (!f.found) out.push(warn("ops", `find ${f.value}: the value is not in the list at that point, so the walk reaches ∅`, "fine if that is the lesson; otherwise insert it first or fix the value"));
+  return out;
+}
+
 function checkTree(scene: Extract<Scene, { kind: "tree" }>, tl: Timeline): Diagnostic[] {
   const out: Diagnostic[] = [];
   const meta = tl.meta as { finalInorder?: number[]; finalDepths?: Record<string, number>; traversals?: number[][]; searches?: { value: number; found: boolean }[] } | undefined;
@@ -413,6 +441,9 @@ export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
   switch (scene.kind) {
     case "sort": out.push(...checkSort(scene, tl)); break;
     case "array": out.push(...checkArray(scene, tl)); break;
+    case "stack":
+    case "queue": out.push(...checkCollection(scene, tl)); break;
+    case "list": out.push(...checkList(scene, tl)); break;
     case "heap": out.push(...checkHeap(scene, tl)); break;
     case "tree": out.push(...checkTree(scene, tl)); break;
     case "state-machine": out.push(...checkStateMachine(scene, tl)); break;

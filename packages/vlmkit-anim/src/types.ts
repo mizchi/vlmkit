@@ -148,9 +148,23 @@ export interface Timeline {
 // Layer 1: Scene IR
 // ---------------------------------------------------------------------------
 
-export type SceneKind = "diagram" | "state-machine" | "sort" | "array" | "heap" | "tree" | "distributed" | "matrix" | "graph" | "chart" | "vector";
+export type SceneKind =
+  | "diagram"
+  | "state-machine"
+  | "sort"
+  | "array"
+  | "stack"
+  | "queue"
+  | "list"
+  | "heap"
+  | "tree"
+  | "distributed"
+  | "matrix"
+  | "graph"
+  | "chart"
+  | "vector";
 
-export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "array", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector"];
+export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "array", "stack", "queue", "list", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector"];
 
 interface SceneBase {
   format: typeof SCENE_FORMAT;
@@ -305,6 +319,61 @@ export interface ArrayScene extends SceneBase {
   /** sliding-window: the window length. */
   window?: number;
   ops?: ArrayOp[];
+}
+
+// ---- stack / queue --------------------------------------------------------
+
+/** Every op may carry `caption`. */
+export type StackOp =
+  | { push: number | string; caption?: string }
+  | { pop: true; caption?: string }
+  /** Highlight the top without removing it. */
+  | { peek: true; caption?: string }
+  | { note: string };
+
+export interface StackScene extends SceneBase {
+  kind: "stack";
+  /** Bottom to top. */
+  initial?: (number | string)[];
+  ops: StackOp[];
+  /** Draw this many slots; a push past it is narrated as overflow and refused. */
+  capacity?: number;
+}
+
+export type QueueOp =
+  | { enqueue: number | string; caption?: string }
+  | { dequeue: true; caption?: string }
+  /** Highlight the front without removing it. */
+  | { peek: true; caption?: string }
+  | { note: string };
+
+export interface QueueScene extends SceneBase {
+  kind: "queue";
+  /** Front to back. */
+  initial?: (number | string)[];
+  ops: QueueOp[];
+  capacity?: number;
+}
+
+// ---- list (singly linked) -------------------------------------------------
+
+/** Every op may carry `caption`. Positions are 0-based from the head. */
+export type ListOp =
+  /** Insert a value: at a position, or right after the first node holding `after`. */
+  | { insert: { value: number | string; at?: number; after?: number | string }; caption?: string }
+  /** Remove the first node holding this value. */
+  | { remove: number | string; caption?: string }
+  /** Walk from the head comparing until the value is found (or the end is reached). */
+  | { find: number | string; caption?: string }
+  /** Reverse the whole list: nodes trade places and the arrows flip. */
+  | { reverse: true; caption?: string }
+  | { note: string };
+
+export interface ListScene extends SceneBase {
+  kind: "list";
+  /** Head first. */
+  initial?: (number | string)[];
+  ops: ListOp[];
 }
 
 // ---- heap -----------------------------------------------------------------
@@ -545,7 +614,21 @@ export interface VectorScene extends SceneBase {
   timeline: (VectorTween | VectorWait)[];
 }
 
-export type Scene = DiagramScene | StateMachineScene | SortScene | ArrayScene | HeapScene | TreeScene | DistributedScene | MatrixScene | GraphScene | ChartScene | VectorScene;
+export type Scene =
+  | DiagramScene
+  | StateMachineScene
+  | SortScene
+  | ArrayScene
+  | StackScene
+  | QueueScene
+  | ListScene
+  | HeapScene
+  | TreeScene
+  | DistributedScene
+  | MatrixScene
+  | GraphScene
+  | ChartScene
+  | VectorScene;
 
 // ---------------------------------------------------------------------------
 // Diagnostics

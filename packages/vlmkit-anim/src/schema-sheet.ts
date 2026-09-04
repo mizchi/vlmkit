@@ -17,9 +17,12 @@ import {
   type DistributedScene,
   type GraphScene,
   type HeapScene,
+  type ListScene,
   type MatrixScene,
+  type QueueScene,
   type Scene,
   type SortScene,
+  type StackScene,
   type StateMachineScene,
   type Timeline,
   type TreeScene,
@@ -29,6 +32,9 @@ import {
 export interface Examples {
   sort: SortScene;
   array: ArrayScene;
+  stack: StackScene;
+  queue: QueueScene;
+  list: ListScene;
   "state-machine": StateMachineScene;
   heap: HeapScene;
   tree: TreeScene;
@@ -56,6 +62,43 @@ export const EXAMPLES: Examples = {
     values: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
     algorithm: "binary-search",
     target: 23,
+  },
+  stack: {
+    format: SCENE_FORMAT,
+    kind: "stack",
+    title: "Matching brackets with a stack",
+    ops: [
+      { push: "(", caption: "Read (: an opener, push it" },
+      { push: "[", caption: "Read [: another opener" },
+      { pop: true, caption: "Read ]: it must match the top — [ does, pop it" },
+      { pop: true, caption: "Read ): matches (, pop it" },
+      { note: "Input consumed and the stack is empty: the brackets balance" },
+    ],
+  },
+  queue: {
+    format: SCENE_FORMAT,
+    kind: "queue",
+    title: "Print jobs",
+    initial: ["report.pdf", "photo.png"],
+    ops: [
+      { enqueue: "memo.txt" },
+      { dequeue: true, caption: "The printer takes the oldest job first" },
+      { peek: true },
+      { dequeue: true },
+    ],
+  },
+  list: {
+    format: SCENE_FORMAT,
+    kind: "list",
+    title: "Singly linked list",
+    initial: [3, 7, 9],
+    ops: [
+      { insert: { value: 5, after: 3 } },
+      { insert: { value: 1, at: 0 }, caption: "Insert 1 at the head: no shifting, the head pointer just moves" },
+      { remove: 7 },
+      { find: 9 },
+      { reverse: true },
+    ],
   },
   tree: {
     format: SCENE_FORMAT,
@@ -238,6 +281,24 @@ The check fails unless the final left-to-right order is sorted. Give "algorithm"
            {"note": "…"} ]                                  each may carry "caption" and "ms"; indices are 0-based positions
 Use this, not sort, when the story is where the pointers are. The check reads the final row back by position; with
 binary-search it also checks that the search ended at the target's index.`,
+  stack: `kind: stack — a column of slots; values are pushed on top and popped from the top (LIFO)
+  "initial": (number | string)[]   optional, bottom to top
+  "ops": [ {"push": v} | {"pop": true} | {"peek": true} | {"note": "…"} ]   required, 1+; each may carry "caption"
+  "capacity": number               optional; draws that many slots, a push past it is narrated as refused (the check warns)
+pop / peek on an empty stack is narrated, not an error. The check reads the final contents back by slot.`,
+  queue: `kind: queue — a row of slots; values join at the back and leave from the front (FIFO), the rest shift forward
+  "initial": (number | string)[]   optional, front to back
+  "ops": [ {"enqueue": v} | {"dequeue": true} | {"peek": true} | {"note": "…"} ]   required, 1+; each may carry "caption"
+  "capacity": number               optional; as for stack
+The check reads the final contents back by slot.`,
+  list: `kind: list — a singly linked list: boxes with an arrow between neighbours, "head" on the first, ∅ after the last
+  "initial": (number | string)[]   optional, head first
+  "ops": [ {"insert": {"value": v, "at": i}} | {"insert": {"value": v, "after": w}}   at a 0-based position (default: tail) or after a value
+           {"remove": v}            the first node holding v; its neighbours relink
+           {"find": v}              a cursor walks from the head, one captioned beat per node, until v (or ∅)
+           {"reverse": true}        the arrows turn around, then the boxes trade places so it reads head-first again
+           {"note": "…"} ]          required, 1+; each may carry "caption"
+Nodes slide between slots; arrows are per-gap and toggled. The check reads the final order back by x and counts the arrows.`,
   tree: `kind: tree — a binary search tree; values are circles, x = in-order rank, y = depth
   "initial": number[]              optional; inserted in this order before the first op, without animation
   "ops": [ {"insert": n} | {"search": n} | {"delete": n} | {"traverse": "inorder" | "preorder" | "postorder" | "levelorder"} | {"note": "…"} ]
@@ -351,6 +412,9 @@ export function schemaIndex(): string {
   Scene (what is explained)      ${SCENE_FORMAT}, one "kind":
     sort           an array being sorted (algorithm-generated or explicit ops)
     array          a row of boxes with named pointers and a window: binary search, two-pointer, sliding window
+    stack          push / pop / peek on a LIFO column
+    queue          enqueue / dequeue / peek on a FIFO row
+    list           a singly linked list: insert / remove / find / reverse
     state-machine  states, transitions, and an event trace
     heap           push / pop on a binary heap
     tree           a binary search tree: insert / search / delete / traverse

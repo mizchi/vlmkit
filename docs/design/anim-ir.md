@@ -34,9 +34,9 @@ Scene IR  (vlmkit-anim/scene@1)  ──compile──▶  Timeline IR  (vlmkit-an
 
 - **Scene IR** is `kind`-tagged. Each kind has a domain vocabulary and a
   compiler that *runs the domain* (the sort algorithm, the heap, the state
-  table, BFS / Dijkstra over the edge list) to produce motion. Eleven kinds:
+  table, BFS / Dijkstra over the edge list) to produce motion. Fourteen kinds:
   sort, state-machine, heap, distributed, matrix, graph, chart, diagram,
-  vector, plus array (pointers, windows) and tree (BST). A bubble sort is 112 bytes and expands ~80× into a
+  vector, plus array (pointers, windows), stack, queue, list and tree (BST). A bubble sort is 112 bytes and expands ~80× into a
   timeline; that ratio is the layer earning its place.
 - **Timeline IR** is the flat, dumb, complete description: nodes with initial
   attributes, tracks of absolute-time keyframes per (target, prop), and

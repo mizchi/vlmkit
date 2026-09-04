@@ -652,6 +652,73 @@ function validateArray(ctx: Ctx, doc: Obj): void {
   }
 }
 
+const isValue = (v: unknown): v is number | string => isNum(v) || isStr(v);
+
+function validateCollection(ctx: Ctx, doc: Obj, mode: "stack" | "queue"): void {
+  validateBase(ctx, doc, ["initial", "ops", "capacity"]);
+  let n = 0;
+  if (doc.initial !== undefined && ctx.array(doc.initial, "initial")) {
+    n = doc.initial.length;
+    doc.initial.forEach((v, i) => { if (!isValue(v)) ctx.error(`initial[${i}]`, `a value is a number or a string, got ${describe(v)}`); });
+  }
+  if (doc.capacity !== undefined && ctx.number(doc.capacity, "capacity", { integer: true, min: 1 }) && n > doc.capacity) ctx.error("capacity", `capacity ${doc.capacity} is smaller than the ${n} initial values`);
+  const add = mode === "stack" ? "push" : "enqueue";
+  const take = mode === "stack" ? "pop" : "dequeue";
+  if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
+    const ACTIONS = [add, take, "peek", "note"];
+    doc.ops.forEach((op, i) => {
+      const path = `ops[${i}]`;
+      if (!ctx.object(op, path)) return;
+      const other = mode === "stack" ? ["enqueue", "dequeue"] : ["push", "pop"];
+      for (const k of other) if (k in op) ctx.error(`${path}.${k}`, `"${k}" is a ${mode === "stack" ? "queue" : "stack"} op; a ${mode} uses "${k === "enqueue" || k === "push" ? add : take}"`);
+      const a = oneAction(ctx, op, path, ACTIONS, ["caption"], `{"${add}": 5} | {"${take}": true} | {"peek": true} | {"note": "…"}`);
+      if (!a) return;
+      const v = op[a];
+      if (a === add && !isValue(v)) ctx.error(`${path}.${add}`, `${add} takes a number or a string, got ${describe(v)}`);
+      else if ((a === take || a === "peek") && v !== true) ctx.error(`${path}.${a}`, `${a} takes the literal true, got ${describe(v)}`, `write {"${a}": true}`);
+      else if (a === "note" && !isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+    });
+  }
+}
+
+function validateList(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["initial", "ops"]);
+  if (doc.initial !== undefined && ctx.array(doc.initial, "initial")) {
+    doc.initial.forEach((v, i) => { if (!isValue(v)) ctx.error(`initial[${i}]`, `a value is a number or a string, got ${describe(v)}`); });
+  }
+  if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
+    const ACTIONS = ["insert", "remove", "find", "reverse", "note"];
+    doc.ops.forEach((op, i) => {
+      const path = `ops[${i}]`;
+      if (!ctx.object(op, path)) return;
+      const a = oneAction(ctx, op, path, ACTIONS, ["caption"], `{"insert": {"value": 5, "after": 3}} | {"remove": 7} | {"find": 9} | {"reverse": true}`);
+      if (!a) return;
+      const v = op[a];
+      switch (a) {
+        case "insert":
+          if (ctx.object(v, `${path}.insert`)) {
+            ctx.keys(v, `${path}.insert`, ["value", "at", "after"]);
+            if (!isValue(v.value)) ctx.error(`${path}.insert.value`, `value is a number or a string, got ${describe(v.value)}`);
+            if (v.at !== undefined) ctx.number(v.at, `${path}.insert.at`, { integer: true, min: 0 });
+            if (v.after !== undefined && !isValue(v.after)) ctx.error(`${path}.insert.after`, `after names an existing value`);
+            if (v.at !== undefined && v.after !== undefined) ctx.error(`${path}.insert`, `give "at" (a position) or "after" (a value), not both`);
+          }
+          break;
+        case "remove":
+        case "find":
+          if (!isValue(v)) ctx.error(`${path}.${a}`, `${a} takes a value (number or string), got ${describe(v)}`);
+          break;
+        case "reverse":
+          if (v !== true) ctx.error(`${path}.reverse`, `reverse takes the literal true`, `write {"reverse": true}`);
+          break;
+        case "note":
+          if (!isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+          break;
+      }
+    });
+  }
+}
+
 function validateTree(ctx: Ctx, doc: Obj): void {
   validateBase(ctx, doc, ["initial", "ops"]);
   const present = new Set<number>();
@@ -1130,6 +1197,9 @@ export function validateScene(doc: unknown): Diagnostic[] {
     case "state-machine": validateStateMachine(ctx, doc); break;
     case "sort": validateSort(ctx, doc); break;
     case "array": validateArray(ctx, doc); break;
+    case "stack": validateCollection(ctx, doc, "stack"); break;
+    case "queue": validateCollection(ctx, doc, "queue"); break;
+    case "list": validateList(ctx, doc); break;
     case "heap": validateHeap(ctx, doc); break;
     case "tree": validateTree(ctx, doc); break;
     case "distributed": validateDistributed(ctx, doc); break;

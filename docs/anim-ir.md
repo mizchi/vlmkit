@@ -104,6 +104,85 @@ own. The check reads the final row back by position; with `binary-search` it
 also fails unless the search ended at the target's index (or reported "not in
 the array" when it is absent).
 
+## kind: stack, kind: queue
+
+A stack is a column of slots (push on top, pop from the top); a queue is a
+row (enqueue at the back, dequeue from the front, the rest shift forward).
+Both take a list of ops and narrate every one.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "stack",
+  "title": "Matching brackets with a stack",
+  "ops": [
+    { "push": "(", "caption": "Read (: an opener, push it" },
+    { "push": "[", "caption": "Read [: another opener" },
+    { "pop": true, "caption": "Read ]: it must match the top — [ does, pop it" },
+    { "pop": true, "caption": "Read ): matches (, pop it" },
+    { "note": "Input consumed and the stack is empty: the brackets balance" }
+  ]
+}
+```
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "queue",
+  "title": "Print jobs",
+  "initial": ["report.pdf", "photo.png"],
+  "ops": [
+    { "enqueue": "memo.txt" },
+    { "dequeue": true, "caption": "The printer takes the oldest job first" },
+    { "peek": true },
+    { "dequeue": true }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `initial` | values present at the start — bottom to top for a stack, front to back for a queue |
+| `ops` | required, 1+, each with optional `caption`: stack `{"push": v}` `{"pop": true}` `{"peek": true}` `{"note": "…"}`; queue `{"enqueue": v}` `{"dequeue": true}` `{"peek": true}` `{"note": "…"}`. Values are numbers or strings |
+| `capacity` | draw this many slots; a push / enqueue past it is narrated as refused and the check warns. Default: as many as the scene ever holds |
+
+`pop` / `dequeue` / `peek` on an empty structure is narrated ("nothing to
+remove"), not an error. A `top` (stack) or `front` / `back` (queue) marker
+follows the occupied slots. The check reads the final contents back by slot.
+
+## kind: list
+
+A singly linked list: boxes with an arrow between neighbours, a `head`
+marker on the first, `∅` after the last.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "list",
+  "title": "Singly linked list",
+  "initial": [3, 7, 9],
+  "ops": [
+    { "insert": { "value": 5, "after": 3 } },
+    { "insert": { "value": 1, "at": 0 }, "caption": "Insert 1 at the head: no shifting, the head pointer just moves" },
+    { "remove": 7 },
+    { "find": 9 },
+    { "reverse": true }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `initial` | values head first |
+| `ops` | required, 1+, each with optional `caption`: `{"insert": {"value": v, "at": i}}` at a 0-based position (default: the tail) or `{"insert": {"value": v, "after": w}}` right after the first node holding `w`; `{"remove": v}` the first node holding `v`, its neighbours relink; `{"find": v}` a cursor walks from the head with one captioned beat per node until `v` or `∅`; `{"reverse": true}` the arrows turn around, then the boxes trade places so the list reads head-first again; `{"note": "…"}` |
+
+Insert narrates the relinking (`3 will point to 5, and 5 to 7`); remove
+names who now points where; a `find` that reaches `∅` is narrated and the
+check warns. The check reads the final order back left to right and counts
+the arrows drawn. A stack, a queue or a list of characters is the way to
+show a string being processed; an array of one-character strings
+(`"values": ["r", "a", "c", "e"]`) is the way to show one being scanned.
+
 ## kind: tree
 
 A binary search tree. Values are circles; x is the value's in-order rank, y

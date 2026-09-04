@@ -8,10 +8,12 @@ import type { Diagnostic, Scene, Timeline } from "../types.ts";
 import { hasErrors, validateScene } from "../validate.ts";
 import { compileArray } from "./array.ts";
 import { compileChart } from "./chart.ts";
+import { compileQueue, compileStack } from "./collection.ts";
 import { compileDiagram } from "./diagram.ts";
 import { compileDistributed } from "./distributed.ts";
 import { compileGraph } from "./graph.ts";
 import { compileHeap } from "./heap.ts";
+import { compileList } from "./list.ts";
 import { compileMatrix } from "./matrix.ts";
 import { compileSort } from "./sort.ts";
 import { compileStateMachine } from "./state-machine.ts";
@@ -35,6 +37,9 @@ export function compileScene(scene: Scene): Timeline {
     case "state-machine": return compileStateMachine(scene);
     case "sort": return compileSort(scene);
     case "array": return compileArray(scene);
+    case "stack": return compileStack(scene);
+    case "queue": return compileQueue(scene);
+    case "list": return compileList(scene);
     case "heap": return compileHeap(scene);
     case "tree": return compileTree(scene);
     case "distributed": return compileDistributed(scene);
@@ -45,7 +50,7 @@ export function compileScene(scene: Scene): Timeline {
   }
 }
 
-export { compileArray, compileChart, compileDiagram, compileDistributed, compileGraph, compileHeap, compileMatrix, compileSort, compileStateMachine, compileTree, compileVector };
+export { compileArray, compileChart, compileList, compileQueue, compileStack, compileDiagram, compileDistributed, compileGraph, compileHeap, compileMatrix, compileSort, compileStateMachine, compileTree, compileVector };
 export { generateSortOps } from "./sort.ts";
 export { generateArrayOps } from "./array.ts";
 export { generateGraphOps } from "./graph.ts";

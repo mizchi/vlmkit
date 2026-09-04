@@ -1,0 +1,26 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "stack",
+  "title": "Matching brackets with a stack",
+  "ops": [
+    {
+      "push": "(",
+      "caption": "Read (: an opener, push it"
+    },
+    {
+      "push": "[",
+      "caption": "Read [: another opener"
+    },
+    {
+      "pop": true,
+      "caption": "Read ]: it must match the top — [ does, pop it"
+    },
+    {
+      "pop": true,
+      "caption": "Read ): matches (, pop it"
+    },
+    {
+      "note": "Input consumed and the stack is empty: the brackets balance"
+    }
+  ]
+}
