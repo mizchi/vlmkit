@@ -20,7 +20,8 @@
 import { realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { sceneFromModule } from "./author.ts";
 import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError } from "./cli-args.ts";
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
@@ -32,6 +33,9 @@ import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
 import { renderSheetHtml } from "./sheet.ts";
 import { writeVideo, type VideoResult } from "./video.ts";
+
+/** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
+const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
 const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip"];
 
@@ -84,11 +88,21 @@ interface Loaded {
 /** Read, validate, and (for a scene) compile. Diagnostics are collected, not thrown. */
 async function load(path: string): Promise<Loaded | { path: string; diagnostics: Diagnostic[]; layer: "scene" | "timeline" | "unknown" }> {
   let doc: unknown;
-  const raw = await readFile(path, "utf-8");
-  try {
-    doc = JSON.parse(raw);
-  } catch (e) {
-    return { path, layer: "unknown", diagnostics: [{ severity: "error", path: "", message: `not valid JSON: ${(e as Error).message}`, hint: "the file must be a single JSON object; check for trailing commas and comments" }] };
+  if (MODULE_EXTENSIONS.test(path)) {
+    // A TypeScript / JavaScript module whose default export is the scene: the typed authoring surface.
+    await readFile(path); // ENOENT / EISDIR surface as the same one-line errors a JSON path gets
+    const picked = sceneFromModule(await import(pathToFileURL(resolve(path)).href));
+    if ("error" in picked) {
+      return { path, layer: "unknown", diagnostics: [{ severity: "error", path: "", message: picked.error, hint: 'import { scene } from "@mizchi/vlmkit-anim" and export default scene.sort({ … })' }] };
+    }
+    doc = picked.scene;
+  } else {
+    const raw = await readFile(path, "utf-8");
+    try {
+      doc = JSON.parse(raw);
+    } catch (e) {
+      return { path, layer: "unknown", diagnostics: [{ severity: "error", path: "", message: `not valid JSON: ${(e as Error).message}`, hint: "the file must be a single JSON object; check for trailing commas and comments" }] };
+    }
   }
   const { layer, diagnostics } = validateDocument(doc);
   if (layer === "unknown" || hasErrors(diagnostics)) return { path, layer, diagnostics };

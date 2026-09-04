@@ -172,9 +172,12 @@ brief passed on the first attempt with the alternative path narrated):
 
 - No layout engine beyond layered / grid / circle. `pos` pins what matters.
 - No edge that follows a moving node (see above).
-- No Svelte / typed-TS / Pkl surface yet. JSON is the IR; typed surfaces are
-  generators for it and can come once the IR has stopped moving. The `types.ts`
-  declarations are already the contract such a surface would target.
+- No Svelte / Pkl surface. JSON is the IR; typed surfaces are generators for
+  it. The one that exists is the smallest possible: `scene.<kind>({ … })` in
+  `author.ts` fills in `format` and `kind` over the `types.ts` declarations,
+  and the CLI `import()`s a `.ts` / `.mjs` module's default export in place of
+  a file. It adds nothing to the format — a misspelling becomes an editor error
+  instead of a `check` error, and `sceneJson` writes the JSON back out.
 - No video *encoder* beyond GIF. `video` writes GIF in-process because flat
   SVG colours fit 256 entries and GIF plays inline everywhere; MP4 / WebM go
   through `ffmpeg` when present and otherwise leave the frames and the

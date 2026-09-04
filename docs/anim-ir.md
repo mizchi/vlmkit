@@ -578,6 +578,38 @@ Nodes (also the Timeline's node model):
 | `fill` `stroke` `strokeWidth` `color` `opacity` `rx` `fontSize` `anchor` `dash` `scale` `rotate` | as in SVG; `color` is the text colour |
 | `parent` | id of a `group` node; children move with it |
 
+## Writing a scene in TypeScript
+
+JSON is the format. When the file is written from code — generated from data,
+kept next to the program it explains, or edited with completion — write a
+module instead and hand it to any verb:
+
+```ts
+// insertion.scene.ts
+import { scene } from "@mizchi/vlmkit-anim";
+
+export default scene.sort({
+  title: "Insertion sort",
+  algorithm: "insertion",
+  values: [5, 3, 8, 1, 4],
+});
+```
+
+```
+vlmkit-anim check insertion.scene.ts        # any .ts / .mts / .js / .mjs whose default export is a scene
+vlmkit-anim explain insertion.scene.ts
+```
+
+`scene.<kind>({ … })` has one constructor per kind (`scene.stateMachine` for
+`state-machine`); it fills in `format` and `kind` and types the rest, so a
+misspelt algorithm or an op the kind does not have is an editor error before it
+is a `check` error. The result is the plain object the JSON file would hold:
+`sceneJson(s)` writes that file for someone without a TypeScript toolchain, and
+`defineScene({ format, kind, … })` type-checks a literal that mirrors the JSON
+one to one. Nothing here adds to the format — the module is loaded with
+`import()` (Node 24 runs `.ts` directly) and its default export goes through
+the same validator as a file.
+
 ## Timeline (the compiled layer)
 
 ```json

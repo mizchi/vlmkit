@@ -140,6 +140,7 @@ is how Playwright's own `mount` fixture works. Consequences:
 ```bash
 vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fourteen)
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
+vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
 vlmkit-anim explain scene.json                      # narration as a numbered list
 vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
 vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it

@@ -31,6 +31,20 @@ describe("vlmkit-anim", () => {
     for (const verb of ["check", "validate", "compile", "explain", "render", "frames", "html", "eval", "schema"]) assert.match(r.stdout, new RegExp(`^  ${verb}`, "m"));
   });
 
+  it("accepts a TypeScript module whose default export is a scene, and names the fix when a module exports none", () => {
+    const r = run(["check", join(FIXTURES, "sort-insertion.scene.ts")]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /✓ sort-insertion\.scene\.ts \(sort\): 0 error\(s\)/);
+    const e = run(["explain", join(FIXTURES, "sort-insertion.scene.ts")]);
+    assert.match(e.stdout, /Insertion sort/);
+    const empty = join(dir, "no-scene.mjs");
+    writeFileSync(empty, "export const other = 1;\n");
+    const bad = run(["check", empty]);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stdout, /exports no scene/);
+    assert.match(bad.stdout, /export default scene\.sort/);
+  });
+
   it("eval measures an emitted page with the shared evaluator and exits 0 when nothing is suspect", () => {
     const page = join(dir, "eval-sort.html");
     assert.equal(run(["html", join(FIXTURES, "sort-bubble.json"), "--out", page]).status, 0);
