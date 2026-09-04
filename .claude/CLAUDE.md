@@ -143,6 +143,7 @@ vlmkit anim check scene.json                        # validate → compile → s
 vlmkit anim explain scene.json                      # narration as a numbered list
 vlmkit anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
 vlmkit anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
+vlmkit anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
 ```
 
 The IR is judged on two things, measured by fresh subagents rather than by

@@ -7,7 +7,8 @@
  *   explain   the narration as a numbered list of steps
  *   render    one frame as SVG at --at <ms> (or --step <n>)
  *   frames    every step (or --samples N) as SVG files, --png through Playwright
- *   html      a self-contained page with the <vlm-anim> runtime inline
+ *   video     GIF (encoded here) or mp4 / webm (ffmpeg), holding on each step
+ *   html     a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   schema    the cheat sheet for one kind, or the index
  *
@@ -29,8 +30,9 @@ import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
 import { renderSheetHtml } from "./sheet.ts";
+import { writeVideo, type VideoResult } from "./video.ts";
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width"];
 
 function usage(): string {
   return `Usage: vlmkit anim <command> <file.json> [options]
@@ -48,6 +50,10 @@ Commands
   sheet <file> --out sheet.png [--cols 3] [--tile 400] [--samples N]
                                   One contact-sheet image: every step as a labelled tile, for a vision model to read
                                   in a single call. --out sheet.html writes the page instead (no browser needed).
+  video <file> --out demo.gif|demo.mp4|demo.webm [--fps 20] [--hold 400] [--width W] [--no-loop]
+                                  A file that plays without the runtime. GIF is encoded here (no external tool);
+                                  mp4 / webm run ffmpeg when it is on PATH and otherwise leave the frames plus the
+                                  command to run. --hold pauses on every step so captions can be read.
   html <file> [--out page.html] [--no-autoplay] [--loop] [--title T]
                                   Self-contained page embedding the <vlm-anim> runtime and the timeline.
   runtime [--out vlm-anim.js]     The runtime script alone, for a site that embeds many animations.
@@ -260,6 +266,28 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       if (json) console.log(JSON.stringify({ out, frames: times.length, cols, tileWidth }, null, 2));
       else console.log(`sheet (${times.length} frames, ${cols} per row, ${tileWidth}px tiles) → ${out}`);
       return 0;
+    }
+    case "video": {
+      const out = readFlag(rest, "--out");
+      if (!out) throw new UsageError("vlmkit anim video needs --out <demo.gif|demo.mp4|demo.webm>");
+      let result: VideoResult;
+      try {
+        result = await writeVideo(tl, out, {
+          fps: readInt(rest, "--fps", { min: 1 }),
+          hold: readInt(rest, "--hold", { min: 0 }),
+          width: readInt(rest, "--width", { min: 16 }),
+          loop: !hasFlag(rest, "--no-loop"),
+        });
+      } catch (e) {
+        throw new UsageError((e as Error).message);
+      }
+      if (json) console.log(JSON.stringify(result, null, 2));
+      else if (result.pending) {
+        console.log(`ffmpeg is not on PATH. ${result.frames} frame(s) are in ${result.pending.framesDir}; finish with:\n  ${result.pending.command}`);
+      } else {
+        console.log(`${result.format} (${result.frames} frames, ${result.durationMs}ms, ${result.width}×${result.height}, ${Math.round((result.bytes ?? 0) / 1024)} KB) → ${out}`);
+      }
+      return result.pending ? 1 : 0;
     }
     case "html": {
       const html = renderEmbedHtml(tl, { autoplay: !hasFlag(rest, "--no-autoplay"), loop: hasFlag(rest, "--loop"), title: readFlag(rest, "--title") });

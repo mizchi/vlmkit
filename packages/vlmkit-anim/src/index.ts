@@ -6,3 +6,5 @@ export { renderFrameSvg, sampleTimes, pathLength } from "./render-svg.ts";
 export { checkAnimation, checkTimeline, animStats, explain } from "./check.ts";
 export { RUNTIME_SOURCE, renderEmbedHtml } from "./runtime.ts";
 export { renderSheetHtml } from "./sheet.ts";
+export { scheduleFrames, encodeGif, decodePng, writeVideo, videoFormat, ffmpegAvailable } from "./video.ts";
+export type { VideoOptions, VideoResult, ScheduledFrame, RgbaFrame, VideoFormat } from "./video.ts";

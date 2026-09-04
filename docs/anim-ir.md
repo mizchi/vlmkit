@@ -18,6 +18,7 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit anim frames scene.json --out dir [--png]   every step as a file, for looking at
    vlmkit anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
 5. vlmkit anim html scene.json --out page.html       the playable page
+   vlmkit anim video scene.json --out demo.gif       a file for a README / slide (or .mp4 / .webm through ffmpeg)
 ```
 
 `check` exits 1 on any error. Warnings (⚠) are advice: off-canvas nodes,
@@ -299,6 +300,30 @@ dozen, or the labels inside frames stop being legible), and the sheet is for
 the judgement "does this explain it?", not for correctness — `check` reads
 sorted order, heap shape and trace legality back from the frames
 deterministically, so do not spend a vision call on those.
+
+## Video (GIF, MP4, WebM)
+
+`vlmkit anim video scene.json --out demo.gif` writes a file that plays where
+no runtime runs: a README, a slide, a chat message. The frames are the same
+deterministic samples `render` produces, at `--fps` (default 20), plus a
+**hold** of `--hold` ms (default 400) on every step marker and on the last
+frame — in a browser the viewer pauses to read a caption, in a video the file
+has to do it. Identical consecutive frames collapse into one longer frame, so
+a hold costs one frame.
+
+- **`.gif`** is encoded in-process, no external tool. Flat SVG colours and
+  text fit a 256-colour palette with no visible loss, and GIF autoplays inline
+  everywhere. Size grows with pixel count: `--width 480` for a README, 640–800
+  for a slide. `--no-loop` plays once.
+- **`.mp4` / `.webm`** run `ffmpeg` (H.264 `yuv420p` / VP9) when it is on
+  PATH. When it is not, the PNG frames and an `frames.ffconcat` list are left
+  next to the output with the exact command printed; run it, or hand the
+  frames to any encoder. MP4 is the format for X, YouTube and Keynote; GitHub
+  renders MP4 only as an uploaded attachment, not from a repository path, so
+  a README wants the GIF.
+
+`sheet` and `video` divide the review work: the sheet is one image for a
+vision model, the video is for a person.
 
 ## Embedding
 
