@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" data-t="4200" data-duration="4200">
+<rect width="640" height="400" fill="#ffffff"/>
+<g id="title" data-shape="text" transform="translate(320 22)"><text font-size="18" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Is Dan within two hops of Ann?</tspan></text></g>
+<g id="edge-0" data-shape="line" transform="translate(0 0)"><line x1="342.45" y1="138.72" x2="357.55" y2="147.28" stroke="#22c55e" stroke-width="1.5" fill="none"/></g>
+<g id="edge-1" data-shape="line" transform="translate(0 0)"><line x1="332.89" y1="148.35" x2="367.11" y2="207.65" stroke="#1f2328" stroke-width="1.5" fill="none"/></g>
+<g id="edge-2" data-shape="line" transform="translate(0 0)"><line x1="367.11" y1="182.35" x2="332.89" y2="241.65" stroke="#22c55e" stroke-width="1.5" fill="none"/></g>
+<g id="edge-3" data-shape="line" transform="translate(0 0)"><line x1="354.2" y1="230" x2="285.8" y2="230" stroke="#1f2328" stroke-width="1.5" fill="none"/></g>
+<g id="edge-4" data-shape="line" transform="translate(0 0)"><line x1="357.71" y1="217" x2="282.29" y2="173" stroke="#1f2328" stroke-width="1.5" fill="none"/></g>
+<g id="edge-5" data-shape="line" transform="translate(0 0)"><line x1="272.89" y1="182.35" x2="307.11" y2="241.65" stroke="#1f2328" stroke-width="1.5" fill="none"/></g>
+<g id="node-Ann" data-shape="circle" transform="translate(320 126)"><circle r="23.8" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Ann</tspan></text></g>
+<g id="label-Ann" data-shape="text" transform="translate(320 161.8)"><text font-size="12" fill="#f59e0b" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0</tspan></text></g>
+<g id="node-Bob" data-shape="circle" transform="translate(380 160)"><circle r="23.8" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Bob</tspan></text></g>
+<g id="label-Bob" data-shape="text" transform="translate(380 195.8)"><text font-size="12" fill="#f59e0b" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">1</tspan></text></g>
+<g id="node-Cat" data-shape="circle" transform="translate(380 230)"><circle r="23.8" fill="#f59e0b" stroke="#1f2328" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Cat</tspan></text></g>
+<g id="label-Cat" data-shape="text" transform="translate(380 265.8)"><text font-size="12" fill="#f59e0b" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">1</tspan></text></g>
+<g id="node-Dan" data-shape="circle" transform="translate(320 264)"><circle r="23.8" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Dan</tspan></text></g>
+<g id="label-Dan" data-shape="text" transform="translate(320 299.8)"><text font-size="12" fill="#f59e0b" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">2</tspan></text></g>
+<g id="node-Eve" data-shape="circle" transform="translate(260 230)"><circle r="23.8" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Eve</tspan></text></g>
+<g id="label-Eve" data-shape="text" transform="translate(260 265.8)"><text font-size="12" fill="#f59e0b" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0"></tspan></text></g>
+<g id="node-Fay" data-shape="circle" transform="translate(260 160)"><circle r="23.8" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Fay</tspan></text></g>
+<g id="label-Fay" data-shape="text" transform="translate(260 195.8)"><text font-size="12" fill="#f59e0b" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0"></tspan></text></g>
+<g id="token" data-shape="circle" transform="translate(332.89 241.65)" opacity="0"><circle r="6" fill="#f59e0b" stroke="#1f2328" stroke-width="1.5"/></g>
+<text x="320" y="386" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">Yes: Ann → Bob → Dan, two hops</text>
+</svg>

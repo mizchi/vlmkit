@@ -111,7 +111,7 @@ semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
 from the quotes. Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
 
-What five rounds found (23 agents, Sonnet and Haiku; v3 re-tested v2's two
+What six rounds found (26 agents, Sonnet and Haiku; v3 re-tested v2's two
 failures with the fixes in place and both closed — 2/2 re-edits kept the
 story's timing without hand re-timing, and the zero-warning state-machine
 brief passed on the first attempt with the alternative path narrated):
@@ -140,8 +140,10 @@ brief passed on the first attempt with the alternative path narrated):
   series data) were added to widen what the IR can say. Four fresh agents,
   four briefs, 4/4 clean on the first attempt with every reported guess
   right; all friction was a missing sentence (default caption shapes, colour
-  semantics, that `pos` pins compose with `layout`). Their re-edit axis is
-  untested and is the next round.
+  semantics, that `pos` pins compose with `layout`). v6 then re-edited one
+  scene of each kind (a pivot swap followed by position-addressed sets, a
+  new node that does not shorten the answer, a new series plus a corrected
+  value): 3/3 clean, nothing unintended moved, again only doc sentences.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".

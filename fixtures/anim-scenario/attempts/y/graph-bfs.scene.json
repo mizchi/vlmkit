@@ -1,0 +1,21 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "graph",
+  "title": "Is Dan within two hops of Ann?",
+  "nodes": ["Ann", "Bob", "Cat", "Dan", "Eve", "Fay"],
+  "edges": [["Ann", "Bob"], ["Ann", "Cat"], ["Bob", "Dan"], ["Cat", "Eve"], ["Cat", "Fay"], ["Fay", "Dan"]],
+  "ops": [
+    { "visit": "Ann", "caption": "Start at Ann: hop 0" },
+    { "label": { "node": "Ann", "text": "0" }, "ms": 0 },
+    { "explore": "Ann->Bob", "caption": "Ann's first friend is Bob: hop 1" },
+    { "highlight": "Bob", "ms": 0 },
+    { "label": { "node": "Bob", "text": "1" }, "ms": 0 },
+    { "explore": "Ann->Cat", "caption": "Ann's other friend is Cat: hop 1" },
+    { "highlight": "Cat", "ms": 0 },
+    { "label": { "node": "Cat", "text": "1" }, "ms": 0 },
+    { "visit": "Bob", "caption": "Next in the queue: Bob" },
+    { "explore": "Bob->Dan", "caption": "Bob knows Dan: hop 2 — found" },
+    { "label": { "node": "Dan", "text": "2" }, "ms": 0 },
+    { "path": ["Ann", "Bob", "Dan"], "caption": "Yes: Ann → Bob → Dan, two hops" }
+  ]
+}

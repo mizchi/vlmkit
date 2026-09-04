@@ -20,12 +20,15 @@ const packageDirectories = [
   "vlmkit-plan",
   "vlmkit-markup",
   "vlmkit-heal",
+  "vlmkit-anim",
 ];
 const playwrightPeerPackages = new Set([
   "@mizchi/vlmkit-core",
   "@mizchi/vlmkit-capture",
   "@mizchi/vlmkit-markup",
   "@mizchi/vlmkit-heal",
+  // Optional peer (only `frames --png`, `sheet` and `video` launch a browser), same range.
+  "@mizchi/vlmkit-anim",
 ]);
 
 function fail(message) {
@@ -132,6 +135,10 @@ const { listComponentGoals } = await import("@mizchi/vlmkit-markup/component/com
 assert.equal(listComponentGoals().includes("app"), true);
 await import("@mizchi/vlmkit-generate/cli");
 await import("@mizchi/vlmkit-plan/cli");
+const { compileScene, checkAnimation, renderFrameSvg } = await import("@mizchi/vlmkit-anim");
+const timeline = compileScene({ format: "vlmkit-anim/scene@1", kind: "sort", algorithm: "bubble", values: [3, 1, 2] });
+assert.equal(checkAnimation(timeline).filter((d) => d.severity === "error").length, 0);
+assert.ok(renderFrameSvg(timeline, 0).startsWith("<svg"));
 console.log("workspace package imports passed");
 `);
 
@@ -151,6 +158,7 @@ console.log("workspace package imports passed");
     run(process.execPath, ["smoke.mjs"], { cwd: consumerDir });
     assertCliHelp(join(consumerDir, "node_modules", ".bin", "vlmkit-plan"), consumerDir);
     assertCliHelp(join(consumerDir, "node_modules", ".bin", "vlmkit-generate"), consumerDir);
+    assertCliHelp(join(consumerDir, "node_modules", ".bin", "vlmkit-anim"), consumerDir);
     console.log("==> packed workspace smoke passed");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

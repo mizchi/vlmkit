@@ -230,7 +230,9 @@ rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
 | `ops` | `{"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}` writes a value — `from` names the cells it was computed from, which flash while a token flies from each into the target; `{"highlight": T}` / `{"unhighlight": T \| "all"}` / `{"mark": T}` where T is `{"cell": [r, c]}` \| `{"cells": [[r, c], …]}` \| `{"row": r}` \| `{"col": c}` (highlight = accent until cleared, mark = permanent done colour); `{"swap": {"rows": [i, j]}}` / `{"swap": {"cols": [i, j]}}` (labels move with them); `{"note": "…"}`; each may carry `caption`, `ms` |
 
 Cell references are `[row, col]`, 0-based, **by current position** (after a
-swap, row 0 is whatever is now on top). `from` may list several cells (the
+swap, row 0 is whatever is now on top; the row label travels with its row,
+so captions can keep naming rows by label). A `set` may write the value a
+cell already holds — a beat that says "this one needs no change". `from` may list several cells (the
 three neighbours a DP cell takes a min over); a token flies in from each.
 The generated caption for a `set` reads `(row, col) = value (from (r, c), …)`
 with the labels when there are any — it names the inputs but not why one won,
@@ -272,12 +274,16 @@ goes.
 | `algorithm`, `start`, `goal` | `bfs` \| `dfs` \| `dijkstra` from `start` generates the ops (every beat captioned with the comparison it makes); `goal` makes Dijkstra paint the shortest path at the end |
 | `ops` | explicit alternative: `{"visit": id}` (current = accent and larger, then stays green), `{"explore": "a->b"}` (a token travels the edge), `{"label": {"node": id \| [ids], "text": "…"}}` (text under the node: a distance, a depth), `{"highlight": id \| [ids]}` / `{"unhighlight": …}`, `{"path": ["a", "b", "c"]}` (paints the answer green), `{"note": "…"}`; each may carry `caption`, `ms` |
 
-Colours: a node starts white; `highlight` makes it accent; `visit` makes it
-accent and a little larger while it is the current node, and it turns green
-("visited") when the next `visit` happens or the animation ends; `path` paints
-its nodes and edges green, and visited nodes off the path stay green too. A
-node never visited stays white, so the final frame shows exactly what the
-walk reached.
+Colours: a node starts white; `highlight` makes it accent (amber by default)
+and it stays amber until a `visit`, `path` or `unhighlight` recolours it —
+so a node discovered but never dequeued ends amber, not green; `visit` makes
+it accent and a little larger while it is the current node, and it turns
+green ("visited") when the next `visit` happens or the animation ends; `path`
+paints its nodes and edges green, and visited nodes off the path stay green
+too. A node never touched stays white, so the final frame shows exactly what
+the walk reached. Use explicit `ops` when the walk should be allowed to stop
+before reaching everything (an `algorithm` visits every reachable node, and
+the check holds it to that).
 
 `ms: 0` on a `label` or `highlight` applies it at the current instant without
 a step of its own — a relaxation writing the new distance inside the explore
@@ -313,14 +319,17 @@ A bar or line chart revealed series by series, with reference lines and focus.
 | `type` | `bar` (default) \| `line` |
 | `categories` | required: the x-axis labels |
 | `series` | required, 1+: `{"id", "label", "values": number[], "color"}`, one value per category; colours default to a palette |
-| `yMax`, `yLabel` | axis top (default: a round number just above the largest value, thresholds and `set` values included) and axis caption |
+| `yMax`, `yLabel` | axis top and axis caption. Default top: 10% above the largest value (thresholds and `set` values included), rounded up to 1 / 1.5 / 2 / 2.5 / 3 / 4 / 5 / 6 / 8 × 10ⁿ — a peak of 2.4 gets 3, of 260 gets 300 |
 | `sequence` | `{"reveal": id \| [ids] \| "all"}` (bars grow in / the line draws in), `{"set": {"series", "index", "value"}}` (a bar animates to a new value; bar charts only), `{"highlight": T}` / `{"unhighlight": T \| "all"}` (everything outside T dims), `{"threshold": {"value", "label"}}` (a horizontal reference line), `{"note": "…"}`; each may carry `caption`, `ms`. Default: reveal each series in order |
 
 A highlight target T picks by any combination of `series` and one of
 `index` / `category`: `{"series": "after"}` is one series across every
 category, `{"category": "ap"}` is every series in one category,
-`{"series": "after", "category": "ap"}` is one bar. Without a `caption`, a
-`reveal` is captioned with the series label; the story usually wants its own.
+`{"series": "after", "category": "ap"}` is one bar. Every series stays
+invisible until its own `reveal` (or `{"reveal": "all"}`); adding a series
+to a hand-written sequence means adding its reveal, and the check warns
+when one is missing. Without a `caption`, a `reveal` is captioned with the
+series label; the story usually wants its own.
 Put a `threshold` at the beat where it becomes relevant — after the series it
 judges is on screen — rather than first. The check fails if a bar's final
 height is not its value's share of the axis and warns about a series the
