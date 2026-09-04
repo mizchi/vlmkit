@@ -27,6 +27,9 @@ v5 (2026-09-04) added briefs for the three kinds that landed that day —
 v6 re-edited one frozen scene per new kind (`README-v6-*.md`, agents `x`–`z`).
 v7 added `array` and `tree`: briefs `array-partition`, `tree-bst-lesson`
 and re-edit tasks `README-v7-{array,tree}.md` (agents `aa`–`ad`).
+v8 added `stack`, `queue` and `list`: briefs `stack-postfix`, `queue-bfs-frontier`,
+`list-lru`, and re-edit tasks `README-v8-{list,vector}.md` — the `vector` one is
+the first re-edit of that kind (agents `ba`–`be`).
 
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing.
