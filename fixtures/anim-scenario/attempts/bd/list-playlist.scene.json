@@ -1,0 +1,14 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "list",
+  "title": "A playlist as a linked list",
+  "initial": ["intro", "verse", "chorus", "outro"],
+  "ops": [
+    { "find": "chorus", "caption": "To reach the chorus we walk from the head: intro, verse, chorus" },
+    { "insert": { "value": "bridge", "after": "chorus" }, "caption": "Add a bridge after the chorus: chorus now points to bridge, bridge to outro" },
+    { "remove": "intro", "caption": "Drop the intro: verse becomes the head" },
+    { "insert": { "value": "chorus", "after": "bridge" }, "caption": "Repeat the chorus: bridge now points to a second chorus, which points to outro" },
+    { "reverse": true, "caption": "Reverse the playlist to play it backwards: outro is now the head" },
+    { "find": "outro", "caption": "From the new head, outro is right here: 0 hops to find it" }
+  ]
+}
