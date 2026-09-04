@@ -14,7 +14,10 @@ from `briefs/` and `docs/anim-ir.md`, writes a scene, and runs
   `README.md` + `replication.scene.json` is the v2 variant (absolute event
   times, kept frozen because two agents' failures are recorded against it);
   `README-v3.md` + `replication-after.scene.json` is the same story written
-  with `after` anchors, used from v3 on.
+  with `after` anchors, used from v3 on. `README-v4-sequential.md` and
+  `README-v4-causal.md` + `replication-causal.scene.json` are v4's two arms
+  (same change request, explicit "ok must not wait" criterion) that decided
+  the timing default.
 
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing.

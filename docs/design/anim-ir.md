@@ -95,7 +95,7 @@ semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
 from the quotes. Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
 
-What three rounds found (14 agents, Sonnet and Haiku; v3 re-tested v2's two
+What four rounds found (19 agents, Sonnet and Haiku; v3 re-tested v2's two
 failures with the fixes in place and both closed — 2/2 re-edits kept the
 story's timing without hand re-timing, and the zero-warning state-machine
 brief passed on the first attempt with the alternative path narrated):
@@ -111,6 +111,14 @@ brief passed on the first attempt with the alternative path narrated):
   path the brief required to reach zero warnings; fixed with trace items
   (`{"on", "caption"}`, `{"note"}`, `{"goto"}`). Every hint must name a remedy
   that exists in the format — that is now a rule for this package.
+- **v4 changed a default from data.** Under list-order timing, 2/2 v3
+  re-editors inserted a side branch and unknowingly delayed the main reply.
+  v4 ran the same edit in two arms: with the guide's new insertion rule
+  (2/2 correct, each by adding explicit anchors) and with a `causal` model
+  where a message starts when its sender is free (2/2 correct with zero or
+  one anchor; a fresh author predicted every start time). All three causal
+  agents preferred it. `causal` is the default; `"timing": "sequential"`
+  remains for a single linear chain.
 - Vision-model review uses `vlmkit anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".
@@ -119,7 +127,6 @@ brief passed on the first attempt with the alternative path narrated):
 
 - No layout engine beyond layered / grid / circle. `pos` pins what matters.
 - No edge that follows a moving node (see above).
-- No video export. `frames --png` gives a filmstrip; a video is `ffmpeg` on it.
 - No Svelte / typed-TS / Pkl surface yet. JSON is the IR; typed surfaces are
   generators for it and can come once the IR has stopped moving. The `types.ts`
   declarations are already the contract such a surface would target.
