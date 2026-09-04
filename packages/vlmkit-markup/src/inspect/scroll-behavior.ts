@@ -23,13 +23,13 @@
  *   vlmkit check scroll <html-or-url> [--json]
  */
 import { resolve } from "node:path";
-import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
+import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { retuneNote, tierIssues } from "../rule-prose.ts";
+import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 

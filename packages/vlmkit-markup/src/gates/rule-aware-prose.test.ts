@@ -216,7 +216,7 @@ import { formatBreakpointCheckReport } from "../stress/breakpoint-check.ts";
 import { formatScrollBehaviorReport } from "../inspect/scroll-behavior.ts";
 import { formatScrollScanReport } from "../inspect/scroll-scan.ts";
 import { formatMotionDetectionReport } from "../style/motion-detect.ts";
-import { formatAnimationEvalReport } from "../style/animation-eval.ts";
+import { formatAnimationEvalReport } from "@mizchi/vlmkit-animation-eval/animation-eval.ts";
 import { formatAssetCheckReport } from "../asset/asset-check.ts";
 import { formatLayoutReport } from "../inspect/layout-contract.ts";
 import { formatStoryVrtReport } from "../component/story-vrt.ts";

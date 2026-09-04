@@ -83,6 +83,7 @@
     "@jsquash/webp": "^1.5.0",
     "@mizchi/vlmkit-ai": "workspace:*",
     "@mizchi/vlmkit-anim": "workspace:*",
+    "@mizchi/vlmkit-animation-eval": "workspace:*",
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",
     "@mizchi/vlmkit-generate": "workspace:*",

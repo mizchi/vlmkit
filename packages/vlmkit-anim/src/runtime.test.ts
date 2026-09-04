@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { runAnimationEval } from "@mizchi/vlmkit-markup/style/animation-eval.ts";
+import { runAnimationEval } from "@mizchi/vlmkit-animation-eval/animation-eval.ts";
 import { compileScene } from "./compile/index.ts";
 import { renderFrameSvg } from "./render-svg.ts";
 import { renderEmbedHtml } from "./runtime.ts";

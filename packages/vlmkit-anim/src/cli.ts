@@ -10,6 +10,7 @@
  *   video     GIF (encoded here) or mp4 / webm (ffmpeg), holding on each step
  *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
+ *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
  *   schema    the cheat sheet for one kind, or the index
  *
  * `check` is the command an agent runs after every edit; everything it prints
@@ -32,7 +33,7 @@ import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
 import { renderSheetHtml } from "./sheet.ts";
 import { writeVideo, type VideoResult } from "./video.ts";
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -57,6 +58,11 @@ Commands
   html <file> [--out page.html] [--no-autoplay] [--loop] [--title T]
                                   Self-contained page embedding the <vlm-anim> runtime and the timeline.
   runtime [--out vlm-anim.js]     The runtime script alone, for a site that embeds many animations.
+  eval <page.html|url> [--samples N] [--viewport WxH] [--strip strip.png]
+                                  Measure the page's Web Animations frame by frame — visible effect, settle time,
+                                  reduced-motion, motion outside the API — with the evaluator vlmkit's
+                                  \`check animation\` gate uses (@mizchi/vlmkit-animation-eval + playwright).
+                                  Exit 1 on a suspect finding.
   schema [--kind <kind>]          The writing guide: field list and a minimal example for a kind, or the index.
 
 Options
@@ -165,6 +171,26 @@ export async function runAnimCli(argv: string[]): Promise<number> {
   if (verb === "runtime") {
     await writeOut(readFlag(rest, "--out"), RUNTIME_SOURCE.trim(), "runtime");
     return 0;
+  }
+
+  if (verb === "eval") {
+    const source = positionals[0];
+    if (!source) throw new UsageError("vlmkit-anim eval needs a page: vlmkit-anim eval <page.html|url>");
+    const viewportRaw = readFlag(rest, "--viewport");
+    const viewportMatch = viewportRaw?.match(/^(\d+)x(\d+)$/);
+    if (viewportRaw && !viewportMatch) throw new UsageError(`--viewport takes WxH (e.g. 1280x720), got ${JSON.stringify(viewportRaw)}`);
+    const evaluator = await loadAnimationEval();
+    const samples = readInt(rest, "--samples", { min: 1 });
+    const stripPath = readFlag(rest, "--strip");
+    const report = await evaluator.runAnimationEval({
+      source,
+      ...(samples !== undefined ? { samples } : {}),
+      ...(viewportMatch ? { viewport: { width: Number(viewportMatch[1]), height: Number(viewportMatch[2]) } } : {}),
+      ...(stripPath ? { stripPath } : {}),
+    });
+    if (json) console.log(JSON.stringify(report, null, 2));
+    else console.log(evaluator.formatAnimationEvalReport(report));
+    return report.issues.some((issue) => issue.severity === "suspect") ? 1 : 0;
   }
 
   const file = requireFile(positionals, verb);
@@ -304,6 +330,23 @@ async function loadChromium(): Promise<typeof import("playwright").chromium> {
     return (await import("playwright")).chromium;
   } catch {
     throw new UsageError("PNG output needs playwright installed (pnpm add -D playwright && npx playwright install chromium); write .svg / .html instead to skip the browser");
+  }
+}
+
+/**
+ * The shared evaluator is an optional peer: this tool writes animations and
+ * depends on nothing else to do so; measuring them is what it shares with
+ * vlmkit, and a consumer who wants that installs the one package that does it.
+ */
+async function loadAnimationEval(): Promise<typeof import("@mizchi/vlmkit-animation-eval")> {
+  try {
+    return await import("@mizchi/vlmkit-animation-eval");
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") {
+      throw new UsageError("vlmkit-anim eval needs the shared evaluator: pnpm add -D @mizchi/vlmkit-animation-eval playwright && npx playwright install chromium");
+    }
+    throw e;
   }
 }
 

@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
-import { STABLE_SELECTOR_JS } from "./stable-selector.ts";
+import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
 import { runMotionDetection } from "./style/motion-detect.ts";
 
 /**
@@ -159,7 +159,7 @@ describe("no seventh copy", () => {
     assert.deepEqual(
       definers.sort(),
       [
-        "packages/vlmkit-markup/src/stable-selector.ts",
+        "packages/vlmkit-core/src/stable-selector.ts",
         "packages/vlmkit-markup/src/style/motion-detect.ts",
       ],
       "a new copy of `stableSelector` — interpolate STABLE_SELECTOR_JS instead. Three of "

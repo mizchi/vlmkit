@@ -28,8 +28,28 @@ describe("vlmkit-anim", () => {
   it("--help exits 0 and lists the verbs", () => {
     const r = run(["--help"]);
     assert.equal(r.status, 0);
-    for (const verb of ["check", "validate", "compile", "explain", "render", "frames", "html", "schema"]) assert.match(r.stdout, new RegExp(`^  ${verb}`, "m"));
+    for (const verb of ["check", "validate", "compile", "explain", "render", "frames", "html", "eval", "schema"]) assert.match(r.stdout, new RegExp(`^  ${verb}`, "m"));
   });
+
+  it("eval measures an emitted page with the shared evaluator and exits 0 when nothing is suspect", () => {
+    const page = join(dir, "eval-sort.html");
+    assert.equal(run(["html", join(FIXTURES, "sort-bubble.json"), "--out", page]).status, 0);
+    const r = run(["eval", page, "--samples", "2", "--viewport", "800x500"]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /animations: \d+ \(evaluated \d+/);
+    assert.match(r.stdout, /reduced-motion: honored/);
+    const j = run(["eval", page, "--samples", "2", "--json"]);
+    assert.equal(j.status, 0, j.stderr);
+    const report = JSON.parse(j.stdout);
+    assert.ok(report.animationCount > 0);
+    assert.deepEqual(report.issues.filter((i: { severity: string }) => i.severity === "suspect"), []);
+    const missing = run(["eval"]);
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /eval needs a page/);
+    const badViewport = run(["eval", page, "--viewport", "wide"]);
+    assert.equal(badViewport.status, 1);
+    assert.match(badViewport.stderr, /--viewport takes WxH/);
+  }, 120_000);
 
   it("check passes every fixture and every schema example, printing stats", () => {
     const files = readdirSync(FIXTURES).filter((f) => f.endsWith(".json")).map((f) => join(FIXTURES, f));

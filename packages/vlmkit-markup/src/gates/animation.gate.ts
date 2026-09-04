@@ -16,7 +16,7 @@ import {
   type AnimationEvalReport,
   formatAnimationEvalReport,
   runAnimationEval,
-} from "../style/animation-eval.ts";
+} from "@mizchi/vlmkit-animation-eval/animation-eval.ts";
 import { firstPositional, optionalInt, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOptions>({

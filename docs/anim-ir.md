@@ -19,6 +19,7 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
 5. vlmkit-anim html scene.json --out page.html       the playable page
    vlmkit-anim video scene.json --out demo.gif       a file for a README / slide (or .mp4 / .webm through ffmpeg)
+6. vlmkit-anim eval page.html                        measure the emitted page frame by frame (needs @mizchi/vlmkit-animation-eval + playwright)
 ```
 
 `check` exits 1 on any error. Warnings (⚠) are advice: off-canvas nodes,
@@ -651,4 +652,9 @@ frame; the step buttons still walk the chapters.
 
 Because the motion is ordinary Web Animations on ordinary SVG, `vlmkit check
 animation page.html` evaluates it like any other page (visible effect, settle
-time, reduced-motion honoured).
+time, reduced-motion honoured). `vlmkit-anim eval page.html` runs the same
+evaluator without installing vlmkit: it needs the one package that holds the
+measurement (`@mizchi/vlmkit-animation-eval`) plus `playwright`, both optional
+peers of `vlmkit-anim`. Expect an `uncontrolled-motion` warning on an
+autoplaying page — the runtime's master clock is a rAF loop the Web Animations
+API cannot pause — and none with `html --no-autoplay`.

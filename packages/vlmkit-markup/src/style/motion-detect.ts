@@ -9,7 +9,7 @@
  *
  * For rendered-frame evaluation (visible effect, motion bbox, settle
  * time, behavioral reduced-motion parity) use `vlmkit check animation`
- * (./animation-eval.ts).
+ * (`@mizchi/vlmkit-animation-eval`).
  *
  * Usage:
  *   vlmkit check motion <html-or-url>
@@ -20,7 +20,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { retuneNote, tierIssues } from "../rule-prose.ts";
+import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";

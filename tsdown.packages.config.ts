@@ -4,6 +4,7 @@ const publicWorkspacePackages = [
   "vlmkit-core",
   "vlmkit-ai",
   "vlmkit-capture",
+  "vlmkit-animation-eval",
   "vlmkit-generate",
   "vlmkit-plan",
   "vlmkit-markup",

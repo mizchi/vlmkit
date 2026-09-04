@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@mizchi/vlmkit-ai": "workspace:*",
+    "@mizchi/vlmkit-animation-eval": "workspace:*",
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",
     "pixelmatch": "^7.1.0",

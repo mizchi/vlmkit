@@ -237,7 +237,7 @@ for gates outside this repo: a project's own gate follows the one-parameter form
 
 Two projections do the work. Seven gates share a report shape — `issues[]` with a
 `kind` and a `severity` — and go through `tierIssues` / `retuneNote` in
-`packages/vlmkit-markup/src/rule-prose.ts`; the rest call `applyRuleTiers` or
+`packages/vlmkit-core/src/plugin/rule-prose.ts`; the rest call `applyRuleTiers` or
 `ruleTier` directly, because a helper covering `check layout`'s per-viewport checks,
 `check story`'s outcomes and `verify markup`'s targets would need more configuration
 than the code it replaced.

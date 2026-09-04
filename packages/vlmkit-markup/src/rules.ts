@@ -158,7 +158,7 @@ export type { InteractionIssue, InteractionMapResult } from "./inspect/interacti
 export { analyzeMotionSamples } from "./style/motion-detect.ts";
 export type { MotionDetectionInput, MotionDetectionReport } from "./style/motion-detect.ts";
 
-export { deriveAnimationIssues } from "./style/animation-eval.ts";
+export { deriveAnimationIssues } from "@mizchi/vlmkit-animation-eval/animation-eval.ts";
 
 export { analyzeBoundary, deriveBreakpointIssues, deriveSweepIssues } from "./stress/breakpoint-check.ts";
 export type { BreakpointCheckIssue } from "./stress/breakpoint-check.ts";
