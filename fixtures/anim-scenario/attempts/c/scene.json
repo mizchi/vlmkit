@@ -1,0 +1,23 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "distributed",
+  "title": "Raft Leader Election",
+  "stepMs": 600,
+  "nodes": [
+    { "id": "n1", "status": "leader" },
+    { "id": "n2" },
+    { "id": "n3" }
+  ],
+  "messages": [
+    { "from": "n1", "to": "n2", "label": "heartbeat", "caption": "Leader n1 sends heartbeat to n2" },
+    { "from": "n1", "to": "n3", "label": "heartbeat", "caption": "Leader n1 sends heartbeat to n3" },
+    { "from": "n2", "to": "n1", "label": "vote request", "lost": true, "caption": "n2 times out and requests votes; n1 is down so the request is lost" },
+    { "from": "n2", "to": "n3", "label": "vote request", "caption": "n2 requests votes from n3" },
+    { "from": "n3", "to": "n2", "label": "vote", "caption": "n3 grants its vote to n2" },
+    { "from": "n2", "to": "n3", "label": "heartbeat", "caption": "n2 is now leader, sends heartbeat to n3" }
+  ],
+  "events": [
+    { "at": 1200, "node": "n1", "status": "down", "caption": "n1 crashes" },
+    { "at": 3600, "node": "n2", "status": "leader", "caption": "n2 is elected leader" }
+  ]
+}

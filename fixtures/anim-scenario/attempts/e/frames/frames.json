@@ -1,0 +1,110 @@
+{
+  "source": "fixtures/anim-scenario/attempts/e/scene.json",
+  "canvas": {
+    "width": 640,
+    "height": 400,
+    "background": "#ffffff"
+  },
+  "frames": [
+    {
+      "t": 0,
+      "file": "frame-000000.svg",
+      "caption": "Empty min-heap"
+    },
+    {
+      "t": 385,
+      "file": "frame-000385.svg",
+      "caption": "push 9: place it in the next free slot"
+    },
+    {
+      "t": 935,
+      "file": "frame-000935.svg",
+      "caption": "push 4: place it in the next free slot"
+    },
+    {
+      "t": 1485,
+      "file": "frame-001485.svg",
+      "caption": "4 < parent 9: swap up"
+    },
+    {
+      "t": 2035,
+      "file": "frame-002035.svg",
+      "caption": "push 7: place it in the next free slot"
+    },
+    {
+      "t": 2585,
+      "file": "frame-002585.svg",
+      "caption": "7 vs parent 4: heap property holds"
+    },
+    {
+      "t": 2915,
+      "file": "frame-002915.svg",
+      "caption": "push 1: place it in the next free slot"
+    },
+    {
+      "t": 3465,
+      "file": "frame-003465.svg",
+      "caption": "1 < parent 9: swap up"
+    },
+    {
+      "t": 4015,
+      "file": "frame-004015.svg",
+      "caption": "1 < parent 4: swap up"
+    },
+    {
+      "t": 4565,
+      "file": "frame-004565.svg",
+      "caption": "push 8: place it in the next free slot"
+    },
+    {
+      "t": 5115,
+      "file": "frame-005115.svg",
+      "caption": "8 vs parent 4: heap property holds"
+    },
+    {
+      "t": 5445,
+      "file": "frame-005445.svg",
+      "caption": "The root is always the minimum — that's what pop returns."
+    },
+    {
+      "t": 5885,
+      "file": "frame-005885.svg",
+      "caption": "pop: the root 1 comes out"
+    },
+    {
+      "t": 6435,
+      "file": "frame-006435.svg",
+      "caption": "Move the last value 8 to the root"
+    },
+    {
+      "t": 6985,
+      "file": "frame-006985.svg",
+      "caption": "4 < 8: swap down with the smaller child"
+    },
+    {
+      "t": 7535,
+      "file": "frame-007535.svg",
+      "caption": "8 is ≤ its children: stop"
+    },
+    {
+      "t": 7865,
+      "file": "frame-007865.svg",
+      "caption": "pop: the root 4 comes out"
+    },
+    {
+      "t": 8415,
+      "file": "frame-008415.svg",
+      "caption": "Move the last value 9 to the root"
+    },
+    {
+      "t": 8965,
+      "file": "frame-008965.svg",
+      "caption": "7 < 9: swap down with the smaller child"
+    },
+    {
+      "t": 9515,
+      "file": "frame-009515.svg",
+      "caption": "Done. Heap: 7, 8, 9; popped 1, 4"
+    }
+  ]
+}

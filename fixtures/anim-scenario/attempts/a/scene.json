@@ -1,0 +1,36 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "sort",
+  "title": "Insertion sort",
+  "values": [7, 2, 9, 4, 1],
+  "stepMs": 400,
+  "ops": [
+    { "note": "Insertion sort grows a sorted run at the left, one item at a time. A single item is already a sorted run of one." },
+
+    { "compare": [0, 1], "caption": "Take the next item, 2, and compare it with 7, the end of the sorted run." },
+    { "swap": [0, 1], "caption": "2 is smaller than 7, so it swaps left. The sorted run is now [2, 7]." },
+    { "note": "2 has nothing left of it to compare against, so it stops here." },
+
+    { "compare": [1, 2], "caption": "Take the next item, 9, and compare it with 7, the end of the sorted run." },
+    { "note": "9 is not smaller than 7, so it does not move. It stops immediately: the sorted run just grows to [2, 7, 9]." },
+
+    { "compare": [2, 3], "caption": "Take the next item, 4, and compare it with 9." },
+    { "swap": [2, 3], "caption": "4 is smaller than 9, so it swaps left." },
+    { "compare": [1, 2], "caption": "Now compare 4 with 7." },
+    { "swap": [1, 2], "caption": "4 is smaller than 7 too, so it swaps left again." },
+    { "compare": [0, 1], "caption": "Now compare 4 with 2, the first item of the sorted run." },
+    { "note": "4 is not smaller than 2, so it stops here. The sorted run is now [2, 4, 7, 9]." },
+
+    { "compare": [3, 4], "caption": "Take the last item, 1, and compare it with 9." },
+    { "swap": [3, 4], "caption": "1 is smaller than 9, so it swaps left." },
+    { "compare": [2, 3], "caption": "Compare 1 with 7." },
+    { "swap": [2, 3], "caption": "1 is smaller than 7, so it swaps left again." },
+    { "compare": [1, 2], "caption": "Compare 1 with 4." },
+    { "swap": [1, 2], "caption": "1 is smaller than 4, so it swaps left again." },
+    { "compare": [0, 1], "caption": "Compare 1 with 2, the last item standing between it and the front." },
+    { "swap": [0, 1], "caption": "1 is smaller than everything else, so it swaps all the way to the front." },
+    { "note": "1 stops only at the very front, because it is smaller than every item in the sorted run." },
+
+    { "done": [0, 1, 2, 3, 4], "caption": "The sorted run now covers the whole array: 1, 2, 4, 7, 9." }
+  ]
+}

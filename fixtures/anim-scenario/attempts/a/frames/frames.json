@@ -1,0 +1,130 @@
+{
+  "source": "fixtures/anim-scenario/attempts/a/scene.json",
+  "canvas": {
+    "width": 640,
+    "height": 360,
+    "background": "#ffffff"
+  },
+  "frames": [
+    {
+      "t": 0,
+      "file": "frame-000000.svg",
+      "caption": "Start: 7, 2, 9, 4, 1"
+    },
+    {
+      "t": 240,
+      "file": "frame-000240.svg",
+      "caption": "Insertion sort grows a sorted run at the left, one item at a time. A single item is already a sorted run of one."
+    },
+    {
+      "t": 560,
+      "file": "frame-000560.svg",
+      "caption": "Take the next item, 2, and compare it with 7, the end of the sorted run."
+    },
+    {
+      "t": 880,
+      "file": "frame-000880.svg",
+      "caption": "2 is smaller than 7, so it swaps left. The sorted run is now [2, 7]."
+    },
+    {
+      "t": 1280,
+      "file": "frame-001280.svg",
+      "caption": "2 has nothing left of it to compare against, so it stops here."
+    },
+    {
+      "t": 1600,
+      "file": "frame-001600.svg",
+      "caption": "Take the next item, 9, and compare it with 7, the end of the sorted run."
+    },
+    {
+      "t": 1920,
+      "file": "frame-001920.svg",
+      "caption": "9 is not smaller than 7, so it does not move. It stops immediately: the sorted run just grows to [2, 7, 9]."
+    },
+    {
+      "t": 2240,
+      "file": "frame-002240.svg",
+      "caption": "Take the next item, 4, and compare it with 9."
+    },
+    {
+      "t": 2560,
+      "file": "frame-002560.svg",
+      "caption": "4 is smaller than 9, so it swaps left."
+    },
+    {
+      "t": 2960,
+      "file": "frame-002960.svg",
+      "caption": "Now compare 4 with 7."
+    },
+    {
+      "t": 3280,
+      "file": "frame-003280.svg",
+      "caption": "4 is smaller than 7 too, so it swaps left again."
+    },
+    {
+      "t": 3680,
+      "file": "frame-003680.svg",
+      "caption": "Now compare 4 with 2, the first item of the sorted run."
+    },
+    {
+      "t": 4000,
+      "file": "frame-004000.svg",
+      "caption": "4 is not smaller than 2, so it stops here. The sorted run is now [2, 4, 7, 9]."
+    },
+    {
+      "t": 4320,
+      "file": "frame-004320.svg",
+      "caption": "Take the last item, 1, and compare it with 9."
+    },
+    {
+      "t": 4640,
+      "file": "frame-004640.svg",
+      "caption": "1 is smaller than 9, so it swaps left."
+    },
+    {
+      "t": 5040,
+      "file": "frame-005040.svg",
+      "caption": "Compare 1 with 7."
+    },
+    {
+      "t": 5360,
+      "file": "frame-005360.svg",
+      "caption": "1 is smaller than 7, so it swaps left again."
+    },
+    {
+      "t": 5760,
+      "file": "frame-005760.svg",
+      "caption": "Compare 1 with 4."
+    },
+    {
+      "t": 6080,
+      "file": "frame-006080.svg",
+      "caption": "1 is smaller than 4, so it swaps left again."
+    },
+    {
+      "t": 6480,
+      "file": "frame-006480.svg",
+      "caption": "Compare 1 with 2, the last item standing between it and the front."
+    },
+    {
+      "t": 6800,
+      "file": "frame-006800.svg",
+      "caption": "1 is smaller than everything else, so it swaps all the way to the front."
+    },
+    {
+      "t": 7200,
+      "file": "frame-007200.svg",
+      "caption": "1 stops only at the very front, because it is smaller than every item in the sorted run."
+    },
+    {
+      "t": 7520,
+      "file": "frame-007520.svg",
+      "caption": "The sorted run now covers the whole array: 1, 2, 4, 7, 9."
+    },
+    {
+      "t": 7760,
+      "file": "frame-007760.svg",
+      "caption": "Sorted: 1, 2, 4, 7, 9"
+    }
+  ]
+}

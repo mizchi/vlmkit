@@ -1,0 +1,40 @@
+{
+  "source": "fixtures/anim-scenario/attempts/b/scene.json",
+  "canvas": {
+    "width": 1792,
+    "height": 360,
+    "background": "#ffffff"
+  },
+  "frames": [
+    {
+      "t": 0,
+      "file": "frame-000000.svg",
+      "caption": "Start in \"ESTABLISHED\""
+    },
+    {
+      "t": 560,
+      "file": "frame-000560.svg",
+      "caption": "on close: ESTABLISHED → FIN_WAIT_1"
+    },
+    {
+      "t": 1540,
+      "file": "frame-001540.svg",
+      "caption": "on ACK: FIN_WAIT_1 → FIN_WAIT_2"
+    },
+    {
+      "t": 2520,
+      "file": "frame-002520.svg",
+      "caption": "on FIN: FIN_WAIT_2 → TIME_WAIT"
+    },
+    {
+      "t": 3500,
+      "file": "frame-003500.svg",
+      "caption": "on timeout: TIME_WAIT → CLOSED"
+    },
+    {
+      "t": 4480,
+      "file": "frame-004480.svg",
+      "caption": "End in final state \"CLOSED\""
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "heap",
+  "title": "Priority queue via min-heap",
+  "type": "min",
+  "ops": [
+    { "push": 9 },
+    { "push": 4 },
+    { "push": 7 },
+    { "push": 1 },
+    { "push": 8 },
+    { "note": "The root is always the minimum — that's what pop returns." },
+    { "pop": true },
+    { "pop": true }
+  ]
+}
