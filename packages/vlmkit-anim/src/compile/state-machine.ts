@@ -24,11 +24,14 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
   });
   const T = b.theme;
   const ids = states.map((s) => s.id);
+  // Pinned states are given in canvas coordinates; the layout works in a frame
+  // inset by the title and caption bands, so translate pins into it and back.
+  const fixed = new Map<string, [number, number]>();
+  for (const s of states) if (s.pos) fixed.set(s.id, [s.pos[0] - 30, s.pos[1] - 40]);
   const pos = layoutNodes(
-    { ids, edges: scene.transitions.map((t) => [t.from, t.to]), fixed: new Map(), width: b.width - 60, height: b.height - 90, nodeW: R * 2.5, nodeH: R * 2.5 },
+    { ids, edges: scene.transitions.map((t) => [t.from, t.to]), fixed, width: b.width - 60, height: b.height - 90, nodeW: R * 2.5, nodeH: R * 2.5 },
     layout,
   );
-  // Shift into the canvas leaving a title band and caption band.
   for (const [id, p] of pos) pos.set(id, [p[0] + 30, p[1] + 40]);
 
   if (scene.title) b.node({ id: "title", shape: "text", pos: [b.width / 2, 22], text: scene.title, fontSize: T.fontSize + 4, color: T.text });

@@ -184,6 +184,12 @@ function checkStateMachine(scene: Extract<Scene, { kind: "state-machine" }>, tl:
   const fired = new Set(visited.slice(1).map((_, i) => `${visited[i]}:${scene.trace[i]}`));
   const unused = scene.transitions.filter((t) => !fired.has(`${t.from}:${t.on}`));
   if (unused.length && unused.length === scene.transitions.length) out.push(warn("trace", "the trace fires no transition: the picture is static"));
+  else {
+    // Drawn but never animated: the viewer sees a path and never learns when it is taken.
+    const visitedSet = new Set(visited);
+    for (const id of ids) if (reachable.has(id) && !visitedSet.has(id)) out.push(warn(`states(${id})`, `state "${id}" is drawn but the trace never enters it`, "extend the trace to reach it, or mention it in a caption so the viewer knows it is an alternative path"));
+    for (const t of unused) if (visitedSet.has(t.from)) out.push(warn(`transitions(${t.from}:${t.on})`, `transition "${t.from}" —${t.on}→ "${t.to}" is drawn but the trace never fires it`));
+  }
   return out;
 }
 
