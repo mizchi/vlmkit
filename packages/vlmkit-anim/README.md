@@ -1,7 +1,8 @@
 # @mizchi/vlmkit-anim
 
 Declarative explanatory animations, for an AI to explain something to a
-person: a sorting run, a state-machine trace, heap operations, messages between
+person: a sorting run, a state-machine trace, heap operations, a DP table filling in,
+a graph traversal, a chart revealed series by series, messages between
 distributed nodes, a concept diagram walked through in beats, or a generic
 vector tween. One JSON file in, a `<vlm-anim>` web component (SVG + Web
 Animations, ~7KB, no dependencies) out — plus headless SVG frames and checks

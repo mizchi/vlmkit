@@ -3,8 +3,9 @@
  *
  * **Layer 1 — Scene IR** (`vlmkit-anim/scene@1`): what is being explained. A
  * `kind`-tagged document — a sorting run, a state machine trace, heap
- * operations, messages between distributed nodes, a concept diagram walked
- * through in steps, or a generic vector timeline. It is the layer an agent
+ * operations, messages between distributed nodes, a matrix or table being
+ * filled, a graph being traversed, a chart revealed series by series, a
+ * concept diagram walked through in steps, or a generic vector timeline. It is the layer an agent
  * writes and a human re-reads: it carries intent (`algorithm: "bubble"`,
  * `trace: ["start", "finish"]`), not coordinates.
  *
@@ -147,9 +148,9 @@ export interface Timeline {
 // Layer 1: Scene IR
 // ---------------------------------------------------------------------------
 
-export type SceneKind = "diagram" | "state-machine" | "sort" | "heap" | "distributed" | "vector";
+export type SceneKind = "diagram" | "state-machine" | "sort" | "heap" | "distributed" | "matrix" | "graph" | "chart" | "vector";
 
-export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "heap", "distributed", "vector"];
+export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "heap", "distributed", "matrix", "graph", "chart", "vector"];
 
 interface SceneBase {
   format: typeof SCENE_FORMAT;
@@ -342,6 +343,120 @@ export interface DistributedScene extends SceneBase {
   timing?: "sequential" | "causal";
 }
 
+// ---- matrix ---------------------------------------------------------------
+
+/** A cell's content. `null` draws an empty cell (a DP table before it is filled). */
+export type CellValue = number | string | null;
+
+/** `[row, col]`, 0-based. */
+export type CellRef = [number, number];
+
+/** One cell, several cells, a whole row, or a whole column. */
+export type MatrixTarget = { cell: CellRef } | { cells: CellRef[] } | { row: number } | { col: number };
+
+/** Every op may carry `caption` (overrides the generated one) and `ms`. */
+export type MatrixOp =
+  /** Write a value into a cell. `from` names the cells it was computed from: they flash and a token travels from each to the target. */
+  | { set: { cell: CellRef; value: number | string; from?: CellRef[] }; caption?: string; ms?: number }
+  | { highlight: MatrixTarget; caption?: string; ms?: number }
+  /** Back to the plain colour; `"all"` clears every highlight (marks stay). */
+  | { unhighlight: MatrixTarget | "all"; caption?: string; ms?: number }
+  /** Rows or columns trade places; labels move with them. */
+  | { swap: { rows: [number, number] } | { cols: [number, number] }; caption?: string; ms?: number }
+  /** Permanent "done" colour (the answer cell, the pivot row). */
+  | { mark: MatrixTarget; caption?: string; ms?: number }
+  | { note: string; ms?: number };
+
+export interface MatrixScene extends SceneBase {
+  kind: "matrix";
+  /** Rows of cells, all the same length. A single row is a plain array. */
+  cells: CellValue[][];
+  rowLabels?: string[];
+  colLabels?: string[];
+  ops?: MatrixOp[];
+}
+
+// ---- graph ----------------------------------------------------------------
+
+export interface GraphNode {
+  id: string;
+  label?: string;
+  /** Pin this node; the rest are laid out around it. */
+  pos?: Vec2;
+}
+
+/** `{"from", "to", "weight", "label"}` or the shorthand `["a", "b"]`. */
+export type GraphEdge = { from: string; to: string; weight?: number; label?: string } | [string, string];
+
+/** Every op may carry `caption` and `ms`. */
+export type GraphOp =
+  /** The node becomes the current one (accent), then stays "visited" (ok colour). */
+  | { visit: string; caption?: string; ms?: number }
+  /** A token travels along an existing edge, `"a->b"` or `["a", "b"]`; on an undirected graph either direction. */
+  | { explore: string | [string, string]; caption?: string; ms?: number }
+  /** Text beside a node (or the same text beside several) — a distance, a depth, a colour class. */
+  | { label: { node: string | string[]; text: string }; caption?: string; ms?: number }
+  | { highlight: string | string[]; caption?: string; ms?: number }
+  | { unhighlight: string | string[]; caption?: string; ms?: number }
+  /** The edges along these nodes turn the ok colour: the answer. */
+  | { path: string[]; caption?: string; ms?: number }
+  | { note: string; ms?: number };
+
+export interface GraphScene extends SceneBase {
+  kind: "graph";
+  nodes: (string | GraphNode)[];
+  edges: GraphEdge[];
+  /** Arrows instead of lines, and `explore` must follow the arrow. Default false. */
+  directed?: boolean;
+  /** `circle` (default), `lr`, `tb`, `grid`; nodes with `pos` are pinned. */
+  layout?: "circle" | "lr" | "tb" | "grid";
+  /** Generate `ops` by running the algorithm from `start`. Ignored when `ops` is given. */
+  algorithm?: "bfs" | "dfs" | "dijkstra";
+  start?: string;
+  /** dijkstra: also show the shortest path to this node at the end. */
+  goal?: string;
+  ops?: GraphOp[];
+}
+
+// ---- chart ----------------------------------------------------------------
+
+export interface ChartSeries {
+  id: string;
+  label?: string;
+  /** One value per category. */
+  values: number[];
+  color?: string;
+}
+
+/** Which bars / points a step touches. */
+export type ChartTarget = { series?: string; index?: number; category?: string };
+
+/** Every step may carry `caption` and `ms`. */
+export type ChartStep =
+  /** Bars grow in / the line draws in. */
+  | { reveal: string | string[] | "all"; caption?: string; ms?: number }
+  /** Change one value; the bar animates to the new height (bar charts only). */
+  | { set: { series: string; index: number; value: number }; caption?: string; ms?: number }
+  | { highlight: ChartTarget; caption?: string; ms?: number }
+  | { unhighlight: ChartTarget | "all"; caption?: string; ms?: number }
+  /** A horizontal reference line at a y value. */
+  | { threshold: { value: number; label?: string }; caption?: string; ms?: number }
+  | { note: string; ms?: number };
+
+export interface ChartScene extends SceneBase {
+  kind: "chart";
+  /** `bar` (default) or `line`. */
+  type?: "bar" | "line";
+  /** x-axis labels; every series has one value per category. */
+  categories: string[];
+  series: ChartSeries[];
+  /** Top of the y axis. Default: 10% above the largest value (including `set` values and thresholds). */
+  yMax?: number;
+  yLabel?: string;
+  /** Default: reveal each series in order. */
+  sequence?: ChartStep[];
+}
+
 // ---- vector (generic) -----------------------------------------------------
 
 /**
@@ -378,7 +493,7 @@ export interface VectorScene extends SceneBase {
   timeline: (VectorTween | VectorWait)[];
 }
 
-export type Scene = DiagramScene | StateMachineScene | SortScene | HeapScene | DistributedScene | VectorScene;
+export type Scene = DiagramScene | StateMachineScene | SortScene | HeapScene | DistributedScene | MatrixScene | GraphScene | ChartScene | VectorScene;
 
 // ---------------------------------------------------------------------------
 // Diagnostics

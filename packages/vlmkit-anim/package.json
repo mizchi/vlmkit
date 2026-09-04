@@ -1,7 +1,7 @@
 {
   "name": "@mizchi/vlmkit-anim",
   "version": "0.11.1",
-  "description": "Declarative explanatory animation IR: a semantic Scene IR (state machines, sorting, heaps, distributed systems, concept diagrams, vector) compiled to a keyframe Timeline IR, rendered by a tiny SVG + Web Animations web component or sampled headlessly to SVG frames.",
+  "description": "Declarative explanatory animation IR: a semantic Scene IR (sorting, state machines, heaps, distributed systems, matrices, graphs, charts, concept diagrams, vector) compiled to a keyframe Timeline IR, rendered by a tiny SVG + Web Animations web component or sampled headlessly to SVG frames.",
   "license": "MIT",
   "author": "mizchi",
   "repository": {

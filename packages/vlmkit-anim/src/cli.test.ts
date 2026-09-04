@@ -132,8 +132,8 @@ describe("vlmkit-anim", () => {
     const p = join(dir, "from-schema.json");
     writeFileSync(p, JSON.stringify(example));
     assert.equal(run(["check", p]).status, 0);
-    const unknown = run(["schema", "--kind", "graph"]);
+    const unknown = run(["schema", "--kind", "tree"]);
     assert.equal(unknown.status, 1);
-    assert.match(unknown.stderr + unknown.stdout, /unknown kind "graph"/);
+    assert.match(unknown.stderr + unknown.stdout, /unknown kind "tree"/);
   });
 });

@@ -358,7 +358,7 @@ function validateBase(ctx: Ctx, doc: Obj, extra: readonly string[]): void {
 
 function captionAndMs(ctx: Ctx, step: Obj, path: string): void {
   if (step.caption !== undefined && !isStr(step.caption)) ctx.error(`${path}.caption`, `caption must be a string`);
-  if (step.ms !== undefined) ctx.number(step.ms, `${path}.ms`, { min: 1 });
+  if (step.ms !== undefined) ctx.number(step.ms, `${path}.ms`, { min: 0 });
 }
 
 function idOrIds(ctx: Ctx, v: unknown, path: string, known: string[], what: string): void {
@@ -669,6 +669,290 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
   }
 }
 
+function oneAction(ctx: Ctx, op: Obj, path: string, actions: readonly string[], extra: readonly string[], example: string): string | undefined {
+  ctx.keys(op, path, [...actions, ...extra]);
+  const found = Object.keys(op).filter((k) => actions.includes(k));
+  if (found.length !== 1) {
+    ctx.error(path, `an op needs exactly one action key, found ${found.length ? list(found) : "none"}`, `one of ${list(actions)}, e.g. ${example}`);
+    return undefined;
+  }
+  if ("caption" in op || "ms" in op) captionAndMs(ctx, op, path);
+  return found[0];
+}
+
+function validateMatrix(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["cells", "rowLabels", "colLabels", "ops"]);
+  let rows = 0;
+  let cols = 0;
+  if (ctx.array(doc.cells, "cells", { minLength: 1 })) {
+    rows = doc.cells.length;
+    doc.cells.forEach((row, r) => {
+      if (!ctx.array(row, `cells[${r}]`, { minLength: 1 })) return;
+      if (r === 0) cols = row.length;
+      else if (row.length !== cols) ctx.error(`cells[${r}]`, `row ${r} has ${row.length} cells but row 0 has ${cols}`, "every row needs the same length; use null for an empty cell");
+      row.forEach((v, c) => {
+        if (v !== null && !isNum(v) && !isStr(v)) ctx.error(`cells[${r}][${c}]`, `a cell is a number, a string, or null (empty), got ${describe(v)}`);
+      });
+    });
+  }
+  for (const [key, count, what] of [["rowLabels", rows, "row"], ["colLabels", cols, "column"]] as const) {
+    if (doc[key] === undefined) continue;
+    if (ctx.array(doc[key], key)) {
+      if ((doc[key] as unknown[]).length !== count) ctx.error(key, `${(doc[key] as unknown[]).length} labels for ${count} ${what}s`);
+      (doc[key] as unknown[]).forEach((l, i) => {
+        if (!isStr(l)) ctx.error(`${key}[${i}]`, `a label is a string`);
+      });
+    }
+  }
+  const cell = (v: unknown, path: string): void => {
+    if (!Array.isArray(v) || v.length !== 2 || !v.every((x) => Number.isInteger(x))) {
+      ctx.error(path, `a cell reference is [row, col] (two 0-based integers), got ${describe(v)}`);
+      return;
+    }
+    const [r, c] = v as [number, number];
+    if (r < 0 || r >= rows) ctx.error(`${path}[0]`, `row ${r} is out of range for ${rows} rows (0..${rows - 1})`);
+    if (c < 0 || c >= cols) ctx.error(`${path}[1]`, `col ${c} is out of range for ${cols} columns (0..${cols - 1})`);
+  };
+  const TARGET_KEYS = ["cell", "cells", "row", "col"];
+  const target = (v: unknown, path: string): void => {
+    if (!ctx.object(v, path)) return;
+    const keys = Object.keys(v).filter((k) => TARGET_KEYS.includes(k));
+    ctx.keys(v, path, TARGET_KEYS);
+    if (keys.length !== 1) {
+      ctx.error(path, `a target is {"cell": [r, c]}, {"cells": [[r, c], …]}, {"row": r} or {"col": c}; found ${keys.length ? list(keys) : "none"}`);
+      return;
+    }
+    if ("cell" in v) cell(v.cell, `${path}.cell`);
+    else if ("cells" in v && ctx.array(v.cells, `${path}.cells`, { minLength: 1 })) v.cells.forEach((x, i) => cell(x, `${path}.cells[${i}]`));
+    else if ("row" in v && ctx.number(v.row, `${path}.row`, { integer: true, min: 0 }) && v.row >= rows) ctx.error(`${path}.row`, `row ${v.row} is out of range for ${rows} rows (0..${rows - 1})`);
+    else if ("col" in v && ctx.number(v.col, `${path}.col`, { integer: true, min: 0 }) && v.col >= cols) ctx.error(`${path}.col`, `col ${v.col} is out of range for ${cols} columns (0..${cols - 1})`);
+  };
+  if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
+    const ACTIONS = ["set", "highlight", "unhighlight", "swap", "mark", "note"];
+    doc.ops.forEach((op, i) => {
+      const path = `ops[${i}]`;
+      if (!ctx.object(op, path)) return;
+      const a = oneAction(ctx, op, path, ACTIONS, ["caption", "ms"], `{"set": {"cell": [1, 2], "value": 7, "from": [[0, 2], [1, 1]]}}`);
+      if (!a) return;
+      const v = op[a];
+      switch (a) {
+        case "set":
+          if (ctx.object(v, `${path}.set`)) {
+            ctx.keys(v, `${path}.set`, ["cell", "value", "from"]);
+            cell(v.cell, `${path}.set.cell`);
+            if (!isNum(v.value) && !isStr(v.value)) ctx.error(`${path}.set.value`, `value is a number or a string, got ${describe(v.value)}`);
+            if (v.from !== undefined && ctx.array(v.from, `${path}.set.from`)) v.from.forEach((x, k) => cell(x, `${path}.set.from[${k}]`));
+          }
+          break;
+        case "highlight":
+        case "mark":
+          target(v, `${path}.${a}`);
+          break;
+        case "unhighlight":
+          if (v !== "all") target(v, `${path}.unhighlight`);
+          break;
+        case "swap":
+          if (ctx.object(v, `${path}.swap`)) {
+            ctx.keys(v, `${path}.swap`, ["rows", "cols"]);
+            const which = "rows" in v ? "rows" : "cols" in v ? "cols" : undefined;
+            if (!which || ("rows" in v && "cols" in v)) {
+              ctx.error(`${path}.swap`, `swap takes {"rows": [i, j]} or {"cols": [i, j]}`);
+              break;
+            }
+            const pair = v[which];
+            const limit = which === "rows" ? rows : cols;
+            if (!Array.isArray(pair) || pair.length !== 2 || !pair.every((x) => Number.isInteger(x))) ctx.error(`${path}.swap.${which}`, `${which} takes [i, j] (two indices), got ${describe(pair)}`);
+            else pair.forEach((x, k) => { if ((x as number) < 0 || (x as number) >= limit) ctx.error(`${path}.swap.${which}[${k}]`, `index ${x} is out of range for ${limit} ${which} (0..${limit - 1})`); });
+          }
+          break;
+        case "note":
+          if (!isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+          break;
+      }
+    });
+  }
+}
+
+function validateGraph(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["nodes", "edges", "directed", "layout", "algorithm", "start", "goal", "ops"]);
+  if (doc.layout !== undefined) ctx.enumOf(doc.layout, "layout", ["circle", "lr", "tb", "grid"], "layout");
+  if (doc.directed !== undefined && typeof doc.directed !== "boolean") ctx.error("directed", "directed takes true/false");
+  const directed = doc.directed === true;
+  let nodeIds: string[] = [];
+  if (ctx.array(doc.nodes, "nodes", { minLength: 1 })) {
+    nodeIds = ids(ctx, doc.nodes, "nodes");
+    doc.nodes.forEach((n, i) => {
+      if (isObj(n)) {
+        ctx.keys(n, `nodes[${i}]`, ["id", "label", "pos"]);
+        if (n.pos !== undefined) ctx.vec2(n.pos, `nodes[${i}].pos`);
+      } else if (!isStr(n)) ctx.error(`nodes[${i}]`, `a node is a string id or {"id", "label", "pos"}`);
+    });
+  }
+  const edgeKeys: string[] = [];
+  const hasEdge = (a: string, c: string): boolean => edgeKeys.includes(`${a}->${c}`) || (!directed && edgeKeys.includes(`${c}->${a}`));
+  if (ctx.array(doc.edges, "edges")) {
+    doc.edges.forEach((e, i) => {
+      const path = `edges[${i}]`;
+      let from: unknown;
+      let to: unknown;
+      if (Array.isArray(e) && e.length === 2) [from, to] = e;
+      else if (isObj(e)) {
+        ctx.keys(e, path, ["from", "to", "weight", "label"]);
+        from = e.from;
+        to = e.to;
+        if (e.weight !== undefined) ctx.number(e.weight, `${path}.weight`);
+        if (e.label !== undefined && !isStr(e.label)) ctx.error(`${path}.label`, `label is a string`);
+      } else {
+        ctx.error(path, `an edge is {"from", "to", "weight", "label"} or ["a", "b"], got ${describe(e)}`);
+        return;
+      }
+      const a = ctx.ref(from, `${path}.from`, nodeIds, "node");
+      const b = ctx.ref(to, `${path}.to`, nodeIds, "node");
+      if (a && b) {
+        if (from === to) ctx.error(`${path}.to`, `an edge cannot go from "${from as string}" to itself`);
+        edgeKeys.push(`${from as string}->${to as string}`);
+      }
+    });
+  }
+  if (doc.algorithm !== undefined) ctx.enumOf(doc.algorithm, "algorithm", ["bfs", "dfs", "dijkstra"], "algorithm");
+  if (doc.start !== undefined) ctx.ref(doc.start, "start", nodeIds, "node");
+  if (doc.goal !== undefined) ctx.ref(doc.goal, "goal", nodeIds, "node");
+  if (doc.algorithm === undefined && doc.ops === undefined) ctx.error("algorithm", `give "algorithm" (bfs | dfs | dijkstra) with "start", or an explicit "ops" list`);
+  if (doc.algorithm === "dijkstra" && Array.isArray(doc.edges) && doc.edges.some((e) => isObj(e) && isNum(e.weight) && (e.weight as number) < 0)) {
+    ctx.error("edges", "dijkstra needs non-negative weights");
+  }
+  if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
+    const ACTIONS = ["visit", "explore", "label", "highlight", "unhighlight", "path", "note"];
+    doc.ops.forEach((op, i) => {
+      const path = `ops[${i}]`;
+      if (!ctx.object(op, path)) return;
+      const a = oneAction(ctx, op, path, ACTIONS, ["caption", "ms"], `{"explore": "a->b", "caption": "…"}`);
+      if (!a) return;
+      const v = op[a];
+      switch (a) {
+        case "visit":
+          ctx.ref(v, `${path}.visit`, nodeIds, "node");
+          break;
+        case "explore": {
+          let from: unknown;
+          let to: unknown;
+          if (isStr(v) && v.includes("->")) [from, to] = v.split("->").map((x) => x.trim());
+          else if (Array.isArray(v) && v.length === 2) [from, to] = v;
+          else {
+            ctx.error(`${path}.explore`, `explore takes "a->b" or ["a", "b"], got ${describe(v)}`);
+            break;
+          }
+          const okA = ctx.ref(from, `${path}.explore`, nodeIds, "node");
+          const okB = ctx.ref(to, `${path}.explore`, nodeIds, "node");
+          if (okA && okB && !hasEdge(from as string, to as string)) {
+            const reverse = directed && edgeKeys.includes(`${to as string}->${from as string}`);
+            ctx.error(`${path}.explore`, reverse ? `the edge runs "${to as string}" → "${from as string}" and the graph is directed` : `no edge between "${from as string}" and "${to as string}"`, reverse ? `explore it as "${to as string}->${from as string}", or drop "directed"` : `add {"from": "${from as string}", "to": "${to as string}"} to "edges"; declared: ${edgeKeys.length ? list(edgeKeys) : "(none)"}`);
+          }
+          break;
+        }
+        case "label":
+          if (ctx.object(v, `${path}.label`)) {
+            ctx.keys(v, `${path}.label`, ["node", "text"]);
+            idOrIds(ctx, v.node, `${path}.label.node`, nodeIds, "node");
+            if (!isStr(v.text)) ctx.error(`${path}.label.text`, `text is a string`);
+          }
+          break;
+        case "highlight":
+        case "unhighlight":
+          idOrIds(ctx, v, `${path}.${a}`, nodeIds, "node");
+          break;
+        case "path":
+          if (ctx.array(v, `${path}.path`, { minLength: 2 })) {
+            v.forEach((id, k) => ctx.ref(id, `${path}.path[${k}]`, nodeIds, "node"));
+            for (let k = 1; k < v.length; k++) {
+              if (isStr(v[k - 1]) && isStr(v[k]) && nodeIds.includes(v[k - 1] as string) && nodeIds.includes(v[k] as string) && !hasEdge(v[k - 1] as string, v[k] as string)) {
+                ctx.error(`${path}.path[${k}]`, `no edge from "${v[k - 1] as string}" to "${v[k] as string}": the path is not connected`);
+              }
+            }
+          }
+          break;
+        case "note":
+          if (!isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+          break;
+      }
+    });
+  }
+}
+
+function validateChart(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["type", "categories", "series", "yMax", "yLabel", "sequence"]);
+  const type = doc.type ?? "bar";
+  if (doc.type !== undefined) ctx.enumOf(doc.type, "type", ["bar", "line"], "type");
+  let n = 0;
+  if (ctx.array(doc.categories, "categories", { minLength: 1 })) {
+    n = doc.categories.length;
+    doc.categories.forEach((c, i) => { if (!isStr(c)) ctx.error(`categories[${i}]`, `a category is a string`); });
+  }
+  let seriesIds: string[] = [];
+  if (ctx.array(doc.series, "series", { minLength: 1 })) {
+    seriesIds = ids(ctx, doc.series, "series");
+    doc.series.forEach((s, i) => {
+      const path = `series[${i}]`;
+      if (!ctx.object(s, path)) return;
+      ctx.keys(s, path, ["id", "label", "values", "color"]);
+      if (ctx.array(s.values, `${path}.values`)) {
+        if (n && s.values.length !== n) ctx.error(`${path}.values`, `${s.values.length} values for ${n} categories`, "one value per category");
+        s.values.forEach((v, k) => ctx.number(v, `${path}.values[${k}]`));
+      }
+    });
+  }
+  if (doc.yMax !== undefined) ctx.number(doc.yMax, "yMax", { min: 0 });
+  if (doc.sequence !== undefined && ctx.array(doc.sequence, "sequence")) {
+    const ACTIONS = ["reveal", "set", "highlight", "unhighlight", "threshold", "note"];
+    const cats = Array.isArray(doc.categories) ? (doc.categories.filter(isStr) as string[]) : [];
+    const target = (v: unknown, path: string): void => {
+      if (!ctx.object(v, path)) return;
+      ctx.keys(v, path, ["series", "index", "category"]);
+      if (v.series !== undefined) ctx.ref(v.series, `${path}.series`, seriesIds, "series");
+      if (v.index !== undefined && ctx.number(v.index, `${path}.index`, { integer: true, min: 0 }) && v.index >= n) ctx.error(`${path}.index`, `index ${v.index} is out of range for ${n} categories (0..${n - 1})`);
+      if (v.category !== undefined) ctx.ref(v.category, `${path}.category`, cats, "category");
+      if (v.index !== undefined && v.category !== undefined) ctx.error(path, `give "index" or "category", not both`);
+    };
+    doc.sequence.forEach((st, i) => {
+      const path = `sequence[${i}]`;
+      if (!ctx.object(st, path)) return;
+      const a = oneAction(ctx, st, path, ACTIONS, ["caption", "ms"], `{"reveal": "<series id>", "caption": "…"}`);
+      if (!a) return;
+      const v = st[a];
+      switch (a) {
+        case "reveal":
+          if (v !== "all") idOrIds(ctx, v, `${path}.reveal`, seriesIds, "series");
+          break;
+        case "set":
+          if (ctx.object(v, `${path}.set`)) {
+            ctx.keys(v, `${path}.set`, ["series", "index", "value"]);
+            ctx.ref(v.series, `${path}.set.series`, seriesIds, "series");
+            if (ctx.number(v.index, `${path}.set.index`, { integer: true, min: 0 }) && v.index >= n) ctx.error(`${path}.set.index`, `index ${v.index} is out of range for ${n} categories (0..${n - 1})`);
+            ctx.number(v.value, `${path}.set.value`);
+            if (type === "line") ctx.error(`${path}.set`, `set animates a bar's height; a line chart's segments cannot be re-pointed`, `use "type": "bar", or a second series with the new values`);
+          }
+          break;
+        case "highlight":
+          target(v, `${path}.highlight`);
+          break;
+        case "unhighlight":
+          if (v !== "all") target(v, `${path}.unhighlight`);
+          break;
+        case "threshold":
+          if (ctx.object(v, `${path}.threshold`)) {
+            ctx.keys(v, `${path}.threshold`, ["value", "label"]);
+            ctx.number(v.value, `${path}.threshold.value`);
+            if (v.label !== undefined && !isStr(v.label)) ctx.error(`${path}.threshold.label`, `label is a string`);
+          }
+          break;
+        case "note":
+          if (!isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+          break;
+      }
+    });
+  }
+}
+
 const TWEEN_TO_KEYS = ["x", "y", "w", "h", ...TRACK_PROPS];
 
 function validateVector(ctx: Ctx, doc: Obj): void {
@@ -728,6 +1012,9 @@ export function validateScene(doc: unknown): Diagnostic[] {
     case "sort": validateSort(ctx, doc); break;
     case "heap": validateHeap(ctx, doc); break;
     case "distributed": validateDistributed(ctx, doc); break;
+    case "matrix": validateMatrix(ctx, doc); break;
+    case "graph": validateGraph(ctx, doc); break;
+    case "chart": validateChart(ctx, doc); break;
     case "vector": validateVector(ctx, doc); break;
   }
   return ctx.diags;

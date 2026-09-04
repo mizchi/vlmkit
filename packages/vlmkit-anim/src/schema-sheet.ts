@@ -11,9 +11,12 @@ import {
   SCENE_FORMAT,
   SCENE_KINDS,
   TIMELINE_FORMAT,
+  type ChartScene,
   type DiagramScene,
   type DistributedScene,
+  type GraphScene,
   type HeapScene,
+  type MatrixScene,
   type Scene,
   type SortScene,
   type StateMachineScene,
@@ -26,6 +29,9 @@ export interface Examples {
   "state-machine": StateMachineScene;
   heap: HeapScene;
   distributed: DistributedScene;
+  matrix: MatrixScene;
+  graph: GraphScene;
+  chart: ChartScene;
   diagram: DiagramScene;
   vector: VectorScene;
   timeline: Timeline;
@@ -71,6 +77,64 @@ export const EXAMPLES: Examples = {
       { from: "primary", to: "client", label: "ok" },
     ],
     events: [{ after: "ok", node: "replica", status: "down", caption: "replica crashes" }],
+  },
+  matrix: {
+    format: SCENE_FORMAT,
+    kind: "matrix",
+    title: "Edit distance: cat → cut",
+    rowLabels: ["", "c", "a", "t"],
+    colLabels: ["", "c", "u", "t"],
+    cells: [
+      [0, 1, 2, 3],
+      [1, null, null, null],
+      [2, null, null, null],
+      [3, null, null, null],
+    ],
+    ops: [
+      { set: { cell: [1, 1], value: 0, from: [[0, 0]] }, caption: "c = c: copy the diagonal" },
+      { set: { cell: [1, 2], value: 1, from: [[1, 1]] }, caption: "c ≠ u: 1 + the smallest neighbour" },
+      { set: { cell: [1, 3], value: 2, from: [[1, 2]] } },
+      { set: { cell: [2, 1], value: 1, from: [[1, 1]] } },
+      { set: { cell: [2, 2], value: 1, from: [[1, 1]] }, caption: "a ≠ u: substitute, 1 + diagonal" },
+      { set: { cell: [2, 3], value: 2, from: [[2, 2]] } },
+      { set: { cell: [3, 1], value: 2, from: [[2, 1]] } },
+      { set: { cell: [3, 2], value: 2, from: [[2, 2]] } },
+      { set: { cell: [3, 3], value: 1, from: [[2, 2]] }, caption: "t = t: copy the diagonal" },
+      { mark: { cell: [3, 3] }, caption: "Edit distance is 1" },
+    ],
+  },
+  graph: {
+    format: SCENE_FORMAT,
+    kind: "graph",
+    title: "Shortest path A → E",
+    nodes: ["A", "B", "C", "D", "E"],
+    edges: [
+      { from: "A", to: "B", weight: 4 },
+      { from: "A", to: "C", weight: 1 },
+      { from: "C", to: "B", weight: 2 },
+      { from: "B", to: "D", weight: 1 },
+      { from: "C", to: "D", weight: 5 },
+      { from: "D", to: "E", weight: 3 },
+    ],
+    algorithm: "dijkstra",
+    start: "A",
+    goal: "E",
+  },
+  chart: {
+    format: SCENE_FORMAT,
+    kind: "chart",
+    title: "p95 latency by region (ms)",
+    categories: ["us", "eu", "ap"],
+    series: [
+      { id: "before", label: "before cache", values: [120, 180, 260] },
+      { id: "after", label: "after cache", values: [40, 60, 90] },
+    ],
+    sequence: [
+      { reveal: "before", caption: "Before: every request hits the database" },
+      { threshold: { value: 100, label: "SLO" }, caption: "The SLO is 100 ms; two regions miss it" },
+      { reveal: "after", caption: "After: a regional cache absorbs most reads" },
+      { highlight: { category: "ap" }, caption: "ap improves most — it was furthest from the database" },
+    ],
   },
   diagram: {
     format: SCENE_FORMAT,
@@ -165,6 +229,42 @@ Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). Th
   "events": [ {"after": "label" | "at": ms, "delay": ms, "node", "status", "caption"} ]   status changes; prefer "after" — an absolute
                                    "at" stays put when message timing shifts (the check warns when it lands mid-flight)
 Time runs down the canvas, so order is visible. A message to a node that is down at arrival should be "lost": true (the check warns).`,
+  matrix: `kind: matrix — a grid of cells (a DP table, a matrix, a table of rows); rows and columns can swap
+  "cells": [[…], …]                required; rows of number | string | null (null = empty, to be filled); one row = a plain array
+  "rowLabels", "colLabels": string[]   optional headers, one per row / column
+  "ops": [ {"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}   write a value; "from" names the cells it came from
+                                                                          (they flash and a token flies from each into the target)
+           {"highlight": T} {"unhighlight": T | "all"} {"mark": T}      T = {"cell": [r, c]} | {"cells": [[r, c], …]} | {"row": r} | {"col": c}
+                                                                          highlight = accent until unhighlighted; mark = permanent done colour
+           {"swap": {"rows": [i, j]} | {"cols": [i, j]}}                 rows / columns trade places, labels move with them
+           {"note": "…"} ]                                                each may carry "caption" and "ms"
+Cell references are [row, col], 0-based. The check reads the final grid back by position and compares it with the ops' result.`,
+  graph: `kind: graph — nodes and edges walked by a traversal; nodes never move
+  "nodes": [ "id" | {"id", "label", "pos": [x, y]} ]   required; pos pins a node
+  "edges": [ {"from", "to", "weight", "label"} | ["a", "b"] ]   required; weight (or label) is drawn on the edge
+  "directed": true                 arrows; explore must follow the arrow. Default false (lines, either direction)
+  "layout": "circle" | "lr" | "tb" | "grid"   default circle
+  "algorithm": "bfs" | "dfs" | "dijkstra", "start": "id", "goal": "id"
+                                   generates the ops by running the algorithm from start (goal: dijkstra also paints the path)
+  "ops": [ {"visit": "id"} {"explore": "a->b" | ["a", "b"]} {"label": {"node": "id" | [ids], "text": "…"}}
+           {"highlight": id | [ids]} {"unhighlight": …} {"path": ["a", "b", "c"]} {"note": "…"} ]
+                                   explicit alternative; each may carry "caption" and "ms"
+                                   visit = current (accent, larger) then visited (green); explore = a token travels the edge;
+                                   label = text under the node (a distance, a depth); path = the answer, painted green
+Give "algorithm" OR "ops". With an algorithm the check fails unless every node reachable from start was visited.`,
+  chart: `kind: chart — a bar or line chart revealed in beats
+  "type": "bar" | "line"           default bar
+  "categories": string[]           required; the x axis
+  "series": [ {"id", "label", "values": number[], "color"} ]   required, 1+; one value per category
+  "yMax": number                   optional; default a round number 10% above the largest value
+  "yLabel": string                 optional
+  "sequence": [ {"reveal": id | [ids] | "all"}   bars grow in / the line draws in
+                {"set": {"series", "index", "value"}}   a bar animates to a new value (bar charts only)
+                {"highlight": {"series", "index" | "category"}} {"unhighlight": … | "all"}   dim everything else
+                {"threshold": {"value", "label"}}   a horizontal reference line
+                {"note": "…"} ]                       each may carry "caption" and "ms"
+                                   default: reveal each series in order
+The check fails if a bar's final height is not its value's share of the axis, and warns about a series never revealed.`,
   diagram: `kind: diagram — boxes and arrows, narrated in beats
   "nodes": [ {"id", "label", "shape": "rect" | "circle" | "ellipse", "pos": [x, y], "fill", "hidden": true} ]   required
   "edges": [ {"from", "to", "label", "style": "arrow" | "line", "hidden": true} ]
@@ -207,6 +307,9 @@ export function schemaIndex(): string {
     state-machine  states, transitions, and an event trace
     heap           push / pop on a binary heap
     distributed    nodes exchanging messages over time, with status events
+    matrix         a grid of cells (DP table, matrix, table) filled, highlighted, rows / columns swapped
+    graph          nodes and edges traversed (bfs / dfs / dijkstra, or explicit ops)
+    chart          a bar or line chart revealed series by series
     diagram        boxes and arrows walked through in narrated beats
     vector         generic shapes and a list of tweens
   Timeline (how it moves)         ${TIMELINE_FORMAT}: nodes + keyframe tracks + steps.

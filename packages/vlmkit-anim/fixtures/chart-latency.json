@@ -1,0 +1,53 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "chart",
+  "title": "p95 latency by region (ms)",
+  "categories": [
+    "us",
+    "eu",
+    "ap"
+  ],
+  "series": [
+    {
+      "id": "before",
+      "label": "before cache",
+      "values": [
+        120,
+        180,
+        260
+      ]
+    },
+    {
+      "id": "after",
+      "label": "after cache",
+      "values": [
+        40,
+        60,
+        90
+      ]
+    }
+  ],
+  "sequence": [
+    {
+      "reveal": "before",
+      "caption": "Before: every request hits the database"
+    },
+    {
+      "threshold": {
+        "value": 100,
+        "label": "SLO"
+      },
+      "caption": "The SLO is 100 ms; two regions miss it"
+    },
+    {
+      "reveal": "after",
+      "caption": "After: a regional cache absorbs most reads"
+    },
+    {
+      "highlight": {
+        "category": "ap"
+      },
+      "caption": "ap improves most — it was furthest from the database"
+    }
+  ]
+}

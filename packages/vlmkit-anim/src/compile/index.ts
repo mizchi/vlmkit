@@ -6,9 +6,12 @@
 
 import type { Diagnostic, Scene, Timeline } from "../types.ts";
 import { hasErrors, validateScene } from "../validate.ts";
+import { compileChart } from "./chart.ts";
 import { compileDiagram } from "./diagram.ts";
 import { compileDistributed } from "./distributed.ts";
+import { compileGraph } from "./graph.ts";
 import { compileHeap } from "./heap.ts";
+import { compileMatrix } from "./matrix.ts";
 import { compileSort } from "./sort.ts";
 import { compileStateMachine } from "./state-machine.ts";
 import { compileVector } from "./vector.ts";
@@ -31,9 +34,14 @@ export function compileScene(scene: Scene): Timeline {
     case "sort": return compileSort(scene);
     case "heap": return compileHeap(scene);
     case "distributed": return compileDistributed(scene);
+    case "matrix": return compileMatrix(scene);
+    case "graph": return compileGraph(scene);
+    case "chart": return compileChart(scene);
     case "vector": return compileVector(scene);
   }
 }
 
-export { compileDiagram, compileDistributed, compileHeap, compileSort, compileStateMachine, compileVector };
+export { compileChart, compileDiagram, compileDistributed, compileGraph, compileHeap, compileMatrix, compileSort, compileStateMachine, compileVector };
 export { generateSortOps } from "./sort.ts";
+export { generateGraphOps } from "./graph.ts";
+export { niceMax } from "./chart.ts";

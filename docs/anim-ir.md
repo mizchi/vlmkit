@@ -188,6 +188,124 @@ so. `delay` on an event or message is milliseconds after its `after` anchor
 lands. Run `explain` after an edit and read the times: a beat that moved when
 it should not have is the tell.
 
+## kind: matrix
+
+A grid of cells: a dynamic-programming table filling in, a matrix, a table of
+rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "matrix",
+  "title": "Edit distance: cat → cut",
+  "rowLabels": ["", "c", "a", "t"],
+  "colLabels": ["", "c", "u", "t"],
+  "cells": [
+    [0, 1, 2, 3],
+    [1, null, null, null],
+    [2, null, null, null],
+    [3, null, null, null]
+  ],
+  "ops": [
+    { "set": { "cell": [1, 1], "value": 0, "from": [[0, 0]] }, "caption": "c = c: copy the diagonal" },
+    { "set": { "cell": [1, 2], "value": 1, "from": [[1, 1]] }, "caption": "c ≠ u: 1 + the smallest neighbour" },
+    { "set": { "cell": [1, 3], "value": 2, "from": [[1, 2]] } },
+    { "set": { "cell": [2, 1], "value": 1, "from": [[1, 1]] } },
+    { "set": { "cell": [2, 2], "value": 1, "from": [[1, 1]] }, "caption": "a ≠ u: substitute, 1 + diagonal" },
+    { "set": { "cell": [2, 3], "value": 2, "from": [[2, 2]] } },
+    { "set": { "cell": [3, 1], "value": 2, "from": [[2, 1]] } },
+    { "set": { "cell": [3, 2], "value": 2, "from": [[2, 2]] } },
+    { "set": { "cell": [3, 3], "value": 1, "from": [[2, 2]] }, "caption": "t = t: copy the diagonal" },
+    { "mark": { "cell": [3, 3] }, "caption": "Edit distance is 1" }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `cells` | required: rows of `number` \| `string` \| `null`, all the same length; `null` is an empty cell waiting to be filled |
+| `rowLabels`, `colLabels` | optional headers, one per row / column; captions use them instead of indices |
+| `ops` | `{"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}` writes a value — `from` names the cells it was computed from, which flash while a token flies from each into the target; `{"highlight": T}` / `{"unhighlight": T \| "all"}` / `{"mark": T}` where T is `{"cell": [r, c]}` \| `{"cells": [[r, c], …]}` \| `{"row": r}` \| `{"col": c}` (highlight = accent until cleared, mark = permanent done colour); `{"swap": {"rows": [i, j]}}` / `{"swap": {"cols": [i, j]}}` (labels move with them); `{"note": "…"}`; each may carry `caption`, `ms` |
+
+Cell references are `[row, col]`, 0-based, **by current position** (after a
+swap, row 0 is whatever is now on top). The check reads the final grid back by
+position and compares it with what the ops produced.
+
+## kind: graph
+
+Nodes and edges walked by a traversal. Nodes never move; the story is which
+node is current, which are visited, what the labels say, and where the token
+goes.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "graph",
+  "title": "Shortest path A → E",
+  "nodes": ["A", "B", "C", "D", "E"],
+  "edges": [
+    { "from": "A", "to": "B", "weight": 4 },
+    { "from": "A", "to": "C", "weight": 1 },
+    { "from": "C", "to": "B", "weight": 2 },
+    { "from": "B", "to": "D", "weight": 1 },
+    { "from": "C", "to": "D", "weight": 5 },
+    { "from": "D", "to": "E", "weight": 3 }
+  ],
+  "algorithm": "dijkstra",
+  "start": "A",
+  "goal": "E"
+}
+```
+
+| field | |
+|---|---|
+| `nodes` | required: `"id"` or `{"id", "label", "pos": [x, y]}` (`pos` pins a node) |
+| `edges` | required: `{"from", "to", "weight", "label"}` or the shorthand `["a", "b"]`; the weight (or label) is drawn on the edge |
+| `directed` | `true` draws arrows and `explore` must follow them; default `false` (lines, either direction) |
+| `layout` | `circle` (default) \| `lr` \| `tb` \| `grid` |
+| `algorithm`, `start`, `goal` | `bfs` \| `dfs` \| `dijkstra` from `start` generates the ops (every beat captioned with the comparison it makes); `goal` makes Dijkstra paint the shortest path at the end |
+| `ops` | explicit alternative: `{"visit": id}` (current = accent and larger, then stays green), `{"explore": "a->b"}` (a token travels the edge), `{"label": {"node": id \| [ids], "text": "…"}}` (text under the node: a distance, a depth), `{"highlight": id \| [ids]}` / `{"unhighlight": …}`, `{"path": ["a", "b", "c"]}` (paints the answer green), `{"note": "…"}`; each may carry `caption`, `ms` |
+
+`ms: 0` on a `label` or `highlight` applies it at the current instant without
+a step of its own — a relaxation writing the new distance inside the explore
+beat. The generated ops use it; write it when two changes belong to one beat.
+With an `algorithm`, the check fails unless every node reachable from `start`
+was visited, and warns about nodes that are not reachable at all.
+
+## kind: chart
+
+A bar or line chart revealed series by series, with reference lines and focus.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "chart",
+  "title": "p95 latency by region (ms)",
+  "categories": ["us", "eu", "ap"],
+  "series": [
+    { "id": "before", "label": "before cache", "values": [120, 180, 260] },
+    { "id": "after", "label": "after cache", "values": [40, 60, 90] }
+  ],
+  "sequence": [
+    { "reveal": "before", "caption": "Before: every request hits the database" },
+    { "threshold": { "value": 100, "label": "SLO" }, "caption": "The SLO is 100 ms; two regions miss it" },
+    { "reveal": "after", "caption": "After: a regional cache absorbs most reads" },
+    { "highlight": { "category": "ap" }, "caption": "ap improves most — it was furthest from the database" }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `type` | `bar` (default) \| `line` |
+| `categories` | required: the x-axis labels |
+| `series` | required, 1+: `{"id", "label", "values": number[], "color"}`, one value per category; colours default to a palette |
+| `yMax`, `yLabel` | axis top (default: a round number just above the largest value, thresholds and `set` values included) and axis caption |
+| `sequence` | `{"reveal": id \| [ids] \| "all"}` (bars grow in / the line draws in), `{"set": {"series", "index", "value"}}` (a bar animates to a new value; bar charts only), `{"highlight": {"series", "index" \| "category"}}` / `{"unhighlight": … \| "all"}` (everything else dims), `{"threshold": {"value", "label"}}` (a horizontal reference line), `{"note": "…"}`; each may carry `caption`, `ms`. Default: reveal each series in order |
+
+The check fails if a bar's final height is not its value's share of the axis
+and warns about a series the sequence never reveals.
+
 ## kind: diagram
 
 ```json
@@ -226,6 +344,8 @@ Hidden nodes and edges stay invisible until a `show`; an edge follows its nodes'
 ## kind: vector
 
 For anything the semantic kinds do not cover: shapes plus a list of tweens.
+Before reaching for it, check the table: an array is a one-row `matrix`, a
+tree is a `graph` with `layout: "tb"`, a sequence of numbers is a `chart`.
 
 ```json
 {

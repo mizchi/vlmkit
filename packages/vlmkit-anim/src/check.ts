@@ -267,6 +267,91 @@ function checkDiagram(scene: Extract<Scene, { kind: "diagram" }>, tl: Timeline):
   return out;
 }
 
+function checkMatrix(scene: Extract<Scene, { kind: "matrix" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  if ((scene.ops ?? []).length === 0) out.push(warn("ops", "no ops: the grid is a still image", 'add ops such as {"set": {"cell": [1, 1], "value": 3, "from": [[0, 0]]}} or {"highlight": {"row": 0}}'));
+  // Read the final grid back by position: which original cell sits in each slot, and what it says.
+  const meta = tl.meta as { finalCells?: string[][]; slots?: { x: number[]; y: number[] } } | undefined;
+  if (!meta?.finalCells || !meta.slots) return out;
+  const frame = sampleFrame(tl, timelineDuration(tl));
+  const cells = tl.nodes.filter((n) => n.id.startsWith("cell-"));
+  const seen = new Map<string, string>();
+  for (const c of cells) {
+    const [x, y] = worldPos(frame, c.id);
+    const r = meta.slots.y.findIndex((yy) => Math.abs(yy - y) < 1);
+    const col = meta.slots.x.findIndex((xx) => Math.abs(xx - x) < 1);
+    if (r < 0 || col < 0) {
+      out.push(error("timeline", `cell ${c.id} ends between slots (${Math.round(x)}, ${Math.round(y)})`));
+      continue;
+    }
+    const key = `${r},${col}`;
+    if (seen.has(key)) out.push(error("timeline", `two cells share slot [${r}, ${col}] in the final frame`));
+    seen.set(key, frame.get(c.id)!.text ?? "");
+    const expected = meta.finalCells[r]?.[col];
+    if (expected !== undefined && expected !== (frame.get(c.id)!.text ?? "")) out.push(error("timeline", `slot [${r}, ${col}] reads "${frame.get(c.id)!.text ?? ""}" but the ops end with "${expected}"`));
+  }
+  return out;
+}
+
+function checkGraph(scene: Extract<Scene, { kind: "graph" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const ids = scene.nodes.map((n) => (typeof n === "string" ? n : n.id));
+  const visited = (tl.meta?.visited as string[] | undefined) ?? [];
+  const directed = scene.directed === true;
+  const edges = scene.edges.map((e) => (Array.isArray(e) ? { from: e[0], to: e[1] } : e));
+  if (scene.algorithm && !scene.ops) {
+    const start = scene.start ?? ids[0];
+    const reach = new Set([start]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const e of edges) {
+        if (reach.has(e.from) && !reach.has(e.to)) { reach.add(e.to); grew = true; }
+        if (!directed && reach.has(e.to) && !reach.has(e.from)) { reach.add(e.from); grew = true; }
+      }
+    }
+    for (const id of ids) if (!reach.has(id)) out.push(warn(`nodes(${id})`, `"${id}" is not reachable from "${start}", so ${scene.algorithm} never visits it`, "connect it with an edge, or drop it"));
+    for (const id of reach) if (!visited.includes(id)) out.push(error("ops", `"${id}" is reachable from "${start}" but the generated ${scene.algorithm} never visited it`));
+    if (scene.goal && !reach.has(scene.goal)) out.push(warn("goal", `"${scene.goal}" is not reachable from "${start}": no path to show`));
+  }
+  if ((scene.ops ?? []).length === 0 && !scene.algorithm) out.push(warn("ops", "no ops: the graph is a still image"));
+  // Every visited node is the ok colour in the final frame, and the token is parked.
+  const frame = sampleFrame(tl, timelineDuration(tl));
+  for (const id of visited) {
+    const st = frame.get(`node-${id}`);
+    if (st && st.fill === tl.nodes.find((n) => n.id === `node-${id}`)?.fill) out.push(error("timeline", `"${id}" was visited but ends in its unvisited colour`));
+  }
+  const token = frame.get("token");
+  if (token && token.opacity > 0) out.push(error("timeline", "the explore token is still visible at the end"));
+  return out;
+}
+
+function checkChart(scene: Extract<Scene, { kind: "chart" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const revealed = new Set((tl.meta?.revealed as string[] | undefined) ?? []);
+  for (const s of scene.series) if (!revealed.has(s.id)) out.push(warn(`series(${s.id})`, `series "${s.id}" is never revealed: it stays invisible`, `add {"reveal": "${s.id}"} to "sequence", or drop the series`));
+  const type = (scene.type ?? "bar");
+  if (type === "bar") {
+    // A bar's final height must be its final value's share of the axis.
+    const meta = tl.meta as { yMax?: number; plotH?: number; finalValues?: Record<string, number[]> } | undefined;
+    if (meta?.yMax && meta.plotH && meta.finalValues) {
+      const frame = sampleFrame(tl, timelineDuration(tl));
+      for (const [sid, values] of Object.entries(meta.finalValues)) {
+        if (!revealed.has(sid)) continue;
+        values.forEach((v, i) => {
+          const st = frame.get(`bar-${sid}-${i}`);
+          if (!st?.size) return;
+          const expected = (v / meta.yMax!) * meta.plotH!;
+          if (Math.abs(st.size[1] - expected) > 1) out.push(error("timeline", `bar ${sid}[${i}] ends ${Math.round(st.size[1])}px tall; ${v} on a ${meta.yMax} axis is ${Math.round(expected)}px`));
+        });
+      }
+    }
+  }
+  const maxV = Math.max(...scene.series.flatMap((s) => s.values));
+  if (scene.yMax !== undefined && maxV > scene.yMax) out.push(warn("yMax", `yMax ${scene.yMax} is below the largest value ${maxV}: bars are clipped`, "raise yMax or drop it to have it computed"));
+  return out;
+}
+
 /** All semantic checks that apply. `scene` is optional for a bare timeline. */
 export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
   const out = checkTimeline(tl);
@@ -277,6 +362,9 @@ export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
     case "state-machine": out.push(...checkStateMachine(scene, tl)); break;
     case "distributed": out.push(...checkDistributed(scene, tl)); break;
     case "diagram": out.push(...checkDiagram(scene, tl)); break;
+    case "matrix": out.push(...checkMatrix(scene, tl)); break;
+    case "graph": out.push(...checkGraph(scene, tl)); break;
+    case "chart": out.push(...checkChart(scene, tl)); break;
     case "vector": break;
   }
   return out;
