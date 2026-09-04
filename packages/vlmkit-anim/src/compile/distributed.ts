@@ -28,6 +28,11 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   // that was written relative to it.
   const msgs = scene.messages.map((m) => ({ ...m, at: undefined as number | undefined, atRaw: m.at }));
   const landed = new Map<string, number>();
+  // `causal`: a node is free to send once the last message it received has landed
+  // and its own previous message has landed. Inserting a side branch from one
+  // node then never delays another node's reply.
+  const free = new Map<string, number>();
+  const causal = scene.timing === "causal";
   let cursor = 0;
   let prevStart = 0;
   for (const m of msgs) {
@@ -35,10 +40,13 @@ export function compileDistributed(scene: DistributedScene): Timeline {
     if (typeof m.atRaw === "number") m.at = m.atRaw;
     else if (m.atRaw === "<") m.at = prevStart; // together with the previous message
     else if (m.after !== undefined) m.at = (landed.get(m.after) ?? cursor) + (m.delay ?? 0);
-    else m.at = cursor;
+    else m.at = causal ? (free.get(m.from) ?? 0) : cursor;
     prevStart = m.at;
-    cursor = Math.max(cursor, m.at + m.latency);
-    if (m.label !== undefined) landed.set(m.label, m.at + m.latency);
+    const lands = m.at + m.latency;
+    cursor = Math.max(cursor, lands);
+    if (m.label !== undefined) landed.set(m.label, lands);
+    free.set(m.from, Math.max(free.get(m.from) ?? 0, lands));
+    if (!m.lost) free.set(m.to, Math.max(free.get(m.to) ?? 0, lands));
   }
   const events = (scene.events ?? [])
     .map((e) => ({ ...e, at: e.at ?? (landed.get(e.after ?? "") ?? cursor) + (e.delay ?? 0) }))

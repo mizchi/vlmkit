@@ -158,13 +158,23 @@ down the canvas, each message a dot travelling with its arrow drawing in
 behind. A message into a node that is down when it lands should be
 `"lost": true` (the check warns otherwise).
 
-Timing is list order by default: each message starts when the one before it
-lands. So **inserting a message in the middle delays everything after it**.
-When the new message is a side branch (a copy to a backup while the main reply
-goes on), anchor it — `{"after": "ack", …}` — and anchor the message it would
-otherwise push (`"ok"` also `after: "ack"`), or give it `"at": "<"` to leave
-with the message before it. Run `explain` after an insertion and read the
-times: a beat that moved when it should not have is the tell.
+Timing of a message with no `at` / `after` is set by the scene's `timing`:
+
+- `"sequential"` (default): it starts when the previous message in the list
+  lands. Simple, but **inserting a message in the middle delays everything
+  after it**. When the new message is a side branch (a copy to a backup while
+  the main reply goes on), anchor it — `{"after": "ack", …}` — and anchor the
+  message it would otherwise push (`"ok"` also `after: "ack"`), or give it
+  `"at": "<"` to leave with the message before it.
+- `"causal"`: it starts when its **sender is free** — after the last message the
+  sender received has landed and its own previous message has landed. A reply
+  waits for what it replies to; a side branch from another node never delays
+  it; two senders with nothing to wait for send at once. Order in the list
+  still decides ties and what "previous" means. Write `"timing": "causal"` at
+  the top of the scene.
+
+Run `explain` after an insertion and read the times: a beat that moved when it
+should not have is the tell.
 
 ## kind: diagram
 

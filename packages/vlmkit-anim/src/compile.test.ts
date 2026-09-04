@@ -209,6 +209,32 @@ describe("distributed", () => {
     assert.ok(d2.some((d) => d.path === "messages[3]" && /has been down since/.test(d.message)), formatDiagnostics(d2));
   });
 
+  it("causal timing: a reply waits for what it replies to, a side branch does not push it", () => {
+    const base: Extract<Scene, { kind: "distributed" }> = {
+      format: SCENE_FORMAT,
+      kind: "distributed",
+      stepMs: 600,
+      timing: "causal",
+      nodes: ["client", "primary", "replica", "backup"],
+      messages: [
+        { from: "client", to: "primary", label: "write" },
+        { from: "primary", to: "replica", label: "replicate" },
+        { from: "replica", to: "primary", label: "ack", latency: 1200 },
+        { from: "replica", to: "backup", label: "copy" },
+        { from: "primary", to: "client", label: "ok" },
+      ],
+    };
+    const tl = compileScene(base);
+    // write 0–600, replicate 600–1200, ack 1200–2400, copy waits for replica's own ack to land: 2400–3000, ok waits for the ack: 2400–3000.
+    assert.deepEqual(tl.meta?.messageTimes, [[0, 600], [600, 1200], [1200, 2400], [2400, 3000], [2400, 3000]]);
+    // The same list under sequential timing pushes ok behind copy.
+    const seq = compileScene({ ...base, timing: "sequential" });
+    assert.deepEqual((seq.meta?.messageTimes as number[][])[4], [3000, 3600]);
+    // Two independent senders start at once under causal; unrelated to list order.
+    const two = compileScene({ ...base, messages: [{ from: "client", to: "primary" }, { from: "replica", to: "backup" }] });
+    assert.deepEqual(two.meta?.messageTimes, [[0, 600], [0, 600]]);
+  });
+
   it('`"at": "<"` sends a message together with the previous one (a broadcast)', () => {
     const s: Scene = {
       format: SCENE_FORMAT,

@@ -330,6 +330,14 @@ export interface DistributedScene extends SceneBase {
   nodes: (string | DistNode)[];
   messages: DistMessage[];
   events?: DistEvent[];
+  /**
+   * When a message with no `at` / `after` starts.
+   * `sequential` (default): when the previous message in the list lands.
+   * `causal`: when its sender is free — the later of the last message the
+   * sender received landing and the sender's own previous message landing;
+   * messages from senders with nothing to wait for start at 0.
+   */
+  timing?: "sequential" | "causal";
 }
 
 // ---- vector (generic) -----------------------------------------------------

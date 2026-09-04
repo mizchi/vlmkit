@@ -157,6 +157,9 @@ Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). Th
                                    message (a broadcast); "latency" defaults to stepMs; "after" starts it when the earlier
                                    message with that label lands (+ "delay"). Inserting a message delays everything after
                                    it unless the later ones are anchored with "after".
+  "timing": "sequential" | "causal"   default sequential: an unanchored message starts when the previous one lands (inserting
+                                   one delays all later ones); causal: it starts when its SENDER is free (its last received
+                                   message and its own previous message have landed) — replies wait, side branches don't push
   "events": [ {"after": "label" | "at": ms, "delay": ms, "node", "status", "caption"} ]   status changes; prefer "after" — an absolute
                                    "at" stays put when message timing shifts (the check warns when it lands mid-flight)
 Time runs down the canvas, so order is visible. A message to a node that is down at arrival should be "lost": true (the check warns).`,

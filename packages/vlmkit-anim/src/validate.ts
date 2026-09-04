@@ -594,7 +594,8 @@ function validateHeap(ctx: Ctx, doc: Obj): void {
 const STATUSES = ["up", "down", "leader", "busy"];
 
 function validateDistributed(ctx: Ctx, doc: Obj): void {
-  validateBase(ctx, doc, ["nodes", "messages", "events"]);
+  validateBase(ctx, doc, ["nodes", "messages", "events", "timing"]);
+  if (doc.timing !== undefined) ctx.enumOf(doc.timing, "timing", ["sequential", "causal"], "timing");
   let nodeIds: string[] = [];
   if (ctx.array(doc.nodes, "nodes", { minLength: 1 })) {
     nodeIds = ids(ctx, doc.nodes, "nodes");
