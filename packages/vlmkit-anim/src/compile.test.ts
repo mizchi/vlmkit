@@ -116,6 +116,32 @@ describe("state-machine", () => {
     assert.ok(captions.some((c) => /final state "locked"/.test(c ?? "")));
   });
 
+  it("goto shows an alternative path after the main one and silences the untaken-path warning", () => {
+    const s: Scene = {
+      format: SCENE_FORMAT,
+      kind: "state-machine",
+      states: ["a", "b", "c", { id: "d", final: true }],
+      initial: "a",
+      transitions: [
+        { from: "a", to: "b", on: "x" },
+        { from: "b", to: "d", on: "y" },
+        { from: "a", to: "c", on: "z" },
+        { from: "c", to: "d", on: "y" },
+      ],
+      trace: ["x", "y", { goto: "a", caption: "The other path: z first" }, "z", { on: "y", caption: "and it also ends in d" }],
+    };
+    const tl = compileScene(s);
+    assert.deepEqual(tl.meta?.visited, ["a", "b", "d", "a", "c", "d"]);
+    const captions = (tl.steps ?? []).map((x) => x.caption);
+    assert.ok(captions.includes("The other path: z first"));
+    assert.ok(captions.includes("and it also ends in d"));
+    assert.deepEqual(checkAnimation(tl, s).filter((d) => /never/.test(d.message)), []);
+    // Without the second leg, both untaken pieces are named and the hint offers goto.
+    const half: Scene = { ...s, trace: ["x", "y"] };
+    const diags = checkAnimation(compileScene(half), half);
+    assert.ok(diags.some((d) => d.path === "states(c)" && /goto/.test(d.hint ?? "")), formatDiagnostics(diags));
+  });
+
   it("warns about unreachable states", () => {
     const s: Scene = { ...EXAMPLES["state-machine"], states: [...EXAMPLES["state-machine"].states, "limbo"] };
     const diags = checkAnimation(compileScene(s), s);
@@ -152,6 +178,35 @@ describe("distributed", () => {
     const tl = compileScene(s);
     const first = (tl.steps ?? []).find((x) => x.t === 0)!;
     assert.match(first.caption ?? "", /a → b: vote\? · the request to c is lost/);
+  });
+
+  it("`after` anchors follow a latency change; an absolute event that drifts mid-flight is warned about", () => {
+    const base: Extract<Scene, { kind: "distributed" }> = {
+      format: SCENE_FORMAT,
+      kind: "distributed",
+      stepMs: 500,
+      nodes: ["client", "primary", "replica"],
+      messages: [
+        { from: "client", to: "primary", label: "write" },
+        { from: "primary", to: "replica", label: "replicate" },
+        { from: "replica", to: "primary", label: "ack" },
+        { from: "primary", to: "client", label: "ok" },
+      ],
+      events: [{ after: "ok", node: "primary", status: "down" }],
+    };
+    const before = compileScene(base);
+    assert.deepEqual(before.meta?.eventTimes, [2000]);
+    const slow: typeof base = { ...base, messages: base.messages.map((m) => (m.label === "ack" ? { ...m, latency: 1700 } : m)) };
+    const after = compileScene(slow);
+    assert.deepEqual(after.meta?.eventTimes, [3200], "the crash moved with the message it is anchored to");
+    assert.deepEqual(checkAnimation(after, slow).filter((d) => d.severity !== "warn" || /flight|down since/.test(d.message)), []);
+    // The same edit with an absolute event: the crash now lands while "ok" is in the air, and primary sends after dying.
+    const absolute: typeof base = { ...slow, events: [{ at: 2000, node: "primary", status: "down" }] };
+    const diags = checkAnimation(compileScene(absolute), absolute);
+    assert.ok(diags.some((d) => d.path === "events[0].at" && /in flight/.test(d.message) && /"after": "ack"/.test(d.hint ?? "")), formatDiagnostics(diags));
+    const later: typeof base = { ...slow, events: [{ at: 1500, node: "primary", status: "down" }] };
+    const d2 = checkAnimation(compileScene(later), later);
+    assert.ok(d2.some((d) => d.path === "messages[3]" && /has been down since/.test(d.message)), formatDiagnostics(d2));
   });
 
   it("messages default to sequential timing and a message into a down node warns unless lost", () => {

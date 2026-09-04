@@ -23,15 +23,21 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   const lifeTop = boxY + boxH / 2 + 4;
   const lifeBottom = b.height - 40;
 
-  // Resolve message times first: default is sequential.
+  // Resolve message times first: default is sequential; `after` anchors to when a
+  // labelled earlier message lands, so a latency change upstream moves everything
+  // that was written relative to it.
   const msgs = scene.messages.map((m) => ({ ...m }));
+  const landed = new Map<string, number>();
   let cursor = 0;
   for (const m of msgs) {
     m.latency = m.latency ?? b.stepMs;
-    m.at = m.at ?? cursor;
+    if (m.at === undefined) m.at = m.after !== undefined ? (landed.get(m.after) ?? cursor) + (m.delay ?? 0) : cursor;
     cursor = Math.max(cursor, m.at + m.latency);
+    if (m.label !== undefined) landed.set(m.label, m.at + m.latency);
   }
-  const events = [...(scene.events ?? [])].sort((a, c) => a.at - c.at);
+  const events = (scene.events ?? [])
+    .map((e) => ({ ...e, at: e.at ?? (landed.get(e.after ?? "") ?? cursor) + (e.delay ?? 0) }))
+    .sort((a, c) => a.at - c.at);
   const end = Math.max(cursor, ...events.map((e) => e.at + b.stepMs * 0.5), b.stepMs);
   // Vertical position is proportional to time.
   const yAt = (t: number): number => Math.round(lifeTop + 16 + ((lifeBottom - lifeTop - 24) * t) / Math.max(1, end));
@@ -88,7 +94,15 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   b.t = end;
   b.step("end", "end");
   b.advance(b.stepMs * 0.3);
-  const tl = b.build({ title: scene.title, kind: "distributed", delivered: msgs.filter((m) => !m.lost).length, lost: msgs.filter((m) => m.lost).length });
+  const tl = b.build({
+    title: scene.title,
+    kind: "distributed",
+    delivered: msgs.filter((m) => !m.lost).length,
+    lost: msgs.filter((m) => m.lost).length,
+    // Resolved timing, so the checker judges what was actually compiled.
+    messageTimes: msgs.map((m) => [m.at!, m.at! + m.latency!]),
+    eventTimes: events.map((e) => e.at),
+  });
   // First step marker should exist at 0 for the runtime's "start" chapter.
   if (!tl.steps?.some((s) => s.t === 0)) tl.steps = [{ t: 0, label: "start", caption: scene.title }, ...(tl.steps ?? [])];
   return tl;

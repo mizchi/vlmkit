@@ -50,7 +50,7 @@ export const EXAMPLES: Examples = {
       { from: "open", to: "closed", on: "pull" },
       { from: "closed", to: "locked", on: "lock", note: "/ beep" },
     ],
-    trace: ["push", "pull", "lock"],
+    trace: ["push", "pull", { note: "Locking is the other way out of closed" }, "lock"],
   },
   heap: {
     format: SCENE_FORMAT,
@@ -70,7 +70,7 @@ export const EXAMPLES: Examples = {
       { from: "replica", to: "primary", label: "ack" },
       { from: "primary", to: "client", label: "ok" },
     ],
-    events: [{ at: 2400, node: "replica", status: "down", caption: "replica crashes" }],
+    events: [{ after: "ok", node: "replica", status: "down", caption: "replica crashes" }],
   },
   diagram: {
     format: SCENE_FORMAT,
@@ -140,7 +140,9 @@ The check fails unless the final left-to-right order is sorted. Give "algorithm"
   "states": [ "id" | {"id", "label", "final": true, "pos": [x, y]} ]   required; final = double ring; pos pins a state
   "initial": "id"                  required
   "transitions": [ {"from", "to", "on": "event", "note": "/ action"} ]   required; one transition per (from, on)
-  "trace": [ "event", ... ]        required; fired in order, each must be legal from the current state
+  "trace": [ "event" | {"on": "event", "caption"} | {"note": "…"} | {"goto": "state", "caption"} ]
+                                   required; events fire in order and must be legal from the current state;
+                                   note = captioned pause; goto = jump the token to show a second path after the first
   "layout": "lr" | "tb" | "circle" default lr
 Each fired event is one step captioned "on <event>: a → b". The validator names the legal events when a trace step is not.`,
   heap: `kind: heap — a binary tree of slots; values sift up and down
@@ -150,9 +152,11 @@ Each fired event is one step captioned "on <event>: a → b". The validator name
 Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). The check verifies the final tree is a heap.`,
   distributed: `kind: distributed — nodes across the top, lifelines down, messages as travelling dots
   "nodes": [ "id" | {"id", "label", "status": "up" | "down" | "leader" | "busy"} ]   required
-  "messages": [ {"from", "to", "label", "at": ms, "latency": ms, "lost": true, "caption"} ]   required
-                                   "at" defaults to right after the previous message lands; "latency" defaults to stepMs
-  "events": [ {"at": ms, "node", "status", "caption"} ]   optional status changes, recolour the node from that moment
+  "messages": [ {"from", "to", "label", "at": ms, "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"} ]   required
+                                   "at" defaults to right after the previous message lands; "latency" defaults to stepMs;
+                                   "after" starts it when the earlier message with that label lands (+ "delay")
+  "events": [ {"after": "label" | "at": ms, "delay": ms, "node", "status", "caption"} ]   status changes; prefer "after" — an absolute
+                                   "at" stays put when message timing shifts (the check warns when it lands mid-flight)
 Time runs down the canvas, so order is visible. A message to a node that is down at arrival should be "lost": true (the check warns).`,
   diagram: `kind: diagram — boxes and arrows, narrated in beats
   "nodes": [ {"id", "label", "shape": "rect" | "circle" | "ellipse", "pos": [x, y], "fill", "hidden": true} ]   required

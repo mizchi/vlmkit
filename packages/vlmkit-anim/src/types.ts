@@ -235,13 +235,20 @@ export interface Transition {
   note?: string;
 }
 
+/**
+ * One item of a trace: an event name, an event with its own caption, a
+ * captioned pause, or a jump — the token moves to `goto` without a
+ * transition, which is how a second path is shown after the first has ended.
+ */
+export type TraceItem = string | { on: string; caption?: string } | { note: string } | { goto: string; caption?: string };
+
 export interface StateMachineScene extends SceneBase {
   kind: "state-machine";
   states: (string | StateDef)[];
   initial: string;
   transitions: Transition[];
-  /** Events to fire in order; each must be a legal transition from the current state. */
-  trace: string[];
+  /** Fired in order; each event must be a legal transition from the current state. */
+  trace: TraceItem[];
   layout?: "lr" | "tb" | "circle";
 }
 
@@ -296,6 +303,10 @@ export interface DistMessage {
   label?: string;
   /** Start time in ms. Default: right after the previous message lands. */
   at?: number;
+  /** Start when the earlier message with this `label` lands (plus `delay`). Alternative to `at`. */
+  after?: string;
+  /** Extra ms after the `after` message lands. Default 0. */
+  delay?: number;
   /** Travel time in ms. Default `stepMs`. */
   latency?: number;
   /** Drop the message: it fades mid-way and never lands. */
@@ -304,7 +315,11 @@ export interface DistMessage {
 }
 
 export interface DistEvent {
-  at: number;
+  /** Absolute ms. Fragile when message timing shifts; prefer `after`. */
+  at?: number;
+  /** Fire when the message with this `label` lands (plus `delay`). */
+  after?: string;
+  delay?: number;
   node: string;
   status: "up" | "down" | "leader" | "busy";
   caption?: string;

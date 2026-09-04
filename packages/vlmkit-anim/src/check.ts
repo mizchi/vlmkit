@@ -172,7 +172,9 @@ function checkHeap(scene: Extract<Scene, { kind: "heap" }>, tl: Timeline): Diagn
 function checkStateMachine(scene: Extract<Scene, { kind: "state-machine" }>, tl: Timeline): Diagnostic[] {
   const out: Diagnostic[] = [];
   const visited = (tl.meta?.visited as string[] | undefined) ?? [];
-  if (visited.length !== scene.trace.length + 1) out.push(error("trace", `only ${Math.max(0, visited.length - 1)} of ${scene.trace.length} events could be fired`));
+  const wanted = scene.trace.filter((it) => typeof it === "string" || "on" in it).length;
+  const gotos = scene.trace.filter((it) => typeof it === "object" && "goto" in it).length;
+  if (visited.length !== wanted + gotos + 1) out.push(error("trace", `only ${Math.max(0, visited.length - 1 - gotos)} of ${wanted} events could be fired`));
   const reachable = new Set<string>([scene.initial]);
   let grew = true;
   while (grew) {
@@ -181,13 +183,24 @@ function checkStateMachine(scene: Extract<Scene, { kind: "state-machine" }>, tl:
   }
   const ids = scene.states.map((s) => (typeof s === "string" ? s : s.id));
   for (const id of ids) if (!reachable.has(id)) out.push(warn(`states(${id})`, `state "${id}" is unreachable from "${scene.initial}"`, "add a transition into it or drop it"));
-  const fired = new Set(visited.slice(1).map((_, i) => `${visited[i]}:${scene.trace[i]}`));
+  // Which (from, on) pairs actually fired: replay the trace over the visited list.
+  const fired = new Set<string>();
+  {
+    let k = 0;
+    for (const it of scene.trace) {
+      if (typeof it === "object" && "note" in it) continue;
+      if (typeof it === "object" && "goto" in it) { k++; continue; }
+      const ev = typeof it === "string" ? it : it.on;
+      if (visited[k + 1] !== undefined) fired.add(`${visited[k]}:${ev}`);
+      k++;
+    }
+  }
   const unused = scene.transitions.filter((t) => !fired.has(`${t.from}:${t.on}`));
   if (unused.length && unused.length === scene.transitions.length) out.push(warn("trace", "the trace fires no transition: the picture is static"));
   else {
     // Drawn but never animated: the viewer sees a path and never learns when it is taken.
     const visitedSet = new Set(visited);
-    for (const id of ids) if (reachable.has(id) && !visitedSet.has(id)) out.push(warn(`states(${id})`, `state "${id}" is drawn but the trace never enters it`, "extend the trace to reach it, or mention it in a caption so the viewer knows it is an alternative path"));
+    for (const id of ids) if (reachable.has(id) && !visitedSet.has(id)) out.push(warn(`states(${id})`, `state "${id}" is drawn but the trace never enters it`, `extend the trace to reach it, jump there with {"goto": "…"} after the main path and play the alternative, or explain it with {"note": "…"} in the trace`));
     for (const t of unused) if (visitedSet.has(t.from)) out.push(warn(`transitions(${t.from}:${t.on})`, `transition "${t.from}" —${t.on}→ "${t.to}" is drawn but the trace never fires it`));
   }
   return out;
@@ -195,22 +208,52 @@ function checkStateMachine(scene: Extract<Scene, { kind: "state-machine" }>, tl:
 
 function checkDistributed(scene: Extract<Scene, { kind: "distributed" }>, tl: Timeline): Diagnostic[] {
   const out: Diagnostic[] = [];
+  // Timing as the compiler resolved it (`after` anchors, defaults), not as written.
+  const times = (tl.meta?.messageTimes as [number, number][] | undefined) ?? [];
+  const eventTimes = (tl.meta?.eventTimes as number[] | undefined) ?? [];
   const down = new Map<string, number>();
-  for (const e of scene.events ?? []) if (e.status === "down") down.set(e.node, Math.min(e.at, down.get(e.node) ?? Infinity));
-  for (const e of scene.events ?? []) if (e.status !== "down" && down.has(e.node) && e.at > down.get(e.node)!) down.delete(e.node);
-  let cursor = 0;
+  (scene.events ?? []).forEach((e, i) => {
+    const t = eventTimes[i];
+    if (t === undefined) return;
+    if (e.status === "down") down.set(e.node, Math.min(t, down.get(e.node) ?? Infinity));
+    else if (down.has(e.node) && t > down.get(e.node)!) down.delete(e.node);
+  });
   scene.messages.forEach((m, i) => {
-    const at = m.at ?? cursor;
-    const lat = m.latency ?? scene.stepMs ?? 600;
-    cursor = Math.max(cursor, at + lat);
+    const [, lands] = times[i] ?? [0, 0];
     const initialDown = scene.nodes.some((n) => typeof n !== "string" && n.id === m.to && n.status === "down");
     const downAt = down.get(m.to);
-    if (!m.lost && (initialDown || (downAt !== undefined && at + lat >= downAt))) {
-      out.push(warn(`messages[${i}]`, `"${m.to}" is down when this message lands (t=${at + lat}) but the message is not marked lost`, 'add "lost": true, or move the event later'));
+    if (!m.lost && (initialDown || (downAt !== undefined && lands >= downAt))) {
+      out.push(warn(`messages[${i}]`, `"${m.to}" is down when this message lands (t=${lands}) but the message is not marked lost`, 'add "lost": true, or move the event later'));
     }
   });
   if (scene.messages.length === 0) out.push(warn("messages", "no messages: nothing travels between nodes"));
-  void tl;
+  // An event pinned to an absolute time that lands mid-flight of a message is the
+  // classic re-edit casualty: someone lengthened a latency upstream and the crash
+  // now happens while the reply is in the air. `after` moves with the messages.
+  (scene.events ?? []).forEach((e, i) => {
+    const at = e.at;
+    if (at === undefined) return;
+    const inside = times.findIndex(([t0, t1]) => at > t0 && at < t1);
+    if (inside >= 0) {
+      const m = scene.messages[inside];
+      out.push(warn(`events[${i}].at`, `t=${at} falls while "${m.from} → ${m.to}${m.label ? `: ${m.label}` : ""}" is in flight (${times[inside][0]}–${times[inside][1]}ms)`, `if that is not the story, anchor it: {"after": "${m.label ?? "<label that message>"}", …} follows the message when timing shifts`));
+    }
+  });
+  // A node that sends after it went down: the other way the drift shows up.
+  const downSince = new Map<string, number>();
+  (scene.events ?? []).forEach((e, i) => {
+    const t = eventTimes[i];
+    if (t === undefined) return;
+    if (e.status === "down") downSince.set(e.node, Math.min(t, downSince.get(e.node) ?? Infinity));
+    else if (downSince.has(e.node) && t > downSince.get(e.node)!) downSince.delete(e.node);
+  });
+  scene.messages.forEach((m, i) => {
+    const t0 = times[i]?.[0];
+    const since = downSince.get(m.from);
+    if (t0 !== undefined && since !== undefined && t0 >= since) {
+      out.push(warn(`messages[${i}]`, `"${m.from}" sends this at t=${t0} but has been down since t=${since}`, "move the event later, anchor it with \"after\", or send from another node"));
+    }
+  });
   return out;
 }
 

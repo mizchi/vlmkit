@@ -16,6 +16,7 @@ This page is the complete writing guide. Every JSON block on it passes
 3. vlmkit anim explain scene.json           the narration as a numbered list — is this the story you meant?
 4. vlmkit anim render scene.json --step 4   one frame as SVG (or --at <ms>); --out frame.svg
    vlmkit anim frames scene.json --out dir [--png]   every step as a file, for looking at
+   vlmkit anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
 5. vlmkit anim html scene.json --out page.html       the playable page
 ```
 
@@ -86,7 +87,7 @@ sorted run growing.
     { "from": "open", "to": "closed", "on": "pull" },
     { "from": "closed", "to": "locked", "on": "lock", "note": "/ beep" }
   ],
-  "trace": ["push", "pull", "lock"]
+  "trace": ["push", "pull", { "note": "Locking is the other way out of closed" }, "lock"]
 }
 ```
 
@@ -95,12 +96,13 @@ sorted run growing.
 | `states` | required: `"id"` or `{"id", "label", "final": true, "pos": [x, y]}` (final = double ring; `pos` pins the state, the rest are laid out around it) |
 | `initial` | required |
 | `transitions` | required: `{"from", "to", "on": "event", "note": "/ action"}`; one per (from, on) |
-| `trace` | required: events fired in order; each must be legal from the current state — the validator lists the legal ones when it is not |
+| `trace` | required: items fired in order. An event name (must be legal from the current state — the validator lists the legal ones when it is not); `{"on": "ev", "caption": "…"}` to narrate that step yourself; `{"note": "…"}` for a captioned pause; `{"goto": "state", "caption": "…"}` to jump the token without a transition — how you show a second path after the first has ended |
 | `layout` | `lr` (default) \| `tb` \| `circle` |
 
 Each event is a step captioned `on <event>: a → b`; a token slides along the
 arrow. States and transitions the trace never reaches are still drawn, and the
-check warns about each so you can extend the trace or explain them in a caption.
+check warns about each: extend the trace, or after the main path ends add
+`{"goto": "<state>", "caption": "The other path: …"}` and play the alternative.
 
 ## kind: heap
 
@@ -141,15 +143,15 @@ check verifies the final tree is a heap and that pops come out in order.
     { "from": "replica", "to": "primary", "label": "ack" },
     { "from": "primary", "to": "client", "label": "ok" }
   ],
-  "events": [{ "at": 2400, "node": "replica", "status": "down", "caption": "replica crashes" }]
+  "events": [{ "after": "ok", "node": "replica", "status": "down", "caption": "replica crashes" }]
 }
 ```
 
 | field | |
 |---|---|
 | `nodes` | required: `"id"` or `{"id", "label", "status": up \| down \| leader \| busy}` |
-| `messages` | required: `{"from", "to", "label", "at": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `latency` to `stepMs` |
-| `events` | `{"at": ms, "node", "status", "caption"}` — recolours the node from that moment |
+| `messages` | required: `{"from", "to", "label", "at": ms, "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `latency` to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`) |
+| `events` | `{"after": "label" \| "at": ms, "delay": ms, "node", "status", "caption"}` — recolours the node from that moment. Prefer `after`: an absolute `at` stays put when you lengthen a latency upstream, and the check warns when it then lands mid-flight or a down node keeps sending |
 
 Sequence-diagram picture: node boxes across the top, lifelines down, time runs
 down the canvas, each message a dot travelling with its arrow drawing in
@@ -256,6 +258,18 @@ Nodes (also the Timeline's node model):
 - `keyframes[].easing` is the curve **into** that keyframe. Times ascend; the first and last values hold outside the span.
 - `steps`: chapter markers with `label` / `caption`; the runtime's ◀ ▶| buttons walk them. A step without a caption keeps the previous caption showing.
 - `duration`: optional, computed from the last keyframe or step.
+
+## Looking at it with a vision model
+
+`sheet` puts every step on one image, tiles in reading order, each labelled
+with step number, time and caption. One image is one call, the order is fixed
+by layout, and a model judges "what changed between tile 3 and 4" far more
+reliably than it reads absolute positions off a single frame. Two limits:
+tiles shrink as frames grow (keep `--tile` at 300px+ and the count near a
+dozen, or the labels inside frames stop being legible), and the sheet is for
+the judgement "does this explain it?", not for correctness — `check` reads
+sorted order, heap shape and trace legality back from the frames
+deterministically, so do not spend a vision call on those.
 
 ## Embedding
 

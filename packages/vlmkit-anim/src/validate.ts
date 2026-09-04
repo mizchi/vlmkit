@@ -481,8 +481,28 @@ function validateStateMachine(ctx: Ctx, doc: Obj): void {
   if (ctx.array(doc.trace, "trace") && isStr(doc.initial) && stateIds.includes(doc.initial)) {
     let cur = doc.initial;
     for (let i = 0; i < doc.trace.length; i++) {
-      const ev = doc.trace[i];
-      if (!ctx.string(ev, `trace[${i}]`)) break;
+      const item = doc.trace[i];
+      let ev: unknown = item;
+      if (isObj(item)) {
+        const keys = Object.keys(item);
+        if ("note" in item) {
+          ctx.keys(item, `trace[${i}]`, ["note"]);
+          if (!isStr(item.note)) ctx.error(`trace[${i}].note`, "note takes a string");
+          continue;
+        }
+        if ("goto" in item) {
+          ctx.keys(item, `trace[${i}]`, ["goto", "caption"]);
+          if (ctx.ref(item.goto, `trace[${i}].goto`, stateIds, "state")) cur = item.goto as string;
+          continue;
+        }
+        if (!("on" in item)) {
+          ctx.error(`trace[${i}]`, `a trace item is an event name, {"on", "caption"}, {"note"} or {"goto", "caption"}; found keys ${keys.length ? list(keys) : "none"}`);
+          break;
+        }
+        ctx.keys(item, `trace[${i}]`, ["on", "caption"]);
+        ev = item.on;
+      }
+      if (!ctx.string(ev, isObj(item) ? `trace[${i}].on` : `trace[${i}]`)) break;
       const row = table.get(cur);
       const next = row?.get(ev);
       if (next === undefined) {
@@ -585,25 +605,55 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
       } else if (!isStr(n)) ctx.error(`nodes[${i}]`, `a node is a string id or {"id", "label", "status"}`);
     });
   }
+  // `after` names an EARLIER message by label; a label used twice cannot be an anchor.
+  const labelsSoFar: string[] = [];
+  const allLabels = new Map<string, number>();
+  if (Array.isArray(doc.messages)) for (const m of doc.messages) if (isObj(m) && isStr(m.label)) allLabels.set(m.label, (allLabels.get(m.label) ?? 0) + 1);
+  const anchor = (v: unknown, path: string, candidates: string[]): void => {
+    if (!isStr(v)) {
+      ctx.error(path, `after takes the "label" of an earlier message, got ${describe(v)}`);
+      return;
+    }
+    if ((allLabels.get(v) ?? 0) > 1) {
+      ctx.error(path, `"${v}" labels ${allLabels.get(v)} messages, so it cannot anchor anything`, "give the message you mean a unique label");
+      return;
+    }
+    if (!candidates.includes(v)) {
+      const near = closest(v, candidates);
+      const later = allLabels.has(v);
+      ctx.error(
+        path,
+        later ? `"${v}" is a later message; after can only reference an earlier one` : `no earlier message is labelled "${v}"`,
+        candidates.length ? `${near ? `did you mean "${near}"? ` : ""}earlier labels: ${list(candidates)}` : "no earlier message has a label yet",
+      );
+    }
+  };
   if (ctx.array(doc.messages, "messages")) {
     doc.messages.forEach((m, i) => {
       const path = `messages[${i}]`;
       if (!ctx.object(m, path)) return;
-      ctx.keys(m, path, ["from", "to", "label", "at", "latency", "lost", "caption"]);
+      ctx.keys(m, path, ["from", "to", "label", "at", "after", "delay", "latency", "lost", "caption"]);
       const a = ctx.ref(m.from, `${path}.from`, nodeIds, "node");
       const b = ctx.ref(m.to, `${path}.to`, nodeIds, "node");
       if (a && b && m.from === m.to) ctx.error(`${path}.to`, `a message cannot go from "${m.from as string}" to itself`);
       if (m.at !== undefined) ctx.number(m.at, `${path}.at`, { min: 0 });
+      if (m.after !== undefined) anchor(m.after, `${path}.after`, labelsSoFar);
+      if (m.at !== undefined && m.after !== undefined) ctx.error(`${path}.after`, `give "at" or "after", not both`);
+      if (m.delay !== undefined) ctx.number(m.delay, `${path}.delay`, { min: 0 });
       if (m.latency !== undefined) ctx.number(m.latency, `${path}.latency`, { min: 1 });
       if (m.lost !== undefined && typeof m.lost !== "boolean") ctx.error(`${path}.lost`, `lost takes true/false`);
+      if (isStr(m.label)) labelsSoFar.push(m.label);
     });
   }
   if (doc.events !== undefined && ctx.array(doc.events, "events")) {
     doc.events.forEach((e, i) => {
       const path = `events[${i}]`;
       if (!ctx.object(e, path)) return;
-      ctx.keys(e, path, ["at", "node", "status", "caption"]);
-      ctx.number(e.at, `${path}.at`, { min: 0 });
+      ctx.keys(e, path, ["at", "after", "delay", "node", "status", "caption"]);
+      if (e.at === undefined && e.after === undefined) ctx.error(path, `an event needs "at" (ms) or "after" (a message label)`, `e.g. {"after": "ok", "node": "primary", "status": "down"}`);
+      if (e.at !== undefined) ctx.number(e.at, `${path}.at`, { min: 0 });
+      if (e.after !== undefined) anchor(e.after, `${path}.after`, [...allLabels.keys()].filter((l) => allLabels.get(l) === 1));
+      if (e.delay !== undefined) ctx.number(e.delay, `${path}.delay`, { min: 0 });
       ctx.ref(e.node, `${path}.node`, nodeIds, "node");
       ctx.enumOf(e.status, `${path}.status`, STATUSES, "status");
     });
