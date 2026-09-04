@@ -7,7 +7,7 @@
  * by an agent as text to see where things are.
  */
 
-import { currentStep, sampleFrame, timelineDuration, type NodeState } from "./timeline.ts";
+import { currentCaption, sampleFrame, timelineDuration, type NodeState } from "./timeline.ts";
 import type { Timeline, Vec2 } from "./types.ts";
 
 const esc = (s: string): string =>
@@ -179,9 +179,9 @@ export function renderFrameSvg(tl: Timeline, t: number, opts: RenderOptions = {}
     .join("");
   let caption = "";
   if (opts.caption !== false) {
-    const step = currentStep(tl, t);
-    if (step?.caption) {
-      caption = `<text x="${num(width / 2)}" y="${num(height - 14)}" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">${esc(step.caption)}</text>`;
+    const text = currentCaption(tl, t);
+    if (text) {
+      caption = `<text x="${num(width / 2)}" y="${num(height - 14)}" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">${esc(text)}</text>`;
     }
   }
   return [

@@ -171,6 +171,17 @@ export function currentStep(tl: Timeline, t: number): { index: number; t: number
   return found === undefined ? undefined : { index: found, ...steps[found] };
 }
 
+/**
+ * The caption in force at `t`: a step without a caption keeps the previous
+ * one showing, so an uncaptioned marker (an "end" chapter, a pause) never
+ * blanks the narration.
+ */
+export function currentCaption(tl: Timeline, t: number): string | undefined {
+  let found: string | undefined;
+  for (const s of tl.steps ?? []) if (s.t <= t + 1e-9 && s.caption) found = s.caption;
+  return found;
+}
+
 /** World-space translation of a node, folding in `group` parents. */
 export function worldPos(frame: Map<string, NodeState>, id: string): Vec2 {
   let x = 0;

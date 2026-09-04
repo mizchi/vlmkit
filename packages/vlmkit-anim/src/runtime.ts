@@ -205,10 +205,11 @@ export const RUNTIME_SOURCE = String.raw`
       const t = this._time;
       for (const a of this._anims) a.currentTime = t;
       for (const tt of this._textTracks) { let v = tt.keyframes[0].value; for (const k of tt.keyframes) if (k.t <= t) v = k.value; tt.set(tt.id, v); }
-      const steps = this._tl.steps || []; let idx = -1;
-      for (let i = 0; i < steps.length; i++) if (steps[i].t <= t + 1e-6) idx = i;
+      const steps = this._tl.steps || []; let idx = -1; let caption = "";
+      for (let i = 0; i < steps.length; i++) if (steps[i].t <= t + 1e-6) { idx = i; if (steps[i].caption) caption = steps[i].caption; }
       if (idx !== this._stepIndex) { this._stepIndex = idx; this.dispatchEvent(new CustomEvent("step", { detail: { index: idx, step: steps[idx] || null, time: t } })); }
-      if (this._caption) this._caption.textContent = (idx >= 0 && steps[idx].caption) || "";
+      // A step without a caption keeps the previous caption showing.
+      if (this._caption) this._caption.textContent = caption;
       if (this._range) this._range.value = String(Math.round(t));
       if (this._stepEl) this._stepEl.textContent = steps.length ? (idx + 1) + " / " + steps.length : Math.round(t) + "ms";
       this.setAttribute("data-time", String(Math.round(t)));

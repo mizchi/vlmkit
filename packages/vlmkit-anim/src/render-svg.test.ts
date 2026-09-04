@@ -51,8 +51,12 @@ describe("renderFrameSvg", () => {
       { id: "t", shape: "text", text: "a\nb", pos: [150, 50] },
     ],
     tracks: [{ target: "g", prop: "pos", keyframes: [{ t: 0, value: [10, 10] }, { t: 1000, value: [110, 10], easing: "linear" }] }],
-    steps: [{ t: 0, caption: "start" }, { t: 500, caption: "half" }],
+    steps: [{ t: 0, caption: "start" }, { t: 500, caption: "half" }, { t: 900, label: "end" }],
   };
+
+  it("an uncaptioned step keeps the previous caption showing", () => {
+    assert.match(renderFrameSvg(tl, 950), /data-caption="true">half</);
+  });
 
   it("nests children in their group's <g> and applies the sampled transform", () => {
     const svg = renderFrameSvg(tl, 500);
@@ -72,7 +76,7 @@ describe("renderFrameSvg", () => {
 
   it("sampleTimes includes every step and both ends, sorted and unique", () => {
     const ts = sampleTimes(tl, 3);
-    assert.deepEqual(ts, [0, 500, 1000]);
+    assert.deepEqual(ts, [0, 500, 900, 1000]);
     const sort = compileScene(EXAMPLES.sort);
     const all = sampleTimes(sort, 0);
     assert.equal(all.length, sort.steps!.length);
