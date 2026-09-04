@@ -155,11 +155,13 @@ Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). Th
   "messages": [ {"from", "to", "label", "at": ms | "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"} ]   required
                                    "at" defaults to right after the previous message lands; "<" = together with the previous
                                    message (a broadcast); "latency" defaults to stepMs; "after" starts it when the earlier
-                                   message with that label lands (+ "delay"). Inserting a message delays everything after
-                                   it unless the later ones are anchored with "after".
-  "timing": "sequential" | "causal"   default sequential: an unanchored message starts when the previous one lands (inserting
-                                   one delays all later ones); causal: it starts when its SENDER is free (its last received
-                                   message and its own previous message have landed) — replies wait, side branches don't push
+                                   message with that label lands (+ "delay"); that label must be unique (a broadcast to two
+                                   nodes needs two labels).
+  "timing": "causal" | "sequential"   default causal: an unanchored message starts when its SENDER is free (its last received
+                                   message and its own previous message have landed) — a reply waits for what it replies to,
+                                   a side branch from another node never delays it, idle senders send at 0; a node that should
+                                   wait says {"after": "label", "delay": ms}. sequential: it starts when the previous message
+                                   in the list lands, so inserting one delays all later ones
   "events": [ {"after": "label" | "at": ms, "delay": ms, "node", "status", "caption"} ]   status changes; prefer "after" — an absolute
                                    "at" stays put when message timing shifts (the check warns when it lands mid-flight)
 Time runs down the canvas, so order is visible. A message to a node that is down at arrival should be "lost": true (the check warns).`,

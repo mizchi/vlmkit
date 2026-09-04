@@ -158,23 +158,34 @@ down the canvas, each message a dot travelling with its arrow drawing in
 behind. A message into a node that is down when it lands should be
 `"lost": true` (the check warns otherwise).
 
-Timing of a message with no `at` / `after` is set by the scene's `timing`:
+**When does a message with no `at` / `after` start?** The scene's `timing` decides:
 
-- `"sequential"` (default): it starts when the previous message in the list
-  lands. Simple, but **inserting a message in the middle delays everything
-  after it**. When the new message is a side branch (a copy to a backup while
-  the main reply goes on), anchor it — `{"after": "ack", …}` — and anchor the
-  message it would otherwise push (`"ok"` also `after: "ack"`), or give it
-  `"at": "<"` to leave with the message before it.
-- `"causal"`: it starts when its **sender is free** — after the last message the
-  sender received has landed and its own previous message has landed. A reply
-  waits for what it replies to; a side branch from another node never delays
-  it; two senders with nothing to wait for send at once. Order in the list
-  still decides ties and what "previous" means. Write `"timing": "causal"` at
-  the top of the scene.
+- `"causal"` (default): when its **sender is free** — after the last message the
+  sender received has landed, and after the sender's own previous message has
+  landed. So a reply waits for what it replies to, a side branch from another
+  node never delays it, and two senders with nothing to wait for send at once.
 
-Run `explain` after an insertion and read the times: a beat that moved when it
-should not have is the tell.
+  ```
+  { "from": "a", "to": "b", "label": "req" }        sent 0,   lands 600   (a had nothing to wait for)
+  { "from": "b", "to": "a", "label": "reply" }      sent 600, lands 1200  (b received req at 600)
+  { "from": "b", "to": "c", "label": "notify" }     sent 1200            (b's own reply landed at 1200)
+  { "from": "a", "to": "d", "label": "log" }        sent 1200            (a received reply at 1200; c's branch is irrelevant)
+  ```
+
+  A node that should wait before sending (a timeout, a slow disk) says so:
+  `{"after": "req", "delay": 400}`. Inserting a message from one node never
+  moves another node's messages.
+- `"sequential"`: when the previous message in the list lands, whatever the
+  sender. Reads plainly for one linear chain, but **inserting a message in the
+  middle delays everything after it** — anchor the side branch with `after`
+  and anchor the message it would otherwise push.
+
+Either way, `"at": "<"` sends together with the previous message and `after`
+pins to a landing. Labels used as an `after` target must be unique — a
+broadcast to two nodes needs two labels (`hb-n2`, `hb-n3`); the validator says
+so. `delay` on an event or message is milliseconds after its `after` anchor
+lands. Run `explain` after an edit and read the times: a beat that moved when
+it should not have is the tell.
 
 ## kind: diagram
 
