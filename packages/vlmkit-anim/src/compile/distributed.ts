@@ -32,7 +32,7 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   // and its own previous message has landed. Inserting a side branch from one
   // node then never delays another node's reply.
   const free = new Map<string, number>();
-  const causal = scene.timing === "causal";
+  const causal = scene.timing !== "sequential";
   let cursor = 0;
   let prevStart = 0;
   for (const m of msgs) {

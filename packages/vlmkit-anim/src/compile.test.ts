@@ -227,6 +227,9 @@ describe("distributed", () => {
     const tl = compileScene(base);
     // write 0–600, replicate 600–1200, ack 1200–2400, copy waits for replica's own ack to land: 2400–3000, ok waits for the ack: 2400–3000.
     assert.deepEqual(tl.meta?.messageTimes, [[0, 600], [600, 1200], [1200, 2400], [2400, 3000], [2400, 3000]]);
+    // Causal is the default: omitting `timing` gives the same times.
+    const { timing: _t, ...noTiming } = base;
+    assert.deepEqual(compileScene(noTiming as Scene).meta?.messageTimes, tl.meta?.messageTimes);
     // The same list under sequential timing pushes ok behind copy.
     const seq = compileScene({ ...base, timing: "sequential" });
     assert.deepEqual((seq.meta?.messageTimes as number[][])[4], [3000, 3600]);

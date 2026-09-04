@@ -332,10 +332,12 @@ export interface DistributedScene extends SceneBase {
   events?: DistEvent[];
   /**
    * When a message with no `at` / `after` starts.
-   * `sequential` (default): when the previous message in the list lands.
-   * `causal`: when its sender is free — the later of the last message the
-   * sender received landing and the sender's own previous message landing;
-   * messages from senders with nothing to wait for start at 0.
+   * `causal` (default): when its sender is free — the later of the last message
+   * the sender received landing and the sender's own previous message landing;
+   * senders with nothing to wait for send at 0. A reply waits for what it
+   * replies to; a side branch from another node never delays it.
+   * `sequential`: when the previous message in the list lands, whatever the
+   * sender. Inserting a message then delays everything after it.
    */
   timing?: "sequential" | "causal";
 }
