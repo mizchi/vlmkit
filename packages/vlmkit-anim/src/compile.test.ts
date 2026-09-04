@@ -139,6 +139,21 @@ describe("state-machine", () => {
 });
 
 describe("distributed", () => {
+  it("two messages sent at the same instant share a step and both captions survive", () => {
+    const s: Scene = {
+      format: SCENE_FORMAT,
+      kind: "distributed",
+      nodes: ["a", "b", "c"],
+      messages: [
+        { from: "a", to: "b", label: "vote?", at: 0 },
+        { from: "a", to: "c", label: "vote?", at: 0, lost: true, caption: "the request to c is lost" },
+      ],
+    };
+    const tl = compileScene(s);
+    const first = (tl.steps ?? []).find((x) => x.t === 0)!;
+    assert.match(first.caption ?? "", /a → b: vote\? · the request to c is lost/);
+  });
+
   it("messages default to sequential timing and a message into a down node warns unless lost", () => {
     const s: Scene = {
       format: SCENE_FORMAT,
