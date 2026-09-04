@@ -48,3 +48,43 @@ Guessed semantics (to verify against `check`/`explain`):
 ## Round 1
 
 Command: `cd /home/user/vlmkit && pnpm exec vlmkit-anim check fixtures/anim-scenario/attempts/aa/scene.json`
+
+Output (verbatim, full):
+```
+✓ scene.json (array): 0 error(s), 0 warning(s)
+  13500ms · 24 steps (23 captioned) · 29 nodes · 17 tracks / 83 keyframes
+  scene 1746 B → timeline 9433 B (×5.4)
+  next: vlmkit-anim explain fixtures/anim-scenario/attempts/aa/scene.json · vlmkit-anim render fixtures/anim-scenario/attempts/aa/scene.json --step N · vlmkit-anim html fixtures/anim-scenario/attempts/aa/scene.json --out page.html
+```
+
+Green on the first attempt — 0 errors, 0 warnings, no fix rounds needed.
+
+`explain` output confirms the story reads as intended (22 named beats + Start +
+End); the caption sequence matches the prediction in Round 0 exactly, e.g.:
+- "j=1: a[1]=2 vs pivot 5. 2 is smaller — swap it into position i=0."
+- "5 is now in its final place: everything left of it is smaller, everything right is larger."
+
+## Verification via render --at end
+
+`pnpm exec vlmkit-anim render fixtures/anim-scenario/attempts/aa/scene.json --at end --out fixtures/anim-scenario/attempts/aa/end.svg`
+
+Read back the `cell-N` groups' `translate(x y)` against the slot x-values
+(idx-0..6 at x = 62, 106, 150, 194, 238, 282, 326, step 44px reading right,
+but the 0-based idx labels sit under x = 62..326 in +44 steps in *increasing*
+index order — i.e. idx-0 at x=62 maps to position 0, idx-6 at x=326 maps to
+position 6):
+
+| cell id | value | translate x | → position |
+|---|---|---|---|
+| cell-1 | 2 | 62  | 0 |
+| cell-3 | 4 | 106 | 1 |
+| cell-4 | 3 | 150 | 2 |
+| cell-6 | 5 | 194 | 3 (fill `#22c55e` — marked done) |
+| cell-2 | 9 | 238 | 4 |
+| cell-5 | 8 | 282 | 5 |
+| cell-0 | 7 | 326 | 6 |
+
+**Final row: `2, 4, 3, 5, 9, 8, 7`** — exact match to the Round 0 prediction.
+Left of pivot (2, 4, 3) all smaller than 5; right (9, 8, 7) all larger; the
+pivot's cell (`cell-6`) is filled `#22c55e`, confirming `mark` painted it
+green as "final place". Brief's success criteria fully met.

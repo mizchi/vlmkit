@@ -1,0 +1,12 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "tree",
+  "title": "Deleting from a BST",
+  "initial": [50, 30, 70, 20, 40, 60, 80, 35, 45],
+  "ops": [
+    { "search": 45, "caption": "45 is a leaf: the simplest thing to delete" },
+    { "delete": 45 },
+    { "delete": 30, "caption": "30 has two children: its in-order successor 35 (the smallest value in the right subtree) takes its place; 40 keeps its spot as 35's new right child, and 45 is already gone from the earlier delete" },
+    { "traverse": "inorder" }
+  ]
+}
