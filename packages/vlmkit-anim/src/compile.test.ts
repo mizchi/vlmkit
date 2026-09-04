@@ -209,6 +209,24 @@ describe("distributed", () => {
     assert.ok(d2.some((d) => d.path === "messages[3]" && /has been down since/.test(d.message)), formatDiagnostics(d2));
   });
 
+  it('`"at": "<"` sends a message together with the previous one (a broadcast)', () => {
+    const s: Scene = {
+      format: SCENE_FORMAT,
+      kind: "distributed",
+      stepMs: 500,
+      nodes: ["leader", "a", "b"],
+      messages: [
+        { from: "leader", to: "a", label: "hb-a" },
+        { from: "leader", to: "b", label: "hb-b", at: "<" },
+        { from: "a", to: "leader", label: "ack" },
+      ],
+    };
+    const tl = compileScene(s);
+    assert.deepEqual(tl.meta?.messageTimes, [[0, 500], [0, 500], [500, 1000]]);
+    const first: Scene = { ...s, messages: [{ from: "leader", to: "a", at: "<" }] };
+    assert.throws(() => compileScene(first), (e: unknown) => e instanceof SceneValidationError && e.diagnostics.some((d) => d.path === "messages[0].at"));
+  });
+
   it("messages default to sequential timing and a message into a down node warns unless lost", () => {
     const s: Scene = {
       format: SCENE_FORMAT,

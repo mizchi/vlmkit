@@ -152,9 +152,11 @@ Each fired event is one step captioned "on <event>: a → b". The validator name
 Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). The check verifies the final tree is a heap.`,
   distributed: `kind: distributed — nodes across the top, lifelines down, messages as travelling dots
   "nodes": [ "id" | {"id", "label", "status": "up" | "down" | "leader" | "busy"} ]   required
-  "messages": [ {"from", "to", "label", "at": ms, "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"} ]   required
-                                   "at" defaults to right after the previous message lands; "latency" defaults to stepMs;
-                                   "after" starts it when the earlier message with that label lands (+ "delay")
+  "messages": [ {"from", "to", "label", "at": ms | "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"} ]   required
+                                   "at" defaults to right after the previous message lands; "<" = together with the previous
+                                   message (a broadcast); "latency" defaults to stepMs; "after" starts it when the earlier
+                                   message with that label lands (+ "delay"). Inserting a message delays everything after
+                                   it unless the later ones are anchored with "after".
   "events": [ {"after": "label" | "at": ms, "delay": ms, "node", "status", "caption"} ]   status changes; prefer "after" — an absolute
                                    "at" stays put when message timing shifts (the check warns when it lands mid-flight)
 Time runs down the canvas, so order is visible. A message to a node that is down at arrival should be "lost": true (the check warns).`,

@@ -301,8 +301,8 @@ export interface DistMessage {
   from: string;
   to: string;
   label?: string;
-  /** Start time in ms. Default: right after the previous message lands. */
-  at?: number;
+  /** Start time in ms, or `"<"` to start together with the previous message. Default: right after the previous message lands. */
+  at?: number | "<";
   /** Start when the earlier message with this `label` lands (plus `delay`). Alternative to `at`. */
   after?: string;
   /** Extra ms after the `after` message lands. Default 0. */

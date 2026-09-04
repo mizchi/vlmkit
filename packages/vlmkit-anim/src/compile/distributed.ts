@@ -26,12 +26,17 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   // Resolve message times first: default is sequential; `after` anchors to when a
   // labelled earlier message lands, so a latency change upstream moves everything
   // that was written relative to it.
-  const msgs = scene.messages.map((m) => ({ ...m }));
+  const msgs = scene.messages.map((m) => ({ ...m, at: undefined as number | undefined, atRaw: m.at }));
   const landed = new Map<string, number>();
   let cursor = 0;
+  let prevStart = 0;
   for (const m of msgs) {
     m.latency = m.latency ?? b.stepMs;
-    if (m.at === undefined) m.at = m.after !== undefined ? (landed.get(m.after) ?? cursor) + (m.delay ?? 0) : cursor;
+    if (typeof m.atRaw === "number") m.at = m.atRaw;
+    else if (m.atRaw === "<") m.at = prevStart; // together with the previous message
+    else if (m.after !== undefined) m.at = (landed.get(m.after) ?? cursor) + (m.delay ?? 0);
+    else m.at = cursor;
+    prevStart = m.at;
     cursor = Math.max(cursor, m.at + m.latency);
     if (m.label !== undefined) landed.set(m.label, m.at + m.latency);
   }

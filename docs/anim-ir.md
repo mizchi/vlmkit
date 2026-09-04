@@ -150,13 +150,21 @@ check verifies the final tree is a heap and that pops come out in order.
 | field | |
 |---|---|
 | `nodes` | required: `"id"` or `{"id", "label", "status": up \| down \| leader \| busy}` |
-| `messages` | required: `{"from", "to", "label", "at": ms, "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `latency` to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`) |
+| `messages` | required: `{"from", "to", "label", "at": ms \| "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `"<"` starts it together with the previous message (a broadcast), `latency` defaults to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`) |
 | `events` | `{"after": "label" \| "at": ms, "delay": ms, "node", "status", "caption"}` — recolours the node from that moment. Prefer `after`: an absolute `at` stays put when you lengthen a latency upstream, and the check warns when it then lands mid-flight or a down node keeps sending |
 
 Sequence-diagram picture: node boxes across the top, lifelines down, time runs
 down the canvas, each message a dot travelling with its arrow drawing in
 behind. A message into a node that is down when it lands should be
 `"lost": true` (the check warns otherwise).
+
+Timing is list order by default: each message starts when the one before it
+lands. So **inserting a message in the middle delays everything after it**.
+When the new message is a side branch (a copy to a backup while the main reply
+goes on), anchor it — `{"after": "ack", …}` — and anchor the message it would
+otherwise push (`"ok"` also `after: "ack"`), or give it `"at": "<"` to leave
+with the message before it. Run `explain` after an insertion and read the
+times: a beat that moved when it should not have is the tell.
 
 ## kind: diagram
 
