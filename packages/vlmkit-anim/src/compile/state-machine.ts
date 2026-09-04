@@ -93,11 +93,33 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
   b.set(`state-${cur}`, "fill", T.accent, 0);
   b.step(`Start in "${cur}"`, "start");
   b.advance(b.stepMs * 0.8);
-  for (const ev of scene.trace) {
+  for (const item of scene.trace) {
+    if (typeof item === "object" && "note" in item) {
+      b.step(item.note);
+      b.advance(b.stepMs * 0.9);
+      continue;
+    }
+    if (typeof item === "object" && "goto" in item) {
+      // A jump, not a transition: the token fades out here and in at the target.
+      const next = item.goto;
+      b.step(item.caption ?? `Now from "${next}"`, `goto ${next}`);
+      const t0 = b.t;
+      const t1 = b.advance(b.stepMs * 0.8);
+      b.tween("token", "opacity", 0, t0, t0 + (t1 - t0) * 0.4);
+      b.set("token", "pos", pos.get(next)!, t0 + (t1 - t0) * 0.5);
+      b.tween("token", "opacity", 1, t0 + (t1 - t0) * 0.6, t1);
+      b.set(`state-${cur}`, "fill", T.node, t0 + (t1 - t0) * 0.4);
+      b.set(`state-${next}`, "fill", T.accent, t0 + (t1 - t0) * 0.6);
+      cur = next;
+      visited.push(cur);
+      continue;
+    }
+    const ev = typeof item === "string" ? item : item.on;
+    const caption = typeof item === "string" ? undefined : item.caption;
     const hit = table.get(cur)?.get(ev);
     if (!hit) break; // validator reports this; compile what is legal.
     const next = hit.to;
-    b.step(`on ${ev}: ${cur} → ${next}`, ev);
+    b.step(caption ?? `on ${ev}: ${cur} → ${next}`, ev);
     b.set(`tr-${hit.index}`, "stroke", T.accent);
     const t0 = b.t;
     const t1 = b.advance();
@@ -112,5 +134,6 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
   const finalState = states.find((s) => s.id === cur);
   b.step(finalState?.final ? `End in final state "${cur}"` : `End in "${cur}"`, "end");
   b.advance(b.stepMs * 0.5);
-  return b.build({ title: scene.title, kind: "state-machine", visited });
+  const fired = scene.trace.filter((it) => typeof it === "string" || "on" in it).length;
+  return b.build({ title: scene.title, kind: "state-machine", visited, fired });
 }
