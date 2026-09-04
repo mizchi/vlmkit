@@ -91,6 +91,17 @@ describe("validateScene", () => {
     assert.ok(errors(diags).some((d) => d.path === "events[0].status" && /"down"/.test(d.hint ?? d.message)));
   });
 
+  it("distributed: `delay` without an `after` anchor is an error that names both fixes", () => {
+    const d = EXAMPLES.distributed;
+    const diags = validateScene({ ...d, messages: d.messages.map((m, i) => (i === 2 ? { ...m, delay: 1200 } : m)) });
+    const e = errors(diags).find((x) => x.path === "messages[2].delay");
+    assert.ok(e, formatDiagnostics(diags));
+    assert.match(e.message, /changes nothing/);
+    assert.match(e.hint ?? "", /"latency"/);
+    const ok = validateScene({ ...d, messages: d.messages.map((m, i) => (i === 2 ? { ...m, after: "replicate", delay: 1200 } : m)) });
+    assert.deepEqual(errors(ok), []);
+  });
+
   it("vector: `at` accepts numbers, '<' and signed offsets only", () => {
     const v = EXAMPLES.vector;
     const ok = validateScene({ ...v, timeline: [{ target: "a", to: { x: 1 }, at: "<" }, { target: "a", to: { x: 2 }, at: "+200" }, { target: "a", to: { x: 3 }, at: 50 }] });

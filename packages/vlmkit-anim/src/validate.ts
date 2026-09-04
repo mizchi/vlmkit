@@ -636,10 +636,14 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
       const a = ctx.ref(m.from, `${path}.from`, nodeIds, "node");
       const b = ctx.ref(m.to, `${path}.to`, nodeIds, "node");
       if (a && b && m.from === m.to) ctx.error(`${path}.to`, `a message cannot go from "${m.from as string}" to itself`);
-      if (m.at !== undefined) ctx.number(m.at, `${path}.at`, { min: 0 });
+      if (m.at !== undefined && m.at !== "<") ctx.number(m.at, `${path}.at`, { min: 0 });
+      if (m.at === "<" && i === 0) ctx.error(`${path}.at`, `"<" means "together with the previous message" and there is none before the first`);
       if (m.after !== undefined) anchor(m.after, `${path}.after`, labelsSoFar);
       if (m.at !== undefined && m.after !== undefined) ctx.error(`${path}.after`, `give "at" or "after", not both`);
-      if (m.delay !== undefined) ctx.number(m.delay, `${path}.delay`, { min: 0 });
+      if (m.delay !== undefined) {
+        ctx.number(m.delay, `${path}.delay`, { min: 0 });
+        if (m.after === undefined) ctx.error(`${path}.delay`, `delay only counts from an "after" anchor; without one it changes nothing`, `add "after": "<label of the message this waits for>", or use "latency" if the message itself should take longer to arrive`);
+      }
       if (m.latency !== undefined) ctx.number(m.latency, `${path}.latency`, { min: 1 });
       if (m.lost !== undefined && typeof m.lost !== "boolean") ctx.error(`${path}.lost`, `lost takes true/false`);
       if (isStr(m.label)) labelsSoFar.push(m.label);
@@ -653,7 +657,11 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
       if (e.at === undefined && e.after === undefined) ctx.error(path, `an event needs "at" (ms) or "after" (a message label)`, `e.g. {"after": "ok", "node": "primary", "status": "down"}`);
       if (e.at !== undefined) ctx.number(e.at, `${path}.at`, { min: 0 });
       if (e.after !== undefined) anchor(e.after, `${path}.after`, [...allLabels.keys()].filter((l) => allLabels.get(l) === 1));
-      if (e.delay !== undefined) ctx.number(e.delay, `${path}.delay`, { min: 0 });
+      if (e.at !== undefined && e.after !== undefined) ctx.error(`${path}.after`, `give "at" or "after", not both`);
+      if (e.delay !== undefined) {
+        ctx.number(e.delay, `${path}.delay`, { min: 0 });
+        if (e.after === undefined) ctx.error(`${path}.delay`, `delay only counts from an "after" anchor; without one it changes nothing`, `add "after": "<message label>", or fold the delay into "at"`);
+      }
       ctx.ref(e.node, `${path}.node`, nodeIds, "node");
       ctx.enumOf(e.status, `${path}.status`, STATUSES, "status");
     });
