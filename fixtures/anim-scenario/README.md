@@ -24,6 +24,10 @@ v5 (2026-09-04) added briefs for the three kinds that landed that day —
 `graph-build-critical-path` (directed Dijkstra, pinned nodes),
 `chart-deploy-frequency` — run by agents `t`–`w`.
 
+v6 re-edited one frozen scene per new kind (`README-v6-*.md`, agents `x`–`z`).
+v7 added `array` and `tree`: briefs `array-partition`, `tree-bst-lesson`
+and re-edit tasks `README-v7-{array,tree}.md` (agents `aa`–`ad`).
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing.
 Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.

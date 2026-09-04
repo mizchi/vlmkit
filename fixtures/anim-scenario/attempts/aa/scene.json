@@ -1,0 +1,30 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "array",
+  "title": "Lomuto partition, pivot = 5",
+  "values": [7, 2, 9, 4, 3, 8, 5],
+  "ops": [
+    { "highlight": 6, "caption": "Pivot is the last element, 5, at position 6." },
+    { "pointers": { "i": 0, "j": 0 }, "caption": "i=0: the next slot for a value smaller than the pivot. j=0: start scanning from the left." },
+    { "compare": [0, 6], "caption": "j=0: a[0]=7 vs pivot 5. 7 is not smaller — no swap, i stays at 0." },
+    { "pointers": { "j": 1 }, "caption": "Advance j to 1." },
+    { "compare": [1, 6], "caption": "j=1: a[1]=2 vs pivot 5. 2 is smaller — swap it into position i=0." },
+    { "swap": [1, 0], "caption": "Swap positions 1 and 0: 2 moves into the smaller region." },
+    { "pointers": { "i": 1 }, "caption": "i advances to 1." },
+    { "pointers": { "j": 2 }, "caption": "Advance j to 2." },
+    { "compare": [2, 6], "caption": "j=2: a[2]=9 vs pivot 5. 9 is not smaller — no swap, i stays at 1." },
+    { "pointers": { "j": 3 }, "caption": "Advance j to 3." },
+    { "compare": [3, 6], "caption": "j=3: a[3]=4 vs pivot 5. 4 is smaller — swap it into position i=1." },
+    { "swap": [3, 1], "caption": "Swap positions 3 and 1." },
+    { "pointers": { "i": 2 }, "caption": "i advances to 2." },
+    { "pointers": { "j": 4 }, "caption": "Advance j to 4." },
+    { "compare": [4, 6], "caption": "j=4: a[4]=3 vs pivot 5. 3 is smaller — swap it into position i=2." },
+    { "swap": [4, 2], "caption": "Swap positions 4 and 2." },
+    { "pointers": { "i": 3 }, "caption": "i advances to 3." },
+    { "pointers": { "j": 5 }, "caption": "Advance j to 5." },
+    { "compare": [5, 6], "caption": "j=5: a[5]=8 vs pivot 5. 8 is not smaller — no swap, i stays at 3." },
+    { "unhighlight": 6, "caption": "Scan complete. Now place the pivot at the boundary." },
+    { "swap": [6, 3], "caption": "Swap the pivot into position i=3." },
+    { "mark": 3, "caption": "5 is now in its final place: everything left of it is smaller, everything right is larger." }
+  ]
+}

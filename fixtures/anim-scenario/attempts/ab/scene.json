@@ -1,0 +1,19 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "tree",
+  "title": "Why BST shape depends on insertion order",
+  "ops": [
+    { "insert": 10, "caption": "Insert 10 as root" },
+    { "insert": 20 },
+    { "insert": 30 },
+    { "insert": 40 },
+    { "insert": 50 },
+    { "insert": 60 },
+    { "insert": 70, "caption": "Inserting in sorted order degenerates into a right-only chain" },
+    { "search": 70, "caption": "Searching for 70 requires traversing down the entire chain" },
+    { "note": "A balanced insertion order like [40, 20, 60, 10, 30, 50, 70] would create a tree where every search is O(log n)" },
+    { "insert": 35, "caption": "35 lands left of 40" },
+    { "insert": 45, "caption": "45 lands left of 50" },
+    { "traverse": "inorder", "caption": "In-order traversal outputs all values sorted, regardless of tree shape" }
+  ]
+}
