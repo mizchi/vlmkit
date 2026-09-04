@@ -1,0 +1,18 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "vector",
+  "title": "A loading indicator",
+  "canvas": { "width": 360, "height": 160 },
+  "nodes": [
+    { "id": "track", "shape": "rect", "pos": [180, 80], "size": [240, 12], "rx": 6, "fill": "#e5e7eb", "stroke": "#e5e7eb" },
+    { "id": "bar", "shape": "rect", "pos": [60, 80], "size": [0, 12], "rx": 6, "fill": "#3b82f6", "stroke": "#3b82f6" },
+    { "id": "pct", "shape": "text", "pos": [180, 50], "text": "0%", "fontSize": 14 }
+  ],
+  "timeline": [
+    { "target": "bar", "to": { "w": 120, "x": 120 }, "duration": 800, "easing": "ease-out", "caption": "Half way" },
+    { "target": "pct", "to": { "text": "50%" }, "duration": 0, "at": "<" },
+    { "wait": 400, "caption": "Waiting on the network" },
+    { "target": "bar", "to": { "w": 240, "x": 180 }, "duration": 600, "easing": "ease-in-out", "caption": "Done" },
+    { "target": "pct", "to": { "text": "100%" }, "duration": 0, "at": "<" }
+  ]
+}
