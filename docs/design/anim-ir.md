@@ -95,7 +95,10 @@ semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
 from the quotes. Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
 
-What two rounds found (10 agents, Sonnet and Haiku):
+What three rounds found (14 agents, Sonnet and Haiku; v3 re-tested v2's two
+failures with the fixes in place and both closed — 2/2 re-edits kept the
+story's timing without hand re-timing, and the zero-warning state-machine
+brief passed on the first attempt with the alternative path narrated):
 
 - **First-attempt correctness saturated immediately**: 9/10 clean from the
   guide or from the one-screen schema sheet alone. That axis is not where the
