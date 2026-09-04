@@ -46,7 +46,7 @@ conventions hold in every kind:
 - A `caption` on an op or sequence item **replaces** the generated caption for that beat.
 - `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
 - Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote.
-- A *beat* is one step. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
+- A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
 
 `vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
@@ -95,7 +95,7 @@ the story is where the pointers are rather than what swaps (that is `sort`).
 |---|---|
 | `values` | required, 1+ numbers or strings |
 | `algorithm` | `binary-search` (needs `target`, sorted numeric values) \| `two-pointer-sum` (needs `target`, the sum; sorted values) \| `sliding-window` (`window` = length, default 3; marks the max-sum window). Generates the ops with a caption on every beat |
-| `ops` | explicit alternative, each with optional `caption`, `ms`: `{"pointers": {"lo": 0, "hi": 9}}` creates or moves named pointers (arrows under the boxes; `null` removes one); `{"window": [i, j]}` brackets an inclusive range, `{"window": null}` clears it; `{"compare": [i, j]}` `{"swap": [i, j]}` `{"set": {"index": i, "value": v}}` as in `sort`; `{"highlight": i \| [i, …]}` / `{"unhighlight": … \| "all"}`; `{"mark": i \| [i, …]}` permanent done colour; `{"found": i}` the answer, green with a pulse; `{"note": "…"}` |
+| `ops` | explicit alternative, each with optional `caption`, `ms`: `{"pointers": {"lo": 0, "hi": 9}}` creates or moves named pointers (arrows under the boxes; name only the ones that move — `{"pointers": {"j": 1}}` leaves the others where they are; `null` removes one); `{"window": [i, j]}` brackets an inclusive range, `{"window": null}` clears it; `{"compare": [i, j]}` highlights two boxes for one beat and moves nothing, `{"swap": [i, j]}` moves them (pointers stay on their indices), `{"set": {"index": i, "value": v}}` rewrites one; `{"highlight": i \| [i, …]}` / `{"unhighlight": … \| "all"}`; `{"mark": i \| [i, …]}` permanent done colour; `{"found": i}` the answer, green with a pulse; `{"note": "…"}` |
 
 Indices are 0-based **positions** and every pointer has its own lane, so two
 pointers on the same index do not collide. `ms: 0` on a `pointers`, `window`,
@@ -132,10 +132,14 @@ slides up into place.
 | `ops` | required, 1+: `{"insert": n}` `{"search": n}` `{"delete": n}` `{"traverse": "inorder" \| "preorder" \| "postorder" \| "levelorder"}` `{"note": "…"}`; each may carry `caption`, which replaces the generated caption of that op's **last** beat (the comparisons on the way down keep theirs) |
 
 Insert, search and delete walk a token down from the root with one captioned
-beat per comparison (`14 > 8: go right`). Delete narrates the three cases —
-leaf, one child (the child moves up), two children (the in-order successor,
-the smallest value on the right, takes the node's place). Traverse visits
-every node and lines the values up underneath. Inserting a value already
+beat per comparison (`14 > 8: go right`); a successful search's last beat is
+the equality (`6 = 6: this is the node`) and counts in "found after N
+comparisons". Delete narrates the three cases — leaf, one child (the child
+moves up), two children (the in-order successor, the smallest value on the
+right, takes the node's place; if the successor had a right child, that
+child takes the successor's old spot). Traverse visits every node, lines the
+values up in a row under the tree as they are reached, and ends with a step
+captioned `inorder: 1, 4, 6, …`. Inserting a value already
 present, or deleting one that is not, is narrated as a no-op and the validator
 warns. The check reads the final tree back from the frame: left-to-right
 order must be ascending and every node at its depth.
