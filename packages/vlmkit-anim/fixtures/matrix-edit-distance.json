@@ -114,10 +114,18 @@
           [
             1,
             1
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            1
           ]
         ]
       },
-      "caption": "a ≠ u: substitute, 1 + diagonal"
+      "caption": "a ≠ u: 1 + min(diagonal, above, left) = 1 + 0"
     },
     {
       "set": {

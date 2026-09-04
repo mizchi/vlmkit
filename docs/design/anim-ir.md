@@ -34,7 +34,9 @@ Scene IR  (vlmkit-anim/scene@1)  ──compile──▶  Timeline IR  (vlmkit-an
 
 - **Scene IR** is `kind`-tagged. Each kind has a domain vocabulary and a
   compiler that *runs the domain* (the sort algorithm, the heap, the state
-  table) to produce motion. A bubble sort is 112 bytes and expands ~80× into a
+  table, BFS / Dijkstra over the edge list) to produce motion. Nine kinds:
+  sort, state-machine, heap, distributed, matrix, graph, chart, diagram,
+  vector. A bubble sort is 112 bytes and expands ~80× into a
   timeline; that ratio is the layer earning its place.
 - **Timeline IR** is the flat, dumb, complete description: nodes with initial
   attributes, tracks of absolute-time keyframes per (target, prop), and
@@ -109,7 +111,7 @@ semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
 from the quotes. Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
 
-What four rounds found (19 agents, Sonnet and Haiku; v3 re-tested v2's two
+What five rounds found (23 agents, Sonnet and Haiku; v3 re-tested v2's two
 failures with the fixes in place and both closed — 2/2 re-edits kept the
 story's timing without hand re-timing, and the zero-warning state-machine
 brief passed on the first attempt with the alternative path narrated):
@@ -133,6 +135,13 @@ brief passed on the first attempt with the alternative path narrated):
   one anchor; a fresh author predicted every start time). All three causal
   agents preferred it. `causal` is the default; `"timing": "sequential"`
   remains for a single linear chain.
+- **v5 asked the v1 question of three new kinds.** `matrix`, `graph` and
+  `chart` (grids with row / column ops, traversals generated or hand-written,
+  series data) were added to widen what the IR can say. Four fresh agents,
+  four briefs, 4/4 clean on the first attempt with every reported guess
+  right; all friction was a missing sentence (default caption shapes, colour
+  semantics, that `pos` pins compose with `layout`). Their re-edit axis is
+  untested and is the next round.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".
@@ -144,5 +153,7 @@ brief passed on the first attempt with the alternative path narrated):
 - No Svelte / typed-TS / Pkl surface yet. JSON is the IR; typed surfaces are
   generators for it and can come once the IR has stopped moving. The `types.ts`
   declarations are already the contract such a surface would target.
-- No video export. `sheet` and `frames --png` cover review; `ffmpeg` over the
-  frames covers the rest.
+- No video *encoder* beyond GIF. `video` writes GIF in-process because flat
+  SVG colours fit 256 entries and GIF plays inline everywhere; MP4 / WebM go
+  through `ffmpeg` when present and otherwise leave the frames and the
+  command. Re-implementing H.264 is not this package's job.

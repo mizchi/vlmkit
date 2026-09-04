@@ -95,7 +95,7 @@ export const EXAMPLES: Examples = {
       { set: { cell: [1, 2], value: 1, from: [[1, 1]] }, caption: "c ≠ u: 1 + the smallest neighbour" },
       { set: { cell: [1, 3], value: 2, from: [[1, 2]] } },
       { set: { cell: [2, 1], value: 1, from: [[1, 1]] } },
-      { set: { cell: [2, 2], value: 1, from: [[1, 1]] }, caption: "a ≠ u: substitute, 1 + diagonal" },
+      { set: { cell: [2, 2], value: 1, from: [[1, 1], [1, 2], [2, 1]] }, caption: "a ≠ u: 1 + min(diagonal, above, left) = 1 + 0" },
       { set: { cell: [2, 3], value: 2, from: [[2, 2]] } },
       { set: { cell: [3, 1], value: 2, from: [[2, 1]] } },
       { set: { cell: [3, 2], value: 2, from: [[2, 2]] } },

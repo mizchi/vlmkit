@@ -19,6 +19,11 @@ from `briefs/` and `docs/anim-ir.md`, writes a scene, and runs
   (same change request, explicit "ok must not wait" criterion) that decided
   the timing default.
 
+v5 (2026-09-04) added briefs for the three kinds that landed that day —
+`matrix-knapsack`, `graph-friend-of-friend` (explicit ops),
+`graph-build-critical-path` (directed Dijkstra, pinned nodes),
+`chart-deploy-frequency` — run by agents `t`–`w`.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing.
 Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.

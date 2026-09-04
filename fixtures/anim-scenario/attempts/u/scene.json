@@ -1,0 +1,89 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "graph",
+  "title": "Can Ann reach Fay in two hops?",
+  "nodes": ["Ann", "Bob", "Cat", "Dan", "Eve", "Fay"],
+  "edges": [
+    { "from": "Ann", "to": "Bob" },
+    { "from": "Ann", "to": "Cat" },
+    { "from": "Bob", "to": "Dan" },
+    { "from": "Cat", "to": "Eve" },
+    { "from": "Eve", "to": "Fay" },
+    { "from": "Dan", "to": "Fay" }
+  ],
+  "ops": [
+    {
+      "visit": "Ann",
+      "caption": "Start: visiting Ann (hop 0)"
+    },
+    {
+      "label": { "node": "Ann", "text": "0" }
+    },
+    {
+      "note": "Ann is connected to Bob and Cat. Adding them to queue.",
+      "caption": "Ann's neighbors are Bob and Cat, both at distance 1"
+    },
+    {
+      "explore": "Ann->Bob"
+    },
+    {
+      "visit": "Bob",
+      "caption": "Visiting Bob (hop 1)"
+    },
+    {
+      "label": { "node": "Bob", "text": "1" }
+    },
+    {
+      "explore": "Ann->Cat"
+    },
+    {
+      "visit": "Cat",
+      "caption": "Visiting Cat (hop 1)"
+    },
+    {
+      "label": { "node": "Cat", "text": "1" }
+    },
+    {
+      "note": "Queue now has Dan and Eve. Processing Bob's neighbors next.",
+      "caption": "Next in queue: Bob and Cat's unvisited neighbors"
+    },
+    {
+      "explore": "Bob->Dan"
+    },
+    {
+      "visit": "Dan",
+      "caption": "Visiting Dan (hop 2)"
+    },
+    {
+      "label": { "node": "Dan", "text": "2" }
+    },
+    {
+      "explore": "Cat->Eve"
+    },
+    {
+      "visit": "Eve",
+      "caption": "Visiting Eve (hop 2)"
+    },
+    {
+      "label": { "node": "Eve", "text": "2" }
+    },
+    {
+      "note": "Queue now has Fay through two paths. Checking Dan's neighbors.",
+      "caption": "Next in queue: Dan and Eve's unvisited neighbors"
+    },
+    {
+      "explore": "Dan->Fay"
+    },
+    {
+      "visit": "Fay",
+      "caption": "FOUND! Fay at hop 3 - reachable from Ann in 3 hops"
+    },
+    {
+      "label": { "node": "Fay", "text": "3" }
+    },
+    {
+      "path": ["Ann", "Bob", "Dan", "Fay"],
+      "caption": "The path that reached Fay: Ann → Bob → Dan → Fay"
+    }
+  ]
+}

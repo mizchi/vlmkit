@@ -182,7 +182,9 @@ behind. A message into a node that is down when it lands should be
   and anchor the message it would otherwise push.
 
 Either way, `"at": "<"` sends together with the previous message and `after`
-pins to a landing. Labels used as an `after` target must be unique — a
+pins to a landing. A lost message still "lands" for anchoring purposes at
+the moment it would have arrived (send + latency), so a timeout can be
+`{"after": "<the lost request>", "delay": 400}`. Labels used as an `after` target must be unique — a
 broadcast to two nodes needs two labels (`hb-n2`, `hb-n3`); the validator says
 so. `delay` on an event or message is milliseconds after its `after` anchor
 lands. Run `explain` after an edit and read the times: a beat that moved when
@@ -211,7 +213,7 @@ rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
     { "set": { "cell": [1, 2], "value": 1, "from": [[1, 1]] }, "caption": "c ≠ u: 1 + the smallest neighbour" },
     { "set": { "cell": [1, 3], "value": 2, "from": [[1, 2]] } },
     { "set": { "cell": [2, 1], "value": 1, "from": [[1, 1]] } },
-    { "set": { "cell": [2, 2], "value": 1, "from": [[1, 1]] }, "caption": "a ≠ u: substitute, 1 + diagonal" },
+    { "set": { "cell": [2, 2], "value": 1, "from": [[1, 1], [1, 2], [2, 1]] }, "caption": "a ≠ u: 1 + min(diagonal, above, left) = 1 + 0" },
     { "set": { "cell": [2, 3], "value": 2, "from": [[2, 2]] } },
     { "set": { "cell": [3, 1], "value": 2, "from": [[2, 1]] } },
     { "set": { "cell": [3, 2], "value": 2, "from": [[2, 2]] } },
@@ -228,8 +230,12 @@ rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
 | `ops` | `{"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}` writes a value — `from` names the cells it was computed from, which flash while a token flies from each into the target; `{"highlight": T}` / `{"unhighlight": T \| "all"}` / `{"mark": T}` where T is `{"cell": [r, c]}` \| `{"cells": [[r, c], …]}` \| `{"row": r}` \| `{"col": c}` (highlight = accent until cleared, mark = permanent done colour); `{"swap": {"rows": [i, j]}}` / `{"swap": {"cols": [i, j]}}` (labels move with them); `{"note": "…"}`; each may carry `caption`, `ms` |
 
 Cell references are `[row, col]`, 0-based, **by current position** (after a
-swap, row 0 is whatever is now on top). The check reads the final grid back by
-position and compares it with what the ops produced.
+swap, row 0 is whatever is now on top). `from` may list several cells (the
+three neighbours a DP cell takes a min over); a token flies in from each.
+The generated caption for a `set` reads `(row, col) = value (from (r, c), …)`
+with the labels when there are any — it names the inputs but not why one won,
+so write a `caption` on the beats where a comparison decides. The check reads
+the final grid back by position and compares it with what the ops produced.
 
 ## kind: graph
 
@@ -262,9 +268,16 @@ goes.
 | `nodes` | required: `"id"` or `{"id", "label", "pos": [x, y]}` (`pos` pins a node) |
 | `edges` | required: `{"from", "to", "weight", "label"}` or the shorthand `["a", "b"]`; the weight (or label) is drawn on the edge |
 | `directed` | `true` draws arrows and `explore` must follow them; default `false` (lines, either direction) |
-| `layout` | `circle` (default) \| `lr` \| `tb` \| `grid` |
+| `layout` | `circle` (default) \| `lr` \| `tb` \| `grid`; nodes with `pos` are pinned and the rest are laid out around them |
 | `algorithm`, `start`, `goal` | `bfs` \| `dfs` \| `dijkstra` from `start` generates the ops (every beat captioned with the comparison it makes); `goal` makes Dijkstra paint the shortest path at the end |
 | `ops` | explicit alternative: `{"visit": id}` (current = accent and larger, then stays green), `{"explore": "a->b"}` (a token travels the edge), `{"label": {"node": id \| [ids], "text": "…"}}` (text under the node: a distance, a depth), `{"highlight": id \| [ids]}` / `{"unhighlight": …}`, `{"path": ["a", "b", "c"]}` (paints the answer green), `{"note": "…"}`; each may carry `caption`, `ms` |
+
+Colours: a node starts white; `highlight` makes it accent; `visit` makes it
+accent and a little larger while it is the current node, and it turns green
+("visited") when the next `visit` happens or the animation ends; `path` paints
+its nodes and edges green, and visited nodes off the path stay green too. A
+node never visited stays white, so the final frame shows exactly what the
+walk reached.
 
 `ms: 0` on a `label` or `highlight` applies it at the current instant without
 a step of its own — a relaxation writing the new distance inside the explore
@@ -301,10 +314,17 @@ A bar or line chart revealed series by series, with reference lines and focus.
 | `categories` | required: the x-axis labels |
 | `series` | required, 1+: `{"id", "label", "values": number[], "color"}`, one value per category; colours default to a palette |
 | `yMax`, `yLabel` | axis top (default: a round number just above the largest value, thresholds and `set` values included) and axis caption |
-| `sequence` | `{"reveal": id \| [ids] \| "all"}` (bars grow in / the line draws in), `{"set": {"series", "index", "value"}}` (a bar animates to a new value; bar charts only), `{"highlight": {"series", "index" \| "category"}}` / `{"unhighlight": … \| "all"}` (everything else dims), `{"threshold": {"value", "label"}}` (a horizontal reference line), `{"note": "…"}`; each may carry `caption`, `ms`. Default: reveal each series in order |
+| `sequence` | `{"reveal": id \| [ids] \| "all"}` (bars grow in / the line draws in), `{"set": {"series", "index", "value"}}` (a bar animates to a new value; bar charts only), `{"highlight": T}` / `{"unhighlight": T \| "all"}` (everything outside T dims), `{"threshold": {"value", "label"}}` (a horizontal reference line), `{"note": "…"}`; each may carry `caption`, `ms`. Default: reveal each series in order |
 
-The check fails if a bar's final height is not its value's share of the axis
-and warns about a series the sequence never reveals.
+A highlight target T picks by any combination of `series` and one of
+`index` / `category`: `{"series": "after"}` is one series across every
+category, `{"category": "ap"}` is every series in one category,
+`{"series": "after", "category": "ap"}` is one bar. Without a `caption`, a
+`reveal` is captioned with the series label; the story usually wants its own.
+Put a `threshold` at the beat where it becomes relevant — after the series it
+judges is on screen — rather than first. The check fails if a bar's final
+height is not its value's share of the axis and warns about a series the
+sequence never reveals.
 
 ## kind: diagram
 

@@ -336,7 +336,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
-| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the six scene kinds, the timeline layer, embedding. The one page an agent reads before producing a scene |
+| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the nine scene kinds, the timeline layer, embedding. The one page an agent reads before producing a scene |
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 27 gates + 127 rules, behavior changes, what is deliberately not a gate |
