@@ -148,9 +148,9 @@ export interface Timeline {
 // Layer 1: Scene IR
 // ---------------------------------------------------------------------------
 
-export type SceneKind = "diagram" | "state-machine" | "sort" | "heap" | "distributed" | "matrix" | "graph" | "chart" | "vector";
+export type SceneKind = "diagram" | "state-machine" | "sort" | "array" | "heap" | "tree" | "distributed" | "matrix" | "graph" | "chart" | "vector";
 
-export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "heap", "distributed", "matrix", "graph", "chart", "vector"];
+export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "array", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector"];
 
 interface SceneBase {
   format: typeof SCENE_FORMAT;
@@ -276,6 +276,37 @@ export interface SortScene extends SceneBase {
   captions?: boolean;
 }
 
+// ---- array ----------------------------------------------------------------
+
+/** Every op may carry `caption` (overrides the generated one) and `ms`. Indices are 0-based positions. */
+export type ArrayOp =
+  /** Create or move named pointers (arrows under the array). `null` removes one. */
+  | { pointers: Record<string, number | null>; caption?: string; ms?: number }
+  /** Bracket a contiguous range `[from, to]` (inclusive); `null` clears it. */
+  | { window: [number, number] | null; caption?: string; ms?: number }
+  | { compare: [number, number]; caption?: string; ms?: number }
+  | { swap: [number, number]; caption?: string; ms?: number }
+  | { set: { index: number; value: number | string }; caption?: string; ms?: number }
+  | { highlight: number | number[]; caption?: string; ms?: number }
+  | { unhighlight: number | number[] | "all"; caption?: string; ms?: number }
+  /** Permanent done colour: the answer, a settled prefix. */
+  | { mark: number | number[]; caption?: string; ms?: number }
+  /** The result: the cell turns the ok colour and pulses; the caption defaults to "Found v at i". */
+  | { found: number; caption?: string; ms?: number }
+  | { note: string; ms?: number };
+
+export interface ArrayScene extends SceneBase {
+  kind: "array";
+  values: (number | string)[];
+  /** Generate `ops` by running the algorithm. Ignored when `ops` is given. */
+  algorithm?: "binary-search" | "two-pointer-sum" | "sliding-window";
+  /** binary-search: the value to find; two-pointer-sum: the sum to reach. */
+  target?: number;
+  /** sliding-window: the window length. */
+  window?: number;
+  ops?: ArrayOp[];
+}
+
 // ---- heap -----------------------------------------------------------------
 
 export type HeapOp = { push: number; caption?: string } | { pop: true; caption?: string } | { note: string };
@@ -287,6 +318,27 @@ export interface HeapScene extends SceneBase {
   /** Values present before the first op. Heapified as given (must already satisfy the heap property). */
   initial?: number[];
   ops: HeapOp[];
+}
+
+// ---- tree (binary search tree) --------------------------------------------
+
+/** Every op may carry `caption`. */
+export type TreeOp =
+  /** Walk down from the root comparing, then attach as a leaf. */
+  | { insert: number; caption?: string }
+  /** Walk down comparing; the node found (or the empty spot) is narrated. */
+  | { search: number; caption?: string }
+  /** Leaf: removed. One child: the child moves up. Two children: the in-order successor takes its place. */
+  | { delete: number; caption?: string }
+  /** A token visits every node in this order and the visited values line up underneath. */
+  | { traverse: "inorder" | "preorder" | "postorder" | "levelorder"; caption?: string }
+  | { note: string };
+
+export interface TreeScene extends SceneBase {
+  kind: "tree";
+  /** Values present before the first op, inserted in this order without animation. */
+  initial?: number[];
+  ops: TreeOp[];
 }
 
 // ---- distributed ----------------------------------------------------------
@@ -493,7 +545,7 @@ export interface VectorScene extends SceneBase {
   timeline: (VectorTween | VectorWait)[];
 }
 
-export type Scene = DiagramScene | StateMachineScene | SortScene | HeapScene | DistributedScene | MatrixScene | GraphScene | ChartScene | VectorScene;
+export type Scene = DiagramScene | StateMachineScene | SortScene | ArrayScene | HeapScene | TreeScene | DistributedScene | MatrixScene | GraphScene | ChartScene | VectorScene;
 
 // ---------------------------------------------------------------------------
 // Diagnostics

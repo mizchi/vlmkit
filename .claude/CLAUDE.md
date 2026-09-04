@@ -138,7 +138,7 @@ is how Playwright's own `mount` fixture works. Consequences:
 ## Explanatory animations (`vlmkit-anim`) and their evaluation loop
 
 ```bash
-vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all nine)
+vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all eleven)
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
 vlmkit-anim explain scene.json                      # narration as a numbered list
 vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
@@ -308,7 +308,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
-| `packages/vlmkit-anim/` | **Explanatory animation IR** (`vlmkit-anim`): Scene IR (sort / state-machine / heap / distributed / matrix / graph / chart / diagram / vector) → Timeline IR → `<vlm-anim>` runtime (SVG + Web Animations) and headless SVG frames. Writing guide `docs/anim-ir.md`; design `docs/design/anim-ir.md`. Every JSON block in the guide is compiled by `docs.test.ts` — edit the guide and the examples together. |
+| `packages/vlmkit-anim/` | **Explanatory animation IR** (`vlmkit-anim`): Scene IR (sort / array / state-machine / heap / tree / distributed / matrix / graph / chart / diagram / vector) → Timeline IR → `<vlm-anim>` runtime (SVG + Web Animations) and headless SVG frames. Writing guide `docs/anim-ir.md`; design `docs/design/anim-ir.md`. Every JSON block in the guide is compiled by `docs.test.ts` — edit the guide and the examples together. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
@@ -336,7 +336,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
-| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the nine scene kinds, the timeline layer, embedding. The one page an agent reads before producing a scene |
+| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the eleven scene kinds, the timeline layer, embedding. The one page an agent reads before producing a scene |
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 27 gates + 127 rules, behavior changes, what is deliberately not a gate |

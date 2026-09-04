@@ -267,6 +267,60 @@ function checkDiagram(scene: Extract<Scene, { kind: "diagram" }>, tl: Timeline):
   return out;
 }
 
+function checkArray(scene: Extract<Scene, { kind: "array" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const meta = tl.meta as { finalOrder?: (number | string)[]; slotX?: number[]; found?: number } | undefined;
+  if ((scene.ops ?? []).length === 0 && !scene.algorithm) out.push(warn("ops", "no ops: the array is a still image"));
+  // Positions are the story: read the final row back by x.
+  if (meta?.finalOrder && meta.slotX) {
+    const frame = sampleFrame(tl, timelineDuration(tl));
+    const cells = tl.nodes.filter((n) => n.shape === "group" && /^cell-\d+$/.test(n.id));
+    const byX = cells.map((c) => ({ x: worldPos(frame, c.id)[0], text: frame.get(`${c.id}-rect`)!.text ?? "" })).sort((a, b) => a.x - b.x);
+    const read = byX.map((c) => c.text);
+    if (JSON.stringify(read) !== JSON.stringify(meta.finalOrder.map(String))) out.push(error("timeline", `final frame reads ${read.join(", ")} left to right; the ops end with ${meta.finalOrder.join(", ")}`));
+    if (new Set(byX.map((c) => Math.round(c.x))).size !== byX.length) out.push(error("timeline", "two cells share a slot in the final frame"));
+  }
+  if (scene.algorithm === "binary-search" && !scene.ops && scene.target !== undefined) {
+    const present = scene.values.map(Number).indexOf(scene.target);
+    if (present >= 0 && meta?.found !== present) out.push(error("ops", `${scene.target} is at index ${present} but the search ended ${meta?.found === undefined ? "without finding it" : `at ${meta.found}`}`));
+    if (present < 0 && meta?.found !== undefined) out.push(error("ops", `${scene.target} is not in the array but the search reported index ${meta.found}`));
+  }
+  for (const op of scene.ops ?? []) {
+    if ("found" in op && scene.target !== undefined && Number(scene.values[op.found]) !== scene.target) {
+      out.push(warn(`ops`, `found index ${op.found} holds ${scene.values[op.found]}, not the target ${scene.target}`, "point found at the index that holds the target, or drop target"));
+    }
+  }
+  return out;
+}
+
+function checkTree(scene: Extract<Scene, { kind: "tree" }>, tl: Timeline): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  const meta = tl.meta as { finalInorder?: number[]; finalDepths?: Record<string, number>; traversals?: number[][]; searches?: { value: number; found: boolean }[] } | undefined;
+  if (!meta?.finalInorder) return out;
+  // Read the final tree back: visible values sorted by x must be ascending (the BST property, as drawn).
+  const frame = sampleFrame(tl, timelineDuration(tl));
+  const visible = tl.nodes.filter((n) => n.id.startsWith("v-")).map((n) => ({ v: Number(n.id.slice(2)), st: frame.get(n.id)! })).filter((n) => n.st.opacity > 0.5);
+  visible.sort((a, b) => a.st.pos[0] - b.st.pos[0]);
+  const byX = visible.map((n) => n.v);
+  if (JSON.stringify(byX) !== JSON.stringify(meta.finalInorder)) out.push(error("timeline", `final frame shows ${byX.join(", ")} left to right; the simulation ends with ${meta.finalInorder.join(", ")}`));
+  for (let i = 1; i < byX.length; i++) if (byX[i] < byX[i - 1]) out.push(error("timeline", `${byX[i]} is drawn right of ${byX[i - 1]}: the picture breaks the BST order`));
+  // Depth drawn matches the simulation (a promotion that did not move its subtree would show here).
+  if (meta.finalDepths) {
+    const ys = [...new Set(visible.map((n) => n.st.pos[1]))].sort((a, b) => a - b);
+    for (const n of visible) {
+      const drawn = ys.indexOf(n.st.pos[1]);
+      const want = meta.finalDepths[String(n.v)];
+      if (want !== undefined && drawn !== want) out.push(error("timeline", `${n.v} is drawn at level ${drawn} but sits at depth ${want} in the tree`));
+    }
+  }
+  for (const [i, order] of (meta.traversals ?? []).entries()) {
+    const op = scene.ops.filter((o) => "traverse" in o)[i] as { traverse: string } | undefined;
+    if (op?.traverse === "inorder") for (let k = 1; k < order.length; k++) if (order[k] < order[k - 1]) out.push(error("ops", `inorder traversal came out ${order.join(", ")}: not ascending, the tree is not a BST`));
+  }
+  if (scene.ops.every((o) => "note" in o)) out.push(warn("ops", "only notes: the tree never changes"));
+  return out;
+}
+
 function checkMatrix(scene: Extract<Scene, { kind: "matrix" }>, tl: Timeline): Diagnostic[] {
   const out: Diagnostic[] = [];
   if ((scene.ops ?? []).length === 0) out.push(warn("ops", "no ops: the grid is a still image", 'add ops such as {"set": {"cell": [1, 1], "value": 3, "from": [[0, 0]]}} or {"highlight": {"row": 0}}'));
@@ -358,7 +412,9 @@ export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
   if (!scene) return out;
   switch (scene.kind) {
     case "sort": out.push(...checkSort(scene, tl)); break;
+    case "array": out.push(...checkArray(scene, tl)); break;
     case "heap": out.push(...checkHeap(scene, tl)); break;
+    case "tree": out.push(...checkTree(scene, tl)); break;
     case "state-machine": out.push(...checkStateMachine(scene, tl)); break;
     case "distributed": out.push(...checkDistributed(scene, tl)); break;
     case "diagram": out.push(...checkDiagram(scene, tl)); break;

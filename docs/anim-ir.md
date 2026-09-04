@@ -74,6 +74,72 @@ sorted. `compare` only highlights the two bars (nothing moves); `swap` moves
 them; `done` turns a bar green for "in its final place" — use it to show the
 sorted run growing.
 
+## kind: array
+
+A row of boxes with **named pointers** underneath and an optional **window**
+bracket: binary search, two-pointer walks, sliding windows — anything where
+the story is where the pointers are rather than what swaps (that is `sort`).
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "array",
+  "title": "Binary search for 23",
+  "values": [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+  "algorithm": "binary-search",
+  "target": 23
+}
+```
+
+| field | |
+|---|---|
+| `values` | required, 1+ numbers or strings |
+| `algorithm` | `binary-search` (needs `target`, sorted numeric values) \| `two-pointer-sum` (needs `target`, the sum; sorted values) \| `sliding-window` (`window` = length, default 3; marks the max-sum window). Generates the ops with a caption on every beat |
+| `ops` | explicit alternative, each with optional `caption`, `ms`: `{"pointers": {"lo": 0, "hi": 9}}` creates or moves named pointers (arrows under the boxes; `null` removes one); `{"window": [i, j]}` brackets an inclusive range, `{"window": null}` clears it; `{"compare": [i, j]}` `{"swap": [i, j]}` `{"set": {"index": i, "value": v}}` as in `sort`; `{"highlight": i \| [i, …]}` / `{"unhighlight": … \| "all"}`; `{"mark": i \| [i, …]}` permanent done colour; `{"found": i}` the answer, green with a pulse; `{"note": "…"}` |
+
+Indices are 0-based **positions** and every pointer has its own lane, so two
+pointers on the same index do not collide. `ms: 0` on a `pointers`, `window`,
+`highlight` or `mark` applies it inside the previous beat with no step of its
+own. The check reads the final row back by position; with `binary-search` it
+also fails unless the search ended at the target's index (or reported "not in
+the array" when it is absent).
+
+## kind: tree
+
+A binary search tree. Values are circles; x is the value's in-order rank, y
+its depth, so the picture is always a valid BST drawing and a promoted node
+slides up into place.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "tree",
+  "title": "Binary search tree",
+  "initial": [8, 3, 10, 1, 6],
+  "ops": [
+    { "insert": 14 },
+    { "insert": 4, "caption": "4 goes under 3, then right of 3: 3 < 4 < 6" },
+    { "search": 6 },
+    { "delete": 3, "caption": "3 has two children: its in-order successor 4 takes its place" },
+    { "traverse": "inorder" }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `initial` | values inserted in this order before the first op, without animation (the shape depends on the order) |
+| `ops` | required, 1+: `{"insert": n}` `{"search": n}` `{"delete": n}` `{"traverse": "inorder" \| "preorder" \| "postorder" \| "levelorder"}` `{"note": "…"}`; each may carry `caption`, which replaces the generated caption of that op's **last** beat (the comparisons on the way down keep theirs) |
+
+Insert, search and delete walk a token down from the root with one captioned
+beat per comparison (`14 > 8: go right`). Delete narrates the three cases —
+leaf, one child (the child moves up), two children (the in-order successor,
+the smallest value on the right, takes the node's place). Traverse visits
+every node and lines the values up underneath. Inserting a value already
+present, or deleting one that is not, is narrated as a no-op and the validator
+warns. The check reads the final tree back from the frame: left-to-right
+order must be ascending and every node at its depth.
+
 ## kind: state-machine
 
 ```json

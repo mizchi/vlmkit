@@ -11,6 +11,7 @@ import {
   SCENE_FORMAT,
   SCENE_KINDS,
   TIMELINE_FORMAT,
+  type ArrayScene,
   type ChartScene,
   type DiagramScene,
   type DistributedScene,
@@ -21,13 +22,16 @@ import {
   type SortScene,
   type StateMachineScene,
   type Timeline,
+  type TreeScene,
   type VectorScene,
 } from "./types.ts";
 
 export interface Examples {
   sort: SortScene;
+  array: ArrayScene;
   "state-machine": StateMachineScene;
   heap: HeapScene;
+  tree: TreeScene;
   distributed: DistributedScene;
   matrix: MatrixScene;
   graph: GraphScene;
@@ -44,6 +48,27 @@ export const EXAMPLES: Examples = {
     title: "Bubble sort",
     algorithm: "bubble",
     values: [5, 3, 8, 1],
+  },
+  array: {
+    format: SCENE_FORMAT,
+    kind: "array",
+    title: "Binary search for 23",
+    values: [2, 5, 8, 12, 16, 23, 38, 56, 72, 91],
+    algorithm: "binary-search",
+    target: 23,
+  },
+  tree: {
+    format: SCENE_FORMAT,
+    kind: "tree",
+    title: "Binary search tree",
+    initial: [8, 3, 10, 1, 6],
+    ops: [
+      { insert: 14 },
+      { insert: 4, caption: "4 goes under 3, then right of 3: 3 < 4 < 6" },
+      { search: 6 },
+      { delete: 3, caption: "3 has two children: its in-order successor 4 takes its place" },
+      { traverse: "inorder" },
+    ],
   },
   "state-machine": {
     format: SCENE_FORMAT,
@@ -200,6 +225,27 @@ const SHEETS: Record<Scene["kind"] | "timeline", string> = {
                                    compare only highlights; swap moves; done turns a bar green (the sorted run)
   "captions": false                turn off the generated captions
 The check fails unless the final left-to-right order is sorted. Give "algorithm" OR "ops".`,
+  array: `kind: array — a row of boxes with named pointers underneath and an optional window; for searches and pointer walks
+  "values": (number | string)[]    required, 1+
+  "algorithm": "binary-search" | "two-pointer-sum" | "sliding-window"
+                                   generates the ops; binary-search / two-pointer-sum need "target" and sorted numeric values,
+                                   sliding-window takes "window" (length, default 3) and marks the max-sum window
+  "ops": [ {"pointers": {"lo": 0, "hi": 9, "mid": null}}   create / move named pointers (arrows under the boxes); null removes one
+           {"window": [i, j] | null}                       bracket an inclusive range; null clears it
+           {"compare": [i, j]} {"swap": [i, j]} {"set": {"index": i, "value": v}}
+           {"highlight": i | [i, …]} {"unhighlight": … | "all"} {"mark": i | [i, …]}   mark = permanent done colour
+           {"found": i}                                    the answer: green + a pulse
+           {"note": "…"} ]                                  each may carry "caption" and "ms"; indices are 0-based positions
+Use this, not sort, when the story is where the pointers are. The check reads the final row back by position; with
+binary-search it also checks that the search ended at the target's index.`,
+  tree: `kind: tree — a binary search tree; values are circles, x = in-order rank, y = depth
+  "initial": number[]              optional; inserted in this order before the first op, without animation
+  "ops": [ {"insert": n} | {"search": n} | {"delete": n} | {"traverse": "inorder" | "preorder" | "postorder" | "levelorder"} | {"note": "…"} ]
+                                   required, 1+; each may carry "caption" (replaces the generated one for that op's LAST beat)
+                                   insert / search / delete walk a token down the comparisons, one captioned beat per node;
+                                   delete narrates leaf / one child / two children (in-order successor moves up);
+                                   traverse walks every node and lines the values up underneath
+The check reads the final tree back from the frame: left-to-right order must be ascending and every node at its depth.`,
   "state-machine": `kind: state-machine — circles, labelled arrows, a token walking a trace
   "states": [ "id" | {"id", "label", "final": true, "pos": [x, y]} ]   required; final = double ring; pos pins a state
   "initial": "id"                  required
@@ -304,8 +350,10 @@ export function schemaIndex(): string {
 
   Scene (what is explained)      ${SCENE_FORMAT}, one "kind":
     sort           an array being sorted (algorithm-generated or explicit ops)
+    array          a row of boxes with named pointers and a window: binary search, two-pointer, sliding window
     state-machine  states, transitions, and an event trace
     heap           push / pop on a binary heap
+    tree           a binary search tree: insert / search / delete / traverse
     distributed    nodes exchanging messages over time, with status events
     matrix         a grid of cells (DP table, matrix, table) filled, highlighted, rows / columns swapped
     graph          nodes and edges traversed (bfs / dfs / dijkstra, or explicit ops)

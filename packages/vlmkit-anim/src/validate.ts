@@ -566,6 +566,125 @@ function validateSort(ctx: Ctx, doc: Obj): void {
   }
 }
 
+function validateArray(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["values", "algorithm", "target", "window", "ops"]);
+  let n = 0;
+  let numeric = true;
+  if (ctx.array(doc.values, "values", { minLength: 1 })) {
+    n = doc.values.length;
+    doc.values.forEach((v, i) => {
+      if (!isNum(v) && !isStr(v)) ctx.error(`values[${i}]`, `a value is a number or a string, got ${describe(v)}`);
+      if (!isNum(v)) numeric = false;
+    });
+  }
+  if (doc.algorithm !== undefined) ctx.enumOf(doc.algorithm, "algorithm", ["binary-search", "two-pointer-sum", "sliding-window"], "algorithm");
+  if (doc.algorithm === undefined && doc.ops === undefined) ctx.error("algorithm", `give "algorithm" (binary-search | two-pointer-sum | sliding-window) or an explicit "ops" list`);
+  if (doc.target !== undefined) ctx.number(doc.target, "target");
+  if (doc.window !== undefined) ctx.number(doc.window, "window", { integer: true, min: 1 });
+  if (doc.ops === undefined && (doc.algorithm === "binary-search" || doc.algorithm === "two-pointer-sum")) {
+    if (doc.target === undefined) ctx.error("target", `${doc.algorithm} needs "target": the value to find (binary-search) or the sum to reach (two-pointer-sum)`);
+    if (!numeric) ctx.error("values", `${doc.algorithm} needs numeric values`);
+    else if (Array.isArray(doc.values) && doc.values.some((v, i) => i > 0 && (v as number) < (doc.values as number[])[i - 1])) {
+      ctx.error("values", `${doc.algorithm} assumes sorted values; these are not in ascending order`, "sort the values, or show the walk with explicit ops");
+    }
+  }
+  if (doc.ops === undefined && doc.algorithm === "sliding-window") {
+    if (!numeric) ctx.error("values", "sliding-window sums numeric values");
+    if (isNum(doc.window) && doc.window > n) ctx.error("window", `window ${doc.window} is longer than the array (${n})`);
+  }
+  if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
+    const ACTIONS = ["pointers", "window", "compare", "swap", "set", "highlight", "unhighlight", "mark", "found", "note"];
+    const idx = (v: unknown, path: string): void => {
+      if (ctx.number(v, path, { integer: true, min: 0 }) && v >= n) ctx.error(path, `index ${v} is out of range for ${n} values (0..${n - 1})`);
+    };
+    const idxs = (v: unknown, path: string): void => {
+      (Array.isArray(v) ? v : [v]).forEach((x, j) => idx(x, Array.isArray(v) ? `${path}[${j}]` : path));
+    };
+    doc.ops.forEach((op, i) => {
+      const path = `ops[${i}]`;
+      if (!ctx.object(op, path)) return;
+      const a = oneAction(ctx, op, path, ACTIONS, ["caption", "ms"], `{"pointers": {"lo": 0, "hi": 5}} or {"compare": [2, 3]}`);
+      if (!a) return;
+      const v = op[a];
+      switch (a) {
+        case "pointers":
+          if (ctx.object(v, `${path}.pointers`)) {
+            if (Object.keys(v).length === 0) ctx.error(`${path}.pointers`, `pointers is empty; name at least one, e.g. {"lo": 0}`);
+            for (const [name, at] of Object.entries(v)) if (at !== null) idx(at, `${path}.pointers.${name}`);
+          }
+          break;
+        case "window":
+          if (v !== null) {
+            if (Array.isArray(v) && v.length === 2) {
+              idx(v[0], `${path}.window[0]`);
+              idx(v[1], `${path}.window[1]`);
+              if (isNum(v[0]) && isNum(v[1]) && v[1] < v[0]) ctx.error(`${path}.window`, `window [${v[0]}, ${v[1]}] ends before it starts`);
+            } else ctx.error(`${path}.window`, `window takes [from, to] (inclusive indices) or null to clear it, got ${describe(v)}`);
+          }
+          break;
+        case "compare":
+        case "swap":
+          if (Array.isArray(v) && v.length === 2) v.forEach((x, j) => idx(x, `${path}.${a}[${j}]`));
+          else ctx.error(`${path}.${a}`, `${a} takes [i, j] (two indices), got ${describe(v)}`);
+          break;
+        case "set":
+          if (ctx.object(v, `${path}.set`)) {
+            ctx.keys(v, `${path}.set`, ["index", "value"]);
+            idx(v.index, `${path}.set.index`);
+            if (!isNum(v.value) && !isStr(v.value)) ctx.error(`${path}.set.value`, `value is a number or a string`);
+          }
+          break;
+        case "highlight":
+        case "mark":
+          idxs(v, `${path}.${a}`);
+          break;
+        case "unhighlight":
+          if (v !== "all") idxs(v, `${path}.unhighlight`);
+          break;
+        case "found":
+          idx(v, `${path}.found`);
+          break;
+        case "note":
+          if (!isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+          break;
+      }
+    });
+  }
+}
+
+function validateTree(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["initial", "ops"]);
+  const present = new Set<number>();
+  if (doc.initial !== undefined && ctx.array(doc.initial, "initial")) {
+    doc.initial.forEach((v, i) => {
+      if (!ctx.number(v, `initial[${i}]`)) return;
+      if (present.has(v)) ctx.error(`initial[${i}]`, `${v} appears twice; a BST holds each value once`);
+      present.add(v);
+    });
+  }
+  if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
+    const ACTIONS = ["insert", "search", "delete", "traverse", "note"];
+    doc.ops.forEach((op, i) => {
+      const path = `ops[${i}]`;
+      if (!ctx.object(op, path)) return;
+      const a = oneAction(ctx, op, path, ACTIONS, ["caption"], `{"insert": 5} | {"search": 7} | {"delete": 3} | {"traverse": "inorder"}`);
+      if (!a) return;
+      const v = op[a];
+      if (a === "insert" || a === "search" || a === "delete") {
+        if (!ctx.number(v, `${path}.${a}`)) return;
+        if (a === "insert") {
+          if (present.has(v)) ctx.warn(`${path}.insert`, `${v} is already in the tree at this point: the insert is narrated as a no-op`);
+          present.add(v);
+        } else if (a === "delete") {
+          if (!present.has(v)) ctx.warn(`${path}.delete`, `${v} is not in the tree at this point: the delete is narrated as a no-op`);
+          present.delete(v);
+        }
+      } else if (a === "traverse") ctx.enumOf(v, `${path}.traverse`, ["inorder", "preorder", "postorder", "levelorder"], "traverse");
+      else if (a === "note" && !isStr(v)) ctx.error(`${path}.note`, `note takes a string`);
+    });
+  }
+}
+
 function validateHeap(ctx: Ctx, doc: Obj): void {
   validateBase(ctx, doc, ["type", "initial", "ops"]);
   if (doc.type !== undefined) ctx.enumOf(doc.type, "type", ["min", "max"], "type");
@@ -1010,7 +1129,9 @@ export function validateScene(doc: unknown): Diagnostic[] {
     case "diagram": validateDiagram(ctx, doc); break;
     case "state-machine": validateStateMachine(ctx, doc); break;
     case "sort": validateSort(ctx, doc); break;
+    case "array": validateArray(ctx, doc); break;
     case "heap": validateHeap(ctx, doc); break;
+    case "tree": validateTree(ctx, doc); break;
     case "distributed": validateDistributed(ctx, doc); break;
     case "matrix": validateMatrix(ctx, doc); break;
     case "graph": validateGraph(ctx, doc); break;

@@ -1,0 +1,19 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "array",
+  "title": "Binary search for 23",
+  "values": [
+    2,
+    5,
+    8,
+    12,
+    16,
+    23,
+    38,
+    56,
+    72,
+    91
+  ],
+  "algorithm": "binary-search",
+  "target": 23
+}
