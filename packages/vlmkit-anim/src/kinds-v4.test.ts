@@ -68,6 +68,13 @@ describe("list", () => {
     assert.equal(arrows, 3);
   });
 
+  it("remove followed by insert leaves no dead arrow track (bc's 2 ⚠ in v8)", () => {
+    const l: ListScene = { format: SCENE_FORMAT, kind: "list", ops: [{ insert: { value: "a" } }, { insert: { value: "b" } }, { insert: { value: "c" } }, { remove: "a" }, { insert: { value: "a", at: 0 } }, { remove: "b" }, { insert: { value: "d", at: 0 } }] };
+    const tl = compileScene(l);
+    assert.deepEqual(tl.meta?.finalOrder, ["d", "a", "c"]);
+    assert.deepEqual(checkAnimation(tl, l).filter((d) => d.severity === "warn"), []);
+  });
+
   it("a find that misses and an insert after a missing value are narrated; the check warns about the miss", () => {
     const l: ListScene = { format: SCENE_FORMAT, kind: "list", initial: ["a", "b"], ops: [{ find: "z" }, { insert: { value: "c", after: "q" } }, { insert: { value: "c" } }, { remove: "a" }] };
     const tl = compileScene(l);

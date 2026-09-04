@@ -52,10 +52,14 @@ export function compileList(scene: ListScene): Timeline {
     return id;
   };
   let shownArrows = 0;
+  /** Set opacity only when it changes, so an arrow that never appears has no track at all. */
+  const show = (id: string, on: boolean, t: number): void => {
+    if (b.valueAt(id, "opacity", t) !== (on ? 1 : 0)) b.set(id, "opacity", on ? 1 : 0, t);
+  };
   /** Show exactly `n - 1` forward arrows and park the ∅ after the last node. */
   const relink = (t: number): void => {
     const want = Math.max(0, nodes.length - 1);
-    for (let i = 0; i < capacity - 1; i++) b.set(`arr-${i}`, "opacity", i < want ? 1 : 0, t);
+    for (let i = 0; i < capacity - 1; i++) show(`arr-${i}`, i < want, t);
     shownArrows = want;
     b.set("nil", "pos", [x(nodes.length) - boxW / 2 + 10, yRow], t);
   };
@@ -104,7 +108,7 @@ export function compileList(scene: ListScene): Timeline {
       b.set(id, "fill", T.accent, t0);
       // Everything from p on slides one slot right, then the new node drops in.
       for (let i = p; i < nodes.length; i++) b.tween(nodes[i].id, "pos", [x(i + 1), yRow], t0, tShift);
-      b.set(`arr-${Math.max(0, shownArrows - 1)}`, "opacity", shownArrows ? 0 : 0, t0);
+      if (shownArrows) show(`arr-${shownArrows - 1}`, false, t0);
       b.tween(id, "pos", [x(p), yRow], tShift, t1);
       b.set(id, "fill", T.node, t1);
       nodes.splice(p, 0, { id, value: v });
@@ -129,7 +133,7 @@ export function compileList(scene: ListScene): Timeline {
       b.tween(gone.id, "pos", above(k), t0, t1);
       b.tween(gone.id, "opacity", 0, t1, t1 + b.stepMs * 0.4);
       for (let i = k; i < nodes.length; i++) b.tween(nodes[i].id, "pos", [x(i), yRow], t1, t1 + b.stepMs * 0.6);
-      for (let i = 0; i < capacity - 1; i++) if (i >= k - (k > 0 ? 1 : 0)) b.set(`arr-${i}`, "opacity", 0, t0);
+      for (let i = 0; i < capacity - 1; i++) if (i >= k - (k > 0 ? 1 : 0)) show(`arr-${i}`, false, t0);
       relink(t1 + b.stepMs * 0.6);
       b.advance(b.stepMs * 1.5);
       continue;
@@ -173,8 +177,8 @@ export function compileList(scene: ListScene): Timeline {
     const tFlip = t0 + b.stepMs * 0.8;
     const t1 = tFlip + b.stepMs;
     for (let i = 0; i < n - 1; i++) {
-      b.set(`arr-${i}`, "opacity", 0, t0 + 150);
-      b.set(`arr-${i}-rev`, "opacity", 1, t0 + 150);
+      show(`arr-${i}`, false, t0 + 150);
+      show(`arr-${i}-rev`, true, t0 + 150);
     }
     if (n) {
       b.set("head-label", "pos", [x(n - 1), yRow - boxH / 2 - 26], t0 + 150);
@@ -182,7 +186,7 @@ export function compileList(scene: ListScene): Timeline {
     }
     nodes.forEach((node, i) => b.tween(node.id, "pos", [x(n - 1 - i), yRow], tFlip, t1));
     nodes.reverse();
-    for (let i = 0; i < n - 1; i++) b.set(`arr-${i}-rev`, "opacity", 0, t1);
+    for (let i = 0; i < n - 1; i++) show(`arr-${i}-rev`, false, t1);
     b.set("head-label", "pos", [x(0), yRow - boxH / 2 - 26], t1);
     b.set("head-arrow", "opacity", 1, t1);
     relink(t1);

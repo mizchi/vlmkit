@@ -148,7 +148,13 @@ Both take a list of ops and narrate every one.
 
 `pop` / `dequeue` / `peek` on an empty structure is narrated ("nothing to
 remove"), not an error. A `top` (stack) or `front` / `back` (queue) marker
-follows the occupied slots. The check reads the final contents back by slot.
+follows the occupied slots. Generated captions name the value (`pop → 7: the
+last one in is the first one out`, `peek → photo.png: the front, left in
+place`), and the compiler's closing step lists what is left and everything
+removed, in order — a free trace of the run. One token that needs several
+operations (an operator popping two operands) is several ops, each its own
+beat; the captions tie them together. The check reads the final contents
+back by slot.
 
 ## kind: list
 
@@ -177,8 +183,11 @@ marker on the first, `∅` after the last.
 | `ops` | required, 1+, each with optional `caption`: `{"insert": {"value": v, "at": i}}` at a 0-based position (default: the tail) or `{"insert": {"value": v, "after": w}}` right after the first node holding `w`; `{"remove": v}` the first node holding `v`, its neighbours relink; `{"find": v}` a cursor walks from the head with one captioned beat per node until `v` or `∅`; `{"reverse": true}` the arrows turn around, then the boxes trade places so the list reads head-first again; `{"note": "…"}` |
 
 Insert narrates the relinking (`3 will point to 5, and 5 to 7`); remove
-names who now points where; a `find` that reaches `∅` is narrated and the
-check warns. The check reads the final order back left to right and counts
+names who now points where; `find` counts hops as arrows followed from the
+head (a value at the head is 0 hops), and a `find` that reaches `∅` is
+narrated and the check warns. With duplicate values, `after`, `remove` and
+`find` all mean the first match from the head, and a reverse keeps duplicates
+as separate boxes that trade places like any other. The check reads the final order back left to right and counts
 the arrows drawn. A stack, a queue or a list of characters is the way to
 show a string being processed; an array of one-character strings
 (`"values": ["r", "a", "c", "e"]`) is the way to show one being scanned.
@@ -550,9 +559,9 @@ tree is a `graph` with `layout: "tb"`, a sequence of numbers is a `chart`.
 | `to` | properties reached by the end: `x`, `y` (or `pos: [x, y]`), `w`, `h` (or `size`), `r`, `opacity`, `fill`, `stroke`, `color`, `scale`, `rotate`, `dash` (0..1 stroke draw progress), `text` |
 | `duration` | ms, default 500 |
 | `easing` | `linear` `ease` `ease-in` `ease-out` `ease-in-out` `step-end` `step-start` `cubic-bezier(a,b,c,d)` |
-| `at` | omitted = after the previous item; `"<"` = together with the previous; `"+200"` / `"-100"` = offset from its end; a number = absolute ms |
-| `caption`, `label` | make this tween a step |
-| `{"wait": ms, "caption"}` | a pause instead of a tween |
+| `at` | omitted = after the previous item; `"<"` = together with the previous item, whether that item is a tween or a `wait`; `"+200"` / `"-100"` = offset from its end; a number = absolute ms |
+| `caption`, `label` | make this tween a step; an item with neither is motion only and gets no line in `explain` (a `duration: 0` text change riding on `"<"` is the usual case) |
+| `{"wait": ms, "caption"}` | a pause instead of a tween; the next item starts when it ends |
 
 Nodes (also the Timeline's node model):
 

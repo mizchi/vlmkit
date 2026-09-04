@@ -111,7 +111,7 @@ semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
 from the quotes. Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
 
-What seven rounds found (30 agents, Sonnet and Haiku; v3 re-tested v2's two
+What eight rounds found (35 agents, Sonnet and Haiku; v3 re-tested v2's two
 failures with the fixes in place and both closed — 2/2 re-edits kept the
 story's timing without hand re-timing, and the zero-warning state-machine
 brief passed on the first attempt with the alternative path narrated):
@@ -149,6 +149,15 @@ brief passed on the first attempt with the alternative path narrated):
   7-comparison search, and two re-edits (retarget a pointer walk; turn a
   leaf delete into a two-children delete and predict the successor): 4/4
   clean, every prediction exact, doc sentences only.
+- **v8 caught a compiler defect through a writer's refusal to accept a
+  warning.** `stack`, `queue` and `list` landed; 5/5 first-attempt correct,
+  but two list scenes carried ⚠ about "a track that changes nothing" that
+  the documented ops could not remove. One agent proved the rule with scratch
+  scenes; the compiler was re-setting arrow opacity on every relink. Fixed,
+  and a second rule joins "every hint must name a remedy that exists":
+  **every warning must be about the scene** — a diagnostic the writer cannot
+  act on is a compiler bug. The first `vector` re-edit (a progress bar's
+  pause becoming a stall) matched every predicted coordinate.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".
