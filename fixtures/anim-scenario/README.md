@@ -11,6 +11,10 @@ from `briefs/` and `docs/anim-ir.md`, writes a scene, and runs
   agent's deliverable. Prior attempts are off-limits to later agents.
 - `re-edit/` — a second-phase task: an existing scene plus a change request,
   measuring whether intent is readable enough to edit in one round.
+  `README.md` + `replication.scene.json` is the v2 variant (absolute event
+  times, kept frozen because two agents' failures are recorded against it);
+  `README-v3.md` + `replication-after.scene.json` is the same story written
+  with `after` anchors, used from v3 on.
 
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing.
