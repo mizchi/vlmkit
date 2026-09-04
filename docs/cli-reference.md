@@ -16,7 +16,7 @@ for options.
 | `vlmkit build` | `component`, `page` |
 | `vlmkit verify` | `markup`, `flow` |
 | `vlmkit contract` | `introspect`, `validate`, `scaffold` |
-| `vlmkit anim` | `check`, `validate`, `compile`, `explain`, `render`, `frames`, `html`, `runtime`, `schema` — declarative explanatory animations (SVG + Web Animations); guide in [`docs/anim-ir.md`](anim-ir.md) |
+| `vlmkit-anim` (separate binary, `@mizchi/vlmkit-anim`) | `check`, `validate`, `compile`, `explain`, `render`, `frames`, `sheet`, `video`, `html`, `runtime`, `schema` — declarative explanatory animations (SVG + Web Animations). Not a `vlmkit` subcommand: a standalone tool that shares vlmkit's evaluation gates; guide in [`docs/anim-ir.md`](anim-ir.md) |
 | `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |

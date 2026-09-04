@@ -102,9 +102,6 @@ importers:
 
   packages/vlmkit-anim:
     dependencies:
-      '@mizchi/vlmkit-core':
-        specifier: workspace:*
-        version: link:../vlmkit-core
       gifenc:
         specifier: ^1.0.3
         version: 1.0.3

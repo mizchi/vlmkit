@@ -1,7 +1,7 @@
 /**
  * The writing guide, one screen per kind: what fields exist, what each
  * accepts, and a minimal example that compiles clean. Printed by
- * `vlmkit anim schema --kind <kind>` and mirrored in `docs/anim-ir.md`.
+ * `vlmkit-anim schema --kind <kind>` and mirrored in `docs/anim-ir.md`.
  *
  * `EXAMPLES` are the source of truth the tests compile; the prose is written
  * to be the ONLY thing a writer needs to read before producing a scene.
@@ -120,7 +120,7 @@ const COMMON = `Common to every scene
   "theme": {"node","nodeStroke","text","accent","muted","ok","bad","background","fontSize"}  optional colours
 
 Captions are the explanation. Every beat that matters should carry one; the
-runtime shows the current caption under the picture and \`vlmkit anim explain\`
+runtime shows the current caption under the picture and \`vlmkit-anim explain\`
 prints them as a numbered list. Write them for the reader, not the machine.
 A "caption" on an op replaces the generated one; {"note": "…"} is a captioned
 pause and counts as a step; compilers add a first (title / "Start") and a last
@@ -196,11 +196,11 @@ Nodes: {"id", "shape": rect | circle | ellipse | text | line | arrow | path | gr
 
 export function schemaSheet(kind: Scene["kind"] | "timeline"): string {
   const example = JSON.stringify(EXAMPLES[kind], null, 2);
-  return `${SHEETS[kind]}\n\n${kind === "timeline" ? "" : COMMON + "\n\n"}Example\n${example}\n\nThen: vlmkit anim check scene.json`;
+  return `${SHEETS[kind]}\n\n${kind === "timeline" ? "" : COMMON + "\n\n"}Example\n${example}\n\nThen: vlmkit-anim check scene.json`;
 }
 
 export function schemaIndex(): string {
-  return `vlmkit anim — declarative explanatory animations, two layers
+  return `vlmkit-anim — declarative explanatory animations, two layers
 
   Scene (what is explained)      ${SCENE_FORMAT}, one "kind":
     sort           an array being sorted (algorithm-generated or explicit ops)
@@ -212,8 +212,8 @@ export function schemaIndex(): string {
   Timeline (how it moves)         ${TIMELINE_FORMAT}: nodes + keyframe tracks + steps.
                                   Every kind compiles to it; it can also be written directly.
 
-  vlmkit anim schema --kind <kind>    field list + minimal example for one kind
-  vlmkit anim check <scene.json>      validate → compile → semantic checks → stats
+  vlmkit-anim schema --kind <kind>    field list + minimal example for one kind
+  vlmkit-anim check <scene.json>      validate → compile → semantic checks → stats
 
 ${COMMON}`;
 }

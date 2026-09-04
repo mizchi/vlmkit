@@ -1,5 +1,5 @@
 /**
- * `vlmkit anim <verb> <file>` — the writer's loop for the animation IR.
+ * `vlmkit-anim <verb> <file>` — the writer's loop for the animation IR.
  *
  *   check     validate + compile + semantic checks + stats, one report   ← the loop
  *   validate  schema/reference validation only
@@ -8,7 +8,7 @@
  *   render    one frame as SVG at --at <ms> (or --step <n>)
  *   frames    every step (or --samples N) as SVG files, --png through Playwright
  *   video     GIF (encoded here) or mp4 / webm (ffmpeg), holding on each step
- *   html     a self-contained page with the <vlm-anim> runtime inline
+ *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   schema    the cheat sheet for one kind, or the index
  *
@@ -16,11 +16,11 @@
  * is phrased for the next edit. Exit 1 on any error-severity diagnostic.
  */
 
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { handleCliError, UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { hasFlag, readFlag, readInt, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError } from "./cli-args.ts";
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
 import { renderFrameSvg, sampleTimes } from "./render-svg.ts";
@@ -35,7 +35,7 @@ import { writeVideo, type VideoResult } from "./video.ts";
 const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width"];
 
 function usage(): string {
-  return `Usage: vlmkit anim <command> <file.json> [options]
+  return `Usage: vlmkit-anim <command> <file.json> [options]
 
 Commands
   check <scene|timeline>          Validate, compile, run semantic checks, print stats. Exit 1 on errors.
@@ -121,7 +121,7 @@ async function writeOut(out: string | undefined, content: string, what: string):
 
 function requireFile(positionals: string[], verb: string): string {
   const file = positionals[0];
-  if (!file) throw new UsageError(`vlmkit anim ${verb} needs a file: vlmkit anim ${verb} <scene.json>`);
+  if (!file) throw new UsageError(`vlmkit-anim ${verb} needs a file: vlmkit-anim ${verb} <scene.json>`);
   return file;
 }
 
@@ -208,7 +208,7 @@ export async function runAnimCli(argv: string[]): Promise<number> {
         console.log(`${ok ? "✓" : "✗"} ${basename(file)} (${stats.kind}): ${errs} error(s), ${warns} warning(s)`);
         console.log(`  ${stats.durationMs}ms · ${stats.steps} steps (${stats.captions} captioned) · ${stats.nodes} nodes · ${stats.tracks} tracks / ${stats.keyframes} keyframes`);
         if (stats.sceneBytes) console.log(`  scene ${stats.sceneBytes} B → timeline ${stats.timelineBytes} B (×${stats.expansion})`);
-        console.log(`  next: vlmkit anim explain ${file} · vlmkit anim render ${file} --step N · vlmkit anim html ${file} --out page.html`);
+        console.log(`  next: vlmkit-anim explain ${file} · vlmkit-anim render ${file} --step N · vlmkit-anim html ${file} --out page.html`);
       }
       return ok ? 0 : 1;
     }
@@ -232,7 +232,7 @@ export async function runAnimCli(argv: string[]): Promise<number> {
     }
     case "frames": {
       const out = readFlag(rest, "--out");
-      if (!out) throw new UsageError("vlmkit anim frames needs --out <dir>");
+      if (!out) throw new UsageError("vlmkit-anim frames needs --out <dir>");
       const samples = readInt(rest, "--samples") ?? 0;
       const times = sampleTimes(tl, samples);
       await mkdir(out, { recursive: true });
@@ -253,7 +253,7 @@ export async function runAnimCli(argv: string[]): Promise<number> {
     }
     case "sheet": {
       const out = readFlag(rest, "--out");
-      if (!out) throw new UsageError("vlmkit anim sheet needs --out <sheet.png|sheet.html>");
+      if (!out) throw new UsageError("vlmkit-anim sheet needs --out <sheet.png|sheet.html>");
       const times = sampleTimes(tl, readInt(rest, "--samples") ?? 0);
       const cols = readInt(rest, "--cols", { min: 1 }) ?? 3;
       const tileWidth = readInt(rest, "--tile", { min: 120 }) ?? 400;
@@ -269,7 +269,7 @@ export async function runAnimCli(argv: string[]): Promise<number> {
     }
     case "video": {
       const out = readFlag(rest, "--out");
-      if (!out) throw new UsageError("vlmkit anim video needs --out <demo.gif|demo.mp4|demo.webm>");
+      if (!out) throw new UsageError("vlmkit-anim video needs --out <demo.gif|demo.mp4|demo.webm>");
       let result: VideoResult;
       try {
         result = await writeVideo(tl, out, {
@@ -337,10 +337,20 @@ async function rasterise(dir: string, files: string[], tl: Timeline): Promise<vo
   }
 }
 
-const isCliEntry =
-  process.env.__VLMKIT_DISPATCHER_LEAF__ === "anim" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
+/**
+ * Standalone entry: `vlmkit-anim` is its own binary, not a `vlmkit` subcommand.
+ * Realpath both sides — npm installs `bin` as a symlink, so `argv[1]` is
+ * `node_modules/.bin/vlmkit-anim` while `import.meta.url` is the real `dist/cli.mjs`.
+ */
+function isDirectRun(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+}
+if (isDirectRun()) {
   runAnimCli(process.argv.slice(2))
     .then((code) => {
       if (code !== 0) process.exitCode = code;

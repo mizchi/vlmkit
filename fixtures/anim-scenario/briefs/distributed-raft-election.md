@@ -15,5 +15,5 @@ Requirements: each beat has a caption a newcomer can follow; use `status`
 events for the crash and the promotion; no message should silently land on
 a crashed node.
 
-Success: `vlmkit anim check scene.json` exits 0 with no ✗ and no ⚠ about a
+Success: `vlmkit-anim check scene.json` exits 0 with no ✗ and no ⚠ about a
 message landing on a down node.

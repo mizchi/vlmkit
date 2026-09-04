@@ -1,6 +1,6 @@
 # Explanatory animation IR — design (2026-09-04)
 
-`@mizchi/vlmkit-anim` and `vlmkit anim`. A declarative format for the
+`@mizchi/vlmkit-anim` and `vlmkit-anim`. A declarative format for the
 animations an AI produces to explain something to a person: a sorting run, a
 state machine's trace, heap operations, messages between distributed nodes, a
 concept diagram walked through in beats, or a generic vector tween. This page
@@ -66,6 +66,20 @@ sampler handle trivially.
 - Light DOM on purpose, so tooling that walks the document sees the SVG.
 - ~7KB, no dependencies, `<vlm-anim src="x.timeline.json">` or inline JSON.
 
+## A standalone tool, not a `vlmkit` subcommand
+
+`vlmkit-anim` is its own binary and the package depends on nothing else in
+the workspace (arg parsing and the error printer are the forty lines in
+`cli-args.ts`). What it shares with vlmkit is the **evaluation** side, and it
+shares that as a consumer: the pages it emits are ordinary SVG + Web
+Animations, so `vlmkit check animation` measures them like any page, and the
+runtime test proves the two agree. The animation tool does not need
+vlmkit's capture, diff or gate plumbing to do its job, and a `vlmkit anim`
+verb would have suggested it did. The next step on that axis is to split the
+evaluation tooling itself, so that the check a page of animations gets is a
+package the animation tool (and anything else) depends on, rather than the
+whole of vlmkit.
+
 ## Headless sampling is the same arithmetic
 
 `timeline.ts` reimplements CSS easing (named curves + `cubic-bezier` Newton
@@ -89,7 +103,7 @@ lost, node off-canvas, steps without captions). One diagnostic shape, one CLI
 ## Evaluation loop
 
 `fixtures/anim-scenario/` holds briefs; fresh subagents get only the brief and
-`docs/anim-ir.md`, write a scene, and run `vlmkit anim check` until green.
+`docs/anim-ir.md`, write a scene, and run `vlmkit-anim check` until green.
 Recorded per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
@@ -119,7 +133,7 @@ brief passed on the first attempt with the alternative path narrated):
   one anchor; a fresh author predicted every start time). All three causal
   agents preferred it. `causal` is the default; `"timing": "sequential"`
   remains for a single linear chain.
-- Vision-model review uses `vlmkit anim sheet`: one labelled contact sheet per
+- Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".
 

@@ -12,4 +12,4 @@ Requirements:
 - Show the normal path first as the trace: close, ACK, FIN, timeout.
 - CLOSED is a final state.
 
-Success: `vlmkit anim check scene.json` exits 0 and the trace fires all four events.
+Success: `vlmkit-anim check scene.json` exits 0 and the trace fires all four events.

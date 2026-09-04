@@ -1,24 +1,24 @@
-# vlmkit anim — writing an explanatory animation
+# vlmkit-anim — writing an explanatory animation
 
-One JSON file describes *what is being explained*; `vlmkit anim` turns it into
+One JSON file describes *what is being explained*; `vlmkit-anim` turns it into
 motion, checks that the motion says what the file claims, and embeds it as a
 `<vlm-anim>` web component (SVG + Web Animations, no dependencies).
 
 This page is the complete writing guide. Every JSON block on it passes
-`vlmkit anim check` (a test enforces that).
+`vlmkit-anim check` (a test enforces that).
 
 ## The loop
 
 ```
 1. write scene.json                         (one "kind", see below)
-2. vlmkit anim check scene.json             validate → compile → semantic checks → stats
+2. vlmkit-anim check scene.json             validate → compile → semantic checks → stats
    read each ✗ line: path, what is wrong, and the → hint with the fix; edit; re-run
-3. vlmkit anim explain scene.json           the narration as a numbered list — is this the story you meant?
-4. vlmkit anim render scene.json --step 4   one frame as SVG (or --at <ms>); --out frame.svg
-   vlmkit anim frames scene.json --out dir [--png]   every step as a file, for looking at
-   vlmkit anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
-5. vlmkit anim html scene.json --out page.html       the playable page
-   vlmkit anim video scene.json --out demo.gif       a file for a README / slide (or .mp4 / .webm through ffmpeg)
+3. vlmkit-anim explain scene.json           the narration as a numbered list — is this the story you meant?
+4. vlmkit-anim render scene.json --step 4   one frame as SVG (or --at <ms>); --out frame.svg
+   vlmkit-anim frames scene.json --out dir [--png]   every step as a file, for looking at
+   vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
+5. vlmkit-anim html scene.json --out page.html       the playable page
+   vlmkit-anim video scene.json --out demo.gif       a file for a README / slide (or .mp4 / .webm through ffmpeg)
 ```
 
 `check` exits 1 on any error. Warnings (⚠) are advice: off-canvas nodes,
@@ -30,7 +30,7 @@ steps without captions, a hidden node that is never shown.
   readable when someone edits it later — `"algorithm": "bubble"` or
   `"trace": ["connect", "SYN+ACK"]`, never coordinates.
 - **Timeline** (`"format": "vlmkit-anim/timeline@1"`): nodes + absolute-time
-  keyframe tracks + step markers. Every kind compiles to it (`vlmkit anim compile`).
+  keyframe tracks + step markers. Every kind compiles to it (`vlmkit-anim compile`).
   Write it directly only when no kind fits and `kind: vector` is not enough.
 
 Common to every scene: `format`, `kind`, optional `title` (drawn at the top),
@@ -48,7 +48,7 @@ conventions hold in every kind:
 - Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote.
 - A *beat* is one step. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
 
-`vlmkit anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
+`vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
 ## kind: sort
 
@@ -303,7 +303,7 @@ deterministically, so do not spend a vision call on those.
 
 ## Video (GIF, MP4, WebM)
 
-`vlmkit anim video scene.json --out demo.gif` writes a file that plays where
+`vlmkit-anim video scene.json --out demo.gif` writes a file that plays where
 no runtime runs: a README, a slide, a chat message. The frames are the same
 deterministic samples `render` produces, at `--fps` (default 20), plus a
 **hold** of `--hold` ms (default 400) on every step marker and on the last
@@ -327,10 +327,10 @@ vision model, the video is for a person.
 
 ## Embedding
 
-`vlmkit anim html scene.json --out page.html` writes a page with the runtime inline. For a site with many animations:
+`vlmkit-anim html scene.json --out page.html` writes a page with the runtime inline. For a site with many animations:
 
 ```html
-<script src="vlm-anim.js"></script>                <!-- vlmkit anim runtime --out vlm-anim.js -->
+<script src="vlm-anim.js"></script>                <!-- vlmkit-anim runtime --out vlm-anim.js -->
 <vlm-anim src="sort.timeline.json" autoplay loop></vlm-anim>
 <vlm-anim><script type="application/json">{ "format": "vlmkit-anim/timeline@1", … }</script></vlm-anim>
 ```

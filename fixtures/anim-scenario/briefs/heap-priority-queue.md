@@ -9,4 +9,4 @@ Requirements:
   reader should watch for (the root is always the minimum).
 - Playback under 20 seconds.
 
-Success: `vlmkit anim check scene.json` exits 0; the pops come out as 1 then 4.
+Success: `vlmkit-anim check scene.json` exits 0; the pops come out as 1 then 4.

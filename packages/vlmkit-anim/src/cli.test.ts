@@ -1,5 +1,5 @@
 /**
- * `vlmkit anim` through the real dispatcher: the verbs an agent's loop runs,
+ * `vlmkit-anim` through the real dispatcher: the verbs an agent's loop runs,
  * their exit codes, and that the schema sheet's own examples pass `check`.
  */
 import assert from "node:assert/strict";
@@ -10,13 +10,13 @@ import { join, resolve } from "node:path";
 import { afterAll, describe, it } from "vitest";
 import { EXAMPLES } from "./schema-sheet.ts";
 
-const CLI = resolve(import.meta.dirname!, "../../../src/cli/vlmkit.ts");
+const CLI = resolve(import.meta.dirname!, "cli.ts");
 const FIXTURES = resolve(import.meta.dirname!, "../fixtures");
 const dir = mkdtempSync(join(tmpdir(), "vlm-anim-cli-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 function run(args: string[]): { stdout: string; stderr: string; status: number } {
-  const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, "anim", ...args], {
+  const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, ...args], {
     encoding: "utf-8",
     env: { ...process.env, NO_COLOR: "1" },
     timeout: 60_000,
@@ -24,7 +24,7 @@ function run(args: string[]): { stdout: string; stderr: string; status: number }
   return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status ?? 1 };
 }
 
-describe("vlmkit anim", () => {
+describe("vlmkit-anim", () => {
   it("--help exits 0 and lists the verbs", () => {
     const r = run(["--help"]);
     assert.equal(r.status, 0);

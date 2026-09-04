@@ -9,5 +9,5 @@ Requirements:
   (or equivalent) and why an element stops where it stops.
 - Keep the whole thing under 15 seconds of playback.
 
-Success: `vlmkit anim check scene.json` exits 0 with no ✗ lines, and
-`vlmkit anim explain scene.json` reads as a coherent explanation.
+Success: `vlmkit-anim check scene.json` exits 0 with no ✗ lines, and
+`vlmkit-anim explain scene.json` reads as a coherent explanation.

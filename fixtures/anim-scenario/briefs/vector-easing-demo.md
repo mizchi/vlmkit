@@ -6,4 +6,4 @@ one `ease-in`, one `ease-out`, each labelled with its easing name, then all
 three return together. Caption the moments so a reader learns what each curve
 feels like.
 
-Success: `vlmkit anim check scene.json` exits 0 with no ✗ and no ⚠.
+Success: `vlmkit-anim check scene.json` exits 0 with no ✗ and no ⚠.

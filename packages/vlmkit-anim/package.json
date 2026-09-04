@@ -48,7 +48,6 @@
     }
   },
   "dependencies": {
-    "@mizchi/vlmkit-core": "workspace:*",
     "gifenc": "^1.0.3",
     "pngjs": "^7.0.0"
   },

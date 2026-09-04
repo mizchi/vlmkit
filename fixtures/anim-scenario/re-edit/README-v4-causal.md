@@ -10,7 +10,7 @@
    reaches the client, and the replica must still be promoted when the lost
    retry would have landed.
 
-Success: `vlmkit anim check replication-causal.scene.json` exits 0 with no ✗
+Success: `vlmkit-anim check replication-causal.scene.json` exits 0 with no ✗
 and no ⚠; `explain` shows the new beat in the right place and every other beat
 at the moment the story needs. Record how long you spent understanding the
 file before editing, and anything unclear about its intent.

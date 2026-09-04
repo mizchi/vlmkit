@@ -1,5 +1,5 @@
 /**
- * `vlmkit anim video` — the animation as a file that plays where no runtime
+ * `vlmkit-anim video` — the animation as a file that plays where no runtime
  * runs: a README, a slide, a chat message.
  *
  * The schedule is the same arithmetic as `render-svg.ts` — frames are sampled

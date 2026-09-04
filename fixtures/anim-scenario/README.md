@@ -1,9 +1,9 @@
-# anim-scenario — subagent evaluation fixture for `vlmkit anim`
+# anim-scenario — subagent evaluation fixture for `vlmkit-anim`
 
 Closed-loop validation of the explanatory-animation IR (see
 `.claude/skills/agent-validation-loop`). A fresh subagent gets ONLY a brief
 from `briefs/` and `docs/anim-ir.md`, writes a scene, and runs
-`vlmkit anim check` until green. What it stumbles on is the deliverable.
+`vlmkit-anim check` until green. What it stumbles on is the deliverable.
 
 - `briefs/<name>.md` — the task. Each names a deterministic success criterion
   (`check` exit 0 + a semantic condition the checker can read back).
