@@ -38,7 +38,15 @@ Common to every scene: `format`, `kind`, optional `title` (drawn at the top),
 
 **Captions are the explanation.** The runtime shows the current step's caption
 under the picture; `explain` prints them. Every kind generates sensible default
-captions; write your own where the default would not say why.
+captions; write your own where the default would not say why. Three
+conventions hold in every kind:
+
+- A `caption` on an op or sequence item **replaces** the generated caption for that beat.
+- `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
+- Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote.
+- A *beat* is one step. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
+
+`vlmkit anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
 ## kind: sort
 
@@ -56,10 +64,13 @@ captions; write your own where the default would not say why.
 |---|---|
 | `values` | required, 2+ numbers |
 | `algorithm` | `bubble` \| `insertion` \| `selection` — runs the algorithm and generates the ops |
-| `ops` | explicit alternative: `{"compare":[i,j]}` `{"swap":[i,j]}` `{"done": i \| [i,…]}` `{"set":{"index":i,"value":v}}` `{"note":"…"}`; indices are 0-based **positions**; each may carry `caption` |
+| `ops` | explicit alternative: `{"compare":[i,j]}` `{"swap":[i,j]}` `{"done": i \| [i,…]}` `{"set":{"index":i,"value":v}}` `{"note":"…"}`; indices are 0-based **positions**; each may carry `caption` and `ms` (that beat's length) |
 | `captions` | `false` to drop the generated captions |
 
-Bars swap places; the check fails unless the final left-to-right order is sorted.
+Bars swap places; the check fails unless the final left-to-right order is
+sorted. `compare` only highlights the two bars (nothing moves); `swap` moves
+them; `done` turns a bar green for "in its final place" — use it to show the
+sorted run growing.
 
 ## kind: state-machine
 
@@ -81,13 +92,15 @@ Bars swap places; the check fails unless the final left-to-right order is sorted
 
 | field | |
 |---|---|
-| `states` | required: `"id"` or `{"id", "label", "final": true}` (final = double ring) |
+| `states` | required: `"id"` or `{"id", "label", "final": true, "pos": [x, y]}` (final = double ring; `pos` pins the state, the rest are laid out around it) |
 | `initial` | required |
 | `transitions` | required: `{"from", "to", "on": "event", "note": "/ action"}`; one per (from, on) |
 | `trace` | required: events fired in order; each must be legal from the current state — the validator lists the legal ones when it is not |
 | `layout` | `lr` (default) \| `tb` \| `circle` |
 
-Each event is a step captioned `on <event>: a → b`; a token slides along the arrow.
+Each event is a step captioned `on <event>: a → b`; a token slides along the
+arrow. States and transitions the trace never reaches are still drawn, and the
+check warns about each so you can extend the trace or explain them in a caption.
 
 ## kind: heap
 
@@ -97,7 +110,11 @@ Each event is a step captioned `on <event>: a → b`; a token slides along the a
   "kind": "heap",
   "title": "Min-heap",
   "type": "min",
-  "ops": [{ "push": 5 }, { "push": 3 }, { "push": 8 }, { "push": 1 }, { "pop": true }]
+  "ops": [
+    { "push": 5 }, { "push": 3 }, { "push": 8 }, { "push": 1 },
+    { "note": "The root is always the minimum. Watch what pop does." },
+    { "pop": true }
+  ]
 }
 ```
 
@@ -237,7 +254,7 @@ Nodes (also the Timeline's node model):
 
 - `tracks[].prop`: `pos` `size` `r` `opacity` `fill` `stroke` `color` `scale` `rotate` `dash` `text` (discrete).
 - `keyframes[].easing` is the curve **into** that keyframe. Times ascend; the first and last values hold outside the span.
-- `steps`: chapter markers with `label` / `caption`; the runtime's ◀ ▶| buttons walk them.
+- `steps`: chapter markers with `label` / `caption`; the runtime's ◀ ▶| buttons walk them. A step without a caption keeps the previous caption showing.
 - `duration`: optional, computed from the last keyframe or step.
 
 ## Embedding

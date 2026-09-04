@@ -121,7 +121,10 @@ const COMMON = `Common to every scene
 
 Captions are the explanation. Every beat that matters should carry one; the
 runtime shows the current caption under the picture and \`vlmkit anim explain\`
-prints them as a numbered list. Write them for the reader, not the machine.`;
+prints them as a numbered list. Write them for the reader, not the machine.
+A "caption" on an op replaces the generated one; {"note": "…"} is a captioned
+pause and counts as a step; compilers add a first (title / "Start") and a last
+("Sorted" / "End") step of their own.`;
 
 const SHEETS: Record<Scene["kind"] | "timeline", string> = {
   sort: `kind: sort — bars that swap into order
@@ -129,11 +132,12 @@ const SHEETS: Record<Scene["kind"] | "timeline", string> = {
   "algorithm": "bubble" | "insertion" | "selection"
                                    generates the ops by running the algorithm; use this unless you need a custom walk
   "ops": [ {"compare": [i, j]} | {"swap": [i, j]} | {"done": i | [i, ...]} | {"set": {"index": i, "value": v}} | {"note": "…"} ]
-                                   explicit alternative; indices are 0-based positions (not values) and every op may carry "caption"
+                                   explicit alternative; indices are 0-based positions (not values); every op may carry "caption" and "ms"
+                                   compare only highlights; swap moves; done turns a bar green (the sorted run)
   "captions": false                turn off the generated captions
 The check fails unless the final left-to-right order is sorted. Give "algorithm" OR "ops".`,
   "state-machine": `kind: state-machine — circles, labelled arrows, a token walking a trace
-  "states": [ "id" | {"id", "label", "final": true} ]   required; final states get a double ring
+  "states": [ "id" | {"id", "label", "final": true, "pos": [x, y]} ]   required; final = double ring; pos pins a state
   "initial": "id"                  required
   "transitions": [ {"from", "to", "on": "event", "note": "/ action"} ]   required; one transition per (from, on)
   "trace": [ "event", ... ]        required; fired in order, each must be legal from the current state
