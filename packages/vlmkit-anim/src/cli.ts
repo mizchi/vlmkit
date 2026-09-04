@@ -29,13 +29,14 @@ import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms"];
 
 function usage(): string {
   return `Usage: vlmkit anim <command> <file.json> [options]
 
 Commands
   check <scene|timeline>          Validate, compile, run semantic checks, print stats. Exit 1 on errors.
+        [--max-ms N]              …and fail when the animation runs longer than N ms.
   validate <scene|timeline>       Schema and reference validation only.
   compile <scene> [--out t.json]  Lower a scene to its timeline (stdout when no --out).
   explain <scene|timeline>        Print the narration: one line per step.
@@ -183,6 +184,10 @@ export async function runAnimCli(argv: string[]): Promise<number> {
     case "check": {
       const diags = [...loaded.diagnostics, ...checkAnimation(tl, scene)];
       const stats = animStats(tl, scene);
+      const maxMs = readInt(rest, "--max-ms", { min: 1 });
+      if (maxMs !== undefined && stats.durationMs > maxMs) {
+        diags.push({ severity: "error", path: "duration", message: `the animation runs ${stats.durationMs}ms, over the ${maxMs}ms budget`, hint: 'lower "stepMs", drop beats, or pass a per-op "ms"' });
+      }
       const ok = !hasErrors(diags);
       if (json) {
         console.log(JSON.stringify({ file, layer: loaded.layer, ok, diagnostics: diags, stats, explain: (tl.steps ?? []).map((s) => ({ t: s.t, label: s.label, caption: s.caption })) }, null, 2));

@@ -222,6 +222,8 @@ export interface StateDef {
   label?: string;
   /** Drawn with a double ring. */
   final?: boolean;
+  /** Pin this state; unpinned states are laid out around it. */
+  pos?: Vec2;
 }
 
 export interface Transition {
@@ -245,14 +247,16 @@ export interface StateMachineScene extends SceneBase {
 
 // ---- sort -----------------------------------------------------------------
 
+/** Every op may carry `caption` (overrides the generated one) and `ms` (this beat's length). */
 export type SortOp =
-  | { compare: [number, number]; caption?: string }
-  | { swap: [number, number]; caption?: string }
+  | { compare: [number, number]; caption?: string; ms?: number }
+  | { swap: [number, number]; caption?: string; ms?: number }
   /** Mark index as in its final place. */
-  | { done: number | number[]; caption?: string }
+  | { done: number | number[]; caption?: string; ms?: number }
   /** Overwrite the value at an index (insertion sort shifts). */
-  | { set: { index: number; value: number }; caption?: string }
-  | { note: string };
+  | { set: { index: number; value: number }; caption?: string; ms?: number }
+  /** A captioned pause: the string is the caption. */
+  | { note: string; ms?: number };
 
 export interface SortScene extends SceneBase {
   kind: "sort";

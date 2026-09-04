@@ -452,8 +452,10 @@ function validateStateMachine(ctx: Ctx, doc: Obj): void {
   if (ctx.array(doc.states, "states", { minLength: 1 })) {
     stateIds = ids(ctx, doc.states, "states");
     doc.states.forEach((s, i) => {
-      if (isObj(s)) ctx.keys(s, `states[${i}]`, ["id", "label", "final"]);
-      else if (!isStr(s)) ctx.error(`states[${i}]`, `a state is a string id or {"id", "label", "final"}`);
+      if (isObj(s)) {
+        ctx.keys(s, `states[${i}]`, ["id", "label", "final", "pos"]);
+        if (s.pos !== undefined) ctx.vec2(s.pos, `states[${i}].pos`);
+      } else if (!isStr(s)) ctx.error(`states[${i}]`, `a state is a string id or {"id", "label", "final", "pos"}`);
     });
   }
   ctx.ref(doc.initial, "initial", stateIds, "state");
@@ -520,11 +522,12 @@ function validateSort(ctx: Ctx, doc: Obj): void {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const actions = Object.keys(op).filter((k) => ACTIONS.includes(k));
-      ctx.keys(op, path, [...ACTIONS, "caption"]);
+      ctx.keys(op, path, [...ACTIONS, "caption", "ms"]);
       if (actions.length !== 1) {
         ctx.error(path, `an op needs exactly one action key, found ${actions.length ? list(actions) : "none"}`, `one of ${list(ACTIONS)}`);
         return;
       }
+      captionAndMs(ctx, op, path);
       const a = actions[0];
       const v = op[a];
       if (a === "compare" || a === "swap") {
