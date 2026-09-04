@@ -1,0 +1,46 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "matrix",
+  "title": "0/1 knapsack: capacity 5, items A(w1,v1) B(w3,v4) C(w4,v5)",
+  "rowLabels": ["none", "A", "B", "C"],
+  "colLabels": ["0", "1", "2", "3", "4", "5"],
+  "cells": [
+    [0, 0, 0, 0, 0, 0],
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null]
+  ],
+  "ops": [
+    { "set": { "cell": [1, 0], "value": 0, "from": [[0, 0]] } },
+    { "set": { "cell": [1, 1], "value": 1, "from": [[0, 1], [0, 0]] },
+      "caption": "A weighs 1: taking it (0+1=1) beats skipping (0)" },
+    { "set": { "cell": [1, 2], "value": 1, "from": [[0, 2], [0, 1]] },
+      "caption": "Still room for A: taking it (0+1=1) beats skipping (0)" },
+    { "set": { "cell": [1, 3], "value": 1, "from": [[0, 3], [0, 2]] },
+      "caption": "Taking A (0+1=1) beats skipping (0)" },
+    { "set": { "cell": [1, 4], "value": 1, "from": [[0, 4], [0, 3]] },
+      "caption": "Taking A (0+1=1) beats skipping (0)" },
+    { "set": { "cell": [1, 5], "value": 1, "from": [[0, 5], [0, 4]] },
+      "caption": "Taking A (0+1=1) beats skipping (0)" },
+
+    { "set": { "cell": [2, 0], "value": 0, "from": [[1, 0]] } },
+    { "set": { "cell": [2, 1], "value": 1, "from": [[1, 1]] } },
+    { "set": { "cell": [2, 2], "value": 1, "from": [[1, 2]] } },
+    { "set": { "cell": [2, 3], "value": 4, "from": [[1, 3], [1, 0]] },
+      "caption": "B weighs 3, worth 4: taking it (0+4=4) beats skipping (1)" },
+    { "set": { "cell": [2, 4], "value": 5, "from": [[1, 4], [1, 1]] },
+      "caption": "Taking B (1+4=5) beats skipping (1)" },
+    { "set": { "cell": [2, 5], "value": 5, "from": [[1, 5], [1, 2]] },
+      "caption": "Taking B (1+4=5) beats skipping (1)" },
+
+    { "set": { "cell": [3, 0], "value": 0, "from": [[2, 0]] } },
+    { "set": { "cell": [3, 1], "value": 1, "from": [[2, 1]] } },
+    { "set": { "cell": [3, 2], "value": 1, "from": [[2, 2]] } },
+    { "set": { "cell": [3, 3], "value": 4, "from": [[2, 3]] } },
+    { "set": { "cell": [3, 4], "value": 5, "from": [[2, 4], [2, 0]] } },
+    { "set": { "cell": [3, 5], "value": 6, "from": [[2, 5], [2, 1]] },
+      "caption": "C weighs 4, worth 5: taking it (1+5=6) beats skipping (5)" },
+
+    { "mark": { "cell": [3, 5] }, "caption": "Answer: best value with capacity 5 is 6" }
+  ]
+}

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" data-t="5530" data-duration="5530">
+<rect width="640" height="360" fill="#ffffff"/>
+<g id="title" data-shape="text" transform="translate(320 22)"><text font-size="18" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Error rate by region (%)</tspan></text></g>
+<g id="axis-y" data-shape="line" transform="translate(0 0)"><line x1="56" y1="70" x2="56" y2="296" stroke="#9ca3af" stroke-width="1.5" fill="none"/></g>
+<g id="axis-x" data-shape="line" transform="translate(0 0)"><line x1="56" y1="296" x2="616" y2="296" stroke="#9ca3af" stroke-width="1.5" fill="none"/></g>
+<g id="tick-0" data-shape="text" transform="translate(48 296)"><text font-size="11" fill="#9ca3af" text-anchor="end" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0</tspan></text></g>
+<g id="tick-1" data-shape="text" transform="translate(48 239.5)"><text font-size="11" fill="#9ca3af" text-anchor="end" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.8</tspan></text></g>
+<g id="grid-1" data-shape="line" transform="translate(0 0)"><line x1="56" y1="239.5" x2="616" y2="239.5" stroke="#e5e7eb" stroke-width="1.5" fill="none"/></g>
+<g id="tick-2" data-shape="text" transform="translate(48 183)"><text font-size="11" fill="#9ca3af" text-anchor="end" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">1.5</tspan></text></g>
+<g id="grid-2" data-shape="line" transform="translate(0 0)"><line x1="56" y1="183" x2="616" y2="183" stroke="#e5e7eb" stroke-width="1.5" fill="none"/></g>
+<g id="tick-3" data-shape="text" transform="translate(48 126.5)"><text font-size="11" fill="#9ca3af" text-anchor="end" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">2.3</tspan></text></g>
+<g id="grid-3" data-shape="line" transform="translate(0 0)"><line x1="56" y1="126.5" x2="616" y2="126.5" stroke="#e5e7eb" stroke-width="1.5" fill="none"/></g>
+<g id="tick-4" data-shape="text" transform="translate(48 70)"><text font-size="11" fill="#9ca3af" text-anchor="end" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">3</tspan></text></g>
+<g id="grid-4" data-shape="line" transform="translate(0 0)"><line x1="56" y1="70" x2="616" y2="70" stroke="#e5e7eb" stroke-width="1.5" fill="none"/></g>
+<g id="cat-0" data-shape="text" transform="translate(112 312)"><text font-size="12" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Mon</tspan></text></g>
+<g id="cat-1" data-shape="text" transform="translate(224 312)"><text font-size="12" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Tue</tspan></text></g>
+<g id="cat-2" data-shape="text" transform="translate(336 312)"><text font-size="12" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Wed</tspan></text></g>
+<g id="cat-3" data-shape="text" transform="translate(448 312)"><text font-size="12" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Thu</tspan></text></g>
+<g id="cat-4" data-shape="text" transform="translate(560 312)"><text font-size="12" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Fri</tspan></text></g>
+<g id="legend-ap-text" data-shape="text" transform="translate(555.2 54)"><text font-size="11" fill="#1f2328" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">ap-south</tspan></text></g>
+<g id="legend-ap" data-shape="rect" transform="translate(545.2 54)"><rect x="-5" y="-5" width="10" height="10" rx="2" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/></g>
+<g id="legend-eu-text" data-shape="text" transform="translate(477 54)"><text font-size="11" fill="#1f2328" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">eu-west</tspan></text></g>
+<g id="legend-eu" data-shape="rect" transform="translate(467 54)"><rect x="-5" y="-5" width="10" height="10" rx="2" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="legend-us-text" data-shape="text" transform="translate(398.8 54)"><text font-size="11" fill="#1f2328" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">us-east</tspan></text></g>
+<g id="legend-us" data-shape="rect" transform="translate(388.8 54)"><rect x="-5" y="-5" width="10" height="10" rx="2" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/></g>
+<g id="bar-us-0" data-shape="rect" transform="translate(85.87 280.93)"><rect x="-12.07" y="-15.07" width="24.13" height="30.13" rx="2" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/></g>
+<g id="val-us-0" data-shape="text" transform="translate(85.87 256.87)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.4</tspan></text></g>
+<g id="bar-us-1" data-shape="rect" transform="translate(197.87 277.17)"><rect x="-12.07" y="-18.83" width="24.13" height="37.67" rx="2" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/></g>
+<g id="val-us-1" data-shape="text" transform="translate(197.87 249.33)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.5</tspan></text></g>
+<g id="bar-us-2" data-shape="rect" transform="translate(309.87 280.93)"><rect x="-12.07" y="-15.07" width="24.13" height="30.13" rx="2" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/></g>
+<g id="val-us-2" data-shape="text" transform="translate(309.87 256.87)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.4</tspan></text></g>
+<g id="bar-us-3" data-shape="rect" transform="translate(421.87 250.8)"><rect x="-12.07" y="-45.2" width="24.13" height="90.4" rx="2" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/></g>
+<g id="val-us-3" data-shape="text" transform="translate(421.87 196.6)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">1.2</tspan></text></g>
+<g id="bar-us-4" data-shape="rect" transform="translate(533.87 273.4)"><rect x="-12.07" y="-22.6" width="24.13" height="45.2" rx="2" fill="#f59e0b" stroke="#f59e0b" stroke-width="1.5"/></g>
+<g id="val-us-4" data-shape="text" transform="translate(533.87 241.8)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.6</tspan></text></g>
+<g id="bar-eu-0" data-shape="rect" transform="translate(112 277.17)"><rect x="-12.07" y="-18.83" width="24.13" height="37.67" rx="2" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="val-eu-0" data-shape="text" transform="translate(112 249.33)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.5</tspan></text></g>
+<g id="bar-eu-1" data-shape="rect" transform="translate(224 273.4)"><rect x="-12.07" y="-22.6" width="24.13" height="45.2" rx="2" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="val-eu-1" data-shape="text" transform="translate(224 241.8)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.6</tspan></text></g>
+<g id="bar-eu-2" data-shape="rect" transform="translate(336 205.6)"><rect x="-12.07" y="-90.4" width="24.13" height="180.8" rx="2" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="val-eu-2" data-shape="text" transform="translate(336 106.2)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">2.4</tspan></text></g>
+<g id="bar-eu-3" data-shape="rect" transform="translate(448 269.63)"><rect x="-12.07" y="-26.37" width="24.13" height="52.73" rx="2" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="val-eu-3" data-shape="text" transform="translate(448 234.27)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.7</tspan></text></g>
+<g id="bar-eu-4" data-shape="rect" transform="translate(560 277.17)"><rect x="-12.07" y="-18.83" width="24.13" height="37.67" rx="2" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="val-eu-4" data-shape="text" transform="translate(560 249.33)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.5</tspan></text></g>
+<g id="bar-ap-0" data-shape="rect" transform="translate(138.13 284.7)"><rect x="-12.07" y="-11.3" width="24.13" height="22.6" rx="2" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/></g>
+<g id="val-ap-0" data-shape="text" transform="translate(138.13 264.4)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.3</tspan></text></g>
+<g id="bar-ap-1" data-shape="rect" transform="translate(250.13 284.7)"><rect x="-12.07" y="-11.3" width="24.13" height="22.6" rx="2" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/></g>
+<g id="val-ap-1" data-shape="text" transform="translate(250.13 264.4)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.3</tspan></text></g>
+<g id="bar-ap-2" data-shape="rect" transform="translate(362.13 280.93)"><rect x="-12.07" y="-15.07" width="24.13" height="30.13" rx="2" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/></g>
+<g id="val-ap-2" data-shape="text" transform="translate(362.13 256.87)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.4</tspan></text></g>
+<g id="bar-ap-3" data-shape="rect" transform="translate(474.13 280.93)"><rect x="-12.07" y="-15.07" width="24.13" height="30.13" rx="2" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/></g>
+<g id="val-ap-3" data-shape="text" transform="translate(474.13 256.87)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.4</tspan></text></g>
+<g id="bar-ap-4" data-shape="rect" transform="translate(586.13 284.7)"><rect x="-12.07" y="-11.3" width="24.13" height="22.6" rx="2" fill="#22c55e" stroke="#22c55e" stroke-width="1.5"/></g>
+<g id="val-ap-4" data-shape="text" transform="translate(586.13 264.4)"><text font-size="11" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">0.3</tspan></text></g>
+<g id="threshold-0" data-shape="line" transform="translate(0 0)"><line x1="56" y1="220.67" x2="616" y2="220.67" stroke="#ef4444" stroke-width="1.5" fill="none"/></g>
+<g id="threshold-0-label" data-shape="text" transform="translate(612 212.67)"><text font-size="11" fill="#ef4444" text-anchor="end" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">alert</tspan></text></g>
+<text x="320" y="346" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">ap-south never saw either: both were region-scoped</text>
+</svg>

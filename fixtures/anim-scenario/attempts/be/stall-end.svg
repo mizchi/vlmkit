@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 160" width="360" height="160" data-t="2300" data-duration="2700">
+<rect width="360" height="160" fill="#ffffff"/>
+<g id="track" data-shape="rect" transform="translate(180 80)"><rect x="-120" y="-6" width="240" height="12" rx="6" fill="#e5e7eb" stroke="#e5e7eb" stroke-width="1.5"/></g>
+<g id="bar" data-shape="rect" transform="translate(132 80)"><rect x="-72" y="-6" width="144" height="12" rx="6" fill="#3b82f6" stroke="#3b82f6" stroke-width="1.5"/></g>
+<g id="pct" data-shape="text" transform="translate(180 50)"><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">100%</tspan></text></g>
+<text x="180" y="146" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">100%</text>
+</svg>

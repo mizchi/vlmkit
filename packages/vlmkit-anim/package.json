@@ -1,0 +1,62 @@
+{
+  "name": "@mizchi/vlmkit-anim",
+  "version": "0.11.1",
+  "description": "Declarative explanatory animation IR: a semantic Scene IR (sorting, arrays with pointers, stacks, queues, linked lists, state machines, heaps, binary search trees, distributed systems, matrices, graphs, charts, concept diagrams, vector) compiled to a keyframe Timeline IR, rendered by a tiny SVG + Web Animations web component or sampled headlessly to SVG frames.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vlmkit.git",
+    "directory": "packages/vlmkit-anim"
+  },
+  "homepage": "https://github.com/mizchi/vlmkit/tree/main/packages/vlmkit-anim#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vlmkit/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-anim",
+    "prepack": "pnpm build",
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-anim/src"
+  },
+  "bin": {
+    "vlmkit-anim": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.mts",
+      "import": "./dist/cli.mjs"
+    },
+    "./*.ts": {
+      "types": "./dist/*.d.mts",
+      "import": "./dist/*.mjs"
+    }
+  },
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "pngjs": "^7.0.0"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.61 <2"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  }
+}

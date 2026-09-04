@@ -1,0 +1,18 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "vector",
+  "title": "Ease comparison",
+  "canvas": { "width": 480, "height": 240 },
+  "nodes": [
+    { "id": "a", "shape": "circle", "pos": [60, 80], "r": 18, "fill": "#f59e0b" },
+    { "id": "b", "shape": "circle", "pos": [60, 160], "r": 18, "fill": "#3b82f6" },
+    { "id": "la", "shape": "text", "pos": [30, 40], "text": "linear vs ease-in-out", "anchor": "start" }
+  ],
+  "timeline": [
+    { "target": "a", "to": { "x": 420 }, "duration": 1200, "easing": "linear", "caption": "linear: constant speed" },
+    { "target": "b", "to": { "x": 420 }, "duration": 1200, "easing": "ease-in-out", "at": "<" },
+    { "wait": 300 },
+    { "target": ["a", "b"], "to": { "x": 60, "opacity": 0.3 }, "duration": 800, "caption": "back, fading" },
+    { "target": "la", "to": { "text": "done" }, "duration": 0 }
+  ]
+}

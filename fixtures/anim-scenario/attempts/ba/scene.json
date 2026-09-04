@@ -1,0 +1,17 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "stack",
+  "title": "Evaluate postfix: 3 4 + 2 *",
+  "ops": [
+    { "push": 3, "caption": "Token 3: push it" },
+    { "push": 4, "caption": "Token 4: push it" },
+    { "pop": true, "caption": "Token +: pop right operand = 4" },
+    { "pop": true, "caption": "Pop left operand = 3 (second pop is left)" },
+    { "push": 7, "caption": "Compute 3 + 4 = 7, push result" },
+    { "push": 2, "caption": "Token 2: push it" },
+    { "pop": true, "caption": "Token *: pop right operand = 2" },
+    { "pop": true, "caption": "Pop left operand = 7 (second pop is left)" },
+    { "push": 14, "caption": "Compute 7 * 2 = 14, push result" },
+    { "note": "Postfix evaluation complete. The answer is 14" }
+  ]
+}

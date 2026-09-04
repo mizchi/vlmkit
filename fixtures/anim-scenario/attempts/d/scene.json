@@ -1,0 +1,65 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "Cache-Aside Pattern",
+  "nodes": [
+    {
+      "id": "app",
+      "label": "App"
+    },
+    {
+      "id": "cache",
+      "label": "Cache"
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "hidden": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "app",
+      "to": "cache",
+      "label": "read"
+    },
+    {
+      "from": "app",
+      "to": "db",
+      "label": "read",
+      "hidden": true
+    },
+    {
+      "from": "db",
+      "to": "cache",
+      "label": "write",
+      "hidden": true
+    }
+  ],
+  "sequence": [
+    {
+      "flow": "app->cache",
+      "caption": "App reads from Cache"
+    },
+    {
+      "note": "Cache miss",
+      "caption": "Key not found"
+    },
+    {
+      "show": "db",
+      "caption": "Database needed"
+    },
+    {
+      "flow": "app->db",
+      "caption": "App reads from Database"
+    },
+    {
+      "flow": "db->cache",
+      "caption": "Result cached"
+    },
+    {
+      "flow": "app->cache",
+      "caption": "App reads Cache again — cache hit"
+    }
+  ]
+}

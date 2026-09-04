@@ -1,0 +1,21 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "chart",
+  "title": "Error rate by region (%)",
+  "categories": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+  "series": [
+    { "id": "us", "label": "us-east", "values": [0.4, 0.5, 0.4, 1.2, 0.6] },
+    { "id": "eu", "label": "eu-west", "values": [0.5, 0.6, 2.4, 0.7, 0.5] },
+    { "id": "ap", "label": "ap-south", "values": [0.3, 0.3, 0.4, 0.4, 0.3] }
+  ],
+  "sequence": [
+    { "reveal": "us", "caption": "us-east: flat all week except Thursday" },
+    { "threshold": { "value": 1, "label": "alert" }, "caption": "The alert threshold is 1%; Thursday crossed it" },
+    { "highlight": { "series": "us", "category": "Thu" }, "caption": "A bad deploy at 14:00 UTC, rolled back after 40 minutes; the post-mortem found part of the spike was a metrics bug, bringing it from 1.8 to 1.2" },
+    { "unhighlight": "all" },
+    { "reveal": "eu", "caption": "eu-west had its own, worse incident on Wednesday" },
+    { "highlight": { "series": "eu", "category": "Wed" }, "caption": "A cascade failure at 11:30 UTC spiked errors to 2.4%" },
+    { "unhighlight": "all" },
+    { "reveal": "ap", "caption": "ap-south never saw either: both were region-scoped" }
+  ]
+}

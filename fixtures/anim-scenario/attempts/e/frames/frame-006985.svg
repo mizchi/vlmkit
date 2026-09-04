@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" data-t="6985" data-duration="9790">
+<rect width="640" height="400" fill="#ffffff"/>
+<g id="title" data-shape="text" transform="translate(320 22)"><text font-size="18" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">Priority queue via min-heap</tspan></text></g>
+<g id="edge-1" data-shape="line" transform="translate(0 0)"><line x1="320" y1="60" x2="160" y2="140" stroke="#9ca3af" stroke-width="1.5" fill="none"/></g>
+<g id="edge-2" data-shape="line" transform="translate(0 0)"><line x1="320" y1="60" x2="480" y2="140" stroke="#9ca3af" stroke-width="1.5" fill="none"/></g>
+<g id="edge-3" data-shape="line" transform="translate(0 0)"><line x1="160" y1="140" x2="80" y2="220" stroke="#9ca3af" stroke-width="1.5" fill="none"/></g>
+<g id="edge-4" data-shape="line" transform="translate(0 0)" opacity="0"><line x1="160" y1="140" x2="240" y2="220" stroke="#9ca3af" stroke-width="1.5" fill="none"/></g>
+<g id="slot-0" data-shape="circle" transform="translate(320 60)"><circle r="22" fill="none" stroke="#9ca3af" stroke-width="1.5"/></g>
+<g id="slot-1" data-shape="circle" transform="translate(160 140)"><circle r="22" fill="none" stroke="#9ca3af" stroke-width="1.5"/></g>
+<g id="slot-2" data-shape="circle" transform="translate(480 140)"><circle r="22" fill="none" stroke="#9ca3af" stroke-width="1.5"/></g>
+<g id="slot-3" data-shape="circle" transform="translate(80 220)"><circle r="22" fill="none" stroke="#9ca3af" stroke-width="1.5"/></g>
+<g id="slot-4" data-shape="circle" transform="translate(240 220)" opacity="0.4"><circle r="22" fill="none" stroke="#9ca3af" stroke-width="1.5"/></g>
+<g id="out-label" data-shape="text" transform="translate(50 366)"><text font-size="12" fill="#9ca3af" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">popped</tspan></text></g>
+<g id="v-0" data-shape="circle" transform="translate(80 220)"><circle r="20" fill="#ffffff" stroke="#1f2328" stroke-width="2"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">9</tspan></text></g>
+<g id="v-1" data-shape="circle" transform="translate(160 140)"><circle r="20" fill="#f59e0b" stroke="#1f2328" stroke-width="2"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">4</tspan></text></g>
+<g id="v-2" data-shape="circle" transform="translate(480 140)"><circle r="20" fill="#ffffff" stroke="#1f2328" stroke-width="2"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">7</tspan></text></g>
+<g id="v-3" data-shape="circle" transform="translate(50 330)"><circle r="20" fill="#22c55e" stroke="#1f2328" stroke-width="2"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">1</tspan></text></g>
+<g id="v-4" data-shape="circle" transform="translate(320 60)"><circle r="20" fill="#f59e0b" stroke="#1f2328" stroke-width="2"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">8</tspan></text></g>
+<text x="320" y="386" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">4 &lt; 8: swap down with the smaller child</text>
+</svg>

@@ -1,0 +1,73 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "vector",
+  "title": "Easing Curves",
+  "canvas": { "width": 500, "height": 300 },
+  "nodes": [
+    {
+      "id": "linear",
+      "shape": "circle",
+      "pos": [50, 80],
+      "r": 15,
+      "fill": "#f59e0b",
+      "text": "linear",
+      "fontSize": 10,
+      "color": "#000"
+    },
+    {
+      "id": "easeIn",
+      "shape": "circle",
+      "pos": [50, 160],
+      "r": 15,
+      "fill": "#3b82f6",
+      "text": "ease-in",
+      "fontSize": 10,
+      "color": "#fff"
+    },
+    {
+      "id": "easeOut",
+      "shape": "circle",
+      "pos": [50, 240],
+      "r": 15,
+      "fill": "#10b981",
+      "text": "ease-out",
+      "fontSize": 10,
+      "color": "#fff"
+    }
+  ],
+  "timeline": [
+    {
+      "target": "linear",
+      "to": { "x": 450 },
+      "duration": 1200,
+      "easing": "linear",
+      "caption": "linear: constant speed throughout"
+    },
+    {
+      "target": "easeIn",
+      "to": { "x": 450 },
+      "duration": 1200,
+      "easing": "ease-in",
+      "at": "<",
+      "caption": "ease-in: starts slow, then accelerates"
+    },
+    {
+      "target": "easeOut",
+      "to": { "x": 450 },
+      "duration": 1200,
+      "easing": "ease-out",
+      "at": "<",
+      "caption": "ease-out: starts fast, then decelerates"
+    },
+    {
+      "wait": 400,
+      "caption": "all three have now finished their journey"
+    },
+    {
+      "target": ["linear", "easeIn", "easeOut"],
+      "to": { "x": 50 },
+      "duration": 1200,
+      "caption": "all three return to the start together"
+    }
+  ]
+}

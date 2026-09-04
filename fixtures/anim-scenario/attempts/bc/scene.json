@@ -1,0 +1,15 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "list",
+  "title": "LRU cache (capacity 3) as a linked list",
+  "ops": [
+    { "insert": { "value": "a", "at": 0 }, "caption": "get a: miss — insert a at the head (head = most recently used)" },
+    { "insert": { "value": "b", "at": 0 }, "caption": "get b: miss — insert b at the head" },
+    { "insert": { "value": "c", "at": 0 }, "caption": "get c: miss — insert c at the head; the cache is now full (capacity 3)" },
+    { "find": "a" },
+    { "remove": "a", "caption": "get a: hit — remove a from its current spot" },
+    { "insert": { "value": "a", "at": 0 }, "caption": "move a to the head: this remove + reinsert-at-0 is what \"move to front\" means" },
+    { "remove": "b", "caption": "get d: miss — b is at the tail, the eviction candidate: evict it" },
+    { "insert": { "value": "d", "at": 0 }, "caption": "insert d at the head" }
+  ]
+}

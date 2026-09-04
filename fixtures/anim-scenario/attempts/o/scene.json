@@ -1,0 +1,19 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "distributed",
+  "title": "Primary-replica write with a failover",
+  "nodes": ["client", { "id": "primary", "status": "leader" }, "replica", "backup"],
+  "messages": [
+    { "from": "client", "to": "primary", "label": "write x=1" },
+    { "from": "primary", "to": "replica", "label": "replicate x=1" },
+    { "from": "replica", "to": "primary", "label": "ack", "after": "replicate x=1", "delay": 1200, "caption": "ack delayed 1200ms: replica's disk write is slow" },
+    { "from": "replica", "to": "backup", "label": "copy x=1", "after": "ack", "caption": "replica forwards a copy to backup" },
+    { "from": "primary", "to": "client", "label": "ok", "after": "ack" },
+    { "from": "client", "to": "primary", "label": "write x=2", "lost": true, "caption": "primary has crashed: the write is lost" },
+    { "from": "client", "to": "replica", "label": "retry x=2", "caption": "client retries against the promoted replica" }
+  ],
+  "events": [
+    { "after": "ok", "delay": 100, "node": "primary", "status": "down", "caption": "primary crashes" },
+    { "after": "write x=2", "node": "replica", "status": "leader", "caption": "replica is promoted" }
+  ]
+}

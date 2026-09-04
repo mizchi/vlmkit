@@ -1,0 +1,25 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "graph",
+  "title": "Fastest build order from core",
+  "nodes": [
+    { "id": "core", "pos": [40, 150] },
+    "utils",
+    "api",
+    "cli",
+    { "id": "web", "pos": [600, 150] }
+  ],
+  "edges": [
+    { "from": "core", "to": "utils", "weight": 2 },
+    { "from": "core", "to": "api", "weight": 5 },
+    { "from": "utils", "to": "api", "weight": 1 },
+    { "from": "utils", "to": "web", "weight": 4 },
+    { "from": "api", "to": "web", "weight": 2 },
+    { "from": "api", "to": "cli", "weight": 3 }
+  ],
+  "directed": true,
+  "layout": "lr",
+  "algorithm": "dijkstra",
+  "start": "core",
+  "goal": "web"
+}

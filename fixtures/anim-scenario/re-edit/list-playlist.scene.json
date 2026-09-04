@@ -1,0 +1,11 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "list",
+  "title": "A playlist as a linked list",
+  "initial": ["intro", "verse", "chorus", "outro"],
+  "ops": [
+    { "find": "chorus", "caption": "To reach the chorus we walk from the head: intro, verse, chorus" },
+    { "insert": { "value": "bridge", "after": "chorus" }, "caption": "Add a bridge after the chorus: chorus now points to bridge, bridge to outro" },
+    { "remove": "intro", "caption": "Drop the intro: verse becomes the head" }
+  ]
+}

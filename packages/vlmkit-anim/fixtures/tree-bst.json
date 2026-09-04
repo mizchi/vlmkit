@@ -1,0 +1,31 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "tree",
+  "title": "Binary search tree",
+  "initial": [
+    8,
+    3,
+    10,
+    1,
+    6
+  ],
+  "ops": [
+    {
+      "insert": 14
+    },
+    {
+      "insert": 4,
+      "caption": "4 goes under 3, then right of 3: 3 < 4 < 6"
+    },
+    {
+      "search": 6
+    },
+    {
+      "delete": 3,
+      "caption": "3 has two children: its in-order successor 4 takes its place"
+    },
+    {
+      "traverse": "inorder"
+    }
+  ]
+}

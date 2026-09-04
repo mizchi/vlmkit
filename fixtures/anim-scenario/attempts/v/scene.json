@@ -1,0 +1,19 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "chart",
+  "title": "Deploys per week by team (Q1–Q4)",
+  "categories": ["Q1", "Q2", "Q3", "Q4"],
+  "series": [
+    { "id": "search", "label": "search", "values": [20, 24, 26, 30] },
+    { "id": "payments", "label": "payments", "values": [8, 9, 12, 14] },
+    { "id": "mobile", "label": "mobile", "values": [3, 4, 4, 5] }
+  ],
+  "sequence": [
+    { "reveal": "search", "caption": "Search team: already at high deployment velocity" },
+    { "reveal": "payments", "caption": "Payments team crosses the target in Q3" },
+    { "threshold": { "value": 10, "label": "Target" }, "caption": "Target: 10 deploys per week" },
+    { "reveal": "mobile", "caption": "Mobile team lags behind the target" },
+    { "highlight": { "series": "mobile" }, "caption": "The review decided to invest in the mobile platform" },
+    { "set": { "series": "mobile", "index": 3, "value": 11 }, "caption": "A pipeline fix shipped late in Q4, boosting mobile above target" }
+  ]
+}

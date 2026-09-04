@@ -1,0 +1,7 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "sort",
+  "title": "Insertion Sort",
+  "algorithm": "insertion",
+  "values": [7, 2, 9, 4, 1]
+}

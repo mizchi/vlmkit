@@ -1,0 +1,19 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "queue",
+  "title": "BFS frontier from A",
+  "ops": [
+    { "enqueue": "A", "caption": "Start BFS at A: enqueue A" },
+    { "dequeue": true, "caption": "Dequeue A: visit A; neighbours B and C are unvisited" },
+    { "enqueue": "B", "caption": "Enqueue B (unvisited neighbour of A)" },
+    { "enqueue": "C", "caption": "Enqueue C (unvisited neighbour of A)" },
+    { "peek": true, "caption": "Peek: B is next to be processed" },
+    { "dequeue": true, "caption": "Dequeue B: visit B; neighbour D is unvisited" },
+    { "enqueue": "D", "caption": "Enqueue D (unvisited neighbour of B)" },
+    { "dequeue": true, "caption": "Dequeue C: visit C; neighbour D is already queued — no enqueue" },
+    { "dequeue": true, "caption": "Dequeue D: visit D; neighbour E is unvisited" },
+    { "enqueue": "E", "caption": "Enqueue E (unvisited neighbour of D)" },
+    { "dequeue": true, "caption": "Dequeue E: visit E; no unvisited neighbours" },
+    { "note": "Queue is empty — BFS from A is complete" }
+  ]
+}

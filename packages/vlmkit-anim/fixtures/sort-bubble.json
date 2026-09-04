@@ -1,0 +1,7 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "sort",
+  "title": "Bubble sort",
+  "algorithm": "bubble",
+  "values": [5, 3, 8, 1, 9, 2]
+}
