@@ -1,0 +1,11 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "array",
+  "title": "Two pointers: a pair that sums to 13",
+  "values": [1, 3, 4, 6, 8, 9, 12],
+  "ops": [
+    { "pointers": { "i": 0, "j": 6 }, "caption": "Sorted array: start with the smallest and the largest" },
+    { "compare": [0, 6], "caption": "1 + 12 = 13: that is the target already" },
+    { "mark": [0, 6], "caption": "Found the pair (1, 12) in one comparison" }
+  ]
+}

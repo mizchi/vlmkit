@@ -1,0 +1,12 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "tree",
+  "title": "Deleting from a BST",
+  "initial": [50, 30, 70, 20, 40, 60, 80, 35, 45],
+  "ops": [
+    { "search": 45, "caption": "45 is a leaf: the simplest thing to delete" },
+    { "delete": 45 },
+    { "delete": 20, "caption": "20 is a leaf too" },
+    { "traverse": "inorder" }
+  ]
+}
