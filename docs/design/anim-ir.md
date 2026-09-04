@@ -95,10 +95,30 @@ semantic verdict, the agent's friction in its own words; plus a re-edit task
 (modify an existing scene) measuring whether intent was readable. Fixes come
 from the quotes. Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
 
+What two rounds found (10 agents, Sonnet and Haiku):
+
+- **First-attempt correctness saturated immediately**: 9/10 clean from the
+  guide or from the one-screen schema sheet alone. That axis is not where the
+  IR needs work.
+- **Re-edit is where the IR was wrong.** Absolute event times in `distributed`
+  drifted silently when a message latency changed (two agents, independently);
+  fixed with `after: "<message label>"` anchors and a mid-flight warning. And a
+  v1 warning's hint ("mention it in a caption") named a remedy the
+  state-machine kind did not have, so a Haiku agent deleted the alternative
+  path the brief required to reach zero warnings; fixed with trace items
+  (`{"on", "caption"}`, `{"note"}`, `{"goto"}`). Every hint must name a remedy
+  that exists in the format — that is now a rule for this package.
+- Vision-model review uses `vlmkit anim sheet`: one labelled contact sheet per
+  animation. Correctness stays with `check`; the sheet is for "does this
+  explain it?".
+
 ## Not done, deliberately
 
 - No layout engine beyond layered / grid / circle. `pos` pins what matters.
 - No edge that follows a moving node (see above).
 - No video export. `frames --png` gives a filmstrip; a video is `ffmpeg` on it.
 - No Svelte / typed-TS / Pkl surface yet. JSON is the IR; typed surfaces are
-  generators for it and can come once the IR has stopped moving.
+  generators for it and can come once the IR has stopped moving. The `types.ts`
+  declarations are already the contract such a surface would target.
+- No video export. `sheet` and `frames --png` cover review; `ffmpeg` over the
+  frames covers the rest.

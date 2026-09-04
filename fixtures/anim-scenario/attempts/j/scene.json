@@ -1,0 +1,20 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "state-machine",
+  "title": "TCP Connection Teardown (Active Close)",
+  "states": [
+    "ESTABLISHED",
+    "FIN_WAIT_1",
+    "FIN_WAIT_2",
+    "TIME_WAIT",
+    { "id": "CLOSED", "final": true }
+  ],
+  "initial": "ESTABLISHED",
+  "transitions": [
+    { "from": "ESTABLISHED", "to": "FIN_WAIT_1", "on": "close", "note": "/ send FIN" },
+    { "from": "FIN_WAIT_1", "to": "FIN_WAIT_2", "on": "ACK", "note": "/ (FIN ack'd)" },
+    { "from": "FIN_WAIT_2", "to": "TIME_WAIT", "on": "FIN", "note": "/ send ACK" },
+    { "from": "TIME_WAIT", "to": "CLOSED", "on": "timeout", "note": "/ 2MSL timer expired" }
+  ],
+  "trace": ["close", "ACK", "FIN", "timeout"]
+}
