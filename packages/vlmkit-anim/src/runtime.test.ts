@@ -159,6 +159,27 @@ describe("<vlm-anim> runtime", () => {
   });
 });
 
+describe("contact sheet", () => {
+  it("renders every step as a tile and screenshots to one PNG at the sheet's own width", async () => {
+    const { renderSheetHtml } = await import("./sheet.ts");
+    const { sampleTimes } = await import("./render-svg.ts");
+    const tl = compileScene(EXAMPLES.heap);
+    const times = sampleTimes(tl, 0);
+    const html = renderSheetHtml(tl, times, { cols: 3, tileWidth: 240 });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const page = await context.newPage();
+    await page.setContent(html);
+    const info = await page.evaluate(() => ({ tiles: document.querySelectorAll("figure").length, width: document.body.getBoundingClientRect().width, svgs: document.querySelectorAll("figure svg").length }));
+    assert.equal(info.tiles, times.length);
+    assert.equal(info.svgs, times.length);
+    assert.equal(info.width, 3 * 240 + 4 * 12);
+    const png = join(dir, "sheet.png");
+    await page.screenshot({ path: png, fullPage: true });
+    assert.ok((await import("node:fs")).statSync(png).size > 5000);
+    await context.close();
+  });
+});
+
 describe("vlmkit check animation on an embedded page", () => {
   it("sees the runtime's animations as page motion: visible effect, settles, honours reduced motion", async () => {
     const tl = compileScene(EXAMPLES.vector);

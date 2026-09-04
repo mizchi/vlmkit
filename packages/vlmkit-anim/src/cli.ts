@@ -28,8 +28,9 @@ import { currentStep, timelineDuration } from "./timeline.ts";
 import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene, type Timeline } from "./types.ts";
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
+import { renderSheetHtml } from "./sheet.ts";
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile"];
 
 function usage(): string {
   return `Usage: vlmkit anim <command> <file.json> [options]
@@ -44,6 +45,9 @@ Commands
                                   One frame as SVG (stdout when no --out).
   frames <file> --out <dir> [--samples N] [--png]
                                   Every step marker (plus N evenly spaced samples) as SVG files; --png also rasterises.
+  sheet <file> --out sheet.png [--cols 3] [--tile 400] [--samples N]
+                                  One contact-sheet image: every step as a labelled tile, for a vision model to read
+                                  in a single call. --out sheet.html writes the page instead (no browser needed).
   html <file> [--out page.html] [--no-autoplay] [--loop] [--title T]
                                   Self-contained page embedding the <vlm-anim> runtime and the timeline.
   runtime [--out vlm-anim.js]     The runtime script alone, for a site that embeds many animations.
@@ -241,6 +245,22 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       }
       return 0;
     }
+    case "sheet": {
+      const out = readFlag(rest, "--out");
+      if (!out) throw new UsageError("vlmkit anim sheet needs --out <sheet.png|sheet.html>");
+      const times = sampleTimes(tl, readInt(rest, "--samples") ?? 0);
+      const cols = readInt(rest, "--cols", { min: 1 }) ?? 3;
+      const tileWidth = readInt(rest, "--tile", { min: 120 }) ?? 400;
+      const html = renderSheetHtml(tl, times, { cols, tileWidth, title: readFlag(rest, "--title") });
+      if (out.endsWith(".html")) {
+        await writeOut(out, html, `sheet (${times.length} frames)`);
+        return 0;
+      }
+      await screenshotHtml(html, out);
+      if (json) console.log(JSON.stringify({ out, frames: times.length, cols, tileWidth }, null, 2));
+      else console.log(`sheet (${times.length} frames, ${cols} per row, ${tileWidth}px tiles) → ${out}`);
+      return 0;
+    }
     case "html": {
       const html = renderEmbedHtml(tl, { autoplay: !hasFlag(rest, "--no-autoplay"), loop: hasFlag(rest, "--loop"), title: readFlag(rest, "--title") });
       await writeOut(readFlag(rest, "--out"), html, "page");
@@ -251,14 +271,31 @@ export async function runAnimCli(argv: string[]): Promise<number> {
   }
 }
 
+async function loadChromium(): Promise<typeof import("playwright").chromium> {
+  try {
+    return (await import("playwright")).chromium;
+  } catch {
+    throw new UsageError("PNG output needs playwright installed (pnpm add -D playwright && npx playwright install chromium); write .svg / .html instead to skip the browser");
+  }
+}
+
+/** Screenshot a self-contained HTML string at its own width, full page. */
+async function screenshotHtml(html: string, out: string): Promise<void> {
+  const chromium = await loadChromium();
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+    await page.setContent(html);
+    await mkdir(dirname(resolve(out)), { recursive: true });
+    await page.screenshot({ path: out, fullPage: true });
+  } finally {
+    await browser.close();
+  }
+}
+
 /** SVG → PNG through Playwright, one page load per frame. Optional dependency: a clear message when absent. */
 async function rasterise(dir: string, files: string[], tl: Timeline): Promise<void> {
-  let chromium: typeof import("playwright").chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    throw new UsageError("--png needs playwright installed (pnpm add -D playwright && npx playwright install chromium)");
-  }
+  const chromium = await loadChromium();
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: Math.ceil(tl.canvas.width), height: Math.ceil(tl.canvas.height) } });

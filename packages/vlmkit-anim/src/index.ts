@@ -5,3 +5,4 @@ export { sampleFrame, sampleKeyframes, timelineDuration, currentStep, currentCap
 export { renderFrameSvg, sampleTimes, pathLength } from "./render-svg.ts";
 export { checkAnimation, checkTimeline, animStats, explain } from "./check.ts";
 export { RUNTIME_SOURCE, renderEmbedHtml } from "./runtime.ts";
+export { renderSheetHtml } from "./sheet.ts";

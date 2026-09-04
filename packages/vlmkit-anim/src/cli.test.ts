@@ -108,6 +108,21 @@ describe("vlmkit anim", () => {
     assert.doesNotMatch(html, /<script src=|<link /);
   });
 
+  it("sheet --out x.html writes a labelled contact sheet without a browser", () => {
+    const out = join(dir, "sheet.html");
+    const r = run(["sheet", join(FIXTURES, "state-tcp.json"), "--out", out, "--cols", "4", "--tile", "300"]);
+    assert.equal(r.status, 0, r.stderr);
+    const html = readFileSync(out, "utf-8");
+    const tiles = html.match(/<figure>/g)?.length ?? 0;
+    assert.ok(tiles >= 7, `expected one tile per step, got ${tiles}`);
+    assert.match(html, /grid-template-columns: repeat\(4, 300px\)/);
+    assert.match(html, /step 2 · \d+ms<\/b><span>on connect: CLOSED → SYN_SENT/);
+    assert.doesNotMatch(html, /data-caption="true"/, "frames on the sheet carry no in-frame caption; the label under the tile has it");
+    const missing = run(["sheet", join(FIXTURES, "state-tcp.json")]);
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr + missing.stdout, /needs --out/);
+  });
+
   it("schema prints a sheet whose example is valid JSON and passes check", () => {
     const r = run(["schema", "--kind", "distributed"]);
     assert.equal(r.status, 0);
