@@ -1,0 +1,644 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #133: vlmkit-anim: annotations in every kind, compose, and a change map on every pull request",
+  "layout": "grid",
+  "canvas": {
+    "width": 1149,
+    "height": 438
+  },
+  "nodes": [
+    {
+      "id": "fixtures/anim-scenario",
+      "label": "fixtures/anim-scenario",
+      "hidden": true
+    },
+    {
+      "id": "anim/src",
+      "label": "anim/src",
+      "hidden": true
+    },
+    {
+      "id": "anim/samples",
+      "label": "anim/samples",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "docs/diagrams",
+      "label": "docs/diagrams",
+      "hidden": true
+    },
+    {
+      "id": "anim",
+      "label": "anim",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "anim/fixtures",
+      "label": "anim/fixtures",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "ci",
+      "label": "ci",
+      "hidden": true
+    },
+    {
+      "id": "scripts",
+      "label": "scripts",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "1/17 anim-scenario: v9 briefs — concept introductions and a new arXiv algori…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 4
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+157 −0"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "2/17 anim-scenario: v9 attempt files in progress"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 9
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+408 −0"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "3/17 anim-scenario: v9 attempt files in progress (2)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 14
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+695 −48"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "4/17 anim-scenario: v9 attempt cb (HTTP/2 multiplexing, haiku)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 20
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1215 −70"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "5/17 anim-scenario: v9 attempt ca (vector clocks, sonnet)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 20
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1283 −74"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "6/17 anim-scenario: v9 attempt files in progress (3)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 20
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1406 −75"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "7/17 anim-scenario: v9 attempt cc (introduce vlmkit-anim, sonnet)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 20
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1523 −75"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "8/17 anim-scenario: v9 attempt ce (Batched Pandora's Box, haiku)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 20
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1622 −75"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "9/17 anim-ir v9: concept introductions and a paper from this week — the form…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 36
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2017 −99"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "anim",
+        "anim/fixtures"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "10/17 vlmkit-anim: annotations in every kind, and `compose` — the two generic…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 63
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3576 −156"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "11/17 anim-scenario: v10 attempt db (HTTP/2 multiplexing, haiku)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 75
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4237 −156"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "12/17 anim-scenario: v10 attempt files in progress"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 75
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4278 −200"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "13/17 anim-scenario: v10 attempt dd (Batched Pandora's Box, sonnet)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 77
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4614 −202"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "14/17 anim-scenario: v10 attempt de (Batched Pandora's Box, haiku)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 77
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4652 −202"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "15/17 anim-scenario: v10 attempt dc (introduce vlmkit-anim, sonnet)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 77
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4753 −202"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "caption": "16/17 anim-ir v10: the same five briefs after annotations and compose — fallb…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 78
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4917 −206"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "ci",
+        "root",
+        "docs/diagrams",
+        "scripts"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "ci",
+        "root",
+        "docs",
+        "docs/design",
+        "docs/diagrams",
+        "anim",
+        "anim/samples",
+        "anim/src",
+        "scripts"
+      ],
+      "caption": "17/17 vlmkit-anim: repo / pr generators, a change map on every pull request, …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 91
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+5995 −219"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "ci",
+        "root",
+        "docs",
+        "docs/design",
+        "docs/diagrams",
+        "anim",
+        "anim/samples",
+        "anim/src",
+        "scripts"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "17 commits · 91 files · +5995 −219 · 13 areas, 0 import edges between them"
+    }
+  ]
+}
