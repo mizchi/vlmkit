@@ -1,0 +1,63 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "distributed",
+  "title": "HTTP/1.1: Two connections with head-of-line blocking",
+  "stepMs": 1000,
+  "nodes": [
+    "Request queue",
+    "Conn 1",
+    "Conn 2"
+  ],
+  "messages": [
+    {
+      "from": "Request queue",
+      "to": "Conn 1",
+      "label": "a: 2",
+      "latency": 2000,
+      "caption": "a (2 units) → Connection 1"
+    },
+    {
+      "from": "Request queue",
+      "to": "Conn 2",
+      "label": "b: 3",
+      "at": "<",
+      "latency": 3000,
+      "caption": "b (3 units) → Connection 2 (both start together)"
+    },
+    {
+      "from": "Request queue",
+      "to": "Conn 1",
+      "label": "c: 1",
+      "after": "a: 2",
+      "latency": 1000,
+      "caption": "c (1 unit) waits for Conn 1 (blocked by a)"
+    },
+    {
+      "from": "Request queue",
+      "to": "Conn 1",
+      "label": "d: 1",
+      "after": "c: 1",
+      "latency": 1000,
+      "caption": "d (1 unit) queued on Conn 1 (blocked by c)"
+    },
+    {
+      "from": "Request queue",
+      "to": "Conn 2",
+      "label": "e: 2",
+      "after": "b: 3",
+      "latency": 2000,
+      "caption": "e (2 units) queued on Conn 2 (blocked by b)"
+    },
+    {
+      "from": "Request queue",
+      "to": "Conn 1",
+      "label": "f: 1",
+      "after": "d: 1",
+      "latency": 1000,
+      "caption": "f (1 unit) last on Conn 1"
+    },
+    {
+      "note": "HTTP/1.1 total: 5 units (max of both connections). Compare: a finishes at 2, b at 3, c at 3, d at 4, e at 5, f at 5"
+    }
+  ]
+}
