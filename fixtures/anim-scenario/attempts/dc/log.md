@@ -169,3 +169,41 @@ a terminal value to report, so there is nothing wrong with the *behavior*,
 but it is a second place the guide's blanket "every kind" claim about the
 closing step doesn't hold literally.
 
+## Summary
+
+- Kinds: `diagram` (scene-1, the pipeline) + `state-machine` (scene-2, the
+  loop). 2 scenes. First-attempt: 2 ✗ (scene-1's `text` annotation
+  rejected), 0 ⚠, 0 ✗ on scene-2. Rounds to green: 2 (1 edit). Bytes on
+  disk: scene-1.json 1571 B, scene-2.json 662 B (2233 B total); the tool's
+  own "scene N B" figure — its parsed/minified count — reports 1304 B / 551 B.
+- Coordinates/colours typed by hand: **none.** Both scenes use only
+  `layout: "lr"` (the default) with no `pos` on any node, and no hex colour
+  anywhere — the caption for beat 2 spells out `{"kind":"sort","values":[5,3,8]}`
+  as prose text (not a real hex/coordinate, just the only way left to put
+  that string on screen — see the `text`-annotation finding above).
+- Storyboard vs delivered: cards 1-6 (title, file, compiler, timeline, the
+  three outputs, check) survived unchanged as scene-1's flow beats — one
+  beat became prose instead of a picture (the JSON snippet: no annotation
+  op works inside `diagram`'s sequence, a real gap, not a design choice).
+  Card 7 (the loop) survived unchanged as scene-2's trace, actually *more*
+  literal than the hand sketch (the guide's `note` field on the fail-edge is
+  the exact hint text I wanted written on the "check" node). Card 8 (the
+  pitch) survived unchanged as the trailing `{"note": …}`. Nothing was
+  dropped outright; one beat was demoted from picture to caption.
+- How free it felt: freer than a slide for the *content* — I never fought
+  layout, arrows auto-routed to a genuinely readable fan-out with zero
+  coordinates, and the loop's states/transitions/notes gave me the check's
+  hint text as a first-class field rather than a manually placed callout. Less
+  free for the *look*: a hand-drawn slide can put anything anywhere (a logo,
+  a real code block with syntax colouring, an arrow from one picture to
+  another); here I had exactly the verbs one kind table lists, and the one
+  time I reached past them (a code snippet on a diagram) the format said no
+  with no fallback annotation, so the idea moved into prose. It is freedom
+  to describe a *kind of thing precisely*, not freedom to draw *anything*.
+- One addition that would help most: let `diagram` (and presumably every
+  kind) actually accept the five annotation ops its own anchor table
+  advertises — a `text` block anchored at a node is precisely how a
+  "scene file / compiler / timeline" pipeline would show the tiny JSON
+  input without inventing a caption workaround.
+
+
