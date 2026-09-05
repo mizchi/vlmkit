@@ -1,0 +1,28 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "distributed",
+  "title": "Vector clocks: causality without a global clock",
+  "nodes": ["A", "B", "C"],
+  "messages": [
+    { "note": "Start: A, B and C each hold a vector [a,b,c] of counters, all zero" },
+    { "value": { "id": "vecA", "label": "A", "text": "[0,0,0]", "at": "A" }, "ms": 0 },
+    { "value": { "id": "vecB", "label": "B", "text": "[0,0,0]", "at": "B" }, "ms": 0 },
+    { "value": { "id": "vecC", "label": "C", "text": "[0,0,0]", "at": "C" }, "ms": 0 },
+
+    { "note": "A has a local event: it increments its own slot" },
+    { "value": { "id": "vecA", "text": "[1,0,0]" }, "ms": 0, "caption": "A: [0,0,0] -> [1,0,0]" },
+
+    { "from": "A", "to": "B", "label": "[1,0,0]", "caption": "A sends its vector to B" },
+    { "value": { "id": "vecB", "text": "[1,1,0]" }, "ms": 0, "caption": "B receives [1,0,0]: max([0,0,0],[1,0,0])=[1,0,0], then +1 own slot -> [1,1,0]" },
+
+    { "note": "Meanwhile, C has a local event of its own: it increments its own slot" },
+    { "value": { "id": "vecC", "text": "[0,0,1]" }, "ms": 0, "caption": "C: [0,0,0] -> [0,0,1]" },
+    { "value": { "id": "eventC", "label": "C's local event (frozen)", "text": "[0,0,1]" }, "ms": 0 },
+
+    { "from": "B", "to": "C", "label": "[1,1,0]", "caption": "B sends its vector to C" },
+    { "value": { "id": "vecC", "text": "[1,1,2]" }, "ms": 0, "caption": "C receives [1,1,0]: max([0,0,1],[1,1,0])=[1,1,1], then +1 own slot -> [1,1,2]" },
+
+    { "note": "Concurrent: A's event [1,0,0] and C's local event [0,0,1] - neither vector is <= the other, so neither happened before the other" },
+    { "note": "Ordered: A's event [1,0,0] <= C's final vector [1,1,2] in every slot - A's event happened-before C's receive" }
+  ]
+}
