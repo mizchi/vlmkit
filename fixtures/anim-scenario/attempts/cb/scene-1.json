@@ -54,10 +54,7 @@
       "label": "f: 1",
       "after": "d: 1",
       "latency": 1000,
-      "caption": "f (1 unit) last on Conn 1"
-    },
-    {
-      "note": "HTTP/1.1 total: 5 units (max of both connections). Compare: a finishes at 2, b at 3, c at 3, d at 4, e at 5, f at 5"
+      "caption": "f (1 unit) last on Conn 1. HTTP/1.1 total: 5 units. Completions: a=2, b=3, c=3, d=4, e=5, f=5"
     }
   ]
 }

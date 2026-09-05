@@ -1,64 +1,123 @@
 {
   "format": "vlmkit-anim/scene@1",
-  "kind": "distributed",
+  "kind": "vector",
   "title": "HTTP/2: One connection with 6 concurrent multiplexed streams",
-  "stepMs": 1000,
+  "stepMs": 500,
+  "canvas": {
+    "width": 600,
+    "height": 320,
+    "background": "#fafafa"
+  },
   "nodes": [
-    "Request queue",
-    "Stream a",
-    "Stream b",
-    "Stream c",
-    "Stream d",
-    "Stream e",
-    "Stream f"
+    {
+      "id": "stream-a",
+      "shape": "rect",
+      "pos": [50, 40],
+      "size": [400, 30],
+      "fill": "#e5e7eb",
+      "text": "Stream a (2 units)"
+    },
+    {
+      "id": "bar-a",
+      "shape": "rect",
+      "pos": [50, 40],
+      "size": [0, 30],
+      "fill": "#3b82f6"
+    },
+    {
+      "id": "stream-b",
+      "shape": "rect",
+      "pos": [50, 80],
+      "size": [400, 30],
+      "fill": "#e5e7eb",
+      "text": "Stream b (3 units)"
+    },
+    {
+      "id": "bar-b",
+      "shape": "rect",
+      "pos": [50, 80],
+      "size": [0, 30],
+      "fill": "#8b5cf6"
+    },
+    {
+      "id": "stream-c",
+      "shape": "rect",
+      "pos": [50, 120],
+      "size": [400, 30],
+      "fill": "#e5e7eb",
+      "text": "Stream c (1 unit)"
+    },
+    {
+      "id": "bar-c",
+      "shape": "rect",
+      "pos": [50, 120],
+      "size": [0, 30],
+      "fill": "#ec4899"
+    },
+    {
+      "id": "stream-d",
+      "shape": "rect",
+      "pos": [50, 160],
+      "size": [400, 30],
+      "fill": "#e5e7eb",
+      "text": "Stream d (1 unit)"
+    },
+    {
+      "id": "bar-d",
+      "shape": "rect",
+      "pos": [50, 160],
+      "size": [0, 30],
+      "fill": "#f59e0b"
+    },
+    {
+      "id": "stream-e",
+      "shape": "rect",
+      "pos": [50, 200],
+      "size": [400, 30],
+      "fill": "#e5e7eb",
+      "text": "Stream e (2 units)"
+    },
+    {
+      "id": "bar-e",
+      "shape": "rect",
+      "pos": [50, 200],
+      "size": [0, 30],
+      "fill": "#10b981"
+    },
+    {
+      "id": "stream-f",
+      "shape": "rect",
+      "pos": [50, 240],
+      "size": [400, 30],
+      "fill": "#e5e7eb",
+      "text": "Stream f (1 unit)"
+    },
+    {
+      "id": "bar-f",
+      "shape": "rect",
+      "pos": [50, 240],
+      "size": [0, 30],
+      "fill": "#06b6d4"
+    }
   ],
-  "messages": [
+  "timeline": [
     {
-      "from": "Request queue",
-      "to": "Stream a",
-      "label": "a: 2",
-      "latency": 2000,
-      "caption": "All assets sent concurrently (one connection, 6 streams)"
+      "target": ["bar-c", "bar-d", "bar-f"],
+      "to": { "w": 200 },
+      "duration": 1000,
+      "caption": "c, d, f complete at 1 unit (40× faster than HTTP/1.1)"
     },
     {
-      "from": "Request queue",
-      "to": "Stream b",
-      "label": "b: 3",
-      "at": "<",
-      "latency": 3000
+      "target": ["bar-a", "bar-e"],
+      "to": { "w": 200 },
+      "duration": 1000,
+      "caption": "a, e complete at 2 units"
     },
     {
-      "from": "Request queue",
-      "to": "Stream c",
-      "label": "c: 1",
-      "at": "<",
-      "latency": 1000,
-      "caption": "Stream c: done at t=1"
-    },
-    {
-      "from": "Request queue",
-      "to": "Stream d",
-      "label": "d: 1",
-      "at": "<",
-      "latency": 1000,
-      "caption": "Streams d and f also done at t=1"
-    },
-    {
-      "from": "Request queue",
-      "to": "Stream e",
-      "label": "e: 2",
-      "at": "<",
-      "latency": 2000
-    },
-    {
-      "from": "Request queue",
-      "to": "Stream f",
-      "label": "f: 1",
-      "at": "<",
-      "latency": 1000
-    },
-    {
-      "note": "HTTP/2 total: 3 units (max of all streams). c, d, f done at 1; a, e done at 2; b done at 3. Compare to HTTP/1.1: 40% faster!"
+      "target": "bar-b",
+      "to": { "w": 200 },
+      "duration": 1000,
+      "caption": "b (longest) completes at 3 units. Total HTTP/2 time: 3 units vs HTTP/1.1's 5 units"
     }
   ]
 }

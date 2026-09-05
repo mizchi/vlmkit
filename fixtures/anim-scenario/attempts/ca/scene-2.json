@@ -1,0 +1,30 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "vector",
+  "title": "Which events can be ordered?",
+  "canvas": { "width": 560, "height": 320 },
+  "nodes": [
+    { "id": "boxA1", "shape": "rect", "pos": [140, 90], "size": [180, 60], "fill": "#3b82f6", "opacity": 0, "text": "A local event: [1,0,0]" },
+    { "id": "boxC1", "shape": "rect", "pos": [420, 90], "size": [180, 60], "fill": "#f59e0b", "opacity": 0, "text": "C local event: [0,0,1]" },
+    { "id": "symbol1", "shape": "text", "pos": [280, 90], "text": "  vs  ", "opacity": 0 },
+
+    { "id": "boxA2", "shape": "rect", "pos": [140, 220], "size": [180, 60], "fill": "#3b82f6", "opacity": 0, "text": "A local event: [1,0,0]" },
+    { "id": "boxC2", "shape": "rect", "pos": [420, 220], "size": [180, 60], "fill": "#f59e0b", "opacity": 0, "text": "C after receiving from B: [1,1,2]" },
+    { "id": "arrow1", "shape": "arrow", "pos": [280, 220], "points": [[-50, 0], [50, 0]], "opacity": 0 }
+  ],
+  "timeline": [
+    {
+      "target": ["boxA1", "boxC1"],
+      "to": { "opacity": 1 },
+      "duration": 300,
+      "caption": "A's local event [1,0,0] and C's local event [0,0,1] cannot be ordered: A has more in slot a, C has more in slot c — neither vector is ≤ the other. They are concurrent."
+    },
+    { "target": "symbol1", "to": { "opacity": 1 }, "duration": 0, "at": "<" },
+    {
+      "target": ["boxA2", "boxC2", "arrow1"],
+      "to": { "opacity": 1 },
+      "duration": 300,
+      "caption": "A's event [1,0,0] and C's later vector [1,1,2] CAN be ordered: every slot of A's vector is ≤ C's ([1,0,0] ≤ [1,1,2]), so A's event happened-before C's receive."
+    }
+  ]
+}
