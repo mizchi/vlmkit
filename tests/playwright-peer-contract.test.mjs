@@ -31,6 +31,7 @@ const PEER_PACKAGES = [
   "package.json",
   "packages/vlmkit-core/package.json",
   "packages/vlmkit-capture/package.json",
+  "packages/vlmkit-animation-eval/package.json",
   "packages/vlmkit-markup/package.json",
 ];
 

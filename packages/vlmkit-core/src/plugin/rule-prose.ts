@@ -20,8 +20,8 @@
  * call the primitive directly, because a helper that fit those too would take more
  * configuration than the code it replaced.
  */
-import type { FindingSeverity, RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { applyRuleTiers, hiddenByRuleNote, type TieredRow } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
+import type { FindingSeverity, RuleView } from "./contract.ts";
+import { applyRuleTiers, hiddenByRuleNote, type TieredRow } from "./rule-tier.ts";
 
 /** The shape all seven reports' rows already have. */
 export interface IssueLike {

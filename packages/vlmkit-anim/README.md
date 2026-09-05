@@ -37,4 +37,22 @@ const svg = renderFrameSvg(timeline, 1200);    // deterministic, browser-free
 const html = renderEmbedHtml(timeline);        // self-contained page
 ```
 
-`playwright` is an optional peer, used only by `vlmkit-anim frames --png`.
+### Writing scenes in TypeScript
+
+```ts
+// insertion.scene.ts — any verb takes it: vlmkit-anim check insertion.scene.ts
+import { scene } from "@mizchi/vlmkit-anim";
+export default scene.sort({ algorithm: "insertion", values: [5, 3, 8, 1, 4] });
+```
+
+`scene.<kind>({ … })` fills in `format` and `kind` and types the body; `sceneJson(s)`
+writes the equivalent JSON file. JSON stays the format — this is the editor's view of it.
+
+## Optional peers
+
+- `playwright` — `frames --png`, `sheet` (PNG), `video`, `eval`. Everything else is browser-free.
+- `@mizchi/vlmkit-animation-eval` — `vlmkit-anim eval page.html`: the frame-sampled evaluator
+  behind vlmkit's `check animation` gate, run on the pages this tool emits. Writing needs neither.
+
+Sample outputs for every fixture (one GIF and one contact sheet each) are in
+[`samples/`](./samples/README.md).

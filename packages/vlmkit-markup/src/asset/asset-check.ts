@@ -40,7 +40,7 @@ import { extractPaletteFromFile, extractPaletteFromRgba, type PaletteColor } fro
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { retuneNote, tierIssues } from "../rule-prose.ts";
+import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 
 export type AssetIssueKind =
   | "aspect-mismatch"

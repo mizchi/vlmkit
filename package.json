@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "VLM-driven frontend toolkit: visual regression (snapshot / diff / regression-watch), markup synthesis from screenshots, design-token / theme / a11y / i18n audits, and a 2-stage VLM+LLM CSS auto-repair loop.",
   "license": "MIT",
   "author": "mizchi",
@@ -77,12 +77,14 @@
     "motion:kagura-runtime-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/game-asset-motion-core.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-smoke-utils.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-batch-utils.test.mjs",
     "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "anim:samples": "node scripts/anim-samples.mjs"
   },
   "devDependencies": {
     "@jsquash/webp": "^1.5.0",
     "@mizchi/vlmkit-ai": "workspace:*",
     "@mizchi/vlmkit-anim": "workspace:*",
+    "@mizchi/vlmkit-animation-eval": "workspace:*",
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",
     "@mizchi/vlmkit-generate": "workspace:*",

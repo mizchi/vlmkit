@@ -16,6 +16,7 @@ const packageDirectories = [
   "vlmkit-core",
   "vlmkit-ai",
   "vlmkit-capture",
+  "vlmkit-animation-eval",
   "vlmkit-generate",
   "vlmkit-plan",
   "vlmkit-markup",
@@ -25,6 +26,7 @@ const packageDirectories = [
 const playwrightPeerPackages = new Set([
   "@mizchi/vlmkit-core",
   "@mizchi/vlmkit-capture",
+  "@mizchi/vlmkit-animation-eval",
   "@mizchi/vlmkit-markup",
   "@mizchi/vlmkit-heal",
   // Optional peer (only `frames --png`, `sheet` and `video` launch a browser), same range.

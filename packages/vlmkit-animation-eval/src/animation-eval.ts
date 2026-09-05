@@ -25,14 +25,18 @@
  * Usage:
  *   vlmkit check animation <html-or-url>
  *   vlmkit check animation <html-or-url> --json --frames out/frames
+ *   vlmkit-anim eval <page.html>          (the same report from the animation tool)
+ *
+ * Lives in its own package (`@mizchi/vlmkit-animation-eval`) so the animation
+ * authoring tool can depend on the measurement without the rest of vlmkit.
  */
 import { mkdir, writeFile } from "node:fs/promises";
-import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
+import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
 import { dirname, join, resolve } from "node:path";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { retuneNote, tierIssues } from "../rule-prose.ts";
+import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";

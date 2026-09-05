@@ -70,17 +70,23 @@ sampler handle trivially.
 
 ## A standalone tool, not a `vlmkit` subcommand
 
-`vlmkit-anim` is its own binary and the package depends on nothing else in
-the workspace (arg parsing and the error printer are the forty lines in
-`cli-args.ts`). What it shares with vlmkit is the **evaluation** side, and it
-shares that as a consumer: the pages it emits are ordinary SVG + Web
-Animations, so `vlmkit check animation` measures them like any page, and the
-runtime test proves the two agree. The animation tool does not need
-vlmkit's capture, diff or gate plumbing to do its job, and a `vlmkit anim`
-verb would have suggested it did. The next step on that axis is to split the
-evaluation tooling itself, so that the check a page of animations gets is a
-package the animation tool (and anything else) depends on, rather than the
-whole of vlmkit.
+`vlmkit-anim` is its own binary and, to write animations, the package depends
+on nothing else in the workspace (arg parsing and the error printer are the
+forty lines in `cli-args.ts`). What it shares with vlmkit is the **evaluation**
+side, and that side is now its own package: `@mizchi/vlmkit-animation-eval`
+holds the frame-sampled measurement (`runAnimationEval` — pause every Web
+Animation, seek deterministic sample points, screenshot, derive issues) that
+used to live inside `vlmkit-markup`. `vlmkit check animation` is that report
+behind the gate runner; `vlmkit-anim eval page.html` is the same report behind
+the animation tool, loaded as an optional peer so a writer who never measures
+installs nothing extra. The evaluator depends on `vlmkit-core` (page load,
+browser launch, PNG) and Playwright, not on capture, diff or gate plumbing;
+two shared helpers it needed (`stable-selector`, `rule-prose`) moved into core
+for the same reason. The runtime test proves the two sides agree: the pages
+`vlmkit-anim` emits are ordinary SVG + Web Animations, and the evaluator sees
+their motion as page motion. A `vlmkit anim` verb would have suggested the
+tool needed the rest of vlmkit; it does not, and now neither does the
+measurement.
 
 ## Headless sampling is the same arithmetic
 
@@ -166,9 +172,12 @@ brief passed on the first attempt with the alternative path narrated):
 
 - No layout engine beyond layered / grid / circle. `pos` pins what matters.
 - No edge that follows a moving node (see above).
-- No Svelte / typed-TS / Pkl surface yet. JSON is the IR; typed surfaces are
-  generators for it and can come once the IR has stopped moving. The `types.ts`
-  declarations are already the contract such a surface would target.
+- No Svelte / Pkl surface. JSON is the IR; typed surfaces are generators for
+  it. The one that exists is the smallest possible: `scene.<kind>({ … })` in
+  `author.ts` fills in `format` and `kind` over the `types.ts` declarations,
+  and the CLI `import()`s a `.ts` / `.mjs` module's default export in place of
+  a file. It adds nothing to the format — a misspelling becomes an editor error
+  instead of a `check` error, and `sceneJson` writes the JSON back out.
 - No video *encoder* beyond GIF. `video` writes GIF in-process because flat
   SVG colours fit 256 entries and GIF plays inline everywhere; MP4 / WebM go
   through `ffmpeg` when present and otherwise leave the frames and the

@@ -140,15 +140,22 @@ is how Playwright's own `mount` fixture works. Consequences:
 ```bash
 vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fourteen)
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
+vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
 vlmkit-anim explain scene.json                      # narration as a numbered list
 vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
 vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
 vlmkit-anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
+vlmkit-anim eval page.html                          # the shared frame-sampled evaluator on an emitted page (same report as `vlmkit check animation`)
 ```
 
-`vlmkit-anim` is a **standalone binary** (`@mizchi/vlmkit-anim`, no workspace
-dependencies), not a `vlmkit` subcommand; it shares vlmkit's evaluation gates as
-a consumer (`vlmkit check animation` on its pages). In this repo run it as
+`vlmkit-anim` is a **standalone binary** (`@mizchi/vlmkit-anim`), not a `vlmkit`
+subcommand. Its only workspace tie is the **evaluation** package
+`@mizchi/vlmkit-animation-eval` (an optional peer, loaded by `vlmkit-anim eval`):
+the frame-sampled measurement behind `vlmkit check animation` lives there, so the
+animation tool and the gate share one evaluator without the tool depending on
+vlmkit's capture, diff or gate plumbing. Sample outputs (one GIF and one contact
+sheet per fixture) are committed under `packages/vlmkit-anim/samples/`; regenerate
+with `pnpm anim:samples` after changing a compiler. In this repo run it as
 `pnpm exec vlmkit-anim …` (resolves to `dist/`, so `pnpm --filter @mizchi/vlmkit-anim build`
 after editing `src/`) or, without a build, `node --experimental-strip-types packages/vlmkit-anim/src/cli.ts …`.
 
@@ -308,6 +315,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
+| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `vlmkit-anim eval`. Depends on core + Playwright only; the first evaluation tool split out so the animation tool can share it without the rest of vlmkit. |
 | `packages/vlmkit-anim/` | **Explanatory animation IR** (`vlmkit-anim`): Scene IR (sort / array / stack / queue / list / state-machine / heap / tree / distributed / matrix / graph / chart / diagram / vector) → Timeline IR → `<vlm-anim>` runtime (SVG + Web Animations) and headless SVG frames. Writing guide `docs/anim-ir.md`; design `docs/design/anim-ir.md`. Every JSON block in the guide is compiled by `docs.test.ts` — edit the guide and the examples together. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |

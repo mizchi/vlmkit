@@ -35,7 +35,7 @@
  *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
  */
 import { resolve } from "node:path";
-import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
+import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
 import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";

@@ -39,6 +39,9 @@ importers:
       '@mizchi/vlmkit-anim':
         specifier: workspace:*
         version: link:packages/vlmkit-anim
+      '@mizchi/vlmkit-animation-eval':
+        specifier: workspace:*
+        version: link:packages/vlmkit-animation-eval
       '@mizchi/vlmkit-capture':
         specifier: workspace:*
         version: link:packages/vlmkit-capture
@@ -102,9 +105,24 @@ importers:
 
   packages/vlmkit-anim:
     dependencies:
+      '@mizchi/vlmkit-animation-eval':
+        specifier: workspace:*
+        version: link:../vlmkit-animation-eval
       gifenc:
         specifier: ^1.0.3
         version: 1.0.3
+      playwright:
+        specifier: '>=1.61 <2'
+        version: 1.61.1
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
+
+  packages/vlmkit-animation-eval:
+    dependencies:
+      '@mizchi/vlmkit-core':
+        specifier: workspace:*
+        version: link:../vlmkit-core
       playwright:
         specifier: '>=1.61 <2'
         version: 1.61.1
@@ -171,6 +189,9 @@ importers:
       '@mizchi/vlmkit-ai':
         specifier: workspace:*
         version: link:../vlmkit-ai
+      '@mizchi/vlmkit-animation-eval':
+        specifier: workspace:*
+        version: link:../vlmkit-animation-eval
       '@mizchi/vlmkit-capture':
         specifier: workspace:*
         version: link:../vlmkit-capture
