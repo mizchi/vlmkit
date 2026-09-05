@@ -67,3 +67,74 @@ Neither scene needs a hand-picked coordinate or a hex colour — `matrix` and
 
 Wrote `scene-1.json` (matrix, the concrete run) and `scene-2.json`
 (state-machine, the branch + takeaway). Ran `check` on both.
+
+```
+$ pnpm exec vlmkit-anim check scene-1.json
+✗ ops[3].set.ms: unknown key "ms"
+    → accepted keys: "cell", "value", "from"
+✗ 1 error(s): fix these before the semantic checks can run
+```
+Bug in my own JSON, not the format: I nested `"ms": 0` *inside* the `set`
+object instead of as a sibling of it. Every kind's op-level fields (`ms`,
+`caption`) sit next to the verb key, not inside it — I'd absorbed the
+verb's own field names from the tables and mis-nested this one. Fixed by
+moving `"ms": 0` up a level, onto the op itself.
+
+```
+$ pnpm exec vlmkit-anim check scene-2.json
+⚠ canvas: the canvas is 2682×360: on a 1280px-wide screen it shrinks to 48% and labels stop being legible
+    → use "layout": "tb" or "circle", shorten labels, or split the scene
+✓ scene-2.json (state-machine): 0 error(s), 1 warning(s)
+```
+Five states with `lr` (default) layout plus a `goto` rewind put everything
+in one wide row. Took the hint verbatim: added `"layout": "tb"`.
+
+## Round 2
+
+- Fixed the `ms` nesting in `scene-1.json`.
+- Added `"layout": "tb"` to `scene-2.json`.
+
+```
+$ pnpm exec vlmkit-anim check scene-1.json
+✓ scene-1.json (matrix): 0 error(s), 0 warning(s)
+  5400ms · 10 steps (9 captioned) · 22 nodes · 16 tracks / 36 keyframes
+  scene 1520 B → timeline 6433 B (×4.2)
+
+$ pnpm exec vlmkit-anim check scene-2.json
+✓ scene-2.json (state-machine): 0 error(s), 0 warning(s)
+  6650ms · 9 steps (9 captioned) · 17 nodes · 11 tracks / 40 keyframes
+  scene 1071 B → timeline 5998 B (×5.6)
+```
+
+Both green. Ran `explain` on both to confirm the required figures actually
+land in the narration (not just "no errors"):
+
+`scene-1.json` step 5 (both boxes of batch 1 reveal):
+> Box 2 opens at the same instant: shows 1/2 (not the jackpot 99, not 0)
+> · best so far = 0.5 · Cost so far: setup 1/5 + box1 1/5 + box2 1/5 = 3/5
+
+`scene-1.json` step 8 (box 3 reveals):
+> Box 3 opens: shows 10 · best so far = 10 · cost so far (setup + boxes)
+> = 1.8 (setup 0.2+0.2 + boxes 0.2+0.2+1)
+
+`scene-2.json` step 3 (the branch taken) and step 7 (the branch replayed):
+> on box2<=0.5: batch1_open → batch2_open E[gain] = 0.2×(10−0.5) = 1.9 >
+> batch-2 cost 1.2: open it
+> on box2=99: batch1_open → stop no second batch is worth 1.2 more;
+> score = 99 − 0.6 = 98.4
+
+Both required figures (1.9 vs 1.2, and the branch outcomes) are present in
+`explain`, not only in the JSON — success criterion met. Also read the
+rendered SVG for step 5 of `scene-1.json` and step 3 of `scene-2.json`
+(`render --step N`) to confirm the picture actually matches the caption:
+the matrix draws the cost row (0.2, 0.2, 1) and an empty reward row at
+step 5's start point with `<g id="group-batch-0">` / `group-batch-1"` present
+(the "Batch 1" / "Batch 2" dashed outlines from the `group` annotation);
+the state-machine draws five circle nodes with `tr-0`..`tr-3` arrows carrying
+the note text I wrote, laid out top-to-bottom after the fix. No stray
+coordinates anywhere in either render — every `transform="translate(...)"`
+in the SVG was computed by the compiler, not typed by me.
+
+Stopped here: both scenes are green (0 ✗, 0 ⚠) and `explain` carries every
+figure the brief's success criterion names. 2 rounds used of the 4-round
+budget.
