@@ -6,10 +6,12 @@
  * a node's box and its lifeline from that moment on.
  */
 
-import type { DistributedScene, Timeline } from "../types.ts";
+import type { DistMessage, DistNote, DistributedScene, Timeline } from "../types.ts";
 import { Builder, labelWidth } from "./builder.ts";
 
 const STATUS_FILL: Record<string, keyof import("../types.ts").Theme> = { up: "node", down: "bad", leader: "accent", busy: "muted" };
+
+const isNote = (m: DistMessage | DistNote): m is DistNote => "note" in m;
 
 export function compileDistributed(scene: DistributedScene): Timeline {
   const b = new Builder(scene, { width: 640, height: 400, stepMs: 600 });
@@ -26,7 +28,15 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   // Resolve message times first: default is sequential; `after` anchors to when a
   // labelled earlier message lands, so a latency change upstream moves everything
   // that was written relative to it.
-  const msgs = scene.messages.map((m) => ({ ...m, at: undefined as number | undefined, atRaw: m.at }));
+  // A note is a captioned pause in the same list: it takes a beat, sends nothing, and every
+  // node waits for it. It is carried through `msgs` so `messageTimes` stays index-aligned.
+  type Resolved = { at: number | undefined; atRaw: number | "<" | undefined; latency: number | undefined } & (
+    | { note: string; from?: undefined; to?: undefined; label?: undefined; lost?: undefined; caption?: undefined; after?: string; delay?: number }
+    | (DistMessage & { note?: undefined })
+  );
+  const msgs: Resolved[] = scene.messages.map((m) =>
+    isNote(m) ? { ...m, at: undefined, atRaw: m.at, latency: undefined } : { ...m, at: undefined, atRaw: m.at, latency: m.latency },
+  );
   const landed = new Map<string, number>();
   // `causal`: a node is free to send once the last message it received has landed
   // and its own previous message has landed. Inserting a side branch from one
@@ -36,14 +46,19 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   let cursor = 0;
   let prevStart = 0;
   for (const m of msgs) {
-    m.latency = m.latency ?? b.stepMs;
+    m.latency = m.latency ?? (m.note !== undefined ? b.stepMs * 0.9 : b.stepMs);
     if (typeof m.atRaw === "number") m.at = m.atRaw;
     else if (m.atRaw === "<") m.at = prevStart; // together with the previous message
     else if (m.after !== undefined) m.at = (landed.get(m.after) ?? cursor) + (m.delay ?? 0);
+    else if (m.note !== undefined) m.at = cursor; // a pause starts when everything so far has landed
     else m.at = causal ? (free.get(m.from) ?? 0) : cursor;
     prevStart = m.at;
     const lands = m.at + m.latency;
     cursor = Math.max(cursor, lands);
+    if (m.note !== undefined) {
+      for (const nd of nodes) free.set(nd.id, Math.max(free.get(nd.id) ?? 0, lands)); // everyone waits
+      continue;
+    }
     if (m.label !== undefined) landed.set(m.label, lands);
     free.set(m.from, Math.max(free.get(m.from) ?? 0, lands));
     if (!m.lost) free.set(m.to, Math.max(free.get(m.to) ?? 0, lands));
@@ -65,6 +80,10 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   });
 
   msgs.forEach((m, i) => {
+    if (m.note !== undefined) {
+      b.step(m.note, undefined, m.at!);
+      return;
+    }
     const from = laneOf.get(m.from)!;
     const to = laneOf.get(m.to)!;
     const y0 = yAt(m.at!);
@@ -110,8 +129,8 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   const tl = b.build({
     title: scene.title,
     kind: "distributed",
-    delivered: msgs.filter((m) => !m.lost).length,
-    lost: msgs.filter((m) => m.lost).length,
+    delivered: msgs.filter((m) => m.note === undefined && !m.lost).length,
+    lost: msgs.filter((m) => m.note === undefined && m.lost).length,
     // Resolved timing, so the checker judges what was actually compiled.
     messageTimes: msgs.map((m) => [m.at!, m.at! + m.latency!]),
     eventTimes: events.map((e) => e.at),

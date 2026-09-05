@@ -166,7 +166,9 @@ reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
 Procedure is the `agent-validation-loop` skill; prompt the agent with one brief
 and the guide, forbid `packages/vlmkit-anim/` and other attempts, and record
 first-attempt ✗ count, rounds to green, scene bytes, and its friction verbatim.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md` (v1–v8, structures) and
+`docs/reports/2026-09-05-anim-ir-v9.md` (concept introductions; the coordinate-fallback
+count is the expressiveness metric).
 
 ## Measuring Gate / Rule Execution Cost
 

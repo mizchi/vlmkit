@@ -14,7 +14,8 @@ This page is the complete writing guide. Every JSON block on it passes
 2. vlmkit-anim check scene.json             validate → compile → semantic checks → stats
    read each ✗ line: path, what is wrong, and the → hint with the fix; edit; re-run
 3. vlmkit-anim explain scene.json           the narration as a numbered list — is this the story you meant?
-4. vlmkit-anim render scene.json --step 4   one frame as SVG (or --at <ms>); --out frame.svg
+4. vlmkit-anim render scene.json --step 4   one frame as SVG, at the instant step 4 begins; --out frame.svg
+   vlmkit-anim render scene.json --at 2300   …at a time — what a step's own fade-in has drawn is only visible past its start
    vlmkit-anim frames scene.json --out dir [--png]   every step as a file, for looking at
    vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
 5. vlmkit-anim html scene.json --out page.html       the playable page
@@ -46,7 +47,7 @@ conventions hold in every kind:
 
 - A `caption` on an op or sequence item **replaces** the generated caption for that beat.
 - `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
-- Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote.
+- Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote. `vector` is the exception: it narrates only the items you captioned, and adds neither.
 - A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
 
 `vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
@@ -255,7 +256,7 @@ order must be ascending and every node at its depth.
 |---|---|
 | `states` | required: `"id"` or `{"id", "label", "final": true, "pos": [x, y]}` (final = double ring; `pos` pins the state, the rest are laid out around it) |
 | `initial` | required |
-| `transitions` | required: `{"from", "to", "on": "event", "note": "/ action"}`; one per (from, on) |
+| `transitions` | required: `{"from", "to", "on": "event", "note": "/ action"}`; one per (from, on). The note is drawn on the edge and appended to the generated caption (`on lock: closed → locked / beep`), so `explain` carries it; a trace item's own `caption` replaces the whole line |
 | `trace` | required: items fired in order. An event name (must be legal from the current state — the validator lists the legal ones when it is not); `{"on": "ev", "caption": "…"}` to narrate that step yourself; `{"note": "…"}` for a captioned pause; `{"goto": "state", "caption": "…"}` to jump the token without a transition — how you show a second path after the first has ended |
 | `layout` | `lr` (default) \| `tb` \| `circle` |
 
@@ -310,7 +311,7 @@ check verifies the final tree is a heap and that pops come out in order.
 | field | |
 |---|---|
 | `nodes` | required: `"id"` or `{"id", "label", "status": up \| down \| leader \| busy}` |
-| `messages` | required: `{"from", "to", "label", "at": ms \| "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `"<"` starts it together with the previous message (a broadcast), `latency` defaults to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`) |
+| `messages` | required: `{"from", "to", "label", "at": ms \| "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `"<"` starts it together with the previous message (a broadcast), `latency` defaults to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`). `{"note": "…", "at" \| "after", "delay"}` in the same list is a captioned pause: nothing travels, every node waits for it, and it defaults to when everything so far has landed |
 | `events` | `{"after": "label" \| "at": ms, "delay": ms, "node", "status", "caption"}` — recolours the node from that moment. Prefer `after`: an absolute `at` stays put when you lengthen a latency upstream, and the check warns when it then lands mid-flight or a down node keeps sending |
 
 Sequence-diagram picture: node boxes across the top, lifelines down, time runs
@@ -384,7 +385,7 @@ rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
 
 | field | |
 |---|---|
-| `cells` | required: rows of `number` \| `string` \| `null`, all the same length; `null` is an empty cell waiting to be filled |
+| `cells` | required: rows of `number` \| `string` \| `null`, all the same length; `null` is an empty cell waiting to be filled. A number is drawn as JavaScript prints it (`0.6`); write `"3/5"` as a string to keep your notation |
 | `rowLabels`, `colLabels` | optional headers, one per row / column; captions use them instead of indices |
 | `ops` | `{"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}` writes a value — `from` names the cells it was computed from, which flash while a token flies from each into the target; `{"highlight": T}` / `{"unhighlight": T \| "all"}` / `{"mark": T}` where T is `{"cell": [r, c]}` \| `{"cells": [[r, c], …]}` \| `{"row": r}` \| `{"col": c}` (highlight = accent until cleared, mark = permanent done colour); `{"swap": {"rows": [i, j]}}` / `{"swap": {"cols": [i, j]}}` (labels move with them); `{"note": "…"}`; each may carry `caption`, `ms` |
 

@@ -77,6 +77,12 @@ export function checkTimeline(tl: Timeline): Diagnostic[] {
       }
     }
   }
+  // A canvas a viewer cannot take in at one glance. Layouts grow with label length and node
+  // count and nothing else complains (v9: five long-labelled states laid out `lr` gave 4266px).
+  const WIDE = 2000;
+  if (width > WIDE || height > WIDE) {
+    out.push(warn("canvas", `the canvas is ${width}×${height}: on a 1280px-wide screen it shrinks to ${Math.round((1280 / Math.max(width, height)) * 100)}% and labels stop being legible`, 'use "layout": "tb" or "circle", shorten labels, or split the scene'));
+  }
   // Steps without captions are legal but explain nothing.
   const steps = tl.steps ?? [];
   if (steps.length > 0 && steps.every((s) => !s.caption)) out.push(warn("steps", "no step has a caption: the viewer gets motion without narration", 'add "caption" to the steps that matter'));
@@ -219,6 +225,7 @@ function checkDistributed(scene: Extract<Scene, { kind: "distributed" }>, tl: Ti
     else if (down.has(e.node) && t > down.get(e.node)!) down.delete(e.node);
   });
   scene.messages.forEach((m, i) => {
+    if ("note" in m) return;
     const [, lands] = times[i] ?? [0, 0];
     const initialDown = scene.nodes.some((n) => typeof n !== "string" && n.id === m.to && n.status === "down");
     const downAt = down.get(m.to);
@@ -233,9 +240,10 @@ function checkDistributed(scene: Extract<Scene, { kind: "distributed" }>, tl: Ti
   (scene.events ?? []).forEach((e, i) => {
     const at = e.at;
     if (at === undefined) return;
-    const inside = times.findIndex(([t0, t1]) => at > t0 && at < t1);
+    const inside = times.findIndex(([t0, t1], k) => !("note" in scene.messages[k]) && at > t0 && at < t1);
     if (inside >= 0) {
       const m = scene.messages[inside];
+      if ("note" in m) return;
       out.push(warn(`events[${i}].at`, `t=${at} falls while "${m.from} → ${m.to}${m.label ? `: ${m.label}` : ""}" is in flight (${times[inside][0]}–${times[inside][1]}ms)`, `if that is not the story, anchor it: {"after": "${m.label ?? "<label that message>"}", …} follows the message when timing shifts`));
     }
   });
@@ -248,6 +256,7 @@ function checkDistributed(scene: Extract<Scene, { kind: "distributed" }>, tl: Ti
     else if (downSince.has(e.node) && t > downSince.get(e.node)!) downSince.delete(e.node);
   });
   scene.messages.forEach((m, i) => {
+    if ("note" in m) return;
     const t0 = times[i]?.[0];
     const since = downSince.get(m.from);
     if (t0 !== undefined && since !== undefined && t0 >= since) {

@@ -369,7 +369,7 @@ Matching brackets with a stack — 7 steps, 4070ms, 9 nodes
 
 ## state-tcp
 
-`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 360 KB
+`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 366 KB
 
 ![state-tcp animation](./state-tcp.gif)
 
@@ -380,10 +380,10 @@ Matching brackets with a stack — 7 steps, 4070ms, 9 nodes
 ```
 TCP client handshake — 7 steps, 5810ms, 15 nodes
  1. [    0ms] Start in "CLOSED"
- 2. [  560ms] on connect: CLOSED → SYN_SENT
+ 2. [  560ms] on connect: CLOSED → SYN_SENT / send SYN
  3. [ 1540ms] on timeout: SYN_SENT → CLOSED
- 4. [ 2520ms] on connect: CLOSED → SYN_SENT
- 5. [ 3500ms] on SYN+ACK: SYN_SENT → ESTABLISHED
+ 4. [ 2520ms] on connect: CLOSED → SYN_SENT / send SYN
+ 5. [ 3500ms] on SYN+ACK: SYN_SENT → ESTABLISHED / send ACK
  6. [ 4480ms] on close: ESTABLISHED → FIN_WAIT
  7. [ 5460ms] End in final state "FIN_WAIT"
 ```

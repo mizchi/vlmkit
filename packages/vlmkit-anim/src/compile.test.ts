@@ -196,7 +196,7 @@ describe("distributed", () => {
     };
     const before = compileScene(base);
     assert.deepEqual(before.meta?.eventTimes, [2000]);
-    const slow: typeof base = { ...base, messages: base.messages.map((m) => (m.label === "ack" ? { ...m, latency: 1700 } : m)) };
+    const slow: typeof base = { ...base, messages: base.messages.map((m) => ("label" in m && m.label === "ack" ? { ...m, latency: 1700 } : m)) };
     const after = compileScene(slow);
     assert.deepEqual(after.meta?.eventTimes, [3200], "the crash moved with the message it is anchored to");
     assert.deepEqual(checkAnimation(after, slow).filter((d) => d.severity !== "warn" || /flight|down since/.test(d.message)), []);

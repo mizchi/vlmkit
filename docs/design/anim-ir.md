@@ -164,6 +164,20 @@ brief passed on the first attempt with the alternative path narrated):
   **every warning must be about the scene** — a diagnostic the writer cannot
   act on is a compiler bug. The first `vector` re-edit (a progress bar's
   pause becoming a stall) matched every predicted coordinate.
+- **v9 asked the other question and found the format short.** Five writers,
+  no kind named, explaining a concept (vector clocks, HTTP/2 multiplexing),
+  introducing the tool itself, and a paper submitted three days earlier
+  (*Batched Pandora's Box*, arXiv 2609.04059). Every brief was met and `check`
+  was nearly silent, but 3 of 8 scenes fell back to `vector` with 52
+  hand-typed positions and 30 colours between them — two of them only to put
+  two known values side by side. Nobody asked for a Pandora kind; the asks
+  were generic and repeated across briefs: a value label that tracks a
+  number next to its owner (three writers), two panes at once (three writers
+  wrote two scenes for want of it), a frozen snapshot of an earlier value, a
+  code block and a callout, a group outline. That fixes the next build: an
+  annotation layer for every kind, then `compose` — and the measure of both
+  is the same five briefs with the fallback count at zero.
+  `docs/reports/2026-09-05-anim-ir-v9.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".

@@ -323,7 +323,8 @@ Each fired event is one step captioned "on <event>: a → b". The validator name
 Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). The check verifies the final tree is a heap.`,
   distributed: `kind: distributed — nodes across the top, lifelines down, messages as travelling dots
   "nodes": [ "id" | {"id", "label", "status": "up" | "down" | "leader" | "busy"} ]   required
-  "messages": [ {"from", "to", "label", "at": ms | "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"} ]   required
+  "messages": [ {"from", "to", "label", "at": ms | "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}
+              | {"note": "…", "at" | "after", "delay"} ]                                 required; a note is a captioned pause every node waits for
                                    "at" defaults to right after the previous message lands; "<" = together with the previous
                                    message (a broadcast); "latency" defaults to stepMs; "after" starts it when the earlier
                                    message with that label lands (+ "delay"); that label must be unique (a broadcast to two

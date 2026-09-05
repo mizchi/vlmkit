@@ -447,10 +447,22 @@ export interface DistEvent {
   caption?: string;
 }
 
+/**
+ * A captioned pause in the message list: the caption is shown, nothing travels,
+ * and everything after it waits (every node is busy reading). Timed like a
+ * message: `at` / `after` + `delay`, else when everything so far has landed.
+ */
+export interface DistNote {
+  note: string;
+  at?: number;
+  after?: string;
+  delay?: number;
+}
+
 export interface DistributedScene extends SceneBase {
   kind: "distributed";
   nodes: (string | DistNode)[];
-  messages: DistMessage[];
+  messages: (DistMessage | DistNote)[];
   events?: DistEvent[];
   /**
    * When a message with no `at` / `after` starts.

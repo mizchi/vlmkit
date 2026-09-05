@@ -819,6 +819,19 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
     doc.messages.forEach((m, i) => {
       const path = `messages[${i}]`;
       if (!ctx.object(m, path)) return;
+      if ("note" in m) {
+        // A captioned pause between messages, timed like one.
+        ctx.keys(m, path, ["note", "at", "after", "delay"]);
+        if (!isStr(m.note)) ctx.error(`${path}.note`, `note takes the caption text, got ${describe(m.note)}`);
+        if (m.at !== undefined) ctx.number(m.at, `${path}.at`, { min: 0 });
+        if (m.after !== undefined) anchor(m.after, `${path}.after`, labelsSoFar);
+        if (m.at !== undefined && m.after !== undefined) ctx.error(`${path}.after`, `give "at" or "after", not both`);
+        if (m.delay !== undefined) {
+          ctx.number(m.delay, `${path}.delay`, { min: 0 });
+          if (m.after === undefined) ctx.error(`${path}.delay`, `delay only counts from an "after" anchor; without one it changes nothing`, `add "after": "<label of the message this waits for>"`);
+        }
+        return;
+      }
       ctx.keys(m, path, ["from", "to", "label", "at", "after", "delay", "latency", "lost", "caption"]);
       const a = ctx.ref(m.from, `${path}.from`, nodeIds, "node");
       const b = ctx.ref(m.to, `${path}.to`, nodeIds, "node");
