@@ -1,0 +1,33 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "distributed",
+  "title": "Vector clocks: causality without a global clock",
+  "nodes": ["A", "B", "C"],
+  "messages": [
+    { "note": "Start: A, B and C each hold a vector [a,b,c] of counters, all zero" },
+    { "value": { "id": "vecA", "label": "A", "text": "[0,0,0]", "at": "A" }, "ms": 0 },
+    { "value": { "id": "vecB", "label": "B", "text": "[0,0,0]", "at": "B" }, "ms": 0 },
+    { "value": { "id": "vecC", "label": "C", "text": "[0,0,0]", "at": "C" }, "ms": 0 },
+
+    { "note": "A has a local event: it increments its own slot" },
+    { "value": { "id": "vecA", "text": "[1,0,0]" }, "ms": 0, "caption": "A: [0,0,0] -> [1,0,0]" },
+
+    { "note": "A has a second local event before sending: it increments its own slot again" },
+    { "value": { "id": "vecA", "text": "[2,0,0]" }, "ms": 0, "caption": "A: [1,0,0] -> [2,0,0]" },
+
+    { "from": "A", "to": "B", "label": "[2,0,0]", "caption": "A sends its vector to B" },
+    { "value": { "id": "vecB", "text": "[2,1,0]" }, "ms": 0, "caption": "B receives [2,0,0]: max([0,0,0],[2,0,0])=[2,0,0], then +1 own slot -> [2,1,0]" },
+
+    { "note": "Meanwhile, C has a local event of its own: it increments its own slot" },
+    { "value": { "id": "vecC", "text": "[0,0,1]" }, "ms": 0, "caption": "C: [0,0,0] -> [0,0,1]" },
+    { "value": { "id": "eventC", "label": "C's local event (frozen)", "text": "[0,0,1]" }, "ms": 0 },
+
+    { "from": "B", "to": "C", "label": "[2,1,0]", "caption": "B sends its vector to C" },
+    { "value": { "id": "vecC", "text": "[2,1,2]" }, "ms": 0, "caption": "C receives [2,1,0]: max([0,0,1],[2,1,0])=[2,1,1], then +1 own slot -> [2,1,2]" },
+
+    { "note": "Concurrent: A's vector when it sent to B [2,0,0] and C's local event [0,0,1] - neither is <= the other" },
+    { "relate": { "from": "A", "to": "C", "label": "∥", "style": "line" }, "caption": "A ∥ C: concurrent" },
+    { "note": "Ordered: A's vector [2,0,0] <= C's final vector [2,1,2] in every slot - A's send happened-before C's receive" },
+    { "relate": { "from": "A", "to": "C", "label": "≤", "style": "arrow" }, "caption": "A ≤ C: ordered" }
+  ]
+}

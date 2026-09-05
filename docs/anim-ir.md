@@ -49,7 +49,7 @@ conventions hold in every kind:
 - `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
 - Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote. `vector` is the exception: it narrates only the items you captioned, and adds neither.
 - A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`, and every annotation op) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
-- Five **annotation ops** — `value`, `callout`, `snapshot`, `group`, `text` — go in any kind's op list and name the kind's own things (an index, a cell, a node) instead of coordinates. See [Annotations](#annotations-every-kind). Two or more pictures at once is [`kind: compose`](#kind-compose).
+- Six **annotation ops** — `value`, `callout`, `snapshot`, `group`, `text`, `relate` — go in any kind's op list and name the kind's own things (an index, a cell, a node) instead of coordinates. See [Annotations](#annotations-every-kind). Two or more pictures at once is [`kind: compose`](#kind-compose).
 
 `vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
@@ -390,6 +390,12 @@ rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
 | `rowLabels`, `colLabels` | optional headers, one per row / column; captions use them instead of indices |
 | `ops` | `{"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}` writes a value — `from` names the cells it was computed from, which flash while a token flies from each into the target; `{"highlight": T}` / `{"unhighlight": T \| "all"}` / `{"mark": T}` where T is `{"cell": [r, c]}` \| `{"cells": [[r, c], …]}` \| `{"row": r}` \| `{"col": c}` (highlight = accent until cleared, mark = permanent done colour); `{"swap": {"rows": [i, j]}}` / `{"swap": {"cols": [i, j]}}` (labels move with them); `{"note": "…"}`; each may carry `caption`, `ms` |
 
+`ms` on a matrix op is that beat's length; only the annotation ops fold into
+the previous beat with `"ms": 0` — a `set` is always a beat of its own. A
+caption is free text and **not checked against what the op wrote**: "receives:
+max, then +1" over a `set` that writes one cell promises a +1 no cell shows.
+Write the second `set`, or write the caption for what this beat changes.
+
 Cell references are `[row, col]`, 0-based, **by current position** (after a
 swap, row 0 is whatever is now on top; the row label travels with its row,
 so captions can keep naming rows by label). A `set` may write the value a
@@ -587,11 +593,12 @@ Nodes (also the Timeline's node model):
 
 ## Annotations (every kind)
 
-Five ops every kind accepts **in its own op list** (`ops`, `sequence`, `trace`,
+Six ops every kind accepts **in its own op list** (`ops`, `sequence`, `trace`,
 `messages`, `timeline`), next to its own verbs. They exist because a value
 often has to stay readable beside the thing it describes, a viewer needs to be
-pointed at one cell, an earlier value must survive to be compared, and a rule
-or a few lines of code have to be *on screen*, not in the caption. None of
+pointed at one cell, an earlier value must survive to be compared, a relation
+between two things has to be drawn rather than stated, and a rule or a few
+lines of code have to be *on screen*, not in the caption. None of
 them takes a coordinate: each names an **anchor**, one of the things the kind
 already draws.
 
@@ -621,6 +628,7 @@ already draws.
 | `{"snapshot": {"of", "label"}}` | A frozen copy, in the panel, of what the anchor shows **at this beat** — the value to compare against later, after the live one has moved on. An anchor that is several cells (a matrix row) snapshots as `[a, b, c]` |
 | `{"group": {"around": anchor \| [anchors], "label", "id"}}` / `{"group": null}` | A dashed outline around the anchors' bounding box, label at the top-left. One per `id`, like callout; `null` removes every group |
 | `{"text": {"lines": [...], "highlight", "at", "side", "id"}}` / `{"text": null}` | A multi-line block: code, a rule, a list. `highlight` is a 0-based line. Same `id` and the same number of lines updates in place and moves the highlight; a different line count redraws. Panel by default, or beside an anchor; `null` hides every block |
+| `{"relate": {"from", "to", "label", "style", "id"}}` / `{"relate": null}` | A line between two anchors — `A ≤ C`, "this came from that", "these two are concurrent". Edge to edge when nothing is in the way; when the two touch or something else sits between them (rows A and C of three, bars with bars between) it runs **beside** the pair instead, level, on the side with room — and when neither side has room (a node row with the title above and the lanes below) it **arcs** over the bystander. The bystander is never crossed and nothing is placed off the canvas; the writer never has to reorder anything for it. `style` is `arrow` (default, from → to) or `line`; the label sits beside the midpoint. One per `id`; `null` removes every relation. Where `group` would enclose a bystander, `relate` names the pair |
 
 A rule that governs the whole scene — the definition of ≤ on vectors, the
 invariant a loop keeps — is a `text` block **without** `at`: it goes to the
@@ -630,9 +638,22 @@ block that belongs to one thing.
 Every annotation op takes `caption` (replaces the generated one) and `ms`.
 `"ms": 0` applies it **inside the previous beat** — the way to have "best so
 far = 10" appear at the moment the reveal it belongs to happens, with its
-caption joined to that beat's. A misspelt anchor is an error naming the
+caption joined to that beat's. Joined means appended with ` · `, never
+replaced, and an explicit `caption` on the folded op is joined the same way:
+`{"note": "A has a local event"}` followed by `{"value": {"id": "vecA",
+"text": "[1,0,0]"}, "ms": 0, "caption": "A: [0,0,0] → [1,0,0]"}` narrates as
+`A has a local event · A: [0,0,0] → [1,0,0]`, one step. A misspelt anchor is an error naming the
 anchors that exist: `no anchor named "row:D" in this matrix scene → did you
 mean "row:C"? anchors here: "0,0", …`.
+
+**Identity.** `callout`, `group`, `text` and `relate` are one-per-`id`, and an
+omitted `id` is `"main"` — so two `relate` ops that both omit `id` are the
+same relation, and the second **replaces** the first (that is how to retire
+`A ∥ C` for `C ≤ A`); give ids only to the ones that must coexist. `value`
+has no default: its `id` is required, because the id is how a later op finds
+it. Replaced or nulled annotations are **faded out, not deleted**: the node
+stays in the timeline and in a rendered frame at `opacity="0"`, so "gone"
+means invisible — read opacity, not presence, when checking a frame.
 
 **Anchors by kind** — what `at`, `of` and `around` may name:
 
@@ -645,7 +666,7 @@ mean "row:C"? anchors here: "0,0", …`.
 | `tree` | a value, `"cursor"` |
 | `heap` | a slot index (`"0"` is the root), `"v7"` for the value 7 |
 | `state-machine` | a state id, an event name (when one transition uses it), `"from->to"`, `"token"` |
-| `distributed` | a node id, a message label |
+| `distributed` | a node id (the node's box at the top of its lifeline, not the lifeline itself — a `relate` between two nodes runs along the top), a message label |
 | `matrix` | a cell `"r,c"`, `"row:<label or index>"`, `"col:<label or index>"` |
 | `graph` | a node id, an edge `"a->b"` |
 | `chart` | a series id, a category, `"series/category"` |

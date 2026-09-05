@@ -120,7 +120,7 @@ export const RUNTIME_SOURCE = String.raw`
             if (n.shape === "arrow") shape.setAttribute("marker-end", "url(#" + ensureMarker(stroke) + ")");
             break;
           }
-          case "path": shape = el("path", { d: n.d || "" }); break;
+          case "path": shape = el("path", { d: n.d || "" }); if (n.head) shape.setAttribute("marker-end", "url(#" + ensureMarker(stroke) + ")"); break;
         }
         if (shape) {
           const isStroke = n.shape === "line" || n.shape === "arrow" || n.shape === "path";

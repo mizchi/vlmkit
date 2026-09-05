@@ -49,6 +49,8 @@ export interface TimelineNode {
   points?: [Vec2, Vec2];
   /** path data, local coordinates. */
   d?: string;
+  /** path: draw an arrowhead at its end (what `arrow` does for a straight line). */
+  head?: boolean;
   /** text content (shape `text`) or a label centred in any other shape. */
   text?: string;
   fontSize?: number;
@@ -231,19 +233,30 @@ export interface TextSpec {
 }
 
 /**
- * The five annotation ops every kind accepts in its own op / sequence / trace /
+ * The six annotation ops every kind accepts in its own op / sequence / trace /
  * message / timeline list. `caption` replaces the generated caption; `ms: 0`
  * folds the op into the previous beat. Anchors are the names each kind
  * documents (an index, a cell, a node id, a state, a value).
  */
-export const ANNOTATION_ACTIONS = ["value", "callout", "snapshot", "group", "text"] as const;
+/** A labelled line or arrow between two anchors, drawn edge to edge whatever lies between them; `null` removes every relation. */
+export interface RelateSpec {
+  id?: string;
+  from: string;
+  to: string;
+  label?: string;
+  /** `arrow` (default, from → to) or a plain `line`. */
+  style?: "arrow" | "line";
+}
+
+export const ANNOTATION_ACTIONS = ["value", "callout", "snapshot", "group", "text", "relate"] as const;
 
 export type AnnotationOp =
   | { value: ValueSpec; caption?: string; ms?: number }
   | { callout: CalloutSpec | null; caption?: string; ms?: number }
   | { snapshot: SnapshotSpec; caption?: string; ms?: number }
   | { group: GroupSpec | null; caption?: string; ms?: number }
-  | { text: TextSpec | null; caption?: string; ms?: number };
+  | { text: TextSpec | null; caption?: string; ms?: number }
+  | { relate: RelateSpec | null; caption?: string; ms?: number };
 
 // ---- compose ----------------------------------------------------------------
 

@@ -275,9 +275,10 @@ Annotations (every kind, in the same op list — vlmkit-anim schema --kind annot
   {"value": {"id", "label", "text", "at"?}}  a readout that tracks a number; same id = update
   {"callout": {"at", "text"} | null}          a pointer at an anchor        {"snapshot": {"of", "label"}}  a frozen copy
   {"group": {"around": [anchors], "label"}}   an outline                    {"text": {"lines": [...], "highlight"}}  a block
+  {"relate": {"from", "to", "label"} | null}  a labelled arrow between two anchors ("style": "line" for no head)
   Anchors are what the kind documents: an index, a cell "r,c", a node id, a state, a value. "ms": 0 folds the op into the previous beat.`;
 
-const ANNOTATIONS_SHEET = `Annotations — five ops every kind accepts in its own op / sequence / trace / messages / timeline list.
+const ANNOTATIONS_SHEET = `Annotations — six ops every kind accepts in its own op / sequence / trace / messages / timeline list.
 They add nothing a "vector" scene could not draw by hand; the point is that you never type a coordinate.
 
   {"value": {"id": "best", "label": "best so far", "text": "1/2"}}      a named readout in the panel on the right;
@@ -289,9 +290,15 @@ They add nothing a "vector" scene could not draw by hand; the point is that you 
   {"group": {"around": ["1", "2"], "label": "batch 1"}}                   a dashed outline around anchors; {"group": null} removes it
   {"text": {"lines": ["for i in a:", "  if i > x:"], "highlight": 1}}    a multi-line block (panel, or "at" an anchor); same id + same
                                                                           line count updates in place and moves the highlight; null hides
+  {"relate": {"from": "A", "to": "B", "label": "A ≤ B"}}                  a labelled arrow from one anchor to another ("style": "line" for
+                                                                          no head); same id redraws it, {"relate": null} removes all.
+                                                                          Where "group" would enclose a bystander, "relate" names the pair:
+                                                                          edge to edge, or level beside the pair, or arced over what lies between
 
   Every op takes "caption" (replaces the generated one, e.g. "best so far = 1/2") and "ms" ("ms": 0 = inside the previous beat).
   explain lists value changes as their beats; check names the anchors that exist when one is misspelt.
+  An omitted "id" on callout / group / text / relate is "main": a second op without an id replaces the first.
+  Replaced or nulled annotations fade out and stay in the markup at opacity 0 — "gone" means invisible, not absent.
 
 Anchors by kind (what "at" / "of" / "around" may name):
   sort           a value ("5" = the bar labelled 5, wherever it is)
@@ -483,7 +490,7 @@ export function schemaIndex(): string {
     diagram        boxes and arrows walked through in narrated beats
     vector         generic shapes and a list of tweens
     compose        several scenes in panes, side by side or stacked, in sequence or in parallel
-  Annotations (every kind)        value / callout / snapshot / group / text — vlmkit-anim schema --kind annotations
+  Annotations (every kind)        value / callout / snapshot / group / text / relate — vlmkit-anim schema --kind annotations
   Timeline (how it moves)         ${TIMELINE_FORMAT}: nodes + keyframe tracks + steps.
                                   Every kind compiles to it; it can also be written directly.
 

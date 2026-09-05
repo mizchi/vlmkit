@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## Unreleased
+
+**`vlmkit-anim`: the layer for explaining a concept, not only a structure.** v9 changed the
+evaluation question from "animate this structure" to "explain this idea" (vector clocks, HTTP/2
+multiplexing, a paper submitted that week) and found 3 of 8 scenes falling back to hand-placed
+`vector` shapes for two reasons: a value that should stay readable beside its owner, and two
+pictures at once. Two generic layers answer that, and a third op followed from the next round.
+
+- **Annotations every kind accepts** in its own op list, over the kind's own **anchors** (an index,
+  a cell `"r,c"`, a node id, a state, a value) rather than coordinates: `value` (a named readout,
+  in a panel or beside its anchor, updated in place by id), `callout`, `snapshot` (a frozen copy of
+  what an anchor shows now), `group` (an outline around several), `text` (a block with one line
+  highlighted) and `relate` (a labelled arrow or line between two anchors — where a group would
+  enclose a bystander, `relate` names the pair; it runs beside the pair when the straight line
+  would cross something else). A misspelt anchor is a compile-time diagnostic that lists the
+  anchors that exist. `vlmkit-anim schema --kind annotations` is the sheet.
+- **`kind: compose`**: several scenes in panes (row / column / grid), in sequence or in parallel,
+  with each pane's checks reported under its own path.
+- **Scenes generated from a repository**: `vlmkit-anim repo` draws the workspace's packages layer by
+  layer; `vlmkit-anim pr --base origin/main` draws the change map of a branch, one beat per commit
+  (areas touched, import edges, line counts), and writes a paste-ready markdown with the GIF and the
+  contact sheet. The `pr-visual` workflow posts that on every same-repo pull request.
+- Typed authoring (`scene.<kind>({…})`, scene modules in `.ts` / `.mjs` accepted by every verb),
+  committed sample outputs for every fixture, and `docs/diagrams/` with the tool's own architecture.
+
+Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
+colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:
+`docs/reports/2026-09-05-anim-ir-v9.md`, `v10.md`, `v11.md`.
+
 ## 0.12.0 — 2026-09-05
 
 A release about the other direction: not measuring a page someone else built, but producing

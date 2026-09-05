@@ -139,7 +139,7 @@ is how Playwright's own `mount` fixture works. Consequences:
 
 ```bash
 vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fifteen)
-vlmkit-anim schema --kind annotations               # the five ops every kind shares (value / callout / snapshot / group / text) and each kind's anchors
+vlmkit-anim schema --kind annotations               # the six ops every kind shares (value / callout / snapshot / group / text / relate) and each kind's anchors
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
 vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
 vlmkit-anim explain scene.json                      # narration as a numbered list
@@ -175,7 +175,9 @@ and the guide, forbid `packages/vlmkit-anim/` and other attempts, and record
 first-attempt ✗ count, rounds to green, scene bytes, and its friction verbatim.
 Reports: `docs/reports/2026-09-04-anim-ir-v*.md` (v1–v8, structures) and
 `docs/reports/2026-09-05-anim-ir-v{9,10}.md` (concept introductions; the coordinate-fallback
-count is the expressiveness metric — 3 of 8 scenes before the annotation layer and `compose`, 1 of 7 after).
+count is the expressiveness metric — 3 of 8 scenes before the annotation layer and `compose`, 1 of 7 after),
+`docs/reports/2026-09-05-anim-ir-v11.md` (re-edits of annotated scenes: every readout and relation followed
+the data change; the round's defects were layout, fixed in the compiler, not in the writer's hands).
 
 ## Measuring Gate / Rule Execution Cost
 

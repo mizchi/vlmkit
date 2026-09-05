@@ -70,17 +70,7 @@
           ]
         ]
       },
-      "caption": "B receives [1,0,0]: max with its own row copies a"
-    },
-    {
-      "set": {
-        "cell": [
-          1,
-          1
-        ],
-        "value": 1
-      },
-      "caption": "…then +1 on its own slot b"
+      "caption": "B receives: max, then +1"
     },
     {
       "callout": {
@@ -114,6 +104,47 @@
         ],
         "label": "ordered"
       }
+    },
+    {
+      "set": {
+        "cell": [
+          0,
+          2
+        ],
+        "value": 1,
+        "from": [
+          [
+            2,
+            2
+          ]
+        ]
+      },
+      "caption": "C sends [0,0,1] to A: max(A, C), c: 0 → 1"
+    },
+    {
+      "set": {
+        "cell": [
+          0,
+          0
+        ],
+        "value": 2
+      },
+      "caption": "A increments its own slot: a: 1 → 2"
+    },
+    {
+      "value": {
+        "id": "vA",
+        "text": "[2,0,1]"
+      },
+      "ms": 0
+    },
+    {
+      "relate": {
+        "from": "row:C",
+        "to": "row:A",
+        "label": "C ≤ A"
+      },
+      "caption": "C's event happened-before A's receive: C ≤ A"
     },
     {
       "text": {

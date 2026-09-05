@@ -26,12 +26,23 @@ export interface AnimStats {
   timelineBytes: number;
   /** timelineBytes / sceneBytes — how many bytes of motion one byte of intent buys. */
   expansion?: number;
+  /** Annotations the compiler drew, and how many are visible in the final frame. Absent when the scene has none. */
+  annotations?: { drawn: number; onScreen: number };
 }
 
 export function animStats(tl: Timeline, scene?: Scene): AnimStats {
   const timelineBytes = Buffer.byteLength(JSON.stringify(tl));
   const sceneBytes = scene ? Buffer.byteLength(JSON.stringify(scene)) : undefined;
+  // Annotation liveness (ed, v11): how many annotations the compiler drew and how many are still on screen at
+  // the end — the number a re-edit otherwise verifies by reading opacity attributes out of the SVG. One node
+  // stands for each annotation: the readout text, the callout box, the snapshot text, the outline, the block's
+  // box, the relation's line.
+  const primary = /^(value-(?!.*-label$)|callout-.*-box$|snapshot-\d+$|group-(?!.*-label$)|text-.*-box$|relate-(?!.*-label$))/;
+  const drawn = tl.nodes.filter((n) => primary.test(n.id));
+  const endFrame = drawn.length ? sampleFrame(tl, timelineDuration(tl)) : undefined;
+  const annotations = drawn.length ? { drawn: drawn.length, onScreen: drawn.filter((n) => (endFrame!.get(n.id)?.opacity ?? 0) > 0).length } : undefined;
   return {
+    annotations,
     kind: String(tl.meta?.kind ?? scene?.kind ?? "timeline"),
     durationMs: timelineDuration(tl),
     nodes: tl.nodes.length,
@@ -74,7 +85,18 @@ export function checkTimeline(tl: Timeline): Diagnostic[] {
       const margin = 4;
       if (x < -margin || y < -margin || x > width + margin || y > height + margin) {
         reported.add(n.id);
-        out.push(warn(`nodes(${n.id})`, `visible node is outside the ${width}×${height} canvas at t=${Math.round(t)} (pos ${Math.round(x)}, ${Math.round(y)})`, "move it, enlarge the canvas, or fade it out before it leaves"));
+        // An annotation's node was placed by the compiler, not the writer: "move it" and "enlarge the canvas"
+        // are not levers the writer has (ea, v11, tried the second and it did nothing). Say what is.
+        const annotation = /^(value|callout|snapshot|group|text|relate)-/.test(n.id);
+        out.push(
+          warn(
+            `nodes(${n.id})`,
+            `visible node is outside the ${width}×${height} canvas at t=${Math.round(t)} (pos ${Math.round(x)}, ${Math.round(y)})`,
+            annotation
+              ? "an annotation placed itself there — it takes no coordinates, so a taller canvas does not move it; try another `side`, or fewer things between a related pair, and report it if nothing helps"
+              : "move it, enlarge the canvas, or fade it out before it leaves",
+          ),
+        );
       }
     }
   }

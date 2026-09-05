@@ -40,14 +40,17 @@ Scene IR  (vlmkit-anim/scene@1)  ──compile──▶  Timeline IR  (vlmkit-an
   and tree (BST); and `compose`, which puts several of them in one canvas. A
   bubble sort is 112 bytes and expands ~80× into a timeline; that ratio is the
   layer earning its place.
-- **Annotations** are the layer v9 showed was missing: five ops (`value`,
-  `callout`, `snapshot`, `group`, `text`) every kind accepts in its own op
+- **Annotations** are the layer v9 showed was missing: six ops (`value`,
+  `callout`, `snapshot`, `group`, `text`, `relate`) every kind accepts in its own op
   list, addressing the kind's own things by **anchor** names each compiler
   registers (an index, a cell `"r,c"`, a node id, a state, a value) rather than
   by coordinate. The Builder draws them — a readout panel that widens the
   canvas only when used, a pointer box beside an anchor, a frozen copy of what
   an anchor showed, an outline around several, a multi-line block with one
-  line highlighted — so a compiler's whole involvement is one `annotate()`
+  line highlighted, a labelled arrow between two anchors (v10's one remaining
+  ask: where a group would enclose a bystander, `relate` names the pair; when
+  the straight line would cross something else it runs beside the pair along
+  their dominant axis, on the side with more free space) — so a compiler's whole involvement is one `annotate()`
   call at the top of its loop and a handful of `anchor()` registrations. A
   misspelt anchor is a compile-time diagnostic that lists the anchors that
   exist. Nothing here draws what `vector` could not; the point is that a
@@ -203,6 +206,24 @@ brief passed on the first attempt with the alternative path narrated):
   and the cheapest of them, a labelled relation between two anchors, is the
   one shape the annotation layer still lacks.
   `docs/reports/2026-09-05-anim-ir-v10.md`.
+- **v11 re-edited the annotated scenes** after `relate` landed: an extra event
+  upstream of three `value` readouts, a cheaper box that moves two readouts
+  and the decision arithmetic, a receive that retires `A ∥ C` for `C ≤ A`.
+  Every dependent literal was updated by every writer and two of three were
+  green on the first `check`; the annotations survive a data change because
+  they are addressed by id and anchor, not by position. What the round found
+  was layout, all of it the compiler's: a `relate` beside a node row with the
+  title above and the lanes below went off the canvas, and the warning's
+  "enlarge the canvas" did nothing because annotations take no coordinates
+  (the writer's way out was to reorder the nodes — the wrong lever); a title
+  wider than the kind's canvas lost its first letters; a group label sat on a
+  column header; long captions were clipped. Each is now the compiler's job:
+  the relation arcs over the bystander when no side has room, the title is
+  re-centred or the canvas grows, the label takes the next free corner,
+  captions wrap, and the off-canvas hint for an annotation node names levers
+  that exist. Two guide gaps closed from quotes: the default id is `"main"`
+  and a replaced annotation fades out rather than disappearing.
+  `docs/reports/2026-09-05-anim-ir-v11.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".

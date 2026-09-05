@@ -70,17 +70,7 @@
           ]
         ]
       },
-      "caption": "B receives [1,0,0]: max with its own row copies a"
-    },
-    {
-      "set": {
-        "cell": [
-          1,
-          1
-        ],
-        "value": 1
-      },
-      "caption": "…then +1 on its own slot b"
+      "caption": "B receives: max, then +1"
     },
     {
       "callout": {
