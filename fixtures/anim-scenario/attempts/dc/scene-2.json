@@ -1,0 +1,19 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "state-machine",
+  "title": "The loop: write, check, read the hint, edit",
+  "states": ["write", "check", { "id": "green", "final": true }],
+  "initial": "write",
+  "transitions": [
+    { "from": "write", "to": "check", "on": "check" },
+    { "from": "check", "to": "write", "on": "fix", "note": "/ ✗ index 2 is out of order: read the hint, edit" },
+    { "from": "check", "to": "green", "on": "clean", "note": "/ no ✗, no ⚠" }
+  ],
+  "trace": [
+    "check",
+    "fix",
+    "check",
+    "clean",
+    { "note": "One line: describe what is being explained. It moves. And it tells you when it is wrong." }
+  ]
+}

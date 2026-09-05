@@ -35,7 +35,10 @@ export function compileHeap(scene: HeapScene): Timeline {
     const p = Math.floor((i - 1) / 2);
     b.node({ id: `edge-${i}`, shape: "line", points: [slotPos(p), slotPos(i)], stroke: T.muted, opacity: 0 });
   }
-  for (let i = 0; i < cap; i++) b.node({ id: `slot-${i}`, shape: "circle", pos: slotPos(i), r: R, fill: "none", stroke: T.muted, opacity: 0.4 });
+  for (let i = 0; i < cap; i++) {
+    b.node({ id: `slot-${i}`, shape: "circle", pos: slotPos(i), r: R, fill: "none", stroke: T.muted, opacity: 0.4 });
+    b.anchor(String(i), `slot-${i}`);
+  }
   b.node({ id: "out-label", shape: "text", pos: [outPos[0], outPos[1] + R + 14], text: "popped", fontSize: T.fontSize - 2, color: T.muted });
 
   const heap: { id: string; value: number }[] = [];
@@ -51,6 +54,7 @@ export function compileHeap(scene: HeapScene): Timeline {
   const token = (value: number, at: [number, number]): string => {
     const id = `v-${tokenCount++}`;
     b.node({ id, shape: "circle", pos: at, r: R - 2, fill: T.node, stroke: T.nodeStroke, strokeWidth: 2, text: String(value), fontSize: T.fontSize, color: T.text, opacity: 0 });
+    b.anchor(`v${value}`, id); // "v7" names the value 7 (slot indices take the bare numbers)
     return id;
   };
   const swap = (i: number, j: number, caption: string): void => {
@@ -108,6 +112,7 @@ export function compileHeap(scene: HeapScene): Timeline {
 
   const popped: number[] = [];
   for (const op of scene.ops) {
+    if (b.annotate(op)) continue;
     if ("note" in op) {
       b.step(op.note);
       b.advance(b.stepMs * 0.8);

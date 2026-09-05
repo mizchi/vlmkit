@@ -1,0 +1,31 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "vlmkit-anim",
+  "nodes": [
+    { "id": "scene", "label": "scene.json" },
+    { "id": "compiler", "label": "compiler" },
+    { "id": "timeline", "label": "timeline" },
+    { "id": "browser", "label": "plays in browser" },
+    { "id": "frames", "label": "renders frames / GIF" },
+    { "id": "check", "label": "check" }
+  ],
+  "edges": [
+    { "from": "scene", "to": "compiler" },
+    { "from": "compiler", "to": "timeline" },
+    { "from": "timeline", "to": "browser" },
+    { "from": "timeline", "to": "frames" },
+    { "from": "timeline", "to": "check" },
+    { "from": "check", "to": "scene", "label": "hint" }
+  ],
+  "sequence": [
+    { "flow": "scene->compiler", "caption": "One JSON file describes what you're explaining -- a kind, not shapes or coordinates" },
+    { "flow": "compiler->timeline", "caption": "The compiler runs that kind's logic into a timeline: nodes plus keyframe tracks" },
+    { "flow": "timeline->browser", "caption": "That timeline plays in the browser as a web component" },
+    { "flow": "timeline->frames", "caption": "...or renders to frames and a GIF for a README" },
+    { "flow": "timeline->check", "caption": "...or gets checked: does the motion say what the file claims?" },
+    { "flow": "check->scene", "caption": "check fails, names the fix as a hint, you edit -- write, check, read the hint, edit" },
+    { "highlight": "scene", "caption": "Small file in, self-checking animation out" },
+    { "note": "Describe what you're explaining. Get an animation that checks itself." }
+  ]
+}

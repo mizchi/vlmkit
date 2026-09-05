@@ -158,8 +158,10 @@ export function compileGraph(scene: GraphScene): Timeline {
     b.node({ id: `label-${n.id}`, shape: "text", pos: [p[0], p[1] + r + 12], text: "", fontSize: T.fontSize - 2, color: T.accent });
   }
   b.node({ id: "token", shape: "circle", pos: [0, 0], r: 6, fill: T.accent, stroke: T.nodeStroke, opacity: 0 });
+  for (const n of nodes) b.anchor(n.id, `node-${n.id}`);
+  for (const [key, g] of edgeGeom) b.anchor(key, g.id);
 
-  const lookup = (a: string, c: string): { id: string; p: [number, number]; q: [number, number] } | undefined => {
+  const lookup =(a: string, c: string): { id: string; p: [number, number]; q: [number, number] } | undefined => {
     const fwd = edgeGeom.get(`${a}->${c}`);
     if (fwd) return fwd;
     const back = edgeGeom.get(`${c}->${a}`);
@@ -177,6 +179,7 @@ export function compileGraph(scene: GraphScene): Timeline {
   b.step(scene.title ?? "Start", "start");
   b.advance(b.stepMs * 0.6);
   for (const op of ops) {
+    if (b.annotate(op)) continue;
     const ms = op.ms ?? b.stepMs;
     const caption = "caption" in op ? op.caption : undefined;
     if ("note" in op) {

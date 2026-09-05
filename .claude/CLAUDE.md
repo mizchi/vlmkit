@@ -138,7 +138,8 @@ is how Playwright's own `mount` fixture works. Consequences:
 ## Explanatory animations (`vlmkit-anim`) and their evaluation loop
 
 ```bash
-vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fourteen)
+vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fifteen)
+vlmkit-anim schema --kind annotations               # the five ops every kind shares (value / callout / snapshot / group / text) and each kind's anchors
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
 vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
 vlmkit-anim explain scene.json                      # narration as a numbered list
@@ -146,7 +147,13 @@ vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and de
 vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
 vlmkit-anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
 vlmkit-anim eval page.html                          # the shared frame-sampled evaluator on an emitted page (same report as `vlmkit check animation`)
+vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture   # the workspace drawn layer by layer (pnpm anim:diagrams regenerates docs/diagrams/)
+vlmkit-anim pr --base origin/main --out .vlmkit-anim/pr           # the change map of a branch: one beat per commit, areas + import edges + counts; <name>.md is paste-ready
 ```
+
+The `pr-visual` workflow runs `vlmkit-anim pr` on every same-repo pull request, publishes the
+GIF and contact sheet on the `pr-visuals` branch (one folder per PR number) and keeps one
+comment on the PR up to date with them — the shape of a change before the diff.
 
 `vlmkit-anim` is a **standalone binary** (`@mizchi/vlmkit-anim`), not a `vlmkit`
 subcommand. Its only workspace tie is the **evaluation** package
@@ -166,7 +173,9 @@ reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
 Procedure is the `agent-validation-loop` skill; prompt the agent with one brief
 and the guide, forbid `packages/vlmkit-anim/` and other attempts, and record
 first-attempt ✗ count, rounds to green, scene bytes, and its friction verbatim.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md` (v1–v8, structures) and
+`docs/reports/2026-09-05-anim-ir-v{9,10}.md` (concept introductions; the coordinate-fallback
+count is the expressiveness metric — 3 of 8 scenes before the annotation layer and `compose`, 1 of 7 after).
 
 ## Measuring Gate / Rule Execution Cost
 
@@ -344,7 +353,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
-| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the fourteen scene kinds, the timeline layer, embedding. The one page an agent reads before producing a scene |
+| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the fifteen scene kinds (fourteen structures + `compose`), the annotation ops every kind shares, the timeline layer, embedding. The one page an agent reads before producing a scene |
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 27 gates + 127 rules, behavior changes, what is deliberately not a gate |

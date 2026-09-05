@@ -6,8 +6,10 @@
 
 import type { Diagnostic, Scene, Timeline } from "../types.ts";
 import { hasErrors, validateScene } from "../validate.ts";
+import { AnchorError } from "./annotate.ts";
 import { compileArray } from "./array.ts";
 import { compileChart } from "./chart.ts";
+import { compileCompose } from "./compose.ts";
 import { compileQueue, compileStack } from "./collection.ts";
 import { compileDiagram } from "./diagram.ts";
 import { compileDistributed } from "./distributed.ts";
@@ -32,7 +34,18 @@ export class SceneValidationError extends Error {
 export function compileScene(scene: Scene): Timeline {
   const diags = validateScene(scene);
   if (hasErrors(diags)) throw new SceneValidationError(diags);
+  try {
+    return dispatch(scene);
+  } catch (e) {
+    // An annotation named an anchor the kind never registered: a scene error, phrased for the writer.
+    if (e instanceof AnchorError) throw new SceneValidationError([...diags, e.diagnostic]);
+    throw e;
+  }
+}
+
+function dispatch(scene: Scene): Timeline {
   switch (scene.kind) {
+    case "compose": return compileCompose(scene);
     case "diagram": return compileDiagram(scene);
     case "state-machine": return compileStateMachine(scene);
     case "sort": return compileSort(scene);
@@ -50,6 +63,7 @@ export function compileScene(scene: Scene): Timeline {
   }
 }
 
+export { compileCompose } from "./compose.ts";
 export { compileArray, compileChart, compileList, compileQueue, compileStack, compileDiagram, compileDistributed, compileGraph, compileHeap, compileMatrix, compileSort, compileStateMachine, compileTree, compileVector };
 export { generateSortOps } from "./sort.ts";
 export { generateArrayOps } from "./array.ts";

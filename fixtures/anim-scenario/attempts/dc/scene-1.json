@@ -1,0 +1,35 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "vlmkit-anim",
+  "nodes": [
+    { "id": "file", "label": "scene.json" },
+    { "id": "compiler", "label": "compiler" },
+    { "id": "timeline", "label": "timeline" },
+    { "id": "html", "label": "browser" },
+    { "id": "frames", "label": "frames" },
+    { "id": "gif", "label": "gif" },
+    { "id": "check", "label": "check" }
+  ],
+  "edges": [
+    { "from": "file", "to": "compiler", "label": "compiles" },
+    { "from": "compiler", "to": "timeline", "label": "emits" },
+    { "from": "timeline", "to": "html", "label": "plays" },
+    { "from": "timeline", "to": "frames", "label": "renders" },
+    { "from": "timeline", "to": "gif", "label": "encodes" },
+    { "from": "timeline", "to": "check", "label": "read back" }
+  ],
+  "layout": "lr",
+  "sequence": [
+    {
+      "highlight": "file",
+      "caption": "One JSON file — { kind: \"sort\", values: [5, 3, 8] } — what is being explained, not shapes or coordinates"
+    },
+    { "flow": "file->compiler", "caption": "vlmkit-anim compiles it" },
+    { "flow": "compiler->timeline", "caption": "into an absolute-time timeline: nodes, keyframe tracks, step markers" },
+    { "flow": "timeline->html", "caption": "It plays in the browser as a web component" },
+    { "flow": "timeline->frames", "caption": "renders to individual frames" },
+    { "flow": "timeline->gif", "caption": "and encodes to a GIF for a README" },
+    { "flow": "timeline->check", "caption": "The same timeline is read back and checked against what the file claims" }
+  ]
+}

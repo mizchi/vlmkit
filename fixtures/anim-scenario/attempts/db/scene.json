@@ -1,0 +1,46 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "chart",
+  "type": "bar",
+  "title": "HTTP/1.1 vs HTTP/2: Asset Completion Times",
+  "categories": ["a", "b", "c", "d", "e", "f"],
+  "series": [
+    {
+      "id": "http11",
+      "label": "HTTP/1.1 (5 units total)",
+      "values": [5, 5, 3, 4, 5, 5]
+    },
+    {
+      "id": "http2",
+      "label": "HTTP/2 (3 units total)",
+      "values": [2, 3, 1, 1, 2, 1]
+    }
+  ],
+  "yMax": 5,
+  "yLabel": "Completion time (units)",
+  "sequence": [
+    {
+      "reveal": "http11",
+      "caption": "HTTP/1.1: Two FIFO connections block assets in queue"
+    },
+    {
+      "reveal": "http2",
+      "caption": "HTTP/2: One connection, all assets progress together"
+    },
+    {
+      "highlight": { "category": "c" },
+      "caption": "Asset c finishes at 3 units (HTTP/1.1) but 1 unit (HTTP/2) — 2 units faster"
+    },
+    {
+      "highlight": { "category": "d" },
+      "caption": "Asset d finishes at 4 units (HTTP/1.1) but 1 unit (HTTP/2) — 3 units faster"
+    },
+    {
+      "highlight": { "category": "f" },
+      "caption": "Asset f finishes at 5 units (HTTP/1.1) but 1 unit (HTTP/2) — 4 units faster"
+    },
+    {
+      "note": "HTTP/1.1 total: 5 units. HTTP/2 total: 3 units. Multiplexing saves 2 units (40% faster)"
+    }
+  ]
+}

@@ -34,10 +34,24 @@ Scene IR  (vlmkit-anim/scene@1)  ──compile──▶  Timeline IR  (vlmkit-an
 
 - **Scene IR** is `kind`-tagged. Each kind has a domain vocabulary and a
   compiler that *runs the domain* (the sort algorithm, the heap, the state
-  table, BFS / Dijkstra over the edge list) to produce motion. Fourteen kinds:
-  sort, state-machine, heap, distributed, matrix, graph, chart, diagram,
-  vector, plus array (pointers, windows), stack, queue, list and tree (BST). A bubble sort is 112 bytes and expands ~80× into a
-  timeline; that ratio is the layer earning its place.
+  table, BFS / Dijkstra over the edge list) to produce motion. Fourteen
+  structural kinds: sort, state-machine, heap, distributed, matrix, graph,
+  chart, diagram, vector, plus array (pointers, windows), stack, queue, list
+  and tree (BST); and `compose`, which puts several of them in one canvas. A
+  bubble sort is 112 bytes and expands ~80× into a timeline; that ratio is the
+  layer earning its place.
+- **Annotations** are the layer v9 showed was missing: five ops (`value`,
+  `callout`, `snapshot`, `group`, `text`) every kind accepts in its own op
+  list, addressing the kind's own things by **anchor** names each compiler
+  registers (an index, a cell `"r,c"`, a node id, a state, a value) rather than
+  by coordinate. The Builder draws them — a readout panel that widens the
+  canvas only when used, a pointer box beside an anchor, a frozen copy of what
+  an anchor showed, an outline around several, a multi-line block with one
+  line highlighted — so a compiler's whole involvement is one `annotate()`
+  call at the top of its loop and a handful of `anchor()` registrations. A
+  misspelt anchor is a compile-time diagnostic that lists the anchors that
+  exist. Nothing here draws what `vector` could not; the point is that a
+  writer never types a number.
 - **Timeline IR** is the flat, dumb, complete description: nodes with initial
   attributes, tracks of absolute-time keyframes per (target, prop), and
   `steps` (chapter markers with captions). It is what plays, samples, and
@@ -164,9 +178,61 @@ brief passed on the first attempt with the alternative path narrated):
   **every warning must be about the scene** — a diagnostic the writer cannot
   act on is a compiler bug. The first `vector` re-edit (a progress bar's
   pause becoming a stall) matched every predicted coordinate.
+- **v9 asked the other question and found the format short.** Five writers,
+  no kind named, explaining a concept (vector clocks, HTTP/2 multiplexing),
+  introducing the tool itself, and a paper submitted three days earlier
+  (*Batched Pandora's Box*, arXiv 2609.04059). Every brief was met and `check`
+  was nearly silent, but 3 of 8 scenes fell back to `vector` with 52
+  hand-typed positions and 30 colours between them — two of them only to put
+  two known values side by side. Nobody asked for a Pandora kind; the asks
+  were generic and repeated across briefs: a value label that tracks a
+  number next to its owner (three writers), two panes at once (three writers
+  wrote two scenes for want of it), a frozen snapshot of an earlier value, a
+  code block and a callout, a group outline. That fixes the next build: an
+  annotation layer for every kind, then `compose` — and the measure of both
+  is the same five briefs with the fallback count at zero.
+  `docs/reports/2026-09-05-anim-ir-v9.md`.
+- **v10 re-ran the same five briefs with both layers in place.** Fallback
+  went from 3 of 8 scenes to 1 of 7, and the one left is the smaller model
+  choosing `vector` before reading the annotation sheet, on the brief where
+  the larger model used `group` and `value` and typed nothing. The round's
+  one refused annotation was the round's one bug (the `diagram` validator's
+  action list had not been extended), now under a test that appends a
+  `value` to every kind's example. The asks changed shape — five different
+  things from one writer each, where v9's were three things from several —
+  and the cheapest of them, a labelled relation between two anchors, is the
+  one shape the annotation layer still lacks.
+  `docs/reports/2026-09-05-anim-ir-v10.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".
+
+## Scenes generated, not written: the tool drawing itself and its pull requests
+
+`vlmkit-anim repo` and `vlmkit-anim pr` (`generators/git.ts`) produce
+`diagram` scenes from the repository: the workspace's packages layer by layer
+from their manifests, and the change map of `base..head` — one beat per
+commit, the *areas* it touched lighting up (a package's `src`, its fixtures,
+`docs/reports`, `tests`, `ci`; more than fourteen fold into "other"), import
+edges between changed areas as they stand at `head`, and `value` readouts
+counting files and lines. Areas rather than files because a reader can take in
+a dozen boxes and not eighty; the caption per beat is the commit subject, so
+`explain` reads as the branch's story.
+
+Each run writes the scene next to the images, so the picture stays editable:
+the generator's job is a first cut a person can retitle or re-cut with the
+same tool. The `pr-visual` workflow runs `pr` on every same-repo pull request,
+publishes GIF and sheet on the `pr-visuals` branch and keeps one comment on
+the PR current — a reviewer sees the shape of a change before the diff.
+`docs/diagrams/vlmkit-architecture.*` is the `repo` output for this
+workspace, regenerated by `pnpm anim:diagrams`.
+
+Two compiler consequences came out of making the generated pictures legible
+on a contact sheet: `diagram` highlights recolour instantly and a `show` puts
+its step marker at the end of a short fade, so the frame *at* a step shows
+what the caption names; and `"ms": 0` on the diagram's own ops folds them into
+the surrounding beat, which is how "these areas appear and light up" is one
+beat rather than two.
 
 ## Not done, deliberately
 

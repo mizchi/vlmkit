@@ -1,0 +1,29 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "state-machine",
+  "title": "The branch: react to what batch 1 showed",
+  "layout": "tb",
+  "states": [
+    "start",
+    "batch1_open",
+    { "id": "stop", "final": true },
+    "batch2_open",
+    { "id": "scored", "final": true }
+  ],
+  "initial": "start",
+  "transitions": [
+    { "from": "start", "to": "batch1_open", "on": "open_batch1", "note": "cost = setup 0.2 + box1 0.2 + box2 0.2 = 0.6" },
+    { "from": "batch1_open", "to": "stop", "on": "box2=99", "note": "no second batch is worth 1.2 more; score = 99 − 0.6 = 98.4" },
+    { "from": "batch1_open", "to": "batch2_open", "on": "box2<=0.5", "note": "E[gain] = 0.2×(10−0.5) = 1.9 > batch-2 cost 1.2: open it" },
+    { "from": "batch2_open", "to": "scored", "on": "box3_reveal", "note": "box3 shows 10; score = 10 − 1.8 = 8.2" }
+  ],
+  "trace": [
+    "open_batch1",
+    "box2<=0.5",
+    "box3_reveal",
+    { "note": "The reacting policy scores 8.2 on this run." },
+    { "goto": "batch1_open", "caption": "Rewind: what if box 2 had shown 99 instead?" },
+    "box2=99",
+    { "note": "Either branch stops fast: reacting between batches beats any fixed menu of batches, but by at most 2x in general — about 1.19x on this instance." }
+  ]
+}

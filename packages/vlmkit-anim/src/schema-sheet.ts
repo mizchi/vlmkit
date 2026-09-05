@@ -13,6 +13,7 @@ import {
   TIMELINE_FORMAT,
   type ArrayScene,
   type ChartScene,
+  type ComposeScene,
   type DiagramScene,
   type DistributedScene,
   type GraphScene,
@@ -44,6 +45,7 @@ export interface Examples {
   chart: ChartScene;
   diagram: DiagramScene;
   vector: VectorScene;
+  compose: ComposeScene;
   timeline: Timeline;
 }
 
@@ -234,6 +236,17 @@ export const EXAMPLES: Examples = {
       { target: ["a", "b"], to: { opacity: 0.2 }, duration: 400, caption: "both fade" },
     ],
   },
+  compose: {
+    format: SCENE_FORMAT,
+    kind: "compose",
+    title: "Bubble vs insertion",
+    layout: "row",
+    timing: "parallel",
+    panes: [
+      { title: "bubble", scene: { format: SCENE_FORMAT, kind: "sort", algorithm: "bubble", values: [3, 1, 2] } },
+      { title: "insertion", scene: { format: SCENE_FORMAT, kind: "sort", algorithm: "insertion", values: [3, 1, 2] } },
+    ],
+  },
   timeline: {
     format: TIMELINE_FORMAT,
     canvas: { width: 300, height: 120 },
@@ -256,7 +269,44 @@ runtime shows the current caption under the picture and \`vlmkit-anim explain\`
 prints them as a numbered list. Write them for the reader, not the machine.
 A "caption" on an op replaces the generated one; {"note": "…"} is a captioned
 pause and counts as a step; compilers add a first (title / "Start") and a last
-("Sorted" / "End") step of their own.`;
+("Sorted" / "End") step of their own.
+
+Annotations (every kind, in the same op list — vlmkit-anim schema --kind annotations):
+  {"value": {"id", "label", "text", "at"?}}  a readout that tracks a number; same id = update
+  {"callout": {"at", "text"} | null}          a pointer at an anchor        {"snapshot": {"of", "label"}}  a frozen copy
+  {"group": {"around": [anchors], "label"}}   an outline                    {"text": {"lines": [...], "highlight"}}  a block
+  Anchors are what the kind documents: an index, a cell "r,c", a node id, a state, a value. "ms": 0 folds the op into the previous beat.`;
+
+const ANNOTATIONS_SHEET = `Annotations — five ops every kind accepts in its own op / sequence / trace / messages / timeline list.
+They add nothing a "vector" scene could not draw by hand; the point is that you never type a coordinate.
+
+  {"value": {"id": "best", "label": "best so far", "text": "1/2"}}      a named readout in the panel on the right;
+                                                                          the same id later updates it: {"value": {"id": "best", "text": "10"}}
+  {"value": {"id": "vA", "label": "A", "text": "[1,0,0]", "at": "A"}}   …or beside an anchor ("side": above | below | left | right)
+  {"callout": {"at": "3", "text": "pivot", "side": "above"}}             a text box with a pointer at the anchor; {"callout": null} hides it;
+                                                                          "id" for several at once
+  {"snapshot": {"of": "row:C", "label": "C at step 4"}}                   a frozen copy, in the panel, of what the anchor shows right now
+  {"group": {"around": ["1", "2"], "label": "batch 1"}}                   a dashed outline around anchors; {"group": null} removes it
+  {"text": {"lines": ["for i in a:", "  if i > x:"], "highlight": 1}}    a multi-line block (panel, or "at" an anchor); same id + same
+                                                                          line count updates in place and moves the highlight; null hides
+
+  Every op takes "caption" (replaces the generated one, e.g. "best so far = 1/2") and "ms" ("ms": 0 = inside the previous beat).
+  explain lists value changes as their beats; check names the anchors that exist when one is misspelt.
+
+Anchors by kind (what "at" / "of" / "around" may name):
+  sort           a value ("5" = the bar labelled 5, wherever it is)
+  array          an index ("3"), a pointer name ("lo"), "window"
+  stack / queue  a slot index ("0" = bottom / front), a value, "top" | "front" | "back"
+  list           a value, "head", "nil"
+  tree           a value, "cursor"
+  heap           a slot index ("0" = root), "v7" (the value 7)
+  state-machine  a state id, an event name (when only one transition uses it), "from->to", "token"
+  distributed    a node id, a message label
+  matrix         a cell "r,c", "row:<label or index>", "col:<label or index>"
+  graph          a node id, an edge "a->b"
+  chart          a series id, a category, "series/category"
+  diagram        a node id, an edge "a->b"
+  vector         a node id`;
 
 const SHEETS: Record<Scene["kind"] | "timeline", string> = {
   sort: `kind: sort — bars that swap into order
@@ -323,7 +373,8 @@ Each fired event is one step captioned "on <event>: a → b". The validator name
 Every comparison and swap becomes a captioned step ("3 < parent 5: swap up"). The check verifies the final tree is a heap.`,
   distributed: `kind: distributed — nodes across the top, lifelines down, messages as travelling dots
   "nodes": [ "id" | {"id", "label", "status": "up" | "down" | "leader" | "busy"} ]   required
-  "messages": [ {"from", "to", "label", "at": ms | "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"} ]   required
+  "messages": [ {"from", "to", "label", "at": ms | "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}
+              | {"note": "…", "at" | "after", "delay"} ]                                 required; a note is a captioned pause every node waits for
                                    "at" defaults to right after the previous message lands; "<" = together with the previous
                                    message (a broadcast); "latency" defaults to stepMs; "after" starts it when the earlier
                                    message with that label lands (+ "delay"); that label must be unique (a broadcast to two
@@ -390,6 +441,12 @@ Hidden nodes stay invisible until a "show" step. A "flow" needs an edge between 
       "at": omitted = after the previous item; "<" = together with the previous; "+200" / "-100" = offset from its end; a number = absolute ms
 Nodes: {"id", "shape": rect | circle | ellipse | text | line | arrow | path | group, "pos": [x, y], "size": [w, h], "r", "points": [[x1,y1],[x2,y2]], "d", "text", "fontSize", "fill", "stroke", "strokeWidth", "opacity", "dash", "rotate", "scale", "parent"}
   rect/ellipse need "size"; circle needs "r"; text needs "text"; line/arrow need "points"; path needs "d". Shapes are centred on "pos". Any shape with "text" draws it centred as a label.`,
+  compose: `kind: compose — several scenes in one canvas, side by side or stacked, played in sequence or together
+  "panes": [ {"id", "title", "scene": { a whole scene of any other kind }} ]   required; a pane cannot be a compose
+  "layout": row | column | grid       optional; row (default) = side by side, grid = two per row
+  "timing": sequence | parallel       optional; sequence (default) plays pane 1 then pane 2; parallel starts them together (a before / after in lockstep)
+  "gap": px                           optional; space between panes (32)
+  Each pane keeps its own kind's anchors and annotations; captions of coinciding beats join with " · ", prefixed by the pane title under parallel.`,
   timeline: `format: ${TIMELINE_FORMAT} — the compiled layer; write it directly only when a tween list is not enough
   "canvas": {"width", "height", "background"}   required
   "nodes": [ … same node fields as kind: vector … ]   required, drawn in order
@@ -401,7 +458,8 @@ Nodes: {"id", "shape": rect | circle | ellipse | text | line | arrow | path | gr
   "duration": ms                   optional; computed from the last keyframe/step`,
 };
 
-export function schemaSheet(kind: Scene["kind"] | "timeline"): string {
+export function schemaSheet(kind: Scene["kind"] | "timeline" | "annotations"): string {
+  if (kind === "annotations") return `${ANNOTATIONS_SHEET}\n\nThen: vlmkit-anim check scene.json`;
   const example = JSON.stringify(EXAMPLES[kind], null, 2);
   return `${SHEETS[kind]}\n\n${kind === "timeline" ? "" : COMMON + "\n\n"}Example\n${example}\n\nThen: vlmkit-anim check scene.json`;
 }
@@ -424,6 +482,8 @@ export function schemaIndex(): string {
     chart          a bar or line chart revealed series by series
     diagram        boxes and arrows walked through in narrated beats
     vector         generic shapes and a list of tweens
+    compose        several scenes in panes, side by side or stacked, in sequence or in parallel
+  Annotations (every kind)        value / callout / snapshot / group / text — vlmkit-anim schema --kind annotations
   Timeline (how it moves)         ${TIMELINE_FORMAT}: nodes + keyframe tracks + steps.
                                   Every kind compiles to it; it can also be written directly.
 

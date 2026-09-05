@@ -31,6 +31,19 @@ v8 added `stack`, `queue` and `list`: briefs `stack-postfix`, `queue-bfs-frontie
 `list-lru`, and re-edit tasks `README-v8-{list,vector}.md` — the `vector` one is
 the first re-edit of that kind (agents `ba`–`be`).
 
+v9 (2026-09-05) changed the question from "animate this structure" to "explain
+this concept": `concept-vector-clock`, `concept-http2-multiplexing`,
+`intro-vlmkit-anim` (a presentation of the tool itself) and
+`arxiv-batched-pandora` (a paper submitted that week, arXiv 2609.04059). No
+brief names a kind; several scenes are allowed; every writer counts their
+hand-written coordinates and colours, the facts that fit only in a caption,
+and what they could not say (agents `ca`–`ce`).
+
+v10 re-ran the same five briefs after the annotation layer and `kind: compose`
+landed (agents `da`–`de`): the coordinate-fallback count is the metric that has
+to move, and the attempts are kept next to v9's for the comparison.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
-semantic verdict, and the agent's own words on what helped / what was missing.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`.
+semantic verdict, and the agent's own words on what helped / what was missing;
+from v9 also the coordinate-fallback count, the expressiveness metric.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10}.md`.

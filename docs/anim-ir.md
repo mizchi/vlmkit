@@ -14,7 +14,8 @@ This page is the complete writing guide. Every JSON block on it passes
 2. vlmkit-anim check scene.json             validate → compile → semantic checks → stats
    read each ✗ line: path, what is wrong, and the → hint with the fix; edit; re-run
 3. vlmkit-anim explain scene.json           the narration as a numbered list — is this the story you meant?
-4. vlmkit-anim render scene.json --step 4   one frame as SVG (or --at <ms>); --out frame.svg
+4. vlmkit-anim render scene.json --step 4   one frame as SVG, at the instant step 4 begins; --out frame.svg
+   vlmkit-anim render scene.json --at 2300   …at a time — what a step's own fade-in has drawn is only visible past its start
    vlmkit-anim frames scene.json --out dir [--png]   every step as a file, for looking at
    vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
 5. vlmkit-anim html scene.json --out page.html       the playable page
@@ -46,8 +47,9 @@ conventions hold in every kind:
 
 - A `caption` on an op or sequence item **replaces** the generated caption for that beat.
 - `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
-- Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote.
-- A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
+- Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote. `vector` is the exception: it narrates only the items you captioned, and adds neither.
+- A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`, and every annotation op) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
+- Five **annotation ops** — `value`, `callout`, `snapshot`, `group`, `text` — go in any kind's op list and name the kind's own things (an index, a cell, a node) instead of coordinates. See [Annotations](#annotations-every-kind). Two or more pictures at once is [`kind: compose`](#kind-compose).
 
 `vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
@@ -255,7 +257,7 @@ order must be ascending and every node at its depth.
 |---|---|
 | `states` | required: `"id"` or `{"id", "label", "final": true, "pos": [x, y]}` (final = double ring; `pos` pins the state, the rest are laid out around it) |
 | `initial` | required |
-| `transitions` | required: `{"from", "to", "on": "event", "note": "/ action"}`; one per (from, on) |
+| `transitions` | required: `{"from", "to", "on": "event", "note": "/ action"}`; one per (from, on). The note is drawn on the edge and appended to the generated caption (`on lock: closed → locked / beep`), so `explain` carries it; a trace item's own `caption` replaces the whole line |
 | `trace` | required: items fired in order. An event name (must be legal from the current state — the validator lists the legal ones when it is not); `{"on": "ev", "caption": "…"}` to narrate that step yourself; `{"note": "…"}` for a captioned pause; `{"goto": "state", "caption": "…"}` to jump the token without a transition — how you show a second path after the first has ended |
 | `layout` | `lr` (default) \| `tb` \| `circle` |
 
@@ -310,7 +312,7 @@ check verifies the final tree is a heap and that pops come out in order.
 | field | |
 |---|---|
 | `nodes` | required: `"id"` or `{"id", "label", "status": up \| down \| leader \| busy}` |
-| `messages` | required: `{"from", "to", "label", "at": ms \| "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `"<"` starts it together with the previous message (a broadcast), `latency` defaults to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`) |
+| `messages` | required: `{"from", "to", "label", "at": ms \| "<", "after": "label", "delay": ms, "latency": ms, "lost": true, "caption"}`; `at` defaults to right after the previous message lands, `"<"` starts it together with the previous message (a broadcast), `latency` defaults to `stepMs`; `after` starts it when the earlier message with that label lands (+ `delay`). `{"note": "…", "at" \| "after", "delay"}` in the same list is a captioned pause: nothing travels, every node waits for it, and it defaults to when everything so far has landed |
 | `events` | `{"after": "label" \| "at": ms, "delay": ms, "node", "status", "caption"}` — recolours the node from that moment. Prefer `after`: an absolute `at` stays put when you lengthen a latency upstream, and the check warns when it then lands mid-flight or a down node keeps sending |
 
 Sequence-diagram picture: node boxes across the top, lifelines down, time runs
@@ -384,7 +386,7 @@ rows. A single row (`"cells": [[3, 1, 2]]`) is a plain array.
 
 | field | |
 |---|---|
-| `cells` | required: rows of `number` \| `string` \| `null`, all the same length; `null` is an empty cell waiting to be filled |
+| `cells` | required: rows of `number` \| `string` \| `null`, all the same length; `null` is an empty cell waiting to be filled. A number is drawn as JavaScript prints it (`0.6`); write `"3/5"` as a string to keep your notation |
 | `rowLabels`, `colLabels` | optional headers, one per row / column; captions use them instead of indices |
 | `ops` | `{"set": {"cell": [r, c], "value": v, "from": [[r, c], …]}}` writes a value — `from` names the cells it was computed from, which flash while a token flies from each into the target; `{"highlight": T}` / `{"unhighlight": T \| "all"}` / `{"mark": T}` where T is `{"cell": [r, c]}` \| `{"cells": [[r, c], …]}` \| `{"row": r}` \| `{"col": c}` (highlight = accent until cleared, mark = permanent done colour); `{"swap": {"rows": [i, j]}}` / `{"swap": {"cols": [i, j]}}` (labels move with them); `{"note": "…"}`; each may carry `caption`, `ms` |
 
@@ -528,6 +530,11 @@ sequence never reveals.
 | `sequence` | one action per step + optional `caption`, `ms`: `{"show": id \| [ids]}` `{"hide": …}` `{"highlight": …}` `{"unhighlight": …}` `{"flow": "a->b"}` (token travels along an existing edge, either direction) `{"note": "…"}` (captioned pause) `{"relabel": {"id", "text"}}` |
 
 Hidden nodes and edges stay invisible until a `show`; an edge follows its nodes' visibility.
+A `show` / `hide` fades over at most 250 ms and puts its step marker at the end of the fade, and
+`highlight` / `unhighlight` recolour instantly, so the frame at a step (`render --step`, the
+contact sheet) shows what its caption names. `"ms": 0` on `show` / `hide` / `highlight` /
+`unhighlight` applies it inside the surrounding beat with no step of its own — `{"show": ["b"], "ms": 0}, {"highlight": ["a", "b"], "caption": "…"}`
+is one beat in which `b` appears and both light up.
 
 ## kind: vector
 
@@ -577,6 +584,136 @@ Nodes (also the Timeline's node model):
 | `text` | required for `text`; on any other shape draws a centred label |
 | `fill` `stroke` `strokeWidth` `color` `opacity` `rx` `fontSize` `anchor` `dash` `scale` `rotate` | as in SVG; `color` is the text colour |
 | `parent` | id of a `group` node; children move with it |
+
+## Annotations (every kind)
+
+Five ops every kind accepts **in its own op list** (`ops`, `sequence`, `trace`,
+`messages`, `timeline`), next to its own verbs. They exist because a value
+often has to stay readable beside the thing it describes, a viewer needs to be
+pointed at one cell, an earlier value must survive to be compared, and a rule
+or a few lines of code have to be *on screen*, not in the caption. None of
+them takes a coordinate: each names an **anchor**, one of the things the kind
+already draws.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "array",
+  "title": "Binary search for 23",
+  "values": [2, 5, 8, 12, 16, 23, 38, 56],
+  "ops": [
+    { "pointers": { "lo": 0, "hi": 7, "mid": 3 }, "caption": "mid = (lo + hi) / 2" },
+    { "value": { "id": "cmp", "label": "comparisons", "text": 1 }, "ms": 0 },
+    { "callout": { "at": "3", "text": "12 < 23: search the right half" } },
+    { "pointers": { "lo": 4, "mid": 5 }, "caption": "lo = mid + 1" },
+    { "value": { "id": "cmp", "text": 2 }, "ms": 0 },
+    { "callout": null, "ms": 0 },
+    { "found": 5, "caption": "23 is at index 5" },
+    { "text": { "lines": ["while lo <= hi:", "  mid = (lo + hi) // 2", "  if a[mid] < x: lo = mid + 1"], "highlight": 2 } }
+  ]
+}
+```
+
+| op | |
+|---|---|
+| `{"value": {"id", "label", "text", "at", "side"}}` | A named readout. The first op with an `id` creates it; a later op with the same `id` updates the text in place. Without `at` it sits in a panel on the right (the canvas widens to fit); with `at` it sits beside that anchor, `side` = `above` \| `below` (default) \| `left` \| `right`. Generated caption `label = text`, so `explain` carries every change |
+| `{"callout": {"at", "text", "side", "id"}}` / `{"callout": null}` | A text box with a pointer at the anchor, `side` default `above`. One callout per `id` (`"main"` when omitted): a new one replaces it, `null` hides every callout |
+| `{"snapshot": {"of", "label"}}` | A frozen copy, in the panel, of what the anchor shows **at this beat** — the value to compare against later, after the live one has moved on. An anchor that is several cells (a matrix row) snapshots as `[a, b, c]` |
+| `{"group": {"around": anchor \| [anchors], "label", "id"}}` / `{"group": null}` | A dashed outline around the anchors' bounding box, label at the top-left. One per `id`, like callout; `null` removes every group |
+| `{"text": {"lines": [...], "highlight", "at", "side", "id"}}` / `{"text": null}` | A multi-line block: code, a rule, a list. `highlight` is a 0-based line. Same `id` and the same number of lines updates in place and moves the highlight; a different line count redraws. Panel by default, or beside an anchor; `null` hides every block |
+
+A rule that governs the whole scene — the definition of ≤ on vectors, the
+invariant a loop keeps — is a `text` block **without** `at`: it goes to the
+panel and stays there, referenceable, while the picture moves. `at` is for a
+block that belongs to one thing.
+
+Every annotation op takes `caption` (replaces the generated one) and `ms`.
+`"ms": 0` applies it **inside the previous beat** — the way to have "best so
+far = 10" appear at the moment the reveal it belongs to happens, with its
+caption joined to that beat's. A misspelt anchor is an error naming the
+anchors that exist: `no anchor named "row:D" in this matrix scene → did you
+mean "row:C"? anchors here: "0,0", …`.
+
+**Anchors by kind** — what `at`, `of` and `around` may name:
+
+| kind | anchors |
+|---|---|
+| `sort` | a value (`"5"` is the bar labelled 5, wherever it currently is) |
+| `array` | an index (`"3"`), a pointer name (`"lo"`), `"window"` |
+| `stack`, `queue` | a slot index (`"0"` is the bottom / front), a value (the newest box with it), `"top"` / `"front"` / `"back"` |
+| `list` | a value, `"head"`, `"nil"` |
+| `tree` | a value, `"cursor"` |
+| `heap` | a slot index (`"0"` is the root), `"v7"` for the value 7 |
+| `state-machine` | a state id, an event name (when one transition uses it), `"from->to"`, `"token"` |
+| `distributed` | a node id, a message label |
+| `matrix` | a cell `"r,c"`, `"row:<label or index>"`, `"col:<label or index>"` |
+| `graph` | a node id, an edge `"a->b"` |
+| `chart` | a series id, a category, `"series/category"` |
+| `diagram` | a node id, an edge `"a->b"` |
+| `vector` | a node id |
+
+`vlmkit-anim schema --kind annotations` prints this table.
+
+## kind: compose
+
+Several scenes in one canvas: a before / after, a structure next to the
+queue that drives it, a run next to its decision tree. Each pane is a whole
+scene of any other kind and keeps its own anchors and annotations.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "compose",
+  "title": "Two ways to sort 3, 1, 2",
+  "layout": "row",
+  "timing": "parallel",
+  "panes": [
+    { "title": "bubble", "scene": { "format": "vlmkit-anim/scene@1", "kind": "sort", "algorithm": "bubble", "values": [3, 1, 2] } },
+    { "title": "insertion", "scene": { "format": "vlmkit-anim/scene@1", "kind": "sort", "algorithm": "insertion", "values": [3, 1, 2] } }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `panes` | required: `{"id", "title", "scene"}`; `scene` is a complete scene (its own `format` and `kind`), and may not itself be a `compose`. Errors inside a pane are reported under `panes[i].scene.…` |
+| `layout` | `row` (default, side by side) \| `column` (stacked) \| `grid` (two per row) |
+| `timing` | `sequence` (default): pane 2 starts when pane 1 ends, so captions never collide. `parallel`: all panes start at 0 — a before / after in lockstep; beats that coincide share one step and their captions join as `bubble: … · insertion: …` |
+| `gap` | pixels between panes, default 32 |
+
+Choose `sequence` when the second picture is the *consequence* of the first
+(a history, then the comparison of two of its values); choose `parallel` when
+the point is *when* things happen relative to each other (two protocols
+finishing the same downloads). A pane's title is drawn above it, and each
+pane keeps a faint border so the reader sees where one picture ends.
+
+## Scenes generated from a repository
+
+Two scenes nobody has to write: the workspace's architecture and the change
+map of a range of commits. Both are ordinary `diagram` scenes — edit the
+written `*.scene.json` and re-run `video` for a different cut.
+
+```
+vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture
+vlmkit-anim pr --base origin/main --title "PR #132: …" --out .vlmkit-anim/pr
+```
+
+- **`repo`** reads every `package.json` in the workspace and shows the packages
+  layer by layer, from the ones that depend on nothing to the CLI, each beat's
+  caption naming the dependencies that place a package where it is.
+- **`pr`** reads `git log base..head`: one beat per commit, the **areas** it
+  touched light up (a package's `src`, its fixtures, `docs/reports`, `tests`,
+  `ci`), areas appear the first time a commit touches them, edges are the
+  imports between changed areas as they stand at `head`, and two readouts
+  count files and lines as they accumulate. More than fourteen areas fold into
+  "other".
+
+Each writes four files under `--out`: `<name>.scene.json`, `<name>.gif`,
+`<name>.sheet.png` and `<name>.md` — the narration with both images embedded,
+ready to paste into a pull request. Without a browser the images are skipped
+and a `<name>.sheet.html` plus the final frame as SVG are written instead.
+The repository's `pr-visual` workflow runs `pr` on every pull request and
+keeps one comment on it up to date with the result.
 
 ## Writing a scene in TypeScript
 

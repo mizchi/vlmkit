@@ -11,7 +11,9 @@
  *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
- *   schema    the cheat sheet for one kind, or the index
+ *   repo      generate the workspace's architecture map (scene + GIF + sheet + markdown) from its package.json files
+ *   pr        generate the change map of a commit range: areas touched per commit, import edges, running counts
+ *   schema    the cheat sheet for one kind, the shared annotation ops (--kind annotations), or the index
  *
  * `check` is the command an agent runs after every edit; everything it prints
  * is phrased for the next edit. Exit 1 on any error-severity diagnostic.
@@ -25,6 +27,7 @@ import { sceneFromModule } from "./author.ts";
 import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError } from "./cli-args.ts";
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
+import { changeMapScene, workspaceScene } from "./generators/git.ts";
 import { renderFrameSvg, sampleTimes } from "./render-svg.ts";
 import { RUNTIME_SOURCE, renderEmbedHtml } from "./runtime.ts";
 import { currentStep, timelineDuration } from "./timeline.ts";
@@ -37,7 +40,7 @@ import { writeVideo, type VideoResult } from "./video.ts";
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -67,6 +70,14 @@ Commands
                                   reduced-motion, motion outside the API — with the evaluator vlmkit's
                                   \`check animation\` gate uses (@mizchi/vlmkit-animation-eval + playwright).
                                   Exit 1 on a suspect finding.
+  repo [--root .] [--out dir] [--title T] [--no-images]
+                                  The workspace's architecture as an animation: packages appear layer by layer
+                                  with the dependencies that place them there. Writes <out>/repo.scene.json,
+                                  repo.gif, repo.sheet.png and repo.md (the explain text with both images embedded).
+  pr --base <ref> [--head HEAD] [--root .] [--out dir] [--title T] [--name pr] [--no-images]
+                                  The change map of base..head: one beat per commit, the areas it touched light
+                                  up, import edges between changed areas, running file / line counts. Same four
+                                  files, named <name>.*; paste <name>.md into the pull request.
   schema [--kind <kind>]          The writing guide: field list and a minimal example for a kind, or the index.
 
 Options
@@ -176,10 +187,10 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       console.log(schemaIndex());
       return 0;
     }
-    if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline") {
-      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline")`);
+    if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline" && kind !== "annotations") {
+      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", or "annotations" for the ops every kind shares)`);
     }
-    console.log(schemaSheet(kind as Scene["kind"] | "timeline"));
+    console.log(schemaSheet(kind as Scene["kind"] | "timeline" | "annotations"));
     return 0;
   }
   if (verb === "runtime") {
@@ -205,6 +216,30 @@ export async function runAnimCli(argv: string[]): Promise<number> {
     if (json) console.log(JSON.stringify(report, null, 2));
     else console.log(evaluator.formatAnimationEvalReport(report));
     return report.issues.some((issue) => issue.severity === "suspect") ? 1 : 0;
+  }
+
+  if (verb === "repo" || verb === "pr") {
+    const root = resolve(readFlag(rest, "--root") ?? ".");
+    const name = readFlag(rest, "--name") ?? verb;
+    const out = readFlag(rest, "--out") ?? join(".vlmkit-anim", name);
+    let scene: Scene;
+    let summary: Record<string, unknown> = {};
+    if (verb === "repo") scene = workspaceScene(root, readFlag(rest, "--title"));
+    else {
+      const base = readFlag(rest, "--base");
+      if (!base) throw new UsageError("vlmkit-anim pr needs --base <ref> (the branch or commit the changes are against, e.g. --base origin/main)");
+      const map = changeMapScene({ root, base, head: readFlag(rest, "--head"), title: readFlag(rest, "--title") });
+      scene = map.scene;
+      summary = { commits: map.commits, files: map.files, added: map.added, removed: map.removed, areas: map.areas };
+    }
+    const result = await emitGenerated(scene, out, name, { images: !hasFlag(rest, "--no-images"), width: readInt(rest, "--width", { min: 160 }) });
+    if (json) console.log(JSON.stringify({ ...result, ...summary }, null, 2));
+    else {
+      console.log(`${name}: ${result.files.join(", ")}`);
+      if (result.skipped) console.log(`  ${result.skipped}`);
+      if (summary.commits !== undefined) console.log(`  ${summary.commits} commit(s), ${summary.files} file(s), +${summary.added} −${summary.removed}, ${(summary.areas as string[]).length} area(s)`);
+    }
+    return result.ok ? 0 : 1;
   }
 
   const file = requireFile(positionals, verb);
@@ -345,6 +380,84 @@ async function loadChromium(): Promise<typeof import("playwright").chromium> {
   } catch {
     throw new UsageError("PNG output needs playwright installed (pnpm add -D playwright && npx playwright install chromium); write .svg / .html instead to skip the browser");
   }
+}
+
+/**
+ * Write a generated scene and everything a reader needs around it: the scene
+ * (so it can be edited by hand), the markdown with the narration and both
+ * images, the GIF and the contact sheet. Without a browser the images are
+ * skipped and the sheet is written as HTML; the scene and the text are the
+ * deliverable, the pictures the bonus.
+ */
+async function emitGenerated(scene: Scene, out: string, name: string, opts: { images: boolean; width?: number }): Promise<{ ok: boolean; files: string[]; skipped?: string; dir: string }> {
+  await mkdir(out, { recursive: true });
+  const files: string[] = [];
+  const scenePath = join(out, `${name}.scene.json`);
+  await writeFile(scenePath, JSON.stringify(scene, null, 2) + "\n");
+  files.push(scenePath);
+  let tl: Timeline;
+  try {
+    tl = compileScene(scene);
+  } catch (e) {
+    if (e instanceof SceneValidationError) {
+      console.log(formatDiagnostics(e.diagnostics));
+      console.log(`✗ the generated scene does not compile — a generator bug; the scene is at ${scenePath}`);
+      return { ok: false, files, dir: out };
+    }
+    throw e;
+  }
+  const diags = checkAnimation(tl, scene);
+  // Warnings on a generated scene are the generator's to fix, so they are printed, not swallowed.
+  if (diags.length) console.log(formatDiagnostics(diags));
+  if (hasErrors(diags)) {
+    console.log(`✗ the generated scene fails its own checks — a generator bug; the scene is at ${scenePath}`);
+    return { ok: false, files, dir: out };
+  }
+  let skipped: string | undefined;
+  let gifName: string | undefined;
+  let sheetName: string | undefined;
+  if (opts.images) {
+    try {
+      const gif = join(out, `${name}.gif`);
+      await writeVideo(tl, gif, { width: opts.width ?? 720, fps: 12 });
+      files.push(gif);
+      gifName = `${name}.gif`;
+      const sheet = join(out, `${name}.sheet.png`);
+      await screenshotHtml(renderSheetHtml(tl, sampleTimes(tl, 0), { cols: 3, tileWidth: 400, title: scene.title }), sheet);
+      files.push(sheet);
+      sheetName = `${name}.sheet.png`;
+    } catch (e) {
+      skipped = `images skipped: ${(e as Error).message}`;
+    }
+  }
+  if (!gifName) {
+    const html = join(out, `${name}.sheet.html`);
+    await writeFile(html, renderSheetHtml(tl, sampleTimes(tl, 0), { cols: 3, tileWidth: 400, title: scene.title }));
+    files.push(html);
+    const svg = join(out, `${name}.final.svg`);
+    await writeFile(svg, renderFrameSvg(tl, timelineDuration(tl)));
+    files.push(svg);
+  }
+  const md = [
+    `## ${scene.title ?? name}`,
+    "",
+    ...(gifName ? [`![${scene.title ?? name}](./${gifName})`, ""] : []),
+    "<details><summary>Every step</summary>",
+    "",
+    ...(sheetName ? [`![steps](./${sheetName})`, ""] : []),
+    "```",
+    explain(tl),
+    "```",
+    "",
+    "</details>",
+    "",
+    `<sub>Generated by \`vlmkit-anim ${name === "repo" ? "repo" : "pr"}\`; the scene is [\`${name}.scene.json\`](./${name}.scene.json) — edit it and re-run \`vlmkit-anim video\` for a different cut.</sub>`,
+    "",
+  ].join("\n");
+  const mdPath = join(out, `${name}.md`);
+  await writeFile(mdPath, md);
+  files.push(mdPath);
+  return { ok: true, files, skipped, dir: out };
 }
 
 /**

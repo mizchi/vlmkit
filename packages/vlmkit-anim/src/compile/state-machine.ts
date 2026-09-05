@@ -80,11 +80,17 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
     b.node({ id: `state-${s.id}`, shape: "circle", pos: p, r, fill: T.node, stroke: T.nodeStroke, strokeWidth: 2, text: s.label ?? s.id, fontSize: T.fontSize, color: T.text });
   }
   b.node({ id: "token", shape: "circle", pos: pos.get(scene.initial)!, r: 7, fill: T.accent, stroke: T.nodeStroke, opacity: 1 });
+  for (const s of states) b.anchor(s.id, `state-${s.id}`);
+  scene.transitions.forEach((tr, i) => {
+    b.anchor(`${tr.from}->${tr.to}`, `tr-${i}`);
+    if (scene.transitions.filter((t) => t.on === tr.on).length === 1) b.anchor(tr.on, `tr-${i}`);
+  });
+  b.anchor("token", "token");
 
-  const table = new Map<string, Map<string, { to: string; index: number }>>();
+  const table = new Map<string, Map<string, { to: string; index: number; note?: string }>>();
   scene.transitions.forEach((tr, i) => {
     const row = table.get(tr.from) ?? new Map();
-    row.set(tr.on, { to: tr.to, index: i });
+    row.set(tr.on, { to: tr.to, index: i, note: tr.note });
     table.set(tr.from, row);
   });
 
@@ -94,6 +100,7 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
   b.step(`Start in "${cur}"`, "start");
   b.advance(b.stepMs * 0.8);
   for (const item of scene.trace) {
+    if (b.annotate(item, "trace")) continue;
     if (typeof item === "object" && "note" in item) {
       b.step(item.note);
       b.advance(b.stepMs * 0.9);
@@ -114,12 +121,16 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
       visited.push(cur);
       continue;
     }
+    if (typeof item === "object" && !("on" in item)) continue; // handled above (annotation / note / goto)
     const ev = typeof item === "string" ? item : item.on;
     const caption = typeof item === "string" ? undefined : item.caption;
     const hit = table.get(cur)?.get(ev);
     if (!hit) break; // validator reports this; compile what is legal.
     const next = hit.to;
-    b.step(caption ?? `on ${ev}: ${cur} → ${next}`, ev);
+    // The transition's `note` is drawn on the edge; the generated caption carries it too, so
+    // `explain` says what the picture says (v9: a writer put every number in `note` and the
+    // narration lost all of them).
+    b.step(caption ?? `on ${ev}: ${cur} → ${next}${hit.note ? ` ${hit.note}` : ""}`, ev);
     b.set(`tr-${hit.index}`, "stroke", T.accent);
     const t0 = b.t;
     const t1 = b.advance();

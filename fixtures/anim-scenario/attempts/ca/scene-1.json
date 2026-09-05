@@ -1,0 +1,42 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "matrix",
+  "title": "Vector clocks: A, B, C",
+  "rowLabels": ["A", "B", "C"],
+  "colLabels": ["a", "b", "c"],
+  "cells": [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ],
+  "ops": [
+    {
+      "set": { "cell": [0, 0], "value": 1 },
+      "caption": "A has a local event: it increments its own slot a. A = [1,0,0]"
+    },
+    {
+      "set": { "cell": [1, 0], "value": 1, "from": [[0, 0]] },
+      "caption": "A sends its vector to B. B takes the element-wise max with its own: max(0,1) = 1 for slot a"
+    },
+    {
+      "set": { "cell": [1, 1], "value": 1 },
+      "caption": "B then increments its own slot b: 0 → 1. B is now [1,1,0]"
+    },
+    {
+      "set": { "cell": [2, 2], "value": 1 },
+      "caption": "Meanwhile, and concurrently with A's send, C has a local event: it increments its own slot c. C = [0,0,1]"
+    },
+    {
+      "set": { "cell": [2, 0], "value": 1, "from": [[1, 0]] },
+      "caption": "B sends its vector to C. C takes the max with its own: max(0,1) = 1 for slot a"
+    },
+    {
+      "set": { "cell": [2, 1], "value": 1, "from": [[1, 1]] },
+      "caption": "max(0,1) = 1 for slot b"
+    },
+    {
+      "set": { "cell": [2, 2], "value": 2 },
+      "caption": "C then increments its own slot c: 1 → 2. C is now [1,1,2]"
+    }
+  ]
+}

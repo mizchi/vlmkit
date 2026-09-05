@@ -78,7 +78,8 @@
     "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "anim:samples": "node scripts/anim-samples.mjs"
+    "anim:samples": "node scripts/anim-samples.mjs",
+    "anim:diagrams": "node scripts/anim-diagrams.mjs"
   },
   "devDependencies": {
     "@jsquash/webp": "^1.5.0",

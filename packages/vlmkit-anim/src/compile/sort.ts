@@ -88,6 +88,7 @@ export function compileSort(scene: SortScene): Timeline {
     b.node({ id, shape: "group", pos: [slotX(i), baseY] });
     b.node({ id: `${id}-rect`, shape: "rect", parent: id, pos: [0, -h / 2], size: [barW, h], fill: T.node, stroke: T.nodeStroke, rx: 3 });
     b.node({ id: `${id}-label`, shape: "text", parent: id, pos: [0, 16], text: String(v), fontSize: T.fontSize, color: T.text });
+    b.anchor(String(v), `${id}-rect`); // a value names its bar wherever it is
   });
   if (scene.title) b.node({ id: "title", shape: "text", pos: [b.width / 2, 24], text: scene.title, fontSize: T.fontSize + 4, color: T.text });
 
@@ -102,6 +103,7 @@ export function compileSort(scene: SortScene): Timeline {
   b.advance(b.stepMs * 0.6);
 
   for (const op of ops) {
+    if (b.annotate(op)) continue;
     const caption = "caption" in op ? op.caption : undefined;
     const ms = op.ms ?? b.stepMs;
     // Reset previous compare highlight (kept when the slot has been marked done).
