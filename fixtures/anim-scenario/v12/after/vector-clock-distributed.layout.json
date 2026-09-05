@@ -1,0 +1,109 @@
+{
+  "frames": [
+    {
+      "index": 1,
+      "t": 0,
+      "step": {
+        "index": 1,
+        "caption": "Start: A, B and C each hold a vector [a,b,c] of counters, all zero · A = [0,0,0] · B = [0,0,0] · C = [0,0,0]"
+      },
+      "issues": []
+    },
+    {
+      "index": 2,
+      "t": 540,
+      "step": {
+        "index": 2,
+        "caption": "A has a local event: it increments its own slot · A: [0,0,0] -> [1,0,0]"
+      },
+      "issues": []
+    },
+    {
+      "index": 3,
+      "t": 1080,
+      "step": {
+        "index": 3,
+        "caption": "A has a second local event before sending: it increments its own slot again · A: [1,0,0] -> [2,0,0]"
+      },
+      "issues": []
+    },
+    {
+      "index": 4,
+      "t": 1620,
+      "step": {
+        "index": 4,
+        "caption": "A sends its vector to B · B receives [2,0,0]: max([0,0,0],[2,0,0])=[2,0,0], then +1 own slot -> [2,1,0]"
+      },
+      "issues": []
+    },
+    {
+      "index": 5,
+      "t": 2220,
+      "step": {
+        "index": 5,
+        "caption": "Meanwhile, C has a local event of its own: it increments its own slot · C: [0,0,0] -> [0,0,1] · C's local event (frozen) = [0,0,1]"
+      },
+      "issues": []
+    },
+    {
+      "index": 6,
+      "t": 2760,
+      "step": {
+        "index": 6,
+        "caption": "B sends its vector to C · C receives [2,1,0]: max([0,0,1],[2,1,0])=[2,1,1], then +1 own slot -> [2,1,2]"
+      },
+      "issues": []
+    },
+    {
+      "index": 7,
+      "t": 3360,
+      "step": {
+        "index": 7,
+        "caption": "Concurrent: A's vector when it sent to B [2,0,0] and C's local event [0,0,1] - neither is <= the other"
+      },
+      "issues": []
+    },
+    {
+      "index": 8,
+      "t": 3900,
+      "step": {
+        "index": 8,
+        "caption": "A ∥ C: concurrent"
+      },
+      "issues": []
+    },
+    {
+      "index": 9,
+      "t": 4440,
+      "step": {
+        "index": 9,
+        "caption": "Ordered: A's vector [2,0,0] <= C's final vector [2,1,2] in every slot - A's send happened-before C's receive"
+      },
+      "issues": []
+    },
+    {
+      "index": 10,
+      "t": 4980,
+      "step": {
+        "index": 10,
+        "caption": "A ≤ C: ordered"
+      },
+      "issues": []
+    },
+    {
+      "index": 11,
+      "t": 5520,
+      "step": {
+        "index": 11,
+        "caption": "end"
+      },
+      "issues": []
+    }
+  ],
+  "totals": {
+    "frames": 11,
+    "framesWithIssues": 0,
+    "overlaps": 0,
+    "clipped": 0
+  }
+}

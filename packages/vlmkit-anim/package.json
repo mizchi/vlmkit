@@ -52,10 +52,14 @@
     "pngjs": "^7.0.0"
   },
   "peerDependencies": {
+    "@mizchi/vlmkit-ai": "workspace:*",
     "@mizchi/vlmkit-animation-eval": "workspace:*",
     "playwright": ">=1.61 <2"
   },
   "peerDependenciesMeta": {
+    "@mizchi/vlmkit-ai": {
+      "optional": true
+    },
     "@mizchi/vlmkit-animation-eval": {
       "optional": true
     },

@@ -46,8 +46,12 @@ export class AnchorError extends Error {
 
 export const PANEL_WIDTH = 220;
 const PANEL_GAP = 16;
-/** The renderer and runtime draw the current caption in the bottom band of the canvas; nothing else goes there. */
-const CAPTION_BAND = 32;
+/**
+ * The renderer and runtime draw the current caption in the bottom band of the canvas; nothing else goes
+ * there. Captions wrap to up to three lines (14px + 2 × 17px above the 14px baseline margin), so the band
+ * is sized for a wrapped one — eb's readout, grown onto a 32px band, sat on the second line of its caption.
+ */
+const CAPTION_BAND = 64;
 
 interface Box {
   x: number;
@@ -99,6 +103,8 @@ export class Annotations {
   private panelRows = 0;
   private panelUsed = false;
   private panelNeed = PANEL_WIDTH;
+  /** Height a relation asked for below the kind's own canvas, when a level line missed fitting by a little. */
+  private extraH = 0;
   private serial = 0;
 
   private readonly b: Builder;
@@ -119,6 +125,11 @@ export class Annotations {
   /** Extra canvas width the panel needs; 0 when nothing used it. */
   extraWidth(): number {
     return this.panelUsed ? this.panelNeed + PANEL_GAP : 0;
+  }
+
+  /** Extra canvas height a relation needed; 0 when none did. */
+  extraHeight(): number {
+    return this.extraH;
   }
 
   /** True when `op` was an annotation op and has been applied at `t`. */
@@ -204,7 +215,7 @@ export class Annotations {
     const dy = n[1] * sign;
     // The panel, when something used it, widens the canvas to the right; the caption owns the bottom band.
     if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? this.b.width + this.extraWidth() - (b.x + b.w) : b.x;
-    return dy > 0 ? this.b.height - CAPTION_BAND - (b.y + b.h) : b.y;
+    return dy > 0 ? this.b.height + this.extraH - CAPTION_BAND - (b.y + b.h) : b.y;
   }
 
   /**
@@ -234,37 +245,59 @@ export class Annotations {
    * Whether the segment p→q runs through some other anchor's visible box — one that is neither of the pair's
    * nor touching them (a cell inside the row it relates, a column spanning both, the edge between two nodes).
    */
-  private crossesBystander(p: Vec2, q: Vec2, a: Box, c: Box, from: string, to: string, t: number): boolean {
-    for (const [name, ids] of this.anchors) {
-      if (name === from || name === to) continue;
-      const visible = ids.filter((id) => (this.b.valueAt(id, "opacity", t) ?? 1) !== 0);
-      if (!visible.length) continue;
-      const b = visible.map((id) => this.nodeBox(id, t)).reduce(union);
-      if (b.w === 0 && b.h === 0) continue;
-      if (intersects(b, a) || intersects(b, c)) continue;
-      if (segmentHitsBox(p, q, b)) return true;
+  /**
+   * The boxes of every anchored node the straight segment p→q passes through that belongs to neither end —
+   * per node, not per anchor: `col:box2` is two cells, and only the one in the row being related is in
+   * the way (measuring the whole column once sent an arc over the header row).
+   */
+  private bystanders(p: Vec2, q: Vec2, a: Box, c: Box, from: string, to: string, t: number): Box[] {
+    const own = new Set([...(this.anchors.get(from) ?? []), ...(this.anchors.get(to) ?? [])]);
+    const seen = new Set<string>();
+    const out: Box[] = [];
+    for (const ids of this.anchors.values()) {
+      for (const id of ids) {
+        if (own.has(id) || seen.has(id)) continue;
+        seen.add(id);
+        if ((this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
+        const b = this.nodeBox(id, t);
+        if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c)) continue;
+        if (segmentHitsBox(p, q, b)) out.push(b);
+      }
     }
-    return false;
+    return out;
+  }
+
+  private crossesBystander(p: Vec2, q: Vec2, a: Box, c: Box, from: string, to: string, t: number): boolean {
+    return this.bystanders(p, q, a, c, from, to, t).length > 0;
   }
 
   /**
-   * How far an arc from p to q must bulge towards `sign · n` to clear every bystander the straight
-   * segment crosses (the same boxes `crossesBystander` counts), measured from the segment's midpoint.
+   * How far an arc from p to q must bulge towards `sign · n` to clear what it sweeps over, from the chord's
+   * midpoint: first what the chord itself crosses, then whatever anchored node the arc would cross once it
+   * bulges that far (a cell in the next row), until nothing new is in the way.
    */
   private bystanderBulge(p: Vec2, q: Vec2, n: Vec2, sign: 1 | -1, a: Box, c: Box, from: string, to: string, t: number): number {
     const m: Vec2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-    let far = 0;
-    for (const [name, ids] of this.anchors) {
-      if (name === from || name === to) continue;
-      const visible = ids.filter((id) => (this.b.valueAt(id, "opacity", t) ?? 1) !== 0);
-      if (!visible.length) continue;
-      const b = visible.map((id) => this.nodeBox(id, t)).reduce(union);
-      if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c) || !segmentHitsBox(p, q, b)) continue;
-      for (const [x, y] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]] as Vec2[]) {
-        far = Math.max(far, ((x - m[0]) * n[0] + (y - m[1]) * n[1]) * sign);
+    const extent = (b: Box): number => Math.max(...([[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]] as Vec2[]).map(([x, y]) => ((x - m[0]) * n[0] + (y - m[1]) * n[1]) * sign));
+    let bulge = Math.max(16, ...this.bystanders(p, q, a, c, from, to, t).map((b) => extent(b) + 12));
+    const own = new Set([...(this.anchors.get(from) ?? []), ...(this.anchors.get(to) ?? [])]);
+    const chord = union(box(p[0], p[1], 0, 0), box(q[0], q[1], 0, 0));
+    for (let iter = 0; iter < 4; iter++) {
+      const shifted: Box = { ...chord, x: chord.x + n[0] * bulge * sign, y: chord.y + n[1] * bulge * sign };
+      const swept = union(chord, shifted);
+      let next = bulge;
+      for (const ids of this.anchors.values()) {
+        for (const id of ids) {
+          if (own.has(id) || (this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
+          const b = this.nodeBox(id, t);
+          if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c) || !intersects(b, swept)) continue;
+          next = Math.max(next, extent(b) + 12);
+        }
       }
+      if (next <= bulge) break;
+      bulge = next;
     }
-    return Math.max(16, far + 12);
+    return bulge;
   }
 
   private anchorText(name: string, t: number, path: string): string {
@@ -285,6 +318,55 @@ export class Annotations {
       case "left": return [target.x - gap - w / 2, cy];
       case "right": return [target.x + target.w + gap + w / 2, cy];
     }
+  }
+
+  /**
+   * `beside`, but on the first side where the box covers no visible text that is not the anchor's own —
+   * the requested side first, then the others clockwise. v12's geometry found a callout on the column
+   * headers and a readout under a group label; both were placed exactly where they were asked, on top of
+   * something already there.
+   */
+  private placeBeside(target: Box, w: number, h: number, side: Side, gap: number, own: Set<string>, t: number): Vec2 {
+    const order: Side[] = [side, ...(["above", "right", "below", "left"] as Side[]).filter((s) => s !== side)];
+    const covers = (box: Box): boolean =>
+      this.b.nodes.some(
+        (n) => (n.shape === "text" || n.text !== undefined) && !own.has(n.id) && (this.b.valueAt(n.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(n.id, t), box),
+      );
+    // Inside the canvas as it stands, panel included when something opened it.
+    const inside = (box: Box): boolean =>
+      box.x >= 0 && box.y >= 0 && box.x + box.w <= this.b.width + this.extraWidth() && box.y + box.h <= this.b.height + this.extraH - CAPTION_BAND;
+    const boxAt = (cx: number, cy: number): Box => ({ x: cx - w / 2, y: cy - h / 2, w, h });
+    // A spot inside the panel takes panel rows, so the readouts stacked there later start below it (ec, v12:
+    // a callout moved into the panel and the code block was laid over it).
+    const take = (box: Box): Vec2 => {
+      if (box.x + box.w > this.b.width) {
+        const top = this.b.hasTitle ? 56 : 32;
+        this.panelRows = Math.max(this.panelRows, Math.ceil((box.y + box.h - top) / 24) + 1);
+      }
+      return [box.x + box.w / 2, box.y + box.h / 2];
+    };
+    // Nearest first: every side at the asked gap, then every side one box further out, and so on — a cell in
+    // the middle of a matrix has neighbours on all four sides, and its callout belongs just past them.
+    for (let k = 0; k < 4; k++) {
+      for (const s of order) {
+        const step = s === "above" || s === "below" ? h + 6 : w + 6;
+        const [cx, cy] = this.beside(target, w, h, s, gap + k * step);
+        const box = boxAt(cx, cy);
+        if (inside(box) && !covers(box)) return take(box);
+      }
+    }
+    // Nothing fits on the canvas as it stands: the bottom edge can grow. Take the first spot below that
+    // covers nothing and ask for the height it needs, within reason.
+    for (let k = 0; k < 4; k++) {
+      const [cx, cy] = this.beside(target, w, h, "below", gap + k * (h + 6));
+      const box = boxAt(cx, cy);
+      const need = box.y + box.h + CAPTION_BAND - (this.b.height + this.extraH);
+      if (box.x >= 0 && box.x + box.w <= this.b.width + this.extraWidth() && need <= 120 && !covers(box)) {
+        if (need > 0) this.extraH += Math.ceil(need);
+        return take(box);
+      }
+    }
+    return this.beside(target, w, h, side, gap);
   }
 
   private panelSlot(rows: number): Vec2 {
@@ -322,7 +404,7 @@ export class Annotations {
       const side = spec.side ?? "below";
       const w = labelWidth(`${label}: ${text}`, T.fontSize - 1);
       const h = T.fontSize * 1.4;
-      const [cx, cy] = this.beside(target, w, h, side, 10);
+      const [cx, cy] = this.placeBeside(target, w, h, side, 10, new Set(this.anchors.get(spec.at) ?? []), t);
       this.b.node({ id: labelId, shape: "text", pos: [cx - w / 2, cy], text: `${label}:`, fontSize: T.fontSize - 2, color: T.muted, anchor: "start", opacity: 0 });
       const lx = cx - w / 2 + labelWidth(`${label}:`, T.fontSize - 2) - (T.fontSize - 2) * 1.2;
       this.b.node({ id: textId, shape: "text", pos: [lx, cy], text, fontSize: T.fontSize, color: T.accent, anchor: "start", opacity: 0 });
@@ -353,7 +435,7 @@ export class Annotations {
     const fs = T.fontSize - 1;
     const w = labelWidth(spec.text, fs);
     const h = fs * 1.9;
-    const [cx, cy] = this.beside(target, w, h, side, 26);
+    const [cx, cy] = this.placeBeside(target, w, h, side, 26, new Set(this.anchors.get(spec.at) ?? []), t);
     const k = this.serial++;
     const ids = [`callout-${id}-${k}-box`, `callout-${id}-${k}-text`, `callout-${id}-${k}-arrow`];
     // The pointer runs from the box edge nearest the target to the target's edge.
@@ -416,8 +498,10 @@ export class Annotations {
       ];
       const free = (p: Vec2) => {
         const labelBox: Box = { x: p[0], y: p[1] - fs * 0.65, w, h: fs * 1.3 };
+        // Anything that carries text counts — a `text` node or a labelled cell (v12's geometry caught "ordered"
+        // landing on row C's first cell when only `text` nodes were checked).
         return !this.b.nodes.some(
-          (n) => n.shape === "text" && !own.has(n.id) && (this.b.valueAt(n.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(n.id, t), labelBox),
+          (n) => (n.shape === "text" || n.text !== undefined) && !own.has(n.id) && (this.b.valueAt(n.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(n.id, t), labelBox),
         );
       };
       const pos = candidates.find(free) ?? candidates[0];
@@ -455,7 +539,7 @@ export class Annotations {
     let cx: number;
     let cy: number;
     if (spec.at) {
-      [cx, cy] = this.beside(this.anchorBox(spec.at, t, `${path}.text.at`), w, h, spec.side ?? "right");
+      [cx, cy] = this.placeBeside(this.anchorBox(spec.at, t, `${path}.text.at`), w, h, spec.side ?? "right", 14, new Set(this.anchors.get(spec.at) ?? []), t);
     } else {
       const rows = Math.ceil(h / 24);
       const [px, py] = this.panelSlot(rows + 1);
@@ -527,7 +611,26 @@ export class Annotations {
     if (!fits(outward, outward === 1 ? offPlus : offMinus) && fits(-outward as 1 | -1, outward === 1 ? offMinus : offPlus)) outward = -outward as 1 | -1;
     let arc: { apex: Vec2; d: string } | undefined;
     if (beside) {
-      const off = outward === 1 ? offPlus : offMinus;
+      let off = outward === 1 ? offPlus : offMinus;
+      if (!fits(outward, off)) {
+        // Neither side fits as the canvas stands. The canvas can grow on its right and bottom edges (the
+        // panel already does the former): when the level line misses by a little on a growable side, grow
+        // that side rather than arc — eb's two-row matrix had its readouts sitting right on the caption band.
+        const grow: 1 | -1 = n[0] + n[1] > 0 ? 1 : -1;
+        const growOff = grow === 1 ? offPlus : offMinus;
+        const pairRadius = boxRadius(pair.w, pair.h, n[0], n[1]);
+        const deficit = growOff - pairRadius + 24 - this.room(pair, n, grow);
+        // Only when the line would still be near the pair: a node row with lanes below it would need the
+        // line under all the lanes, which is not a relation anyone can read — that case arcs.
+        if (deficit <= 120 && growOff <= pairRadius + 100) {
+          if (Math.abs(n[0]) > Math.abs(n[1])) {
+            this.panelUsed = true;
+            this.panelNeed = Math.max(this.panelNeed, PANEL_WIDTH + Math.ceil(deficit));
+          } else this.extraH += Math.ceil(deficit);
+          outward = grow;
+          off = growOff;
+        }
+      }
       if (fits(outward, off)) {
         // Level with the first anchor's centre, offset just past everything in the lane (the pair's own boxes,
         // a row label, a readout beside a row); the arrow ends level with the second anchor's centre.
@@ -565,16 +668,22 @@ export class Annotations {
       // A vertical line's label is beside it, start-anchored, so it reads left to right off the line.
       const vertical = Math.abs(u[1]) > Math.abs(u[0]);
       const gap = vertical ? 8 : 12;
-      this.b.node({
-        id: labelId,
-        shape: "text",
-        pos: [mid[0] + n[0] * gap * outward, mid[1] + n[1] * gap * outward],
-        text: spec.label,
-        fontSize: T.fontSize - 2,
-        color: T.accent,
-        anchor: vertical ? (n[0] * outward > 0 ? "start" : "end") : "middle",
-        opacity: 0,
-      });
+      const fs = T.fontSize - 2;
+      const anchor = vertical ? (n[0] * outward > 0 ? "start" : "end") : "middle";
+      const lw = labelWidth(spec.label, fs) - fs * 1.6;
+      const lh = fs * 1.3;
+      // Off the line's far side at its middle — unless text already sits there (ed, v12: the arc's label on
+      // B's readout under the node row); then further out, then off the line's quarter points.
+      // Quarter points along the chord (an arc's label candidates sit off the chord, still on its far side).
+      const quarter = (f: number): Vec2 => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+      const candidates: Vec2[] = [gap, gap * 2.5, gap * 4].flatMap((g) =>
+        [mid, quarter(0.25), quarter(0.75)].map((pt): Vec2 => [pt[0] + n[0] * g * outward, pt[1] + n[1] * g * outward]),
+      );
+      const boxOf = (pt: Vec2): Box => ({ x: anchor === "start" ? pt[0] : anchor === "end" ? pt[0] - lw : pt[0] - lw / 2, y: pt[1] - lh / 2, w: lw, h: lh });
+      const covered = (bx: Box) =>
+        this.b.nodes.some((nd) => (nd.shape === "text" || nd.text !== undefined) && (this.b.valueAt(nd.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(nd.id, t), bx));
+      const pos = candidates.find((pt) => !covered(boxOf(pt))) ?? candidates[0];
+      this.b.node({ id: labelId, shape: "text", pos, text: spec.label, fontSize: fs, color: T.accent, anchor, opacity: 0 });
     }
     for (const nodeId of ids) this.b.set(nodeId, "opacity", 1, t);
     this.relations.set(id, ids);

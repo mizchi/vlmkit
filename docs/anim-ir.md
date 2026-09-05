@@ -18,6 +18,8 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit-anim render scene.json --at 2300   …at a time — what a step's own fade-in has drawn is only visible past its start
    vlmkit-anim frames scene.json --out dir [--png]   every step as a file, for looking at
    vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
+   vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, per step (check warns about these too)
+   vlmkit-anim review scene.json --out dir           the sheet + a review brief for a vision model or an agent; --answers its JSON scores it
 5. vlmkit-anim html scene.json --out page.html       the playable page
    vlmkit-anim video scene.json --out demo.gif       a file for a README / slide (or .mp4 / .webm through ffmpeg)
 6. vlmkit-anim eval page.html                        measure the emitted page frame by frame (needs @mizchi/vlmkit-animation-eval + playwright)

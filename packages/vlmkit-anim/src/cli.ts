@@ -11,6 +11,8 @@
  *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
+ *   layout    the deterministic layout reading: texts on texts, texts under boxes, texts past the edge, per step
+ *   review    the contact sheet + a review brief for a vision model (or an agent); scores its JSON against `layout`
  *   repo      generate the workspace's architecture map (scene + GIF + sheet + markdown) from its package.json files
  *   pr        generate the change map of a commit range: areas touched per commit, import edges, running counts
  *   schema    the cheat sheet for one kind, the shared annotation ops (--kind annotations), or the index
@@ -34,13 +36,15 @@ import { currentStep, timelineDuration } from "./timeline.ts";
 import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene, type Timeline } from "./types.ts";
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
+import { formatLayout, layoutReport } from "./layout.ts";
+import { formatScore, parseAnswers, reviewBrief, reviewTiles, scoreReview, type ReviewAnswers, type ReviewScore } from "./review.ts";
 import { renderSheetHtml } from "./sheet.ts";
 import { writeVideo, type VideoResult } from "./video.ts";
 
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -70,6 +74,14 @@ Commands
                                   reduced-motion, motion outside the API — with the evaluator vlmkit's
                                   \`check animation\` gate uses (@mizchi/vlmkit-animation-eval + playwright).
                                   Exit 1 on a suspect finding.
+  layout <scene.json> [--json]     Where texts sit on texts, under filled boxes, or past the canvas edge, at every
+                                  step — read from the compiled timeline, no browser. Exit 1 when any is found.
+  review <scene.json> --out <dir> [--model M] [--answers a.json] [--cols N] [--tile W]
+                                  Writes <name>.sheet.png (or .html without playwright), <name>.review-brief.md
+                                  (the prompt for a vision model or an agent: tiles + the JSON to return) and
+                                  <name>.layout.json. --model M asks that VLM (@mizchi/vlmkit-ai, needs its key)
+                                  and --answers a.json takes a reader's JSON; either is scored frame by frame
+                                  against the geometry into <name>.review-score.md.
   repo [--root .] [--out dir] [--title T] [--no-images]
                                   The workspace's architecture as an animation: packages appear layer by layer
                                   with the dependencies that place them there. Writes <out>/repo.scene.json,
@@ -327,6 +339,76 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       }
       return 0;
     }
+    case "layout": {
+      const report = layoutReport(tl);
+      if (json) console.log(JSON.stringify(report, null, 2));
+      else console.log(formatLayout(report));
+      return report.totals.framesWithIssues ? 1 : 0;
+    }
+    case "review": {
+      const out = readFlag(rest, "--out");
+      if (!out) throw new UsageError("vlmkit-anim review needs --out <dir>");
+      await mkdir(out, { recursive: true });
+      // `--name` for files that share a basename (every attempt is a `scene.json`).
+      const name = readFlag(rest, "--name") ?? basename(file).replace(/\.(scene\.|timeline\.)?(json|m?ts|m?js)$/, "");
+      const times = sampleTimes(tl, 0);
+      const cols = readInt(rest, "--cols", { min: 1 }) ?? 3;
+      const tileWidth = readInt(rest, "--tile", { min: 120 }) ?? 400;
+      const title = scene?.title ?? String(tl.meta?.title ?? name);
+      const html = renderSheetHtml(tl, times, { cols, tileWidth, title });
+      const files: string[] = [];
+      let sheet = join(out, `${name}.sheet.png`);
+      try {
+        await screenshotHtml(html, sheet);
+      } catch (e) {
+        sheet = join(out, `${name}.sheet.html`);
+        await writeFile(sheet, html);
+        console.error(`sheet as HTML (${(e as Error).message})`);
+      }
+      files.push(sheet);
+      const brief = reviewBrief(title, reviewTiles(tl, times));
+      const briefPath = join(out, `${name}.review-brief.md`);
+      await writeFile(briefPath, brief);
+      files.push(briefPath);
+      const report = layoutReport(tl);
+      const layoutPath = join(out, `${name}.layout.json`);
+      await writeFile(layoutPath, JSON.stringify(report, null, 2));
+      files.push(layoutPath);
+      let answers: ReviewAnswers | undefined;
+      let readerLabel = "";
+      const answersPath = readFlag(rest, "--answers");
+      const model = readFlag(rest, "--model");
+      if (answersPath) {
+        answers = parseAnswers(await readFile(answersPath, "utf-8"));
+        readerLabel = basename(answersPath);
+      } else if (model) {
+        if (!sheet.endsWith(".png")) throw new UsageError("--model needs the sheet as PNG: install playwright");
+        const ai = await loadVlm();
+        const client = await ai.createVlmClient(await ai.resolveModel(model));
+        if (!client) throw new UsageError(`no API key for ${model}`);
+        const res = await client.analyzeImageFile(sheet, brief, { maxTokens: 4000 });
+        const rawPath = join(out, `${name}.review-${model.replace(/[^a-zA-Z0-9.-]/g, "_")}.json`);
+        await writeFile(rawPath, res.content);
+        files.push(rawPath);
+        answers = parseAnswers(res.content);
+        readerLabel = `${model} (${res.latencyMs}ms, $${res.costUsd.toFixed(5)})`;
+      }
+      let score: ReviewScore | undefined;
+      if (answers) {
+        score = scoreReview(report, answers);
+        const scorePath = join(out, `${name}.review-score.md`);
+        await writeFile(scorePath, `# ${title} — visual review vs geometry\n\nreader: ${readerLabel}\n\n${formatScore(score, report, answers)}\n`);
+        files.push(scorePath);
+      }
+      if (json) console.log(JSON.stringify({ files, layout: report.totals, score: score?.totals }, null, 2));
+      else {
+        for (const f of files) console.log(`wrote ${f}`);
+        console.log(formatLayout(report));
+        if (score && answers) console.log(formatScore(score, report, answers));
+        else console.log(`next: hand ${basename(sheet)} and ${basename(briefPath)} to a reader, then --answers <its.json>; or --model <vlm> with its API key`);
+      }
+      return 0;
+    }
     case "sheet": {
       const out = readFlag(rest, "--out");
       if (!out) throw new UsageError("vlmkit-anim sheet needs --out <sheet.png|sheet.html>");
@@ -466,6 +548,18 @@ async function emitGenerated(scene: Scene, out: string, name: string, opts: { im
  * depends on nothing else to do so; measuring them is what it shares with
  * vlmkit, and a consumer who wants that installs the one package that does it.
  */
+async function loadVlm(): Promise<typeof import("@mizchi/vlmkit-ai")> {
+  try {
+    return await import("@mizchi/vlmkit-ai");
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") {
+      throw new UsageError("vlmkit-anim review --model needs the VLM clients: pnpm add -D @mizchi/vlmkit-ai (and OPENROUTER_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY for the model)");
+    }
+    throw e;
+  }
+}
+
 async function loadAnimationEval(): Promise<typeof import("@mizchi/vlmkit-animation-eval")> {
   try {
     return await import("@mizchi/vlmkit-animation-eval");

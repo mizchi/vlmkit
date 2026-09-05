@@ -1,0 +1,16 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] }
+  ],
+  "notes": "Tiles were reasonably legible at this size for the main grid, row/column labels, and the 'copied from A' / 'C before' / 'A:' annotations. I did not find clear overlap, clipping, offscreen, or illegible defects in any frame. Two areas I was less certain about and would want a closer zoom to fully confirm: (1) the small vertical 'A|C' label with the orange downward arrow to the left of the table in frames 7-11 - text and arrow appear stacked (not overlapping) and the arrow stays within the tile, but at this resolution I can't be fully certain the arrowhead isn't terminating ambiguously; (2) the small 'on receive(v): clock = max(clock, v) / clock[self] += 1' code box in frames 10-11 - the two code lines are legible but the font is quite small, so a subtle clipped character at the box's right edge could be easy to miss. Nothing in either area looked clearly wrong, so I left issues empty rather than guessing."
+}

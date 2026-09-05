@@ -1,0 +1,16 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] }
+  ],
+  "notes": "The contact sheet tiles are small (roughly 370x140px each), so the colored side annotations (e.g. the 'setup 0.2+0.2 + boxes ...' cost readouts and 'best so far' readouts in frames 5-11, and the small 'Box=2'/batch labels near the box grid in frames 3, 4, 7, 10, 11) render at very small font size. I could not fully confirm at this resolution whether any of that small text is clipped at its own edge or slightly overlapping the box grid outlines versus just sitting close to them with clear whitespace. Based on what I could resolve, none of it appeared to be cut off at a tile border or sitting on top of another element, but I'd treat that read as low-confidence rather than a clean bill of health -- a higher-resolution crop of frames 5, 6, 8, 9, and 11 (the ones with the most side annotation text) would be needed to be fully certain there is no overlap or clipping. No clear overlap, clipped text, offscreen elements, or stray arrows/lines were identified within any frame at the resolution available."
+}

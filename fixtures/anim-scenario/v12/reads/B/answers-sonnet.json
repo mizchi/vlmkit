@@ -1,0 +1,16 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] }
+  ],
+  "notes": "Tiles are small (roughly 380x140px each) and the box-grid diagrams inside them are quite small in turn, so fine-grained text is at the edge of legibility. I was able to read the title text, the box1/box2/box3 headers, the cost/reward row values, the orange side-annotations (e.g. 'cost so far (setup + boxes): ...'), and the 'Batch N' / 'best so far' labels in every frame by close inspection, and did not find clear instances of overlapping text, clipped text, off-screen elements, or drawing errors (stray arrows/lines). The orange progress arrow in frames 10-11 stays within the tile and does not appear to run off the edge. Given the small scale, I cannot fully rule out very minor overlaps or crowding in the annotation text of frames 5, 6, 8, and 9 (where cost-so-far annotations sit close to the box grid), but nothing rose to a level I could confidently flag as a defect from the image as rendered."
+}

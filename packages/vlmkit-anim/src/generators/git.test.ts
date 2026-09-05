@@ -21,7 +21,7 @@ describe("workspaceScene", () => {
     const pkgs = readWorkspace(REPO);
     const by = new Map(pkgs.map((p) => [p.id, p]));
     assert.deepEqual(by.get("core")!.deps, []);
-    assert.deepEqual(by.get("anim")!.deps, ["animation-eval"]);
+    assert.deepEqual(by.get("anim")!.deps, ["ai", "animation-eval"]);
     assert.ok(by.get("vlmkit (cli)")!.deps.includes("anim"));
     const scene = workspaceScene(REPO);
     const tl = compileScene(scene);
@@ -29,7 +29,7 @@ describe("workspaceScene", () => {
     assert.deepEqual(diags.filter((d) => d.severity === "error"), [], formatDiagnostics(diags));
     const text = explain(tl);
     assert.match(text, /core: depends on nothing else in the workspace/);
-    assert.match(text, /anim → animation-eval/);
+    assert.match(text, /anim → (ai, )?animation-eval/);
     // One beat per layer, not one per package, and the readout rides each beat.
     assert.ok((tl.steps ?? []).filter((s) => /packages so far = \d+/.test(s.caption ?? "")).length >= 3);
   });

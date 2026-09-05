@@ -58,6 +58,18 @@ writes the equivalent JSON file. JSON stays the format — this is the editor's 
 - `playwright` — `frames --png`, `sheet` (PNG), `video`, `eval`. Everything else is browser-free.
 - `@mizchi/vlmkit-animation-eval` — `vlmkit-anim eval page.html`: the frame-sampled evaluator
   behind vlmkit's `check animation` gate, run on the pages this tool emits. Writing needs neither.
+- `@mizchi/vlmkit-ai` — `vlmkit-anim review scene.json --out dir --model <vlm>`: asks a vision model to
+  read the contact sheet for layout defects and scores its answer against the geometry (below).
+
+## Layout: geometry, then eyes
+
+`vlmkit-anim layout scene.json` reads every step back from the compiled timeline and lists texts that
+sit on other texts, texts under a filled box that is not their own, and texts past the canvas edge; the
+same findings are warnings in `check`. `vlmkit-anim review scene.json --out dir` writes the contact
+sheet, a review brief (what counts as a defect and the JSON to return) and the geometry's report; give
+the sheet and the brief to a vision model or an agent and pass its JSON back as `--answers` (or let
+`--model` call the VLM) to get a frame-by-frame agreement table — which frames both flag, which only the
+reader, which only the geometry.
 
 Sample outputs for every fixture (one GIF and one contact sheet each) are in
 [`samples/`](./samples/README.md).

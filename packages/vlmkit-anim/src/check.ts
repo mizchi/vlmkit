@@ -10,6 +10,7 @@
  * timeline (how much the semantic layer buys), duration, step count.
  */
 
+import { layoutReport, type LayoutFrame, type LayoutIssue } from "./layout.ts";
 import { sampleFrame, timelineDuration, worldPos } from "./timeline.ts";
 import { compileScene } from "./compile/index.ts";
 import type { Diagnostic, Scene, Timeline } from "./types.ts";
@@ -478,8 +479,41 @@ function checkCompose(scene: Extract<Scene, { kind: "compose" }>): Diagnostic[] 
   return out;
 }
 
+/**
+ * Layout defects read back from the frames (v12): a text on another text, a text under a filled box that is
+ * not its own, a text past the canvas edge. One warning per pair (or per clipped text), at the first step it
+ * shows, with the count of later steps it persists through. The compiler places annotations to avoid these;
+ * when one is reported on an annotation's node it is the compiler's to fix, and the hint says so.
+ */
+export function checkLayout(tl: Timeline): Diagnostic[] {
+  const report = layoutReport(tl);
+  const seen = new Map<string, { first: LayoutFrame; issue: LayoutIssue; more: number }>();
+  for (const f of report.frames) {
+    for (const issue of f.issues) {
+      const key = `${issue.kind}:${issue.nodes.join("|")}`;
+      const s = seen.get(key);
+      if (s) s.more++;
+      else seen.set(key, { first: f, issue, more: 0 });
+    }
+  }
+  const out: Diagnostic[] = [];
+  for (const { first, issue, more } of seen.values()) {
+    const where = `at step ${first.step?.index ?? "?"} (${Math.round(first.t)}ms)${more ? ` and ${more} later step(s)` : ""}`;
+    const annotation = issue.nodes.some((id) => /^(value|callout|snapshot|group|text|relate)-/.test(id));
+    const hint = annotation
+      ? "the compiler placed this annotation — try another `side` or a shorter label, and report it if that does not help"
+      : "move one of them, shorten the text, or widen the canvas";
+    if (issue.kind === "clipped") out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" runs ${issue.amount}px past the canvas edge ${where}`, hint));
+    else {
+      const other = issue.texts[1] ? `"${issue.texts[1]}"` : issue.nodes[1];
+      out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" is covered by ${other} (${Math.round(issue.amount * 100)}% of the smaller) ${where}`, hint));
+    }
+  }
+  return out;
+}
+
 export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
-  const out = checkTimeline(tl);
+  const out = [...checkTimeline(tl), ...checkLayout(tl)];
   if (!scene) return out;
   switch (scene.kind) {
     case "sort": out.push(...checkSort(scene, tl)); break;

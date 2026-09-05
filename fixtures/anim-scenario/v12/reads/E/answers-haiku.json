@@ -1,0 +1,18 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] },
+    { "frame": 12, "issues": [] },
+    { "frame": 13, "issues": [] }
+  ],
+  "notes": "All frames have clean layout. Text is legible throughout. Vector clock tables, annotations, labels, arrows, and code blocks are all properly positioned with no overlaps, clipping, or offscreen elements."
+}
