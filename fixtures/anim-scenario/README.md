@@ -39,7 +39,11 @@ brief names a kind; several scenes are allowed; every writer counts their
 hand-written coordinates and colours, the facts that fit only in a caption,
 and what they could not say (agents `ca`–`ce`).
 
+v10 re-ran the same five briefs after the annotation layer and `kind: compose`
+landed (agents `da`–`de`): the coordinate-fallback count is the metric that has
+to move, and the attempts are kept next to v9's for the comparison.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v9.md`.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10}.md`.

@@ -617,6 +617,11 @@ already draws.
 | `{"group": {"around": anchor \| [anchors], "label", "id"}}` / `{"group": null}` | A dashed outline around the anchors' bounding box, label at the top-left. One per `id`, like callout; `null` removes every group |
 | `{"text": {"lines": [...], "highlight", "at", "side", "id"}}` / `{"text": null}` | A multi-line block: code, a rule, a list. `highlight` is a 0-based line. Same `id` and the same number of lines updates in place and moves the highlight; a different line count redraws. Panel by default, or beside an anchor; `null` hides every block |
 
+A rule that governs the whole scene — the definition of ≤ on vectors, the
+invariant a loop keeps — is a `text` block **without** `at`: it goes to the
+panel and stays there, referenceable, while the picture moves. `at` is for a
+block that belongs to one thing.
+
 Every annotation op takes `caption` (replaces the generated one) and `ms`.
 `"ms": 0` applies it **inside the previous beat** — the way to have "best so
 far = 10" appear at the moment the reveal it belongs to happens, with its

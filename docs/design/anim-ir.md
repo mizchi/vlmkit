@@ -192,6 +192,17 @@ brief passed on the first attempt with the alternative path narrated):
   annotation layer for every kind, then `compose` — and the measure of both
   is the same five briefs with the fallback count at zero.
   `docs/reports/2026-09-05-anim-ir-v9.md`.
+- **v10 re-ran the same five briefs with both layers in place.** Fallback
+  went from 3 of 8 scenes to 1 of 7, and the one left is the smaller model
+  choosing `vector` before reading the annotation sheet, on the brief where
+  the larger model used `group` and `value` and typed nothing. The round's
+  one refused annotation was the round's one bug (the `diagram` validator's
+  action list had not been extended), now under a test that appends a
+  `value` to every kind's example. The asks changed shape — five different
+  things from one writer each, where v9's were three things from several —
+  and the cheapest of them, a labelled relation between two anchors, is the
+  one shape the annotation layer still lacks.
+  `docs/reports/2026-09-05-anim-ir-v10.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".

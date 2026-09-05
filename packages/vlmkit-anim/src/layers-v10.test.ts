@@ -131,6 +131,16 @@ describe("annotations reach every kind's list", () => {
     clean(sort);
     const chart = { ...EXAMPLES.chart, sequence: [{ reveal: "all" }, { group: { around: [EXAMPLES.chart.series[0].id], label: "series" } }] } as Scene;
     clean(chart);
+    // dc (v10) had this rejected: diagram's action list had not been extended with the shared ops.
+    const diagram = { ...EXAMPLES.diagram, sequence: [...(EXAMPLES.diagram.sequence ?? []), { text: { lines: ['{"kind": "sort",', ' "values": [5, 3]}'], at: EXAMPLES.diagram.nodes[0].id, side: "below" } }] } as Scene;
+    assert.deepEqual(validateScene(diagram).filter((d) => d.severity === "error"), []);
+    clean(diagram);
+    for (const kind of ["diagram", "matrix", "graph", "chart", "sort", "array", "heap", "list", "tree", "stack", "queue"] as const) {
+      const ex = EXAMPLES[kind] as Scene & { ops?: unknown[]; sequence?: unknown[] };
+      const listName = "sequence" in ex && ex.sequence ? "sequence" : "ops";
+      const withValue = { ...ex, [listName]: [...((ex as unknown as Record<string, unknown[]>)[listName] ?? []), { value: { id: "n", text: 1 } }] } as Scene;
+      assert.deepEqual(validateScene(withValue).filter((d) => d.severity === "error"), [], `${kind} rejects a value op`);
+    }
   });
 
   it("`ms` is accepted on an annotation even in kinds whose own ops take only `caption` (queue, heap, list, tree)", () => {

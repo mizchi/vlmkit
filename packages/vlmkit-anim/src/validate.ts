@@ -394,7 +394,7 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
     });
   }
   if (doc.sequence !== undefined && ctx.array(doc.sequence, "sequence")) {
-    const ACTIONS = ["show", "hide", "highlight", "unhighlight", "flow", "note", "relabel"];
+    const ACTIONS = ["show", "hide", "highlight", "unhighlight", "flow", "note", "relabel", ...ANNOTATION_ACTIONS];
     doc.sequence.forEach((s, i) => {
       const path = `sequence[${i}]`;
       if (!ctx.object(s, path)) return;
