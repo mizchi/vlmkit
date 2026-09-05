@@ -1,0 +1,49 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "state-machine",
+  "title": "The decision rule at the branch point",
+  "states": [
+    "start",
+    "batch1-open",
+    { "id": "stop-99", "final": true },
+    "open-batch2",
+    { "id": "done", "final": true }
+  ],
+  "initial": "start",
+  "transitions": [
+    {
+      "from": "start",
+      "to": "batch1-open",
+      "on": "open-batch-1",
+      "note": "/ pay 1/5+1/5+setup 1/5 = 3/5, reveal box 1 and box 2 together"
+    },
+    {
+      "from": "batch1-open",
+      "to": "stop-99",
+      "on": "box2-shows-99",
+      "note": "/ stop: no second batch beats keeping 99 (score 99 − 3/5)"
+    },
+    {
+      "from": "batch1-open",
+      "to": "open-batch2",
+      "on": "box2-shows-low",
+      "note": "/ box2 ∈ {0, 1/2}: batch 2 (box 3 alone) costs 6/5, expected gain 10−1/2 w.p. 1/5 = 1.9 > 1.2, so continue"
+    },
+    {
+      "from": "open-batch2",
+      "to": "done",
+      "on": "box3-revealed",
+      "note": "/ this run shows 10: final score 10 − 9/5 = 8.2"
+    }
+  ],
+  "trace": [
+    "open-batch-1",
+    "box2-shows-low",
+    "box3-revealed",
+    {
+      "goto": "batch1-open",
+      "caption": "The branch not taken this run — replaying from the same point: what if box 2 had shown 99 instead?"
+    },
+    "box2-shows-99"
+  ]
+}

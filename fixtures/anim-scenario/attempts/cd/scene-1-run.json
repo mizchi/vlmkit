@@ -1,0 +1,50 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "matrix",
+  "title": "Batched Pandora's Box — one adaptive run (k=2, T=1/5)",
+  "rowLabels": ["box 1", "box 2", "box 3", "running"],
+  "colLabels": ["cost", "reward"],
+  "cells": [
+    [0.2, null],
+    [0.2, null],
+    [1, null],
+    [0, 0]
+  ],
+  "ops": [
+    {
+      "set": { "cell": [0, 1], "value": 0.5 },
+      "caption": "Batch 1 opens box 1 and box 2 together: cost 1/5 + 1/5 + setup 1/5 = 3/5. Box 1 always shows 1/2."
+    },
+    { "highlight": { "row": 0 }, "ms": 0 },
+    {
+      "set": { "cell": [1, 1], "value": 0.5 },
+      "caption": "Box 2 shows 1/2 this run (it could have been 0 or 99 — see the other scene)."
+    },
+    { "highlight": { "row": 1 }, "ms": 0 },
+    {
+      "set": { "cell": [3, 0], "value": 0.6, "from": [[0, 0], [1, 0]] },
+      "caption": "Cost so far: 3/5 (two box costs + one setup)."
+    },
+    {
+      "set": { "cell": [3, 1], "value": 0.5, "from": [[0, 1], [1, 1]] },
+      "caption": "Best so far: 1/2. Box 2 didn't show 99, so compare: a second batch (box 3 alone) costs 1 + 1/5 = 6/5 and gains 10 − 1/2 with probability 1/5, expected 1.9 > 1.2 — worth opening."
+    },
+    {
+      "set": { "cell": [2, 1], "value": 10 },
+      "caption": "Batch 2: box 3 opens alone (k=2 is a cap, not a requirement). It shows 10."
+    },
+    { "mark": { "row": 2 }, "ms": 0 },
+    {
+      "set": { "cell": [3, 0], "value": 1.8, "from": [[3, 0], [2, 0]] },
+      "caption": "Total cost: 3/5 + (1 + setup 1/5) = 3/5 + 6/5 = 9/5."
+    },
+    {
+      "set": { "cell": [3, 1], "value": 10, "from": [[3, 1], [2, 1]] },
+      "caption": "Best so far becomes 10."
+    },
+    { "mark": { "cell": [3, 1] }, "ms": 0 },
+    {
+      "note": "Final score = best 10 − total cost 9/5 = 8.2. (The paper's bound: reacting between batches beats any fixed menu of batches by at most 2×; on this instance about 1.19×.)"
+    }
+  ]
+}

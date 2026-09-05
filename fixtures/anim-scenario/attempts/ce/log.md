@@ -39,3 +39,46 @@
 ---
 
 ## Round 1
+
+### Attempt 1a: Single vector scene
+
+**Check output:**
+```
+✓ scene-1.json (vector): 0 error(s), 0 warning(s)
+  5100ms · 14 steps (14 captioned) · 14 nodes · 10 tracks / 25 keyframes
+  scene 4126 B → timeline 4581 B (×1.1)
+```
+
+**Explain output (14 steps):**
+1. Setup: boxes, costs, distributions
+2-3. Goal and problem statement
+4. Batch 1 decision, costs update to 3/5
+5. Batch 1 opens, both rewards appear at once
+6-7. Rewards revealed: 1/2, 1/2; best = 1/2
+8-9. Decision analysis: "expected reward gain 1/5 × (10 − 1/2) = 1.9, cost = 1.2, so 1.9 > 1.2"
+10. Batch 2 decision, cost updates to 9/5
+11-12. Batch 2 opens, box 3 shows 10
+13. Final: score = 8.2
+14. Concluding statement about adaptive policies
+
+**Observations:**
+- ✓ All key facts appear in explain: best (1/2→10), costs (3/5→9/5), expected gain comparison (1.9 > 1.2)
+- ✓ Visual state tracking (boxes change color, rewards show, state vars update)
+- ✓ Decision branching narrated clearly (why 1.9 > 1.2)
+- ⚠ Step 8's caption is awkward (catches myself recalculating) — should clean up wording
+- ⚠ Rewards are visible at opacity 0.3 on unopened boxes from the start — could hide them initially
+- ⚠ Expected value explanation could be more concise
+
+**Hardcoded values:**
+- Box positions: 90, 190, 290 (x-axis spacing), 120 (y-axis baseline)
+- Canvas size: 600×420 to fit 3 boxes left, state display right
+- State tracking text positioned at x=450 (right side)
+- Costs: "cost 1/5", "cost 1/5", "cost 1"
+- Rewards shown as numbers: 1/2, 1/2, 10
+- Color values: #e8e8e8 (closed), #a8e6a8 (opened), #0066cc (accent blue)
+
+**Next improvements:**
+1. Fix step 8 caption to remove the recalculation stumble
+2. Hide rewards (opacity 0) initially, reveal only during batch opening
+3. Consider whether a state-machine companion scene would help illustrate the decision tree (the two outcomes: box 2 shows 99 vs. 1/2)
+
