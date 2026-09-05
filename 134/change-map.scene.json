@@ -1,0 +1,269 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #134: anim: `relate` annotation, v11 re-edit round, layout fixes from its frames",
+  "layout": "grid",
+  "canvas": {
+    "width": 1149,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "anim/src",
+      "label": "anim/src",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/anim-scenario",
+      "label": "fixtures/anim-scenario",
+      "hidden": true
+    },
+    {
+      "id": "anim/samples",
+      "label": "anim/samples",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "anim",
+      "label": "anim",
+      "hidden": true
+    },
+    {
+      "id": "anim/fixtures",
+      "label": "anim/fixtures",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "1/5 anim: `relate` annotation — a labelled arrow or line between two anchors"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 15
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+320 −33"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root",
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root",
+        "fixtures/anim-scenario"
+      ],
+      "caption": "2/5 anim-scenario: v11 re-edit tasks on annotated scenes; CHANGELOG unrelea…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 23
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+629 −35"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root",
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs",
+        "fixtures/anim-scenario",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "3/5 anim: v11 fixes from eb / ec — identity rule in the guide, wrapped capt…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 35
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1212 −55"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs",
+        "fixtures/anim-scenario",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "caption": "4/5 anim: `relate` arcs over a bystander when no side has room; honest off-…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 39
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1547 −70"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "caption": "5/5 anim-scenario: v11 report; ed re-run after the fix; annotation liveness…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 43
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1892 −74"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "5 commits · 43 files · +1892 −74 · 10 areas, 0 import edges between them"
+    }
+  ]
+}
