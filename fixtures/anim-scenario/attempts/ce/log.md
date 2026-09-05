@@ -82,3 +82,55 @@
 2. Hide rewards (opacity 0) initially, reveal only during batch opening
 3. Consider whether a state-machine companion scene would help illustrate the decision tree (the two outcomes: box 2 shows 99 vs. 1/2)
 
+
+### Round 2: Refinements
+
+**Changes made:**
+1. Removed the opacity=0.3 "preview" reveals and kept rewards hidden (opacity=0) until batch opens
+2. Simplified captions, removing the awkward recalculation in step 8
+3. Consolidated steps 2-3, cutting from 14 to 12 steps
+4. Streamlined the decision explanation into step 8 (cleaner: "Expected gain: 1.9, Cost: 1.2, Since 1.9 > 1.2...")
+
+**Check output:**
+```
+✓ scene-1.json (vector): 0 error(s), 0 warning(s)
+  4400ms · 12 steps (12 captioned) · 14 nodes · 10 tracks / 22 keyframes
+  scene 3748 B → timeline 4269 B (×1.1)
+```
+
+**Metrics improved:**
+- Duration: 5100ms → 4400ms (13% faster)
+- Bytes: 4126 B → 3748 B (9% smaller)
+- Steps: 14 → 12 (more concise)
+
+**Explain output still carries:**
+- Best updates: 1/2 (step 6) → 10 (step 11)
+- Cost tracking: 0 → 3/5 (step 4) → 9/5 (step 9)
+- Expected gain calculation: "1/5 × 9.5 = 1.9. Cost: 1.2" (step 8)
+- Final score: 8.2 (step 11)
+
+**Requirements checklist (from brief):**
+- ✓ Visible at each beat: closed/open boxes, rewards, best-so-far, total cost
+- ✓ Setup and box costs shown separately: "1/5 + 1/5 + setup 1/5 = 3/5" (step 4)
+- ✓ Decision rule: expected gain (1.9) > cost (1.2) → open batch 2 (step 8)
+- ✓ One concrete run with one outcome: box 2 = 1/2, batch 2 outcome = 10
+- ✓ All scenes pass check with no ✗/⚠
+
+**Narrative completeness:**
+The scene explains:
+- The problem: maximize (best reward - total cost)
+- The constraints: batches mean all rewards in a batch appear together
+- The policy: adaptive (decide after each batch based on results)
+- One full run: batch 1 opens, decision made, batch 2 opens, final score
+- Why the policy is adaptive: "we reacted to batch 1 outcome, chose whether to open batch 2"
+
+**Design decision: single scene vs. multiple**
+Considered whether to add a second scene showing the alternative branch (box 2 = 99 → stop immediately). Decided against it because:
+1. The brief says "show one outcome (say 10)" — one path, not both
+2. The decision rule is clear enough that viewers can infer the alternative
+3. Single cohesive scene more effective than fragmenting across two
+
+---
+
+## Round 3 — Final review
+

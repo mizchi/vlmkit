@@ -37,13 +37,25 @@
     }
   ],
   "trace": [
-    "open-batch-1",
-    "box2-shows-low",
-    "box3-revealed",
+    {
+      "on": "open-batch-1",
+      "caption": "Batch 1 opens box 1 and box 2 together: pay 1/5 + 1/5 + setup 1/5 = 3/5."
+    },
+    {
+      "on": "box2-shows-low",
+      "caption": "Box 2 shows 1/2 or 0 (not 99): a second batch (box 3 alone) costs 1 + 1/5 = 6/5 and gains 10 − 1/2 with probability 1/5, expected 1.9 > 1.2 — worth it, continue."
+    },
+    {
+      "on": "box3-revealed",
+      "caption": "Box 3 opens, shows 10: final score 10 − 9/5 = 8.2."
+    },
     {
       "goto": "batch1-open",
       "caption": "The branch not taken this run — replaying from the same point: what if box 2 had shown 99 instead?"
     },
-    "box2-shows-99"
+    {
+      "on": "box2-shows-99",
+      "caption": "Box 2 shows 99: stop now — no second batch beats keeping it. Score 99 − 3/5 = 98.4."
+    }
   ]
 }
