@@ -122,8 +122,14 @@ function shapeMarkup(n: NodeState, markers: Set<string>): string {
       }
       return `<line x1="${num(x1)}" y1="${num(y1)}" x2="${num(x2)}" y2="${num(y2)}" stroke="${esc(stroke)}" stroke-width="${num(sw)}" fill="none"${marker}${dashAttrs(n, Math.hypot(x2 - x1, y2 - y1))}/>`;
     }
-    case "path":
-      return `<path d="${esc(n.d ?? "")}" fill="${esc(n.fill ?? "none")}" stroke="${esc(stroke)}" stroke-width="${num(sw)}"${dashAttrs(n, pathLength(n.d ?? ""))}/>`;
+    case "path": {
+      let marker = "";
+      if (n.head) {
+        markers.add(stroke);
+        marker = ` marker-end="url(#${markerId(stroke)})"`;
+      }
+      return `<path d="${esc(n.d ?? "")}" fill="${esc(n.fill ?? "none")}" stroke="${esc(stroke)}" stroke-width="${num(sw)}"${marker}${dashAttrs(n, pathLength(n.d ?? ""))}/>`;
+    }
     case "text":
     case "group":
       return "";

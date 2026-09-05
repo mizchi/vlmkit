@@ -206,6 +206,24 @@ brief passed on the first attempt with the alternative path narrated):
   and the cheapest of them, a labelled relation between two anchors, is the
   one shape the annotation layer still lacks.
   `docs/reports/2026-09-05-anim-ir-v10.md`.
+- **v11 re-edited the annotated scenes** after `relate` landed: an extra event
+  upstream of three `value` readouts, a cheaper box that moves two readouts
+  and the decision arithmetic, a receive that retires `A ∥ C` for `C ≤ A`.
+  Every dependent literal was updated by every writer and two of three were
+  green on the first `check`; the annotations survive a data change because
+  they are addressed by id and anchor, not by position. What the round found
+  was layout, all of it the compiler's: a `relate` beside a node row with the
+  title above and the lanes below went off the canvas, and the warning's
+  "enlarge the canvas" did nothing because annotations take no coordinates
+  (the writer's way out was to reorder the nodes — the wrong lever); a title
+  wider than the kind's canvas lost its first letters; a group label sat on a
+  column header; long captions were clipped. Each is now the compiler's job:
+  the relation arcs over the bystander when no side has room, the title is
+  re-centred or the canvas grows, the label takes the next free corner,
+  captions wrap, and the off-canvas hint for an annotation node names levers
+  that exist. Two guide gaps closed from quotes: the default id is `"main"`
+  and a replaced annotation fades out rather than disappearing.
+  `docs/reports/2026-09-05-anim-ir-v11.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".

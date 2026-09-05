@@ -292,7 +292,8 @@ They add nothing a "vector" scene could not draw by hand; the point is that you 
                                                                           line count updates in place and moves the highlight; null hides
   {"relate": {"from": "A", "to": "B", "label": "A ≤ B"}}                  a labelled arrow from one anchor to another ("style": "line" for
                                                                           no head); same id redraws it, {"relate": null} removes all.
-                                                                          Where "group" would enclose a bystander, "relate" names the pair
+                                                                          Where "group" would enclose a bystander, "relate" names the pair:
+                                                                          edge to edge, or level beside the pair, or arced over what lies between
 
   Every op takes "caption" (replaces the generated one, e.g. "best so far = 1/2") and "ms" ("ms": 0 = inside the previous beat).
   explain lists value changes as their beats; check names the anchors that exist when one is misspelt.

@@ -247,6 +247,26 @@ export class Annotations {
     return false;
   }
 
+  /**
+   * How far an arc from p to q must bulge towards `sign · n` to clear every bystander the straight
+   * segment crosses (the same boxes `crossesBystander` counts), measured from the segment's midpoint.
+   */
+  private bystanderBulge(p: Vec2, q: Vec2, n: Vec2, sign: 1 | -1, a: Box, c: Box, from: string, to: string, t: number): number {
+    const m: Vec2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    let far = 0;
+    for (const [name, ids] of this.anchors) {
+      if (name === from || name === to) continue;
+      const visible = ids.filter((id) => (this.b.valueAt(id, "opacity", t) ?? 1) !== 0);
+      if (!visible.length) continue;
+      const b = visible.map((id) => this.nodeBox(id, t)).reduce(union);
+      if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c) || !segmentHitsBox(p, q, b)) continue;
+      for (const [x, y] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]] as Vec2[]) {
+        far = Math.max(far, ((x - m[0]) * n[0] + (y - m[1]) * n[1]) * sign);
+      }
+    }
+    return Math.max(16, far + 12);
+  }
+
   private anchorText(name: string, t: number, path: string): string {
     const texts = this.resolve(name, path).map((id) => {
       const v = this.b.valueAt(id, "text", t);
@@ -486,6 +506,7 @@ export class Annotations {
     let q: Vec2 = [cc[0] - u[0] * rc, cc[1] - u[1] * rc];
     let n: Vec2 = [-u[1], u[0]];
     const pair = union(a, c);
+    const straight = { u, n, p, q };
     const tooShort = (q[0] - p[0]) * u[0] + (q[1] - p[1]) * u[1] < 16;
     const beside = tooShort || this.crossesBystander(p, q, a, c, spec.from, spec.to, t);
     if (beside) {
@@ -504,19 +525,40 @@ export class Annotations {
     const [offPlus, offMinus] = [clearance(1), clearance(-1)];
     let outward: 1 | -1 = offPlus <= offMinus ? 1 : -1;
     if (!fits(outward, outward === 1 ? offPlus : offMinus) && fits(-outward as 1 | -1, outward === 1 ? offMinus : offPlus)) outward = -outward as 1 | -1;
+    let arc: { apex: Vec2; d: string } | undefined;
     if (beside) {
-      // Level with the first anchor's centre, offset just past everything in the lane (the pair's own boxes,
-      // a row label, a readout beside a row); the arrow ends level with the second anchor's centre.
       const off = outward === 1 ? offPlus : offMinus;
-      const span = (cc[0] - ca[0]) * u[0] + (cc[1] - ca[1]) * u[1];
-      p = [ca[0] + n[0] * off * outward, ca[1] + n[1] * off * outward];
-      q = [p[0] + u[0] * span, p[1] + u[1] * span];
+      if (fits(outward, off)) {
+        // Level with the first anchor's centre, offset just past everything in the lane (the pair's own boxes,
+        // a row label, a readout beside a row); the arrow ends level with the second anchor's centre.
+        const span = (cc[0] - ca[0]) * u[0] + (cc[1] - ca[1]) * u[1];
+        p = [ca[0] + n[0] * off * outward, ca[1] + n[1] * off * outward];
+        q = [p[0] + u[0] * span, p[1] + u[1] * span];
+      } else {
+        // Neither side has room for a level line — a node row at the top of a distributed scene, with the title
+        // above it and the lanes below (ea, v11: the line went off the canvas at y = -16 and the writer's only
+        // way out was to reorder the nodes). Arc over the bystanders instead, edge to edge along the straight
+        // line, bulging on the side with more room by just enough to clear what it crosses.
+        ({ u, n, p, q } = straight);
+        outward = this.room(pair, n, 1) >= this.room(pair, n, -1) ? 1 : -1;
+        const bulge = this.bystanderBulge(p, q, n, outward, a, c, spec.from, spec.to, t);
+        const m: Vec2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+        const apex: Vec2 = [m[0] + n[0] * bulge * outward, m[1] + n[1] * bulge * outward];
+        // A quadratic Bézier passes halfway to its control point: the control sits at twice the bulge.
+        const ctrl: Vec2 = [m[0] + n[0] * 2 * bulge * outward, m[1] + n[1] * 2 * bulge * outward];
+        const r = (v: number) => Math.round(v * 10) / 10;
+        arc = {
+          apex,
+          d: `M ${r(p[0] - apex[0])} ${r(p[1] - apex[1])} Q ${r(ctrl[0] - apex[0])} ${r(ctrl[1] - apex[1])} ${r(q[0] - apex[0])} ${r(q[1] - apex[1])}`,
+        };
+      }
     }
-    const mid: Vec2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    const mid: Vec2 = arc ? arc.apex : [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
     const k = this.serial++;
     const lineId = `relate-${id}-${k}`;
     const ids = [lineId];
-    this.b.node({ id: lineId, shape: spec.style === "line" ? "line" : "arrow", pos: mid, points: [[p[0] - mid[0], p[1] - mid[1]], [q[0] - mid[0], q[1] - mid[1]]], stroke: T.accent, strokeWidth: 2, opacity: 0 });
+    if (arc) this.b.node({ id: lineId, shape: "path", pos: mid, d: arc.d, head: spec.style !== "line", fill: "none", stroke: T.accent, strokeWidth: 2, opacity: 0 });
+    else this.b.node({ id: lineId, shape: spec.style === "line" ? "line" : "arrow", pos: mid, points: [[p[0] - mid[0], p[1] - mid[1]], [q[0] - mid[0], q[1] - mid[1]]], stroke: T.accent, strokeWidth: 2, opacity: 0 });
     if (spec.label) {
       const labelId = `relate-${id}-${k}-label`;
       ids.push(labelId);

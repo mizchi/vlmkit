@@ -49,6 +49,8 @@ export interface TimelineNode {
   points?: [Vec2, Vec2];
   /** path data, local coordinates. */
   d?: string;
+  /** path: draw an arrowhead at its end (what `arrow` does for a straight line). */
+  head?: boolean;
   /** text content (shape `text`) or a label centred in any other shape. */
   text?: string;
   fontSize?: number;

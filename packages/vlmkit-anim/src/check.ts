@@ -74,7 +74,18 @@ export function checkTimeline(tl: Timeline): Diagnostic[] {
       const margin = 4;
       if (x < -margin || y < -margin || x > width + margin || y > height + margin) {
         reported.add(n.id);
-        out.push(warn(`nodes(${n.id})`, `visible node is outside the ${width}×${height} canvas at t=${Math.round(t)} (pos ${Math.round(x)}, ${Math.round(y)})`, "move it, enlarge the canvas, or fade it out before it leaves"));
+        // An annotation's node was placed by the compiler, not the writer: "move it" and "enlarge the canvas"
+        // are not levers the writer has (ea, v11, tried the second and it did nothing). Say what is.
+        const annotation = /^(value|callout|snapshot|group|text|relate)-/.test(n.id);
+        out.push(
+          warn(
+            `nodes(${n.id})`,
+            `visible node is outside the ${width}×${height} canvas at t=${Math.round(t)} (pos ${Math.round(x)}, ${Math.round(y)})`,
+            annotation
+              ? "an annotation placed itself there — it takes no coordinates, so a taller canvas does not move it; try another `side`, or fewer things between a related pair, and report it if nothing helps"
+              : "move it, enlarge the canvas, or fade it out before it leaves",
+          ),
+        );
       }
     }
   }

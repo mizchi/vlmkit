@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
+import { renderFrameSvg } from "./render-svg.ts";
 import { EXAMPLES } from "./schema-sheet.ts";
 import { sampleFrame, timelineDuration } from "./timeline.ts";
 import { SCENE_FORMAT, type ComposeScene, type MatrixScene, type Scene, type SortScene, type StateMachineScene } from "./types.ts";
@@ -191,6 +192,37 @@ describe("annotations: relate (v10, da: a labelled line between two anchors wher
       () => compileScene({ ...vc, ops: [{ relate: { from: "row:A", to: "row:D" } }] }),
       (e: unknown) => e instanceof SceneValidationError && e.diagnostics.some((d) => d.path === "ops[0].relate.to" && /no anchor named "row:D"/.test(d.message)),
     );
+  });
+
+  it("a node row with no room beside it (ea, v11: distributed A → C over B) gets an arc over the bystander, on the canvas", () => {
+    const s = {
+      format: SCENE_FORMAT,
+      kind: "distributed",
+      title: "Vector clocks",
+      nodes: ["A", "B", "C"],
+      messages: [
+        { value: { id: "vecA", label: "A", text: "[1,0,0]", at: "A" } },
+        { from: "A", to: "B", label: "[1,0,0]" },
+        { from: "B", to: "C", label: "[1,1,0]" },
+        { relate: { from: "A", to: "C", label: "∥", style: "line" }, caption: "concurrent" },
+        { relate: { from: "A", to: "C", label: "≤" }, caption: "ordered" },
+      ],
+    } as Scene;
+    const { tl, diags } = clean(s);
+    assert.deepEqual(diags.filter((d) => d.severity === "warn"), [], formatDiagnostics(diags));
+    const arcs = tl.nodes.filter((n) => n.id.startsWith("relate-main-") && !n.id.endsWith("-label"));
+    assert.equal(arcs.length, 2);
+    assert.equal(arcs[0].shape, "path");
+    assert.equal(arcs[0].head, false, "a `line` arc has no head");
+    assert.equal(arcs[1].shape, "path");
+    assert.equal(arcs[1].head, true, "an `arrow` arc ends in a head");
+    const end = sampleFrame(tl, timelineDuration(tl));
+    const b = end.get("node-B")!;
+    const apex = arcs[1].pos!;
+    assert.ok(Math.abs(apex[0] - b.pos[0]) < 40, "the arc peaks over B");
+    assert.ok(Math.abs(apex[1] - b.pos[1]) > 20 && apex[1] > 0 && apex[1] < tl.canvas.height, `apex ${apex} is clear of B at ${b.pos} and on the canvas`);
+    const svg = renderFrameSvg(tl, timelineDuration(tl));
+    assert.match(svg, /<path d="M [^"]+ Q [^"]+"[^>]*marker-end=/, "the arc is drawn with an arrowhead");
   });
 
   it("every kind's list takes it", () => {

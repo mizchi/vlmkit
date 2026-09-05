@@ -209,7 +209,7 @@ function ids(ctx: Ctx, items: unknown[], path: string, key = "id"): string[] {
 // ---------------------------------------------------------------------------
 
 const NODE_KEYS = [
-  "id", "shape", "pos", "size", "r", "rx", "points", "d", "text", "fontSize", "anchor", "fill", "stroke",
+  "id", "shape", "pos", "size", "r", "rx", "points", "d", "head", "text", "fontSize", "anchor", "fill", "stroke",
   "strokeWidth", "opacity", "dash", "scale", "rotate", "parent", "color",
 ] as const;
 
