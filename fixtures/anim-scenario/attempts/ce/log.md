@@ -134,3 +134,120 @@ Considered whether to add a second scene showing the alternative branch (box 2 =
 
 ## Round 3 — Final review
 
+
+### Scene passes with no errors or warnings. Moving to final analysis.
+
+---
+
+## COORDINATE/COLOUR FALLBACK
+
+**Hardcoded positions (absolute):**
+- Box 1: x=90, y=120, size 50×70
+- Box 2: x=190, y=120, size 50×70
+- Box 3: x=290, y=120, size 50×70
+- State header: x=450, y=30 (text-anchor: start)
+- Best/Cost labels: x=450, y=60 and y=90
+- Batch markers: x=140, y=250 and x=290, y=250
+- Canvas: 600×420
+
+*Why these numbers:* 100-unit x-spacing keeps boxes readable. y=120 baseline aligns with reward labels at y=70 (above) and cost labels at y=210 (below). Right panel at x=450 leaves ~130px margin from rightmost box. Vertical layout uses first 300px for boxes, 250px below for labels.
+
+**Hardcoded colours:**
+- Closed boxes: #e8e8e8 (light gray)
+- Opened boxes: #a8e6a8 (light green)
+- Reward text / batch labels: #0066cc (blue)
+- Background: #f9f5f0 (off-white)
+- Text: #1f2328 (dark gray, from theme)
+
+*Why these choices:* Closed → opened uses a clear visual change (gray to green). Blue rewards pop against light background. Off-white background reduces eye strain for 4.4-second animation.
+
+---
+
+## CAPTION LOAD (facts ONLY in captions, not on screen)
+
+**Facts that live entirely in captions:**
+1. "Boxes show 0, 1/2, or 99 (equal chance)" — reward distribution for box 2 (step 2)
+2. "Setup cost 1/5 adds to their individual costs" — how setup cost works (step 4 caption)
+3. "Batching constraint: no intermediate decisions" — why both rewards appear together (step 5)
+4. "Could have been 0 or 99" — acknowledging the other possible outcomes for box 2 (step 6)
+5. "If it shows 10 (1/5 chance), we gain 10 − 1/2 = 9.5" — the payoff structure (step 7)
+6. "Expected gain: 1/5 × 9.5 = 1.9. Cost: 1.2" — the expected value calculation (step 8)
+7. "Adaptive beats fixed: we reacted to batch 1, then chose batch 2. Fixed policy could not." — the key insight (step 12)
+
+**Facts shown on screen:**
+- Boxes visual state (closed gray → opened green)
+- Individual box costs as labels (1/5, 1/5, 1)
+- Rewards as numbers above opened boxes (1/2, 1/2, 10)
+- Best-so-far: state panel updates (— → 1/2 → 10)
+- Total cost: state panel updates (0 → 3/5 → 9/5)
+- Batch markers when each batch opens
+
+**Why this split:**
+- On-screen: visual dynamics (what boxes do) + tracked state (best, cost)
+- Captions: reasoning (why distributions matter, what calculations mean, what alternatives exist)
+- The most critical insight (1.9 > 1.2, therefore open batch 2) lives in caption step 8, but the visual green color change shows the decision is acted on
+
+---
+
+## STORYBOARD vs. DELIVERED
+
+**Planned beats (from hand-sketch):**
+1. Setup: show boxes, costs, rewards → **DELIVERED** (steps 1-3 cover all three boxes + goal)
+2. Batch 1 decision: show cost = 3/5 → **DELIVERED** (step 4)
+3. Batch 1 opens: boxes move/glow → **DELIVERED** (green color change)
+4. Batch 1 rewards appear → **DELIVERED** (steps 5-6, both rewards reveal)
+5. Best/cost update → **DELIVERED** (state panel updates)
+6. Branch decision: cost/benefit analysis → **DELIVERED** (steps 7-8, expected gain comparison)
+7. Batch 2 opens → **DELIVERED** (step 9, box 3 turns green)
+8. Batch 2 reward appears → **DELIVERED** (step 10, "10" becomes visible)
+9. Final score calculation → **DELIVERED** (step 11: "8.2")
+10. Conclusion: adaptive beats fixed → **DELIVERED** (step 12)
+
+**Beats bent or rephrased:**
+- "Decision: should we open batch 2?" — made more concrete: "Compare expected gain (1.9) vs cost (1.2)"
+- "Show the good outcome" (box 3 = 10) — delivered literally (step 10 animation + caption)
+
+**Beats not shown:**
+- Alternative branch (box 2 = 99 → stop immediately) — NOT animated, only mentioned in caption. This is by design per the brief ("show one outcome").
+
+**Generic structures not in the format:**
+- A second overlay panel showing the comparison (1.9 vs 1.2) side-by-side — vector doesn't have a table/chart structure, so this lives in caption
+- A decision-tree diagram showing both branches — would require state-machine or diagram kind; not attempted per brief guidance
+- A "confidence" or "probability" annotation on outcomes — the format doesn't have conditional branching visuals
+
+---
+
+## HONESTY: DOES THIS EXPLAIN THE ALGORITHM?
+
+**What a viewer gets:**
+1. ✓ The problem: maximize (reward − cost), can stop anytime
+2. ✓ The constraint: batches mean no intermediate decisions within a batch
+3. ✓ One concrete policy: open batch 1 (boxes 1+2), then decide on batch 2 based on outcome
+4. ✓ The decision rule: compare expected gain to cost, choose if positive
+5. ✓ Adaptive property: the choice of batch 2 depended on the batch 1 outcome (saw 1/2, then evaluated)
+
+**What is NOT clear without re-reading carefully:**
+1. ⚠ Why box 2's outcome (1/2) was surprising or important — we mention "could have been 0 or 99" but the implication (99 would be excellent, 0 would be bad) isn't strongly shown
+2. ⚠ The "non-reusable" constraint (boxes disappear after opening) — assumed but never stated
+3. ⚠ The scope of the paper's contribution (bounded factor of 2×, actual 1.19× on this instance) — not mentioned at all
+
+**Bottom line:** The animation explains the algorithm well enough for someone unfamiliar with it to follow the concrete run and understand why batch 2 was opened. The decision rule (1.9 > 1.2) is front-and-center. It does NOT convey the full theoretical contribution (bounding adaptive vs. fixed), but that wasn't the brief's primary goal — explaining the problem and policy shape was.
+
+---
+
+## WHAT WOULD HELP MOST (one sentence)
+
+A **value label that tracks a number through the timeline** (e.g., "expected gain: 0.5" → "expected gain: 1.9" as properties change) would eliminate the need to state "expected gain: 1/5 × 9.5 = 1.9" in a caption; the calculation could happen on screen.
+
+---
+
+## Summary statistics
+
+- Kinds used: **1** (vector)
+- Scenes: **1** (scene-1.json)
+- First-attempt ✗/⚠ count: **0** (passed check immediately)
+- Rounds to green (polished): **2**
+  - Round 1: 0 errors, 0 warnings; 14 steps, 5.1s, 4126 B
+  - Round 2: 0 errors, 0 warnings; 12 steps, 4.4s, 3748 B (final)
+- Bytes: **3748** (scene only; timeline 4269 B after compilation)
+
