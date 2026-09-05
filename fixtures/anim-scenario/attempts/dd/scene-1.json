@@ -12,7 +12,7 @@
     { "note": "Classic Pandora's box: open one at a time, keep the best reward seen, pay each box's cost. Here boxes open in batches of up to k=2, plus a fixed setup cost T=1/5 per batch." },
     { "group": { "around": ["col:box1", "col:box2"], "label": "Batch 1", "id": "batch" }, "caption": "Batch 1: boxes 1 and 2 open together" },
     { "set": { "cell": [1, 0], "value": 0.5 }, "caption": "Box 1 opens: always 1/2" },
-    { "set": { "cell": [1, 1], "value": 0.5, "ms": 0 }, "caption": "Box 2 opens at the same instant: shows 1/2 (not the jackpot 99, not 0)" },
+    { "set": { "cell": [1, 1], "value": 0.5 }, "ms": 0, "caption": "Box 2 opens at the same instant: shows 1/2 (not the jackpot 99, not 0)" },
     { "value": { "id": "best", "label": "best so far", "text": 0.5, "at": "1,1" }, "ms": 0 },
     { "value": { "id": "cost", "label": "cost so far (setup + boxes)", "text": "0.6 (setup 0.2 + boxes 0.2+0.2)" }, "caption": "Cost so far: setup 1/5 + box1 1/5 + box2 1/5 = 3/5" },
     { "note": "Box 2 showed 1/2, not 99 — check whether a second batch is worth it: E[gain from box 3] = 1/5·(10 − 1/2) = 1.9, batch-2 cost = 1 + 1/5 = 1.2. 1.9 > 1.2, so open it." },

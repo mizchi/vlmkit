@@ -22,12 +22,8 @@
   "layout": "lr",
   "sequence": [
     {
-      "text": {
-        "id": "snippet",
-        "lines": ["{", "  \"kind\": \"sort\",", "  \"values\": [5, 3, 8]", "}"],
-        "at": "file"
-      },
-      "caption": "One JSON file: what is being explained — a kind and its data, not shapes or coordinates"
+      "highlight": "file",
+      "caption": "One JSON file — { kind: \"sort\", values: [5, 3, 8] } — what is being explained, not shapes or coordinates"
     },
     { "flow": "file->compiler", "caption": "vlmkit-anim compiles it" },
     { "flow": "compiler->timeline", "caption": "into an absolute-time timeline: nodes, keyframe tracks, step markers" },

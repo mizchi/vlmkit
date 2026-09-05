@@ -2,6 +2,7 @@
   "format": "vlmkit-anim/scene@1",
   "kind": "state-machine",
   "title": "The branch: react to what batch 1 showed",
+  "layout": "tb",
   "states": [
     "start",
     "batch1_open",
