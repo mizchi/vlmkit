@@ -88,3 +88,104 @@ I do NOT know yet whether chaining multiple `ms:0` ops back to back (my
 init block: note + three `value` inits, all ms:0) merges them all into one
 beat or only the first — the guide's own example only ever shows a single
 `ms:0` op after one captioned op. Flagging as untested before round 1.
+
+## Round 1
+
+`pnpm exec vlmkit-anim check fixtures/anim-scenario/attempts/da/scene.json`:
+
+```
+✓ scene.json (distributed): 0 error(s), 0 warning(s)
+  4080ms · 8 steps (8 captioned) · 21 nodes · 21 tracks / 45 keyframes
+  scene 1508 B → timeline 6759 B (×4.5)
+```
+
+Clean on the first attempt — 0 ✗, 0 ⚠. The chained `ms:0` block (note +
+three `value` inits) DID all merge into step 1, resolving my pre-round
+uncertainty: `explain` shows them joined with " · " exactly like the
+same-instant rule for two ordinary beats. Good to know for next time: ms:0
+chains however long, not just one deep.
+
+`explain` output:
+
+```
+Vector clocks: causality without a global clock — 8 steps, 4080ms, 21 nodes
+ 1. [    0ms] Start: A, B and C each hold a vector [a,b,c] of counters, all zero · A = [0,0,0] · B = [0,0,0] · C = [0,0,0]
+ 2. [  540ms] A has a local event: it increments its own slot · A: [0,0,0] -> [1,0,0]
+ 3. [ 1080ms] A sends its vector to B · B receives [1,0,0]: max([0,0,0],[1,0,0])=[1,0,0], then +1 own slot -> [1,1,0]
+ 4. [ 1680ms] Meanwhile, C has a local event of its own: it increments its own slot · C: [0,0,0] -> [0,0,1] · C's local event (frozen) = [0,0,1]
+ 5. [ 2220ms] B sends its vector to C · C receives [1,1,0]: max([0,0,1],[1,1,0])=[1,1,1], then +1 own slot -> [1,1,2]
+ 6. [ 2820ms] Concurrent: A's event [1,0,0] and C's local event [0,0,1] - neither vector is <= the other, so neither happened before the other
+ 7. [ 3360ms] Ordered: A's event [1,0,0] <= C's final vector [1,1,2] in every slot - A's event happened-before C's receive
+ 8. [ 3900ms] end
+```
+
+Matches the brief's success criterion exactly: `explain` of the last scene
+names the concurrent pair (A's `[1,0,0]`, C's `[0,0,1]`) and the ordered
+pair (A's `[1,0,0]` ≤ C's final `[1,1,2]`) with their vectors, in the
+narration text.
+
+I then rendered specific instants to check *when* a value actually flips —
+this matters because the brief demands "the viewer must be able to read
+every vector at the moment it changes":
+
+```
+--at 1080 .. 1679  → value-vecB still "[0,0,0]"
+--at 1680          → value-vecB flips to "[1,1,0]"
+```
+
+So the `ms:0` receive-side update snaps at the END of the message's travel
+beat (1080→1680ms), i.e. exactly when the dot lands — not at the moment the
+message departs. That is the semantically correct instant (max+increment
+happens on receipt) and I did not have to do anything to get it; it falls
+out of "ms:0 applies inside the previous beat" for free. No round 2 needed
+on this scene — the brief's success bar is met on the first attempt.
+
+## Rounds 2-3: pushing past "green" to find friction
+
+Per the task, a clean pass that hides what I couldn't express is
+worthless, so I spent the remaining budget probing the two places I'd
+flagged as uncertain in the plan, on copies in scratch (not the submitted
+scene — both probes below were rejected from the final file, one because
+it actively misleads and one because it added nothing over prose).
+
+**Probe A — `group` around two node ids to visually mark the incomparable
+pair.** I added `{"group": {"around": ["A","C"], "label": "incomparable"}}`
+at the concurrent beat. `check` passed clean (0/0), but the rendered SVG
+shows why this is a trap for this scene's layout:
+
+```
+<rect x="-244" y="-25.4" width="488" height="50.8" .../>  <!-- centered on B, x=320 -->
+```
+
+`around: ["A","C"]` draws ONE bounding rectangle spanning from A's box all
+the way to C's — and B sits geometrically in between them in a
+`distributed` layout (nodes are laid out left-to-right in the order
+declared). The box visually encloses B too, even though B has nothing to
+do with the incomparability claim. The validator has no way to know this is
+wrong because `group`'s contract is purely geometric ("bounding box of the
+anchors"), not semantic ("these two things, and nothing between them"). I
+did not adopt this into the final scene.
+
+**Probe B — `callout` anchored at a single node instead.** I tried
+`{"callout": {"at": "C", "text": "[1,0,0] vs [0,0,1]: neither <= the other"}}`
+to sidestep the bounding-box problem. This also passed clean, and avoids
+falsely implicating B — but it doesn't solve the actual problem either: a
+callout is a speech-bubble on ONE anchor, so "[1,0,0] vs [0,0,1]" is just
+text floating near C's box. There is still no way to draw a visual line or
+bracket connecting A's vector readout to C's frozen one — the reader gets
+the comparison as a sentence, identical in kind to just using a `note`.
+I did not adopt this either — it added an extra beat and a redundant panel
+for the same information already in the final two `note` captions.
+
+**Also discovered along the way (my own scripting slip, but revealing):**
+`note` items do not accept a `caption` key at all (`unknown key "caption" →
+accepted keys: "note", "at", "after", "delay"`) — sensible, since the note
+string IS the caption, but worth knowing: you cannot override a note's
+displayed text separately from its narrated text, unlike every op verb.
+
+## Stopping point
+
+Budget used: 1 real round on the submitted scene (clean first attempt) + 2
+exploratory rounds that improved my understanding but were correctly left
+out of the final file. Success criterion met: `check` 0 ✗ / 0 ⚠; `explain`
+names both the concurrent and the ordered pair with their exact vectors.
