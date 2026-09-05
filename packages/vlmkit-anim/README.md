@@ -61,3 +61,14 @@ writes the equivalent JSON file. JSON stays the format — this is the editor's 
 
 Sample outputs for every fixture (one GIF and one contact sheet each) are in
 [`samples/`](./samples/README.md).
+
+## Scenes from a repository
+
+```bash
+vlmkit-anim repo --out docs/diagrams --name architecture       # the workspace's packages, layer by layer
+vlmkit-anim pr --base origin/main --title "PR #12: …" --out pr  # one beat per commit: areas touched, import edges, counts
+```
+
+Both write the scene, a GIF, a contact sheet and a markdown file with the narration and both
+images embedded — paste it into the pull request, or let a workflow do it on every push (this
+repository's `pr-visual` workflow does). The scene is kept so the picture stays editable.

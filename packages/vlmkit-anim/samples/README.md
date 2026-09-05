@@ -99,7 +99,7 @@ Six assets, two protocols — 7 steps, 2200ms, 40 nodes
 
 ## diagram-cdn
 
-`diagram` — [`fixtures/diagram-cdn.json`](../fixtures/diagram-cdn.json) · 9 steps · 5.5s · GIF 339 KB
+`diagram` — [`fixtures/diagram-cdn.json`](../fixtures/diagram-cdn.json) · 9 steps · 5.5s · GIF 344 KB
 
 ![diagram-cdn animation](./diagram-cdn.gif)
 
@@ -112,7 +112,7 @@ How a CDN serves a request — 9 steps, 5460ms, 9 nodes
  1. [    0ms] How a CDN serves a request
  2. [  350ms] The browser asks the nearest edge
  3. [ 1050ms] The edge checks its cache: miss
- 4. [ 1750ms] Only on a miss does the origin get involved
+ 4. [ 2000ms] Only on a miss does the origin get involved
  5. [ 2450ms] edge → origin
  6. [ 3150ms] Origin responds; the edge stores a copy
  7. [ 3850ms]

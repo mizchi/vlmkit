@@ -277,7 +277,10 @@ describe("diagram", () => {
   it("hidden nodes appear on show, and a hidden node no step shows is warned about", () => {
     const tl = compileScene(EXAMPLES.diagram);
     const show = (tl.steps ?? []).find((s) => s.caption === "The API needs the database")!;
-    assert.equal(sampleFrame(tl, show.t - 1).get("db")!.opacity, 0);
+    // The step marker sits at the end of the short fade, so the frame at the step shows the node
+    // the caption names (v10: contact sheets of generated change maps were blank at each beat).
+    assert.equal(sampleFrame(tl, show.t - 251).get("db")!.opacity, 0);
+    assert.equal(sampleFrame(tl, show.t).get("db")!.opacity, 1);
     assert.equal(sampleFrame(tl, timelineDuration(tl)).get("db")!.opacity, 1);
     const s: Scene = { ...EXAMPLES.diagram, sequence: [{ flow: "browser->api" }] };
     assert.ok(checkAnimation(compileScene(s), s).some((d) => /"db" is hidden and no step shows it/.test(d.message)));

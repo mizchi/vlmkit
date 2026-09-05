@@ -1,0 +1,337 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "vlmkit — the workspace and its dependencies",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "vlmkit (cli)",
+      "label": "vlmkit (cli)",
+      "hidden": true
+    },
+    {
+      "id": "ai",
+      "label": "ai",
+      "hidden": true
+    },
+    {
+      "id": "anim",
+      "label": "anim",
+      "hidden": true
+    },
+    {
+      "id": "animation-eval",
+      "label": "animation-eval",
+      "hidden": true
+    },
+    {
+      "id": "capture",
+      "label": "capture",
+      "hidden": true
+    },
+    {
+      "id": "core",
+      "label": "core",
+      "hidden": false
+    },
+    {
+      "id": "generate",
+      "label": "generate",
+      "hidden": true
+    },
+    {
+      "id": "heal",
+      "label": "heal",
+      "hidden": true
+    },
+    {
+      "id": "markup",
+      "label": "markup",
+      "hidden": true
+    },
+    {
+      "id": "mcp",
+      "label": "mcp",
+      "hidden": true
+    },
+    {
+      "id": "plan",
+      "label": "plan",
+      "hidden": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "vlmkit (cli)",
+      "to": "ai",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "anim",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "animation-eval",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "capture",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "generate",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "heal",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "markup",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "mcp",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
+      "to": "plan",
+      "hidden": true
+    },
+    {
+      "from": "ai",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "anim",
+      "to": "animation-eval",
+      "hidden": true
+    },
+    {
+      "from": "animation-eval",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "capture",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "generate",
+      "to": "ai",
+      "hidden": true
+    },
+    {
+      "from": "heal",
+      "to": "ai",
+      "hidden": true
+    },
+    {
+      "from": "heal",
+      "to": "capture",
+      "hidden": true
+    },
+    {
+      "from": "heal",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "markup",
+      "to": "ai",
+      "hidden": true
+    },
+    {
+      "from": "markup",
+      "to": "animation-eval",
+      "hidden": true
+    },
+    {
+      "from": "markup",
+      "to": "capture",
+      "hidden": true
+    },
+    {
+      "from": "markup",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "mcp",
+      "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "mcp",
+      "to": "markup",
+      "hidden": true
+    },
+    {
+      "from": "plan",
+      "to": "ai",
+      "hidden": true
+    }
+  ],
+  "sequence": [
+    {
+      "highlight": [
+        "core"
+      ],
+      "caption": "core: depends on nothing else in the workspace"
+    },
+    {
+      "value": {
+        "id": "n",
+        "label": "packages so far",
+        "text": 1
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "core"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "ai",
+        "animation-eval",
+        "capture"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "ai",
+        "animation-eval",
+        "capture"
+      ],
+      "caption": "ai → core; animation-eval → core; capture → core"
+    },
+    {
+      "value": {
+        "id": "n",
+        "label": "packages so far",
+        "text": 4
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "ai",
+        "animation-eval",
+        "capture"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "anim",
+        "generate",
+        "heal",
+        "markup",
+        "plan"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "anim",
+        "generate",
+        "heal",
+        "markup",
+        "plan"
+      ],
+      "caption": "anim → animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core; plan → ai"
+    },
+    {
+      "value": {
+        "id": "n",
+        "label": "packages so far",
+        "text": 9
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "anim",
+        "generate",
+        "heal",
+        "markup",
+        "plan"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "mcp"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "mcp"
+      ],
+      "caption": "mcp → core, markup"
+    },
+    {
+      "value": {
+        "id": "n",
+        "label": "packages so far",
+        "text": 10
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "mcp"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "vlmkit (cli)"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "vlmkit (cli)"
+      ],
+      "caption": "vlmkit (cli) → ai, anim, animation-eval, capture, core, generate, heal, markup, mcp, plan"
+    },
+    {
+      "value": {
+        "id": "n",
+        "label": "packages so far",
+        "text": 11
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "vlmkit (cli)"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "11 packages, 25 workspace dependencies, 5 layers deep"
+    }
+  ]
+}

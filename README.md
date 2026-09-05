@@ -119,6 +119,16 @@ marked `[key]`.
 Task-routing recipes and done-condition sets:
 [`docs/markup-assist.md`](./docs/markup-assist.md).
 
+## The workspace, drawn by itself
+
+![vlmkit — the workspace and its dependencies](./docs/diagrams/vlmkit-architecture.gif)
+
+Eleven packages, layer by layer from `core` to the CLI, generated from the manifests by
+`vlmkit-anim repo` ([every step](./docs/diagrams/vlmkit-architecture.sheet.png), regenerate with
+`pnpm anim:diagrams`). Every pull request gets the same treatment: the `pr-visual` workflow
+runs `vlmkit-anim pr` and posts the change map — one beat per commit, the areas it touched,
+the imports between them — as a comment on the PR.
+
 ## Documentation
 
 | Doc | Contents |

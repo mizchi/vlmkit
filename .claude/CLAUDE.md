@@ -147,7 +147,13 @@ vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and de
 vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
 vlmkit-anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
 vlmkit-anim eval page.html                          # the shared frame-sampled evaluator on an emitted page (same report as `vlmkit check animation`)
+vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture   # the workspace drawn layer by layer (pnpm anim:diagrams regenerates docs/diagrams/)
+vlmkit-anim pr --base origin/main --out .vlmkit-anim/pr           # the change map of a branch: one beat per commit, areas + import edges + counts; <name>.md is paste-ready
 ```
+
+The `pr-visual` workflow runs `vlmkit-anim pr` on every same-repo pull request, publishes the
+GIF and contact sheet on the `pr-visuals` branch (one folder per PR number) and keeps one
+comment on the PR up to date with them — the shape of a change before the diff.
 
 `vlmkit-anim` is a **standalone binary** (`@mizchi/vlmkit-anim`), not a `vlmkit`
 subcommand. Its only workspace tie is the **evaluation** package

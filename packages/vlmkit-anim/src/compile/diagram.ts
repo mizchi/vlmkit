@@ -84,11 +84,17 @@ export function compileDiagram(scene: DiagramScene): Timeline {
     if ("show" in st || "hide" in st) {
       const targets = arr("show" in st ? st.show : st.hide);
       const to = "show" in st ? 1 : 0;
-      b.step(st.caption ?? `${to ? "Show" : "Hide"} ${targets.join(", ")}`);
+      // `ms: 0`: applied at the cursor inside the surrounding beat, no step of its own (the
+      // convention `pointers` / `highlight` follow elsewhere; v10's generated change maps need it).
+      // Otherwise the fade is short and the step marker sits at its end, so a frame taken at the
+      // step (`render --step`, the contact sheet) shows the node the caption is talking about.
       const t0 = b.t;
+      const fadeMs = Math.min(ms, 250);
+      if (ms > 0) b.step(st.caption ?? `${to ? "Show" : "Hide"} ${targets.join(", ")}`, undefined, t0 + fadeMs);
       const t1 = b.advance(ms);
+      const fade = (id: string): void => (ms > 0 ? b.tween(id, "opacity", to, t0, t0 + fadeMs) : b.set(id, "opacity", to, t0));
       for (const id of targets) {
-        b.tween(id, "opacity", to, t0, t1);
+        fade(id);
         // Edges touching a node follow its visibility so an arrow never points at nothing.
         for (const [key, eid] of edgeId) {
           const [from, dest] = key.split("->");
@@ -96,21 +102,22 @@ export function compileDiagram(scene: DiagramScene): Timeline {
           const other = from === id ? dest : from;
           const otherVisible = (b.valueAt(other, "opacity", t1) ?? 1) as number;
           if (to === 1 && otherVisible < 1) continue;
-          b.tween(eid, "opacity", to, t0, t1);
-          if (b.has(`${eid}-label`)) b.tween(`${eid}-label`, "opacity", to, t0, t1);
+          fade(eid);
+          if (b.has(`${eid}-label`)) fade(`${eid}-label`);
         }
       }
     } else if ("highlight" in st || "unhighlight" in st) {
       const targets = arr("highlight" in st ? st.highlight : st.unhighlight);
       const color = "highlight" in st ? T.accent : T.node;
-      b.step(st.caption ?? ("highlight" in st ? `Focus on ${targets.join(", ")}` : undefined));
+      if (ms > 0) b.step(st.caption ?? ("highlight" in st ? `Focus on ${targets.join(", ")}` : undefined));
       const t0 = b.t;
-      const t1 = b.advance(ms);
+      b.advance(ms);
+      // Instant, like the sort and matrix highlights: the frame at the step shows the focus.
       for (const id of targets) {
         const original = scene.nodes.find((n) => n.id === id)?.fill;
-        b.tween(id, "fill", "highlight" in st ? color : original ?? color, t0, t0 + Math.min(200, ms / 2));
+        const fill = "highlight" in st ? color : original ?? color;
+        if (b.valueAt(id, "fill", t0) !== fill) b.set(id, "fill", fill, t0);
       }
-      void t1;
     } else if ("flow" in st) {
       const [from, to] = typeof st.flow === "string" ? st.flow.split("->").map((x) => x.trim()) : st.flow;
       let ends = edgeEnds.get(`${from}->${to}`);

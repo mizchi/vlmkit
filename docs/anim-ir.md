@@ -530,6 +530,11 @@ sequence never reveals.
 | `sequence` | one action per step + optional `caption`, `ms`: `{"show": id \| [ids]}` `{"hide": …}` `{"highlight": …}` `{"unhighlight": …}` `{"flow": "a->b"}` (token travels along an existing edge, either direction) `{"note": "…"}` (captioned pause) `{"relabel": {"id", "text"}}` |
 
 Hidden nodes and edges stay invisible until a `show`; an edge follows its nodes' visibility.
+A `show` / `hide` fades over at most 250 ms and puts its step marker at the end of the fade, and
+`highlight` / `unhighlight` recolour instantly, so the frame at a step (`render --step`, the
+contact sheet) shows what its caption names. `"ms": 0` on `show` / `hide` / `highlight` /
+`unhighlight` applies it inside the surrounding beat with no step of its own — `{"show": ["b"], "ms": 0}, {"highlight": ["a", "b"], "caption": "…"}`
+is one beat in which `b` appears and both light up.
 
 ## kind: vector
 
@@ -681,6 +686,34 @@ Choose `sequence` when the second picture is the *consequence* of the first
 the point is *when* things happen relative to each other (two protocols
 finishing the same downloads). A pane's title is drawn above it, and each
 pane keeps a faint border so the reader sees where one picture ends.
+
+## Scenes generated from a repository
+
+Two scenes nobody has to write: the workspace's architecture and the change
+map of a range of commits. Both are ordinary `diagram` scenes — edit the
+written `*.scene.json` and re-run `video` for a different cut.
+
+```
+vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture
+vlmkit-anim pr --base origin/main --title "PR #132: …" --out .vlmkit-anim/pr
+```
+
+- **`repo`** reads every `package.json` in the workspace and shows the packages
+  layer by layer, from the ones that depend on nothing to the CLI, each beat's
+  caption naming the dependencies that place a package where it is.
+- **`pr`** reads `git log base..head`: one beat per commit, the **areas** it
+  touched light up (a package's `src`, its fixtures, `docs/reports`, `tests`,
+  `ci`), areas appear the first time a commit touches them, edges are the
+  imports between changed areas as they stand at `head`, and two readouts
+  count files and lines as they accumulate. More than fourteen areas fold into
+  "other".
+
+Each writes four files under `--out`: `<name>.scene.json`, `<name>.gif`,
+`<name>.sheet.png` and `<name>.md` — the narration with both images embedded,
+ready to paste into a pull request. Without a browser the images are skipped
+and a `<name>.sheet.html` plus the final frame as SVG are written instead.
+The repository's `pr-visual` workflow runs `pr` on every pull request and
+keeps one comment on it up to date with the result.
 
 ## Writing a scene in TypeScript
 

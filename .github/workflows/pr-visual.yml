@@ -1,0 +1,96 @@
+# On every pull request from this repository: draw the change map of the PR with
+# `vlmkit-anim pr` (one beat per commit, the areas it touched, the import edges
+# between them, running file / line counts), publish the GIF and the contact
+# sheet on the `pr-visuals` branch, and keep one comment on the PR up to date
+# with both images and the narration. A reviewer sees the shape of the change
+# before reading the diff.
+#
+# Forks are skipped: publishing needs push access, and a PR from a fork has none.
+# The generator runs from source (no build), so it needs Node and Playwright only.
+name: PR visual
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-visual-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  change-map:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Draw the change map
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+        run: |
+          node --experimental-strip-types packages/vlmkit-anim/src/cli.ts pr \
+            --base "$BASE" --head "$HEAD" --title "$TITLE" --name "change-map" --out .vlmkit-anim/pr
+
+      - name: Publish the images on the pr-visuals branch
+        id: publish
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          dest="$(mktemp -d)"
+          if git fetch origin pr-visuals 2>/dev/null; then
+            git worktree add "$dest" origin/pr-visuals
+          else
+            git worktree add --detach "$dest"
+            git -C "$dest" checkout --orphan pr-visuals
+            git -C "$dest" rm -rfq . || true
+            printf '# pr-visuals\n\nChange maps drawn by `vlmkit-anim pr` for pull requests, one folder per PR.\n' > "$dest/README.md"
+          fi
+          mkdir -p "$dest/$PR"
+          cp .vlmkit-anim/pr/change-map.* "$dest/$PR/"
+          git -C "$dest" add -A
+          git -C "$dest" commit -qm "PR #$PR @ ${SHA:0:7}" || true
+          git -C "$dest" push -q origin HEAD:pr-visuals
+          echo "commit=$(git -C "$dest" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Keep one comment on the PR up to date
+        uses: actions/github-script@v7
+        env:
+          COMMIT: ${{ steps.publish.outputs.commit }}
+        with:
+          script: |
+            const fs = require("fs");
+            const pr = context.payload.pull_request.number;
+            const raw = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${process.env.COMMIT}/${pr}`;
+            // The generator's markdown embeds ./change-map.gif and ./change-map.sheet.png; point them at the published copies.
+            const md = fs.readFileSync(".vlmkit-anim/pr/change-map.md", "utf8").replaceAll("](./", `](${raw}/`);
+            const marker = "<!-- vlmkit-anim:change-map -->";
+            const body = `${marker}\n${md}\n_Redrawn on every push. Scene: [\`change-map.scene.json\`](${raw}/change-map.scene.json)._`;
+            const { data: comments } = await github.rest.issues.listComments({ ...context.repo, issue_number: pr, per_page: 100 });
+            const mine = comments.find((c) => c.body && c.body.startsWith(marker));
+            if (mine) await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: pr, body });
