@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { compileScene } from "./compile/index.ts";
-import { pathLength, renderFrameSvg, sampleTimes } from "./render-svg.ts";
+import { pathLength, renderFrameSvg, sampleTimes, wrapCaption } from "./render-svg.ts";
 import { EXAMPLES } from "./schema-sheet.ts";
 import { ease, sampleKeyframes, timelineDuration } from "./timeline.ts";
 import { TIMELINE_FORMAT, type Timeline } from "./types.ts";
@@ -55,14 +55,14 @@ describe("renderFrameSvg", () => {
   };
 
   it("an uncaptioned step keeps the previous caption showing", () => {
-    assert.match(renderFrameSvg(tl, 950), /data-caption="true">half</);
+    assert.match(renderFrameSvg(tl, 950), /data-caption="true"><tspan[^>]*>half</);
   });
 
   it("nests children in their group's <g> and applies the sampled transform", () => {
     const svg = renderFrameSvg(tl, 500);
     assert.match(svg, /<g id="g" data-shape="group" transform="translate\(60 10\)">.*<g id="box"/s);
     assert.match(svg, /<tspan x="0" y="0">hi<\/tspan>/);
-    assert.match(svg, /data-caption="true">half</);
+    assert.match(svg, /data-caption="true"><tspan[^>]*>half</);
     assert.match(svg, /marker-end="url\(#arrow-333\)"/);
     assert.match(svg, /stroke-dasharray="100" stroke-dashoffset="50"/);
     assert.match(svg, /<tspan x="0" y="-8.4">a<\/tspan><tspan x="0" y="8.4">b<\/tspan>/);
@@ -89,5 +89,30 @@ describe("renderFrameSvg", () => {
     // Quarter circle of radius 100 via a cubic approximation: length ≈ 157.08.
     const q = pathLength("M 100 0 C 100 55.2 55.2 100 0 100");
     assert.ok(Math.abs(q - 157.08) < 1, String(q));
+  });
+});
+
+describe("captions wider than the canvas wrap instead of clipping (v11: eb's decision caption, the vector-clock fixture)", () => {
+  it("wrapCaption: a short caption is one line, a long one breaks at spaces, the last line takes the rest", () => {
+    assert.deepEqual(wrapCaption("short", 200, 14, 3), ["short"]);
+    const long = "A and C never exchanged a message: concurrent, and B lies between them so a group would enclose it";
+    const lines = wrapCaption(long, 300, 14, 3);
+    assert.ok(lines.length >= 2 && lines.length <= 3, lines.join(" | "));
+    assert.equal(lines.join(" "), long, "no word is lost or duplicated");
+    for (const l of lines.slice(0, -1)) assert.ok(l.length * 14 * 0.55 <= 300, `line too wide: ${l}`);
+  });
+
+  it("renderFrameSvg emits one tspan per wrapped line, the last on the baseline the single-line caption used", () => {
+    const tl: Timeline = {
+      format: TIMELINE_FORMAT,
+      canvas: { width: 240, height: 120 },
+      nodes: [{ id: "a", shape: "rect", pos: [50, 50], size: [20, 20] }],
+      tracks: [],
+      steps: [{ t: 0, caption: "this caption is far too long for a canvas two hundred and forty pixels wide" }],
+    };
+    const svg = renderFrameSvg(tl, 0);
+    const spans = svg.match(/<tspan x="120" y="[\d.]+">/g) ?? [];
+    assert.ok(spans.length >= 2, svg);
+    assert.match(svg, /<tspan x="120" y="106">[^<]*<\/tspan><\/text>/, "the last line sits at height - 14");
   });
 });

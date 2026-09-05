@@ -18,7 +18,7 @@ test — `samples.test.ts` only checks that every fixture is represented here.
 | [heap-min](#heap-min) | heap | 16 | 8.1s |
 | [list-linked](#list-linked) | list | 10 | 6.0s |
 | [matrix-edit-distance](#matrix-edit-distance) | matrix | 12 | 6.6s |
-| [matrix-vector-clock](#matrix-vector-clock) | matrix | 10 | 5.4s |
+| [matrix-vector-clock](#matrix-vector-clock) | matrix | 11 | 6.0s |
 | [queue-print-jobs](#queue-print-jobs) | queue | 6 | 3.5s |
 | [sort-bubble](#sort-bubble) | sort | 31 | 12.3s |
 | [sort-insertion](#sort-insertion) | sort | 21 | 8.3s |
@@ -211,7 +211,7 @@ Min-heap push and pop — 16 steps, 8140ms, 13 nodes
 
 ## list-linked
 
-`list` — [`fixtures/list-linked.json`](../fixtures/list-linked.json) · 10 steps · 6.0s · GIF 345 KB
+`list` — [`fixtures/list-linked.json`](../fixtures/list-linked.json) · 10 steps · 6.0s · GIF 344 KB
 
 ![list-linked animation](./list-linked.gif)
 
@@ -265,7 +265,7 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 
 ## matrix-vector-clock
 
-`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 10 steps · 5.4s · GIF 407 KB
+`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 11 steps · 6.0s · GIF 449 KB
 
 ![matrix-vector-clock animation](./matrix-vector-clock.gif)
 
@@ -274,17 +274,18 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 ![matrix-vector-clock contact sheet](./matrix-vector-clock.sheet.png)
 
 ```
-Vector clocks — 10 steps, 5400ms, 38 nodes
+Vector clocks — 11 steps, 6000ms, 38 nodes
  1. [    0ms] Vector clocks
  2. [  360ms] A: local event · A = [1,0,0]
  3. [  960ms] C before
- 4. [ 1560ms] B receives: max, then +1
- 5. [ 2160ms] copied from A
- 6. [ 2760ms] C: local event, no message from anyone
- 7. [ 3360ms] A and C never exchanged a message: concurrent
- 8. [ 3960ms] ordered
- 9. [ 4560ms]   clock = max(clock, v)
-10. [ 5160ms] (end)
+ 4. [ 1560ms] B receives [1,0,0]: max with its own row copies a
+ 5. [ 2160ms] …then +1 on its own slot b
+ 6. [ 2760ms] copied from A
+ 7. [ 3360ms] C: local event, no message from anyone
+ 8. [ 3960ms] A and C never exchanged a message: concurrent
+ 9. [ 4560ms] ordered
+10. [ 5160ms]   clock = max(clock, v)
+11. [ 5760ms] (end)
 ```
 
 </details>
@@ -397,7 +398,7 @@ Insertion sort — 21 steps, 8250ms, 16 nodes
 
 ## stack-brackets
 
-`stack` — [`fixtures/stack-brackets.json`](../fixtures/stack-brackets.json) · 7 steps · 4.1s · GIF 352 KB
+`stack` — [`fixtures/stack-brackets.json`](../fixtures/stack-brackets.json) · 7 steps · 4.1s · GIF 349 KB
 
 ![stack-brackets animation](./stack-brackets.gif)
 
@@ -443,7 +444,7 @@ TCP client handshake — 7 steps, 5810ms, 15 nodes
 
 ## tree-bst
 
-`tree` — [`fixtures/tree-bst.json`](../fixtures/tree-bst.json) · 18 steps · 11.3s · GIF 849 KB
+`tree` — [`fixtures/tree-bst.json`](../fixtures/tree-bst.json) · 18 steps · 11.3s · GIF 850 KB
 
 ![tree-bst animation](./tree-bst.gif)
 

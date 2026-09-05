@@ -296,6 +296,8 @@ They add nothing a "vector" scene could not draw by hand; the point is that you 
 
   Every op takes "caption" (replaces the generated one, e.g. "best so far = 1/2") and "ms" ("ms": 0 = inside the previous beat).
   explain lists value changes as their beats; check names the anchors that exist when one is misspelt.
+  An omitted "id" on callout / group / text / relate is "main": a second op without an id replaces the first.
+  Replaced or nulled annotations fade out and stay in the markup at opacity 0 — "gone" means invisible, not absent.
 
 Anchors by kind (what "at" / "of" / "around" may name):
   sort           a value ("5" = the bar labelled 5, wherever it is)

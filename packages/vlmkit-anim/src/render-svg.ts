@@ -181,7 +181,13 @@ export function renderFrameSvg(tl: Timeline, t: number, opts: RenderOptions = {}
   if (opts.caption !== false) {
     const text = currentCaption(tl, t);
     if (text) {
-      caption = `<text x="${num(width / 2)}" y="${num(height - 14)}" font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">${esc(text)}</text>`;
+      // A caption wider than the canvas wraps (up to three lines, growing upward from the bottom band)
+      // rather than being clipped at both ends.
+      const lines = wrapCaption(text, width - 24, 14, 3);
+      const lineH = 17;
+      const y0 = height - 14 - (lines.length - 1) * lineH;
+      const spans = lines.map((l, i) => `<tspan x="${num(width / 2)}" y="${num(y0 + i * lineH)}">${esc(l)}</tspan>`).join("");
+      caption = `<text font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">${spans}</text>`;
     }
   }
   return [
@@ -194,6 +200,29 @@ export function renderFrameSvg(tl: Timeline, t: number, opts: RenderOptions = {}
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/** Greedy word wrap on an average-glyph-width estimate; the last allowed line takes whatever is left. */
+export function wrapCaption(text: string, maxWidth: number, fontSize: number, maxLines: number): string[] {
+  const perChar = fontSize * 0.55;
+  const fits = (s: string) => s.length * perChar <= maxWidth;
+  if (fits(text)) return [text];
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (fits(next) || !cur) cur = next;
+    else {
+      lines.push(cur);
+      cur = w;
+      if (lines.length === maxLines - 1) break;
+    }
+  }
+  const used = lines.join(" ").split(/\s+/).filter(Boolean).length;
+  const rest = words.slice(used).join(" ");
+  if (rest) lines.push(rest);
+  return lines;
 }
 
 /** Sample times: every step marker plus evenly spaced fills, deduplicated and sorted. */

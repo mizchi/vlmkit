@@ -203,6 +203,44 @@ describe("annotations: relate (v10, da: a labelled line between two anchors wher
   });
 });
 
+describe("layout defects the v11 frames showed (eb's Pandora scene)", () => {
+  it("a title wider than the kind's own canvas is re-centred over the whole canvas, or the canvas grows to hold it", () => {
+    const s: MatrixScene = {
+      format: SCENE_FORMAT,
+      kind: "matrix",
+      title: "Batched Pandora's Box: one adaptive run (k=2, T=1/5)",
+      rowLabels: ["cost", "reward"],
+      colLabels: ["box1", "box2", "box3"],
+      cells: [[0.2, 0.2, 0.5], [null, null, null]],
+      ops: [{ set: { cell: [1, 0], value: 0.5 } }, { value: { id: "cost", label: "cost so far (setup + boxes)", text: "0.6 (setup 0.2 + boxes 0.2+0.2)" } }],
+    };
+    const { tl } = clean(s);
+    const title = tl.nodes.find((n) => n.id === "title")!;
+    assert.equal(title.pos![0], tl.canvas.width / 2, "centred over the final canvas, panel included");
+    const narrow = clean({ ...s, ops: [{ set: { cell: [1, 0], value: 0.5 } }] }).tl;
+    const t2 = narrow.nodes.find((n) => n.id === "title")!;
+    assert.ok(t2.pos![0] - 300 >= 0 && t2.pos![0] + 300 <= narrow.canvas.width, `title of ~600px still fits a ${narrow.canvas.width}px canvas centred at ${t2.pos![0]}`);
+  });
+
+  it("a group label moves off a column header that already occupies its top-left corner", () => {
+    const s: MatrixScene = {
+      format: SCENE_FORMAT,
+      kind: "matrix",
+      rowLabels: ["cost", "reward"],
+      colLabels: ["box1", "box2", "box3"],
+      cells: [[0.2, 0.2, 1], [null, null, null]],
+      ops: [{ group: { around: "col:box3", label: "Batch 2" } }],
+    };
+    const { tl } = clean(s);
+    const label = tl.nodes.find((n) => n.id.startsWith("group-main-") && n.id.endsWith("-label"))!;
+    const rect = tl.nodes.find((n) => n.id.startsWith("group-main-") && !n.id.endsWith("-label"))!;
+    const top = rect.pos![1] - rect.size![1] / 2;
+    const header = tl.nodes.find((n) => n.shape === "text" && n.text === "box3")!;
+    assert.ok(!(Math.abs(label.pos![1] - header.pos![1]) < 10 && label.pos![0] < header.pos![0] + 30), `label at ${label.pos} sits on the header at ${header.pos}`);
+    assert.ok(label.pos![1] >= top - 12, "and it stayed at the outline, not somewhere arbitrary");
+  });
+});
+
 describe("annotations reach every kind's list", () => {
   it("state-machine trace, distributed messages, vector timeline, sort ops, chart sequence", () => {
     const sm: StateMachineScene = { ...EXAMPLES["state-machine"], trace: [...EXAMPLES["state-machine"].trace, { value: { id: "n", label: "events", text: 3 } }] };

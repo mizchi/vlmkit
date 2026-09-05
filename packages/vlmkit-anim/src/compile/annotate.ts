@@ -383,7 +383,25 @@ export class Annotations {
     if (spec.label) {
       const labelId = `group-${id}-${k}-label`;
       ids.push(labelId);
-      this.b.node({ id: labelId, shape: "text", pos: [bb.x - pad + 4, bb.y - pad - 9], text: spec.label, fontSize: T.fontSize - 2, color: T.accent, anchor: "start", opacity: 0 });
+      const fs = T.fontSize - 2;
+      // Top-left, outside the outline — unless something already sits there (a column header over the
+      // grouped columns, dd's "Batch 2" over "box3"); then bottom-left, then beside the top-right corner.
+      // The first corner where no visible text already is wins; the top-left stays the default.
+      const w = labelWidth(spec.label, fs) - fs * 1.6;
+      const own = new Set(names.flatMap((n) => this.anchors.get(n) ?? []));
+      const candidates: Vec2[] = [
+        [bb.x - pad + 4, bb.y - pad - 9],
+        [bb.x - pad + 4, bb.y + bb.h + pad + 9],
+        [bb.x + bb.w + pad + 6, bb.y - pad + fs * 0.65],
+      ];
+      const free = (p: Vec2) => {
+        const labelBox: Box = { x: p[0], y: p[1] - fs * 0.65, w, h: fs * 1.3 };
+        return !this.b.nodes.some(
+          (n) => n.shape === "text" && !own.has(n.id) && (this.b.valueAt(n.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(n.id, t), labelBox),
+        );
+      };
+      const pos = candidates.find(free) ?? candidates[0];
+      this.b.node({ id: labelId, shape: "text", pos, text: spec.label, fontSize: fs, color: T.accent, anchor: "start", opacity: 0 });
     }
     for (const nodeId of ids) this.b.set(nodeId, "opacity", 1, t);
     this.groups.set(id, ids);
