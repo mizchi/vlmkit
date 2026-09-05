@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.12.0 — 2026-09-05
+
+A release about the other direction: not measuring a page someone else built, but producing
+something — an explanatory animation — and measuring that. Two new packages, one of them carved out
+of an existing one.
+
+**`vlmkit-anim`, a standalone tool for explanatory animations** (`@mizchi/vlmkit-anim`). An agent
+explaining a sorting run, a BST delete, a Dijkstra traversal or a message exchange writes a
+`kind`-tagged Scene — `{"kind": "sort", "algorithm": "bubble", "values": [5, 3, 8, 1]}` — and the
+compiler *runs the domain* to produce a Timeline of keyframe tracks and captioned steps, played by a
+7 KB `<vlm-anim>` web component (SVG + Web Animations) or sampled headlessly to SVG frames. Fourteen
+kinds: sort, array, stack, queue, list, tree, heap, state-machine, distributed, matrix, graph, chart,
+diagram, vector. `check` validates, compiles and reads the semantics back from the frames (final bar
+order by x, heap property by slot, list order plus arrow count); `explain` prints the narration;
+`sheet` puts every step on one image for a vision model; `video` writes a GIF in-process or an MP4 /
+WebM through ffmpeg; `html` emits the page. It is its own binary rather than a `vlmkit` subcommand
+because writing an animation needs none of vlmkit's capture, diff or gate plumbing.
+
+The format was designed by measurement rather than by taste: eight rounds of fresh subagents (35
+agents, Sonnet and Haiku) given only a brief and the one-page guide, with their friction recorded
+verbatim and every fix traced to a quote (`docs/reports/2026-09-04-anim-ir-v1.md` … `v8.md`). Two
+rules came out of it and now hold for the package: every diagnostic hint must name a remedy the
+format has (a v1 hint that did not led an agent to delete the branch its brief required), and every
+warning must be about the scene (a warning the writer cannot act on is a compiler bug — v8 found one
+that way). Guide: `docs/anim-ir.md`; design: `docs/design/anim-ir.md`.
+
+**`@mizchi/vlmkit-animation-eval`, the evaluator split out of `vlmkit-markup`.** The frame-sampled
+measurement behind `check animation` — pause every Web Animation, seek deterministic sample points,
+screenshot, derive issues — is now a package that depends on core and Playwright only. The gate
+imports it; `vlmkit-anim eval page.html` runs the same report on the pages the animation tool emits,
+through an optional peer, so the tool and the gate share one evaluator and neither drags in the
+other. Two helpers it needed moved into core with it: `stable-selector.ts` (the in-page selector
+generator) and `plugin/rule-prose.ts` (the `issues[]` projection of rule tiers).
+
+**A typed authoring surface that adds nothing to the format.** `scene.sort({ … })` and its thirteen
+siblings fill in `format` and `kind` over the existing type declarations, so a misspelt algorithm is
+an editor error before it is a `check` error; every `vlmkit-anim` verb accepts a `.ts` / `.mjs`
+module whose default export is a scene. JSON stays the IR — `sceneJson` writes it back out.
+
+**Sample outputs are committed.** `packages/vlmkit-anim/samples/` holds a GIF and a contact sheet
+for every fixture with its narration, so a compiler change can be judged by eye in a review;
+`pnpm anim:samples` regenerates them.
+
+### Behaviour changes
+
+None for `vlmkit` commands; `check animation` reports exactly what it did. Three deep imports moved,
+which a consumer of the workspace packages can see:
+
+- `@mizchi/vlmkit-markup/style/animation-eval.ts` → `@mizchi/vlmkit-animation-eval` (or its
+  `/animation-eval.ts` deep path). `deriveAnimationIssues` is still re-exported from
+  `@mizchi/vlmkit-markup/rules`.
+- `@mizchi/vlmkit-markup/stable-selector.ts` → `@mizchi/vlmkit-core/stable-selector.ts`.
+- `@mizchi/vlmkit-markup/rule-prose.ts` → `@mizchi/vlmkit-core/plugin/rule-prose.ts`.
+
+`vlmkit-markup` now depends on `@mizchi/vlmkit-animation-eval`; `vlmkit-anim` declares it and
+`playwright` as optional peers (writing needs neither; `eval`, `sheet` to PNG, `frames --png` and
+`video` need a browser).
+
 ## 0.11.1 — 2026-08-18
 
 A dogfood round on what 0.11 published, and two defects it shipped in the feature it led with.
