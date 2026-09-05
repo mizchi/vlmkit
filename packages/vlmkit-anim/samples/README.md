@@ -18,7 +18,7 @@ test — `samples.test.ts` only checks that every fixture is represented here.
 | [heap-min](#heap-min) | heap | 16 | 8.1s |
 | [list-linked](#list-linked) | list | 10 | 6.0s |
 | [matrix-edit-distance](#matrix-edit-distance) | matrix | 12 | 6.6s |
-| [matrix-vector-clock](#matrix-vector-clock) | matrix | 8 | 4.2s |
+| [matrix-vector-clock](#matrix-vector-clock) | matrix | 10 | 5.4s |
 | [queue-print-jobs](#queue-print-jobs) | queue | 6 | 3.5s |
 | [sort-bubble](#sort-bubble) | sort | 31 | 12.3s |
 | [sort-insertion](#sort-insertion) | sort | 21 | 8.3s |
@@ -265,7 +265,7 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 
 ## matrix-vector-clock
 
-`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 8 steps · 4.2s · GIF 308 KB
+`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 10 steps · 5.4s · GIF 407 KB
 
 ![matrix-vector-clock animation](./matrix-vector-clock.gif)
 
@@ -274,15 +274,17 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 ![matrix-vector-clock contact sheet](./matrix-vector-clock.sheet.png)
 
 ```
-Vector clocks — 8 steps, 4200ms, 36 nodes
+Vector clocks — 10 steps, 5400ms, 38 nodes
  1. [    0ms] Vector clocks
  2. [  360ms] A: local event · A = [1,0,0]
  3. [  960ms] C before
  4. [ 1560ms] B receives: max, then +1
  5. [ 2160ms] copied from A
- 6. [ 2760ms] ordered
- 7. [ 3360ms]   clock = max(clock, v)
- 8. [ 3960ms] (end)
+ 6. [ 2760ms] C: local event, no message from anyone
+ 7. [ 3360ms] A and C never exchanged a message: concurrent
+ 8. [ 3960ms] ordered
+ 9. [ 4560ms]   clock = max(clock, v)
+10. [ 5160ms] (end)
 ```
 
 </details>

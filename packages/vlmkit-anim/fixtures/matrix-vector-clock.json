@@ -79,6 +79,24 @@
       }
     },
     {
+      "set": {
+        "cell": [
+          2,
+          2
+        ],
+        "value": 1
+      },
+      "caption": "C: local event, no message from anyone"
+    },
+    {
+      "relate": {
+        "from": "row:A",
+        "to": "row:C",
+        "label": "A ∥ C"
+      },
+      "caption": "A and C never exchanged a message: concurrent"
+    },
+    {
       "group": {
         "around": [
           "row:A",

@@ -49,7 +49,7 @@ conventions hold in every kind:
 - `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
 - Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote. `vector` is the exception: it narrates only the items you captioned, and adds neither.
 - A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`, and every annotation op) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
-- Five **annotation ops** — `value`, `callout`, `snapshot`, `group`, `text` — go in any kind's op list and name the kind's own things (an index, a cell, a node) instead of coordinates. See [Annotations](#annotations-every-kind). Two or more pictures at once is [`kind: compose`](#kind-compose).
+- Six **annotation ops** — `value`, `callout`, `snapshot`, `group`, `text`, `relate` — go in any kind's op list and name the kind's own things (an index, a cell, a node) instead of coordinates. See [Annotations](#annotations-every-kind). Two or more pictures at once is [`kind: compose`](#kind-compose).
 
 `vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
@@ -587,11 +587,12 @@ Nodes (also the Timeline's node model):
 
 ## Annotations (every kind)
 
-Five ops every kind accepts **in its own op list** (`ops`, `sequence`, `trace`,
+Six ops every kind accepts **in its own op list** (`ops`, `sequence`, `trace`,
 `messages`, `timeline`), next to its own verbs. They exist because a value
 often has to stay readable beside the thing it describes, a viewer needs to be
-pointed at one cell, an earlier value must survive to be compared, and a rule
-or a few lines of code have to be *on screen*, not in the caption. None of
+pointed at one cell, an earlier value must survive to be compared, a relation
+between two things has to be drawn rather than stated, and a rule or a few
+lines of code have to be *on screen*, not in the caption. None of
 them takes a coordinate: each names an **anchor**, one of the things the kind
 already draws.
 
@@ -621,6 +622,7 @@ already draws.
 | `{"snapshot": {"of", "label"}}` | A frozen copy, in the panel, of what the anchor shows **at this beat** — the value to compare against later, after the live one has moved on. An anchor that is several cells (a matrix row) snapshots as `[a, b, c]` |
 | `{"group": {"around": anchor \| [anchors], "label", "id"}}` / `{"group": null}` | A dashed outline around the anchors' bounding box, label at the top-left. One per `id`, like callout; `null` removes every group |
 | `{"text": {"lines": [...], "highlight", "at", "side", "id"}}` / `{"text": null}` | A multi-line block: code, a rule, a list. `highlight` is a 0-based line. Same `id` and the same number of lines updates in place and moves the highlight; a different line count redraws. Panel by default, or beside an anchor; `null` hides every block |
+| `{"relate": {"from", "to", "label", "style", "id"}}` / `{"relate": null}` | A line between two anchors, drawn edge to edge **whatever sits between them** — `A ≤ C`, "this came from that", "these two are concurrent". `style` is `arrow` (default, from → to) or `line`; the label sits beside the midpoint. One per `id`; `null` removes every relation. Where `group` would enclose a bystander, `relate` names the pair |
 
 A rule that governs the whole scene — the definition of ≤ on vectors, the
 invariant a loop keeps — is a `text` block **without** `at`: it goes to the

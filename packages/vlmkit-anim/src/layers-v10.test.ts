@@ -1,6 +1,6 @@
 /**
  * The two generic layers v9 asked for: annotations every kind accepts
- * (value / callout / snapshot / group / text over named anchors) and
+ * (value / callout / snapshot / group / text / relate over named anchors) and
  * `compose` (several scenes in panes). Read back from frames, not from meta.
  */
 import assert from "node:assert/strict";
@@ -115,6 +115,91 @@ describe("annotations: value", () => {
     assert.ok(paths.includes("ops[2].text.highlight"));
     assert.ok(paths.includes("ops[3].group.around"));
     assert.ok(diags.some((d) => d.path === "ops[4]" && /exactly one action key/.test(d.message)));
+  });
+});
+
+describe("annotations: relate (v10, da: a labelled line between two anchors where a group would enclose a bystander)", () => {
+  const vc: MatrixScene = {
+    format: SCENE_FORMAT,
+    kind: "matrix",
+    rowLabels: ["A", "B", "C"],
+    colLabels: ["a", "b", "c"],
+    cells: [[1, 0, 0], [1, 1, 0], [0, 0, 1]],
+    ops: [
+      { relate: { from: "row:A", to: "row:B", label: "A ≤ B" } },
+      { relate: { from: "row:A", to: "row:C", label: "A ∥ C", style: "line", id: "conc" } },
+      { relate: { from: "row:B", to: "row:C", label: "B ∥ C", id: "conc" }, caption: "B and C are concurrent too" },
+      { relate: null, caption: "clear" },
+    ],
+  };
+
+  it("draws an edge-to-edge arrow from one anchor's box to the other's, the label beside it; explain narrates the label", () => {
+    const { tl, diags } = clean(vc);
+    assert.deepEqual(diags.filter((d) => d.severity === "warn"), [], formatDiagnostics(diags));
+    const t0 = tl.steps!.find((s) => s.caption === "A ≤ B")!.t;
+    const frame = sampleFrame(tl, t0 + 1);
+    const line = tl.nodes.find((n) => n.id.startsWith("relate-main-") && !n.id.endsWith("-label"))!;
+    assert.equal(line.shape, "arrow");
+    assert.equal(frame.get(line.id)!.opacity, 1);
+    const label = frame.get(`${line.id}-label`)!;
+    assert.equal(label.text, "A ≤ B");
+    assert.equal(label.opacity, 1);
+    // Row A is above row B and the two touch, so the arrow cannot run between their edges: it runs
+    // downward beside the rows, from A's centre line to B's, past the rows' right end.
+    const rowA = frame.get("row-0")!;
+    const rowB = frame.get("row-1")!;
+    const lastCell = frame.get("cell-0-2")!;
+    const [p, q] = line.points!;
+    const yStart = line.pos![1] + p[1];
+    const yEnd = line.pos![1] + q[1];
+    assert.ok(Math.abs(yStart - rowA.pos[1]) < 20 && Math.abs(yEnd - rowB.pos[1]) < 20 && yStart < yEnd, `arrow ${yStart}→${yEnd} between rows at ${rowA.pos[1]} and ${rowB.pos[1]}`);
+    assert.ok(line.pos![0] > rowA.pos[0] + lastCell.pos[0], "the line is to the right of the rows, not across them");
+    assert.ok(label.pos[0] > line.pos![0], "the label is beside the line, further out");
+    const text = explain(tl);
+    assert.match(text, /A ≤ B/);
+    assert.match(text, /B and C are concurrent too/, "caption replaces the generated one");
+  });
+
+  it("the same id redraws (the old line goes), a plain `line` has no head, and null removes every relation", () => {
+    const { tl } = clean(vc);
+    const lines = tl.nodes.filter((n) => n.id.startsWith("relate-conc-") && !n.id.endsWith("-label"));
+    assert.equal(lines.length, 2, "two relations shared the id conc");
+    assert.equal(lines[0].shape, "line");
+    assert.equal(lines[1].shape, "arrow");
+    const tSecond = tl.steps!.find((s) => s.caption === "B and C are concurrent too")!.t;
+    const mid = sampleFrame(tl, tSecond + 1);
+    assert.equal(mid.get(lines[0].id)!.opacity, 0, "the first `conc` line was replaced");
+    assert.equal(mid.get(lines[1].id)!.opacity, 1);
+    const main = tl.nodes.find((n) => n.id.startsWith("relate-main-") && !n.id.endsWith("-label"))!;
+    assert.equal(mid.get(main.id)!.opacity, 1, "a different id is untouched");
+    const end = sampleFrame(tl, timelineDuration(tl));
+    for (const n of tl.nodes.filter((n) => n.id.startsWith("relate-"))) assert.equal(end.get(n.id)!.opacity, 0, `${n.id} still visible after relate: null`);
+  });
+
+  it("validator: both ends must be anchors, different from each other; style is arrow | line; unknown anchors name the list", () => {
+    const diags = validateScene({
+      format: SCENE_FORMAT,
+      kind: "sort",
+      values: [2, 1],
+      ops: [{ relate: { from: "2", to: "2" } }, { relate: { from: "2", to: "1", style: "dashed" } }, { relate: { from: "2" } }],
+    });
+    const paths = diags.map((d) => d.path);
+    assert.ok(paths.includes("ops[0].relate.to"), formatDiagnostics(diags));
+    assert.ok(paths.includes("ops[1].relate.style"));
+    assert.ok(paths.includes("ops[2].relate.to"));
+    assert.throws(
+      () => compileScene({ ...vc, ops: [{ relate: { from: "row:A", to: "row:D" } }] }),
+      (e: unknown) => e instanceof SceneValidationError && e.diagnostics.some((d) => d.path === "ops[0].relate.to" && /no anchor named "row:D"/.test(d.message)),
+    );
+  });
+
+  it("every kind's list takes it", () => {
+    for (const kind of ["diagram", "matrix", "graph", "chart", "sort", "array", "heap", "list", "tree", "stack", "queue", "state-machine", "distributed", "vector"] as const) {
+      const ex = EXAMPLES[kind] as Scene & Record<string, unknown>;
+      const listName = (["ops", "sequence", "trace", "messages", "timeline"] as const).find((k) => Array.isArray(ex[k])) ?? "ops";
+      const withRelate = { ...ex, [listName]: [...((ex[listName] as unknown[]) ?? []), { relate: { from: "x", to: "y" } }] } as Scene;
+      assert.deepEqual(validateScene(withRelate).filter((d) => d.severity === "error"), [], `${kind} rejects a relate op`);
+    }
   });
 });
 

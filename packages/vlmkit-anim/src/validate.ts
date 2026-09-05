@@ -904,7 +904,7 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
 const SIDES = ["above", "below", "left", "right"];
 
 /**
- * The five annotation ops, shared by every kind. Anchor names are checked at
+ * The six annotation ops, shared by every kind. Anchor names are checked at
  * compile time (the compiler knows what it registered); here the shape.
  */
 function validateAnnotationOp(ctx: Ctx, op: Obj, path: string, action: string): void {
@@ -953,6 +953,17 @@ function validateAnnotationOp(ctx: Ctx, op: Obj, path: string, action: string): 
         v.around.forEach((x, i) => anchor(x, `${p}.around[${i}]`));
       } else anchor(v.around, `${p}.around`);
       if (v.label !== undefined && !isStr(v.label)) ctx.error(`${p}.label`, `label must be a string`);
+      if (v.id !== undefined && !isStr(v.id)) ctx.error(`${p}.id`, `id must be a string`);
+      return;
+    case "relate":
+      if (v === null) return;
+      if (!ctx.object(v, p)) return;
+      ctx.keys(v, p, ["id", "from", "to", "label", "style"]);
+      anchor(v.from, `${p}.from`);
+      anchor(v.to, `${p}.to`);
+      if (isStr(v.from) && isStr(v.to) && v.from === v.to) ctx.error(`${p}.to`, `a relation needs two different anchors, both are "${v.from}"`);
+      if (v.label !== undefined && !isStr(v.label)) ctx.error(`${p}.label`, `label must be a string`);
+      if (v.style !== undefined) ctx.enumOf(v.style, `${p}.style`, ["arrow", "line"], "style");
       if (v.id !== undefined && !isStr(v.id)) ctx.error(`${p}.id`, `id must be a string`);
       return;
     case "text":

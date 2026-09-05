@@ -40,14 +40,17 @@ Scene IR  (vlmkit-anim/scene@1)  ──compile──▶  Timeline IR  (vlmkit-an
   and tree (BST); and `compose`, which puts several of them in one canvas. A
   bubble sort is 112 bytes and expands ~80× into a timeline; that ratio is the
   layer earning its place.
-- **Annotations** are the layer v9 showed was missing: five ops (`value`,
-  `callout`, `snapshot`, `group`, `text`) every kind accepts in its own op
+- **Annotations** are the layer v9 showed was missing: six ops (`value`,
+  `callout`, `snapshot`, `group`, `text`, `relate`) every kind accepts in its own op
   list, addressing the kind's own things by **anchor** names each compiler
   registers (an index, a cell `"r,c"`, a node id, a state, a value) rather than
   by coordinate. The Builder draws them — a readout panel that widens the
   canvas only when used, a pointer box beside an anchor, a frozen copy of what
   an anchor showed, an outline around several, a multi-line block with one
-  line highlighted — so a compiler's whole involvement is one `annotate()`
+  line highlighted, a labelled arrow between two anchors (v10's one remaining
+  ask: where a group would enclose a bystander, `relate` names the pair; when
+  the straight line would cross something else it runs beside the pair along
+  their dominant axis, on the side with more free space) — so a compiler's whole involvement is one `annotate()`
   call at the top of its loop and a handful of `anchor()` registrations. A
   misspelt anchor is a compile-time diagnostic that lists the anchors that
   exist. Nothing here draws what `vector` could not; the point is that a
