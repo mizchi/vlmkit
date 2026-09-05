@@ -43,7 +43,20 @@ v10 re-ran the same five briefs after the annotation layer and `kind: compose`
 landed (agents `da`–`de`): the coordinate-fallback count is the metric that has
 to move, and the attempts are kept next to v9's for the comparison.
 
+v11 is the re-edit round on the annotated scenes v10 produced, after `relate`
+landed: `README-v11-distributed.md` + `vector-clock-values.scene.json` (da's
+scene: an extra upstream event that every `value` downstream has to follow),
+`README-v11-matrix.md` + `pandora-batched.scene.json` (dd's scene: a cheaper
+box that moves both readouts and the decision arithmetic), and
+`README-v11-relate.md` + `vector-clock-relate.scene.json` (the package fixture:
+a receive that retires a `∥` relation for a `≤` one). The question is whether
+a readout or a relation survives someone changing the data it tracks
+(agents `ea`–`ec`).
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
-from v9 also the coordinate-fallback count, the expressiveness metric.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10}.md`.
+from v9 also the coordinate-fallback count, the expressiveness metric; from
+v11 also whether every dependent literal (readout text, message label,
+caption arithmetic) was updated — the checker cannot read arithmetic, so that
+is a hand count.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10,11}.md`.
