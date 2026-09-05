@@ -80,6 +80,12 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
     b.node({ id: `state-${s.id}`, shape: "circle", pos: p, r, fill: T.node, stroke: T.nodeStroke, strokeWidth: 2, text: s.label ?? s.id, fontSize: T.fontSize, color: T.text });
   }
   b.node({ id: "token", shape: "circle", pos: pos.get(scene.initial)!, r: 7, fill: T.accent, stroke: T.nodeStroke, opacity: 1 });
+  for (const s of states) b.anchor(s.id, `state-${s.id}`);
+  scene.transitions.forEach((tr, i) => {
+    b.anchor(`${tr.from}->${tr.to}`, `tr-${i}`);
+    if (scene.transitions.filter((t) => t.on === tr.on).length === 1) b.anchor(tr.on, `tr-${i}`);
+  });
+  b.anchor("token", "token");
 
   const table = new Map<string, Map<string, { to: string; index: number; note?: string }>>();
   scene.transitions.forEach((tr, i) => {
@@ -94,6 +100,7 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
   b.step(`Start in "${cur}"`, "start");
   b.advance(b.stepMs * 0.8);
   for (const item of scene.trace) {
+    if (b.annotate(item, "trace")) continue;
     if (typeof item === "object" && "note" in item) {
       b.step(item.note);
       b.advance(b.stepMs * 0.9);
@@ -114,6 +121,7 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
       visited.push(cur);
       continue;
     }
+    if (typeof item === "object" && !("on" in item)) continue; // handled above (annotation / note / goto)
     const ev = typeof item === "string" ? item : item.on;
     const caption = typeof item === "string" ? undefined : item.caption;
     const hit = table.get(cur)?.get(ev);

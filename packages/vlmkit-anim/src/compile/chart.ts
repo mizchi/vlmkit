@@ -89,6 +89,12 @@ export function compileChart(scene: ChartScene): Timeline {
     });
   });
   let thresholds = 0;
+  // Anchors: a series id (all its marks), a category (that column across series), "series/category" (one mark).
+  series.forEach((s) => b.anchor(s.id, ...s.values.map((_, i) => (type === "bar" ? `bar-${s.id}-${i}` : `pt-${s.id}-${i}`))));
+  cats.forEach((c, i) => {
+    b.anchor(c, ...series.map((s) => (type === "bar" ? `bar-${s.id}-${i}` : `pt-${s.id}-${i}`)));
+    series.forEach((s) => b.anchor(`${s.id}/${c}`, type === "bar" ? `bar-${s.id}-${i}` : `pt-${s.id}-${i}`));
+  });
 
   const resolve = (t: ChartTarget): { sid: string; i: number }[] => {
     const sids = t.series !== undefined ? [t.series] : series.map((s) => s.id);
@@ -107,6 +113,7 @@ export function compileChart(scene: ChartScene): Timeline {
   b.step(scene.title ?? "Start", "start");
   b.advance(b.stepMs * 0.5);
   for (const st of steps) {
+    if (b.annotate(st, "sequence")) continue;
     const ms = st.ms ?? b.stepMs;
     const caption = "caption" in st ? st.caption : undefined;
     if ("note" in st) {

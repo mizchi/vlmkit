@@ -14,6 +14,7 @@
  */
 
 import {
+  ANNOTATION_ACTIONS,
   NAMED_EASINGS,
   SCENE_FORMAT,
   SCENE_KINDS,
@@ -407,6 +408,10 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
       captionAndMs(ctx, s, path);
       const action = actions[0];
       const v = s[action];
+      if ((ANNOTATION_ACTIONS as readonly string[]).includes(action)) {
+        validateAnnotationOp(ctx, s, path, action);
+        return;
+      }
       switch (action) {
         case "show":
         case "hide":
@@ -485,6 +490,7 @@ function validateStateMachine(ctx: Ctx, doc: Obj): void {
       let ev: unknown = item;
       if (isObj(item)) {
         const keys = Object.keys(item);
+        if (annotationItem(ctx, item, `trace[${i}]`)) continue;
         if ("note" in item) {
           ctx.keys(item, `trace[${i}]`, ["note"]);
           if (!isStr(item.note)) ctx.error(`trace[${i}].note`, "note takes a string");
@@ -534,7 +540,7 @@ function validateSort(ctx: Ctx, doc: Obj): void {
     ctx.error("algorithm", `give "algorithm" (bubble | insertion | selection) or an explicit "ops" list`);
   }
   if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
-    const ACTIONS = ["compare", "swap", "done", "set", "note"];
+    const ACTIONS = ["compare", "swap", "done", "set", "note", ...ANNOTATION_ACTIONS];
     const idx = (v: unknown, path: string): void => {
       if (ctx.number(v, path, { integer: true, min: 0 }) && v >= n) ctx.error(path, `index ${v} is out of range for ${n} values (0..${n - 1})`);
     };
@@ -550,6 +556,10 @@ function validateSort(ctx: Ctx, doc: Obj): void {
       captionAndMs(ctx, op, path);
       const a = actions[0];
       const v = op[a];
+      if ((ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (a === "compare" || a === "swap") {
         if (Array.isArray(v) && v.length === 2) v.forEach((x, j) => idx(x, `${path}.${a}[${j}]`));
         else ctx.error(`${path}.${a}`, `${a} takes [i, j] (two indices), got ${describe(v)}`);
@@ -593,7 +603,7 @@ function validateArray(ctx: Ctx, doc: Obj): void {
     if (isNum(doc.window) && doc.window > n) ctx.error("window", `window ${doc.window} is longer than the array (${n})`);
   }
   if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
-    const ACTIONS = ["pointers", "window", "compare", "swap", "set", "highlight", "unhighlight", "mark", "found", "note"];
+    const ACTIONS = ["pointers", "window", "compare", "swap", "set", "highlight", "unhighlight", "mark", "found", "note", ...ANNOTATION_ACTIONS];
     const idx = (v: unknown, path: string): void => {
       if (ctx.number(v, path, { integer: true, min: 0 }) && v >= n) ctx.error(path, `index ${v} is out of range for ${n} values (0..${n - 1})`);
     };
@@ -604,6 +614,10 @@ function validateArray(ctx: Ctx, doc: Obj): void {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const a = oneAction(ctx, op, path, ACTIONS, ["caption", "ms"], `{"pointers": {"lo": 0, "hi": 5}} or {"compare": [2, 3]}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (!a) return;
       const v = op[a];
       switch (a) {
@@ -665,13 +679,17 @@ function validateCollection(ctx: Ctx, doc: Obj, mode: "stack" | "queue"): void {
   const add = mode === "stack" ? "push" : "enqueue";
   const take = mode === "stack" ? "pop" : "dequeue";
   if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
-    const ACTIONS = [add, take, "peek", "note"];
+    const ACTIONS = [add, take, "peek", "note", ...ANNOTATION_ACTIONS];
     doc.ops.forEach((op, i) => {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const other = mode === "stack" ? ["enqueue", "dequeue"] : ["push", "pop"];
       for (const k of other) if (k in op) ctx.error(`${path}.${k}`, `"${k}" is a ${mode === "stack" ? "queue" : "stack"} op; a ${mode} uses "${k === "enqueue" || k === "push" ? add : take}"`);
       const a = oneAction(ctx, op, path, ACTIONS, ["caption"], `{"${add}": 5} | {"${take}": true} | {"peek": true} | {"note": "…"}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (!a) return;
       const v = op[a];
       if (a === add && !isValue(v)) ctx.error(`${path}.${add}`, `${add} takes a number or a string, got ${describe(v)}`);
@@ -687,11 +705,15 @@ function validateList(ctx: Ctx, doc: Obj): void {
     doc.initial.forEach((v, i) => { if (!isValue(v)) ctx.error(`initial[${i}]`, `a value is a number or a string, got ${describe(v)}`); });
   }
   if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
-    const ACTIONS = ["insert", "remove", "find", "reverse", "note"];
+    const ACTIONS = ["insert", "remove", "find", "reverse", "note", ...ANNOTATION_ACTIONS];
     doc.ops.forEach((op, i) => {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const a = oneAction(ctx, op, path, ACTIONS, ["caption"], `{"insert": {"value": 5, "after": 3}} | {"remove": 7} | {"find": 9} | {"reverse": true}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (!a) return;
       const v = op[a];
       switch (a) {
@@ -730,11 +752,15 @@ function validateTree(ctx: Ctx, doc: Obj): void {
     });
   }
   if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
-    const ACTIONS = ["insert", "search", "delete", "traverse", "note"];
+    const ACTIONS = ["insert", "search", "delete", "traverse", "note", ...ANNOTATION_ACTIONS];
     doc.ops.forEach((op, i) => {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const a = oneAction(ctx, op, path, ACTIONS, ["caption"], `{"insert": 5} | {"search": 7} | {"delete": 3} | {"traverse": "inorder"}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (!a) return;
       const v = op[a];
       if (a === "insert" || a === "search" || a === "delete") {
@@ -759,17 +785,23 @@ function validateHeap(ctx: Ctx, doc: Obj): void {
     doc.initial.forEach((v, i) => ctx.number(v, `initial[${i}]`));
   }
   if (ctx.array(doc.ops, "ops", { minLength: 1 })) {
-    const ACTIONS = ["push", "pop", "note"];
+    const ACTIONS = ["push", "pop", "note", ...ANNOTATION_ACTIONS];
     doc.ops.forEach((op, i) => {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
-      ctx.keys(op, path, [...ACTIONS, "caption"]);
       const actions = Object.keys(op).filter((k) => ACTIONS.includes(k));
+      const isAnnotation = actions.length === 1 && (ANNOTATION_ACTIONS as readonly string[]).includes(actions[0]);
+      ctx.keys(op, path, [...ACTIONS, "caption", ...(isAnnotation ? ["ms"] : [])]);
       if (actions.length !== 1) {
         ctx.error(path, `an op needs exactly one action key, found ${actions.length ? list(actions) : "none"}`, `{"push": 5} | {"pop": true} | {"note": "…"}`);
         return;
       }
       const a = actions[0];
+      if ((ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        captionAndMs(ctx, op, path);
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (a === "push") ctx.number(op.push, `${path}.push`);
       else if (a === "pop" && op.pop !== true) ctx.error(`${path}.pop`, `pop takes the literal true, got ${describe(op.pop)}`, `write {"pop": true}`);
       else if (a === "note" && !isStr(op.note)) ctx.error(`${path}.note`, `note takes a string`);
@@ -819,6 +851,7 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
     doc.messages.forEach((m, i) => {
       const path = `messages[${i}]`;
       if (!ctx.object(m, path)) return;
+      if (annotationItem(ctx, m, path)) return;
       if ("note" in m) {
         // A captioned pause between messages, timed like one.
         ctx.keys(m, path, ["note", "at", "after", "delay"]);
@@ -868,9 +901,123 @@ function validateDistributed(ctx: Ctx, doc: Obj): void {
   }
 }
 
+const SIDES = ["above", "below", "left", "right"];
+
+/**
+ * The five annotation ops, shared by every kind. Anchor names are checked at
+ * compile time (the compiler knows what it registered); here the shape.
+ */
+function validateAnnotationOp(ctx: Ctx, op: Obj, path: string, action: string): void {
+  const v = op[action];
+  const p = `${path}.${action}`;
+  const anchor = (x: unknown, at: string): void => {
+    if (!isStr(x) || !x) ctx.error(at, `takes an anchor name (a string the kind documents: an index, a cell "r,c", a node id, a state, a value), got ${describe(x)}`);
+  };
+  const side = (x: unknown, at: string): void => {
+    if (x !== undefined) ctx.enumOf(x, at, SIDES, "side");
+  };
+  const text = (x: unknown, at: string): void => {
+    if (!isStr(x) && !isNum(x)) ctx.error(at, `takes the text to show, got ${describe(x)}`);
+  };
+  switch (action) {
+    case "value":
+      if (!ctx.object(v, p)) return;
+      ctx.keys(v, p, ["id", "label", "text", "at", "side"]);
+      if (!isStr(v.id) || !v.id) ctx.error(`${p}.id`, `a value needs an "id" — the same id later updates the readout`, `e.g. {"value": {"id": "best", "label": "best so far", "text": "1/2"}}`);
+      if (v.label !== undefined && !isStr(v.label)) ctx.error(`${p}.label`, `label must be a string`);
+      text(v.text, `${p}.text`);
+      if (v.at !== undefined) anchor(v.at, `${p}.at`);
+      side(v.side, `${p}.side`);
+      return;
+    case "callout":
+      if (v === null) return;
+      if (!ctx.object(v, p)) return;
+      ctx.keys(v, p, ["id", "at", "text", "side"]);
+      anchor(v.at, `${p}.at`);
+      text(v.text, `${p}.text`);
+      side(v.side, `${p}.side`);
+      if (v.id !== undefined && !isStr(v.id)) ctx.error(`${p}.id`, `id must be a string`);
+      return;
+    case "snapshot":
+      if (!ctx.object(v, p)) return;
+      ctx.keys(v, p, ["of", "label"]);
+      anchor(v.of, `${p}.of`);
+      if (v.label !== undefined && !isStr(v.label)) ctx.error(`${p}.label`, `label must be a string`);
+      return;
+    case "group":
+      if (v === null) return;
+      if (!ctx.object(v, p)) return;
+      ctx.keys(v, p, ["id", "around", "label"]);
+      if (Array.isArray(v.around)) {
+        if (v.around.length === 0) ctx.error(`${p}.around`, `around needs at least one anchor`);
+        v.around.forEach((x, i) => anchor(x, `${p}.around[${i}]`));
+      } else anchor(v.around, `${p}.around`);
+      if (v.label !== undefined && !isStr(v.label)) ctx.error(`${p}.label`, `label must be a string`);
+      if (v.id !== undefined && !isStr(v.id)) ctx.error(`${p}.id`, `id must be a string`);
+      return;
+    case "text":
+      if (v === null) return;
+      if (!ctx.object(v, p)) return;
+      ctx.keys(v, p, ["id", "lines", "highlight", "at", "side"]);
+      if (ctx.array(v.lines, `${p}.lines`, { minLength: 1 })) v.lines.forEach((l, i) => text(l, `${p}.lines[${i}]`));
+      if (v.highlight !== undefined && v.highlight !== null) {
+        if (ctx.number(v.highlight, `${p}.highlight`, { integer: true, min: 0 }) && Array.isArray(v.lines) && v.highlight >= v.lines.length) {
+          ctx.error(`${p}.highlight`, `line ${v.highlight} does not exist; the block has ${v.lines.length} line(s), numbered 0..${v.lines.length - 1}`);
+        }
+      }
+      if (v.at !== undefined) anchor(v.at, `${p}.at`);
+      side(v.side, `${p}.side`);
+      if (v.id !== undefined && !isStr(v.id)) ctx.error(`${p}.id`, `id must be a string`);
+      return;
+  }
+}
+
+/** An annotation op anywhere it can appear; `true` when `item` was one (valid or not). */
+function annotationItem(ctx: Ctx, item: Obj, path: string, extra: readonly string[] = ["caption", "ms"]): boolean {
+  const found = Object.keys(item).filter((k) => (ANNOTATION_ACTIONS as readonly string[]).includes(k));
+  if (found.length === 0) return false;
+  ctx.keys(item, path, [...ANNOTATION_ACTIONS, ...extra]);
+  if (found.length > 1) {
+    ctx.error(path, `one annotation per op, found ${list(found)}`);
+    return true;
+  }
+  captionAndMs(ctx, item, path);
+  validateAnnotationOp(ctx, item, path, found[0]);
+  return true;
+}
+
+function validateCompose(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["layout", "timing", "gap", "panes"]);
+  if (doc.layout !== undefined) ctx.enumOf(doc.layout, "layout", ["row", "column", "grid"], "layout");
+  if (doc.timing !== undefined) ctx.enumOf(doc.timing, "timing", ["sequence", "parallel"], "timing");
+  if (doc.gap !== undefined) ctx.number(doc.gap, "gap", { min: 0 });
+  if (!ctx.array(doc.panes, "panes", { minLength: 1 })) return;
+  const ids = new Set<string>();
+  doc.panes.forEach((pane, i) => {
+    const path = `panes[${i}]`;
+    if (!ctx.object(pane, path)) return;
+    ctx.keys(pane, path, ["id", "title", "scene"]);
+    if (pane.id !== undefined) {
+      if (!isStr(pane.id)) ctx.error(`${path}.id`, `id must be a string`);
+      else if (ids.has(pane.id)) ctx.error(`${path}.id`, `pane id "${pane.id}" is used twice`);
+      else ids.add(pane.id);
+    }
+    if (pane.title !== undefined && !isStr(pane.title)) ctx.error(`${path}.title`, `title must be a string`);
+    if (!ctx.object(pane.scene, `${path}.scene`)) return;
+    if (pane.scene.kind === "compose") {
+      ctx.error(`${path}.scene.kind`, `a compose pane cannot itself be a compose scene`, `flatten: list every pane in the outer "panes"`);
+      return;
+    }
+    // The pane is a whole scene: validate it with its own kind's rules, under this path.
+    for (const d of validateScene(pane.scene)) ctx.diags.push({ ...d, path: d.path ? `${path}.scene.${d.path}` : `${path}.scene` });
+  });
+}
+
 function oneAction(ctx: Ctx, op: Obj, path: string, actions: readonly string[], extra: readonly string[], example: string): string | undefined {
-  ctx.keys(op, path, [...actions, ...extra]);
   const found = Object.keys(op).filter((k) => actions.includes(k));
+  // An annotation op always takes "caption" and "ms", even in a kind whose own ops take only "caption".
+  const shared = found.length === 1 && (ANNOTATION_ACTIONS as readonly string[]).includes(found[0]) ? ["caption", "ms"] : [];
+  ctx.keys(op, path, [...actions, ...extra, ...shared]);
   if (found.length !== 1) {
     ctx.error(path, `an op needs exactly one action key, found ${found.length ? list(found) : "none"}`, `one of ${list(actions)}, e.g. ${example}`);
     return undefined;
@@ -927,11 +1074,15 @@ function validateMatrix(ctx: Ctx, doc: Obj): void {
     else if ("col" in v && ctx.number(v.col, `${path}.col`, { integer: true, min: 0 }) && v.col >= cols) ctx.error(`${path}.col`, `col ${v.col} is out of range for ${cols} columns (0..${cols - 1})`);
   };
   if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
-    const ACTIONS = ["set", "highlight", "unhighlight", "swap", "mark", "note"];
+    const ACTIONS = ["set", "highlight", "unhighlight", "swap", "mark", "note", ...ANNOTATION_ACTIONS];
     doc.ops.forEach((op, i) => {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const a = oneAction(ctx, op, path, ACTIONS, ["caption", "ms"], `{"set": {"cell": [1, 2], "value": 7, "from": [[0, 2], [1, 1]]}}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (!a) return;
       const v = op[a];
       switch (a) {
@@ -1021,11 +1172,15 @@ function validateGraph(ctx: Ctx, doc: Obj): void {
     ctx.error("edges", "dijkstra needs non-negative weights");
   }
   if (doc.ops !== undefined && ctx.array(doc.ops, "ops")) {
-    const ACTIONS = ["visit", "explore", "label", "highlight", "unhighlight", "path", "note"];
+    const ACTIONS = ["visit", "explore", "label", "highlight", "unhighlight", "path", "note", ...ANNOTATION_ACTIONS];
     doc.ops.forEach((op, i) => {
       const path = `ops[${i}]`;
       if (!ctx.object(op, path)) return;
       const a = oneAction(ctx, op, path, ACTIONS, ["caption", "ms"], `{"explore": "a->b", "caption": "…"}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, op, path, a);
+        return;
+      }
       if (!a) return;
       const v = op[a];
       switch (a) {
@@ -1102,7 +1257,7 @@ function validateChart(ctx: Ctx, doc: Obj): void {
   }
   if (doc.yMax !== undefined) ctx.number(doc.yMax, "yMax", { min: 0 });
   if (doc.sequence !== undefined && ctx.array(doc.sequence, "sequence")) {
-    const ACTIONS = ["reveal", "set", "highlight", "unhighlight", "threshold", "note"];
+    const ACTIONS = ["reveal", "set", "highlight", "unhighlight", "threshold", "note", ...ANNOTATION_ACTIONS];
     const cats = Array.isArray(doc.categories) ? (doc.categories.filter(isStr) as string[]) : [];
     const target = (v: unknown, path: string): void => {
       if (!ctx.object(v, path)) return;
@@ -1116,6 +1271,10 @@ function validateChart(ctx: Ctx, doc: Obj): void {
       const path = `sequence[${i}]`;
       if (!ctx.object(st, path)) return;
       const a = oneAction(ctx, st, path, ACTIONS, ["caption", "ms"], `{"reveal": "<series id>", "caption": "…"}`);
+      if (a !== undefined && (ANNOTATION_ACTIONS as readonly string[]).includes(a)) {
+        validateAnnotationOp(ctx, st, path, a);
+        return;
+      }
       if (!a) return;
       const v = st[a];
       switch (a) {
@@ -1168,6 +1327,7 @@ function validateVector(ctx: Ctx, doc: Obj): void {
     doc.timeline.forEach((item, i) => {
       const path = `timeline[${i}]`;
       if (!ctx.object(item, path)) return;
+      if (annotationItem(ctx, item, path)) return;
       if ("wait" in item) {
         ctx.keys(item, path, ["wait", "caption", "label"]);
         ctx.number(item.wait, `${path}.wait`, { min: 0 });
@@ -1206,6 +1366,7 @@ export function validateScene(doc: unknown): Diagnostic[] {
   }
   if (!ctx.enumOf(doc.kind, "kind", SCENE_KINDS, "kind")) return ctx.diags;
   switch (doc.kind as Scene["kind"]) {
+    case "compose": validateCompose(ctx, doc); break;
     case "diagram": validateDiagram(ctx, doc); break;
     case "state-machine": validateStateMachine(ctx, doc); break;
     case "sort": validateSort(ctx, doc); break;

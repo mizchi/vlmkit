@@ -207,8 +207,12 @@ export function compileTree(scene: TreeScene): Timeline {
     if (!id) throw new Error(`tree: edge ${p}→${c} at depths ${pd}/${cd} was not seen in the dry run`);
     return id;
   };
-  for (const v of ranks) b.node({ id: `v-${v}`, shape: "circle", pos: [x(v), y(0)], r: R, fill: T.node, stroke: T.nodeStroke, strokeWidth: 1.5, text: String(v), fontSize: T.fontSize, color: T.text, opacity: 0 });
+  for (const v of ranks) {
+    b.node({ id: `v-${v}`, shape: "circle", pos: [x(v), y(0)], r: R, fill: T.node, stroke: T.nodeStroke, strokeWidth: 1.5, text: String(v), fontSize: T.fontSize, color: T.text, opacity: 0 });
+    b.anchor(String(v), `v-${v}`);
+  }
   b.node({ id: "cursor", shape: "circle", pos: cursorHome, r: 7, fill: T.accent, stroke: T.nodeStroke, opacity: 0 });
+  b.anchor("cursor", "cursor");
   let outputs = 0;
 
   const bst = new Bst();
@@ -263,6 +267,7 @@ export function compileTree(scene: TreeScene): Timeline {
   const searches: { value: number; found: boolean }[] = [];
   const deletions: string[] = [];
   for (const op of scene.ops) {
+    if (b.annotate(op)) continue;
     if ("note" in op) {
       b.step(op.note);
       b.advance(b.stepMs);
@@ -344,6 +349,7 @@ export function compileTree(scene: TreeScene): Timeline {
       continue;
     }
     // traverse
+    if (!("traverse" in op)) continue;
     const order = bst.traverse(op.traverse);
     outputsOf.push(order);
     const rowIndex = outputs++;

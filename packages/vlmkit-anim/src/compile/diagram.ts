@@ -72,11 +72,14 @@ export function compileDiagram(scene: DiagramScene): Timeline {
     });
   }
   b.node({ id: "token", shape: "circle", pos: [0, 0], r: 6, fill: T.accent, stroke: T.nodeStroke, opacity: 0 });
+  for (const n of scene.nodes) b.anchor(n.id, n.id);
+  for (const [key, id] of edgeId) b.anchor(key, id);
 
   const arr = (v: string | string[]): string[] => (Array.isArray(v) ? v : [v]);
   b.step(scene.title ? scene.title : undefined, "start");
   b.advance(b.stepMs * 0.5);
   for (const st of scene.sequence ?? []) {
+    if (b.annotate(st, "sequence")) continue;
     const ms = st.ms ?? b.stepMs;
     if ("show" in st || "hide" in st) {
       const targets = arr("show" in st ? st.show : st.hide);

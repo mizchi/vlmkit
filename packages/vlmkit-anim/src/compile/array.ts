@@ -117,7 +117,10 @@ export function compileArray(scene: ArrayScene): Timeline {
     b.node({ id: `cell-${i}-rect`, shape: "rect", parent: `cell-${i}`, pos: [0, 0], size: [boxW - 6, boxH - 6], rx: 4, fill: T.node, stroke: T.nodeStroke, text: fmt(v), fontSize: T.fontSize, color: T.text });
     b.node({ id: `idx-${i}`, shape: "text", pos: [x(i), yIndex], text: String(i), fontSize: T.fontSize - 4, color: T.muted });
   });
+  values.forEach((_, i) => b.anchor(String(i), `cell-${i}-rect`));
+  b.anchor("window", "window");
   pointerNames.forEach((name, lane) => {
+    b.anchor(name, `ptr-${name}`);
     b.node({ id: `ptr-${name}`, shape: "group", pos: [x(0), yLane(lane)], opacity: 0 });
     b.node({ id: `ptr-${name}-head`, shape: "path", parent: `ptr-${name}`, pos: [0, -6], d: "M 0 0 L -5 7 L 5 7 Z", fill: T.accent, stroke: T.accent });
     b.node({ id: `ptr-${name}-label`, shape: "text", parent: `ptr-${name}`, pos: [0, 9], text: name, fontSize: T.fontSize - 3, color: T.text });
@@ -140,6 +143,7 @@ export function compileArray(scene: ArrayScene): Timeline {
   b.step(scene.title ?? `Array: ${cur.join(", ")}`, "start");
   b.advance(b.stepMs * 0.6);
   for (const op of ops) {
+    if (b.annotate(op)) continue;
     const ms = op.ms ?? b.stepMs;
     const caption = "caption" in op ? op.caption : undefined;
     // A compare highlight lasts one beat.

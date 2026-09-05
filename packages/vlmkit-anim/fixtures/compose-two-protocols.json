@@ -1,0 +1,80 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "compose",
+  "title": "Six assets, two protocols",
+  "timing": "parallel",
+  "panes": [
+    {
+      "title": "HTTP/1.1 — two connections",
+      "scene": {
+        "format": "vlmkit-anim/scene@1",
+        "kind": "queue",
+        "initial": [
+          "a.css",
+          "b.js",
+          "c.png"
+        ],
+        "ops": [
+          {
+            "dequeue": true,
+            "caption": "t=2: a.css done"
+          },
+          {
+            "value": {
+              "id": "t",
+              "label": "time",
+              "text": "2"
+            },
+            "ms": 0
+          },
+          {
+            "dequeue": true,
+            "caption": "t=3: b.js done"
+          },
+          {
+            "value": {
+              "id": "t",
+              "text": "3"
+            },
+            "ms": 0
+          }
+        ]
+      }
+    },
+    {
+      "title": "HTTP/2 — one connection",
+      "scene": {
+        "format": "vlmkit-anim/scene@1",
+        "kind": "chart",
+        "categories": [
+          "a.css",
+          "b.js",
+          "c.png"
+        ],
+        "series": [
+          {
+            "id": "done",
+            "label": "finished at",
+            "values": [
+              2,
+              3,
+              1
+            ]
+          }
+        ],
+        "sequence": [
+          {
+            "reveal": "done",
+            "caption": "all six progress together"
+          },
+          {
+            "callout": {
+              "at": "done/c.png",
+              "text": "1 unit: first out"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

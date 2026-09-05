@@ -6,12 +6,13 @@
  * a node's box and its lifeline from that moment on.
  */
 
-import type { DistMessage, DistNote, DistributedScene, Timeline } from "../types.ts";
+import type { AnnotationOp, DistMessage, DistNote, DistributedScene, Timeline } from "../types.ts";
+import { isAnnotationOp } from "./annotate.ts";
 import { Builder, labelWidth } from "./builder.ts";
 
 const STATUS_FILL: Record<string, keyof import("../types.ts").Theme> = { up: "node", down: "bad", leader: "accent", busy: "muted" };
 
-const isNote = (m: DistMessage | DistNote): m is DistNote => "note" in m;
+const isNote = (m: DistMessage | DistNote | AnnotationOp): m is DistNote => "note" in m;
 
 export function compileDistributed(scene: DistributedScene): Timeline {
   const b = new Builder(scene, { width: 640, height: 400, stepMs: 600 });
@@ -30,12 +31,15 @@ export function compileDistributed(scene: DistributedScene): Timeline {
   // that was written relative to it.
   // A note is a captioned pause in the same list: it takes a beat, sends nothing, and every
   // node waits for it. It is carried through `msgs` so `messageTimes` stays index-aligned.
-  type Resolved = { at: number | undefined; atRaw: number | "<" | undefined; latency: number | undefined } & (
+  type Resolved = { at: number | undefined; atRaw: number | "<" | undefined; latency: number | undefined; annotation?: AnnotationOp } & (
     | { note: string; from?: undefined; to?: undefined; label?: undefined; lost?: undefined; caption?: undefined; after?: string; delay?: number }
     | (DistMessage & { note?: undefined })
   );
+  // An annotation op in the list is a beat like a note (`ms: 0` folds it into the previous one).
   const msgs: Resolved[] = scene.messages.map((m) =>
-    isNote(m) ? { ...m, at: undefined, atRaw: m.at, latency: undefined } : { ...m, at: undefined, atRaw: m.at, latency: m.latency },
+    isAnnotationOp(m)
+      ? { note: m.caption ?? "", at: undefined, atRaw: undefined, latency: m.ms === 0 ? 0 : m.ms ?? b.stepMs * 0.9, annotation: m }
+      : isNote(m) ? { ...m, at: undefined, atRaw: m.at, latency: undefined } : { ...m, at: undefined, atRaw: m.at, latency: m.latency },
   );
   const landed = new Map<string, number>();
   // `causal`: a node is free to send once the last message it received has landed
@@ -79,11 +83,19 @@ export function compileDistributed(scene: DistributedScene): Timeline {
     b.node({ id: `node-${nd.id}`, shape: "rect", pos: [x, boxY], size: [w, boxH], rx: 6, fill: String(fill), stroke: T.nodeStroke, strokeWidth: 1.5, text: nd.label ?? nd.id, fontSize: T.fontSize, color: T.text });
   });
 
+  nodes.forEach((nd) => b.anchor(nd.id, `node-${nd.id}`));
   msgs.forEach((m, i) => {
+    if (m.annotation) {
+      b.t = m.at!;
+      b.annotate(m.annotation, "messages");
+      return;
+    }
+    b.annotate(m, "messages"); // index bookkeeping only
     if (m.note !== undefined) {
       b.step(m.note, undefined, m.at!);
       return;
     }
+    if (m.label) b.anchor(m.label, `msg-${i}`);
     const from = laneOf.get(m.from)!;
     const to = laneOf.get(m.to)!;
     const y0 = yAt(m.at!);

@@ -11,7 +11,7 @@
  *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
- *   schema    the cheat sheet for one kind, or the index
+ *   schema    the cheat sheet for one kind, the shared annotation ops (--kind annotations), or the index
  *
  * `check` is the command an agent runs after every edit; everything it prints
  * is phrased for the next edit. Exit 1 on any error-severity diagnostic.
@@ -176,10 +176,10 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       console.log(schemaIndex());
       return 0;
     }
-    if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline") {
-      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline")`);
+    if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline" && kind !== "annotations") {
+      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", or "annotations" for the ops every kind shares)`);
     }
-    console.log(schemaSheet(kind as Scene["kind"] | "timeline"));
+    console.log(schemaSheet(kind as Scene["kind"] | "timeline" | "annotations"));
     return 0;
   }
   if (verb === "runtime") {

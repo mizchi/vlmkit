@@ -48,7 +48,8 @@ conventions hold in every kind:
 - A `caption` on an op or sequence item **replaces** the generated caption for that beat.
 - `{"note": "…"}` is a captioned pause: the string is the caption, and it is a step like any other.
 - Compilers add a first step at t=0 (the title, or "Start: …") and a last one ("Sorted: …", "End in …"), so `explain` shows two more steps than you wrote. `vector` is the exception: it narrates only the items you captioned, and adds neither.
-- A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
+- A *beat* is one step. Every op is its own beat by default; `ms: 0` on an op that only recolours or relabels (`pointers`, `window`, `highlight`, `mark`, `label`, and every annotation op) applies it inside the previous beat with no step of its own. Two beats that start at the same instant (two messages sent together, an event coinciding with a message) share one step and their captions are joined with " · ".
+- Five **annotation ops** — `value`, `callout`, `snapshot`, `group`, `text` — go in any kind's op list and name the kind's own things (an index, a cell, a node) instead of coordinates. See [Annotations](#annotations-every-kind). Two or more pictures at once is [`kind: compose`](#kind-compose).
 
 `vlmkit-anim check scene.json --max-ms 15000` fails when the animation runs longer than a budget.
 
@@ -578,6 +579,103 @@ Nodes (also the Timeline's node model):
 | `text` | required for `text`; on any other shape draws a centred label |
 | `fill` `stroke` `strokeWidth` `color` `opacity` `rx` `fontSize` `anchor` `dash` `scale` `rotate` | as in SVG; `color` is the text colour |
 | `parent` | id of a `group` node; children move with it |
+
+## Annotations (every kind)
+
+Five ops every kind accepts **in its own op list** (`ops`, `sequence`, `trace`,
+`messages`, `timeline`), next to its own verbs. They exist because a value
+often has to stay readable beside the thing it describes, a viewer needs to be
+pointed at one cell, an earlier value must survive to be compared, and a rule
+or a few lines of code have to be *on screen*, not in the caption. None of
+them takes a coordinate: each names an **anchor**, one of the things the kind
+already draws.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "array",
+  "title": "Binary search for 23",
+  "values": [2, 5, 8, 12, 16, 23, 38, 56],
+  "ops": [
+    { "pointers": { "lo": 0, "hi": 7, "mid": 3 }, "caption": "mid = (lo + hi) / 2" },
+    { "value": { "id": "cmp", "label": "comparisons", "text": 1 }, "ms": 0 },
+    { "callout": { "at": "3", "text": "12 < 23: search the right half" } },
+    { "pointers": { "lo": 4, "mid": 5 }, "caption": "lo = mid + 1" },
+    { "value": { "id": "cmp", "text": 2 }, "ms": 0 },
+    { "callout": null, "ms": 0 },
+    { "found": 5, "caption": "23 is at index 5" },
+    { "text": { "lines": ["while lo <= hi:", "  mid = (lo + hi) // 2", "  if a[mid] < x: lo = mid + 1"], "highlight": 2 } }
+  ]
+}
+```
+
+| op | |
+|---|---|
+| `{"value": {"id", "label", "text", "at", "side"}}` | A named readout. The first op with an `id` creates it; a later op with the same `id` updates the text in place. Without `at` it sits in a panel on the right (the canvas widens to fit); with `at` it sits beside that anchor, `side` = `above` \| `below` (default) \| `left` \| `right`. Generated caption `label = text`, so `explain` carries every change |
+| `{"callout": {"at", "text", "side", "id"}}` / `{"callout": null}` | A text box with a pointer at the anchor, `side` default `above`. One callout per `id` (`"main"` when omitted): a new one replaces it, `null` hides every callout |
+| `{"snapshot": {"of", "label"}}` | A frozen copy, in the panel, of what the anchor shows **at this beat** — the value to compare against later, after the live one has moved on. An anchor that is several cells (a matrix row) snapshots as `[a, b, c]` |
+| `{"group": {"around": anchor \| [anchors], "label", "id"}}` / `{"group": null}` | A dashed outline around the anchors' bounding box, label at the top-left. One per `id`, like callout; `null` removes every group |
+| `{"text": {"lines": [...], "highlight", "at", "side", "id"}}` / `{"text": null}` | A multi-line block: code, a rule, a list. `highlight` is a 0-based line. Same `id` and the same number of lines updates in place and moves the highlight; a different line count redraws. Panel by default, or beside an anchor; `null` hides every block |
+
+Every annotation op takes `caption` (replaces the generated one) and `ms`.
+`"ms": 0` applies it **inside the previous beat** — the way to have "best so
+far = 10" appear at the moment the reveal it belongs to happens, with its
+caption joined to that beat's. A misspelt anchor is an error naming the
+anchors that exist: `no anchor named "row:D" in this matrix scene → did you
+mean "row:C"? anchors here: "0,0", …`.
+
+**Anchors by kind** — what `at`, `of` and `around` may name:
+
+| kind | anchors |
+|---|---|
+| `sort` | a value (`"5"` is the bar labelled 5, wherever it currently is) |
+| `array` | an index (`"3"`), a pointer name (`"lo"`), `"window"` |
+| `stack`, `queue` | a slot index (`"0"` is the bottom / front), a value (the newest box with it), `"top"` / `"front"` / `"back"` |
+| `list` | a value, `"head"`, `"nil"` |
+| `tree` | a value, `"cursor"` |
+| `heap` | a slot index (`"0"` is the root), `"v7"` for the value 7 |
+| `state-machine` | a state id, an event name (when one transition uses it), `"from->to"`, `"token"` |
+| `distributed` | a node id, a message label |
+| `matrix` | a cell `"r,c"`, `"row:<label or index>"`, `"col:<label or index>"` |
+| `graph` | a node id, an edge `"a->b"` |
+| `chart` | a series id, a category, `"series/category"` |
+| `diagram` | a node id, an edge `"a->b"` |
+| `vector` | a node id |
+
+`vlmkit-anim schema --kind annotations` prints this table.
+
+## kind: compose
+
+Several scenes in one canvas: a before / after, a structure next to the
+queue that drives it, a run next to its decision tree. Each pane is a whole
+scene of any other kind and keeps its own anchors and annotations.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "compose",
+  "title": "Two ways to sort 3, 1, 2",
+  "layout": "row",
+  "timing": "parallel",
+  "panes": [
+    { "title": "bubble", "scene": { "format": "vlmkit-anim/scene@1", "kind": "sort", "algorithm": "bubble", "values": [3, 1, 2] } },
+    { "title": "insertion", "scene": { "format": "vlmkit-anim/scene@1", "kind": "sort", "algorithm": "insertion", "values": [3, 1, 2] } }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `panes` | required: `{"id", "title", "scene"}`; `scene` is a complete scene (its own `format` and `kind`), and may not itself be a `compose`. Errors inside a pane are reported under `panes[i].scene.…` |
+| `layout` | `row` (default, side by side) \| `column` (stacked) \| `grid` (two per row) |
+| `timing` | `sequence` (default): pane 2 starts when pane 1 ends, so captions never collide. `parallel`: all panes start at 0 — a before / after in lockstep; beats that coincide share one step and their captions join as `bubble: … · insertion: …` |
+| `gap` | pixels between panes, default 32 |
+
+Choose `sequence` when the second picture is the *consequence* of the first
+(a history, then the comparison of two of its values); choose `parallel` when
+the point is *when* things happen relative to each other (two protocols
+finishing the same downloads). A pane's title is drawn above it, and each
+pane keeps a faint border so the reader sees where one picture ends.
 
 ## Writing a scene in TypeScript
 

@@ -9,8 +9,13 @@ vector tween. One JSON file in, a `<vlm-anim>` web component (SVG + Web
 Animations, ~7KB, no dependencies) out — plus headless SVG frames and checks
 that the motion says what the file claims.
 
+Every kind also takes five **annotation** ops (`value`, `callout`, `snapshot`,
+`group`, `text`) that point at the kind's own things by name, and `kind: compose`
+puts several scenes side by side, in sequence or in parallel.
+
 ```bash
 vlmkit-anim schema --kind sort          # the writing guide for one kind
+vlmkit-anim schema --kind annotations   # the shared ops and each kind's anchors
 vlmkit-anim check scene.json            # validate → compile → semantic checks → stats (exit 1 on errors)
 vlmkit-anim explain scene.json          # the narration as a numbered list
 vlmkit-anim render scene.json --step 4  # one frame as SVG

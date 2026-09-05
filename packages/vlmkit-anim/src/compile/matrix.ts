@@ -54,6 +54,18 @@ export function compileMatrix(scene: MatrixScene): Timeline {
       });
     });
   });
+  // Anchors: "r,c" for a cell, "row:<label or index>" and "col:<label or index>" for a line of cells.
+  scene.cells.forEach((row, r) => {
+    row.forEach((_, c) => b.anchor(`${r},${c}`, `cell-${r}-${c}`));
+    const rowIds = row.map((_, c) => `cell-${r}-${c}`);
+    b.anchor(`row:${r}`, ...rowIds);
+    if (scene.rowLabels?.[r] !== undefined) b.anchor(`row:${scene.rowLabels[r]}`, ...rowIds);
+  });
+  (scene.cells[0] ?? []).forEach((_, c) => {
+    const colIds = scene.cells.map((_, r) => `cell-${r}-${c}`);
+    b.anchor(`col:${c}`, ...colIds);
+    if (scene.colLabels?.[c] !== undefined) b.anchor(`col:${scene.colLabels[c]}`, ...colIds);
+  });
   const maxFrom = Math.max(0, ...ops.map((op) => ("set" in op ? op.set.from?.length ?? 0 : 0)));
   for (let k = 0; k < maxFrom; k++) b.node({ id: `token-${k}`, shape: "circle", pos: [0, 0], r: 6, fill: T.accent, stroke: T.nodeStroke, opacity: 0 });
 
@@ -91,6 +103,7 @@ export function compileMatrix(scene: MatrixScene): Timeline {
   b.advance(b.stepMs * 0.6);
 
   for (const op of ops) {
+    if (b.annotate(op)) continue;
     const ms = op.ms ?? b.stepMs;
     const caption = "caption" in op ? op.caption : undefined;
     if ("note" in op) {

@@ -17,6 +17,7 @@ import {
   SCENE_FORMAT,
   type ArrayScene,
   type ChartScene,
+  type ComposeScene,
   type DiagramScene,
   type DistributedScene,
   type GraphScene,
@@ -58,6 +59,7 @@ export const scene = {
   graph: constructor<GraphScene>("graph"),
   chart: constructor<ChartScene>("chart"),
   vector: constructor<VectorScene>("vector"),
+  compose: constructor<ComposeScene>("compose"),
 } as const;
 
 /**

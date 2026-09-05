@@ -11,12 +11,14 @@ test — `samples.test.ts` only checks that every fixture is represented here.
 |---|---|---|---|
 | [array-binary-search](#array-binary-search) | array | 9 | 4.8s |
 | [chart-latency](#chart-latency) | chart | 6 | 3.4s |
+| [compose-two-protocols](#compose-two-protocols) | compose | 7 | 2.2s |
 | [diagram-cdn](#diagram-cdn) | diagram | 9 | 5.5s |
 | [distributed-replication](#distributed-replication) | distributed | 8 | 3.8s |
 | [graph-dijkstra](#graph-dijkstra) | graph | 15 | 8.4s |
 | [heap-min](#heap-min) | heap | 16 | 8.1s |
 | [list-linked](#list-linked) | list | 10 | 6.0s |
 | [matrix-edit-distance](#matrix-edit-distance) | matrix | 12 | 6.6s |
+| [matrix-vector-clock](#matrix-vector-clock) | matrix | 8 | 4.2s |
 | [queue-print-jobs](#queue-print-jobs) | queue | 6 | 3.5s |
 | [sort-bubble](#sort-bubble) | sort | 31 | 12.3s |
 | [sort-insertion](#sort-insertion) | sort | 21 | 8.3s |
@@ -68,6 +70,29 @@ p95 latency by region (ms) — 6 steps, 3430ms, 33 nodes
  4. [ 1750ms] After: a regional cache absorbs most reads
  5. [ 2450ms] ap improves most — it was furthest from the database
  6. [ 3150ms] (end)
+```
+
+</details>
+
+## compose-two-protocols
+
+`compose` — [`fixtures/compose-two-protocols.json`](../fixtures/compose-two-protocols.json) · 7 steps · 2.2s · GIF 118 KB
+
+![compose-two-protocols animation](./compose-two-protocols.gif)
+
+<details><summary>Contact sheet (every step) and narration</summary>
+
+![compose-two-protocols contact sheet](./compose-two-protocols.sheet.png)
+
+```
+Six assets, two protocols — 7 steps, 2200ms, 40 nodes
+ 1. [    0ms] HTTP/1.1 — two connections: Queue: a.css, b.js, c.png · HTTP/2 — one connection: Start
+ 2. [  350ms] HTTP/2 — one connection: all six progress together
+ 3. [  385ms] HTTP/1.1 — two connections: t=2: a.css done · time = 2
+ 4. [ 1050ms] HTTP/2 — one connection: 1 unit: first out
+ 5. [ 1155ms] HTTP/1.1 — two connections: t=3: b.js done · time = 3
+ 6. [ 1925ms] HTTP/1.1 — two connections: Queue: c.png · removed a.css, b.js
+ 7. [ 2200ms] (end)
 ```
 
 </details>
@@ -234,6 +259,30 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 10. [ 5160ms] t = t: copy the diagonal
 11. [ 5760ms] Edit distance is 1
 12. [ 6360ms] (end)
+```
+
+</details>
+
+## matrix-vector-clock
+
+`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 8 steps · 4.2s · GIF 308 KB
+
+![matrix-vector-clock animation](./matrix-vector-clock.gif)
+
+<details><summary>Contact sheet (every step) and narration</summary>
+
+![matrix-vector-clock contact sheet](./matrix-vector-clock.sheet.png)
+
+```
+Vector clocks — 8 steps, 4200ms, 36 nodes
+ 1. [    0ms] Vector clocks
+ 2. [  360ms] A: local event · A = [1,0,0]
+ 3. [  960ms] C before
+ 4. [ 1560ms] B receives: max, then +1
+ 5. [ 2160ms] copied from A
+ 6. [ 2760ms] ordered
+ 7. [ 3360ms]   clock = max(clock, v)
+ 8. [ 3960ms] (end)
 ```
 
 </details>

@@ -162,9 +162,10 @@ export type SceneKind =
   | "matrix"
   | "graph"
   | "chart"
-  | "vector";
+  | "vector"
+  | "compose";
 
-export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "array", "stack", "queue", "list", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector"];
+export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "array", "stack", "queue", "list", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector", "compose"];
 
 interface SceneBase {
   format: typeof SCENE_FORMAT;
@@ -186,6 +187,86 @@ export interface Theme {
   bad: string;
   background: string;
   fontSize: number;
+}
+
+// ---- annotations (every kind) -----------------------------------------------
+
+export type AnnotationSide = "above" | "below" | "left" | "right";
+
+/** A named readout. The first op with an `id` creates it; later ops with the same id update the text. */
+export interface ValueSpec {
+  id: string;
+  label?: string;
+  text: string | number;
+  /** An anchor name: draw the readout beside it instead of in the panel. */
+  at?: string;
+  side?: AnnotationSide;
+}
+/** A text box with a pointer at an anchor. One per `id` ("main" by default); `null` hides it. */
+export interface CalloutSpec {
+  id?: string;
+  at: string;
+  text: string;
+  side?: AnnotationSide;
+}
+/** A frozen copy, in the panel, of what the anchor shows at this moment. */
+export interface SnapshotSpec {
+  of: string;
+  label?: string;
+}
+/** A dashed outline around one or more anchors, with an optional label; `null` removes it. */
+export interface GroupSpec {
+  id?: string;
+  around: string | string[];
+  label?: string;
+}
+/** A multi-line block (code, a rule, a list). Same id + same line count = update in place and move the highlight. */
+export interface TextSpec {
+  id?: string;
+  lines: string[];
+  /** 0-based line to highlight. */
+  highlight?: number | null;
+  at?: string;
+  side?: AnnotationSide;
+}
+
+/**
+ * The five annotation ops every kind accepts in its own op / sequence / trace /
+ * message / timeline list. `caption` replaces the generated caption; `ms: 0`
+ * folds the op into the previous beat. Anchors are the names each kind
+ * documents (an index, a cell, a node id, a state, a value).
+ */
+export const ANNOTATION_ACTIONS = ["value", "callout", "snapshot", "group", "text"] as const;
+
+export type AnnotationOp =
+  | { value: ValueSpec; caption?: string; ms?: number }
+  | { callout: CalloutSpec | null; caption?: string; ms?: number }
+  | { snapshot: SnapshotSpec; caption?: string; ms?: number }
+  | { group: GroupSpec | null; caption?: string; ms?: number }
+  | { text: TextSpec | null; caption?: string; ms?: number };
+
+// ---- compose ----------------------------------------------------------------
+
+export interface ComposePane {
+  id?: string;
+  /** Drawn above the pane. */
+  title?: string;
+  scene: Exclude<Scene, ComposeScene>;
+}
+
+/**
+ * Several scenes in one canvas. `row` (default) puts them side by side,
+ * `column` stacks them, `grid` wraps two per row. `timing: "sequence"`
+ * (default) plays the panes one after another; `"parallel"` starts them
+ * together so a before / after runs in lockstep.
+ */
+export interface ComposeScene extends SceneBase {
+  kind: "compose";
+  layout?: "row" | "column" | "grid";
+  timing?: "sequence" | "parallel";
+  /** Pixels between panes. Default 32. */
+  gap?: number;
+  panes: ComposePane[];
 }
 
 // ---- diagram --------------------------------------------------------------
@@ -219,7 +300,8 @@ export type DiagramStep =
   /** `"a->b"` or `["a","b"]`: a token travels along the edge. */
   | { flow: string | [string, string]; caption?: string; ms?: number }
   | { note: string; ms?: number }
-  | { relabel: { id: string; text: string }; caption?: string; ms?: number };
+  | { relabel: { id: string; text: string }; caption?: string; ms?: number }
+  | AnnotationOp;
 
 export interface DiagramScene extends SceneBase {
   kind: "diagram";
@@ -255,7 +337,7 @@ export interface Transition {
  * captioned pause, or a jump — the token moves to `goto` without a
  * transition, which is how a second path is shown after the first has ended.
  */
-export type TraceItem = string | { on: string; caption?: string } | { note: string } | { goto: string; caption?: string };
+export type TraceItem = string | { on: string; caption?: string } | { note: string } | { goto: string; caption?: string } | AnnotationOp;
 
 export interface StateMachineScene extends SceneBase {
   kind: "state-machine";
@@ -278,7 +360,8 @@ export type SortOp =
   /** Overwrite the value at an index (insertion sort shifts). */
   | { set: { index: number; value: number }; caption?: string; ms?: number }
   /** A captioned pause: the string is the caption. */
-  | { note: string; ms?: number };
+  | { note: string; ms?: number }
+  | AnnotationOp;
 
 export interface SortScene extends SceneBase {
   kind: "sort";
@@ -307,7 +390,8 @@ export type ArrayOp =
   | { mark: number | number[]; caption?: string; ms?: number }
   /** The result: the cell turns the ok colour and pulses; the caption defaults to "Found v at i". */
   | { found: number; caption?: string; ms?: number }
-  | { note: string; ms?: number };
+  | { note: string; ms?: number }
+  | AnnotationOp;
 
 export interface ArrayScene extends SceneBase {
   kind: "array";
@@ -329,7 +413,8 @@ export type StackOp =
   | { pop: true; caption?: string }
   /** Highlight the top without removing it. */
   | { peek: true; caption?: string }
-  | { note: string };
+  | { note: string }
+  | AnnotationOp;
 
 export interface StackScene extends SceneBase {
   kind: "stack";
@@ -345,7 +430,8 @@ export type QueueOp =
   | { dequeue: true; caption?: string }
   /** Highlight the front without removing it. */
   | { peek: true; caption?: string }
-  | { note: string };
+  | { note: string }
+  | AnnotationOp;
 
 export interface QueueScene extends SceneBase {
   kind: "queue";
@@ -367,7 +453,8 @@ export type ListOp =
   | { find: number | string; caption?: string }
   /** Reverse the whole list: nodes trade places and the arrows flip. */
   | { reverse: true; caption?: string }
-  | { note: string };
+  | { note: string }
+  | AnnotationOp;
 
 export interface ListScene extends SceneBase {
   kind: "list";
@@ -378,7 +465,7 @@ export interface ListScene extends SceneBase {
 
 // ---- heap -----------------------------------------------------------------
 
-export type HeapOp = { push: number; caption?: string } | { pop: true; caption?: string } | { note: string };
+export type HeapOp = { push: number; caption?: string } | { pop: true; caption?: string } | { note: string } | AnnotationOp;
 
 export interface HeapScene extends SceneBase {
   kind: "heap";
@@ -401,7 +488,8 @@ export type TreeOp =
   | { delete: number; caption?: string }
   /** A token visits every node in this order and the visited values line up underneath. */
   | { traverse: "inorder" | "preorder" | "postorder" | "levelorder"; caption?: string }
-  | { note: string };
+  | { note: string }
+  | AnnotationOp;
 
 export interface TreeScene extends SceneBase {
   kind: "tree";
@@ -462,7 +550,7 @@ export interface DistNote {
 export interface DistributedScene extends SceneBase {
   kind: "distributed";
   nodes: (string | DistNode)[];
-  messages: (DistMessage | DistNote)[];
+  messages: (DistMessage | DistNote | AnnotationOp)[];
   events?: DistEvent[];
   /**
    * When a message with no `at` / `after` starts.
@@ -498,7 +586,8 @@ export type MatrixOp =
   | { swap: { rows: [number, number] } | { cols: [number, number] }; caption?: string; ms?: number }
   /** Permanent "done" colour (the answer cell, the pivot row). */
   | { mark: MatrixTarget; caption?: string; ms?: number }
-  | { note: string; ms?: number };
+  | { note: string; ms?: number }
+  | AnnotationOp;
 
 export interface MatrixScene extends SceneBase {
   kind: "matrix";
@@ -533,7 +622,8 @@ export type GraphOp =
   | { unhighlight: string | string[]; caption?: string; ms?: number }
   /** The edges along these nodes turn the ok colour: the answer. */
   | { path: string[]; caption?: string; ms?: number }
-  | { note: string; ms?: number };
+  | { note: string; ms?: number }
+  | AnnotationOp;
 
 export interface GraphScene extends SceneBase {
   kind: "graph";
@@ -574,7 +664,8 @@ export type ChartStep =
   | { unhighlight: ChartTarget | "all"; caption?: string; ms?: number }
   /** A horizontal reference line at a y value. */
   | { threshold: { value: number; label?: string }; caption?: string; ms?: number }
-  | { note: string; ms?: number };
+  | { note: string; ms?: number }
+  | AnnotationOp;
 
 export interface ChartScene extends SceneBase {
   kind: "chart";
@@ -623,7 +714,7 @@ export interface VectorWait {
 export interface VectorScene extends SceneBase {
   kind: "vector";
   nodes: TimelineNode[];
-  timeline: (VectorTween | VectorWait)[];
+  timeline: (VectorTween | VectorWait | AnnotationOp)[];
 }
 
 export type Scene =
@@ -640,7 +731,8 @@ export type Scene =
   | MatrixScene
   | GraphScene
   | ChartScene
-  | VectorScene;
+  | VectorScene
+  | ComposeScene;
 
 // ---------------------------------------------------------------------------
 // Diagnostics

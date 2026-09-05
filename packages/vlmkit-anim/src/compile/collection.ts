@@ -48,7 +48,15 @@ function compileCollection(scene: StackScene | QueueScene, mode: "stack" | "queu
   const outPos: [number, number] = mode === "stack" ? [b.width - 60, baseY] : [30, baseY];
 
   if (scene.title) b.node({ id: "title", shape: "text", pos: [b.width / 2, 22], text: scene.title, fontSize: T.fontSize + 4, color: T.text });
-  for (let i = 0; i < capacity; i++) b.node({ id: `slot-${i}`, shape: "rect", pos: slot(i), size: [boxW, boxH], rx: 4, fill: "none", stroke: T.muted, opacity: 0.5 });
+  for (let i = 0; i < capacity; i++) {
+    b.node({ id: `slot-${i}`, shape: "rect", pos: slot(i), size: [boxW, boxH], rx: 4, fill: "none", stroke: T.muted, opacity: 0.5 });
+    b.anchor(String(i), `slot-${i}`);
+  }
+  if (mode === "stack") b.anchor("top", "ptr-top");
+  else {
+    b.anchor("front", "ptr-front");
+    b.anchor("back", "ptr-back");
+  }
   if (mode === "stack") {
     b.node({ id: "base", shape: "line", points: [[cx - boxW / 2 - 10, baseY + boxH / 2 + 4], [cx + boxW / 2 + 10, baseY + boxH / 2 + 4]], stroke: T.nodeStroke, strokeWidth: 2 });
     b.node({ id: "ptr-top", shape: "text", pos: [cx + boxW / 2 + 30, baseY], text: "← top", fontSize: T.fontSize - 2, color: T.accent, anchor: "start", opacity: 0 });
@@ -66,6 +74,7 @@ function compileCollection(scene: StackScene | QueueScene, mode: "stack" | "queu
   const token = (v: number | string, at: [number, number]): string => {
     const id = `v-${created++}`;
     b.node({ id, shape: "rect", pos: at, size: [boxW - 4, boxH - 4], rx: 4, fill: T.node, stroke: T.nodeStroke, strokeWidth: 1.5, text: fmt(v), fontSize: T.fontSize, color: T.text, opacity: 0 });
+    b.anchor(fmt(v), id); // a value is an anchor too; a duplicate value names the newest box
     return id;
   };
   const show = (id: string, on: boolean, t: number): void => {
@@ -105,6 +114,7 @@ function compileCollection(scene: StackScene | QueueScene, mode: "stack" | "queu
   const removed: (number | string)[] = [];
   const refused: (number | string)[] = [];
   for (const op of ops) {
+    if (b.annotate(op)) continue;
     if ("note" in op) {
       b.step(op.note);
       b.advance(b.stepMs);

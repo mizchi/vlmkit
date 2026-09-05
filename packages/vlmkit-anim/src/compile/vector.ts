@@ -7,14 +7,27 @@
  */
 
 import type { Timeline, TrackProp, TrackValue, VectorScene } from "../types.ts";
+import { isAnnotationOp } from "./annotate.ts";
 import { Builder } from "./builder.ts";
 
 export function compileVector(scene: VectorScene): Timeline {
   const b = new Builder(scene, { width: 640, height: 360, stepMs: 500 });
-  for (const n of scene.nodes) b.node({ ...n });
+  for (const n of scene.nodes) {
+    b.node({ ...n });
+    b.anchor(n.id, n.id);
+  }
   let prevStart = 0;
   let prevEnd = 0;
   for (const item of scene.timeline) {
+    if (isAnnotationOp(item)) {
+      // An annotation rides the sequence like a wait: it starts when the previous item ends.
+      b.t = prevEnd;
+      b.annotate(item, "timeline");
+      prevStart = prevEnd;
+      prevEnd = b.t;
+      continue;
+    }
+    b.annotate(item, "timeline"); // counts the index only; a tween or wait is never an annotation
     if ("wait" in item) {
       const start = prevEnd;
       if (item.caption || item.label) b.step(item.caption, item.label, start);

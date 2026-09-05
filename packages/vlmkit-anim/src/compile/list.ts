@@ -49,8 +49,11 @@ export function compileList(scene: ListScene): Timeline {
   const token = (v: number | string, at: [number, number]): string => {
     const id = `n-${created++}`;
     b.node({ id, shape: "rect", pos: at, size: [boxW - 4, boxH - 4], rx: 4, fill: T.node, stroke: T.nodeStroke, strokeWidth: 1.5, text: fmt(v), fontSize: T.fontSize, color: T.text, opacity: 0 });
+    b.anchor(fmt(v), id); // a value is an anchor; a duplicate names the newest box
     return id;
   };
+  b.anchor("head", "head-label");
+  b.anchor("nil", "nil");
   let shownArrows = 0;
   /** Set opacity only when it changes, so an arrow that never appears has no track at all. */
   const show = (id: string, on: boolean, t: number): void => {
@@ -75,6 +78,7 @@ export function compileList(scene: ListScene): Timeline {
 
   const finds: { value: number | string; hops: number; found: boolean }[] = [];
   for (const op of scene.ops) {
+    if (b.annotate(op)) continue;
     if ("note" in op) {
       b.step(op.note);
       b.advance(b.stepMs);
