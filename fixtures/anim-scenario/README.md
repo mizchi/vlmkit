@@ -51,7 +51,8 @@ box that moves both readouts and the decision arithmetic), and
 `README-v11-relate.md` + `vector-clock-relate.scene.json` (the package fixture:
 a receive that retires a `∥` relation for a `≤` one). The question is whether
 a readout or a relation survives someone changing the data it tracks
-(agents `ea`–`ec`).
+(agents `ea`–`ec`; `ed` re-ran ea's task after the `relate` routing fix ea's
+friction produced, to measure the fix the same way the defect was found).
 
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;

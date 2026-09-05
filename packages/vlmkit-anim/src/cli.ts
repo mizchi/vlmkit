@@ -281,7 +281,8 @@ export async function runAnimCli(argv: string[]): Promise<number> {
         const errs = diags.filter((d) => d.severity === "error").length;
         const warns = diags.length - errs;
         console.log(`${ok ? "✓" : "✗"} ${basename(file)} (${stats.kind}): ${errs} error(s), ${warns} warning(s)`);
-        console.log(`  ${stats.durationMs}ms · ${stats.steps} steps (${stats.captions} captioned) · ${stats.nodes} nodes · ${stats.tracks} tracks / ${stats.keyframes} keyframes`);
+        const ann = stats.annotations ? ` · annotations: ${stats.annotations.drawn} drawn, ${stats.annotations.onScreen} on screen at the end` : "";
+        console.log(`  ${stats.durationMs}ms · ${stats.steps} steps (${stats.captions} captioned) · ${stats.nodes} nodes · ${stats.tracks} tracks / ${stats.keyframes} keyframes${ann}`);
         if (stats.sceneBytes) console.log(`  scene ${stats.sceneBytes} B → timeline ${stats.timelineBytes} B (×${stats.expansion})`);
         console.log(`  next: vlmkit-anim explain ${file} · vlmkit-anim render ${file} --step N · vlmkit-anim html ${file} --out page.html`);
       }

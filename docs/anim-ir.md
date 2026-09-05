@@ -638,7 +638,11 @@ block that belongs to one thing.
 Every annotation op takes `caption` (replaces the generated one) and `ms`.
 `"ms": 0` applies it **inside the previous beat** — the way to have "best so
 far = 10" appear at the moment the reveal it belongs to happens, with its
-caption joined to that beat's. A misspelt anchor is an error naming the
+caption joined to that beat's. Joined means appended with ` · `, never
+replaced, and an explicit `caption` on the folded op is joined the same way:
+`{"note": "A has a local event"}` followed by `{"value": {"id": "vecA",
+"text": "[1,0,0]"}, "ms": 0, "caption": "A: [0,0,0] → [1,0,0]"}` narrates as
+`A has a local event · A: [0,0,0] → [1,0,0]`, one step. A misspelt anchor is an error naming the
 anchors that exist: `no anchor named "row:D" in this matrix scene → did you
 mean "row:C"? anchors here: "0,0", …`.
 
@@ -662,7 +666,7 @@ means invisible — read opacity, not presence, when checking a frame.
 | `tree` | a value, `"cursor"` |
 | `heap` | a slot index (`"0"` is the root), `"v7"` for the value 7 |
 | `state-machine` | a state id, an event name (when one transition uses it), `"from->to"`, `"token"` |
-| `distributed` | a node id, a message label |
+| `distributed` | a node id (the node's box at the top of its lifeline, not the lifeline itself — a `relate` between two nodes runs along the top), a message label |
 | `matrix` | a cell `"r,c"`, `"row:<label or index>"`, `"col:<label or index>"` |
 | `graph` | a node id, an edge `"a->b"` |
 | `chart` | a series id, a category, `"series/category"` |
