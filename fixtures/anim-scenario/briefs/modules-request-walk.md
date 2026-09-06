@@ -23,7 +23,7 @@ Deliver `scene.json`, `map.svg` (the still), `walk.gif` (the animation, via
 
 Success: `vlmkit-anim check scene.json` exits 0 with no ✗ and no ⚠;
 `vlmkit-anim layout scene.json` reports no issue; the still shows all eight
-modules, all ten dependencies and the three groups; `explain` reads as the
+modules, all nine dependencies and the three groups; `explain` reads as the
 walk described above; the two asynchronous hops are marked in the final
 frame.
 
