@@ -224,6 +224,27 @@ brief passed on the first attempt with the alternative path narrated):
   that exist. Two guide gaps closed from quotes: the default id is `"main"`
   and a replaced annotation fades out rather than disappearing.
   `docs/reports/2026-09-05-anim-ir-v11.md`.
+- **v12 read the frames two ways and compared them.** A deterministic layout
+  reading (`layout.ts`: texts on texts, texts under a filled box not their own,
+  texts past the edge, at every step, from the compiled timeline) and a
+  vision reader on the contact sheet (`review.ts`: the brief, the JSON, the
+  frame-level score against the geometry). Run on the v11 scenes as the
+  previous compiler drew them, the geometry found 27, 42, 4 and 4 overlaps —
+  every one an annotation placed exactly where it was asked, on top of
+  something already there — so annotations now take the nearest free spot
+  (other sides, one box further out, the panel, a taller canvas) and every
+  fixture reads clean. The readers: the larger model saw every frame the
+  geometry flagged on the two dense sheets (recall 1.0, one extra finding the
+  geometry cannot make: a highlight ring turning a `0` into an `O`) and none
+  on the two sparse ones, where the defects are 12px labels on a 400px tile.
+  Re-read at 640px tiles, the sparse matrix sheet went to recall 1.0 and the
+  reader described the defects in the geometry's own terms; the two-glyph
+  `∥` / `≤` labels on the distributed sheet still went unseen, and that reader
+  found the round's second thing geometry cannot: a message sampled at the
+  start of its beat is an arrowhead with no line (fixed: the head appears
+  with the stroke). The smaller model reported every sheet clean. Geometry is
+  the gate; the sheet is the second opinion, at a tile size the labels survive.
+  `docs/reports/2026-09-05-anim-ir-v12.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".

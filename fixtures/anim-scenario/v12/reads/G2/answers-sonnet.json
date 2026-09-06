@@ -1,0 +1,20 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [
+      { "kind": "other", "what": "the message arrow from A toward B is not fully drawn: there is a dot on A's lifeline and a small arrowhead near B's lifeline with the label [2,0,0] between them, but no connecting line joins them - reads as an arrowhead pointing at nothing", "severity": "minor" }
+    ] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [
+      { "kind": "other", "what": "same disconnected-arrow pattern as frame 4: a dot on B's lifeline and an arrowhead near C's lifeline with the label [2,1,0] between them, but no line connects them", "severity": "minor" }
+    ] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] }
+  ],
+  "notes": "Tiles were large enough to read comfortably - vector labels like [2,0,0], the 'C's local event (frozen)' annotation, and the A/B/C boxes were all legible without zooming, though the orange in-flight vector labels are small. The one recurring thing I flagged (frames 4 and 6) is a dot-plus-arrowhead with no visible connecting line, which reads as a layout defect ('arrow pointing at nothing') per the brief's example, but it may instead be an intentional mid-transit animation state (the arrow completes into a full line-plus-arrowhead in the very next frame in both cases) rather than a bug - flagging with minor severity and noting the uncertainty here. The orange curved arc added in frames 8-11 (A over B to C) never overlaps the boxes or other labels in any frame, and gains an arrowhead starting at frame 9 which appears to be the deliberate visual distinction between 'concurrent' (no arrowhead, frame 8) and 'ordered' (arrowhead, frames 9-11) rather than a defect. No overlap, clipping, offscreen content, or illegible text was seen elsewhere."
+}

@@ -54,6 +54,14 @@ a readout or a relation survives someone changing the data it tracks
 (agents `ea`–`ec`; `ed` re-ran ea's task after the `relate` routing fix ea's
 friction produced, to measure the fix the same way the defect was found).
 
+v12 measured the frames instead of the writers: `v12/before-timelines/` holds
+the four v11 scenes compiled by the pre-v12 compiler (the layout defects kept),
+`v12/before/` and `v12/after/` their review sets (sheet, brief, geometry
+report), `v12/reads/<letter>/` the blind folders the readers saw — a sheet and
+a brief, nothing else; `KEY.md` maps letters to before/after — with each
+reader's `answers-<model>.json`, and `v12/scores/` the frame-level agreement
+of each answer with the geometry (`vlmkit-anim review --answers`).
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from

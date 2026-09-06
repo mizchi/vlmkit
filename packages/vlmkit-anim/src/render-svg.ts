@@ -116,7 +116,9 @@ function shapeMarkup(n: NodeState, markers: Set<string>): string {
     case "arrow": {
       const [[x1, y1], [x2, y2]] = n.points ?? [[0, 0], [0, 0]];
       let marker = "";
-      if (n.shape === "arrow") {
+      // The head appears with the stroke: a message sampled at the start of its beat has dash 0, and a head
+      // on an undrawn line reads as "an arrowhead pointing at nothing" (a v12 reader, on a contact sheet).
+      if (n.shape === "arrow" && (n.dash === undefined || n.dash >= 0.999)) {
         markers.add(stroke);
         marker = ` marker-end="url(#${markerId(stroke)})"`;
       }

@@ -124,7 +124,7 @@ How a CDN serves a request — 9 steps, 5460ms, 9 nodes
 
 ## distributed-replication
 
-`distributed` — [`fixtures/distributed-replication.json`](../fixtures/distributed-replication.json) · 8 steps · 3.8s · GIF 339 KB
+`distributed` — [`fixtures/distributed-replication.json`](../fixtures/distributed-replication.json) · 8 steps · 3.8s · GIF 336 KB
 
 ![distributed-replication animation](./distributed-replication.gif)
 

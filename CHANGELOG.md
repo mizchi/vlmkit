@@ -27,6 +27,13 @@ pictures at once. Two generic layers answer that, and a third op followed from t
   contact sheet. The `pr-visual` workflow posts that on every same-repo pull request.
 - Typed authoring (`scene.<kind>({…})`, scene modules in `.ts` / `.mjs` accepted by every verb),
   committed sample outputs for every fixture, and `docs/diagrams/` with the tool's own architecture.
+- **Layout read back from the frames.** `vlmkit-anim layout` lists, at every step, texts on other
+  texts, texts under a filled box that is not their own, and texts past the canvas edge; `check`
+  warns about the same. `vlmkit-anim review` writes the contact sheet with a review brief for a
+  vision model or an agent and scores its JSON against that geometry frame by frame (`--answers`,
+  or `--model` through the optional `@mizchi/vlmkit-ai` peer). Annotations now place themselves off
+  other text — the asked side first, then the other sides, one box further out, the panel, or a
+  taller canvas — and relations arc over a bystander only when no level line fits nearby.
 
 Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
 colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:
