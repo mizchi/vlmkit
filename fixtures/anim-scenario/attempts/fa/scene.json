@@ -1,0 +1,52 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "vlmkit workspace: package dependencies",
+  "layout": "tb",
+  "modules": [
+    { "id": "core", "label": "core" },
+    { "id": "ai", "label": "ai" },
+    { "id": "capture", "label": "capture" },
+    { "id": "animation-eval", "label": "animation-eval" },
+    { "id": "generate", "label": "generate" },
+    { "id": "heal", "label": "heal" },
+    { "id": "markup", "label": "markup" },
+    { "id": "mcp", "label": "mcp" },
+    { "id": "plan", "label": "plan" },
+    { "id": "anim", "label": "anim" },
+    { "id": "cli", "label": "vlmkit (root CLI)" }
+  ],
+  "deps": [
+    ["ai", "core"],
+    ["capture", "core"],
+    ["animation-eval", "core"],
+    ["generate", "ai"],
+    ["plan", "ai"],
+    { "from": "anim", "to": "ai", "label": "peer" },
+    { "from": "anim", "to": "animation-eval", "label": "peer" },
+    ["heal", "ai"],
+    ["heal", "capture"],
+    ["heal", "core"],
+    ["markup", "ai"],
+    ["markup", "animation-eval"],
+    ["markup", "capture"],
+    ["markup", "core"],
+    ["mcp", "core"],
+    ["mcp", "markup"],
+    ["cli", "ai"],
+    ["cli", "anim"],
+    ["cli", "animation-eval"],
+    ["cli", "capture"],
+    ["cli", "core"],
+    ["cli", "generate"],
+    ["cli", "heal"],
+    ["cli", "markup"],
+    ["cli", "mcp"],
+    ["cli", "plan"]
+  ],
+  "groups": [
+    { "id": "browser", "label": "needs a browser (required Playwright peer)", "modules": ["core", "capture", "animation-eval", "heal", "markup"] },
+    { "id": "pure", "label": "pure (no Playwright)", "modules": ["ai", "generate", "mcp", "plan"] },
+    { "id": "optional-browser", "label": "browser only for .png / eval", "modules": ["anim"] }
+  ]
+}
