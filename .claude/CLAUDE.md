@@ -187,7 +187,10 @@ the data change; the round's defects were layout, fixed in the compiler, not in 
 the contact sheet — and compared; annotations now place themselves off other text),
 `docs/reports/2026-09-06-anim-ir-v13.md` (the first still-figure round: five module maps, all green and all with lines
 through labels the geometry could not see; `layout` now reports `crossed`, and the module layout, edge routing,
-container labels, annotation placement and arcs were reworked until the five scenes went from 91 crossings to 2).
+container labels, annotation placement and arcs were reworked until the five scenes went from 91 crossings to 2),
+`docs/reports/2026-09-06-anim-ir-v14.md` (the figure against its facts: `check --expect facts.json` names v13's two
+green-but-wrong pictures in one line each; four writers with fact sheets were four green, and the sheet caught one
+wrong final highlight on the first run).
 
 ## Measuring Gate / Rule Execution Cost
 

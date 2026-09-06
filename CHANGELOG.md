@@ -62,7 +62,12 @@ pictures at once. Two generic layers answer that, and a third op followed from t
   that style, lit in the final frame, with exactly those members) and nothing drawn may be missing
   from it. Ids the picture spells differently are reported once each and the dependencies naming
   them wait in one line. `vlmkit-anim repo` writes the workspace's own sheet as `repo.expect.json`;
-  `schema --kind expect` has the fields. Report: `docs/reports/2026-09-06-anim-ir-v14.md`.
+  `schema --kind expect` has the fields. Four fresh writers on the four briefs with their sheets:
+  four green, four clean, and the sheet caught one wrong final highlight on the first run. Their
+  friction: a callout wider than the canvas now wraps (it was laid across six edges and past the
+  edge), a group label hemmed in by edges on every side takes the least-crossed spot with a halo,
+  and the guide says "one action per step" where it did not. Report:
+  `docs/reports/2026-09-06-anim-ir-v14.md`.
 
 Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
 colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:

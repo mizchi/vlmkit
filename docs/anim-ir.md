@@ -575,7 +575,7 @@ a caption band. With a `sequence` it is walked in beats like a `diagram`.
 | `deps` | `["a", "b"]` reads **a depends on b**: the arrow runs a → b and a sits above b. Long form `{"from", "to", "label", "style", "hidden"}`; `style` is `arrow` (default), `line` (no head), `dashed` (an optional or weak dependency — still laid out) or **`forbidden`** (dashed, in the `bad` colour, labelled ✗ unless you label it: drawn, but ignored by the layout and the cycle check — the import that must not exist, shown next to the ones that do) |
 | `groups` | `{"id", "label", "modules": [ids]}` — a container around its modules; a module is in at most one. Group ids are anchors (`callout`, `group`, `relate`) and `highlight` targets (the outline lights up) |
 | `layout` | `tb` (default, dependencies point down) or `lr` (they point right) |
-| `sequence` | optional: the `diagram` steps — `show`, `hide`, `highlight`, `unhighlight`, `flow "a->b"`, `note`, `relabel` — and every annotation op. `show` / `hide` take module and group ids; `highlight` takes those **and an edge `"a->b"`** (the stroke and its label light up); `flow` takes an edge; the annotation ops take module ids, group ids and `"a->b"` |
+| `sequence` | optional: the `diagram` steps — `show`, `hide`, `highlight`, `unhighlight`, `flow "a->b"`, `note`, `relabel` — and every annotation op, **one action per step** plus `caption` / `ms` (a callout on the same beat as a highlight is the next step with `"ms": 0`). `show` / `hide` take module and group ids; `highlight` takes those **and an edge `"a->b"`** (the stroke and its label light up); `flow` takes an edge; the annotation ops take module ids, group ids and `"a->b"` |
 
 The layout is automatic and deliberate. A module's layer is one below the
 deepest module **it depends on**, so leaves are at the bottom and two modules
@@ -713,7 +713,11 @@ pointed at one cell, an earlier value must survive to be compared, a relation
 between two things has to be drawn rather than stated, and a rule or a few
 lines of code have to be *on screen*, not in the caption. None of
 them takes a coordinate: each names an **anchor**, one of the things the kind
-already draws.
+already draws. An annotation op is an entry of its own: **one op per entry**,
+plus `caption` and `ms` — `{"highlight": "a", "callout": {…}}` is an error
+("a step needs exactly one action key"). To put a callout on the same beat as
+a verb, write it as the next entry with `"ms": 0`, as the `value` lines below
+do.
 
 ```json
 {

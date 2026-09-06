@@ -24,7 +24,7 @@
 
 import { ANNOTATION_ACTIONS, type AnnotationOp, type AnnotationSide as Side, type CalloutSpec, type Diagnostic, type GroupSpec, type RelateSpec, type SnapshotSpec, type TextSpec, type ValueSpec, type Vec2 } from "../types.ts";
 import type { Builder } from "./builder.ts";
-import { boxRadius, labelWidth } from "./builder.ts";
+import { boxRadius, labelWidth, wrapText } from "./builder.ts";
 import { segmentInside } from "./diagram.ts";
 import { strokeSegments } from "../layout.ts";
 
@@ -197,7 +197,9 @@ export class Annotations {
         const w = labelWidth(text, fs) - fs * 1.6;
         const anchor = n.anchor ?? "middle";
         const left = anchor === "start" ? cx : anchor === "end" ? cx - w : cx - w / 2;
-        return { x: left, y: cy - fs * 0.65, w, h: fs * 1.3 };
+        // Lines are 1.2 em apart and centred on the position, as the renderer draws them.
+        const h = fs * 1.3 + (text.split("\n").length - 1) * fs * 1.2;
+        return { x: left, y: cy - h / 2, w, h };
       }
       case "line":
       case "arrow": {
@@ -539,8 +541,13 @@ export class Annotations {
     if (anchored.length && anchored.every((s) => s === "line" || s === "arrow" || s === "path")) target = box(target.x + target.w / 2, target.y + target.h / 2, 16, 16);
     const asked = spec.side ?? "above";
     const fs = T.fontSize - 1;
-    const w = labelWidth(spec.text, fs);
-    const h = fs * 1.9;
+    // A callout wider than the picture has nowhere to go: every spot is off-canvas, and the unchecked fallback
+    // laid hc's (v14) 70-character line across six edges and past the right edge. Wrap it to a readable width
+    // first — a callout is a note, not a banner — unless the writer broke the lines themselves.
+    const text = spec.text.includes("\n") ? spec.text : wrapText(spec.text, fs, Math.max(160, Math.min(360, this.b.width * 0.55)));
+    const lines = text.split("\n").length;
+    const w = labelWidth(text, fs);
+    const h = fs * 1.9 + (lines - 1) * fs * 1.2;
     const [cx, cy] = this.placeBeside(target, w, h, asked, 26, new Set(this.anchors.get(spec.at) ?? []), t, true);
     const side = this.placedSide;
     const k = this.serial++;
@@ -554,7 +561,7 @@ export class Annotations {
     const from: Vec2 = side === "above" ? [fx, cy + h / 2] : side === "below" ? [fx, cy - h / 2] : side === "left" ? [cx + w / 2, fy] : [cx - w / 2, fy];
     const to: Vec2 = side === "above" ? [tx, target.y - 3] : side === "below" ? [tx, target.y + target.h + 3] : side === "left" ? [target.x - 3, ty] : [target.x + target.w + 3, ty];
     this.b.node({ id: ids[0], shape: "rect", pos: [cx, cy], size: [w, h], rx: 6, fill: T.accent, stroke: T.nodeStroke, strokeWidth: 1, opacity: 0 });
-    this.b.node({ id: ids[1], shape: "text", pos: [cx, cy], text: spec.text, fontSize: fs, color: T.nodeStroke, opacity: 0 });
+    this.b.node({ id: ids[1], shape: "text", pos: [cx, cy], text, fontSize: fs, color: T.nodeStroke, opacity: 0 });
     this.b.node({ id: ids[2], shape: "arrow", points: [[from[0] - cx, from[1] - cy], [to[0] - cx, to[1] - cy]], pos: [cx, cy], stroke: T.nodeStroke, strokeWidth: 1.5, opacity: 0 });
     for (const nodeId of ids) this.b.set(nodeId, "opacity", 1, t);
     this.callouts.set(id, ids);

@@ -185,8 +185,13 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
     if (g.label) {
       const fs = T.fontSize - 2;
       const lw = labelWidth(g.label, fs) - fs * 1.6;
-      // Inside the top corners, inside the bottom corners (the container grows a band for it), then just outside.
-      type Corner = { pos: [number, number]; anchor: "start" | "end"; bottom?: boolean };
+      // Inside the top corners, inside the bottom corners (the container grows a band for it), then just outside;
+      // then the middles — inside top and bottom, outside above and below, and beside the container at its
+      // mid-height — for a small container under a fan of edges, where every corner has one through it (hd, v14:
+      // two one-module containers straight below the root, both labels crossed at every corner).
+      type Corner = { pos: [number, number]; anchor: "start" | "end" | "middle"; bottom?: boolean };
+      const ym = (y0 + y1) / 2;
+      const xm = (x0 + x1) / 2;
       const corners: Corner[] = [
         { pos: [x0 + 10, y0 + 12], anchor: "start" },
         { pos: [x1 - 10, y0 + 12], anchor: "end" },
@@ -196,15 +201,24 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
         { pos: [x1 - 4, y0 - 10], anchor: "end" },
         { pos: [x0 + 4, y1 + 10], anchor: "start" },
         { pos: [x1 - 4, y1 + 10], anchor: "end" },
+        { pos: [xm, y0 + 12], anchor: "middle" },
+        { pos: [xm, y1 + labelH - 12], anchor: "middle", bottom: true },
+        { pos: [xm, y0 - 10], anchor: "middle" },
+        { pos: [xm, y1 + 10], anchor: "middle" },
+        { pos: [x0 - 6, ym], anchor: "end" },
+        { pos: [x1 + 6, ym], anchor: "start" },
       ];
-      const boxAt = (c: Corner): Box => ({ x: c.anchor === "start" ? c.pos[0] : c.pos[0] - lw, y: c.pos[1] - fs * 0.65, w: lw, h: fs * 1.3 });
+      const boxAt = (c: Corner): Box => ({ x: c.anchor === "start" ? c.pos[0] : c.anchor === "end" ? c.pos[0] - lw : c.pos[0] - lw / 2, y: c.pos[1] - fs * 0.65, w: lw, h: fs * 1.3 });
       const onCanvas = (bx: Box) => bx.y >= 4 && bx.x >= 0 && bx.x + bx.w <= b.width && bx.y + bx.h <= b.height - 40;
       const free = corners.filter((c) => onCanvas(boxAt(c)) && !hits(boxAt(c)));
       // A free corner no edge runs through; failing that the free corner with the least edge through it; failing
       // that the first corner.
-      const corner = free.find((c) => crossed(boxAt(c)) < 4) ?? free.sort((c, d) => crossed(boxAt(c)) - crossed(boxAt(d)))[0] ?? corners[0];
+      const clear = free.find((c) => crossed(boxAt(c)) < 4);
+      const corner = clear ?? free.sort((c, d) => crossed(boxAt(c)) - crossed(boxAt(d)))[0] ?? corners[0];
       if (corner.bottom) y1 += labelH;
-      labelNode = { id: `${g.id}-label`, shape: "text", pos: corner.pos, text: g.label, fontSize: fs, color: T.muted, anchor: corner.anchor };
+      // Hemmed in on every side (a one-module container straight under the root, hd, v14): the least-crossed
+      // spot, with a halo so the edge breaks around the glyphs — the same treatment an edge label gets.
+      labelNode = { id: `${g.id}-label`, shape: "text", pos: corner.pos, text: g.label, fontSize: fs, color: T.muted, anchor: corner.anchor, ...(clear ? {} : { halo: true }) };
       occupied.push(boxAt(corner));
     }
     b.node({ id: g.id, shape: "rect", pos: [(x0 + x1) / 2, (y0 + y1) / 2], size: [x1 - x0, y1 - y0], rx: 10, fill: "none", stroke: T.muted, strokeWidth: 1.2 });

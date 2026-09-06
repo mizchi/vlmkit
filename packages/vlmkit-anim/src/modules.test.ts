@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "vitest";
 import { checkAnimation } from "./check.ts";
+import { labelWidth, wrapText } from "./compile/builder.ts";
 import { compileScene, moduleCycles, moduleLayers, normalizeModules } from "./compile/index.ts";
 import { layoutReport } from "./layout.ts";
 import { renderFrameSvg } from "./render-svg.ts";
@@ -219,5 +220,63 @@ describe("modules: v13 — the writers' friction", () => {
     assert.equal(line.dashed, true);
     assert.equal(line.stroke, nodeOf(compileScene({ ...s, sequence: [] }), "a").stroke === line.stroke ? "no" : line.stroke);
     assert.equal(tl.nodes.find((n) => /^relate-main-\d+-label$/.test(n.id))!.halo, true);
+  });
+});
+
+describe("modules: v14 — the writers' friction", () => {
+  const attempt = (letter: string): ModulesScene => JSON.parse(readFileSync(new URL(`../../../fixtures/anim-scenario/attempts/${letter}/scene.json`, import.meta.url), "utf-8")) as ModulesScene;
+
+  it("a callout wider than the picture is wrapped instead of laid across the graph and past the edge (hc)", () => {
+    // hc's round 2: a 70-character callout on the back edge of an eleven-module graph — clipped 18px past the
+    // canvas and through six edges, because no spot on the canvas could hold it and the fallback was unchecked.
+    const s = attempt("hc");
+    const seq = s.sequence!.map((st) => ("callout" in st && st.callout ? { ...st, callout: { at: st.callout.at, text: "Cut events→handlers: events should notify, not call back into handlers" } } : st));
+    const tl = compileScene({ ...s, sequence: seq });
+    const text = tl.nodes.find((n) => /^callout-main-\d+-text$/.test(n.id))!;
+    assert.ok(text.text!.includes("\n"), `wrapped: ${JSON.stringify(text.text)}`);
+    assert.ok(text.text!.split("\n").length >= 2 && text.text!.split("\n").length <= 4);
+    const r = layoutReport(tl);
+    assert.equal(r.totals.clipped, 0, formatLayoutIssues(r));
+    assert.equal(r.totals.crossed, 0, formatLayoutIssues(r));
+    // Lines the writer broke themselves are kept as written.
+    const own = compileScene({ ...s, sequence: s.sequence!.map((st) => ("callout" in st && st.callout ? { ...st, callout: { at: st.callout.at, text: "Cut here:\nevents should notify" } } : st)) });
+    assert.equal(own.nodes.find((n) => /^callout-main-\d+-text$/.test(n.id))!.text, "Cut here:\nevents should notify");
+  });
+
+  it("a group label hemmed in by edges on every side gets a halo at the least-crossed spot (hd)", () => {
+    // hd's round 1: two one-module containers straight under the root, every corner and middle of both labels
+    // crossed by the fan of edges — the writer shortened the labels; the compiler now halos them instead.
+    const s = attempt("hd");
+    const long: Record<string, string> = { measurement: "Measurement & Capture", integration: "Integration", synthesis: "Synthesis & Healing" };
+    const tl = compileScene({ ...s, groups: s.groups!.map((g) => ({ ...g, label: long[g.id] ?? g.label })) });
+    const r = layoutReport(tl);
+    assert.equal(r.totals.crossed, 0, formatLayoutIssues(r));
+    assert.equal(tl.nodes.find((n) => n.id === "integration-label")!.halo, true);
+    // A label with a clear corner stays plain.
+    assert.notEqual(compileScene(EXAMPLES.modules).nodes.find((n) => n.id === "core-label")!.halo, true);
+  });
+
+  it("the writers' own final scenes stay clean under the reworked placement", () => {
+    for (const letter of ["ha", "hb", "hc", "hd"]) {
+      const r = layoutReport(compileScene(attempt(letter)));
+      assert.equal(r.totals.framesWithIssues, 0, `${letter}: ${formatLayoutIssues(r)}`);
+    }
+  });
+});
+
+function formatLayoutIssues(r: ReturnType<typeof layoutReport>): string {
+  return r.frames.flatMap((f) => f.issues.map((i) => `${i.kind} ${i.texts.join(" / ")} ${i.nodes.join(" × ")}`)).join("\n");
+}
+
+describe("wrapText", () => {
+  it("breaks at spaces so no line is wider than the limit, never splits a word, and leaves short text alone", () => {
+    const fs = 13;
+    const text = "Cut events→handlers: events should notify, not call back into handlers";
+    const wrapped = wrapText(text, fs, 240);
+    for (const line of wrapped.split("\n")) assert.ok(labelWidth(line, fs) <= 240, line);
+    assert.equal(wrapped.replace(/\n/g, " "), text);
+    assert.equal(wrapText("short", fs, 240), "short");
+    // A single word longer than the limit stays one line rather than being cut.
+    assert.equal(wrapText("supercalifragilisticexpialidocious", fs, 60), "supercalifragilisticexpialidocious");
   });
 });
