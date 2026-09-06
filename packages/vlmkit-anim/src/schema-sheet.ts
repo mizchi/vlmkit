@@ -20,6 +20,7 @@ import {
   type HeapScene,
   type ListScene,
   type MatrixScene,
+  type ModulesScene,
   type QueueScene,
   type Scene,
   type SortScene,
@@ -44,6 +45,7 @@ export interface Examples {
   graph: GraphScene;
   chart: ChartScene;
   diagram: DiagramScene;
+  modules: ModulesScene;
   vector: VectorScene;
   compose: ComposeScene;
   timeline: Timeline;
@@ -218,6 +220,18 @@ export const EXAMPLES: Examples = {
       { flow: "api->db" },
       { flow: "db->api", caption: "Rows come back" },
       { highlight: "browser", caption: "…and the page renders" },
+    ],
+  },
+  modules: {
+    format: SCENE_FORMAT,
+    kind: "modules",
+    title: "A web service, by module",
+    modules: ["web", "api", { id: "auth", label: "auth service" }, "db", "cache", "logging"],
+    deps: [["web", "api"], ["api", "auth"], ["api", "db"], ["api", "cache"], ["auth", "db"], { from: "api", to: "logging", style: "line", label: "emits" }],
+    groups: [
+      { id: "edge", label: "edge", modules: ["web"] },
+      { id: "core", label: "core", modules: ["api", "auth"] },
+      { id: "infra", label: "infrastructure", modules: ["db", "cache", "logging"] },
     ],
   },
   vector: {
@@ -440,6 +454,14 @@ The check fails if a bar's final height is not its value's share of the axis, an
       {"note": "…"}         a captioned pause
       {"relabel": {"id", "text"}}
 Hidden nodes stay invisible until a "show" step. A "flow" needs an edge between the two nodes.`,
+  modules: `kind: modules — a module map: layers with dependencies pointing one way, containers around what belongs together (a still figure unless it has a sequence)
+  "modules": [ "id" | {"id", "label", "hidden": true} ]                       required
+  "deps":    [ ["a", "b"] | {"from", "to", "label", "style": "arrow" | "line", "hidden": true} ]   ["a", "b"] reads "a depends on b": arrow a → b, a drawn above b
+  "groups":  [ {"id", "label", "modules": [ids]} ]                            containers; a module is in at most one; ids are anchors and highlight targets
+  "layout":  "tb" | "lr"                                                      default tb (dependencies point down)
+  "sequence": [ the diagram steps: show / hide / highlight / unhighlight / flow "a->b" / note / relabel, and every annotation op ]   optional
+The layout is automatic: a module's layer is one below the deepest thing it depends on, and each group gets its own band so a container holds only its members.
+A dependency cycle is a warning (the layers cannot show its direction). vlmkit-anim still scene.json --out map.svg renders the figure without a caption.`,
   vector: `kind: vector — generic shapes with a list of tweens (when nothing semantic fits)
   "nodes": [ timeline nodes, see below ]   required
   "timeline": [ tween | {"wait": ms, "caption"} ]   required

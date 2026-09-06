@@ -162,6 +162,8 @@ function nodeMarkup(n: NodeState, children: Map<string, NodeState[]>, markers: S
 export interface RenderOptions {
   /** Draw the current step's caption at the bottom of the canvas. Default true. */
   caption?: boolean;
+  /** Show only this region of the canvas (a still cropped to its content). The image takes the region's size. */
+  crop?: { x: number; y: number; w: number; h: number };
 }
 
 export function renderFrameSvg(tl: Timeline, t: number, opts: RenderOptions = {}): string {
@@ -198,10 +200,11 @@ export function renderFrameSvg(tl: Timeline, t: number, opts: RenderOptions = {}
       caption = `<text font-size="14" fill="#1f2328" text-anchor="middle" font-family="system-ui, sans-serif" data-caption="true">${spans}</text>`;
     }
   }
+  const view = opts.crop ?? { x: 0, y: 0, w: width, h: height };
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(width)} ${num(height)}" width="${num(width)}" height="${num(height)}" data-t="${num(t)}" data-duration="${num(timelineDuration(tl))}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${num(view.x)} ${num(view.y)} ${num(view.w)} ${num(view.h)}" width="${num(view.w)}" height="${num(view.h)}" data-t="${num(t)}" data-duration="${num(timelineDuration(tl))}">`,
     defs ? `<defs>${defs}</defs>` : "",
-    `<rect width="${num(width)}" height="${num(height)}" fill="${esc(background ?? "#ffffff")}"/>`,
+    `<rect x="${num(view.x)}" y="${num(view.y)}" width="${num(view.w)}" height="${num(view.h)}" fill="${esc(background ?? "#ffffff")}"/>`,
     body,
     caption,
     `</svg>`,

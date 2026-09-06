@@ -61,6 +61,14 @@ writes the equivalent JSON file. JSON stays the format — this is the editor's 
 - `@mizchi/vlmkit-ai` — `vlmkit-anim review scene.json --out dir --model <vlm>`: asks a vision model to
   read the contact sheet for layout defects and scores its answer against the geometry (below).
 
+## Still figures
+
+Not everything needs to move. `kind: modules` is a module map — modules, `deps` (`["a", "b"]` reads "a
+depends on b"), `groups` as containers — laid out in layers with dependencies pointing one way and a
+container around exactly its members; a dependency cycle is a warning. `vlmkit-anim still scene.json
+--out map.svg` (or `.png`) renders any scene's final frame without the caption band, cropped to what is
+drawn: a module map, a filled matrix, a walked graph. `vlmkit-anim repo` writes the figure next to the GIF.
+
 ## Layout: geometry, then eyes
 
 `vlmkit-anim layout scene.json` reads every step back from the compiled timeline and lists texts that

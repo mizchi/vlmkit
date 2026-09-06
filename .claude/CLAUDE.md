@@ -138,12 +138,14 @@ is how Playwright's own `mount` fixture works. Consequences:
 ## Explanatory animations (`vlmkit-anim`) and their evaluation loop
 
 ```bash
-vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fifteen)
+vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all sixteen)
+vlmkit-anim schema --kind modules                   # the still-figure preset: a module map (modules / deps / groups), layered, cycle-checked
 vlmkit-anim schema --kind annotations               # the six ops every kind shares (value / callout / snapshot / group / text / relate) and each kind's anchors
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
 vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
 vlmkit-anim explain scene.json                      # narration as a numbered list
 vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
+vlmkit-anim still scene.json --out map.svg          # the figure: final frame, no caption, cropped to what is drawn (.png needs playwright)
 vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
 vlmkit-anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
 vlmkit-anim eval page.html                          # the shared frame-sampled evaluator on an emitted page (same report as `vlmkit check animation`)

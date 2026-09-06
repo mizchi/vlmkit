@@ -11,6 +11,7 @@
  *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
+ *   still     one frame as a figure, no caption band: the end by default (a module map, a filled table), SVG or PNG
  *   layout    the deterministic layout reading: texts on texts, texts under boxes, texts past the edge, per step
  *   review    the contact sheet + a review brief for a vision model (or an agent); scores its JSON against `layout`
  *   repo      generate the workspace's architecture map (scene + GIF + sheet + markdown) from its package.json files
@@ -36,7 +37,7 @@ import { currentStep, timelineDuration } from "./timeline.ts";
 import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene, type Timeline } from "./types.ts";
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
-import { formatLayout, layoutReport } from "./layout.ts";
+import { contentBox, formatLayout, layoutReport } from "./layout.ts";
 import { formatScore, parseAnswers, reviewBrief, reviewTiles, scoreReview, type ReviewAnswers, type ReviewScore } from "./review.ts";
 import { renderSheetHtml } from "./sheet.ts";
 import { writeVideo, type VideoResult } from "./video.ts";
@@ -74,6 +75,10 @@ Commands
                                   reduced-motion, motion outside the API — with the evaluator vlmkit's
                                   \`check animation\` gate uses (@mizchi/vlmkit-animation-eval + playwright).
                                   Exit 1 on a suspect finding.
+  still <scene.json> --out <fig.svg|fig.png> [--step N | --at ms] [--full]
+                                  One frame as a figure without the caption band, cropped to what is drawn
+                                  (--full keeps the canvas) — the end by default: a \`modules\` map, a filled
+                                  matrix, a walked graph. PNG needs playwright.
   layout <scene.json> [--json]     Where texts sit on texts, under filled boxes, or past the canvas edge, at every
                                   step — read from the compiled timeline, no browser. Exit 1 when any is found.
   review <scene.json> --out <dir> [--model M] [--answers a.json] [--cols N] [--tile W]
@@ -318,6 +323,22 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       await writeOut(out, svg, `frame t=${Math.round(t)}${step?.caption ? ` "${step.caption}"` : ""}`);
       return 0;
     }
+    case "still": {
+      // The figure, not the film: one frame, no caption band. The end by default — a module map, a filled
+      // table, a walked graph — or `--step` / `--at` for another instant.
+      const out = readFlag(rest, "--out");
+      if (!out) throw new UsageError("vlmkit-anim still needs --out <fig.svg|fig.png>");
+      const t = rest.includes("--step") || rest.includes("--at") ? resolveTime(tl, rest) : timelineDuration(tl);
+      // Cropped to what is drawn (plus a margin): the canvas was sized before the picture existed.
+      const crop = rest.includes("--full") ? { x: 0, y: 0, w: tl.canvas.width, h: tl.canvas.height } : contentBox(tl, t);
+      const svg = renderFrameSvg(tl, t, { caption: false, crop });
+      if (out.endsWith(".png")) {
+        await screenshotHtml(`<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">${svg}</body></html>`, out, { width: crop.w, height: crop.h });
+        if (json) console.log(JSON.stringify({ out, t }, null, 2));
+        else console.log(`still t=${Math.round(t)} → ${out}`);
+      } else await writeOut(out, svg, `still t=${Math.round(t)}`);
+      return 0;
+    }
     case "frames": {
       const out = readFlag(rest, "--out");
       if (!out) throw new UsageError("vlmkit-anim frames needs --out <dir>");
@@ -517,14 +538,17 @@ async function emitGenerated(scene: Scene, out: string, name: string, opts: { im
     const html = join(out, `${name}.sheet.html`);
     await writeFile(html, renderSheetHtml(tl, sampleTimes(tl, 0), { cols: 3, tileWidth: 400, title: scene.title }));
     files.push(html);
-    const svg = join(out, `${name}.final.svg`);
-    await writeFile(svg, renderFrameSvg(tl, timelineDuration(tl)));
-    files.push(svg);
   }
+  // The figure as well as the film: the final frame, no caption, cropped to what is drawn — the image a README
+  // or a design note embeds when the motion is not the point.
+  const end = timelineDuration(tl);
+  const stillPath = join(out, `${name}.svg`);
+  await writeFile(stillPath, renderFrameSvg(tl, end, { caption: false, crop: contentBox(tl, end) }));
+  files.push(stillPath);
   const md = [
     `## ${scene.title ?? name}`,
     "",
-    ...(gifName ? [`![${scene.title ?? name}](./${gifName})`, ""] : []),
+    ...(gifName ? [`![${scene.title ?? name}](./${gifName})`, ""] : [`![${scene.title ?? name}](./${name}.svg)`, ""]),
     "<details><summary>Every step</summary>",
     "",
     ...(sheetName ? [`![steps](./${sheetName})`, ""] : []),
@@ -534,7 +558,7 @@ async function emitGenerated(scene: Scene, out: string, name: string, opts: { im
     "",
     "</details>",
     "",
-    `<sub>Generated by \`vlmkit-anim ${name === "repo" ? "repo" : "pr"}\`; the scene is [\`${name}.scene.json\`](./${name}.scene.json) — edit it and re-run \`vlmkit-anim video\` for a different cut.</sub>`,
+    `<sub>Generated by \`vlmkit-anim ${name === "repo" ? "repo" : "pr"}\`; the scene is [\`${name}.scene.json\`](./${name}.scene.json) — edit it and re-run \`vlmkit-anim video\` for a different cut, or \`vlmkit-anim still\` for the figure alone ([\`${name}.svg\`](./${name}.svg)).</sub>`,
     "",
   ].join("\n");
   const mdPath = join(out, `${name}.md`);
@@ -573,11 +597,11 @@ async function loadAnimationEval(): Promise<typeof import("@mizchi/vlmkit-animat
 }
 
 /** Screenshot a self-contained HTML string at its own width, full page. */
-async function screenshotHtml(html: string, out: string): Promise<void> {
+async function screenshotHtml(html: string, out: string, viewport = { width: 1280, height: 720 }): Promise<void> {
   const chromium = await loadChromium();
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: Math.max(1, Math.round(viewport.width)), height: Math.max(1, Math.round(viewport.height)) }, deviceScaleFactor: 1 });
     await page.setContent(html);
     await mkdir(dirname(resolve(out)), { recursive: true });
     await page.screenshot({ path: out, fullPage: true });

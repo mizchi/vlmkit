@@ -55,6 +55,16 @@ Scene IR  (vlmkit-anim/scene@1)  ──compile──▶  Timeline IR  (vlmkit-an
   misspelt anchor is a compile-time diagnostic that lists the anchors that
   exist. Nothing here draws what `vector` could not; the point is that a
   writer never types a number.
+- **Still figures** are the same IR at one instant. Not every explanation
+  needs motion — a module map, a dependency graph, a filled table — and
+  building a second tool for them would split the vocabulary, the checks and
+  the layout geometry in two. So `kind: modules` is a preset over `diagram`
+  (modules / deps / groups normalised into nodes / edges / containers, layered
+  by dependency depth with one band per container so a container holds only
+  its members, a cycle check because layers lie about direction otherwise),
+  and `vlmkit-anim still` renders any scene's frame without the caption band,
+  cropped to its content. A `modules` scene with a `sequence` animates like a
+  diagram; without one, `check` does not call the stillness a warning.
 - **Timeline IR** is the flat, dumb, complete description: nodes with initial
   attributes, tracks of absolute-time keyframes per (target, prop), and
   `steps` (chapter markers with captions). It is what plays, samples, and

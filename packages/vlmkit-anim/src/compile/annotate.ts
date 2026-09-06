@@ -592,7 +592,13 @@ export class Annotations {
     const pair = union(a, c);
     const straight = { u, n, p, q };
     const tooShort = (q[0] - p[0]) * u[0] + (q[1] - p[1]) * u[1] < 16;
-    const beside = tooShort || this.crossesBystander(p, q, a, c, spec.from, spec.to, t);
+    const crosses = this.crossesBystander(p, q, a, c, spec.from, spec.to, t);
+    // A pair that is apart on both axes (web at the top-left of a module map, db at the bottom-right) has no
+    // "level" line worth drawing beside it: such a pair goes straight, arcing over what it crosses.
+    const minor = Math.abs(u[0]) >= Math.abs(u[1]) ? 1 : 0;
+    const apart = Math.abs(cc[minor] - ca[minor]) > (minor === 1 ? a.h / 2 + c.h / 2 : a.w / 2 + c.w / 2) + 20;
+    const beside = tooShort || (crosses && !apart);
+    const arcOnly = crosses && apart && !tooShort;
     if (beside) {
       // Adjacent boxes (two neighbouring rows, cells, bars) leave nothing between their edges, and a pair with
       // something else in between (rows A and C of three) would have the line drawn across the bystander — the
@@ -605,14 +611,22 @@ export class Annotations {
     // The label (and, when beside, the whole line) goes to the side of the pair that is nearer to free space:
     // the smaller clearance past everything drawn in the pair's lane wins, as long as the canvas has room for it.
     const clearance = (sign: 1 | -1) => this.laneClearance(ca, cc, u, n, sign, t);
-    const fits = (sign: 1 | -1, off: number) => off - boxRadius(pair.w, pair.h, n[0], n[1]) + 24 <= this.room(pair, n, sign);
+    // A level line sits at `ca + n · off · sign`: it fits when that coordinate is inside the canvas with a margin
+    // for its label (the pair's radius says nothing about where the line is — that assumption once put a
+    // relation at y = −4).
+    const fits = (sign: 1 | -1, off: number): boolean => {
+      const at: Vec2 = [ca[0] + n[0] * off * sign, ca[1] + n[1] * off * sign];
+      const lo = 24;
+      return at[0] >= lo && at[0] <= this.b.width + this.extraWidth() - lo && at[1] >= lo && at[1] <= this.b.height + this.extraH - CAPTION_BAND - lo;
+    };
     const [offPlus, offMinus] = [clearance(1), clearance(-1)];
     let outward: 1 | -1 = offPlus <= offMinus ? 1 : -1;
     if (!fits(outward, outward === 1 ? offPlus : offMinus) && fits(-outward as 1 | -1, outward === 1 ? offMinus : offPlus)) outward = -outward as 1 | -1;
     let arc: { apex: Vec2; d: string } | undefined;
-    if (beside) {
+    if (beside || arcOnly) {
       let off = outward === 1 ? offPlus : offMinus;
-      if (!fits(outward, off)) {
+      if (arcOnly) off = Infinity; // never a level line: straight to the arc below
+      if (!fits(outward, off) && !arcOnly) {
         // Neither side fits as the canvas stands. The canvas can grow on its right and bottom edges (the
         // panel already does the former): when the level line misses by a little on a growable side, grow
         // that side rather than arc — eb's two-row matrix had its readouts sitting right on the caption band.
@@ -643,17 +657,25 @@ export class Annotations {
         // way out was to reorder the nodes). Arc over the bystanders instead, edge to edge along the straight
         // line, bulging on the side with more room by just enough to clear what it crosses.
         ({ u, n, p, q } = straight);
-        outward = this.room(pair, n, 1) >= this.room(pair, n, -1) ? 1 : -1;
-        const bulge = this.bystanderBulge(p, q, n, outward, a, c, spec.from, spec.to, t);
         const m: Vec2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-        const apex: Vec2 = [m[0] + n[0] * bulge * outward, m[1] + n[1] * bulge * outward];
-        // A quadratic Bézier passes halfway to its control point: the control sits at twice the bulge.
-        const ctrl: Vec2 = [m[0] + n[0] * 2 * bulge * outward, m[1] + n[1] * 2 * bulge * outward];
-        const r = (v: number) => Math.round(v * 10) / 10;
-        arc = {
-          apex,
-          d: `M ${r(p[0] - apex[0])} ${r(p[1] - apex[1])} Q ${r(ctrl[0] - apex[0])} ${r(ctrl[1] - apex[1])} ${r(q[0] - apex[0])} ${r(q[1] - apex[1])}`,
-        };
+        const onCanvas = (pt: Vec2) => pt[0] >= 12 && pt[0] <= this.b.width + this.extraWidth() - 12 && pt[1] >= 12 && pt[1] <= this.b.height + this.extraH - CAPTION_BAND;
+        // The side with more room first; if its apex would leave the canvas, the other side; if both would
+        // (a long diagonal across a layered map), the straight line — crossing a box beats drawing off-canvas.
+        const sides: (1 | -1)[] = this.room(pair, n, 1) >= this.room(pair, n, -1) ? [1, -1] : [-1, 1];
+        for (const side of sides) {
+          const bulge = this.bystanderBulge(p, q, n, side, a, c, spec.from, spec.to, t);
+          const apex: Vec2 = [m[0] + n[0] * bulge * side, m[1] + n[1] * bulge * side];
+          if (!onCanvas(apex)) continue;
+          outward = side;
+          // A quadratic Bézier passes halfway to its control point: the control sits at twice the bulge.
+          const ctrl: Vec2 = [m[0] + n[0] * 2 * bulge * side, m[1] + n[1] * 2 * bulge * side];
+          const r = (v: number) => Math.round(v * 10) / 10;
+          arc = {
+            apex,
+            d: `M ${r(p[0] - apex[0])} ${r(p[1] - apex[1])} Q ${r(ctrl[0] - apex[0])} ${r(ctrl[1] - apex[1])} ${r(q[0] - apex[0])} ${r(q[1] - apex[1])}`,
+          };
+          break;
+        }
       }
     }
     const mid: Vec2 = arc ? arc.apex : [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
@@ -682,7 +704,8 @@ export class Annotations {
       const boxOf = (pt: Vec2): Box => ({ x: anchor === "start" ? pt[0] : anchor === "end" ? pt[0] - lw : pt[0] - lw / 2, y: pt[1] - lh / 2, w: lw, h: lh });
       const covered = (bx: Box) =>
         this.b.nodes.some((nd) => (nd.shape === "text" || nd.text !== undefined) && (this.b.valueAt(nd.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(nd.id, t), bx));
-      const pos = candidates.find((pt) => !covered(boxOf(pt))) ?? candidates[0];
+      const inCanvas = (bx: Box) => bx.x >= 0 && bx.y >= 0 && bx.x + bx.w <= this.b.width + this.extraWidth() && bx.y + bx.h <= this.b.height + this.extraH - CAPTION_BAND;
+      const pos = candidates.find((pt) => inCanvas(boxOf(pt)) && !covered(boxOf(pt))) ?? candidates.find((pt) => inCanvas(boxOf(pt))) ?? candidates[0];
       this.b.node({ id: labelId, shape: "text", pos, text: spec.label, fontSize: fs, color: T.accent, anchor, opacity: 0 });
     }
     for (const nodeId of ids) this.b.set(nodeId, "opacity", 1, t);

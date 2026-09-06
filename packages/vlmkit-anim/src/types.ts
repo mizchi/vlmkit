@@ -152,6 +152,7 @@ export interface Timeline {
 
 export type SceneKind =
   | "diagram"
+  | "modules"
   | "state-machine"
   | "sort"
   | "array"
@@ -167,7 +168,7 @@ export type SceneKind =
   | "vector"
   | "compose";
 
-export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "state-machine", "sort", "array", "stack", "queue", "list", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector", "compose"];
+export const SCENE_KINDS: readonly SceneKind[] = ["diagram", "modules", "state-machine", "sort", "array", "stack", "queue", "list", "heap", "tree", "distributed", "matrix", "graph", "chart", "vector", "compose"];
 
 interface SceneBase {
   format: typeof SCENE_FORMAT;
@@ -316,12 +317,56 @@ export type DiagramStep =
   | { relabel: { id: string; text: string }; caption?: string; ms?: number }
   | AnnotationOp;
 
+/** A container drawn around several nodes: a package, a layer, a bounded context. Laid out so it holds only its members. */
+export interface DiagramGroup {
+  id: string;
+  label?: string;
+  nodes: string[];
+}
+
 export interface DiagramScene extends SceneBase {
   kind: "diagram";
   nodes: DiagramNode[];
   edges?: DiagramEdge[];
+  /** Containers around nodes; a node belongs to at most one. Their ids are anchors and `highlight` targets. */
+  groups?: DiagramGroup[];
   /** `lr` (default), `tb`, `grid`, `circle`. Ignored for nodes with `pos`. */
   layout?: "lr" | "tb" | "grid" | "circle";
+  sequence?: DiagramStep[];
+}
+
+// ---- modules (a still-figure preset over diagram) --------------------------
+
+export interface ModuleDef {
+  id: string;
+  label?: string;
+  /** Hidden until a `show` step reveals it. */
+  hidden?: boolean;
+}
+
+/** `["a", "b"]` (a depends on b) or the long form. */
+export type ModuleDep = readonly [string, string] | { from: string; to: string; label?: string; style?: "arrow" | "line"; hidden?: boolean };
+
+export interface ModuleGroup {
+  id: string;
+  label?: string;
+  modules: string[];
+}
+
+/**
+ * A module map: what depends on what, drawn as layers with dependencies pointing
+ * one way (down by default), containers around the modules that belong together.
+ * Without a `sequence` it is a still figure; with one it walks the map in beats
+ * (the diagram steps and every annotation op).
+ */
+export interface ModulesScene extends SceneBase {
+  kind: "modules";
+  modules: (string | ModuleDef)[];
+  /** `[a, b]` reads "a depends on b": the arrow runs from a to b and a sits above b. */
+  deps?: ModuleDep[];
+  groups?: ModuleGroup[];
+  /** `tb` (default): dependencies point down. `lr`: they point right. */
+  layout?: "tb" | "lr";
   sequence?: DiagramStep[];
 }
 
@@ -732,6 +777,7 @@ export interface VectorScene extends SceneBase {
 
 export type Scene =
   | DiagramScene
+  | ModulesScene
   | StateMachineScene
   | SortScene
   | ArrayScene

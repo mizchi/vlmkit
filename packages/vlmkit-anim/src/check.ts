@@ -10,6 +10,7 @@
  * timeline (how much the semantic layer buys), duration, step count.
  */
 
+import { moduleCycles } from "./compile/modules.ts";
 import { layoutReport, type LayoutFrame, type LayoutIssue } from "./layout.ts";
 import { sampleFrame, timelineDuration, worldPos } from "./timeline.ts";
 import { compileScene } from "./compile/index.ts";
@@ -300,6 +301,25 @@ function checkDiagram(scene: Extract<Scene, { kind: "diagram" }>, tl: Timeline):
   return out;
 }
 
+/**
+ * A module map is a still figure by design, so no "no sequence" warning; what can be wrong is a
+ * dependency cycle (the layers then lie about direction) and a hidden module no step shows.
+ */
+function checkModules(scene: Extract<Scene, { kind: "modules" }>): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  for (const cycle of moduleCycles(scene)) {
+    out.push(
+      warn("deps", `dependency cycle: ${cycle.join(" → ")}`, "layers read as direction only when dependencies flow one way — break the cycle, or draw the back edge deliberately with a `relate`"),
+    );
+  }
+  const shown = new Set<string>();
+  for (const st of scene.sequence ?? []) if ("show" in st) for (const id of Array.isArray(st.show) ? st.show : [st.show]) shown.add(id);
+  for (const m of scene.modules) {
+    if (typeof m !== "string" && m.hidden && !shown.has(m.id)) out.push(warn(`modules(${m.id})`, `"${m.id}" is hidden and no step shows it: it never appears`, `add {"show": "${m.id}"} to "sequence" or drop "hidden"`));
+  }
+  return out;
+}
+
 function checkArray(scene: Extract<Scene, { kind: "array" }>, tl: Timeline): Diagnostic[] {
   const out: Diagnostic[] = [];
   const meta = tl.meta as { finalOrder?: (number | string)[]; slotX?: number[]; found?: number } | undefined;
@@ -513,8 +533,10 @@ export function checkLayout(tl: Timeline): Diagnostic[] {
 }
 
 export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
-  const out = [...checkTimeline(tl), ...checkLayout(tl)];
+  let out = [...checkTimeline(tl), ...checkLayout(tl)];
   if (!scene) return out;
+  // A module map without a sequence is a still figure by design: that nothing moves is not a warning.
+  if (scene.kind === "modules" && !(scene.sequence ?? []).length) out = out.filter((d) => d.path !== "tracks");
   switch (scene.kind) {
     case "sort": out.push(...checkSort(scene, tl)); break;
     case "array": out.push(...checkArray(scene, tl)); break;
@@ -526,6 +548,7 @@ export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
     case "state-machine": out.push(...checkStateMachine(scene, tl)); break;
     case "distributed": out.push(...checkDistributed(scene, tl)); break;
     case "diagram": out.push(...checkDiagram(scene, tl)); break;
+    case "modules": out.push(...checkModules(scene)); break;
     case "matrix": out.push(...checkMatrix(scene, tl)); break;
     case "graph": out.push(...checkGraph(scene, tl)); break;
     case "chart": out.push(...checkChart(scene, tl)); break;

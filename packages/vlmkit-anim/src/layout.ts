@@ -182,6 +182,44 @@ export function layoutFrame(tl: Timeline, t: number, opts: LayoutOptions = {}): 
   return issues;
 }
 
+/**
+ * The box everything visible at `t` occupies (texts, filled and outlined shapes, lines), for cropping a
+ * still to its content rather than to a canvas that was sized before the picture existed.
+ */
+export function contentBox(tl: Timeline, t: number, margin = 16): { x: number; y: number; w: number; h: number } {
+  const frame = sampleFrame(tl, t);
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  const take = (b: { x: number; y: number; w: number; h: number }) => {
+    x0 = Math.min(x0, b.x);
+    y0 = Math.min(y0, b.y);
+    x1 = Math.max(x1, b.x + b.w);
+    y1 = Math.max(y1, b.y + b.h);
+  };
+  for (const n of tl.nodes) {
+    const st = frame.get(n.id);
+    if (!st || st.opacity <= 0 || n.shape === "group") continue;
+    const pos = worldPos(tl, frame, n.id);
+    const tb = textBox(n, st, pos);
+    if (tb) take(tb);
+    if (n.shape === "rect" || n.shape === "ellipse") {
+      const [w, h] = st.size ?? n.size ?? [0, 0];
+      take({ x: pos[0] - w / 2, y: pos[1] - h / 2, w, h });
+    } else if (n.shape === "circle") {
+      const r = st.r ?? n.r ?? 0;
+      take({ x: pos[0] - r, y: pos[1] - r, w: 2 * r, h: 2 * r });
+    } else if ((n.shape === "line" || n.shape === "arrow") && n.points) {
+      for (const [px, py] of n.points) take({ x: pos[0] + px, y: pos[1] + py, w: 0, h: 0 });
+    } else if (n.shape === "path" && n.d) {
+      for (const m of n.d.matchAll(/(-?\d+(?:\.\d+)?)[ ,]+(-?\d+(?:\.\d+)?)/g)) take({ x: pos[0] + Number(m[1]), y: pos[1] + Number(m[2]), w: 0, h: 0 });
+    }
+  }
+  if (!Number.isFinite(x0)) return { x: 0, y: 0, w: tl.canvas.width, h: tl.canvas.height };
+  return { x: Math.floor(x0 - margin), y: Math.floor(y0 - margin), w: Math.ceil(x1 - x0 + 2 * margin), h: Math.ceil(y1 - y0 + 2 * margin) };
+}
+
 export function layoutReport(tl: Timeline, opts: LayoutOptions = {}): LayoutReport {
   const times = opts.times ?? sampleTimes(tl, 0);
   const frames: LayoutFrame[] = times.map((t, i) => {

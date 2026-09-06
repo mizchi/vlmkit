@@ -17,6 +17,7 @@ import { compileGraph } from "./graph.ts";
 import { compileHeap } from "./heap.ts";
 import { compileList } from "./list.ts";
 import { compileMatrix } from "./matrix.ts";
+import { compileModules } from "./modules.ts";
 import { compileSort } from "./sort.ts";
 import { compileStateMachine } from "./state-machine.ts";
 import { compileTree } from "./tree.ts";
@@ -47,6 +48,7 @@ function dispatch(scene: Scene): Timeline {
   switch (scene.kind) {
     case "compose": return compileCompose(scene);
     case "diagram": return compileDiagram(scene);
+    case "modules": return compileModules(scene);
     case "state-machine": return compileStateMachine(scene);
     case "sort": return compileSort(scene);
     case "array": return compileArray(scene);
@@ -64,7 +66,8 @@ function dispatch(scene: Scene): Timeline {
 }
 
 export { compileCompose } from "./compose.ts";
-export { compileArray, compileChart, compileList, compileQueue, compileStack, compileDiagram, compileDistributed, compileGraph, compileHeap, compileMatrix, compileSort, compileStateMachine, compileTree, compileVector };
+export { compileArray, compileChart, compileList, compileQueue, compileStack, compileDiagram, compileDistributed, compileGraph, compileHeap, compileMatrix, compileModules, compileSort, compileStateMachine, compileTree, compileVector };
+export { moduleCycles, moduleLayers, normalizeModules } from "./modules.ts";
 export { generateSortOps } from "./sort.ts";
 export { generateArrayOps } from "./array.ts";
 export { generateGraphOps } from "./graph.ts";

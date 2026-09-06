@@ -34,6 +34,11 @@ pictures at once. Two generic layers answer that, and a third op followed from t
   or `--model` through the optional `@mizchi/vlmkit-ai` peer). Annotations now place themselves off
   other text — the asked side first, then the other sides, one box further out, the panel, or a
   taller canvas — and relations arc over a bystander only when no level line fits nearby.
+- **Still figures.** `kind: modules` — a module map (modules, `deps` read "a depends on b", `groups`
+  as containers) laid out in dependency layers with one band per container, cycle-checked, a still
+  unless it has a `sequence`; `diagram` takes `groups` too. `vlmkit-anim still` renders any scene's
+  frame without the caption band, cropped to what is drawn, as SVG or PNG; `repo` and `pr` write
+  the figure next to the GIF.
 
 Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
 colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:

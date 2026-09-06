@@ -544,6 +544,60 @@ contact sheet) shows what its caption names. `"ms": 0` on `show` / `hide` / `hig
 `unhighlight` applies it inside the surrounding beat with no step of its own — `{"show": ["b"], "ms": 0}, {"highlight": ["a", "b"], "caption": "…"}`
 is one beat in which `b` appears and both light up.
 
+## kind: modules
+
+A module map for when the picture, not the motion, is the explanation: which
+modules exist, what depends on what, which belong together. Dependencies
+point one way (down by default) and the layout follows from them; containers
+group modules. Without a `sequence` it is a **still figure** —
+`vlmkit-anim still scene.json --out map.svg` (or `.png`) renders it without
+a caption band. With a `sequence` it is walked in beats like a `diagram`.
+
+```json
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "A web service, by module",
+  "modules": ["web", "api", { "id": "auth", "label": "auth service" }, "db", "cache", "logging"],
+  "deps": [["web", "api"], ["api", "auth"], ["api", "db"], ["api", "cache"], ["auth", "db"], { "from": "api", "to": "logging", "style": "line", "label": "emits" }],
+  "groups": [
+    { "id": "edge", "label": "edge", "modules": ["web"] },
+    { "id": "core", "label": "core", "modules": ["api", "auth"] },
+    { "id": "infra", "label": "infrastructure", "modules": ["db", "cache", "logging"] }
+  ]
+}
+```
+
+| field | |
+|---|---|
+| `modules` | required: ids, or `{"id", "label", "hidden"}` |
+| `deps` | `["a", "b"]` reads **a depends on b**: the arrow runs a → b and a sits above b. Long form `{"from", "to", "label", "style": "arrow" \| "line", "hidden"}` |
+| `groups` | `{"id", "label", "modules": [ids]}` — a container around its modules; a module is in at most one. Group ids are anchors (`callout`, `group`, `relate`) and `highlight` targets (the outline lights up) |
+| `layout` | `tb` (default, dependencies point down) or `lr` (they point right) |
+| `sequence` | optional: the `diagram` steps — `show`, `hide`, `highlight`, `unhighlight`, `flow "a->b"`, `note`, `relabel` — and every annotation op. Anchors: module ids, group ids, `"a->b"` |
+
+The layout is automatic and deliberate: a module's layer is one below the
+deepest module it depends on, so leaves are at the bottom; each group gets its
+own band across the layers, so a container is drawn around exactly its
+members and never encloses a bystander. A **dependency cycle** is a warning
+(`dependency cycle: a → b → a`): the layers can no longer show direction —
+break it, or draw the back edge deliberately with a `relate`. The canvas is
+sized for the map; set `canvas` to override.
+
+For a plain dependency graph without containers, `modules` without `groups`;
+for a graph that is walked by an algorithm (BFS, Dijkstra) use `graph`, whose
+`lr` / `tb` layouts layer the same way.
+
+## Still figures
+
+Any scene is a figure at any instant: `vlmkit-anim still scene.json --out
+fig.svg` renders the final frame without the caption band (`--step N` or
+`--at ms` for another instant; `.png` needs playwright). `modules` and a
+`diagram` without `sequence` are written for this; a `matrix` after its ops,
+a `graph` after its walk, or a `chart` fully revealed are stills too. `check`
+does not warn about a missing `sequence` on `modules`; it does on `diagram`,
+where the beats are the point.
+
 ## kind: vector
 
 For anything the semantic kinds do not cover: shapes plus a list of tweens.

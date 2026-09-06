@@ -24,6 +24,7 @@ import {
   type HeapScene,
   type ListScene,
   type MatrixScene,
+  type ModulesScene,
   type QueueScene,
   type Scene,
   type SortScene,
@@ -46,6 +47,7 @@ function constructor<S extends Scene>(kind: S["kind"]): (body: SceneBody<S>) => 
  */
 export const scene = {
   diagram: constructor<DiagramScene>("diagram"),
+  modules: constructor<ModulesScene>("modules"),
   stateMachine: constructor<StateMachineScene>("state-machine"),
   sort: constructor<SortScene>("sort"),
   array: constructor<ArrayScene>("array"),

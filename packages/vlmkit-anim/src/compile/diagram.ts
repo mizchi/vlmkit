@@ -8,7 +8,7 @@ import type { DiagramScene, Timeline } from "../types.ts";
 import { Builder, along, boxRadius, labelWidth, trimEdge } from "./builder.ts";
 import { layoutNodes } from "./layout.ts";
 
-export function compileDiagram(scene: DiagramScene): Timeline {
+export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modules" = "diagram"): Timeline {
   const b = new Builder(scene, { width: 640, height: 360, stepMs: 700 });
   const T = b.theme;
   const ids = scene.nodes.map((n) => n.id);
@@ -24,10 +24,67 @@ export function compileDiagram(scene: DiagramScene): Timeline {
   const maxW = Math.max(...[...sizes.values()].map((s) => s[0]));
   const maxH = Math.max(...[...sizes.values()].map((s) => s[1]));
   const edges = (scene.edges ?? []).map((e): [string, string] => [e.from, e.to]);
-  const pos = layoutNodes({ ids, edges, fixed, width: b.width - 40, height: b.height - 90, nodeW: maxW, nodeH: maxH }, scene.layout ?? "lr");
-  for (const [id, p] of pos) if (!fixed.has(id)) pos.set(id, [p[0] + 20, p[1] + 40]);
+  const groups = scene.groups ?? [];
+  // Containers need room for their padding and label: the free area shrinks by a band per group.
+  const groupPad = groups.length ? 18 : 0;
+  const pos = layoutNodes(
+    { ids, edges, fixed, width: b.width - 40 - groupPad * 2, height: b.height - 90 - groupPad * 2, nodeW: maxW + groupPad, nodeH: maxH + groupPad, groups },
+    scene.layout ?? "lr",
+  );
+  for (const [id, p] of pos) if (!fixed.has(id)) pos.set(id, [p[0] + 20 + groupPad, p[1] + 40 + groupPad]);
 
   if (scene.title) b.node({ id: "title", shape: "text", pos: [b.width / 2, 22], text: scene.title, fontSize: T.fontSize + 4, color: T.text });
+
+  // Where every edge label will sit, before anything is drawn: group labels pick a corner that none of
+  // them (and no node) occupies — "infrastructure" under "emits" was the first thing the layout geometry
+  // found in this kind's own example.
+  const occupied: { x: number; y: number; w: number; h: number }[] = [];
+  for (const n of scene.nodes) {
+    const p = pos.get(n.id)!;
+    const s = sizes.get(n.id)!;
+    occupied.push({ x: p[0] - s[0] / 2, y: p[1] - s[1] / 2, w: s[0], h: s[1] });
+  }
+  for (const e of scene.edges ?? []) {
+    if (!e.label) continue;
+    const a = pos.get(e.from)!;
+    const c = pos.get(e.to)!;
+    const mid = along(a, c, 0.5);
+    const w = labelWidth(e.label, T.fontSize - 2);
+    occupied.push({ x: mid[0] - w / 2, y: mid[1] - 20, w, h: 40 });
+  }
+  const hits = (bx: { x: number; y: number; w: number; h: number }) => occupied.some((o) => bx.x < o.x + o.w && o.x < bx.x + bx.w && bx.y < o.y + o.h && o.y < bx.y + bx.h);
+
+  // Containers first, so they sit behind everything they hold: the members' bounding box with padding,
+  // the label in the first free corner (top-left, top-right, bottom-left, bottom-right).
+  const groupIds = new Set(groups.map((g) => g.id));
+  for (const g of groups) {
+    const members = g.nodes.filter((id) => pos.has(id));
+    if (!members.length) continue;
+    const xs = members.flatMap((id) => [pos.get(id)![0] - sizes.get(id)![0] / 2, pos.get(id)![0] + sizes.get(id)![0] / 2]);
+    const ys = members.flatMap((id) => [pos.get(id)![1] - sizes.get(id)![1] / 2, pos.get(id)![1] + sizes.get(id)![1] / 2]);
+    const pad = 14;
+    const labelH = g.label ? 16 : 0;
+    const x0 = Math.min(...xs) - pad;
+    const y0 = Math.min(...ys) - pad - labelH;
+    const x1 = Math.max(...xs) + pad;
+    const y1 = Math.max(...ys) + pad + (g.label ? 0 : 0);
+    b.node({ id: g.id, shape: "rect", pos: [(x0 + x1) / 2, (y0 + y1) / 2], size: [x1 - x0, y1 - y0], rx: 10, fill: "none", stroke: T.muted, strokeWidth: 1.2 });
+    if (g.label) {
+      const fs = T.fontSize - 2;
+      const lw = labelWidth(g.label, fs) - fs * 1.6;
+      const corners: { pos: [number, number]; anchor: "start" | "end" }[] = [
+        { pos: [x0 + 10, y0 + 12], anchor: "start" },
+        { pos: [x1 - 10, y0 + 12], anchor: "end" },
+        { pos: [x0 + 10, y1 - 12], anchor: "start" },
+        { pos: [x1 - 10, y1 - 12], anchor: "end" },
+      ];
+      const boxAt = (c: { pos: [number, number]; anchor: "start" | "end" }) => ({ x: c.anchor === "start" ? c.pos[0] : c.pos[0] - lw, y: c.pos[1] - fs * 0.65, w: lw, h: fs * 1.3 });
+      const corner = corners.find((c) => !hits(boxAt(c))) ?? corners[0];
+      b.node({ id: `${g.id}-label`, shape: "text", pos: corner.pos, text: g.label, fontSize: fs, color: T.muted, anchor: corner.anchor });
+      occupied.push(boxAt(corner));
+    }
+    b.anchor(g.id, g.id);
+  }
 
   const edgeEnds = new Map<string, [[number, number], [number, number]]>();
   const edgeId = new Map<string, string>();
@@ -114,6 +171,11 @@ export function compileDiagram(scene: DiagramScene): Timeline {
       b.advance(ms);
       // Instant, like the sort and matrix highlights: the frame at the step shows the focus.
       for (const id of targets) {
+        if (groupIds.has(id)) {
+          // A container has no fill to change: its outline takes the accent instead.
+          b.set(id, "stroke", "highlight" in st ? T.accent : T.muted, t0);
+          continue;
+        }
         const original = scene.nodes.find((n) => n.id === id)?.fill;
         const fill = "highlight" in st ? color : original ?? color;
         if (b.valueAt(id, "fill", t0) !== fill) b.set(id, "fill", fill, t0);
@@ -149,5 +211,5 @@ export function compileDiagram(scene: DiagramScene): Timeline {
   }
   b.step(undefined, "end");
   b.advance(b.stepMs * 0.3);
-  return b.build({ title: scene.title, kind: "diagram" });
+  return b.build({ title: scene.title, kind: kindName });
 }
