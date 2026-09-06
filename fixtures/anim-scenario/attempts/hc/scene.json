@@ -1,0 +1,39 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Import cycle: handlers → services → events → handlers",
+  "modules": ["server", "router", "config", "logger", "handlers", "middleware", "auth", "services", "events", "repo", "validation"],
+  "deps": [
+    ["server", "router"],
+    ["server", "config"],
+    ["server", "logger"],
+    ["router", "handlers"],
+    ["router", "middleware"],
+    ["handlers", "services"],
+    ["handlers", "validation"],
+    ["middleware", "auth"],
+    ["middleware", "logger"],
+    ["auth", "services"],
+    ["auth", "config"],
+    ["services", "repo"],
+    ["services", "events"],
+    ["events", "handlers"],
+    ["repo", "config"],
+    ["repo", "logger"],
+    ["validation", "config"]
+  ],
+  "sequence": [
+    {
+      "highlight": ["handlers->services", "services->events", "events->handlers"],
+      "caption": "handlers → services → events → handlers is a cycle; cutting events→handlers keeps events one-way"
+    },
+    {
+      "callout": {
+        "at": "events->handlers",
+        "text": "Cut here: events should notify, not call back",
+        "side": "right"
+      },
+      "ms": 0
+    }
+  ]
+}
