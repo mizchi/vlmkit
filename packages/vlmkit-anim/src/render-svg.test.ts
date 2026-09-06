@@ -63,8 +63,12 @@ describe("renderFrameSvg", () => {
     assert.match(svg, /<g id="g" data-shape="group" transform="translate\(60 10\)">.*<g id="box"/s);
     assert.match(svg, /<tspan x="0" y="0">hi<\/tspan>/);
     assert.match(svg, /data-caption="true"><tspan[^>]*>half</);
-    assert.match(svg, /marker-end="url\(#arrow-333\)"/);
+    // Half drawn: the stroke shows its progress and the head waits — a head on an undrawn line read as an
+    // arrowhead pointing at nothing on a v12 contact sheet.
+    assert.doesNotMatch(svg, /marker-end=/);
     assert.match(svg, /stroke-dasharray="100" stroke-dashoffset="50"/);
+    const drawn = renderFrameSvg({ ...tl, nodes: tl.nodes.map((n) => (n.id === "line" ? { ...n, dash: 1 } : n)) }, 500);
+    assert.match(drawn, /marker-end="url\(#arrow-333\)"/);
     assert.match(svg, /<tspan x="0" y="-8.4">a<\/tspan><tspan x="0" y="8.4">b<\/tspan>/);
   });
 
