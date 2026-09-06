@@ -610,7 +610,10 @@ fig.svg` renders the final frame without the caption band (`--step N` or
 `diagram` without `sequence` are written for this; a `matrix` after its ops,
 a `graph` after its walk, or a `chart` fully revealed are stills too. `check`
 does not warn about a missing `sequence` on `modules`; it does on `diagram`,
-where the beats are the point.
+where the beats are the point. A still may still carry a one-beat `sequence`
+for emphasis — `{"highlight": ["handlers->services", "services->events"]}`
+colours those edges, a `callout` at an edge or module adds a note — since
+`still` renders the last frame.
 
 ## kind: vector
 
@@ -740,7 +743,7 @@ means invisible — read opacity, not presence, when checking a frame.
 | `matrix` | a cell `"r,c"`, `"row:<label or index>"`, `"col:<label or index>"` |
 | `graph` | a node id, an edge `"a->b"` |
 | `chart` | a series id, a category, `"series/category"` |
-| `diagram` | a node id, an edge `"a->b"` |
+| `diagram`, `modules` | a node or module id, a group id, an edge `"a->b"` (the dependency `["a", "b"]` is the edge `"a->b"`) |
 | `vector` | a node id |
 
 `vlmkit-anim schema --kind annotations` prints this table.

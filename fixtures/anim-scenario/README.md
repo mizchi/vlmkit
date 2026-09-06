@@ -71,6 +71,9 @@ plus one dependency that must be shown as forbidden), `depgraph-import-cycle`
 `modules-request-walk` (one file as both the onboarding map and a walked
 request). Writers `fa`–`fe`; success adds `layout` reporting no issue and an
 edge-fidelity hand count (every listed dependency drawn, none invented).
+`ga`–`gc` re-ran three of the briefs on the compiler and guide the first
+five's friction produced (`layout` had learned to see a line through a text
+in between).
 
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;

@@ -328,7 +328,7 @@ Anchors by kind (what "at" / "of" / "around" may name):
   matrix         a cell "r,c", "row:<label or index>", "col:<label or index>"
   graph          a node id, an edge "a->b"
   chart          a series id, a category, "series/category"
-  diagram        a node id, an edge "a->b"
+  diagram / modules  a node or module id, a group id, an edge "a->b" (the dependency ["a", "b"] is the edge "a->b")
   vector         a node id`;
 
 const SHEETS: Record<Scene["kind"] | "timeline", string> = {
