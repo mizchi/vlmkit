@@ -444,7 +444,7 @@ Matching brackets with a stack — 7 steps, 4070ms, 9 nodes
 
 ## state-tcp
 
-`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 366 KB
+`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 400 KB
 
 ![state-tcp animation](./state-tcp.gif)
 
