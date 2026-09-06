@@ -1,0 +1,39 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Request through checkout",
+  "modules": ["web", "gateway", "checkout", "inventory", "payments", "orders", "db", "queue"],
+  "deps": [
+    ["web", "gateway"],
+    ["gateway", "checkout"],
+    ["checkout", "inventory"],
+    ["checkout", "payments"],
+    ["checkout", "orders"],
+    ["inventory", "db"],
+    ["orders", "db"],
+    ["orders", "queue"],
+    ["payments", "queue"]
+  ],
+  "groups": [
+    { "id": "frontend", "label": "frontend", "modules": ["web", "gateway"] },
+    { "id": "domain", "label": "domain", "modules": ["checkout", "inventory", "payments", "orders"] },
+    { "id": "platform", "label": "platform", "modules": ["db", "queue"] }
+  ],
+  "sequence": [
+    { "flow": "web->gateway", "caption": "Request enters at web" },
+    { "flow": "gateway->checkout", "caption": "Routed to checkout via gateway" },
+    { "flow": "checkout->inventory", "caption": "Reserve stock" },
+    { "flow": "inventory->db", "caption": "Query inventory database" },
+    { "flow": "db->inventory", "caption": "Stock reserved" },
+    { "flow": "inventory->checkout", "caption": "Inventory confirmed" },
+    { "flow": "checkout->payments", "caption": "Charge the card (asynchronous)" },
+    { "highlight": "payments->queue", "caption": "Payment queued for async processing" },
+    { "flow": "checkout->orders", "caption": "Record the order" },
+    { "flow": "orders->db", "caption": "Persist order" },
+    { "flow": "db->orders", "caption": "Order recorded" },
+    { "flow": "orders->queue", "caption": "Queue order for async processing" },
+    { "highlight": "checkout->payments", "caption": "Async hop 1: payments are eventual" },
+    { "highlight": "checkout->orders", "caption": "Async hop 2: orders are queued" },
+    { "note": "The checkout makes the customer experience consistent while payments and orders settle eventually" }
+  ]
+}
