@@ -39,6 +39,20 @@ pictures at once. Two generic layers answer that, and a third op followed from t
   unless it has a `sequence`; `diagram` takes `groups` too. `vlmkit-anim still` renders any scene's
   frame without the caption band, cropped to what is drawn, as SVG or PNG; `repo` and `pr` write
   the figure next to the GIF.
+- **v13, the first writer round on still figures, and what it changed.** Five fresh writers drew
+  module maps and a dependency graph from the guide alone; every one was green, and every figure
+  had lines through labels the geometry could not see. `vlmkit-anim layout` now reports a fourth
+  defect, **crossed** — a line through a text, or through a box that is not one of its ends — and
+  `check` warns about it. The compiler then earns that check: module maps layer from their leaves
+  (two modules with the same dependencies share a layer, whatever depends on them), order each
+  layer to straighten edges, bend an edge around a module in its way, draw a group that owns its
+  layers as a full-width row instead of a band, keep container labels out of edges, place callouts
+  and relation labels off strokes as well as off text (an unchecked fallback once put a callout on
+  the module next to its edge), pick the arc side that clears everything, and halo edge, message
+  and relation labels so a line under them breaks around the glyphs. Edges take `"style":
+  "dashed"` (optional) and `"forbidden"` (dashed red, ignored by the layout — the import that must
+  not exist); `highlight` takes an edge `"a->b"`; `relate` takes `"tone": "bad" | "muted"`. Across
+  the five scenes: 91 crossings before, 2 after. Report: `docs/reports/2026-09-06-anim-ir-v13.md`.
 
 Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
 colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:

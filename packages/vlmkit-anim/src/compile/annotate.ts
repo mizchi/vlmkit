@@ -25,6 +25,10 @@
 import { ANNOTATION_ACTIONS, type AnnotationOp, type AnnotationSide as Side, type CalloutSpec, type Diagnostic, type GroupSpec, type RelateSpec, type SnapshotSpec, type TextSpec, type ValueSpec, type Vec2 } from "../types.ts";
 import type { Builder } from "./builder.ts";
 import { boxRadius, labelWidth } from "./builder.ts";
+import { segmentInside } from "./diagram.ts";
+import { strokeSegments } from "../layout.ts";
+
+type Seg = [Vec2, Vec2];
 
 export { ANNOTATION_ACTIONS };
 export type { AnnotationOp };
@@ -250,19 +254,23 @@ export class Annotations {
    * per node, not per anchor: `col:box2` is two cells, and only the one in the row being related is in
    * the way (measuring the whole column once sent an arc over the header row).
    */
+  /** Every node a relation has to keep clear of: the anchored ones, and the annotation texts drawn so far. */
+  private inTheWay(): string[] {
+    const ids = new Set<string>();
+    for (const list of this.anchors.values()) for (const id of list) ids.add(id);
+    for (const n of this.b.nodes) if (/^(callout|value|text|snapshot)-/.test(n.id) && (n.shape === "text" || n.shape === "rect")) ids.add(n.id);
+    return [...ids];
+  }
+
   private bystanders(p: Vec2, q: Vec2, a: Box, c: Box, from: string, to: string, t: number): Box[] {
     const own = new Set([...(this.anchors.get(from) ?? []), ...(this.anchors.get(to) ?? [])]);
-    const seen = new Set<string>();
     const out: Box[] = [];
-    for (const ids of this.anchors.values()) {
-      for (const id of ids) {
-        if (own.has(id) || seen.has(id)) continue;
-        seen.add(id);
-        if ((this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
-        const b = this.nodeBox(id, t);
-        if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c)) continue;
-        if (segmentHitsBox(p, q, b)) out.push(b);
-      }
+    for (const id of this.inTheWay()) {
+      if (own.has(id)) continue;
+      if ((this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
+      const b = this.nodeBox(id, t);
+      if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c)) continue;
+      if (segmentHitsBox(p, q, b)) out.push(b);
     }
     return out;
   }
@@ -276,28 +284,48 @@ export class Annotations {
    * midpoint: first what the chord itself crosses, then whatever anchored node the arc would cross once it
    * bulges that far (a cell in the next row), until nothing new is in the way.
    */
-  private bystanderBulge(p: Vec2, q: Vec2, n: Vec2, sign: 1 | -1, a: Box, c: Box, from: string, to: string, t: number): number {
+  private bystanderBulge(p: Vec2, q: Vec2, n: Vec2, sign: 1 | -1, a: Box, c: Box, from: string, to: string, t: number): { bulge: number; clear: boolean } {
     const m: Vec2 = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
     const extent = (b: Box): number => Math.max(...([[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]] as Vec2[]).map(([x, y]) => ((x - m[0]) * n[0] + (y - m[1]) * n[1]) * sign));
     let bulge = Math.max(16, ...this.bystanders(p, q, a, c, from, to, t).map((b) => extent(b) + 12));
     const own = new Set([...(this.anchors.get(from) ?? []), ...(this.anchors.get(to) ?? [])]);
-    const chord = union(box(p[0], p[1], 0, 0), box(q[0], q[1], 0, 0));
-    for (let iter = 0; iter < 4; iter++) {
-      const shifted: Box = { ...chord, x: chord.x + n[0] * bulge * sign, y: chord.y + n[1] * bulge * sign };
-      const swept = union(chord, shifted);
+    // The arc itself, sampled: a quadratic Bézier clears its apex's line only at the middle, so a box near one
+    // end can still be under the curve when the apex is past it (the callout beside `db`, v13).
+    const samples = (bulge: number): Vec2[] => {
+      const ctrl: Vec2 = [m[0] + n[0] * 2 * bulge * sign, m[1] + n[1] * 2 * bulge * sign];
+      const pts: Vec2[] = [];
+      for (let k = 0; k <= 16; k++) {
+        const s = k / 16;
+        const u = 1 - s;
+        pts.push([u * u * p[0] + 2 * u * s * ctrl[0] + s * s * q[0], u * u * p[1] + 2 * u * s * ctrl[1] + s * s * q[1]]);
+      }
+      return pts;
+    };
+    const arcHits = (bulge: number, b: Box): boolean => {
+      const pts = samples(bulge);
+      for (let k = 0; k + 1 < pts.length; k++) if (segmentInside([pts[k], pts[k + 1]], b) > 2) return true;
+      return false;
+    };
+    for (let iter = 0; iter < 6; iter++) {
       let next = bulge;
-      for (const ids of this.anchors.values()) {
-        for (const id of ids) {
-          if (own.has(id) || (this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
-          const b = this.nodeBox(id, t);
-          if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c) || !intersects(b, swept)) continue;
-          next = Math.max(next, extent(b) + 12);
-        }
+      for (const id of this.inTheWay()) {
+        if (own.has(id) || (this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
+        const b = this.nodeBox(id, t);
+        if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c) || !arcHits(bulge, b)) continue;
+        next = Math.max(next, extent(b) + 12, bulge + 16);
       }
       if (next <= bulge) break;
       bulge = next;
     }
-    return bulge;
+    // Whether the arc, bulged this far, still runs through something: the other side may do better.
+    let clear = true;
+    for (const id of this.inTheWay()) {
+      if (own.has(id) || (this.b.valueAt(id, "opacity", t) ?? 1) === 0) continue;
+      const b = this.nodeBox(id, t);
+      if ((b.w === 0 && b.h === 0) || intersects(b, a) || intersects(b, c)) continue;
+      if (arcHits(bulge, b)) clear = false;
+    }
+    return { bulge, clear };
   }
 
   private anchorText(name: string, t: number, path: string): string {
@@ -326,12 +354,61 @@ export class Annotations {
    * headers and a readout under a group label; both were placed exactly where they were asked, on top of
    * something already there.
    */
-  private placeBeside(target: Box, w: number, h: number, side: Side, gap: number, own: Set<string>, t: number): Vec2 {
+  /** Visible strokes (edges straight or bent, lifelines, message arrows, relation arcs) at `t`, in world coordinates. */
+  private strokesAt(t: number, except: Set<string> = new Set()): Seg[] {
+    const out: Seg[] = [];
+    for (const n of this.b.nodes) {
+      if ((n.shape !== "line" && n.shape !== "arrow" && n.shape !== "path") || except.has(n.id)) continue;
+      if (((this.b.valueAt(n.id, "opacity", t) as number | undefined) ?? 1) < 0.5) continue;
+      const [x, y] = (this.b.valueAt(n.id, "pos", t) as Vec2 | undefined) ?? [0, 0];
+      const [px, py] = n.parent ? ((this.b.valueAt(n.parent, "pos", t) as Vec2 | undefined) ?? [0, 0]) : [0, 0];
+      out.push(...strokeSegments(n, [x + px, y + py]));
+    }
+    return out;
+  }
+
+  /** Pixels of stroke that run through a box — an edge under a callout is as unreadable as a text under it. */
+  private crossedBy(box: Box, strokes: Seg[]): number {
+    return strokes.reduce((s, seg) => s + segmentInside(seg, box), 0);
+  }
+
+  /** The side `placeBeside` last chose, for a pointer that has to leave the box on that side. */
+  private placedSide: Side = "above";
+
+  private placeBeside(target: Box, w: number, h: number, side: Side, gap: number, own: Set<string>, t: number, pointer = false): Vec2 {
     const order: Side[] = [side, ...(["above", "right", "below", "left"] as Side[]).filter((s) => s !== side)];
-    const covers = (box: Box): boolean =>
-      this.b.nodes.some(
-        (n) => (n.shape === "text" || n.text !== undefined) && !own.has(n.id) && (this.b.valueAt(n.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(n.id, t), box),
-      );
+    // The anchor's own strokes (the edge a callout is about) may run under the box; everything else may not.
+    const strokes = this.strokesAt(t, own);
+    const tc: Vec2 = [target.x + target.w / 2, target.y + target.h / 2];
+    // A pointer from the box to the target must not run through some other box on its way (fd, v13: a callout
+    // on one edge pointed straight through the module next to it).
+    // Scored by how much of it runs through what: a thin pointer over a labelled box costs its length (a
+    // hand-drawn callout does the same to reach an interior cell), over a free-standing label four times that
+    // — that one the geometry reports.
+    const pointerCost = (box: Box): number => {
+      if (!pointer) return 0;
+      let cost = 0;
+      for (const n of this.b.nodes) {
+        if ((n.shape !== "text" && n.text === undefined) || own.has(n.id) || (this.b.valueAt(n.id, "opacity", t) ?? 1) === 0) continue;
+        const inside = segmentInside([[box.x + box.w / 2, box.y + box.h / 2], tc], this.nodeBox(n.id, t));
+        if (inside > 6) cost += n.shape === "text" ? inside * 4 : inside;
+      }
+      return cost;
+    };
+    // How bad a spot is: a text it covers is never acceptable, a line through it or a blocked pointer is bad,
+    // a clear spot is 0. The first clear spot wins; when none is, the least bad one does — an unchecked
+    // fallback once put a callout squarely on the module next to its edge.
+    const badness = (box: Box): number => {
+      let s = 0;
+      for (const n of this.b.nodes) {
+        if ((n.shape !== "text" && n.text === undefined) || own.has(n.id) || (this.b.valueAt(n.id, "opacity", t) ?? 1) === 0) continue;
+        if (intersects(this.nodeBox(n.id, t), box)) s += 1000;
+      }
+      const crossed = this.crossedBy(box, strokes);
+      if (crossed >= 8) s += crossed;
+      s += pointerCost(box);
+      return s;
+    };
     // Inside the canvas as it stands, panel included when something opened it.
     const inside = (box: Box): boolean =>
       box.x >= 0 && box.y >= 0 && box.x + box.w <= this.b.width + this.extraWidth() && box.y + box.h <= this.b.height + this.extraH - CAPTION_BAND;
@@ -347,25 +424,49 @@ export class Annotations {
     };
     // Nearest first: every side at the asked gap, then every side one box further out, and so on — a cell in
     // the middle of a matrix has neighbours on all four sides, and its callout belongs just past them.
+    // A box above or below slides sideways to stay on the canvas (and one beside slides up or down): a wide
+    // callout on a node at the left edge is otherwise never "inside" on the side it was asked for, and lands
+    // on whatever is to the right (fc, v13).
+    const W = this.b.width + this.extraWidth();
+    const H = this.b.height + this.extraH - CAPTION_BAND;
+    const slid = (cx: number, cy: number, s: Side): Box => {
+      const box = boxAt(cx, cy);
+      if (s === "above" || s === "below") box.x = Math.max(0, Math.min(W - box.w, box.x));
+      else box.y = Math.max(0, Math.min(H - box.h, box.y));
+      return box;
+    };
+    let best: { box: Box; side: Side; score: number; need: number } | undefined;
     for (let k = 0; k < 4; k++) {
       for (const s of order) {
         const step = s === "above" || s === "below" ? h + 6 : w + 6;
         const [cx, cy] = this.beside(target, w, h, s, gap + k * step);
-        const box = boxAt(cx, cy);
-        if (inside(box) && !covers(box)) return take(box);
+        const box = slid(cx, cy, s);
+        if (!inside(box)) continue;
+        const score = badness(box);
+        if (score === 0) {
+          this.placedSide = s;
+          return take(box);
+        }
+        if (!best || score < best.score) best = { box, side: s, score, need: 0 };
       }
     }
-    // Nothing fits on the canvas as it stands: the bottom edge can grow. Take the first spot below that
-    // covers nothing and ask for the height it needs, within reason.
+    // Nothing clear on the canvas as it stands: the bottom edge can grow. A spot below that covers no text is
+    // worth the height it needs, within reason — and beats a spot on the canvas that covers one.
     for (let k = 0; k < 4; k++) {
       const [cx, cy] = this.beside(target, w, h, "below", gap + k * (h + 6));
-      const box = boxAt(cx, cy);
+      const box = slid(cx, cy, "below");
       const need = box.y + box.h + CAPTION_BAND - (this.b.height + this.extraH);
-      if (box.x >= 0 && box.x + box.w <= this.b.width + this.extraWidth() && need <= 120 && !covers(box)) {
-        if (need > 0) this.extraH += Math.ceil(need);
-        return take(box);
-      }
+      if (box.x < 0 || box.x + box.w > W || need > 120) continue;
+      const score = badness(box) + Math.max(0, need) / 10;
+      if (score >= 1000) continue;
+      if (!best || score < best.score) best = { box, side: "below", score, need };
     }
+    if (best) {
+      if (best.need > 0) this.extraH += Math.ceil(best.need);
+      this.placedSide = best.side;
+      return take(best.box);
+    }
+    this.placedSide = side;
     return this.beside(target, w, h, side, gap);
   }
 
@@ -405,9 +506,10 @@ export class Annotations {
       const w = labelWidth(`${label}: ${text}`, T.fontSize - 1);
       const h = T.fontSize * 1.4;
       const [cx, cy] = this.placeBeside(target, w, h, side, 10, new Set(this.anchors.get(spec.at) ?? []), t);
-      this.b.node({ id: labelId, shape: "text", pos: [cx - w / 2, cy], text: `${label}:`, fontSize: T.fontSize - 2, color: T.muted, anchor: "start", opacity: 0 });
+      // Haloed: a readout beside a node sits where lifelines and edges run, and reads over them.
+      this.b.node({ id: labelId, shape: "text", pos: [cx - w / 2, cy], text: `${label}:`, fontSize: T.fontSize - 2, color: T.muted, anchor: "start", halo: true, opacity: 0 });
       const lx = cx - w / 2 + labelWidth(`${label}:`, T.fontSize - 2) - (T.fontSize - 2) * 1.2;
-      this.b.node({ id: textId, shape: "text", pos: [lx, cy], text, fontSize: T.fontSize, color: T.accent, anchor: "start", opacity: 0 });
+      this.b.node({ id: textId, shape: "text", pos: [lx, cy], text, fontSize: T.fontSize, color: T.accent, anchor: "start", halo: true, opacity: 0 });
     } else {
       const [cx, cy] = this.panelSlot(1);
       const left = cx - PANEL_WIDTH / 2;
@@ -430,18 +532,26 @@ export class Annotations {
     if (!spec) return;
     const id = spec.id ?? "main";
     const T = this.b.theme;
-    const target = this.anchorBox(spec.at, t, `${path}.callout.at`);
-    const side = spec.side ?? "above";
+    let target = this.anchorBox(spec.at, t, `${path}.callout.at`);
+    // An edge or a message is pointed at by its middle: "beside" the whole span of a diagonal would be far
+    // from the line the callout is about.
+    const anchored = this.resolve(spec.at, `${path}.callout.at`).map((nid) => this.b.nodes.find((n) => n.id === nid)?.shape);
+    if (anchored.length && anchored.every((s) => s === "line" || s === "arrow" || s === "path")) target = box(target.x + target.w / 2, target.y + target.h / 2, 16, 16);
+    const asked = spec.side ?? "above";
     const fs = T.fontSize - 1;
     const w = labelWidth(spec.text, fs);
     const h = fs * 1.9;
-    const [cx, cy] = this.placeBeside(target, w, h, side, 26, new Set(this.anchors.get(spec.at) ?? []), t);
+    const [cx, cy] = this.placeBeside(target, w, h, asked, 26, new Set(this.anchors.get(spec.at) ?? []), t, true);
+    const side = this.placedSide;
     const k = this.serial++;
     const ids = [`callout-${id}-${k}-box`, `callout-${id}-${k}-text`, `callout-${id}-${k}-arrow`];
-    // The pointer runs from the box edge nearest the target to the target's edge.
-    const from: Vec2 = side === "above" ? [cx, cy + h / 2] : side === "below" ? [cx, cy - h / 2] : side === "left" ? [cx + w / 2, cy] : [cx - w / 2, cy];
+    // The pointer runs from the box edge nearest the target to the target's edge — from the point on that edge
+    // nearest the target, since the box may have slid sideways to stay on the canvas.
     const tx = target.x + target.w / 2;
     const ty = target.y + target.h / 2;
+    const fx = Math.max(cx - w / 2 + 8, Math.min(cx + w / 2 - 8, tx));
+    const fy = Math.max(cy - h / 2 + 6, Math.min(cy + h / 2 - 6, ty));
+    const from: Vec2 = side === "above" ? [fx, cy + h / 2] : side === "below" ? [fx, cy - h / 2] : side === "left" ? [cx + w / 2, fy] : [cx - w / 2, fy];
     const to: Vec2 = side === "above" ? [tx, target.y - 3] : side === "below" ? [tx, target.y + target.h + 3] : side === "left" ? [target.x - 3, ty] : [target.x + target.w + 3, ty];
     this.b.node({ id: ids[0], shape: "rect", pos: [cx, cy], size: [w, h], rx: 6, fill: T.accent, stroke: T.nodeStroke, strokeWidth: 1, opacity: 0 });
     this.b.node({ id: ids[1], shape: "text", pos: [cx, cy], text: spec.text, fontSize: fs, color: T.nodeStroke, opacity: 0 });
@@ -661,20 +771,34 @@ export class Annotations {
         const onCanvas = (pt: Vec2) => pt[0] >= 12 && pt[0] <= this.b.width + this.extraWidth() - 12 && pt[1] >= 12 && pt[1] <= this.b.height + this.extraH - CAPTION_BAND;
         // The side with more room first; if its apex would leave the canvas, the other side; if both would
         // (a long diagonal across a layered map), the straight line — crossing a box beats drawing off-canvas.
+        // A side whose arc clears everything wins over one that still crosses something (the callout beside
+        // `db` under an arc from `web`, v13); the roomier side breaks the tie.
         const sides: (1 | -1)[] = this.room(pair, n, 1) >= this.room(pair, n, -1) ? [1, -1] : [-1, 1];
-        for (const side of sides) {
-          const bulge = this.bystanderBulge(p, q, n, side, a, c, spec.from, spec.to, t);
+        const tried = sides.map((side) => ({ side, ...this.bystanderBulge(p, q, n, side, a, c, spec.from, spec.to, t) }));
+        const usable = tried.filter(({ bulge, side }) => onCanvas([m[0] + n[0] * bulge * side, m[1] + n[1] * bulge * side]));
+        const pick = usable.find((x) => x.clear) ?? usable[0];
+        if (pick) {
+          const { side, bulge } = pick;
           const apex: Vec2 = [m[0] + n[0] * bulge * side, m[1] + n[1] * bulge * side];
-          if (!onCanvas(apex)) continue;
           outward = side;
           // A quadratic Bézier passes halfway to its control point: the control sits at twice the bulge.
           const ctrl: Vec2 = [m[0] + n[0] * 2 * bulge * side, m[1] + n[1] * 2 * bulge * side];
+          // The arc leaves and enters each box on the side that faces the bulge — an arc that swings left of
+          // `db` comes into its left side, not down through the space above it where a callout sits.
+          const towards = (from: Vec2, radius: (dx: number, dy: number) => number, gap: number): Vec2 => {
+            const dx = ctrl[0] - from[0];
+            const dy = ctrl[1] - from[1];
+            const len = Math.hypot(dx, dy) || 1;
+            const rr = radius(dx / len, dy / len) + gap;
+            return [from[0] + (dx / len) * rr, from[1] + (dy / len) * rr];
+          };
+          p = towards(ca, (dx, dy) => boxRadius(a.w, a.h, dx, dy), 5);
+          q = towards(cc, (dx, dy) => boxRadius(c.w, c.h, dx, dy), spec.style === "line" ? 5 : 9);
           const r = (v: number) => Math.round(v * 10) / 10;
           arc = {
             apex,
             d: `M ${r(p[0] - apex[0])} ${r(p[1] - apex[1])} Q ${r(ctrl[0] - apex[0])} ${r(ctrl[1] - apex[1])} ${r(q[0] - apex[0])} ${r(q[1] - apex[1])}`,
           };
-          break;
         }
       }
     }
@@ -682,8 +806,12 @@ export class Annotations {
     const k = this.serial++;
     const lineId = `relate-${id}-${k}`;
     const ids = [lineId];
-    if (arc) this.b.node({ id: lineId, shape: "path", pos: mid, d: arc.d, head: spec.style !== "line", fill: "none", stroke: T.accent, strokeWidth: 2, opacity: 0 });
-    else this.b.node({ id: lineId, shape: spec.style === "line" ? "line" : "arrow", pos: mid, points: [[p[0] - mid[0], p[1] - mid[1]], [q[0] - mid[0], q[1] - mid[1]]], stroke: T.accent, strokeWidth: 2, opacity: 0 });
+    // The tone is the relation's colour role: accent by default, `bad` for one that must not exist (a forbidden
+    // import in a module map — fb, v13, wanted red and found only amber), `muted` for an aside.
+    const color = spec.tone === "bad" ? T.bad : spec.tone === "muted" ? T.muted : T.accent;
+    const dashed = spec.tone === "bad" ? true : undefined;
+    if (arc) this.b.node({ id: lineId, shape: "path", pos: mid, d: arc.d, head: spec.style !== "line", fill: "none", stroke: color, strokeWidth: 2, dashed, opacity: 0 });
+    else this.b.node({ id: lineId, shape: spec.style === "line" ? "line" : "arrow", pos: mid, points: [[p[0] - mid[0], p[1] - mid[1]], [q[0] - mid[0], q[1] - mid[1]]], stroke: color, strokeWidth: 2, dashed, opacity: 0 });
     if (spec.label) {
       const labelId = `relate-${id}-${k}-label`;
       ids.push(labelId);
@@ -702,11 +830,14 @@ export class Annotations {
         [mid, quarter(0.25), quarter(0.75)].map((pt): Vec2 => [pt[0] + n[0] * g * outward, pt[1] + n[1] * g * outward]),
       );
       const boxOf = (pt: Vec2): Box => ({ x: anchor === "start" ? pt[0] : anchor === "end" ? pt[0] - lw : pt[0] - lw / 2, y: pt[1] - lh / 2, w: lw, h: lh });
+      const strokes = this.strokesAt(t);
       const covered = (bx: Box) =>
-        this.b.nodes.some((nd) => (nd.shape === "text" || nd.text !== undefined) && (this.b.valueAt(nd.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(nd.id, t), bx));
+        this.b.nodes.some((nd) => (nd.shape === "text" || nd.text !== undefined) && (this.b.valueAt(nd.id, "opacity", t) ?? 1) !== 0 && intersects(this.nodeBox(nd.id, t), bx)) ||
+        this.crossedBy(bx, strokes) >= 8;
       const inCanvas = (bx: Box) => bx.x >= 0 && bx.y >= 0 && bx.x + bx.w <= this.b.width + this.extraWidth() && bx.y + bx.h <= this.b.height + this.extraH - CAPTION_BAND;
       const pos = candidates.find((pt) => inCanvas(boxOf(pt)) && !covered(boxOf(pt))) ?? candidates.find((pt) => inCanvas(boxOf(pt))) ?? candidates[0];
-      this.b.node({ id: labelId, shape: "text", pos, text: spec.label, fontSize: fs, color: T.accent, anchor, opacity: 0 });
+      // Haloed: the relation's own line runs right past its label, and another edge may cross it.
+      this.b.node({ id: labelId, shape: "text", pos, text: spec.label, fontSize: fs, color, anchor, halo: true, opacity: 0 });
     }
     for (const nodeId of ids) this.b.set(nodeId, "opacity", 1, t);
     this.relations.set(id, ids);

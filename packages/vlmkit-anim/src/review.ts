@@ -26,7 +26,7 @@ export interface ReviewTile {
 }
 
 export interface ReviewIssue {
-  kind: "overlap" | "clipped" | "offscreen" | "illegible" | "other";
+  kind: "overlap" | "clipped" | "crossed" | "offscreen" | "illegible" | "other";
   what: string;
   severity?: "minor" | "major";
 }
@@ -42,7 +42,7 @@ export interface ReviewAnswers {
   notes?: string;
 }
 
-export const REVIEW_KINDS = ["overlap", "clipped", "offscreen", "illegible", "other"] as const;
+export const REVIEW_KINDS = ["overlap", "clipped", "crossed", "offscreen", "illegible", "other"] as const;
 
 /** The brief a reader gets with the sheet. `tiles` come from the sheet's own labels. */
 export function reviewBrief(title: string, tiles: ReviewTile[]): string {
@@ -57,6 +57,7 @@ Look at each tile and report **layout defects only** — not whether the explana
 - **overlap**: two pieces of text on top of each other, or text under a filled box that is not its own
   (a label on a column header, a readout under an arrow's label, a callout box hiding a cell).
 - **clipped**: text cut off at the tile's edge (a title missing its first letters, a caption running out).
+- **crossed**: a line or arrow drawn straight through a label, or through a box that is not one of its ends.
 - **offscreen**: an arrow, box or label that clearly continues past the edge of the frame.
 - **illegible**: text too small or too crowded to read at this size.
 - **other**: anything else that looks wrong in the drawing (an arrow pointing at nothing, a line through a box).

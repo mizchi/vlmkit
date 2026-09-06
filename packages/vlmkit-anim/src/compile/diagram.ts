@@ -8,6 +8,32 @@ import type { DiagramScene, Timeline } from "../types.ts";
 import { Builder, along, boxRadius, labelWidth, trimEdge } from "./builder.ts";
 import { layoutNodes } from "./layout.ts";
 
+type Box = { x: number; y: number; w: number; h: number };
+type Seg = [[number, number], [number, number]];
+
+/** Length of the part of a segment inside a box (Liang–Barsky), for "does this edge run through that label". */
+export function segmentInside(seg: Seg, b: Box): number {
+  const [[x0, y0], [x1, y1]] = seg;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  let t0 = 0;
+  let t1 = 1;
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+  if (!clip(-dx, x0 - b.x) || !clip(dx, b.x + b.w - x0) || !clip(-dy, y0 - b.y) || !clip(dy, b.y + b.h - y0)) return 0;
+  return Math.hypot(dx, dy) * Math.max(0, t1 - t0);
+}
+
 export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modules" = "diagram"): Timeline {
   const b = new Builder(scene, { width: 640, height: 360, stepMs: 700 });
   const T = b.theme;
@@ -23,39 +49,126 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   }
   const maxW = Math.max(...[...sizes.values()].map((s) => s[0]));
   const maxH = Math.max(...[...sizes.values()].map((s) => s[1]));
-  const edges = (scene.edges ?? []).map((e): [string, string] => [e.from, e.to]);
+  // A forbidden edge is drawn but says nothing about where things go: the layout never sees it.
+  const edges = (scene.edges ?? []).filter((e) => e.style !== "forbidden").map((e): [string, string] => [e.from, e.to]);
   const groups = scene.groups ?? [];
   // Containers need room for their padding and label: the free area shrinks by a band per group.
   const groupPad = groups.length ? 18 : 0;
   const pos = layoutNodes(
-    { ids, edges, fixed, width: b.width - 40 - groupPad * 2, height: b.height - 90 - groupPad * 2, nodeW: maxW + groupPad, nodeH: maxH + groupPad, groups },
+    {
+      ids,
+      edges,
+      fixed,
+      width: b.width - 40 - groupPad * 2,
+      height: b.height - 90 - groupPad * 2,
+      nodeW: maxW + groupPad,
+      nodeH: maxH + groupPad,
+      groups,
+      // A module map layers from its leaves: what two modules depend on decides their layer, not what
+      // depends on them (fa, v13: the same dependency set landed on different layers under the root walk).
+      layering: kindName === "modules" ? "sinks" : "sources",
+    },
     scene.layout ?? "lr",
   );
   for (const [id, p] of pos) if (!fixed.has(id)) pos.set(id, [p[0] + 20 + groupPad, p[1] + 40 + groupPad]);
 
   if (scene.title) b.node({ id: "title", shape: "text", pos: [b.width / 2, 22], text: scene.title, fontSize: T.fontSize + 4, color: T.text });
 
-  // Where every edge label will sit, before anything is drawn: group labels pick a corner that none of
-  // them (and no node) occupies — "infrastructure" under "emits" was the first thing the layout geometry
-  // found in this kind's own example.
-  const occupied: { x: number; y: number; w: number; h: number }[] = [];
+  // Edge geometry first — where each runs and where its label sits — so containers and their labels can keep
+  // out of the way: "infrastructure" under "emits" was the first thing the layout geometry found in this
+  // kind's own example (v12), and "core" with an arrow through it the first thing v13's writers drew.
+  const boxOf = (id: string): Box => {
+    const p = pos.get(id)!;
+    const s = sizes.get(id)!;
+    return { x: p[0] - s[0] / 2, y: p[1] - s[1] / 2, w: s[0], h: s[1] };
+  };
+  // An edge that would run behind a box that is not one of its ends bends around it: a waypoint level with
+  // the box, just past its nearer side, then on. Passes repeat while a new segment finds a new box (fa, fc
+  // and the workspace map, v13: dependency arrows from two layers up vanished behind a module in between).
+  const route = (e: { from: string; to: string }): [number, number][] => {
+    let pts: [number, number][] = [pos.get(e.from)!, pos.get(e.to)!];
+    const routed = new Set<string>();
+    for (let pass = 0; pass < 4; pass++) {
+      const next: [number, number][] = [pts[0]];
+      let bent = false;
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const [a, c] = [pts[k], pts[k + 1]];
+        // Blockers in the order the leg meets them, by projection on the leg's dominant axis.
+        const steepLeg = Math.abs(c[1] - a[1]) >= Math.abs(c[0] - a[0]);
+        const blockers = scene.nodes
+          .filter((n) => n.id !== e.from && n.id !== e.to && !routed.has(n.id) && segmentInside([a, c], boxOf(n.id)) > 2)
+          .map((n) => ({ n, box: boxOf(n.id), at: steepLeg ? (pos.get(n.id)![1] - a[1]) / ((c[1] - a[1]) || 1) : (pos.get(n.id)![0] - a[0]) / ((c[0] - a[0]) || 1) }))
+          .sort((u, v) => u.at - v.at);
+        for (const { n, box, at } of blockers) {
+          routed.add(n.id);
+          bent = true;
+          // Where the line is, level with the box: go round on the side it already leans to, far enough out
+          // that neither leg clips a corner of the box.
+          const lineAt = along(a, c, Math.max(0, Math.min(1, at)));
+          const prev = next[next.length - 1];
+          // A mostly vertical leg goes round to the left or right of the box; a mostly horizontal one over or under.
+          const steep = Math.abs(c[1] - a[1]) >= Math.abs(c[0] - a[0]);
+          let w: [number, number] = prev;
+          for (const margin of [14, 26, 40]) {
+            w = steep
+              ? [lineAt[0] <= box.x + box.w / 2 ? box.x - margin : box.x + box.w + margin, box.y + box.h / 2]
+              : [box.x + box.w / 2, lineAt[1] <= box.y + box.h / 2 ? box.y - margin : box.y + box.h + margin];
+            if (segmentInside([prev, w], box) <= 2 && segmentInside([w, c], box) <= 2) break;
+          }
+          next.push(w);
+        }
+        next.push(c);
+      }
+      pts = next;
+      if (!bent) break;
+    }
+    return pts;
+  };
+  const edgeGeom = (scene.edges ?? []).map((e, i) => {
+    const centres = route(e);
+    const first = centres[1];
+    const last = centres[centres.length - 2];
+    const a = centres[0];
+    const c = centres[centres.length - 1];
+    const d0 = [first[0] - a[0], first[1] - a[1]];
+    const l0 = Math.hypot(d0[0], d0[1]) || 1;
+    const d1 = [c[0] - last[0], c[1] - last[1]];
+    const l1 = Math.hypot(d1[0], d1[1]) || 1;
+    const sa = sizes.get(e.from)!;
+    const sc = sizes.get(e.to)!;
+    const ra = scene.nodes.find((n) => n.id === e.from)?.shape === "circle" ? sa[0] / 2 : boxRadius(sa[0], sa[1], d0[0] / l0, d0[1] / l0);
+    const rc = scene.nodes.find((n) => n.id === e.to)?.shape === "circle" ? sc[0] / 2 : boxRadius(sc[0], sc[1], d1[0] / l1, d1[1] / l1);
+    const headless = e.style === "line";
+    const [p] = trimEdge(a, first, ra + 2, 0);
+    const [, q] = trimEdge(last, c, 0, rc + (headless ? 2 : 6));
+    const pts: [number, number][] = [p, ...centres.slice(1, -1), q];
+    const label = e.label ?? (e.style === "forbidden" ? "✗" : undefined);
+    // The label sits off the middle of the longest segment, on its left-hand normal.
+    let best = 0;
+    for (let k = 1; k + 1 < pts.length; k++) if (Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]) > Math.hypot(pts[best + 1][0] - pts[best][0], pts[best + 1][1] - pts[best][1])) best = k;
+    const [sa0, sa1] = [pts[best], pts[best + 1]];
+    const sl = Math.hypot(sa1[0] - sa0[0], sa1[1] - sa0[1]) || 1;
+    const mid = along(sa0, sa1, 0.5);
+    const labelPos: [number, number] = [mid[0] + (-(sa1[1] - sa0[1]) / sl) * 11, mid[1] + ((sa1[0] - sa0[0]) / sl) * 11];
+    return { e, i, id: `edge-${i}`, p, q, pts, label, labelPos };
+  });
+  const occupied: Box[] = [];
   for (const n of scene.nodes) {
     const p = pos.get(n.id)!;
     const s = sizes.get(n.id)!;
     occupied.push({ x: p[0] - s[0] / 2, y: p[1] - s[1] / 2, w: s[0], h: s[1] });
   }
-  for (const e of scene.edges ?? []) {
-    if (!e.label) continue;
-    const a = pos.get(e.from)!;
-    const c = pos.get(e.to)!;
-    const mid = along(a, c, 0.5);
-    const w = labelWidth(e.label, T.fontSize - 2);
-    occupied.push({ x: mid[0] - w / 2, y: mid[1] - 20, w, h: 40 });
+  for (const g of edgeGeom) {
+    if (!g.label) continue;
+    const w = labelWidth(g.label, T.fontSize - 2);
+    occupied.push({ x: g.labelPos[0] - w / 2, y: g.labelPos[1] - 10, w, h: 20 });
   }
-  const hits = (bx: { x: number; y: number; w: number; h: number }) => occupied.some((o) => bx.x < o.x + o.w && o.x < bx.x + bx.w && bx.y < o.y + o.h && o.y < bx.y + bx.h);
+  const segs: Seg[] = edgeGeom.filter((g) => !g.e.hidden).flatMap((g) => g.pts.slice(1).map((pt, k): Seg => [g.pts[k], pt]));
+  const hits = (bx: Box) => occupied.some((o) => bx.x < o.x + o.w && o.x < bx.x + bx.w && bx.y < o.y + o.h && o.y < bx.y + bx.h);
+  const crossed = (bx: Box) => segs.reduce((s, seg) => s + segmentInside(seg, bx), 0);
 
-  // Containers first, so they sit behind everything they hold: the members' bounding box with padding,
-  // the label in the first free corner (top-left, top-right, bottom-left, bottom-right).
+  // Containers first, so they sit behind everything they hold: the members' bounding box with padding, the
+  // label in the first corner that nothing occupies and no edge runs through — inside first, then just outside.
   const groupIds = new Set(groups.map((g) => g.id));
   for (const g of groups) {
     const members = g.nodes.filter((id) => pos.has(id));
@@ -67,49 +180,62 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
     const x0 = Math.min(...xs) - pad;
     const y0 = Math.min(...ys) - pad - labelH;
     const x1 = Math.max(...xs) + pad;
-    const y1 = Math.max(...ys) + pad + (g.label ? 0 : 0);
-    b.node({ id: g.id, shape: "rect", pos: [(x0 + x1) / 2, (y0 + y1) / 2], size: [x1 - x0, y1 - y0], rx: 10, fill: "none", stroke: T.muted, strokeWidth: 1.2 });
+    let y1 = Math.max(...ys) + pad;
+    let labelNode: Parameters<typeof b.node>[0] | undefined;
     if (g.label) {
       const fs = T.fontSize - 2;
       const lw = labelWidth(g.label, fs) - fs * 1.6;
-      const corners: { pos: [number, number]; anchor: "start" | "end" }[] = [
+      // Inside the top corners, inside the bottom corners (the container grows a band for it), then just outside.
+      type Corner = { pos: [number, number]; anchor: "start" | "end"; bottom?: boolean };
+      const corners: Corner[] = [
         { pos: [x0 + 10, y0 + 12], anchor: "start" },
         { pos: [x1 - 10, y0 + 12], anchor: "end" },
-        { pos: [x0 + 10, y1 - 12], anchor: "start" },
-        { pos: [x1 - 10, y1 - 12], anchor: "end" },
+        { pos: [x0 + 10, y1 + labelH - 12], anchor: "start", bottom: true },
+        { pos: [x1 - 10, y1 + labelH - 12], anchor: "end", bottom: true },
+        { pos: [x0 + 4, y0 - 10], anchor: "start" },
+        { pos: [x1 - 4, y0 - 10], anchor: "end" },
+        { pos: [x0 + 4, y1 + 10], anchor: "start" },
+        { pos: [x1 - 4, y1 + 10], anchor: "end" },
       ];
-      const boxAt = (c: { pos: [number, number]; anchor: "start" | "end" }) => ({ x: c.anchor === "start" ? c.pos[0] : c.pos[0] - lw, y: c.pos[1] - fs * 0.65, w: lw, h: fs * 1.3 });
-      const corner = corners.find((c) => !hits(boxAt(c))) ?? corners[0];
-      b.node({ id: `${g.id}-label`, shape: "text", pos: corner.pos, text: g.label, fontSize: fs, color: T.muted, anchor: corner.anchor });
+      const boxAt = (c: Corner): Box => ({ x: c.anchor === "start" ? c.pos[0] : c.pos[0] - lw, y: c.pos[1] - fs * 0.65, w: lw, h: fs * 1.3 });
+      const onCanvas = (bx: Box) => bx.y >= 4 && bx.x >= 0 && bx.x + bx.w <= b.width && bx.y + bx.h <= b.height - 40;
+      const free = corners.filter((c) => onCanvas(boxAt(c)) && !hits(boxAt(c)));
+      // A free corner no edge runs through; failing that the free corner with the least edge through it; failing
+      // that the first corner.
+      const corner = free.find((c) => crossed(boxAt(c)) < 4) ?? free.sort((c, d) => crossed(boxAt(c)) - crossed(boxAt(d)))[0] ?? corners[0];
+      if (corner.bottom) y1 += labelH;
+      labelNode = { id: `${g.id}-label`, shape: "text", pos: corner.pos, text: g.label, fontSize: fs, color: T.muted, anchor: corner.anchor };
       occupied.push(boxAt(corner));
     }
+    b.node({ id: g.id, shape: "rect", pos: [(x0 + x1) / 2, (y0 + y1) / 2], size: [x1 - x0, y1 - y0], rx: 10, fill: "none", stroke: T.muted, strokeWidth: 1.2 });
+    if (labelNode) b.node(labelNode);
     b.anchor(g.id, g.id);
   }
 
-  const edgeEnds = new Map<string, [[number, number], [number, number]]>();
+  const edgeEnds = new Map<string, [number, number][]>();
   const edgeId = new Map<string, string>();
-  (scene.edges ?? []).forEach((e, i) => {
-    const a = pos.get(e.from)!;
-    const c = pos.get(e.to)!;
-    const dx = c[0] - a[0];
-    const dy = c[1] - a[1];
-    const len = Math.hypot(dx, dy) || 1;
-    const sa = sizes.get(e.from)!;
-    const sc = sizes.get(e.to)!;
-    const ra = scene.nodes.find((n) => n.id === e.from)?.shape === "circle" ? sa[0] / 2 : boxRadius(sa[0], sa[1], dx / len, dy / len);
-    const rc = scene.nodes.find((n) => n.id === e.to)?.shape === "circle" ? sc[0] / 2 : boxRadius(sc[0], sc[1], dx / len, dy / len);
-    const [p, q] = trimEdge(a, c, ra + 2, rc + (e.style === "line" ? 2 : 6));
-    const id = `edge-${i}`;
-    edgeEnds.set(`${e.from}->${e.to}`, [p, q]);
+  const edgeStroke = new Map<string, string>();
+  for (const g of edgeGeom) {
+    const { e, id, p, q, pts } = g;
+    const stroke = e.style === "forbidden" ? T.bad : T.nodeStroke;
+    edgeEnds.set(`${e.from}->${e.to}`, pts);
     edgeId.set(`${e.from}->${e.to}`, id);
-    b.node({ id, shape: e.style === "line" ? "line" : "arrow", points: [p, q], stroke: T.nodeStroke, opacity: e.hidden ? 0 : 1 });
-    if (e.label) {
-      const mid = along(p, q, 0.5);
-      const nx = -dy / len;
-      const ny = dx / len;
-      b.node({ id: `${id}-label`, shape: "text", pos: [mid[0] + nx * 11, mid[1] + ny * 11], text: e.label, fontSize: T.fontSize - 2, color: T.text, opacity: e.hidden ? 0 : 1 });
+    edgeStroke.set(id, stroke);
+    const dashed = e.style === "dashed" || e.style === "forbidden" ? true : undefined;
+    if (pts.length === 2) {
+      b.node({ id, shape: e.style === "line" ? "line" : "arrow", points: [p, q], stroke, dashed, opacity: e.hidden ? 0 : 1 });
+    } else {
+      // A bent edge is a path through its waypoints, drawn from its first point.
+      const r = (v: number) => Math.round(v * 10) / 10;
+      const d = pts.map((pt, k) => `${k === 0 ? "M" : "L"} ${r(pt[0] - p[0])} ${r(pt[1] - p[1])}`).join(" ");
+      b.node({ id, shape: "path", pos: p, d, head: e.style !== "line", fill: "none", stroke, dashed, opacity: e.hidden ? 0 : 1 });
     }
-  });
+    if (g.label) {
+      // An edge label sits on a line by design: the halo breaks the line around the glyphs, so an edge that
+      // crosses it stays a readable label rather than a struck-through one.
+      b.node({ id: `${id}-label`, shape: "text", pos: g.labelPos, text: g.label, fontSize: T.fontSize - 2, color: e.style === "forbidden" ? T.bad : T.text, halo: true, opacity: e.hidden ? 0 : 1 });
+    }
+  }
   for (const n of scene.nodes) {
     const p = pos.get(n.id)!;
     const s = sizes.get(n.id)!;
@@ -165,19 +291,27 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
       }
     } else if ("highlight" in st || "unhighlight" in st) {
       const targets = arr("highlight" in st ? st.highlight : st.unhighlight);
-      const color = "highlight" in st ? T.accent : T.node;
-      if (ms > 0) b.step(st.caption ?? ("highlight" in st ? `Focus on ${targets.join(", ")}` : undefined));
+      const on = "highlight" in st;
+      const color = on ? T.accent : T.node;
+      if (ms > 0) b.step(st.caption ?? (on ? `Focus on ${targets.join(", ")}` : undefined));
       const t0 = b.t;
       b.advance(ms);
       // Instant, like the sort and matrix highlights: the frame at the step shows the focus.
       for (const id of targets) {
         if (groupIds.has(id)) {
           // A container has no fill to change: its outline takes the accent instead.
-          b.set(id, "stroke", "highlight" in st ? T.accent : T.muted, t0);
+          b.set(id, "stroke", on ? T.accent : T.muted, t0);
+          continue;
+        }
+        const eid = edgeId.get(id.replace(/\s+/g, "")) ?? (id.includes("->") ? edgeId.get(id.split("->").reverse().join("->")) : undefined);
+        if (eid) {
+          // An edge lights up along its length, its label with it (fd and fc, v13, both reached for this).
+          b.set(eid, "stroke", on ? T.accent : edgeStroke.get(eid)!, t0);
+          if (b.has(`${eid}-label`)) b.set(`${eid}-label`, "color", on ? T.accent : T.text, t0);
           continue;
         }
         const original = scene.nodes.find((n) => n.id === id)?.fill;
-        const fill = "highlight" in st ? color : original ?? color;
+        const fill = on ? color : original ?? color;
         if (b.valueAt(id, "fill", t0) !== fill) b.set(id, "fill", fill, t0);
       }
     } else if ("flow" in st) {
@@ -189,17 +323,25 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
         reversed = true;
       }
       if (!ends) continue; // validator reports the missing edge
-      const [p, q] = reversed ? [ends[1], ends[0]] : ends;
+      const pts = reversed ? [...ends].reverse() : ends;
       b.step(st.caption ?? `${from} → ${to}`);
       const eid = edgeId.get(reversed ? `${to}->${from}` : `${from}->${to}`)!;
       b.set(eid, "stroke", T.accent);
-      b.set("token", "pos", p);
+      b.set("token", "pos", pts[0]);
       b.set("token", "opacity", 1);
       const t0 = b.t;
       const t1 = b.advance(ms);
-      b.tween("token", "pos", q, t0, t1, "ease-in-out");
+      // The token follows the edge's waypoints, each leg taking its share of the beat by length.
+      const legs = pts.slice(1).map((pt, k) => Math.hypot(pt[0] - pts[k][0], pt[1] - pts[k][1]));
+      const total = legs.reduce((s, l) => s + l, 0) || 1;
+      let at = t0;
+      pts.slice(1).forEach((pt, k) => {
+        const end = k === legs.length - 1 ? t1 : at + ((t1 - t0) * legs[k]) / total;
+        b.tween("token", "pos", pt, at, end, legs.length === 1 ? "ease-in-out" : "linear");
+        at = end;
+      });
       b.set("token", "opacity", 0, t1);
-      b.set(eid, "stroke", T.nodeStroke, t1);
+      b.set(eid, "stroke", edgeStroke.get(eid)!, t1);
     } else if ("note" in st) {
       b.step(st.note);
       b.advance(ms);

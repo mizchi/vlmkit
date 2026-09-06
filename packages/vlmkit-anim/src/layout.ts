@@ -29,12 +29,12 @@ export interface LayoutBox {
 }
 
 export interface LayoutIssue {
-  kind: "overlap" | "clipped";
-  /** The nodes involved: two for an overlap (text first), one for a clipped text. */
+  kind: "overlap" | "clipped" | "crossed";
+  /** The nodes involved: two for an overlap (text first) or a crossing (text first, stroke second), one for a clipped text. */
   nodes: string[];
   /** Their texts, for a human or a scorer. */
   texts: string[];
-  /** overlap: intersection area over the smaller box's area (0..1). clipped: pixels past the edge. */
+  /** overlap: intersection area over the smaller box's area (0..1). clipped: pixels past the edge. crossed: pixels of stroke inside the text box. */
   amount: number;
 }
 
@@ -47,14 +47,16 @@ export interface LayoutFrame {
 
 export interface LayoutReport {
   frames: LayoutFrame[];
-  totals: { frames: number; framesWithIssues: number; overlaps: number; clipped: number };
+  totals: { frames: number; framesWithIssues: number; overlaps: number; clipped: number; crossed: number };
 }
 
 export interface LayoutOptions {
-  /** Intersection over the smaller box below which an overlap is not reported. Default 0.2. */
+  /** Intersection over the smaller box below which an overlap is not reported. Default 0.3. */
   minOverlap?: number;
   /** Pixels past the canvas edge below which a text is not reported as clipped. Default 2. */
   minClip?: number;
+  /** Pixels of a stroke inside a text box below which a crossing is not reported. Default 6. */
+  minCross?: number;
   /** Sample times; default every step marker. */
   times?: number[];
 }
@@ -121,6 +123,73 @@ function filledBox(n: TimelineNode, st: NodeState, pos: [number, number]): Layou
   return { id: n.id, x: pos[0] - w / 2, y: pos[1] - h / 2, w, h };
 }
 
+type Segment = [[number, number], [number, number]];
+
+/** The segments a visible stroke is made of: a line or arrow's points, a path's M/L points and a sampled Q curve. */
+export function strokeSegments(n: TimelineNode, pos: [number, number]): Segment[] {
+  const pts: [number, number][] = [];
+  if ((n.shape === "line" || n.shape === "arrow") && n.points) {
+    for (const [px, py] of n.points) pts.push([pos[0] + px, pos[1] + py]);
+  } else if (n.shape === "path" && n.d && (n.fill === undefined || n.fill === "none")) {
+    // An outlined path is a stroke; a filled one (a pointer head) is a shape.
+    // Commands with their numbers; a quadratic curve is sampled so an arc over a label is seen as a crossing.
+    const re = /([MLQZ])\s*((?:-?\d+(?:\.\d+)?[ ,]*)*)/g;
+    let cur: [number, number] | undefined;
+    for (const m of n.d.matchAll(re)) {
+      const nums = m[2].trim().split(/[ ,]+/).filter(Boolean).map(Number);
+      if (m[1] === "M" || m[1] === "L") {
+        for (let i = 0; i + 1 < nums.length; i += 2) {
+          cur = [pos[0] + nums[i], pos[1] + nums[i + 1]];
+          pts.push(cur);
+        }
+      } else if (m[1] === "Q" && cur && nums.length >= 4) {
+        const [p0, c, p1] = [cur, [pos[0] + nums[0], pos[1] + nums[1]], [pos[0] + nums[2], pos[1] + nums[3]]];
+        for (let k = 1; k <= 12; k++) {
+          const s = k / 12;
+          const u = 1 - s;
+          pts.push([u * u * p0[0] + 2 * u * s * c[0] + s * s * p1[0], u * u * p0[1] + 2 * u * s * c[1] + s * s * p1[1]]);
+        }
+        cur = p1 as [number, number];
+      }
+    }
+  }
+  const segs: Segment[] = [];
+  for (let i = 0; i + 1 < pts.length; i++) segs.push([pts[i], pts[i + 1]]);
+  return segs;
+}
+
+/** Length of the part of a segment that lies inside a box (Liang–Barsky). */
+function insideLength(seg: Segment, b: LayoutBox): number {
+  const [[x0, y0], [x1, y1]] = seg;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  let t0 = 0;
+  let t1 = 1;
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+  if (!clip(-dx, x0 - b.x) || !clip(dx, b.x + b.w - x0) || !clip(-dy, y0 - b.y) || !clip(dy, b.y + b.h - y0)) return 0;
+  return Math.hypot(dx, dy) * Math.max(0, t1 - t0);
+}
+
+/** A stroke and a text that belong together: an edge and its label, a callout's arrow and its text, children of one group. */
+function related(tl: Timeline, text: TimelineNode, stroke: TimelineNode): boolean {
+  const base = text.id.replace(/-(label|text)$/, "");
+  if (stroke.id === base || stroke.id.startsWith(`${base}-`) || base.startsWith(`${stroke.id}-`)) return true;
+  if (text.parent && text.parent === stroke.parent) return true;
+  if (text.parent && (stroke.id === text.parent || isAncestor(tl, stroke.parent ?? "", text.id))) return true;
+  return false;
+}
+
 /** Whether a node's position is between two different keyframes at `t` — a token in flight, a bar mid-swap. */
 function inMotion(tl: Timeline, id: string, t: number): boolean {
   for (const tr of tl.tracks) {
@@ -136,9 +205,12 @@ function inMotion(tl: Timeline, id: string, t: number): boolean {
 export function layoutFrame(tl: Timeline, t: number, opts: LayoutOptions = {}): LayoutIssue[] {
   const minOverlap = opts.minOverlap ?? 0.3;
   const minClip = opts.minClip ?? 2;
+  const minCross = opts.minCross ?? 6;
   const frame = sampleFrame(tl, t);
   const texts: LayoutBox[] = [];
   const fills: LayoutBox[] = [];
+  const strokes: { node: TimelineNode; segs: Segment[] }[] = [];
+  const byId = new Map(tl.nodes.map((n) => [n.id, n]));
   for (const n of tl.nodes) {
     const st = frame.get(n.id);
     if (!st || st.opacity <= 0 || n.shape === "group") continue;
@@ -149,6 +221,11 @@ export function layoutFrame(tl: Timeline, t: number, opts: LayoutOptions = {}): 
     // beat) is where the animation wants it for an instant, not a layout defect.
     const fb = inMotion(tl, n.id, t) ? undefined : filledBox(n, st, pos);
     if (fb) fills.push(fb);
+    // Strokes that are drawn (a dashed-in line at the start of its beat is not yet there) and hold still.
+    if (st.opacity >= 0.5 && !inMotion(tl, n.id, t) && (st.dash === undefined || st.dash >= 0.5)) {
+      const segs = strokeSegments(n, pos);
+      if (segs.length) strokes.push({ node: n, segs });
+    }
   }
   const issues: LayoutIssue[] = [];
   const { width, height } = tl.canvas;
@@ -177,6 +254,21 @@ export function layoutFrame(tl: Timeline, t: number, opts: LayoutOptions = {}): 
       if (!inter) continue;
       const ratio = inter / (tb.w * tb.h);
       if (ratio >= minOverlap) issues.push({ kind: "overlap", nodes: [tb.id, fb.id], texts: [tb.text ?? "", fb.text ?? ""], amount: Math.round(ratio * 100) / 100 });
+    }
+  }
+  // A line through a text: an edge across a container label, a dependency under a callout (v13). The text's
+  // own edge, a callout's own pointer and siblings in one annotation group are not crossings.
+  for (const tb of texts) {
+    const tn = byId.get(tb.id)!;
+    if (tn.halo) continue; // a haloed label breaks the line around itself: sitting on lines is its job
+    for (const s of strokes) {
+      if (s.node.id === tb.id || related(tl, tn, s.node)) continue;
+      // A callout's pointer has to reach an interior cell through its neighbours — a thin line over a labelled
+      // box is what a hand-drawn callout does too. Over a free-standing text (a header, a label) it is a defect.
+      if (/^callout-.*-arrow$/.test(s.node.id) && tn.shape !== "text") continue;
+      let inside = 0;
+      for (const seg of s.segs) inside += insideLength(seg, tb);
+      if (inside >= minCross) issues.push({ kind: "crossed", nodes: [tb.id, s.node.id], texts: [tb.text ?? "", ""], amount: Math.round(inside) });
     }
   }
   return issues;
@@ -234,6 +326,7 @@ export function layoutReport(tl: Timeline, opts: LayoutOptions = {}): LayoutRepo
       framesWithIssues: frames.filter((f) => f.issues.length).length,
       overlaps: all.filter((i) => i.kind === "overlap").length,
       clipped: all.filter((i) => i.kind === "clipped").length,
+      crossed: all.filter((i) => i.kind === "crossed").length,
     },
   };
 }
@@ -247,10 +340,11 @@ export function formatLayout(report: LayoutReport): string {
     lines.push(head);
     for (const i of f.issues) {
       if (i.kind === "clipped") lines.push(`  clipped  "${i.texts[0]}" runs ${i.amount}px past the canvas edge (${i.nodes[0]})`);
+      else if (i.kind === "crossed") lines.push(`  crossed  "${i.texts[0]}" has a line through it — ${i.amount}px inside the text (${i.nodes.join(" × ")})`);
       else lines.push(`  overlap  "${i.texts[0]}" on ${i.texts[1] ? `"${i.texts[1]}"` : i.nodes[1]} — ${Math.round(i.amount * 100)}% of the smaller box (${i.nodes.join(" × ")})`);
     }
   }
   const t = report.totals;
-  lines.push(`${t.framesWithIssues} of ${t.frames} frames with layout issues · ${t.overlaps} overlap(s) · ${t.clipped} clipped`);
+  lines.push(`${t.framesWithIssues} of ${t.frames} frames with layout issues · ${t.overlaps} overlap(s) · ${t.clipped} clipped · ${t.crossed} crossed`);
   return lines.join("\n");
 }

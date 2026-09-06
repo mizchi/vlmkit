@@ -63,6 +63,10 @@ export interface TimelineNode {
   opacity?: number;
   /** Stroke draw progress 0..1 (line / arrow / path). 1 = fully drawn. */
   dash?: number;
+  /** A dashed stroke pattern (an optional or forbidden dependency), once fully drawn. */
+  dashed?: boolean;
+  /** Text with a background-coloured outline, so a line it sits on breaks around the glyphs (edge and message labels). */
+  halo?: boolean;
   scale?: number;
   /** degrees */
   rotate?: number;
@@ -247,6 +251,8 @@ export interface RelateSpec {
   label?: string;
   /** `arrow` (default, from → to) or a plain `line`. */
   style?: "arrow" | "line";
+  /** Colour role: `accent` (default), `bad` (a relation that must not exist), `muted` (an aside). */
+  tone?: "accent" | "bad" | "muted";
 }
 
 export const ANNOTATION_ACTIONS = ["value", "callout", "snapshot", "group", "text", "relate"] as const;
@@ -300,10 +306,16 @@ export interface DiagramEdge {
   from: string;
   to: string;
   label?: string;
-  /** `arrow` (default) or plain `line`. */
-  style?: "arrow" | "line";
+  /**
+   * `arrow` (default), plain `line`, `dashed` (an optional or weak edge, still laid out), or `forbidden`
+   * (dashed in the `bad` colour, drawn but ignored by the layout — the dependency that must not exist).
+   */
+  style?: EdgeStyle;
   hidden?: boolean;
 }
+
+export type EdgeStyle = "arrow" | "line" | "dashed" | "forbidden";
+export const EDGE_STYLES: readonly EdgeStyle[] = ["arrow", "line", "dashed", "forbidden"];
 
 /** One narrated beat of a diagram. Exactly one action key per step. */
 export type DiagramStep =
@@ -345,7 +357,7 @@ export interface ModuleDef {
 }
 
 /** `["a", "b"]` (a depends on b) or the long form. */
-export type ModuleDep = readonly [string, string] | { from: string; to: string; label?: string; style?: "arrow" | "line"; hidden?: boolean };
+export type ModuleDep = readonly [string, string] | { from: string; to: string; label?: string; style?: EdgeStyle; hidden?: boolean };
 
 export interface ModuleGroup {
   id: string;

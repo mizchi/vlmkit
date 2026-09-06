@@ -125,6 +125,7 @@ export const RUNTIME_SOURCE = String.raw`
         if (shape) {
           const isStroke = n.shape === "line" || n.shape === "arrow" || n.shape === "path";
           shape.style.fill = isStroke ? (n.fill || "none") : fill; shape.style.stroke = stroke; shape.style.strokeWidth = sw;
+          if (n.dashed && (n.dash === undefined || n.dash >= 1)) shape.style.strokeDasharray = "6 4";
           g.appendChild(shape); shapes.set(n.id, shape);
           if (n.shape === "path") lengths.set(n.id, shape.getTotalLength ? 0 : 0);
         }
@@ -132,6 +133,7 @@ export const RUNTIME_SOURCE = String.raw`
           const size = n.fontSize || 14;
           const t = el("text", { "font-size": size, "text-anchor": n.shape === "text" ? (n.anchor || "middle") : "middle", "dominant-baseline": "central" });
           t.style.fill = n.color || "#1f2328";
+          if (n.halo) { t.style.stroke = (tl.canvas && tl.canvas.background) || "#ffffff"; t.style.strokeWidth = "3px"; t.style.strokeLinejoin = "round"; t.style.paintOrder = "stroke"; }
           const lines = String(n.text).split("\n"); const y0 = -((lines.length - 1) * size * 1.2) / 2;
           lines.forEach((line, i) => { const ts = el("tspan", { x: 0, y: num(y0 + i * size * 1.2) }); ts.textContent = line; t.appendChild(ts); });
           g.appendChild(t); texts.set(n.id, t);

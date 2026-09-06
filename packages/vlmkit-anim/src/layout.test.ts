@@ -137,3 +137,30 @@ describe("review: brief, answers, score", () => {
     assert.match(text, /recall 1/);
   });
 });
+
+describe("layout: a line through a text (v13)", () => {
+  it("an edge across a label is a crossing; the label's own edge, a haloed label and a callout pointer over a box are not", () => {
+    const across = layoutFrame(tl([{ id: "lbl", shape: "text", pos: [100, 50], text: "platform" }, { id: "edge-0", shape: "arrow", points: [[20, 50], [200, 50]] }]), 0);
+    assert.equal(across.length, 1);
+    assert.equal(across[0].kind, "crossed");
+    assert.deepEqual(across[0].nodes, ["lbl", "edge-0"]);
+    assert.ok(across[0].amount > 30, String(across[0].amount));
+    const own = layoutFrame(tl([{ id: "edge-0-label", shape: "text", pos: [100, 50], text: "emits" }, { id: "edge-0", shape: "arrow", points: [[20, 50], [200, 50]] }]), 0);
+    assert.deepEqual(own, [], "an edge label belongs to its edge");
+    const halo = layoutFrame(tl([{ id: "lbl", shape: "text", pos: [100, 50], text: "platform", halo: true }, { id: "edge-0", shape: "arrow", points: [[20, 50], [200, 50]] }]), 0);
+    assert.deepEqual(halo, [], "a halo breaks the line around the glyphs");
+    const pointer = layoutFrame(tl([{ id: "cell", shape: "rect", pos: [100, 50], size: [40, 30], fill: "#fff", text: "7" }, { id: "callout-main-0-arrow", shape: "arrow", points: [[100, 0], [100, 120]] }]), 0);
+    assert.deepEqual(pointer, [], "a callout pointer may pass over a labelled box on its way");
+    const bent = layoutFrame(tl([{ id: "lbl", shape: "text", pos: [100, 50], text: "platform" }, { id: "edge-0", shape: "path", pos: [20, 10], d: "M 0 0 L 80 40 L 180 40" }]), 0);
+    assert.equal(bent.length, 1, "a bent edge is read segment by segment");
+    const faded = layoutFrame(tl([{ id: "lbl", shape: "text", pos: [100, 50], text: "platform" }, { id: "edge-0", shape: "arrow", points: [[20, 50], [200, 50]], opacity: 0.2 }]), 0);
+    assert.deepEqual(faded, [], "a faded stroke is not there");
+  });
+
+  it("the report totals crossings and the text names them", () => {
+    const report = layoutReport(tl([{ id: "lbl", shape: "text", pos: [100, 50], text: "platform" }, { id: "edge-0", shape: "arrow", points: [[20, 50], [200, 50]] }]));
+    assert.equal(report.totals.crossed, 1);
+    assert.match(formatLayout(report), /crossed\s+"platform" has a line through it/);
+    assert.match(formatLayout(report), /1 crossed$/);
+  });
+});

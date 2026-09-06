@@ -86,7 +86,8 @@ function bezierPoint(pts: Vec2[], t: number): Vec2 {
 }
 
 function dashAttrs(n: NodeState, length: number): string {
-  if (n.dash >= 1) return "";
+  // A dashed pattern once drawn; while drawing in, the offset trick owns the dasharray.
+  if (n.dash >= 1) return n.dashed ? ` stroke-dasharray="6 4"` : "";
   const L = Math.max(length, 0.01);
   return ` stroke-dasharray="${num(L)}" stroke-dashoffset="${num(L * (1 - n.dash))}"`;
 }
@@ -138,7 +139,7 @@ function shapeMarkup(n: NodeState, markers: Set<string>): string {
   }
 }
 
-function textMarkup(n: NodeState): string {
+function textMarkup(n: NodeState, background: string): string {
   if (n.text === undefined) return "";
   const size = n.fontSize ?? 14;
   const color = n.color ?? "#1f2328";
@@ -148,15 +149,17 @@ function textMarkup(n: NodeState): string {
   const spans = lines
     .map((line, i) => `<tspan x="0" y="${num(y0 + i * size * 1.2)}">${esc(line)}</tspan>`)
     .join("");
-  return `<text font-size="${num(size)}" fill="${esc(color)}" text-anchor="${anchor}" dominant-baseline="central" font-family="system-ui, sans-serif">${spans}</text>`;
+  // A halo: the background colour stroked under the glyphs, so a line the label sits on breaks around it.
+  const halo = n.halo ? ` stroke="${esc(background)}" stroke-width="3" stroke-linejoin="round" paint-order="stroke"` : "";
+  return `<text font-size="${num(size)}" fill="${esc(color)}"${halo} text-anchor="${anchor}" dominant-baseline="central" font-family="system-ui, sans-serif">${spans}</text>`;
 }
 
-function nodeMarkup(n: NodeState, children: Map<string, NodeState[]>, markers: Set<string>): string {
+function nodeMarkup(n: NodeState, children: Map<string, NodeState[]>, markers: Set<string>, background: string): string {
   const [x, y] = n.pos;
   const transform = `translate(${num(x)} ${num(y)})${n.rotate ? ` rotate(${num(n.rotate)})` : ""}${n.scale !== 1 ? ` scale(${num(n.scale)})` : ""}`;
   const opacity = n.opacity < 1 ? ` opacity="${num(n.opacity)}"` : "";
-  const kids = (children.get(n.id) ?? []).map((c) => nodeMarkup(c, children, markers)).join("");
-  return `<g id="${esc(n.id)}" data-shape="${n.shape}" transform="${transform}"${opacity}>${shapeMarkup(n, markers)}${textMarkup(n)}${kids}</g>`;
+  const kids = (children.get(n.id) ?? []).map((c) => nodeMarkup(c, children, markers, background)).join("");
+  return `<g id="${esc(n.id)}" data-shape="${n.shape}" transform="${transform}"${opacity}>${shapeMarkup(n, markers)}${textMarkup(n, background)}${kids}</g>`;
 }
 
 export interface RenderOptions {
@@ -179,8 +182,8 @@ export function renderFrameSvg(tl: Timeline, t: number, opts: RenderOptions = {}
     } else roots.push(st);
   }
   const markers = new Set<string>();
-  const body = roots.map((n) => nodeMarkup(n, children, markers)).join("\n");
   const { width, height, background } = tl.canvas;
+  const body = roots.map((n) => nodeMarkup(n, children, markers, background ?? "#ffffff")).join("\n");
   const defs = [...markers]
     .map(
       (c) =>

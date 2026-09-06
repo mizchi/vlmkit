@@ -49,7 +49,7 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
       // Self loop: a small arc above the state.
       const d = `M ${a[0] - 12} ${a[1] - ra + 4} C ${a[0] - 40} ${a[1] - ra - 50}, ${a[0] + 40} ${a[1] - ra - 50}, ${a[0] + 12} ${a[1] - ra + 4}`;
       b.node({ id, shape: "path", d, stroke: T.nodeStroke, fill: "none" });
-      b.node({ id: `${id}-label`, shape: "text", pos: [a[0], a[1] - ra - 48], text: label, fontSize: T.fontSize - 2, color: T.text });
+      b.node({ id: `${id}-label`, shape: "text", pos: [a[0], a[1] - ra - 48], text: label, fontSize: T.fontSize - 2, color: T.text, halo: true });
       return;
     }
     // Parallel edges (a→b and b→a) share one perpendicular, fixed by the first of
@@ -70,7 +70,7 @@ export function compileStateMachine(scene: StateMachineScene): Timeline {
     b.node({ id, shape: "arrow", points: [pp, qq], stroke: T.nodeStroke });
     const mid = along(pp, qq, 0.5);
     const labelOff = pair.k === 0 ? -13 : off + 13;
-    b.node({ id: `${id}-label`, shape: "text", pos: [mid[0] + nx * labelOff, mid[1] + ny * labelOff], text: label, fontSize: T.fontSize - 2, color: T.text });
+    b.node({ id: `${id}-label`, shape: "text", pos: [mid[0] + nx * labelOff, mid[1] + ny * labelOff], text: label, fontSize: T.fontSize - 2, color: T.text, halo: true });
   });
 
   for (const s of states) {

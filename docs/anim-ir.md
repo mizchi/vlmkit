@@ -18,7 +18,7 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit-anim render scene.json --at 2300   …at a time — what a step's own fade-in has drawn is only visible past its start
    vlmkit-anim frames scene.json --out dir [--png]   every step as a file, for looking at
    vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
-   vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, per step (check warns about these too)
+   vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, lines through texts — per step (check warns about these too)
    vlmkit-anim review scene.json --out dir           the sheet + a review brief for a vision model or an agent; --answers its JSON scores it
 5. vlmkit-anim html scene.json --out page.html       the playable page
    vlmkit-anim video scene.json --out demo.gif       a file for a README / slide (or .mp4 / .webm through ffmpeg)
@@ -571,18 +571,32 @@ a caption band. With a `sequence` it is walked in beats like a `diagram`.
 | field | |
 |---|---|
 | `modules` | required: ids, or `{"id", "label", "hidden"}` |
-| `deps` | `["a", "b"]` reads **a depends on b**: the arrow runs a → b and a sits above b. Long form `{"from", "to", "label", "style": "arrow" \| "line", "hidden"}` |
+| `deps` | `["a", "b"]` reads **a depends on b**: the arrow runs a → b and a sits above b. Long form `{"from", "to", "label", "style", "hidden"}`; `style` is `arrow` (default), `line` (no head), `dashed` (an optional or weak dependency — still laid out) or **`forbidden`** (dashed, in the `bad` colour, labelled ✗ unless you label it: drawn, but ignored by the layout and the cycle check — the import that must not exist, shown next to the ones that do) |
 | `groups` | `{"id", "label", "modules": [ids]}` — a container around its modules; a module is in at most one. Group ids are anchors (`callout`, `group`, `relate`) and `highlight` targets (the outline lights up) |
 | `layout` | `tb` (default, dependencies point down) or `lr` (they point right) |
-| `sequence` | optional: the `diagram` steps — `show`, `hide`, `highlight`, `unhighlight`, `flow "a->b"`, `note`, `relabel` — and every annotation op. Anchors: module ids, group ids, `"a->b"` |
+| `sequence` | optional: the `diagram` steps — `show`, `hide`, `highlight`, `unhighlight`, `flow "a->b"`, `note`, `relabel` — and every annotation op. `show` / `hide` take module and group ids; `highlight` takes those **and an edge `"a->b"`** (the stroke and its label light up); `flow` takes an edge; the annotation ops take module ids, group ids and `"a->b"` |
 
-The layout is automatic and deliberate: a module's layer is one below the
-deepest module it depends on, so leaves are at the bottom; each group gets its
-own band across the layers, so a container is drawn around exactly its
-members and never encloses a bystander. A **dependency cycle** is a warning
-(`dependency cycle: a → b → a`): the layers can no longer show direction —
-break it, or draw the back edge deliberately with a `relate`. The canvas is
-sized for the map; set `canvas` to override.
+The layout is automatic and deliberate. A module's layer is one below the
+deepest module **it depends on**, so leaves are at the bottom and two modules
+with the same dependencies share a layer whatever depends on them (what
+depends on a module does not move it). Within a layer, modules are ordered so
+edges run as straight as they can; an edge that would otherwise pass behind a
+module that is not one of its ends bends around it. A group whose layers hold
+nothing but its members is a full-width row (a "frontend" row above a
+"domain" row above a "platform" row); groups that share a layer with something
+else each get their own band across the layers, so a container is drawn
+around exactly its members and never encloses a bystander. A **dependency
+cycle** is a warning (`dependency cycle: a → b → c → a`): the layout cuts it at
+the last edge and draws that arrow against the flow, which is what a cycle
+looks like — keep it if the cycle is the point, break it, or mark the edge to
+remove with `"style": "forbidden"`. The canvas is sized for the map; set
+`canvas` to override.
+
+The dependency someone keeps adding by mistake belongs in `deps` as
+`{"from": "domain", "to": "postgres", "style": "forbidden", "label": "never"}`:
+it is drawn red and dashed among the real arrows without bending the layers
+around it. (A `relate` with `"tone": "bad"` draws the same thing as an
+annotation, at a beat of the sequence.)
 
 For a plain dependency graph without containers, `modules` without `groups`;
 for a graph that is walked by an algorithm (BFS, Dijkstra) use `graph`, whose
@@ -684,7 +698,7 @@ already draws.
 | `{"snapshot": {"of", "label"}}` | A frozen copy, in the panel, of what the anchor shows **at this beat** — the value to compare against later, after the live one has moved on. An anchor that is several cells (a matrix row) snapshots as `[a, b, c]` |
 | `{"group": {"around": anchor \| [anchors], "label", "id"}}` / `{"group": null}` | A dashed outline around the anchors' bounding box, label at the top-left. One per `id`, like callout; `null` removes every group |
 | `{"text": {"lines": [...], "highlight", "at", "side", "id"}}` / `{"text": null}` | A multi-line block: code, a rule, a list. `highlight` is a 0-based line. Same `id` and the same number of lines updates in place and moves the highlight; a different line count redraws. Panel by default, or beside an anchor; `null` hides every block |
-| `{"relate": {"from", "to", "label", "style", "id"}}` / `{"relate": null}` | A line between two anchors — `A ≤ C`, "this came from that", "these two are concurrent". Edge to edge when nothing is in the way; when the two touch or something else sits between them (rows A and C of three, bars with bars between) it runs **beside** the pair instead, level, on the side with room — and when neither side has room (a node row with the title above and the lanes below) it **arcs** over the bystander. The bystander is never crossed and nothing is placed off the canvas; the writer never has to reorder anything for it. `style` is `arrow` (default, from → to) or `line`; the label sits beside the midpoint. One per `id`; `null` removes every relation. Where `group` would enclose a bystander, `relate` names the pair |
+| `{"relate": {"from", "to", "label", "style", "id"}}` / `{"relate": null}` | A line between two anchors — `A ≤ C`, "this came from that", "these two are concurrent". Edge to edge when nothing is in the way; when the two touch or something else sits between them (rows A and C of three, bars with bars between) it runs **beside** the pair instead, level, on the side with room — and when neither side has room (a node row with the title above and the lanes below) it **arcs** over the bystander. The bystander is never crossed and nothing is placed off the canvas; the writer never has to reorder anything for it. `style` is `arrow` (default, from → to) or `line`; `tone` is `accent` (default — amber, the same colour every highlight uses), `bad` (red and dashed: a relation that must not exist) or `muted`; the label sits beside the midpoint, haloed so a line under it stays readable. One per `id`; `null` removes every relation. Where `group` would enclose a bystander, `relate` names the pair |
 
 A rule that governs the whole scene — the definition of ≤ on vectors, the
 invariant a loop keeps — is a `text` block **without** `at`: it goes to the

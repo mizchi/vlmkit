@@ -64,16 +64,19 @@ writes the equivalent JSON file. JSON stays the format — this is the editor's 
 ## Still figures
 
 Not everything needs to move. `kind: modules` is a module map — modules, `deps` (`["a", "b"]` reads "a
-depends on b"), `groups` as containers — laid out in layers with dependencies pointing one way and a
-container around exactly its members; a dependency cycle is a warning. `vlmkit-anim still scene.json
+depends on b"; `"style": "forbidden"` for the one that must not exist), `groups` as containers — laid
+out in layers with dependencies pointing one way, edges bending around modules in their way, and a
+container around exactly its members (a full-width row when it owns its layers); a dependency cycle is
+a warning. `vlmkit-anim still scene.json
 --out map.svg` (or `.png`) renders any scene's final frame without the caption band, cropped to what is
 drawn: a module map, a filled matrix, a walked graph. `vlmkit-anim repo` writes the figure next to the GIF.
 
 ## Layout: geometry, then eyes
 
 `vlmkit-anim layout scene.json` reads every step back from the compiled timeline and lists texts that
-sit on other texts, texts under a filled box that is not their own, and texts past the canvas edge; the
-same findings are warnings in `check`. `vlmkit-anim review scene.json --out dir` writes the contact
+sit on other texts, texts under a filled box that is not their own, texts past the canvas edge, and
+lines drawn through a text or through a box that is not one of their ends; the same findings are
+warnings in `check`. `vlmkit-anim review scene.json --out dir` writes the contact
 sheet, a review brief (what counts as a defect and the JSON to return) and the geometry's report; give
 the sheet and the brief to a vision model or an agent and pass its JSON back as `--answers` (or let
 `--model` call the VLM) to get a frame-by-frame agreement table — which frames both flag, which only the

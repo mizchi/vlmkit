@@ -309,7 +309,7 @@ function checkModules(scene: Extract<Scene, { kind: "modules" }>): Diagnostic[] 
   const out: Diagnostic[] = [];
   for (const cycle of moduleCycles(scene)) {
     out.push(
-      warn("deps", `dependency cycle: ${cycle.join(" → ")}`, "layers read as direction only when dependencies flow one way — break the cycle, or draw the back edge deliberately with a `relate`"),
+      warn("deps", `dependency cycle: ${cycle.join(" → ")}`, `the layout cuts it at "${cycle[cycle.length - 2]} → ${cycle[cycle.length - 1]}" and draws that arrow against the flow — keep it if the cycle is the point, else break it, or mark the edge to remove with "style": "forbidden"`),
     );
   }
   const shown = new Set<string>();
@@ -521,10 +521,15 @@ export function checkLayout(tl: Timeline): Diagnostic[] {
     const where = `at step ${first.step?.index ?? "?"} (${Math.round(first.t)}ms)${more ? ` and ${more} later step(s)` : ""}`;
     const annotation = issue.nodes.some((id) => /^(value|callout|snapshot|group|text|relate)-/.test(id));
     const hint = annotation
-      ? "the compiler placed this annotation — try another `side` or a shorter label, and report it if that does not help"
+      ? "the compiler placed this annotation — try another `side`, a shorter label, or anchor it at a different thing (the node instead of the edge), and report it if nothing helps"
       : "move one of them, shorten the text, or widen the canvas";
     if (issue.kind === "clipped") out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" runs ${issue.amount}px past the canvas edge ${where}`, hint));
-    else {
+    else if (issue.kind === "crossed") {
+      const edgeHint = annotation
+        ? hint
+        : "an edge runs through a box that is not one of its ends — reorder the modules in that layer, put the two in one group, or shorten the label so the layout has room";
+      out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" has a line through it (${issue.nodes[1]}, ${issue.amount}px) ${where}`, edgeHint));
+    } else {
       const other = issue.texts[1] ? `"${issue.texts[1]}"` : issue.nodes[1];
       out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" is covered by ${other} (${Math.round(issue.amount * 100)}% of the smaller) ${where}`, hint));
     }

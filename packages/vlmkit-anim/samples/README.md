@@ -266,7 +266,7 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 
 ## matrix-vector-clock
 
-`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 11 steps · 6.0s · GIF 472 KB
+`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 11 steps · 6.0s · GIF 462 KB
 
 ![matrix-vector-clock animation](./matrix-vector-clock.gif)
 
@@ -293,7 +293,7 @@ Vector clocks — 11 steps, 6000ms, 38 nodes
 
 ## modules-web-service
 
-`modules` — [`fixtures/modules-web-service.json`](../fixtures/modules-web-service.json) · 6 steps · 3.4s · GIF 353 KB
+`modules` — [`fixtures/modules-web-service.json`](../fixtures/modules-web-service.json) · 6 steps · 3.4s · GIF 343 KB
 
 ![modules-web-service animation](./modules-web-service.gif)
 
@@ -305,7 +305,7 @@ Vector clocks — 11 steps, 6000ms, 38 nodes
 A web service, by module — 6 steps, 3360ms, 26 nodes
  1. [    0ms] A web service, by module
  2. [  350ms] The core: the API and the auth service it delegates to
- 3. [ 1050ms] the only shared state
+ 3. [ 1050ms] only shared state
  4. [ 1750ms] The edge never touches the database: every read goes through the API
  5. [ 2450ms] Six modules, six dependencies, three layers — and one rule the arrows make visible
  6. [ 3150ms] (end)
@@ -444,7 +444,7 @@ Matching brackets with a stack — 7 steps, 4070ms, 9 nodes
 
 ## state-tcp
 
-`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 400 KB
+`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 401 KB
 
 ![state-tcp animation](./state-tcp.gif)
 
