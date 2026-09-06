@@ -1,0 +1,45 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Ports and adapters: dependency flow",
+  "modules": [
+    { "id": "http", "label": "HTTP handler" },
+    { "id": "cli", "label": "CLI command" },
+    { "id": "app-svc", "label": "Application\nservices" },
+    { "id": "domain", "label": "Domain model" },
+    { "id": "repo-port", "label": "Repository\nport (interface)" },
+    { "id": "postgres", "label": "Postgres\nadapter" },
+    { "id": "in-memory", "label": "In-memory\nadapter" }
+  ],
+  "deps": [
+    ["http", "app-svc"],
+    ["cli", "app-svc"],
+    ["app-svc", "repo-port"],
+    ["app-svc", "domain"],
+    ["postgres", "repo-port"],
+    ["in-memory", "repo-port"],
+    {
+      "from": "domain",
+      "to": "postgres",
+      "label": "❌ FORBIDDEN",
+      "style": "line"
+    }
+  ],
+  "groups": [
+    {
+      "id": "driving",
+      "label": "Driving side (ports)",
+      "modules": ["http", "cli"]
+    },
+    {
+      "id": "core",
+      "label": "Core domain",
+      "modules": ["domain", "app-svc", "repo-port"]
+    },
+    {
+      "id": "adapters",
+      "label": "Adapters (driven side)",
+      "modules": ["postgres", "in-memory"]
+    }
+  ]
+}
