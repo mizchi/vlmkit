@@ -62,6 +62,16 @@ a brief, nothing else; `KEY.md` maps letters to before/after — with each
 reader's `answers-<model>.json`, and `v12/scores/` the frame-level agreement
 of each answer with the geometry (`vlmkit-anim review --answers`).
 
+v13 (2026-09-06) is the first round on **still figures**, after `kind: modules`,
+diagram `groups` and the `still` verb landed: `modules-this-workspace` (this
+repository's packages from their `package.json` files; the `repo` generator is
+forbidden), `modules-ports-adapters` (a rule — every dependency points inward —
+plus one dependency that must be shown as forbidden), `depgraph-import-cycle`
+(nine modules, one cycle to make visible and name the cut) and
+`modules-request-walk` (one file as both the onboarding map and a walked
+request). Writers `fa`–`fe`; success adds `layout` reporting no issue and an
+edge-fidelity hand count (every listed dependency drawn, none invented).
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from
