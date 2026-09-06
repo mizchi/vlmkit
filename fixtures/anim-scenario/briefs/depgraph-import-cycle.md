@@ -19,17 +19,21 @@ repo       imports config, logger
 validation imports config
 ```
 
-Draw all nine modules and every import. The cycle must be distinguishable from
-the rest of the graph at a glance, and the figure should name the edge you
-would cut and why (one short line, in the figure, not only in the log).
+Draw all eleven modules and every import. The cycle must be distinguishable from
+the rest of the graph at a glance — highlight its edges — and the figure should
+name the edge you would cut and why (one short line, in the figure, not only in
+the log).
+
+The import list is also written as a fact sheet,
+`facts/depgraph-import-cycle.expect.json`, in the shape `check --expect` reads;
+it names the cycle's three edges as the ones to highlight.
 
 Deliver `scene.json`, `cycle.svg` (rendered with `vlmkit-anim still`) and
 `log.md`.
 
-Success: `vlmkit-anim check scene.json` exits 0 with no ✗ (a ⚠ is acceptable
-only if your log says which one and why you kept it); `vlmkit-anim layout
-scene.json` reports no issue; the picture has every edge from the list and no
-other; the cycle's edges are visually distinct from the acyclic ones.
+Success: `vlmkit-anim check scene.json --expect facts/depgraph-import-cycle.expect.json`
+exits 0 with no ✗ (a ⚠ is acceptable only if your log says which one and why
+you kept it); `vlmkit-anim layout scene.json` reports no issue.
 
 Also record in `log.md`: what the tool told you about the cycle and whether
 that was before or after you found it yourself; every coordinate, colour or

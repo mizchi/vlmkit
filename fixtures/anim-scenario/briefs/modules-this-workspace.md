@@ -16,10 +16,15 @@ give the figure a title.
 Deliver `scene.json`, `map.svg` (rendered with `vlmkit-anim still`), and
 `log.md`.
 
-Success: `vlmkit-anim check scene.json` exits 0 with no ✗ and no ⚠;
-`vlmkit-anim layout scene.json` reports no issue; every dependency edge in
-the figure is a real one and none is missing; the direction reads from the
-picture without a legend.
+The package list and the dependencies, as the `package.json` files state them,
+are also written as a fact sheet, `facts/modules-this-workspace.expect.json`,
+in the shape `check --expect` reads: use its module ids as written (the root
+package is `vlmkit`). The groups are yours to decide; the sheet does not fix
+them.
+
+Success: `vlmkit-anim check scene.json --expect facts/modules-this-workspace.expect.json`
+exits 0 with no ✗ and no ⚠; `vlmkit-anim layout scene.json` reports no issue;
+the direction reads from the picture without a legend.
 
 Also record in `log.md`: how you decided the groups; every coordinate,
 colour or canvas size you wrote by hand and why; anything you wanted in the

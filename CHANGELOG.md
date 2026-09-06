@@ -53,6 +53,16 @@ pictures at once. Two generic layers answer that, and a third op followed from t
   "dashed"` (optional) and `"forbidden"` (dashed red, ignored by the layout — the import that must
   not exist); `highlight` takes an edge `"a->b"`; `relate` takes `"tone": "bad" | "muted"`. Across
   the five scenes: 91 crossings before, 2 after. Report: `docs/reports/2026-09-06-anim-ir-v13.md`.
+- **The figure against its facts (`check --expect facts.json`).** v13 also had two pictures that
+  were green and wrong — a map that drew the forbidden dependency as a real one and then deleted a
+  true one to quiet the cycle warning, and a walk that highlighted the wrong edge — and neither
+  `check` nor `layout` could know, because neither reads what the figure is about. An expectation
+  file (`vlmkit-anim/expect@1`: `modules`, `deps` `"a->b"`, `forbidden`, `highlighted`, `groups`) is
+  the brief's fact sheet in a shape `check` reads: every fact must be drawn (in that direction, in
+  that style, lit in the final frame, with exactly those members) and nothing drawn may be missing
+  from it. Ids the picture spells differently are reported once each and the dependencies naming
+  them wait in one line. `vlmkit-anim repo` writes the workspace's own sheet as `repo.expect.json`;
+  `schema --kind expect` has the fields. Report: `docs/reports/2026-09-06-anim-ir-v14.md`.
 
 Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
 colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:

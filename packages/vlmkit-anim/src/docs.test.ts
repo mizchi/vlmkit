@@ -9,6 +9,8 @@ import { resolve } from "node:path";
 import { describe, it } from "vitest";
 import { checkAnimation } from "./check.ts";
 import { compileScene } from "./compile/index.ts";
+import { checkExpectation, EXPECT_FORMAT, validateExpectation, type Expectation } from "./expect.ts";
+import { EXAMPLES } from "./schema-sheet.ts";
 import { SCENE_FORMAT, type Scene, type Timeline } from "./types.ts";
 import { formatDiagnostics, validateDocument } from "./validate.ts";
 
@@ -24,7 +26,15 @@ describe("docs/anim-ir.md", () => {
 
   it("every json block validates, compiles, and passes the semantic checks with no errors", () => {
     for (const [i, src] of blocks.entries()) {
-      const doc = JSON.parse(src) as Scene | Timeline;
+      const doc = JSON.parse(src) as Scene | Timeline | Expectation;
+      if ((doc as Expectation).format === EXPECT_FORMAT) {
+        // A fact sheet for `check --expect`: well-formed, and true of the modules example just above it.
+        const shape = validateExpectation(doc);
+        assert.deepEqual(shape, [], `block ${i + 1}: ${formatDiagnostics(shape)}`);
+        const r = checkExpectation(doc as Expectation, EXAMPLES.modules, compileScene(EXAMPLES.modules));
+        assert.deepEqual(r.diagnostics, [], `block ${i + 1}: ${formatDiagnostics(r.diagnostics)}`);
+        continue;
+      }
       const { layer, diagnostics } = validateDocument(doc);
       assert.deepEqual(diagnostics, [], `block ${i + 1}: ${formatDiagnostics(diagnostics)}`);
       if (layer === "scene") {

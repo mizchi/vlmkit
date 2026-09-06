@@ -18,10 +18,15 @@ Deliver `scene.json`, `figure.svg` (rendered with `vlmkit-anim still`) and
 `log.md`. If you also want a walked version (beats), put it in the same
 `scene.json` as a `sequence` and note that `still` shows its last frame.
 
-Success: `vlmkit-anim check scene.json` exits 0 with no ✗ and no ⚠;
-`vlmkit-anim layout scene.json` reports no issue; the forbidden dependency is
-visibly different from the real ones; the domain has no outgoing dependency
-in the picture.
+The parts, their dependencies and the sides are also written as a fact sheet,
+`facts/modules-ports-adapters.expect.json`, in the shape `check --expect`
+reads: use its module and group ids as written. (The port's interface names
+domain types, so the port depends on the domain; the adapters depend on the
+port; the domain depends on nothing.)
+
+Success: `vlmkit-anim check scene.json --expect facts/modules-ports-adapters.expect.json`
+exits 0 with no ✗ and no ⚠; `vlmkit-anim layout scene.json` reports no issue;
+the forbidden dependency is visibly different from the real ones.
 
 Also record in `log.md`: which kind you chose and what you considered;
 every coordinate, colour or canvas size you wrote by hand and why; how you

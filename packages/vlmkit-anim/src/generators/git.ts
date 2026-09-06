@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, posix } from "node:path";
 import { labelWidth } from "../compile/builder.ts";
+import { EXPECT_FORMAT, type Expectation } from "../expect.ts";
 import { SCENE_FORMAT, type DiagramEdge, type DiagramNode, type DiagramScene, type DiagramStep, type ModuleDef, type ModuleDep, type ModulesScene } from "../types.ts";
 
 // ---- the workspace ---------------------------------------------------------------
@@ -87,6 +88,19 @@ export function workspaceScene(root: string, title = "vlmkit — the workspace")
   sequence.push({ unhighlight: prev, ms: 0 });
   sequence.push({ note: `${pkgs.length} packages, ${edges.length} workspace dependencies, ${layers.length} layers deep` });
   return { format: SCENE_FORMAT, kind: "modules", title, layout: "lr", modules, deps: edges, sequence };
+}
+
+/**
+ * The workspace's facts for `check --expect`: every package, every workspace dependency. A module map drawn by
+ * hand (or by an agent from the package.json files) is checked against this rather than against itself.
+ */
+export function workspaceExpectation(root: string): Expectation {
+  const pkgs = readWorkspace(root);
+  return {
+    format: EXPECT_FORMAT,
+    modules: pkgs.map((p) => p.id),
+    deps: pkgs.flatMap((p) => p.deps.map((d) => `${p.id}->${d}`)),
+  };
 }
 
 // ---- a range of commits -----------------------------------------------------------

@@ -18,6 +18,7 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit-anim render scene.json --at 2300   …at a time — what a step's own fade-in has drawn is only visible past its start
    vlmkit-anim frames scene.json --out dir [--png]   every step as a file, for looking at
    vlmkit-anim sheet scene.json --out sheet.png      every step on ONE labelled image — what to show a vision model
+   vlmkit-anim check scene.json --expect facts.json  …and the figure against its facts: modules, dependencies "a->b", forbidden ones, what is lit, group members
    vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, lines through texts — per step (check warns about these too)
    vlmkit-anim review scene.json --out dir           the sheet + a review brief for a vision model or an agent; --answers its JSON scores it
 5. vlmkit-anim html scene.json --out page.html       the playable page
@@ -614,6 +615,45 @@ where the beats are the point. A still may still carry a one-beat `sequence`
 for emphasis — `{"highlight": ["handlers->services", "services->events"]}`
 colours those edges, a `callout` at an edge or module adds a note — since
 `still` renders the last frame.
+
+## Checking a figure against the facts
+
+`check` proves the scene is well-formed and `layout` that nothing is drawn on
+anything, and both were green on a module map that had deleted a true
+dependency to quiet a cycle warning and on a walk that highlighted the wrong
+edge. Neither reads what the figure is *about*. When the facts exist somewhere
+— a brief, the bundler's import list, the `package.json` files — write them as
+an expectation file and pass it to `check`:
+
+```json
+{
+  "format": "vlmkit-anim/expect@1",
+  "modules": ["web", "api", "auth", "db", "cache", "logging"],
+  "deps": ["web->api", "api->auth", "api->db", "api->cache", "auth->db", "api->logging"],
+  "highlighted": [],
+  "groups": { "edge": ["web"], "core": ["api", "auth"], "infra": ["db", "cache", "logging"] }
+}
+```
+
+```
+vlmkit-anim check scene.json --expect facts.json
+```
+
+| field | |
+|---|---|
+| `modules` | ids that must be drawn and visible at the end. A drawn module the list does not have is an error too — the facts fix the ids, so spell them as the facts do |
+| `deps` | `"a->b"` (a depends on b): drawn, in that direction, as a real dependency. A real dependency drawn that is on neither `deps` nor `forbidden` is an error: nothing invented |
+| `forbidden` | `"a->b"`: drawn with `"style": "forbidden"`. Drawn as a real arrow it is an error — that arrow bends the layers around a lie |
+| `highlighted` | module and group ids and edges `"a->b"` that are lit in the **final frame**, and nothing else; read from the frame, so a `flow` (which lights nothing at the end) or a later `unhighlight` counts as dark |
+| `groups` | `{"id": ["member", …]}`: each container holds exactly these members; a drawn group the list does not have is an error |
+
+Every field is optional and an absent field is not checked; a present one is
+checked exactly, both ways. Fact sheets for the four still-figure briefs are in
+`fixtures/anim-scenario/briefs/facts/`; `vlmkit-anim repo` writes the
+workspace's own as `repo.expect.json`, so a map drawn by hand from the
+`package.json` files is checked against them rather than against itself.
+`vlmkit-anim schema --kind expect` prints the field list. The check applies to
+`modules` and `diagram`; other kinds have their own semantic checks.
 
 ## kind: vector
 

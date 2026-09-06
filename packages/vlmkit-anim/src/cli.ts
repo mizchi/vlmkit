@@ -30,7 +30,8 @@ import { sceneFromModule } from "./author.ts";
 import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError } from "./cli-args.ts";
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
-import { changeMapScene, workspaceScene } from "./generators/git.ts";
+import { checkExpectation, EXPECT_SHEET, formatCompared, validateExpectation, type Expectation } from "./expect.ts";
+import { changeMapScene, workspaceExpectation, workspaceScene } from "./generators/git.ts";
 import { renderFrameSvg, sampleTimes } from "./render-svg.ts";
 import { RUNTIME_SOURCE, renderEmbedHtml } from "./runtime.ts";
 import { currentStep, timelineDuration } from "./timeline.ts";
@@ -45,7 +46,7 @@ import { writeVideo, type VideoResult } from "./video.ts";
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -53,6 +54,9 @@ function usage(): string {
 Commands
   check <scene|timeline>          Validate, compile, run semantic checks, print stats. Exit 1 on errors.
         [--max-ms N]              …and fail when the animation runs longer than N ms.
+        [--expect facts.json]     …and compare a modules / diagram scene with its facts: modules, dependencies
+                                  ("a->b"), forbidden ones, what the final frame highlights, group members —
+                                  drawn exactly as listed, nothing invented. \`schema --kind expect\` has the file.
   validate <scene|timeline>       Schema and reference validation only.
   compile <scene> [--out t.json]  Lower a scene to its timeline (stdout when no --out).
   explain <scene|timeline>        Print the narration: one line per step.
@@ -90,7 +94,8 @@ Commands
   repo [--root .] [--out dir] [--title T] [--no-images]
                                   The workspace's architecture as an animation: packages appear layer by layer
                                   with the dependencies that place them there. Writes <out>/repo.scene.json,
-                                  repo.gif, repo.sheet.png and repo.md (the explain text with both images embedded).
+                                  repo.gif, repo.sheet.png, repo.md (the explain text with both images embedded)
+                                  and repo.expect.json (the fact sheet a hand-drawn map is checked against).
   pr --base <ref> [--head HEAD] [--root .] [--out dir] [--title T] [--name pr] [--no-images]
                                   The change map of base..head: one beat per commit, the areas it touched light
                                   up, import edges between changed areas, running file / line counts. Same four
@@ -146,6 +151,16 @@ async function load(path: string): Promise<Loaded | { path: string; diagnostics:
   // The compiler's output must itself validate; a failure here is a compiler bug, reported as such.
   const tlDiags = validateTimeline(timeline).map((d) => ({ ...d, path: `compiled:${d.path}`, message: `compiler produced an invalid timeline: ${d.message}` }));
   return { path, doc, layer, scene, timeline, diagnostics: [...diagnostics, ...tlDiags] };
+}
+
+/** A side file (`--expect`) as JSON; a parse error names the file rather than throwing a stack. */
+async function readJson(path: string): Promise<unknown> {
+  const raw = await readFile(path, "utf-8");
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new UsageError(`${path} is not valid JSON: ${(e as Error).message}`);
+  }
 }
 
 function isLoaded(x: Awaited<ReturnType<typeof load>>): x is Loaded {
@@ -204,8 +219,12 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       console.log(schemaIndex());
       return 0;
     }
+    if (kind === "expect") {
+      console.log(EXPECT_SHEET);
+      return 0;
+    }
     if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline" && kind !== "annotations") {
-      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", or "annotations" for the ops every kind shares)`);
+      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", "annotations" for the ops every kind shares, "expect" for the fact sheet \`check --expect\` reads)`);
     }
     console.log(schemaSheet(kind as Scene["kind"] | "timeline" | "annotations"));
     return 0;
@@ -250,6 +269,12 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       summary = { commits: map.commits, files: map.files, added: map.added, removed: map.removed, areas: map.areas };
     }
     const result = await emitGenerated(scene, out, name, { images: !hasFlag(rest, "--no-images"), width: readInt(rest, "--width", { min: 160 }) });
+    if (verb === "repo") {
+      // The workspace's facts, so a map someone draws by hand can be checked against the package.json files.
+      const expectPath = join(out, `${name}.expect.json`);
+      await writeFile(expectPath, JSON.stringify(workspaceExpectation(root), null, 2) + "\n");
+      result.files.push(expectPath);
+    }
     if (json) console.log(JSON.stringify({ ...result, ...summary }, null, 2));
     else {
       console.log(`${name}: ${result.files.join(", ")}`);
@@ -290,9 +315,24 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       if (maxMs !== undefined && stats.durationMs > maxMs) {
         diags.push({ severity: "error", path: "duration", message: `the animation runs ${stats.durationMs}ms, over the ${maxMs}ms budget`, hint: 'lower "stepMs", drop beats, or pass a per-op "ms"' });
       }
+      // The facts the figure must show (`--expect`): compared with the scene and the final frame, reported in
+      // the same list. A scene that is not a scene (a bare timeline) has no deps to compare.
+      const expectPath = readFlag(rest, "--expect");
+      let expect: { file: string; ok: boolean; compared: string } | undefined;
+      if (expectPath) {
+        const expectDoc = await readJson(expectPath);
+        const shape = validateExpectation(expectDoc).map((d) => ({ ...d, path: `${basename(expectPath)}${d.path ? `:${d.path}` : ""}` }));
+        if (shape.length) diags.push(...shape);
+        else if (!scene) diags.push({ severity: "error", path: "expect", message: "--expect compares a scene with its facts; this file is a compiled timeline", hint: "run check on the scene.json" });
+        else {
+          const r = checkExpectation(expectDoc as Expectation, scene, tl);
+          diags.push(...r.diagnostics);
+          expect = { file: expectPath, ok: !hasErrors(r.diagnostics), compared: formatCompared(r.compared) };
+        }
+      }
       const ok = !hasErrors(diags);
       if (json) {
-        console.log(JSON.stringify({ file, layer: loaded.layer, ok, diagnostics: diags, stats, explain: (tl.steps ?? []).map((s) => ({ t: s.t, label: s.label, caption: s.caption })) }, null, 2));
+        console.log(JSON.stringify({ file, layer: loaded.layer, ok, diagnostics: diags, stats, expect, explain: (tl.steps ?? []).map((s) => ({ t: s.t, label: s.label, caption: s.caption })) }, null, 2));
       } else {
         printDiagnostics(diags, false);
         const errs = diags.filter((d) => d.severity === "error").length;
@@ -301,6 +341,7 @@ export async function runAnimCli(argv: string[]): Promise<number> {
         const ann = stats.annotations ? ` · annotations: ${stats.annotations.drawn} drawn, ${stats.annotations.onScreen} on screen at the end` : "";
         console.log(`  ${stats.durationMs}ms · ${stats.steps} steps (${stats.captions} captioned) · ${stats.nodes} nodes · ${stats.tracks} tracks / ${stats.keyframes} keyframes${ann}`);
         if (stats.sceneBytes) console.log(`  scene ${stats.sceneBytes} B → timeline ${stats.timelineBytes} B (×${stats.expansion})`);
+        if (expect) console.log(`  facts ${basename(expect.file)}: ${expect.compared} — ${expect.ok ? "all as drawn" : "see above"}`);
         console.log(`  next: vlmkit-anim explain ${file} · vlmkit-anim render ${file} --step N · vlmkit-anim html ${file} --out page.html`);
       }
       return ok ? 0 : 1;

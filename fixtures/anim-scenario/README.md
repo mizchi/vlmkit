@@ -75,10 +75,20 @@ edge-fidelity hand count (every listed dependency drawn, none invented).
 five's friction produced (`layout` had learned to see a line through a text
 in between).
 
+v14 (2026-09-06) answers v13's two green-but-wrong pictures (fe deleted a true
+dependency, gc highlighted the wrong edge): each still-figure brief now ships a
+**fact sheet** in `briefs/facts/<brief>.expect.json` — modules, `deps`
+`"a->b"`, `forbidden`, `highlighted`, `groups` — and success is
+`check scene.json --expect facts/….expect.json` exiting 0. Writers `ha`–`hd`
+(two of them the smaller model that produced both v13 errors) re-run the four
+briefs; the sheet's verdict on each first attempt, and how many rounds the
+sheet's own lines take to clear, are the metrics.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from
 v11 also whether every dependent literal (readout text, message label,
 caption arithmetic) was updated — the checker cannot read arithmetic, so that
 is a hand count.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10,11}.md`.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10,11,12}.md`,
+`docs/reports/2026-09-06-anim-ir-v{13,14}.md`.

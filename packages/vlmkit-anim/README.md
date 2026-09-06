@@ -71,6 +71,14 @@ a warning. `vlmkit-anim still scene.json
 --out map.svg` (or `.png`) renders any scene's final frame without the caption band, cropped to what is
 drawn: a module map, a filled matrix, a walked graph. `vlmkit-anim repo` writes the figure next to the GIF.
 
+A figure can be well-formed, clean and wrong: a true dependency deleted, the wrong edge highlighted.
+When the facts exist (a brief, the bundler's import list, the `package.json` files), write them as
+`{"format": "vlmkit-anim/expect@1", "modules": […], "deps": ["a->b", …], "forbidden": […],
+"highlighted": […], "groups": {…}}` and run `vlmkit-anim check scene.json --expect facts.json`: every
+listed fact must be drawn (in that direction, in that style, lit in the final frame) and nothing drawn
+may be missing from the list. `vlmkit-anim repo` writes the workspace's own sheet as `repo.expect.json`;
+`vlmkit-anim schema --kind expect` has the fields.
+
 ## Layout: geometry, then eyes
 
 `vlmkit-anim layout scene.json` reads every step back from the compiled timeline and lists texts that

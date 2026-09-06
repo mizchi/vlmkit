@@ -21,11 +21,14 @@ consistent.
 Deliver `scene.json`, `map.svg` (the still), `walk.gif` (the animation, via
 `vlmkit-anim video`) and `log.md`.
 
-Success: `vlmkit-anim check scene.json` exits 0 with no ✗ and no ⚠;
-`vlmkit-anim layout scene.json` reports no issue; the still shows all eight
-modules, all nine dependencies and the three groups; `explain` reads as the
-walk described above; the two asynchronous hops are marked in the final
-frame.
+The facts above are also written as a fact sheet,
+`facts/modules-request-walk.expect.json`, in the shape `check --expect` reads:
+use its module and group ids as written, and highlight the two asynchronous
+hops it names in the final frame.
+
+Success: `vlmkit-anim check scene.json --expect facts/modules-request-walk.expect.json`
+exits 0 with no ✗ and no ⚠; `vlmkit-anim layout scene.json` reports no issue;
+`explain` reads as the walk described above.
 
 Also record in `log.md`: whether one `kind` carried both uses or you wanted
 two files; every coordinate, colour or canvas size you wrote by hand and why;

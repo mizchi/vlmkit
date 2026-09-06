@@ -94,6 +94,38 @@ describe("vlmkit-anim", () => {
     assert.ok(parsed.diagnostics.some((d: { path: string }) => d.path === "algorithm"));
   });
 
+  it("check --expect compares the scene with a fact sheet: a matching one prints what was compared, a wrong edge exits 1", () => {
+    const scene = join(dir, "modules.json");
+    writeFileSync(scene, JSON.stringify(EXAMPLES.modules));
+    const facts = join(dir, "facts.json");
+    writeFileSync(facts, JSON.stringify({ format: "vlmkit-anim/expect@1", modules: ["web", "api", "auth", "db", "cache", "logging"], deps: ["web->api", "api->auth", "api->db", "api->cache", "auth->db", "api->logging"], groups: { edge: ["web"], core: ["api", "auth"], infra: ["db", "cache", "logging"] } }));
+    const ok = run(["check", scene, "--expect", facts]);
+    assert.equal(ok.status, 0, ok.stdout);
+    assert.match(ok.stdout, /facts facts\.json: 6 module\(s\) · 6 dependencies · 3 group\(s\) — all as drawn/);
+    const wrong = join(dir, "facts-wrong.json");
+    writeFileSync(wrong, JSON.stringify({ format: "vlmkit-anim/expect@1", deps: ["web->api", "api->auth", "api->db", "api->cache", "db->auth", "api->logging"], highlighted: ["api->db"] }));
+    const bad = run(["check", scene, "--expect", wrong]);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stdout, /✗ deps\(auth->db\): dependency db->auth is drawn the other way round, as auth->db/);
+    assert.match(bad.stdout, /✗ expect\.highlighted: dependency "api->db" is not highlighted in the final frame/);
+    const j = JSON.parse(run(["check", scene, "--expect", wrong, "--json"]).stdout);
+    assert.equal(j.ok, false);
+    assert.equal(j.expect.ok, false);
+    assert.match(j.expect.compared, /6 dependencies · 1 highlighted/);
+    // A malformed sheet is reported under the sheet's name, before anything is compared.
+    const malformed = join(dir, "facts-bad.json");
+    writeFileSync(malformed, JSON.stringify({ deps: ["a-b"] }));
+    const m = run(["check", scene, "--expect", malformed]);
+    assert.equal(m.status, 1);
+    assert.match(m.stdout, /✗ facts-bad\.json:format: "format" must be "vlmkit-anim\/expect@1" \(missing\)/);
+    assert.match(m.stdout, /✗ facts-bad\.json:deps\[0\]: "a-b" is not an edge/);
+    // The sheet has its own page in the writing guide.
+    const sheet = run(["schema", "--kind", "expect"]);
+    assert.equal(sheet.status, 0);
+    assert.match(sheet.stdout, /check --expect facts\.json/);
+    assert.match(sheet.stdout, /"forbidden"/);
+  });
+
   it("invalid JSON is a one-line diagnostic, not a stack trace", () => {
     const p = join(dir, "syntax.json");
     writeFileSync(p, '{"format": "vlmkit-anim/scene@1", "kind": "sort",}');
