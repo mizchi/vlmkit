@@ -183,7 +183,10 @@ count is the expressiveness metric — 3 of 8 scenes before the annotation layer
 `docs/reports/2026-09-05-anim-ir-v11.md` (re-edits of annotated scenes: every readout and relation followed
 the data change; the round's defects were layout, fixed in the compiler, not in the writer's hands),
 `docs/reports/2026-09-05-anim-ir-v12.md` (the frames measured two ways — `layout` geometry and vision readers on
-the contact sheet — and compared; annotations now place themselves off other text).
+the contact sheet — and compared; annotations now place themselves off other text),
+`docs/reports/2026-09-06-anim-ir-v13.md` (the first still-figure round: five module maps, all green and all with lines
+through labels the geometry could not see; `layout` now reports `crossed`, and the module layout, edge routing,
+container labels, annotation placement and arcs were reworked until the five scenes went from 91 crossings to 2).
 
 ## Measuring Gate / Rule Execution Cost
 

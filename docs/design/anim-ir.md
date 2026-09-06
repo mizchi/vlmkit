@@ -255,6 +255,26 @@ brief passed on the first attempt with the alternative path narrated):
   with the stroke). The smaller model reported every sheet clean. Geometry is
   the gate; the sheet is the second opinion, at a tile size the labels survive.
   `docs/reports/2026-09-05-anim-ir-v12.md`.
+- **v13 was the first round on still figures, and the geometry was blind to
+  the defect every writer produced.** Five writers drew module maps and a
+  dependency graph from the guide alone: green checks, clean `layout`, zero
+  hand-typed coordinates, every edge right — and every still had a line
+  through a container label, an arrow vanishing behind a module in its way, or
+  a dependency running under a callout. Nothing in the v12 geometry reads a
+  line. `layout` now reports **crossed** (pixels of stroke inside a text, or
+  inside a box that is not the stroke's end), and the compiler was made to
+  earn it: module maps layer from their leaves (fa found the root walk put
+  identical dependency sets on different layers), layers are ordered by
+  barycentre, an edge bends around a box in its way, a group that owns its
+  layers is a full-width row, container labels and annotations keep off
+  strokes, arcs pick the side that clears and enter a box on the side facing
+  the bulge, and labels that sit on lines by design (edges, messages,
+  relations, readouts) are haloed so the line breaks around them. Two writers
+  also had no word for "the dependency that must not exist" — one drew it as
+  a real edge, and the layout obeyed it — so edges take `forbidden` and
+  `dashed`, `relate` takes a `tone`, and `highlight` takes an edge. 91
+  crossings across the five scenes before, 2 after; 0 on every fixture.
+  `docs/reports/2026-09-06-anim-ir-v13.md`.
 - Vision-model review uses `vlmkit-anim sheet`: one labelled contact sheet per
   animation. Correctness stays with `check`; the sheet is for "does this
   explain it?".
