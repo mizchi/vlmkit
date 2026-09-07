@@ -105,6 +105,9 @@ importers:
 
   packages/vlmkit-anim:
     dependencies:
+      '@mizchi/vlmkit-ai':
+        specifier: workspace:*
+        version: link:../vlmkit-ai
       '@mizchi/vlmkit-animation-eval':
         specifier: workspace:*
         version: link:../vlmkit-animation-eval
