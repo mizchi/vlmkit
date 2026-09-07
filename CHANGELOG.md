@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## Unreleased
+## 0.13.0 — 2026-09-07
 
 **`vlmkit-anim`: the layer for explaining a concept, not only a structure.** v9 changed the
 evaluation question from "animate this structure" to "explain this idea" (vector clocks, HTTP/2
