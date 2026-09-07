@@ -15,6 +15,7 @@
 
 import {
   ANNOTATION_ACTIONS,
+  EDGE_STYLES,
   NAMED_EASINGS,
   SCENE_FORMAT,
   SCENE_KINDS,
@@ -210,7 +211,7 @@ function ids(ctx: Ctx, items: unknown[], path: string, key = "id"): string[] {
 
 const NODE_KEYS = [
   "id", "shape", "pos", "size", "r", "rx", "points", "d", "head", "text", "fontSize", "anchor", "fill", "stroke",
-  "strokeWidth", "opacity", "dash", "scale", "rotate", "parent", "color",
+  "strokeWidth", "opacity", "dash", "dashed", "halo", "scale", "rotate", "parent", "color",
 ] as const;
 
 export function validateTimelineNode(ctx: Ctx, node: unknown, path: string): void {
@@ -367,8 +368,78 @@ function idOrIds(ctx: Ctx, v: unknown, path: string, known: string[], what: stri
   arr.forEach((id, i) => ctx.ref(id, Array.isArray(v) ? `${path}[${i}]` : path, known, what));
 }
 
+/**
+ * `modules`: its own vocabulary (modules / deps / groups) checked here with its own paths, then the
+ * normalised diagram's sequence checked by the diagram rules — the steps are the diagram's steps.
+ */
+function validateModules(ctx: Ctx, doc: Obj): void {
+  validateBase(ctx, doc, ["modules", "deps", "groups", "layout", "sequence"]);
+  if (doc.layout !== undefined) ctx.enumOf(doc.layout, "layout", ["tb", "lr"], "layout");
+  const before = ctx.diags.length;
+  const moduleIds: string[] = [];
+  if (ctx.array(doc.modules, "modules", { minLength: 1 })) {
+    doc.modules.forEach((m, i) => {
+      const path = `modules[${i}]`;
+      const id = isStr(m) ? m : ctx.object(m, path) ? m.id : undefined;
+      if (!isStr(m) && ctx.object(m, path)) {
+        ctx.keys(m, path, ["id", "label", "hidden"]);
+        if (!isStr(m.id)) ctx.error(`${path}.id`, `a module needs a string "id"`, `"${path}": "cache" or {"id": "cache", "label": "Cache"}`);
+      }
+      if (isStr(id)) {
+        if (moduleIds.includes(id)) ctx.error(path, `duplicate module id "${id}"`);
+        else moduleIds.push(id);
+      }
+    });
+  }
+  if (doc.deps !== undefined && ctx.array(doc.deps, "deps")) {
+    doc.deps.forEach((d, i) => {
+      const path = `deps[${i}]`;
+      if (Array.isArray(d)) {
+        if (d.length !== 2) ctx.error(path, `a dependency is ["a", "b"] (a depends on b), got ${d.length} item(s)`);
+        else {
+          ctx.ref(d[0], `${path}[0]`, moduleIds, "module");
+          ctx.ref(d[1], `${path}[1]`, moduleIds, "module");
+        }
+      } else if (ctx.object(d, path)) {
+        ctx.keys(d, path, ["from", "to", "label", "style", "hidden"]);
+        ctx.ref(d.from, `${path}.from`, moduleIds, "module");
+        ctx.ref(d.to, `${path}.to`, moduleIds, "module");
+        if (d.style !== undefined) ctx.enumOf(d.style, `${path}.style`, EDGE_STYLES, "style");
+      }
+    });
+  }
+  if (doc.groups !== undefined && ctx.array(doc.groups, "groups")) {
+    const owner = new Map<string, string>();
+    const groupIds: string[] = [];
+    doc.groups.forEach((g, i) => {
+      const path = `groups[${i}]`;
+      if (!ctx.object(g, path)) return;
+      ctx.keys(g, path, ["id", "label", "modules"]);
+      if (!isStr(g.id)) ctx.error(`${path}.id`, `a group needs a string "id"`);
+      else if (moduleIds.includes(g.id) || groupIds.includes(g.id)) ctx.error(`${path}.id`, `"${g.id}" is already a module or group id`);
+      else groupIds.push(g.id);
+      if (ctx.array(g.modules, `${path}.modules`, { minLength: 1 })) {
+        g.modules.forEach((m, k) => {
+          if (!ctx.ref(m, `${path}.modules[${k}]`, moduleIds, "module")) return;
+          const prev = owner.get(m as string);
+          if (prev && prev !== g.id) ctx.error(`${path}.modules[${k}]`, `"${m as string}" is already in group "${prev}"`, "a module belongs to at most one group");
+          else owner.set(m as string, String(g.id));
+        });
+      }
+    });
+  }
+  // The sequence follows the diagram's rules over the normalised shape; only when the shape itself is sound,
+  // so a bad dep is reported once, as deps[i], not again as edges[i].
+  if (ctx.diags.length === before && doc.sequence !== undefined) {
+    const nodes = (doc.modules as unknown[]).map((m) => (isStr(m) ? { id: m } : { id: (m as { id: string }).id, hidden: (m as { hidden?: boolean }).hidden }));
+    const edges = ((doc.deps as unknown[] | undefined) ?? []).map((d) => (Array.isArray(d) ? { from: d[0], to: d[1] } : { from: (d as { from: string }).from, to: (d as { to: string }).to, style: (d as { style?: string }).style }));
+    const groups = ((doc.groups as unknown[] | undefined) ?? []).map((g) => ({ id: (g as { id: string }).id, nodes: (g as { modules: string[] }).modules }));
+    validateDiagram(ctx, { format: doc.format, kind: "diagram", nodes, edges, groups, sequence: doc.sequence } as Obj);
+  }
+}
+
 function validateDiagram(ctx: Ctx, doc: Obj): void {
-  validateBase(ctx, doc, ["nodes", "edges", "layout", "sequence"]);
+  validateBase(ctx, doc, ["nodes", "edges", "groups", "layout", "sequence"]);
   if (doc.layout !== undefined) ctx.enumOf(doc.layout, "layout", ["lr", "tb", "grid", "circle"], "layout");
   let nodeIds: string[] = [];
   if (ctx.array(doc.nodes, "nodes", { minLength: 1 })) {
@@ -381,6 +452,20 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
       if (n.pos !== undefined) ctx.vec2(n.pos, `${path}.pos`);
     });
   }
+  const groupIds: string[] = [];
+  if (doc.groups !== undefined && ctx.array(doc.groups, "groups")) {
+    doc.groups.forEach((g, i) => {
+      const path = `groups[${i}]`;
+      if (!ctx.object(g, path)) return;
+      ctx.keys(g, path, ["id", "label", "nodes"]);
+      if (!isStr(g.id)) ctx.error(`${path}.id`, `a group needs a string "id"`);
+      else if (nodeIds.includes(g.id) || groupIds.includes(g.id)) ctx.error(`${path}.id`, `"${g.id}" is already a node or group id`);
+      else groupIds.push(g.id);
+      if (ctx.array(g.nodes, `${path}.nodes`, { minLength: 1 })) g.nodes.forEach((n, k) => ctx.ref(n, `${path}.nodes[${k}]`, nodeIds, "node"));
+    });
+  }
+  // Steps may name a group where they name a node: show / hide / highlight its container.
+  const targetIds = [...nodeIds, ...groupIds];
   const edgeKeys: string[] = [];
   if (doc.edges !== undefined && ctx.array(doc.edges, "edges")) {
     doc.edges.forEach((e, i) => {
@@ -390,9 +475,11 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
       const a = ctx.ref(e.from, `${path}.from`, nodeIds, "node");
       const b = ctx.ref(e.to, `${path}.to`, nodeIds, "node");
       if (a && b) edgeKeys.push(`${e.from as string}->${e.to as string}`);
-      if (e.style !== undefined) ctx.enumOf(e.style, `${path}.style`, ["arrow", "line"], "style");
+      if (e.style !== undefined) ctx.enumOf(e.style, `${path}.style`, EDGE_STYLES, "style");
     });
   }
+  // `highlight` lights up a node, a container or an edge ("a->b"); show / hide take nodes and containers.
+  const highlightIds = [...targetIds, ...edgeKeys];
   if (doc.sequence !== undefined && ctx.array(doc.sequence, "sequence")) {
     const ACTIONS = ["show", "hide", "highlight", "unhighlight", "flow", "note", "relabel", ...ANNOTATION_ACTIONS];
     doc.sequence.forEach((s, i) => {
@@ -417,7 +504,7 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
         case "hide":
         case "highlight":
         case "unhighlight":
-          idOrIds(ctx, v, `${path}.${action}`, nodeIds, "node");
+          idOrIds(ctx, v, `${path}.${action}`, highlightIds, "node");
           break;
         case "flow": {
           let from: unknown;
@@ -958,12 +1045,13 @@ function validateAnnotationOp(ctx: Ctx, op: Obj, path: string, action: string): 
     case "relate":
       if (v === null) return;
       if (!ctx.object(v, p)) return;
-      ctx.keys(v, p, ["id", "from", "to", "label", "style"]);
+      ctx.keys(v, p, ["id", "from", "to", "label", "style", "tone"]);
       anchor(v.from, `${p}.from`);
       anchor(v.to, `${p}.to`);
       if (isStr(v.from) && isStr(v.to) && v.from === v.to) ctx.error(`${p}.to`, `a relation needs two different anchors, both are "${v.from}"`);
       if (v.label !== undefined && !isStr(v.label)) ctx.error(`${p}.label`, `label must be a string`);
       if (v.style !== undefined) ctx.enumOf(v.style, `${p}.style`, ["arrow", "line"], "style");
+      if (v.tone !== undefined) ctx.enumOf(v.tone, `${p}.tone`, ["accent", "bad", "muted"], "tone");
       if (v.id !== undefined && !isStr(v.id)) ctx.error(`${p}.id`, `id must be a string`);
       return;
     case "text":
@@ -1379,6 +1467,7 @@ export function validateScene(doc: unknown): Diagnostic[] {
   switch (doc.kind as Scene["kind"]) {
     case "compose": validateCompose(ctx, doc); break;
     case "diagram": validateDiagram(ctx, doc); break;
+    case "modules": validateModules(ctx, doc); break;
     case "state-machine": validateStateMachine(ctx, doc); break;
     case "sort": validateSort(ctx, doc); break;
     case "array": validateArray(ctx, doc); break;

@@ -58,6 +58,37 @@ writes the equivalent JSON file. JSON stays the format — this is the editor's 
 - `playwright` — `frames --png`, `sheet` (PNG), `video`, `eval`. Everything else is browser-free.
 - `@mizchi/vlmkit-animation-eval` — `vlmkit-anim eval page.html`: the frame-sampled evaluator
   behind vlmkit's `check animation` gate, run on the pages this tool emits. Writing needs neither.
+- `@mizchi/vlmkit-ai` — `vlmkit-anim review scene.json --out dir --model <vlm>`: asks a vision model to
+  read the contact sheet for layout defects and scores its answer against the geometry (below).
+
+## Still figures
+
+Not everything needs to move. `kind: modules` is a module map — modules, `deps` (`["a", "b"]` reads "a
+depends on b"; `"style": "forbidden"` for the one that must not exist), `groups` as containers — laid
+out in layers with dependencies pointing one way, edges bending around modules in their way, and a
+container around exactly its members (a full-width row when it owns its layers); a dependency cycle is
+a warning. `vlmkit-anim still scene.json
+--out map.svg` (or `.png`) renders any scene's final frame without the caption band, cropped to what is
+drawn: a module map, a filled matrix, a walked graph. `vlmkit-anim repo` writes the figure next to the GIF.
+
+A figure can be well-formed, clean and wrong: a true dependency deleted, the wrong edge highlighted.
+When the facts exist (a brief, the bundler's import list, the `package.json` files), write them as
+`{"format": "vlmkit-anim/expect@1", "modules": […], "deps": ["a->b", …], "forbidden": […],
+"highlighted": […], "groups": {…}}` and run `vlmkit-anim check scene.json --expect facts.json`: every
+listed fact must be drawn (in that direction, in that style, lit in the final frame) and nothing drawn
+may be missing from the list. `vlmkit-anim repo` writes the workspace's own sheet as `repo.expect.json`;
+`vlmkit-anim schema --kind expect` has the fields.
+
+## Layout: geometry, then eyes
+
+`vlmkit-anim layout scene.json` reads every step back from the compiled timeline and lists texts that
+sit on other texts, texts under a filled box that is not their own, texts past the canvas edge, and
+lines drawn through a text or through a box that is not one of their ends; the same findings are
+warnings in `check`. `vlmkit-anim review scene.json --out dir` writes the contact
+sheet, a review brief (what counts as a defect and the JSON to return) and the geometry's report; give
+the sheet and the brief to a vision model or an agent and pass its JSON back as `--answers` (or let
+`--model` call the VLM) to get a frame-by-frame agreement table — which frames both flag, which only the
+reader, which only the geometry.
 
 Sample outputs for every fixture (one GIF and one contact sheet each) are in
 [`samples/`](./samples/README.md).

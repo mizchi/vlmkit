@@ -1,0 +1,11 @@
+# v12 blind reading key (readers must not open this)
+- A → before/vector-clock
+- B → after/pandora
+- C → before/pandora
+- D → after/vector-clock
+- E → before/vector-clock-receive
+- F → after/vector-clock-receive
+- G → before/vector-clock-distributed
+- H → after/vector-clock-distributed
+- C2 → before/pandora at --cols 2 --tile 640
+- G2 → before/vector-clock-distributed at --cols 2 --tile 640

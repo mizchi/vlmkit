@@ -138,15 +138,20 @@ is how Playwright's own `mount` fixture works. Consequences:
 ## Explanatory animations (`vlmkit-anim`) and their evaluation loop
 
 ```bash
-vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all fifteen)
+vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all sixteen)
+vlmkit-anim schema --kind modules                   # the still-figure preset: a module map (modules / deps / groups), layered, cycle-checked
 vlmkit-anim schema --kind annotations               # the six ops every kind shares (value / callout / snapshot / group / text / relate) and each kind's anchors
 vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
 vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
 vlmkit-anim explain scene.json                      # narration as a numbered list
 vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
+vlmkit-anim still scene.json --out map.svg          # the figure: final frame, no caption, cropped to what is drawn (.png needs playwright)
 vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
 vlmkit-anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
 vlmkit-anim eval page.html                          # the shared frame-sampled evaluator on an emitted page (same report as `vlmkit check animation`)
+vlmkit-anim check scene.json --expect facts.json    # …and the figure against its facts (modules, deps "a->b", forbidden, highlighted in the final frame, group members) — a green check on a wrong picture was v13's finding
+vlmkit-anim layout scene.json                       # texts on texts / under boxes / past the edge / lines through texts, per step, from the timeline (also warnings in `check`)
+vlmkit-anim review scene.json --out dir [--model M | --answers a.json]   # contact sheet + review brief for a vision model or an agent; scores its JSON against `layout`
 vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture   # the workspace drawn layer by layer (pnpm anim:diagrams regenerates docs/diagrams/)
 vlmkit-anim pr --base origin/main --out .vlmkit-anim/pr           # the change map of a branch: one beat per commit, areas + import edges + counts; <name>.md is paste-ready
 ```
@@ -177,7 +182,15 @@ Reports: `docs/reports/2026-09-04-anim-ir-v*.md` (v1–v8, structures) and
 `docs/reports/2026-09-05-anim-ir-v{9,10}.md` (concept introductions; the coordinate-fallback
 count is the expressiveness metric — 3 of 8 scenes before the annotation layer and `compose`, 1 of 7 after),
 `docs/reports/2026-09-05-anim-ir-v11.md` (re-edits of annotated scenes: every readout and relation followed
-the data change; the round's defects were layout, fixed in the compiler, not in the writer's hands).
+the data change; the round's defects were layout, fixed in the compiler, not in the writer's hands),
+`docs/reports/2026-09-05-anim-ir-v12.md` (the frames measured two ways — `layout` geometry and vision readers on
+the contact sheet — and compared; annotations now place themselves off other text),
+`docs/reports/2026-09-06-anim-ir-v13.md` (the first still-figure round: five module maps, all green and all with lines
+through labels the geometry could not see; `layout` now reports `crossed`, and the module layout, edge routing,
+container labels, annotation placement and arcs were reworked until the five scenes went from 91 crossings to 2),
+`docs/reports/2026-09-06-anim-ir-v14.md` (the figure against its facts: `check --expect facts.json` names v13's two
+green-but-wrong pictures in one line each; four writers with fact sheets were four green, and the sheet caught one
+wrong final highlight on the first run).
 
 ## Measuring Gate / Rule Execution Cost
 

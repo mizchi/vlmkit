@@ -148,7 +148,7 @@ export function compileGraph(scene: GraphScene): Timeline {
       const len = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
       const nx = -(q[1] - p[1]) / len;
       const ny = (q[0] - p[0]) / len;
-      b.node({ id: `${id}-label`, shape: "text", pos: [mid[0] + nx * 10, mid[1] + ny * 10], text, fontSize: T.fontSize - 2, color: T.muted });
+      b.node({ id: `${id}-label`, shape: "text", pos: [mid[0] + nx * 10, mid[1] + ny * 10], text, fontSize: T.fontSize - 2, color: T.muted, halo: true });
     }
   });
   for (const n of nodes) {

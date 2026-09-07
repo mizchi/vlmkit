@@ -109,7 +109,7 @@ export function compileDistributed(scene: DistributedScene): Timeline {
     b.node({ id, shape: "arrow", points: [p, q], stroke: m.lost ? T.bad : T.nodeStroke, dash: 0, opacity: 0 });
     b.node({ id: `${id}-dot`, shape: "circle", pos: p, r: 6, fill: m.lost ? T.bad : T.accent, stroke: T.nodeStroke, opacity: 0 });
     if (m.label) {
-      b.node({ id: `${id}-label`, shape: "text", pos: [(p[0] + q[0]) / 2, Math.min(y0, y1) - 9], text: m.label, fontSize: T.fontSize - 2, color: T.text, opacity: 0 });
+      b.node({ id: `${id}-label`, shape: "text", pos: [(p[0] + q[0]) / 2, Math.min(y0, y1) - 9], text: m.label, fontSize: T.fontSize - 2, color: T.text, halo: true, opacity: 0 });
     }
     const t0 = m.at!;
     const t1 = m.at! + m.latency!;

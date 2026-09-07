@@ -10,6 +10,8 @@
  * timeline (how much the semantic layer buys), duration, step count.
  */
 
+import { moduleCycles } from "./compile/modules.ts";
+import { layoutReport, type LayoutFrame, type LayoutIssue } from "./layout.ts";
 import { sampleFrame, timelineDuration, worldPos } from "./timeline.ts";
 import { compileScene } from "./compile/index.ts";
 import type { Diagnostic, Scene, Timeline } from "./types.ts";
@@ -299,6 +301,25 @@ function checkDiagram(scene: Extract<Scene, { kind: "diagram" }>, tl: Timeline):
   return out;
 }
 
+/**
+ * A module map is a still figure by design, so no "no sequence" warning; what can be wrong is a
+ * dependency cycle (the layers then lie about direction) and a hidden module no step shows.
+ */
+function checkModules(scene: Extract<Scene, { kind: "modules" }>): Diagnostic[] {
+  const out: Diagnostic[] = [];
+  for (const cycle of moduleCycles(scene)) {
+    out.push(
+      warn("deps", `dependency cycle: ${cycle.join(" → ")}`, `the layout cuts it at "${cycle[cycle.length - 2]} → ${cycle[cycle.length - 1]}" and draws that arrow against the flow — keep it if the cycle is the point, else break it, or mark the edge to remove with "style": "forbidden"`),
+    );
+  }
+  const shown = new Set<string>();
+  for (const st of scene.sequence ?? []) if ("show" in st) for (const id of Array.isArray(st.show) ? st.show : [st.show]) shown.add(id);
+  for (const m of scene.modules) {
+    if (typeof m !== "string" && m.hidden && !shown.has(m.id)) out.push(warn(`modules(${m.id})`, `"${m.id}" is hidden and no step shows it: it never appears`, `add {"show": "${m.id}"} to "sequence" or drop "hidden"`));
+  }
+  return out;
+}
+
 function checkArray(scene: Extract<Scene, { kind: "array" }>, tl: Timeline): Diagnostic[] {
   const out: Diagnostic[] = [];
   const meta = tl.meta as { finalOrder?: (number | string)[]; slotX?: number[]; found?: number } | undefined;
@@ -478,9 +499,49 @@ function checkCompose(scene: Extract<Scene, { kind: "compose" }>): Diagnostic[] 
   return out;
 }
 
+/**
+ * Layout defects read back from the frames (v12): a text on another text, a text under a filled box that is
+ * not its own, a text past the canvas edge. One warning per pair (or per clipped text), at the first step it
+ * shows, with the count of later steps it persists through. The compiler places annotations to avoid these;
+ * when one is reported on an annotation's node it is the compiler's to fix, and the hint says so.
+ */
+export function checkLayout(tl: Timeline): Diagnostic[] {
+  const report = layoutReport(tl);
+  const seen = new Map<string, { first: LayoutFrame; issue: LayoutIssue; more: number }>();
+  for (const f of report.frames) {
+    for (const issue of f.issues) {
+      const key = `${issue.kind}:${issue.nodes.join("|")}`;
+      const s = seen.get(key);
+      if (s) s.more++;
+      else seen.set(key, { first: f, issue, more: 0 });
+    }
+  }
+  const out: Diagnostic[] = [];
+  for (const { first, issue, more } of seen.values()) {
+    const where = `at step ${first.step?.index ?? "?"} (${Math.round(first.t)}ms)${more ? ` and ${more} later step(s)` : ""}`;
+    const annotation = issue.nodes.some((id) => /^(value|callout|snapshot|group|text|relate)-/.test(id));
+    const hint = annotation
+      ? "the compiler placed this annotation — try another `side`, a shorter label, or anchor it at a different thing (the node instead of the edge), and report it if nothing helps"
+      : "move one of them, shorten the text, or widen the canvas";
+    if (issue.kind === "clipped") out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" runs ${issue.amount}px past the canvas edge ${where}`, hint));
+    else if (issue.kind === "crossed") {
+      const edgeHint = annotation
+        ? hint
+        : "an edge runs through a box that is not one of its ends — reorder the modules in that layer, put the two in one group, or shorten the label so the layout has room";
+      out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" has a line through it (${issue.nodes[1]}, ${issue.amount}px) ${where}`, edgeHint));
+    } else {
+      const other = issue.texts[1] ? `"${issue.texts[1]}"` : issue.nodes[1];
+      out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" is covered by ${other} (${Math.round(issue.amount * 100)}% of the smaller) ${where}`, hint));
+    }
+  }
+  return out;
+}
+
 export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
-  const out = checkTimeline(tl);
+  let out = [...checkTimeline(tl), ...checkLayout(tl)];
   if (!scene) return out;
+  // A module map without a sequence is a still figure by design: that nothing moves is not a warning.
+  if (scene.kind === "modules" && !(scene.sequence ?? []).length) out = out.filter((d) => d.path !== "tracks");
   switch (scene.kind) {
     case "sort": out.push(...checkSort(scene, tl)); break;
     case "array": out.push(...checkArray(scene, tl)); break;
@@ -492,6 +553,7 @@ export function checkAnimation(tl: Timeline, scene?: Scene): Diagnostic[] {
     case "state-machine": out.push(...checkStateMachine(scene, tl)); break;
     case "distributed": out.push(...checkDistributed(scene, tl)); break;
     case "diagram": out.push(...checkDiagram(scene, tl)); break;
+    case "modules": out.push(...checkModules(scene)); break;
     case "matrix": out.push(...checkMatrix(scene, tl)); break;
     case "graph": out.push(...checkGraph(scene, tl)); break;
     case "chart": out.push(...checkChart(scene, tl)); break;

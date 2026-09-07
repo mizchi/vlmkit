@@ -54,10 +54,41 @@ a readout or a relation survives someone changing the data it tracks
 (agents `ea`–`ec`; `ed` re-ran ea's task after the `relate` routing fix ea's
 friction produced, to measure the fix the same way the defect was found).
 
+v12 measured the frames instead of the writers: `v12/before-timelines/` holds
+the four v11 scenes compiled by the pre-v12 compiler (the layout defects kept),
+`v12/before/` and `v12/after/` their review sets (sheet, brief, geometry
+report), `v12/reads/<letter>/` the blind folders the readers saw — a sheet and
+a brief, nothing else; `KEY.md` maps letters to before/after — with each
+reader's `answers-<model>.json`, and `v12/scores/` the frame-level agreement
+of each answer with the geometry (`vlmkit-anim review --answers`).
+
+v13 (2026-09-06) is the first round on **still figures**, after `kind: modules`,
+diagram `groups` and the `still` verb landed: `modules-this-workspace` (this
+repository's packages from their `package.json` files; the `repo` generator is
+forbidden), `modules-ports-adapters` (a rule — every dependency points inward —
+plus one dependency that must be shown as forbidden), `depgraph-import-cycle`
+(nine modules, one cycle to make visible and name the cut) and
+`modules-request-walk` (one file as both the onboarding map and a walked
+request). Writers `fa`–`fe`; success adds `layout` reporting no issue and an
+edge-fidelity hand count (every listed dependency drawn, none invented).
+`ga`–`gc` re-ran three of the briefs on the compiler and guide the first
+five's friction produced (`layout` had learned to see a line through a text
+in between).
+
+v14 (2026-09-06) answers v13's two green-but-wrong pictures (fe deleted a true
+dependency, gc highlighted the wrong edge): each still-figure brief now ships a
+**fact sheet** in `briefs/facts/<brief>.expect.json` — modules, `deps`
+`"a->b"`, `forbidden`, `highlighted`, `groups` — and success is
+`check scene.json --expect facts/….expect.json` exiting 0. Writers `ha`–`hd`
+(two of them the smaller model that produced both v13 errors) re-run the four
+briefs; the sheet's verdict on each first attempt, and how many rounds the
+sheet's own lines take to clear, are the metrics.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from
 v11 also whether every dependent literal (readout text, message label,
 caption arithmetic) was updated — the checker cannot read arithmetic, so that
 is a hand count.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10,11}.md`.
+Reports: `docs/reports/2026-09-04-anim-ir-v*.md`, `docs/reports/2026-09-05-anim-ir-v{9,10,11,12}.md`,
+`docs/reports/2026-09-06-anim-ir-v{13,14}.md`.

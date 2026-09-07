@@ -1,0 +1,918 @@
+{
+  "format": "vlmkit-anim/timeline@1",
+  "canvas": {
+    "width": 964,
+    "height": 400,
+    "background": "#ffffff"
+  },
+  "duration": 5700,
+  "nodes": [
+    {
+      "id": "title",
+      "shape": "text",
+      "pos": [
+        320,
+        22
+      ],
+      "text": "Vector clocks: causality without a global clock",
+      "fontSize": 18,
+      "color": "#1f2328"
+    },
+    {
+      "id": "life-A",
+      "shape": "line",
+      "points": [
+        [
+          107,
+          79.4
+        ],
+        [
+          107,
+          360
+        ]
+      ],
+      "stroke": "#9ca3af",
+      "strokeWidth": 1
+    },
+    {
+      "id": "node-A",
+      "shape": "rect",
+      "pos": [
+        107,
+        60
+      ],
+      "size": [
+        42,
+        30.800000000000004
+      ],
+      "rx": 6,
+      "fill": "#ffffff",
+      "stroke": "#1f2328",
+      "strokeWidth": 1.5,
+      "text": "A",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "life-B",
+      "shape": "line",
+      "points": [
+        [
+          320,
+          79.4
+        ],
+        [
+          320,
+          360
+        ]
+      ],
+      "stroke": "#9ca3af",
+      "strokeWidth": 1
+    },
+    {
+      "id": "node-B",
+      "shape": "rect",
+      "pos": [
+        320,
+        60
+      ],
+      "size": [
+        42,
+        30.800000000000004
+      ],
+      "rx": 6,
+      "fill": "#ffffff",
+      "stroke": "#1f2328",
+      "strokeWidth": 1.5,
+      "text": "B",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "life-C",
+      "shape": "line",
+      "points": [
+        [
+          533,
+          79.4
+        ],
+        [
+          533,
+          360
+        ]
+      ],
+      "stroke": "#9ca3af",
+      "strokeWidth": 1
+    },
+    {
+      "id": "node-C",
+      "shape": "rect",
+      "pos": [
+        533,
+        60
+      ],
+      "size": [
+        42,
+        30.800000000000004
+      ],
+      "rx": 6,
+      "fill": "#ffffff",
+      "stroke": "#1f2328",
+      "strokeWidth": 1.5,
+      "text": "C",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "value-vecA-label",
+      "shape": "text",
+      "pos": [
+        57.6,
+        95.2
+      ],
+      "text": "A:",
+      "fontSize": 12,
+      "color": "#9ca3af",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-vecA",
+      "shape": "text",
+      "pos": [
+        79.19999999999999,
+        95.2
+      ],
+      "text": "[0,0,0]",
+      "fontSize": 14,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-vecB-label",
+      "shape": "text",
+      "pos": [
+        270.6,
+        95.2
+      ],
+      "text": "B:",
+      "fontSize": 12,
+      "color": "#9ca3af",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-vecB",
+      "shape": "text",
+      "pos": [
+        292.20000000000005,
+        95.2
+      ],
+      "text": "[0,0,0]",
+      "fontSize": 14,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-vecC-label",
+      "shape": "text",
+      "pos": [
+        483.6,
+        95.2
+      ],
+      "text": "C:",
+      "fontSize": 12,
+      "color": "#9ca3af",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-vecC",
+      "shape": "text",
+      "pos": [
+        505.20000000000005,
+        95.2
+      ],
+      "text": "[0,0,0]",
+      "fontSize": 14,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "msg-8",
+      "shape": "arrow",
+      "points": [
+        [
+          111,
+          171
+        ],
+        [
+          312,
+          199
+        ]
+      ],
+      "stroke": "#1f2328",
+      "dash": 0,
+      "opacity": 0
+    },
+    {
+      "id": "msg-8-dot",
+      "shape": "circle",
+      "pos": [
+        111,
+        171
+      ],
+      "r": 6,
+      "fill": "#f59e0b",
+      "stroke": "#1f2328",
+      "opacity": 0
+    },
+    {
+      "id": "msg-8-label",
+      "shape": "text",
+      "pos": [
+        211.5,
+        162
+      ],
+      "text": "[2,0,0]",
+      "fontSize": 12,
+      "color": "#1f2328",
+      "opacity": 0
+    },
+    {
+      "id": "value-eventC-label",
+      "shape": "text",
+      "pos": [
+        656,
+        56
+      ],
+      "text": "C's local event (frozen):",
+      "fontSize": 12,
+      "color": "#9ca3af",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-eventC",
+      "shape": "text",
+      "pos": [
+        840.8000000000001,
+        56
+      ],
+      "text": "[0,0,1]",
+      "fontSize": 14,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "msg-13",
+      "shape": "arrow",
+      "points": [
+        [
+          324,
+          224
+        ],
+        [
+          525,
+          252
+        ]
+      ],
+      "stroke": "#1f2328",
+      "dash": 0,
+      "opacity": 0
+    },
+    {
+      "id": "msg-13-dot",
+      "shape": "circle",
+      "pos": [
+        324,
+        224
+      ],
+      "r": 6,
+      "fill": "#f59e0b",
+      "stroke": "#1f2328",
+      "opacity": 0
+    },
+    {
+      "id": "msg-13-label",
+      "shape": "text",
+      "pos": [
+        424.5,
+        215
+      ],
+      "text": "[2,1,0]",
+      "fontSize": 12,
+      "color": "#1f2328",
+      "opacity": 0
+    },
+    {
+      "id": "relate-main-0",
+      "shape": "path",
+      "pos": [
+        320,
+        87.4
+      ],
+      "d": "M -187 -27.4 Q 0 27.4 187 -27.4",
+      "head": false,
+      "fill": "none",
+      "stroke": "#f59e0b",
+      "strokeWidth": 2,
+      "opacity": 0
+    },
+    {
+      "id": "relate-main-0-label",
+      "shape": "text",
+      "pos": [
+        320,
+        99.4
+      ],
+      "text": "∥",
+      "fontSize": 12,
+      "color": "#f59e0b",
+      "anchor": "middle",
+      "opacity": 0
+    },
+    {
+      "id": "relate-main-1",
+      "shape": "path",
+      "pos": [
+        318,
+        87.4
+      ],
+      "d": "M -185 -27.4 Q 0 27.4 185 -27.4",
+      "head": true,
+      "fill": "none",
+      "stroke": "#f59e0b",
+      "strokeWidth": 2,
+      "opacity": 0
+    },
+    {
+      "id": "relate-main-1-label",
+      "shape": "text",
+      "pos": [
+        318,
+        99.4
+      ],
+      "text": "≤",
+      "fontSize": 12,
+      "color": "#f59e0b",
+      "anchor": "middle",
+      "opacity": 0
+    }
+  ],
+  "tracks": [
+    {
+      "target": "value-vecA-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 540,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecA",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 540,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecB-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 540,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecB",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 540,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecC-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 540,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecC",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 540,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecA",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "[0,0,0]"
+        },
+        {
+          "t": 1080,
+          "value": "[1,0,0]",
+          "easing": "step-end"
+        },
+        {
+          "t": 1620,
+          "value": "[2,0,0]",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-8",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 1620,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-8-dot",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 1620,
+          "value": 1,
+          "easing": "step-end"
+        },
+        {
+          "t": 2220,
+          "value": 0,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-8-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 1620,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-8-dot",
+      "prop": "pos",
+      "keyframes": [
+        {
+          "t": 1620,
+          "value": [
+            111,
+            171
+          ]
+        },
+        {
+          "t": 2220,
+          "value": [
+            312,
+            199
+          ],
+          "easing": "linear"
+        }
+      ]
+    },
+    {
+      "target": "msg-8",
+      "prop": "dash",
+      "keyframes": [
+        {
+          "t": 1620,
+          "value": 0
+        },
+        {
+          "t": 2220,
+          "value": 1,
+          "easing": "linear"
+        }
+      ]
+    },
+    {
+      "target": "value-vecB",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "[0,0,0]"
+        },
+        {
+          "t": 2220,
+          "value": "[2,1,0]",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-vecC",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "[0,0,0]"
+        },
+        {
+          "t": 2760,
+          "value": "[0,0,1]",
+          "easing": "step-end"
+        },
+        {
+          "t": 3360,
+          "value": "[2,1,2]",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-eventC-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2760,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-eventC",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2760,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-13",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2760,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-13-dot",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2760,
+          "value": 1,
+          "easing": "step-end"
+        },
+        {
+          "t": 3360,
+          "value": 0,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-13-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2760,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "msg-13-dot",
+      "prop": "pos",
+      "keyframes": [
+        {
+          "t": 2760,
+          "value": [
+            324,
+            224
+          ]
+        },
+        {
+          "t": 3360,
+          "value": [
+            525,
+            252
+          ],
+          "easing": "linear"
+        }
+      ]
+    },
+    {
+      "target": "msg-13",
+      "prop": "dash",
+      "keyframes": [
+        {
+          "t": 2760,
+          "value": 0
+        },
+        {
+          "t": 3360,
+          "value": 1,
+          "easing": "linear"
+        }
+      ]
+    },
+    {
+      "target": "relate-main-0",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 3900,
+          "value": 1,
+          "easing": "step-end"
+        },
+        {
+          "t": 4980,
+          "value": 0,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "relate-main-0-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 3900,
+          "value": 1,
+          "easing": "step-end"
+        },
+        {
+          "t": 4980,
+          "value": 0,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "relate-main-1",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 4980,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "relate-main-1-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 4980,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "t": 0,
+      "caption": "Start: A, B and C each hold a vector [a,b,c] of counters, all zero · A = [0,0,0] · B = [0,0,0] · C = [0,0,0]"
+    },
+    {
+      "t": 540,
+      "caption": "A has a local event: it increments its own slot · A: [0,0,0] -> [1,0,0]"
+    },
+    {
+      "t": 1080,
+      "caption": "A has a second local event before sending: it increments its own slot again · A: [1,0,0] -> [2,0,0]"
+    },
+    {
+      "t": 1620,
+      "caption": "A sends its vector to B · B receives [2,0,0]: max([0,0,0],[2,0,0])=[2,0,0], then +1 own slot -> [2,1,0]"
+    },
+    {
+      "t": 2220,
+      "caption": "Meanwhile, C has a local event of its own: it increments its own slot · C: [0,0,0] -> [0,0,1] · C's local event (frozen) = [0,0,1]"
+    },
+    {
+      "t": 2760,
+      "caption": "B sends its vector to C · C receives [2,1,0]: max([0,0,1],[2,1,0])=[2,1,1], then +1 own slot -> [2,1,2]"
+    },
+    {
+      "t": 3360,
+      "caption": "Concurrent: A's vector when it sent to B [2,0,0] and C's local event [0,0,1] - neither is <= the other"
+    },
+    {
+      "t": 3900,
+      "caption": "A ∥ C: concurrent"
+    },
+    {
+      "t": 4440,
+      "caption": "Ordered: A's vector [2,0,0] <= C's final vector [2,1,2] in every slot - A's send happened-before C's receive"
+    },
+    {
+      "t": 4980,
+      "caption": "A ≤ C: ordered"
+    },
+    {
+      "t": 5520,
+      "label": "end",
+      "caption": "end"
+    }
+  ],
+  "meta": {
+    "title": "Vector clocks: causality without a global clock",
+    "kind": "distributed",
+    "delivered": 2,
+    "lost": 0,
+    "messageTimes": [
+      [
+        0,
+        540
+      ],
+      [
+        540,
+        540
+      ],
+      [
+        540,
+        540
+      ],
+      [
+        540,
+        540
+      ],
+      [
+        540,
+        1080
+      ],
+      [
+        1080,
+        1080
+      ],
+      [
+        1080,
+        1620
+      ],
+      [
+        1620,
+        1620
+      ],
+      [
+        1620,
+        2220
+      ],
+      [
+        2220,
+        2220
+      ],
+      [
+        2220,
+        2760
+      ],
+      [
+        2760,
+        2760
+      ],
+      [
+        2760,
+        2760
+      ],
+      [
+        2760,
+        3360
+      ],
+      [
+        3360,
+        3360
+      ],
+      [
+        3360,
+        3900
+      ],
+      [
+        3900,
+        4440
+      ],
+      [
+        4440,
+        4980
+      ],
+      [
+        4980,
+        5520
+      ]
+    ],
+    "eventTimes": []
+  }
+}

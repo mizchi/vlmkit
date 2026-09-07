@@ -14,7 +14,8 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, posix } from "node:path";
 import { labelWidth } from "../compile/builder.ts";
-import { SCENE_FORMAT, type DiagramEdge, type DiagramNode, type DiagramScene, type DiagramStep } from "../types.ts";
+import { EXPECT_FORMAT, type Expectation } from "../expect.ts";
+import { SCENE_FORMAT, type DiagramEdge, type DiagramNode, type DiagramScene, type DiagramStep, type ModuleDef, type ModuleDep, type ModulesScene } from "../types.ts";
 
 // ---- the workspace ---------------------------------------------------------------
 
@@ -61,13 +62,15 @@ function layersOf(pkgs: WorkspacePackage[]): Map<string, number> {
   return depth;
 }
 
-/** The workspace as a `diagram`: one layer of packages per beat, from the ones that depend on nothing to the CLI. */
-export function workspaceScene(root: string, title = "vlmkit — the workspace"): DiagramScene {
+/** The workspace as a `modules` map: one layer of packages per beat, from the ones that depend on nothing to the CLI. */
+export function workspaceScene(root: string, title = "vlmkit — the workspace"): ModulesScene {
   const pkgs = readWorkspace(root);
   const depth = layersOf(pkgs);
   const layers = [...new Set([...depth.values()])].sort((a, b) => a - b);
-  const nodes: DiagramNode[] = pkgs.map((p) => ({ id: p.id, label: p.id, hidden: depth.get(p.id)! > 0 }));
-  const edges: DiagramEdge[] = pkgs.flatMap((p) => p.deps.map((d): DiagramEdge => ({ from: p.id, to: d, hidden: depth.get(p.id)! > 0 })));
+  // A `modules` scene: the map is a still figure on its own (`vlmkit-anim still`), and the sequence below
+  // walks it layer by layer for the GIF.
+  const modules: ModuleDef[] = pkgs.map((p) => ({ id: p.id, label: p.id, hidden: depth.get(p.id)! > 0 }));
+  const edges: ModuleDep[] = pkgs.flatMap((p) => p.deps.map((d): ModuleDep => ({ from: p.id, to: d, hidden: depth.get(p.id)! > 0 })));
   // One beat per layer: the previous layer dims, this layer appears and lights up, the caption says why it sits there.
   const sequence: DiagramStep[] = [];
   let prev: string[] = [];
@@ -84,7 +87,20 @@ export function workspaceScene(root: string, title = "vlmkit — the workspace")
   }
   sequence.push({ unhighlight: prev, ms: 0 });
   sequence.push({ note: `${pkgs.length} packages, ${edges.length} workspace dependencies, ${layers.length} layers deep` });
-  return { format: SCENE_FORMAT, kind: "diagram", title, layout: "lr", nodes, edges, sequence };
+  return { format: SCENE_FORMAT, kind: "modules", title, layout: "lr", modules, deps: edges, sequence };
+}
+
+/**
+ * The workspace's facts for `check --expect`: every package, every workspace dependency. A module map drawn by
+ * hand (or by an agent from the package.json files) is checked against this rather than against itself.
+ */
+export function workspaceExpectation(root: string): Expectation {
+  const pkgs = readWorkspace(root);
+  return {
+    format: EXPECT_FORMAT,
+    modules: pkgs.map((p) => p.id),
+    deps: pkgs.flatMap((p) => p.deps.map((d) => `${p.id}->${d}`)),
+  };
 }
 
 // ---- a range of commits -----------------------------------------------------------

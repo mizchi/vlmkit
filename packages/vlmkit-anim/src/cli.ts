@@ -11,6 +11,9 @@
  *   html      a self-contained page with the <vlm-anim> runtime inline
  *   runtime   write the runtime JS to a file (or stdout)
  *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
+ *   still     one frame as a figure, no caption band: the end by default (a module map, a filled table), SVG or PNG
+ *   layout    the deterministic layout reading: texts on texts, texts under boxes, texts past the edge, per step
+ *   review    the contact sheet + a review brief for a vision model (or an agent); scores its JSON against `layout`
  *   repo      generate the workspace's architecture map (scene + GIF + sheet + markdown) from its package.json files
  *   pr        generate the change map of a commit range: areas touched per commit, import edges, running counts
  *   schema    the cheat sheet for one kind, the shared annotation ops (--kind annotations), or the index
@@ -27,20 +30,23 @@ import { sceneFromModule } from "./author.ts";
 import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError } from "./cli-args.ts";
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
-import { changeMapScene, workspaceScene } from "./generators/git.ts";
+import { checkExpectation, EXPECT_SHEET, formatCompared, validateExpectation, type Expectation } from "./expect.ts";
+import { changeMapScene, workspaceExpectation, workspaceScene } from "./generators/git.ts";
 import { renderFrameSvg, sampleTimes } from "./render-svg.ts";
 import { RUNTIME_SOURCE, renderEmbedHtml } from "./runtime.ts";
 import { currentStep, timelineDuration } from "./timeline.ts";
 import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene, type Timeline } from "./types.ts";
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
+import { contentBox, formatLayout, layoutReport } from "./layout.ts";
+import { formatScore, parseAnswers, reviewBrief, reviewTiles, scoreReview, type ReviewAnswers, type ReviewScore } from "./review.ts";
 import { renderSheetHtml } from "./sheet.ts";
 import { writeVideo, type VideoResult } from "./video.ts";
 
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -48,6 +54,9 @@ function usage(): string {
 Commands
   check <scene|timeline>          Validate, compile, run semantic checks, print stats. Exit 1 on errors.
         [--max-ms N]              …and fail when the animation runs longer than N ms.
+        [--expect facts.json]     …and compare a modules / diagram scene with its facts: modules, dependencies
+                                  ("a->b"), forbidden ones, what the final frame highlights, group members —
+                                  drawn exactly as listed, nothing invented. \`schema --kind expect\` has the file.
   validate <scene|timeline>       Schema and reference validation only.
   compile <scene> [--out t.json]  Lower a scene to its timeline (stdout when no --out).
   explain <scene|timeline>        Print the narration: one line per step.
@@ -70,10 +79,23 @@ Commands
                                   reduced-motion, motion outside the API — with the evaluator vlmkit's
                                   \`check animation\` gate uses (@mizchi/vlmkit-animation-eval + playwright).
                                   Exit 1 on a suspect finding.
+  still <scene.json> --out <fig.svg|fig.png> [--step N | --at ms] [--full]
+                                  One frame as a figure without the caption band, cropped to what is drawn
+                                  (--full keeps the canvas) — the end by default: a \`modules\` map, a filled
+                                  matrix, a walked graph. PNG needs playwright.
+  layout <scene.json> [--json]     Where texts sit on texts, under filled boxes, or past the canvas edge, at every
+                                  step — read from the compiled timeline, no browser. Exit 1 when any is found.
+  review <scene.json> --out <dir> [--model M] [--answers a.json] [--cols N] [--tile W]
+                                  Writes <name>.sheet.png (or .html without playwright), <name>.review-brief.md
+                                  (the prompt for a vision model or an agent: tiles + the JSON to return) and
+                                  <name>.layout.json. --model M asks that VLM (@mizchi/vlmkit-ai, needs its key)
+                                  and --answers a.json takes a reader's JSON; either is scored frame by frame
+                                  against the geometry into <name>.review-score.md.
   repo [--root .] [--out dir] [--title T] [--no-images]
                                   The workspace's architecture as an animation: packages appear layer by layer
                                   with the dependencies that place them there. Writes <out>/repo.scene.json,
-                                  repo.gif, repo.sheet.png and repo.md (the explain text with both images embedded).
+                                  repo.gif, repo.sheet.png, repo.md (the explain text with both images embedded)
+                                  and repo.expect.json (the fact sheet a hand-drawn map is checked against).
   pr --base <ref> [--head HEAD] [--root .] [--out dir] [--title T] [--name pr] [--no-images]
                                   The change map of base..head: one beat per commit, the areas it touched light
                                   up, import edges between changed areas, running file / line counts. Same four
@@ -129,6 +151,16 @@ async function load(path: string): Promise<Loaded | { path: string; diagnostics:
   // The compiler's output must itself validate; a failure here is a compiler bug, reported as such.
   const tlDiags = validateTimeline(timeline).map((d) => ({ ...d, path: `compiled:${d.path}`, message: `compiler produced an invalid timeline: ${d.message}` }));
   return { path, doc, layer, scene, timeline, diagnostics: [...diagnostics, ...tlDiags] };
+}
+
+/** A side file (`--expect`) as JSON; a parse error names the file rather than throwing a stack. */
+async function readJson(path: string): Promise<unknown> {
+  const raw = await readFile(path, "utf-8");
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new UsageError(`${path} is not valid JSON: ${(e as Error).message}`);
+  }
 }
 
 function isLoaded(x: Awaited<ReturnType<typeof load>>): x is Loaded {
@@ -187,8 +219,12 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       console.log(schemaIndex());
       return 0;
     }
+    if (kind === "expect") {
+      console.log(EXPECT_SHEET);
+      return 0;
+    }
     if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline" && kind !== "annotations") {
-      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", or "annotations" for the ops every kind shares)`);
+      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", "annotations" for the ops every kind shares, "expect" for the fact sheet \`check --expect\` reads)`);
     }
     console.log(schemaSheet(kind as Scene["kind"] | "timeline" | "annotations"));
     return 0;
@@ -233,6 +269,12 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       summary = { commits: map.commits, files: map.files, added: map.added, removed: map.removed, areas: map.areas };
     }
     const result = await emitGenerated(scene, out, name, { images: !hasFlag(rest, "--no-images"), width: readInt(rest, "--width", { min: 160 }) });
+    if (verb === "repo") {
+      // The workspace's facts, so a map someone draws by hand can be checked against the package.json files.
+      const expectPath = join(out, `${name}.expect.json`);
+      await writeFile(expectPath, JSON.stringify(workspaceExpectation(root), null, 2) + "\n");
+      result.files.push(expectPath);
+    }
     if (json) console.log(JSON.stringify({ ...result, ...summary }, null, 2));
     else {
       console.log(`${name}: ${result.files.join(", ")}`);
@@ -273,9 +315,24 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       if (maxMs !== undefined && stats.durationMs > maxMs) {
         diags.push({ severity: "error", path: "duration", message: `the animation runs ${stats.durationMs}ms, over the ${maxMs}ms budget`, hint: 'lower "stepMs", drop beats, or pass a per-op "ms"' });
       }
+      // The facts the figure must show (`--expect`): compared with the scene and the final frame, reported in
+      // the same list. A scene that is not a scene (a bare timeline) has no deps to compare.
+      const expectPath = readFlag(rest, "--expect");
+      let expect: { file: string; ok: boolean; compared: string } | undefined;
+      if (expectPath) {
+        const expectDoc = await readJson(expectPath);
+        const shape = validateExpectation(expectDoc).map((d) => ({ ...d, path: `${basename(expectPath)}${d.path ? `:${d.path}` : ""}` }));
+        if (shape.length) diags.push(...shape);
+        else if (!scene) diags.push({ severity: "error", path: "expect", message: "--expect compares a scene with its facts; this file is a compiled timeline", hint: "run check on the scene.json" });
+        else {
+          const r = checkExpectation(expectDoc as Expectation, scene, tl);
+          diags.push(...r.diagnostics);
+          expect = { file: expectPath, ok: !hasErrors(r.diagnostics), compared: formatCompared(r.compared) };
+        }
+      }
       const ok = !hasErrors(diags);
       if (json) {
-        console.log(JSON.stringify({ file, layer: loaded.layer, ok, diagnostics: diags, stats, explain: (tl.steps ?? []).map((s) => ({ t: s.t, label: s.label, caption: s.caption })) }, null, 2));
+        console.log(JSON.stringify({ file, layer: loaded.layer, ok, diagnostics: diags, stats, expect, explain: (tl.steps ?? []).map((s) => ({ t: s.t, label: s.label, caption: s.caption })) }, null, 2));
       } else {
         printDiagnostics(diags, false);
         const errs = diags.filter((d) => d.severity === "error").length;
@@ -284,6 +341,7 @@ export async function runAnimCli(argv: string[]): Promise<number> {
         const ann = stats.annotations ? ` · annotations: ${stats.annotations.drawn} drawn, ${stats.annotations.onScreen} on screen at the end` : "";
         console.log(`  ${stats.durationMs}ms · ${stats.steps} steps (${stats.captions} captioned) · ${stats.nodes} nodes · ${stats.tracks} tracks / ${stats.keyframes} keyframes${ann}`);
         if (stats.sceneBytes) console.log(`  scene ${stats.sceneBytes} B → timeline ${stats.timelineBytes} B (×${stats.expansion})`);
+        if (expect) console.log(`  facts ${basename(expect.file)}: ${expect.compared} — ${expect.ok ? "all as drawn" : "see above"}`);
         console.log(`  next: vlmkit-anim explain ${file} · vlmkit-anim render ${file} --step N · vlmkit-anim html ${file} --out page.html`);
       }
       return ok ? 0 : 1;
@@ -306,6 +364,22 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       await writeOut(out, svg, `frame t=${Math.round(t)}${step?.caption ? ` "${step.caption}"` : ""}`);
       return 0;
     }
+    case "still": {
+      // The figure, not the film: one frame, no caption band. The end by default — a module map, a filled
+      // table, a walked graph — or `--step` / `--at` for another instant.
+      const out = readFlag(rest, "--out");
+      if (!out) throw new UsageError("vlmkit-anim still needs --out <fig.svg|fig.png>");
+      const t = rest.includes("--step") || rest.includes("--at") ? resolveTime(tl, rest) : timelineDuration(tl);
+      // Cropped to what is drawn (plus a margin): the canvas was sized before the picture existed.
+      const crop = rest.includes("--full") ? { x: 0, y: 0, w: tl.canvas.width, h: tl.canvas.height } : contentBox(tl, t);
+      const svg = renderFrameSvg(tl, t, { caption: false, crop });
+      if (out.endsWith(".png")) {
+        await screenshotHtml(`<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">${svg}</body></html>`, out, { width: crop.w, height: crop.h });
+        if (json) console.log(JSON.stringify({ out, t }, null, 2));
+        else console.log(`still t=${Math.round(t)} → ${out}`);
+      } else await writeOut(out, svg, `still t=${Math.round(t)}`);
+      return 0;
+    }
     case "frames": {
       const out = readFlag(rest, "--out");
       if (!out) throw new UsageError("vlmkit-anim frames needs --out <dir>");
@@ -324,6 +398,76 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       else {
         for (const w of written) console.log(`  ${w.file}  ${String(Math.round(w.t)).padStart(6)}ms  ${w.caption ?? ""}`);
         console.log(`${written.length} frame(s) → ${out}${hasFlag(rest, "--png") ? " (svg + png)" : ""}`);
+      }
+      return 0;
+    }
+    case "layout": {
+      const report = layoutReport(tl);
+      if (json) console.log(JSON.stringify(report, null, 2));
+      else console.log(formatLayout(report));
+      return report.totals.framesWithIssues ? 1 : 0;
+    }
+    case "review": {
+      const out = readFlag(rest, "--out");
+      if (!out) throw new UsageError("vlmkit-anim review needs --out <dir>");
+      await mkdir(out, { recursive: true });
+      // `--name` for files that share a basename (every attempt is a `scene.json`).
+      const name = readFlag(rest, "--name") ?? basename(file).replace(/\.(scene\.|timeline\.)?(json|m?ts|m?js)$/, "");
+      const times = sampleTimes(tl, 0);
+      const cols = readInt(rest, "--cols", { min: 1 }) ?? 3;
+      const tileWidth = readInt(rest, "--tile", { min: 120 }) ?? 400;
+      const title = scene?.title ?? String(tl.meta?.title ?? name);
+      const html = renderSheetHtml(tl, times, { cols, tileWidth, title });
+      const files: string[] = [];
+      let sheet = join(out, `${name}.sheet.png`);
+      try {
+        await screenshotHtml(html, sheet);
+      } catch (e) {
+        sheet = join(out, `${name}.sheet.html`);
+        await writeFile(sheet, html);
+        console.error(`sheet as HTML (${(e as Error).message})`);
+      }
+      files.push(sheet);
+      const brief = reviewBrief(title, reviewTiles(tl, times));
+      const briefPath = join(out, `${name}.review-brief.md`);
+      await writeFile(briefPath, brief);
+      files.push(briefPath);
+      const report = layoutReport(tl);
+      const layoutPath = join(out, `${name}.layout.json`);
+      await writeFile(layoutPath, JSON.stringify(report, null, 2));
+      files.push(layoutPath);
+      let answers: ReviewAnswers | undefined;
+      let readerLabel = "";
+      const answersPath = readFlag(rest, "--answers");
+      const model = readFlag(rest, "--model");
+      if (answersPath) {
+        answers = parseAnswers(await readFile(answersPath, "utf-8"));
+        readerLabel = basename(answersPath);
+      } else if (model) {
+        if (!sheet.endsWith(".png")) throw new UsageError("--model needs the sheet as PNG: install playwright");
+        const ai = await loadVlm();
+        const client = await ai.createVlmClient(await ai.resolveModel(model));
+        if (!client) throw new UsageError(`no API key for ${model}`);
+        const res = await client.analyzeImageFile(sheet, brief, { maxTokens: 4000 });
+        const rawPath = join(out, `${name}.review-${model.replace(/[^a-zA-Z0-9.-]/g, "_")}.json`);
+        await writeFile(rawPath, res.content);
+        files.push(rawPath);
+        answers = parseAnswers(res.content);
+        readerLabel = `${model} (${res.latencyMs}ms, $${res.costUsd.toFixed(5)})`;
+      }
+      let score: ReviewScore | undefined;
+      if (answers) {
+        score = scoreReview(report, answers);
+        const scorePath = join(out, `${name}.review-score.md`);
+        await writeFile(scorePath, `# ${title} — visual review vs geometry\n\nreader: ${readerLabel}\n\n${formatScore(score, report, answers)}\n`);
+        files.push(scorePath);
+      }
+      if (json) console.log(JSON.stringify({ files, layout: report.totals, score: score?.totals }, null, 2));
+      else {
+        for (const f of files) console.log(`wrote ${f}`);
+        console.log(formatLayout(report));
+        if (score && answers) console.log(formatScore(score, report, answers));
+        else console.log(`next: hand ${basename(sheet)} and ${basename(briefPath)} to a reader, then --answers <its.json>; or --model <vlm> with its API key`);
       }
       return 0;
     }
@@ -435,14 +579,17 @@ async function emitGenerated(scene: Scene, out: string, name: string, opts: { im
     const html = join(out, `${name}.sheet.html`);
     await writeFile(html, renderSheetHtml(tl, sampleTimes(tl, 0), { cols: 3, tileWidth: 400, title: scene.title }));
     files.push(html);
-    const svg = join(out, `${name}.final.svg`);
-    await writeFile(svg, renderFrameSvg(tl, timelineDuration(tl)));
-    files.push(svg);
   }
+  // The figure as well as the film: the final frame, no caption, cropped to what is drawn — the image a README
+  // or a design note embeds when the motion is not the point.
+  const end = timelineDuration(tl);
+  const stillPath = join(out, `${name}.svg`);
+  await writeFile(stillPath, renderFrameSvg(tl, end, { caption: false, crop: contentBox(tl, end) }));
+  files.push(stillPath);
   const md = [
     `## ${scene.title ?? name}`,
     "",
-    ...(gifName ? [`![${scene.title ?? name}](./${gifName})`, ""] : []),
+    ...(gifName ? [`![${scene.title ?? name}](./${gifName})`, ""] : [`![${scene.title ?? name}](./${name}.svg)`, ""]),
     "<details><summary>Every step</summary>",
     "",
     ...(sheetName ? [`![steps](./${sheetName})`, ""] : []),
@@ -452,7 +599,7 @@ async function emitGenerated(scene: Scene, out: string, name: string, opts: { im
     "",
     "</details>",
     "",
-    `<sub>Generated by \`vlmkit-anim ${name === "repo" ? "repo" : "pr"}\`; the scene is [\`${name}.scene.json\`](./${name}.scene.json) — edit it and re-run \`vlmkit-anim video\` for a different cut.</sub>`,
+    `<sub>Generated by \`vlmkit-anim ${name === "repo" ? "repo" : "pr"}\`; the scene is [\`${name}.scene.json\`](./${name}.scene.json) — edit it and re-run \`vlmkit-anim video\` for a different cut, or \`vlmkit-anim still\` for the figure alone ([\`${name}.svg\`](./${name}.svg)).</sub>`,
     "",
   ].join("\n");
   const mdPath = join(out, `${name}.md`);
@@ -466,6 +613,18 @@ async function emitGenerated(scene: Scene, out: string, name: string, opts: { im
  * depends on nothing else to do so; measuring them is what it shares with
  * vlmkit, and a consumer who wants that installs the one package that does it.
  */
+async function loadVlm(): Promise<typeof import("@mizchi/vlmkit-ai")> {
+  try {
+    return await import("@mizchi/vlmkit-ai");
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") {
+      throw new UsageError("vlmkit-anim review --model needs the VLM clients: pnpm add -D @mizchi/vlmkit-ai (and OPENROUTER_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY for the model)");
+    }
+    throw e;
+  }
+}
+
 async function loadAnimationEval(): Promise<typeof import("@mizchi/vlmkit-animation-eval")> {
   try {
     return await import("@mizchi/vlmkit-animation-eval");
@@ -479,11 +638,11 @@ async function loadAnimationEval(): Promise<typeof import("@mizchi/vlmkit-animat
 }
 
 /** Screenshot a self-contained HTML string at its own width, full page. */
-async function screenshotHtml(html: string, out: string): Promise<void> {
+async function screenshotHtml(html: string, out: string, viewport = { width: 1280, height: 720 }): Promise<void> {
   const chromium = await loadChromium();
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: Math.max(1, Math.round(viewport.width)), height: Math.max(1, Math.round(viewport.height)) }, deviceScaleFactor: 1 });
     await page.setContent(html);
     await mkdir(dirname(resolve(out)), { recursive: true });
     await page.screenshot({ path: out, fullPage: true });

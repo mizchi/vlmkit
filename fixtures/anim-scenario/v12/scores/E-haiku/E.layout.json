@@ -1,0 +1,639 @@
+{
+  "frames": [
+    {
+      "index": 1,
+      "t": 0,
+      "step": {
+        "index": 1,
+        "caption": "Vector clocks"
+      },
+      "issues": []
+    },
+    {
+      "index": 2,
+      "t": 360,
+      "step": {
+        "index": 2,
+        "caption": "A: local event · A = [1,0,0]"
+      },
+      "issues": []
+    },
+    {
+      "index": 3,
+      "t": 960,
+      "step": {
+        "index": 3,
+        "caption": "C before"
+      },
+      "issues": []
+    },
+    {
+      "index": 4,
+      "t": 1560,
+      "step": {
+        "index": 4,
+        "caption": "B receives: max, then +1"
+      },
+      "issues": []
+    },
+    {
+      "index": 5,
+      "t": 2160,
+      "step": {
+        "index": 5,
+        "caption": "copied from A"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "t": 2760,
+      "step": {
+        "index": 6,
+        "caption": "C: local event, no message from anyone"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "t": 3360,
+      "step": {
+        "index": 7,
+        "caption": "A and C never exchanged a message: concurrent"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "t": 3960,
+      "step": {
+        "index": 8,
+        "caption": "ordered"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "cell-2-0",
+            "group-main-3-label"
+          ],
+          "texts": [
+            "0",
+            "ordered"
+          ],
+          "amount": 0.86
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "t": 4560,
+      "step": {
+        "index": 9,
+        "caption": "C sends [0,0,1] to A: max(A, C), c: 0 → 1"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "cell-2-0",
+            "group-main-3-label"
+          ],
+          "texts": [
+            "0",
+            "ordered"
+          ],
+          "amount": 0.86
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "t": 5160,
+      "step": {
+        "index": 10,
+        "caption": "A increments its own slot: a: 1 → 2 · A = [2,0,1]"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "cell-2-0",
+            "group-main-3-label"
+          ],
+          "texts": [
+            "0",
+            "ordered"
+          ],
+          "amount": 0.86
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "t": 5760,
+      "step": {
+        "index": 11,
+        "caption": "C's event happened-before A's receive: C ≤ A"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "cell-2-0",
+            "group-main-3-label"
+          ],
+          "texts": [
+            "0",
+            "ordered"
+          ],
+          "amount": 0.86
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "t": 6360,
+      "step": {
+        "index": 12,
+        "caption": "  clock = max(clock, v)"
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "cell-2-0",
+            "group-main-3-label"
+          ],
+          "texts": [
+            "0",
+            "ordered"
+          ],
+          "amount": 0.86
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "t": 6960,
+      "step": {
+        "index": 13
+      },
+      "issues": [
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "a",
+            "copied from A"
+          ],
+          "amount": 0.38
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-text"
+          ],
+          "texts": [
+            "b",
+            "copied from A"
+          ],
+          "amount": 0.32
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "cell-2-0",
+            "group-main-3-label"
+          ],
+          "texts": [
+            "0",
+            "ordered"
+          ],
+          "amount": 0.86
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-0",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "a",
+            ""
+          ],
+          "amount": 0.67
+        },
+        {
+          "kind": "overlap",
+          "nodes": [
+            "col-label-1",
+            "callout-main-1-box"
+          ],
+          "texts": [
+            "b",
+            ""
+          ],
+          "amount": 0.67
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "frames": 13,
+    "framesWithIssues": 9,
+    "overlaps": 42,
+    "clipped": 0
+  }
+}

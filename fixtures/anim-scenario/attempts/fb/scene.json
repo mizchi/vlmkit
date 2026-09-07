@@ -1,0 +1,39 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Ports and adapters: dependencies point inward",
+  "modules": [
+    { "id": "http", "label": "HTTP handler" },
+    { "id": "cli", "label": "CLI command" },
+    { "id": "appsvc", "label": "Application services" },
+    { "id": "domain", "label": "Domain model" },
+    { "id": "port", "label": "Repository port (interface)" },
+    { "id": "postgres", "label": "Postgres repository" },
+    { "id": "inmemory", "label": "In-memory repository (test)" }
+  ],
+  "deps": [
+    ["http", "appsvc"],
+    ["cli", "appsvc"],
+    ["appsvc", "domain"],
+    ["appsvc", "port"],
+    ["postgres", "port"],
+    ["inmemory", "port"]
+  ],
+  "groups": [
+    { "id": "driving", "label": "driving side", "modules": ["http", "cli"] },
+    { "id": "application", "label": "application", "modules": ["appsvc"] },
+    { "id": "domaincore", "label": "domain (owns the port)", "modules": ["domain", "port"] },
+    { "id": "adapters", "label": "driven adapters", "modules": ["postgres", "inmemory"] }
+  ],
+  "sequence": [
+    {
+      "relate": {
+        "from": "domain",
+        "to": "postgres",
+        "label": "forbidden — must not exist",
+        "style": "line"
+      },
+      "caption": "The domain must depend on nothing outside itself. domain -> postgres is the import to delete; every real dependency above points inward, toward domain and its port."
+    }
+  ]
+}

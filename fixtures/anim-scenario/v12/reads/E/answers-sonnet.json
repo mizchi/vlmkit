@@ -1,0 +1,76 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    {
+      "frame": 4,
+      "issues": [
+        { "kind": "illegible", "what": "the highlighted cell in row A / column a renders as an orange-outlined letter 'O' rather than a clear digit '0', hard to tell if it is a callout circle or the value itself", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 5,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge sits in the same row where the column headers (a, b, c) appear in earlier frames, hiding them above row A", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 6,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 7,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 8,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 9,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" },
+        { "kind": "illegible", "what": "the highlighted cell in row C / column c renders as an orange-outlined letter 'O' rather than a clear digit, hard to read at this size", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 10,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 11,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 12,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" }
+      ]
+    },
+    {
+      "frame": 13,
+      "issues": [
+        { "kind": "overlap", "what": "the 'copied from A' badge covers the column header row (a, b, c labels) above row A", "severity": "minor" },
+        { "kind": "overlap", "what": "a small annotation label near row C's leftmost cell (appears to read 'ordered') is partly hidden behind the cell's box border", "severity": "minor" }
+      ]
+    }
+  ],
+  "notes": "Tiles were mostly large enough to read the main grid, digits, badges and titles clearly. Two things I was not fully certain of at this resolution: (1) in frames 4 and 9 the orange-highlighted cell shows what looks like the letter 'O' rather than a digit '0' -- it might just be a callout circle drawn around a normal '0' that reads as a letter at this size, so I flagged it as illegible/ambiguous rather than a hard overlap. (2) near row C's first cell in frames 7-13 there is a small annotation label that appears to be partly occluded by the cell border -- I could not confidently read the full word (it looks like 'ordered') because of the overlap itself, so the exact text is a guess. Frame 13 also appeared to be missing the 'C before: [...]' / 'A: [...]' summary text that similar frames (9-12) show at top right, but I couldn't be sure this wasn't just an image-resolution artifact, so I did not report it as a defect. The left-side vertical relation labels ('A || C', 'C <= A') with their up/down arrows looked intentional and did not appear to run off any tile edge."
+}

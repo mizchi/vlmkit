@@ -1,0 +1,40 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Circular import in the service",
+  "modules": [
+    "server",
+    "router",
+    "config",
+    "logger",
+    "handlers",
+    "middleware",
+    "services",
+    "validation",
+    "auth",
+    "events",
+    "repo"
+  ],
+  "deps": [
+    ["server", "router"],
+    ["server", "config"],
+    ["server", "logger"],
+    ["router", "handlers"],
+    ["router", "middleware"],
+    ["handlers", "services"],
+    ["handlers", "validation"],
+    ["middleware", "auth"],
+    ["middleware", "logger"],
+    ["auth", "services"],
+    ["auth", "config"],
+    ["services", "repo"],
+    ["services", "events"],
+    { "from": "events", "to": "handlers", "label": "cut here: closes the loop back into handlers" },
+    ["repo", "config"],
+    ["repo", "logger"],
+    ["validation", "config"]
+  ],
+  "sequence": [
+    { "highlight": ["handlers->services", "services->events", "events->handlers"], "caption": "The cycle: handlers → services → events → handlers" }
+  ]
+}

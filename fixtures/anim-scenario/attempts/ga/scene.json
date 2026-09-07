@@ -1,0 +1,28 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Ports and adapters: dependencies point inward",
+  "modules": [
+    { "id": "http", "label": "HTTP handler" },
+    { "id": "cli", "label": "CLI command" },
+    { "id": "app", "label": "Application services" },
+    { "id": "domain", "label": "Domain model" },
+    { "id": "port", "label": "Repository port" },
+    { "id": "postgres", "label": "Postgres repository" },
+    { "id": "memory", "label": "In-memory repository (tests)" }
+  ],
+  "deps": [
+    ["http", "app"],
+    ["cli", "app"],
+    ["app", "domain"],
+    ["app", "port"],
+    ["postgres", "port"],
+    ["memory", "port"],
+    { "from": "domain", "to": "postgres", "style": "forbidden", "label": "never: domain must not import the driver" }
+  ],
+  "groups": [
+    { "id": "driving", "label": "Driving side (inbound)", "modules": ["http", "cli"] },
+    { "id": "core", "label": "Application & domain", "modules": ["app", "domain", "port"] },
+    { "id": "driven", "label": "Driven side (adapters)", "modules": ["postgres", "memory"] }
+  ]
+}

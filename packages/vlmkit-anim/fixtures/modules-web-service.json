@@ -1,0 +1,101 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "A web service, by module",
+  "modules": [
+    "web",
+    "api",
+    {
+      "id": "auth",
+      "label": "auth service"
+    },
+    "db",
+    "cache",
+    "logging"
+  ],
+  "deps": [
+    [
+      "web",
+      "api"
+    ],
+    [
+      "api",
+      "auth"
+    ],
+    [
+      "api",
+      "db"
+    ],
+    [
+      "api",
+      "cache"
+    ],
+    [
+      "auth",
+      "db"
+    ],
+    {
+      "from": "api",
+      "to": "logging",
+      "style": "line",
+      "label": "emits"
+    }
+  ],
+  "groups": [
+    {
+      "id": "edge",
+      "label": "edge",
+      "modules": [
+        "web"
+      ]
+    },
+    {
+      "id": "core",
+      "label": "core",
+      "modules": [
+        "api",
+        "auth"
+      ]
+    },
+    {
+      "id": "infra",
+      "label": "infrastructure",
+      "modules": [
+        "db",
+        "cache",
+        "logging"
+      ]
+    }
+  ],
+  "sequence": [
+    {
+      "highlight": "core",
+      "caption": "The core: the API and the auth service it delegates to"
+    },
+    {
+      "callout": {
+        "at": "db",
+        "text": "only shared state"
+      }
+    },
+    {
+      "relate": {
+        "from": "web",
+        "to": "db",
+        "label": "never directly"
+      },
+      "caption": "The edge never touches the database: every read goes through the API"
+    },
+    {
+      "unhighlight": "core",
+      "ms": 0
+    },
+    {
+      "callout": null,
+      "ms": 0
+    },
+    {
+      "note": "Six modules, six dependencies, three layers — and one rule the arrows make visible"
+    }
+  ]
+}

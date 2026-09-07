@@ -1,0 +1,78 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "vlmkit workspace modules and dependencies",
+  "modules": [
+    "core",
+    "ai",
+    "capture",
+    "animation-eval",
+    "generate",
+    "heal",
+    "markup",
+    "mcp",
+    "plan",
+    "anim",
+    "vlmkit"
+  ],
+  "deps": [
+    ["ai", "core"],
+    ["anim", "ai"],
+    ["anim", "animation-eval"],
+    ["animation-eval", "core"],
+    ["capture", "core"],
+    ["generate", "ai"],
+    ["heal", "ai"],
+    ["heal", "capture"],
+    ["heal", "core"],
+    ["markup", "ai"],
+    ["markup", "animation-eval"],
+    ["markup", "capture"],
+    ["markup", "core"],
+    ["mcp", "core"],
+    ["mcp", "markup"],
+    ["plan", "ai"],
+    ["vlmkit", "ai"],
+    ["vlmkit", "anim"],
+    ["vlmkit", "animation-eval"],
+    ["vlmkit", "capture"],
+    ["vlmkit", "core"],
+    ["vlmkit", "generate"],
+    ["vlmkit", "heal"],
+    ["vlmkit", "markup"],
+    ["vlmkit", "mcp"],
+    ["vlmkit", "plan"]
+  ],
+  "groups": [
+    {
+      "id": "foundation",
+      "label": "Core",
+      "modules": ["core"]
+    },
+    {
+      "id": "ai-services",
+      "label": "AI/LLM",
+      "modules": ["ai", "plan", "generate"]
+    },
+    {
+      "id": "measurement",
+      "label": "Measurement",
+      "modules": ["capture", "animation-eval"]
+    },
+    {
+      "id": "synthesis",
+      "label": "Synthesis",
+      "modules": ["heal", "markup", "anim"]
+    },
+    {
+      "id": "integration",
+      "label": "MCP",
+      "modules": ["mcp"]
+    },
+    {
+      "id": "cli",
+      "label": "CLI",
+      "modules": ["vlmkit"]
+    }
+  ]
+}

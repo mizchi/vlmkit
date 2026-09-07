@@ -1,0 +1,16 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] }
+  ],
+  "notes": "The contact sheet renders each tile quite small (~400x250px), and the colored per-actor vector labels ('A: [2,0,0]', etc.) and the small arrow-value labels ('[2,0,0]', '[2,1,0]') are rendered at a very small font size — legible enough to transcribe values but at the edge of readability, so subtle overlaps at that scale could be missed. In frames 4 and 6, the in-flight message arrow is drawn as a filled dot on the sender's line plus a separate '>' chevron further along the path with a visible gap between them (no connecting line segment) — this reads as an intentional 'message in transit' animation state (consistent between the two frames) rather than a broken/disconnected arrow, so I did not flag it as 'arrow pointing at nothing', but I'm not fully certain that's the intended rendering versus a rendering gap. The orange 'C's local event (frozen): [0,0,1]' annotation in frames 6-11 sits close to the curved A-to-C concurrency/ordering arc and to C's box, but at this resolution I did not see it actually overlapping either."
+}

@@ -19,6 +19,7 @@ test — `samples.test.ts` only checks that every fixture is represented here.
 | [list-linked](#list-linked) | list | 10 | 6.0s |
 | [matrix-edit-distance](#matrix-edit-distance) | matrix | 12 | 6.6s |
 | [matrix-vector-clock](#matrix-vector-clock) | matrix | 11 | 6.0s |
+| [modules-web-service](#modules-web-service) | modules | 6 | 3.4s |
 | [queue-print-jobs](#queue-print-jobs) | queue | 6 | 3.5s |
 | [sort-bubble](#sort-bubble) | sort | 31 | 12.3s |
 | [sort-insertion](#sort-insertion) | sort | 21 | 8.3s |
@@ -124,7 +125,7 @@ How a CDN serves a request — 9 steps, 5460ms, 9 nodes
 
 ## distributed-replication
 
-`distributed` — [`fixtures/distributed-replication.json`](../fixtures/distributed-replication.json) · 8 steps · 3.8s · GIF 339 KB
+`distributed` — [`fixtures/distributed-replication.json`](../fixtures/distributed-replication.json) · 8 steps · 3.8s · GIF 336 KB
 
 ![distributed-replication animation](./distributed-replication.gif)
 
@@ -265,7 +266,7 @@ Edit distance: cat → cut — 12 steps, 6600ms, 32 nodes
 
 ## matrix-vector-clock
 
-`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 11 steps · 6.0s · GIF 449 KB
+`matrix` — [`fixtures/matrix-vector-clock.json`](../fixtures/matrix-vector-clock.json) · 11 steps · 6.0s · GIF 462 KB
 
 ![matrix-vector-clock animation](./matrix-vector-clock.gif)
 
@@ -286,6 +287,28 @@ Vector clocks — 11 steps, 6000ms, 38 nodes
  9. [ 4560ms] ordered
 10. [ 5160ms]   clock = max(clock, v)
 11. [ 5760ms] (end)
+```
+
+</details>
+
+## modules-web-service
+
+`modules` — [`fixtures/modules-web-service.json`](../fixtures/modules-web-service.json) · 6 steps · 3.4s · GIF 343 KB
+
+![modules-web-service animation](./modules-web-service.gif)
+
+<details><summary>Contact sheet (every step) and narration</summary>
+
+![modules-web-service contact sheet](./modules-web-service.sheet.png)
+
+```
+A web service, by module — 6 steps, 3360ms, 26 nodes
+ 1. [    0ms] A web service, by module
+ 2. [  350ms] The core: the API and the auth service it delegates to
+ 3. [ 1050ms] only shared state
+ 4. [ 1750ms] The edge never touches the database: every read goes through the API
+ 5. [ 2450ms] Six modules, six dependencies, three layers — and one rule the arrows make visible
+ 6. [ 3150ms] (end)
 ```
 
 </details>
@@ -421,7 +444,7 @@ Matching brackets with a stack — 7 steps, 4070ms, 9 nodes
 
 ## state-tcp
 
-`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 366 KB
+`state-machine` — [`fixtures/state-tcp.json`](../fixtures/state-tcp.json) · 7 steps · 5.8s · GIF 401 KB
 
 ![state-tcp animation](./state-tcp.gif)
 

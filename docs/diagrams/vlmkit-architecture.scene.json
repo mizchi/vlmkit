@@ -1,9 +1,9 @@
 {
   "format": "vlmkit-anim/scene@1",
-  "kind": "diagram",
+  "kind": "modules",
   "title": "vlmkit — the workspace and its dependencies",
   "layout": "lr",
-  "nodes": [
+  "modules": [
     {
       "id": "vlmkit (cli)",
       "label": "vlmkit (cli)",
@@ -60,7 +60,7 @@
       "hidden": true
     }
   ],
-  "edges": [
+  "deps": [
     {
       "from": "vlmkit (cli)",
       "to": "ai",
@@ -114,6 +114,11 @@
     {
       "from": "ai",
       "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "anim",
+      "to": "ai",
       "hidden": true
     },
     {
@@ -258,7 +263,7 @@
         "markup",
         "plan"
       ],
-      "caption": "anim → animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core; plan → ai"
+      "caption": "anim → ai, animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core; plan → ai"
     },
     {
       "value": {
@@ -331,7 +336,7 @@
       "ms": 0
     },
     {
-      "note": "11 packages, 25 workspace dependencies, 5 layers deep"
+      "note": "11 packages, 26 workspace dependencies, 5 layers deep"
     }
   ]
 }

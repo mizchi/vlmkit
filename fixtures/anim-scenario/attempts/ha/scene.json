@@ -1,0 +1,36 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Checkout request through the stack",
+  "modules": ["web", "gateway", "checkout", "inventory", "payments", "orders", "db", "queue"],
+  "deps": [
+    ["web", "gateway"],
+    ["gateway", "checkout"],
+    ["checkout", "inventory"],
+    ["checkout", "payments"],
+    ["checkout", "orders"],
+    ["inventory", "db"],
+    ["orders", "db"],
+    ["orders", "queue"],
+    ["payments", "queue"]
+  ],
+  "groups": [
+    {"id": "frontend", "label": "frontend", "modules": ["web", "gateway"]},
+    {"id": "domain", "label": "domain", "modules": ["checkout", "inventory", "payments", "orders"]},
+    {"id": "platform", "label": "platform", "modules": ["db", "queue"]}
+  ],
+  "sequence": [
+    {"highlight": "web", "caption": "A customer places an order on the web storefront"},
+    {"flow": "web->gateway", "caption": "The request passes through the API gateway"},
+    {"flow": "gateway->checkout", "caption": "Reaching the checkout service"},
+    {"flow": "checkout->inventory", "caption": "Checkout reserves stock in inventory"},
+    {"flow": "inventory->db", "caption": "Which writes to the database"},
+    {"flow": "checkout->payments", "caption": "Checkout charges the customer's card"},
+    {"flow": "payments->queue", "caption": "Payment is queued asynchronously"},
+    {"flow": "checkout->orders", "caption": "Checkout records the order"},
+    {"flow": "orders->db", "caption": "Order is written to the database"},
+    {"flow": "orders->queue", "caption": "Order is also queued asynchronously"},
+    {"unhighlight": "web", "ms": 0},
+    {"highlight": ["payments->queue", "orders->queue"], "caption": "These two async flows make the checkout eventually consistent"}
+  ]
+}

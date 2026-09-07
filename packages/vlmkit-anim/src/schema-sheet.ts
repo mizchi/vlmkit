@@ -20,6 +20,7 @@ import {
   type HeapScene,
   type ListScene,
   type MatrixScene,
+  type ModulesScene,
   type QueueScene,
   type Scene,
   type SortScene,
@@ -44,6 +45,7 @@ export interface Examples {
   graph: GraphScene;
   chart: ChartScene;
   diagram: DiagramScene;
+  modules: ModulesScene;
   vector: VectorScene;
   compose: ComposeScene;
   timeline: Timeline;
@@ -220,6 +222,18 @@ export const EXAMPLES: Examples = {
       { highlight: "browser", caption: "…and the page renders" },
     ],
   },
+  modules: {
+    format: SCENE_FORMAT,
+    kind: "modules",
+    title: "A web service, by module",
+    modules: ["web", "api", { id: "auth", label: "auth service" }, "db", "cache", "logging"],
+    deps: [["web", "api"], ["api", "auth"], ["api", "db"], ["api", "cache"], ["auth", "db"], { from: "api", to: "logging", style: "line", label: "emits" }],
+    groups: [
+      { id: "edge", label: "edge", modules: ["web"] },
+      { id: "core", label: "core", modules: ["api", "auth"] },
+      { id: "infra", label: "infrastructure", modules: ["db", "cache", "logging"] },
+    ],
+  },
   vector: {
     format: SCENE_FORMAT,
     kind: "vector",
@@ -291,7 +305,9 @@ They add nothing a "vector" scene could not draw by hand; the point is that you 
   {"text": {"lines": ["for i in a:", "  if i > x:"], "highlight": 1}}    a multi-line block (panel, or "at" an anchor); same id + same
                                                                           line count updates in place and moves the highlight; null hides
   {"relate": {"from": "A", "to": "B", "label": "A ≤ B"}}                  a labelled arrow from one anchor to another ("style": "line" for
-                                                                          no head); same id redraws it, {"relate": null} removes all.
+                                                                          no head; "tone": "accent" (default, amber) | "bad" (red, dashed:
+                                                                          a relation that must not exist) | "muted"); same id redraws it,
+                                                                          {"relate": null} removes all.
                                                                           Where "group" would enclose a bystander, "relate" names the pair:
                                                                           edge to edge, or level beside the pair, or arced over what lies between
 
@@ -312,7 +328,7 @@ Anchors by kind (what "at" / "of" / "around" may name):
   matrix         a cell "r,c", "row:<label or index>", "col:<label or index>"
   graph          a node id, an edge "a->b"
   chart          a series id, a category, "series/category"
-  diagram        a node id, an edge "a->b"
+  diagram / modules  a node or module id, a group id, an edge "a->b" (the dependency ["a", "b"] is the edge "a->b")
   vector         a node id`;
 
 const SHEETS: Record<Scene["kind"] | "timeline", string> = {
@@ -432,14 +448,25 @@ Give "algorithm" OR "ops". With an algorithm the check fails unless every node r
 The check fails if a bar's final height is not its value's share of the axis, and warns about a series never revealed.`,
   diagram: `kind: diagram — boxes and arrows, narrated in beats
   "nodes": [ {"id", "label", "shape": "rect" | "circle" | "ellipse", "pos": [x, y], "fill", "hidden": true} ]   required
-  "edges": [ {"from", "to", "label", "style": "arrow" | "line", "hidden": true} ]
+  "edges": [ {"from", "to", "label", "style": "arrow" | "line" | "dashed" | "forbidden", "hidden": true} ]   forbidden: dashed red, ignored by the layout
+  "groups": [ {"id", "label", "nodes": [ids]} ]   containers; ids are anchors and highlight targets
   "layout": "lr" | "tb" | "grid" | "circle"   default lr; nodes with "pos" are pinned
   "sequence": [ one action per step, plus optional "caption" and "ms" ]
-      {"show": id | [ids]}  {"hide": …}  {"highlight": …}  {"unhighlight": …}
+      {"show": id | [ids]}  {"hide": …}  {"highlight": id | group id | "a->b"}  {"unhighlight": …}
       {"flow": "a->b"}      a token travels along an existing edge (either direction)
       {"note": "…"}         a captioned pause
       {"relabel": {"id", "text"}}
 Hidden nodes stay invisible until a "show" step. A "flow" needs an edge between the two nodes.`,
+  modules: `kind: modules — a module map: layers with dependencies pointing one way, containers around what belongs together (a still figure unless it has a sequence)
+  "modules": [ "id" | {"id", "label", "hidden": true} ]                       required
+  "deps":    [ ["a", "b"] | {"from", "to", "label", "style", "hidden": true} ]   ["a", "b"] reads "a depends on b": arrow a → b, a drawn above b
+             "style": "arrow" (default) | "line" (no head) | "dashed" (optional / weak, still laid out) | "forbidden" (dashed red, drawn but ignored by the layout: the import that must not exist)
+  "groups":  [ {"id", "label", "modules": [ids]} ]                            containers; a module is in at most one; ids are anchors and highlight targets
+  "layout":  "tb" | "lr"                                                      default tb (dependencies point down)
+  "sequence": [ the diagram steps: show / hide / highlight (a module, a group, or an edge "a->b") / unhighlight / flow "a->b" / note / relabel, and every annotation op ]   optional
+The layout is automatic: a module's layer is one below the deepest thing it depends on (two modules with the same dependencies share a layer, whatever depends on them);
+a group whose layers hold only its members is a full-width row, otherwise it gets its own band so a container holds only its members.
+A dependency cycle is a warning: the back edge is drawn against the flow. vlmkit-anim still scene.json --out map.svg renders the figure without a caption.`,
   vector: `kind: vector — generic shapes with a list of tweens (when nothing semantic fits)
   "nodes": [ timeline nodes, see below ]   required
   "timeline": [ tween | {"wait": ms, "caption"} ]   required

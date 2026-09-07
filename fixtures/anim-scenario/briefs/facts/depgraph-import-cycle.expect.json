@@ -1,0 +1,24 @@
+{
+  "format": "vlmkit-anim/expect@1",
+  "modules": ["server", "router", "config", "logger", "handlers", "middleware", "auth", "services", "events", "repo", "validation"],
+  "deps": [
+    "server->router",
+    "server->config",
+    "server->logger",
+    "router->handlers",
+    "router->middleware",
+    "handlers->services",
+    "handlers->validation",
+    "middleware->auth",
+    "middleware->logger",
+    "auth->services",
+    "auth->config",
+    "services->repo",
+    "services->events",
+    "events->handlers",
+    "repo->config",
+    "repo->logger",
+    "validation->config"
+  ],
+  "highlighted": ["handlers->services", "services->events", "events->handlers"]
+}

@@ -1,0 +1,108 @@
+{
+  "frames": [
+    {
+      "index": 1,
+      "t": 0,
+      "step": {
+        "index": 1,
+        "caption": "Batched Pandora's Box: one adaptive run (k=2, T=1/5)"
+      },
+      "issues": []
+    },
+    {
+      "index": 2,
+      "t": 360,
+      "step": {
+        "index": 2,
+        "caption": "Classic Pandora's box: open one at a time, keep the best reward seen, pay each box's cost. Here boxes open in batches of up to k=2, plus a fixed setup cost T=1/5 per batch."
+      },
+      "issues": []
+    },
+    {
+      "index": 3,
+      "t": 960,
+      "step": {
+        "index": 3,
+        "caption": "Batch 1: boxes 1 and 2 open together"
+      },
+      "issues": []
+    },
+    {
+      "index": 4,
+      "t": 1560,
+      "step": {
+        "index": 4,
+        "caption": "Box 1 opens: always 1/2"
+      },
+      "issues": []
+    },
+    {
+      "index": 5,
+      "t": 2160,
+      "step": {
+        "index": 5,
+        "caption": "Box 2 opens at the same instant: shows 1/2 (not the jackpot 99, not 0) · best so far = 0.5 · Cost so far: setup 1/5 + box1 1/5 + box2 1/5 = 3/5"
+      },
+      "issues": []
+    },
+    {
+      "index": 6,
+      "t": 2760,
+      "step": {
+        "index": 6,
+        "caption": "Box 2 showed 1/2, not 99 — check whether a second batch is worth it: E[gain from box 3] = 1/5·(6 − 1/2) = 1.1, batch-2 cost = 1/2 + 1/5 = 0.7. 1.1 > 0.7, so open it."
+      },
+      "issues": []
+    },
+    {
+      "index": 7,
+      "t": 3360,
+      "step": {
+        "index": 7,
+        "caption": "Batch 2: box 3 alone"
+      },
+      "issues": []
+    },
+    {
+      "index": 8,
+      "t": 3960,
+      "step": {
+        "index": 8,
+        "caption": "Box 3 opens: shows 6 · best so far = 6 · cost so far (setup + boxes) = 1.3 (setup 0.2+0.2 + boxes 0.2+0.2+0.5)"
+      },
+      "issues": []
+    },
+    {
+      "index": 9,
+      "t": 4560,
+      "step": {
+        "index": 9,
+        "caption": "Final score = best (6) − total cost (1.3) = 4.7"
+      },
+      "issues": []
+    },
+    {
+      "index": 10,
+      "t": 5160,
+      "step": {
+        "index": 10,
+        "caption": "kept 6 > 1/2"
+      },
+      "issues": []
+    },
+    {
+      "index": 11,
+      "t": 5760,
+      "step": {
+        "index": 11
+      },
+      "issues": []
+    }
+  ],
+  "totals": {
+    "frames": 11,
+    "framesWithIssues": 0,
+    "overlaps": 0,
+    "clipped": 0
+  }
+}

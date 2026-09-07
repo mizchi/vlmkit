@@ -1,0 +1,24 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [
+      { "kind": "overlap", "what": "the orange 'Batch 1' batch-label and the 'best so far: 0.5' readout are drawn at the same position under box1/box2, so the two text strings run together into an illegible smear", "severity": "major" }
+    ] },
+    { "frame": 6, "issues": [
+      { "kind": "overlap", "what": "same as frame 5: 'Batch 1' label and 'best so far: 0.5' readout overlap under box1/box2, text runs together", "severity": "major" }
+    ] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [
+      { "kind": "overlap", "what": "the small 'kept 6 > 1/2' annotation sits directly on top of the 'box1 box2 box3' column header and the box2 cost cell (0.2)", "severity": "minor" }
+    ] },
+    { "frame": 11, "issues": [
+      { "kind": "overlap", "what": "same as frame 10: 'kept 6 > 1/2' annotation overlaps the column header row / box2 cost cell", "severity": "minor" }
+    ] }
+  ],
+  "notes": "Tiles were small enough that fine details (e.g. exact pixel overlap vs. close proximity) are hard to be fully certain of, especially the 'kept 6 > 1/2' annotation in frames 10-11 and the small orange batch/readout labels in frames 5-6 and 7-9 — I flagged the two spots where text visibly ran together, but did not treat close-but-separate small labels (e.g. 'Batch 2' near box3 in frames 7-11) as overlap since they appeared to sit in their own space. No clipped, offscreen, or other-category defects were confidently visible at this resolution."
+}

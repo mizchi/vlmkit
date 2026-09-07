@@ -1,0 +1,16 @@
+{
+  "frames": [
+    { "frame": 1, "issues": [] },
+    { "frame": 2, "issues": [] },
+    { "frame": 3, "issues": [] },
+    { "frame": 4, "issues": [] },
+    { "frame": 5, "issues": [] },
+    { "frame": 6, "issues": [] },
+    { "frame": 7, "issues": [] },
+    { "frame": 8, "issues": [] },
+    { "frame": 9, "issues": [] },
+    { "frame": 10, "issues": [] },
+    { "frame": 11, "issues": [] }
+  ],
+  "notes": "Tiles are small (~400x230px each in the contact sheet) and the vector readouts ('A: [2,0,0]', arrow labels like '[2,1,0]', the 'C's local event (frozen): [0,0,1]' text) are rendered in a very small font. I was able to read all of them correctly at this resolution, but it was close to the limit of legibility, so I can't be fully certain no readout is silently colliding with a neighboring element at a slightly finer scale than I could resolve. In frames 4 and 6, the black arrow from the sender's dot toward the receiver stops partway across the tile rather than reaching the destination lifeline; I read this as an intentional 'message in flight' depiction (matching the mid-transit captions for those steps) rather than a defect ('arrow pointing at nothing'), but flagging the ambiguity. The orange curved arcs connecting A and C in frames 7-10 pass above the A/B/C header boxes without appearing to touch them or the 'C's local event (frozen)' label at the same resolution. No clipped, offscreen, or overlapping text was clearly identifiable in any frame at the resolution reviewed."
+}

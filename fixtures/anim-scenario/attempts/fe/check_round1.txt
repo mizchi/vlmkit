@@ -1,0 +1,4 @@
+✓ scene.json (modules): 0 error(s), 0 warning(s)
+  560ms · 2 steps (1 captioned) · 23 nodes · 0 tracks / 0 keyframes
+  scene 883 B → timeline 3976 B (×4.5)
+  next: vlmkit-anim explain scene.json · vlmkit-anim render scene.json --step N · vlmkit-anim html scene.json --out page.html

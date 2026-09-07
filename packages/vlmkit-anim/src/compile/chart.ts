@@ -80,10 +80,10 @@ export function compileChart(scene: ChartScene): Timeline {
     s.values.forEach((v, i) => {
       if (type === "bar") {
         b.node({ id: `bar-${s.id}-${i}`, shape: "rect", pos: [xOfBar(si, i), baseY], size: [barW - 2, 0], fill: s.color, stroke: s.color, rx: 2 });
-        b.node({ id: `val-${s.id}-${i}`, shape: "text", pos: [xOfBar(si, i), yOf(v) - 9], text: fmt(v), fontSize: T.fontSize - 3, color: T.text, opacity: 0 });
+        b.node({ id: `val-${s.id}-${i}`, shape: "text", pos: [xOfBar(si, i), yOf(v) - 9], text: fmt(v), fontSize: T.fontSize - 3, color: T.text, halo: true, opacity: 0 });
       } else {
         b.node({ id: `pt-${s.id}-${i}`, shape: "circle", pos: [xOfCat(i), yOf(v)], r: 4, fill: s.color, stroke: s.color, opacity: 0 });
-        b.node({ id: `val-${s.id}-${i}`, shape: "text", pos: [xOfCat(i), yOf(v) - 12], text: fmt(v), fontSize: T.fontSize - 3, color: T.text, opacity: 0 });
+        b.node({ id: `val-${s.id}-${i}`, shape: "text", pos: [xOfCat(i), yOf(v) - 12], text: fmt(v), fontSize: T.fontSize - 3, color: T.text, halo: true, opacity: 0 });
         if (i > 0) b.node({ id: `seg-${s.id}-${i}`, shape: "line", points: [[xOfCat(i - 1), yOf(s.values[i - 1])], [xOfCat(i), yOf(v)]], stroke: s.color, strokeWidth: 2, dash: 0 });
       }
     });
@@ -189,7 +189,7 @@ export function compileChart(scene: ChartScene): Timeline {
       const id = `threshold-${thresholds++}`;
       const yy = yOf(st.threshold.value);
       b.node({ id, shape: "line", points: [[left, yy], [right, yy]], stroke: T.bad, strokeWidth: 1.5, dash: 0 });
-      if (st.threshold.label) b.node({ id: `${id}-label`, shape: "text", pos: [right - 4, yy - 8], text: st.threshold.label, fontSize: T.fontSize - 3, color: T.bad, anchor: "end", opacity: 0 });
+      if (st.threshold.label) b.node({ id: `${id}-label`, shape: "text", pos: [right - 4, yy - 8], text: st.threshold.label, fontSize: T.fontSize - 3, color: T.bad, anchor: "end", halo: true, opacity: 0 });
       b.step(caption ?? `${st.threshold.label ?? "Threshold"}: ${fmt(st.threshold.value)}`);
       const t0 = b.t;
       b.tween(id, "dash", 1, t0, t0 + ms, "linear");

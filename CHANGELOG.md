@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## Unreleased
+## 0.13.0 — 2026-09-07
 
 **`vlmkit-anim`: the layer for explaining a concept, not only a structure.** v9 changed the
 evaluation question from "animate this structure" to "explain this idea" (vector clocks, HTTP/2
@@ -27,6 +27,47 @@ pictures at once. Two generic layers answer that, and a third op followed from t
   contact sheet. The `pr-visual` workflow posts that on every same-repo pull request.
 - Typed authoring (`scene.<kind>({…})`, scene modules in `.ts` / `.mjs` accepted by every verb),
   committed sample outputs for every fixture, and `docs/diagrams/` with the tool's own architecture.
+- **Layout read back from the frames.** `vlmkit-anim layout` lists, at every step, texts on other
+  texts, texts under a filled box that is not their own, and texts past the canvas edge; `check`
+  warns about the same. `vlmkit-anim review` writes the contact sheet with a review brief for a
+  vision model or an agent and scores its JSON against that geometry frame by frame (`--answers`,
+  or `--model` through the optional `@mizchi/vlmkit-ai` peer). Annotations now place themselves off
+  other text — the asked side first, then the other sides, one box further out, the panel, or a
+  taller canvas — and relations arc over a bystander only when no level line fits nearby.
+- **Still figures.** `kind: modules` — a module map (modules, `deps` read "a depends on b", `groups`
+  as containers) laid out in dependency layers with one band per container, cycle-checked, a still
+  unless it has a `sequence`; `diagram` takes `groups` too. `vlmkit-anim still` renders any scene's
+  frame without the caption band, cropped to what is drawn, as SVG or PNG; `repo` and `pr` write
+  the figure next to the GIF.
+- **v13, the first writer round on still figures, and what it changed.** Five fresh writers drew
+  module maps and a dependency graph from the guide alone; every one was green, and every figure
+  had lines through labels the geometry could not see. `vlmkit-anim layout` now reports a fourth
+  defect, **crossed** — a line through a text, or through a box that is not one of its ends — and
+  `check` warns about it. The compiler then earns that check: module maps layer from their leaves
+  (two modules with the same dependencies share a layer, whatever depends on them), order each
+  layer to straighten edges, bend an edge around a module in its way, draw a group that owns its
+  layers as a full-width row instead of a band, keep container labels out of edges, place callouts
+  and relation labels off strokes as well as off text (an unchecked fallback once put a callout on
+  the module next to its edge), pick the arc side that clears everything, and halo edge, message
+  and relation labels so a line under them breaks around the glyphs. Edges take `"style":
+  "dashed"` (optional) and `"forbidden"` (dashed red, ignored by the layout — the import that must
+  not exist); `highlight` takes an edge `"a->b"`; `relate` takes `"tone": "bad" | "muted"`. Across
+  the five scenes: 91 crossings before, 2 after. Report: `docs/reports/2026-09-06-anim-ir-v13.md`.
+- **The figure against its facts (`check --expect facts.json`).** v13 also had two pictures that
+  were green and wrong — a map that drew the forbidden dependency as a real one and then deleted a
+  true one to quiet the cycle warning, and a walk that highlighted the wrong edge — and neither
+  `check` nor `layout` could know, because neither reads what the figure is about. An expectation
+  file (`vlmkit-anim/expect@1`: `modules`, `deps` `"a->b"`, `forbidden`, `highlighted`, `groups`) is
+  the brief's fact sheet in a shape `check` reads: every fact must be drawn (in that direction, in
+  that style, lit in the final frame, with exactly those members) and nothing drawn may be missing
+  from it. Ids the picture spells differently are reported once each and the dependencies naming
+  them wait in one line. `vlmkit-anim repo` writes the workspace's own sheet as `repo.expect.json`;
+  `schema --kind expect` has the fields. Four fresh writers on the four briefs with their sheets:
+  four green, four clean, and the sheet caught one wrong final highlight on the first run. Their
+  friction: a callout wider than the canvas now wraps (it was laid across six edges and past the
+  edge), a group label hemmed in by edges on every side takes the least-crossed spot with a halo,
+  and the guide says "one action per step" where it did not. Report:
+  `docs/reports/2026-09-06-anim-ir-v14.md`.
 
 Measured, not asserted: the coordinate-fallback count went from 3 of 8 scenes (52 positions, 30
 colours typed by hand) to 1 of 7 (one writer who never opened the annotation sheet). Reports:

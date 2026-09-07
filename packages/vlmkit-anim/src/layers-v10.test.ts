@@ -74,9 +74,15 @@ describe("annotations: value", () => {
     const tShown = tl.steps!.find((s) => s.caption === "A's event")!.t;
     assert.equal(sampleFrame(tl, tShown + 1).get(calloutBox.id)!.opacity, 1);
     assert.equal(frame.get(calloutBox.id)!.opacity, 0, "callout: null hid it");
-    const cell = sampleFrame(tl, tShown + 1).get("cell-0-0")!;
-    const row0 = sampleFrame(tl, tShown + 1).get("row-0")!;
-    assert.ok(calloutBox.pos![1] < cell.pos[1] + row0.pos[1], "the callout sits above the cell");
+    // Asked for "above" cell 0,0, where the column headers are: since v12 the box takes the nearest free spot
+    // instead, and covers no header.
+    const shown = sampleFrame(tl, tShown + 1);
+    const box = { x: calloutBox.pos![0] - calloutBox.size![0] / 2, y: calloutBox.pos![1] - calloutBox.size![1] / 2, w: calloutBox.size![0], h: calloutBox.size![1] };
+    for (const hdr of tl.nodes.filter((n) => n.id.startsWith("col-label-"))) {
+      const h = shown.get(hdr.id)!;
+      const inside = h.pos[0] > box.x && h.pos[0] < box.x + box.w && h.pos[1] > box.y && h.pos[1] < box.y + box.h;
+      assert.ok(!inside, `the callout box covers the header ${hdr.text}`);
+    }
     const group = tl.nodes.find((n) => n.id.startsWith("group-main-") && !n.id.endsWith("-label"))!;
     assert.equal(frame.get(group.id)!.opacity, 1);
     assert.ok(group.size![1] > 2 * 20, "the outline spans two rows");

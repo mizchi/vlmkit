@@ -1,0 +1,725 @@
+{
+  "format": "vlmkit-anim/timeline@1",
+  "canvas": {
+    "width": 938,
+    "height": 196,
+    "background": "#ffffff"
+  },
+  "duration": 6000,
+  "nodes": [
+    {
+      "id": "title",
+      "shape": "text",
+      "pos": [
+        469,
+        22
+      ],
+      "text": "Batched Pandora's Box: one adaptive run (k=2, T=1/5)",
+      "fontSize": 18,
+      "color": "#1f2328"
+    },
+    {
+      "id": "col-label-0",
+      "shape": "text",
+      "pos": [
+        149,
+        56
+      ],
+      "text": "box1",
+      "fontSize": 13,
+      "color": "#9ca3af"
+    },
+    {
+      "id": "col-label-1",
+      "shape": "text",
+      "pos": [
+        197,
+        56
+      ],
+      "text": "box2",
+      "fontSize": 13,
+      "color": "#9ca3af"
+    },
+    {
+      "id": "col-label-2",
+      "shape": "text",
+      "pos": [
+        245,
+        56
+      ],
+      "text": "box3",
+      "fontSize": 13,
+      "color": "#9ca3af"
+    },
+    {
+      "id": "row-0",
+      "shape": "group",
+      "pos": [
+        0,
+        85
+      ]
+    },
+    {
+      "id": "row-label-0",
+      "shape": "text",
+      "parent": "row-0",
+      "pos": [
+        115,
+        0
+      ],
+      "text": "cost",
+      "fontSize": 13,
+      "color": "#9ca3af",
+      "anchor": "end"
+    },
+    {
+      "id": "cell-0-0",
+      "shape": "rect",
+      "parent": "row-0",
+      "pos": [
+        149,
+        0
+      ],
+      "size": [
+        44,
+        30
+      ],
+      "rx": 3,
+      "fill": "#ffffff",
+      "stroke": "#1f2328",
+      "text": "0.2",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "cell-0-1",
+      "shape": "rect",
+      "parent": "row-0",
+      "pos": [
+        197,
+        0
+      ],
+      "size": [
+        44,
+        30
+      ],
+      "rx": 3,
+      "fill": "#ffffff",
+      "stroke": "#1f2328",
+      "text": "0.2",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "cell-0-2",
+      "shape": "rect",
+      "parent": "row-0",
+      "pos": [
+        245,
+        0
+      ],
+      "size": [
+        44,
+        30
+      ],
+      "rx": 3,
+      "fill": "#ffffff",
+      "stroke": "#1f2328",
+      "text": "0.5",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "row-1",
+      "shape": "group",
+      "pos": [
+        0,
+        119
+      ]
+    },
+    {
+      "id": "row-label-1",
+      "shape": "text",
+      "parent": "row-1",
+      "pos": [
+        115,
+        0
+      ],
+      "text": "reward",
+      "fontSize": 13,
+      "color": "#9ca3af",
+      "anchor": "end"
+    },
+    {
+      "id": "cell-1-0",
+      "shape": "rect",
+      "parent": "row-1",
+      "pos": [
+        149,
+        0
+      ],
+      "size": [
+        44,
+        30
+      ],
+      "rx": 3,
+      "fill": "#f3f4f6",
+      "stroke": "#1f2328",
+      "text": "",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "cell-1-1",
+      "shape": "rect",
+      "parent": "row-1",
+      "pos": [
+        197,
+        0
+      ],
+      "size": [
+        44,
+        30
+      ],
+      "rx": 3,
+      "fill": "#f3f4f6",
+      "stroke": "#1f2328",
+      "text": "",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "cell-1-2",
+      "shape": "rect",
+      "parent": "row-1",
+      "pos": [
+        245,
+        0
+      ],
+      "size": [
+        44,
+        30
+      ],
+      "rx": 3,
+      "fill": "#f3f4f6",
+      "stroke": "#1f2328",
+      "text": "",
+      "fontSize": 14,
+      "color": "#1f2328"
+    },
+    {
+      "id": "group-batch-0",
+      "shape": "rect",
+      "pos": [
+        173,
+        102
+      ],
+      "size": [
+        112,
+        84
+      ],
+      "rx": 8,
+      "fill": "none",
+      "stroke": "#f59e0b",
+      "strokeWidth": 1.5,
+      "opacity": 0
+    },
+    {
+      "id": "group-batch-0-label",
+      "shape": "text",
+      "pos": [
+        121,
+        153
+      ],
+      "text": "Batch 1",
+      "fontSize": 12,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-best-label",
+      "shape": "text",
+      "pos": [
+        124.2,
+        153.8
+      ],
+      "text": "best so far:",
+      "fontSize": 12,
+      "color": "#9ca3af",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-best",
+      "shape": "text",
+      "pos": [
+        215.4,
+        153.8
+      ],
+      "text": "0.5",
+      "fontSize": 14,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-cost-label",
+      "shape": "text",
+      "pos": [
+        336,
+        56
+      ],
+      "text": "cost so far (setup + boxes):",
+      "fontSize": 12,
+      "color": "#9ca3af",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "value-cost",
+      "shape": "text",
+      "pos": [
+        542.4,
+        56
+      ],
+      "text": "0.6 (setup 0.2 + boxes 0.2+0.2)",
+      "fontSize": 14,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "group-batch-1",
+      "shape": "rect",
+      "pos": [
+        245,
+        102
+      ],
+      "size": [
+        64,
+        84
+      ],
+      "rx": 8,
+      "fill": "none",
+      "stroke": "#f59e0b",
+      "strokeWidth": 1.5,
+      "opacity": 0
+    },
+    {
+      "id": "group-batch-1-label",
+      "shape": "text",
+      "pos": [
+        283,
+        67.8
+      ],
+      "text": "Batch 2",
+      "fontSize": 12,
+      "color": "#f59e0b",
+      "anchor": "start",
+      "opacity": 0
+    },
+    {
+      "id": "relate-main-2",
+      "shape": "path",
+      "pos": [
+        195,
+        58
+      ],
+      "d": "M -19 61 Q 0 -61 19 61",
+      "head": true,
+      "fill": "none",
+      "stroke": "#f59e0b",
+      "strokeWidth": 2,
+      "opacity": 0
+    },
+    {
+      "id": "relate-main-2-label",
+      "shape": "text",
+      "pos": [
+        195,
+        46
+      ],
+      "text": "kept 6 > 1/2",
+      "fontSize": 12,
+      "color": "#f59e0b",
+      "anchor": "middle",
+      "opacity": 0
+    }
+  ],
+  "tracks": [
+    {
+      "target": "group-batch-0",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 960,
+          "value": 1,
+          "easing": "step-end"
+        },
+        {
+          "t": 3360,
+          "value": 0,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "group-batch-0-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 960,
+          "value": 1,
+          "easing": "step-end"
+        },
+        {
+          "t": 3360,
+          "value": 0,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "cell-1-0",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": ""
+        },
+        {
+          "t": 1560,
+          "value": "0.5",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "cell-1-0",
+      "prop": "fill",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "#f3f4f6"
+        },
+        {
+          "t": 1560,
+          "value": "#f59e0b",
+          "easing": "step-end"
+        },
+        {
+          "t": 2160,
+          "value": "#ffffff",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "cell-1-1",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": ""
+        },
+        {
+          "t": 2160,
+          "value": "0.5",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "cell-1-1",
+      "prop": "fill",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "#f3f4f6"
+        },
+        {
+          "t": 2160,
+          "value": "#ffffff",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-best-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2160,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-best",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2160,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-cost-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2160,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-cost",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 2160,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "group-batch-1",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 3360,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "group-batch-1-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 3360,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "cell-1-2",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": ""
+        },
+        {
+          "t": 3960,
+          "value": "6",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "cell-1-2",
+      "prop": "fill",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "#f3f4f6"
+        },
+        {
+          "t": 3960,
+          "value": "#f59e0b",
+          "easing": "step-end"
+        },
+        {
+          "t": 4560,
+          "value": "#22c55e",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-best",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "0.5"
+        },
+        {
+          "t": 4560,
+          "value": "6",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "value-cost",
+      "prop": "text",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": "0.6 (setup 0.2 + boxes 0.2+0.2)"
+        },
+        {
+          "t": 4560,
+          "value": "1.3 (setup 0.2+0.2 + boxes 0.2+0.2+0.5)",
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "relate-main-2",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 5160,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    },
+    {
+      "target": "relate-main-2-label",
+      "prop": "opacity",
+      "keyframes": [
+        {
+          "t": 0,
+          "value": 0
+        },
+        {
+          "t": 5160,
+          "value": 1,
+          "easing": "step-end"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "t": 0,
+      "label": "start",
+      "caption": "Batched Pandora's Box: one adaptive run (k=2, T=1/5)"
+    },
+    {
+      "t": 360,
+      "caption": "Classic Pandora's box: open one at a time, keep the best reward seen, pay each box's cost. Here boxes open in batches of up to k=2, plus a fixed setup cost T=1/5 per batch."
+    },
+    {
+      "t": 960,
+      "caption": "Batch 1: boxes 1 and 2 open together"
+    },
+    {
+      "t": 1560,
+      "caption": "Box 1 opens: always 1/2"
+    },
+    {
+      "t": 2160,
+      "caption": "Box 2 opens at the same instant: shows 1/2 (not the jackpot 99, not 0) · best so far = 0.5 · Cost so far: setup 1/5 + box1 1/5 + box2 1/5 = 3/5"
+    },
+    {
+      "t": 2760,
+      "caption": "Box 2 showed 1/2, not 99 — check whether a second batch is worth it: E[gain from box 3] = 1/5·(6 − 1/2) = 1.1, batch-2 cost = 1/2 + 1/5 = 0.7. 1.1 > 0.7, so open it."
+    },
+    {
+      "t": 3360,
+      "caption": "Batch 2: box 3 alone"
+    },
+    {
+      "t": 3960,
+      "caption": "Box 3 opens: shows 6 · best so far = 6 · cost so far (setup + boxes) = 1.3 (setup 0.2+0.2 + boxes 0.2+0.2+0.5)"
+    },
+    {
+      "t": 4560,
+      "caption": "Final score = best (6) − total cost (1.3) = 4.7"
+    },
+    {
+      "t": 5160,
+      "caption": "kept 6 > 1/2"
+    },
+    {
+      "t": 5760,
+      "label": "end"
+    }
+  ],
+  "meta": {
+    "title": "Batched Pandora's Box: one adaptive run (k=2, T=1/5)",
+    "kind": "matrix",
+    "finalCells": [
+      [
+        "0.2",
+        "0.2",
+        "0.5"
+      ],
+      [
+        "0.5",
+        "0.5",
+        "6"
+      ]
+    ],
+    "rowOrder": [
+      0,
+      1
+    ],
+    "colOrder": [
+      0,
+      1,
+      2
+    ],
+    "slots": {
+      "x": [
+        149,
+        197,
+        245
+      ],
+      "y": [
+        85,
+        119
+      ]
+    }
+  }
+}

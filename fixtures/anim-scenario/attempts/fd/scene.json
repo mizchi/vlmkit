@@ -1,0 +1,35 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "Checkout request walk",
+  "modules": ["web", "gateway", "checkout", "inventory", "payments", "orders", "db", "queue"],
+  "deps": [
+    ["web", "gateway"],
+    ["gateway", "checkout"],
+    ["checkout", "inventory"],
+    ["checkout", "payments"],
+    ["checkout", "orders"],
+    ["inventory", "db"],
+    ["orders", "db"],
+    ["orders", "queue"],
+    ["payments", "queue"]
+  ],
+  "groups": [
+    { "id": "frontend", "label": "frontend", "modules": ["web", "gateway"] },
+    { "id": "domain", "label": "domain", "modules": ["checkout", "inventory", "payments", "orders"] },
+    { "id": "platform", "label": "platform", "modules": ["db", "queue"] }
+  ],
+  "sequence": [
+    { "flow": "web->gateway", "caption": "The request arrives at web and is routed to the gateway." },
+    { "flow": "gateway->checkout", "caption": "The gateway forwards it to checkout, which orchestrates the rest." },
+    { "flow": "checkout->inventory", "caption": "Checkout asks inventory to reserve stock." },
+    { "flow": "inventory->db", "caption": "Inventory reserves the stock in db." },
+    { "flow": "checkout->payments", "caption": "Checkout asks payments to charge the card." },
+    { "flow": "payments->queue", "caption": "Payments charges the card, then hands off to the queue asynchronously — checkout does not wait for this to land." },
+    { "flow": "checkout->orders", "caption": "Checkout asks orders to record the order." },
+    { "flow": "orders->db", "caption": "Orders writes the order to db." },
+    { "flow": "orders->queue", "caption": "Orders also enqueues an order-placed event, asynchronously." },
+    { "callout": { "at": "payments->queue", "text": "async: charge confirmation", "id": "async-payments" }, "caption": "Two hops run through the queue — the charge confirmation and the order event — both asynchronous." },
+    { "callout": { "at": "orders->queue", "text": "async: order event", "id": "async-orders" }, "ms": 0, "caption": "These two async hops are what make checkout eventually — not immediately — consistent." }
+  ]
+}
