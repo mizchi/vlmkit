@@ -4,8 +4,8 @@
   "title": "PR #135: anim: still figures, layout geometry and the figure against its facts (v12–v14)",
   "layout": "grid",
   "canvas": {
-    "width": 1149,
-    "height": 366
+    "width": 1283,
+    "height": 438
   },
   "nodes": [
     {
@@ -34,13 +34,13 @@
       "hidden": true
     },
     {
-      "id": ".claude",
-      "label": ".claude",
+      "id": "root",
+      "label": "root",
       "hidden": true
     },
     {
-      "id": "root",
-      "label": "root",
+      "id": ".claude",
+      "label": ".claude",
       "hidden": true
     },
     {
@@ -61,6 +61,21 @@
     {
       "id": "anim/fixtures",
       "label": "anim/fixtures",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "examples/vlmkit-intro-page",
+      "label": "examples/vlmkit-intro-page",
+      "hidden": true
+    },
+    {
+      "id": "other (11 areas)",
+      "label": "other (11 areas)",
       "hidden": true
     }
   ],
@@ -86,7 +101,7 @@
         "anim/samples",
         "anim/src"
       ],
-      "caption": "1/20 anim: layout geometry + `review` protocol (v12); annotations place them…"
+      "caption": "1/21 anim: layout geometry + `review` protocol (v12); annotations place them…"
     },
     {
       "value": {
@@ -133,7 +148,7 @@
         "anim/samples",
         "anim/src"
       ],
-      "caption": "2/20 anim-scenario: v12 report — geometry vs vision readers; arrow heads app…"
+      "caption": "2/21 anim-scenario: v12 report — geometry vs vision readers; arrow heads app…"
     },
     {
       "value": {
@@ -167,7 +182,7 @@
       "highlight": [
         "anim/src"
       ],
-      "caption": "3/20 anim: renderer test follows the arrow-head rule (head only once the str…"
+      "caption": "3/21 anim: renderer test follows the arrow-head rule (head only once the str…"
     },
     {
       "value": {
@@ -210,7 +225,7 @@
         "anim/samples",
         "anim/src"
       ],
-      "caption": "4/20 anim: still-figure presets — `modules` kind, diagram `groups`, `still` …"
+      "caption": "4/21 anim: still-figure presets — `modules` kind, diagram `groups`, `still` …"
     },
     {
       "value": {
@@ -248,7 +263,7 @@
         "anim/samples",
         "anim/src"
       ],
-      "caption": "5/20 anim: layered layout ignores declaration order; architecture still rege…"
+      "caption": "5/21 anim: layered layout ignores declaration order; architecture still rege…"
     },
     {
       "value": {
@@ -278,7 +293,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "6/20 anim-scenario: v13 briefs — still figures (module maps, dependency grap…"
+      "caption": "6/21 anim-scenario: v13 briefs — still figures (module maps, dependency grap…"
     },
     {
       "value": {
@@ -306,7 +321,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "7/20 anim-scenario: v13 attempt fe (ports and adapters, haiku)"
+      "caption": "7/21 anim-scenario: v13 attempt fe (ports and adapters, haiku)"
     },
     {
       "value": {
@@ -334,7 +349,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "8/20 anim-scenario: v13 attempts fb (ports and adapters) and fd (request wal…"
+      "caption": "8/21 anim-scenario: v13 attempts fb (ports and adapters) and fd (request wal…"
     },
     {
       "value": {
@@ -362,7 +377,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "9/20 anim-scenario: v13 attempts fa (workspace map) and fc (import cycle)"
+      "caption": "9/21 anim-scenario: v13 attempts fa (workspace map) and fc (import cycle)"
     },
     {
       "value": {
@@ -397,7 +412,7 @@
         "anim/samples",
         "anim/src"
       ],
-      "caption": "10/20 anim: v13 — lines through text are a layout defect, and the compiler ea…"
+      "caption": "10/21 anim: v13 — lines through text are a layout defect, and the compiler ea…"
     },
     {
       "value": {
@@ -434,7 +449,7 @@
         "docs/design",
         "docs/reports"
       ],
-      "caption": "11/20 anim: v13 report (draft, confirmation round pending), design note and C…"
+      "caption": "11/21 anim: v13 report (draft, confirmation round pending), design note and C…"
     },
     {
       "value": {
@@ -464,7 +479,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "12/20 anim-scenario: v13 confirmation attempt gc (request walk, haiku)"
+      "caption": "12/21 anim-scenario: v13 confirmation attempt gc (request walk, haiku)"
     },
     {
       "value": {
@@ -492,7 +507,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "13/20 anim-scenario: v13 confirmation attempt ga (ports and adapters)"
+      "caption": "13/21 anim-scenario: v13 confirmation attempt ga (ports and adapters)"
     },
     {
       "value": {
@@ -520,7 +535,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "14/20 anim-scenario: v13 confirmation attempt gb (import cycle), writer still…"
+      "caption": "14/21 anim-scenario: v13 confirmation attempt gb (import cycle), writer still…"
     },
     {
       "value": {
@@ -551,7 +566,7 @@
         "fixtures/anim-scenario",
         "anim/src"
       ],
-      "caption": "15/20 anim: v13 report complete (confirmation round ga–gc: 3/3 green first ch…"
+      "caption": "15/21 anim: v13 report complete (confirmation round ga–gc: 3/3 green first ch…"
     },
     {
       "value": {
@@ -587,7 +602,7 @@
         "anim",
         "anim/src"
       ],
-      "caption": "16/20 anim: check --expect — the figure against its facts (modules, deps, for…"
+      "caption": "16/21 anim: check --expect — the figure against its facts (modules, deps, for…"
     },
     {
       "value": {
@@ -622,7 +637,7 @@
         "docs/reports",
         "fixtures/anim-scenario"
       ],
-      "caption": "17/20 anim-scenario: v14 attempts ha (request walk) and hb (ports and adapter…"
+      "caption": "17/21 anim-scenario: v14 attempts ha (request walk) and hb (ports and adapter…"
     },
     {
       "value": {
@@ -652,7 +667,7 @@
       "highlight": [
         "fixtures/anim-scenario"
       ],
-      "caption": "18/20 anim-scenario: v14 attempt hd (this workspace, green with the sheet on …"
+      "caption": "18/21 anim-scenario: v14 attempt hd (this workspace, green with the sheet on …"
     },
     {
       "value": {
@@ -684,7 +699,7 @@
         "docs/reports",
         "anim/src"
       ],
-      "caption": "19/20 anim: v14 — callouts wider than the canvas wrap; hemmed-in group labels…"
+      "caption": "19/21 anim: v14 — callouts wider than the canvas wrap; hemmed-in group labels…"
     },
     {
       "value": {
@@ -716,7 +731,7 @@
       "highlight": [
         "root"
       ],
-      "caption": "20/20 lockfile: vlmkit-anim's optional @mizchi/vlmkit-ai peer (added in v12; …"
+      "caption": "20/21 lockfile: vlmkit-anim's optional @mizchi/vlmkit-ai peer (added in v12; …"
     },
     {
       "value": {
@@ -741,7 +756,51 @@
       "ms": 0
     },
     {
-      "note": "20 commits · 238 files · +18238 −413 · 11 areas, 0 import edges between them"
+      "show": [
+        ".apm/skills",
+        "examples/vlmkit-intro-page",
+        "other (11 areas)"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        "root",
+        "examples/vlmkit-intro-page",
+        "other (11 areas)",
+        "anim"
+      ],
+      "caption": "21/21 Release 0.13.0: stamp the changelog, bump the workspace, restate the ve…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 252
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+18258 −433"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        "root",
+        "examples/vlmkit-intro-page",
+        "other (11 areas)",
+        "anim"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "21 commits · 252 files · +18258 −433 · 14 areas, 0 import edges between them"
     }
   ]
 }
