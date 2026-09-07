@@ -1,0 +1,747 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #135: anim: still figures, layout geometry and the figure against its facts (v12–v14)",
+  "layout": "grid",
+  "canvas": {
+    "width": 1149,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "fixtures/anim-scenario",
+      "label": "fixtures/anim-scenario",
+      "hidden": true
+    },
+    {
+      "id": "anim/src",
+      "label": "anim/src",
+      "hidden": true
+    },
+    {
+      "id": "anim/samples",
+      "label": "anim/samples",
+      "hidden": true
+    },
+    {
+      "id": "docs/diagrams",
+      "label": "docs/diagrams",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "anim",
+      "label": "anim",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "anim/fixtures",
+      "label": "anim/fixtures",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".claude",
+        "docs",
+        "fixtures/anim-scenario",
+        "anim",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "fixtures/anim-scenario",
+        "anim",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "1/20 anim: layout geometry + `review` protocol (v12); annotations place them…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 132
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+12228 −49"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "fixtures/anim-scenario",
+        "anim",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root",
+        "docs/design",
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "root",
+        "docs/design",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "2/20 anim-scenario: v12 report — geometry vs vision readers; arrow heads app…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 149
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+12907 −52"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "root",
+        "docs/design",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "anim/src"
+      ],
+      "caption": "3/20 anim: renderer test follows the arrow-head rule (head only once the str…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 150
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+12912 −53"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "docs/diagrams",
+        "anim/fixtures"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "docs/diagrams",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "4/20 anim: still-figure presets — `modules` kind, diagram `groups`, `still` …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 168
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+13604 −104"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "docs/diagrams",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs/diagrams",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "5/20 anim: layered layout ignores declaration order; architecture still rege…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 170
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+13644 −144"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs/diagrams",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "6/20 anim-scenario: v13 briefs — still figures (module maps, dependency grap…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 174
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+13779 −144"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "7/20 anim-scenario: v13 attempt fe (ports and adapters, haiku)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 178
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+13928 −144"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "8/20 anim-scenario: v13 attempts fb (ports and adapters) and fd (request wal…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 186
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+14380 −145"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "9/20 anim-scenario: v13 attempts fa (workspace map) and fc (import cycle)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 192
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+14906 −145"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "root",
+        "docs",
+        "docs/diagrams",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "caption": "10/20 anim: v13 — lines through text are a layout defect, and the compiler ea…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 202
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+15748 −362"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "root",
+        "docs",
+        "docs/diagrams",
+        "anim",
+        "anim/fixtures",
+        "anim/samples",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs/design",
+        "docs/reports"
+      ],
+      "caption": "11/20 anim: v13 report (draft, confirmation round pending), design note and C…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 203
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+15986 −363"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs/design",
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "12/20 anim-scenario: v13 confirmation attempt gc (request walk, haiku)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 207
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+16100 −363"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "13/20 anim-scenario: v13 confirmation attempt ga (ports and adapters)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 210
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+16280 −363"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "14/20 anim-scenario: v13 confirmation attempt gb (import cycle), writer still…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 213
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+16410 −363"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "caption": "15/20 anim: v13 report complete (confirmation round ga–gc: 3/3 green first ch…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 213
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+16563 −370"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs",
+        "docs/reports",
+        "fixtures/anim-scenario",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "root",
+        "docs",
+        "fixtures/anim-scenario",
+        "anim",
+        "anim/src"
+      ],
+      "caption": "16/20 anim: check --expect — the figure against its facts (modules, deps, for…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 222
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+17293 −398"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "root",
+        "docs",
+        "fixtures/anim-scenario",
+        "anim",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs/diagrams",
+        "docs/reports",
+        "fixtures/anim-scenario"
+      ],
+      "caption": "17/20 anim-scenario: v14 attempts ha (request walk) and hb (ports and adapter…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 231
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+17630 −398"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs/diagrams",
+        "docs/reports",
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/anim-scenario"
+      ],
+      "caption": "18/20 anim-scenario: v14 attempt hd (this workspace, green with the sheet on …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 237
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+18001 −398"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/anim-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "root",
+        "docs",
+        "docs/reports",
+        "anim/src"
+      ],
+      "caption": "19/20 anim: v14 — callouts wider than the canvas wrap; hemmed-in group labels…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 237
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+18235 −413"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "root",
+        "docs",
+        "docs/reports",
+        "anim/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root"
+      ],
+      "caption": "20/20 lockfile: vlmkit-anim's optional @mizchi/vlmkit-ai peer (added in v12; …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 238
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+18238 −413"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "20 commits · 238 files · +18238 −413 · 11 areas, 0 import edges between them"
+    }
+  ]
+}
