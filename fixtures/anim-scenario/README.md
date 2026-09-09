@@ -150,6 +150,14 @@ grey, checked against a diff sheet with `--expect` — and one brief,
 `auth` into a new container and renames `logging`; the sheet fixes the change).
 Writers `oa`–`ob`; a reader reads the fixture's diff figure back.
 
+v23 (2026-09-09) adds `vlmkit-anim import mermaid` and the remark plugin, and
+one brief, `mermaid-import`: two diagrams a repository already has — a
+`sequenceDiagram` with a loop and an alt, and a Markdown page whose mermaid
+`graph` has seven subgraphs — imported, finished (a title, captioned beats)
+and checked, the sequence against the v20 fact sheet. Writers `pa`–`pb`; the
+imports as produced, before any hand, are `v23/pipeline.json` and
+`v23/project-structure.json` (the 32-node one, kept for the density ceiling).
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from

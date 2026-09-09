@@ -1,0 +1,8 @@
+stateDiagram-v2
+  [*] --> Cart
+  Cart --> Checkout: checkout
+  Checkout --> Paid: pay
+  Checkout --> Cart: back
+  Paid --> Shipped: ship
+  Shipped --> [*]
+  state "Payment pending" as Checkout

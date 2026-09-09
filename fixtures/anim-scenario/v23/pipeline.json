@@ -1,0 +1,257 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "nodes": [
+    {
+      "id": "GIT",
+      "label": "Git Diff\n(code change)"
+    },
+    {
+      "id": "PW",
+      "label": "Playwright Execution"
+    },
+    {
+      "id": "PARSE_DIFF",
+      "label": "Parse Unified Diff"
+    },
+    {
+      "id": "DEP_GRAPH",
+      "label": "Dependency Graph\n(TS / MoonBit / Rust)"
+    },
+    {
+      "id": "AFFECTED",
+      "label": "Affected Components"
+    },
+    {
+      "id": "INTENT",
+      "label": "Change Intent\nHeuristic or LLM"
+    },
+    {
+      "id": "SCREENSHOT",
+      "label": "Screenshots\n(current + baseline)"
+    },
+    {
+      "id": "PIXEL_DIFF",
+      "label": "Pixel Diff\n(pixelmatch)"
+    },
+    {
+      "id": "HEATMAP",
+      "label": "Heatmap +\nRegion Detection"
+    },
+    {
+      "id": "VIS_SEM",
+      "label": "Visual Semantic Diff\n- Region classification (text/icon/layout/color)\n- Nature of change (added/removed/moved/restyled)"
+    },
+    {
+      "id": "A11Y_TREE",
+      "label": "A11y Tree Snapshot\n(current + baseline)"
+    },
+    {
+      "id": "A11Y_DIFF",
+      "label": "A11y Tree Diff\n- Node added/removed/changed\n- role, name, state changes"
+    },
+    {
+      "id": "A11Y_SEM",
+      "label": "A11y Semantic Diff\n- ARIA contract validation\n- Navigation structure changes\n- Label/landmark consistency"
+    },
+    {
+      "id": "CROSS",
+      "label": "Cross-Validation\nVisual ↔ A11y consistency check"
+    },
+    {
+      "id": "JUDGE",
+      "label": "Unified Verdict Engine"
+    },
+    {
+      "id": "VERDICTS",
+      "label": "Verdicts\n(approve / reject / escalate)"
+    },
+    {
+      "id": "QC",
+      "label": "Quality Checks"
+    },
+    {
+      "id": "WH",
+      "label": "Whiteout detection"
+    },
+    {
+      "id": "ERR",
+      "label": "Error state detection"
+    },
+    {
+      "id": "COV",
+      "label": "VRT + A11y coverage"
+    },
+    {
+      "id": "A11Y_REG",
+      "label": "A11y regression\n(missing role, lost label)"
+    },
+    {
+      "id": "REPORT",
+      "label": "Verification Report"
+    }
+  ],
+  "edges": [
+    {
+      "from": "GIT",
+      "to": "PARSE_DIFF"
+    },
+    {
+      "from": "PARSE_DIFF",
+      "to": "DEP_GRAPH"
+    },
+    {
+      "from": "DEP_GRAPH",
+      "to": "AFFECTED"
+    },
+    {
+      "from": "PARSE_DIFF",
+      "to": "INTENT"
+    },
+    {
+      "from": "PW",
+      "to": "SCREENSHOT"
+    },
+    {
+      "from": "SCREENSHOT",
+      "to": "PIXEL_DIFF"
+    },
+    {
+      "from": "PIXEL_DIFF",
+      "to": "HEATMAP"
+    },
+    {
+      "from": "HEATMAP",
+      "to": "VIS_SEM"
+    },
+    {
+      "from": "PW",
+      "to": "A11Y_TREE"
+    },
+    {
+      "from": "A11Y_TREE",
+      "to": "A11Y_DIFF"
+    },
+    {
+      "from": "A11Y_DIFF",
+      "to": "A11Y_SEM"
+    },
+    {
+      "from": "VIS_SEM",
+      "to": "CROSS"
+    },
+    {
+      "from": "A11Y_SEM",
+      "to": "CROSS"
+    },
+    {
+      "from": "INTENT",
+      "to": "JUDGE"
+    },
+    {
+      "from": "AFFECTED",
+      "to": "JUDGE"
+    },
+    {
+      "from": "CROSS",
+      "to": "JUDGE"
+    },
+    {
+      "from": "JUDGE",
+      "to": "VERDICTS"
+    },
+    {
+      "from": "VERDICTS",
+      "to": "QC"
+    },
+    {
+      "from": "QC",
+      "to": "WH"
+    },
+    {
+      "from": "QC",
+      "to": "ERR"
+    },
+    {
+      "from": "QC",
+      "to": "COV"
+    },
+    {
+      "from": "QC",
+      "to": "A11Y_REG"
+    },
+    {
+      "from": "QC",
+      "to": "REPORT"
+    }
+  ],
+  "groups": [
+    {
+      "id": "Input",
+      "label": "Input Sources",
+      "nodes": [
+        "GIT",
+        "PW"
+      ]
+    },
+    {
+      "id": "Parallel",
+      "label": "Parallel Pipelines",
+      "nodes": []
+    },
+    {
+      "id": "Track_Intent",
+      "label": "Track 1: Diff Intent",
+      "nodes": [
+        "PARSE_DIFF",
+        "DEP_GRAPH",
+        "AFFECTED",
+        "INTENT"
+      ],
+      "parent": "Parallel"
+    },
+    {
+      "id": "Track_Visual",
+      "label": "Track 2: Visual Semantic Diff",
+      "nodes": [
+        "SCREENSHOT",
+        "PIXEL_DIFF",
+        "HEATMAP",
+        "VIS_SEM"
+      ],
+      "parent": "Parallel"
+    },
+    {
+      "id": "Track_A11y",
+      "label": "Track 3: Accessibility Semantic Diff",
+      "nodes": [
+        "A11Y_TREE",
+        "A11Y_DIFF",
+        "A11Y_SEM"
+      ],
+      "parent": "Parallel"
+    },
+    {
+      "id": "Merge",
+      "label": "Cross-Validation",
+      "nodes": [
+        "CROSS",
+        "JUDGE",
+        "VERDICTS"
+      ]
+    },
+    {
+      "id": "Quality",
+      "label": "Quality Gate",
+      "nodes": [
+        "QC",
+        "WH",
+        "ERR",
+        "COV",
+        "A11Y_REG",
+        "REPORT"
+      ]
+    }
+  ],
+  "layout": "tb"
+}

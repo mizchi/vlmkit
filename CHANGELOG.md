@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.22.0 — 2026-09-09
+
+**`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**
+
+- **`@mizchi/vlmkit-anim/remark`**: a remark plugin with no dependencies of its own — every ```` ```vlm-anim ````
+  fence becomes the `<vlm-anim>` element with its timeline inline (the runtime once per document), a fence
+  marked `still` becomes the figure as inline SVG, and a scene that does not compile becomes a visible
+  `<pre>` with the check's lines rather than a build failure. `renderFence` / `parseFenceMeta` are the same
+  function for markdown-it; the guide has the VitePress recipe.
+- **`vlmkit-anim import mermaid <file.mmd | page.md> [--as …] [--nth N] [--out scene.json]`**: `flowchart` /
+  `graph` → `flowchart` (a decision node present) or `diagram` with subgraphs as groups, nested ones keeping
+  their parent; `sequenceDiagram` → `sequence` with `loop` / `alt` frames and notes; `stateDiagram-v2` →
+  `state-machine` without a trace. Node shapes, edge labels, `&` fans, `<br/>` breaks come through; styles,
+  classDefs, clicks, `opt` / `par` frames, composite states are dropped or changed and named one line each.
+- A `diagram` without a `canvas` is now sized to fit: the picture is laid out once on a unit square and scaled
+  until the tightest pair of neighbours has room (boxes in one layer, containers' paddings over a container
+  edge, an arrow's length between layers). An imported 22-node pipeline was laid out off the default 640×360;
+  a guess from counts was 2989px wide. A container may hold only containers (a subgraph of subgraphs): the
+  validator no longer demands a node of its own.
+- **Nested groups lay out as a tree**: a parent's range is shared out among its children the way the picture is
+  among the roots — a child that owns its layers is a row of the parent, children that share a layer are bands
+  of it. Three tracks under one subgraph were one full-width row with their members spread evenly, and the
+  middle track's widest box crossed both neighbours until the canvas was 2700px (writers pa and pb, v23). The
+  `cluster` layout option is gone; the group tree supersedes it.
+- An edge told to go round a box no longer goes through it when the leg is "mostly horizontal" but arrives
+  from above: `routeAround` tries the box's other pair of sides and its corners and takes the shortest waypoint
+  that clears.
+- `import mermaid` reports a `direction` inside a subgraph (dropped: a scene has one layout) and lists labels
+  over 300px wide in a `notes:` block — the canvas grows to fit the widest label in each layer, and shortening
+  any other changes nothing (three of pa's five rounds). The guide's `kind: diagram` table gains `groups`, and
+  the import section says `--as` is for flowchart / graph sources only.
+- Report: `docs/reports/2026-09-09-anim-ir-v23.md`.
+
 ## 0.21.0 — 2026-09-09
 
 **`vlmkit-anim`: the diff figure — two module maps as one still, with what changed marked.**

@@ -1,0 +1,53 @@
+graph TB
+  subgraph Input["Input Sources"]
+    GIT["Git Diff<br/>(code change)"]
+    PW["Playwright Execution"]
+  end
+
+  subgraph Parallel["Parallel Pipelines"]
+    direction TB
+
+    subgraph Track_Intent["Track 1: Diff Intent"]
+      GIT --> PARSE_DIFF["Parse Unified Diff"]
+      PARSE_DIFF --> DEP_GRAPH["Dependency Graph<br/>(TS / MoonBit / Rust)"]
+      DEP_GRAPH --> AFFECTED["Affected Components"]
+      PARSE_DIFF --> INTENT["Change Intent<br/>Heuristic or LLM"]
+    end
+
+    subgraph Track_Visual["Track 2: Visual Semantic Diff"]
+      PW --> SCREENSHOT["Screenshots<br/>(current + baseline)"]
+      SCREENSHOT --> PIXEL_DIFF["Pixel Diff<br/>(pixelmatch)"]
+      PIXEL_DIFF --> HEATMAP["Heatmap +<br/>Region Detection"]
+      HEATMAP --> VIS_SEM["Visual Semantic Diff<br/>- Region classification (text/icon/layout/color)<br/>- Nature of change (added/removed/moved/restyled)"]
+    end
+
+    subgraph Track_A11y["Track 3: Accessibility Semantic Diff"]
+      PW --> A11Y_TREE["A11y Tree Snapshot<br/>(current + baseline)"]
+      A11Y_TREE --> A11Y_DIFF["A11y Tree Diff<br/>- Node added/removed/changed<br/>- role, name, state changes"]
+      A11Y_DIFF --> A11Y_SEM["A11y Semantic Diff<br/>- ARIA contract validation<br/>- Navigation structure changes<br/>- Label/landmark consistency"]
+    end
+  end
+
+  subgraph Merge["Cross-Validation"]
+    VIS_SEM --> CROSS["Cross-Validation<br/>Visual ↔ A11y consistency check"]
+    A11Y_SEM --> CROSS
+    INTENT --> JUDGE["Unified Verdict Engine"]
+    AFFECTED --> JUDGE
+    CROSS --> JUDGE
+    JUDGE --> VERDICTS["Verdicts<br/>(approve / reject / escalate)"]
+  end
+
+  subgraph Quality["Quality Gate"]
+    VERDICTS --> QC["Quality Checks"]
+    QC --> WH["Whiteout detection"]
+    QC --> ERR["Error state detection"]
+    QC --> COV["VRT + A11y coverage"]
+    QC --> A11Y_REG["A11y regression<br/>(missing role, lost label)"]
+    QC --> REPORT["Verification Report"]
+  end
+
+  style Track_Intent fill:#e8f4f8,stroke:#2196F3
+  style Track_Visual fill:#fff3e0,stroke:#FF9800
+  style Track_A11y fill:#e8f5e9,stroke:#4CAF50
+  style Merge fill:#f3e5f5,stroke:#9C27B0
+  style Quality fill:#fce4ec,stroke:#E91E63

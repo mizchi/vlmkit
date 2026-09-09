@@ -423,7 +423,9 @@ function validateModules(ctx: Ctx, doc: Obj): void {
       if (!isStr(g.id)) ctx.error(`${path}.id`, `a group needs a string "id"`);
       else if (moduleIds.includes(g.id) || groupIds.includes(g.id)) ctx.error(`${path}.id`, `"${g.id}" is already a module or group id`);
       else groupIds.push(g.id);
-      if (ctx.array(g.modules, `${path}.modules`, { minLength: 1 })) {
+      // A container may hold only containers (an imported mermaid subgraph of subgraphs, v23): then no modules of its own.
+      const holdsGroups = isStr(g.id) && (doc.groups as { parent?: unknown }[]).some((h) => isObj(h) && h.parent === g.id);
+      if (ctx.array(g.modules, `${path}.modules`, { minLength: holdsGroups ? 0 : 1 })) {
         g.modules.forEach((m, k) => {
           if (!ctx.ref(m, `${path}.modules[${k}]`, moduleIds, "module")) return;
           const prev = owner.get(m as string);
@@ -468,7 +470,8 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
       if (!isStr(g.id)) ctx.error(`${path}.id`, `a group needs a string "id"`);
       else if (nodeIds.includes(g.id) || groupIds.includes(g.id)) ctx.error(`${path}.id`, `"${g.id}" is already a node or group id`);
       else groupIds.push(g.id);
-      if (ctx.array(g.nodes, `${path}.nodes`, { minLength: 1 })) g.nodes.forEach((n, k) => ctx.ref(n, `${path}.nodes[${k}]`, nodeIds, "node"));
+      const holdsGroups = isStr(g.id) && (doc.groups as { parent?: unknown }[]).some((h) => isObj(h) && h.parent === g.id);
+      if (ctx.array(g.nodes, `${path}.nodes`, { minLength: holdsGroups ? 0 : 1 })) g.nodes.forEach((n, k) => ctx.ref(n, `${path}.nodes[${k}]`, nodeIds, "node"));
     });
     groupParents(ctx, doc.groups, "groups");
   }

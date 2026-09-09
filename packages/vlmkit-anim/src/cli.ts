@@ -32,6 +32,7 @@ import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
 import { checkDiffExpectation, DIFF_SHEET, diffFacts, diffScene, formatDiffFacts, type DiffExpectation } from "./diff.ts";
+import { formatImport, importMermaid, mermaidSource, type ImportAs } from "./import/mermaid.ts";
 import { checkExpectation, EXPECT_SHEET, formatCompared, sceneFacts, validateExpectation, type Expectation } from "./expect.ts";
 import { changeMapScene, workspaceExpectation, workspaceScene } from "./generators/git.ts";
 import { importFacts } from "./generators/imports.ts";
@@ -49,7 +50,7 @@ import { writeVideo, type VideoResult } from "./video.ts";
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers", "--scene"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers", "--scene", "--as", "--nth"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -105,6 +106,13 @@ Commands
                                   with the dependencies that place them there. Writes <out>/repo.scene.json,
                                   repo.gif, repo.sheet.png, repo.md (the explain text with both images embedded)
                                   and repo.expect.json (the fact sheet a hand-drawn map is checked against).
+  import mermaid <diagram.mmd | page.md> [--as diagram|flowchart|modules] [--nth N] [--title T] [--out scene.json]
+                                  A mermaid diagram (or the first \`\`\`mermaid fence of a Markdown page, --nth for
+                                  another) as a scene: flowchart / graph → \`flowchart\` when it has a decision {}
+                                  node, else \`diagram\` with its subgraphs as groups (--as picks); sequenceDiagram
+                                  → \`sequence\` with loop / alt frames and notes; stateDiagram-v2 → \`state-machine\`
+                                  without a trace. Prints what it dropped — styles, classDefs, clicks, frames the IR
+                                  does not have — one line each, then the scene (or --out writes it).
   diff <before.json> <after.json> [--out change.svg|.png] [--scene change.json] [--expect diff.json]
                                   Two module maps as one figure: the after map, with what it added in the accent
                                   colour and what it lost drawn in dashed and grey where it was, a moved or
@@ -326,6 +334,34 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       if (summary.commits !== undefined) console.log(`  ${summary.commits} commit(s), ${summary.files} file(s), +${summary.added} −${summary.removed}, ${(summary.areas as string[]).length} area(s)`);
     }
     return result.ok ? 0 : 1;
+  }
+
+  if (verb === "import") {
+    const [what, srcPath] = positionals;
+    if (what !== "mermaid" || !srcPath) throw new UsageError("vlmkit-anim import mermaid <diagram.mmd | page.md> [--as diagram|flowchart|modules] [--nth N] [--title T] [--out scene.json]");
+    const text = await readFile(srcPath, "utf-8");
+    const src = mermaidSource(text, readInt(rest, "--nth", { min: 0 }) ?? 0);
+    if (!src) throw new UsageError(`${basename(srcPath)} has no \`\`\`mermaid fence and is not a mermaid diagram (flowchart / graph, sequenceDiagram, stateDiagram-v2 are read)`);
+    const as = readFlag(rest, "--as") as ImportAs | undefined;
+    if (as && !["diagram", "flowchart", "modules"].includes(as)) throw new UsageError(`--as takes diagram, flowchart or modules; not "${as}"`);
+    const result = importMermaid(src, { as, title: readFlag(rest, "--title") });
+    const out = readFlag(rest, "--out");
+    const sceneText = JSON.stringify(result.scene, null, 2) + "\n";
+    if (out) {
+      await mkdir(dirname(resolve(out)), { recursive: true });
+      await writeFile(out, sceneText);
+    }
+    // What the scene says now, so the writer sees the first `check` without running it.
+    const diags = validateDocument(result.scene).diagnostics;
+    if (json) console.log(JSON.stringify({ source: srcPath, out, kind: result.scene.kind, from: result.source, counts: result.counts, dropped: result.dropped, diagnostics: diags, scene: out ? undefined : result.scene }, null, 2));
+    else {
+      console.log(formatImport(result));
+      if (out) console.log(`wrote ${out}`);
+      else process.stdout.write(sceneText);
+      printDiagnostics(diags, false);
+      console.log(`next: vlmkit-anim check ${out ?? "scene.json"}${result.scene.kind === "state-machine" ? " — after adding a trace" : result.scene.kind === "flowchart" ? " — add a walk for the token" : ""}`);
+    }
+    return hasErrors(diags) ? 1 : 0;
   }
 
   if (verb === "diff") {
