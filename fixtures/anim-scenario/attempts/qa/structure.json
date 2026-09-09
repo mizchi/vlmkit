@@ -1,0 +1,331 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "layout": "tb",
+  "nodes": [
+    {
+      "id": "user",
+      "label": "User / Coding Agent"
+    },
+    {
+      "id": "vlmkit"
+    },
+    {
+      "id": "diff",
+      "label": "diff\nhtml / png\nelements / browsers\nagent / runs"
+    },
+    {
+      "id": "snapshot",
+      "label": "snapshot\ncapture\napprove\nstability\nreport\nflipbook\nfix-prompt"
+    },
+    {
+      "id": "check",
+      "label": "check\na11y / tokens\ntheme / perf\ndrift"
+    },
+    {
+      "id": "inspect",
+      "label": "inspect\ninteract / explore\nsmoke"
+    },
+    {
+      "id": "markup_cli",
+      "label": "build\nscan\nstress\ncomponent\nbreakpoints\ni18n\nmedia"
+    },
+    {
+      "id": "migration",
+      "label": "migration\ncompare / blind\nsubagent"
+    },
+    {
+      "id": "labs",
+      "label": "bench / report\nCSS challenge lab"
+    },
+    {
+      "id": "api_cli",
+      "label": "api\nserve / status"
+    },
+    {
+      "id": "workflow",
+      "label": "workflow\ninit / capture\nverify / approve"
+    },
+    {
+      "id": "hono",
+      "label": "Hono API app"
+    },
+    {
+      "id": "compare_api",
+      "label": "/api/compare"
+    },
+    {
+      "id": "renderers_api",
+      "label": "/api/compare-renderers"
+    },
+    {
+      "id": "reason_api",
+      "label": "/api/reason"
+    },
+    {
+      "id": "smoke_api",
+      "label": "/api/smoke-test"
+    },
+    {
+      "id": "openapi",
+      "label": "OpenAPI"
+    },
+    {
+      "id": "worker",
+      "label": "Cloudflare Worker entry"
+    },
+    {
+      "id": "core",
+      "label": "@mizchi/vlmkit-core\nPNG diff / heatmap\nDOM / style\na11y / quality"
+    },
+    {
+      "id": "capture",
+      "label": "@mizchi/vlmkit-capture\nPlaywright / Crater\nviewport discovery / config"
+    },
+    {
+      "id": "markup",
+      "label": "@mizchi/vlmkit-markup\ncomponent / design tokens\ntheme / inspect\nstress / heal"
+    },
+    {
+      "id": "ai",
+      "label": "@mizchi/vlmkit-ai\nVLM / LLM clients\nreasoning / intent"
+    },
+    {
+      "id": "playwright",
+      "label": "Playwright Chromium"
+    },
+    {
+      "id": "crater",
+      "label": "Crater BiDi"
+    },
+    {
+      "id": "cloudflare",
+      "label": "Cloudflare Browser Rendering"
+    },
+    {
+      "id": "llm",
+      "label": "OpenRouter / Gemini\nAnthropic"
+    },
+    {
+      "id": "storage",
+      "label": "R2 / KV\nD1 bindings"
+    },
+    {
+      "id": "pngs",
+      "label": "baseline / current\nheatmap PNG"
+    },
+    {
+      "id": "json",
+      "label": "diff-report.json\nsnapshot-report.json\nstability-report.json"
+    },
+    {
+      "id": "md",
+      "label": "agent Markdown\nfix prompt\nsummary report"
+    },
+    {
+      "id": "html",
+      "label": "flipbook HTML"
+    },
+    {
+      "id": "baselines",
+      "label": "baselines / snapshots\napproval manifests"
+    }
+  ],
+  "edges": [
+    {
+      "from": "user",
+      "to": "vlmkit"
+    },
+    {
+      "from": "vlmkit",
+      "to": "diff"
+    },
+    {
+      "from": "vlmkit",
+      "to": "snapshot"
+    },
+    {
+      "from": "vlmkit",
+      "to": "check"
+    },
+    {
+      "from": "vlmkit",
+      "to": "inspect"
+    },
+    {
+      "from": "vlmkit",
+      "to": "markup_cli"
+    },
+    {
+      "from": "vlmkit",
+      "to": "migration"
+    },
+    {
+      "from": "vlmkit",
+      "to": "labs"
+    },
+    {
+      "from": "vlmkit",
+      "to": "api_cli"
+    },
+    {
+      "from": "vlmkit",
+      "to": "workflow"
+    },
+    {
+      "from": "api_cli",
+      "to": "hono"
+    },
+    {
+      "from": "hono",
+      "to": "openapi"
+    },
+    {
+      "from": "hono",
+      "to": "compare_api"
+    },
+    {
+      "from": "hono",
+      "to": "renderers_api"
+    },
+    {
+      "from": "hono",
+      "to": "reason_api"
+    },
+    {
+      "from": "hono",
+      "to": "smoke_api"
+    },
+    {
+      "from": "worker",
+      "to": "hono"
+    },
+    {
+      "from": "diff",
+      "to": "core"
+    },
+    {
+      "from": "snapshot",
+      "to": "core"
+    },
+    {
+      "from": "check",
+      "to": "core"
+    },
+    {
+      "from": "workflow",
+      "to": "core"
+    },
+    {
+      "from": "migration",
+      "to": "core"
+    },
+    {
+      "from": "labs",
+      "to": "core"
+    },
+    {
+      "from": "compare_api",
+      "to": "core"
+    },
+    {
+      "from": "diff",
+      "to": "capture"
+    },
+    {
+      "from": "snapshot",
+      "to": "capture"
+    },
+    {
+      "from": "workflow",
+      "to": "capture"
+    },
+    {
+      "from": "renderers_api",
+      "to": "capture"
+    },
+    {
+      "from": "smoke_api",
+      "to": "capture"
+    },
+    {
+      "from": "check",
+      "to": "markup"
+    },
+    {
+      "from": "inspect",
+      "to": "markup"
+    },
+    {
+      "from": "markup_cli",
+      "to": "markup"
+    },
+    {
+      "from": "migration",
+      "to": "markup"
+    },
+    {
+      "from": "smoke_api",
+      "to": "markup"
+    },
+    {
+      "from": "reason_api",
+      "to": "ai"
+    },
+    {
+      "from": "migration",
+      "to": "ai"
+    },
+    {
+      "from": "labs",
+      "to": "ai"
+    },
+    {
+      "from": "capture",
+      "to": "playwright"
+    },
+    {
+      "from": "capture",
+      "to": "crater"
+    },
+    {
+      "from": "capture",
+      "to": "cloudflare"
+    },
+    {
+      "from": "ai",
+      "to": "llm"
+    },
+    {
+      "from": "worker",
+      "to": "storage"
+    },
+    {
+      "from": "core",
+      "to": "pngs"
+    },
+    {
+      "from": "core",
+      "to": "json"
+    },
+    {
+      "from": "markup",
+      "to": "md"
+    },
+    {
+      "from": "snapshot",
+      "to": "html"
+    },
+    {
+      "from": "workflow",
+      "to": "baselines"
+    }
+  ],
+  "title": "vlmkit \u2014 request path from CLI to backends",
+  "sequence": [
+    {
+      "flow": "user->vlmkit",
+      "caption": "One request end-to-end through the CLI, the HTTP API, the workspace packages, and the backends/artifacts they use."
+    }
+  ]
+}

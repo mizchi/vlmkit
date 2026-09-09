@@ -1,0 +1,185 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "VLMKit Architecture",
+  "modules": [
+    {
+      "id": "user",
+      "label": "User"
+    },
+    {
+      "id": "vlmkit",
+      "label": "vlmkit"
+    },
+    {
+      "id": "diff",
+      "label": "diff"
+    },
+    {
+      "id": "snapshot",
+      "label": "snapshot"
+    },
+    {
+      "id": "check",
+      "label": "check"
+    },
+    {
+      "id": "inspect",
+      "label": "inspect"
+    },
+    {
+      "id": "markup_cli",
+      "label": "build"
+    },
+    {
+      "id": "migration",
+      "label": "migration"
+    },
+    {
+      "id": "labs",
+      "label": "labs"
+    },
+    {
+      "id": "api_cli",
+      "label": "api"
+    },
+    {
+      "id": "workflow",
+      "label": "workflow"
+    },
+    {
+      "id": "hono",
+      "label": "Hono"
+    },
+    {
+      "id": "openapi",
+      "label": "OpenAPI"
+    },
+    {
+      "id": "compare_api",
+      "label": "/compare"
+    },
+    {
+      "id": "renderers_api",
+      "label": "/renderers"
+    },
+    {
+      "id": "reason_api",
+      "label": "/reason"
+    },
+    {
+      "id": "smoke_api",
+      "label": "/smoke"
+    },
+    {
+      "id": "worker",
+      "label": "Worker"
+    },
+    {
+      "id": "core",
+      "label": "core"
+    },
+    {
+      "id": "capture",
+      "label": "capture"
+    },
+    {
+      "id": "markup",
+      "label": "markup"
+    },
+    {
+      "id": "ai",
+      "label": "ai"
+    },
+    {
+      "id": "playwright",
+      "label": "Playwright"
+    },
+    {
+      "id": "crater",
+      "label": "Crater"
+    },
+    {
+      "id": "cloudflare",
+      "label": "Cloudflare"
+    },
+    {
+      "id": "llm",
+      "label": "LLM"
+    },
+    {
+      "id": "storage",
+      "label": "Storage"
+    },
+    {
+      "id": "pngs",
+      "label": "PNGs"
+    },
+    {
+      "id": "json",
+      "label": "JSON"
+    },
+    {
+      "id": "md",
+      "label": "Markdown"
+    },
+    {
+      "id": "html",
+      "label": "HTML"
+    },
+    {
+      "id": "baselines",
+      "label": "Baselines"
+    }
+  ],
+  "deps": [
+    ["user", "vlmkit"],
+    ["vlmkit", "diff"],
+    ["vlmkit", "snapshot"],
+    ["vlmkit", "check"],
+    ["vlmkit", "inspect"],
+    ["vlmkit", "markup_cli"],
+    ["vlmkit", "migration"],
+    ["vlmkit", "labs"],
+    ["vlmkit", "api_cli"],
+    ["vlmkit", "workflow"],
+    ["api_cli", "hono"],
+    ["hono", "openapi"],
+    ["hono", "compare_api"],
+    ["hono", "renderers_api"],
+    ["hono", "reason_api"],
+    ["hono", "smoke_api"],
+    ["worker", "hono"],
+    ["diff", "core"],
+    ["snapshot", "core"],
+    ["check", "core"],
+    ["workflow", "core"],
+    ["migration", "core"],
+    ["labs", "core"],
+    ["compare_api", "core"],
+    ["diff", "capture"],
+    ["snapshot", "capture"],
+    ["workflow", "capture"],
+    ["renderers_api", "capture"],
+    ["smoke_api", "capture"],
+    ["check", "markup"],
+    ["inspect", "markup"],
+    ["markup_cli", "markup"],
+    ["migration", "markup"],
+    ["smoke_api", "markup"],
+    ["reason_api", "ai"],
+    ["migration", "ai"],
+    ["labs", "ai"],
+    ["capture", "playwright"],
+    ["capture", "crater"],
+    ["capture", "cloudflare"],
+    ["ai", "llm"],
+    ["worker", "storage"],
+    ["core", "pngs"],
+    ["core", "json"],
+    ["markup", "md"],
+    ["snapshot", "html"],
+    ["workflow", "baselines"]
+  ],
+  "layout": "tb"
+}

@@ -155,6 +155,7 @@ vlmkit-anim facts packages/x/src --depth 1 --out x.expect.json   # a fact sheet 
 vlmkit-anim diff before.json after.json --out change.svg --expect diff.json   # two module maps as one figure: added in accent, removed dashed grey; the change checked against a diff sheet (v22)
 vlmkit-anim import mermaid docs/page.md --out scene.json   # a flowchart / graph, sequenceDiagram or stateDiagram-v2 the repo already has, as a scene; says what it dropped (v23; `@mizchi/vlmkit-anim/remark` embeds ```vlm-anim fences)
 vlmkit-anim layout scene.json                       # texts on texts / under boxes / past the edge / lines through texts, per step, from the timeline (also warnings in `check`)
+vlmkit-anim why scene.json [--about id]             # the compiler's account of a modules / diagram picture: the pair of boxes that set each canvas axis, rows vs bands and their share, what put each box on its layer, which box an edge bent round (v24)
 vlmkit-anim review scene.json --out dir [--model M | --answers a.json]   # contact sheet + review brief for a vision model or an agent; scores its JSON against `layout`
 vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture   # the workspace drawn layer by layer (pnpm anim:diagrams regenerates docs/diagrams/)
 vlmkit-anim pr --base origin/main --out .vlmkit-anim/pr           # the change map of a branch: one beat per commit, areas + import edges + counts; <name>.md is paste-ready
@@ -224,7 +225,12 @@ dependency-free remark plugin turns ```vlm-anim fences into the runtime or a sti
 sequenceDiagram and stateDiagram-v2 into scenes naming what it dropped; the sequence import matched its fact sheet with no edit, the
 22-node pipeline was faithful and laid out at 2989px, and the three compiler defects under that one warning — a canvas guessed from
 counts, a parent's children spread evenly through one band, a detour routed through the box — were fixed until the import as-is is a
-clean 1751px figure; a 32-node graph at 13277px names the next layout change, band widths by content, and the first case for `why`).
+clean 1751px figure; a 32-node graph at 13277px names the next layout change, band widths by content, and the first case for `why`),
+`docs/reports/2026-09-09-anim-ir-v24.md` (`vlmkit-anim why`: the compiler's account of a modules / diagram picture — the pair of boxes that
+set each canvas axis, rows vs bands and their share, what put each box on its layer, which box an edge bent round — and bands sized by their
+fullest layer's boxes (13277px → 8882px on the 32-node graph); two writers read the banding cause off `why` before their first edit and
+brought the graph to 1805px and 1806px, both asking for the cause in `check`'s warning itself, which it now carries; the module map's own
+count-based canvas guess was replaced by the shared estimator after a kind switch moved a writer's canvas from 986px to 1806px).
 
 ## Measuring Gate / Rule Execution Cost
 

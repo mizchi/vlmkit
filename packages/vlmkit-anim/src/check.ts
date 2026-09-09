@@ -114,7 +114,17 @@ export function checkTimeline(tl: Timeline): Diagnostic[] {
     const shrink = Math.round(Math.min(1280 / width, 720 / height) * 100);
     const kind = tl.meta?.kind;
     const layouts = kind === "modules" || kind === "diagram" ? '"layout": "tb" or "lr"' : kind === "state-machine" || kind === "graph" ? '"layout": "tb", "lr" or "circle"' : "another layout";
-    out.push(warn("canvas", `the canvas is ${width}×${height}: its ${over} is over ${WIDE}px, so on a 1280×720 screen it shrinks to ${shrink}% and labels stop being legible`, `bring the ${over} under ${WIDE}px: ${layouts}, shorter labels, or split the scene`));
+    // What set the axis, when the compiler recorded it (v24): the pair of boxes and the room between them — the
+    // lever is one of those two labels or the structure that put them that far apart, not any other label.
+    const whys = (tl.meta as { why?: { kind: string; about: string; says: string; n?: number; across?: boolean }[] } | undefined)?.why ?? [];
+    const why = whys.find((w) => w.kind === "canvas" && w.about === over);
+    // …and the structure behind the pair, when there is one: the containers that sit side by side across the
+    // picture, each as wide as its fullest layer (qb, v24: "the warning named workflow as the culprit but did not
+    // explain that the real issue was banding — five groups sharing layers").
+    const bands = whys.filter((w) => w.kind === "band" && / of the picture — shares layers with /.test(w.says));
+    const banding = why?.across && bands.length > 1 ? `; ${bands.length} containers sit side by side across the picture (${bands.map((b) => `${b.about || "the ungrouped"} ${b.n}%`).join(", ")}), each as wide as its fullest layer's boxes` : "";
+    const cause = why ? ` — ${why.says.replace(/^(width|height) \d+: /, "")}${banding}` : "";
+    out.push(warn("canvas", `the canvas is ${width}×${height}: its ${over} is over ${WIDE}px, so on a 1280×720 screen it shrinks to ${shrink}% and labels stop being legible${cause}`, `bring the ${over} under ${WIDE}px: ${layouts}, shorter labels, or split the scene${why ? " — `vlmkit-anim why` has every layer, band and detour" : ""}`));
   }
   // Steps without captions are legal but explain nothing.
   const steps = tl.steps ?? [];
@@ -304,7 +314,7 @@ function checkDiagram(scene: Extract<Scene, { kind: "diagram" }>, tl: Timeline):
   const shown = new Set<string>();
   for (const st of scene.sequence ?? []) if ("show" in st) for (const id of Array.isArray(st.show) ? st.show : [st.show]) shown.add(id);
   for (const n of scene.nodes) if (n.hidden && !shown.has(n.id)) out.push(warn(`nodes(${n.id})`, `"${n.id}" is hidden and no step shows it: it never appears`, `add {"show": "${n.id}"} to "sequence" or drop "hidden"`));
-  if ((scene.sequence ?? []).length === 0) out.push(warn("sequence", "no sequence: the diagram is a still image", "add steps such as {\"highlight\": \"a\", \"caption\": \"…\"} or {\"flow\": \"a->b\"}"));
+  if ((scene.sequence ?? []).length === 0) out.push(warn("sequence", "no sequence: the diagram is a still image", "add steps such as {\"highlight\": \"a\", \"caption\": \"…\"} or {\"flow\": \"a->b\"} — or make it \"kind\": \"modules\" when the picture, not the motion, is the point: a module map is a still and check does not ask it to move"));
   void tl;
   return out;
 }
@@ -514,6 +524,7 @@ function checkCompose(scene: Extract<Scene, { kind: "compose" }>): Diagnostic[] 
  * when one is reported on an annotation's node it is the compiler's to fix, and the hint says so.
  */
 export function checkLayout(tl: Timeline): Diagnostic[] {
+  const edgeEnds = (id: string): string | undefined => (tl.meta as { edges?: Record<string, string> } | undefined)?.edges?.[id];
   const report = layoutReport(tl);
   const seen = new Map<string, { first: LayoutFrame; issue: LayoutIssue; more: number }>();
   for (const f of report.frames) {
@@ -542,7 +553,10 @@ export function checkLayout(tl: Timeline): Diagnostic[] {
           : kind === "state-machine"
             ? "a transition runs through a state or a label that is not one of its ends — reorder `states` (ties in `lr` / `tb` follow the list) or try another `layout`"
             : "an edge runs through a box that is not one of its ends — reorder the modules in that layer, put the two in one group, or shorten the label so the layout has room";
-      out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" has a line through it (${issue.nodes[1]}, ${issue.amount}px) ${where}`, edgeHint));
+      // The edge by its ends, not only its id (qa, v24: "the crossing warning names an edge only by opaque id
+      // (`edge-18`), not its endpoints, even though `why`'s detours section already prints edges as (from → to)").
+      const ends = edgeEnds(issue.nodes[1]);
+      out.push(warn(`nodes(${issue.nodes[0]})`, `"${issue.texts[0]}" has a line through it (${issue.nodes[1]}${ends ? `: ${ends}` : ""}, ${issue.amount}px) ${where}`, edgeHint));
     } else if (issue.kind === "boxes") {
       out.push(
         warn(

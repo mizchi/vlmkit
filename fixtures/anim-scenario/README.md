@@ -158,6 +158,12 @@ and checked, the sequence against the v20 fact sheet. Writers `pa`–`pb`; the
 imports as produced, before any hand, are `v23/pipeline.json` and
 `v23/project-structure.json` (the 32-node one, kept for the density ceiling).
 
+v24 (2026-09-09) adds `vlmkit-anim why` and one brief, `why-figure`: the
+32-node import, 8882px wide with lines through labels, to be brought under
+2000px on both sides and `layout` clean without losing a node or an edge (the
+sheet is `facts/project-structure-facts.expect.json`). The log asks, per
+round, *what told you* that was the thing to change. Writers `qa`–`qb`.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from

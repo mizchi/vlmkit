@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.23.0 — 2026-09-09
+
+**`vlmkit-anim why`: the compiler's account of the picture.**
+
+- **`vlmkit-anim why scene.json [--about id] [--json]`**: for a `modules` or `diagram` scene, what set each canvas
+  axis (the pair of boxes, the room they needed between their centres, how far apart the layout put them), which
+  containers are rows and which are bands (each band's share and its fullest layer, in pixels of boxes), what put
+  every box on its layer (the one edge, or "nothing drawn points into it"), which box each bent edge went round
+  and on which side, and the annotations that did not land on the side they asked for. Collected while
+  compiling into `Timeline.meta.why`; kinds that lay out by their own rule have nothing to explain and say so.
+- **`check`'s canvas warning quotes the pair that set the axis** and, when containers sit side by side across
+  it, their count and shares ("6 containers sit side by side across the picture (cli 40%, api 10%, …), each as
+  wide as its fullest layer's boxes") — the two levers a writer has are those two labels or the structure that
+  put them that far apart; shortening any other label changes nothing (v23's writer pa spent three of five
+  rounds on labels that were never the widest, and found the pair by dumping the SVG's rects; both v24 writers
+  read the banding off `why` and asked for it in the warning). A crossing names its edge by its ends
+  (`edge-24: diff → capture`), and the "no sequence" warning on a `diagram` offers `kind: modules`.
+- **Bands are sized by content**: a container that shares a layer with another gets a share of the cross axis
+  proportional to the sum of its fullest layer's boxes, not their count, and the boxes in a layer share the band
+  in proportion. Nine CLI commands in one layer had taken nine of twenty-six equal slots, the widest pair set
+  the slot for all twenty-six, and a 32-node import was 13277px wide; it is 8882px now — still over the
+  warning, and `why` names the layer that sets it. The imported pipeline went from 1751px to 1583px; the corpus
+  of 98 scenes is unchanged in `layout`.
+- **One canvas estimator for `modules` and `diagram`**: a module map's canvas was a count-based guess of its
+  own, and switching a writer's `diagram` to `modules` moved the canvas from 986px to 1806px with nothing else
+  changed (qb, v24). `normalizeModules` no longer sizes the canvas; the diagram compiler's pairwise estimate does,
+  keeping the module map's former room as a floor (below it a relation's arc and two dependency arrows ran
+  through labels on three corpus maps). Two boxes across a container edge keep their outermost containers'
+  paddings apart, not the innermost groups' (siblings under one parent 14px each, different roots the roots').
+- Guide: `## Asking why`; the two axes grow for different reasons and `layout` only swaps them; switching
+  `diagram` to `modules` changes the layering rule (forward from what points at a box vs backward from what it
+  depends on) and can move the widest layer (qa, v24: 4615px → 7031px on the kind change alone).
+- Report: `docs/reports/2026-09-09-anim-ir-v24.md`.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**

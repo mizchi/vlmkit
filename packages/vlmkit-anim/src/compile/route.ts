@@ -5,6 +5,8 @@
  * states until it happened not to).
  */
 
+import type { WhyEntry } from "./why.ts";
+
 export type Box = { x: number; y: number; w: number; h: number };
 export type Seg = [[number, number], [number, number]];
 
@@ -39,7 +41,7 @@ const along = (a: [number, number], c: [number, number], f: number): [number, nu
  * Passes repeat while a new leg finds a new box (at most four). `blockers` are every box that could be in the
  * way, the edge's own ends included; they are skipped by id.
  */
-export function routeAround(from: [number, number], to: [number, number], blockers: { id: string; box: Box }[], ends: Set<string>): [number, number][] {
+export function routeAround(from: [number, number], to: [number, number], blockers: { id: string; box: Box }[], ends: Set<string>, why?: WhyEntry[], label?: string): [number, number][] {
   let pts: [number, number][] = [from, to];
   const routed = new Set<string>();
   for (let pass = 0; pass < 4; pass++) {
@@ -88,6 +90,7 @@ export function routeAround(from: [number, number], to: [number, number], blocke
         // A leg at 30° from above right to below left is "mostly horizontal", but a waypoint under the box is
         // reached through the box; round the box's other pair of sides then, and failing that past the corner
         // nearest the leg (v23: an a11y arrow into the merge box ran through the visual track's widest node).
+        let how = found ? (steep ? (low ? "left of" : "right of") : low ? "above" : "below") : "";
         if (!found) {
           const side = (vertical: boolean, low: boolean, margin: number): [number, number] =>
             vertical ? [low ? box.x - margin : box.x + box.w + margin, box.y + box.h / 2] : [box.x + box.w / 2, low ? box.y - margin : box.y + box.h + margin];
@@ -98,8 +101,12 @@ export function routeAround(from: [number, number], to: [number, number], blocke
             [box.x + box.w + m, box.y + box.h + m],
           ]);
           const candidates: [number, number][] = [...[14, 26, 40].flatMap((m) => [side(!steep, true, m), side(!steep, false, m)]), ...corners].filter(clears);
-          if (candidates.length) w = candidates.reduce((best, cand) => (length(cand) < length(best) ? cand : best));
+          if (candidates.length) {
+            w = candidates.reduce((best, cand) => (length(cand) < length(best) ? cand : best));
+            how = w[1] === box.y + box.h / 2 ? (w[0] < box.x ? "left of" : "right of") : w[0] === box.x + box.w / 2 ? (w[1] < box.y ? "above" : "below") : `past the ${w[1] < box.y ? "top" : "bottom"}-${w[0] < box.x ? "left" : "right"} corner of`;
+          } else how = "through (no waypoint clears)";
         }
+        if (why) why.push({ kind: "route", about: label ?? "", says: `${label ?? "an edge"}: bends ${how} ${n.id} — the straight line ran ${Math.round(segmentInside([a, c], box))}px through its box`, ids: [n.id], n: Math.round(segmentInside([a, c], box)) });
         next.push(w);
       }
       next.push(c);

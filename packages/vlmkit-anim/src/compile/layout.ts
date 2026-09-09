@@ -7,6 +7,8 @@
  * them.
  */
 
+import { say, type WhyEntry } from "./why.ts";
+
 /** A container for the layout: its own nodes and, when groups nest, the groups inside it. */
 export interface LayoutGroup {
   id: string;
@@ -35,6 +37,15 @@ export interface LayoutInput {
    * as a dependency map reads: two modules with the same dependencies share a layer whatever depends on them.
    */
   layering?: "sources" | "sinks";
+  /**
+   * A node's size across the layers (its width in `tb`, its height in `lr`). When given, a band is as wide
+   * as the sum of its fullest layer's boxes rather than their count, and the boxes in a layer share the band
+   * in proportion (v24: nine CLI commands in one layer took nine of twenty-six equal slots, and the widest
+   * pair set the slot for all twenty-six — 13277px).
+   */
+  sizeOf?: (id: string) => number;
+  /** Where to say why: a node's layer and what set it, a group's row or band and its share. */
+  why?: WhyEntry[];
 }
 
 export type LayoutMode = "lr" | "tb" | "grid" | "circle";
@@ -153,6 +164,23 @@ export function layoutNodes(input: LayoutInput, mode: LayoutMode): Map<string, [
   const layerKeys = [...byLayer.keys()].sort((a, b) => a - b);
   const nLayers = layerKeys.length;
   const ordered = layerKeys.map((l) => byLayer.get(l)!);
+  if (input.why) {
+    // What put a node on its layer: the neighbour one layer before it along an edge (a longest path has one).
+    const from = input.layering ?? "sources";
+    const layerNo = (id: string) => layerKeys.indexOf(layerOf.get(id) ?? 0) + 1;
+    for (const id of free) {
+      const l = layerNo(id);
+      const setter = edges.find(([a, b]) => (from === "sources" ? b === id && layerNo(a) === l - 1 : a === id && layerNo(b) === l + 1));
+      const other = setter ? (from === "sources" ? setter[0] : setter[1]) : undefined;
+      const says =
+        other === undefined
+          ? `${id}: layer ${l} of ${nLayers} — ${from === "sources" ? "nothing drawn points into it" : "it depends on nothing drawn"}`
+          : from === "sources"
+            ? `${id}: layer ${l} of ${nLayers} — one past ${other} (${other} → ${id})`
+            : `${id}: layer ${l} of ${nLayers} — one before ${other}, which it depends on (${id} → ${other})`;
+      say(input.why, { kind: "layer", about: id, says, ids: other ? [other] : [], n: l });
+    }
+  }
   const place = (id: string, main: number, cross: number): void => {
     if (mode === "lr") pos.set(id, [Math.round(main * width), Math.round(cross * height)]);
     else pos.set(id, [Math.round(cross * width), Math.round(main * height)]);
@@ -169,7 +197,17 @@ export function layoutNodes(input: LayoutInput, mode: LayoutMode): Map<string, [
     // as its fullest layer, the ungrouped last. Inside a group the same rule places its own nodes and its
     // children (v23: a parent's children were spread evenly through the parent's band, so two sibling
     // containers crossed wherever one child's layer was wider than another's).
-    const assign = (members: string[], groups: LayoutGroup[], lo: number, hi: number): void => {
+    const size = (id: string) => input.sizeOf?.(id) ?? 1;
+    // The members of a cell share its range in proportion to their sizes (all 1 without `sizeOf`: evenly).
+    const spread = (cell: string[], blo: number, bhi: number): void => {
+      const total = cell.reduce((sum, id) => sum + size(id), 0) || 1;
+      let cum = 0;
+      for (const id of cell) {
+        place(id, mainOf(li(id)), blo + ((cum + size(id) / 2) / total) * (bhi - blo));
+        cum += size(id);
+      }
+    };
+    const assign = (members: string[], groups: LayoutGroup[], lo: number, hi: number, within?: string): void => {
       const here = new Set(members);
       const bandOf = new Map<string, LayoutGroup>();
       for (const g of groups) for (const n of allMembers(g)) if (here.has(n) && !bandOf.has(n)) bandOf.set(n, g);
@@ -190,36 +228,61 @@ export function layoutNodes(input: LayoutInput, mode: LayoutMode): Map<string, [
         const crossed = [...span].some(([h, [lo2, hi2]]) => h !== g && lo2 < glo && hi2 > ghi);
         if (!crossed) exclusive.add(g);
       }
+      const where = within ? `inside ${within}` : "of the picture";
       // What goes where at this level: a row group's members within the whole range, recursively; a band
       // group's within its band; the ungrouped in the last band.
+      const cellsOf = (mine: string[]): string[][] => {
+        const cells = new Map<number, string[]>();
+        for (const id of ordered.flat()) if (mine.includes(id)) cells.set(li(id), [...(cells.get(li(id)) ?? []), id]);
+        return [...cells.values()];
+      };
       const inside = (g: LayoutGroup, blo: number, bhi: number): void => {
         const mine = members.filter((id) => bandOf.get(id) === g);
-        if (g.children?.length) assign(mine, g.children, blo, bhi);
-        else {
-          const cells = new Map<number, string[]>();
-          for (const id of ordered.flat()) if (mine.includes(id)) cells.set(li(id), [...(cells.get(li(id)) ?? []), id]);
-          for (const cell of cells.values()) cell.forEach((id, mi) => place(id, mainOf(li(id)), blo + ((mi + 0.5) / cell.length) * (bhi - blo)));
-        }
+        if (g.children?.length) assign(mine, g.children, blo, bhi, g.id);
+        else for (const cell of cellsOf(mine)) spread(cell, blo, bhi);
       };
-      for (const g of exclusive) inside(g, lo, hi);
+      for (const g of exclusive) {
+        const [glo, ghi] = span.get(g)!;
+        say(input.why, { kind: "row", about: g.id, says: `${g.id}: a row ${where} — layer${glo === ghi ? ` ${glo + 1}` : `s ${glo + 1}–${ghi + 1}`} hold${glo === ghi ? "s" : ""} nothing else${within ? ` of ${within}` : ""}`, n: ghi - glo + 1 });
+        inside(g, lo, hi);
+      }
       const bands: (LayoutGroup | " none")[] = [...groups.filter((g) => span.has(g) && !exclusive.has(g)), " none"];
+      // A band is as wide as its fullest layer: the sum of that layer's sizes (its count, without `sizeOf`).
       const bandSize = new Map<LayoutGroup | " none", number>();
+      const fullest = new Map<LayoutGroup | " none", string[]>();
       for (const b of bands) {
         const mine = members.filter((id) => (b === " none" ? !bandOf.has(id) : bandOf.get(id) === b));
-        const perLayer = new Map<number, number>();
-        for (const id of mine) perLayer.set(li(id), (perLayer.get(li(id)) ?? 0) + 1);
-        if (mine.length) bandSize.set(b, Math.max(...perLayer.values()));
+        for (const cell of cellsOf(mine)) {
+          const w = cell.reduce((sum, id) => sum + size(id), 0);
+          if (w > (bandSize.get(b) ?? 0)) {
+            bandSize.set(b, w);
+            fullest.set(b, cell);
+          }
+        }
       }
       const used = bands.filter((b) => bandSize.has(b));
       const total = Math.max(1, used.reduce((sum, b) => sum + bandSize.get(b)!, 0));
       let start = lo;
       for (const b of used) {
         const width = ((hi - lo) * bandSize.get(b)!) / total;
-        if (b === " none") {
-          const cells = new Map<number, string[]>();
-          for (const id of ordered.flat()) if (here.has(id) && !bandOf.has(id)) cells.set(li(id), [...(cells.get(li(id)) ?? []), id]);
-          for (const cell of cells.values()) cell.forEach((id, mi) => place(id, mainOf(li(id)), start + ((mi + 0.5) / cell.length) * width));
-        } else inside(b, start, start + width);
+        if (input.why) {
+          const name = b === " none" ? (within ? `${within}'s own nodes` : "the ungrouped nodes") : b.id;
+          const others = used.filter((o) => o !== b).map((o) => (o === " none" ? (within ? `${within}'s own nodes` : "the ungrouped") : o.id));
+          const cell = fullest.get(b)!;
+          const px = input.sizeOf ? ` (${Math.round(bandSize.get(b)!)}px of boxes)` : "";
+          say(input.why, {
+            kind: "band",
+            about: b === " none" ? (within ?? "") : b.id,
+            says:
+              used.length === 1
+                ? `${name}: the whole width ${where} — nothing shares their layers; the fullest layer is ${cell.join(", ")}${px}`
+                : `${name}: a band across ${Math.round((100 * width) / (hi - lo))}% ${where} — shares layers with ${others.join(", ")}; its fullest layer is ${cell.join(", ")}${px}`,
+            ids: cell,
+            n: Math.round((100 * width) / (hi - lo)),
+          });
+        }
+        if (b === " none") for (const cell of cellsOf(members.filter((id) => !bandOf.has(id)))) spread(cell, start, start + width);
+        else inside(b, start, start + width);
         start += width;
       }
     };

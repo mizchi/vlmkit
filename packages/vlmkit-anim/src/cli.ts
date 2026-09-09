@@ -13,6 +13,8 @@
  *   eval      measure an emitted page with the shared animation evaluator (@mizchi/vlmkit-animation-eval)
  *   still     one frame as a figure, no caption band: the end by default (a module map, a filled table), SVG or PNG
  *   layout    the deterministic layout reading: texts on texts, texts under boxes, texts past the edge, per step
+ *   why       the compiler's account of the picture: what set the canvas, which containers are rows or bands and why,
+ *             what put each box on its layer, which box an edge bent round, where an annotation landed against where it was asked
  *   review    the contact sheet + a review brief for a vision model (or an agent); scores its JSON against `layout`
  *   repo      generate the workspace's architecture map (scene + GIF + sheet + markdown) from its package.json files
  *   pr        generate the change map of a commit range: areas touched per commit, import edges, running counts
@@ -43,6 +45,7 @@ import { SCENE_FORMAT, SCENE_KINDS, TIMELINE_FORMAT, type Diagnostic, type Scene
 import { formatDiagnostics, hasErrors, validateDocument, validateTimeline } from "./validate.ts";
 import { schemaIndex, schemaSheet } from "./schema-sheet.ts";
 import { contentBox, formatLayout, layoutFrame, layoutReport } from "./layout.ts";
+import { formatWhy, type PlacementNote, type WhyEntry } from "./compile/why.ts";
 import { formatReading, formatScore, parseAnswers, parseReading, reviewBrief, reviewTiles, scoreReading, scoreReview, stillBrief, type Reading, type ReadingScore, type ReviewAnswers, type ReviewScore } from "./review.ts";
 import { renderSheetHtml } from "./sheet.ts";
 import { writeVideo, type VideoResult } from "./video.ts";
@@ -50,7 +53,7 @@ import { writeVideo, type VideoResult } from "./video.ts";
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers", "--scene", "--as", "--nth"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers", "--scene", "--as", "--nth", "--about"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -90,6 +93,13 @@ Commands
   layout <scene.json> [--json]     Where texts sit on texts, under filled boxes, or past the canvas edge, where a
                                   line runs through a text, and where two containers cross, at every step —
                                   read from the compiled timeline, no browser. Exit 1 when any is found.
+  why <scene.json> [--about id] [--json]
+                                  Why the picture is the way it is, from the compiler that drew it: the pair of
+                                  boxes that set each canvas axis and the room they needed, which containers are
+                                  rows and which are bands (and each band's share and fullest layer), what put
+                                  every box on its layer, which box each bent edge went round, and where an
+                                  annotation landed against where it was asked. --about keeps what names one id.
+                                  modules / diagram scenes; other kinds lay out by their own rule and say so.
   review <scene.json> --out <dir> [--model M] [--answers a.json] [--cols N] [--tile W] [--still | --sheet]
                                   Writes <name>.sheet.png (or .html without playwright), <name>.review-brief.md
                                   (the prompt for a vision model or an agent: tiles + the JSON to return) and
@@ -544,6 +554,14 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       if (json) console.log(JSON.stringify(report, null, 2));
       else console.log(formatLayout(report));
       return report.totals.framesWithIssues ? 1 : 0;
+    }
+    case "why": {
+      const meta = (tl.meta ?? {}) as { why?: WhyEntry[]; placements?: PlacementNote[] };
+      const about = readFlag(rest, "--about");
+      const entries = meta.why ?? [];
+      if (json) console.log(JSON.stringify({ why: entries, placements: meta.placements ?? [] }, null, 2));
+      else console.log(formatWhy(entries, meta.placements ?? [], about));
+      return 0;
     }
     case "review": {
       const out = readFlag(rest, "--out");
