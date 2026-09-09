@@ -9,6 +9,7 @@ import { Builder, along, boxRadius, labelWidth, trimEdge } from "./builder.ts";
 import { circleRadius, layoutNodes, type LayoutGroup, type LayoutInput } from "./layout.ts";
 
 import { routeAround, segmentInside, type Box, type Seg } from "./route.ts";
+import { say, type WhyEntry } from "./why.ts";
 export { segmentInside } from "./route.ts";
 
 type LayoutArgs = Omit<LayoutInput, "width" | "height" | "nodeW" | "nodeH">;
@@ -22,12 +23,30 @@ type LayoutArgs = Omit<LayoutInput, "width" | "height" | "nodeW" | "nodeH">;
  * layers need their halves and an arrow's length. A guess from counts (widest layer × widest label, then
  * group counts) was either double what the picture needed or left containers crossing.
  */
-function autoCanvas(scene: DiagramScene, args: LayoutArgs, sizes: Map<string, [number, number]>, groupPad: number, groupOf: Map<string, string>, padOf: Map<string, number>): { width: number; height: number } {
+function autoCanvas(
+  scene: DiagramScene,
+  args: LayoutArgs,
+  sizes: Map<string, [number, number]>,
+  groupPad: number,
+  groupOf: Map<string, string>,
+  chains: Map<string, { id: string; pad: number }[]>,
+  generous: { groups: number; nest: number } | undefined,
+  why?: WhyEntry[],
+): { width: number; height: number } {
   const layout = scene.layout ?? "lr";
   const maxW = Math.max(60, ...[...sizes.values()].map((s) => s[0]));
   const maxH = Math.max(20, ...[...sizes.values()].map((s) => s[1]));
   const groups = groupOf.size > 0;
-  const pad = (id: string) => padOf.get(id) ?? 0;
+  // The padding a box keeps from the edge of the picture: its outermost container's.
+  const pad = (id: string) => Math.max(0, ...(chains.get(id) ?? []).map((g) => g.pad));
+  // The paddings between two boxes: for each, the outermost of its containers that does not also hold the
+  // other (siblings under one parent keep their own 14px apart; boxes in different roots keep the roots').
+  const padBetween = (a: string, b: string): number => {
+    const other = new Set((chains.get(b) ?? []).map((g) => g.id));
+    const own = (chains.get(a) ?? []).filter((g) => !other.has(g.id));
+    const otherOwn = (chains.get(b) ?? []).filter((g) => !new Set((chains.get(a) ?? []).map((x) => x.id)).has(g.id));
+    return Math.max(0, ...own.map((g) => g.pad)) + Math.max(0, ...otherOwn.map((g) => g.pad));
+  };
   if (layout === "grid" || layout === "circle") {
     const n = args.ids.length;
     const cols = Math.ceil(Math.sqrt(n * 1.5));
@@ -62,34 +81,70 @@ function autoCanvas(scene: DiagramScene, args: LayoutArgs, sizes: Map<string, [n
   const ids = args.ids;
   // The free length one axis needs: for every pair that has to keep apart along it, their room over the
   // fraction between them; for the first and last, the half box plus a padding over the fraction to the edge.
-  const fit = (pairs: (a: string, b: string) => number, coord: (id: string) => number, half: (id: string) => number): number => {
-    let out = 0;
+  type Fit = { px: number; a: string; b?: string; room: number; d: number };
+  const fit = (pairs: (a: string, b: string) => number, coord: (id: string) => number, half: (id: string) => number): Fit => {
+    let out: Fit = { px: 0, a: ids[0] ?? "", room: 0, d: 1 };
+    const take = (px: number, a: string, b: string | undefined, room: number, d: number) => {
+      if (px > out.px) out = { px, a, b, room, d };
+    };
     for (const a of ids) {
       for (const b of ids) {
         const d = coord(b) - coord(a);
         if (d < 1e-6) continue;
         const room = pairs(a, b);
-        if (room > 0) out = Math.max(out, room / d);
+        if (room > 0) take(room / d, a, b, room, d);
       }
-      out = Math.max(out, (half(a) + pad(a)) / Math.max(coord(a), 0.02), (half(a) + pad(a)) / Math.max(1 - coord(a), 0.02));
+      take((half(a) + pad(a)) / Math.max(coord(a), 0.02), a, undefined, half(a) + pad(a), Math.max(coord(a), 0.02));
+      take((half(a) + pad(a)) / Math.max(1 - coord(a), 0.02), a, undefined, half(a) + pad(a), Math.max(1 - coord(a), 0.02));
     }
     return out;
   };
   // Across: two boxes in one layer keep a gap; over a container edge, both paddings too — also between boxes
   // of two containers that share a layer, whatever layers the boxes themselves are on (a container spans all of its members).
-  const acrossFree = fit(
-    (a, b) => (sameLayer(a, b) ? wOf(a) / 2 + wOf(b) / 2 + 28 + (sameGroup(a, b) ? 0 : pad(a) + pad(b)) : !sameGroup(a, b) && besides(a, b) ? wOf(a) / 2 + wOf(b) / 2 + 28 + pad(a) + pad(b) : 0),
+  const across = fit(
+    (a, b) => (sameLayer(a, b) ? wOf(a) / 2 + wOf(b) / 2 + 28 + (sameGroup(a, b) ? 0 : padBetween(a, b)) : !sameGroup(a, b) && besides(a, b) ? wOf(a) / 2 + wOf(b) / 2 + 28 + padBetween(a, b) : 0),
     cross,
     (id) => wOf(id) / 2,
   );
+  const acrossFree = across.px;
   // Along: a layer to the next is a box and an arrow's length; over a container edge, when the two boxes are in
   // the same column of the picture, the paddings and a label band as well.
-  const stacked = (a: string, b: string) => Math.abs(cross(a) - cross(b)) * acrossFree < wOf(a) / 2 + wOf(b) / 2 + pad(a) + pad(b);
-  const alongFree = fit((a, b) => hOf(a) / 2 + hOf(b) / 2 + 56 + (!sameGroup(a, b) && stacked(a, b) ? pad(a) + pad(b) + 16 : 0), main, (id) => hOf(id) / 2 + (groups ? 16 : 0));
-  const alongMain = alongFree + 90 + groupPad * 2;
-  const alongCross = acrossFree + 40 + groupPad * 2;
+  const stacked = (a: string, b: string) => Math.abs(cross(a) - cross(b)) * acrossFree < wOf(a) / 2 + wOf(b) / 2 + padBetween(a, b);
+  // Between layers: an arrow's length (56), or, over a container edge in the same column, the two containers'
+  // paddings, a label band and a gap when that is more — the arrow runs inside that room, it does not add to it.
+  const along = fit((a, b) => hOf(a) / 2 + hOf(b) / 2 + (!sameGroup(a, b) && stacked(a, b) ? Math.max(56, padBetween(a, b) + 16 + 12) : 56), main, (id) => hOf(id) / 2 + (groups ? 16 : 0));
+  let alongMain = along.px + 90 + groupPad * 2;
+  let alongCross = acrossFree + 40 + groupPad * 2;
+  if (generous) {
+    // A module map keeps the room it had before the pairwise estimate (v13–v23: the widest layer's count of
+    // boxes, the layer count, a band per container level): the tight fit exposed a relation's arc and two
+    // dependency arrows through labels on three of the corpus's maps. Growth past it is the estimate's.
+    const perMain = new Map<number, number>();
+    for (const id of ids) perMain.set(Math.round(main(id) * 1000), (perMain.get(Math.round(main(id) * 1000)) ?? 0) + 1);
+    const widest = Math.max(1, ...perMain.values()) + Math.max(0, generous.groups - 1) * 0.6;
+    alongCross = Math.max(alongCross, widest * (maxW + 36 + generous.nest) + 80 + (generous.groups ? 40 : 0));
+    alongMain = Math.max(alongMain, Math.max(1, perMain.size) * (maxH + 56 + generous.nest) + 110 + (generous.groups ? 40 : 0));
+  }
   const [w, h] = tb ? [alongCross, alongMain] : [alongMain, alongCross];
-  return { width: Math.max(640, Math.ceil(w)), height: Math.max(360, Math.ceil(h)) };
+  // A module map's floor is the one it always had (480×280); a diagram's is the runtime's default frame.
+  const out = { width: Math.max(generous ? 480 : 640, Math.ceil(w)), height: Math.max(generous ? 280 : 360, Math.ceil(h)) };
+  if (why) {
+    // The pair that set each axis, in the picture's names: what they needed between them and how far apart the
+    // layout put them — the two levers a writer has (the label, or the structure that put them that far apart).
+    const axis = (f: Fit, name: "width" | "height", total: number, margins: number, size: (id: string) => number, isCross: boolean): void => {
+      const box = (id: string) => `${id} (${Math.round(size(id))}px${groupOf.has(id) ? `, in ${groupOf.get(id)}` : ""})`;
+      // Larger than the boxes asked: the kind's minimum frame, or a module map's room (rounding is not a floor).
+      const floor = total > Math.ceil(f.px + margins) + 1;
+      const pair = f.b
+        ? `${box(f.a)} and ${box(f.b)} need ${Math.round(f.room)}px between their centres${!sameGroup(f.a, f.b) ? " (both boxes' halves, a gap, and their containers' paddings)" : isCross && sameLayer(f.a, f.b) ? " (both halves and a gap)" : " (both halves and an arrow's length)"} and the layout put them ${Math.round(f.d * 100)}% of the ${name} apart`
+        : `${box(f.a)} sits ${Math.round(f.d * 100)}% of the ${name} from the edge and needs ${Math.round(f.room)}px of room there`;
+      const minimum = total === (name === "width" ? (generous ? 480 : 640) : generous ? 280 : 360) ? "the minimum" : "a module map's room for its arcs and labels";
+      say(why, { kind: "canvas", about: name, says: floor ? `${name} ${total}: ${minimum} — the boxes needed ${Math.round(f.px)}px + ${margins}px of margins (${pair})` : `${name} ${total}: ${pair}, so ${Math.round(f.px)}px + ${margins}px of margins`, ids: f.b ? [f.a, f.b] : [f.a], n: total, across: isCross });
+    };
+    axis(across, tb ? "width" : "height", tb ? out.width : out.height, 40 + groupPad * 2, wOf, true);
+    axis(along, tb ? "height" : "width", tb ? out.height : out.width, 90 + groupPad * 2, hOf, false);
+  }
+  return out;
 }
 
 export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modules" = "diagram"): Timeline {
@@ -133,10 +188,14 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   const tree = (g: (typeof groups)[number]): LayoutGroup => ({ id: g.id, nodes: g.nodes, children: childrenOf(g.id).map(tree) });
   // Containers need room for their padding and label: the free area shrinks by a band per group level.
   const groupPad = groups.length ? 18 + maxDepth * 14 : 0;
+  const why: WhyEntry[] = [];
+  const tbLayout = (scene.layout ?? "lr") === "tb";
   const layoutArgs: LayoutArgs = {
     ids,
     edges,
     fixed,
+    // A band is as wide as its fullest layer's boxes, not their count (v24).
+    sizeOf: (id) => sizes.get(id)![tbLayout ? 0 : 1],
     // The group tree: a parent's range is shared out among its children the way the picture is among the
     // roots, so two sibling containers get their own slots instead of one band that spreads their members
     // evenly (pa, pb, v23: an imported pipeline's three tracks under one "Parallel" subgraph were one
@@ -149,9 +208,16 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   // A scene that names its canvas, or places a node itself, is drawn as written; otherwise the canvas fits the picture.
   const named = scene.canvas?.width !== undefined && scene.canvas?.height !== undefined;
   // A container's padding grows by 24 per level it holds — what two neighbours over a container edge keep between them.
-  const padOf = new Map<string, number>();
-  for (const g of groups) for (const n of g.nodes) padOf.set(n, 14 + depthBelow(g) * 24);
-  const fit = named || fixed.size ? { width: 640, height: 360 } : autoCanvas(scene, { ...layoutArgs, fixed: new Map() }, sizes, groupPad, innermost, padOf);
+  const padOfGroup = (g: (typeof groups)[number]) => 14 + depthBelow(g) * 24;
+  const chains = new Map<string, { id: string; pad: number }[]>();
+  for (const g of groups) {
+    const chain: { id: string; pad: number }[] = [];
+    for (let cur: (typeof groups)[number] | undefined = g; cur; cur = cur.parent ? byId.get(cur.parent) : undefined) chain.push({ id: cur.id, pad: padOfGroup(cur) });
+    for (const n of g.nodes) chains.set(n, chain);
+  }
+  const generous = kindName === "modules" ? { groups: groups.length, nest: maxDepth * 48 } : undefined;
+  const fit = named || fixed.size ? { width: 640, height: 360 } : autoCanvas(scene, { ...layoutArgs, fixed: new Map() }, sizes, groupPad, innermost, chains, generous, why);
+  if (named) say(why, { kind: "canvas", about: "canvas", says: `canvas ${scene.canvas!.width}×${scene.canvas!.height}: as the scene names it — the layout fills it and does not clip; a smaller one draws the same picture smaller`, n: scene.canvas!.width });
   const b = new Builder(scene, { ...fit, stepMs: 700 });
   const T = b.theme;
   // Colour roles for a still (gb, v13, v14: "no colour field on deps edges — colouring one edge requires reaching
@@ -161,6 +227,7 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   const pos = layoutNodes(
     {
       ...layoutArgs,
+      why,
       width: b.width - 40 - groupPad * 2,
       height: b.height - 90 - groupPad * 2,
       nodeW: maxW + groupPad,
@@ -183,11 +250,11 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   // An edge that would run behind a box that is not one of its ends bends around it: a waypoint level with
   // the box, just past its nearer side, then on. Passes repeat while a new segment finds a new box (fa, fc
   // and the workspace map, v13: dependency arrows from two layers up vanished behind a module in between).
-  const route = (e: { from: string; to: string }): [number, number][] =>
-    routeAround(pos.get(e.from)!, pos.get(e.to)!, scene.nodes.map((n) => ({ id: n.id, box: boxOf(n.id) })), new Set([e.from, e.to]));
+  const route = (e: { from: string; to: string }, i: number): [number, number][] =>
+    routeAround(pos.get(e.from)!, pos.get(e.to)!, scene.nodes.map((n) => ({ id: n.id, box: boxOf(n.id) })), new Set([e.from, e.to]), why, `edge-${i} (${e.from} → ${e.to})`);
   const isCircle = (id: string) => scene.nodes.find((n) => n.id === id)?.shape === "circle";
   const rawGeom = (scene.edges ?? []).map((e, i) => {
-    const centres = route(e);
+    const centres = route(e, i);
     const first = centres[1];
     const last = centres[centres.length - 2];
     const a = centres[0];
@@ -525,5 +592,7 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   }
   b.step(undefined, "end");
   b.advance(b.stepMs * 0.3);
-  return b.build({ title: scene.title, kind: kindName });
+  // Every edge by its ends, for `check` to name a crossing's edge as `a → b` rather than by id alone.
+  const edgeNames = Object.fromEntries(rawGeom.map((g) => [g.id, `${g.e.from} → ${g.e.to}`]));
+  return b.build({ title: scene.title, kind: kindName, why, edges: edgeNames });
 }

@@ -24,6 +24,8 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit-anim diff before.json after.json --out d.svg   two module maps as one figure: added in accent, removed dashed grey; --expect checks the change
    vlmkit-anim import mermaid page.md --out scene.json   a flowchart / graph, sequenceDiagram or stateDiagram-v2 as a scene; says what it dropped
    vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, lines through texts, containers crossing — per step (check warns about these too)
+   vlmkit-anim why scene.json [--about id]           why the picture is the way it is: the pair of boxes that set each canvas axis, which containers are rows
+                                                     and which bands (and their share), what put each box on its layer, which box a bent edge went round
    vlmkit-anim review scene.json --out dir           the sheet + a review brief for a vision model or an agent; --answers its JSON scores it
                                                      (a still figure is read back instead: modules, containers, nesting, arrows — scored against the facts it draws)
 5. vlmkit-anim html scene.json --out page.html       the playable page
@@ -768,6 +770,56 @@ for emphasis — `{"highlight": ["handlers->services", "services->events"]}`
 colours those edges, a `callout` at an edge or module adds a note, a `text`
 block without `at` says what the map leaves out ("tests omitted") — since
 `still` renders the last frame.
+
+## Asking why
+
+A `modules` or `diagram` picture is a set of decisions the compiler made, and
+`check` reports their consequences — a 2400px canvas, two containers crossing
+— without their causes. `vlmkit-anim why scene.json` prints the causes, in
+the picture's own names, grouped in the order a reader looks:
+
+```
+canvas — what set each axis
+  width 1386: INTENT (162px, in Track_Intent) and VIS_SEM (435px, in Track_Visual) need 355px between their centres (both boxes' halves, a gap, and their containers' paddings) and the layout put them 28% of the width apart, so 1282px + 104px of margins
+  height 1770: VIS_SEM (70px, in Track_Visual) and CROSS (53px, in Merge) need 162px between their centres … 10% of the height apart, so 1616px + 154px of margins
+rows — containers that own their layers
+  Input: a row of the picture — layer 1 holds nothing else
+  Parallel: a row of the picture — layers 2–5 hold nothing else
+bands — containers side by side, and their share
+  Track_Visual: a band across 40% inside Parallel — shares layers with Track_Intent, Track_A11y; its fullest layer is VIS_SEM (435px of boxes)
+layers — what put each box where it is along the flow
+  CROSS: layer 6 of 10 — one past VIS_SEM (VIS_SEM → CROSS)
+detours — edges bent round a box
+  edge-12 (A11Y_SEM → CROSS): bends past the bottom-right corner of VIS_SEM — the straight line ran 103px through its box
+```
+
+Read the canvas line first: it names the **two boxes** whose room set the
+axis and **how far apart** the layout put them. A wide canvas has exactly two
+levers — those two labels (shorter, or broken with `\n`), or the structure
+that put them that fraction apart (the band the wider one is in, which the
+bands section explains: a container that shares a layer with another is a
+band as wide as its fullest layer's boxes; one that owns its layers is a row
+and costs nothing across). Shortening any other label changes nothing, which
+is what one writer's three rounds went to before this existed. A layer line
+names the one edge that put a box where it is — the lever for a box that
+should sit level with another is that edge, or the `layout` direction. A
+detour line names the box an edge would have run through. `--about id` keeps
+the lines that name one box, and `check`'s canvas warning quotes the pair
+that set the axis. Kinds that lay out by their own rule (a sort's bars, a
+matrix's cells, a sequence's lifelines) have nothing to explain and say so.
+Annotations that did not land on the side they asked for are listed last,
+with what was in the way. The two axes grow for different reasons: along the
+flow, one layer per dependency step (a chain of ten is ten boxes long);
+across it, the bands side by side, each as wide as its fullest layer.
+`layout` only swaps which of the two is the width — a picture that is too
+wide in `tb` because five containers sit side by side is too tall in `lr`
+for the same reason (qb, v24: 8882×1037 became 1302×2483). Switching
+`diagram` to `modules` changes the layering rule as well as the warnings: a
+diagram layers forward from what points at a box, a module map backward
+from what a box depends on, so the widest layer can hold a different set
+of boxes and the canvas moves with it (qa, v24: 4615px became 7031px on the
+kind change alone; the `layers` lines say which rule placed each box). A
+`sequence` without captions is warned about in every kind.
 
 ## The diff figure
 

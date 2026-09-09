@@ -347,7 +347,7 @@ Vector clocks — 11 steps, 6000ms, 38 nodes
 
 ## modules-checkout-ja
 
-`modules` — [`fixtures/modules-checkout-ja.json`](../fixtures/modules-checkout-ja.json) · 3 steps · 1.3s · GIF 170 KB
+`modules` — [`fixtures/modules-checkout-ja.json`](../fixtures/modules-checkout-ja.json) · 3 steps · 1.3s · GIF 171 KB
 
 ![modules-checkout-ja animation](./modules-checkout-ja.gif)
 
@@ -366,7 +366,7 @@ Vector clocks — 11 steps, 6000ms, 38 nodes
 
 ## modules-nested
 
-`modules` — [`fixtures/modules-nested.json`](../fixtures/modules-nested.json) · 2 steps · 0.6s · GIF 56 KB
+`modules` — [`fixtures/modules-nested.json`](../fixtures/modules-nested.json) · 2 steps · 0.6s · GIF 57 KB
 
 ![modules-nested animation](./modules-nested.gif)
 
@@ -402,7 +402,7 @@ Ports and adapters: every dependency points inward — 2 steps, 560ms, 28 nodes
 
 ## modules-web-service
 
-`modules` — [`fixtures/modules-web-service.json`](../fixtures/modules-web-service.json) · 6 steps · 3.4s · GIF 346 KB
+`modules` — [`fixtures/modules-web-service.json`](../fixtures/modules-web-service.json) · 6 steps · 3.4s · GIF 344 KB
 
 ![modules-web-service animation](./modules-web-service.gif)
 

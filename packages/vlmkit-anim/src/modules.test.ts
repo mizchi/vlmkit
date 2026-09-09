@@ -94,14 +94,16 @@ describe("modules: layers and containers", () => {
     assert.deepEqual(ok.filter((d) => d.severity === "error"), [], formatDiagnostics(ok));
   });
 
-  it("normalises to a diagram with groups, sized for the map", () => {
+  it("normalises to a diagram with groups; the diagram compiler sizes the map (v24: one estimator for both kinds)", () => {
     const d = normalizeModules(ex);
     assert.equal(d.kind, "diagram");
     assert.equal(d.nodes.length, 6);
     assert.equal(d.edges!.length, 6);
     assert.equal(d.groups!.length, 3);
     assert.equal(d.layout, "tb");
-    assert.ok((d.canvas!.height ?? 0) >= 4 * 60, "four layers need height");
+    assert.equal(d.canvas, undefined, "no canvas of its own unless the scene names one");
+    assert.ok(compileScene(ex).canvas.height >= 4 * 60, "four layers need height");
+    assert.deepEqual(normalizeModules({ ...ex, canvas: { width: 700, height: 500, background: "#fff" } }).canvas, { width: 700, height: 500, background: "#fff" });
   });
 });
 
@@ -245,13 +247,16 @@ describe("modules: v14 — the writers' friction", () => {
 
   it("a group label hemmed in by edges on every side gets a halo at the least-crossed spot (hd)", () => {
     // hd's round 1: two one-module containers straight under the root, every corner and middle of both labels
-    // crossed by the fan of edges — the writer shortened the labels; the compiler now halos them instead.
+    // crossed by the fan of edges — the writer shortened the labels; the compiler now halos them instead. (v24:
+    // with bands sized by content `integration` is a row whose label finds a clear corner; the hemmed-in label
+    // is now `measurement`'s, in the band the fan crosses.)
     const s = attempt("hd");
     const long: Record<string, string> = { measurement: "Measurement & Capture", integration: "Integration", synthesis: "Synthesis & Healing" };
     const tl = compileScene({ ...s, groups: s.groups!.map((g) => ({ ...g, label: long[g.id] ?? g.label })) });
     const r = layoutReport(tl);
     assert.equal(r.totals.crossed, 0, formatLayoutIssues(r));
-    assert.equal(tl.nodes.find((n) => n.id === "integration-label")!.halo, true);
+    assert.ok(tl.nodes.some((n) => /-label$/.test(n.id) && n.halo === true), "one hemmed-in group label is haloed");
+    assert.equal(tl.nodes.find((n) => n.id === "measurement-label")!.halo, true);
     // A label with a clear corner stays plain.
     assert.notEqual(compileScene(EXAMPLES.modules).nodes.find((n) => n.id === "core-label")!.halo, true);
   });
