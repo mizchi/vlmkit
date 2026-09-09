@@ -1,0 +1,7 @@
+{
+  "format": "vlmkit-anim/diff@1",
+  "added": { "modules": ["search"], "deps": ["api->search", "search->db"], "groups": ["identity"] },
+  "removed": { "modules": ["cache"], "deps": ["api->cache"], "groups": [] },
+  "moved": [{ "module": "auth", "from": "core", "to": "identity" }],
+  "relabelled": [{ "id": "logging", "from": "logging", "to": "logs" }]
+}

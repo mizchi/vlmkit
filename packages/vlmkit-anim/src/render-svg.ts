@@ -105,17 +105,19 @@ function shapeMarkup(n: NodeState, markers: Set<string>): string {
   const fill = n.fill ?? "#fff";
   const sw = n.strokeWidth ?? 1.5;
   const common = `fill="${esc(fill)}" stroke="${esc(stroke)}" stroke-width="${num(sw)}"`;
+  // A dashed outline on a closed shape (a box that is not, or no longer, there — v22); strokes get theirs from dashAttrs.
+  const outline = n.dashed ? ` stroke-dasharray="6 4"` : "";
   switch (n.shape) {
     case "rect": {
       const [w, h] = n.size ?? [80, 40];
-      return `<rect x="${num(-w / 2)}" y="${num(-h / 2)}" width="${num(w)}" height="${num(h)}"${n.rx !== undefined ? ` rx="${num(n.rx)}"` : ""} ${common}/>`;
+      return `<rect x="${num(-w / 2)}" y="${num(-h / 2)}" width="${num(w)}" height="${num(h)}"${n.rx !== undefined ? ` rx="${num(n.rx)}"` : ""} ${common}${outline}/>`;
     }
     case "ellipse": {
       const [w, h] = n.size ?? [80, 40];
-      return `<ellipse rx="${num(w / 2)}" ry="${num(h / 2)}" ${common}/>`;
+      return `<ellipse rx="${num(w / 2)}" ry="${num(h / 2)}" ${common}${outline}/>`;
     }
     case "circle":
-      return `<circle r="${num(n.r ?? 20)}" ${common}/>`;
+      return `<circle r="${num(n.r ?? 20)}" ${common}${outline}/>`;
     case "line":
     case "arrow": {
       const [[x1, y1], [x2, y2]] = n.points ?? [[0, 0], [0, 0]];

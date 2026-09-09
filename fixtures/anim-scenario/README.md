@@ -143,6 +143,13 @@ misplaced and one fidelity number. Nine figures (`fa`, `fe`, `ga`, `hb`,
 before the round's compiler changes and nine after; the readings and scores
 are in `v21/`.
 
+v22 (2026-09-09) adds the diff figure — `vlmkit-anim diff before.json
+after.json`: two module maps as one still, added in accent, removed dashed
+grey, checked against a diff sheet with `--expect` — and one brief,
+`modules-diff-figure` (a web service gains `search`, loses `cache`, moves
+`auth` into a new container and renames `logging`; the sheet fixes the change).
+Writers `oa`–`ob`; a reader reads the fixture's diff figure back.
+
 Metrics per run: first-attempt error count, rounds to green, scene bytes,
 semantic verdict, and the agent's own words on what helped / what was missing;
 from v9 also the coordinate-fallback count, the expressiveness metric; from

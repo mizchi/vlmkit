@@ -1,0 +1,21 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "modules",
+  "title": "A web service, by module",
+  "modules": ["web", "api", { "id": "auth", "label": "auth service" }, "search", "db", { "id": "logging", "label": "logs" }],
+  "deps": [
+    ["web", "api"],
+    ["api", "auth"],
+    ["api", "db"],
+    ["api", "search"],
+    ["search", "db"],
+    ["auth", "db"],
+    { "from": "api", "to": "logging", "style": "line", "label": "emits" }
+  ],
+  "groups": [
+    { "id": "edge", "label": "edge", "modules": ["web"] },
+    { "id": "core", "label": "core", "modules": ["api", "search"] },
+    { "id": "identity", "label": "identity", "modules": ["auth"] },
+    { "id": "infra", "label": "infrastructure", "modules": ["db", "logging"] }
+  ]
+}

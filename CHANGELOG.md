@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.21.0 — 2026-09-09
+
+**`vlmkit-anim`: the diff figure — two module maps as one still, with what changed marked.**
+
+- **`vlmkit-anim diff before.json after.json [--out change.svg|.png] [--scene change.json] [--expect diff.json]`**:
+  the after map, with what it added — modules, dependencies, a container — in the accent colour, what it
+  lost drawn in dashed and grey where it was (a removed module inside the container it left), a moved or
+  relabelled module accent, and a legend in the readout panel. The change is printed in one line
+  (`+1 module (search) · +2 deps · −1 module (cache) · 1 moved (auth: core → identity)`) and `--expect`
+  checks it against a diff sheet (`schema --kind diff`): `added` / `removed` (modules, deps, groups),
+  `moved`, `relabelled` — every field optional, a present one exact, a change the sheet does not name an
+  error too. A lifted `forbidden` dependency is a removed dependency in the facts and is not drawn.
+- **`"dashed": true` on a module or diagram node**: a dashed outline for a box that is not, or no longer, there.
+  From the writer round (two writers, both green on the first write): the guide said a removed module was
+  drawn "dashed and grey" and only the arrow was; now the box is too. A reader read the fixture's diff figure
+  back at fidelity 0.83 and gave an edge label to the removed arrow running past it.
+- Report: `docs/reports/2026-09-09-anim-ir-v22.md`.
+
 ## 0.20.0 — 2026-09-09
 
 **`vlmkit-anim`: a still figure read back by a vision reader, and what the readings changed.**

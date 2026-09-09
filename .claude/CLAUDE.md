@@ -152,6 +152,7 @@ vlmkit-anim eval page.html                          # the shared frame-sampled e
 vlmkit-anim check scene.json --expect facts.json    # …and the figure against its facts (modules, deps "a->b", forbidden, highlighted in the final frame, group members) — a green check on a wrong picture was v13's finding
 vlmkit-anim check walk.json --expect facts.json     # …a graph's visit order and path, a state machine's transitions / end state, a distributed scene's messages and lost ones (v18)
 vlmkit-anim facts packages/x/src --depth 1 --out x.expect.json   # a fact sheet from a directory's import graph: a map drawn by hand from the code is checked against the code
+vlmkit-anim diff before.json after.json --out change.svg --expect diff.json   # two module maps as one figure: added in accent, removed dashed grey; the change checked against a diff sheet (v22)
 vlmkit-anim layout scene.json                       # texts on texts / under boxes / past the edge / lines through texts, per step, from the timeline (also warnings in `check`)
 vlmkit-anim review scene.json --out dir [--model M | --answers a.json]   # contact sheet + review brief for a vision model or an agent; scores its JSON against `layout`
 vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture   # the workspace drawn layer by layer (pnpm anim:diagrams regenerates docs/diagrams/)
@@ -214,7 +215,10 @@ it counts now), `docs/reports/2026-09-09-anim-ir-v21.md` (a still figure read ba
 and scores its reading against the facts the scene draws — read / missed / invented / reversed / misplaced, one fidelity number; nine
 figures read before and after, four findings the geometry could not see fixed in the compilers — containers crossing, a label at a
 bottom corner read as a caption, forbidden arrows filed as highlights, fans out of one corner — and one ceiling named: at 26 arrows
-on 11 boxes a map reads back at 0.5–0.8 whatever the routing).
+on 11 boxes a map reads back at 0.5–0.8 whatever the routing), `docs/reports/2026-09-09-anim-ir-v22.md` (the diff figure: `vlmkit-anim diff
+before.json after.json` draws two module maps as one still — added in accent, removed dashed grey, a legend — and prints the change as facts
+checked against a diff sheet with `--expect`; two writers green on the first write, a reader read the change back at fidelity 0.83 and
+mistook which arrow an edge label belonged to).
 
 ## Measuring Gate / Rule Execution Cost
 
