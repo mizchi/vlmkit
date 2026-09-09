@@ -1,0 +1,62 @@
+{
+  "format": "vlmkit-anim/expect@1",
+  "modules": [
+    "web",
+    "api",
+    "auth",
+    "search",
+    "db",
+    "logging",
+    "cache"
+  ],
+  "deps": [
+    "web->api",
+    "api->auth",
+    "api->db",
+    "api->search",
+    "search->db",
+    "auth->db",
+    "api->logging",
+    "api->cache"
+  ],
+  "forbidden": [],
+  "highlighted": [
+    "api->search",
+    "search->db",
+    "auth",
+    "search",
+    "logging",
+    "identity"
+  ],
+  "groups": {
+    "edge": [
+      "web"
+    ],
+    "core": [
+      "api",
+      "search"
+    ],
+    "identity": [
+      "auth"
+    ],
+    "infra": [
+      "db",
+      "logging",
+      "cache"
+    ]
+  },
+  "labels": {
+    "web": "web",
+    "api": "api",
+    "auth": "auth service",
+    "search": "search",
+    "db": "db",
+    "logging": "logs",
+    "cache": "cache",
+    "edge": "edge",
+    "core": "core",
+    "identity": "identity",
+    "infra": "infrastructure"
+  },
+  "parents": {}
+}

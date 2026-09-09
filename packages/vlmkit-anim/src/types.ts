@@ -307,6 +307,8 @@ export interface DiagramNode {
   fill?: string;
   /** Colour role for a still: `accent` fills the box, `bad` / `muted` colour its outline and label. */
   tone?: Tone;
+  /** A dashed outline: a node that is not, or no longer, there (a removed module in a diff figure). */
+  dashed?: boolean;
   /** Hidden until a `show` step reveals it. Default: visible from t=0. */
   hidden?: boolean;
 }
@@ -368,6 +370,8 @@ export interface ModuleDef {
   label?: string;
   /** Colour role for a still: `accent` fills the box, `bad` / `muted` colour its outline and label. */
   tone?: Tone;
+  /** A dashed outline: a module that is not, or no longer, there (a removed module in a diff figure). */
+  dashed?: boolean;
   /** Hidden until a `show` step reveals it. */
   hidden?: boolean;
 }

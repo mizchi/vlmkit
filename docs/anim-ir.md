@@ -21,6 +21,7 @@ This page is the complete writing guide. Every JSON block on it passes
    vlmkit-anim check scene.json --expect facts.json  …and the figure against its facts: modules, dependencies "a->b", forbidden ones, what is lit, group members;
                                                      a graph's visits and path, a state machine's transitions and end state, a distributed scene's messages and lost ones
    vlmkit-anim facts src --depth 1 --out f.json      a fact sheet from a directory's import graph, for a map drawn by hand from the code
+   vlmkit-anim diff before.json after.json --out d.svg   two module maps as one figure: added in accent, removed dashed grey; --expect checks the change
    vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, lines through texts, containers crossing — per step (check warns about these too)
    vlmkit-anim review scene.json --out dir           the sheet + a review brief for a vision model or an agent; --answers its JSON scores it
                                                      (a still figure is read back instead: modules, containers, nesting, arrows — scored against the facts it draws)
@@ -673,7 +674,7 @@ once, `"from->to"`, a frame's label, `"participants"`.
 
 | field | |
 |---|---|
-| `nodes` | required: `{"id", "label", "shape": rect \| circle \| ellipse, "pos": [x, y], "fill", "tone", "hidden": true}`; `tone` is `accent` (fills the box), `bad` or `muted` (outline and label) — a colour role for a still, without a `highlight` step |
+| `nodes` | required: `{"id", "label", "shape": rect \| circle \| ellipse, "pos": [x, y], "fill", "tone", "dashed": true, "hidden": true}`; `tone` is `accent` (fills the box), `bad` or `muted` (outline and label) — a colour role for a still, without a `highlight` step; `dashed` draws the outline dashed: a box that is not, or no longer, there |
 | `edges` | `{"from", "to", "label", "style": arrow \| line \| dashed \| implements \| forbidden, "tone", "hidden": true}`; `implements` is dashed with a hollow head (realises an interface, still laid out); `tone` colours one edge `accent` \| `bad` \| `muted` |
 | `layout` | `lr` (default) \| `tb` \| `grid` \| `circle`; nodes with `pos` are pinned |
 | `sequence` | one action per step + optional `caption`, `ms`: `{"show": id \| [ids]}` `{"hide": …}` `{"highlight": …}` `{"unhighlight": …}` `{"flow": "a->b"}` (token travels along an existing edge, either direction) `{"note": "…"}` (captioned pause) `{"relabel": {"id", "text"}}` |
@@ -711,7 +712,7 @@ a caption band. With a `sequence` it is walked in beats like a `diagram`.
 
 | field | |
 |---|---|
-| `modules` | required: ids, or `{"id", "label", "tone", "hidden"}`; `tone` is `accent` (the box is filled — the module the figure is about), `bad` or `muted` (outline and label; a test double, a deprecated module) |
+| `modules` | required: ids, or `{"id", "label", "tone", "dashed", "hidden"}`; `tone` is `accent` (the box is filled — the module the figure is about), `bad` or `muted` (outline and label; a test double, a deprecated module); `dashed: true` draws the box's outline dashed — a module that is not, or no longer, there (the diff figure uses it for a removed one) |
 | `deps` | `["a", "b"]` reads **a depends on b**: the arrow runs a → b and a sits above b. Long form `{"from", "to", "label", "style", "tone", "hidden"}`; `style` is `arrow` (default), `line` (no head), `dashed` (an optional or weak dependency — still laid out), `implements` (dashed with a hollow head: the module realises an interface — still laid out) or **`forbidden`** (dashed, in the `bad` colour, labelled ✗ unless you label it: drawn, but ignored by the layout and the cycle check — the import that must not exist, shown next to the ones that do). `tone` colours one dependency `accent` \| `bad` \| `muted` in a still, with no sequence — on its own, `{"from", "to", "tone": "accent"}` is a plain arrow in the accent colour; `style` stays at its default |
 | `groups` | `{"id", "label", "modules": [ids], "parent"}` — a container around its modules; a module is in at most one (the innermost, when groups nest). `parent` nests one container inside another: `"parent": "backend"` on `services` and `core` draws them inside `backend`, whose box wraps theirs with room for their labels, and the layout keeps each inner group's modules together. Group ids are anchors (`callout`, `group`, `relate`) and `highlight` targets (the outline lights up) |
 | `layout` | `tb` (default, dependencies point down) or `lr` (they point right) |
@@ -765,6 +766,36 @@ for emphasis — `{"highlight": ["handlers->services", "services->events"]}`
 colours those edges, a `callout` at an edge or module adds a note, a `text`
 block without `at` says what the map leaves out ("tests omitted") — since
 `still` renders the last frame.
+
+## The diff figure
+
+Two module maps — before and after a change, or two revisions of one file —
+drawn as one still with the change marked:
+
+```
+vlmkit-anim diff before.json after.json --out change.svg            # or .png
+vlmkit-anim diff before.json after.json --expect change.expect.json  # …and check the change against a sheet
+vlmkit-anim diff before.json after.json --scene change.json          # the marked scene, to edit or animate
+```
+
+The picture is the **after** map. What it added — modules, dependencies, a
+container — is in the accent colour; what it lost is drawn in where it was,
+dashed and grey (a removed module inside the container it left, when that
+container survives); a module that changed container, or label, is accent
+too; a legend states the change in one line. The same line is printed:
+
+```
++1 module (search) · +2 deps (api->search, search->db) · +1 group (identity) · −1 module (cache) · −1 dep (api->cache) · 1 moved (auth: core → identity)
+```
+
+`--expect` reads a diff sheet — `vlmkit-anim schema --kind diff` prints the
+shape: `added` / `removed` (each `modules`, `deps` `"a->b"`, `groups`),
+`moved` (`{"module", "from", "to"}`, a group id or `null`), `relabelled`.
+Every field is optional and a present one must match exactly: a change the
+sheet does not name is an error too, so a figure that claims a change is
+checked against the two scenes, not against a memory of them. A lifted
+prohibition (a `forbidden` dependency the after map no longer has) is a
+removed dependency in the facts and is not drawn.
 
 ## Checking a figure against the facts
 

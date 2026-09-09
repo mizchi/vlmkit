@@ -322,6 +322,8 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
       fill: nodeFill(n),
       stroke: n.tone === "bad" ? T.bad : n.tone === "muted" ? T.muted : T.nodeStroke,
       strokeWidth: 1.5,
+      // A dashed outline: a box that is not (or no longer) there — a removed module in a diff figure (v22).
+      ...(n.dashed ? { dashed: true } : {}),
       text: n.label ?? n.id,
       fontSize: T.fontSize,
       color: n.tone === "bad" ? T.bad : n.tone === "muted" ? T.muted : T.text,

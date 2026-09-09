@@ -31,6 +31,7 @@ import { sceneFromModule } from "./author.ts";
 import { handleCliError, hasFlag, readFlag, readInt, readPositionals, UsageError } from "./cli-args.ts";
 import { animStats, checkAnimation, explain } from "./check.ts";
 import { compileScene, SceneValidationError } from "./compile/index.ts";
+import { checkDiffExpectation, DIFF_SHEET, diffFacts, diffScene, formatDiffFacts, type DiffExpectation } from "./diff.ts";
 import { checkExpectation, EXPECT_SHEET, formatCompared, sceneFacts, validateExpectation, type Expectation } from "./expect.ts";
 import { changeMapScene, workspaceExpectation, workspaceScene } from "./generators/git.ts";
 import { importFacts } from "./generators/imports.ts";
@@ -48,7 +49,7 @@ import { writeVideo, type VideoResult } from "./video.ts";
 /** Scene files that are modules rather than JSON: `import()`ed, default export taken. */
 const MODULE_EXTENSIONS = /\.(m?ts|m?js)$/;
 
-const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers"];
+const VALUE_FLAGS = ["--out", "--at", "--step", "--samples", "--kind", "--title", "--max-ms", "--expect", "--cols", "--tile", "--fps", "--hold", "--width", "--viewport", "--strip", "--base", "--head", "--root", "--name", "--model", "--answers", "--scene"];
 
 function usage(): string {
   return `Usage: vlmkit-anim <command> <file.json> [options]
@@ -104,6 +105,13 @@ Commands
                                   with the dependencies that place them there. Writes <out>/repo.scene.json,
                                   repo.gif, repo.sheet.png, repo.md (the explain text with both images embedded)
                                   and repo.expect.json (the fact sheet a hand-drawn map is checked against).
+  diff <before.json> <after.json> [--out change.svg|.png] [--scene change.json] [--expect diff.json]
+                                  Two module maps as one figure: the after map, with what it added in the accent
+                                  colour and what it lost drawn in dashed and grey where it was, a moved or
+                                  relabelled module accent, and a legend. Prints the change in one line
+                                  (+1 module (search) · −1 dep (api->cache) · 1 moved (auth: core → identity));
+                                  --expect checks it against a diff sheet (\`schema --kind diff\`), exit 1 on a
+                                  difference; --scene writes the marked scene to edit or animate.
   facts <dir> [--depth 1] [--tests] [--out facts.expect.json]
                                   The directory's import graph as a fact sheet for \`check --expect\`: the entries
                                   at --depth are the modules (a directory is one module, a file is one), and every
@@ -233,12 +241,16 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       console.log(schemaIndex());
       return 0;
     }
+    if (kind === "diff") {
+      console.log(DIFF_SHEET);
+      return 0;
+    }
     if (kind === "expect") {
       console.log(EXPECT_SHEET);
       return 0;
     }
     if (!(SCENE_KINDS as readonly string[]).includes(kind) && kind !== "timeline" && kind !== "annotations") {
-      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", "annotations" for the ops every kind shares, "expect" for the fact sheet \`check --expect\` reads)`);
+      throw new UsageError(`unknown kind "${kind}"; kinds are ${SCENE_KINDS.join(", ")} (or "timeline", "annotations" for the ops every kind shares, "expect" for the fact sheet \`check --expect\` reads, "diff" for the sheet \`diff --expect\` reads)`);
     }
     console.log(schemaSheet(kind as Scene["kind"] | "timeline" | "annotations"));
     return 0;
@@ -314,6 +326,64 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       if (summary.commits !== undefined) console.log(`  ${summary.commits} commit(s), ${summary.files} file(s), +${summary.added} −${summary.removed}, ${(summary.areas as string[]).length} area(s)`);
     }
     return result.ok ? 0 : 1;
+  }
+
+  if (verb === "diff") {
+    const [beforePath, afterPath] = positionals;
+    if (!beforePath || !afterPath) throw new UsageError("vlmkit-anim diff needs two module maps: vlmkit-anim diff before.json after.json --out change.svg");
+    const pair: Scene[] = [];
+    for (const p of [beforePath, afterPath]) {
+      const l = await load(p);
+      if (!isLoaded(l)) {
+        printDiagnostics(l.diagnostics, json);
+        if (json) console.log(JSON.stringify({ file: p, ok: false, diagnostics: l.diagnostics }, null, 2));
+        else console.log(`✗ ${l.diagnostics.filter((d) => d.severity === "error").length} error(s) in ${basename(p)}: fix these before \`diff\` can run`);
+        return 1;
+      }
+      if (!l.scene || l.scene.kind !== "modules") throw new UsageError(`vlmkit-anim diff reads two "modules" scenes; ${basename(p)} is ${l.scene ? `a "${l.scene.kind}"` : "a compiled timeline"}`);
+      pair.push(l.scene);
+    }
+    const [before, after] = pair as [Extract<Scene, { kind: "modules" }>, Extract<Scene, { kind: "modules" }>];
+    const facts = diffFacts(before, after);
+    const marked = diffScene(before, after, facts);
+    const tl = compileScene(marked);
+    const t = timelineDuration(tl);
+    const issues = layoutFrame(tl, t);
+    const files: string[] = [];
+    const out = readFlag(rest, "--out");
+    if (out) {
+      const crop = contentBox(tl, t);
+      const svg = renderFrameSvg(tl, t, { caption: false, crop });
+      if (out.endsWith(".png")) await screenshotHtml(`<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">${svg}</body></html>`, out, { width: crop.w, height: crop.h });
+      else {
+        await mkdir(dirname(resolve(out)), { recursive: true });
+        await writeFile(out, svg);
+      }
+      files.push(out);
+    }
+    const scenePath = readFlag(rest, "--scene");
+    if (scenePath) {
+      await mkdir(dirname(resolve(scenePath)), { recursive: true });
+      await writeFile(scenePath, JSON.stringify(marked, null, 2) + "\n");
+      files.push(scenePath);
+    }
+    const expectPath = readFlag(rest, "--expect");
+    let diags: Diagnostic[] = [];
+    if (expectPath) {
+      const exp = JSON.parse(await readFile(expectPath, "utf-8")) as DiffExpectation;
+      diags = checkDiffExpectation(facts, exp);
+    }
+    if (json) console.log(JSON.stringify({ before: beforePath, after: afterPath, facts, files, layout: issues.length, diagnostics: diags }, null, 2));
+    else {
+      console.log(formatDiffFacts(facts));
+      for (const f of files) console.log(`wrote ${f}`);
+      if (issues.length) console.log(`layout: ${issues.length} issue(s) in the figure — write it with --scene and run vlmkit-anim layout on it`);
+      if (expectPath) {
+        printDiagnostics(diags, false);
+        console.log(diags.length ? `✗ ${diags.length} difference(s) between the change and ${basename(expectPath)}` : `✓ the change is what ${basename(expectPath)} says`);
+      }
+    }
+    return diags.length ? 1 : 0;
   }
 
   const file = requireFile(positionals, verb);

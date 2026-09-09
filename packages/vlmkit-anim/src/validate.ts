@@ -385,7 +385,7 @@ function validateModules(ctx: Ctx, doc: Obj): void {
       const path = `modules[${i}]`;
       const id = isStr(m) ? m : ctx.object(m, path) ? m.id : undefined;
       if (!isStr(m) && ctx.object(m, path)) {
-        ctx.keys(m, path, ["id", "label", "tone", "hidden"]);
+        ctx.keys(m, path, ["id", "label", "tone", "dashed", "hidden"]);
         if (!isStr(m.id)) ctx.error(`${path}.id`, `a module needs a string "id"`, `"${path}": "cache" or {"id": "cache", "label": "Cache"}`);
         if (m.tone !== undefined) ctx.enumOf(m.tone, `${path}.tone`, TONES, "tone");
       }
@@ -453,7 +453,7 @@ function validateDiagram(ctx: Ctx, doc: Obj): void {
     doc.nodes.forEach((n, i) => {
       const path = `nodes[${i}]`;
       if (!ctx.object(n, path)) return;
-      ctx.keys(n, path, ["id", "label", "shape", "pos", "fill", "tone", "hidden"]);
+      ctx.keys(n, path, ["id", "label", "shape", "pos", "fill", "tone", "dashed", "hidden"]);
       if (n.shape !== undefined) ctx.enumOf(n.shape, `${path}.shape`, ["rect", "circle", "ellipse"], "shape");
       if (n.tone !== undefined) ctx.enumOf(n.tone, `${path}.tone`, TONES, "tone");
       if (n.pos !== undefined) ctx.vec2(n.pos, `${path}.pos`);

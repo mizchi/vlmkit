@@ -558,7 +558,7 @@ when the cursor goes backwards.`,
 Nothing is timed: order is the meaning, each message one beat captioned "a → b: label" (returns "b ← a: label").
 The check warns about a return from a participant no call activated, a participant never messaged, an alt with one branch.`,
   diagram: `kind: diagram — boxes and arrows, narrated in beats
-  "nodes": [ {"id", "label", "shape": "rect" | "circle" | "ellipse", "pos": [x, y], "fill", "tone", "hidden": true} ]   required; "tone": "accent" fills the box, "bad" | "muted" colour outline and label
+  "nodes": [ {"id", "label", "shape": "rect" | "circle" | "ellipse", "pos": [x, y], "fill", "tone", "dashed": true, "hidden": true} ]   required; "tone": "accent" fills the box, "bad" | "muted" colour outline and label; "dashed": a box that is not (or no longer) there
   "edges": [ {"from", "to", "label", "style": "arrow" | "line" | "dashed" | "implements" | "forbidden", "tone", "hidden": true} ]
              implements: dashed with a hollow head (realises an interface); forbidden: dashed red, ignored by the layout; "tone": "accent" | "bad" | "muted" colours one edge in a still
   "groups": [ {"id", "label", "nodes": [ids], "parent": group id} ]   containers, nested with "parent"; ids are anchors and highlight targets
@@ -570,7 +570,7 @@ The check warns about a return from a participant no call activated, a participa
       {"relabel": {"id", "text"}}
 Hidden nodes stay invisible until a "show" step. A "flow" needs an edge between the two nodes.`,
   modules: `kind: modules — a module map: layers with dependencies pointing one way, containers around what belongs together (a still figure unless it has a sequence)
-  "modules": [ "id" | {"id", "label", "tone", "hidden": true} ]               required; "tone": "accent" fills the box, "bad" | "muted" colour outline and label
+  "modules": [ "id" | {"id", "label", "tone", "dashed": true, "hidden": true} ]   required; "tone": "accent" fills the box, "bad" | "muted" colour outline and label; "dashed": a box that is not (or no longer) there
   "deps":    [ ["a", "b"] | {"from", "to", "label", "style", "tone", "hidden": true} ]   ["a", "b"] reads "a depends on b": arrow a → b, a drawn above b
              "style": "arrow" (default) | "line" (no head) | "dashed" (optional / weak, still laid out) | "implements" (dashed, hollow head: realises an interface, still laid out)
                       | "forbidden" (dashed red, drawn but ignored by the layout: the import that must not exist)
