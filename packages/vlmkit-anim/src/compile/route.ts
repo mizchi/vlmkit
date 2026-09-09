@@ -75,10 +75,30 @@ export function routeAround(from: [number, number], to: [number, number], blocke
         // the edge does not swing away from where it is going and back across whatever lies between.
         const destLow = steep ? c[0] <= box.x + box.w / 2 : c[1] <= box.y + box.h / 2;
         const low = lenOther < lenLean * 0.85 ? !leanLow : Math.abs(lenOther - lenLean) <= lenLean * 0.15 ? destLow : leanLow;
+        const clears = (w: [number, number]) => segmentInside([prev, w], box) <= 2 && segmentInside([w, c], box) <= 2;
         let w: [number, number] = prev;
+        let found = false;
         for (const margin of [14, 26, 40]) {
           w = detour(low, margin);
-          if (segmentInside([prev, w], box) <= 2 && segmentInside([w, c], box) <= 2) break;
+          if (clears(w)) {
+            found = true;
+            break;
+          }
+        }
+        // A leg at 30° from above right to below left is "mostly horizontal", but a waypoint under the box is
+        // reached through the box; round the box's other pair of sides then, and failing that past the corner
+        // nearest the leg (v23: an a11y arrow into the merge box ran through the visual track's widest node).
+        if (!found) {
+          const side = (vertical: boolean, low: boolean, margin: number): [number, number] =>
+            vertical ? [low ? box.x - margin : box.x + box.w + margin, box.y + box.h / 2] : [box.x + box.w / 2, low ? box.y - margin : box.y + box.h + margin];
+          const corners: [number, number][] = [14, 26].flatMap((m) => [
+            [box.x - m, box.y - m],
+            [box.x + box.w + m, box.y - m],
+            [box.x - m, box.y + box.h + m],
+            [box.x + box.w + m, box.y + box.h + m],
+          ]);
+          const candidates: [number, number][] = [...[14, 26, 40].flatMap((m) => [side(!steep, true, m), side(!steep, false, m)]), ...corners].filter(clears);
+          if (candidates.length) w = candidates.reduce((best, cand) => (length(cand) < length(best) ? cand : best));
         }
         next.push(w);
       }

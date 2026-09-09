@@ -22,6 +22,7 @@ This page is the complete writing guide. Every JSON block on it passes
                                                      a graph's visits and path, a state machine's transitions and end state, a distributed scene's messages and lost ones
    vlmkit-anim facts src --depth 1 --out f.json      a fact sheet from a directory's import graph, for a map drawn by hand from the code
    vlmkit-anim diff before.json after.json --out d.svg   two module maps as one figure: added in accent, removed dashed grey; --expect checks the change
+   vlmkit-anim import mermaid page.md --out scene.json   a flowchart / graph, sequenceDiagram or stateDiagram-v2 as a scene; says what it dropped
    vlmkit-anim layout scene.json                     texts on texts, under boxes, past the edge, lines through texts, containers crossing — per step (check warns about these too)
    vlmkit-anim review scene.json --out dir           the sheet + a review brief for a vision model or an agent; --answers its JSON scores it
                                                      (a still figure is read back instead: modules, containers, nesting, arrows — scored against the facts it draws)
@@ -677,6 +678,7 @@ once, `"from->to"`, a frame's label, `"participants"`.
 | `nodes` | required: `{"id", "label", "shape": rect \| circle \| ellipse, "pos": [x, y], "fill", "tone", "dashed": true, "hidden": true}`; `tone` is `accent` (fills the box), `bad` or `muted` (outline and label) — a colour role for a still, without a `highlight` step; `dashed` draws the outline dashed: a box that is not, or no longer, there |
 | `edges` | `{"from", "to", "label", "style": arrow \| line \| dashed \| implements \| forbidden, "tone", "hidden": true}`; `implements` is dashed with a hollow head (realises an interface, still laid out); `tone` colours one edge `accent` \| `bad` \| `muted` |
 | `layout` | `lr` (default) \| `tb` \| `grid` \| `circle`; nodes with `pos` are pinned |
+| `groups` | `{"id", "label", "nodes": [ids], "parent": id}` — a container around the nodes that belong together, nested with `parent`; the same field as `modules`' (which says `modules` for the list), with the same layout: a group that owns its layers is a row, groups that share a layer sit side by side, and a parent's width is shared out among its children the same way |
 | `sequence` | one action per step + optional `caption`, `ms`: `{"show": id \| [ids]}` `{"hide": …}` `{"highlight": …}` `{"unhighlight": …}` `{"flow": "a->b"}` (token travels along an existing edge, either direction) `{"note": "…"}` (captioned pause) `{"relabel": {"id", "text"}}` |
 
 Hidden nodes and edges stay invisible until a `show`; an edge follows its nodes' visibility.
@@ -1158,6 +1160,54 @@ a hold costs one frame.
 `sheet` and `video` divide the review work: the sheet is one image for a
 vision model, the video is for a person.
 
+## Importing a mermaid diagram
+
+A repository already has diagrams. `vlmkit-anim import mermaid` reads the
+common subset of three of them into scenes and says what it dropped:
+
+```
+vlmkit-anim import mermaid docs/pipeline.md --out pipeline.json         # the page's first ```mermaid fence (--nth 1 for the second)
+vlmkit-anim import mermaid flow.mmd --as flowchart --out flow.json      # a bare .mmd file
+```
+
+- **`flowchart` / `graph`** → `flowchart` when the source has a decision
+  `{}` node, else `diagram` with its `subgraph`s as groups (nested ones keep
+  their parent). `--as diagram | flowchart | modules` picks — for this source
+  only; a sequenceDiagram or stateDiagram-v2 has one kind. Node shapes map
+  (`([ ])` and `(( ))` are terminals, `[/ /]` is io, `{ }` a decision), edge
+  labels (`-->|yes|`, `-- no -->`) become the edges' labels, `&` fans out,
+  `<br/>` in a label is a line break. `style`, `linkStyle`, `classDef`,
+  `class` and `click` lines are dropped and counted — colour with `tone`;
+  a `direction` inside a subgraph is dropped and counted too (a scene has
+  one layout). A diagram without a `canvas` is sized to what it draws, so
+  a label over 300px wide is named in a `notes:` line: the canvas grows to
+  fit the widest label in each layer, and shortening any other changes nothing.
+- **`sequenceDiagram`** → `sequence`: `participant` / `actor` with `as`
+  labels, `->>` calls, `-->>` returns, `-)` async, `loop` and `alt` / `else`
+  frames, `Note over X:` as a captioned note. `opt` and `break` become a loop
+  frame labelled `opt: …`; `par`, `critical` and `rect` are flattened; a lost
+  message `-x` is drawn as a plain one. `activate` / `deactivate` are
+  ignored: activation is drawn from calls and returns.
+- **`stateDiagram-v2`** → `state-machine`: `[*] -->` names the initial
+  state, `--> [*]` marks a final one, `A --> B: event` is a transition (one
+  without an event is named `A → B`), `state "Label" as A` labels. Composite
+  states are flattened, notes dropped, and the scene has **no trace** — add
+  the events to fire, or the diagram is a still.
+
+The summary line says what came through and what did not:
+
+```
+flowchart / graph → diagram: 22 nodes · 23 edges · 7 groups
+  dropped / changed:
+    - 5 style / linkStyle line(s) — colour with "tone" instead
+  notes:
+    - 1 label(s) over 300px wide (VIS_SEM) — the canvas grows to fit the widest; a <br/> or a shorter label keeps the picture legible
+```
+
+then the scene's own `check` lines. What the import cannot know — a title,
+captions, a walk, a trace — is the writer's; what it drops is named so the
+writer can put it back by hand.
+
 ## Embedding
 
 `vlmkit-anim html scene.json --out page.html` writes a page with the runtime inline. For a site with many animations:
@@ -1174,6 +1224,59 @@ Attributes: `src`, `autoplay`, `loop`, `speed="1.5"`, `nocontrols`. Properties:
 Events: `step` (`detail: {index, step, time}`), `ended`. Under
 `prefers-reduced-motion: reduce` it does not autoplay and shows the final
 frame; the step buttons still walk the chapters.
+
+### Markdown: a fenced scene becomes the animation
+
+A scene can live in the prose that explains it. In a Markdown page:
+
+````markdown
+```vlm-anim
+{ "format": "vlmkit-anim/scene@1", "kind": "sort", "values": [5, 2, 4, 1], "algorithm": "bubble" }
+```
+
+```vlm-anim still
+{ "format": "vlmkit-anim/scene@1", "kind": "modules", "modules": ["web", "api"], "deps": [["web", "api"]] }
+```
+````
+
+`@mizchi/vlmkit-anim/remark` is a remark plugin with no dependencies of its
+own: every ```` ```vlm-anim ```` fence becomes the `<vlm-anim>` element with
+the timeline inline — the runtime `<script>` once per document, before the
+first — and a fence marked `still` becomes the figure as inline SVG. A scene
+that does not compile becomes a visible `<pre>` with the check's lines, not a
+build failure. The info string takes `still`, `autoplay=false`, `loop`,
+`nocontrols`.
+
+```js
+import remarkVlmAnim from "@mizchi/vlmkit-anim/remark";
+unified().use(remarkParse).use(remarkVlmAnim).use(remarkRehype, { allowDangerousHtml: true }).use(rehypeStringify, { allowDangerousHtml: true });
+```
+
+VitePress (markdown-it) wraps the same function around its fence rule:
+
+```js
+// .vitepress/config.mts
+import { renderFence, parseFenceMeta } from "@mizchi/vlmkit-anim/remark";
+export default {
+  markdown: {
+    config(md) {
+      const fence = md.renderer.rules.fence;
+      let runtime = false;
+      md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+        const [lang, ...meta] = tokens[idx].info.trim().split(/\s+/);
+        if (lang !== "vlm-anim") return fence(tokens, idx, options, env, self);
+        const res = renderFence(tokens[idx].content, { ...parseFenceMeta(meta.join(" ")), includeRuntime: !runtime });
+        runtime ||= res.runtimeIncluded;
+        return res.html;
+      };
+    },
+  },
+};
+```
+
+`vlmkit-anim check` reads the same JSON, so the scenes in a site's pages are
+checked the way its fixtures are: extract the fences (any Markdown tool) and
+run `check` on each, or keep the scenes as files and paste them in.
 
 Because the motion is ordinary Web Animations on ordinary SVG, `vlmkit check
 animation page.html` evaluates it like any other page (visible effect, settle

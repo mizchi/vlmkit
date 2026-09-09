@@ -6,26 +6,102 @@
 
 import type { DiagramScene, Timeline, Tone } from "../types.ts";
 import { Builder, along, boxRadius, labelWidth, trimEdge } from "./builder.ts";
-import { layoutNodes } from "./layout.ts";
+import { circleRadius, layoutNodes, type LayoutGroup, type LayoutInput } from "./layout.ts";
 
 import { routeAround, segmentInside, type Box, type Seg } from "./route.ts";
 export { segmentInside } from "./route.ts";
 
+type LayoutArgs = Omit<LayoutInput, "width" | "height" | "nodeW" | "nodeH">;
+
+/**
+ * A canvas that fits when the scene names none: the default 640×360 holds eight boxes; an imported
+ * architecture graph has thirty (v23: a mermaid pipeline's nodes were laid out off the canvas). The
+ * layered layout places every node at a fraction of the free area that does not depend on the size, so
+ * the picture is laid out once on a unit square and scaled until the tightest pair of neighbours has
+ * room — two boxes in one layer with a container edge between them need both paddings and a gap, two
+ * layers need their halves and an arrow's length. A guess from counts (widest layer × widest label, then
+ * group counts) was either double what the picture needed or left containers crossing.
+ */
+function autoCanvas(scene: DiagramScene, args: LayoutArgs, sizes: Map<string, [number, number]>, groupPad: number, groupOf: Map<string, string>, padOf: Map<string, number>): { width: number; height: number } {
+  const layout = scene.layout ?? "lr";
+  const maxW = Math.max(60, ...[...sizes.values()].map((s) => s[0]));
+  const maxH = Math.max(20, ...[...sizes.values()].map((s) => s[1]));
+  const groups = groupOf.size > 0;
+  const pad = (id: string) => padOf.get(id) ?? 0;
+  if (layout === "grid" || layout === "circle") {
+    const n = args.ids.length;
+    const cols = Math.ceil(Math.sqrt(n * 1.5));
+    const rows = Math.ceil(n / cols);
+    const w = layout === "circle" ? 2 * circleRadius(n, Math.max(maxW, maxH)) + 2 * Math.max(maxW, maxH) : cols * (maxW * 1.5 + groupPad) + 80;
+    const h = layout === "circle" ? w : rows * (maxH * 1.8 + groupPad) + 120;
+    return { width: Math.max(640, Math.ceil(w)), height: Math.max(360, Math.ceil(h)) };
+  }
+  const U = 10000;
+  const pos = layoutNodes({ ...args, width: U, height: U, nodeW: maxW, nodeH: maxH }, layout);
+  const tb = layout === "tb";
+  const cross = (id: string) => pos.get(id)![tb ? 0 : 1] / U;
+  const main = (id: string) => pos.get(id)![tb ? 1 : 0] / U;
+  const wOf = (id: string) => sizes.get(id)![tb ? 0 : 1];
+  const hOf = (id: string) => sizes.get(id)![tb ? 1 : 0];
+  const sameGroup = (a: string, b: string) => (groupOf.get(a) ?? "") === (groupOf.get(b) ?? "");
+  const sameLayer = (a: string, b: string) => Math.abs(main(a) - main(b)) < 1e-4;
+  // Each container's reach along the layers: two containers side by side across the picture are the ones
+  // that share a layer — a row above them costs nothing across.
+  const reach = new Map<string, [number, number]>();
+  for (const id of args.ids) {
+    const g = groupOf.get(id);
+    if (!g) continue;
+    const r = reach.get(g) ?? [main(id), main(id)];
+    reach.set(g, [Math.min(r[0], main(id)), Math.max(r[1], main(id))]);
+  }
+  const besides = (a: string, b: string): boolean => {
+    const ra = reach.get(groupOf.get(a) ?? "");
+    const rb = reach.get(groupOf.get(b) ?? "");
+    return !!ra && !!rb && ra[0] <= rb[1] + 1e-4 && rb[0] <= ra[1] + 1e-4;
+  };
+  const ids = args.ids;
+  // The free length one axis needs: for every pair that has to keep apart along it, their room over the
+  // fraction between them; for the first and last, the half box plus a padding over the fraction to the edge.
+  const fit = (pairs: (a: string, b: string) => number, coord: (id: string) => number, half: (id: string) => number): number => {
+    let out = 0;
+    for (const a of ids) {
+      for (const b of ids) {
+        const d = coord(b) - coord(a);
+        if (d < 1e-6) continue;
+        const room = pairs(a, b);
+        if (room > 0) out = Math.max(out, room / d);
+      }
+      out = Math.max(out, (half(a) + pad(a)) / Math.max(coord(a), 0.02), (half(a) + pad(a)) / Math.max(1 - coord(a), 0.02));
+    }
+    return out;
+  };
+  // Across: two boxes in one layer keep a gap; over a container edge, both paddings too — also between boxes
+  // of two containers that share a layer, whatever layers the boxes themselves are on (a container spans all of its members).
+  const acrossFree = fit(
+    (a, b) => (sameLayer(a, b) ? wOf(a) / 2 + wOf(b) / 2 + 28 + (sameGroup(a, b) ? 0 : pad(a) + pad(b)) : !sameGroup(a, b) && besides(a, b) ? wOf(a) / 2 + wOf(b) / 2 + 28 + pad(a) + pad(b) : 0),
+    cross,
+    (id) => wOf(id) / 2,
+  );
+  // Along: a layer to the next is a box and an arrow's length; over a container edge, when the two boxes are in
+  // the same column of the picture, the paddings and a label band as well.
+  const stacked = (a: string, b: string) => Math.abs(cross(a) - cross(b)) * acrossFree < wOf(a) / 2 + wOf(b) / 2 + pad(a) + pad(b);
+  const alongFree = fit((a, b) => hOf(a) / 2 + hOf(b) / 2 + 56 + (!sameGroup(a, b) && stacked(a, b) ? pad(a) + pad(b) + 16 : 0), main, (id) => hOf(id) / 2 + (groups ? 16 : 0));
+  const alongMain = alongFree + 90 + groupPad * 2;
+  const alongCross = acrossFree + 40 + groupPad * 2;
+  const [w, h] = tb ? [alongCross, alongMain] : [alongMain, alongCross];
+  return { width: Math.max(640, Math.ceil(w)), height: Math.max(360, Math.ceil(h)) };
+}
+
 export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modules" = "diagram"): Timeline {
-  const b = new Builder(scene, { width: 640, height: 360, stepMs: 700 });
-  const T = b.theme;
-  // Colour roles for a still (gb, v13, v14: "no colour field on deps edges — colouring one edge requires reaching
-  // into the beat/sequence/highlight machinery on what is supposed to be a motion-free still figure").
-  const toneStroke = (tone: Tone | undefined, plain: string): string => (tone === "accent" ? T.accent : tone === "bad" ? T.bad : tone === "muted" ? T.muted : plain);
-  const nodeFill = (n: { fill?: string; tone?: Tone }): string => n.fill ?? (n.tone === "accent" ? T.accent : T.node);
+  const fontSize = scene.theme?.fontSize ?? 14;
   const ids = scene.nodes.map((n) => n.id);
   const fixed = new Map<string, [number, number]>();
   for (const n of scene.nodes) if (n.pos) fixed.set(n.id, n.pos);
   const sizes = new Map<string, [number, number]>();
   for (const n of scene.nodes) {
     const label = n.label ?? n.id;
-    const w = labelWidth(label, T.fontSize);
-    const h = T.fontSize * 1.2 * label.split("\n").length + T.fontSize * 1.4;
+    const w = labelWidth(label, fontSize);
+    const h = fontSize * 1.2 * label.split("\n").length + fontSize * 1.4;
     sizes.set(n.id, n.shape === "circle" ? [Math.max(w, h), Math.max(w, h)] : [w, h]);
   }
   const maxW = Math.max(...[...sizes.values()].map((s) => s[0]));
@@ -50,25 +126,45 @@ export function compileDiagram(scene: DiagramScene, kindName: "diagram" | "modul
   const depthBelow = (g: (typeof groups)[number]): number => Math.max(0, ...childrenOf(g.id).map((c) => depthBelow(c) + 1));
   const depthOf = (g: (typeof groups)[number]): number => (g.parent && byId.has(g.parent) ? depthOf(byId.get(g.parent)!) + 1 : 0);
   const roots = groups.filter((g) => !g.parent || !byId.has(g.parent));
-  const cluster = new Map<string, string>();
-  for (const g of groups) for (const n of g.nodes) cluster.set(n, g.id);
+  // node → the innermost group it belongs to: the container whose padding it keeps from a neighbour.
+  const innermost = new Map<string, string>();
+  for (const g of groups) for (const n of g.nodes) innermost.set(n, g.id);
   const maxDepth = Math.max(0, ...groups.map(depthBelow));
+  const tree = (g: (typeof groups)[number]): LayoutGroup => ({ id: g.id, nodes: g.nodes, children: childrenOf(g.id).map(tree) });
   // Containers need room for their padding and label: the free area shrinks by a band per group level.
   const groupPad = groups.length ? 18 + maxDepth * 14 : 0;
+  const layoutArgs: LayoutArgs = {
+    ids,
+    edges,
+    fixed,
+    // The group tree: a parent's range is shared out among its children the way the picture is among the
+    // roots, so two sibling containers get their own slots instead of one band that spreads their members
+    // evenly (pa, pb, v23: an imported pipeline's three tracks under one "Parallel" subgraph were one
+    // full-width row, and the middle track's widest box crossed both neighbours until the canvas was 2700px).
+    groups: roots.map(tree),
+    // A module map layers from its leaves: what two modules depend on decides their layer, not what
+    // depends on them (fa, v13: the same dependency set landed on different layers under the root walk).
+    layering: kindName === "modules" ? "sinks" : "sources",
+  };
+  // A scene that names its canvas, or places a node itself, is drawn as written; otherwise the canvas fits the picture.
+  const named = scene.canvas?.width !== undefined && scene.canvas?.height !== undefined;
+  // A container's padding grows by 24 per level it holds — what two neighbours over a container edge keep between them.
+  const padOf = new Map<string, number>();
+  for (const g of groups) for (const n of g.nodes) padOf.set(n, 14 + depthBelow(g) * 24);
+  const fit = named || fixed.size ? { width: 640, height: 360 } : autoCanvas(scene, { ...layoutArgs, fixed: new Map() }, sizes, groupPad, innermost, padOf);
+  const b = new Builder(scene, { ...fit, stepMs: 700 });
+  const T = b.theme;
+  // Colour roles for a still (gb, v13, v14: "no colour field on deps edges — colouring one edge requires reaching
+  // into the beat/sequence/highlight machinery on what is supposed to be a motion-free still figure").
+  const toneStroke = (tone: Tone | undefined, plain: string): string => (tone === "accent" ? T.accent : tone === "bad" ? T.bad : tone === "muted" ? T.muted : plain);
+  const nodeFill = (n: { fill?: string; tone?: Tone }): string => n.fill ?? (n.tone === "accent" ? T.accent : T.node);
   const pos = layoutNodes(
     {
-      ids,
-      edges,
-      fixed,
+      ...layoutArgs,
       width: b.width - 40 - groupPad * 2,
       height: b.height - 90 - groupPad * 2,
       nodeW: maxW + groupPad,
       nodeH: maxH + groupPad,
-      groups: roots.map((g) => ({ id: g.id, nodes: membersOf(g) })),
-      cluster,
-      // A module map layers from its leaves: what two modules depend on decides their layer, not what
-      // depends on them (fa, v13: the same dependency set landed on different layers under the root walk).
-      layering: kindName === "modules" ? "sinks" : "sources",
     },
     scene.layout ?? "lr",
   );

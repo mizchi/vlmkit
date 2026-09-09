@@ -1,0 +1,21 @@
+sequenceDiagram
+  title Place order
+  actor customer as Customer
+  participant shop as Shop
+  participant stock as Stock
+  participant payment as Payment
+  participant mail as Mail
+  customer->>shop: place order
+  shop->>stock: reserve(items)
+  stock-->>shop: reserved
+  loop until paid, max 2
+    shop->>payment: charge(card)
+    alt declined
+      payment-->>shop: declined
+    else approved
+      payment-->>shop: receipt
+    end
+  end
+  Note over shop: order is final
+  shop-)mail: send confirmation
+  shop-->>customer: order #4711

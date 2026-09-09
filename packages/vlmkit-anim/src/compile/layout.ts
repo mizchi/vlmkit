@@ -7,6 +7,13 @@
  * them.
  */
 
+/** A container for the layout: its own nodes and, when groups nest, the groups inside it. */
+export interface LayoutGroup {
+  id: string;
+  nodes: string[];
+  children?: LayoutGroup[];
+}
+
 export interface LayoutInput {
   ids: string[];
   edges: [string, string][];
@@ -21,9 +28,7 @@ export interface LayoutInput {
    * axis (a "frontend" row above a "domain" row); groups that share a layer with something else each get
    * their own band across the layers, so a container drawn around its members never encloses a bystander.
    */
-  groups?: { id: string; nodes: string[] }[];
-  /** node → the innermost group it belongs to, when groups nest: members of one child group stay contiguous within a band. */
-  cluster?: Map<string, string>;
+  groups?: LayoutGroup[];
   /**
    * `sources` (default): a node's layer is one past the deepest node with an edge into it — a walk from the
    * roots, as a graph traversal reads. `sinks`: one past the deepest node it points to — leaves at the end,
@@ -155,77 +160,70 @@ export function layoutNodes(input: LayoutInput, mode: LayoutMode): Map<string, [
   const mainOf = (li: number) => (nLayers === 1 ? 0.5 : (li + 0.5) / nLayers);
 
   if (input.groups?.length) {
-    const bandOf = new Map<string, string>();
-    for (const g of input.groups) for (const n of g.nodes) if (!bandOf.has(n)) bandOf.set(n, g.id);
-    // A group owns a layer when every node in it is a member; a group that owns every layer it spans needs
-    // no band — its container is a full-width row (or column) of the picture.
-    const span = new Map<string, [number, number]>();
-    for (const id of free) {
-      const g = bandOf.get(id);
-      if (!g) continue;
-      const l = layerOf.get(id) ?? 0;
-      const s = span.get(g) ?? [l, l];
-      span.set(g, [Math.min(s[0], l), Math.max(s[1], l)]);
-    }
-    const exclusive = new Set<string>();
-    for (const [g, [lo, hi]] of span) {
-      if (!free.every((id) => bandOf.get(id) === g || (layerOf.get(id) ?? 0) < lo || (layerOf.get(id) ?? 0) > hi)) continue;
-      // …and no other group reaches across its layers: a full-width row through a column another group spans
-      // is two containers crossing (fe, v21: "Adapters" drawn as a row through the "Core domain" column, and
-      // the reader put the port inside both).
-      const crossed = [...span].some(([h, [lo2, hi2]]) => h !== g && lo2 < lo && hi2 > hi);
-      if (!crossed) exclusive.add(g);
-    }
-    // Bands for the rest, in declaration order, plus one for the ungrouped: each as wide as its fullest layer.
-    const bandName = (id: string): string => {
-      const g = bandOf.get(id);
-      return g && !exclusive.has(g) ? g : g ? " full" : " none";
-    };
-    const bands = [...input.groups.map((g) => g.id).filter((g) => !exclusive.has(g)), " none"];
-    const cell = new Map<string, string[]>(); // `${band} ${layer}` → members
-    const bandSize = new Map<string, number>();
     orderLayers(ordered, edges);
-    ordered.forEach((members, li) => {
+    const layerIndex = new Map<number, number>(layerKeys.map((l, i) => [l, i]));
+    const li = (id: string) => layerIndex.get(layerOf.get(id) ?? 0) ?? 0;
+    const allMembers = (g: LayoutGroup): string[] => [...new Set([...g.nodes, ...(g.children ?? []).flatMap(allMembers)])];
+    // Members of one level, its groups, and the range of the cross axis they may use. A group whose layers hold
+    // nothing else at this level spans the whole range (a row); the rest share the range as bands, each as wide
+    // as its fullest layer, the ungrouped last. Inside a group the same rule places its own nodes and its
+    // children (v23: a parent's children were spread evenly through the parent's band, so two sibling
+    // containers crossed wherever one child's layer was wider than another's).
+    const assign = (members: string[], groups: LayoutGroup[], lo: number, hi: number): void => {
+      const here = new Set(members);
+      const bandOf = new Map<string, LayoutGroup>();
+      for (const g of groups) for (const n of allMembers(g)) if (here.has(n) && !bandOf.has(n)) bandOf.set(n, g);
+      const span = new Map<LayoutGroup, [number, number]>();
       for (const id of members) {
-        const band = bandName(id);
-        if (band === " full") continue;
-        const key = `${band} ${li}`;
-        const arr = [...(cell.get(key) ?? []), id];
-        cell.set(key, arr);
-        bandSize.set(band, Math.max(bandSize.get(band) ?? 0, arr.length));
+        const g = bandOf.get(id);
+        if (!g) continue;
+        const l = li(id);
+        const sp = span.get(g) ?? [l, l];
+        span.set(g, [Math.min(sp[0], l), Math.max(sp[1], l)]);
       }
-    });
-    // Nested groups: within a cell, the members of one inner group sit next to each other (stable), so the inner
-    // container is one box and not a comb across its siblings.
-    if (input.cluster?.size) {
-      const cl = input.cluster;
-      for (const [key, arr] of cell) {
-        const firstIndex = new Map<string, number>();
-        arr.forEach((id, i) => {
-          const c = cl.get(id) ?? "";
-          if (!firstIndex.has(c)) firstIndex.set(c, i);
-        });
-        cell.set(key, [...arr].sort((a, c) => (firstIndex.get(cl.get(a) ?? "")! - firstIndex.get(cl.get(c) ?? "")!) || arr.indexOf(a) - arr.indexOf(c)));
+      const exclusive = new Set<LayoutGroup>();
+      for (const [g, [glo, ghi]] of span) {
+        if (!members.every((id) => bandOf.get(id) === g || li(id) < glo || li(id) > ghi)) continue;
+        // …and no other group reaches across its layers: a full-width row through a column another group spans
+        // is two containers crossing (fe, v21: "Adapters" drawn as a row through the "Core domain" column, and
+        // the reader put the port inside both).
+        const crossed = [...span].some(([h, [lo2, hi2]]) => h !== g && lo2 < glo && hi2 > ghi);
+        if (!crossed) exclusive.add(g);
       }
-    }
-    const used = bands.filter((b) => bandSize.has(b));
-    const total = Math.max(1, used.reduce((s, b) => s + bandSize.get(b)!, 0));
-    let start = 0;
-    const bandStart = new Map<string, number>();
-    for (const b of used) {
-      bandStart.set(b, start);
-      start += bandSize.get(b)!;
-    }
-    ordered.forEach((members, li) => {
-      const main = mainOf(li);
-      const full = members.filter((id) => bandName(id) === " full");
-      full.forEach((id, mi) => place(id, main, (mi + 0.5) / full.length));
+      // What goes where at this level: a row group's members within the whole range, recursively; a band
+      // group's within its band; the ungrouped in the last band.
+      const inside = (g: LayoutGroup, blo: number, bhi: number): void => {
+        const mine = members.filter((id) => bandOf.get(id) === g);
+        if (g.children?.length) assign(mine, g.children, blo, bhi);
+        else {
+          const cells = new Map<number, string[]>();
+          for (const id of ordered.flat()) if (mine.includes(id)) cells.set(li(id), [...(cells.get(li(id)) ?? []), id]);
+          for (const cell of cells.values()) cell.forEach((id, mi) => place(id, mainOf(li(id)), blo + ((mi + 0.5) / cell.length) * (bhi - blo)));
+        }
+      };
+      for (const g of exclusive) inside(g, lo, hi);
+      const bands: (LayoutGroup | " none")[] = [...groups.filter((g) => span.has(g) && !exclusive.has(g)), " none"];
+      const bandSize = new Map<LayoutGroup | " none", number>();
+      for (const b of bands) {
+        const mine = members.filter((id) => (b === " none" ? !bandOf.has(id) : bandOf.get(id) === b));
+        const perLayer = new Map<number, number>();
+        for (const id of mine) perLayer.set(li(id), (perLayer.get(li(id)) ?? 0) + 1);
+        if (mine.length) bandSize.set(b, Math.max(...perLayer.values()));
+      }
+      const used = bands.filter((b) => bandSize.has(b));
+      const total = Math.max(1, used.reduce((sum, b) => sum + bandSize.get(b)!, 0));
+      let start = lo;
       for (const b of used) {
-        const cellMembers = cell.get(`${b} ${li}`) ?? [];
-        const size = bandSize.get(b)!;
-        cellMembers.forEach((id, mi) => place(id, main, (bandStart.get(b)! + ((mi + 0.5) / cellMembers.length) * size) / total));
+        const width = ((hi - lo) * bandSize.get(b)!) / total;
+        if (b === " none") {
+          const cells = new Map<number, string[]>();
+          for (const id of ordered.flat()) if (here.has(id) && !bandOf.has(id)) cells.set(li(id), [...(cells.get(li(id)) ?? []), id]);
+          for (const cell of cells.values()) cell.forEach((id, mi) => place(id, mainOf(li(id)), start + ((mi + 0.5) / cell.length) * width));
+        } else inside(b, start, start + width);
+        start += width;
       }
-    });
+    };
+    assign(free, input.groups, 0, 1);
     return pos;
   }
   orderLayers(ordered, edges);
