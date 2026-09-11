@@ -44,6 +44,13 @@ Dates are YYYY-MM-DD.
   `agent-validation-loop` gains the anim-ir run (24 rounds, 86 attempts) as a second reference: the docs as
   the only input, a fact sheet as the success criterion, two unlike measurements compared, "what told you"
   per round, two model sizes per brief, a corpus check on every compiler change.
+- **Skill `explain-with-anim`** (the fifteenth workflow): answering a question — "how does this work", "how is
+  this structured", "what does this PR change" — with a figure and a narration that walks it. Decides whether a
+  picture helps (four or more things and their relations, an order, a before / after), chooses the picture from
+  the question (a module map from `facts`, a walked request, a state machine, an algorithm's kind, `pr` / `diff`
+  for a branch), grounds it in the code rather than memory, checks it (`check --expect`, `layout`), and writes
+  the prose from `explain`'s beats naming ids, never geometry. `explanatory-animation` stays the scene-writing
+  reference and points at it.
 
 ## 0.22.0 — 2026-09-09
 

@@ -21,6 +21,11 @@ Two layers: a **Scene** (`kind` + intent — `"algorithm": "bubble"`,
 compiles to a **Timeline** (nodes, keyframe tracks, captioned steps). Write
 the scene; read the timeline only through the verbs below.
 
+When the task is to *answer a question* with a figure — "how does this
+work", "how is this structured", "what does this PR change" — `explain-with-anim`
+decides what to draw, from what, and how the prose follows it; this skill is
+how the scene itself is written and checked.
+
 **The one page to read before writing is `docs/anim-ir.md`** (in this repo)
 — every kind, its ops, the annotation ops every kind shares, and one JSON
 example per kind that `check` passes. `vlmkit-anim schema --kind <k>` prints

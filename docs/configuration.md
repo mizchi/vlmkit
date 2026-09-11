@@ -144,7 +144,7 @@ the snapshot, workflow, and diff-pr sections.
 
 ## Agent Skills (APM)
 
-vlmkit ships fourteen coding-agent skills under `.claude/skills/`. They wrap
+vlmkit ships fifteen coding-agent skills under `.claude/skills/`. They wrap
 the most common workflows as standalone, agent-readable playbooks.
 Other repos can install them via [APM](https://agentskills.io):
 
@@ -168,6 +168,7 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 | `markup-decompose` | routes `contract introspect` → `auto-markup` → `check story` | Whole screen: decide the component split, then freeze each part as a baseline |
 | `component-vrt` | `vlmkit check story --gallery <url>` | Repair one component with a component-sized diff; includes gallery templates (vanilla / React / Vue) |
 | `agent-validation-loop` | disposable subagent runs → friction → fix → re-run | Harden a CLI/library by measuring whether agents can drive it |
+| `explain-with-anim` | question → picture (`facts` / `repo` / `pr` / a kind) → `check --expect` → `still` / `video` → prose that walks `explain`'s beats | Answer "how does this work / how is it structured / what does this change" with a checked figure and a narration |
 | `explanatory-animation` | `vlmkit-anim check\|layout\|why\|still\|html\|video`, `import mermaid`, `facts`, `diff`, `repo`, `pr` | Explain an algorithm, protocol or architecture as a checked animation or still figure; draw a module map held to its facts (separate binary `@mizchi/vlmkit-anim`) |
 
 Each skill assumes the `vlmkit` CLI is on `$PATH` (this repo published as
