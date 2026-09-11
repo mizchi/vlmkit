@@ -36,6 +36,14 @@ Dates are YYYY-MM-DD.
   `diagram` to `modules` changes the layering rule (forward from what points at a box vs backward from what it
   depends on) and can move the widest layer (qa, v24: 4615px → 7031px on the kind change alone).
 - Report: `docs/reports/2026-09-09-anim-ir-v24.md`.
+- **Skill `explanatory-animation`** (`.claude/skills/`, bundled into the `vlmkit` router as its fourteenth
+  workflow): the agent-facing playbook for `vlmkit-anim` — route by task (animate a kind, explain a concept
+  with annotations, draw a module map held to a fact sheet, draw the repository or a branch, diff two maps,
+  import mermaid, embed), the write → `check` → `explain` → `layout` → `why` → `still` / `html` / `video` loop,
+  the done condition, and how to read the canvas, crossing, `--expect` and `dropped / changed:` lines.
+  `agent-validation-loop` gains the anim-ir run (24 rounds, 86 attempts) as a second reference: the docs as
+  the only input, a fact sheet as the success criterion, two unlike measurements compared, "what told you"
+  per round, two model sizes per brief, a corpus check on every compiler change.
 
 ## 0.22.0 — 2026-09-09
 

@@ -176,6 +176,11 @@ with `pnpm anim:samples` after changing a compiler. In this repo run it as
 `pnpm exec vlmkit-anim …` (resolves to `dist/`, so `pnpm --filter @mizchi/vlmkit-anim build`
 after editing `src/`) or, without a build, `node --experimental-strip-types packages/vlmkit-anim/src/cli.ts …`.
 
+The agent-facing playbook for writing a scene is the `explanatory-animation` skill
+(`.claude/skills/explanatory-animation/`; routed from `skills/vlmkit/SKILL.md` like the
+markup workflows). It points at `docs/anim-ir.md` as the one page to read and says how to
+read `check`'s canvas and crossing lines, `--expect`, `why` and `import mermaid`'s dropped list.
+
 The IR is judged on two things, measured by fresh subagents rather than by
 reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
 **intent is readable when someone edits the file later**. Scenario fixture:

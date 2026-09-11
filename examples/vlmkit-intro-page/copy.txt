@@ -75,6 +75,8 @@ vrt-migration-eval
 Evaluation and hardening
 vrt-css-fix-loop
 agent-validation-loop
+Explanation and figures
+explanatory-animation
 Install with APM
 curl -sSL https://aka.ms/apm-unix | sh
 apm install mizchi/vlmkit

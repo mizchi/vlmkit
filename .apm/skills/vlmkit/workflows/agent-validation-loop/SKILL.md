@@ -354,3 +354,52 @@ agent-g regressing on a class of bug (typographic cascade) that the
 existing signal hierarchy couldn't classify — the new REFLOW tag
 closed it, and post-REFLOW runs (h, i) converged within
 the budget.
+
+## Second reference run: an IR judged by its writers (anim-ir v1–v24)
+
+`vlmkit-anim` (the `explanatory-animation` skill) was built with this loop
+from its first day: 24 rounds over six days, 86 writer attempts (`a`…`qb`),
+reports `docs/reports/2026-09-0{4..9}-anim-ir-v*.md`, fixture
+`fixtures/anim-scenario/`. The tool under test is a **format** an agent
+writes, not a signal it reads, and that changed five things about the loop.
+They are worth copying whenever the deliverable is "an agent gets it right
+from the docs alone".
+
+- **The docs are the only input.** Each writer gets one brief and one guide
+  (`docs/anim-ir.md`) and is forbidden the package source, other attempts,
+  the reports and the CHANGELOG — by path, in the prompt. A writer who reads
+  the compiler is measuring their own reading, not the guide. Every JSON
+  block in the guide is compiled by a test, so the guide cannot drift from
+  the tool it describes.
+- **The success criterion is a fact sheet, not a green check.** Round 13 had
+  five green module maps and two of them were wrong (a true dependency
+  deleted, the wrong edge lit). From round 14 every brief ships
+  `facts/<brief>.expect.json` and success is `check --expect` exiting 0;
+  from round 18 the tool writes the sheet itself from the code
+  (`vlmkit-anim facts`). Whatever your tool draws or emits: find the ground
+  truth it can be held to and make the check read it, or a clean run proves
+  nothing.
+- **Two measurements, then compare them.** Geometry (`layout`) said the
+  frames were clean; vision readers on the same frames (round 12, and round
+  21 on stills) found lines through labels, containers crossing, a corner
+  label read as a caption. Each disagreement was a defect one side could not
+  see, and each became a rule in the cheaper measurement. A second, unlike
+  reader is how you learn what your first one is blind to.
+- **Ask for "what told you", per round.** From round 24 the log asks the
+  writer to quote the line — a `check` line, a `why` line, the picture, a
+  guess — that made them change what they changed. Two writers quoted the
+  same `why` line before their first edit; both then asked for it in the
+  warning itself, which is where it now is. The quote locates the fix in the
+  tool's output, not in the writer's head.
+- **Run two model sizes on the same brief.** A smaller model (haiku) beside
+  a larger one (sonnet) on the same brief, from round 14 on: the smaller one
+  hits the gaps in the guide the larger one reads past, and a fix that only
+  the larger model can use is not a fix. When the two converge on the same
+  lever from the same line, the tool said it.
+
+Two habits from this run that the ten steps above assume but do not say:
+a **corpus check** on every compiler change (`layout` over every fixture and
+attempt, diffed against the previous round's baseline — a fix for one
+writer's scene has regressed another's more than once), and a report that
+**names the next round** in its last paragraph, so the list the user gave
+and the list the evidence gives can be compared before either is started.
