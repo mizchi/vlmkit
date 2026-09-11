@@ -1,0 +1,105 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #146: skills: `explanatory-animation` workflow for vlmkit-anim; anim-ir run in agent-validation-loop",
+  "layout": "grid",
+  "canvas": {
+    "width": 982,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "examples/vlmkit-intro-page",
+      "label": "examples/vlmkit-intro-page",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "1/1 skills: `explanatory-animation` workflow for vlmkit-anim, anim-ir run f…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 17
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+652 −10"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 17 files · +652 −10 · 7 areas, 0 import edges between them"
+    }
+  ]
+}
