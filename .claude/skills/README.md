@@ -1,6 +1,6 @@
 # vlmkit agent skills
 
-vlmkit ships one automatic router backed by 14 specialized workflows.
+vlmkit ships one automatic router backed by 15 specialized workflows.
 Install once, then describe the outcome you want in ordinary language. The
 agent picks the workflow whose inputs and done condition match the task.
 
@@ -62,7 +62,7 @@ which skill the user wants.
 | Test generation | A natural-language story must become a reproducible browser test | [`spec-to-playwright`](./spec-to-playwright/) | Explore the app, generate Playwright tests, stabilize VRT, run CI gates, and heal drift |
 | Comparison and monitoring | Two renders or repeated runs must be compared | [`vrt-markup-synth`](./vrt-markup-synth/), [`vrt-visual-diff`](./vrt-visual-diff/), [`vrt-regression-watch`](./vrt-regression-watch/), [`vrt-migration-eval`](./vrt-migration-eval/) | Produce deterministic authoring signals, explain visual deltas, detect regressions over time, and evaluate framework/CSS migrations |
 | Evaluation and hardening | You are measuring the repair system or the agent-facing tool itself | [`vrt-css-fix-loop`](./vrt-css-fix-loop/), [`agent-validation-loop`](./agent-validation-loop/) | Benchmark VLM+LLM CSS recovery on known fixtures and improve tool ergonomics with fresh-agent validation loops |
-| Explanation and figures | Something has to be explained or drawn, not verified: an algorithm step by step, a protocol, a module or architecture map, a diagram the docs already carry as mermaid | [`explanatory-animation`](./explanatory-animation/) | Write one JSON scene (`kind` + intent, no coordinates) with `vlmkit-anim`; check it against its facts and its own layout; emit a `<vlm-anim>` page, a GIF, or a cropped still; import mermaid; draw a repository or a branch's change |
+| Explanation and figures | Something has to be explained or drawn, not verified: an algorithm step by step, a protocol, a module or architecture map, a diagram the docs already carry as mermaid | [`explain-with-anim`](./explain-with-anim/), [`explanatory-animation`](./explanatory-animation/) | Answer a "how does this work / what does this change" question with a figure drawn from the code and a narration that walks it (`explain-with-anim`); write one JSON scene (`kind` + intent, no coordinates) with `vlmkit-anim`, check it against its facts and its own layout, emit a `<vlm-anim>` page, a GIF, or a cropped still, import mermaid, draw a repository or a branch's change (`explanatory-animation`) |
 
 ## Selection rules
 
@@ -78,4 +78,5 @@ which skill the user wants.
 - Component, token, theme, or i18n authoring signal → `vrt-markup-synth`.
 - Known CSS deletion benchmark → `vrt-css-fix-loop`.
 - Agent-facing CLI or harness usability study → `agent-validation-loop`.
-- Animate or illustrate how something works, draw a module / dependency / architecture map, turn a mermaid diagram into a checked figure → `explanatory-animation`.
+- "Explain / walk me through / show me the structure of / what does this PR change" — an answer that needs a picture → `explain-with-anim` (decides what to draw from the code, explains beat by beat).
+- Animate or illustrate how something works, draw a module / dependency / architecture map, turn a mermaid diagram into a checked figure → `explanatory-animation` (how a scene is written and checked).

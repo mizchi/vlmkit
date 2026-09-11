@@ -1,6 +1,6 @@
 ---
 name: vlmkit
-description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, Playwright/VRT, or a visual regression — and whenever they ask to animate, illustrate or diagram how something works, or to draw a module, dependency or architecture map. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
+description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, Playwright/VRT, or a visual regression — and whenever they ask to explain, walk through, animate, illustrate or diagram how something works, or to draw a module, dependency or architecture map. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
 ---
 
 # vlmkit — Skill Router and CLI Guide
@@ -105,7 +105,8 @@ second only when the task genuinely crosses boundaries.
 | Evaluate a framework/CSS/build migration | `./workflows/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
 | Benchmark known CSS repair challenges | `./workflows/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
 | Harden an agent-facing CLI, SDK, or harness | `./workflows/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
-| Explain an algorithm, protocol or architecture as an animation or a still figure; draw a module / dependency map; import a mermaid diagram | `./workflows/explanatory-animation/SKILL.md` | Write one checked `vlmkit-anim` scene, hold it to its facts and layout, emit a page, GIF or cropped figure (separate binary: `@mizchi/vlmkit-anim`) |
+| Answer "how does this work / how is it structured / what does this change" with a figure drawn from the code and a narration that walks it | `./workflows/explain-with-anim/SKILL.md` | Choose the picture from the question, ground it in `facts` / `repo` / `pr`, check it, deliver SVG or GIF with beat-by-beat prose |
+| Write an animation or still figure as the deliverable: an algorithm, protocol or architecture; a module / dependency map; a mermaid import | `./workflows/explanatory-animation/SKILL.md` | Write one checked `vlmkit-anim` scene, hold it to its facts and layout, emit a page, GIF or cropped figure (separate binary: `@mizchi/vlmkit-anim`) |
 
 The human-facing catalog, direct install commands, and category rationale are
 in the [vlmkit skill catalog](https://github.com/mizchi/vlmkit/tree/main/.claude/skills).

@@ -22,6 +22,7 @@ const workflows = [
   "auto-markup",
   "component-vrt",
   "dynamic-markup",
+  "explain-with-anim",
   "explanatory-animation",
   "markup-assist",
   "markup-decompose",
