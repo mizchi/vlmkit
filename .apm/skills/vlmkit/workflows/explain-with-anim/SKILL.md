@@ -37,6 +37,7 @@ list of more than four named things that point at each other, draw them.
 | "What does this branch / PR change?" | `vlmkit-anim pr --base origin/main --out .vlmkit-anim/pr` — one beat per commit; or `vlmkit-anim diff before.json after.json` for two maps | git; `<name>.md` is paste-ready |
 | "What is the schedule / what slipped?" | `kind: gantt` | the plan, the slips as `slip` ops |
 | "The docs already have a mermaid diagram" | `vlmkit-anim import mermaid page.md --out scene.json`, then finish it | the diagram; read its `dropped / changed:` list |
+| "Give me a D2 file" / "something I can paste in the README as ASCII" / the repo keeps `.d2` diagrams | `d2-diagram` — D2 text laid out by TALA, rendered in the terminal | the same `facts` sheet, drawn by hand into D2; say in the prose that nothing checks the D2 against the code |
 
 One picture per question. Two aspects that both matter (structure and a
 walk) are one `modules` scene with a `sequence`, or `kind: compose` — not

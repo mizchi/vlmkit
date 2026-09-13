@@ -60,6 +60,7 @@ Nothing below needs a browser or an API key except: `.png` output, `sheet`,
 | "Show what changed between two maps" | `vlmkit-anim diff before.json after.json --out change.svg [--expect diff.json]` — added in accent, removed dashed grey, a legend; `--expect` checks the change against a diff sheet. |
 | "We already have a mermaid diagram" | `vlmkit-anim import mermaid page.md --out scene.json` (flowchart / graph, sequenceDiagram, stateDiagram-v2). Read its `dropped / changed:` and `notes:` lines; add what the import cannot know (a title, captions, a walk or trace). |
 | "Put it in the docs" | `html --out page.html` (runtime inline), `video --out demo.gif` for a README, or the remark plugin `@mizchi/vlmkit-anim/remark` so a ```` ```vlm-anim ```` fence in Markdown becomes the animation and ```` ```vlm-anim still ```` the figure. |
+| "As D2 text" / "show it in the terminal" / an existing `.d2` | Not this tool: `d2-diagram` writes the `.d2`, lays it out with TALA and renders it as box drawing in the terminal. Hand it the `facts` sheet so the D2 is drawn from the code, and say that nothing checks it. |
 
 ## The loop
 

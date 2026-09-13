@@ -184,6 +184,14 @@ this structured", "what does this PR change" — with a figure drawn from the co
 `docs/anim-ir.md` as the one page to read and says how to read `check`'s canvas and crossing lines,
 `--expect`, `why` and `import mermaid`'s dropped list.
 
+A third skill in the same class, `d2-diagram` (`.claude/skills/d2-diagram/`), is for a diagram whose
+deliverable is D2 text laid out by TALA (D2's whiteboard-style engine, open source and bundled since D2 0.9)
+and read in the terminal: `d2 --layout=tala x.d2 x.txt` renders the layout as box drawing, `--ascii-mode
+standard` as plain ASCII for a README or PR, `.svg` / `.png` for docs. Pass the flag: the in-file
+`layout-engine: tala` was honoured for SVG and not for `.txt` on the build measured. A D2 diagram is a
+drawing — nothing checks it against the code — so a map that must be true is `explanatory-animation`'s, or
+is drawn from `vlmkit-anim facts`' sheet.
+
 The IR is judged on two things, measured by fresh subagents rather than by
 reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
 **intent is readable when someone edits the file later**. Scenario fixture:

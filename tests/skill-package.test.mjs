@@ -21,6 +21,7 @@ const workflows = [
   "agent-validation-loop",
   "auto-markup",
   "component-vrt",
+  "d2-diagram",
   "dynamic-markup",
   "explain-with-anim",
   "explanatory-animation",

@@ -124,7 +124,7 @@ export const messages = Object.freeze({
     "skills.line2": "あとは自然に頼むだけ。",
     "skills.lead":
       "vlmkit をひとつ追加すれば、スキル名を覚える必要はありません。作りたい結果を伝えると、AI が依頼と素材を分類し、必要なワークフローを読み込んで、検証が通るまで実行します。",
-    "skills.note": "1 インストール · 自動ルーティング · 15 ワークフロー",
+    "skills.note": "1 インストール · 自動ルーティング · 16 ワークフロー",
     "skills.metaLabel": "メタエントリー",
     "skills.metaDescription":
       "フロントエンドの依頼で自動的に起動し、専門ワークフローを選択。利用者にスキル選択を求めず、CLI と Chromium も必要になった時だけ準備します。",
@@ -149,8 +149,8 @@ export const messages = Object.freeze({
       "既知の CSS 回帰に対する修復性能と、エージェント向けツール自体の使いやすさを検証。",
     "skills.explainTitle": "説明と図",
     "skills.explainDescription":
-      "アルゴリズムやプロトコルの動きをアニメーションにし、モジュール構成やアーキテクチャの図を描き、その絵を事実とレイアウトで検証。",
-    "skills.catalogLink": "15スキルの詳しい選択ガイドを見る",
+      "アルゴリズムやプロトコルの動きをアニメーションにし、モジュール構成やアーキテクチャの図を描いて事実とレイアウトで検証し、D2 テキストの構成図をターミナルで描画。",
+    "skills.catalogLink": "16スキルの詳しい選択ガイドを見る",
     "skills.apmLabel": "APM でインストール",
     "skills.apmDescription":
       "公式 bootstrap で APM を導入または更新してから、自動ルーターをプロジェクトへひとつ追加します。",
@@ -289,7 +289,7 @@ export const messages = Object.freeze({
     "skills.line2": "Ask naturally.",
     "skills.lead":
       "Add vlmkit once—there are no skill names to learn. Describe the outcome, and the AI classifies the request and artifacts, loads the right workflow, and runs it until the checks pass.",
-    "skills.note": "1 install · automatic routing · 15 workflows",
+    "skills.note": "1 install · automatic routing · 16 workflows",
     "skills.metaLabel": "Meta entry",
     "skills.metaDescription":
       "Activates automatically for frontend work and selects the matching workflow. It never asks you to pick a skill, and prepares the CLI and Chromium only when needed.",
@@ -314,8 +314,8 @@ export const messages = Object.freeze({
       "Measure repair performance on known CSS regressions and improve agent-facing tool usability.",
     "skills.explainTitle": "Explanation and figures",
     "skills.explainDescription":
-      "Animate how an algorithm or protocol works, draw a module or architecture map, and hold the picture to its facts and layout.",
-    "skills.catalogLink": "Open the detailed guide to all 15 skills",
+      "Animate how an algorithm or protocol works, draw a module or architecture map and hold it to its facts, or keep an architecture diagram as D2 text that renders in the terminal.",
+    "skills.catalogLink": "Open the detailed guide to all 16 skills",
     "skills.apmLabel": "Install with APM",
     "skills.apmDescription":
       "Install or update APM with its official bootstrap, then add the single automatic router.",
