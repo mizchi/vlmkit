@@ -1,0 +1,42 @@
+# The vlmkit workspace, drawn from packages/*/package.json (2026-09-13).
+# Ids are ASCII; the label after the colon is what the reader sees.
+# Render:  d2 --layout=tala vlmkit-workspace.d2 vlmkit-workspace.svg
+# Preview: d2 --layout=tala vlmkit-workspace.d2 vlmkit-workspace.txt && cat vlmkit-workspace.txt
+
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+direction: right
+
+packages: packages/ {
+  core: vlmkit-core {
+    plugin: plugin runtime
+  }
+  capture: vlmkit-capture
+  ai: vlmkit-ai
+  markup: vlmkit-markup
+  eval: animation-eval
+  anim: vlmkit-anim
+
+  capture -> core
+  ai -> core
+  markup -> core
+  markup -> capture
+  markup -> ai
+  eval -> core
+  anim -> eval: optional peer {
+    style.stroke-dash: 3
+  }
+}
+
+cli: src/cli {
+  router
+  registry: gate-registry
+}
+
+cli -> packages.markup
+cli -> packages.capture
+cli -> packages.core.plugin: defineGate

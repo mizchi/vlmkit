@@ -51,6 +51,20 @@ Dates are YYYY-MM-DD.
   for a branch), grounds it in the code rather than memory, checks it (`check --expect`, `layout`), and writes
   the prose from `explain`'s beats naming ids, never geometry. `explanatory-animation` stays the scene-writing
   reference and points at it.
+- **Skill `d2-diagram`** (the sixteenth workflow): a diagram whose deliverable is D2 text laid out by TALA —
+  D2's whiteboard-style engine for architecture diagrams, open-sourced under MPL-2.0 and bundled since D2 0.9 —
+  and read in the terminal before anyone opens an image. The loop is `d2 fmt` / `validate` → `d2 --layout=tala
+  x.d2 x.txt` (box drawing; `--ascii-mode standard` for plain ASCII in a README or PR) → `.svg` / `.png` → fix the
+  text; routes by task (architecture with containers, `sql_table`, `sequence_diagram`, `class`, an existing `.d2`),
+  and records what the text render does and does not show, measured on 0.8.1-HEAD: width is the layout's (120
+  columns with TALA `direction: right`, 94 `down`, 163 with dagre / ELK, `--scale` changes nothing), edge labels
+  are written onto the line, `shape: text` and markdown blocks come out as empty boxes, CJK labels pad per glyph,
+  and the in-file `layout-engine: tala` is honoured for SVG but not for `.txt`, so the flag is always passed. TALA's
+  three-seed default renders the same file identically twice; `--tala-seeds` gives a different layout, `top` /
+  `left` pins a shape. A D2 diagram is a drawing that nothing checks against the code — the skill says so and sends
+  a map that must be true to `explanatory-animation`, or has it drawn from `vlmkit-anim facts`' sheet.
+  `assets/vlmkit-workspace.d2` and its TALA render are the reference; `explain-with-anim` and
+  `explanatory-animation` route "as D2 text / in the terminal" to it.
 
 ## 0.22.0 — 2026-09-09
 

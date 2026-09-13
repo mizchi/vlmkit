@@ -78,6 +78,7 @@ agent-validation-loop
 Explanation and figures
 explain-with-anim
 explanatory-animation
+d2-diagram
 Install with APM
 curl -sSL https://aka.ms/apm-unix | sh
 apm install mizchi/vlmkit
