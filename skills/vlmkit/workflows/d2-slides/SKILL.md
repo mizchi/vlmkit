@@ -174,6 +174,11 @@ heading, bullets, pull quotes and paragraphs, as the page renders them
 - **The chrome.** The footer's deck title and page number are not manifest
   lines.
 
+A bullet, quote or paragraph wrapped over several lines is **rejoined** into one
+line, as Markdown does, so wrapping at 80 columns is safe and one sentence is
+one manifest line. A blank line ends the block: an indented line after one is a
+paragraph of its own.
+
 ## Failure modes
 
 - **`✗ slide 6-1: the d2 figure does not compile`** with

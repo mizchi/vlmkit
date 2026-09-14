@@ -162,6 +162,61 @@ c -> d
     );
   });
 
+  /**
+   * Writer e, d2-slides v1, grepping its own deck for a string the brief
+   * required: `sed -n '15,22p' built/copy.txt` showed "…D2 creates a new" /
+   * "The fix is always a full path from the root" / "shape, so the picture…".
+   * A bullet wrapped at 80 columns had become a PARAGRAPH, and paragraphs
+   * render before the list, so the continuation appeared above its own bullet
+   * and split one sentence across two manifest lines. All four page gates
+   * passed: every fragment was visible somewhere on the slide.
+   */
+  it("rejoins a bullet wrapped over several lines instead of making it a paragraph", () => {
+    const r = build(`## Wrapping
+
+- A reference to an id not in scope does not error — D2 creates a new
+  shape, so the picture silently gains boxes.
+- The fix is always a full path from the root.
+`);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(
+      r.read("copy.txt"),
+      "Wrapping\n"
+        + "A reference to an id not in scope does not error — D2 creates a new shape, so the picture silently gains boxes.\n"
+        + "The fix is always a full path from the root.\n",
+    );
+    const index = r.read("index.html");
+    // No stray paragraph, and the two bullets in the order they were written.
+    assert.doesNotMatch(index, /<p>shape, so the picture/);
+    assert.match(
+      index,
+      /<li>A reference to an id not in scope does not error — D2 creates a new shape, so the picture silently gains boxes\.<\/li><li>The fix is always a full path from the root\.<\/li>/,
+    );
+  });
+
+  it("rejoins a wrapped paragraph and a wrapped quote, and a blank line ends the block", () => {
+    const r = build(`## Wrapping everything
+
+A paragraph that runs
+over two lines.
+
+> a quote that also
+> wraps
+
+- and a bullet
+
+  which continues after a blank line, so it is a paragraph of its own
+`);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.read("copy.txt").trim().split("\n"), [
+      "Wrapping everything",
+      "and a bullet",
+      "a quote that also wraps",
+      "A paragraph that runs over two lines.",
+      "which continues after a blank line, so it is a paragraph of its own",
+    ]);
+  });
+
   it("keeps speaker notes off the slide and out of the manifest", () => {
     const r = build(`## Heading
 

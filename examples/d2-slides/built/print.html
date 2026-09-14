@@ -36,7 +36,8 @@ h2 { font-size: 38px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
 h2::after { content: ""; display: block; width: 56px; height: 4px; background: var(--accent); margin-top: 16px; }
 .subtitle { font-size: 26px; color: var(--muted); margin: 0; }
 .slide.title .body { justify-content: center; }
-ul { margin: 0; padding-left: 26px; }
+ul, ol { margin: 0; padding-left: 26px; }
+ol { display: flex; flex-direction: column; }
 li { font-size: 25px; margin: 0 0 14px; }
 li code, p code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
 p { font-size: 25px; margin: 0 0 10px; }
