@@ -1,0 +1,21 @@
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+shape: sequence_diagram
+
+browser
+gateway
+orders
+inventory
+broker
+
+browser -> gateway: POST /checkout
+gateway -> orders: createOrder
+orders -> inventory: reserve
+inventory -> orders: ret reserved
+orders -> broker: order.placed async
+orders -> gateway: ret 201 Created
+gateway -> browser: ret order-id

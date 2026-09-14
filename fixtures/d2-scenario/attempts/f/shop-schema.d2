@@ -1,0 +1,64 @@
+# The shop's tables, from briefs/shop-schema.md (2026-09-14).
+# Ids are ASCII and match the table names; rows are the columns.
+# Render:  d2 --layout=tala shop-schema.d2 shop-schema.svg
+# Preview: d2 --layout=tala shop-schema.d2 shop-schema.txt && cat shop-schema.txt
+# Check:   node ../../../../.claude/skills/d2-diagram/assets/d2-facts.mjs shop-schema.d2 \
+#            --expect ../../briefs/facts/shop-schema.expect.json
+
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+direction: down
+
+customers: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  email: varchar
+  created_at: timestamp
+}
+
+orders: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  customer_id: int {constraint: foreign_key}
+  status: varchar
+  placed_at: timestamp
+}
+
+order_items: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  order_id: int {constraint: foreign_key}
+  product_id: int {constraint: foreign_key}
+  quantity: int
+}
+
+products: {
+  shape: sql_table
+  # Pinned under order_items so the picture is two bands wide, not three: TALA
+  # otherwise puts products in a third band of its own and the render is 113
+  # columns. top and left are SVG pixels and only mean anything together.
+  left: 420
+  top: 520
+  id: int {constraint: primary_key}
+  sku: varchar
+  price_cents: int
+}
+
+shipments: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  order_id: int {constraint: foreign_key}
+  carrier: varchar
+  tracking_code: varchar
+}
+
+# Each arrow leaves the column holding the foreign key and enters the column it
+# references. order_items is the only table with two, and joins orders to products.
+orders.customer_id -> customers.id
+order_items.order_id -> orders.id
+order_items.product_id -> products.id
+shipments.order_id -> orders.id

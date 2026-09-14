@@ -1,0 +1,41 @@
+vars: {d2-config: {layout-engine: tala}}
+direction: right
+
+browser: Browser
+
+edge: {
+  cdn: CDN
+  gateway: API Gateway
+}
+
+cluster: {
+  direction: down
+  orders: Orders
+  inventory: Inventory
+  billing: Billing
+  shipping: Shipping
+  broker: Broker
+  postgres: PostgreSQL {shape: cylinder}
+  redis: Redis {shape: cylinder}
+}
+
+outside: {
+  stripe: Stripe
+}
+
+browser -> edge.cdn: Request
+edge.cdn -> edge.gateway: Forward
+edge.gateway -> cluster.orders: Call
+
+cluster.orders -> cluster.inventory: Sync call
+cluster.orders -> cluster.broker: Publish order.placed
+
+cluster.broker -> cluster.billing: order.placed
+cluster.broker -> cluster.shipping: order.placed
+
+cluster.orders -> cluster.postgres: Write
+cluster.shipping -> cluster.postgres: Read
+
+cluster.inventory -> cluster.redis: Reserve stock
+
+cluster.billing -> outside.stripe: Process payment
