@@ -30,6 +30,15 @@ half the brief is the failure mode a green check cannot see — the same lesson
 | round | writers | report |
 |---|---|---|
 | v1 | `a` (sonnet, tala-talk), `b` (haiku, tala-talk), `c` (sonnet, ja), `d` (sonnet, re-edit) | `docs/reports/2026-09-14-d2-slides-v1.md` |
+| v2 | `e` (sonnet, tala-talk + two fact sheets), `f` (sonnet, re-edit + shared sheet and `--forbid`) | `docs/reports/2026-09-14-d2-slides-v2.md` |
+
+v2 answered v1's open question: `f`'s figure passed all four page gates and
+failed the shared sheet (`✗ forbidden edge drawn: checkout->orders`). It also
+found a builder bug that had silently hit **both** v2 writers — a bullet wrapped
+over two lines became a paragraph, which renders before the list, so the second
+half of a sentence appeared above its own bullet. `e` caught it by grepping its
+own `copy.txt`; `f` shipped it. Both are fixed; the decks under `attempts/` are
+as delivered, so `e`'s and `f`'s builds still show the pre-fix behaviour.
 
 ## Attempts
 

@@ -1,0 +1,6 @@
+direction: right
+checkout
+pg: Postgres orders (authoritative until cutover)
+ledger
+checkout -> pg: dual-write
+checkout -> ledger: dual-write
