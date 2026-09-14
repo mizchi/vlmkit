@@ -1,0 +1,192 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #150: d2-diagram v2: the sheet in the writer's hands, and the false green it exposed",
+  "layout": "grid",
+  "canvas": {
+    "width": 835,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "fixtures/d2-scenario",
+      "label": "fixtures/d2-scenario",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "caption": "1/4 d2-diagram v2 setup: hand the writers the sheet, and fix the check it e…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 10
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+121 −73"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/d2-scenario"
+      ],
+      "caption": "2/4 d2-diagram v2 attempts: four writers, four correct diagrams"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 32
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+893 −74"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/d2-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/d2-scenario"
+      ],
+      "caption": "3/4 Record the v2 round in the d2-scenario fixture README"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 32
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+905 −74"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/d2-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root",
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs/reports",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "caption": "4/4 d2-diagram v2: the sheet moves the failure, and f finds the false green"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 38
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1513 −192"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs/reports",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "4 commits · 38 files · +1513 −192 · 6 areas, 0 import edges between them"
+    }
+  ]
+}
