@@ -1,0 +1,25 @@
+Diagrams that live in the repo
+The problem
+A diagram in a drawing tool goes stale the moment the code changes, and nobody notices
+It is not in the diff
+It is not in review
+Only one person has the file
+What D2 is
+D2 is a text format for diagrams
+The same three steps every time: text, a layout engine, then an image
+What TALA is, and why its licence matters
+TALA is D2's own layout engine
+It is whiteboard-style, not a strict hierarchy
+It is open source (MPL-2.0) and bundled
+So a repo can commit a .d2 file and every contributor renders the same picture with no paid component
+The one thing that bites you
+A reference to an id that is not in scope does not error
+D2 creates a new shape — the picture silently gains boxes
+What to do about it
+Write the text
+Format and validate it
+Read the render
+Hold the picture to a fact sheet before trusting it
+Closing
+Diagrams that live in the repo stay true, because the repo is what changes them
+Get D2 at d2lang.com

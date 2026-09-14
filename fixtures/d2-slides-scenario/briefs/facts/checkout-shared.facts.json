@@ -1,0 +1,6 @@
+{
+  "_why": "Held against EVERY slide figure that draws the write path. After the migration ledger is the writer, so a figure still drawing checkout straight into orders is stale — that is the miss this sheet exists to catch.",
+  "boxes": ["checkout", "ledger"],
+  "deps": ["checkout->ledger"],
+  "forbidden": ["checkout->orders"]
+}

@@ -1,0 +1,4 @@
+{
+  "_why": "The engines slide: the three bundled layout engines must all be drawn. Not exhaustive — how you mark tala as the chosen one is yours.",
+  "boxes": ["dagre", "elk", "tala"]
+}
