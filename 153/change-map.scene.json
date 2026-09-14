@@ -1,0 +1,359 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #153: d2-slides validation rounds v1 + v2: six writers, and the two defects a green deck shipped",
+  "layout": "grid",
+  "canvas": {
+    "width": 1322,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "fixtures/d2-slides-scenario",
+      "label": "fixtures/d2-slides-scenario",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/d2-scenario",
+      "label": "fixtures/d2-scenario",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "examples/d2-slides",
+      "label": "examples/d2-slides",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        "fixtures/d2-slides-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/d2-slides-scenario"
+      ],
+      "caption": "1/8 d2-slides v1: four writers green, and what a green deck still cannot pr…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 41
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3764 −0"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/d2-slides-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "markup/src"
+      ],
+      "caption": "2/8 check copy --forbid: the manifest's mirror, asked for by a writer who h…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 45
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3926 −1"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "skills/vlmkit"
+      ],
+      "caption": "3/8 d2-slides: the figure check is step 7, not an aside; four more correcti…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 48
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4115 −37"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs/reports"
+      ],
+      "caption": "4/8 Report: d2-slides v1 — the round where nothing failed and five things w…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 49
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4336 −37"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "fixtures/d2-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/d2-scenario",
+        "fixtures/d2-slides-scenario"
+      ],
+      "caption": "5/8 d2-slides v2: the sheet catches a figure four green gates passed"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 70
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+6187 −41"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/d2-scenario",
+        "fixtures/d2-slides-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "examples/d2-slides",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "6/8 build-deck: rejoin a wrapped line, and make a numbered list a list"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 76
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+6417 −64"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "docs/reports",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "7/8 d2-facts: name the match a row turned on, so a sheet can be told from a…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 84
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+6851 −82"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "docs/reports",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root"
+      ],
+      "caption": "8/8 CHANGELOG: check copy --forbid and the two d2-slides validation rounds"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 85
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+6877 −82"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "8 commits · 85 files · +6877 −82 · 10 areas, 0 import edges between them"
+    }
+  ]
+}
