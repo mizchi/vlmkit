@@ -14,13 +14,13 @@
       "hidden": true
     },
     {
-      "id": ".apm/skills",
-      "label": ".apm/skills",
+      "id": ".claude",
+      "label": ".claude",
       "hidden": true
     },
     {
-      "id": ".claude",
-      "label": ".claude",
+      "id": ".apm/skills",
+      "label": ".apm/skills",
       "hidden": true
     },
     {
@@ -57,6 +57,11 @@
       "id": "root",
       "label": "root",
       "hidden": true
+    },
+    {
+      "id": "src/cli",
+      "label": "src/cli",
+      "hidden": true
     }
   ],
   "edges": [],
@@ -71,7 +76,7 @@
       "highlight": [
         "fixtures/d2-slides-scenario"
       ],
-      "caption": "1/8 d2-slides v1: four writers green, and what a green deck still cannot pr…"
+      "caption": "1/9 d2-slides v1: four writers green, and what a green deck still cannot pr…"
     },
     {
       "value": {
@@ -105,7 +110,7 @@
       "highlight": [
         "markup/src"
       ],
-      "caption": "2/8 check copy --forbid: the manifest's mirror, asked for by a writer who h…"
+      "caption": "2/9 check copy --forbid: the manifest's mirror, asked for by a writer who h…"
     },
     {
       "value": {
@@ -143,7 +148,7 @@
         ".claude",
         "skills/vlmkit"
       ],
-      "caption": "3/8 d2-slides: the figure check is step 7, not an aside; four more correcti…"
+      "caption": "3/9 d2-slides: the figure check is step 7, not an aside; four more correcti…"
     },
     {
       "value": {
@@ -179,7 +184,7 @@
       "highlight": [
         "docs/reports"
       ],
-      "caption": "4/8 Report: d2-slides v1 — the round where nothing failed and five things w…"
+      "caption": "4/9 Report: d2-slides v1 — the round where nothing failed and five things w…"
     },
     {
       "value": {
@@ -214,7 +219,7 @@
         "fixtures/d2-scenario",
         "fixtures/d2-slides-scenario"
       ],
-      "caption": "5/8 d2-slides v2: the sheet catches a figure four green gates passed"
+      "caption": "5/9 d2-slides v2: the sheet catches a figure four green gates passed"
     },
     {
       "value": {
@@ -254,7 +259,7 @@
         "skills/vlmkit",
         "tests"
       ],
-      "caption": "6/8 build-deck: rejoin a wrapped line, and make a numbered list a list"
+      "caption": "6/9 build-deck: rejoin a wrapped line, and make a numbered list a list"
     },
     {
       "value": {
@@ -290,7 +295,7 @@
         "skills/vlmkit",
         "tests"
       ],
-      "caption": "7/8 d2-facts: name the match a row turned on, so a sheet can be told from a…"
+      "caption": "7/9 d2-facts: name the match a row turned on, so a sheet can be told from a…"
     },
     {
       "value": {
@@ -328,7 +333,7 @@
       "highlight": [
         "root"
       ],
-      "caption": "8/8 CHANGELOG: check copy --forbid and the two d2-slides validation rounds"
+      "caption": "8/9 CHANGELOG: check copy --forbid and the two d2-slides validation rounds"
     },
     {
       "value": {
@@ -353,7 +358,43 @@
       "ms": 0
     },
     {
-      "note": "8 commits · 85 files · +6877 −82 · 10 areas, 0 import edges between them"
+      "show": [
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "src/cli"
+      ],
+      "caption": "9/9 Count copy-forbidden in the rule-total ledger"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 87
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+6884 −84"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "9 commits · 87 files · +6884 −84 · 11 areas, 0 import edges between them"
     }
   ]
 }
