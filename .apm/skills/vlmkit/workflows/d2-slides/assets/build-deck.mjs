@@ -116,11 +116,28 @@ const inline = (s) =>
     .replace(/(^|\s)\*([^*]+)\*/g, "$1<em>$2</em>");
 
 function parseSlide(lines) {
-  const slide = { heading: null, level: 2, bullets: [], figures: [], code: [], quotes: [], notes: [], paras: [] };
+  const slide = { heading: null, level: 2, bullets: [], numbers: [], figures: [], code: [], quotes: [], notes: [], paras: [] };
+  /**
+   * Which block a bare line continues, Markdown's lazy continuation.
+   *
+   * A wrapped bullet used to end up as a PARAGRAPH, and paragraphs render
+   * before the list, so `- …D2 creates a new\n  shape, so the picture…` put
+   * "shape, so the picture…" above its own bullet and split the sentence
+   * across two manifest lines. Every gate passed — each fragment is visible
+   * somewhere on the slide — and a writer found it by grepping copy.txt for a
+   * string the brief required (writer e, v1). Wrapping a bullet at 80 columns
+   * is ordinary Markdown, so the builder rejoins instead of warning.
+   */
+  let open = null;
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
+    if (!line.trim()) {
+      open = null;
+      continue;
+    }
     const fence = line.match(/^```(\S*)\s*$/);
     if (fence) {
+      open = null;
       const lang = fence[1];
       const block = [];
       i += 1;
@@ -132,25 +149,50 @@ function parseSlide(lines) {
     const note = line.match(/^<!--\s*notes?:\s*([\s\S]*?)\s*-->\s*$/);
     if (note) {
       slide.notes.push(note[1]);
+      open = null;
       continue;
     }
     const head = line.match(/^(#{1,3})\s+(.*)$/);
     if (head && !slide.heading) {
       slide.level = head[1].length;
       slide.heading = head[2].trim();
+      open = null;
       continue;
     }
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
     if (bullet) {
       slide.bullets.push(bullet[1].trim());
+      open = slide.bullets;
+      continue;
+    }
+    // `1. step` is a list, not prose. Before continuation lines were rejoined
+    // each numbered line became its own paragraph, which happened to LOOK like
+    // a list because the text carried the number; once bare lines joined the
+    // block above them, a writer's four-step loop ran together into one
+    // sentence (writer e's deck, v1). So the marker starts a block of its own.
+    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (numbered) {
+      slide.numbers.push(numbered[1].trim());
+      open = slide.numbers;
       continue;
     }
     const quote = line.match(/^>\s?(.*)$/);
     if (quote) {
-      slide.quotes.push(quote[1].trim());
+      // Consecutive `>` lines are ONE pull quote, as in Markdown: two of them
+      // would be two blockquotes and two manifest lines for one sentence.
+      if (open === slide.quotes) slide.quotes[slide.quotes.length - 1] += ` ${quote[1].trim()}`;
+      else slide.quotes.push(quote[1].trim());
+      open = slide.quotes;
       continue;
     }
-    if (line.trim()) slide.paras.push(line.trim());
+    // A bare line continues the block above it — the wrapped half of a bullet,
+    // a quote or a paragraph — and starts a paragraph only when nothing is open.
+    if (open) {
+      open[open.length - 1] = `${open[open.length - 1]} ${line.trim()}`;
+      continue;
+    }
+    slide.paras.push(line.trim());
+    open = slide.paras;
   }
   return slide;
 }
@@ -189,7 +231,7 @@ const copy = [];
 const built = [];
 slides.forEach((lines, index) => {
   const slide = parseSlide(lines);
-  if (!slide.heading && !slide.bullets.length && !slide.figures.length && !slide.paras.length && !slide.quotes.length && !slide.code.length)
+  if (!slide.heading && !slide.bullets.length && !slide.numbers.length && !slide.figures.length && !slide.paras.length && !slide.quotes.length && !slide.code.length)
     return;
   const svgs = slide.figures.map((fig, n) => {
     const svg = renderFigure(fig, `${index + 1}-${n + 1}`);
@@ -205,7 +247,7 @@ slides.forEach((lines, index) => {
 // lines of room under a heading. The gates measure it properly; this says it before they run.
 const budget = (s) => (s.svgs.length ? 430 : 900);
 for (const s of built) {
-  const chars = [...s.bullets, ...s.paras, ...s.quotes].join(" ").length;
+  const chars = [...s.bullets, ...s.numbers, ...s.paras, ...s.quotes].join(" ").length;
   if (chars > budget(s))
     console.warn(
       `⚠ slide ${s.index + 1} (${(s.heading || "untitled").slice(0, 40)}): ${chars} characters of prose` +
@@ -235,13 +277,14 @@ const rendered = (s) =>
 for (const s of built) {
   if (s.heading) copy.push(rendered(s.heading));
   for (const b of s.bullets) copy.push(rendered(b));
+  for (const n of s.numbers) copy.push(rendered(n));
   for (const q of s.quotes) copy.push(rendered(q));
   for (const p of s.paras) copy.push(rendered(p));
 }
 
 const slideHtml = (s) => {
   const kind =
-    s.figures.length && !s.bullets.length && !s.paras.length && !s.quotes.length
+    s.figures.length && !s.bullets.length && !s.numbers.length && !s.paras.length && !s.quotes.length
       ? "figure-only"
       : s.figures.length
         ? "split"
@@ -254,6 +297,7 @@ const slideHtml = (s) => {
   const prose = [];
   for (const p of s.paras) prose.push(`<p>${inline(p)}</p>`);
   if (s.bullets.length) prose.push(`<ul>${s.bullets.map((b) => `<li>${inline(b)}</li>`).join("")}</ul>`);
+  if (s.numbers.length) prose.push(`<ol>${s.numbers.map((n) => `<li>${inline(n)}</li>`).join("")}</ol>`);
   for (const q of s.quotes) prose.push(`<blockquote>${inline(q)}</blockquote>`);
   for (const c of s.code) prose.push(`<pre><code>${escape(c.text)}</code></pre>`);
   const figures = s.svgs.map((f) => `<div class="fig">${f.svg}</div>`).join("");
@@ -306,7 +350,8 @@ h2 { font-size: 38px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
 h2::after { content: ""; display: block; width: 56px; height: 4px; background: var(--accent); margin-top: 16px; }
 .subtitle { font-size: 26px; color: var(--muted); margin: 0; }
 .slide.title .body { justify-content: center; }
-ul { margin: 0; padding-left: 26px; }
+ul, ol { margin: 0; padding-left: 26px; }
+ol { display: flex; flex-direction: column; }
 li { font-size: 25px; margin: 0 0 14px; }
 li code, p code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
 p { font-size: 25px; margin: 0 0 10px; }

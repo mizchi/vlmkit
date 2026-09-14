@@ -36,6 +36,7 @@ const checker = join(repoRoot, ".claude/skills/d2-diagram/assets/d2-facts.mjs");
 const attempts = join(repoRoot, "fixtures/d2-scenario/attempts");
 const sheets = join(repoRoot, "fixtures/d2-scenario/briefs/facts");
 const truncation = join(repoRoot, "fixtures/d2-scenario/v2/pinned-truncation");
+const labelSubstring = join(repoRoot, "fixtures/d2-scenario/v2/label-substring");
 
 /** Run the checker over a render that already exists. Returns { status, out }. */
 function read({ svg, txt, expect: sheet }) {
@@ -149,6 +150,31 @@ describe("d2-facts reads a drawn D2 figure back", () => {
     assert.equal(facts.columns, null, "no --from-txt means no width, not a guessed one");
     assert.deepEqual(Object.keys(facts.containers).sort(), ["cluster", "edge", "outside"]);
     assert.ok(facts.deps.includes("edge.gw->cluster.orders"), "ids are fully qualified");
+  });
+
+  /**
+   * A name in a sheet resolves through four widening attempts, and the last —
+   * a substring of an id or of a LABEL — is generous on purpose (`gw: API
+   * gateway` holds a sheet's `gateway`). Writer f, re-editing a deck in the
+   * d2-slides v1 round, lost a round to it: no box was called `orders`, but
+   * one was labelled "Postgres orders (authoritative until cutover)", so
+   * `forbidden: checkout->orders` fired on a figure that was right. The row is
+   * still an error — the sheet did say so — but it now names the match it used,
+   * which is the difference between fixing the figure and scoping the sheet.
+   */
+  it("names a label-substring match in the line that turns on it", () => {
+    const { status, out } = read({
+      svg: join(labelSubstring, "dual-write.svg"),
+      txt: join(labelSubstring, "dual-write.txt"),
+      expect: join(labelSubstring, "dual-write.facts.json"),
+    });
+    assert.equal(status, 1);
+    assert.match(
+      out,
+      /forbidden edge drawn: checkout->orders \(orders matched no id — it is a substring of box pg's label "Postgres orders \(authoritative until cutover\)"\)/,
+    );
+    // The exact-id path must stay quiet, or every line grows a clause.
+    assert.doesNotMatch(out, /edge checkout->ledger[^\n]*matched/);
   });
 
   it("checks the skill's own example against the sheet it ships", () => {

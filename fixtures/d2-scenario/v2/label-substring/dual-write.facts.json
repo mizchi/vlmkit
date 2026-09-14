@@ -1,0 +1,6 @@
+{
+  "_why": "Writer f's round-1 figure, d2-slides v1. The sheet forbids checkout->orders; no box is called orders, but pg's LABEL contains the word, so the substring fallback fires and the row reads like a wrong figure. The message has to say which match it used.",
+  "boxes": ["checkout", "ledger"],
+  "deps": ["checkout->ledger"],
+  "forbidden": ["checkout->orders"]
+}

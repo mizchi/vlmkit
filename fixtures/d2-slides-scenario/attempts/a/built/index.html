@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagrams that live in the repo</title>
+<style>
+:root {
+  --ink: #14181f; --muted: #5b6472; --line: #d6dbe4; --bg: #ffffff; --stage: #ffffff;
+  --accent: #0d32b2; --code: #f4f6fa;
+  --stage-w: 1280px; --stage-h: 720px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #0d1117; color: var(--ink); }
+body { font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif; overflow: hidden; }
+#deck { position: fixed; inset: 0; }
+.slide {
+  width: var(--stage-w); height: var(--stage-h); background: var(--stage); color: var(--ink);
+  display: none; padding: 64px 72px 56px;
+  /* Centred by transform, not by the layout box: a 1280px stage is wider than a phone, and
+     centring an over-sized grid item leaves the middle off-screen. The integrity gate caught
+     that at 375px as "the DOM holds 4 text blocks but almost nothing painted". */
+  position: absolute; left: 50%; top: 50%; transform-origin: center center;
+  /* A slide is a fixed frame, so content that does not fit is CUT rather than spilling over the
+     next slide — which is what makes overflow detectable: the integrity gate reads it as clipped
+     text, and the copy gate reads the cut line as copy it cannot see. */
+  overflow: hidden;
+}
+.slide.active { display: flex; flex-direction: column; }
+/* The frame is a flex column and the body is the flexible child: a percentage height inside a
+   padded, fixed box was 114px out on every slide, which the integrity gate reported as clipped
+   content on slides whose text was well inside the frame. */
+.slide .body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 58px; line-height: 1.1; margin: 0; letter-spacing: -0.02em; }
+h2 { font-size: 38px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+h2::after { content: ""; display: block; width: 56px; height: 4px; background: var(--accent); margin-top: 16px; }
+.subtitle { font-size: 26px; color: var(--muted); margin: 0; }
+.slide.title .body { justify-content: center; }
+ul { margin: 0; padding-left: 26px; }
+li { font-size: 25px; margin: 0 0 14px; }
+li code, p code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+p { font-size: 25px; margin: 0 0 10px; }
+blockquote { margin: 0; padding-left: 20px; border-left: 4px solid var(--accent); font-size: 24px; color: var(--muted); }
+pre { background: var(--code); padding: 14px 18px; border-radius: 8px; overflow: auto; margin: 0; }
+pre code { font: 18px/1.45 ui-monospace, "SF Mono", Menlo, monospace; }
+/* align-items is start, not center: prose taller than the frame then overflows DOWNWARD, where
+   the clip is measurable, instead of being cut off at both ends. Centred, a long bullet list is
+   silently trimmed top and bottom — the copy gate reads those lines as copy a user cannot see. */
+.cols { flex: 1; display: grid; grid-template-columns: 1fr 1.1fr; gap: 40px; align-items: start; min-height: 0; height: 100%; }
+.prose { min-height: 0; }
+.figs { display: flex; flex-direction: column; gap: 16px; justify-content: center; align-items: center; min-height: 0; height: 100%; }
+.figs.full { flex: 1; }
+.fig { display: flex; min-height: 0; width: 100%; height: 100%; justify-content: center; align-items: center; }
+svg.figure { max-width: 100%; max-height: 100%; height: auto; width: auto; }
+footer {
+  position: absolute; left: 72px; right: 72px; bottom: 22px; display: flex; justify-content: space-between;
+  font-size: 15px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px;
+}
+.notes { display: none; }
+#progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--accent); transition: width .15s; z-index: 5; }
+#overview { position: fixed; inset: 0; background: #0d1117; overflow: auto; padding: 28px; display: none; z-index: 10; }
+#overview.on { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; align-content: start; }
+#overview .thumb { background: #fff; border-radius: 6px; overflow: hidden; cursor: pointer; position: relative; aspect-ratio: 16 / 9; }
+#overview .thumb .slide { display: block; transform: scale(0.234); transform-origin: top left; position: absolute; }
+#overview .thumb span { position: absolute; right: 6px; bottom: 4px; font-size: 12px; color: var(--muted); z-index: 2; }
+/* Every slide at once: what printing gives, and what a page gate has to read. One slide is on
+   screen at a time in the deck, so the copy gate over index.html only ever sees the first one.
+   print.html is the same content stacked, and that is the file the copy and contrast gates take. */
+body.print { overflow: visible; background: #eef1f6; }
+body.print #deck { position: static; }
+body.print #progress, body.print #overview { display: none !important; }
+body.print .slide {
+  display: flex !important; flex-direction: column; position: relative; left: auto; top: auto; transform: none !important;
+  margin: 0 auto 24px; box-shadow: 0 1px 4px rgba(20, 24, 31, .18); page-break-after: always; break-after: page;
+}
+body.print .notes { display: block; margin-top: 18px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 15px; color: var(--muted); }
+@media print {
+  html, body { background: #fff; overflow: visible; }
+  #deck { position: static; display: block; }
+  #progress, #overview { display: none !important; }
+  .slide { display: flex !important; flex-direction: column; position: static; left: auto; top: auto; margin: 0; box-shadow: none; page-break-after: always; break-after: page; transform: none !important; }
+  .notes { display: block; margin-top: 18px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 14px; color: var(--muted); }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="deck">
+<section class="slide title" data-index="0" aria-label="Diagrams that live in the repo">
+  <div class="body"><h1>Diagrams that live in the repo</h1>
+  <p class="subtitle">A talk about D2 and TALA</p>
+  <div class="prose"></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">1 / 7</span></footer>
+  
+</section>
+<section class="slide text" data-index="1" aria-label="The problem">
+  <div class="body"><h2>The problem</h2>
+  <div class="prose"><ul><li>A diagram in a drawing tool goes stale the moment the code changes, and nobody notices</li><li>It is <strong>not in the diff</strong></li><li>It is not in review</li><li>Only one person has the file</li></ul></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">2 / 7</span></footer>
+  <aside class="notes"><p>ask the room who has a diagram like this right now</p></aside>
+</section>
+<section class="slide split" data-index="2" aria-label="What D2 is">
+  <div class="body"><h2>What D2 is</h2>
+  <div class="cols"><div class="prose"><ul><li>D2 is a text format for diagrams</li><li>The same three steps every time: text, a layout engine, then an image</li></ul></div><div class="figs"><div class="fig"><svg class="figure" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.8.1-HEAD" preserveAspectRatio="xMinYMin meet" viewBox="0 0 715 108"><svg class="d2-4108890366 d2-svg" viewBox="-21 -21 715 108"><rect x="-21" y="-21" width="715" height="108" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+.d2-4108890366 .text-bold {
+	font-family: "d2-4108890366-font-bold";
+}
+@font-face {
+	font-family: d2-4108890366-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-4108890366 .fill-N1{fill:#0A0F25;}
+		.d2-4108890366 .fill-N7{fill:#FFFFFF;}
+		.d2-4108890366 .fill-B1{fill:#0D32B2;}
+		.d2-4108890366 .fill-B6{fill:#F7F8FE;}
+		.d2-4108890366 .stroke-B1{stroke:#0D32B2;}
+		.d2-4108890366 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="dGV4dA=="><g class="shape" ><rect x="0" y="0" width="100" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="50" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">.d2 text</text></g><g class="ZW5naW5l"><g class="shape" ><rect x="221" y="0" width="141" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="291.5" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">layout engine</text></g><g class="b3V0"><g class="shape" ><rect x="482" y="0" width="191" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="577.5" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">.svg / .png / terminal</text></g><g class="KHRleHQgLSZndDsgZW5naW5lKVswXQ=="><marker id="mk-d2-4108890366-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 102 33 L 217 33" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-4108890366-3488378134)" mask="url(#d2-4108890366)" /></g><g class="KGVuZ2luZSAtJmd0OyBvdXQpWzBd"><path d="M 364 33 L 478 33" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-4108890366-3488378134)" mask="url(#d2-4108890366)" /></g><mask id="d2-4108890366" maskUnits="userSpaceOnUse" x="-21" y="-21" width="715" height="108">
+<rect x="-21" y="-21" width="715" height="108" fill="white"></rect>
+
+</mask></svg></svg></div></div></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">3 / 7</span></footer>
+  
+</section>
+<section class="slide split" data-index="3" aria-label="What TALA is, and why its licence matters">
+  <div class="body"><h2>What TALA is, and why its licence matters</h2>
+  <div class="cols"><div class="prose"><ul><li>TALA is D2's own layout engine</li><li>It is whiteboard-style, not a strict hierarchy</li><li>It is open source (<strong>MPL-2.0</strong>) and bundled</li><li>So a repo can commit a <code>.d2</code> file and every contributor renders the same picture with no paid component</li></ul></div><div class="figs"><div class="fig"><svg class="figure" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.8.1-HEAD" preserveAspectRatio="xMinYMin meet" viewBox="0 0 348 224"><svg class="d2-2804404783 d2-svg" viewBox="-21 -21 348 224"><rect x="-21" y="-21" width="348" height="224" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+.d2-2804404783 .text-bold {
+	font-family: "d2-2804404783-font-bold";
+}
+@font-face {
+	font-family: d2-2804404783-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}
+.d2-2804404783 .text-italic {
+	font-family: "d2-2804404783-font-italic";
+}
+@font-face {
+	font-family: d2-2804404783-font-italic;
+	src: url("data:application/font-woff;base64,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");
+}]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-2804404783 .fill-N1{fill:#0A0F25;}
+		.d2-2804404783 .fill-N2{fill:#676C7E;}
+		.d2-2804404783 .fill-N7{fill:#FFFFFF;}
+		.d2-2804404783 .fill-B1{fill:#0D32B2;}
+		.d2-2804404783 .fill-B6{fill:#F7F8FE;}
+		.d2-2804404783 .stroke-B1{stroke:#0D32B2;}
+		.d2-2804404783 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="ZGFncmU="><g class="shape" ><rect x="0" y="0" width="86" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="43" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">dagre</text></g><g class="ZWxr"><g class="shape" ><rect x="9" y="116" width="67" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="42.5" y="154.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">elk</text></g><g class="dGFsYV9lbmdpbmU="><g class="shape" ><rect x="233" y="58" width="73" height="66" stroke="#e67e22" fill="#F7F8FE" class=" fill-B6" style="stroke-width:2;" /></g><text x="269.5" y="96.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">tala</text></g><g class="KGRhZ3JlIC0mZ3Q7IHRhbGFfZW5naW5lKVswXQ=="><marker id="mk-d2-2804404783-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 88 33 L 173 33 S 183 33 183 43 L 183 81 S 183 91 193 91 L 229 91" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-2804404783-3488378134)" mask="url(#d2-2804404783)" /><text x="134.5" y="55" fill="#676C7E" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">choose</text></g><g class="KGVsayAtJmd0OyB0YWxhX2VuZ2luZSlbMF0="><path d="M 78 149 L 173 149 S 183 149 183 139 L 183 101 S 183 91 193 91 L 229 91" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-2804404783-3488378134)" mask="url(#d2-2804404783)" /><text x="129.5" y="138" fill="#676C7E" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">choose</text></g><mask id="d2-2804404783" maskUnits="userSpaceOnUse" x="-21" y="-21" width="348" height="224">
+<rect x="-21" y="-21" width="348" height="224" fill="white"></rect>
+<rect x="109" y="39" width="51" height="21" fill="rgba(0,0,0,0.75)"></rect>
+<rect x="104" y="122" width="51" height="21" fill="rgba(0,0,0,0.75)"></rect>
+</mask></svg></svg></div></div></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">4 / 7</span></footer>
+  <aside class="notes"><p>tala is the one this talk uses</p></aside>
+</section>
+<section class="slide split" data-index="4" aria-label="The one thing that bites you">
+  <div class="body"><h2>The one thing that bites you</h2>
+  <div class="cols"><div class="prose"><ul><li>A reference to an id that is not in scope does not error</li><li>D2 <strong>creates a new shape</strong> — the picture silently gains boxes</li></ul></div><div class="figs"><div class="fig"><svg class="figure" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.8.1-HEAD" preserveAspectRatio="xMinYMin meet" viewBox="0 0 630 228"><svg class="d2-3788402118 d2-svg" viewBox="-21 -21 630 228"><rect x="-21" y="-21" width="630" height="228" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+.d2-3788402118 .text {
+	font-family: "d2-3788402118-font-regular";
+}
+@font-face {
+	font-family: d2-3788402118-font-regular;
+	src: url("data:application/font-woff;base64,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");
+}
+.d2-3788402118 .text-bold {
+	font-family: "d2-3788402118-font-bold";
+}
+@font-face {
+	font-family: d2-3788402118-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-3788402118 .fill-N1{fill:#0A0F25;}
+		.d2-3788402118 .fill-N7{fill:#FFFFFF;}
+		.d2-3788402118 .fill-B1{fill:#0D32B2;}
+		.d2-3788402118 .fill-B4{fill:#E3E9FD;}
+		.d2-3788402118 .fill-B5{fill:#EDF0FD;}
+		.d2-3788402118 .stroke-B1{stroke:#0D32B2;}
+		.d2-3788402118 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="YXBp"><g class="shape" ><rect x="0" y="0" width="212" height="186" stroke="#0D32B2" fill="#E3E9FD" class=" stroke-B1 fill-B4" style="stroke-width:2;" /></g><text x="106" y="33" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">api</text></g><g class="ZGF0YQ=="><g class="shape" ><rect x="362" y="0" width="226" height="186" stroke="#0D32B2" fill="#E3E9FD" class=" stroke-B1 fill-B4" style="stroke-width:2;" /></g><text x="475" y="33" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">data</text></g><g class="YXBpLm9yZGVycw=="><g class="shape" ><rect x="60" y="60" width="92" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="106" y="98.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">orders</text></g><g class="ZGF0YS5wb3N0Z3Jlcw=="><g class="shape" ><rect x="422" y="60" width="106" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="475" y="98.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">postgres</text></g><g class="KGFwaS5vcmRlcnMgLSZndDsgZGF0YS5wb3N0Z3JlcylbMF0="><marker id="mk-d2-3788402118-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 154 93 L 418 93" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-3788402118-3488378134)" mask="url(#d2-3788402118)" /></g><mask id="d2-3788402118" maskUnits="userSpaceOnUse" x="-21" y="-21" width="630" height="228">
+<rect x="-21" y="-21" width="630" height="228" fill="white"></rect>
+
+</mask></svg></svg></div></div></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">5 / 7</span></footer>
+  <aside class="notes"><p>written wrong at the root this becomes two phantom boxes</p></aside>
+</section>
+<section class="slide text" data-index="5" aria-label="What to do about it">
+  <div class="body"><h2>What to do about it</h2>
+  <div class="prose"><ul><li>Write the text</li><li>Format and validate it</li><li>Read the render</li><li>Hold the picture to a fact sheet before trusting it</li></ul></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">6 / 7</span></footer>
+  
+</section>
+<section class="slide text" data-index="6" aria-label="Closing">
+  <div class="body"><h2>Closing</h2>
+  <div class="prose"><ul><li>Diagrams that live in the repo stay true, because the repo is what changes them</li><li>Get D2 at d2lang.com</li></ul></div></div>
+  <footer><span class="deck-title">Diagrams that live in the repo</span><span class="page">7 / 7</span></footer>
+  <aside class="notes"><p>end here, ten minutes total</p></aside>
+</section>
+</div>
+<div id="overview" aria-hidden="true"></div>
+<script>
+(() => {
+  const slides = [...document.querySelectorAll("#deck .slide")];
+  const deck = document.getElementById("deck");
+  const progress = document.getElementById("progress");
+  const overview = document.getElementById("overview");
+  let at = 0;
+  const fit = () => {
+    // One fixed 1280x720 stage scaled to the viewport: nothing reflows between screens, so a
+    // screenshot of slide N is the same picture on any display.
+    const s = Math.min(innerWidth / 1280, innerHeight / 720) * 0.96;
+    for (const el of slides) el.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  };
+  const show = (n) => {
+    at = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((el, i) => el.classList.toggle("active", i === at));
+    progress.style.width = ((at + 1) / slides.length) * 100 + "%";
+    if (location.hash !== "#/" + (at + 1)) history.replaceState(null, "", "#/" + (at + 1));
+  };
+  const buildOverview = () => {
+    if (overview.childElementCount) return;
+    slides.forEach((el, i) => {
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+      const clone = el.cloneNode(true);
+      clone.classList.add("active");
+      clone.style.transform = "scale(0.234)";
+      thumb.append(clone, Object.assign(document.createElement("span"), { textContent: i + 1 }));
+      thumb.addEventListener("click", () => { overview.classList.remove("on"); show(i); });
+      overview.append(thumb);
+    });
+  };
+  addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { show(at + 1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") show(at - 1);
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+    else if (e.key === "o") { buildOverview(); overview.classList.toggle("on"); }
+    else if (e.key === "p") print();
+    else if (e.key === "f") document.documentElement.requestFullscreen?.();
+    else if (e.key === "Escape") overview.classList.remove("on");
+  });
+  deck.addEventListener("click", (e) => show(at + (e.clientX < innerWidth / 3 ? -1 : 1)));
+  addEventListener("resize", fit);
+  addEventListener("hashchange", () => show((parseInt(location.hash.slice(2), 10) || 1) - 1));
+  fit();
+  show((parseInt(location.hash.slice(2), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>

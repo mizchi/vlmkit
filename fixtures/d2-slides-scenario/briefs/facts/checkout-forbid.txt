@@ -1,0 +1,1 @@
+One writer per table, and payments is the only thing holding a key.

@@ -173,6 +173,31 @@ With a sheet it also checks:
 Write the sheet from the brief **before** the diagram, the way a test comes
 first. It is the only artifact that survives a TALA reflow.
 
+## How a sheet name finds its shape
+
+A name in a sheet is not matched on the id alone; the search widens until
+exactly one shape matches:
+
+1. the **last segment of an id** — `orders` finds `cluster.orders`
+2. an exact **label** — `gateway` finds `gw: API gateway`
+3. a **substring** of an id, or of a label, when exactly one shape matches
+
+Step 3 is generous on purpose and it will surprise you. A box called `pg`
+labelled `Postgres orders (authoritative until cutover)` **is** a sheet's
+`orders`, so `forbidden: ["checkout->orders"]` fires on an edge into it. That is
+not a bug in either the sheet or the figure — they disagree about a name — so
+every line that turns on a loose match now says which match it used:
+
+```
+✗ forbidden edge drawn: checkout->orders (orders matched no id — it is a
+  substring of box pg's label "Postgres orders (authoritative until cutover)")
+```
+
+Read that clause before editing anything: with it, the choice is between
+scoping the sheet and fixing the figure. Without it, a writer relabelled a
+correct box to satisfy the checker
+(`fixtures/d2-scenario/v2/label-substring/`).
+
 ## Why TALA, and when not
 
 TALA (Terrastruct's AutoLayout Algorithm) is D2's own engine for software

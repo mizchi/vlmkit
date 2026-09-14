@@ -1,0 +1,13 @@
+{
+  "_why": "Held against every slide figure that draws the write path AFTER the cutover. The migration-window figure is out of its scope: a dual write to Postgres is legitimately drawn there, and `forbidden: checkout->orders` matches a box whose LABEL merely contains the word (writer f, v1) \u2014 read the checker's match clause before changing a figure to satisfy this sheet.",
+  "boxes": [
+    "checkout",
+    "ledger"
+  ],
+  "deps": [
+    "checkout->ledger"
+  ],
+  "forbidden": [
+    "checkout->orders"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "_why": "The slide about D2's phantom-box trap. Its figure has to draw exactly four boxes in two containers and exactly one edge between them: an extra box is the very bug the slide is about, so this sheet is exhaustive.",
+  "boxes": ["api", "orders", "data", "postgres"],
+  "containers": { "api": ["orders"], "data": ["postgres"] },
+  "deps": ["orders->postgres"],
+  "exhaustive": true
+}

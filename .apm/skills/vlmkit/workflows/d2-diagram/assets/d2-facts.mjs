@@ -25,6 +25,13 @@
  *
  * Names in a sheet are matched against the last segment of a drawn id, so a
  * sheet says `orders` whether the file wrote `cluster.orders` or `svc_orders`.
+ * When no id matches, the search widens — to an exact LABEL (`gw: API gateway`
+ * holds the sheet's `gateway`), then to a substring of an id or of a label, and
+ * a substring match counts only when exactly one shape matches. That last
+ * fallback is generous: a box called `pg` labelled "Postgres orders (…)" IS the
+ * sheet's `orders`. Every message that turns on such a match says which one it
+ * used, because "the figure is wrong" and "the sheet means another box" need
+ * different fixes.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -319,7 +326,18 @@ if (!expectPath) {
 
 const sheet = JSON.parse(readFileSync(expectPath, "utf8"));
 const labelMatches = (id, n) => (labelsOf.get(id) || []).some((l) => norm(l) === n);
+/**
+ * How a sheet name found its shape. Reported wherever the answer is
+ * surprising, because the fallbacks are generous on purpose: a writer whose
+ * `forbidden: ["checkout->orders"]` fired on a box called `pg` labelled
+ * "Postgres orders (authoritative until cutover)" spent a round assuming the
+ * edge was wrong, when what had happened was that "orders" appeared in a
+ * label (writer f, d2-slides v1). The generosity stays — `gw: API gateway`
+ * holding the sheet's `gateway` is why it exists — but it says so now.
+ */
+let lastHow = null;
 const resolve = (name) => {
+  lastHow = null;
   const n = norm(name);
   if (name.includes(".")) {
     // A column-level name (`orders.customer_id`): the table is the shape.
@@ -331,19 +349,47 @@ const resolve = (name) => {
   }
   const deepest = (list) => list.sort((a, b) => b.split(".").length - a.split(".").length)[0];
   const byId = shapes.filter((s) => tail(s) === n);
-  if (byId.length) return deepest(byId);
+  if (byId.length) {
+    lastHow = { how: "id" };
+    return deepest(byId);
+  }
   const byLabel = shapes.filter((s) => labelMatches(s, n));
-  if (byLabel.length) return deepest(byLabel);
+  if (byLabel.length) {
+    const hit = deepest(byLabel);
+    lastHow = { how: "label", label: (labelsOf.get(hit) || [])[0], id: hit };
+    return hit;
+  }
+  let looseLabel;
   const loose = shapes.filter((s) => {
     const t = tail(s);
     const byTailPart = t.length >= 3 && n.length >= 3 && (t.includes(n) || n.includes(t));
     const byLabelPart = (labelsOf.get(s) || []).some((l) => {
       const ln = norm(l);
-      return ln.length >= 3 && n.length >= 3 && (ln.includes(n) || n.includes(ln));
+      const hit = ln.length >= 3 && n.length >= 3 && (ln.includes(n) || n.includes(ln));
+      if (hit && !byTailPart) looseLabel = { id: s, label: l };
+      return hit;
     });
     return byTailPart || byLabelPart;
   });
-  return loose.length === 1 ? loose[0] : null;
+  if (loose.length !== 1) return null;
+  lastHow = looseLabel && looseLabel.id === loose[0]
+    ? { how: "label-substring", ...looseLabel }
+    : { how: "id-substring", id: loose[0] };
+  return loose[0];
+};
+/** resolve() plus how it matched, for a message where that is the answer. */
+const resolveHow = (name) => {
+  const id = resolve(name);
+  return { id, ...(lastHow || {}) };
+};
+/** The clause that explains a surprising match, or "" when the id said it. */
+const via = (name, info) => {
+  if (!info || info.how === "id") return "";
+  if (info.how === "label") return ` (${name} is the LABEL of box ${info.id})`;
+  if (info.how === "label-substring") {
+    return ` (${name} matched no id — it is a substring of box ${info.id}'s label "${info.label}")`;
+  }
+  return ` (${name} matched box ${info.id} on a partial id, not an exact one)`;
 };
 const drawn = new Set(deps);
 const key = (a, b) => `${a}->${b}`;
@@ -368,8 +414,16 @@ for (const spec of sheet.deps || []) {
   else errors.push(`✗ edge not drawn: ${spec} (looked for ${a}->${b})`);
 }
 for (const spec of sheet.forbidden || []) {
-  const [a, b] = pair(spec);
-  if (a && b && drawn.has(key(a, b))) errors.push(`✗ forbidden edge drawn: ${spec}`);
+  const [an, bn] = spec.split("->").map((s) => s.trim());
+  const from = resolveHow(an);
+  const to = resolveHow(bn);
+  if (from.id && to.id && drawn.has(key(from.id, to.id))) {
+    // The clause is the difference between "the picture draws a forbidden edge"
+    // and "the sheet and the picture disagree about a name" — the first is a
+    // figure to fix, the second a sheet to scope, and a bare line cannot tell
+    // them apart.
+    errors.push(`✗ forbidden edge drawn: ${spec}${via(an, from)}${via(bn, to)}`);
+  }
 }
 for (const [container, members] of Object.entries(sheet.containers || {})) {
   const c = resolve(container);

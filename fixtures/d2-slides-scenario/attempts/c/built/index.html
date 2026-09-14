@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>壊れたページには失敗状態がない</title>
+<style>
+:root {
+  --ink: #14181f; --muted: #5b6472; --line: #d6dbe4; --bg: #ffffff; --stage: #ffffff;
+  --accent: #0d32b2; --code: #f4f6fa;
+  --stage-w: 1280px; --stage-h: 720px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #0d1117; color: var(--ink); }
+body { font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif; overflow: hidden; }
+#deck { position: fixed; inset: 0; }
+.slide {
+  width: var(--stage-w); height: var(--stage-h); background: var(--stage); color: var(--ink);
+  display: none; padding: 64px 72px 56px;
+  /* Centred by transform, not by the layout box: a 1280px stage is wider than a phone, and
+     centring an over-sized grid item leaves the middle off-screen. The integrity gate caught
+     that at 375px as "the DOM holds 4 text blocks but almost nothing painted". */
+  position: absolute; left: 50%; top: 50%; transform-origin: center center;
+  /* A slide is a fixed frame, so content that does not fit is CUT rather than spilling over the
+     next slide — which is what makes overflow detectable: the integrity gate reads it as clipped
+     text, and the copy gate reads the cut line as copy it cannot see. */
+  overflow: hidden;
+}
+.slide.active { display: flex; flex-direction: column; }
+/* The frame is a flex column and the body is the flexible child: a percentage height inside a
+   padded, fixed box was 114px out on every slide, which the integrity gate reported as clipped
+   content on slides whose text was well inside the frame. */
+.slide .body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 58px; line-height: 1.1; margin: 0; letter-spacing: -0.02em; }
+h2 { font-size: 38px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+h2::after { content: ""; display: block; width: 56px; height: 4px; background: var(--accent); margin-top: 16px; }
+.subtitle { font-size: 26px; color: var(--muted); margin: 0; }
+.slide.title .body { justify-content: center; }
+ul { margin: 0; padding-left: 26px; }
+li { font-size: 25px; margin: 0 0 14px; }
+li code, p code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+p { font-size: 25px; margin: 0 0 10px; }
+blockquote { margin: 0; padding-left: 20px; border-left: 4px solid var(--accent); font-size: 24px; color: var(--muted); }
+pre { background: var(--code); padding: 14px 18px; border-radius: 8px; overflow: auto; margin: 0; }
+pre code { font: 18px/1.45 ui-monospace, "SF Mono", Menlo, monospace; }
+/* align-items is start, not center: prose taller than the frame then overflows DOWNWARD, where
+   the clip is measurable, instead of being cut off at both ends. Centred, a long bullet list is
+   silently trimmed top and bottom — the copy gate reads those lines as copy a user cannot see. */
+.cols { flex: 1; display: grid; grid-template-columns: 1fr 1.1fr; gap: 40px; align-items: start; min-height: 0; height: 100%; }
+.prose { min-height: 0; }
+.figs { display: flex; flex-direction: column; gap: 16px; justify-content: center; align-items: center; min-height: 0; height: 100%; }
+.figs.full { flex: 1; }
+.fig { display: flex; min-height: 0; width: 100%; height: 100%; justify-content: center; align-items: center; }
+svg.figure { max-width: 100%; max-height: 100%; height: auto; width: auto; }
+footer {
+  position: absolute; left: 72px; right: 72px; bottom: 22px; display: flex; justify-content: space-between;
+  font-size: 15px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px;
+}
+.notes { display: none; }
+#progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--accent); transition: width .15s; z-index: 5; }
+#overview { position: fixed; inset: 0; background: #0d1117; overflow: auto; padding: 28px; display: none; z-index: 10; }
+#overview.on { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; align-content: start; }
+#overview .thumb { background: #fff; border-radius: 6px; overflow: hidden; cursor: pointer; position: relative; aspect-ratio: 16 / 9; }
+#overview .thumb .slide { display: block; transform: scale(0.234); transform-origin: top left; position: absolute; }
+#overview .thumb span { position: absolute; right: 6px; bottom: 4px; font-size: 12px; color: var(--muted); z-index: 2; }
+/* Every slide at once: what printing gives, and what a page gate has to read. One slide is on
+   screen at a time in the deck, so the copy gate over index.html only ever sees the first one.
+   print.html is the same content stacked, and that is the file the copy and contrast gates take. */
+body.print { overflow: visible; background: #eef1f6; }
+body.print #deck { position: static; }
+body.print #progress, body.print #overview { display: none !important; }
+body.print .slide {
+  display: flex !important; flex-direction: column; position: relative; left: auto; top: auto; transform: none !important;
+  margin: 0 auto 24px; box-shadow: 0 1px 4px rgba(20, 24, 31, .18); page-break-after: always; break-after: page;
+}
+body.print .notes { display: block; margin-top: 18px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 15px; color: var(--muted); }
+@media print {
+  html, body { background: #fff; overflow: visible; }
+  #deck { position: static; display: block; }
+  #progress, #overview { display: none !important; }
+  .slide { display: flex !important; flex-direction: column; position: static; left: auto; top: auto; margin: 0; box-shadow: none; page-break-after: always; break-after: page; transform: none !important; }
+  .notes { display: block; margin-top: 18px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 14px; color: var(--muted); }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="deck">
+<section class="slide title" data-index="0" aria-label="壊れたページには失敗状態がない">
+  <div class="body"><h1>壊れたページには失敗状態がない</h1>
+  <p class="subtitle">VRT ゲートを CI に入れる</p>
+  <div class="prose"></div></div>
+  <footer><span class="deck-title">壊れたページには失敗状態がない</span><span class="page">1 / 6</span></footer>
+  
+</section>
+<section class="slide text" data-index="1" aria-label="今どうなっているか">
+  <div class="body"><h2>今どうなっているか</h2>
+  <div class="prose"><ul><li>スクリーンショットを目で見比べる運用は、見落としが検出漏れとして残る</li><li>記録として残るのは「見た人が気づかなかった」以外に何もない</li><li>気づいた人がいなければ、そのまま本番に出る</li></ul></div></div>
+  <footer><span class="deck-title">壊れたページには失敗状態がない</span><span class="page">2 / 6</span></footer>
+  <aside class="notes"><p>現状の運用の弱さを説明する</p></aside>
+</section>
+<section class="slide split" data-index="2" aria-label="ゲートとは何か">
+  <div class="body"><h2>ゲートとは何か</h2>
+  <div class="cols"><div class="prose"><ul><li>ページを測って、しきい値を割ったら <strong>exit 1</strong> を返すもの</li><li>人が見る前に、機械が先に落とす</li></ul></div><div class="figs"><div class="fig"><svg class="figure" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.8.1-HEAD" preserveAspectRatio="xMinYMin meet" viewBox="0 0 898 108"><svg class="d2-952553197 d2-svg" viewBox="-21 -21 898 108"><rect x="-21" y="-21" width="898" height="108" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+.d2-952553197 .text-bold {
+	font-family: "d2-952553197-font-bold";
+}
+@font-face {
+	font-family: d2-952553197-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-952553197 .fill-N1{fill:#0A0F25;}
+		.d2-952553197 .fill-N7{fill:#FFFFFF;}
+		.d2-952553197 .fill-B1{fill:#0D32B2;}
+		.d2-952553197 .fill-B6{fill:#F7F8FE;}
+		.d2-952553197 .stroke-B1{stroke:#0D32B2;}
+		.d2-952553197 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="cGFnZQ=="><g class="shape" ><rect x="0" y="0" width="104" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="52" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ページ</text></g><g class="bWVhc3VyZQ=="><g class="shape" ><rect x="254" y="0" width="84" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="296" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">測定</text></g><g class="dmVyZGljdA=="><g class="shape" ><rect x="488" y="0" width="84" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="530" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">判定</text></g><g class="cmVzdWx0"><g class="shape" ><rect x="722" y="0" width="134" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="789" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">exit 0 / exit 1</text></g><g class="KHBhZ2UgLSZndDsgbWVhc3VyZSlbMF0="><marker id="mk-d2-952553197-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 106 33 L 250 33" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-952553197-3488378134)" mask="url(#d2-952553197)" /></g><g class="KG1lYXN1cmUgLSZndDsgdmVyZGljdClbMF0="><path d="M 340 33 L 484 33" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-952553197-3488378134)" mask="url(#d2-952553197)" /></g><g class="KHZlcmRpY3QgLSZndDsgcmVzdWx0KVswXQ=="><path d="M 574 33 L 718 33" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-952553197-3488378134)" mask="url(#d2-952553197)" /></g><mask id="d2-952553197" maskUnits="userSpaceOnUse" x="-21" y="-21" width="898" height="108">
+<rect x="-21" y="-21" width="898" height="108" fill="white"></rect>
+
+</mask></svg></svg></div></div></div></div>
+  <footer><span class="deck-title">壊れたページには失敗状態がない</span><span class="page">3 / 6</span></footer>
+  <aside class="notes"><p>ゲートの一連の流れを図で説明する</p></aside>
+</section>
+<section class="slide split" data-index="3" aria-label="どの測定を先に入れるか">
+  <div class="body"><h2>どの測定を先に入れるか</h2>
+  <div class="cols"><div class="prose"><ul><li>壊れ方の検出（要素の重なり、はみ出し、何も描画されていない）が最初の一本</li><li>次に文言、次にコントラスト</li></ul></div><div class="figs"><div class="fig"><svg class="figure" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-d2-version="v0.8.1-HEAD" preserveAspectRatio="xMinYMin meet" viewBox="0 0 207 438"><svg class="d2-1698272913 d2-svg" viewBox="-21 -21 207 438"><rect x="-21" y="-21" width="207" height="438" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css"><![CDATA[
+.d2-1698272913 .text-bold {
+	font-family: "d2-1698272913-font-bold";
+}
+@font-face {
+	font-family: d2-1698272913-font-bold;
+	src: url("data:application/font-woff;base64,d09GRgABAAAAAAWoAAoAAAAAClwAAguFAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAAA9AAAAGAAAABgXxHXrmNtYXAAAAFUAAAAJgAAACYADAAoZ2x5ZgAAAXwAAABYAAAAWA4fL09oZWFkAAAB1AAAADYAAAA2G38e1GhoZWEAAAIMAAAAJAAAACQKfwXAaG10eAAAAjAAAAAEAAAABAKyAFBsb2NhAAACNAAAAAQAAAAEAAAALG1heHAAAAI4AAAAIAAAACAAGQD3bmFtZQAAAlgAAAMvAAAIKgjwVkFwb3N0AAAFiAAAACAAAAAg/9EAMgADAioCvAAFAAACigJYAAAASwKKAlgAAAFeADIBKQAAAgsHAwMEAwICBGAAAvcAAAADAAAAAAAAAABBREJPACAAIP//Au7/BgAAA9gBESAAAZ8AAAAAAfAClAAAACAAAwAAAAEAAwABAAAADAAEABoAAAACAAIAAAAA//8AAP//AAEAAAAAAAAABQBQAAACYgKUAAMACQAPABIAFQAAMxEhESUzJycjBzczNzcjFwM3JwERB1ACEv6lpCcpBCkpBCogmB96X18BTV4ClP1sW01iYvZfOzv+nrm6/o0Bc7oAAAEAAAACC4VoCYP3Xw889QABA+gAAAAA2F2ghAAAAADdZi82/jf+xAhtA/EAAQADAAIAAAAAAAAAAQAAA9j+7wAACJj+N/43CG0AAQAAAAAAAAAAAAAAAAAAAAECsgBQAAAALAABAAAAAQCQAAwAYwAHAAEAAAAAAAAAAAAAAAAABAADeJyclM9uG2UUxX9ObNMKwQJFVbqJvgWLIrVjUyVV26wmpFZGRHHwuCAkhDS2J7bl8czIM3YanoA1b8FbdMVD8ByINbrX165dEAUrinVm5v4537nnfsABf7JPpXof+K2eGq5wVL82vMe9+oXhfVr1PcNVHtV+N1xjUFsYrvN5rWP4I95WfzF8j+Pqj4bvc1htGf6Yp9UDw5/sO/4w/CnHvF3iCjznZ8MVDskN73HAD4b3eYDVrFR5QNNwjc84MlznCOgypiRhTMoQxw1jhsyZEVMQEjNjzA0xAxwBPgmlvk2JFDmG//g2IqRkRqQVR5Q4EkISIgpGVvEnzcq41o7SZ6ZIuvmUjIjoacaEiBRHxpCMlJiJ1ikpyXlJgwYFfeWbU1LgUTAmwSNjxpAGbVpc0mXEmAJHSysJs5CMG0puibS/swhRpk9MSmGs5qQMlKdTfrFmB1ziaJNr7Gbly60Kj3F8q9nCTWIcX+Lpv9tgtt13xSZioXqKhj0S5XmrExyp4tLX5xvFJS9xO+mzzeTDGg2Uncx6TI+5zl/mJ3nCJMW5Q3xCdVDoHuI40+eAUBX5joAuF7R5TVeffTp08LmiS8ArzW3TwfEVba4414xA8fJbSx1zxfc4vibQGKkdmz6iuTy9ITd3C3dxhpxjSq5bIDOW84vz450mLDuUbbmjUFf0dY8kUvZAVJE9ixiaK3J1xVS1XHmjMP0G5gj5Wups332XbVjY7q22+I5Md9gxN04yuSWjD03Ve88zt/rnETEgo6cRfTKmNCi507NdEzEnwXGuPr7QLSnx1znS505dEjNVBgGp1pmR629kvgmNe3/L987uEtm8qe7oZH2qXbpI5XRjRq9VvdW30FSONybQsKlmliMTlsrLk4r3Jdrb4h+q+wu93TKecEZGwuBvN8BTPJocc8IpI+0glVMWdjs09YZo8oJTPf2EWKPkvnyjOkmFEzyeccIJL3j2no4rJs64uDWXzd4+55zR5vQ/nWIZ3+aMV+t3/971V2Xa1LM4nqyfnu88xUf/w61f8HjrvuzoLSCbs7Bq77biioipcHGHm1q4h3h/AQAA//8DAPS3T1EAAAMAAAAAAAD/zgAyAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+}]]></style><style type="text/css"><![CDATA[.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-1698272913 .fill-N1{fill:#0A0F25;}
+		.d2-1698272913 .fill-N7{fill:#FFFFFF;}
+		.d2-1698272913 .fill-B1{fill:#0D32B2;}
+		.d2-1698272913 .fill-B6{fill:#F7F8FE;}
+		.d2-1698272913 .stroke-B1{stroke:#0D32B2;}
+		.d2-1698272913 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}]]></style><g class="YnJva2Vu"><g class="shape" ><rect x="0" y="0" width="165" height="66" stroke="#0D32B2" fill="#eef" class=" stroke-B1" style="stroke-width:2;" /></g><text x="82.5" y="38.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">壊れ方の検出</text></g><g class="Y29weQ=="><g class="shape" ><rect x="41" y="165" width="84" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="83" y="203.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">文言</text></g><g class="Y29udHJhc3Q="><g class="shape" ><rect x="0" y="330" width="165" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="82.5" y="368.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">コントラスト</text></g><g class="KGJyb2tlbiAtJmd0OyBjb3B5KVswXQ=="><marker id="mk-d2-1698272913-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 83 68 L 83 161" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-1698272913-3488378134)" mask="url(#d2-1698272913)" /></g><g class="KGNvcHkgLSZndDsgY29udHJhc3QpWzBd"><path d="M 83 233 L 83 326" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-1698272913-3488378134)" mask="url(#d2-1698272913)" /></g><mask id="d2-1698272913" maskUnits="userSpaceOnUse" x="-21" y="-21" width="207" height="438">
+<rect x="-21" y="-21" width="207" height="438" fill="white"></rect>
+
+</mask></svg></svg></div></div></div></div>
+  <footer><span class="deck-title">壊れたページには失敗状態がない</span><span class="page">4 / 6</span></footer>
+  <aside class="notes"><p>3つの測定のうち最初に入れるものを強調している</p></aside>
+</section>
+<section class="slide text" data-index="4" aria-label="通るだけのゲートは信用できない">
+  <div class="body"><h2>通るだけのゲートは信用できない</h2>
+  <div class="prose"><ul><li>わざと壊して落ちることを確かめるステップを CI に入れる</li><li>一度も落ちたことのないゲートは、正しく落ちるかどうか分からないから</li></ul></div></div>
+  <footer><span class="deck-title">壊れたページには失敗状態がない</span><span class="page">5 / 6</span></footer>
+  <aside class="notes"><p>なぜネガティブコントロールが必要かを説明する</p></aside>
+</section>
+<section class="slide text" data-index="5" aria-label="まとめ">
+  <div class="body"><h2>まとめ</h2>
+  <div class="prose"><blockquote>壊れたページには失敗状態がない。ゲートがその失敗状態になる。</blockquote></div></div>
+  <footer><span class="deck-title">壊れたページには失敗状態がない</span><span class="page">6 / 6</span></footer>
+  <aside class="notes"><p>覚えて帰ってほしい一行</p></aside>
+</section>
+</div>
+<div id="overview" aria-hidden="true"></div>
+<script>
+(() => {
+  const slides = [...document.querySelectorAll("#deck .slide")];
+  const deck = document.getElementById("deck");
+  const progress = document.getElementById("progress");
+  const overview = document.getElementById("overview");
+  let at = 0;
+  const fit = () => {
+    // One fixed 1280x720 stage scaled to the viewport: nothing reflows between screens, so a
+    // screenshot of slide N is the same picture on any display.
+    const s = Math.min(innerWidth / 1280, innerHeight / 720) * 0.96;
+    for (const el of slides) el.style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  };
+  const show = (n) => {
+    at = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((el, i) => el.classList.toggle("active", i === at));
+    progress.style.width = ((at + 1) / slides.length) * 100 + "%";
+    if (location.hash !== "#/" + (at + 1)) history.replaceState(null, "", "#/" + (at + 1));
+  };
+  const buildOverview = () => {
+    if (overview.childElementCount) return;
+    slides.forEach((el, i) => {
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+      const clone = el.cloneNode(true);
+      clone.classList.add("active");
+      clone.style.transform = "scale(0.234)";
+      thumb.append(clone, Object.assign(document.createElement("span"), { textContent: i + 1 }));
+      thumb.addEventListener("click", () => { overview.classList.remove("on"); show(i); });
+      overview.append(thumb);
+    });
+  };
+  addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { show(at + 1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") show(at - 1);
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+    else if (e.key === "o") { buildOverview(); overview.classList.toggle("on"); }
+    else if (e.key === "p") print();
+    else if (e.key === "f") document.documentElement.requestFullscreen?.();
+    else if (e.key === "Escape") overview.classList.remove("on");
+  });
+  deck.addEventListener("click", (e) => show(at + (e.clientX < innerWidth / 3 ? -1 : 1)));
+  addEventListener("resize", fit);
+  addEventListener("hashchange", () => show((parseInt(location.hash.slice(2), 10) || 1) - 1));
+  fit();
+  show((parseInt(location.hash.slice(2), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>

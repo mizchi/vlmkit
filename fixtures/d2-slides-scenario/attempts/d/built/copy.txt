@@ -1,0 +1,27 @@
+How checkout talks to the rest of us
+The services on the path
+A request comes in at the gateway, which owns auth and nothing else.
+checkout holds the cart and the order, and now calls ledger to
+payments talks to the card processor and is the only service with the key.
+record it.
+Where the state lives
+checkout no longer writes Postgres directly — it calls ledger, which is
+payments keeps no state of its own; the processor is the record.
+now the only writer to the orders table.
+The migration window
+For the next two weeks both paths are live: checkout dual-writes to
+Postgres is authoritative until the cutover; ledger becomes the source of
+Existing readers keep reading Postgres during the window; nothing else
+Postgres and to ledger.
+truth afterward.
+changes for them.
+What wakes you up
+A 402 from payments is the processor, not us — check its status page first.
+A 500 from checkout with no payments call in the trace is the order write.
+A 409 from ledger means the dual-write disagreed; it is the migration,
+Latency on POST /orders past two seconds is almost always the card
+not the order.
+processor, and the dashboard shows it per-service.
+What to remember
+One writer per table, and ledger is the only thing holding the pen for
+orders now.

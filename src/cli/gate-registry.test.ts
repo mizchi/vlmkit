@@ -177,8 +177,13 @@ describe("composed built-in registry", () => {
     //       its gesture and did nothing else with it. `drag-ghost-illegible` — the dragged element
     //       measured at rest and again in the air, graded only when the fall crosses 4.5:1, because
     //       a page that dims 15:1 to 9:1 has lost the same proportion and is still readable.
+    // 171 → 172: `copy-forbidden`, the manifest's mirror on `check copy`. `--forbid <file>` is one
+    //       line per piece of copy that must NOT be on the page any more, matched against the raw
+    //       text and every revealed state rather than the visible text — hiding a stale claim does
+    //       not retire it. Asked for by a writer re-editing a slide deck who could prove the new
+    //       claim was there and had to grep by hand to prove the old one was gone.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 171);
+    assert.equal(total, 172);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
