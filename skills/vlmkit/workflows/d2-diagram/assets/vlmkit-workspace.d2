@@ -2,6 +2,7 @@
 # Ids are ASCII; the label after the colon is what the reader sees.
 # Render:  d2 --layout=tala vlmkit-workspace.d2 vlmkit-workspace.svg
 # Preview: d2 --layout=tala vlmkit-workspace.d2 vlmkit-workspace.txt && cat vlmkit-workspace.txt
+# Check:   node d2-facts.mjs vlmkit-workspace.d2 --expect vlmkit-workspace.facts.json
 
 vars: {
   d2-config: {

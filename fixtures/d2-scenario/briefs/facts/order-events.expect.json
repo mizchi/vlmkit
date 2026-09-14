@@ -1,0 +1,44 @@
+{
+  "_note": "Scorer's truth for the order-events brief. NOT given to writers in v1 — the round measures how often a writer's own green render is wrong about these facts. Ids are the meaning, not the spelling: score a box by its label.",
+  "boxes": [
+    "browser",
+    "cdn",
+    "gateway",
+    "orders",
+    "inventory",
+    "billing",
+    "shipping",
+    "broker",
+    "postgres",
+    "redis",
+    "stripe"
+  ],
+  "deps": [
+    "browser->cdn",
+    "cdn->gateway",
+    "gateway->orders",
+    "orders->inventory",
+    "orders->broker",
+    "broker->billing",
+    "broker->shipping",
+    "orders->postgres",
+    "shipping->postgres",
+    "inventory->redis",
+    "billing->stripe"
+  ],
+  "forbidden": [
+    "orders->billing",
+    "orders->shipping",
+    "billing->orders",
+    "gateway->inventory",
+    "gateway->billing"
+  ],
+  "regions": {
+    "edge": ["cdn", "gateway"],
+    "cluster": ["orders", "inventory", "billing", "shipping", "broker", "postgres", "redis"],
+    "outside": ["stripe"]
+  },
+  "synchronous": ["orders->inventory"],
+  "fanOut": { "from": "broker", "to": ["billing", "shipping"], "notAChain": true },
+  "maxColumns": 100
+}

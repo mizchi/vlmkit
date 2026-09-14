@@ -1,17 +1,17 @@
 ---
 name: d2-diagram
-description: Draw a software architecture, system, data-model or call-flow diagram as D2 text laid out by TALA (D2's whiteboard-style engine, open source since D2 0.9), and look at it in the terminal before anyone opens an image — `d2 --layout=tala x.d2 x.txt` renders the same layout as Unicode box drawing, `--ascii-mode standard` as plain ASCII for a README. Loop: write `.d2` → `d2 fmt` / `validate` → terminal render → SVG / PNG → fix the text. Use when asked for a D2 diagram, an architecture diagram kept as editable text in the repo, a TALA layout, a diagram that shows in a terminal or a code block, or when the repo already has `.d2` files. Not for animations or figures held to a fact sheet (`explanatory-animation`, `explain-with-anim`).
+description: Draw a software architecture, system, data-model or call-flow diagram as D2 text laid out by TALA (D2's whiteboard-style engine, open source since D2 0.9), look at it in the terminal before anyone opens an image, and check that the picture says what it claims — `d2 --layout=tala x.d2 x.txt` renders the layout as Unicode box drawing, `--ascii-mode standard` as plain ASCII for a README, and `assets/d2-facts.mjs` reads the drawn boxes and arrows back out of the render and holds them to a fact sheet. Loop: write `.d2` → `d2 fmt --check` / `validate` → facts → terminal render → PNG → fix the text. Use when asked for a D2 diagram, an architecture diagram kept as editable text in the repo, a TALA layout, a diagram that shows in a terminal or a code block, or when the repo already has `.d2` files. Not for animations or figures with a moving walk (`explanatory-animation`, `explain-with-anim`).
 metadata:
   internal: true
 ---
 
 # d2-diagram
 
-A D2 file is the diagram; the picture is a render of it. The writer's job is
-the text — ids, labels, containers, connections — and TALA's job is where the
-boxes go and how the lines bend. The terminal render exists so the writer
-reads the picture on every round without leaving the shell, and so the
-diagram can live in a README code block, a PR comment, or a `--help` text.
+A D2 file is the diagram; the picture is a render of it. The writer's job is the
+text — ids, labels, containers, connections — and TALA's job is where the boxes
+go and how the lines bend. The terminal render exists so the writer reads the
+picture on every round without leaving the shell, and so the diagram can live in
+a README code block, a PR comment, or a `--help` text.
 
 ```d2
 direction: right
@@ -34,28 +34,32 @@ api -> db: SQL
 
 (`d2 --layout=tala x.d2 x.txt`, verbatim, D2 0.8.1-HEAD.)
 
-This skill is for a diagram whose deliverable is **D2 text**: someone will
-edit it later, TALA lays it out, and it renders wherever D2 does. When the
-picture must be *checked against the code* (a module map held to the import
-graph) or *move* (an algorithm step by step), use `explanatory-animation` /
-`explain-with-anim` instead — a D2 diagram is a drawing, and nothing in D2
-tells you it is wrong. The two combine: draw the modules and dependencies that
-`vlmkit-anim facts <dir> --depth 1 --out f.expect.json` lists, so the D2 is
-grounded, and keep both files.
+This skill is for a diagram whose deliverable is **D2 text**: someone will edit
+it later, TALA lays it out, and it renders wherever D2 does. When the picture has
+to *move* (an algorithm step by step, a walked request) use
+`explanatory-animation` / `explain-with-anim` instead. The two combine: draw the
+modules and dependencies that `vlmkit-anim facts <dir> --depth 1 --out
+f.expect.json` lists, so the D2 is grounded in the code, and keep both files.
 
 ## Invocation
 
 ```bash
-d2 --version                                # v0.9.0 or newer bundles TALA
-d2 layout                                   # must list: tala (bundled)
+d2 layout                                   # must list `tala (bundled)`. That, not the version
+                                            # string, is the gate: v0.8.1-HEAD already bundles it.
 
-d2 --layout=tala arch.d2 arch.txt && cat arch.txt   # the terminal render (Unicode box drawing)
-d2 --layout=tala --ascii-mode standard arch.d2 arch.txt   # plain ASCII (+ - | / < > v), for READMEs and dumb terminals
-d2 --layout=tala arch.d2 --stdout-format ascii -    # to stdout, for a pipe or a PR comment
-d2 --layout=tala arch.d2 arch.svg           # the figure for docs
-d2 --layout=tala arch.d2 arch.png           # a raster to look at with your own vision (no browser needed)
-d2 fmt arch.d2                              # canonical formatting, in place
+d2 --layout=tala arch.d2 arch.txt && cat arch.txt        # the terminal render (Unicode box drawing)
+d2 --layout=tala --ascii-mode standard arch.d2 arch.txt  # plain ASCII (+ - | / < > v) for a README
+d2 --layout=tala arch.d2 --stdout-format ascii -         # to stdout, for a pipe or a PR comment
+d2 --layout=tala arch.d2 arch.svg                        # the figure for docs
+d2 --layout=tala arch.d2 arch.png                        # a raster to LOOK at (see the loop, step 5)
+
 d2 validate arch.d2                         # syntax only; exit 1 with file:line:col
+d2 fmt --check arch.d2                      # formatted? exit 1 and names the file, changes nothing
+d2 fmt arch.d2                              # ...and this rewrites it in place
+
+node .claude/skills/d2-diagram/assets/d2-facts.mjs arch.d2               # what the picture DRAWS
+node .claude/skills/d2-diagram/assets/d2-facts.mjs arch.d2 --expect f.json   # ...held to a sheet
+LC_ALL=C.UTF-8 wc -L arch.txt               # the width in columns — the locale matters, see below
 ```
 
 Install when `d2` is missing — never drive the diagram through an online
@@ -69,146 +73,281 @@ go install github.com/d2lang/d2@latest                   # Go 1.27+; what to do 
 
 `D2_LAYOUT=tala` in the environment is the same as the flag. `vars: { d2-config:
 { layout-engine: tala } }` inside the file is honoured for `.svg` / `.png` **and
-not for `.txt`** on the build this was measured on (0.8.1-HEAD, 2026-09-13: the
-text render fell back to dagre and came out 163 columns wide instead of 120),
-so pass the flag anyway; put the config in the file so the next renderer of
-the SVG gets the same engine.
+not for `.txt`** on the build measured (0.8.1-HEAD: the text render fell back to
+dagre and came out 163 columns instead of 120), so pass the flag anyway; keep the
+config in the file so the next person's SVG gets the same engine.
+
+## Nothing in D2 tells you the picture is wrong
+
+`validate` reads syntax. The renderers draw whatever the file says. There is no
+`--expect`, no layout report, and **no error for a reference to an id that is not
+in scope — it creates a new shape.** So this is a silently wrong diagram:
+
+```d2
+edge:    { cdn; gateway }
+cluster: { orders; inventory }
+gateway -> orders        # ← two NEW empty boxes at the root; the real ones keep no arrow
+```
+
+A writer in this skill's own validation round shipped exactly that: `d2 validate`
+0, `d2 fmt` clean, 94 columns, and its log said "can trace all connections". The
+render had **four duplicated boxes**, two orphans, and the system's entry call
+drawn as a floating pair outside every region
+([report](../../../docs/reports/2026-09-14-d2-diagram-v1.md)). Reach out of a
+container with `_.` or a full path — `billing -> _.outside.stripe`, not
+`_.stripe` — and put cross-container connections at the root.
+
+`assets/d2-facts.mjs` is the check D2 does not have. It renders the file and
+reads the picture back out of the SVG — d2 writes every shape's and every
+connection's fully-qualified id into it — so what it reports is what a reader
+sees, not what the source seems to say. No dependencies; copy it next to your
+diagrams in another repo.
+
+```bash
+node assets/d2-facts.mjs arch.d2               # boxes, containers and their members, labels, edges, columns
+node assets/d2-facts.mjs arch.d2 --expect arch.facts.json
+```
+
+It fails on its own, with no sheet, for the two defects that are always defects:
+**a name drawn twice** (the scoping trap above) and, with a sheet, a box that
+overlaps a sibling or escapes its container. It warns about a box nothing
+connects to. With a sheet it also checks:
+
+```json
+{
+  "boxes": ["gateway", "orders", "broker"],
+  "deps": ["gateway->orders", "orders->broker"],
+  "forbidden": ["orders->billing"],
+  "containers": { "cluster": ["orders", "inventory"] },
+  "order": ["browser->gateway", "gateway->orders"],
+  "exhaustive": true,
+  "maxColumns": 100,
+  "allowOrphans": ["legend"]
+}
+```
+
+- `deps` are checked **with direction**: a reversed arrow reads `✗ edge
+  reversed: the sheet says broker->billing, the picture draws billing->broker`.
+- `exhaustive` makes an edge the sheet does not list an error, not a warning.
+- `order` reads a sequence diagram's messages back by their y position — the one
+  place D2 makes order visible.
+- Names match an id's last segment **or its label**, so a sheet says `gateway`
+  for a file that wrote `gw: API gateway`.
+- It cannot see inside a `sql_table`: a column-level edge
+  (`orders.customer_id -> customers.id`) is reported as `orders->customers`.
+  Constraint badges are not checked either; `grep -c '>FK</text>' arch.svg` is
+  the crude way to count them.
+
+Write the sheet from the brief **before** the diagram, the way a test comes
+first. It is the only artifact that survives a TALA reflow.
 
 ## Why TALA, and when not
 
 TALA (Terrastruct's AutoLayout Algorithm) is D2's own engine for software
-architecture diagrams, open-sourced under MPL-2.0 and bundled in D2 since 0.9.0
-(older releases needed a separate download). Where dagre and ELK lay a directed
-graph out in layers, TALA arranges boxes the way a whiteboard drawing does —
+architecture diagrams, open-sourced under MPL-2.0 and bundled with D2 (0.9.0 is
+the release the announcement names; the 0.8.1-HEAD build measured here has it
+too — ask `d2 layout`, not the version). Where dagre and ELK lay a directed graph
+out in layers, TALA arranges boxes the way a whiteboard drawing does —
 orthogonal, symmetric where it can be, clustered by container — and it is the
-only engine that honours every D2 feature: `direction` per container,
-`width` / `height` on containers, `near: <other shape>`, and `top` / `left` to
-pin a shape while the engine places the rest.
+only engine that honours every D2 feature: `direction` per container, `width` /
+`height` on containers, `near: <other shape>`, and `top` / `left` to pin a shape
+while the engine places the rest.
 
 | The diagram is… | Engine |
 |---|---|
 | Boxes in containers with connections in several directions (an architecture, a deployment, a data model) | **tala** |
-| One flow with a clear direction, many hops (a pipeline, a DAG) | tala with `direction: right`; if it still reads badly, `elk` — the blog is explicit that TALA does less well on flowing graphs |
+| One flow with a clear direction, many hops (a pipeline, a DAG) | tala with `direction: right`; if it still reads badly, `elk` — the announcement is explicit that TALA does less well on flowing graphs |
 | Thirty-plus shapes | Split by container into two files. TALA's runtime is nonlinear in size: 30 nodes took 0.94s here where ELK took 0.05s; layouts that size also read badly whatever the engine |
 
-**Randomness, made reproducible.** TALA tries three seeds (`--tala-seeds`
-default `1,2,3`) and keeps the best complete result, so the same file renders
-the same picture twice — measured identical here. A label change can still
-cascade into a different arrangement. Two consequences: never describe the
-geometry in prose ("the box on the left") — name ids; and when a layout is
-ugly, `--tala-seeds 4,5,6` gives you a *different* layout, not a nudged one.
-Pin with `top` / `left` (both together, TALA only) when a shape must stay put:
-the blog's intended hybrid is that you choose positions for the few boxes
-that matter and TALA routes everything else.
+**Randomness, made reproducible.** TALA tries three seeds (`--tala-seeds`,
+default `1,2,3`) and keeps the best complete result, so the same file renders the
+same picture twice — measured identical. A label change can still cascade into a
+different arrangement, so never describe the geometry in prose ("the box on the
+left"); name ids. Two measured caveats before you reach for seeds:
+
+- **A different seed set often changes nothing.** One writer swept twelve seed
+  sets over a five-table schema and got the identical 109-column layout every
+  time; another moved 113 → 100 columns with `--tala-seeds 4,5,6`. Try it once,
+  keep the number you measured, and do not plan on it.
+- **Seeds cannot live in the file.** `d2 layout tala` says "Diagram data under
+  tala-seeds takes precedence over the command-line flag", but
+  `vars.d2-config.tala-seeds` is rejected at compile time. A committed diagram
+  whose layout depends on a seed only renders that way if every render passes the
+  flag — so write the flag into the script or the Makefile target, or do not rely
+  on it.
 
 ## Route by task
 
 | Task shape | Write |
 |---|---|
-| "Draw the architecture / how the services fit" | Containers per area (`packages: packages/ { core; capture; … }`), connections between children (`cli -> packages.markup`), `direction: right` at the root, per-container `direction` where a group flows the other way |
-| "Draw the data model / tables" | `shape: sql_table` with `id: int {constraint: primary_key}` rows; connect columns (`orders.user_id -> users.id`) |
-| "Draw the request / call flow between components" | `shape: sequence_diagram` at the root; actors in first-use order; one message per line with its label |
+| "Draw the architecture / how the services fit" | Containers per area (`cluster: our cluster { orders; inventory }`), connections between children at the **root** (`edge.gateway -> cluster.orders`) or with `_.` from inside. `direction: right` at the root; per-container `direction` on the fullest container is the width lever, see below |
+| "Draw the data model / tables" | `shape: sql_table` with `id: int {constraint: primary_key}` and `customer_id: int {constraint: foreign_key}` rows; connect the columns (`orders.customer_id -> customers.id`) |
+| "Draw the request / call flow between components" | `shape: sequence_diagram` at the root; actors in first-use order; one message per line with its label. D2 has no return or async arrow, and the terminal render drops arrowheads and dash styles, so **say it in the label** (`reserved (ret)`, `order.placed (async)`) |
 | "Draw the classes" | `shape: class` with `+method(): type` / `-field: type` lines |
 | "Draw the deployment / network" | Containers for hosts and zones; `shape: cylinder` for stores, `shape: cloud` for external services, `shape: queue` for brokers |
-| "We already have a `.d2`" | Edit it; `d2 fmt`; render before and after; do not switch its engine or theme without saying so |
-| "Put it in the README / a code block / a PR comment" | The `standard` ASCII render inside a fenced block; check its width (below); keep the `.d2` next to it |
-| "It has to be checked against the code" | `vlmkit-anim facts <dir>` first, draw exactly its modules and deps, cite the sheet — or hand the task to `explanatory-animation` |
+| "We already have a `.d2`" | Edit it; `d2 fmt --check`; render before and after; do not switch its engine or theme without saying so |
+| "Put it in the README / a code block / a PR comment" | The `standard` ASCII render inside a fenced block; measure the width as below; keep the `.d2` next to it |
+| "It has to be checked against the code" | `vlmkit-anim facts <dir>` first, draw exactly its modules and deps into the sheet, then `d2-facts --expect` — or hand the task to `explanatory-animation` |
 
 ## The loop
 
 ```
-1. write arch.d2                                     ids ASCII; the label after the colon is what the reader sees
-2. d2 fmt arch.d2 && d2 validate arch.d2             syntax; exit 1 names file:line:col and the missing } or destination
-3. d2 --layout=tala arch.d2 arch.txt && cat arch.txt read the picture in the terminal — every box, every arrow, its direction
-   wc -L arch.txt                                    columns; over your terminal's width, change `direction` or split
-4. d2 --layout=tala arch.d2 arch.png                 look at it once with your own vision (labels, edge labels, icons the text render drops)
-5. fix the text; go to 2
+1. write arch.facts.json                             the boxes, edges and width the brief asks for
+2. write arch.d2                                     ids ASCII; the label after the colon is what the reader sees
+3. d2 fmt --check arch.d2 && d2 validate arch.d2     syntax; exit 1 names file:line:col
+4. node assets/d2-facts.mjs arch.d2 --expect arch.facts.json
+                                                     duplicates, missing / reversed / invented edges,
+                                                     container members, overlaps, order, width
+5. d2 --layout=tala arch.d2 arch.png                 and READ the .png — you can look at an image; this is
+                                                     where labels, shapes and crowding become visible
+6. d2 --layout=tala arch.d2 arch.txt && cat arch.txt the deliverable, if it is going in a terminal
+7. fix the text; go to 3
 ```
 
-Five rounds at most. The text render is where you read *structure*: which
-box is inside which, what points at what, whether an arrow runs the way the
-sentence does. Read *labels* on the PNG. A compile error is one line —
+Five rounds at most. Each step answers a different question: 3 is "does it
+compile", 4 is "does it say what I meant", 5 is "does it read", 6 is "does it fit
+where it is going". A compile error is one line —
 `arch.d2:2:9: invalid style keyword: "colour"`, `2:1: connection missing
 destination` — fix the line it names.
 
 ## Done condition
 
-- `d2 validate` exits 0 and `d2 fmt` changes nothing.
-- The TALA render exits 0 (`d2 layout` listed `tala (bundled)` — the render
-  did not silently fall back).
-- The terminal render fits the width it is for: 120 columns for a wide
-  terminal, 80 for a README code block, measured with `wc -L`.
+- `d2 validate` exits 0 and `d2 fmt --check` exits 0.
+- `d2 layout` listed `tala (bundled)` and the render used it.
+- `d2-facts --expect` exits 0: no duplicate name, every listed box and edge
+  drawn with its direction, no forbidden edge, the width inside budget.
+- You opened the PNG once.
 - Every shape and connection in the prose is named by its id, and every id in
   the prose is in the file.
 - The `.d2` is committed where the SVG is; the SVG is a build output or is
   committed next to it — never only pasted.
 
+## Width: measure it the way a terminal sees it
+
+```bash
+LC_ALL=C.UTF-8 wc -L arch.txt      # 122 — correct, and CJK-aware
+wc -L arch.txt                     # 120 in the C locale: an undercount, and 87 vs 111 on a Japanese figure
+awk '{if(length($0)>m)m=length($0)}END{print m}' arch.txt   # 338 — BYTES. Never this.
+```
+
+`d2-facts.mjs` prints the same number as `columns`, which is the one to quote.
+Two writers hit the undercount independently; one spent a round shrinking a
+render that was already inside budget.
+
+**The levers are not monotone. Measure after every one.** Measured on two
+different diagrams in the same round:
+
+| Lever | Diagram A | Diagram B |
+|---|---|---|
+| root `direction: right` → `down` | 144 → **145** (worse) | 148 → **109** (the win) |
+| shorter labels | 144 → **146** (worse) | 109 → **135** (worse) |
+| per-container `direction` on the fullest container | 146 → **113** (the win) | — |
+| `--tala-seeds 4,5,6` | 113 → **100** | no change across 12 seed sets |
+| `top` / `left` pin on one shape | 113 → **74** | 102 → **75** |
+
+So: set the root `direction`, then the **own `direction` of the container holding
+the most boxes** — that is the first thing to try, not the last — and re-measure
+after each. Shortening labels is as likely to make it wider, because TALA reflows
+the whole picture. `--scale` does not change the text render at all.
+
+Two caveats on the escape hatches:
+
+- **Per-container `direction` is often ignored.** Setting it on two containers
+  produced byte-identical renders; on the fullest one it moved 33 columns. TALA
+  appears to honour it only where the container's internal flow is ambiguous.
+- **`top` / `left` are SVG pixels, not columns**, and both must be set together
+  (TALA only). Roughly 11.5px per terminal column on a 100-column figure, but
+  both writers who used it found their numbers by trying three to five values.
+  Pin the one or two shapes whose place matters, comment why, and expect the pin
+  to need re-tuning after the next label change.
+
 ## Reading the terminal render
 
-Measured on 0.8.1-HEAD with the file under `assets/`:
+Measured on 0.8.1-HEAD. Read **structure** here; read **labels and shapes** on
+the PNG.
 
-- **Width is the layout's, not yours.** The workspace map rendered at 120
-  columns with TALA `direction: right`, 94 with `direction: down`, 163 with
-  dagre or ELK. `--scale` does not shrink the text render. The levers are
-  `direction`, splitting a container into its own file, and shorter labels.
 - **Edge labels are written onto the line** and their spaces become line
-  characters (`vlmkit check integrity─page─html`). Keep terminal-bound edge
-  labels to one or two words, or drop them from the terminal version.
-- **`shape: text` and `|md …|` blocks render as empty boxes.** A title, a
-  legend or a paragraph belongs in the prose around the render, or in a
-  variant of the file rendered only to SVG.
+  characters (`vlmkit check integrity─page─html`, `201─Created`). Keep
+  terminal-bound edge labels to one or two words.
+- **Every connection style is dropped.** `stroke-dash`, `stroke`, `bold` render
+  as a plain line: a writer diffed its styled render against a style-free copy
+  and they were **identical**. Dashed-means-async does not survive, so carry the
+  distinction in the label.
+- **Arrowheads are unreliable on long labels.** A label long enough to fill the
+  lane can leave the arrow with no head at all, and `<<` in a label is eaten
+  outright. Probe the spelling you land on.
+- **`shape: text` and `|md …|` blocks render as empty boxes.** A title, a legend
+  or a paragraph belongs in the prose around the render, or in a variant of the
+  file rendered only to SVG.
+- **`sql_table` rows render, their constraint badges do not.** PK / FK markers
+  are visible only in the SVG / PNG, and a column-level edge attaches to the
+  wrong row in the text view often enough that you cannot read it there.
+- **An edge label can land on a box or container border** (`┌────sync call────┐│`),
+  which reads as two boxes merged. It is cosmetic in the SVG and confusing in the
+  terminal: shorten the label or move the connection to the root.
 - **CJK labels pad every glyph** (`ウ  ェ  ブ`) and misalign the box that holds
-  them. Ids stay ASCII always; for a diagram that will be *read* in a
-  terminal, keep labels ASCII too and put the Japanese in the surrounding
-  text. The SVG / PNG render Japanese correctly.
+  them. Ids stay ASCII always; for a figure that will be read in a terminal keep
+  the labels ASCII too and put the Japanese in the surrounding text. The SVG and
+  PNG render Japanese correctly.
 - **`standard` mode** keeps the same layout with `+ - | / < > v` only — the
-  version for a README that is read on GitHub, where box-drawing glyphs in a
-  code block depend on the viewer's font.
-- **Icons and images are dropped**; sequence diagrams, `sql_table` and
-  `class` shapes render, with their rows.
+  version for a README read on GitHub, where box-drawing glyphs in a code block
+  depend on the viewer's font.
+- **Icons and images are dropped**; sequence diagrams, `sql_table` and `class`
+  shapes render, with their rows.
 
 ## Rules the writer keeps
 
-- Ids are ASCII and stable (`api`, not `API server`); the label goes after
-  the colon, `_` reaches the parent (`presents -> _.regift`), dots reach into
-  containers (`cli -> packages.core.plugin`).
+- Ids are ASCII and stable (`api`, not `API server`); the label goes after the
+  colon. Abbreviating an id is fine — `d2-facts` matches on the label too — but
+  the next editor reads the id first.
+- **A cross-container connection is written at the root or with `_.`**, and `_`
+  is one level: from inside `cluster`, the root is `_`, so a shape in a sibling
+  container is `_.outside.stripe`. Never let an out-of-scope name stand: it
+  becomes a new box (see above).
 - One root `direction`; a container that must flow the other way sets its own
-  (TALA only).
-- Connections read as sentences: `a -> b: verb`. `--` is undirected, `<->`
-  both ways; `{style.stroke-dash: 3}` on a connection marks it optional or
-  planned — say which, in the label or the prose.
-- `vars: { d2-config: { layout-engine: tala } }` at the top of every file, so
-  a render without the flag still gets TALA for the SVG.
-- No coordinates unless a shape must be pinned; then `top` and `left`
-  together, on that shape only, and a comment saying why.
+  (TALA only, and only sometimes honoured).
+- Connections read as sentences: `a -> b: verb`. `--` is undirected, `<->` both
+  ways. A style on a connection (`{style.stroke-dash: 3}`) is invisible in the
+  terminal — if the distinction matters there, put it in the label.
+- `vars: { d2-config: { layout-engine: tala } }` at the top of every file, so a
+  render without the flag still gets TALA for the SVG.
+- No coordinates unless a shape must be pinned; then `top` and `left` together,
+  on that shape only, and a comment saying why.
 
 ## Deliver
 
 - In a chat: the terminal render in a fenced block (it *is* the picture in a
   terminal), the ids named in the prose, the `.d2` and the PNG / SVG as files
   (`SendUserFile` when available).
-- In a PR or issue: the `standard` render in a fenced block, or the SVG
-  committed and linked. The `.d2` in the diff is the review target.
+- In a PR or issue: the `standard` render in a fenced block, or the SVG committed
+  and linked. The `.d2` in the diff is the review target.
 - In docs: the `.d2` committed next to the page and the SVG generated by the
-  build (`d2 --layout=tala docs/arch.d2 docs/arch.svg` in a script), or the
-  SVG committed when the site has no build step.
+  build (`d2 --layout=tala docs/arch.d2 docs/arch.svg` in a script), or the SVG
+  committed when the site has no build step.
 
 ## Failure modes
 
 - `d2: command not found` → install (above); do not draw it in another tool.
 - `d2 layout` does not list `tala` → an old release; upgrade. The installer's
   `--tala` flag no longer exists and is rejected.
+- **A box appears twice, or an arrow you wrote is nowhere** → an out-of-scope
+  reference created a phantom. `d2-facts` names it; the fix is a full path or
+  `_.`, not another arrow.
 - The text render came out dagre-shaped and wide though the file says
   `layout-engine: tala` → the `.txt` path ignores the in-file config on some
   builds; pass `--layout=tala`.
-- `connection missing destination`, `maps must be terminated with }` → the
-  line and column named; usually a trailing `->` or an unclosed brace.
-- `invalid style keyword` → D2 spells `color`, `stroke`, `stroke-dash`,
-  `fill`, `font-size`, `bold`, `opacity`, `shadow`, `3d`, `multiple`.
-- Every round moves the boxes though you changed one label → TALA reflowed;
-  pin the few shapes whose place matters with `top` / `left`, or accept it and
-  stop describing positions.
+- `"tala-seeds" needs a value` / `is not a valid config` → seeds are a flag only.
+- `connection missing destination`, `maps must be terminated with }` → the line
+  and column are named; usually a trailing `->` or an unclosed brace.
+- `invalid style keyword` → D2 spells `color`, `stroke`, `stroke-dash`, `fill`,
+  `font-size`, `bold`, `opacity`, `shadow`, `3d`, `multiple`.
+- Every round moves the boxes though you changed one label → TALA reflowed. Pin
+  the few shapes whose place matters, or accept it and stop describing positions.
+- Two boxes look like they touch and you cannot tell → `d2-facts` reports
+  sibling overlaps in px²; D2 itself has no collision report.
 
 `assets/vlmkit-workspace.d2` is this repository's workspace as a D2 file, and
 `assets/vlmkit-workspace.txt` is its TALA terminal render — what a clean round
-looks like.
+looks like. The validation round that produced the numbers above is
+`fixtures/d2-scenario/` and
+[`docs/reports/2026-09-14-d2-diagram-v1.md`](../../../docs/reports/2026-09-14-d2-diagram-v1.md).

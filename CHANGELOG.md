@@ -65,6 +65,35 @@ Dates are YYYY-MM-DD.
   a map that must be true to `explanatory-animation`, or has it drawn from `vlmkit-anim facts`' sheet.
   `assets/vlmkit-workspace.d2` and its TALA render are the reference; `explain-with-anim` and
   `explanatory-animation` route "as D2 text / in the terminal" to it.
+- **`d2-facts.mjs`: the check D2 does not have** (`.claude/skills/d2-diagram/assets/`, from the skill's
+  first validation round). D2 has no `--expect`, no layout report, and — the trap that produced the
+  round's one wrong picture — **no error for a reference to an id that is not in scope: it creates a new
+  shape**. A writer shipped `d2 validate` 0, `d2 fmt` clean, 94 columns and a log saying "can trace all
+  connections" over a render with four phantom duplicate boxes, two orphans, and the system's entry call
+  drawn as a floating pair outside every region. d2 does write every shape's and every connection's
+  fully-qualified id, geometry and label into the SVG, so the drawn picture is readable back: the script
+  renders the file and reports the boxes, containers and edges a reader actually sees, fails on a name
+  drawn twice and on a box overlapping a sibling or escaping its container, warns on a box nothing
+  connects to, and with a fact sheet checks every listed box and edge (with direction), forbidden edges,
+  container membership, a sequence diagram's message order (read off the connections' y positions) and the
+  width. Names match an id's last segment or its label, so a sheet says `gateway` for a file that wrote
+  `gw: API gateway`. Dependency-free, copyable into any repo; `assets/vlmkit-workspace.facts.json` is the
+  worked pair.
+- **Six corrections to `d2-diagram` the round's writers proved**: `wc -L` under-reports in the C locale
+  (120 vs 122 on the example, 87 vs 111 on a Japanese figure) and `awk`'s `length` reports bytes (338), so
+  the skill now names `LC_ALL=C.UTF-8 wc -L`; the width levers are **not monotone** (`direction: down`
+  made one diagram wider and was another's 148 → 109 win; shorter labels cost +26 columns once) and the
+  first lever is the fullest container's own `direction` (146 → 113), with the measured two-diagram table
+  in the skill; `--tala-seeds` may change nothing (twelve seed sets, one identical layout) and **cannot
+  live in the file** (`vars.d2-config.tala-seeds` is rejected); every connection style is dropped in the
+  text render (a writer diffed a styled render against a style-free copy — identical), as are `sql_table`
+  constraint badges and `<<` in a label; `{constraint: foreign_key}` was missing from the data-model row;
+  and the TALA gate is `d2 layout` listing `tala (bundled)`, not a version string — v0.8.1-HEAD bundles it
+  and three writers flagged the old claim. `d2 fmt --check` replaces the in-place `fmt` in the loop, the
+  loop now says to render the `.png` **and read the file**, and cross-container references (`_.outside.stripe`,
+  not `_.stripe`) moved from a parenthetical into the route row, the rules and a section of their own.
+  Fixture `fixtures/d2-scenario/` (three briefs, four attempts, the scorer's sheets);
+  report `docs/reports/2026-09-14-d2-diagram-v1.md`.
 
 ## 0.22.0 — 2026-09-09
 

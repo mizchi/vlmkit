@@ -1,0 +1,76 @@
+# The order pipeline of the shop, from the handover meeting (2026-09-14).
+# Ids are ASCII; the label after the colon is what the reader sees.
+# Labels are kept short because the terminal render has a 100-column budget.
+# Render:  d2 --layout=tala order-events.d2 order-events.svg
+# Preview: d2 --layout=tala order-events.d2 order-events.txt && cat order-events.txt
+
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+direction: right
+
+outside: outside world {
+  browser: Customer browser
+  stripe: Stripe (cards) {
+    shape: cloud
+
+    # Pinned only to keep the terminal render inside its 100-column budget.
+    # Unpinned, TALA parks stripe at the far right of `outside` (it is dragged
+    # there by the billing -> stripe edge) and the container spans ~74 empty
+    # columns; the whole render was 113 wide. These two numbers are a measured
+    # choice, not a meaningful position: top=200/left=40 gives 74 columns,
+    # top=400/left=100 gives 112.
+    top: 200
+    left: 40
+  }
+}
+
+edge: edge (ours) {
+  cdn: CDN (cache)
+  gw: API gateway
+
+  cdn -> gw: forwards
+}
+
+cluster: our cluster {
+  # Per-container direction (TALA only). Without it TALA puts billing, broker,
+  # orders, inventory and redis in one row and the render is 146 columns.
+  direction: down
+
+  orders: orders (records)
+  inventory: inventory (stock)
+  billing: billing (payment)
+  shipping: shipping (dispatch)
+
+  broker: broker (events) {
+    shape: queue
+  }
+
+  pg: postgres {
+    shape: cylinder
+  }
+  redis: redis (counts) {
+    shape: cylinder
+  }
+
+  orders -> inventory: sync
+  orders -> broker: publish {
+    style.stroke-dash: 3
+  }
+  broker -> billing: consume {
+    style.stroke-dash: 3
+  }
+  broker -> shipping: consume {
+    style.stroke-dash: 3
+  }
+  orders -> pg: writes
+  shipping -> pg: reads
+  inventory -> redis: counts
+}
+
+outside.browser -> edge.cdn: HTTPS
+edge.gw -> cluster.orders: REST
+cluster.billing -> outside.stripe: HTTPS

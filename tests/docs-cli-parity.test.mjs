@@ -63,6 +63,26 @@ const FLAG = /--[a-z][a-z0-9-]{2,}/g;
  */
 const DOCUMENTED_AS_ABSENT = new Set(["--capture-spec"]);
 
+/**
+ * Flags of a binary the docs tell the reader to run that is NOT vlmkit.
+ *
+ * The skill catalog in `docs/configuration.md` shows each skill's entry workflow as it is
+ * actually typed, and two skills drive their own binary: `d2-diagram` runs `d2`
+ * (`d2 --layout=tala x.d2 x.txt`, `--ascii-mode standard`). Those flags exist — in d2, whose
+ * source this repository does not contain — so the existence check has nothing to look at and
+ * reports a working command as a phantom.
+ *
+ * Keyed to the owning binary rather than pattern-matched, for the same reason as
+ * `DOCUMENTED_AS_ABSENT`: enumerating a handful is cheaper than teaching the scanner which
+ * command each flag belongs to, and the map is the audit trail. The test below keeps it from
+ * going stale in either direction — an entry whose doc line is gone must be deleted, and if
+ * vlmkit ever grows a `--layout` of its own the entry must go so the check gets it back.
+ */
+const THIRD_PARTY_FLAGS = new Map([
+  ["--layout", "d2"],
+  ["--ascii-mode", "d2"],
+]);
+
 function documentedFlags() {
   const found = new Map();
   for (const doc of REFERENCE_DOCS) {
@@ -173,7 +193,8 @@ async function declaredVerbs() {
 function missingFlags(documented, known) {
   return [...documented]
     .filter(([flag]) => !known.has(flag))
-    .filter(([flag]) => !DOCUMENTED_AS_ABSENT.has(flag));
+    .filter(([flag]) => !DOCUMENTED_AS_ABSENT.has(flag))
+    .filter(([flag]) => !THIRD_PARTY_FLAGS.has(flag));
 }
 
 describe("flags in the reference docs", () => {
@@ -193,6 +214,23 @@ describe("flags in the reference docs", () => {
       + "delete the line. `--capture-spec` sat in docs/cli-reference.md through a rename it "
       + "predated, and the reader who typed it got `Unknown workflow option`.",
     );
+  });
+
+  it("every third-party exemption is still earned", () => {
+    // The exemption is the one way a documented flag can go unchecked, so it is held to two
+    // things. Each entry must still appear in a reference doc, on a line that runs the binary it
+    // is credited to — otherwise the doc changed and the entry is dead weight. And it must still
+    // be absent from vlmkit's own source: the day vlmkit grows a `--layout`, this fails and the
+    // entry has to go, which puts the flag back under the existence check.
+    const texts = REFERENCE_DOCS.map((doc) => [doc, readFileSync(join(repoRoot, doc), "utf8")]);
+    const known = knownFlags();
+    for (const [flag, binary] of THIRD_PARTY_FLAGS) {
+      const onItsBinarysLine = texts.some(([, text]) =>
+        text.split("\n").some((line) => line.includes(flag) && new RegExp(`\`?\\b${binary}\\s`).test(line)),
+      );
+      assert.ok(onItsBinarysLine, `${flag} is exempt as ${binary}'s, but no doc line runs ${binary} with it`);
+      assert.equal(known.has(flag), false, `${flag} now exists in vlmkit — drop the exemption`);
+    }
   });
 
   it("catches a flag that does not exist (this test is not vacuous)", () => {

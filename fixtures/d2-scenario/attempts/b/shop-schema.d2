@@ -1,0 +1,73 @@
+# The shop's schema, from fixtures/d2-scenario/briefs/shop-schema.md.
+# Render:  d2 --layout=tala shop-schema.d2 shop-schema.svg
+# Preview: d2 --layout=tala shop-schema.d2 shop-schema.txt && cat shop-schema.txt
+#
+# Why every table is pinned with top/left: unpinned TALA laid this out at 148
+# columns with `direction: right` and 109 with `direction: down`, and every
+# label-shortening attempt made it WIDER (135 / 136 / 138) rather than
+# narrower, while --tala-seeds 1..12 all returned the same 109. The brief
+# needs <=100 columns in the terminal render, so the five tables are placed on
+# a 3-row grid (customers|orders, products|order_items, shipments) and TALA
+# routes the four foreign-key edges. The canvas maps at ~11.5px per terminal
+# column, which is where these numbers come from.
+
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+direction: down
+
+customers: customers {
+  shape: sql_table
+  top: 0
+  left: 0
+  id: int {constraint: primary_key}
+  email: text
+  created_at: timestamp
+}
+
+orders: orders {
+  shape: sql_table
+  top: 0
+  left: 420
+  id: int {constraint: primary_key}
+  customer_id: int {constraint: foreign_key}
+  status: text
+  placed_at: timestamp
+}
+
+products: products {
+  shape: sql_table
+  top: 320
+  left: 0
+  id: int {constraint: primary_key}
+  sku: text
+  price_cents: int
+}
+
+order_items: order_items {
+  shape: sql_table
+  top: 320
+  left: 420
+  id: int {constraint: primary_key}
+  order_id: int {constraint: foreign_key}
+  product_id: int {constraint: foreign_key}
+  quantity: int
+}
+
+shipments: shipments {
+  shape: sql_table
+  top: 640
+  left: 420
+  id: int {constraint: primary_key}
+  order_id: int {constraint: foreign_key}
+  carrier: text
+  tracking_code: text
+}
+
+orders.customer_id -> customers.id
+order_items.order_id -> orders.id
+order_items.product_id -> products.id
+shipments.order_id -> orders.id
