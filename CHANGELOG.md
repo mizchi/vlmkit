@@ -136,6 +136,32 @@ Dates are YYYY-MM-DD.
   four gates, and then breaks the deck twice to prove they still gate: a manifest line the deck never says must be
   reported `copy-missing`, and `--stage-h: 260px` must be reported `clipped-content`.
 
+- **`check copy --forbid <file>`**: the manifest's mirror — one line per piece of copy that must NOT be on the
+  page any more. Deliberately not symmetric: the manifest is matched against the visible text, the forbid list
+  against the RAW text and every revealed disclosure state, because a stale claim behind a `<details>` or left
+  at `font-size:0` is still shipped. New rule `copy-forbidden` (suspect), reported with where it was found, and
+  available in `--elements` mode too. Asked for, in those words, by a writer re-editing a slide deck in the
+  `d2-slides` v1 round who had to finish its own brief with a `grep -F`.
+- **`d2-slides` and `d2-facts`, two agent-validation rounds** (`fixtures/d2-slides-scenario/`, reports
+  `docs/reports/2026-09-14-d2-slides-v{1,2}.md`). v1: four writers on one brief and `SKILL.md` alone, four green
+  decks (three on the first write, the small model in two) — so the round's findings are what they said after
+  being green. The figure check moved from an aside to step 7 of the loop and into the done condition, because
+  two writers named the same hole independently: no page gate can see a figure that compiles and draws the wrong
+  thing. The skill also gained what the copy manifest covers (the Markdown prose only — a figure's labels,
+  speaker notes and the footer chrome are not in it), a done condition that says *no failures* rather than
+  `CLEAN`, a contrast count that is a comparison rather than a number, and the figure-internals warn that cannot
+  be exempted stably (`near-misalignment` on TALA's own edge-label groups; `--allow` substring-matches the
+  finding's own selector, which d2 derives from the edge's text).
+- v2 put the fact sheets and `--forbid` in the writers' hands and answered v1's open question: a figure that
+  passed `check integrity` on both views, `check copy` and `check a11y contrast` **failed** the shared sheet
+  (`✗ forbidden edge drawn: checkout->orders`). It also found a builder bug that had hit both v2 writers — a
+  bullet wrapped over two lines became a paragraph, which renders before the list, so half a sentence appeared
+  above its own bullet and one sentence became two manifest lines; one writer caught it by grepping its own
+  `copy.txt`, the other shipped it. Bare lines now continue the block above them, consecutive `>` lines are one
+  quote, and an ordered marker starts an `<ol>` (that last one because rejoining first ran a writer's numbered
+  loop into one sentence). `d2-facts` now names the match a row turned on, so "the figure is wrong" and "the
+  sheet means another box" can be told apart.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**
