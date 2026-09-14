@@ -48,6 +48,18 @@ fact sheets are written in — plus six measured corrections to the skill (the
 width measurement, the non-monotone width levers, seeds, the dropped connection
 styles, `foreign_key`, the TALA version claim).
 
+v2 (2026-09-14) hands the sheet over and re-runs the same three briefs with the
+corrected skill and `d2-facts.mjs`, keeping the model assignment so `d` and `h`
+are the same brief on the same model with and without both. Writers `e`–`h`; all
+four are clean against the sheet their own writers used (0 errors at 95 / 71 / 75
+/ 65 columns), where v1's `d` scores 14 errors and 94 columns against it. Every
+v2 writer wrote its cross-container connections at the root with full paths. The
+round's findings are about the half the sheet cannot reach: the spelling the skill
+suggested for a sequence diagram's returns (`reserved (ret)`) is eaten by the
+render's own line characters and leaves arrows with no head, `_` is an error
+outside a container, and a label on a container border does not move when it is
+shortened.
+
 Scoring one attempt, for reference:
 
 ```sh
