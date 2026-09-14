@@ -6,11 +6,15 @@ from it, committed so the example can be opened and diffed without a `d2`
 install.
 
 ```sh
-node .claude/skills/d2-slides/assets/build-deck.mjs examples/d2-slides/deck.md \
-  --out examples/d2-slides/built
+pnpm deck:example        # = build-deck.mjs examples/d2-slides/deck.md --out examples/d2-slides/built
 ```
 
 Open `built/index.html`; arrows and space move, `o` is the overview, `p` prints.
+
+Run that after any edit to `deck.md`: `tests/d2-slides.test.mjs` compares the
+committed manifest and slide structure against a fresh build, and the
+`d2-slides` workflow compares every byte with the pinned `d2`. A committed
+build that has drifted from its source is worse than no committed build.
 
 ## The gates, as run on this deck
 
@@ -34,9 +38,14 @@ stage centred as a grid item painted nothing at 375px, a percentage height
 inside a padded frame clipped 114px on every slide, and a centred split layout
 cut long bullets off at both ends. The skill file records each one.
 
+All four runs are the `d2-slides` workflow's steps, which also proves the gates
+still gate: it appends a sentence the deck never says to `copy.txt` (must report
+`copy-missing`) and shortens `--stage-h` to 260px (must report
+`clipped-content`), and fails if either exits 0.
+
 ## The copy gate's `unknown` invisibility, reproduced
 
-`--allow-invisible unknown` is not decoration. Six of this deck's 26 manifest
+`--allow-invisible unknown` is not decoration. Eight of this deck's 26 manifest
 lines are reported as `copy-invisible (reason: unknown)` while being plainly on
 the slide. It is reproducible with nothing but the builder:
 

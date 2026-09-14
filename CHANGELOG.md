@@ -116,6 +116,25 @@ Dates are YYYY-MM-DD.
   to buy it with a pin; the width levers do not apply to a `sequence_diagram`, which lays itself out; and
   the loop's PNG step now says to *read the file*, because both writers who skipped it wrote "a PNG read
   would have answered this". Report `docs/reports/2026-09-14-d2-diagram-v2.md`.
+- **Skill `d2-slides`** (`.claude/skills/`, the router's seventeenth workflow): a slide deck from one Markdown
+  file — prose in Markdown, a ```` ```d2 ```` fence per figure laid out by TALA, `<!-- notes: -->` for what to say
+  out loud. `assets/build-deck.mjs deck.md --out built` emits a self-contained `index.html` (fixed 1280×720 frames
+  scaled to any screen, arrows / space / `o` overview / `p` print / `#/4` deep links, no network), a stacked
+  `print.html`, every figure as `slide-NN.svg`, and a `copy.txt` manifest. No dependencies. **Emitting a page is
+  the point**: a deck normally has no failing state, so nobody notices the bullet the frame cut in half, and here
+  `check integrity`, `check copy --manifest` and `check a11y contrast` read it like any other page — which found
+  three real defects in the template while it was being written (a 1280px stage centred as an over-sized grid item
+  painted nothing at 375px, a percentage height inside a padded fixed frame clipped 114px on every slide, a centred
+  split layout cut long bullets off at both ends; all three fixed, and the builder now warns above ~430 characters
+  of prose beside a figure). Worked example, its committed build and the four gate runs: `examples/d2-slides/`.
+- **The deck loop is gated in CI**, in two halves. `tests/d2-slides.test.mjs` (ordinary suite, `D2` pointed at a
+  stub SVG, no browser) pins everything the builder decides before a figure is drawn — slide splitting, layout
+  choice, the manifest taken from the *render* rather than from Markdown with its markers stripped, the overflow
+  warning naming the slide, a figure that fails to compile — and that `examples/d2-slides/built/` still matches its
+  `deck.md` (`pnpm deck:example` regenerates it). The `d2-slides` workflow installs `d2` pinned at `v0.9.0`, checks
+  `d2 layout` lists `tala (bundled)`, rebuilds the example, compares every byte with the committed build, runs the
+  four gates, and then breaks the deck twice to prove they still gate: a manifest line the deck never says must be
+  reported `copy-missing`, and `--stage-h: 260px` must be reported `clipped-content`.
 
 ## 0.22.0 — 2026-09-09
 

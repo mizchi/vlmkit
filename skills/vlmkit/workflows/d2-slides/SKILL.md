@@ -92,6 +92,28 @@ when a figure has facts it must not get wrong.
   pointed it at `index.html`, which shows one slide at a time).
 - You opened the deck and pressed through it.
 
+## The same loop, in CI
+
+This repo runs its own worked example through that loop on every change to the skill,
+the example or the three gates it uses, so the claim above is measured rather than
+asserted. Two halves, because they need different machines:
+
+- **`tests/d2-slides.test.mjs`** (in the ordinary suite, no `d2`, no browser) — the
+  builder's decisions before a figure is drawn: where a slide ends (`---` inside a
+  fence is not a separator), which layout a slide gets, the manifest as the *rendered*
+  text, the overflow warning naming the slide, a figure that does not compile failing
+  the build, and `examples/d2-slides/built/` still matching its `deck.md`. `D2` points
+  at a stub that echoes a fixed SVG — the builder already reads that variable.
+- **`.github/workflows/d2-slides.yml`** (real `d2` pinned at `v0.9.0`, real Chromium) —
+  the four gate runs above on a fresh build, plus a byte comparison against the
+  committed build, plus two negative controls: a manifest line the deck does not say
+  must be reported `copy-missing`, and a frame shortened to 260px must be reported
+  `clipped-content`. A suite that only ever sees passes cannot tell a working gate from
+  a gate that always passes.
+
+Regenerate the committed example with `pnpm deck:example` after editing its `deck.md` —
+the byte comparison is what keeps a committed build from drifting into a lie.
+
 ## What the gates found in this skill's own deck
 
 Everything below was a real defect in the template or the example, caught by a
