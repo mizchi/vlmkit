@@ -211,6 +211,15 @@ boxes — is `fixtures/d2-scenario/` and `docs/reports/2026-09-14-d2-diagram-v1.
 measured width levers (they are not monotone; the fullest container's own `direction` is the first lever)
 and what the terminal render silently drops (every connection style, `sql_table` constraint badges, `<<`).
 
+`docs/reports/2026-09-14-d2-diagram-v2.md` is the round with the sheet in the writer's hands: no wrong
+picture in four attempts and the small model down from 14 errors to 0 in two rounds, so the failures moved
+to what a sheet cannot reach. The three that matter when reading a D2 figure: a `top` / `left` pin can push
+shapes off the ascii canvas, which reads as a **narrower** render (`d2` exits 0 on the fragment, and
+`d2-facts` now errors on it — re-read the render after any pin); a width budget can simply be unreachable
+without one (five `sql_table`s bottomed out at 113 columns, so split the file or say the number in the
+prose); and `_` is one level and only valid inside a container (`_.outside.stripe` from inside `cluster`,
+`invalid underscore` at the root), which is why cross-container connections go at the root with full paths.
+
 The IR is judged on two things, measured by fresh subagents rather than by
 reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
 **intent is readable when someone edits the file later**. Scenario fixture:

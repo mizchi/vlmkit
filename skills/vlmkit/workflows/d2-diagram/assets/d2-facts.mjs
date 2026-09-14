@@ -44,11 +44,15 @@ if (!file) {
   process.exit(2);
 }
 const layout = flag("layout", "tala");
+const seeds = flag("seeds");
 const d2 = process.env.D2 || "d2";
 const dir = mkdtempSync(join(tmpdir(), "d2-facts-"));
 const render = (ext) => {
   const out = join(dir, `out.${ext}`);
-  execFileSync(d2, [`--layout=${layout}`, file, out], { stdio: "pipe" });
+  // `--seeds 4,5,6` is passed through because the width lever is useless otherwise: a diagram
+  // whose budget only the seed reaches cannot be checked at the width it will be rendered at.
+  const args = [`--layout=${layout}`, ...(seeds ? [`--tala-seeds=${seeds}`] : []), file, out];
+  execFileSync(d2, args, { stdio: "pipe" });
   return readFileSync(out, "utf8");
 };
 
@@ -214,8 +218,20 @@ for (const s of placed) {
 /* ---------- the terminal render's width, measured the way a terminal sees it ---------- */
 
 let columns = null;
+let truncated = [];
 try {
   const txt = render("txt");
+  // Is the render even complete? A `top` / `left` pin can push shapes outside the ascii
+  // canvas: d2 exits 0, the file holds a fragment, and the width it reports is the fragment's.
+  // One writer's diagram passed at "71 columns" with three of five tables missing from the
+  // text, while the SVG had grown. So every box drawn must be findable in the text.
+  const flat = txt.toLowerCase().replace(/[^a-z0-9]/g, "");
+  truncated = facts.boxes.filter((b) => {
+    // The shape's own name only — its FIRST label, not its rows: a `sql_table`'s label list
+    // holds every column, and looking for `id` or `int` finds them in any other table.
+    const names = [tail(b), norm((labelsOf.get(b) || [])[0] || "")].filter((n) => n.length >= 3);
+    return names.length > 0 && !names.some((n) => flat.includes(n));
+  });
   const width = (line) =>
     [...line.replace(/\s+$/, "")].reduce((n, ch) => {
       const cp = ch.codePointAt(0);
@@ -246,6 +262,10 @@ const ok = [];
 for (const [name, list] of duplicates)
   errors.push(
     `✗ "${name}" is drawn ${list.length} times (${list.join(", ")}) — a reference to an id that is not in scope creates a new shape; use a full path or \`_.\` to reach out of a container`,
+  );
+if (truncated.length)
+  errors.push(
+    `✗ the terminal render is truncated: ${truncated.length} of ${facts.boxes.length} boxes are missing from it (${truncated.join(", ")}) — so the column count below measures a fragment. A \`top\` / \`left\` pin that puts a shape outside the ascii canvas does this, and d2 exits 0 on it.`,
   );
 for (const c of collisions)
   errors.push(`✗ ${c.a} and ${c.b} overlap by ${c.area}px² — they are siblings, so a reader sees one box run into the other`);

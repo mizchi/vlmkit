@@ -4,6 +4,14 @@
 # Preview: d2 --layout=tala shop-schema.d2 shop-schema.txt && cat shop-schema.txt
 # Check:   node ../../../../.claude/skills/d2-diagram/assets/d2-facts.mjs shop-schema.d2 \
 #            --expect ../../briefs/facts/shop-schema.expect.json
+#
+# Width: 113 columns, over the sheet's 100. Measured levers, all of them worse or
+# unusable (see log.md): root `direction: right` 152; a `shop` container with its
+# own `direction: down` 121; dropping the type column (narrower boxes) 127,
+# because TALA then spread the tables over four bands instead of three;
+# `--tala-seeds` cannot be passed through d2-facts.mjs, so it cannot satisfy the
+# gate; a `top`/`left` pin on products reports 71 columns only because d2's ascii
+# render silently truncates to 15 lines and drops three of the five tables.
 
 vars: {
   d2-config: {
@@ -38,11 +46,6 @@ order_items: {
 
 products: {
   shape: sql_table
-  # Pinned under order_items so the picture is two bands wide, not three: TALA
-  # otherwise puts products in a third band of its own and the render is 113
-  # columns. top and left are SVG pixels and only mean anything together.
-  left: 420
-  top: 520
   id: int {constraint: primary_key}
   sku: varchar
   price_cents: int
@@ -57,7 +60,8 @@ shipments: {
 }
 
 # Each arrow leaves the column holding the foreign key and enters the column it
-# references. order_items is the only table with two, and joins orders to products.
+# references. order_items is the only table with two foreign keys, and it is the
+# one that joins orders to products.
 orders.customer_id -> customers.id
 order_items.order_id -> orders.id
 order_items.product_id -> products.id

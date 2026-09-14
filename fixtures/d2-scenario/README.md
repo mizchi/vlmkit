@@ -50,15 +50,22 @@ styles, `foreign_key`, the TALA version claim).
 
 v2 (2026-09-14) hands the sheet over and re-runs the same three briefs with the
 corrected skill and `d2-facts.mjs`, keeping the model assignment so `d` and `h`
-are the same brief on the same model with and without both. Writers `e`–`h`; all
-four are clean against the sheet their own writers used (0 errors at 95 / 71 / 75
-/ 65 columns), where v1's `d` scores 14 errors and 94 columns against it. Every
-v2 writer wrote its cross-container connections at the root with full paths. The
-round's findings are about the half the sheet cannot reach: the spelling the skill
+are the same brief on the same model with and without both. Writers `e`–`h`: no
+wrong picture and no duplicated name anywhere, `e` / `g` / `h` fully green at 95
+/ 75 / 65 columns, and `f` correct in every fact but 13 columns over its budget
+at 113 — where v1's `d`, the same brief on the same model, scores 14 errors and
+94 columns against the same sheet. Every v2 writer wrote its cross-container
+connections at the root with full paths.
+
+The findings are all in the half a sheet cannot reach. `f` caught the checker
+reporting a **false green**: a `top` / `left` pin pushed three of five tables off
+the ascii canvas, `d2` exited 0, and "71 columns" was a measurement of the
+fragment — `d2-facts` now compares the boxes it found in the SVG against the text
+render and errors when any is missing. `g` measured that the spelling v1's skill
 suggested for a sequence diagram's returns (`reserved (ret)`) is eaten by the
-render's own line characters and leaves arrows with no head, `_` is an error
-outside a container, and a label on a container border does not move when it is
-shortened.
+render's own line characters and leaves arrows with no head. `h` hit `_` being an
+error outside a container, and `e` showed that a label on a container border does
+not move when it is shortened.
 
 Scoring one attempt, for reference:
 
@@ -68,4 +75,5 @@ node .claude/skills/d2-diagram/assets/d2-facts.mjs \
   --expect fixtures/d2-scenario/briefs/facts/order-events.expect.json
 ```
 
-Reports: `docs/reports/2026-09-14-d2-diagram-v1.md`.
+Reports: `docs/reports/2026-09-14-d2-diagram-v1.md`,
+`docs/reports/2026-09-14-d2-diagram-v2.md`.
