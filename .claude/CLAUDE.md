@@ -192,6 +192,25 @@ standard` as plain ASCII for a README or PR, `.svg` / `.png` for docs. Pass the 
 drawing — nothing checks it against the code — so a map that must be true is `explanatory-animation`'s, or
 is drawn from `vlmkit-anim facts`' sheet.
 
+```bash
+d2 layout                                                   # must list `tala (bundled)` — the gate, not the version string
+d2 fmt --check x.d2 && d2 validate x.d2                     # formatted (in place without --check) and syntactically valid
+node .claude/skills/d2-diagram/assets/d2-facts.mjs x.d2 [--expect x.facts.json]   # what the picture DRAWS, held to a sheet
+LC_ALL=C.UTF-8 wc -L x.txt                                  # columns; in the C locale wc -L undercounts and awk reports BYTES
+```
+
+`d2-facts.mjs` is the check D2 does not have, and it is the one thing to reach for before trusting a D2
+figure: d2 writes every shape's and every connection's fully-qualified id (plus geometry and labels) into
+the SVG, so the drawn picture is readable back — missing / reversed / invented edges, container membership,
+a sequence diagram's message order, sibling overlaps, the width, and above all **a name drawn twice**.
+That last one is D2's sharpest trap: a reference to an id that is not in scope *creates a new shape* rather
+than failing, so `gateway -> orders` written at the root when both live in containers silently adds two
+more boxes. Reach out of a container with a full path (`_.outside.stripe`, not `_.stripe`). The evaluation
+round that found this — three of four fresh writers factually correct, the fourth green with four phantom
+boxes — is `fixtures/d2-scenario/` and `docs/reports/2026-09-14-d2-diagram-v1.md`, which also records the
+measured width levers (they are not monotone; the fullest container's own `direction` is the first lever)
+and what the terminal render silently drops (every connection style, `sql_table` constraint badges, `<<`).
+
 The IR is judged on two things, measured by fresh subagents rather than by
 reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
 **intent is readable when someone edits the file later**. Scenario fixture:

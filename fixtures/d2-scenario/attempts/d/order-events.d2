@@ -1,0 +1,53 @@
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+direction: right
+
+outside: Outside {
+  browser: Browser
+  stripe: Stripe {
+    shape: cloud
+  }
+}
+
+edge: Edge {
+  cdn: CDN
+  gateway: Gateway
+
+  browser -> cdn
+  cdn -> gateway
+}
+
+cluster: Cluster {
+  orders: Orders
+  inventory: Inventory
+  billing: Billing
+  shipping: Shipping
+
+  postgres: PostgreSQL {
+    shape: cylinder
+  }
+  redis: Redis {
+    shape: cylinder
+  }
+  broker: Broker {
+    shape: queue
+  }
+
+  orders -> inventory
+  orders -> postgres: write
+  orders -> broker: publish
+
+  inventory -> redis
+
+  billing -> broker: consume
+  shipping -> broker: consume
+
+  billing -> _.stripe: call
+  shipping -> postgres: read
+}
+
+gateway -> orders

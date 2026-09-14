@@ -1,0 +1,36 @@
+{
+  "_note": "Scorer's truth for the checkout-calls brief. NOT given to writers in v1.",
+  "participants": ["browser", "gateway", "orders", "inventory", "broker"],
+  "messages": [
+    { "from": "browser", "to": "gateway", "label": "POST /checkout", "kind": "call" },
+    { "from": "gateway", "to": "orders", "label": "createOrder", "kind": "call" },
+    { "from": "orders", "to": "inventory", "label": "reserve", "kind": "call" },
+    { "from": "inventory", "to": "orders", "label": "reserved", "kind": "return" },
+    { "from": "orders", "to": "broker", "label": "order.placed", "kind": "async" },
+    { "from": "orders", "to": "gateway", "label": "201 Created", "kind": "return" },
+    { "from": "gateway", "to": "browser", "label": "order id", "kind": "return" }
+  ],
+  "messageCount": 7,
+  "orderMatters": true,
+  "boxes": ["browser", "gateway", "orders", "inventory", "broker"],
+  "order": [
+    "browser->gateway",
+    "gateway->orders",
+    "orders->inventory",
+    "inventory->orders",
+    "orders->broker",
+    "orders->gateway",
+    "gateway->browser"
+  ],
+  "deps": [
+    "browser->gateway",
+    "gateway->orders",
+    "orders->inventory",
+    "inventory->orders",
+    "orders->broker",
+    "orders->gateway",
+    "gateway->browser"
+  ],
+  "exhaustive": true,
+  "maxColumns": 80
+}

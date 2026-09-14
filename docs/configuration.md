@@ -170,7 +170,7 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 | `agent-validation-loop` | disposable subagent runs → friction → fix → re-run | Harden a CLI/library by measuring whether agents can drive it |
 | `explain-with-anim` | question → picture (`facts` / `repo` / `pr` / a kind) → `check --expect` → `still` / `video` → prose that walks `explain`'s beats | Answer "how does this work / how is it structured / what does this change" with a checked figure and a narration |
 | `explanatory-animation` | `vlmkit-anim check\|layout\|why\|still\|html\|video`, `import mermaid`, `facts`, `diff`, `repo`, `pr` | Explain an algorithm, protocol or architecture as a checked animation or still figure; draw a module map held to its facts (separate binary `@mizchi/vlmkit-anim`) |
-| `d2-diagram` | `d2 fmt\|validate` → `d2 --layout=tala x.d2 x.txt` (terminal render, `--ascii-mode standard` for plain ASCII) → `x.svg` / `x.png` | Keep an architecture, data-model or call-flow diagram as D2 text laid out by TALA, read it in the terminal, paste it in a README or PR (separate binary `d2`) |
+| `d2-diagram` | `d2 fmt --check\|validate` → `d2-facts.mjs --expect` → `d2 --layout=tala x.d2 x.txt` (terminal render, `--ascii-mode standard` for plain ASCII) → `x.svg` / `x.png` | Keep an architecture, data-model or call-flow diagram as D2 text laid out by TALA, hold the drawn boxes and arrows to a fact sheet, read it in the terminal, paste it in a README or PR (separate binary `d2`) |
 
 Each skill assumes the `vlmkit` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills

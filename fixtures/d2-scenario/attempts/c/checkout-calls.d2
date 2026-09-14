@@ -1,0 +1,37 @@
+# One checkout request, as a call flow. Ids are ASCII; labels are what the
+# reader sees. Render:
+#   d2 --layout=tala checkout-calls.d2 checkout-calls.txt
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+shape: sequence_diagram
+
+browser
+gateway
+orders
+inventory
+broker
+
+# The .txt render drops every connection style -- a dashed return and a solid
+# call are byte-identical there -- so "is a return" / "is async" has to live in
+# the label text: the "ret" prefix marks a return, "async" marks the
+# fire-and-forget event. The styles stay for the SVG, where they do show.
+#
+# Label spellings are constrained by the text renderer, not by taste: a leading
+# "<<" is eaten on a right-to-left arrow, and a label that fills its span eats
+# its own arrowhead. Re-render after any label edit.
+browser -> gateway: POST /checkout
+gateway -> orders: createOrder
+orders -> inventory: reserve
+inventory -> orders: ret reserved {style.stroke-dash: 3}
+# Solid with an open arrowhead, the UML sign for a fire-and-forget send: the
+# returns below are the dashed ones. (Rendered the event dashed at first and
+# the PNG showed it looking exactly like a return.)
+orders -> broker: order.placed async {
+  target-arrowhead.shape: arrow
+}
+orders -> gateway: ret 201 Created {style.stroke-dash: 3}
+gateway -> browser: ret order id {style.stroke-dash: 3}

@@ -1,0 +1,24 @@
+{
+  "_note": "The fact sheet for vlmkit-workspace.d2 — what the figure must say, written from packages/*/package.json. `node d2-facts.mjs vlmkit-workspace.d2 --expect vlmkit-workspace.facts.json` is the check; `exhaustive` means a dependency this file does not list is an error, which is what keeps a hand-drawn map honest.",
+  "boxes": ["router", "registry", "markup", "capture", "ai", "eval", "anim", "plugin"],
+  "containers": {
+    "packages": ["markup", "capture", "ai", "eval", "anim", "core"],
+    "cli": ["router", "registry"]
+  },
+  "deps": [
+    "capture->core",
+    "ai->core",
+    "markup->core",
+    "markup->capture",
+    "markup->ai",
+    "eval->core",
+    "anim->eval",
+    "cli->markup",
+    "cli->capture",
+    "cli->plugin"
+  ],
+  "forbidden": ["core->markup", "core->capture", "anim->core", "markup->anim"],
+  "exhaustive": true,
+  "allowOrphans": ["router", "registry"],
+  "maxColumns": 130
+}
