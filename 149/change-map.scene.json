@@ -1,0 +1,105 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #149: d2-diagram v1: the facts check D2 lacks, and six corrections the round proved",
+  "layout": "grid",
+  "canvas": {
+    "width": 835,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "fixtures/d2-scenario",
+      "label": "fixtures/d2-scenario",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "caption": "1/1 d2-diagram v1: the facts check D2 lacks, and six corrections the round …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 47
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3513 −314"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/d2-scenario",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 47 files · +3513 −314 · 7 areas, 0 import edges between them"
+    }
+  ]
+}
