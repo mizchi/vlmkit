@@ -1,0 +1,105 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #152: Gate the d2-slides deck loop in CI, in two halves",
+  "layout": "grid",
+  "canvas": {
+    "width": 785,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "ci",
+      "label": "ci",
+      "hidden": true
+    },
+    {
+      "id": "examples/d2-slides",
+      "label": "examples/d2-slides",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "ci",
+        "root",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "ci",
+        "root",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "1/1 Gate the d2-slides deck loop in CI, in two halves"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 9
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+585 −4"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "ci",
+        "root",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 9 files · +585 −4 · 7 areas, 0 import edges between them"
+    }
+  ]
+}
