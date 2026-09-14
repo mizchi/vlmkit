@@ -1,5 +1,5 @@
 {
-  "_note": "Scorer's truth for the order-events brief. NOT given to writers in v1 — the round measures how often a writer's own green render is wrong about these facts. Ids are the meaning, not the spelling: score a box by its label.",
+  "_note": "The fact sheet for the order-events brief, in the schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. v1 withheld it and scored the attempts against it afterwards (writer d shipped four phantom boxes); from v2 it is handed to the writer and `d2-facts --expect` exiting 0 is part of the done condition. `browser` is deliberately absent from `containers`: the brief names three regions but never says which holds the browser, so either placement passes.",
   "boxes": [
     "browser",
     "cdn",
@@ -13,6 +13,11 @@
     "redis",
     "stripe"
   ],
+  "containers": {
+    "edge": ["cdn", "gateway"],
+    "cluster": ["orders", "inventory", "billing", "shipping", "broker", "postgres", "redis"],
+    "outside": ["stripe"]
+  },
   "deps": [
     "browser->cdn",
     "cdn->gateway",
@@ -33,12 +38,6 @@
     "gateway->inventory",
     "gateway->billing"
   ],
-  "regions": {
-    "edge": ["cdn", "gateway"],
-    "cluster": ["orders", "inventory", "billing", "shipping", "broker", "postgres", "redis"],
-    "outside": ["stripe"]
-  },
-  "synchronous": ["orders->inventory"],
-  "fanOut": { "from": "broker", "to": ["billing", "shipping"], "notAChain": true },
+  "exhaustive": true,
   "maxColumns": 100
 }

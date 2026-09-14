@@ -35,13 +35,30 @@ Nothing else talks to it, and nothing outside calls in except the browser.
   broker (`billing` and `shipping` do not know about `orders`).
 - That the broker fan-out is one event to two consumers, not a chain.
 
+## From v2 on: the fact sheet is yours
+
+`briefs/facts/order-events.expect.json` says what the diagram has to draw, in the
+schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. Hold your picture
+to it:
+
+```sh
+node .claude/skills/d2-diagram/assets/d2-facts.mjs order-events.d2 \
+  --expect ../../briefs/facts/order-events.expect.json
+```
+
+The sheet wins over the picture, and over your reading of this brief: if they
+disagree, the sheet is right. What it cannot see is named in its own `_note`.
+(v1 withheld this sheet and scored the attempts against it afterwards; one of
+four shipped a green diagram with four duplicated boxes.)
+
 ## Done when
 
-1. `d2 validate` exits 0, and `d2 fmt` leaves the file unchanged.
-2. The TALA terminal render (`d2 --layout=tala order-events.d2 order-events.txt`)
-   exits 0 and its widest line is **100 columns or fewer** (`wc -L`). It goes in
+1. `d2 validate` exits 0, and `d2 fmt --check` exits 0.
+2. `d2-facts.mjs --expect` exits 0 against the sheet above.
+3. The TALA terminal render (`d2 --layout=tala order-events.d2 order-events.txt`)
+   exits 0 and its widest line is **100 columns or fewer** (`LC_ALL=C.UTF-8 wc -L`, or the `columns` the facts check prints). It goes in
    a README, so also produce the plain-ASCII variant.
-3. You have read your own render and can say, without looking at the `.d2`, what
+4. You have read your own render and can say, without looking at the `.d2`, what
    calls what.
 
 ## Deliver in your working directory

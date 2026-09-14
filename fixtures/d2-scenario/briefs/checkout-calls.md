@@ -30,12 +30,30 @@ whether or not the broker has delivered anything.
 - Which messages are returns and which are new calls.
 - That the event to the broker does not block the reply to the browser.
 
+## From v2 on: the fact sheet is yours
+
+`briefs/facts/checkout-calls.expect.json` says what the diagram has to draw, in
+the schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads — including the
+seven messages **in order**, which it reads back from the drawn geometry. Hold
+your picture to it:
+
+```sh
+node .claude/skills/d2-diagram/assets/d2-facts.mjs checkout-calls.d2 \
+  --expect ../../briefs/facts/checkout-calls.expect.json
+```
+
+The sheet wins over the picture, and over your reading of this brief. What it
+cannot see is in its `_byEye` and is still required: which messages are returns
+and which is async. The terminal render drops every connection style, so that
+distinction has to survive in the labels.
+
 ## Done when
 
-1. `d2 validate` exits 0, and `d2 fmt` leaves the file unchanged.
-2. The TALA terminal render exits 0 and its widest line is **80 columns or
-   fewer** (`wc -L`) — it is going in a PR comment, which wraps.
-3. The render is legible as pasted: no message label broken across a line, no
+1. `d2 validate` exits 0, and `d2 fmt --check` exits 0.
+2. `d2-facts.mjs --expect` exits 0 against the sheet above.
+3. The TALA terminal render exits 0 and its widest line is **80 columns or
+   fewer** (`LC_ALL=C.UTF-8 wc -L`, or the `columns` the facts check prints) — it is going in a PR comment, which wraps.
+4. The render is legible as pasted: no message label broken across a line, no
    arrow whose ends you cannot tell apart.
 
 ## Deliver in your working directory

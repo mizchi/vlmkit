@@ -1,0 +1,54 @@
+# The order pipeline of the shop, as described in the handover meeting.
+# Ids are ASCII; the label after the colon is what the reader sees.
+# Render:  d2 --layout=tala order-events.d2 order-events.svg
+# Preview: d2 --layout=tala order-events.d2 order-events.txt && cat order-events.txt
+# Check:   node ../../../../.claude/skills/d2-diagram/assets/d2-facts.mjs order-events.d2 \
+#            --expect ../../briefs/facts/order-events.expect.json
+
+vars: {
+  d2-config: {
+    layout-engine: tala
+  }
+}
+
+direction: right
+
+browser: User browser
+
+edge: our edge {
+  cdn: CDN
+  gateway: API gateway
+
+  cdn -> gateway: forwards
+}
+
+cluster: our cluster {
+  # the fullest container: its own direction is the width lever
+  direction: down
+
+  orders: orders (order records)
+  inventory: inventory (stock)
+  billing: billing (payment)
+  shipping: shipping (fulfilment)
+  broker: event broker {shape: queue}
+  postgres: PostgreSQL {shape: cylinder}
+  redis: Redis {shape: cylinder}
+
+  orders -> inventory: reserve (sync)
+  orders -> broker: publish order.placed
+  broker -> billing: order.placed
+  broker -> shipping: order.placed
+  orders -> postgres: writes
+  shipping -> postgres: reads
+  inventory -> redis: counters
+}
+
+outside: outside world {
+  stripe: Stripe {shape: cloud}
+}
+
+browser -> edge.cdn: HTTPS
+edge.gateway -> cluster.orders: place order
+# The label on this edge lands on the cluster's bottom border in the terminal render
+# whatever its length (probed at 5 and 21 chars, round 3) — kept short so it eats less border.
+cluster.billing -> outside.stripe: HTTPS

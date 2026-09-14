@@ -1,17 +1,5 @@
 {
-  "_note": "Scorer's truth for the checkout-calls brief. NOT given to writers in v1.",
-  "participants": ["browser", "gateway", "orders", "inventory", "broker"],
-  "messages": [
-    { "from": "browser", "to": "gateway", "label": "POST /checkout", "kind": "call" },
-    { "from": "gateway", "to": "orders", "label": "createOrder", "kind": "call" },
-    { "from": "orders", "to": "inventory", "label": "reserve", "kind": "call" },
-    { "from": "inventory", "to": "orders", "label": "reserved", "kind": "return" },
-    { "from": "orders", "to": "broker", "label": "order.placed", "kind": "async" },
-    { "from": "orders", "to": "gateway", "label": "201 Created", "kind": "return" },
-    { "from": "gateway", "to": "browser", "label": "order id", "kind": "return" }
-  ],
-  "messageCount": 7,
-  "orderMatters": true,
+  "_note": "The fact sheet for the checkout-calls brief, in the schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. v1 withheld it; from v2 it is the writer's. `order` is checked from the connections' y positions, so the seven messages must be drawn top to bottom in this order. What the sheet cannot see is which messages are returns and which is async — the render drops every connection style, so that distinction has to be in the labels, and it is checked by eye.",
   "boxes": ["browser", "gateway", "orders", "inventory", "broker"],
   "order": [
     "browser->gateway",
@@ -32,5 +20,10 @@
     "gateway->browser"
   ],
   "exhaustive": true,
-  "maxColumns": 80
+  "maxColumns": 80,
+  "_byEye": {
+    "returns": ["inventory->orders (reserved)", "orders->gateway (201 Created)", "gateway->browser (order id)"],
+    "async": ["orders->broker (order.placed)"],
+    "readableAsPasted": "no label broken across a line, no arrow whose ends you cannot tell apart"
+  }
 }

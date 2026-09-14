@@ -9,13 +9,14 @@ deliverable.
 - `briefs/<name>.md` — the task: a system described in prose and nowhere else in
   this repository, what the diagram has to show, a width budget for the terminal
   render, and the deliverables.
-- `briefs/facts/<name>.expect.json` — **the scorer's truth, not given to
-  writers.** D2 has no `--expect`: nothing in the toolchain checks a diagram
-  against what it is supposed to say. So the round scores each attempt by hand
-  against this sheet, and the error rate on attempts the writer itself called
-  done is the round's main number. (This mirrors v13 → v14 of `anim-ir`, where
-  five green module maps included two that were wrong and the answer was a fact
-  sheet the tool could read.)
+- `briefs/facts/<name>.expect.json` — the sheet: what the diagram has to say, in
+  the schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. **v1 withheld
+  it** and scored the attempts against it afterwards, because D2 has no
+  `--expect` and the round's question was whether a writer can check its own
+  picture with what the skill gives it. **From v2 the brief hands it over** and
+  `d2-facts --expect` exiting 0 is part of the done condition. (This mirrors v13
+  → v14 of `anim-ir`, where five green module maps included two that were wrong
+  and the answer was a fact sheet the tool could read.)
 - `attempts/<agent>/` — one directory per run: the `.d2`, the renders, `log.md`,
   and the agent's deliverable. Prior attempts and the fact sheets are off-limits
   to later writers.
@@ -47,6 +48,25 @@ fact sheets are written in — plus six measured corrections to the skill (the
 width measurement, the non-monotone width levers, seeds, the dropped connection
 styles, `foreign_key`, the TALA version claim).
 
+v2 (2026-09-14) hands the sheet over and re-runs the same three briefs with the
+corrected skill and `d2-facts.mjs`, keeping the model assignment so `d` and `h`
+are the same brief on the same model with and without both. Writers `e`–`h`: no
+wrong picture and no duplicated name anywhere, `e` / `g` / `h` fully green at 95
+/ 75 / 65 columns, and `f` correct in every fact but 13 columns over its budget
+at 113 — where v1's `d`, the same brief on the same model, scores 14 errors and
+94 columns against the same sheet. Every v2 writer wrote its cross-container
+connections at the root with full paths.
+
+The findings are all in the half a sheet cannot reach. `f` caught the checker
+reporting a **false green**: a `top` / `left` pin pushed three of five tables off
+the ascii canvas, `d2` exited 0, and "71 columns" was a measurement of the
+fragment — `d2-facts` now compares the boxes it found in the SVG against the text
+render and errors when any is missing. `g` measured that the spelling v1's skill
+suggested for a sequence diagram's returns (`reserved (ret)`) is eaten by the
+render's own line characters and leaves arrows with no head. `h` hit `_` being an
+error outside a container, and `e` showed that a label on a container border does
+not move when it is shortened.
+
 Scoring one attempt, for reference:
 
 ```sh
@@ -55,4 +75,5 @@ node .claude/skills/d2-diagram/assets/d2-facts.mjs \
   --expect fixtures/d2-scenario/briefs/facts/order-events.expect.json
 ```
 
-Reports: `docs/reports/2026-09-14-d2-diagram-v1.md`.
+Reports: `docs/reports/2026-09-14-d2-diagram-v1.md`,
+`docs/reports/2026-09-14-d2-diagram-v2.md`.

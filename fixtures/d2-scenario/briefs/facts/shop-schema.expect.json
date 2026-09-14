@@ -1,31 +1,25 @@
 {
-  "_note": "Scorer's truth for the shop-schema brief. NOT given to writers in v1.",
-  "tables": {
-    "customers": ["id", "email", "created_at"],
-    "orders": ["id", "customer_id", "status", "placed_at"],
-    "order_items": ["id", "order_id", "product_id", "quantity"],
-    "products": ["id", "sku", "price_cents"],
-    "shipments": ["id", "order_id", "carrier", "tracking_code"]
-  },
-  "primaryKeys": {
-    "customers": "id",
-    "orders": "id",
-    "order_items": "id",
-    "products": "id",
-    "shipments": "id"
-  },
-  "foreignKeys": {
-    "orders": ["customer_id"],
-    "order_items": ["order_id", "product_id"],
-    "shipments": ["order_id"]
-  },
+  "_note": "The fact sheet for the shop-schema brief, in the schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. v1 withheld it; from v2 it is the writer's. Two limits are the checker's, not the diagram's, and the brief still requires both: a `sql_table`'s rows are not shapes in the render, so a column-level edge (`orders.customer_id -> customers.id`) reads back as `orders->customers`, and the PK / FK badges are not readable at all. Check those by eye on the PNG — `grep -o '>FK</text>' shop-schema.svg | wc -l` counts four when every foreign key carries its badge (`grep -c` counts LINES, and an SVG is one line, so it prints 1 however many badges there are).",
+  "boxes": ["customers", "orders", "order_items", "products", "shipments"],
   "deps": [
     "orders.customer_id->customers.id",
     "order_items.order_id->orders.id",
     "order_items.product_id->products.id",
     "shipments.order_id->orders.id"
   ],
-  "edgeCount": 4,
-  "columnLevelEdges": true,
-  "maxColumns": 100
+  "forbidden": ["customers->orders", "orders->order_items", "products->order_items", "orders->shipments"],
+  "exhaustive": true,
+  "maxColumns": 100,
+  "_byEye": {
+    "columns": {
+      "customers": ["id", "email", "created_at"],
+      "orders": ["id", "customer_id", "status", "placed_at"],
+      "order_items": ["id", "order_id", "product_id", "quantity"],
+      "products": ["id", "sku", "price_cents"],
+      "shipments": ["id", "order_id", "carrier", "tracking_code"]
+    },
+    "primaryKey": "id, on all five",
+    "foreignKeys": { "orders": ["customer_id"], "order_items": ["order_id", "product_id"], "shipments": ["order_id"] },
+    "columnLevelEdges": "each arrow drawn between the two columns, not merely the two tables"
+  }
 }

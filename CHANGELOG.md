@@ -94,6 +94,28 @@ Dates are YYYY-MM-DD.
   not `_.stripe`) moved from a parenthetical into the route row, the rules and a section of their own.
   Fixture `fixtures/d2-scenario/` (three briefs, four attempts, the scorer's sheets);
   report `docs/reports/2026-09-14-d2-diagram-v1.md`.
+- **`d2-diagram` v2 — the sheet in the writer's hands, and the false green it exposed.** The same three
+  briefs re-run with the sheets handed over and `d2-facts --expect` in the done condition (writers `e`–`h`,
+  same model assignment, so `d` and `h` are one brief on one model with and without): no wrong picture and
+  no duplicated name in four attempts, three fully green at 95 / 75 / 65 columns, and the smaller model —
+  which shipped four phantom boxes in v1 — down from **14 errors to 0 in two rounds**. Correctness stopped
+  being where the rounds go: of fifteen rounds, one was about a fact. So the round's findings are the half a
+  sheet cannot reach, and the first is a defect in the check itself: a `top` / `left` pin can push shapes
+  **off the ascii canvas**, and `d2` exits 0 on a text render holding a fragment — one writer's five-table
+  schema passed at "71 columns" with three tables missing while its SVG had grown. `d2-facts.mjs` now
+  compares every box it found in the SVG against the terminal render and errors when any is missing, naming
+  them; `--seeds 4,5,6` passes the seed through so a width reachable only with a seed can be checked at the
+  width it will render at; and container membership resolves labels the way the rest of the checker does
+  (v1's `a`, which wrote `gw: API gateway`, was reported as "edge does not hold gateway"). The skill gains
+  what the writers measured: `_` is one level and only valid inside a container (`invalid underscore` at the
+  root), so cross-container connections go at the root with full paths; the spelling v1 suggested for a
+  sequence diagram's returns (`reserved (ret)`) is eaten by the render's own line characters and leaves
+  arrows with no head, so a marker is a bare word of four characters or fewer glossed in the prose; a label
+  on a container border does not move when it is shortened; a width budget can be unreachable without a pin
+  (five `sql_table`s bottomed out at 113 columns) and the answer is to split the file or say the number, not
+  to buy it with a pin; the width levers do not apply to a `sequence_diagram`, which lays itself out; and
+  the loop's PNG step now says to *read the file*, because both writers who skipped it wrote "a PNG read
+  would have answered this". Report `docs/reports/2026-09-14-d2-diagram-v2.md`.
 
 ## 0.22.0 — 2026-09-09
 

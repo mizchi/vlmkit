@@ -75,7 +75,9 @@ go install github.com/d2lang/d2@latest                   # Go 1.27+; what to do 
 { layout-engine: tala } }` inside the file is honoured for `.svg` / `.png` **and
 not for `.txt`** on the build measured (0.8.1-HEAD: the text render fell back to
 dagre and came out 163 columns instead of 120), so pass the flag anyway; keep the
-config in the file so the next person's SVG gets the same engine.
+config in the file so the next person's SVG gets the same engine. A
+`sequence_diagram` is the exception that proves the rule — it lays itself out, so
+its text render came out byte-identical with and without the flag.
 
 ## Nothing in D2 tells you the picture is wrong
 
@@ -93,9 +95,25 @@ A writer in this skill's own validation round shipped exactly that: `d2 validate
 0, `d2 fmt` clean, 94 columns, and its log said "can trace all connections". The
 render had **four duplicated boxes**, two orphans, and the system's entry call
 drawn as a floating pair outside every region
-([report](../../../docs/reports/2026-09-14-d2-diagram-v1.md)). Reach out of a
-container with `_.` or a full path — `billing -> _.outside.stripe`, not
-`_.stripe` — and put cross-container connections at the root.
+([report](../../../docs/reports/2026-09-14-d2-diagram-v1.md)).
+
+**Write cross-container connections at the root, with full paths.** That is the
+one form that always works and the one every writer in the round that got this
+right used:
+
+```d2
+edge.gateway -> cluster.orders          # at the root: full path on both ends
+cluster: {
+  billing -> _.outside.stripe           # from INSIDE: `_` is this container's parent
+}
+```
+
+`_` is **one level and only valid inside a container**. From inside `cluster`,
+`_` is the root, so a shape in a sibling container is `_.outside.stripe` — not
+`_.stripe`, which invents a root-level `stripe` (that was the round's fourth
+phantom). At the root `_` has no parent to mean: `d2` fails the compile with
+`invalid underscore`, which a later writer hit and read as the escape being
+broken.
 
 `assets/d2-facts.mjs` is the check D2 does not have. It renders the file and
 reads the picture back out of the SVG — d2 writes every shape's and every
@@ -106,12 +124,17 @@ diagrams in another repo.
 ```bash
 node assets/d2-facts.mjs arch.d2               # boxes, containers and their members, labels, edges, columns
 node assets/d2-facts.mjs arch.d2 --expect arch.facts.json
+node assets/d2-facts.mjs arch.d2 --seeds 4,5,6 # the seed the final render will use, so the width it reports is real
 ```
 
-It fails on its own, with no sheet, for the two defects that are always defects:
-**a name drawn twice** (the scoping trap above) and, with a sheet, a box that
-overlaps a sibling or escapes its container. It warns about a box nothing
-connects to. With a sheet it also checks:
+It fails on its own, with no sheet, for three defects that are always defects:
+**a name drawn twice** (the scoping trap above), a box that overlaps a sibling or
+escapes its container, and **a truncated terminal render** — a `top` / `left`
+pin can push shapes off the ascii canvas, and `d2` exits 0 on a text file
+holding a fragment. One writer's five-table schema passed at "71 columns" with
+three of the five tables missing from the render it had just measured, which is
+why the box-by-box comparison exists. It warns about a box nothing connects to.
+With a sheet it also checks:
 
 ```json
 {
@@ -135,8 +158,10 @@ connects to. With a sheet it also checks:
   for a file that wrote `gw: API gateway`.
 - It cannot see inside a `sql_table`: a column-level edge
   (`orders.customer_id -> customers.id`) is reported as `orders->customers`.
-  Constraint badges are not checked either; `grep -c '>FK</text>' arch.svg` is
-  the crude way to count them.
+  Constraint badges are not checked either; count them with
+  `grep -o '>FK</text>' arch.svg | wc -l` (`grep -c` counts *lines*, and an SVG
+  is one line, so it prints 1 however many badges there are) and read the PNG
+  for which row each arrow actually leaves.
 
 Write the sheet from the brief **before** the diagram, the way a test comes
 first. It is the only artifact that survives a TALA reflow.
@@ -182,7 +207,7 @@ left"); name ids. Two measured caveats before you reach for seeds:
 |---|---|
 | "Draw the architecture / how the services fit" | Containers per area (`cluster: our cluster { orders; inventory }`), connections between children at the **root** (`edge.gateway -> cluster.orders`) or with `_.` from inside. `direction: right` at the root; per-container `direction` on the fullest container is the width lever, see below |
 | "Draw the data model / tables" | `shape: sql_table` with `id: int {constraint: primary_key}` and `customer_id: int {constraint: foreign_key}` rows; connect the columns (`orders.customer_id -> customers.id`) |
-| "Draw the request / call flow between components" | `shape: sequence_diagram` at the root; actors in first-use order; one message per line with its label. D2 has no return or async arrow, and the terminal render drops arrowheads and dash styles, so **say it in the label** (`reserved (ret)`, `order.placed (async)`) |
+| "Draw the request / call flow between components" | `shape: sequence_diagram` at the root; actors in first-use order; one message per line with its label. D2 has no return or async arrow and the terminal render drops every style, so the distinction lives in the label — as a **bare marker of four characters or fewer, no punctuation**, at the start or the end (`ret 201 Created`, `order.placed async`), glossed in the prose above the figure. `reserved (ret)` does not survive: the render overwrites the parentheses with line characters and a label that fills the lane leaves the arrow with **no head at all**. A legend inside the diagram is not an option either — `shape: text` renders as an empty box |
 | "Draw the classes" | `shape: class` with `+method(): type` / `-field: type` lines |
 | "Draw the deployment / network" | Containers for hosts and zones; `shape: cylinder` for stores, `shape: cloud` for external services, `shape: queue` for brokers |
 | "We already have a `.d2`" | Edit it; `d2 fmt --check`; render before and after; do not switch its engine or theme without saying so |
@@ -198,8 +223,11 @@ left"); name ids. Two measured caveats before you reach for seeds:
 4. node assets/d2-facts.mjs arch.d2 --expect arch.facts.json
                                                      duplicates, missing / reversed / invented edges,
                                                      container members, overlaps, order, width
-5. d2 --layout=tala arch.d2 arch.png                 and READ the .png — you can look at an image; this is
-                                                     where labels, shapes and crowding become visible
+5. d2 --layout=tala arch.d2 arch.png                 then READ arch.png with your file-reading tool — you can
+                                                     look at an image, and this is the only step that shows
+                                                     labels, shapes, key badges and which row an arrow leaves.
+                                                     Both writers who skipped it reported the same thing:
+                                                     "a PNG read would have answered this"
 6. d2 --layout=tala arch.d2 arch.txt && cat arch.txt the deliverable, if it is going in a terminal
 7. fix the text; go to 3
 ```
@@ -214,9 +242,10 @@ destination` — fix the line it names.
 
 - `d2 validate` exits 0 and `d2 fmt --check` exits 0.
 - `d2 layout` listed `tala (bundled)` and the render used it.
-- `d2-facts --expect` exits 0: no duplicate name, every listed box and edge
-  drawn with its direction, no forbidden edge, the width inside budget.
-- You opened the PNG once.
+- `d2-facts --expect` exits 0: no duplicate name, no truncated render, every
+  listed box and edge drawn with its direction, no forbidden edge, the width
+  inside budget — measured with the same `--seeds` the final render will use.
+- You read the PNG once, and it is one of the deliverables.
 - Every shape and connection in the prose is named by its id, and every id in
   the prose is in the file.
 - The `.d2` is committed where the SVG is; the SVG is a build output or is
@@ -248,7 +277,9 @@ different diagrams in the same round:
 So: set the root `direction`, then the **own `direction` of the container holding
 the most boxes** — that is the first thing to try, not the last — and re-measure
 after each. Shortening labels is as likely to make it wider, because TALA reflows
-the whole picture. `--scale` does not change the text render at all.
+the whole picture. `--scale` does not change the text render at all. None of this
+applies to a `sequence_diagram`, which lays itself out: there the only lever is
+label length, and it moves the width by a column or two in either direction.
 
 Two caveats on the escape hatches:
 
@@ -257,9 +288,20 @@ Two caveats on the escape hatches:
   appears to honour it only where the container's internal flow is ambiguous.
 - **`top` / `left` are SVG pixels, not columns**, and both must be set together
   (TALA only). Roughly 11.5px per terminal column on a 100-column figure, but
-  both writers who used it found their numbers by trying three to five values.
+  every writer who used it found its numbers by trying three to five values.
   Pin the one or two shapes whose place matters, comment why, and expect the pin
   to need re-tuning after the next label change.
+- **A pin can truncate the terminal render, and that looks like a win.** One
+  writer pinned a table, watched the width fall 113 → 71, and the number was a
+  fragment: the pin had pushed shapes off the ascii canvas and three of five
+  tables were gone from the text while the SVG had grown. `d2` exits 0 on it.
+  `d2-facts` now reports it as an error; if you pin, re-read the render.
+- **The budget may be unreachable without a pin.** On five `sql_table`s no
+  documented lever got under 100 columns: `direction: down` reached 113, shorter
+  labels 127, a wrapping container 121, and only the unsafe pin went lower. When
+  that happens, split the diagram by container into two files, or keep the wider
+  figure and say in the prose that the terminal version is 113 columns — do not
+  buy the number with a pin you have not re-read.
 
 ## Reading the terminal render
 
@@ -275,7 +317,10 @@ the PNG.
   distinction in the label.
 - **Arrowheads are unreliable on long labels.** A label long enough to fill the
   lane can leave the arrow with no head at all, and `<<` in a label is eaten
-  outright. Probe the spelling you land on.
+  outright. Which character the line eats is not stable either: the same file
+  lost a label's parentheses on one round and its full stop on the next
+  (`order.placed` → `order─placed`). Probe the spelling you land on, and prefer
+  one short word with no punctuation.
 - **`shape: text` and `|md …|` blocks render as empty boxes.** A title, a legend
   or a paragraph belongs in the prose around the render, or in a variant of the
   file rendered only to SVG.
@@ -283,8 +328,12 @@ the PNG.
   are visible only in the SVG / PNG, and a column-level edge attaches to the
   wrong row in the text view often enough that you cannot read it there.
 - **An edge label can land on a box or container border** (`┌────sync call────┐│`),
-  which reads as two boxes merged. It is cosmetic in the SVG and confusing in the
-  terminal: shorten the label or move the connection to the root.
+  which reads as two boxes merged. Where it lands is **positional, not
+  length-driven**: a writer whose connection was already at the root both
+  shortened and lengthened the label and it stayed on the same border row at the
+  same width. The levers that do move it are the ones that reflow the picture —
+  the container's `direction`, a different seed — so treat it as a layout outcome
+  to check on the PNG, not a label to trim.
 - **CJK labels pad every glyph** (`ウ  ェ  ブ`) and misalign the box that holds
   them. Ids stay ASCII always; for a figure that will be read in a terminal keep
   the labels ASCII too and put the Japanese in the surrounding text. The SVG and
