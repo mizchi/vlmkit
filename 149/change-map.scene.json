@@ -42,6 +42,11 @@
       "id": "docs/reports",
       "label": "docs/reports",
       "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
     }
   ],
   "edges": [],
@@ -68,7 +73,7 @@
         "fixtures/d2-scenario",
         "skills/vlmkit"
       ],
-      "caption": "1/1 d2-diagram v1: the facts check D2 lacks, and six corrections the round …"
+      "caption": "1/2 d2-diagram v1: the facts check D2 lacks, and six corrections the round …"
     },
     {
       "value": {
@@ -99,7 +104,41 @@
       "ms": 0
     },
     {
-      "note": "1 commit · 47 files · +3513 −314 · 7 areas, 0 import edges between them"
+      "show": [
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "tests"
+      ],
+      "caption": "2/2 Exempt d2's own flags from the docs/CLI parity check"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 48
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3552 −315"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 48 files · +3552 −315 · 8 areas, 0 import edges between them"
     }
   ]
 }

@@ -7,11 +7,12 @@
 ![steps](./change-map.sheet.png)
 
 ```
-PR #149: d2-diagram v1: the facts check D2 lacks, and six corrections the round proved — 4 steps, 1960ms, 13 nodes
+PR #149: d2-diagram v1: the facts check D2 lacks, and six corrections the round proved — 5 steps, 2660ms, 14 nodes
  1. [    0ms] PR #149: d2-diagram v1: the facts check D2 lacks, and six corrections the round proved
- 2. [  350ms] 1/1 d2-diagram v1: the facts check D2 lacks, and six corrections the round … · files changed = 47 · lines = +3513 −314
- 3. [ 1050ms] 1 commit · 47 files · +3513 −314 · 7 areas, 0 import edges between them
- 4. [ 1750ms] (end)
+ 2. [  350ms] 1/2 d2-diagram v1: the facts check D2 lacks, and six corrections the round … · files changed = 47 · lines = +3513 −314
+ 3. [ 1050ms] 2/2 Exempt d2's own flags from the docs/CLI parity check · files changed = 48 · lines = +3552 −315
+ 4. [ 1750ms] 2 commits · 48 files · +3552 −315 · 8 areas, 0 import edges between them
+ 5. [ 2450ms] (end)
 ```
 
 </details>
