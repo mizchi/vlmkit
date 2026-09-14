@@ -30,12 +30,29 @@ the picture: a reader should see immediately that it joins orders to products.
 - No relationship that is not in the list — five tables and four arrows, no
   more.
 
+## From v2 on: the fact sheet is yours
+
+`briefs/facts/shop-schema.expect.json` says what the diagram has to draw, in the
+schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. Hold your picture
+to it:
+
+```sh
+node .claude/skills/d2-diagram/assets/d2-facts.mjs shop-schema.d2 \
+  --expect ../../briefs/facts/shop-schema.expect.json
+```
+
+The sheet wins over the picture, and over your reading of this brief. Two things
+it cannot check are listed in its `_byEye` and are still required: the columns
+and their key constraints, and that each arrow is drawn between the two
+**columns** rather than the two tables. Check those on the PNG.
+
 ## Done when
 
-1. `d2 validate` exits 0, and `d2 fmt` leaves the file unchanged.
-2. The TALA terminal render exits 0 and its widest line is **100 columns or
-   fewer** (`wc -L`).
-3. Reading only your render, you can name which table each arrow leaves and
+1. `d2 validate` exits 0, and `d2 fmt --check` exits 0.
+2. `d2-facts.mjs --expect` exits 0 against the sheet above.
+3. The TALA terminal render exits 0 and its widest line is **100 columns or
+   fewer** (`LC_ALL=C.UTF-8 wc -L`, or the `columns` the facts check prints).
+4. Reading only your render, you can name which table each arrow leaves and
    which it enters.
 
 ## Deliver in your working directory

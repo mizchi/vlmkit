@@ -9,13 +9,14 @@ deliverable.
 - `briefs/<name>.md` — the task: a system described in prose and nowhere else in
   this repository, what the diagram has to show, a width budget for the terminal
   render, and the deliverables.
-- `briefs/facts/<name>.expect.json` — **the scorer's truth, not given to
-  writers.** D2 has no `--expect`: nothing in the toolchain checks a diagram
-  against what it is supposed to say. So the round scores each attempt by hand
-  against this sheet, and the error rate on attempts the writer itself called
-  done is the round's main number. (This mirrors v13 → v14 of `anim-ir`, where
-  five green module maps included two that were wrong and the answer was a fact
-  sheet the tool could read.)
+- `briefs/facts/<name>.expect.json` — the sheet: what the diagram has to say, in
+  the schema `.claude/skills/d2-diagram/assets/d2-facts.mjs` reads. **v1 withheld
+  it** and scored the attempts against it afterwards, because D2 has no
+  `--expect` and the round's question was whether a writer can check its own
+  picture with what the skill gives it. **From v2 the brief hands it over** and
+  `d2-facts --expect` exiting 0 is part of the done condition. (This mirrors v13
+  → v14 of `anim-ir`, where five green module maps included two that were wrong
+  and the answer was a fact sheet the tool could read.)
 - `attempts/<agent>/` — one directory per run: the `.d2`, the renders, `log.md`,
   and the agent's deliverable. Prior attempts and the fact sheets are off-limits
   to later writers.

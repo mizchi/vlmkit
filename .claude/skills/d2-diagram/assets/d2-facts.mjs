@@ -330,10 +330,13 @@ for (const [container, members] of Object.entries(sheet.containers || {})) {
     errors.push(`✗ container not drawn: ${container}`);
     continue;
   }
-  const deep = new Set(shapes.filter((s) => s.startsWith(`${c}.`)).map(tail));
   for (const m of members) {
-    if (deep.has(norm(m))) ok.push(`${container} holds ${m}`);
-    else errors.push(`✗ ${container} does not hold ${m}`);
+    // Resolved, not matched on the id's tail: a file that wrote `gw: API gateway` holds the
+    // sheet's `gateway`, and saying otherwise reported a correct diagram as wrong.
+    const hit = resolve(m);
+    if (hit && (hit === c || hit.startsWith(`${c}.`))) ok.push(`${container} holds ${m} (${hit})`);
+    else if (hit) errors.push(`✗ ${container} does not hold ${m} — it is drawn as ${hit}`);
+    else errors.push(`✗ ${container} does not hold ${m}, which is not drawn at all`);
   }
 }
 const listed = new Set(
