@@ -211,6 +211,17 @@ boxes — is `fixtures/d2-scenario/` and `docs/reports/2026-09-14-d2-diagram-v1.
 measured width levers (they are not monotone; the fullest container's own `direction` is the first lever)
 and what the terminal render silently drops (every connection style, `sql_table` constraint badges, `<<`).
 
+A fourth, `d2-slides` (`.claude/skills/d2-slides/`), turns one Markdown file into a slide deck whose figures
+TALA lays out: prose in Markdown, a ```d2 fence per figure, and
+`node .claude/skills/d2-slides/assets/build-deck.mjs deck.md --out dist` emits a self-contained
+`index.html` (1280x720 frames, keyboard nav, overview, `#/4` deep links), a stacked `print.html`, each figure
+as `slide-NN.svg`, and `copy.txt`. The deck is a page, which is the point — `vlmkit check integrity` on both
+views, `check copy --manifest` and `check a11y contrast` on `print.html` (one slide is on screen at a time, so
+the deck view only ever shows the gates its first slide). Those gates found three real defects in the template
+while it was being written: a 1280px stage centred as a grid item painted nothing at 375px, a percentage
+height inside a padded frame clipped 114px on every slide, and a centred split layout cut long bullets off at
+both ends. Worked example and the gate runs: `examples/d2-slides/`.
+
 `docs/reports/2026-09-14-d2-diagram-v2.md` is the round with the sheet in the writer's hands: no wrong
 picture in four attempts and the small model down from 14 errors to 0 in two rounds, so the failures moved
 to what a sheet cannot reach. The three that matter when reading a D2 figure: a `top` / `left` pin can push

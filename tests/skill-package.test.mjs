@@ -22,6 +22,7 @@ const workflows = [
   "auto-markup",
   "component-vrt",
   "d2-diagram",
+  "d2-slides",
   "dynamic-markup",
   "explain-with-anim",
   "explanatory-animation",
