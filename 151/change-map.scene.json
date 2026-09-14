@@ -1,0 +1,152 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #151: Gate d2-facts in CI, and add d2-slides: a deck whose figures TALA lays out",
+  "layout": "grid",
+  "canvas": {
+    "width": 982,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "examples/d2-slides",
+      "label": "examples/d2-slides",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/d2-scenario",
+      "label": "fixtures/d2-scenario",
+      "hidden": true
+    },
+    {
+      "id": "examples/vlmkit-intro-page",
+      "label": "examples/vlmkit-intro-page",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "fixtures/d2-scenario",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "fixtures/d2-scenario",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "1/2 Gate d2-facts in CI by reading renders instead of making them"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 14
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+568 −18"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "fixtures/d2-scenario",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "docs",
+        "examples/d2-slides",
+        "examples/vlmkit-intro-page"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "docs",
+        "examples/d2-slides",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "2/2 Add skill d2-slides: a deck whose source is text and whose figures TALA…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 40
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3598 −30"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "docs",
+        "examples/d2-slides",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 40 files · +3598 −30 · 8 areas, 0 import edges between them"
+    }
+  ]
+}
