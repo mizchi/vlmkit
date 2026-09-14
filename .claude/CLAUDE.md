@@ -222,6 +222,16 @@ while it was being written: a 1280px stage centred as a grid item painted nothin
 height inside a padded frame clipped 114px on every slide, and a centred split layout cut long bullets off at
 both ends. Worked example and the gate runs: `examples/d2-slides/`.
 
+That loop is itself gated, in two halves, because the halves need different machines. `tests/d2-slides.test.mjs`
+runs in the ordinary suite with `D2` pointed at a stub that echoes a fixed SVG, and checks everything the builder
+decides before a figure is drawn — slide splitting (a `---` inside a fence is not a separator), layout choice, the
+manifest taken from the *render*, the overflow warning naming the slide, a figure that fails to compile — plus that
+`examples/d2-slides/built/` still matches its `deck.md`. The `d2-slides` workflow installs `d2` pinned at `v0.9.0`,
+rebuilds the example, compares every byte with the committed build, runs the four gates, and then breaks the deck
+twice to prove they still fail: an extra manifest line must report `copy-missing`, and `--stage-h: 260px` must
+report `clipped-content`. Regenerate the committed build with `pnpm deck:example` — it is byte-reproducible for a
+given `d2` (each figure carries `--salt=sN`), which is what makes the byte comparison possible at all.
+
 `docs/reports/2026-09-14-d2-diagram-v2.md` is the round with the sheet in the writer's hands: no wrong
 picture in four attempts and the small model down from 14 errors to 0 in two rounds, so the failures moved
 to what a sheet cannot reach. The three that matter when reading a D2 figure: a `top` / `left` pin can push

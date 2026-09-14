@@ -1,0 +1,247 @@
+name: d2-slides deck gates
+
+# The `d2-slides` claim is that a slide deck HAS a failing state: it is emitted as an
+# HTML page, so vlmkit's own gates read it, and the bullet the frame cut in half is a
+# finding rather than something nobody noticed. A claim like that has to be run.
+#
+# Why a job rather than a unit test. `tests/d2-slides.test.mjs` covers everything the
+# builder decides before a figure is drawn (slide splitting, layout choice, the
+# manifest, the overflow budget, a figure that does not compile) with a stub `d2` and
+# no browser. What it cannot do is measure a rendered page: the three template defects
+# this skill was written around — a 1280px stage that painted nothing at 375px, a
+# percentage height that clipped 114px on every slide, prose cut off at both ends —
+# were all invisible to the Markdown and obvious to Chromium. That needs the real
+# TALA, the real CLI and a real browser, which is this job.
+#
+# Two negative controls run last, for the reason the component-vrt job carries one: a
+# suite that only ever sees passes cannot tell a working gate from a gate that always
+# passes. One breaks the copy manifest, one shrinks the frame; both must exit non-zero.
+#
+# Deterministic and keyless: no VLM, no API key, no dev server, `d2` pinned.
+
+on:
+  pull_request:
+    paths:
+      - ".claude/skills/d2-slides/**"
+      - "examples/d2-slides/**"
+      - "tests/d2-slides.test.mjs"
+      - "packages/vlmkit-markup/src/gates/copy.gate.ts"
+      - "packages/vlmkit-markup/src/gates/integrity.gate.ts"
+      - "packages/vlmkit-markup/src/gates/a11y.gate.ts"
+      - ".github/workflows/d2-slides.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".claude/skills/d2-slides/**"
+      - "examples/d2-slides/**"
+      - "tests/d2-slides.test.mjs"
+      - "packages/vlmkit-markup/src/gates/copy.gate.ts"
+      - "packages/vlmkit-markup/src/gates/integrity.gate.ts"
+      - "packages/vlmkit-markup/src/gates/a11y.gate.ts"
+      - ".github/workflows/d2-slides.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  deck-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Pinned, because the committed example build is compared byte for byte below and
+      # TALA's layout is what writes those bytes. Bumping this and regenerating
+      # `examples/d2-slides/built/` (`pnpm deck:example`) is one commit, and the diff is
+      # then a readable record of what the new TALA did to the figures.
+      #
+      # The version STRING is not the gate: `go install` does not stamp d2's ldflags, so
+      # this binary reports itself as v0.8.1-HEAD whichever tag is built. `d2 layout`
+      # listing `tala (bundled)` is the check that matters, and it runs.
+      D2_VERSION: v0.9.0
+      DECK: examples/d2-slides/deck.md
+    steps:
+      - uses: actions/checkout@v4
+
+      # Outside the checkout: a stray build must not be committable by accident.
+      - name: Resolve output paths
+        run: |
+          echo "BUILT=$RUNNER_TEMP/deck" >> "$GITHUB_ENV"
+          echo "BROKEN=$RUNNER_TEMP/broken" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache: false
+
+      - name: Cache the d2 binary
+        id: d2-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/d2
+          key: d2-${{ runner.os }}-${{ env.D2_VERSION }}
+
+      - name: Install d2
+        if: steps.d2-cache.outputs.cache-hit != 'true'
+        run: go install github.com/d2lang/d2@${{ env.D2_VERSION }}
+
+      - name: TALA must be bundled — this is the gate, not the version string
+        run: |
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/go/bin:$PATH"
+          d2 layout
+          d2 layout | grep -q 'tala (bundled)'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - run: pnpm build:packages
+
+      - name: Build the deck
+        run: |
+          node .claude/skills/d2-slides/assets/build-deck.mjs "$DECK" --out "$BUILT" \
+            2> "$RUNNER_TEMP/build.err" | tee "$RUNNER_TEMP/build.out"
+          cat "$RUNNER_TEMP/build.err"
+          # The builder warns on stderr when a slide's prose is past its frame's
+          # character budget. The example deck must not need that warning: it is the
+          # thing the gates below then report as clipped or invisible copy.
+          if [ -s "$RUNNER_TEMP/build.err" ]; then
+            echo "the example deck built with warnings — fix the deck, not this job"
+            exit 1
+          fi
+          grep -q '5 figure(s) laid out by tala' "$RUNNER_TEMP/build.out"
+
+      # The committed build is what makes the example openable without installing d2,
+      # and it goes stale the first time someone edits deck.md. The unit test compares
+      # the parts that come from the Markdown; here, with the pinned TALA, every byte
+      # is comparable — including the figures.
+      - name: The committed example build must be current
+        run: |
+          if ! diff -r --brief examples/d2-slides/built "$BUILT"; then
+            echo
+            echo "examples/d2-slides/built/ is not what the deck builds — run \`pnpm deck:example\` and commit it"
+            exit 1
+          fi
+          echo "built/ matches, $(ls "$BUILT"/slide-*.svg | wc -l) figure(s) byte for byte"
+
+      - name: check integrity — the deck view, every viewport
+        run: node --experimental-strip-types src/cli/vlmkit.ts check integrity "$BUILT/index.html"
+
+      - name: check integrity — the print view, where every slide is on the page at once
+        run: |
+          # 1280 only: the print view is a column of fixed 1280px frames, so a phone
+          # width legitimately overflows horizontally. That is the view's shape, not a
+          # defect, and pinning the viewport says so rather than suppressing a rule.
+          node --experimental-strip-types src/cli/vlmkit.ts check integrity \
+            "$BUILT/print.html" --viewports 1280
+
+      - name: check copy — every line of the deck's own text is still on a slide
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts check copy "$BUILT/print.html" \
+            --manifest "$BUILT/copy.txt" --allow-invisible unknown --json > "$RUNNER_TEMP/copy.json"
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/copy.json", "utf8"));
+            const rep = r.report;
+            if (rep.missingLines.length > 0) throw new Error("copy missing from the deck: " + rep.missingLines.join(" | "));
+            // `--allow-invisible unknown` is a known gate limitation (a manifest line whose
+            // rendered text is assembled from several inline children can read as invisible;
+            // reproduced in examples/d2-slides/README.md), and a suppression that can grow
+            // without limit would eventually accept a blank deck. It stays a minority.
+            const allowed = rep.allowedInvisibleLines.length;
+            if (allowed * 2 >= rep.manifestLines) {
+              throw new Error(`--allow-invisible now covers ${allowed} of ${rep.manifestLines} manifest lines`);
+            }
+            console.log(`${rep.manifestLines} manifest lines, 0 missing, ${allowed} invisible-allowed`);
+          '
+
+      - name: check a11y contrast — readable from the back of the room
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts check a11y contrast "$BUILT/print.html" \
+            --json > "$RUNNER_TEMP/contrast.json"
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/contrast.json", "utf8"));
+            // Every slide, not just the first: the deck view shows one at a time, so a
+            // handful of inspected elements means the gate was pointed at index.html and
+            // measured one eighth of the deck while reporting a pass.
+            const n = r.report.totalText;
+            if (!(n >= 100)) throw new Error("only " + n + " elements inspected — is this the print view?");
+            console.log(n + " text-bearing elements, " + r.report.failures.length + " failures");
+          '
+
+      - name: Negative control — a manifest line the deck does not say must fail the copy gate
+        run: |
+          rm -rf "$BROKEN" && cp -r "$BUILT" "$BROKEN"
+          echo "a sentence this deck never says" >> "$BROKEN/copy.txt"
+          set +e
+          node --experimental-strip-types src/cli/vlmkit.ts check copy "$BROKEN/print.html" \
+            --manifest "$BROKEN/copy.txt" --allow-invisible unknown --json > "$RUNNER_TEMP/copy-broken.json"
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "check copy exited 0 on a manifest line that is not on any slide — the gate is not gating"
+            exit 1
+          fi
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/copy-broken.json", "utf8"));
+            const rules = new Set((r.findings || []).map((f) => f.rule));
+            if (!rules.has("copy-missing")) throw new Error("expected copy-missing, got: " + [...rules].join(", "));
+            console.log("copy-missing reported, exit 1");
+          '
+
+      - name: Negative control — a frame too short for its slide must fail the integrity gate
+        run: |
+          rm -rf "$BROKEN" && cp -r "$BUILT" "$BROKEN"
+          # The frame is fixed and clips, which is what makes overflow measurable. Shrink
+          # it and the deck's own history repeats: content past the frame reads as clipped.
+          node -e '
+            const fs = require("fs");
+            const p = process.env.BROKEN + "/print.html";
+            const before = fs.readFileSync(p, "utf8");
+            const after = before.replace("--stage-h: 720px", "--stage-h: 260px");
+            if (after === before) throw new Error("template changed: --stage-h not found");
+            fs.writeFileSync(p, after);
+          '
+          set +e
+          node --experimental-strip-types src/cli/vlmkit.ts check integrity "$BROKEN/print.html" \
+            --viewports 1280 --json > "$RUNNER_TEMP/integrity-broken.json"
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "check integrity exited 0 on slides whose content does not fit — the gate is not gating"
+            exit 1
+          fi
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/integrity-broken.json", "utf8"));
+            const rules = new Set((r.findings || []).map((f) => f.rule));
+            if (!rules.has("clipped-content")) throw new Error("expected clipped-content, got: " + [...rules].join(", "));
+            console.log("clipped-content reported, exit 1");
+          '
+
+      - name: Upload the built deck and the gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d2-slides-deck
+          path: |
+            ${{ runner.temp }}/deck/**
+            ${{ runner.temp }}/build.out
+            ${{ runner.temp }}/build.err
+            ${{ runner.temp }}/copy.json
+            ${{ runner.temp }}/contrast.json
+            ${{ runner.temp }}/copy-broken.json
+            ${{ runner.temp }}/integrity-broken.json
+          if-no-files-found: warn

@@ -79,7 +79,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "anim:samples": "node scripts/anim-samples.mjs",
-    "anim:diagrams": "node scripts/anim-diagrams.mjs"
+    "anim:diagrams": "node scripts/anim-diagrams.mjs",
+    "deck:example": "node .claude/skills/d2-slides/assets/build-deck.mjs examples/d2-slides/deck.md --out examples/d2-slides/built"
   },
   "devDependencies": {
     "@jsquash/webp": "^1.5.0",
