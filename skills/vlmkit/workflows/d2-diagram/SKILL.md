@@ -125,7 +125,14 @@ diagrams in another repo.
 node assets/d2-facts.mjs arch.d2               # boxes, containers and their members, labels, edges, columns
 node assets/d2-facts.mjs arch.d2 --expect arch.facts.json
 node assets/d2-facts.mjs arch.d2 --seeds 4,5,6 # the seed the final render will use, so the width it reports is real
+node assets/d2-facts.mjs --from-svg arch.svg --from-txt arch.txt   # read renders that already exist, no d2 run
 ```
+
+The last form is how the checker is itself gated: `tests/d2-facts.test.mjs` drives
+it over renders committed under `fixtures/d2-scenario/` with no `d2` installed,
+so the phantom-box, truncation, reversed-edge and width lines each have a test
+that fails if they stop firing. It is also the way to check a render somebody
+else produced, or a `.svg` in a PR you are reviewing.
 
 It fails on its own, with no sheet, for three defects that are always defects:
 **a name drawn twice** (the scoping trap above), a box that overlaps a sibling or

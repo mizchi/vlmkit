@@ -1,0 +1,153 @@
+---
+name: d2-slides
+description: Build a slide deck whose source is text and whose figures are laid out by TALA — one Markdown file with a ```d2 fence per figure, compiled to a self-contained HTML deck (keyboard nav, overview grid, print-to-PDF), each figure as its own SVG, and a copy manifest. The deck is a page, so vlmkit's own gates read it: `check integrity` for a slide that breaks or clips, `check copy --manifest` for text the frame cut off, `check a11y contrast` for a projector. Loop: write `deck.md` → build → gates → fix. Use when asked for slides, a deck, a talk, a presentation, a review walkthrough, or a figure-heavy explainer that has to be presented rather than read. Not for one diagram (`d2-diagram`) or a moving figure (`explanatory-animation`).
+metadata:
+  internal: true
+---
+
+# d2-slides
+
+A deck is text: the prose is Markdown, every figure is a ```d2 fence, and the
+build is a pure function of the file. Nothing is dragged, so a slide can be
+reviewed in a diff, regenerated after a rename, and — because the output is an
+HTML page — **checked**. That last part is the point: a slide deck normally has
+no failing state, so nobody notices the bullet the frame cut in half.
+
+```bash
+node .claude/skills/d2-slides/assets/build-deck.mjs deck.md --out built
+# ✓ built/index.html: 8 slides, 5 figure(s) laid out by tala, 26 copy lines → built/copy.txt
+#   the deck:   built/index.html   → vlmkit check integrity
+#   all slides: built/print.html   → vlmkit check copy --manifest, check a11y contrast, print to PDF
+```
+
+Requires `d2` with TALA (`d2 layout` must list `tala (bundled)` — see
+`d2-diagram` for installing it) and nothing else: the builder has no
+dependencies and the deck loads no network resource.
+
+## The deck format
+
+````markdown
+---
+title: Nothing tells you the picture is wrong
+subtitle: two rounds, measured
+date: 2026-09-14
+---
+
+# Nothing tells you the picture is wrong      ← a lone `#` heading is the title slide
+
+---
+
+## A D2 diagram is a drawing                  ← `##` is a slide heading
+
+- `d2 validate` reads **syntax**              ← bullets; `code`, **bold**, *italic* work
+- there is no `--expect`
+
+```d2                                          ← the figure, laid out by TALA
+direction: right
+write -> check -> facts
+```
+
+<!-- notes: what to say out loud -->          ← speaker notes: printed, never on screen
+````
+
+- Slides are separated by a line of exactly `---`; a `---` inside a fence is not
+  a separator.
+- **Bullets plus a figure** lays them side by side; **a figure alone** gets the
+  whole stage; a heading alone is a title slide. `> line` is a pull quote, and a
+  fence in any other language stays a code block.
+- Each slide is a fixed **1280×720 frame**, scaled to whatever screen it is
+  shown on. Nothing reflows between a laptop and a projector, which is also why
+  a screenshot of slide 4 is the same picture everywhere.
+
+## The loop
+
+```
+1. write deck.md                                     prose in Markdown, every figure a ```d2 fence
+2. node …/build-deck.mjs deck.md --out built         fails on the first figure that does not compile,
+                                                     naming the slide; warns when a slide's prose
+                                                     overflows its frame's character budget
+3. vlmkit check integrity built/index.html            a slide that breaks, clips, collides or paints nothing
+4. vlmkit check integrity built/print.html --viewports 1280
+                                                     every slide at once — this is what catches the
+                                                     bullet the frame cut off
+5. vlmkit check copy built/print.html --manifest built/copy.txt --allow-invisible unknown
+                                                     every line of the deck's own text still on a slide
+6. vlmkit check a11y contrast built/print.html        readable from the back of the room
+7. read built/index.html in a browser, or the PNG of a slide; fix the Markdown; go to 2
+```
+
+Each figure is also written out as `built/slide-NN.svg`, so a slide's picture can
+be checked with the `d2-diagram` skill's own checker
+(`node …/d2-facts.mjs --from-svg built/slide-04.svg --expect slide-04.facts.json`)
+when a figure has facts it must not get wrong.
+
+## Done condition
+
+- The build exits 0 with no overflow warning.
+- `check integrity` is CLEAN on `index.html` (all three viewports) and on
+  `print.html` at 1280.
+- `check copy --manifest` reports nothing missing.
+- `check a11y contrast` reports no failure, counting **every** slide (it
+  inspects ~17 elements per slide on the print view; if it says four, you
+  pointed it at `index.html`, which shows one slide at a time).
+- You opened the deck and pressed through it.
+
+## What the gates found in this skill's own deck
+
+Everything below was a real defect in the template or the example, caught by a
+gate, fixed, and re-measured. It is why the loop above is in that order.
+
+- **A phone showed nothing.** `check integrity` at 375px: *"the DOM holds 4 text
+  blocks but almost nothing painted (ink ratio 0.05%)"*. Centring a 1280px stage
+  as an over-sized grid item leaves the middle off-screen; the stage is centred
+  by transform now.
+- **Every slide clipped 114px.** A percentage height inside a padded fixed box
+  is not the box: the frame is a flex column and the body the flexible child.
+  The gate reported it as `clipped-content` on slides whose text was well inside
+  the frame.
+- **Long bullets were cut top and bottom.** With `align-items: center` on the
+  split layout, prose taller than the frame overflows both ways and the copy
+  gate reads those lines as copy a user cannot see. Overflow goes downward now,
+  where it is measurable, and the builder warns above ~430 characters of prose
+  beside a figure.
+- **The manifest did not match the render.** It is generated from the rendered
+  markup, not from the Markdown with its markers stripped: a line containing
+  ```` ```d2 ```` strips to something the page never says.
+
+## Failure modes
+
+- **`✗ slide 6-1: the d2 figure does not compile`** with
+  `reserved keywords are prohibited in edges` → an id collided with a D2
+  keyword. `width`, `height`, `label`, `style`, `shape`, `icon`, `near`, `top`,
+  `left`, `direction`, `class`, `link`, `constraint`, `layers`, `steps` and
+  `scenarios` are the ones that bite; rename the box (`cols`, `verdict`) and
+  keep the words in its label.
+- **`copy-invisible (reason: unknown)` on a line that is plainly on the slide**
+  → a vlmkit gate limitation, not your deck: a manifest line whose rendered text
+  is assembled from several inline children can read as invisible. Reproduced
+  minimally in `examples/d2-slides/README.md`; three bullets carrying `<code>`
+  and `<strong>` fail, the same three lines without markup pass. Run with
+  `--allow-invisible unknown` (every accepted line is listed, so the suppression
+  stays auditable) and check the `missing` count, which is the part that matters.
+- **`check a11y contrast` inspected only four elements** → you pointed it at
+  `index.html`. One slide is on screen at a time; `print.html` is the stacked
+  view.
+- **`page-overflow-x` on `print.html` at 768 or 375** → expected: the print view
+  is a column of 1280px frames. Check it at `--viewports 1280`.
+- **A figure is enormous or unreadable** → it is a D2 diagram like any other:
+  take it to `d2-diagram`, where the width levers, the fact check and the
+  terminal render live. A slide figure has about 700×560 to live in.
+- **CJK labels** render correctly in SVG, so a Japanese deck is fine; the
+  terminal-render caveats in `d2-diagram` do not apply here.
+
+## Deliver
+
+- The deck: `built/index.html`, opened in a browser. Arrows and space move, `o`
+  is the overview grid, `p` prints, `f` is fullscreen, and the URL carries
+  `#/4`, so one slide can be linked.
+- A PDF: open `print.html` and print it, or `index.html` and press `p`. Speaker
+  notes appear in print and never on screen.
+- In a repo: commit `deck.md` and the figures' `.svg`; the HTML is a build
+  output. `examples/d2-slides/` is the worked example — its deck, its build, and
+  the gate runs above.
+- One slide as an image: the figure is already `built/slide-NN.svg`.

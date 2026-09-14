@@ -1,0 +1,26 @@
+Nothing tells you the picture is wrong
+A D2 diagram is a drawing
+d2 validate reads syntax. The renderers draw whatever the file says.
+There is no --expect, no layout report, and no collision check.
+Worst: a reference to an id not in scope creates a new shape.
+One writer shipped exactly that
+d2 validate 0, d2 fmt clean, 94 columns.
+Its own log: "can trace all connections."
+The render had four duplicated boxes, two orphans, and the entry call drawn as a floating pair outside every region.
+A green check on a wrong picture is the failure the fact sheet exists for.
+What the render gives back
+Two rounds
+v1 — the sheet withheld. Three of four diagrams correct; the fourth green and wrong.
+v2 — the sheet handed over. No wrong picture, and the small model went 14 errors → 0 in two rounds.
+Of fifteen v2 rounds, one was about a fact. The rest were width and legibility.
+The failure moved, it did not vanish
+A top / left pin pushed three of five tables off the ascii canvas.
+d2 exited 0. The width fell 113 → 71. The 71 measured a fragment.
+The checker read boxes from the SVG and columns from the text and never compared them.
+The loop, as it stands
+Five rounds at most. Each step answers a different question.
+Compiles → says what I meant → reads → fits where it is going.
+Where it runs
+tests/d2-facts.test.mjs drives the checker over committed renders, so CI gates it with no d2 installed.
+This deck is a page: vlmkit check integrity, check copy --manifest, check a11y contrast read it like any other.
+The deck source is Markdown; every figure is a ```d2 fence laid out by TALA.

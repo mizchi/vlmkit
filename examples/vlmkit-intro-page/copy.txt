@@ -79,6 +79,7 @@ Explanation and figures
 explain-with-anim
 explanatory-animation
 d2-diagram
+d2-slides
 Install with APM
 curl -sSL https://aka.ms/apm-unix | sh
 apm install mizchi/vlmkit

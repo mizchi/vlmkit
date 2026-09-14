@@ -1,6 +1,6 @@
 # vlmkit agent skills
 
-vlmkit ships one automatic router backed by 16 specialized workflows.
+vlmkit ships one automatic router backed by 17 specialized workflows.
 Install once, then describe the outcome you want in ordinary language. The
 agent picks the workflow whose inputs and done condition match the task.
 
@@ -62,7 +62,7 @@ which skill the user wants.
 | Test generation | A natural-language story must become a reproducible browser test | [`spec-to-playwright`](./spec-to-playwright/) | Explore the app, generate Playwright tests, stabilize VRT, run CI gates, and heal drift |
 | Comparison and monitoring | Two renders or repeated runs must be compared | [`vrt-markup-synth`](./vrt-markup-synth/), [`vrt-visual-diff`](./vrt-visual-diff/), [`vrt-regression-watch`](./vrt-regression-watch/), [`vrt-migration-eval`](./vrt-migration-eval/) | Produce deterministic authoring signals, explain visual deltas, detect regressions over time, and evaluate framework/CSS migrations |
 | Evaluation and hardening | You are measuring the repair system or the agent-facing tool itself | [`vrt-css-fix-loop`](./vrt-css-fix-loop/), [`agent-validation-loop`](./agent-validation-loop/) | Benchmark VLM+LLM CSS recovery on known fixtures and improve tool ergonomics with fresh-agent validation loops |
-| Explanation and figures | Something has to be explained or drawn, not verified: an algorithm step by step, a protocol, a module or architecture map, a diagram the docs already carry as mermaid, an architecture diagram kept as D2 text | [`explain-with-anim`](./explain-with-anim/), [`explanatory-animation`](./explanatory-animation/), [`d2-diagram`](./d2-diagram/) | Answer a "how does this work / what does this change" question with a figure drawn from the code and a narration that walks it (`explain-with-anim`); write one JSON scene (`kind` + intent, no coordinates) with `vlmkit-anim`, check it against its facts and its own layout, emit a `<vlm-anim>` page, a GIF, or a cropped still, import mermaid, draw a repository or a branch's change (`explanatory-animation`); write a D2 file laid out by TALA, hold the boxes and arrows it draws to a fact sheet, read it in the terminal as box drawing or plain ASCII, render SVG / PNG for docs (`d2-diagram`) |
+| Explanation and figures | Something has to be explained or drawn, not verified: an algorithm step by step, a protocol, a module or architecture map, a diagram the docs already carry as mermaid, an architecture diagram kept as D2 text | [`explain-with-anim`](./explain-with-anim/), [`explanatory-animation`](./explanatory-animation/), [`d2-diagram`](./d2-diagram/), [`d2-slides`](./d2-slides/) | Answer a "how does this work / what does this change" question with a figure drawn from the code and a narration that walks it (`explain-with-anim`); write one JSON scene (`kind` + intent, no coordinates) with `vlmkit-anim`, check it against its facts and its own layout, emit a `<vlm-anim>` page, a GIF, or a cropped still, import mermaid, draw a repository or a branch's change (`explanatory-animation`); write a D2 file laid out by TALA, hold the boxes and arrows it draws to a fact sheet, read it in the terminal as box drawing or plain ASCII, render SVG / PNG for docs (`d2-diagram`); build a slide deck from one Markdown file whose figures TALA lays out, and check the deck with the page gates (`d2-slides`) |
 
 ## Selection rules
 
@@ -81,3 +81,4 @@ which skill the user wants.
 - "Explain / walk me through / show me the structure of / what does this PR change" — an answer that needs a picture → `explain-with-anim` (decides what to draw from the code, explains beat by beat).
 - Animate or illustrate how something works, draw a module / dependency / architecture map, turn a mermaid diagram into a checked figure → `explanatory-animation` (how a scene is written and checked).
 - A D2 diagram, an architecture diagram as editable text, a TALA layout, a diagram that has to show in a terminal or a README code block, an existing `.d2` → `d2-diagram` (the text is the deliverable; `d2-facts.mjs` checks the picture against a fact sheet, but nothing checks it against the code).
+- Slides, a deck, a talk, a presentation, a review walkthrough → `d2-slides` (Markdown in, a self-contained HTML deck out, checked with `check integrity` / `check copy` / `check a11y contrast`).
