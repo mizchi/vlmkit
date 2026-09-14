@@ -32,22 +32,45 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const argv = process.argv.slice(2);
-const file = argv.find((a) => !a.startsWith("--"));
+const positional = [];
+for (let i = 0; i < argv.length; i += 1) {
+  const a = argv[i];
+  if (a.startsWith("--")) {
+    // A flag's value is the next token unless the flag was written as --name=value.
+    if (!a.includes("=") && argv[i + 1] && !argv[i + 1].startsWith("--")) i += 1;
+    continue;
+  }
+  positional.push(a);
+}
 const flag = (name, fallback) => {
   const i = argv.indexOf(`--${name}`);
   if (i !== -1 && argv[i + 1] && !argv[i + 1].startsWith("--")) return argv[i + 1];
   const eq = argv.find((a) => a.startsWith(`--${name}=`));
   return eq ? eq.slice(name.length + 3) : fallback;
 };
-if (!file) {
-  console.error("usage: d2-facts.mjs diagram.d2 [--expect facts.json] [--layout tala]");
-  process.exit(2);
-}
 const layout = flag("layout", "tala");
 const seeds = flag("seeds");
+const fromSvg = flag("from-svg");
+const fromTxt = flag("from-txt");
+const file = positional[0] || fromSvg;
+if (!file) {
+  console.error(
+    "usage: d2-facts.mjs diagram.d2 [--expect facts.json] [--layout tala] [--seeds 4,5,6]\n" +
+      "       d2-facts.mjs --from-svg out.svg [--from-txt out.txt] [--expect facts.json]",
+  );
+  process.exit(2);
+}
 const d2 = process.env.D2 || "d2";
-const dir = mkdtempSync(join(tmpdir(), "d2-facts-"));
+const dir = fromSvg ? null : mkdtempSync(join(tmpdir(), "d2-facts-"));
 const render = (ext) => {
+  // `--from-svg` / `--from-txt` read renders that already exist instead of running d2. The
+  // reader half is then testable with no binary installed, which is how this file is gated in
+  // CI; it is also the way to check a render someone else produced.
+  if (fromSvg) {
+    if (ext === "svg") return readFileSync(fromSvg, "utf8");
+    if (ext === "txt" && fromTxt) return readFileSync(fromTxt, "utf8");
+    throw new Error(`no --from-${ext} given`);
+  }
   const out = join(dir, `out.${ext}`);
   // `--seeds 4,5,6` is passed through because the width lever is useless otherwise: a diagram
   // whose budget only the seed reaches cannot be checked at the width it will be rendered at.
@@ -62,7 +85,11 @@ let svg;
 try {
   svg = render("svg");
 } catch (error) {
-  console.error(`✗ ${file} does not render with --layout=${layout}:`);
+  console.error(
+    fromSvg
+      ? `✗ ${fromSvg} could not be read:`
+      : `✗ ${file} does not render with --layout=${layout}:`,
+  );
   console.error(String(error.stderr || error.message).trim());
   process.exit(1);
 }
