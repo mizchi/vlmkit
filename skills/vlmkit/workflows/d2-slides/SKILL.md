@@ -72,24 +72,47 @@ write -> check -> facts
                                                      bullet the frame cut off
 5. vlmkit check copy built/print.html --manifest built/copy.txt --allow-invisible unknown
                                                      every line of the deck's own text still on a slide
+                                                     (add --forbid stale.txt when you are editing a deck:
+                                                     the claim you removed must really be gone)
 6. vlmkit check a11y contrast built/print.html        readable from the back of the room
-7. read built/index.html in a browser, or the PNG of a slide; fix the Markdown; go to 2
+7. node …/d2-facts.mjs --from-svg built/slide-NN.svg --expect slide-NN.facts.json
+                                                     what each figure DRAWS, for every figure that has
+                                                     facts it must not get wrong — steps 3-6 are blind to it
+8. read built/index.html in a browser, or the PNG of a slide; fix the Markdown; go to 2
 ```
 
-Each figure is also written out as `built/slide-NN.svg`, so a slide's picture can
-be checked with the `d2-diagram` skill's own checker
-(`node …/d2-facts.mjs --from-svg built/slide-04.svg --expect slide-04.facts.json`)
-when a figure has facts it must not get wrong.
+**Step 7 is not optional decoration, and the four page gates do not cover it.**
+They read the page: a figure that compiles and draws the wrong thing passes all
+four. The checker takes the slide SVGs the build already writes and needs no
+`d2` (it reads the render), so this costs one command per figure:
+
+```bash
+node .claude/skills/d2-diagram/assets/d2-facts.mjs --from-svg built/slide-04.svg \
+  --expect slide-04.facts.json     # exits 1 and names the box or edge that is wrong
+```
+
+The same trick pins **two figures to each other**, which nothing else does: when
+slides 2 and 3 both claim `ledger` is the writer, hold *both* SVGs to one sheet
+(`{"boxes": ["checkout","ledger"], "deps": ["checkout->ledger"], "forbidden": ["checkout->orders"]}`).
+Update one figure and forget the other and that sheet fails on the one you
+missed. The fact-sheet schema is `d2-diagram`'s; `exhaustive: true` is what makes
+an extra box an error rather than a shrug.
 
 ## Done condition
 
 - The build exits 0 with no overflow warning.
-- `check integrity` is CLEAN on `index.html` (all three viewports) and on
-  `print.html` at 1280.
-- `check copy --manifest` reports nothing missing.
-- `check a11y contrast` reports no failure, counting **every** slide (it
-  inspects ~17 elements per slide on the print view; if it says four, you
-  pointed it at `index.html`, which shows one slide at a time).
+- `check integrity` reports **no failures** on `index.html` (all three
+  viewports) and on `print.html` at 1280. A `warn` is not a failure and the
+  command still exits 0 — see the figure-internals note below before you spend
+  a round chasing one.
+- `check copy --manifest` reports nothing missing (and nothing forbidden, if
+  you are editing an existing deck).
+- `check a11y contrast` reports no failure, over a count that means **every**
+  slide was read. The count is content-dependent — a terse deck runs about 7
+  elements a slide, a dense one about 17 — so the number is not the test. Run
+  it against `index.html` too: that shows one slide at a time, so it comes back
+  in single digits. Print view ≫ deck view is the check.
+- Every figure with facts it must not get wrong passed `d2-facts --expect`.
 - You opened the deck and pressed through it.
 
 ## The same loop, in CI
@@ -136,6 +159,21 @@ gate, fixed, and re-measured. It is why the loop above is in that order.
   markup, not from the Markdown with its markers stripped: a line containing
   ```` ```d2 ```` strips to something the page never says.
 
+## What the copy manifest covers
+
+`copy.txt` is generated from the **Markdown prose only** — each slide's
+heading, bullets, pull quotes and paragraphs, as the page renders them
+(markers gone, entities decoded). Three things are therefore *not* in it:
+
+- **A figure's labels.** Text inside a ```d2 fence is drawn as SVG, and the
+  manifest never contains it. So a string the deck must be seen to say belongs
+  in prose; if it only appears in a figure, the copy gate cannot vouch for it —
+  hold the figure to a fact sheet instead (step 7).
+- **Speaker notes.** `<!-- notes: … -->` is printed and never on screen, and it
+  is not in the manifest either.
+- **The chrome.** The footer's deck title and page number are not manifest
+  lines.
+
 ## Failure modes
 
 - **`✗ slide 6-1: the d2 figure does not compile`** with
@@ -153,7 +191,20 @@ gate, fixed, and re-measured. It is why the loop above is in that order.
   stays auditable) and check the `missing` count, which is the part that matters.
 - **`check a11y contrast` inspected only four elements** → you pointed it at
   `index.html`. One slide is on screen at a time; `print.html` is the stacked
-  view.
+  view. Do not read the absolute count as a threshold: it tracks how many text
+  nodes the deck has, so a terse deck legitimately sits near 7 a slide. The
+  comparison between the two views is the signal.
+- **`near-misalignment` (a warn) on a base64-looking selector like
+  `g.KGdhdGV3YXkgLSZndDsgY2hlY2tvdXQpWzBd`** → that is *inside* a figure's SVG:
+  the gate has found two of TALA's own edge-label groups sitting 5.5px apart,
+  which is the layout engine's business and not the deck's. It is a `warn`, so
+  the verdict reads `NO DEFECTS, n WARN` and the command exits 0 — that is
+  done, leave it. There is no stable way to exempt it either: `--allow` matches
+  the finding's own selector by substring, and d2 derives that class from the
+  edge's text, so the string changes with the label. If a run has to be silent,
+  `--rule near-misalignment=off` is the only lever, and it gives up the rule for
+  the slide chrome too. Whether it fires at all depends on the layout, not on
+  having labelled edges: the same deck's figures can be CLEAN after an edit.
 - **`page-overflow-x` on `print.html` at 768 or 375** → expected: the print view
   is a column of 1280px frames. Check it at `--viewports 1280`.
 - **A figure is enormous or unreadable** → it is a D2 diagram like any other:
