@@ -72,6 +72,8 @@ export interface CopyImageOptions {
   /** Frame PNG. Optional: without it the ink check (unpainted text) cannot run. */
   imagePath?: string;
   manifestPath?: string;
+  /** Copy that must be GONE (CLI `--forbid`) — text-only, so it works here too. */
+  forbidPath?: string;
   /** Invisible-match reason classes to accept as satisfied (CLI `--allow-invisible`). */
   allowInvisible?: InvisibleReason[];
 }
@@ -134,6 +136,9 @@ export async function runImageCopyCheck(options: CopyImageOptions): Promise<Copy
   let image: PNG | undefined;
   if (options.imagePath) image = PNG.sync.read(await readFile(options.imagePath));
 
+  const forbiddenLines = options.forbidPath
+    ? parseCopyManifest(await readFile(options.forbidPath, "utf8"))
+    : undefined;
   const manifestLines = options.manifestPath
     ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))
     : undefined;
@@ -199,6 +204,7 @@ export async function runImageCopyCheck(options: CopyImageOptions): Promise<Copy
     invisibleChunks,
     ...(options.allowInvisible ? { allowInvisible: options.allowInvisible } : {}),
     ...(manifestLines ? { manifestLines } : {}),
+    ...(forbiddenLines ? { forbiddenLines } : {}),
   }) as CopyImageReport;
 
   // Truncation is reported for every clipped text element, not only manifest-carrying ones:

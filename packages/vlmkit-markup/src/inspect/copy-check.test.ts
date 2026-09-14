@@ -343,3 +343,73 @@ test("disclosure-state sweep reveals details / tab / aria-expanded copy (E2E)", 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * `--forbid`: the manifest's mirror. Asked for by a writer re-editing someone
+ * else's slide deck in the d2-slides v1 round, who had to verify the deleted
+ * claim was gone with a grep by hand: "`check copy --manifest` only detects
+ * missing required lines, never forbidden/stale ones".
+ */
+test("forbidden copy still on the page is a suspect; copy that is gone passes", () => {
+  const report = analyzeCopy({
+    source: "x.html",
+    pageText: "Ledger is the only writer to orders.\nOne writer per table, and payments holds the key.",
+    forbiddenLines: ["One writer per table, and payments holds the key.", "Beta pricing ends soon"],
+  });
+  assert.equal(report.forbidLines, 2);
+  assert.deepEqual(
+    report.forbiddenLines,
+    [{ line: "One writer per table, and payments holds the key.", where: "visible" }],
+  );
+  const forbidden = report.issues.filter((i) => i.kind === "copy-forbidden");
+  assert.equal(forbidden.length, 1);
+  assert.equal(forbidden[0]!.severity, "suspect");
+  assert.match(forbidden[0]!.message, /still on the page \(visible\)/);
+});
+
+test("no forbid list means no forbid reporting at all", () => {
+  const report = analyzeCopy({ source: "x.html", pageText: "Anything at all." });
+  assert.equal(report.forbidLines, 0);
+  assert.deepEqual(report.forbiddenLines, []);
+});
+
+/**
+ * Hiding a stale claim does not retire it: the line is still in the DOM, still
+ * in the next diff, and one CSS change from being on screen again. So the
+ * forbid list reads the RAW text, unlike the manifest, which reads the visible
+ * text — the two halves point in opposite directions on purpose.
+ */
+test("a forbidden line hidden rather than deleted is still reported, with where", () => {
+  const report = analyzeCopy({
+    source: "x.html",
+    pageText: "Current copy.\nBeta pricing ends soon",
+    visibleText: "Current copy.",
+    invisibleChunks: [{ reason: "font-size-zero", text: "Beta pricing ends soon" }],
+    forbiddenLines: ["Beta pricing ends soon"],
+  });
+  assert.deepEqual(report.forbiddenLines, [{ line: "Beta pricing ends soon", where: "invisible" }]);
+});
+
+test("a forbidden line only behind a disclosure is reported, named by the state", () => {
+  const report = analyzeCopy({
+    source: "x.html",
+    pageText: "Current copy.",
+    forbiddenLines: ["Beta pricing ends soon"],
+    stateSweep: {
+      states: [{ label: 'details "Pricing"', text: "Beta pricing ends soon" }],
+      droppedActions: 0,
+    },
+  });
+  assert.deepEqual(report.forbiddenLines, [{ line: "Beta pricing ends soon", where: 'details "Pricing"' }]);
+  assert.match(report.issues[0]!.message, /details "Pricing"/);
+});
+
+test("the forbid list shares the manifest's parser, so its headings are comments", () => {
+  const report = analyzeCopy({
+    source: "x.html",
+    pageText: "# Stale claims\nkept verbatim",
+    forbiddenLines: parseCopyManifest("# Stale claims\n\n- kept verbatim\n"),
+  });
+  assert.equal(report.forbidLines, 1);
+  assert.deepEqual(report.forbiddenLines.map((f) => f.line), ["kept verbatim"]);
+});

@@ -49,7 +49,7 @@ export interface CopyGateOptions extends CopyCheckOptions {
   imageMode?: CopyImageOptions;
 }
 
-const COPY_VALUE_FLAGS = ["--manifest", "--target", "--out", "--allow-invisible"];
+const COPY_VALUE_FLAGS = ["--manifest", "--forbid", "--target", "--out", "--allow-invisible"];
 
 /**
  * Flags that promise a check element-rect mode does not perform.
@@ -128,6 +128,13 @@ is the user-visible copy spec — keep assistive-tech-only strings out
 of it. Markdown headings in the manifest ("# Section") are organizing
 comments, not required lines.
 
+--forbid <file> is the manifest's mirror: one line per piece of copy that
+must NOT be on the page any more — a claim that was edited out, a price
+that changed, a feature that shipped. Unlike the manifest it is matched
+against the RAW text and every revealed disclosure state, because a stale
+claim behind a <details> or left at font-size:0 is still shipped and comes
+back on the next edit. Reported as copy-forbidden with where it was found.
+
 Reason classes:
   ${INVISIBLE_REASONS.join(", ")}
 When an invisibility is deliberate, accept that class with --allow-invisible;
@@ -155,6 +162,13 @@ rules out.`,
       severity: "suspect",
     },
     { id: "copy-missing", title: "Manifest line absent from the rendered text", severity: "suspect" },
+    {
+      id: "copy-forbidden",
+      title: "Copy the forbid list says is gone is still on the page",
+      severity: "suspect",
+      docs: "--forbid <file> is the manifest's mirror, for a claim that was edited out. Matched"
+        + " against the raw text and every revealed state, so hiding the line does not satisfy it.",
+    },
     {
       id: "copy-invisible",
       title: "Manifest line present in the DOM but not visible",
@@ -196,6 +210,12 @@ rules out.`,
     },
     { name: "manifest", placeholder: "file", kind: "path", description: "Copy manifest (plain text / markdown; one required line per row)" },
     {
+      name: "forbid",
+      placeholder: "file",
+      kind: "path",
+      description: "Copy that must be GONE, one line per row — the manifest's mirror, for a claim edited out",
+    },
+    {
       name: "allow-invisible",
       kind: "string-list",
       description: `Reason classes to accept as satisfied (${INVISIBLE_REASONS.join(", ")})`,
@@ -229,6 +249,7 @@ rules out.`,
         }
       }
       const elementsManifest = readFlag(argv, "manifest");
+      const elementsForbid = readFlag(argv, "forbid");
       const elementsAllow = allowInvisibleFrom(argv);
       return {
         source: image ?? elements,
@@ -236,6 +257,9 @@ rules out.`,
           elementsPath: elements,
           ...(image ? { imagePath: image } : {}),
           ...(elementsManifest ? { manifestPath: elementsManifest } : {}),
+          // --forbid needs only text, which element-rect mode has, so it is one of
+          // the few manifest-side flags that is NOT in NOT_IN_ELEMENTS_MODE.
+          ...(elementsForbid ? { forbidPath: elementsForbid } : {}),
           ...(elementsAllow ? { allowInvisible: elementsAllow } : {}),
         },
       };
@@ -249,6 +273,7 @@ rules out.`,
       COPY_VALUE_FLAGS,
     );
     const manifestPath = readFlag(argv, "manifest");
+    const forbidPath = readFlag(argv, "forbid");
     const targetPath = readFlag(argv, "target");
     const outDir = readFlag(argv, "out");
     const storageState = readFlag(argv, "storage-state");
@@ -259,6 +284,7 @@ rules out.`,
       source,
       exploreStates: !argv.includes("--no-states"),
       ...(manifestPath ? { manifestPath } : {}),
+      ...(forbidPath ? { forbidPath } : {}),
       ...(targetPath ? { targetPath } : {}),
       ...(outDir ? { outDir } : {}),
       ...(storageState ? { storageState } : {}),

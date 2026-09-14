@@ -69,6 +69,12 @@ import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 export type CopyIssueKind =
   | "placeholder-text"
   | "copy-missing"
+  /**
+   * The manifest's mirror (`--forbid`): copy that must NOT be on the page any
+   * more. Matched against the raw text and every revealed state, because a
+   * stale claim hidden behind a disclosure is still shipped.
+   */
+  | "copy-forbidden"
   | "copy-invisible"
   /**
    * Element-rect mode only (`copy-image.ts`): the renderer says the string is drawn but its
@@ -126,6 +132,10 @@ export interface CopyCheckReport {
   invisibleLines: { line: string; reason: InvisibleReason }[];
   /** Invisible matches accepted via allowInvisible (deliberate, per-class suppression). */
   allowedInvisibleLines: { line: string; reason: InvisibleReason }[];
+  /** Lines the forbid list says must be gone, found anyway, and where. */
+  forbiddenLines: { line: string; where: "visible" | "invisible" | string }[];
+  /** Lines in the forbid list (0 = no list given). */
+  forbidLines: number;
   /** Disclosure states explored (0 = nothing to reveal or sweep disabled). */
   statesExplored: number;
   droppedStates: number;
@@ -512,6 +522,16 @@ export function analyzeCopy(input: {
   /** Invisible-match reasons to accept as satisfied (deliberate suppression, e.g. ["visually-hidden"]). */
   allowInvisible?: InvisibleReason[];
   manifestLines?: string[];
+  /**
+   * Copy that must NOT be on the page any more — a claim that was edited out,
+   * a price that changed, a feature that shipped. The manifest's mirror: it
+   * says what is required, this says what is stale.
+   *
+   * Checked against the RAW text and every revealed state, not just the
+   * visible text: a stale claim behind a disclosure, or left in the DOM at
+   * `font-size:0`, is still shipped and still comes back on the next edit.
+   */
+  forbiddenLines?: string[];
   stateSweep?: StateSweep;
 }): CopyCheckReport {
   const normalized = normalizeWhitespace(input.pageText);
@@ -597,10 +617,37 @@ export function analyzeCopy(input: {
     });
   }
 
+  // The manifest's mirror. A re-edit's requirement is two-sided — "the new
+  // claim is on the page" AND "the old one is gone" — and only the first half
+  // was checkable, so it was verified with a grep by hand (writer d, v1).
+  const forbidLines = input.forbiddenLines ?? [];
+  const forbiddenLines: { line: string; where: "visible" | "invisible" | string }[] = [];
+  for (const line of forbidLines) {
+    const needle = normalizeWhitespace(line);
+    const state = states.find((s) => s.normalized.includes(needle));
+    const where = visible.includes(needle)
+      ? "visible"
+      : normalized.includes(needle)
+        ? "invisible"
+        : state
+          ? state.label
+          : undefined;
+    if (where === undefined) continue;
+    forbiddenLines.push({ line, where });
+    issues.push({
+      kind: "copy-forbidden",
+      severity: "suspect",
+      message: `Copy that must be gone is still on the page (${where}): "${line}"`
+        + " — the forbid list is for a claim that was edited out; remove it from the source rather than hiding it.",
+    });
+  }
+
   return {
     source: input.source,
     textLength: normalized.length,
     manifestLines: manifestLines.length,
+    forbidLines: forbidLines.length,
+    forbiddenLines,
     missingLines,
     revealedLines,
     invisibleLines,
@@ -621,6 +668,8 @@ export interface CopyCheckOptions extends PageLoadOptions {
   source: string;
   html?: string;
   manifestPath?: string;
+  /** Copy that must be GONE, one line per entry (CLI `--forbid`). */
+  forbidPath?: string;
   viewport?: { width: number; height: number };
   /** Target screenshot for the image-side check. */
   targetPath?: string;
@@ -690,6 +739,9 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   const manifestLines = options.manifestPath
     ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))
     : undefined;
+  const forbiddenLines = options.forbidPath
+    ? parseCopyManifest(await readFile(options.forbidPath, "utf8"))
+    : undefined;
   const report = analyzeCopy({
     source: options.source,
     pageText,
@@ -697,6 +749,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     invisibleChunks,
     ...(options.allowInvisible ? { allowInvisible: options.allowInvisible } : {}),
     ...(manifestLines ? { manifestLines } : {}),
+    ...(forbiddenLines ? { forbiddenLines } : {}),
     ...(stateSweep ? { stateSweep } : {}),
   });
   if (redirectNote) {
@@ -830,6 +883,12 @@ export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView)
     lines.push(`manifest: none (pass --manifest; --target is not available in --elements mode)`);
   } else {
     lines.push(`manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)`);
+  }
+  if (report.forbidLines > 0) {
+    lines.push(`forbid: ${report.forbidLines} line(s) that must be gone, ${report.forbiddenLines.length} still present`);
+    for (const f of report.forbiddenLines) {
+      lines.push(`  ${YELLOW}! still present (${f.where}): "${f.line}"${RESET}`);
+    }
   }
   if (report.imageReview) {
     const r = report.imageReview;
