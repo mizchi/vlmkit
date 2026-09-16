@@ -1,0 +1,158 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #154: d2-slides v3: a reader catches what four green gates passed",
+  "layout": "grid",
+  "canvas": {
+    "width": 1012,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "fixtures/d2-slides-scenario",
+      "label": "fixtures/d2-slides-scenario",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    },
+    {
+      "id": "examples/d2-slides",
+      "label": "examples/d2-slides",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "1/2 deck-review: shoot each slide, hand it to a reader, score what comes ba…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 9
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1490 −24"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "examples/d2-slides",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root",
+        "docs/reports",
+        "fixtures/d2-slides-scenario",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs/reports",
+        "fixtures/d2-slides-scenario",
+        "markup/src",
+        "skills/vlmkit"
+      ],
+      "caption": "2/2 d2-slides v3: four readers, one deck rendered twice, and the answer to …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 24
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2315 −31"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs/reports",
+        "fixtures/d2-slides-scenario",
+        "markup/src",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 24 files · +2315 −31 · 9 areas, 0 import edges between them"
+    }
+  ]
+}
