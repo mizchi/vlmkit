@@ -1,0 +1,96 @@
+{
+  "slides": [
+    {
+      "index": 0,
+      "lines": [
+        "How checkout talks to the rest of us",
+        "a walkthrough for the on-call rotation"
+      ],
+      "issues": []
+    },
+    {
+      "index": 1,
+      "lines": [
+        "The four services on the path",
+        "which is now the only writer to orders .",
+        "A request comes in at the gateway, which owns auth and nothing else.",
+        "checkout holds the cart and the order.",
+        "checkout no longer writes Postgres directly — it calls ledger,",
+        "payments talks to the card processor and is the only service with the key.",
+        "write",
+        "API gateway",
+        "POST /orders",
+        "checkout",
+        "ledger",
+        "payments",
+        "authorize"
+      ],
+      "issues": [
+        { "kind": "split", "what": "\"which is now the only writer to orders.\" sits at the top of the slide, right under the title, but it is the missing back half of the third bullet (\"checkout no longer writes Postgres directly — it calls ledger,\"). The full sentence would read \"...it calls ledger, which is now the only writer to orders.\" but the ending is placed before the bullet instead of after it." }
+      ]
+    },
+    {
+      "index": 2,
+      "lines": [
+        "Where the state lives",
+        "that table now.",
+        "checkout calls ledger to write orders; ledger is the only writer to",
+        "payments keeps no state of its own; the processor is the record.",
+        "checkout",
+        "write",
+        "ledger",
+        "write",
+        "orders (postgres)"
+      ],
+      "issues": [
+        { "kind": "split", "what": "\"that table now.\" appears at the top of the slide, above the bullets, but it completes the first bullet (\"checkout calls ledger to write orders; ledger is the only writer to\") — should read \"...is the only writer to that table now.\" The ending sits before the bullet it belongs to instead of after it." }
+      ]
+    },
+    {
+      "index": 3,
+      "lines": [
+        "The migration window",
+        "ledger .",
+        "source of truth.",
+        "the 409 on the next slide means.",
+        "For the next two weeks, checkout dual-writes to Postgres and to",
+        "Postgres stays authoritative until the cutover; after that, ledger is the",
+        "Both paths are live at once, so the two writes can disagree — that is what",
+        "checkout",
+        "write",
+        "Postgres (legacy path, authoritative until cutover)",
+        "write",
+        "ledger (authoritative after cutover)"
+      ],
+      "issues": [
+        { "kind": "split", "what": "\"ledger.\" (first line under the title) is the missing tail of bullet 1 (\"...checkout dual-writes to Postgres and to\" + \"ledger.\"), but it is printed above all three bullets instead of after the first one." },
+        { "kind": "split", "what": "\"source of truth.\" (second line under the title) is the missing tail of bullet 2 (\"...after that, ledger is the\" + \"source of truth.\"), printed above the bullets instead of after the second one." },
+        { "kind": "split", "what": "\"the 409 on the next slide means.\" (third line under the title) is the missing tail of bullet 3 (\"...that is what\" + \"the 409 on the next slide means.\"), printed above the bullets instead of after the third one." }
+      ]
+    },
+    {
+      "index": 4,
+      "lines": [
+        "What wakes you up",
+        "not the order.",
+        "processor, and the dashboard shows it per-service.",
+        "A 402 from payments is the processor, not us — check its status page first.",
+        "A 500 from checkout with no payments call in the trace is the order write.",
+        "A 409 from ledger means the dual-write disagreed; it is the migration,",
+        "Latency on POST /orders past two seconds is almost always the card"
+      ],
+      "issues": [
+        { "kind": "split", "what": "\"not the order.\" sits above the bullet list but completes the third bullet (\"...it is the migration,\" + \"not the order.\") — should read \"...it is the migration, not the order.\"" },
+        { "kind": "split", "what": "\"processor, and the dashboard shows it per-service.\" sits above the bullet list but completes the fourth bullet (\"...almost always the card\" + \"processor, and the dashboard shows it per-service.\")" }
+      ]
+    },
+    {
+      "index": 5,
+      "lines": [
+        "What to remember",
+        "ledger writes the table now, and payments is still the only thing holding a key."
+      ],
+      "issues": []
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "slides": [
+    {
+      "index": 0,
+      "lines": [
+        "How checkout talks to the rest of us",
+        "a walkthrough for the on-call rotation"
+      ],
+      "issues": []
+    },
+    {
+      "index": 1,
+      "lines": [
+        "The four services on the path",
+        "which is now the only writer to orders .",
+        "A request comes in at the gateway, which owns auth and nothing else.",
+        "checkout holds the cart and the order.",
+        "checkout no longer writes Postgres directly — it calls ledger,",
+        "payments talks to the card processor and is the only service with the key."
+      ],
+      "issues": []
+    },
+    {
+      "index": 2,
+      "lines": [
+        "Where the state lives",
+        "that table now.",
+        "checkout calls ledger to write orders; ledger is the only writer to",
+        "payments keeps no state of its own; the processor is the record."
+      ],
+      "issues": []
+    },
+    {
+      "index": 3,
+      "lines": [
+        "The migration window",
+        "ledger .",
+        "source of truth.",
+        "the 409 on the next slide means.",
+        "For the next two weeks, checkout dual-writes to Postgres and to",
+        "Postgres stays authoritative until the cutover; after that, ledger is the",
+        "Both paths are live at once, so the two writes can disagree — that is what"
+      ],
+      "issues": [
+        {
+          "kind": "clipped",
+          "what": "Three consecutive bullet points end abruptly without completing their sentences: 'dual-writes to Postgres and to', 'after that, ledger is the', and 'can disagree — that is what'. Text appears cut off at the right edge."
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "lines": [
+        "What wakes you up",
+        "not the order.",
+        "processor, and the dashboard shows it per-service.",
+        "A 402 from payments is the processor, not us — check its status page first.",
+        "A 500 from checkout with no payments call in the trace is the order write.",
+        "A 409 from ledger means the dual-write disagreed; it is the migration,",
+        "Latency on POST /orders past two seconds is almost always the card"
+      ],
+      "issues": [
+        {
+          "kind": "clipped",
+          "what": "Final bullet point ends with 'almost always the card' but appears incomplete, cutting off at the right edge."
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "lines": [
+        "What to remember",
+        "ledger writes the table now, and payments is still the only thing holding a key."
+      ],
+      "issues": []
+    }
+  ]
+}

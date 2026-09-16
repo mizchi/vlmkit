@@ -31,6 +31,7 @@ half the brief is the failure mode a green check cannot see — the same lesson
 |---|---|---|
 | v1 | `a` (sonnet, tala-talk), `b` (haiku, tala-talk), `c` (sonnet, ja), `d` (sonnet, re-edit) | `docs/reports/2026-09-14-d2-slides-v1.md` |
 | v2 | `e` (sonnet, tala-talk + two fact sheets), `f` (sonnet, re-edit + shared sheet and `--forbid`) | `docs/reports/2026-09-14-d2-slides-v2.md` |
+| v3 | **readers**, not writers: `r1`–`r4` shown only PNGs of one arm each | `docs/reports/2026-09-16-d2-slides-v3.md` |
 
 v2 answered v1's open question: `f`'s figure passed all four page gates and
 failed the shared sheet (`✗ forbidden edge drawn: checkout->orders`). It also
@@ -39,6 +40,13 @@ over two lines became a paragraph, which renders before the list, so the second
 half of a sentence appeared above its own bullet. `e` caught it by grepping its
 own `copy.txt`; `f` shipped it. Both are fixed; the decks under `attempts/` are
 as delivered, so `e`'s and `f`'s builds still show the pre-fix behaviour.
+
+v3 changed the instrument. Writers have been green on the first write since v2,
+so the round asked the question v2's report left open — can a reader catch what
+the gates cannot — by rendering **one** deck twice and showing four readers one
+arm each, blind. Both readers of the deck as delivered scored fidelity 0.70 and
+had its split named; both readers of the rebuilt deck scored 1.00 with nothing
+to report. Details and the frozen readings: `v3/`.
 
 ## Attempts
 
