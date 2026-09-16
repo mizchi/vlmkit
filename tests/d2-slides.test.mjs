@@ -263,6 +263,59 @@ a -> b
     assert.match(r.stderr, /✗ no slides found/);
   });
 
+  /**
+   * `slides.json` is the sheet a READER is scored against, and its whole value
+   * is that it is not `copy.txt`: the manifest is a set the copy gate looks
+   * lines up in, and it lists bullets before paragraphs, while the page renders
+   * paragraphs first. The v1/v2 defects were order defects, so the sheet has to
+   * carry order.
+   */
+  it("writes a per-slide sheet in reading order, which is not the manifest's order", () => {
+    const r = build(`## Ordering
+
+A paragraph that the page renders first.
+
+- but the manifest lists this bullet first
+`);
+    assert.equal(r.status, 0, r.stderr);
+    const sheet = JSON.parse(r.read("slides.json"));
+    assert.equal(sheet.slides.length, 1);
+    assert.deepEqual(sheet.slides[0].lines, [
+      "Ordering",
+      "A paragraph that the page renders first.",
+      "but the manifest lists this bullet first",
+    ]);
+    // The manifest disagrees, on purpose — heading, bullets, then paragraphs.
+    assert.deepEqual(r.read("copy.txt").trim().split("\n"), [
+      "Ordering",
+      "but the manifest lists this bullet first",
+      "A paragraph that the page renders first.",
+    ]);
+  });
+
+  /**
+   * A reader transcribing a slide reads the figure's labels too. Without them
+   * in the sheet every one scores as text the reader invented: a v3 reader read
+   * all 21 prose lines and was scored 0.55 for also reading the figures.
+   */
+  it("carries each figure's words in the sheet, taken from the rendered SVG", () => {
+    const r = build(`## With a figure
+
+- one bullet
+
+\`\`\`d2
+a -> b
+\`\`\`
+`);
+    assert.equal(r.status, 0, r.stderr);
+    const slide = JSON.parse(r.read("slides.json")).slides[0];
+    assert.deepEqual(slide.figures, ["slide-01.svg"]);
+    // The stub SVG draws no <text>, so the list is empty rather than absent —
+    // a reader's figure lines are then scored as invented, which is correct.
+    assert.deepEqual(slide.figureText, []);
+    assert.equal(slide.kind, "split");
+  });
+
   // The staleness gate. `pnpm deck:example` regenerates the committed build.
   it("keeps the committed example build in sync with its deck", () => {
     const fresh = build(readFileSync(EXAMPLE, "utf8"));
