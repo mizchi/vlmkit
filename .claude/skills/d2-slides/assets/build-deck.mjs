@@ -282,15 +282,52 @@ for (const s of built) {
   for (const p of s.paras) copy.push(rendered(p));
 }
 
+/**
+ * The words a figure draws, read back out of the SVG the build just made.
+ *
+ * A reader transcribing a slide reads the figure's box labels too — of course
+ * it does, they are words on the slide — and without this the sheet counts
+ * every one as text the reader invented. One v3 reader read all 21 prose lines
+ * and scored 0.55 fidelity for also reading the figures. It is also the only
+ * record of whether a label was legible at slide size.
+ */
+const figureTextOf = (svg) =>
+  [...svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)]
+    .map((m) => m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim())
+    .filter((s) => s.length > 0);
+
+const kindOf = (s) =>
+  s.figures.length && !s.bullets.length && !s.numbers.length && !s.paras.length && !s.quotes.length
+    ? "figure-only"
+    : s.figures.length
+      ? "split"
+      : s.level === 1
+        ? "title"
+        : "text";
+
+/**
+ * A slide's text in the order a READER meets it, top to bottom.
+ *
+ * Not the same list as `copy.txt`: the manifest is a set the copy gate looks
+ * each line up in, and it lists bullets before paragraphs while the page
+ * renders paragraphs first. Order is the whole point here — the two defects
+ * that reached a delivered deck in the v1/v2 rounds were a sentence split
+ * across two blocks and a fragment rendered ABOVE its own bullet, both of
+ * which a set cannot express and every page gate passed.
+ */
+const readingOrder = (s) => {
+  const lines = [];
+  if (s.heading) lines.push(rendered(s.heading));
+  if (s.level === 1 && meta.subtitle && s.index === 0) lines.push(rendered(meta.subtitle));
+  for (const p of s.paras) lines.push(rendered(p));
+  for (const b of s.bullets) lines.push(rendered(b));
+  for (const n of s.numbers) lines.push(rendered(n));
+  for (const q of s.quotes) lines.push(rendered(q));
+  return lines;
+};
+
 const slideHtml = (s) => {
-  const kind =
-    s.figures.length && !s.bullets.length && !s.numbers.length && !s.paras.length && !s.quotes.length
-      ? "figure-only"
-      : s.figures.length
-        ? "split"
-        : s.level === 1
-          ? "title"
-          : "text";
+  const kind = kindOf(s);
   const parts = [];
   if (s.heading) parts.push(`<h${s.level === 1 ? 1 : 2}>${inline(s.heading)}</h${s.level === 1 ? 1 : 2}>`);
   if (s.level === 1 && meta.subtitle && s.index === 0) parts.push(`<p class="subtitle">${inline(meta.subtitle)}</p>`);
@@ -462,6 +499,27 @@ writeFileSync(join(outDir, "index.html"), html);
 // only form in which a page gate can read all of the copy.
 writeFileSync(join(outDir, "print.html"), html.replace("<body>", '<body class="print">'));
 writeFileSync(join(outDir, "copy.txt"), `${copy.join("\n")}\n`);
+// The sheet a reader is scored against: what each slide says, in reading order,
+// and which figures it carries. `deck-review.mjs` needs exactly this and the
+// manifest cannot supply it (see `readingOrder`).
+writeFileSync(
+  join(outDir, "slides.json"),
+  `${JSON.stringify(
+    {
+      title: meta.title || "",
+      slides: built.map((s) => ({
+        index: s.index,
+        kind: kindOf(s),
+        ...(s.heading ? { heading: rendered(s.heading) } : {}),
+        lines: readingOrder(s),
+        figures: s.svgs.map((f) => f.name),
+        figureText: s.svgs.flatMap((f) => figureTextOf(f.svg)),
+      })),
+    },
+    null,
+    2,
+  )}\n`,
+);
 const figures = built.reduce((n, s) => n + s.svgs.length, 0);
 console.log(
   `✓ ${join(outDir, "index.html")}: ${built.length} slides, ${figures} figure(s) laid out by ${layout}, ` +

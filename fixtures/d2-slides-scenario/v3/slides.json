@@ -1,0 +1,106 @@
+{
+  "title": "How checkout talks to the rest of us",
+  "slides": [
+    {
+      "index": 0,
+      "kind": "title",
+      "heading": "How checkout talks to the rest of us",
+      "lines": [
+        "How checkout talks to the rest of us",
+        "a walkthrough for the on-call rotation"
+      ],
+      "figures": [],
+      "figureText": []
+    },
+    {
+      "index": 1,
+      "kind": "split",
+      "heading": "The four services on the path",
+      "lines": [
+        "The four services on the path",
+        "A request comes in at the gateway, which owns auth and nothing else.",
+        "checkout holds the cart and the order.",
+        "checkout no longer writes Postgres directly — it calls ledger, which is now the only writer to orders.",
+        "payments talks to the card processor and is the only service with the key."
+      ],
+      "figures": [
+        "slide-02.svg"
+      ],
+      "figureText": [
+        "API gateway",
+        "checkout",
+        "ledger",
+        "payments",
+        "POST /orders",
+        "write",
+        "authorize"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "split",
+      "heading": "Where the state lives",
+      "lines": [
+        "Where the state lives",
+        "checkout calls ledger to write orders; ledger is the only writer to that table now.",
+        "payments keeps no state of its own; the processor is the record."
+      ],
+      "figures": [
+        "slide-03.svg"
+      ],
+      "figureText": [
+        "checkout",
+        "ledger",
+        "orders (postgres)",
+        "write",
+        "write"
+      ]
+    },
+    {
+      "index": 3,
+      "kind": "split",
+      "heading": "The migration window",
+      "lines": [
+        "The migration window",
+        "For the next two weeks, checkout dual-writes to Postgres and to ledger.",
+        "Postgres stays authoritative until the cutover; after that, ledger is the source of truth.",
+        "Both paths are live at once, so the two writes can disagree — that is what the 409 on the next slide means."
+      ],
+      "figures": [
+        "slide-04.svg"
+      ],
+      "figureText": [
+        "checkout",
+        "Postgres (legacy path, authoritative until cutover)",
+        "ledger (authoritative after cutover)",
+        "write",
+        "write"
+      ]
+    },
+    {
+      "index": 4,
+      "kind": "text",
+      "heading": "What wakes you up",
+      "lines": [
+        "What wakes you up",
+        "A 402 from payments is the processor, not us — check its status page first.",
+        "A 500 from checkout with no payments call in the trace is the order write.",
+        "A 409 from ledger means the dual-write disagreed; it is the migration, not the order.",
+        "Latency on POST /orders past two seconds is almost always the card processor, and the dashboard shows it per-service."
+      ],
+      "figures": [],
+      "figureText": []
+    },
+    {
+      "index": 5,
+      "kind": "text",
+      "heading": "What to remember",
+      "lines": [
+        "What to remember",
+        "ledger writes the table now, and payments is still the only thing holding a key."
+      ],
+      "figures": [],
+      "figureText": []
+    }
+  ]
+}

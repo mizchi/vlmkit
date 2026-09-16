@@ -162,6 +162,24 @@ Dates are YYYY-MM-DD.
   loop into one sentence). `d2-facts` now names the match a row turned on, so "the figure is wrong" and "the
   sheet means another box" can be told apart.
 
+- **`d2-slides` step 8, and the v3 round that produced it** (`deck-review.mjs`, `fixtures/d2-slides-scenario/v3/`,
+  report `docs/reports/2026-09-16-d2-slides-v3.md`). Every other check in the deck loop reads the page or a
+  figure's geometry; two defects still reached a delivered deck in v1/v2 because every fragment was visible text
+  and nothing overflowed. So the build now also writes **`slides.json`** — each slide's text in READING order
+  (which `copy.txt` is not: a manifest is a set, and it lists bullets before paragraphs while the page renders
+  paragraphs first) plus the words its figures draw — and `deck-review.mjs` shoots each slide through the deck's
+  own `#/N` navigation, hands the PNGs to a reader, and scores the reading against that sheet: read / missed /
+  invented / fidelity / order, `--sheet` to score one render against another build's sheet.
+- v3 measured it as an A/B on one deck rendered twice, four readers shown one arm each and nothing else: **0.70
+  fidelity from both readers of the deck as its writer delivered it, 1.00 from both readers of the rebuilt one**,
+  and the larger reader named the builder bug from six pictures ("a systematic wrap/overflow bug … worth fixing
+  at the template level"). Two fixes came out of the round's own friction: the scorer now names a **SPLIT** —
+  a sheet line whose words are all present across two or more read lines — because one reader reported that
+  defect as "cut off at the right edge" (right slides, wrong mechanism), and a figure's labels are counted apart
+  from invented text after a reader that transcribed them scored 0.55 for reading more of the slide. Recorded
+  rather than tuned: the `order` score did not catch this defect, since the fragments kept the sheet's relative
+  order.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**

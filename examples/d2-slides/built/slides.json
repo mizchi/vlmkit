@@ -1,0 +1,165 @@
+{
+  "title": "Nothing tells you the picture is wrong",
+  "slides": [
+    {
+      "index": 0,
+      "kind": "title",
+      "heading": "Nothing tells you the picture is wrong",
+      "lines": [
+        "Nothing tells you the picture is wrong",
+        "D2, TALA, and two rounds of measuring whether an agent can draw"
+      ],
+      "figures": [],
+      "figureText": []
+    },
+    {
+      "index": 1,
+      "kind": "split",
+      "heading": "A D2 diagram is a drawing",
+      "lines": [
+        "A D2 diagram is a drawing",
+        "d2 validate reads syntax. The renderers draw whatever the file says.",
+        "There is no --expect, no layout report, and no collision check.",
+        "Worst: a reference to an id not in scope creates a new shape."
+      ],
+      "figures": [
+        "slide-02.svg"
+      ],
+      "figureText": [
+        "edge",
+        "cluster",
+        "gateway -> orders, written at the root",
+        "cdn",
+        "gateway",
+        "orders",
+        "gateway",
+        "orders"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "text",
+      "heading": "One writer shipped exactly that",
+      "lines": [
+        "One writer shipped exactly that",
+        "d2 validate 0, d2 fmt clean, 94 columns.",
+        "Its own log: \"can trace all connections.\"",
+        "The render had four duplicated boxes, two orphans, and the entry call drawn as a floating pair outside every region.",
+        "A green check on a wrong picture is the failure the fact sheet exists for."
+      ],
+      "figures": [],
+      "figureText": []
+    },
+    {
+      "index": 3,
+      "kind": "figure-only",
+      "heading": "What the render gives back",
+      "lines": [
+        "What the render gives back"
+      ],
+      "figures": [
+        "slide-04.svg"
+      ],
+      "figureText": [
+        "arch.d2",
+        "arch.svg",
+        "arch.txt",
+        "d2-facts.mjs",
+        "arch.facts.json",
+        "verdict",
+        "every shape and connection id",
+        "x / y / width / height",
+        "the text a reader sees",
+        "columns, wcwidth-aware",
+        "d2 --layout=tala",
+        "d2 --layout=tala",
+        "expected",
+        "missing / reversed / invented / duplicated"
+      ]
+    },
+    {
+      "index": 4,
+      "kind": "split",
+      "heading": "Two rounds",
+      "lines": [
+        "Two rounds",
+        "v1 — the sheet withheld. Three of four diagrams correct; the fourth green and wrong.",
+        "v2 — the sheet handed over. No wrong picture, and the small model went 14 errors → 0 in two rounds.",
+        "Of fifteen v2 rounds, one was about a fact. The rest were width and legibility."
+      ],
+      "figures": [
+        "slide-05.svg"
+      ],
+      "figureText": [
+        "v1 — no sheet",
+        "v2 — sheet in hand",
+        "a ✓",
+        "b ✓",
+        "c ✓",
+        "d ✗ 14 errors",
+        "e ✓",
+        "f width only",
+        "g ✓",
+        "h ✓ 2 rounds",
+        "d2-facts + six corrections"
+      ]
+    },
+    {
+      "index": 5,
+      "kind": "split",
+      "heading": "The failure moved, it did not vanish",
+      "lines": [
+        "The failure moved, it did not vanish",
+        "A top / left pin pushed three of five tables off the ascii canvas.",
+        "d2 exited 0. The width fell 113 → 71. The 71 measured a fragment.",
+        "The checker read boxes from the SVG and columns from the text and never compared them."
+      ],
+      "figures": [
+        "slide-06.svg"
+      ],
+      "figureText": [
+        "top / left pin",
+        "SVG grows (x=1893)",
+        "text render: 2 of 5 tables",
+        "71 columns — a fragment",
+        "d2-facts: ✓ 0 errors",
+        "believed"
+      ]
+    },
+    {
+      "index": 6,
+      "kind": "split",
+      "heading": "The loop, as it stands",
+      "lines": [
+        "The loop, as it stands",
+        "Five rounds at most. Each step answers a different question.",
+        "Compiles → says what I meant → reads → fits where it is going."
+      ],
+      "figures": [
+        "slide-07.svg"
+      ],
+      "figureText": [
+        "write the sheet",
+        "write the .d2",
+        "fmt --check / validate",
+        "d2-facts --expect",
+        "read the .png",
+        "the terminal render",
+        "one change per round"
+      ]
+    },
+    {
+      "index": 7,
+      "kind": "text",
+      "heading": "Where it runs",
+      "lines": [
+        "Where it runs",
+        "tests/d2-facts.test.mjs drives the checker over committed renders, so CI gates it with no d2 installed.",
+        "This deck is a page: vlmkit check integrity, check copy --manifest, check a11y contrast read it like any other.",
+        "The deck source is Markdown; every figure is a ```d2 fence laid out by TALA."
+      ],
+      "figures": [],
+      "figureText": []
+    }
+  ]
+}

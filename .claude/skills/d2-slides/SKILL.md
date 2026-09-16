@@ -78,7 +78,9 @@ write -> check -> facts
 7. node …/d2-facts.mjs --from-svg built/slide-NN.svg --expect slide-NN.facts.json
                                                      what each figure DRAWS, for every figure that has
                                                      facts it must not get wrong — steps 3-6 are blind to it
-8. read built/index.html in a browser, or the PNG of a slide; fix the Markdown; go to 2
+8. node …/deck-review.mjs built --out review           shoot each slide, hand the PNGs to a reader
+   node …/deck-review.mjs built --answers a.json      score what it read back: fidelity, order, SPLITs
+9. read built/index.html in a browser, or the PNG of a slide; fix the Markdown; go to 2
 ```
 
 **Step 7 is not optional decoration, and the four page gates do not cover it.**
@@ -98,6 +100,54 @@ Update one figure and forget the other and that sheet fails on the one you
 missed. The fact-sheet schema is `d2-diagram`'s; `exhaustive: true` is what makes
 an extra box an error rather than a shrug.
 
+## Step 8: somebody has to read it
+
+Steps 3-7 are the page and the figures' geometry. None of them reads the slide
+the way a viewer does, and that gap is not theoretical: in the v1/v2 rounds two
+defects reached a **delivered** deck — a sentence rendered as two blocks, and a
+fragment sitting above its own bullet — with all four gates green, because
+every fragment was visible text and nothing overflowed.
+
+```bash
+node .claude/skills/d2-slides/assets/deck-review.mjs built --out review
+#   → review/slide-NN.png, one per slide, plus review-brief.md
+#   hand that directory to a vision model or an agent; it answers JSON
+node .claude/skills/d2-slides/assets/deck-review.mjs built --answers review/answers.json
+#   read 19/21, invented 6, fidelity 0.70, order 1.00
+#   ⚠ SPLIT: "…it calls ledger, which is now the only writer to orders."
+#     every word is on the slide, the sentence is not — read back as 2 blocks
+```
+
+The scoring is deterministic, against the `slides.json` the build writes: each
+slide's text **in reading order** (which `copy.txt` is not — the manifest is a
+set, and it lists bullets before paragraphs while the page renders paragraphs
+first) plus the words its figures draw.
+
+Two numbers and one line to read:
+
+- **fidelity** — sheet lines read / (sheet lines + invented). 1.00 is "the
+  slide, nothing more". Measured in v3: 1.00 on a clean deck from both readers,
+  0.70 on the same deck built by a builder that split its bullets.
+- **order** — pairs of read lines whose order disagrees with the sheet. It is
+  for a genuinely reordered slide; be aware it did **not** catch v3's split,
+  because the fragments still appeared in the sheet's relative order. Fidelity
+  and the SPLIT line caught that.
+- **⚠ SPLIT** — a sheet line no single read line covers, whose words are all
+  present across two or more. That is one sentence rendered as two blocks, and
+  the tool names it whether or not the reader had the word for it: one v3
+  reader called the same defect "clipped at the right edge" — right slides,
+  wrong mechanism — and the diagnosis came out anyway.
+
+`--sheet <other-build>/slides.json` scores one render against another build's
+sheet, which is how a before/after pair is compared against one ground truth.
+
+Honest limits. A reader that transcribes none of the figures' labels is not
+evidence they are illegible, only that it read prose — the `figures: k of n`
+line is a hint, not a verdict. A reading is a measurement and exits 0; what to
+do about a 0.7 is the author's call. And a reader will occasionally report a
+mechanism that is not the real one, so read the slide it names before believing
+the reason it gives.
+
 ## Done condition
 
 - The build exits 0 with no overflow warning.
@@ -113,7 +163,9 @@ an extra box an error rather than a shrug.
   it against `index.html` too: that shows one slide at a time, so it comes back
   in single digits. Print view ≫ deck view is the check.
 - Every figure with facts it must not get wrong passed `d2-facts --expect`.
-- You opened the deck and pressed through it.
+- **Somebody read it back.** You pressed through the deck yourself, or a reader
+  scored it with `deck-review` — fidelity near 1.00 and no `SPLIT`. This is the
+  only step that sees a sentence broken into two blocks.
 
 ## The same loop, in CI
 
@@ -173,6 +225,11 @@ heading, bullets, pull quotes and paragraphs, as the page renders them
   is not in the manifest either.
 - **The chrome.** The footer's deck title and page number are not manifest
   lines.
+
+For a reader, the build also writes **`slides.json`**: per slide, its heading,
+its text in reading order, its figures and the words those figures draw. That
+is the sheet `deck-review` scores against, and the reason it is a separate file
+from `copy.txt` is that a manifest cannot express order.
 
 A bullet, quote or paragraph wrapped over several lines is **rejoined** into one
 line, as Markdown does, so wrapping at 80 columns is safe and one sentence is

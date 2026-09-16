@@ -396,7 +396,7 @@ test("a forbidden line only behind a disclosure is reported, named by the state"
     pageText: "Current copy.",
     forbiddenLines: ["Beta pricing ends soon"],
     stateSweep: {
-      states: [{ label: 'details "Pricing"', text: "Beta pricing ends soon" }],
+      states: [{ kind: "details" as const, label: 'details "Pricing"', text: "Beta pricing ends soon" }],
       droppedActions: 0,
     },
   });
