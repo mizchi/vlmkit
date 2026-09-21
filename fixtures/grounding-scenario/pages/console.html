@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Northwind Console — Billing</title>
+<style>
+  :root {
+    --ink: #16181d; --muted: #6b7280; --line: #e4e6eb; --accent: #1d4ed8;
+    --bg: #f6f7f9; --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  header {
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 0 24px; height: 56px; display: flex; align-items: center; gap: 24px;
+  }
+  .brand { font-weight: 650; font-size: 15px; letter-spacing: -.01em; }
+  nav { display: flex; gap: 20px; margin-left: 8px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 0; }
+  nav a.on { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px var(--accent); }
+  .spacer { flex: 1; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: #c7d2fe;
+    border: 0; font-size: 12px; font-weight: 600; color: #3730a3;
+  }
+  main { padding: 24px; max-width: 1000px; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 20px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 14px; letter-spacing: .01em; }
+
+  /* ---- Renewal banner: the ribbon overlaps the LEFT of the primary button ---- */
+  .renew { display: flex; align-items: center; gap: 16px; }
+  .renew p { margin: 0; flex: 1; font-size: 13px; color: var(--muted); }
+  .cta-wrap { position: relative; }
+  .cta {
+    background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+    padding: 0 22px; height: 38px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .ribbon {
+    position: absolute; top: -6px; left: -14px; width: 118px; height: 50px;
+    background: rgba(250, 204, 21, .92); border: 1px solid #ca8a04; border-radius: 7px;
+    font-size: 11px; font-weight: 700; color: #713f12;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    transform: rotate(-3deg);
+  }
+
+  /* ---- Accounts table: three identical row actions ---- */
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); font-weight: 600; padding: 0 0 8px;
+  }
+  td { border-top: 1px solid var(--line); padding: 11px 0; font-size: 13px; }
+  td.name { font-weight: 550; }
+  td.plan { color: var(--muted); }
+  td.act { text-align: right; }
+  .manage {
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    padding: 0 14px; height: 30px; font-size: 13px; cursor: pointer;
+  }
+
+  /* ---- Icon rail: three 14px controls, no gap ---- */
+  .rail { display: flex; gap: 0; align-items: center; }
+  .rail button {
+    width: 14px; height: 14px; padding: 0; border: 0; cursor: pointer;
+    background-size: 14px 14px; background-repeat: no-repeat; background-position: center;
+  }
+  .rail .refresh { background-color: #0f766e; }
+  .rail .export  { background-color: #4338ca; }
+  .rail .trash   { background-color: #b91c1c; }
+  .rail-label { font-size: 12px; color: var(--muted); margin-right: 10px; }
+
+  /* ---- Footer form ---- */
+  .row { display: flex; gap: 12px; align-items: flex-end; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  input[type=text] {
+    height: 36px; border: 1px solid var(--line); border-radius: 7px;
+    padding: 0 11px; font-size: 13px; width: 260px; background: #fff;
+  }
+  .ghost-btn {
+    background: #fff; border: 1px solid var(--line); border-radius: 7px;
+    height: 36px; padding: 0 16px; font-size: 13px; cursor: pointer;
+  }
+  .send {
+    background: #0f766e; color: #fff; border: 0; border-radius: 7px;
+    height: 36px; padding: 0 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">Northwind Console</span>
+  <nav>
+    <a href="#overview">Overview</a>
+    <a href="#billing" class="on">Billing</a>
+    <a href="#usage">Usage</a>
+    <a href="#audit">Audit log</a>
+  </nav>
+  <span class="spacer"></span>
+  <button class="avatar" aria-label="Account menu">RM</button>
+</header>
+
+<main>
+  <h1>Billing</h1>
+  <p class="sub">Plans, invoices and the accounts they are charged to.</p>
+
+  <section class="card">
+    <div class="renew">
+      <p>Your Enterprise plan renews on 4 October. Payment method ending 4417.</p>
+      <span class="cta-wrap">
+        <button class="cta" id="renew-now">Renew plan</button>
+        <span class="ribbon" id="promo">SAVE 20%<br>ANNUAL</span>
+      </span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Accounts</h2>
+    <table>
+      <thead>
+        <tr><th>Account</th><th>Plan</th><th>Seats</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">Acme Freight</td><td class="plan">Team</td><td class="plan">18</td>
+          <td class="act"><button class="manage">Manage</button></td>
+        </tr>
+        <tr>
+          <td class="name">Globex Media</td><td class="plan">Enterprise</td><td class="plan">240</td>
+          <td class="act"><button class="manage">Manage</button></td>
+        </tr>
+        <tr>
+          <td class="name">Initech Labs</td><td class="plan">Starter</td><td class="plan">4</td>
+          <td class="act"><button class="manage">Manage</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Invoice tools</h2>
+    <span class="rail">
+      <span class="rail-label">Actions</span>
+      <button class="refresh" aria-label="Refresh invoices"></button><button class="export" aria-label="Export invoices as CSV"></button><button class="trash" aria-label="Delete draft invoice"></button>
+    </span>
+  </section>
+
+  <section class="card">
+    <h2>Billing contact</h2>
+    <div class="row">
+      <div>
+        <label for="contact">Notification address</label>
+        <input type="text" id="contact" value="billing@northwind.example">
+      </div>
+      <button class="ghost-btn" id="revert">Revert</button>
+      <button class="send" id="publish" aria-label="Publish changes">Send</button>
+    </div>
+  </section>
+</main>
+</body>
+</html>

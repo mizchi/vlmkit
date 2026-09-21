@@ -5,6 +5,7 @@ import { createGateRegistry } from "@mizchi/vlmkit-core/plugin/registry.ts";
 import { validateGateDefinition } from "@mizchi/vlmkit-core/plugin/rules.ts";
 import { formatGateHelp } from "@mizchi/vlmkit-core/plugin/runner.ts";
 import { markupGatesPlugin } from "./index.ts";
+import { parseAtPoints } from "./grounding.gate.ts";
 
 /**
  * These assertions are about the *declarations*, not the measurements: they
@@ -487,5 +488,23 @@ describe("check story argument parsing", () => {
     assert.equal(parsed.threshold, 0.005);
     assert.equal(parsed.root, "#root");
     assert.equal(parsed.updateBaseline, false);
+  });
+});
+
+describe("check grounding --at", () => {
+  it("reads every repeat as a screenshot-px point", () => {
+    assert.deepEqual(
+      parseAtPoints(["page.html", "--at", "473,96", "--at", "0, 12"]),
+      [{ x: 473, y: 96 }, { x: 0, y: 12 }],
+    );
+    assert.deepEqual(parseAtPoints(["page.html"]), []);
+  });
+
+  it("rejects a malformed point rather than silently probing nothing", () => {
+    // The failure this guards is a caller checking an answer, getting no probe
+    // row back, and reading the absence as "the coordinate is fine".
+    assert.throws(() => parseAtPoints(["--at", "473"]), UsageError);
+    assert.throws(() => parseAtPoints(["--at", "473x96"]), UsageError);
+    assert.throws(() => parseAtPoints(["--at"]), UsageError);
   });
 });

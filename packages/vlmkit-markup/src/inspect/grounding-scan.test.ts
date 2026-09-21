@@ -101,16 +101,129 @@ test("a click point that routes elsewhere is a suspect naming the interceptor", 
   assert.ok(issue, "expected occluded-target");
   assert.equal(issue!.severity, "suspect");
   assert.match(issue!.message, /div\.cookie-banner/);
-  assert.match(issue!.message, /no point inside the box routes here at all/);
+  assert.match(issue!.message, /no point inside the box routes here/);
   assert.deepEqual(report.targets[0]!.risks, ["occluded-target"]);
 });
 
-test("a partly-reachable target says how much of the box still routes correctly", () => {
+test("a reachable point moves the map's coordinate and the message names both", () => {
+  // v1's whole finding: the map handed out the covered centre, the smaller model
+  // emitted it, and the click activated the interceptor. The row now aims at the
+  // point that reaches the target, and still reports the page as defective.
   const report = analyzeGroundingSamples(
-    input({ targets: [target({ centreHit: false, interceptedBy: "div.toast", hitFraction: 4 / 9 })] }),
+    input({
+      targets: [target({
+        centreHit: false,
+        interceptedBy: "div.promo",
+        hitFraction: 0,
+        reachable: { x: 205, y: 220, room: 8, sampled: 400, clear: 44 },
+      })],
+    }),
     UNSCALED,
   );
-  assert.match(report.issues[0]!.message, /44% of the box still routes here/);
+  const row = report.targets[0]!;
+  assert.deepEqual(row.point, { x: 205, y: 220 }, "the map aims where the click lands");
+  assert.deepEqual(row.aimedOffCentre, { reason: "occluded", centre: { x: 160, y: 220 }, room: 8 });
+  const issue = report.issues.find((i) => i.kind === "occluded-target")!;
+  assert.equal(issue.severity, "suspect", "a covered centre is still a defect");
+  assert.match(issue.message, /covered at its own centre \(160,220\)/);
+  assert.match(issue.message, /aims at \(205,220\) instead, which does reach it, with 8px of room/);
+});
+
+test("a target with no reachable point says so, and says what has to move", () => {
+  const report = analyzeGroundingSamples(
+    input({ targets: [target({ centreHit: false, interceptedBy: "div.veil", hitFraction: 0 })] }),
+    UNSCALED,
+  );
+  const issue = report.issues.find((i) => i.kind === "occluded-target")!;
+  assert.match(issue.message, /no point inside the box routes here, so nothing can click it until div\.veil moves/);
+  assert.equal(report.targets[0]!.aimedOffCentre, undefined);
+});
+
+test("the reachable point is scaled with everything else", () => {
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [target({
+        centreHit: false,
+        interceptedBy: "div.promo",
+        reachable: { x: 205, y: 220, room: 8, sampled: 400, clear: 44 },
+      })],
+    }),
+    { resolution: { maxWidth: 640, maxHeight: 480 } },
+  );
+  assert.deepEqual(report.targets[0]!.point, { x: 103, y: 110 });
+  assert.deepEqual(report.targets[0]!.cssPoint, { x: 205, y: 220 });
+  assert.equal(report.targets[0]!.aimedOffCentre!.room, 4);
+});
+
+test("a clipped target declares its recentred point and its aim budget", () => {
+  // v1's follow-up run: "the click point is silently recentred into the visible
+  // sliver, but only the occlusion case gets an explicit `aimedOffCentre` field
+  // — clipping gets no equivalent margin number, just prose."
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [target({
+        bbox: { x: 100, y: 700, width: 120, height: 40 },
+        clickPoint: { x: 160, y: 710 },
+        clipped: true,
+      })],
+    }),
+    UNSCALED,
+  );
+  const moved = report.targets[0]!.aimedOffCentre!;
+  assert.equal(moved.reason, "clipped");
+  assert.deepEqual(moved.centre, { x: 160, y: 720 }, "the element's own centre, which is off the frame");
+  assert.equal(moved.room, 10, "how far the point can be wrong before it leaves the visible part");
+});
+
+test("an ordinary target is not labelled clipped by a rounding disagreement", () => {
+  // The first version compared the two centres, which are rounded from different
+  // quantities, and reported three nav links and a table button as `clipped`
+  // with 7px of room. The condition is a cut box, not a ±1 difference.
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [target({
+        bbox: { x: 107, y: 7, width: 31, height: 14 },
+        clickPoint: { x: 122, y: 14 },
+      })],
+    }),
+    UNSCALED,
+  );
+  assert.equal(report.targets[0]!.aimedOffCentre, undefined);
+});
+
+test("a cut target's message says the gate never scrolls", () => {
+  // 5 of its 40 px are inside the frame, so it is under the precision floor and
+  // the fold is why — which is exactly when the advice to scroll applies.
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [target({
+        bbox: { x: 100, y: 715, width: 120, height: 40 },
+        clickPoint: { x: 160, y: 717 },
+        clipped: true,
+      })],
+    }),
+    UNSCALED,
+  );
+  // "doesn't clarify whether scrolling occurred during measurement or if the
+  // screenshot is pre-scrolled" — it did not, and now it says so.
+  assert.match(
+    report.issues.find((i) => i.kind === "imprecise-target")!.message,
+    /measures the initial frame and never scrolls, so scroll it into view and re-run/,
+  );
+});
+
+test("findings quote the frame, not the preset's cap", () => {
+  // v1's agent: "every message says 'at medium (640x480)' though the actual
+  // frame is 640x360 … that parenthetical never matches the real frame size, in
+  // every single finding line."
+  const report = analyzeGroundingSamples(
+    input({ targets: [target({ bbox: { x: 10, y: 10, width: 6, height: 6 }, clickPoint: { x: 13, y: 13 } })] }),
+    { resolution: "medium" },
+  );
+  const issue = report.issues.find((i) => i.kind === "imprecise-target")!;
+  assert.match(issue.message, /in the 640x360 frame/);
+  assert.doesNotMatch(issue.message, /640x480/);
+  assert.match(report.frame.resolution, /^medium, cap 640x480$/);
 });
 
 test("a label that forwards the click to its own control is not occlusion", () => {
@@ -314,7 +427,26 @@ test("a target clipped by the viewport is measured on the part that is visible",
     UNSCALED,
   );
   assert.equal(report.targets[0]!.minSide, 4);
-  assert.ok(report.issues.some((i) => i.kind === "imprecise-target"));
+  assert.deepEqual(report.targets[0]!.visibleBox, { x: 100, y: 0, width: 120, height: 4 });
+  const issue = report.issues.find((i) => i.kind === "imprecise-target");
+  assert.ok(issue);
+  // The number quoted is the one that tripped the rule. Printing the element's
+  // own size here read as a contradiction — "is 34x18 screenshot px, under the
+  // 10px floor" — on the first realistic page the gate was pointed at.
+  assert.match(issue!.message, /shows 120x4 screenshot px/);
+  assert.match(issue!.message, /the frame cuts it \(the element is 120x40\)/);
+});
+
+test("a target the frame contains quotes its own size and does not blame the frame", () => {
+  const report = analyzeGroundingSamples(
+    input({ targets: [target({ bbox: { x: 10, y: 10, width: 6, height: 6 }, clickPoint: { x: 13, y: 13 } })] }),
+    UNSCALED,
+  );
+  const issue = report.issues.find((i) => i.kind === "imprecise-target")!;
+  assert.match(issue.message, /shows 6x6 screenshot px/);
+  assert.match(issue.message, /the whole element/);
+  assert.doesNotMatch(issue.message, /frame cuts it/);
+  assert.deepEqual(report.targets[0]!.visibleBox, report.targets[0]!.box);
 });
 
 test("findDisambiguator picks the nearest level that separates every member", () => {
@@ -481,6 +613,61 @@ test("E2E: the groundable fixture reports nothing, and still yields a full map",
   // the point of the pair: passing is a property of the markup, not of the gate
   // being lenient.
   assert.ok(map.every((t) => t.minSide >= 10), map.map((t) => `${t.selector}=${t.minSide}`).join(", "));
+});
+
+test("E2E: a partly covered button gets a point that reaches it, found by sweeping", { timeout: 180_000 }, async () => {
+  // The 3x3 hit test samples 25/50/75% and the veil covers all three, so the
+  // sweep is the only thing between "unreachable" and the 48px that are clear.
+  const report = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html") });
+  const row = report.targets.find((t) => t.selector === "#cta")!;
+  assert.ok(row.aimedOffCentre, "expected the map to aim off the covered centre");
+  assert.ok(row.point.x > row.aimedOffCentre!.centre.x, "the clear part of this button is to the right");
+
+  const probed = await runGroundingScan({
+    source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html"),
+    at: [row.point, row.aimedOffCentre!.centre],
+  });
+  assert.equal(probed.probes![0]!.hit, "#cta", "the point the map hands out reaches the button");
+  assert.equal(probed.probes![1]!.hit, "#veil", "the centre it moved away from does not");
+});
+
+test("E2E: --at answers in screenshot px and names the row it landed on", { timeout: 180_000 }, async () => {
+  const report = await runGroundingScan({
+    source: hostile,
+    at: [{ x: 92, y: 58 }, { x: 10_000, y: 5 }],
+  });
+  assert.equal(report.probes!.length, 2);
+  assert.equal(report.probes![0]!.hit, "#promo", "the covered CTA's centre goes to the ribbon");
+  assert.deepEqual(report.probes![0]!.cssPoint, { x: 184, y: 116 });
+  assert.equal(report.probes![1]!.offFrame, true);
+  // Asked-for only: a run without --at must not imply a clean probe.
+  const plain = await runGroundingScan({ source: hostile });
+  assert.equal(plain.probes, undefined);
+});
+
+test("E2E: a probe says what a click would set off, not just that it is off the map", { timeout: 180_000 }, async () => {
+  const base = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html") });
+  const save = base.targets.find((t) => t.selector === "#save")!;
+  const cta = base.targets.find((t) => t.selector === "#cta")!;
+  const report = await runGroundingScan({
+    source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html"),
+    at: [
+      // On the button's own icon: `elementFromPoint` answers with the child, and
+      // the probe still has to say the click reaches the button.
+      { x: save.box.x + 5, y: save.point.y },
+      // On the veil over the CTA: not a target, and nothing above it is one.
+      cta.aimedOffCentre!.centre,
+      // Empty background.
+      { x: 2, y: 2 },
+    ],
+  });
+  assert.equal(report.probes![0]!.targetId, save.id, "a hit on the icon is a hit on the button");
+  assert.equal(report.probes![1]!.hit, "#veil");
+  assert.equal(report.probes![1]!.targetId, undefined);
+  // "'not a target' means 'not in the actionable list,' not 'safe to slip onto'"
+  // — so the absence of `wouldReach` is the claim, and it is a measured one.
+  assert.equal(report.probes![1]!.wouldReach, undefined, "nothing up to body declares itself interactive");
+  assert.equal(report.probes![2]!.targetId, undefined);
 });
 
 test("E2E: --mark writes the overlay at the frame's own resolution", { timeout: 180_000 }, async () => {

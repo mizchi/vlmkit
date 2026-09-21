@@ -1,0 +1,38 @@
+{
+  "page": "console.html",
+  "viewport": { "width": 1280, "height": 720 },
+  "scale": 0.5,
+  "note": "Withheld from attempts. `selector` is the element the click must reach; a descendant counts, which is what the browser would route anyway.",
+  "tasks": [
+    {
+      "id": "renew",
+      "selector": "#renew-now",
+      "hazard": "occluded-target — a promo ribbon covers the button's left half; only its right part routes"
+    },
+    {
+      "id": "manage-globex",
+      "selector": "table tbody tr:nth-of-type(2) button.manage",
+      "hazard": "ambiguous-target — three rows paint the same 'Manage'; only the row text separates them"
+    },
+    {
+      "id": "export-csv",
+      "selector": "button.export",
+      "hazard": "imprecise-target + crowded-target — 7x7 screenshot px, touching two siblings, one of which deletes"
+    },
+    {
+      "id": "publish",
+      "selector": "#publish",
+      "hazard": "label-mismatch (screen says 'Send', a11y name says 'Publish changes') + cut by the fold"
+    },
+    {
+      "id": "audit-log",
+      "selector": "nav a[href='#audit']",
+      "hazard": "none — an ordinary nav link, the control for the other five"
+    },
+    {
+      "id": "account-menu",
+      "selector": "button.avatar",
+      "hazard": "label-mismatch — painted 'RM', accessible name 'Account menu'"
+    }
+  ]
+}
