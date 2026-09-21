@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 27);
+    assert.equal(r.list().length, 28);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 165 tunable rules in total", async () => {
+  it("declares 178 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -182,8 +182,20 @@ describe("composed built-in registry", () => {
     //       text and every revealed state rather than the visible text — hiding a stale claim does
     //       not retire it. Asked for by a writer re-editing a slide deck who could prove the new
     //       claim was there and had to grep by hand to prove the old one was gone.
+    // 172 → 178: `check composition`, six rules for the composition principles
+    //       geometry can carry. `proximity-inversion` (warn) — a label closer to the block
+    //       above it than to the content it labels, so it groups upward; `rail-near-miss`
+    //       (info) — two of the page's rails 2-8px apart, A12's window applied across
+    //       containers instead of between siblings; `flat-heading-step` (warn) — two
+    //       DECLARED heading levels rendering at one size and weight, so the structure the
+    //       markup asserts is invisible; `no-type-contrast` (warn) — a floor, requiring both
+    //       a size ratio under 1.3x and a weight step under 200; plus `nothing-judged` and
+    //       `redirected`, the two `check design` already carries for the same reasons. Six
+    //       further candidate metrics were measured and rejected for not discriminating —
+    //       docs/design/composition-metrics.md keeps the list, because a rejected metric is
+    //       the more reusable half of that study.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 172);
+    assert.equal(total, 178);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -208,6 +220,7 @@ describe("composed built-in registry", () => {
       "check.animation",
       "check.asset",
       "check.breakpoints",
+      "check.composition",
       "check.copy",
       "check.crater",
       "check.design",

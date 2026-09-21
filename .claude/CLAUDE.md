@@ -297,6 +297,51 @@ fullest layer's boxes (13277px → 8882px on the 32-node graph); two writers rea
 brought the graph to 1805px and 1806px, both asking for the cause in `check`'s warning itself, which it now carries; the module map's own
 count-based canvas guess was replaced by the shared estimator after a kind switch moved a writer's canvas from 986px to 1806px).
 
+## Design quality: the two gates, and which sees what
+
+Two deterministic gates measure "does this look right", on disjoint evidence.
+Run both — neither subsumes the other, and the proof is that `check design`
+prints **byte-identical** findings on `fixtures/composition/proximity-broken.html`
+and on the intact page.
+
+```bash
+vlmkit check design      page.html   # 反復: are components styled consistently (style signatures)
+vlmkit check composition page.html   # 近接/整列/対比: label grouping, page rails, declared type hierarchy
+```
+
+| Principle | Where it lives | The measurable claim |
+|---|---|---|
+| 近接 proximity | `check composition` / `proximity-inversion` (warn) | A label's gap to its content is >=1.5x its gap to the boundary above AND >=8px wider, so it groups upward |
+| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two of the page's rails sit 2-8px apart. A12 in `check integrity` covers the same window between siblings |
+| 反復 repetition | `check design` / `component-drift` | Instances per distinct style signature, below 3x |
+| 対比 contrast | `check composition` / `flat-heading-step`, `no-type-contrast` (warn) | Two DECLARED heading levels render at one size and weight; or nothing is >=1.3x body size and nothing >=200 weight heavier |
+
+Both report **inconsistency, never which value is correct**, and nothing exceeds
+`warn` — taste stays with humans.
+
+### What was rejected, so it does not get re-proposed
+
+Six candidate metrics were measured against paired mutants and thrown out. Read
+`docs/design/composition-metrics.md` before adding a fifth composition rule; the
+two traps worth knowing up front:
+
+- **Per-container alignment is free.** A column rail score is 1.00 on 14 of 16
+  pages, because block layout hands every child the same left edge. Same trap as
+  the 4px-grid metric: it measures CSS, not design.
+- **Two candidates ran BACKWARDS.** Designed pages use *more* font sizes (3-14
+  vs 2-4) and *more* near-equal size pairs than generated ones. Contrast is only
+  judgeable against the hierarchy the page itself declares.
+
+The corpus split `check design` was built on (designed vs agent-built pages) is
+**unusable** for composition: the agent fixtures are app shells with zero
+heading-led groups, so the groups differ by page kind rather than by quality.
+Use paired mutants — break one principle with injected CSS and require the rule
+to fire on that mutant and stay silent on the other seven.
+
+Fixtures: `fixtures/composition/` (one intact page plus one per broken
+principle, each the intact page plus a single overriding rule).
+Report: `docs/reports/2026-09-21-composition-principles-v1.md`.
+
 ## Measuring Gate / Rule Execution Cost
 
 ```bash
@@ -439,7 +484,7 @@ This repository is a pnpm workspace.
 |------|----------|
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 25 of the 27 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 26 of the 28 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -476,7 +521,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the eighteen scene kinds (seventeen structures + `compose`), the annotation ops every kind shares, the timeline layer, embedding. The one page an agent reads before producing a scene |
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 27 gates + 172 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 28 gates + 178 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

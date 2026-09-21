@@ -159,6 +159,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Design-system conformance: hard-coded values vs a token scale | `vlmkit check tokens page.html` |
 | No token file to check against: is the page consistent with *itself*? (one button style or six; spacing on the page's own scale) | `vlmkit check design page.html` |
 | A vendor widget injects DOM outside the app's design system | `vlmkit check design page.html --exclude ".maplibregl-ctrl"`; excluded and unmatched selectors remain visible in the report |
+| Does the spacing *group* what belongs together, do the sections share a rail, does the heading hierarchy render? (近接 / 整列 / 対比) | `vlmkit check composition page.html` — sees defects that leave every style signature untouched, so run it alongside `check design` rather than instead of it |
 | Light/dark theme parity | `vlmkit check theme page.html` |
 | WCAG contrast / touch targets / focus order | `vlmkit check a11y contrast\|touch\|focus page.html` |
 | Layout survives 30% longer strings (i18n) | `vlmkit stress i18n page.html` |

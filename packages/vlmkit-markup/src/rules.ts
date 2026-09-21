@@ -92,6 +92,49 @@ export type {
 } from "./style/design-policy.ts";
 
 // ---------------------------------------------------------------------------
+// check composition — 近接 proximity / 整列 alignment / 対比 contrast
+//
+// The sibling of `check design`, and the split is style vs composition: that
+// one measures whether your buttons render one way, this one whether the
+// spacing groups what belongs together and size encodes priority. They see
+// disjoint defect classes — a heading that has drifted away from the content it
+// labels changes no style signature, so `check design` prints byte-identical
+// findings on the intact and broken pages.
+//
+// The sub-judges are exported individually because they read different shapes
+// of the same sample and a caller may want only one: `measureProximity` needs
+// the parent links, `measureRails` needs only geometry and the viewport width,
+// `measureHierarchy` needs only the heading boxes and the text leaves.
+
+export {
+  COLLECT_COMPOSITION,
+  judgeComposition,
+  measureHierarchy,
+  measureProximity,
+  measureRails,
+  measureSeparation,
+  parseCompositionAllowRules,
+  CONTRAST_MIN_LEAVES,
+  HEADING_STEP,
+  LABEL_HEIGHT_FACTOR,
+  PROXIMITY_FLOOR_PX,
+  PROXIMITY_RATIO,
+  RAIL_NEAR_MAX_PX,
+  RAIL_NEAR_MIN_PX,
+  RANGE_FLOOR,
+  WEIGHT_STEP,
+} from "./style/composition.ts";
+export type {
+  CompositionBox,
+  CompositionFinding,
+  CompositionFindingKind,
+  CompositionInput,
+  CompositionReport,
+  LabelGap,
+  RailNearMiss,
+} from "./style/composition.ts";
+
+// ---------------------------------------------------------------------------
 // check integrity — is the page broken on its own terms
 //
 // Nine judges rather than one, because each reads a different collected shape

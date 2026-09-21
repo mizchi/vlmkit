@@ -24,6 +24,7 @@ describe("markup gate plugin", () => {
         "check animation",
         "check asset",
         "check breakpoints",
+        "check composition",
         "check copy",
         "check design",
         "check drift component",
