@@ -1,0 +1,121 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #155: check grounding: the page as a computer-use agent sees it",
+  "layout": "grid",
+  "canvas": {
+    "width": 781,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "src/cli",
+      "label": "src/cli",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/grounding",
+      "label": "fixtures/grounding",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "fixtures/grounding",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "fixtures/grounding",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "caption": "1/1 check grounding: the page as a computer-use agent sees it"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 20
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1827 −15"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "fixtures/grounding",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 20 files · +1827 −15 · 9 areas, 0 import edges between them"
+    }
+  ]
+}
