@@ -1,0 +1,121 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #157: check composition: the design principles geometry can carry",
+  "layout": "grid",
+  "canvas": {
+    "width": 831,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/composition",
+      "label": "fixtures/composition",
+      "hidden": true
+    },
+    {
+      "id": "src/cli",
+      "label": "src/cli",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/composition",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/composition",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "caption": "1/1 check composition: the design principles geometry can carry"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 23
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2377 −14"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/composition",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 23 files · +2377 −14 · 9 areas, 0 import edges between them"
+    }
+  ]
+}
