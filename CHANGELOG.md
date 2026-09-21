@@ -180,6 +180,89 @@ Dates are YYYY-MM-DD.
   rather than tuned: the `order` score did not catch this defect, since the fragments kept the sheet's relative
   order.
 
+- **`vlmkit check grounding <html|url>`** — the 28th gate, and the first whose findings are denominated in
+  SCREENSHOT pixels rather than CSS ones. A computer-use agent receives a PNG, names a target in words, emits a
+  pixel coordinate, and learns what happened from the next PNG; every other gate measures the page for a human
+  reader or for selector-driven tooling. Seven rules for the three things that decide whether such a turn
+  succeeds: `occluded-target` (suspect — the control is painted, focusable and keyboard-operable, and
+  `elementFromPoint` at its own click point returns the promo strip on top of it; Playwright's `click()` reports
+  the interception, a raw coordinate does not), `ambiguous-target` / `label-mismatch` / `unlabeled-target` (the
+  words resolve to one target, or to six rows that all read `Edit`, or to nothing painted at all), and
+  `imprecise-target` / `crowded-target` (the target survives the downscale — a 24 CSS px control passing WCAG
+  2.5.8 is 12 screenshot px at scale 0.5 and 7 at a 640px cap).
+- **The action map is the positive output**, and it is consumed rather than read: `--json` emits one row per
+  target with its role, the label painted on screen, the click point in screenshot px, the CSS-px point for a
+  caller driving a real browser, and the `risks` on that coordinate — so a caller using the map alone still
+  learns which coordinates not to trust. Deterministic: Playwright hit testing plus pixel arithmetic, no VLM and
+  no API key. The calls a vision model would make here are the ones it gets wrong; the one it cannot make —
+  which element receives a click at (613,284) — is the one that decides the turn.
+- **`--mark <png>`** draws the map onto the screenshot as numbered boxes, red where a row carries a risk: the
+  set-of-mark prompt a vision model grounds against far better than raw pixels. Marks are drawn at the
+  downscaled resolution with the same nearest-neighbour resampling `image-resize.ts` uses, so a mark's position
+  in the file is the click point in the JSON; glyphs come from this repo's own 5x7 bitmap font, so the output is
+  identical on every platform. A target smaller than its own mark gets the mark above it rather than over it.
+- **`--resolution preset|WxH`** declares where the decision is made. With no flag the frame is whatever
+  `resolveResolutionForViewport` picks for the viewport — `medium` (640x480) at 1280 wide, i.e. the downscale
+  this toolkit's own VLM path applies, giving a 640x360 frame at scale 0.5. `--precision-floor` (10) and
+  `--aim-margin` (6) are in the same screenshot pixels.
+- Two false positives the measurement rules out by construction, both found while building it: a `<label>` that
+  forwards its click to the control inside it is not occlusion (otherwise every form on every page reported),
+  and a container that encloses a target is not a neighbour a miss lands on (otherwise every wrapper reported
+  itself crowded by its own child).
+- Deliberately left to its neighbours: WCAG touch size is `check a11y touch` (CSS px, for a finger, with the
+  criteria's exceptions), text under a `pointer-events: none` layer is `check integrity` (that layer takes no
+  clicks, so hit testing calls it clean), keyboard behaviour is `check interactions`, and whether an action had
+  a visible effect is `vlmkit inspect explore`.
+- Fixtures: `fixtures/grounding/agent-hostile.html` trips every rule, `groundable.html` trips none. Docs:
+  `docs/cli-reference.md` (`### Computer use`), `docs/markup-assist.md`, and a routing row in the
+  `markup-assist` skill.
+- **`vlmkit check composition <html|url>`** — the 29th gate: the classical composition principles that geometry
+  can carry. 近接 proximity, 整列 alignment and 対比 contrast, measured from a render with no reference design, no
+  tokens file and no VLM. The sibling of `check design`, and the split is style vs composition — that one asks
+  whether your buttons render one way, this one whether the spacing groups what belongs together and whether
+  size encodes priority. They see disjoint defect classes, and the proof is that `check design` prints
+  **byte-identical** findings on `fixtures/composition/proximity-broken.html` and on the intact page: no style
+  signature changes when a heading's margins move. 反復 repetition is deliberately absent, because
+  `component-drift` already owns it — the same mutant run moved `check design` from 6 to 7 button styles while
+  this gate stayed silent.
+- **Four rules, each with its measured confusion matrix** over 6 designed pages x 8 single-principle CSS
+  mutations (54 runs): `proximity-inversion` (warn — a label whose gap to its content is >=1.5x its gap to the
+  boundary above AND >=8px wider, so it reads as belonging to the block above; 0/6 on the originals, 5/6 on its
+  mutant, **0/24 on the other seven**), `flat-heading-step` (warn — two DECLARED heading levels rendering at one
+  size and weight, so the structure the markup asserts is invisible; 0/6, 5/6, 0/24), `no-type-contrast` (warn —
+  a floor requiring BOTH a size ratio under 1.3x and a weight step under 200, since emphasis carried by weight
+  alone is real emphasis; 0/6, **6/6**, 0/24), and `rail-near-miss` (**info** — two of the page's rails 2-8px
+  apart, which is `check integrity`'s A12 window applied ACROSS containers instead of between siblings). The
+  last is the weak survivor and never carries a verdict: good specificity, 3/6 sensitivity, and a per-element
+  padding change reports through it too. Zero proximity false positives across 16 real pages.
+- **Six candidate metrics were measured and rejected**, which is the more reusable half of the study. Two traps
+  worth the record: a per-container alignment score is **1.00 on 14 of 16 pages**, because block layout hands
+  every child the same left edge (the 4px-grid trap again — it measures CSS, not design); and two contrast
+  candidates ran **backwards**, since designed pages use more font sizes (3-14 vs 2-4) and more near-equal size
+  pairs than generated ones. Contrast is only judgeable against the hierarchy the page itself declares. Also
+  rejected: the group-separation ratio (intact pages span 0.86-3.00 with the mutants inside that range, so it is
+  reported as context and explicitly labelled as not carrying a verdict), text-align disagreement (8 firings on
+  one intact designed page), and section rhythm.
+- **The corpus split `check design` was built on does not work here.** Designed vs agent-built pages is
+  confounded by page KIND: the agent fixtures are app shells with zero heading-led groups, so the groups differ
+  by what kind of page they are rather than by composition quality. Paired mutants replace it — break one
+  principle with injected CSS and require the rule to fire on that mutant and stay silent on the other seven.
+- Four measurement bugs the mutants found, each now a regression test. The one worth naming: **margin
+  collapsing** puts an unbounded `<section>`'s border box exactly on its first heading, so "distance to the
+  parent's top edge" is 0 and the ratio test goes vacuous. Declining to judge those made
+  `proximity-broken.html` report COMPOSED with **zero labels judged**, on a page whose every heading had visibly
+  drifted; fixed by climbing to the parent's own boundary, which also took coverage on
+  `examples/vlmkit-intro-page` from 4 labels to 20.
+- Cross-checked against a vision reader on 14 shuffled screenshots with the key withheld: **8 of 8 agreed with
+  the gate**, including which principle. The two rows that look like reader misses are the strongest — both are
+  mutants whose CSS did not match those pages' structure, and the gate reported nothing there either. A 5px rail
+  split sits at the perceptibility floor, which is what put `rail-near-miss` at `info`.
+- Not done: live-URL validation. The sandbox re-terminates TLS and Chromium rejects the proxy CA, so the
+  false-positive rate on production markup is the largest remaining unknown — which is why nothing here ships
+  above `warn`. Fixtures: `fixtures/composition/` (one intact page plus one per broken principle, each the
+  intact page plus a single overriding rule). Study: `docs/design/composition-metrics.md`. Report:
+  `docs/reports/2026-09-21-composition-principles-v1.md`.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**

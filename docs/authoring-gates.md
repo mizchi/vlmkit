@@ -367,7 +367,7 @@ finding list, while your prose renders from the raw report — so a one-paramete
 formatter prints findings the project turned off, counts them on its own status
 line, and sits above a verdict and an exit code that disagree. The runner detects
 this from your formatter's arity and appends a disclaimer, which is a warning
-label on a screen that contradicts itself rather than a fix. All 27 built-in
+label on a screen that contradicts itself rather than a fix. All 28 built-in
 gates take it; the shortest correct shape is:
 
 ```ts
