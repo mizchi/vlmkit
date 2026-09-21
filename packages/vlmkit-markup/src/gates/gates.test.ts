@@ -29,6 +29,7 @@ describe("markup gate plugin", () => {
         "check drift component",
         "check drift pages",
         "check equivalence",
+        "check grounding",
         "check integrity",
         "check interactions",
         "check layout",

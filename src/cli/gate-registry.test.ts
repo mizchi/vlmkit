@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 27);
+    assert.equal(r.list().length, 28);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 165 tunable rules in total", async () => {
+  it("declares 179 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -182,8 +182,15 @@ describe("composed built-in registry", () => {
     //       text and every revealed state rather than the visible text — hiding a stale claim does
     //       not retire it. Asked for by a writer re-editing a slide deck who could prove the new
     //       claim was there and had to grep by hand to prove the old one was gone.
+    // 172 → 179: `check grounding`, the first gate whose findings are denominated in SCREENSHOT
+    //       pixels rather than CSS ones. `occluded-target` (a click at the target's own centre
+    //       routes elsewhere), `ambiguous-target`, `unlabeled-target`, `imprecise-target`,
+    //       `crowded-target`, `label-mismatch`, and the shared `redirected`. None of them
+    //       duplicates a neighbour: `check a11y touch` measures CSS px for a finger,
+    //       `check interactions` drives the keyboard, and `scan handlers` hit-tests drop
+    //       targets only — this is the same question asked of every click an agent aims by eye.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 172);
+    assert.equal(total, 179);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -214,6 +221,7 @@ describe("composed built-in registry", () => {
       "check.drift.component",
       "check.drift.pages",
       "check.equivalence",
+      "check.grounding",
       "check.integrity",
       "check.interactions",
       "check.layout",
