@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Groundable controls</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; color: #111; background: #fff; }
+  h1 { font-size: 18px; margin: 0 0 16px; }
+  section { margin-bottom: 28px; }
+  table { border-collapse: collapse; }
+  td { border-bottom: 1px solid #e5e5e5; padding: 6px 12px; }
+  button { min-height: 36px; padding: 0 16px; font-size: 14px; }
+  .row-actions { display: flex; gap: 12px; }
+  .row-actions button { min-width: 36px; }
+</style>
+</head>
+<body>
+<h1>Groundable controls</h1>
+
+<section>
+  <button id="checkout">Proceed to checkout</button>
+</section>
+
+<section>
+  <table>
+    <tr><td>ACME Corp</td><td><button aria-label="Edit ACME Corp">Edit ACME Corp</button></td></tr>
+    <tr><td>Globex</td><td><button aria-label="Edit Globex">Edit Globex</button></td></tr>
+  </table>
+</section>
+
+<section>
+  <span class="row-actions">
+    <button aria-label="Archive">Archive</button>
+    <button aria-label="Delete">Delete</button>
+  </span>
+</section>
+
+<section>
+  <button id="send" aria-label="Submit application">Submit application</button>
+</section>
+</body>
+</html>

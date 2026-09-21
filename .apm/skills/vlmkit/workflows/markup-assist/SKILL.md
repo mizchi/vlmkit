@@ -46,6 +46,7 @@ nothing — failing on a suspect is the default.
 | Drag and drop wired but unfireable (a `dragstart` source that is not draggable, a `drop` target with no `dragover`) | `vlmkit scan handlers page.html` |
 | Drag and drop that looks wired but is not (`dragover` without `preventDefault`, `dragstart` transferring nothing) | `vlmkit scan handlers page.html --probe-drag` |
 | A scripted flow reaches its post-conditions | `vlmkit verify flow page.html --flow flow.json` |
+| Can an agent that only sees a screenshot click the right thing? (a control whose own centre routes to an overlay, six rows that all read `Edit`, a target too small at the resolution the model reads) | `vlmkit check grounding page.html` |
 
 **Against a target design:**
 

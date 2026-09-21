@@ -469,6 +469,7 @@ vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow s
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
+vlmkit check grounding     <html|url>          # Screenshot-space action map for a computer-use agent (see below)
 vlmkit check drift component <html> --selector .card
 vlmkit check drift pages     --selector .footer --files A.html B.html C.html
 ```
@@ -613,7 +614,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-27 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+28 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
@@ -668,6 +669,72 @@ separate baselines — pick one spelling and list it in `vlmkit.gates.json`).
 
 Runnable example plus a React + Vite gallery to copy:
 [`examples/story-gallery/`](../examples/story-gallery/).
+
+### Computer use (`check grounding`)
+
+```bash
+# The page as a screenshot-driven agent sees it: an action map in screenshot px.
+vlmkit check grounding http://localhost:5173/
+
+# The resolution the model actually reads the image at.
+vlmkit check grounding <url> --resolution 1024x768
+vlmkit check grounding <url> --resolution medium        # a preset from image-resize.ts
+
+# The action map as JSON, and as a numbered overlay on the screenshot.
+vlmkit check grounding <url> --json
+vlmkit check grounding <url> --mark marked.png
+```
+
+A computer-use agent receives a PNG, names a target in words, emits a pixel
+coordinate, and learns what happened from the next PNG. Every other gate here
+measures the page for a human reader or for selector-driven tooling, and three
+things that decide whether the agent's turn succeeds are invisible to all of
+them:
+
+- **The coordinate it emits is the one the browser routes.** A control can be
+  painted, focusable and keyboard-operable while `elementFromPoint` at its own
+  centre returns a cookie banner. Playwright's `click()` would report the
+  interception; an agent sending a raw coordinate just reads someone else's
+  dialog back. → `occluded-target` (suspect).
+- **The words it uses resolve to one target.** "Click Edit" is unanswerable when
+  six rows each paint `Edit`. The message names the surrounding text that would
+  disambiguate them, because that is what an accessible name should carry.
+  → `ambiguous-target`, `label-mismatch`, `unlabeled-target`.
+- **The screenshot it is given still resolves the target.** The PNG is
+  downscaled before the model reads it, so a 24 CSS px control — passing WCAG
+  2.5.8 and `check a11y touch` — is 12 screenshot px at scale 0.5 and 7 at a
+  640px cap. → `imprecise-target`, `crowded-target`.
+
+The positive output is the **action map**, which is the part an agent consumes
+rather than reads: `--json` emits one row per target with its role, the label
+painted on screen, the click point in screenshot px, the CSS-px point for a
+caller driving a real browser, and the `risks` attached to that coordinate — so
+a caller using the map alone still learns which coordinates not to trust. No VLM
+and no API key: the judgement calls a vision model would make here are the ones
+it gets wrong, and the ones it cannot make ("which element receives a click at
+613,284?") are the ones that decide the turn.
+
+`--mark <png>` draws the same map onto the screenshot as numbered boxes, red
+where a row carries a risk — the set-of-mark prompt a vision model grounds
+against far more reliably than raw pixels. Marks are drawn at the downscaled
+resolution with the same nearest-neighbour resampling `image-resize.ts` uses, so
+a mark's position in the file is the click point in the JSON.
+
+Defaults: the viewport is `1280x720`, and with no `--resolution` the frame is
+whatever `resolveResolutionForViewport` picks for it — `medium` (640x480) at
+that width, i.e. the downscale this toolkit's own VLM path applies, giving a
+640x360 frame at scale 0.5. `--precision-floor` (10) and `--aim-margin` (6) are
+both in screenshot px.
+
+What it deliberately leaves to its neighbours: WCAG touch size is
+`check a11y touch` (CSS px, for a finger, with the criteria's exceptions), text
+painted over by a `pointer-events: none` layer is `check integrity` (that layer
+takes no clicks, so hit testing calls it clean), keyboard behaviour is
+`check interactions`, and whether an action had a visible effect is
+`vlmkit inspect explore`.
+
+Fixtures: [`fixtures/grounding/`](../fixtures/grounding/) — `agent-hostile.html`
+trips every rule, `groundable.html` trips none.
 
 ### Cost (which gates and rules your CI is paying for)
 

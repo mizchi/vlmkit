@@ -180,6 +180,43 @@ Dates are YYYY-MM-DD.
   rather than tuned: the `order` score did not catch this defect, since the fragments kept the sheet's relative
   order.
 
+- **`vlmkit check grounding <html|url>`** — the 28th gate, and the first whose findings are denominated in
+  SCREENSHOT pixels rather than CSS ones. A computer-use agent receives a PNG, names a target in words, emits a
+  pixel coordinate, and learns what happened from the next PNG; every other gate measures the page for a human
+  reader or for selector-driven tooling. Seven rules for the three things that decide whether such a turn
+  succeeds: `occluded-target` (suspect — the control is painted, focusable and keyboard-operable, and
+  `elementFromPoint` at its own click point returns the promo strip on top of it; Playwright's `click()` reports
+  the interception, a raw coordinate does not), `ambiguous-target` / `label-mismatch` / `unlabeled-target` (the
+  words resolve to one target, or to six rows that all read `Edit`, or to nothing painted at all), and
+  `imprecise-target` / `crowded-target` (the target survives the downscale — a 24 CSS px control passing WCAG
+  2.5.8 is 12 screenshot px at scale 0.5 and 7 at a 640px cap).
+- **The action map is the positive output**, and it is consumed rather than read: `--json` emits one row per
+  target with its role, the label painted on screen, the click point in screenshot px, the CSS-px point for a
+  caller driving a real browser, and the `risks` on that coordinate — so a caller using the map alone still
+  learns which coordinates not to trust. Deterministic: Playwright hit testing plus pixel arithmetic, no VLM and
+  no API key. The calls a vision model would make here are the ones it gets wrong; the one it cannot make —
+  which element receives a click at (613,284) — is the one that decides the turn.
+- **`--mark <png>`** draws the map onto the screenshot as numbered boxes, red where a row carries a risk: the
+  set-of-mark prompt a vision model grounds against far better than raw pixels. Marks are drawn at the
+  downscaled resolution with the same nearest-neighbour resampling `image-resize.ts` uses, so a mark's position
+  in the file is the click point in the JSON; glyphs come from this repo's own 5x7 bitmap font, so the output is
+  identical on every platform. A target smaller than its own mark gets the mark above it rather than over it.
+- **`--resolution preset|WxH`** declares where the decision is made. With no flag the frame is whatever
+  `resolveResolutionForViewport` picks for the viewport — `medium` (640x480) at 1280 wide, i.e. the downscale
+  this toolkit's own VLM path applies, giving a 640x360 frame at scale 0.5. `--precision-floor` (10) and
+  `--aim-margin` (6) are in the same screenshot pixels.
+- Two false positives the measurement rules out by construction, both found while building it: a `<label>` that
+  forwards its click to the control inside it is not occlusion (otherwise every form on every page reported),
+  and a container that encloses a target is not a neighbour a miss lands on (otherwise every wrapper reported
+  itself crowded by its own child).
+- Deliberately left to its neighbours: WCAG touch size is `check a11y touch` (CSS px, for a finger, with the
+  criteria's exceptions), text under a `pointer-events: none` layer is `check integrity` (that layer takes no
+  clicks, so hit testing calls it clean), keyboard behaviour is `check interactions`, and whether an action had
+  a visible effect is `vlmkit inspect explore`.
+- Fixtures: `fixtures/grounding/agent-hostile.html` trips every rule, `groundable.html` trips none. Docs:
+  `docs/cli-reference.md` (`### Computer use`), `docs/markup-assist.md`, and a routing row in the
+  `markup-assist` skill.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**

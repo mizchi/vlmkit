@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent-hostile controls</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; color: #111; background: #fff; }
+  h1 { font-size: 18px; margin: 0 0 16px; }
+  section { margin-bottom: 28px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #666; margin: 0 0 8px; }
+  table { border-collapse: collapse; }
+  td { border-bottom: 1px solid #e5e5e5; padding: 6px 12px; }
+
+  /* occluded-target: a promo strip sits over the primary CTA and takes its clicks. */
+  .cta-wrap { position: relative; width: 320px; height: 44px; }
+  .cta { width: 320px; height: 44px; font-size: 15px; }
+  .promo {
+    position: absolute; inset: -4px -4px -4px -4px;
+    background: rgba(255, 214, 0, .35); border: 1px solid #e0b700;
+  }
+
+  /* imprecise-target: an 8px dismiss control. */
+  .dismiss { width: 8px; height: 8px; padding: 0; border: 1px solid #999; background: #fff; }
+
+  /* crowded-target: two 10px row actions with no gap between them. */
+  .row-actions { display: flex; gap: 0; }
+  .row-actions button { width: 10px; height: 10px; padding: 0; border: 0; }
+  .row-actions .edit { background: #2563eb; }
+  .row-actions .del { background: #dc2626; }
+
+  /* unlabeled-target: sized, focusable, and paints nothing at all. */
+  .ghost {
+    display: inline-block; width: 90px; height: 24px;
+    background: none; border: 0; text-decoration: none;
+  }
+</style>
+</head>
+<body>
+<h1>Agent-hostile controls</h1>
+
+<section>
+  <h2>Covered call to action</h2>
+  <div class="cta-wrap">
+    <button class="cta" id="checkout">Proceed to checkout</button>
+    <div class="promo" id="promo"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Repeated row labels</h2>
+  <table>
+    <tr><td>ACME Corp</td><td><button class="edit-row">Edit</button></td></tr>
+    <tr><td>Globex</td><td><button class="edit-row">Edit</button></td></tr>
+    <tr><td>Initech</td><td><button class="edit-row">Edit</button></td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Sub-pixel and crowded controls</h2>
+  <button class="dismiss" aria-label="Dismiss notice"></button>
+  <span class="row-actions">
+    <button class="edit" aria-label="Edit item"></button><button class="del" aria-label="Delete item"></button>
+  </span>
+</section>
+
+<section>
+  <h2>Invisible affordance</h2>
+  <a class="ghost" href="#main" aria-label="Skip to main content"></a>
+</section>
+
+<section>
+  <h2>Screen text and accessible name disagree</h2>
+  <button id="send" aria-label="Submit application">Send</button>
+</section>
+</body>
+</html>
