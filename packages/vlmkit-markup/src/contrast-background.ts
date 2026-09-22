@@ -53,11 +53,86 @@
  * fragment that stops being valid JavaScript.
  */
 export const CONTRAST_BACKGROUND_JS = `
+  var __colorCtx;
+  function __colorContext() {
+    if (__colorCtx === undefined) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+        __colorCtx = canvas.getContext("2d", { willReadFrequently: true }) || null;
+      } catch (e) {
+        __colorCtx = null;
+      }
+    }
+    return __colorCtx;
+  }
+  function __acceptsColor(ctx, s) {
+    // Assigning an invalid value to fillStyle leaves the previous one in place, so
+    // two different sentinels tell "the browser rejected this" apart from "the value
+    // happens to equal the sentinel". One sentinel is not enough: #010203 would read
+    // as rejected.
+    ctx.fillStyle = "#010203";
+    ctx.fillStyle = s;
+    if (ctx.fillStyle !== "#010203") return true;
+    ctx.fillStyle = "#040506";
+    ctx.fillStyle = s;
+    return ctx.fillStyle !== "#040506";
+  }
   function parseColor(s) {
-    const m = (s || "").match(/rgba?\\(([^)]+)\\)/);
-    if (!m) return null;
-    const p = m[1].split(",").map(parseFloat);
-    return [p[0], p[1], p[2], p[3] === undefined ? 1 : p[3]];
+    s = (s || "").trim();
+    if (s === "") return null;
+    // rgb()/rgba() is what getComputedStyle serialises legacy colours to, and it is
+    // exact, so it stays the fast path — no canvas, no rounding, no allocation per
+    // element. The separator class covers the space/slash form too.
+    const m = s.match(/rgba?\\(([^)]+)\\)/);
+    if (m) {
+      const p = m[1].split(/[,\\/\\s]+/).map(parseFloat).filter(function (n) { return Number.isFinite(n); });
+      if (p.length >= 3) return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+    }
+    // Everything else — lab(), oklch(), color(srgb …), color-mix(), hsl(), a hex, a
+    // named colour — is handed to the browser and read back as the sRGB it paints.
+    //
+    // This branch is why the file exists in its current form. getComputedStyle does
+    // NOT normalise non-legacy colour functions to rgb(): Chromium returns
+    // lab(1.90334 0.278696 -5.48866) for a Tailwind v4 oklch() token, verbatim. The
+    // rgb()-only regex above returned null for those, and every caller drops a colour
+    // it cannot parse — so on the Tailwind docs page 'check a11y contrast' inspected
+    // TEN text-bearing elements out of 1068 visible boxes and called the page clean.
+    // Not even a refusal: the composite counter said 1, and the other ~850 appeared in
+    // no count at all. Exactly the failure this file's header calls unacceptable, one
+    // colour syntax later.
+    //
+    // fillStyle alone is not enough — it round-trips lab() as lab(). Filling a pixel
+    // and reading it back is, because rasterising is the browser's own conversion and
+    // gamut mapping, which is the colour a reader actually sees and the sRGB that WCAG
+    // luminance is defined on.
+    const ctx = __colorContext();
+    if (!ctx) return null;
+    try {
+      if (!__acceptsColor(ctx, s)) return null;
+      const fill = ctx.fillStyle;
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, 1, 1);
+      const px = ctx.getImageData(0, 0, 1, 1).data;
+      const alpha = px[3] / 255;
+      if (alpha <= 0) return [0, 0, 0, 0];
+      if (alpha > 0.998) return [px[0], px[1], px[2], 1];
+      // Under full opacity those bytes are premultiplied, which costs about a unit per
+      // channel. Re-draw over opaque black and divide the alpha back out so a
+      // translucent oklch() is as accurate as an rgba() literal.
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, 1, 1);
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, 1, 1);
+      const over = ctx.getImageData(0, 0, 1, 1).data;
+      return [over[0] / alpha, over[1] / alpha, over[2] / alpha, alpha];
+    } catch (e) {
+      // A canvas that refuses getImageData leaves us where the regex did. Returning
+      // null is the honest answer; it is the caller's business to count it.
+      return null;
+    }
   }
   function blendColor(base, over) {
     const a = over[3];

@@ -231,10 +231,11 @@ Dates are YYYY-MM-DD.
   mutant, **0/24 on the other seven**), `flat-heading-step` (warn — two DECLARED heading levels rendering at one
   size and weight, so the structure the markup asserts is invisible; 0/6, 5/6, 0/24), `no-type-contrast` (warn —
   a floor requiring BOTH a size ratio under 1.3x and a weight step under 200, since emphasis carried by weight
-  alone is real emphasis; 0/6, **6/6**, 0/24), and `rail-near-miss` (**info** — two of the page's rails 2-8px
-  apart, which is `check integrity`'s A12 window applied ACROSS containers instead of between siblings). The
-  last is the weak survivor and never carries a verdict: good specificity, 3/6 sensitivity, and a per-element
-  padding change reports through it too. Zero proximity false positives across 16 real pages.
+  alone is real emphasis; 0/6, **6/6**, 0/24), and `rail-near-miss` (**info** — two SIBLINGS on rails 2-8px
+  apart, so the same edge was available to both; `check integrity`'s A12 window, and the finding names the
+  container whose children disagree). The last is the weak survivor and never carries a verdict: good
+  specificity, 3/6 sensitivity, and a per-element padding change reports through it too. Zero proximity false
+  positives across 16 real pages.
 - **Six candidate metrics were measured and rejected**, which is the more reusable half of the study. Two traps
   worth the record: a per-container alignment score is **1.00 on 14 of 16 pages**, because block layout hands
   every child the same left edge (the 4px-grid trap again — it measures CSS, not design); and two contrast
@@ -257,11 +258,67 @@ Dates are YYYY-MM-DD.
   the gate**, including which principle. The two rows that look like reader misses are the strongest — both are
   mutants whose CSS did not match those pages' structure, and the gate reported nothing there either. A 5px rail
   split sits at the perceptibility floor, which is what put `rail-near-miss` at `info`.
-- Not done: live-URL validation. The sandbox re-terminates TLS and Chromium rejects the proxy CA, so the
-  false-positive rate on production markup is the largest remaining unknown — which is why nothing here ships
-  above `warn`. Fixtures: `fixtures/composition/` (one intact page plus one per broken principle, each the
-  intact page plus a single overriding rule). Study: `docs/design/composition-metrics.md`. Report:
-  `docs/reports/2026-09-21-composition-principles-v1.md`.
+- **Then measured on production markup, in two further rounds — and the fixture numbers above did not hold.**
+  The pages are mirrored through `wget --ca-certificate` and served over 127.0.0.1, because Chromium rejects
+  this sandbox's egress CA. On 14 professionally designed pages the verdict flipped on **7, every one a false
+  positive** (v2): a kicker — a breadcrumb or eyebrow set tight above a title on purpose — is now climbed
+  THROUGH by rank rather than measured against, the boundary above a label must be a preceding sibling, and
+  `no-type-contrast` needs the page to declare a heading before it can fail to render one. 13 of 14 clean after.
+  Then every `rail-near-miss` on that corpus was classified (v3): **46 findings, not one a misalignment** — a
+  block against its own ancestor's padding, two unrelated containers, an inline box's prose-wrap edge, or a
+  pair the collector gave no parent. Requiring two siblings takes it to 0 while three alignment mutants keep
+  firing. Two traps recorded there: "ignore ancestor/descendant pairs" is the intuitive fix and silences a real
+  nested indent, and "require equal widths" reaches zero in one line while going blind to an uncompensated
+  margin. One false-positive class is left reporting on purpose (css-tricks' card titles bonded to their dates,
+  gap ratio 5.2 against the mutant's 3.7 — `--allow` is the lever, not a fourth threshold).
+- Fixtures: `fixtures/composition/` (one intact page plus one per broken principle, each the intact page plus a
+  single overriding rule — three for 整列, since one shape of a defect cannot tell a real narrowing from a lucky
+  one). Study: `docs/design/composition-metrics.md`. Reports:
+  `docs/reports/2026-09-21-composition-principles-v1.md`,
+  `docs/reports/2026-09-22-composition-live-corpus-v2.md`,
+  `docs/reports/2026-09-23-composition-rail-classification-v3.md`.
+
+- **`check color`: what each colour is FOR, and where colour alone carries a meaning** (the 30th gate).
+  Extracts the palette by role — surfaces / ink / marks by painted area, plus the **base**, the **body ink**
+  and the **link ink** — then reports the two places colour is doing a job on its own:
+  `control-boundary-invisible` (WCAG 1.4.11 — a text field whose fill or strongest border is under 3:1 against
+  the surface behind it, with no shadow or outline either, so where to type is invisible) and `color-only-link`
+  (WCAG 1.4.1 / G183 — a link inside a flow that holds its own prose, with no underline, weight step, border or
+  fill, under 3:1 against that prose), plus `link-no-cue`, `unreadable-color`, `nothing-judged`, `redirected`.
+  Both judgements carry **WCAG's own 3:1**, not a number this repo chose. Disjoint from `check a11y contrast`
+  by construction, and the proof is measured: that gate **passes every** `color-only-link` this one reports,
+  correctly — caniuse's `#0046d1` note links are 8.2:1 against the page and 2.8:1 against the sentence they sit
+  in. On 14 mirrored designed pages 7 report, and unlike the composition round these are **true positives**,
+  every one verified (three of the nine marginal against the floor, which the report says rather than rounds
+  away). 0.16% firing rate on 4899 links in a flow.
+- **The fix that mattered more than the gate: the shared colour parser could not read modern CSS colour.**
+  `getComputedStyle` does NOT normalise non-legacy colour functions — Chromium returns a Tailwind v4 `oklch()`
+  token as `lab(1.90334 0.278696 -5.48866)` verbatim — and `parseColor` in `CONTRAST_BACKGROUND_JS` matched
+  `rgba?()` only. Every caller drops a colour it cannot parse, so **`check a11y contrast` inspected 10 of 1068
+  elements on tailwindcss.com/docs and called the page clean**, its one "failure" a `#ffffff on #ffffff` artifact
+  of the unreadable background falling through to white. Neither the coverage count nor the composite-refusal
+  count mentioned the ~850 it dropped. It now rasterises one pixel and reads it back, which is the browser's own
+  conversion and gamut mapping: **501 elements inspected, the bogus row gone, four real AA failures found**
+  (`#99a1af` on `#ffffff` at 2.60:1 and two more). `rgb()` keeps an exact fast path; invalid values are told apart
+  with two sentinels, because one would report `#010203` as rejected. `fillStyle` alone does not work — it
+  round-trips `lab()` as `lab()`. Measured scope: 566 of that page's 576 text-bearing elements, 4 `oklch()`
+  backgrounds on MDN, zero on the other 13 pages — narrow in population, **total** where it applies.
+  `check integrity`'s contrast rule shares the helper and was equally blind.
+- **Three colour candidates measured and rejected**, and the first two run backwards — the third time in this
+  project. **base/main/accent against 70:25:5**: all 13 measurable designed pages miss it by **15 to 55 points**,
+  base shares 39.6% to 97.6%, so a rule scoring the slogan reports every one of them as wrong. **Palette sprawl**:
+  3 to 35 distinct colours with no clustering and the most careful pages at the top (Smashing 20 surfaces).
+  **Accent role collision**: fires on 13 of 15, and the collisions are the body ink (Wikipedia 257 static elements
+  and 5 links at `#202122`) — a link in the body colour is the norm. That last rejection paid for itself: it is
+  why `findLinkInk` requires "not the body ink", after ranking interactive ink by count alone named the BODY ink
+  as the link colour on 7 of the 14 pages. Two further extraction corrections needed measuring: the base cannot be
+  the largest DECLARED background (danluu.com declares zero on 625 boxes), and interactive ink is counted once per
+  control, not per box inside it (counting descendants let css-tricks' nav outvote its link colour 404 to 410).
+- Fixtures `fixtures/color/` (one intact page authored in `oklch()`, so it exercises the parser fix end to end,
+  plus one mutant per rule). 23 unit tests on the pure judge, two of which caught real defects before shipping
+  (`findBase` depended on pre-sorted input; the `--allow` path would have crashed on first use), and 2 browser
+  tests on `parseColor` that assert values rather than source — the old parser returns null for 8 of their 9 cases.
+  Report: `docs/reports/2026-09-23-color-roles-v1.md`.
 
 - **The action map's click point is now a coordinate that reaches its target.** When something covers a
   target's centre the collector sweeps the box and returns the middle of the largest clear pocket, with the

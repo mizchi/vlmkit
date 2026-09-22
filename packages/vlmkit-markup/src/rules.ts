@@ -116,11 +116,13 @@ export {
   parseCompositionAllowRules,
   CONTRAST_MIN_LEAVES,
   HEADING_STEP,
+  KICKER_SIZE_RATIO,
   LABEL_HEIGHT_FACTOR,
   PROXIMITY_FLOOR_PX,
   PROXIMITY_RATIO,
   RAIL_NEAR_MAX_PX,
   RAIL_NEAR_MIN_PX,
+  RAIL_WIDTH_FRACTION,
   RANGE_FLOOR,
   WEIGHT_STEP,
 } from "./style/composition.ts";
@@ -133,6 +135,44 @@ export type {
   LabelGap,
   RailNearMiss,
 } from "./style/composition.ts";
+
+// ---------------------------------------------------------------------------
+// check color — what each colour is FOR, and where colour alone carries meaning
+//
+// The third gate in the design-quality family, and the split from its two
+// siblings is the same kind: `check design` measures whether one role renders
+// one way, `check composition` whether spacing groups what belongs together,
+// and this one what a colour's JOB is. It is also disjoint from
+// `check a11y contrast` by construction — that gate measures text against its
+// BACKGROUND and passes every `color-only-link` this one reports, because the
+// criterion it measures is satisfied.
+//
+// The sub-judges are exported individually because they read different shapes of
+// the same sample: `invisibleControls` needs only the control rows,
+// `colorOnlyLinks` only the link rows, and the three finders only the palette.
+
+export {
+  COLLECT_COLOR_ROLES,
+  colorOnlyLinks,
+  findBase,
+  findBodyInk,
+  findLinkInk,
+  invisibleControls,
+  judgeColorRoles,
+  NON_TEXT_CONTRAST_FLOOR,
+  PALETTE_MIN_SHARE,
+  PROSE_FLOOR_CHARS,
+  WEIGHT_CUE_STEP,
+} from "./style/color-roles.ts";
+export type {
+  ColorFinding,
+  ColorFindingKind,
+  ColorRolesInput,
+  ColorRolesReport,
+  ColorUse,
+  ControlBoundary,
+  LinkCue,
+} from "./style/color-roles.ts";
 
 // ---------------------------------------------------------------------------
 // check integrity — is the page broken on its own terms

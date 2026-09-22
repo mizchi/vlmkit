@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>link-color-only</title>
+<style>
+  :root {
+    /* A base, a panel, an accent, and an ink ramp — the four roles the gate
+       extracts. Authored in oklch so the fixture also exercises the colour
+       syntax the shared parser was blind to until 2026-09-23. */
+    --base: oklch(0.99 0.002 250);
+    --panel: #ffffff;
+    --accent: #1145c4;
+    --ink: #16233a;
+    --muted: #5b6b85;
+    --line: #cdd6e4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 16px/1.6 system-ui, sans-serif; color: var(--ink); background: var(--base); }
+  .shell { max-width: 760px; margin: 0 auto; padding: 40px 32px 72px; }
+  h1 { font-size: 34px; margin-bottom: 8px; }
+  h2 { font-size: 22px; margin: 32px 0 8px; }
+  p { margin-bottom: 14px; }
+  /* A link in prose carries TWO cues: the accent AND an underline. Either one
+     alone would satisfy WCAG 1.4.1; both is what a careful page does. */
+  p a { color: var(--accent); text-decoration: underline; }
+  /* WCAG 1.4.1 broken: the underline is removed, so the accent is the ONLY
+     thing marking a link — and the accent against this page's ink is under
+     3:1, which is the number G183 names. Everything else is untouched. */
+  p a { text-decoration: none !important; }
+  .card { padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  /* A field whose boundary is 4.6:1 against the panel behind it. */
+  form { margin-top: 24px; padding: 20px; background: var(--panel); border-radius: 10px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  input[type="email"] { width: 100%; padding: 10px 12px; font: inherit;
+    background: #ffffff; border: 1px solid #6b7280; border-radius: 6px; }
+  button { margin-top: 12px; padding: 10px 18px; font: inherit; color: #ffffff;
+    background: var(--accent); border: 0; border-radius: 6px; }
+  /* A link list: every row is a link, so there is no prose for one to hide in.
+     Undecorated here on purpose — the rule must not report it. */
+  .index a { color: var(--accent); text-decoration: none; }
+  .index li { list-style: none; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <h1>Colour roles</h1>
+    <p class="muted">What each colour in a page is actually for.</p>
+
+    <h2>Links in prose</h2>
+    <p>A page's accent marks what can be clicked, and an
+      <a href="#a">underline carries the same meaning</a> for a reader who does not
+      see the hue. Both cues together is what the intact case looks like, and either
+      one on its own would be enough.</p>
+    <p>A second sentence with <a href="#b">another link inside it</a> so the rule has
+      more than one element to read on this page.</p>
+
+    <h2>A card</h2>
+    <div class="card">
+      <p>Panels sit on the base, and their own boundary is a mark.</p>
+      <p class="muted">Muted ink for what supports the sentence above it.</p>
+    </div>
+
+    <h2>A field</h2>
+    <form>
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@example.com">
+      <button type="submit">Subscribe</button>
+    </form>
+
+    <h2>An index</h2>
+    <ul class="index">
+      <li><a href="#1">2026-09-21 — composition principles</a></li>
+      <li><a href="#2">2026-09-22 — the live corpus</a></li>
+      <li><a href="#3">2026-09-23 — colour roles</a></li>
+    </ul>
+  </div>
+</body>
+</html>

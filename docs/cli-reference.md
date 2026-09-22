@@ -468,6 +468,7 @@ vlmkit check palette       <target.png> [current.png]  # Dominant colors, or pal
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
 vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy
+vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check grounding     <html|url>          # Screenshot-space action map for a computer-use agent (see below)
@@ -615,7 +616,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-29 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+30 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
