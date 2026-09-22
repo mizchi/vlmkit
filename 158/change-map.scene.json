@@ -1,0 +1,65 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #158: Run the unit tests on the roots that hold them",
+  "layout": "grid",
+  "canvas": {
+    "width": 640,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "ci",
+      "label": "ci",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        "ci",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "ci",
+        "tests"
+      ],
+      "caption": "1/1 Run the unit tests on the roots that hold them"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 2
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+113 −0"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "ci",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 2 files · +113 −0 · 2 areas, 0 import edges between them"
+    }
+  ]
+}
