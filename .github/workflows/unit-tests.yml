@@ -1,0 +1,88 @@
+name: Unit tests
+
+# The suite used to be a step inside `vrt-compare.yml`'s `bench` job, which had
+# two consequences worth stating, since both are why this file exists:
+#
+#   1. Its trigger was that workflow's `paths:` list, written for VRT. Four of
+#      the five roots `vitest.config.ts` reads were absent from it, so a PR
+#      confined to `packages/**`, `tests/**`, `examples/**` or `worker/**` ran
+#      no unit tests and reported green. `packages/` alone holds 188 test files.
+#   2. A test failure reported on the PR as a check named `bench` failing,
+#      which reads like the CSS benchmark regressed.
+#
+# `tests/workflow-commands.test.mjs` pins the first: it finds whichever workflow
+# runs a bare `pnpm test` and requires its paths to cover every root derived
+# from the vitest config, so an `include` glob for a new directory fails until
+# this list learns about it.
+on:
+  pull_request:
+    paths:
+      # Every root in `vitest.config.ts`'s `include` — where the tests live.
+      - "src/**"
+      - "packages/**"
+      - "tests/**"
+      - "examples/**"
+      - "worker/**"
+      # Where their INPUTS live. 49 test files read `fixtures/`, more than read
+      # any other directory, and it was covered before this split because
+      # `vrt-compare.yml` needed it for VRT — so dropping it here would have
+      # been a regression rather than a no-op. It is listed by hand because it
+      # cannot be derived: fixtures hold no test files, so the vitest config
+      # never names them, and the per-directory reference counts (fixtures 49,
+      # src 40, packages 21, examples 17, docs 14, tests 10, skills 9,
+      # scripts 8) form a gradient with no defensible cutoff — a threshold
+      # picked to include this one would be a free parameter, not a measurement.
+      - "fixtures/**"
+      # …and what decides how the suite runs at all.
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "vitest.config.ts"
+      - ".github/workflows/unit-tests.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # The suite is ~6 minutes locally and ~8 in the `bench` job it came from;
+    # 20 leaves room for a cold pnpm store without masking a hang.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Measured, not assumed: with `packages/*/dist` removed the suite fails
+      # ~130 tests across 12 files — every one that shells out to the CLI or
+      # imports through a package's `exports` map, which resolves to `dist`.
+      # `markup-core-dispatch` and `markup-core-injection` need the MoonBit
+      # build specifically, so `moon` has to be on PATH before `build:packages`
+      # (otherwise: `spawnSync moon ENOENT`).
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - run: pnpm build:packages
+
+      - run: pnpm test
+
+      # vitest strips types rather than checking them, so the suite passing
+      # says nothing about whether the repo compiles. Nothing in CI ran this
+      # before; a latent type error in a test file shipped once for exactly
+      # that reason.
+      - run: pnpm typecheck

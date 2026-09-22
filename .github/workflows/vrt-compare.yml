@@ -2,25 +2,17 @@ name: VRT Compare
 
 on:
   pull_request:
-    # The `bench` job below runs `pnpm test` — the whole suite — so this list is
-    # also the trigger for every unit test in the repo. It must therefore cover
-    # every root `vitest.config.ts` reads, not just the ones VRT compares:
-    # `src/**` was here and `packages/**`, `tests/**`, `examples/**` and
-    # `worker/**` were not, so a change confined to any of those four ran no
-    # unit tests at all. Nothing had hit it in the previous 25 merged PRs, but
-    # only because each one happened to touch `src/**` or `fixtures/**` as well
-    # — the coverage was a coincidence, not a rule. Pinned by
-    # `tests/workflow-commands.test.mjs`, which derives the required roots from
-    # the vitest config rather than repeating them.
+    # VRT inputs only. The unit-test suite used to run as a step in the `bench`
+    # job below, which made this list the trigger for every test in the repo and
+    # left four of the five roots `vitest.config.ts` reads uncovered. The suite
+    # moved to `unit-tests.yml`, so this list went back to what VRT itself
+    # needs — widening it further would only make a four-job browser workflow
+    # run on changes it does not measure.
     paths:
       - ".github/workflows/**"
       - ".github/vrt-snapshot-ci.config.json"
       - "fixtures/**"
       - "src/**"
-      - "packages/**"
-      - "tests/**"
-      - "examples/**"
-      - "worker/**"
       - "package.json"
   workflow_dispatch:
     inputs:
@@ -227,5 +219,6 @@ jobs:
           node --experimental-strip-types src/cli/vlmkit.ts bench \
             --fixture page --trials 15 --no-db
 
-      - name: Run unit tests
-        run: pnpm test
+      # `pnpm test` used to run here. It is `unit-tests.yml` now: the suite's
+      # trigger should not be this workflow's `paths:` list, and a test failure
+      # should not report as a check named `bench`.
