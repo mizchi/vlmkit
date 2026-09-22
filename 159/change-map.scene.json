@@ -1,0 +1,81 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #159: check composition: the false-positive rate on production markup",
+  "layout": "grid",
+  "canvas": {
+    "width": 640,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".claude",
+        "docs/design",
+        "docs/reports",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs/design",
+        "docs/reports",
+        "markup/src"
+      ],
+      "caption": "1/1 check composition: the false-positive rate on production markup"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 5
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+509 −24"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs/design",
+        "docs/reports",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 5 files · +509 −24 · 4 areas, 0 import edges between them"
+    }
+  ]
+}
