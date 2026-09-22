@@ -1,0 +1,97 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #156: check grounding: a map whose coordinate reaches its own target",
+  "layout": "grid",
+  "canvas": {
+    "width": 1008,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "fixtures/grounding-scenario",
+      "label": "fixtures/grounding-scenario",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/grounding",
+      "label": "fixtures/grounding",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/grounding-scenario",
+        "fixtures/grounding",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/grounding-scenario",
+        "fixtures/grounding",
+        "markup/src"
+      ],
+      "caption": "1/1 check grounding: a map whose coordinate reaches its own target"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 32
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3047 −27"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/grounding-scenario",
+        "fixtures/grounding",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 32 files · +3047 −27 · 6 areas, 0 import edges between them"
+    }
+  ]
+}
