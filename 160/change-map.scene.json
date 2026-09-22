@@ -1,0 +1,186 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #160: check grounding: a row scrolled out of its list is not occluded by html",
+  "layout": "grid",
+  "canvas": {
+    "width": 1008,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "fixtures/grounding-scenario",
+      "label": "fixtures/grounding-scenario",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/grounding",
+      "label": "fixtures/grounding",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        "fixtures/grounding-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "caption": "1/4 grounding-scenario v3: a harness that clicks, and a job that takes three"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 8
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+587 −1"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "caption": "2/4 grounding-scenario v3: attempts g (haiku + tool) and h (control)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 23
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+703 −1"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "caption": "3/4 grounding-scenario v3: attempt f (sonnet + tool)"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 30
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+753 −1"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/grounding",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/grounding-scenario",
+        "fixtures/grounding",
+        "markup/src"
+      ],
+      "caption": "4/4 check grounding: a row scrolled out of its list is not occluded by html"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 36
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1165 −15"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root",
+        "docs",
+        "docs/reports",
+        "fixtures/grounding-scenario",
+        "fixtures/grounding",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "4 commits · 36 files · +1165 −15 · 6 areas, 0 import edges between them"
+    }
+  ]
+}
