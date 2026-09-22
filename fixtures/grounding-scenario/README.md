@@ -122,11 +122,19 @@ not have. `check grounding` reports seven of the twelve tickets as
 They are not occluded. They are clipped by their scroll container, `inFrame` is
 true because their boxes are inside the *viewport*, and `elementFromPoint`
 answers `html` because that is what is painted outside the list's box. The advice
-is unactionable — and the task's own target is one of the seven. Left in place
-for v3 on purpose, on v1's precedent: what an agent does with an incoherent
-"impossible" verdict is what decides whether the fix is a new rule naming the
-container, a smarter interceptor, or a coordinate plus the scroll that reaches
-it.
+is unactionable — and the task's own target is one of the seven. It was left in place for the round on v1's precedent, and what the
+agents did with it decided the fix. `f` refused it — "the actual fix is scrolling
+the list, which the harness supports and the tool never names as an option" — and
+`h`, with no tool at all, specified the replacement: "A DOM-aware tool would have
+told me directly '12 tickets, scrolled to 4/12'". `g` is the one worth keeping:
+it reached the right action from the wrong sentence and filed it as the tool
+helping.
+
+**Fixed in v3.** Visibility is measured against every clipping ancestor, so
+`inFrame` means *painted*; a target a container hides is inventory rather than a
+finding, and carries `clippedBy` — the container, whether it scrolls, and how far.
+The page went from `status: suspect` with seven false suspects to `status: ok`
+with a scroll plan.
 
 ## Rounds
 
@@ -134,6 +142,7 @@ it.
 |---|---|---|---|
 | v1 | `a` sonnet+tool, `b` haiku+tool, `c` sonnet control | 6/6, **5/6**, 5/6 | as merged in [#155](https://github.com/mizchi/vlmkit/pull/155) |
 | v2 | `d` haiku+tool, `e` sonnet+tool | **6/6**, 6/6 | the map aims at a reachable point; `--at`; findings quote the frame |
+| v3 | `f` sonnet+tool, `g` haiku+tool, `h` control — the `inbox.html` flow | 4 actions each, all reached | visibility measured against clipping ancestors; `clippedBy` and the *Out of the frame* block |
 
 v1's two arms failed on **opposite** tasks: the tool won `export-csv`, which the
 image cannot answer (three unlabelled 7x7 colour chips — the control guessed by
