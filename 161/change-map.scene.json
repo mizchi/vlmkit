@@ -1,0 +1,178 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #161: check color (30番目のゲート) と、rail-near-miss が実際に報告していたもの",
+  "layout": "grid",
+  "canvas": {
+    "width": 1082,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/color",
+      "label": "fixtures/color",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "src/cli",
+      "label": "src/cli",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/composition",
+      "label": "fixtures/composition",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".claude",
+        "root",
+        "docs/design",
+        "docs/reports",
+        "fixtures/composition",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "root",
+        "docs/design",
+        "docs/reports",
+        "fixtures/composition",
+        "markup/src"
+      ],
+      "caption": "1/2 check composition: what rail-near-miss was actually reporting"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 9
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+630 −45"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "root",
+        "docs/design",
+        "docs/reports",
+        "fixtures/composition",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        ".apm/skills",
+        "docs",
+        "fixtures/color",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/color",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "caption": "2/2 check color: what each colour is for, and a gate that could not see mod…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 30
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3020 −67"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "root",
+        "docs",
+        "docs/design",
+        "docs/reports",
+        "fixtures/color",
+        "markup/src",
+        "skills/vlmkit",
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 30 files · +3020 −67 · 11 areas, 0 import edges between them"
+    }
+  ]
+}
