@@ -31,10 +31,38 @@ click. A MISS names what the click *would* have activated, so a report can say
 node fixtures/grounding-scenario/score.mjs fixtures/grounding-scenario/attempts/a/answers.json
 ```
 
+## Two kinds of round
+
+**v1–v2 measured one frame**: a screenshot, six things a user asked for, one
+coordinate each, scored by dispatching those coordinates at the live page.
+
+**v3 measures the loop**: a job that takes three actions, a harness that clicks
+and hands back the next screenshot, and a goal scored on the DOM the actions
+actually produced. It exists because v2's report named the two things one frame
+cannot reach — whether an agent can tell its click worked, and a target cut by an
+inner scroll container rather than the page fold.
+
+```sh
+node fixtures/grounding-scenario/act.mjs f click 93,70       # act, get the next shot
+node fixtures/grounding-scenario/act.mjs f wheel 93,120 240  # scroll at a point
+node fixtures/grounding-scenario/act.mjs f reset             # undo everything
+node fixtures/grounding-scenario/score-flow.mjs fixtures/grounding-scenario/attempts/f/session.json
+```
+
+`act.mjs` **replays** rather than holding a browser open: every call reloads the
+page and re-runs the whole action list before doing the new one. That costs a
+second and buys reproducibility from the file alone, resumability after a crash,
+and a scorer that rebuilds the final state instead of trusting the attempt's
+account of it — which matters here, because "did my click work" is the claim
+under test.
+
 ## Layout
 
 - `pages/<name>.html` — the page under test. **Off-limits to every attempt**: it
   is the answer key for half the tasks. Attempts may point tools *at* it.
+- `act.mjs` — the v3 harness: click / wheel / shot / reset, by replay.
+- `score-flow.mjs` — the v3 scorer: replays a session, reads the DOM, checks the
+  goal. Also off-limits.
 - `shots/<name>.png` — the one artifact both arms get: the viewport shot at
   1280x720 and reduced to the resolution `check grounding` reports by default
   for that width (640x360, scale 0.5), with the same resampling `image-resize.ts`
@@ -53,7 +81,7 @@ line of output the attempt acted on (or "the screenshot", or "a guess"). That
 column is where the findings come from: a coordinate being right says less than
 what the agent believed when it wrote it.
 
-## The page and its six tasks
+## `console.html` and its six tasks (v1–v2)
 
 `console.html` is an app screen — a billing console — rather than a synthetic
 hazard board, so the ordinary controls outnumber the traps and a run can be
@@ -69,6 +97,36 @@ scored on both. Four tasks carry a hazard and two are ordinary:
 | `account-menu` | painted `RM`, accessible name `Account menu` |
 
 Every task is answerable: a known-good answer set scores 6/6.
+
+## `inbox.html` and its one job (v3)
+
+A helpdesk inbox. The job is **archive the ticket titled "Payment webhook
+retries"**, reachable in three actions — scroll the list, click the ticket, click
+Archive — and scored on the DOM, with deleting any ticket and archiving the wrong
+one both counting against.
+
+| hazard | why it is here |
+|---|---|
+| the target is the 9th of 12 tickets in a **218px scroll container** | every clipped finding in v1–v2 was the page's own fold; nothing had exercised a target cut by an inner scrollport, and the remedy is an action (`wheel`) rather than a coordinate |
+| `Archive` sits between `Reply` and `Delete` | a miss to the right is irreversible inside a run |
+| `Mark all read` is wired and changes **nothing observable** | no pixels, no DOM, no attribute — an agent that clicks it to test the harness should say it learned nothing, not that the click failed |
+
+The scroll container is the one that found something before any agent ran, and
+it is recorded here because it is the shape of defect a synthetic fixture does
+not have. `check grounding` reports seven of the twelve tickets as
+`occluded-target` with:
+
+> `a click there goes to html — and no point inside the box routes here, so
+> nothing can click it until html moves or drops pointer-events.`
+
+They are not occluded. They are clipped by their scroll container, `inFrame` is
+true because their boxes are inside the *viewport*, and `elementFromPoint`
+answers `html` because that is what is painted outside the list's box. The advice
+is unactionable — and the task's own target is one of the seven. Left in place
+for v3 on purpose, on v1's precedent: what an agent does with an incoherent
+"impossible" verdict is what decides whether the fix is a new rule naming the
+container, a smarter interceptor, or a coordinate plus the scroll that reaches
+it.
 
 ## Rounds
 

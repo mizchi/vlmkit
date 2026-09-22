@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Helpdesk — Inbox</title>
+<style>
+  :root { --ink:#15171c; --muted:#6b7280; --line:#e4e6eb; --accent:#1d4ed8; --bg:#f6f7f9; --card:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  header { background:var(--card); border-bottom:1px solid var(--line); height:52px;
+           display:flex; align-items:center; gap:18px; padding:0 20px; }
+  .brand { font-weight:650; font-size:15px; }
+  .spacer { flex:1; }
+  .mark-all { background:#fff; border:1px solid var(--line); border-radius:6px; height:28px;
+              padding:0 12px; font-size:12px; cursor:pointer; color:var(--muted); }
+  main { display:flex; gap:16px; padding:18px 20px; align-items:flex-start; }
+
+  /* ---- Left: a real scroll container. Nine of twelve tickets are below its edge. ---- */
+  .list-card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+               width:330px; overflow:hidden; }
+  .list-head { padding:12px 14px 8px; font-size:11px; text-transform:uppercase;
+               letter-spacing:.06em; color:var(--muted); font-weight:600;
+               border-bottom:1px solid var(--line); }
+  .list { height:218px; overflow-y:auto; }
+  .ticket { display:block; width:100%; text-align:left; background:#fff; border:0;
+            border-bottom:1px solid var(--line); padding:9px 14px; cursor:pointer; font:inherit; }
+  .ticket:hover { background:#f9fafb; }
+  .ticket[aria-current="true"] { background:#eef2ff; }
+  .ticket .t { font-weight:550; font-size:13px; }
+  .ticket .m { color:var(--muted); font-size:11px; }
+  .ticket[data-state="archived"] .t { text-decoration:line-through; color:var(--muted); }
+
+  /* ---- Right: the detail panel, empty until a ticket is chosen ---- */
+  .detail { background:var(--card); border:1px solid var(--line); border-radius:10px;
+            flex:1; min-height:262px; padding:16px 18px; }
+  .empty { color:var(--muted); font-size:13px; }
+  .detail h2 { font-size:15px; margin:0 0 4px; }
+  .detail .meta { color:var(--muted); font-size:12px; margin:0 0 16px; }
+  .detail .body { font-size:13px; margin:0 0 20px; max-width:46ch; }
+  .actions { display:flex; gap:8px; }
+  .actions button { height:32px; padding:0 14px; border-radius:7px; font-size:13px;
+                    cursor:pointer; border:1px solid var(--line); background:#fff; }
+  .actions .reply { background:var(--accent); color:#fff; border:0; font-weight:600; }
+  .actions .archive { color:#1f2937; }
+  .actions .delete { color:#b91c1c; border-color:#fca5a5; }
+  .flash { margin-top:14px; font-size:12px; color:#047857; }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">Helpdesk</span>
+  <span class="spacer"></span>
+  <!-- Wired, and does nothing anyone can see. -->
+  <button class="mark-all" id="mark-all">Mark all read</button>
+</header>
+
+<main>
+  <section class="list-card">
+    <div class="list-head">Open tickets</div>
+    <div class="list" id="list">
+      <button class="ticket" data-id="t1"><span class="t">Invoice PDF is blank</span><br><span class="m">Acme Freight · 2h</span></button>
+      <button class="ticket" data-id="t2"><span class="t">SSO login loop</span><br><span class="m">Globex Media · 3h</span></button>
+      <button class="ticket" data-id="t3"><span class="t">Export stalls at 80%</span><br><span class="m">Initech Labs · 5h</span></button>
+      <button class="ticket" data-id="t4"><span class="t">Seat count mismatch</span><br><span class="m">Umbrella Co · 6h</span></button>
+      <button class="ticket" data-id="t5"><span class="t">Cannot remove teammate</span><br><span class="m">Soylent · 8h</span></button>
+      <button class="ticket" data-id="t6"><span class="t">Dark mode contrast</span><br><span class="m">Hooli · 9h</span></button>
+      <button class="ticket" data-id="t7"><span class="t">API key rotation docs</span><br><span class="m">Massive Dynamic · 11h</span></button>
+      <button class="ticket" data-id="t8"><span class="t">Webhook signature 401</span><br><span class="m">Stark Industries · 13h</span></button>
+      <button class="ticket" data-id="t9"><span class="t">Payment webhook retries</span><br><span class="m">Wayne Enterprises · 14h</span></button>
+      <button class="ticket" data-id="t10"><span class="t">Slow dashboard on mobile</span><br><span class="m">Cyberdyne · 16h</span></button>
+      <button class="ticket" data-id="t11"><span class="t">CSV encoding garbled</span><br><span class="m">Tyrell Corp · 18h</span></button>
+      <button class="ticket" data-id="t12"><span class="t">Билинг на кириллице</span><br><span class="m">Vandelay · 20h</span></button>
+    </div>
+  </section>
+
+  <section class="detail" id="detail">
+    <p class="empty">Select a ticket to read it.</p>
+  </section>
+</main>
+
+<script>
+  const DETAIL = document.getElementById("detail");
+  const BODIES = {
+    t9: "Retries stop after the third attempt even though the endpoint returns 500. We expect five.",
+  };
+  let current = null;
+
+  document.getElementById("list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".ticket");
+    if (!btn) return;
+    for (const t of document.querySelectorAll(".ticket")) t.removeAttribute("aria-current");
+    btn.setAttribute("aria-current", "true");
+    current = btn;
+    const title = btn.querySelector(".t").textContent;
+    const meta = btn.querySelector(".m").textContent;
+    DETAIL.innerHTML = `
+      <h2 id="detail-title">${title}</h2>
+      <p class="meta">${meta}</p>
+      <p class="body">${BODIES[btn.dataset.id] ?? "No description was attached to this ticket."}</p>
+      <div class="actions">
+        <button class="reply" id="reply">Reply</button>
+        <button class="archive" id="archive">Archive</button>
+        <button class="delete" id="delete">Delete</button>
+      </div>`;
+    DETAIL.querySelector("#archive").addEventListener("click", () => {
+      current.dataset.state = "archived";
+      DETAIL.insertAdjacentHTML("beforeend", `<p class="flash">Archived.</p>`);
+    });
+    DETAIL.querySelector("#delete").addEventListener("click", () => {
+      current.dataset.state = "deleted";
+      current.remove();
+      DETAIL.innerHTML = `<p class="empty">Select a ticket to read it.</p>`;
+    });
+  });
+
+  // Wired, and nothing about it is observable: no pixels, no DOM, no attribute.
+  document.getElementById("mark-all").addEventListener("click", () => { void 0; });
+</script>
+</body>
+</html>
