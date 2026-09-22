@@ -216,6 +216,52 @@ Dates are YYYY-MM-DD.
 - Fixtures: `fixtures/grounding/agent-hostile.html` trips every rule, `groundable.html` trips none. Docs:
   `docs/cli-reference.md` (`### Computer use`), `docs/markup-assist.md`, and a routing row in the
   `markup-assist` skill.
+- **`vlmkit check composition <html|url>`** — the 29th gate: the classical composition principles that geometry
+  can carry. 近接 proximity, 整列 alignment and 対比 contrast, measured from a render with no reference design, no
+  tokens file and no VLM. The sibling of `check design`, and the split is style vs composition — that one asks
+  whether your buttons render one way, this one whether the spacing groups what belongs together and whether
+  size encodes priority. They see disjoint defect classes, and the proof is that `check design` prints
+  **byte-identical** findings on `fixtures/composition/proximity-broken.html` and on the intact page: no style
+  signature changes when a heading's margins move. 反復 repetition is deliberately absent, because
+  `component-drift` already owns it — the same mutant run moved `check design` from 6 to 7 button styles while
+  this gate stayed silent.
+- **Four rules, each with its measured confusion matrix** over 6 designed pages x 8 single-principle CSS
+  mutations (54 runs): `proximity-inversion` (warn — a label whose gap to its content is >=1.5x its gap to the
+  boundary above AND >=8px wider, so it reads as belonging to the block above; 0/6 on the originals, 5/6 on its
+  mutant, **0/24 on the other seven**), `flat-heading-step` (warn — two DECLARED heading levels rendering at one
+  size and weight, so the structure the markup asserts is invisible; 0/6, 5/6, 0/24), `no-type-contrast` (warn —
+  a floor requiring BOTH a size ratio under 1.3x and a weight step under 200, since emphasis carried by weight
+  alone is real emphasis; 0/6, **6/6**, 0/24), and `rail-near-miss` (**info** — two of the page's rails 2-8px
+  apart, which is `check integrity`'s A12 window applied ACROSS containers instead of between siblings). The
+  last is the weak survivor and never carries a verdict: good specificity, 3/6 sensitivity, and a per-element
+  padding change reports through it too. Zero proximity false positives across 16 real pages.
+- **Six candidate metrics were measured and rejected**, which is the more reusable half of the study. Two traps
+  worth the record: a per-container alignment score is **1.00 on 14 of 16 pages**, because block layout hands
+  every child the same left edge (the 4px-grid trap again — it measures CSS, not design); and two contrast
+  candidates ran **backwards**, since designed pages use more font sizes (3-14 vs 2-4) and more near-equal size
+  pairs than generated ones. Contrast is only judgeable against the hierarchy the page itself declares. Also
+  rejected: the group-separation ratio (intact pages span 0.86-3.00 with the mutants inside that range, so it is
+  reported as context and explicitly labelled as not carrying a verdict), text-align disagreement (8 firings on
+  one intact designed page), and section rhythm.
+- **The corpus split `check design` was built on does not work here.** Designed vs agent-built pages is
+  confounded by page KIND: the agent fixtures are app shells with zero heading-led groups, so the groups differ
+  by what kind of page they are rather than by composition quality. Paired mutants replace it — break one
+  principle with injected CSS and require the rule to fire on that mutant and stay silent on the other seven.
+- Four measurement bugs the mutants found, each now a regression test. The one worth naming: **margin
+  collapsing** puts an unbounded `<section>`'s border box exactly on its first heading, so "distance to the
+  parent's top edge" is 0 and the ratio test goes vacuous. Declining to judge those made
+  `proximity-broken.html` report COMPOSED with **zero labels judged**, on a page whose every heading had visibly
+  drifted; fixed by climbing to the parent's own boundary, which also took coverage on
+  `examples/vlmkit-intro-page` from 4 labels to 20.
+- Cross-checked against a vision reader on 14 shuffled screenshots with the key withheld: **8 of 8 agreed with
+  the gate**, including which principle. The two rows that look like reader misses are the strongest — both are
+  mutants whose CSS did not match those pages' structure, and the gate reported nothing there either. A 5px rail
+  split sits at the perceptibility floor, which is what put `rail-near-miss` at `info`.
+- Not done: live-URL validation. The sandbox re-terminates TLS and Chromium rejects the proxy CA, so the
+  false-positive rate on production markup is the largest remaining unknown — which is why nothing here ships
+  above `warn`. Fixtures: `fixtures/composition/` (one intact page plus one per broken principle, each the
+  intact page plus a single overriding rule). Study: `docs/design/composition-metrics.md`. Report:
+  `docs/reports/2026-09-21-composition-principles-v1.md`.
 
 ## 0.22.0 — 2026-09-09
 

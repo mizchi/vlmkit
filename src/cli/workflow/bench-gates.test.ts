@@ -74,13 +74,13 @@ describe("which gates the bench can run", () => {
     assert.equal(isBenchable(stub([{ name: "url", kind: "string", description: "Crater URL" }])), false);
   });
 
-  it("selects 19 of the 28 built-ins, and every one of them takes a page", async () => {
+  it("selects 20 of the 29 built-ins, and every one of them takes a page", async () => {
     // The count is a canary: a new gate that takes a page should join the bench
     // by existing, and one that does not must not be dragged in.
     resetGateRegistryCache();
     const registry = await loadGateRegistry({ builtinsOnly: true });
     const benchable = registry.list().filter(({ gate }) => isBenchable(gate));
-    assert.equal(benchable.length, 19, benchable.map(({ gate }) => gate.id).join(", "));
+    assert.equal(benchable.length, 20, benchable.map(({ gate }) => gate.id).join(", "));
     for (const { gate } of benchable) {
       const positional = (gate.inputs ?? []).find((i) => i.positional === 0);
       assert.equal(positional?.kind, "path-or-url", `${gate.id} positional is not a page`);

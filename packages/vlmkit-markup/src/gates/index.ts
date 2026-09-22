@@ -28,6 +28,7 @@ import { a11yContrastGate, a11yFocusGate, a11yTouchGate } from "./a11y.gate.ts";
 import { animationGate } from "./animation.gate.ts";
 import { assetGate } from "./asset.gate.ts";
 import { breakpointsGate } from "./breakpoints.gate.ts";
+import { compositionGate } from "./composition.gate.ts";
 import { copyGate } from "./copy.gate.ts";
 import { designGate } from "./design.gate.ts";
 import { driftComponentGate, driftPagesGate } from "./drift.gate.ts";
@@ -53,6 +54,7 @@ export {
   animationGate,
   assetGate,
   breakpointsGate,
+  compositionGate,
   copyGate,
   designGate,
   driftComponentGate,
@@ -101,6 +103,7 @@ export const markupGatesPlugin = definePlugin({
     // Decoration and consistency.
     tokensGate,
     designGate,
+    compositionGate,
     themeGate,
     assetGate,
     driftComponentGate,
