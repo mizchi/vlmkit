@@ -33,7 +33,7 @@
         "ci",
         "tests"
       ],
-      "caption": "1/1 Run the unit tests on the roots that hold them"
+      "caption": "1/2 Run the unit tests on the roots that hold them"
     },
     {
       "value": {
@@ -59,7 +59,37 @@
       "ms": 0
     },
     {
-      "note": "1 commit · 2 files · +113 −0 · 2 areas, 0 import edges between them"
+      "highlight": [
+        "ci",
+        "tests"
+      ],
+      "caption": "2/2 Give the unit tests their own workflow"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 3
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+239 −27"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "ci",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 3 files · +239 −27 · 2 areas, 0 import edges between them"
     }
   ]
 }

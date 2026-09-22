@@ -7,11 +7,12 @@
 ![steps](./change-map.sheet.png)
 
 ```
-PR #158: Run the unit tests on the roots that hold them — 4 steps, 1960ms, 8 nodes
+PR #158: Run the unit tests on the roots that hold them — 5 steps, 2660ms, 8 nodes
  1. [    0ms] PR #158: Run the unit tests on the roots that hold them
- 2. [  350ms] 1/1 Run the unit tests on the roots that hold them · files changed = 2 · lines = +113 −0
- 3. [ 1050ms] 1 commit · 2 files · +113 −0 · 2 areas, 0 import edges between them
- 4. [ 1750ms] (end)
+ 2. [  350ms] 1/2 Run the unit tests on the roots that hold them · files changed = 2 · lines = +113 −0
+ 3. [ 1050ms] 2/2 Give the unit tests their own workflow · files changed = 3 · lines = +239 −27
+ 4. [ 1750ms] 2 commits · 3 files · +239 −27 · 2 areas, 0 import edges between them
+ 5. [ 2450ms] (end)
 ```
 
 </details>
