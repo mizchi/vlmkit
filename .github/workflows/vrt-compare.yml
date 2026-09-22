@@ -2,6 +2,12 @@ name: VRT Compare
 
 on:
   pull_request:
+    # VRT inputs only. The unit-test suite used to run as a step in the `bench`
+    # job below, which made this list the trigger for every test in the repo and
+    # left four of the five roots `vitest.config.ts` reads uncovered. The suite
+    # moved to `unit-tests.yml`, so this list went back to what VRT itself
+    # needs — widening it further would only make a four-job browser workflow
+    # run on changes it does not measure.
     paths:
       - ".github/workflows/**"
       - ".github/vrt-snapshot-ci.config.json"
@@ -213,5 +219,6 @@ jobs:
           node --experimental-strip-types src/cli/vlmkit.ts bench \
             --fixture page --trials 15 --no-db
 
-      - name: Run unit tests
-        run: pnpm test
+      # `pnpm test` used to run here. It is `unit-tests.yml` now: the suite's
+      # trigger should not be this workflow's `paths:` list, and a test failure
+      # should not report as a check named `bench`.
