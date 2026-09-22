@@ -181,12 +181,69 @@ otherwise. That measurement is why `rail-near-miss` is `info`.
   buttons rendering identically. Two gates disagreeing about the same
   measurement is worse than a missing rule.
 
-## Limitation on the evidence
+## Validated against production markup
 
-The corpus is 16 local pages plus 54 mutant runs. Live-URL validation against
-real-world designed pages (MDN, web.dev, Hacker News — the previous study's
-reference set) **was not run**: the sandbox re-terminates TLS and the measurement
-browser will not accept the proxy CA, so the pages could not be loaded. The
-false-positive rate on real-world production markup is therefore the largest
-remaining unknown, and the reason every rule here is `warn` or `info` rather
-than `suspect`.
+This section used to say the live-URL round **was not run**, and that the
+false-positive rate on real-world markup was the largest remaining unknown. It
+has been run: `docs/reports/2026-09-22-composition-live-corpus-v2.md`, 14
+professionally designed pages mirrored locally (the sandbox re-terminates TLS
+and the measurement browser rejects the proxy CA, so the pages come down through
+`wget --ca-certificate` and are served back over 127.0.0.1 — the same mirroring
+the original design-policy study used).
+
+**The first run flipped the verdict on 7 of 14 designed pages.** Every one of
+those findings was a false positive, and they fell into three mechanisms, all of
+which are now fixed and pinned as regressions:
+
+| mechanism | pages | fix |
+|---|---|---|
+| The block above the heading is a **kicker** — a breadcrumb, date, byline or eyebrow that belongs to the title. Set tight above it ON PURPOSE. | 6 | Climb through a block whose type is at most half the label's size (`KICKER_SIZE_RATIO`) |
+| The label **opens its group**, so the boundary measured was its container's padding-top — not a thing it could be mis-grouped with | 2 | The boundary must be a preceding SIBLING; otherwise unjudgeable |
+| The page **declares no heading at all**, so "nothing reads as the most important" describes a list rather than finding a defect | 1 | `no-type-contrast` requires ≥1 declared heading |
+
+After the fixes: **13 of 14 clean**, and all five committed fixtures still
+discriminate exactly as before — `proximity-broken` still reports 4 inversions,
+the intact page still reports none.
+
+### The fix that had to be un-made
+
+The kicker test was first written as "short text and a smaller font". That is
+wrong in the direction that matters: a 74-character paragraph is short, and body
+text is *always* smaller than a heading, so it absorbed ordinary prose and then
+measured the gap above *that* — inventing `before: 16` on web.dev's
+`h2#monitor_lcp_breakdown_in_javascript`, where the rendered gaps are 32 above
+and 32 below. Equal. No inversion at all.
+
+What separates a kicker from a peer is **rank, not length**, and the two
+populations are not close: breadcrumb-over-title measures 3.0x (16px under a
+48px h1, on both web.dev and developer.chrome.com), body-prose-over-heading
+1.5x, and a CodePen embed over an h3 1.67x. The cut at 2.0 has margin on both
+sides. `textContent` length is a bad proxy for "short" anyway — that same
+`devsite-article-meta` is one 24px line carrying 357 characters, most of them in
+markup a reader never sees.
+
+### The residual class, and why it is not fixed
+
+One page still reports: css-tricks' related-post cards, five identical
+instances of
+
+```
+FLEXBOX  IMAGES            <- tag row
+Article on Oct 3, 2019     <- <time>, 7.7px above the title
+Adaptive Photo Layout…     <- h3, the card's payload
+                           <- 40px (an authored margin-top on the byline)
+[avatar] Tim Van Damme     <- flush to the card's content bottom
+```
+
+The rule's premise is that a heading labels what follows it. In a card the
+heading **is** the payload: `[tags, date, title]` is the head and the byline is a
+separate group, deliberately pushed away. So the finding is a false positive —
+and geometry cannot tell it from a true one. Its gap ratio is **5.2** (7.7 →
+40), *higher* than the paired mutant's 3.7 (12 → 44), and its absolute gap above
+(7.7px) sits close enough to the mutant's (12px) that any floor drawn between
+them would be a free parameter tuned to the answer already wanted — the exact
+trap this document records for grid conformance. It is left reporting, with the
+mechanism written down, and `--allow "<selector>;<reason>"` is the lever for it.
+
+That is the honest state of the rule: quiet on 13 of 14 production pages, and
+unable to distinguish a card title from a drifted label.

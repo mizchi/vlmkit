@@ -461,26 +461,116 @@ interface GapAbove {
  * (nothing above it to mis-group with, so there is nothing to judge), or offers
  * genuine padding of its own.
  */
+/**
+ * Is this block a KICKER — part of the label's own title block rather than
+ * material the label could be mis-grouped with?
+ *
+ * The breadcrumb / date / eyebrow / byline above a heading is set tight against
+ * it ON PURPOSE: the two read as one title block, and the wider gap below the
+ * heading separates that block from the body. Measuring the heading against the
+ * kicker therefore reports the most conventional editorial layout on the web as
+ * a proximity inversion, which is what the live corpus showed — 6 of 14
+ * professionally designed pages, every one of them on exactly this shape:
+ *
+ *     Home > Articles > Resources          <- breadcrumb, 16px above the title
+ *     Optimize Largest Contentful Paint    <- h1
+ *                                          <- 32px, then the body
+ *
+ * (web.dev and developer.chrome.com's `devsite-article-meta`, css-tricks'
+ * `breadcrumbs` and its cards' `<time>`, tailwindcss' eyebrow `p.flex`.)
+ *
+ * Subordinate is the whole test, and it is deliberately two-sided: short text
+ * AND a smaller font than the heading. A competing content block is either long
+ * (a paragraph) or set at the heading's own scale (another heading).
+ */
+/**
+ * How much smaller than its label a block must be to read as part of the label's
+ * own title block rather than as a competing group.
+ *
+ * Measured on the live corpus, and the point is that the two populations are not
+ * close. Breadcrumb/meta lines above a page title: web.dev and
+ * developer.chrome.com both render a 16px `devsite-article-meta` above a 48px
+ * h1 — a ratio of **3.0**. Ordinary body prose above a section heading: a 16px
+ * `<p>` above a 24px h2 on the same two pages, **1.5**, and a 19.2px CodePen
+ * embed above a 32px h3 on css-tricks, **1.67**. A cut at 2.0 has real margin on
+ * both sides; it is a qualitative step ("at most half the label's size"), not a
+ * value tuned until the answer came out right.
+ *
+ * Length was tried first and was WRONG, in the direction that matters. A
+ * 74-character paragraph is "short", and body text is of course smaller than a
+ * heading, so a char-limit test absorbed ordinary prose: on web.dev it climbed
+ * past the paragraph above `h2#monitor_lcp_breakdown_in_javascript` and reported
+ * `before: 16` where the rendered gaps are 32 above and 32 below — equal, and no
+ * inversion at all. The test has to be about the block's RANK, not its size on
+ * the page. (`textContent` length is a bad proxy for "short" anyway: that same
+ * `devsite-article-meta` is one 24px line carrying 357 characters, most of them
+ * in markup a reader never sees.)
+ */
+const KICKER_SIZE_RATIO = 2;
+function isKicker(
+  prev: CompositionBox,
+  labelFontSize: number,
+  kids: Map<number, CompositionBox[]>,
+): boolean {
+  if (prev.textLen === 0) return false;
+  const prevFont = maxFont(prev, kids);
+  if (prevFont <= 0) return false;
+  // A kicker is a line of type, not a block with its own content: a 450px
+  // CodePen embed is excluded by the ratio above, but say it directly too.
+  if (prev.h > prevFont * LABEL_HEIGHT_FACTOR) return false;
+  return labelFontSize / prevFont >= KICKER_SIZE_RATIO;
+}
+
+/**
+ * How far above this label the nearest block it could be MIS-GROUPED with sits.
+ *
+ * Two properties, both learned from the live corpus rather than from the
+ * fixtures:
+ *
+ *   - The answer is always a preceding SIBLING, never a container's padding
+ *     edge. A label that opens its group has nothing above it inside that group,
+ *     so comparing its container's padding-top against the gap below it compares
+ *     two unlike things — that reported w3c-apg's page title (4.7px of `main`
+ *     padding vs 27.5px to the body) and nngroup's footer heading. When the
+ *     climb runs out of siblings the label is unjudgeable, and says so.
+ *   - A kicker is climbed THROUGH, not measured against, because it belongs to
+ *     the label (see `isKicker`).
+ *
+ * The climb itself is still there for margin collapsing: an unbounded
+ * `<section>`'s border box begins exactly where its first heading does, so the
+ * section's own preceding sibling is the real boundary. Without it,
+ * `fixtures/composition/proximity-broken.html` reported COMPOSED with zero
+ * labels judged.
+ */
 function gapAbove(
   box: CompositionBox,
   boxes: readonly CompositionBox[],
   slots: Map<number, StackSlot>,
+  kids: Map<number, CompositionBox[]>,
+  labelFontSize: number,
 ): GapAbove | null {
   let cur = box;
   // Bounded: a pathological tree cannot spin here, and eight levels of
-  // coincident wrappers is already far past anything real.
+  // coincident wrappers or stacked kickers is already far past anything real.
   for (let climbed = 0; climbed < 8; climbed++) {
     const slot = slots.get(cur.i);
     if (!slot) return null;
     if (slot.index > 0) {
       const prev = slot.stack[slot.index - 1]!;
-      return { gap: Math.round((cur.y - bottom(prev)) * 10) / 10, via: prev.selector };
+      // A kicker is part of the title block: keep looking above IT.
+      if (isKicker(prev, labelFontSize, kids)) { cur = prev; continue; }
+      const gap = Math.round((cur.y - bottom(prev)) * 10) / 10;
+      // Flush against the block above means the separation is done by PAINT (a
+      // background or a rule), not by space, so there is no gap to compare and
+      // the ratio test would be vacuous — anything is >= 0 * 1.5. nngroup's
+      // footer stacks its sections edge to edge and reported its "Follow us"
+      // heading twice because of it.
+      if (gap < 1) return null;
+      return { gap, via: prev.selector };
     }
-    // A first child inside a box that paints its own boundary cannot be
-    // mis-grouped: there is nothing above it inside that box.
+    // First child. A box that paints its own boundary has already grouped its
+    // contents, and an unpainted one just hands the question to its own parent.
     if (paintsBoundary(slot.parent, boxes)) return null;
-    const padding = Math.round((cur.y - slot.parent.y) * 10) / 10;
-    if (padding >= 1) return { gap: padding, via: `${slot.parent.selector} top edge` };
     cur = slot.parent;
   }
   return null;
@@ -509,11 +599,11 @@ export function measureProximity(boxes: readonly CompositionBox[]): {
       // sibling, but the boundary it is being pulled away from need not be.
       const after = Math.round((stack[i + 1]!.y - bottom(c)) * 10) / 10;
       if (after < 0) continue;
-      const above = gapAbove(c, boxes, slots);
+      const above = gapAbove(c, boxes, slots, kids, maxFont(c, kids));
       if (!above) {
         unjudged.push({
           selector: c.selector,
-          reason: "no boundary above it to compare against — it opens a box that paints its own group edge",
+          reason: "nothing above it could be mis-grouped with it — it opens its group, or only a kicker sits above",
         });
         continue;
       }
@@ -738,6 +828,12 @@ export function judgeComposition(
   if (
     hierarchy.bodyFontSize > 0
     && textLeaves >= CONTRAST_MIN_LEAVES
+    // The page has to CLAIM a hierarchy before failing to render one. A page
+    // with no heading at all is a list, and "nothing reads as the most
+    // important" describes a list correctly rather than finding a defect in it:
+    // danluu.com is a date-and-link index, every row 16px/400 by design, and it
+    // was the one live-corpus page this rule fired on.
+    && hierarchy.levels.length > 0
     && hierarchy.range < RANGE_FLOOR
     && hierarchy.weightDelta < WEIGHT_STEP
   ) {

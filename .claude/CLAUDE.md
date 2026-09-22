@@ -340,7 +340,21 @@ to fire on that mutant and stay silent on the other seven.
 
 Fixtures: `fixtures/composition/` (one intact page plus one per broken
 principle, each the intact page plus a single overriding rule).
-Report: `docs/reports/2026-09-21-composition-principles-v1.md`.
+Reports: `docs/reports/2026-09-21-composition-principles-v1.md` (the paired-mutant
+round that set every threshold) and `docs/reports/2026-09-22-composition-live-corpus-v2.md`
+(14 mirrored production pages — the round that found the verdict flipping on 7 of
+them, all false positives, and fixed the three mechanisms).
+
+**Before touching `proximity-inversion`, know its two live-corpus lessons.** A
+**kicker** — a breadcrumb, date or eyebrow at most half the heading's type size —
+is climbed THROUGH, not measured against; the first version of that test used
+text length instead of rank, absorbed a 74-character body paragraph and invented
+an inversion where the real gaps were 32 and 32. And the boundary above must be a
+preceding **sibling**: a container's padding-top is not something a label can be
+mis-grouped with. One false-positive class is knowingly left in — a card title
+bonded to its date, whose gap ratio (5.2) is *higher* than the mutant's (3.7), so
+no threshold separates them. Use `--allow` for it rather than adding a fourth
+number.
 
 ## Measuring Gate / Rule Execution Cost
 

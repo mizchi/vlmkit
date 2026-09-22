@@ -79,10 +79,23 @@ function sections(opts: { gapAbove: number; gapBelow: number; count?: number }):
 describe("measureProximity", () => {
   it("passes a label that is closer to what it labels than to the block above", () => {
     const { labels } = measureProximity(tree(sections({ gapAbove: 40, gapBelow: 10 })));
-    assert.ok(labels.length >= 2, `expected labels, got ${labels.length}`);
+    // One judged, not two: the FIRST section's heading has no preceding sibling
+    // anywhere up its chain, so nothing could mis-group with it. See
+    // "does not judge the first label on the page".
+    assert.equal(labels.length, 1);
     assert.equal(labels.filter((l) => l.inverted).length, 0);
     assert.equal(labels[0]!.before, 40);
     assert.equal(labels[0]!.after, 10);
+  });
+
+  it("does not judge the first label on the page", () => {
+    // Its container's padding-top is not a boundary it could be mis-grouped
+    // with — comparing that against the gap below it compares two unlike
+    // things. On the live corpus this reported w3c-apg's page title (4.7px of
+    // `main` padding vs 27.5px to the body) and nngroup's footer heading.
+    const { labels, unjudged } = measureProximity(tree(sections({ gapAbove: 40, gapBelow: 10 })));
+    assert.ok(!labels.some((l) => l.selector === "section.s0>h2"));
+    assert.ok(unjudged.some((u) => u.selector === "section.s0>h2"));
   });
 
   it("reports a label that is closer to the block above than to its own content", () => {
@@ -107,9 +120,12 @@ describe("measureProximity", () => {
     // fixtures/composition/proximity-broken.html report COMPOSED with zero
     // labels judged, on a page whose every heading had visibly drifted.
     const boxes = tree(sections({ gapAbove: 12, gapBelow: 44 }));
-    const { labels, unjudged } = measureProximity(boxes);
+    const { labels } = measureProximity(boxes);
     assert.ok(labels.length > 0, "the flush heading must still be judged");
-    assert.equal(unjudged.length, 0);
+    // The boundary is the PREVIOUS SECTION, found by climbing out of this
+    // heading's own flush section rather than by giving up.
+    assert.equal(labels[0]!.before, 12);
+    assert.equal(labels[0]!.after, 44);
   });
 
   it("does not judge a label opening a box that paints its own boundary", () => {
@@ -126,7 +142,7 @@ describe("measureProximity", () => {
     const { labels, unjudged } = measureProximity(boxes);
     assert.equal(labels.length, 0);
     assert.equal(unjudged.length, 1);
-    assert.match(unjudged[0]!.reason, /paints its own group edge/);
+    assert.match(unjudged[0]!.reason, /nothing above it could be mis-grouped/);
   });
 
   it("needs both the ratio and the absolute floor", () => {
@@ -152,6 +168,64 @@ describe("measureProximity", () => {
     ]);
     const { labels } = measureProximity(boxes);
     assert.equal(labels.filter((l) => l.selector === "div.card").length, 0);
+  });
+
+  it("climbs through a kicker instead of measuring the label against it", () => {
+    // The live corpus's biggest false-positive class, 6 of 14 designed pages.
+    // web.dev and developer.chrome.com set a 16px breadcrumb 16px above a 48px
+    // h1 and the body 32px below it — one title block, read as such because the
+    // size contrast (3.0x) settles the grouping, not the gaps.
+    const boxes = tree([
+      box({ parent: -1, selector: "div.shell", y: 0, h: 600, leaf: false, textLen: 400 }),
+      box({ parent: 0, selector: "div.prev", y: 0, h: 100, textLen: 200 }),
+      box({ parent: 0, selector: "div.breadcrumb", y: 218, h: 24, fontSize: 16, textLen: 48 }),
+      box({ parent: 0, selector: "h1", tag: "h1", heading: 1, y: 258, h: 60, fontSize: 48, textLen: 30 }),
+      box({ parent: 0, selector: "p.body", tag: "p", y: 350, h: 80, fontSize: 16, textLen: 300 }),
+    ]);
+    const { labels } = measureProximity(boxes);
+    const h1 = labels.find((l) => l.selector === "h1");
+    assert.ok(h1, "the h1 is still judged");
+    // Measured above the BREADCRUMB (218 - 100 = 118), not against it (16).
+    assert.equal(h1.before, 118);
+    assert.equal(h1.inverted, false);
+  });
+
+  it("does not treat ordinary body prose as a kicker", () => {
+    // The first attempt at the rule above used "short text + smaller font",
+    // which absorbed a 74-character paragraph and then measured the gap above
+    // THAT — manufacturing `before: 16` on web.dev's
+    // h2#monitor_lcp_breakdown_in_javascript where the rendered gaps are 32 and
+    // 32. Body text is always smaller than a heading, so only a real step in
+    // rank counts: 16px under a 24px h2 is 1.5x and stays a peer.
+    const boxes = tree([
+      box({ parent: -1, selector: "div.body", y: 0, h: 600, leaf: false, textLen: 500 }),
+      box({ parent: 0, selector: "p.a", tag: "p", y: 0, h: 84, fontSize: 16, textLen: 222 }),
+      box({ parent: 0, selector: "p.short", tag: "p", y: 100, h: 28, fontSize: 16, textLen: 74 }),
+      box({ parent: 0, selector: "h2", tag: "h2", heading: 2, y: 160, h: 32, fontSize: 24, textLen: 35 }),
+      box({ parent: 0, selector: "p.next", tag: "p", y: 224, h: 56, fontSize: 16, textLen: 159 }),
+    ]);
+    const h2 = measureProximity(boxes).labels.find((l) => l.selector === "h2");
+    assert.ok(h2);
+    assert.equal(h2.before, 32, "measured against the short paragraph, not above it");
+    assert.equal(h2.after, 32);
+    assert.equal(h2.inverted, false);
+  });
+
+  it("does not judge a label flush against the block above it", () => {
+    // Zero gap means PAINT is separating the two (a background or a rule), so
+    // there is no gap to compare and the ratio goes vacuous — anything is
+    // >= 0 * 1.5. nngroup stacks its footer sections edge to edge and reported
+    // its "Follow us" heading twice because of it.
+    const boxes = tree([
+      box({ parent: -1, selector: "footer", y: 0, h: 400, leaf: false, textLen: 300 }),
+      box({ parent: 0, selector: "section.nav", y: 0, h: 200, textLen: 200 }),
+      box({ parent: 0, selector: "div.bottom", y: 200, h: 120, leaf: false, textLen: 100 }),
+      box({ parent: 2, selector: "div.bottom>h2", tag: "h2", heading: 2, y: 200, h: 24, fontSize: 18, textLen: 10 }),
+      box({ parent: 2, selector: "div.bottom>ul", y: 256, h: 60, textLen: 80 }),
+    ]);
+    const { labels, unjudged } = measureProximity(boxes);
+    assert.ok(!labels.some((l) => l.selector === "div.bottom>h2"));
+    assert.ok(unjudged.some((u) => u.selector === "div.bottom>h2"));
   });
 
   it("ignores out-of-flow boxes, which make no gaps a reader reads", () => {
@@ -304,6 +378,25 @@ describe("judgeComposition", () => {
     assert.equal(boldOnly.findings.filter((f) => f.kind === "no-type-contrast").length, 0);
   });
 
+  it("does not report no-type-contrast on a page that declares no heading", () => {
+    // danluu.com is a date-and-link index, every row 16px/400 by design, and it
+    // was the one live-corpus page this rule fired on. "Nothing reads as the
+    // most important" describes a list correctly rather than finding a defect
+    // in it; the page has to CLAIM a hierarchy before failing to render one.
+    const rows = Array.from({ length: 8 }, (_, i) =>
+      box({ parent: -1, selector: `a.row${i}`, tag: "a", fontSize: 16, fontWeight: 400, textLen: 40 }));
+    const report = judgeComposition(input(rows));
+    assert.equal(report.hierarchy.levels.length, 0);
+    assert.equal(report.findings.filter((f) => f.kind === "no-type-contrast").length, 0);
+
+    // …and still fires once a heading is declared and rendered at body scale.
+    const withHeading = judgeComposition(input([
+      box({ parent: -1, selector: "h1", tag: "h1", heading: 1, fontSize: 16, fontWeight: 400, textLen: 20 }),
+      ...rows,
+    ]));
+    assert.equal(withHeading.findings.filter((f) => f.kind === "no-type-contrast").length, 1);
+  });
+
   it("says so rather than passing when nothing could be measured", () => {
     const report = judgeComposition(input([
       box({ parent: -1, selector: "span.only", w: 40, h: 20, textLen: 3 }),
@@ -324,10 +417,10 @@ describe("judgeComposition", () => {
 
   it("takes an allowed row out of the verdict and still lists it", () => {
     const boxes = sections({ gapAbove: 12, gapBelow: 44 });
-    const report = judgeComposition(input(boxes), { allow: ["section.s0>h2;the lede heading is deliberately isolated"] });
+    const report = judgeComposition(input(boxes), { allow: ["section.s1>h2;the lede heading is deliberately isolated"] });
     assert.ok(report.allowed.length >= 1);
     assert.equal(report.allowed[0]!.reason, "the lede heading is deliberately isolated");
-    assert.ok(!report.findings.some((f) => f.selector === "section.s0>h2"));
+    assert.ok(!report.findings.some((f) => f.selector === "section.s1>h2"));
   });
 
   it("reports an allow rule that matched nothing", () => {
