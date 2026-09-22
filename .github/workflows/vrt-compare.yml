@@ -2,11 +2,25 @@ name: VRT Compare
 
 on:
   pull_request:
+    # The `bench` job below runs `pnpm test` — the whole suite — so this list is
+    # also the trigger for every unit test in the repo. It must therefore cover
+    # every root `vitest.config.ts` reads, not just the ones VRT compares:
+    # `src/**` was here and `packages/**`, `tests/**`, `examples/**` and
+    # `worker/**` were not, so a change confined to any of those four ran no
+    # unit tests at all. Nothing had hit it in the previous 25 merged PRs, but
+    # only because each one happened to touch `src/**` or `fixtures/**` as well
+    # — the coverage was a coincidence, not a rule. Pinned by
+    # `tests/workflow-commands.test.mjs`, which derives the required roots from
+    # the vitest config rather than repeating them.
     paths:
       - ".github/workflows/**"
       - ".github/vrt-snapshot-ci.config.json"
       - "fixtures/**"
       - "src/**"
+      - "packages/**"
+      - "tests/**"
+      - "examples/**"
+      - "worker/**"
       - "package.json"
   workflow_dispatch:
     inputs:

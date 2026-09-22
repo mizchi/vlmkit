@@ -237,3 +237,102 @@ describe("test runners in workflows", async () => {
     assert.deepEqual(matched, ["      - run: node --test 'src/**/*.test.ts'"]);
   });
 });
+
+/**
+ * The workflow that runs the FULL suite must trigger on every root the suite reads.
+ *
+ * `pnpm test` is one step inside `vrt-compare.yml`'s `bench` job, so the unit
+ * tests inherit whatever `paths:` that workflow declares for its own VRT
+ * purposes. Four of the five roots `vitest.config.ts` reads were missing from
+ * it — `packages/**`, `tests/**`, `examples/**` and `worker/**` — which means a
+ * PR confined to any of them ran no unit tests at all. `packages/` alone holds
+ * 188 test files.
+ *
+ * Measured before fixing it: none of the previous 25 merged PRs actually hit
+ * this, because every one that touched `packages/**` also touched `src/**` or
+ * `fixtures/**` and was covered by coincidence. That is exactly why it needs a
+ * test rather than a fix — the symptom is silence, and silence from a path
+ * filter looks identical to "there was nothing to run".
+ *
+ * The required roots are DERIVED from the vitest config, not restated here, so
+ * adding an `include` glob for a new directory fails this until the trigger
+ * learns about it.
+ *
+ * Scope, stated honestly: this checks that the root of each include glob appears
+ * as a `paths:` prefix. It does not verify the glob depth (`packages/*​/src/**`
+ * is satisfied by `packages/**`, which is correct but coarser), and it says
+ * nothing about `push:` triggers or about workflows that run a subset of the
+ * suite on purpose (`pnpm test:examples`, `vitest run <file>`).
+ */
+const vitestConfig = join(repoRoot, "vitest.config.ts");
+
+/** First path segment of each `include` glob — the directory a trigger has to name. */
+async function suiteRoots() {
+  const source = await readFile(vitestConfig, "utf8");
+  const block = source.match(/include:\s*\[([^\]]*)\]/);
+  assert.ok(block, "could not find the `include` array in vitest.config.ts");
+  const roots = new Set();
+  for (const match of block[1].matchAll(/["']([^"']+)["']/g)) {
+    const root = match[1].split("/")[0];
+    if (root && !root.includes("*")) roots.add(root);
+  }
+  return roots;
+}
+
+/** Workflow files with a step running the BARE `pnpm test`, i.e. the whole suite. */
+async function fullSuiteWorkflows() {
+  const hits = [];
+  for (const entry of await readdir(workflowDir)) {
+    if (!entry.endsWith(".yml") && !entry.endsWith(".yaml")) continue;
+    const yaml = await readFile(join(workflowDir, entry), "utf8");
+    // `pnpm test:examples` and `pnpm exec vitest run <paths>` run a subset and
+    // are not this invariant's business, so the match has to end at `test`.
+    if (/^\s*-?\s*(?:run:\s*)?pnpm test\s*$/m.test(yaml)) hits.push({ file: entry, yaml });
+  }
+  return hits;
+}
+
+/** The `paths:` entries under `on: pull_request:`, by indentation. */
+function pullRequestPaths(yaml) {
+  const lines = yaml.split("\n");
+  const start = lines.findIndex((l) => /^ {4}paths:\s*$/.test(l));
+  if (start === -1) return null;
+  const paths = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    const item = line.match(/^ {6}- ["']?([^"']+)["']?\s*$/);
+    if (!item) break;
+    paths.push(item[1]);
+  }
+  return paths;
+}
+
+describe("full-suite workflow triggers", async () => {
+  const workflows = await fullSuiteWorkflows();
+  const roots = await suiteRoots();
+
+  it("finds the workflow that runs the whole suite, and the roots it must cover", () => {
+    // Both extractors guarded: either one matching nothing would pass every
+    // assertion below vacuously.
+    assert.ok(workflows.length > 0, "no workflow runs a bare `pnpm test` — did the step move?");
+    assert.ok(roots.size >= 3, `only derived ${roots.size} suite root(s): ${[...roots]}`);
+    assert.ok(roots.has("packages"), "expected `packages` among the vitest include roots");
+  });
+
+  for (const { file, yaml } of workflows) {
+    it(`${file} triggers on every root the suite reads`, () => {
+      const paths = pullRequestPaths(yaml);
+      assert.ok(paths && paths.length > 0, `${file} runs the full suite but declares no pull_request paths`);
+      const missing = [...roots].filter((root) => !paths.some((p) => p === root || p.startsWith(`${root}/`)));
+      assert.deepEqual(
+        missing,
+        [],
+        `${file} runs \`pnpm test\` but its pull_request paths do not cover ${missing.join(", ")}.`
+          + ` vitest reads those roots, so a PR confined to one of them would run no unit tests`
+          + ` and report green. Add "<root>/**" to the paths list, or move the step to a workflow`
+          + ` whose trigger covers the suite.`,
+      );
+    });
+  }
+});
