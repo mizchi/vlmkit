@@ -138,10 +138,26 @@ export interface GroundingTargetSample {
   reachable?: { x: number; y: number; room: number; sampled: number; clear: number };
   /** `disabled` / `aria-disabled`. Kept in the map, excluded from every finding. */
   disabled: boolean;
-  /** Any part of the box inside the viewport. Targets below the fold are map-only. */
+  /**
+   * Any part of the box actually PAINTED — inside the viewport and inside every
+   * clipping ancestor. False for a list item scrolled out of its scrollport as
+   * much as for one below the page fold: neither is on the screen the agent has.
+   */
   inFrame: boolean;
-  /** The box extends past a viewport edge. */
+  /** The box extends past the visible area — the frame's edge, or a container's. */
   clipped: boolean;
+  /**
+   * The nearest ancestor that hides this target entirely, when one does, with
+   * how far it would have to scroll for the target to come into view (CSS px,
+   * positive = down / right).
+   *
+   * The round that added this had all three agents work out the remedy from the
+   * picture instead: "the actual fix is scrolling the list, which the harness
+   * supports (wheel) and the tool never names as an option." The control arm,
+   * with no tool at all, specified it: "A DOM-aware tool would have told me
+   * directly '12 tickets, scrolled to 4/12'."
+   */
+  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number };
   /**
    * Own visible text of up to three ancestors, nearest first, for disambiguation.
    *
@@ -246,6 +262,8 @@ export interface GroundingTarget {
   disabled: boolean;
   inFrame: boolean;
   clipped: boolean;
+  /** See `GroundingTargetSample.clippedBy`. Scaled into screenshot px. */
+  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number };
   /**
    * Rule ids this target tripped. Present on the row as well as in `issues` so a
    * caller consuming the action map alone — which is the point of the action map —
@@ -457,6 +475,16 @@ export function analyzeGroundingSamples(
     disabled: sample.disabled,
     inFrame: sample.inFrame,
     clipped: sample.clipped,
+    ...(sample.clippedBy
+      ? {
+        clippedBy: {
+          selector: sample.clippedBy.selector,
+          scrollable: sample.clippedBy.scrollable,
+          dy: Math.round(sample.clippedBy.dy * frame.scale),
+          dx: Math.round(sample.clippedBy.dx * frame.scale),
+        },
+      }
+      : {}),
     risks: [],
     };
   });
@@ -755,6 +783,8 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
     return out;
   };
 
+  const CLIPS = /^(auto|scroll|hidden|clip)$/;
+  const SCROLLS = /^(auto|scroll)$/;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const targets = [];
@@ -772,10 +802,43 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
     if (targets.length >= ${MAX_TARGETS}) { capped++; continue; }
     seen.add(el);
 
-    const left = Math.max(rect.left, 0);
-    const top = Math.max(rect.top, 0);
-    const right = Math.min(rect.right, vw);
-    const bottom = Math.min(rect.bottom, vh);
+    // What is PAINTED, not what is inside the viewport. A list item scrolled out
+    // of a 218px scrollport has a box well inside a 720px viewport and is not on
+    // screen at all; asking only the viewport made the gate call seven such rows
+    // an occluded-target "by html" — html being merely what is drawn where the row
+    // is not — and advise moving html. The fix is to scroll the list, and that is
+    // a fact about the ancestor, so the ancestors have to be walked.
+    // (No backticks in this block: it lives inside a template literal.)
+    let clip = { left: 0, top: 0, right: vw, bottom: vh };
+    let clippedBy = null;
+    for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+      const ps = getComputedStyle(p);
+      if (!CLIPS.test(ps.overflowX) && !CLIPS.test(ps.overflowY)) continue;
+      const pr = p.getBoundingClientRect();
+      const before = clip;
+      clip = {
+        left: Math.max(clip.left, pr.left), top: Math.max(clip.top, pr.top),
+        right: Math.min(clip.right, pr.right), bottom: Math.min(clip.bottom, pr.bottom),
+      };
+      // Blame the FIRST ancestor that actually hides it, and say how far it would
+      // have to scroll — a caller with a wheel needs the delta, not the fact.
+      if (!clippedBy && (rect.bottom <= pr.top || rect.top >= pr.bottom
+        || rect.right <= pr.left || rect.left >= pr.right)) {
+        const scrollable = SCROLLS.test(ps.overflowY) || SCROLLS.test(ps.overflowX);
+        clippedBy = {
+          selector: stableSelector(p),
+          scrollable,
+          dy: Math.round(rect.top < pr.top ? rect.top - pr.top : rect.bottom > pr.bottom ? rect.bottom - pr.bottom : 0),
+          dx: Math.round(rect.left < pr.left ? rect.left - pr.left : rect.right > pr.right ? rect.right - pr.right : 0),
+        };
+      }
+      void before;
+    }
+
+    const left = Math.max(rect.left, clip.left);
+    const top = Math.max(rect.top, clip.top);
+    const right = Math.min(rect.right, clip.right);
+    const bottom = Math.min(rect.bottom, clip.bottom);
     const inFrame = right > left && bottom > top;
     const cx = inFrame ? (left + right) / 2 : rect.left + rect.width / 2;
     const cy = inFrame ? (top + bottom) / 2 : rect.top + rect.height / 2;
@@ -869,7 +932,8 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
       ...(reach ? { reachable: reach } : {}),
       disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
       inFrame,
-      clipped: rect.left < 0 || rect.top < 0 || rect.right > vw || rect.bottom > vh,
+      clipped: rect.left < left || rect.top < top || rect.right > right || rect.bottom > bottom,
+      ...(clippedBy ? { clippedBy } : {}),
       ancestorTexts: ancestorTexts(el),
     });
   }
@@ -1087,10 +1151,34 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
   );
   lines.push(
     `targets: ${inFrame.length} actionable in frame`
-    + ` (${report.targets.length - inFrame.length} disabled or below the fold`
+    + ` (${report.targets.length - inFrame.length} disabled or out of the frame`
     + (report.capped > 0 ? `, ${report.capped} dropped by the cap` : "")
     + `)`,
   );
+  // Out of the frame but in the page, with what to do about it. Listed as its own
+  // block rather than dropped: a caller that cannot see these cannot plan the
+  // scroll that reveals them, and the round that added it had every agent infer
+  // the list's existence from a row clipped at a panel border.
+  const offscreen = report.targets.filter((t) => !t.inFrame && !t.disabled && t.clippedBy);
+  if (offscreen.length > 0) {
+    lines.push("");
+    lines.push(`Out of the frame (${offscreen.length}) — scroll first, then re-run:`);
+    const byContainer = new Map<string, typeof offscreen>();
+    for (const t of offscreen) {
+      const key = t.clippedBy!.selector;
+      byContainer.set(key, [...(byContainer.get(key) ?? []), t]);
+    }
+    for (const [selector, rows] of byContainer) {
+      const how = rows[0]!.clippedBy!.scrollable
+        ? `scroll it (nearest needs ${rows.map((r) => r.clippedBy!.dy).reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)}px)`
+        : `it does not scroll — this content cannot be reached by scrolling`;
+      lines.push(`  ${selector}: hides ${rows.length} target(s) — ${how}`);
+      for (const t of rows.slice(0, 6)) {
+        lines.push(`    ${DIM}${t.id} ${t.role} "${t.label}" (dy ${t.clippedBy!.dy}px)${RESET}`);
+      }
+      if (rows.length > 6) lines.push(`    ${DIM}… ${rows.length - 6} more${RESET}`);
+    }
+  }
   if (inFrame.length > 0) {
     lines.push("");
     lines.push("Action map (click point in screenshot px):");
