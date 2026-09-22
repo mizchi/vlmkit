@@ -268,6 +268,15 @@ export interface RailNearMiss {
   /** Blocks sitting on the second rail — the ones that look misaligned. */
   users: number;
   selector: string;
+  /**
+   * The container both rails have a child on — the reason the two edges are
+   * comparable at all, and the thing to look at. Without it the row claims
+   * nothing: two edges 5px apart in unrelated parts of the page is not a
+   * misalignment. See `sharedParent`.
+   */
+  via: string;
+  /** The sibling on the FIRST rail, so the row names both sides of the split. */
+  siblingOnA: string;
 }
 
 export interface CompositionReport {
@@ -506,7 +515,7 @@ interface GapAbove {
  * `devsite-article-meta` is one 24px line carrying 357 characters, most of them
  * in markup a reader never sees.)
  */
-const KICKER_SIZE_RATIO = 2;
+export const KICKER_SIZE_RATIO = 2;
 function isKicker(
   prev: CompositionBox,
   labelFontSize: number,
@@ -619,6 +628,51 @@ export function measureProximity(boxes: readonly CompositionBox[]): {
 }
 
 /**
+ * Two blocks on the two rails that share a parent, or null.
+ *
+ * This is the whole claim the rule makes. Siblings share a containing block, so
+ * the same edge is available to both and a 2-8px difference is one of them
+ * being offset. A box and its own ancestor have DIFFERENT containing blocks and
+ * their edges differ by the ancestor's padding or border, which is by design —
+ * a `<td>`'s 2px cellpadding, a `<textarea>` inside its form, a `<div class=note>`
+ * inset inside its section. Two blocks in unrelated parts of the page (a 462px
+ * sidebar column and a 1032px article body) have no reason to agree at all.
+ *
+ * Measured: requiring this took the live corpus from 46 findings to 0 while all
+ * three alignment mutants keep firing. The full table is in
+ * `docs/reports/2026-09-23-composition-rail-classification-v3.md`; the two
+ * findings worth carrying here are that the INTUITIVE fix is wrong and that a
+ * detail of the collector was load-bearing:
+ *
+ *   - "exclude ancestor/descendant pairs" also silences `rail-nested`, where a
+ *     subsection really is indented 5px from its container while its own
+ *     siblings are not. The distinction is siblinghood, not nesting.
+ *   - `parent === -1` means the collector recorded no ancestor box. Treating it
+ *     as a shared parent left 4 findings standing: MDN's skip links
+ *     (`ul.a11y-menu>li>a`, inset 2px inside the 1265px full-bleed rail) report
+ *     -1, as do the page-layout divs, and neither is the other's sibling.
+ */
+function sharedParent(
+  a: readonly CompositionBox[],
+  b: readonly CompositionBox[],
+  boxes: readonly CompositionBox[],
+): { via: CompositionBox; onA: CompositionBox; onB: CompositionBox } | null {
+  const byParent = new Map<number, CompositionBox>();
+  for (const box of a) {
+    if (box.parent >= 0 && !byParent.has(box.parent)) byParent.set(box.parent, box);
+  }
+  for (const box of b) {
+    if (box.parent < 0) continue;
+    const onA = byParent.get(box.parent);
+    if (!onA) continue;
+    const via = boxes[box.parent];
+    if (!via) continue;
+    return { via, onA, onB: box };
+  }
+  return null;
+}
+
+/**
  * 整列 — the page's rails, page-wide.
  *
  * Page-wide rather than per container because per-container alignment is free:
@@ -649,9 +703,15 @@ export function measureRails(
       const delta = entries[i]![0] - entries[i - 1]![0];
       if (delta < RAIL_NEAR_MIN_PX || delta > RAIL_NEAR_MAX_PX) continue;
       const users = entries[i]![1];
+      // Adjacent rail values are not enough: the two edges have to belong to
+      // one container's children before a difference between them means
+      // anything. `sharedParent` documents the 46-to-0 measurement.
+      const pair = sharedParent(entries[i - 1]![1], users, boxes);
+      if (!pair) continue;
       out.push({
         axis, a: entries[i - 1]![0], b: entries[i]![0], delta,
-        users: users.length, selector: users[0]!.selector,
+        users: users.length, selector: pair.onB.selector,
+        via: pair.via.selector, siblingOnA: pair.onA.selector,
       });
     }
     return out;
@@ -803,11 +863,15 @@ export function judgeComposition(
       severity: "info",
       selector: n.selector,
       message:
-        `Two of the page's ${n.axis} rails sit ${n.delta}px apart (${n.a}px and ${n.b}px);`
-        + ` ${n.users} block(s) use the second, e.g. ${n.selector}.`
-        + ` Nobody designs a ${n.delta}px indent, so this is usually a stray margin — but a ${n.delta}px`
+        `Two children of ${n.via} sit on ${n.axis} rails ${n.delta}px apart`
+        + ` (${n.siblingOnA} at ${n.a}px, ${n.selector} at ${n.b}px; ${n.users} block(s) on the second).`
+        + ` Siblings share a containing block, so the same edge was available to both`
+        + ` — nobody designs a ${n.delta}px indent, so this is usually a stray margin. A ${n.delta}px`
         + ` split is at the edge of what a reader can see, which is why this never carries the verdict.`,
-      evidence: { axis: n.axis, a: n.a, b: n.b, delta: n.delta, users: n.users },
+      evidence: {
+        axis: n.axis, a: n.a, b: n.b, delta: n.delta, users: n.users,
+        via: n.via, siblingOnA: n.siblingOnA,
+      },
     });
   }
 

@@ -231,10 +231,11 @@ Dates are YYYY-MM-DD.
   mutant, **0/24 on the other seven**), `flat-heading-step` (warn — two DECLARED heading levels rendering at one
   size and weight, so the structure the markup asserts is invisible; 0/6, 5/6, 0/24), `no-type-contrast` (warn —
   a floor requiring BOTH a size ratio under 1.3x and a weight step under 200, since emphasis carried by weight
-  alone is real emphasis; 0/6, **6/6**, 0/24), and `rail-near-miss` (**info** — two of the page's rails 2-8px
-  apart, which is `check integrity`'s A12 window applied ACROSS containers instead of between siblings). The
-  last is the weak survivor and never carries a verdict: good specificity, 3/6 sensitivity, and a per-element
-  padding change reports through it too. Zero proximity false positives across 16 real pages.
+  alone is real emphasis; 0/6, **6/6**, 0/24), and `rail-near-miss` (**info** — two SIBLINGS on rails 2-8px
+  apart, so the same edge was available to both; `check integrity`'s A12 window, and the finding names the
+  container whose children disagree). The last is the weak survivor and never carries a verdict: good
+  specificity, 3/6 sensitivity, and a per-element padding change reports through it too. Zero proximity false
+  positives across 16 real pages.
 - **Six candidate metrics were measured and rejected**, which is the more reusable half of the study. Two traps
   worth the record: a per-container alignment score is **1.00 on 14 of 16 pages**, because block layout hands
   every child the same left edge (the 4px-grid trap again — it measures CSS, not design); and two contrast
@@ -257,11 +258,25 @@ Dates are YYYY-MM-DD.
   the gate**, including which principle. The two rows that look like reader misses are the strongest — both are
   mutants whose CSS did not match those pages' structure, and the gate reported nothing there either. A 5px rail
   split sits at the perceptibility floor, which is what put `rail-near-miss` at `info`.
-- Not done: live-URL validation. The sandbox re-terminates TLS and Chromium rejects the proxy CA, so the
-  false-positive rate on production markup is the largest remaining unknown — which is why nothing here ships
-  above `warn`. Fixtures: `fixtures/composition/` (one intact page plus one per broken principle, each the
-  intact page plus a single overriding rule). Study: `docs/design/composition-metrics.md`. Report:
-  `docs/reports/2026-09-21-composition-principles-v1.md`.
+- **Then measured on production markup, in two further rounds — and the fixture numbers above did not hold.**
+  The pages are mirrored through `wget --ca-certificate` and served over 127.0.0.1, because Chromium rejects
+  this sandbox's egress CA. On 14 professionally designed pages the verdict flipped on **7, every one a false
+  positive** (v2): a kicker — a breadcrumb or eyebrow set tight above a title on purpose — is now climbed
+  THROUGH by rank rather than measured against, the boundary above a label must be a preceding sibling, and
+  `no-type-contrast` needs the page to declare a heading before it can fail to render one. 13 of 14 clean after.
+  Then every `rail-near-miss` on that corpus was classified (v3): **46 findings, not one a misalignment** — a
+  block against its own ancestor's padding, two unrelated containers, an inline box's prose-wrap edge, or a
+  pair the collector gave no parent. Requiring two siblings takes it to 0 while three alignment mutants keep
+  firing. Two traps recorded there: "ignore ancestor/descendant pairs" is the intuitive fix and silences a real
+  nested indent, and "require equal widths" reaches zero in one line while going blind to an uncompensated
+  margin. One false-positive class is left reporting on purpose (css-tricks' card titles bonded to their dates,
+  gap ratio 5.2 against the mutant's 3.7 — `--allow` is the lever, not a fourth threshold).
+- Fixtures: `fixtures/composition/` (one intact page plus one per broken principle, each the intact page plus a
+  single overriding rule — three for 整列, since one shape of a defect cannot tell a real narrowing from a lucky
+  one). Study: `docs/design/composition-metrics.md`. Reports:
+  `docs/reports/2026-09-21-composition-principles-v1.md`,
+  `docs/reports/2026-09-22-composition-live-corpus-v2.md`,
+  `docs/reports/2026-09-23-composition-rail-classification-v3.md`.
 
 - **The action map's click point is now a coordinate that reaches its target.** When something covers a
   target's centre the collector sweeps the box and returns the middle of the largest clear pocket, with the

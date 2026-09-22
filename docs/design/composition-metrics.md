@@ -82,6 +82,30 @@ specificity but 3/6 sensitivity, and a per-element padding change reports
 through it as well as through `check design`'s `component-drift` — so it is
 true, and it does not carry a verdict. Same shape as `scale-outlier`.
 
+**The specificity above was measured on fixtures and did not survive production
+markup.** On 14 mirrored designed pages the rule fired 46 times and every one
+was a false positive: a block against its own ancestor's padding, two unrelated
+containers, an inline box's prose-wrap edge, or a pair with no recorded parent.
+It now requires **two siblings on the two rails** — which takes the live corpus
+to 0 while three separate alignment mutants keep firing — and the finding names
+the container whose children disagree, because that container is the only reason
+the two edges are comparable at all.
+
+Two traps worth knowing before touching this rule again, both measured in
+`docs/reports/2026-09-23-composition-rail-classification-v3.md`:
+
+- **"Ignore ancestor/descendant pairs" is the intuitive fix and it is wrong.**
+  It names the biggest false-positive class correctly and silences
+  `rail-broken-nested`, where a subsection really is indented 5px off the rail
+  its own siblings sit on. The distinction is siblinghood, not nesting.
+- **"Require both rails' blocks to be equally wide" also reaches zero on live
+  pages, in one line** — which is how a narrowing tuned to the answer presents
+  itself. `rail-broken-shrink` separates them: an uncompensated `margin-left`
+  changes the width too, so the width test reports nothing on it.
+
+That is why `fixtures/composition/` now carries three alignment mutants. One
+shape of a defect cannot tell a real narrowing from a lucky one.
+
 ### Already covered — 反復 is not here
 
 `check design`'s `component-drift` owns repetition. The mutant run confirms it

@@ -312,7 +312,7 @@ vlmkit check composition page.html   # 近接/整列/対比: label grouping, pag
 | Principle | Where it lives | The measurable claim |
 |---|---|---|
 | 近接 proximity | `check composition` / `proximity-inversion` (warn) | A label's gap to its content is >=1.5x its gap to the boundary above AND >=8px wider, so it groups upward |
-| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two of the page's rails sit 2-8px apart. A12 in `check integrity` covers the same window between siblings |
+| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two **siblings** sit on rails 2-8px apart, so the same edge was available to both. A12 in `check integrity` covers the same window between siblings |
 | 反復 repetition | `check design` / `component-drift` | Instances per distinct style signature, below 3x |
 | 対比 contrast | `check composition` / `flat-heading-step`, `no-type-contrast` (warn) | Two DECLARED heading levels render at one size and weight; or nothing is >=1.3x body size and nothing >=200 weight heavier |
 
@@ -339,11 +339,18 @@ Use paired mutants — break one principle with injected CSS and require the rul
 to fire on that mutant and stay silent on the other seven.
 
 Fixtures: `fixtures/composition/` (one intact page plus one per broken
-principle, each the intact page plus a single overriding rule).
+principle, each the intact page plus a single overriding rule — and **three**
+for 整列, because one shape of a defect cannot tell a real narrowing from a
+lucky one: `rail-broken` shifts sections by a compensated margin,
+`rail-broken-shrink` by an uncompensated one so the width changes too, and
+`rail-broken-nested` indents the subsections inside a section).
 Reports: `docs/reports/2026-09-21-composition-principles-v1.md` (the paired-mutant
-round that set every threshold) and `docs/reports/2026-09-22-composition-live-corpus-v2.md`
+round that set every threshold), `docs/reports/2026-09-22-composition-live-corpus-v2.md`
 (14 mirrored production pages — the round that found the verdict flipping on 7 of
-them, all false positives, and fixed the three mechanisms).
+them, all false positives, and fixed the three mechanisms) and
+`docs/reports/2026-09-23-composition-rail-classification-v3.md` (every
+`rail-near-miss` on that corpus classified: 46 findings, none a misalignment,
+fixed to 0 by one predicate).
 
 **Before touching `proximity-inversion`, know its two live-corpus lessons.** A
 **kicker** — a breadcrumb, date or eyebrow at most half the heading's type size —

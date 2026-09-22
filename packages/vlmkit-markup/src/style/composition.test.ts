@@ -76,6 +76,30 @@ function sections(opts: { gapAbove: number; gapBelow: number; count?: number }):
   return boxes;
 }
 
+/**
+ * A container whose four children sit on two left rails 5px apart — the
+ * minimum shape that makes `rail-near-miss` fire, for tests about something
+ * else that also need an info row.
+ *
+ * It brings its OWN container rather than hanging the blocks off `sections()`'s
+ * shell, because the rule requires two siblings on the two rails and siblings
+ * of the sections join the proximity stack: four blocks at y=0 under the shell
+ * silently moved every heading's boundary and took the inversion these tests
+ * pair the info row with down to zero judged labels.
+ *
+ * `at` is where the container lands in the box array, so its children can name
+ * it as their parent.
+ */
+function railSplit(at: number): CompositionBox[] {
+  const wide = (x: number, selector: string, y: number) =>
+    box({ parent: at, selector, x, w: 800, y, h: 50 });
+  return [
+    box({ parent: -1, selector: "div.rails", x: 0, w: 1280, y: 3000, h: 400, leaf: false }),
+    wide(232, "section.p", 3000), wide(232, "section.q", 3100),
+    wide(237, "section.r", 3200), wide(237, "section.s", 3300),
+  ];
+}
+
 describe("measureProximity", () => {
   it("passes a label that is closer to what it labels than to the block above", () => {
     const { labels } = measureProximity(tree(sections({ gapAbove: 40, gapBelow: 10 })));
@@ -239,53 +263,134 @@ describe("measureProximity", () => {
 });
 
 describe("measureRails", () => {
-  const wide = (x: number, w: number, selector: string) =>
-    box({ parent: -1, selector, x, w, y: 0, h: 50 });
+  /**
+   * A block under the page shell. Every rail box is a CHILD of something on a
+   * real page, and the rule now requires two of them to be siblings, so a
+   * `parent: -1` box is no longer a usable fixture — the parentless form was
+   * this suite's shape before the live-corpus round and it tested a case the
+   * gate never sees.
+   */
+  const wide = (x: number, w: number, selector: string, parent = 0) =>
+    box({ parent, selector, x, w, y: 0, h: 50 });
+  /** `div.shell` at index 0, so children can name it as their parent. */
+  const shell = (...kids: CompositionBox[]) =>
+    tree([box({ parent: -1, selector: "div.shell", x: 0, w: 1280, h: 2000, leaf: false }), ...kids]);
 
   it("reports two rails a few pixels apart", () => {
-    const boxes = tree([
+    const rails = measureRails(shell(
       wide(232, 800, "section.a"), wide(232, 800, "section.b"),
       wide(237, 800, "section.c"), wide(237, 800, "section.d"),
-    ]);
-    const rails = measureRails(boxes, 1280);
+    ), 1280);
     const left = rails.near.filter((n) => n.axis === "left");
     assert.equal(left.length, 1);
     assert.equal(left[0]!.delta, 5);
     assert.equal(left[0]!.users, 2);
+    // The row has to name the container whose children disagree, because that
+    // is the only thing that makes the two edges comparable.
+    assert.equal(left[0]!.via, "div.shell");
+    assert.equal(left[0]!.siblingOnA, "section.a");
   });
 
   it("ignores a 1px split, which is rounding of fractional layout", () => {
     // landing-product renders rails at 78 and 79, and at 1201 and 1202. A12
     // excludes sub-2px for the same reason.
-    const boxes = tree([
+    assert.equal(measureRails(shell(
       wide(78, 800, "section.a"), wide(78, 800, "section.b"),
       wide(79, 800, "section.c"), wide(79, 800, "section.d"),
-    ]);
-    assert.equal(measureRails(boxes, 1280).near.length, 0);
+    ), 1280).near.length, 0);
   });
 
   it("ignores a clearly deliberate indent", () => {
-    const boxes = tree([
+    assert.equal(measureRails(shell(
       wide(100, 800, "section.a"), wide(100, 800, "section.b"),
       wide(140, 700, "section.c"), wide(140, 700, "section.d"),
-    ]);
-    assert.equal(measureRails(boxes, 1280).near.filter((n) => n.axis === "left").length, 0);
+    ), 1280).near.filter((n) => n.axis === "left").length, 0);
   });
 
   it("needs two blocks on a rail before calling it one", () => {
     // One stray block must not invent a phantom rail to compare against.
-    const boxes = tree([
+    assert.equal(measureRails(shell(
       wide(232, 800, "section.a"), wide(232, 800, "section.b"),
       wide(237, 800, "section.stray"),
+    ), 1280).near.length, 0);
+  });
+
+  it("ignores boxes too narrow to carry the page's rail", () => {
+    assert.equal(measureRails(shell(
+      wide(232, 800, "section.a"), wide(232, 800, "section.b"),
+      box({ parent: 0, selector: "span.badge", x: 237, w: 40, y: 0, h: 20 }),
+      box({ parent: 0, selector: "span.badge2", x: 237, w: 40, y: 0, h: 20 }),
+    ), 1280).near.length, 0);
+  });
+
+  // The four classes the live corpus turned up. Every current firing on 14
+  // professionally designed pages was one of these, and all four are silent
+  // now: 46 findings to 0 with all three alignment mutants still firing.
+  // docs/reports/2026-09-23-composition-rail-classification-v3.md
+
+  it("does not compare rails from two unrelated containers", () => {
+    // css-tricks: a 462px sidebar column against the 1032px article body;
+    // smashing: a 761px header nav against a 512px article card. Different
+    // containers, thousands of pixels apart vertically. Their left edges were
+    // never meant to agree, so a 7px difference claims nothing.
+    const boxes = tree([
+      box({ parent: -1, selector: "div.page", x: 0, w: 1280, h: 4000, leaf: false }),
+      box({ parent: -1, selector: "main.article", x: 0, w: 1280, h: 2000, leaf: false }),
+      box({ parent: -1, selector: "aside.rail", x: 0, w: 1280, h: 2000, leaf: false }),
+      box({ parent: 1, selector: "main.article>ul", x: 129, w: 1032, y: 100, h: 100 }),
+      box({ parent: 1, selector: "main.article>div", x: 129, w: 1032, y: 300, h: 100 }),
+      box({ parent: 2, selector: "aside.rail>details", x: 136, w: 462, y: 2400, h: 100 }),
+      box({ parent: 2, selector: "aside.rail>p", x: 136, w: 462, y: 2600, h: 100 }),
+    ]);
+    assert.equal(measureRails(boxes, 1280).near.filter((n) => n.axis === "left").length, 0);
+  });
+
+  it("does not report a block against its own ancestor's edge", () => {
+    // Hacker News nests a 1070.4px table inside a 1074.4px one (cellpadding);
+    // Wikipedia runs td 631.4 -> div 629.4 -> ul 622.3 through a navbox, which
+    // was 16 of its 21 findings. The delta is the ancestor's own padding, which
+    // is by design — an ancestor and its descendant have different containing
+    // blocks, so the same edge was never available to both.
+    const boxes = tree([
+      box({ parent: -1, selector: "div.page", x: 0, w: 1280, h: 2000, leaf: false }),
+      box({ parent: 0, selector: "table#outer", x: 103, w: 1074, y: 0, h: 600, leaf: false }),
+      box({ parent: 0, selector: "table#outer2", x: 103, w: 1074, y: 700, h: 600, leaf: false }),
+      box({ parent: 1, selector: "table#outer>tbody", x: 105, w: 1070, y: 0, h: 600, leaf: false }),
+      box({ parent: 2, selector: "table#outer2>tbody", x: 105, w: 1070, y: 700, h: 600, leaf: false }),
     ]);
     assert.equal(measureRails(boxes, 1280).near.length, 0);
   });
 
-  it("ignores boxes too narrow to carry the page's rail", () => {
+  it("still reports a nested block indented from its own siblings", () => {
+    // The mirror image of the case above, and the reason the fix is siblinghood
+    // rather than "exclude ancestor/descendant pairs": that intuitive form of
+    // the fix silences this too. `.subsection` is 5px off the rail its own
+    // siblings h2 and p sit on, which is a real stray indent.
     const boxes = tree([
-      wide(232, 800, "section.a"), wide(232, 800, "section.b"),
-      box({ parent: -1, selector: "span.badge", x: 237, w: 40, y: 0, h: 20 }),
-      box({ parent: -1, selector: "span.badge2", x: 237, w: 40, y: 0, h: 20 }),
+      box({ parent: -1, selector: "div.shell", x: 0, w: 1280, h: 2000, leaf: false }),
+      box({ parent: 0, selector: "div.shell>section", x: 232, w: 816, h: 900, leaf: false }),
+      box({ parent: 1, selector: "section>h2", x: 232, w: 816, y: 0, h: 30, heading: 2 }),
+      box({ parent: 1, selector: "section>p", x: 232, w: 816, y: 60, h: 40 }),
+      box({ parent: 1, selector: "section>div.subsection", x: 237, w: 816, y: 200, h: 200, leaf: false }),
+      box({ parent: 1, selector: "section>div.subsection2", x: 237, w: 816, y: 500, h: 200, leaf: false }),
+    ]);
+    const near = measureRails(boxes, 1280).near.filter((n) => n.axis === "left");
+    assert.equal(near.length, 1);
+    assert.equal(near[0]!.delta, 5);
+    assert.equal(near[0]!.via, "div.shell>section");
+  });
+
+  it("does not treat two boxes with no recorded parent as siblings", () => {
+    // MDN's skip links (`ul.a11y-menu>li>a`, 1261px wide inset 2px inside the
+    // 1265px full-bleed rail) report parent -1, and so do the page-layout divs
+    // — the collector records -1 when no ancestor was kept as a box. Reading
+    // that as "same parent" left these 4 findings standing on mdn and mdn-learn
+    // after every other class was gone.
+    const boxes = tree([
+      box({ parent: -1, selector: "div.page-layout__banner", x: 0, w: 1265, y: 0, h: 50 }),
+      box({ parent: -1, selector: "div.page-layout__main", x: 0, w: 1265, y: 100, h: 50 }),
+      box({ parent: -1, selector: "ul.a11y-menu>li>a", x: 2, w: 1261, y: 0, h: 20 }),
+      box({ parent: -1, selector: "ul.a11y-menu>li>a2", x: 2, w: 1261, y: 20, h: 20 }),
     ]);
     assert.equal(measureRails(boxes, 1280).near.length, 0);
   });
@@ -351,11 +456,8 @@ describe("judgeComposition", () => {
   it("keeps a rail near-miss off the verdict", () => {
     // Info-level by measurement: a 5px split is at the edge of perceptibility,
     // and a per-element padding change reports through it too.
-    const wide = (x: number, selector: string) => box({ parent: -1, selector, x, w: 800, y: 0, h: 50 });
-    const report = judgeComposition(input([
-      ...sections({ gapAbove: 40, gapBelow: 10 }),
-      wide(232, "section.p"), wide(232, "section.q"), wide(237, "section.r"), wide(237, "section.s"),
-    ]));
+    const stack = sections({ gapAbove: 40, gapBelow: 10 });
+    const report = judgeComposition(input([...stack, ...railSplit(stack.length)]));
     assert.ok(report.findings.some((f) => f.kind === "rail-near-miss" && f.severity === "info"));
     assert.equal(report.verdict, "composed");
   });
@@ -461,11 +563,8 @@ describe("formatCompositionReport", () => {
   });
 
   it("separates informational rows from the ones that carry the verdict", () => {
-    const wide = (x: number, selector: string) => box({ parent: -1, selector, x, w: 800, y: 0, h: 50 });
-    const text = plain(formatCompositionReport(report([
-      ...sections({ gapAbove: 12, gapBelow: 44 }),
-      wide(232, "section.p"), wide(232, "section.q"), wide(237, "section.r"), wide(237, "section.s"),
-    ])));
+    const stack = sections({ gapAbove: 12, gapBelow: 44 });
+    const text = plain(formatCompositionReport(report([...stack, ...railSplit(stack.length)])));
     assert.match(text, /Findings/);
     assert.match(text, /Informational .*does not carry the verdict/);
   });
