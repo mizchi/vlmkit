@@ -576,6 +576,8 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 
 **After editing anything under `.claude/skills/`, run `pnpm sync:skills`.** The content lives there once and is copied into two installer packages (`skills/vlmkit/workflows/`, `.apm/skills/vlmkit/`); `tests/skill-package.test.mjs` fails if the three drift, and hand-editing a copy is the wrong repair.
 
+There are **three** publication routes and still only those **two** copies. The third is the Claude Code plugin marketplace, `.claude-plugin/marketplace.json`, whose one plugin's `source` is `./skills/vlmkit` — the package the npm installer already publishes. So it adds no third copy and nothing new for `pnpm sync:skills` to remember; `tests/skill-package.test.mjs` asserts that (the plugin root holds `SKILL.md` and no `skills/` subdirectory, which is what makes it a single-skill plugin needing no `plugin.json`). A new directory under `.claude-plugin/` would be a fourth copy and is the wrong repair for anything. The manifest deliberately carries no `version`: with a relative source in a git-hosted marketplace, update detection falls back to the commit SHA, so every skill edit ships — pinning a version would hide edits until someone bumped it, and `package.json`'s version is the CLI's, not the skills'.
+
 **Commands invoked from `.github/workflows/` are checked by `tests/workflow-commands.test.mjs`.** Renaming or removing a CLI verb fails that test rather than a 15-minute browser job — or, worse, than nothing at all when the workflow step ends in `|| true`.
 
 ## Documentation Structure

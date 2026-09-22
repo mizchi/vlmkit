@@ -9,6 +9,12 @@ const exampleDir = dirname(fileURLToPath(import.meta.url));
 const apmBootstrapCommand = "curl -sSL https://aka.ms/apm-unix | sh";
 const metaApmCommand = "apm install mizchi/vlmkit";
 const metaSkillsCliCommand = "npx skills add mizchi/vlmkit";
+// The third route, added when `.claude-plugin/marketplace.json` landed. It
+// installs the SAME `skills/vlmkit/` package the line above publishes — see the
+// marketplace test in `tests/skill-package.test.mjs` — so the two docs that
+// carry the other two commands have to carry this one too or a Claude Code user
+// is told to use a shell for something the client does itself.
+const metaPluginCommand = "/plugin marketplace add mizchi/vlmkit";
 const skillCatalogUrl = "https://github.com/mizchi/vlmkit/tree/main/.claude/skills";
 const specializedSkills = [
   "agent-validation-loop",
@@ -205,7 +211,7 @@ test("the visual system stays quiet and documentation-like", async () => {
   assert.doesNotMatch(css, /box-shadow: 18px 18px 0/);
 });
 
-test("README and page distribute the automatic router through APM and skills CLI", async () => {
+test("README and page distribute the automatic router through APM, skills CLI and the plugin marketplace", async () => {
   const [html, readme, catalog, copyManifest] = await Promise.all([
     read("index.html"),
     readFile(join(exampleDir, "../../README.md"), "utf8"),
@@ -221,8 +227,32 @@ test("README and page distribute the automatic router through APM and skills CLI
   assert.ok(readme.includes(metaSkillsCliCommand));
   assert.ok(copyManifest.includes(metaApmCommand));
   assert.ok(copyManifest.includes(metaSkillsCliCommand));
-  assert.match(readme, /Both installers expose one visible `vlmkit` skill/);
-  assert.match(catalog, /Both installers expose only the `vlmkit` entry/);
+  assert.ok(readme.includes(metaPluginCommand));
+  assert.ok(catalog.includes(metaPluginCommand));
+  // On the page the leading `/` is its own `<span aria-hidden>` — the prompt
+  // glyph, exactly as `$` is for the two shell cards — so the page and the copy
+  // manifest carry the command without it. Asserted on the remainder rather
+  // than loosened to a substring of the whole command.
+  const pluginCommandAsTyped = metaPluginCommand.replace(/^\//, "");
+  assert.ok(html.includes(pluginCommandAsTyped));
+  assert.ok(copyManifest.includes(pluginCommandAsTyped));
+  assert.ok(html.includes("plugin install vlmkit@vlmkit"));
+  assert.match(readme, /All three installers expose one visible `vlmkit` skill/);
+  assert.match(catalog, /All three installers expose only the `vlmkit` entry/);
+
+  /*
+   * The workflow count in prose, derived rather than typed.
+   *
+   * Both of these sentences said 11 for four releases — they were written when
+   * there were 11 and never touched again, while `specializedSkills` below grew
+   * to 17 under a test that checks the DIRECTORY listing and not a word of the
+   * README. A number a reader uses to decide whether a skill exists is worth
+   * pinning, and pinning it to the array is the only version that cannot rot.
+   */
+  const count = String(specializedSkills.length);
+  assert.match(readme, new RegExp(`The ${count} specialized\\s+workflows`));
+  assert.match(readme, new RegExp(`without adding ${count} separate skills`));
+  assert.match(readme, new RegExp(`catalog\\]\\(\\./\\.claude/skills/README\\.md\\) for all ${count}`));
   assert.ok(copyManifest.includes("This site is generated and debugged with vlmkit itself."));
   assert.ok(copyManifest.includes("VLM-assisted UI."));
 });

@@ -85,6 +85,9 @@ curl -sSL https://aka.ms/apm-unix | sh
 apm install mizchi/vlmkit
 Install with skills CLI
 npx skills add mizchi/vlmkit
+Install as a Claude Code plugin
+plugin marketplace add mizchi/vlmkit
+plugin install vlmkit@vlmkit
 
 # Start
 Measure the page

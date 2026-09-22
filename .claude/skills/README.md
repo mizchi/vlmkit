@@ -24,6 +24,14 @@ apm install mizchi/vlmkit
 npx skills add mizchi/vlmkit
 ```
 
+Or, inside Claude Code, as a plugin — the same `skills/vlmkit/` package, so all
+three routes ship identical content:
+
+```
+/plugin marketplace add mizchi/vlmkit
+/plugin install vlmkit@vlmkit
+```
+
 After that, ask naturally—for example:
 
 - “Implement this mock and make it responsive.”
@@ -34,9 +42,11 @@ The user does not select a skill. The agent routes these requests to
 `mock-markup` + `dynamic-markup`, `markup-assist`, and `spec-to-playwright`
 respectively.
 
-Both installers expose only the `vlmkit` entry. The specialists below are
+All three installers expose only the `vlmkit` entry. The specialists below are
 bundled internal workflow resources, so they do not clutter the user's skill
-picker and are not installed separately.
+picker and are not installed separately. The Claude Code plugin needs no
+`plugin.json`: `skills/vlmkit/` has a `SKILL.md` at its root and no `skills/`
+subdirectory, which is how Claude Code recognises a single-skill plugin.
 
 ## How automatic routing works
 
@@ -57,7 +67,7 @@ which skill the user wants.
 
 | Class | Choose it when… | Skills | What it can do |
 |---|---|---|---|
-| General verification | You edited HTML/CSS and need a fast correctness loop | [`markup-assist`](./markup-assist/), [`component-vrt`](./component-vrt/) | Select an integrity, copy, layout, responsive, interaction, a11y, or design gate; read kickback; fix; rerun to green — or scope the diff to one mounted component when a page diff is too noisy |
+| General verification | You edited HTML/CSS and need a fast correctness loop | [`markup-assist`](./markup-assist/), [`component-vrt`](./component-vrt/) | Select an integrity, copy, layout, responsive, interaction, a11y, design, composition or colour gate; read kickback; fix; rerun to green — or scope the diff to one mounted component when a page diff is too noisy |
 | UI creation | The task starts from an image, reference, contract, or behavior brief | [`mock-markup`](./mock-markup/), [`auto-markup`](./auto-markup/), [`dynamic-markup`](./dynamic-markup/), [`markup-decompose`](./markup-decompose/) | Normalize raw mock exports; recreate static HTML/CSS; verify responsive, scrolling, interaction, and motion behavior |
 | Test generation | A natural-language story must become a reproducible browser test | [`spec-to-playwright`](./spec-to-playwright/) | Explore the app, generate Playwright tests, stabilize VRT, run CI gates, and heal drift |
 | Comparison and monitoring | Two renders or repeated runs must be compared | [`vrt-markup-synth`](./vrt-markup-synth/), [`vrt-visual-diff`](./vrt-visual-diff/), [`vrt-regression-watch`](./vrt-regression-watch/), [`vrt-migration-eval`](./vrt-migration-eval/) | Produce deterministic authoring signals, explain visual deltas, detect regressions over time, and evaluate framework/CSS migrations |
@@ -67,6 +77,9 @@ which skill the user wants.
 ## Selection rules
 
 - No reference, just edited markup → `markup-assist`.
+- "What is each colour for", a field you cannot see the edge of, a link in prose
+  with no underline → `markup-assist` (`check color`; disjoint from
+  `check a11y contrast`, which measures text against its background and passes both).
 - Whole screen or feature that needs splitting into components first → `markup-decompose`.
 - Raw Figma export, retina screenshot, or competitor capture → `mock-markup`.
 - Target screenshot or UI Contract IR → `auto-markup`.

@@ -152,3 +152,67 @@ test("the local development shell pins the current APM release", async () => {
   const apmNix = await readFile(join(repoRoot, "apm.nix"), "utf8");
   assert.match(apmNix, /version \? "0\.27\.0"/);
 });
+
+/**
+ * The Claude Code plugin marketplace, and the one thing it must NOT do.
+ *
+ * This repository already publishes the skills two ways — APM
+ * (`.apm/skills/vlmkit/`) and the skills CLI (`skills/vlmkit/`) — and the tests
+ * above exist because those two are COPIES of `.claude/skills/` and copies
+ * drift. A third route was added for `/plugin marketplace add mizchi/vlmkit`,
+ * and the interesting decision is that it adds no copy at all: its plugin
+ * `source` points at the existing `skills/vlmkit/`, which is already a
+ * single-skill plugin by Claude Code's own rules (a `SKILL.md` at the plugin
+ * root, no `skills/` subdirectory, so no `plugin.json` is required) and is
+ * already guarded by every assertion above.
+ *
+ * So this test's job is to keep that true. A future edit that points the plugin
+ * at a fourth directory, or vendors the skills under `.claude-plugin/`, fails
+ * here — because then `pnpm sync:skills` would have one more place to forget.
+ */
+test("the plugin marketplace reuses the existing package rather than adding a copy", async () => {
+  const manifest = JSON.parse(await readFile(join(repoRoot, ".claude-plugin/marketplace.json"), "utf8"));
+
+  // The schema's required fields. Asserted rather than assumed: a marketplace
+  // missing `owner.name` is rejected on `/plugin marketplace add`, and the
+  // failure a user sees is about JSON, not about what is wrong.
+  assert.equal(manifest.name, "vlmkit");
+  assert.equal(typeof manifest.owner?.name, "string");
+  assert.ok(Array.isArray(manifest.plugins) && manifest.plugins.length === 1,
+    "one plugin: the router is the only thing either other installer exposes, and the 17 "
+    + "workflows are bundled resources rather than separately installable skills");
+
+  const [plugin] = manifest.plugins;
+  assert.equal(plugin.name, "vlmkit");
+  assert.equal(plugin.source, "./skills/vlmkit",
+    "the plugin must point at the package the other two installers already publish — a new "
+    + "directory here is a fourth copy and a fourth thing `pnpm sync:skills` has to remember");
+  // Relative sources resolve from the marketplace ROOT, not from `.claude-plugin/`.
+  const pluginRoot = join(repoRoot, plugin.source.replace(/^\.\//, ""));
+  assert.equal(pluginRoot, skillsPackage, "and that package is the skills-CLI one");
+  await access(join(pluginRoot, "SKILL.md"));
+  await assert.rejects(
+    access(join(pluginRoot, "skills")),
+    "a `skills/` subdirectory next to a root SKILL.md would make Claude Code load this as a "
+    + "multi-skill plugin and stop treating the router as the entry",
+  );
+  await assert.rejects(
+    access(join(repoRoot, ".claude-plugin/skills")),
+    "the marketplace directory holds the manifest only; vendoring skills beside it is the copy "
+    + "this test exists to prevent",
+  );
+
+  // `strict: false` is the documented signal for "this plugin ships no
+  // plugin.json", which is the case here and must stay consistent with the
+  // absence of one.
+  assert.equal(plugin.strict, false);
+  await assert.rejects(access(join(pluginRoot, ".claude-plugin/plugin.json")));
+
+  // No `version`. With a relative-path source inside a git-hosted marketplace,
+  // update detection falls back to the commit SHA when the field is absent, so
+  // every skill edit reaches users. Pinning it would hide edits until someone
+  // bumped the string — and the obvious string to reach for, package.json's
+  // 0.23.0, is the CLI's version and has never described the skills.
+  assert.equal("version" in plugin, false,
+    "omitted on purpose: a pinned version hides skill edits until it is bumped");
+});
