@@ -49,8 +49,15 @@
  *   inheritedOpacity(el)            -> number           (product of the ancestor chain)
  *
  * Contains no backticks and no `${`, so it interpolates into a template literal without
- * escaping. `tests/browser-script-syntax` parses every such constant, which is what catches a
- * fragment that stops being valid JavaScript.
+ * escaping. That is a property of THIS fragment, not a rule for fragments: nesting is the
+ * established pattern (`ANIMATION_HELPERS_JS` splices `${STABLE_SELECTOR_JS}` and is itself
+ * spliced twice), and `COLLECT_DESIGN_SAMPLES` carries escaped backticks in its comments.
+ *
+ * `src/util/browser-script-escapes.test.ts` parses every browser-script constant with its
+ * fragments spliced in, which is what catches one that stops being valid JavaScript, and sweeps
+ * the same population for the escape a template literal eats. This line used to name a
+ * `tests/browser-script-syntax` that has never existed in any form — the claim had nothing
+ * behind it until the check was written.
  */
 export const CONTRAST_BACKGROUND_JS = `
   var __colorCtx;
