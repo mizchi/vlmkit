@@ -160,6 +160,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | No token file to check against: is the page consistent with *itself*? (one button style or six; spacing on the page's own scale) | `vlmkit check design page.html` |
 | A vendor widget injects DOM outside the app's design system | `vlmkit check design page.html --exclude ".maplibregl-ctrl"`; excluded and unmatched selectors remain visible in the report |
 | Does the spacing *group* what belongs together, do the sections share a rail, does the heading hierarchy render? (近接 / 整列 / 対比) | `vlmkit check composition page.html` — sees defects that leave every style signature untouched, so run it alongside `check design` rather than instead of it |
+| What are this page's colours FOR, and is colour carrying a meaning on its own? | `vlmkit check color page.html` — extracts the palette by role (base / body ink / link ink) and reports a field with no visible boundary (WCAG 1.4.11) or a link marked off from its prose by colour alone (WCAG 1.4.1). Disjoint from `check a11y contrast`, which measures text against its background and passes both |
 | Light/dark theme parity | `vlmkit check theme page.html` |
 | WCAG contrast / touch targets / focus order | `vlmkit check a11y contrast\|touch\|focus page.html` |
 | Layout survives 30% longer strings (i18n) | `vlmkit stress i18n page.html` |

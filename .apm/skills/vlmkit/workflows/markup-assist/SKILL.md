@@ -33,6 +33,7 @@ nothing — failing on a suspect is the default.
 | Tokens / theme / a11y / long-text survival | `check tokens` · `check theme` · `check a11y contrast\|touch\|focus` · `stress i18n` |
 | Is the page consistent with itself? (no tokens file needed — component styles reused, spacing on its own scale) | `vlmkit check design page.html` |
 | Does the layout read as organized? A heading drifted from the content it labels, two page rails a few px apart, `h2`/`h3` rendering at one size | `vlmkit check composition page.html` (complements `check design`: style reuse cannot see a margin change) |
+| What is each colour for, and does colour alone carry a meaning? A text field with no visible boundary, a link in prose with no underline | `vlmkit check color page.html` (complements `check a11y contrast`, which measures text against its background and passes both) |
 
 **Behavior:**
 

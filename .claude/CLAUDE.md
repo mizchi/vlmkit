@@ -297,16 +297,20 @@ fullest layer's boxes (13277px → 8882px on the 32-node graph); two writers rea
 brought the graph to 1805px and 1806px, both asking for the cause in `check`'s warning itself, which it now carries; the module map's own
 count-based canvas guess was replaced by the shared estimator after a kind switch moved a writer's canvas from 986px to 1806px).
 
-## Design quality: the two gates, and which sees what
+## Design quality: the three gates, and which sees what
 
-Two deterministic gates measure "does this look right", on disjoint evidence.
-Run both — neither subsumes the other, and the proof is that `check design`
-prints **byte-identical** findings on `fixtures/composition/proximity-broken.html`
-and on the intact page.
+Three deterministic gates measure "does this look right", on disjoint evidence.
+Run all three — none subsumes another, and the proof in each case is measured:
+`check design` prints **byte-identical** findings on
+`fixtures/composition/proximity-broken.html` and on the intact page, and
+`check a11y contrast` **passes every** `color-only-link` that `check color`
+reports (caniuse's `#0046d1` note links are 8.2:1 against the page and 2.8:1
+against the sentence they sit in — a different criterion, correctly satisfied).
 
 ```bash
 vlmkit check design      page.html   # 反復: are components styled consistently (style signatures)
 vlmkit check composition page.html   # 近接/整列/対比: label grouping, page rails, declared type hierarchy
+vlmkit check color       page.html   # the palette by role, and where colour alone carries a meaning
 ```
 
 | Principle | Where it lives | The measurable claim |
@@ -362,6 +366,51 @@ mis-grouped with. One false-positive class is knowingly left in — a card title
 bonded to its date, whose gap ratio (5.2) is *higher* than the mutant's (3.7), so
 no threshold separates them. Use `--allow` for it rather than adding a fourth
 number.
+
+### `check color`: the palette by role, and colour carrying meaning alone
+
+Extracts **surfaces / ink / marks** ranked by painted area, and names three
+colours: the **base** (largest surface), the **body ink** (largest by area) and
+the **link ink** (the most-used interactive ink that is **not** the body ink).
+Then two rules, both carrying WCAG's own 3:1 rather than a number this repo
+chose:
+
+| Rule | Criterion | The measurable claim |
+|---|---|---|
+| `control-boundary-invisible` | WCAG 1.4.11 | A text field's fill or strongest border is <3:1 against the surface behind it, with no shadow or outline either |
+| `color-only-link` | WCAG 1.4.1 / G183 | A link inside a flow that holds its own prose, with no underline, weight step, border or fill, <3:1 against that prose |
+
+**Two definitions had to be measured into existence, and both are the same
+lesson.** The base cannot be "the largest declared background" — danluu.com
+declares **zero** backgrounds on 625 boxes, so the composited page background
+stands in. And the link ink cannot be "the most-used interactive ink": that named
+the **body** ink on 7 of the 14 corpus pages, because nav items, card titles and
+logos are links set in the body colour on purpose. Interactive ink is also
+counted **once per control**, not per box inside it — counting descendants made
+css-tricks' nav (every link wrapping a span) outvote its real link colour 404 to
+410.
+
+**Before proposing a fourth colour rule, read the three that were rejected**
+(`docs/reports/2026-09-23-color-roles-v1.md`); the first two run backwards:
+
+- **base/main/accent against 70:25:5** — the 13 measurable designed pages miss it
+  by **15 to 55 points**, base shares 39.6% to 97.6%. Every one would report wrong.
+- **palette sprawl** — 3 to 35 distinct colours, no clustering, and the most
+  careful pages are at the top. Same trap as the type-scale candidates.
+- **accent role collision** — fires on 13 of 15, and the collisions are the body
+  ink (Wikipedia: 257 static elements and 5 links at `#202122`).
+
+**The round's largest finding was not a new rule.** `parseColor` in
+`CONTRAST_BACKGROUND_JS` matched `rgba?()` only, and Chromium serialises
+non-legacy colour functions verbatim — a Tailwind v4 `oklch()` token computes to
+`lab(1.90334 0.278696 -5.48866)`. Every caller drops a colour it cannot parse, so
+`check a11y contrast` **inspected 10 of 1068 elements** on tailwindcss.com/docs
+and reported one bogus `#ffffff on #ffffff` failure. It now rasterises a pixel
+and reads it back, which is the browser's own conversion and gamut mapping: 501
+elements inspected, the bogus row gone, four real AA failures found. 566 of that
+page's 576 text-bearing elements were unreadable; the other 13 corpus pages had
+none, plus 4 `oklch()` backgrounds on MDN. So the blindness is narrow in
+population and **total** where it applies.
 
 ## Measuring Gate / Rule Execution Cost
 
@@ -505,7 +554,7 @@ This repository is a pnpm workspace.
 |------|----------|
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 27 of the 29 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 28 of the 30 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -542,7 +591,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the eighteen scene kinds (seventeen structures + `compose`), the annotation ops every kind shares, the timeline layer, embedding. The one page an agent reads before producing a scene |
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 29 gates + 185 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 30 gates + 191 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

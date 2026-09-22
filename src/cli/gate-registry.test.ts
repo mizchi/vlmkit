@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 29);
+    assert.equal(r.list().length, 30);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -201,8 +201,22 @@ describe("composed built-in registry", () => {
     //       the same reasons. Six further candidate metrics were measured against paired
     //       mutants and rejected for not discriminating — docs/design/composition-metrics.md
     //       keeps the list, because a rejected metric is the more reusable half of that study.
+    // 185 → 191: `check color`, the first gate about what a colour is FOR rather than whether one
+    //       string is legible. `control-boundary-invisible` (warn) — a text field whose own fill
+    //       or border is under 3:1 against the surface behind it with no shadow or outline
+    //       either, so where to type is invisible; `color-only-link` (warn) — a link inside
+    //       prose, marked off from that prose by colour alone and under 3:1 against it;
+    //       `link-no-cue` (warn) — the degenerate case, a link in exactly the body ink;
+    //       `unreadable-color` (info) — the anti-silence rule, because the shared colour parser
+    //       understood rgb() only and `check a11y contrast` had been inspecting 10 of 1068
+    //       elements on an oklch() page and calling it clean; plus `nothing-judged` and
+    //       `redirected`. Both judgements carry WCAG's own 3:1 (1.4.11 and 1.4.1/G183), so
+    //       neither is a threshold this repo chose — and three further candidates were measured
+    //       on 14 designed pages and rejected, including scoring base/main/accent against
+    //       70:25:5, which every one of those pages misses by 15 to 55 points.
+    //       docs/reports/2026-09-23-color-roles-v1.md keeps the list.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 185);
+    assert.equal(total, 191);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -227,6 +241,7 @@ describe("composed built-in registry", () => {
       "check.animation",
       "check.asset",
       "check.breakpoints",
+      "check.color",
       "check.composition",
       "check.copy",
       "check.crater",
