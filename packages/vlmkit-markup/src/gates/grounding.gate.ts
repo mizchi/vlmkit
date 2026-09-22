@@ -59,6 +59,25 @@ export function parseResolution(
   return { maxWidth: Number(m[1]), maxHeight: Number(m[2]) };
 }
 
+/**
+ * `--at 473,96 --at 447,96` — the points to hit-test, in screenshot px.
+ *
+ * Repeatable rather than comma-joined: a caller checking two candidate answers
+ * for one target wants to see them side by side, and `x,y` already uses the
+ * comma.
+ */
+export function parseAtPoints(argv: readonly string[]): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== "--at") continue;
+    const raw = argv[i + 1];
+    const m = raw?.match(/^(-?\d+)\s*,\s*(-?\d+)$/);
+    if (!m) throw new UsageError(`--at ${raw ?? ""}: expected a screenshot-px point as x,y (e.g. --at 473,96).`);
+    out.push({ x: Number(m[1]), y: Number(m[2]) });
+  }
+  return out;
+}
+
 export const groundingGate = defineGate<GroundingScanReport, GroundingScanOptions>({
   id: "check.grounding",
   command: ["check", "grounding"],
@@ -76,6 +95,10 @@ usable for grounding a click without a VLM.
 
 --mark <png> draws the same map onto the screenshot as numbered boxes
 (set-of-mark), red where the coordinate carries a risk.
+
+--at x,y (repeatable) hit-tests a coordinate you already have and says
+which element a click there would reach -- for checking an answer, or
+a line of this report, before acting on it.
 
 Complements rather than repeats: WCAG touch size is \`check a11y touch\`,
 keyboard behavior is \`check interactions\`, and whether an action had a
@@ -154,6 +177,7 @@ finding.`,
     { name: "precision-floor", placeholder: "px", kind: "number", description: "Min side in screenshot px below which a target is unresolvable", defaultDescription: "10" },
     { name: "aim-margin", placeholder: "px", kind: "number", description: "Click-point-to-neighbour distance in screenshot px below which a miss hits the neighbour", defaultDescription: "6" },
     { name: "mark", placeholder: "png", kind: "path", description: "Write a numbered set-of-mark screenshot here" },
+    { name: "at", placeholder: "x,y", kind: "string", description: "Hit-test this screenshot-px point and report what a click there reaches", repeatable: true },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -162,12 +186,14 @@ finding.`,
       "--precision-floor",
       "--aim-margin",
       "--mark",
+      "--at",
     ]);
     const precisionFloor = optionalInt(argv, "precision-floor", { min: 1 });
     const aimMargin = optionalInt(argv, "aim-margin", { min: 0 });
     const viewport = viewportFlag(argv);
     const resolution = parseResolution(argv);
     const markPath = readFlag(argv, "mark");
+    const at = parseAtPoints(argv);
     return {
       source,
       ...(resolution !== undefined ? { resolution } : {}),
@@ -175,6 +201,7 @@ finding.`,
       ...(aimMargin !== undefined ? { aimMargin } : {}),
       ...(viewport ? { viewport } : {}),
       ...(markPath ? { markPath } : {}),
+      ...(at.length > 0 ? { at } : {}),
       ...parsePageLoad(argv),
     };
   },

@@ -125,6 +125,17 @@ export interface GroundingTargetSample {
    * conclusion that would have been wrong.
    */
   forwardedByLabel?: boolean;
+  /**
+   * A point inside the box that DOES route to the target, found by sweeping it
+   * when the centre did not. Absent when the centre routed (nothing to search
+   * for) or when the sweep found nothing (the target really is unreachable).
+   *
+   * `room` is how far that point sits from the nearest thing that is not the
+   * target, in CSS px — the margin an agent's coordinate error has to stay
+   * inside. A 1px pocket and a 40px one are both "reachable" and only one of
+   * them is worth aiming at.
+   */
+  reachable?: { x: number; y: number; room: number; sampled: number; clear: number };
   /** `disabled` / `aria-disabled`. Kept in the map, excluded from every finding. */
   disabled: boolean;
   /** Any part of the box inside the viewport. Targets below the fold are map-only. */
@@ -158,7 +169,14 @@ export interface GroundingScanInput {
 
 /** The resolution the decision is actually made at. */
 export interface AgentFrame {
-  /** How the resolution was chosen, for the report line. */
+  /**
+   * How the resolution was chosen — a preset name, or the `WxH` the caller asked
+   * for. This is the CAP that was applied, not the frame that came out of it:
+   * `medium` caps at 640x480 and a 16:9 viewport under it is 640x360. Findings
+   * quote `width`x`height`; v1's agent read the cap in every message and
+   * reported, correctly, that "that parenthetical never matches the real frame
+   * size, in every single finding line".
+   */
   resolution: string;
   /** Screenshot pixels the model sees. */
   width: number;
@@ -177,13 +195,43 @@ export interface GroundingTarget {
   role: string;
   /** What a reader of the screenshot would call it: visible text, else the accessible name. */
   label: string;
-  /** Click point in screenshot px — the coordinate to emit. */
+  /**
+   * Click point in screenshot px — **the coordinate to emit**, which is the
+   * whole contract of this row. It is the centre of the visible box normally,
+   * and the middle of the largest clear pocket when something covers that
+   * centre, because a map whose coordinate does not reach its own target is
+   * worse than no map: v1's smaller model emitted the centre the map gave it
+   * and activated the promo ribbon on top of the button.
+   */
   point: { x: number; y: number };
+  /**
+   * Present when `point` is NOT the centre of the element's own box: why it
+   * moved, where the centre was, and how far the new point sits from whatever
+   * would make it miss — the interceptor for `occluded`, the frame edge for
+   * `clipped` — in screenshot px.
+   *
+   * `clipped` is here because v1's follow-up run asked for it by name: "the
+   * click point is silently recentred into the visible sliver, but only the
+   * occlusion case gets an explicit `aimedOffCentre` field — clipping gets no
+   * equivalent margin number, just prose." Both cases move the coordinate, so
+   * both declare it, and a consumer can tell a 3px aim budget from a 40px one
+   * without re-deriving it from two boxes.
+   */
+  aimedOffCentre?: { reason: "occluded" | "clipped"; centre: { x: number; y: number }; room: number };
   /** Click point in CSS px, for a caller driving a real browser instead. */
   cssPoint: { x: number; y: number };
   /** Box in screenshot px. */
   box: Box;
-  /** Min side in screenshot px — the limiting dimension for resolving the target at all. */
+  /**
+   * The part of the box inside the frame, in screenshot px. Equal to `box` for a
+   * target the frame contains; smaller for one the fold or an edge cuts.
+   *
+   * Carried because it is the box every measurement here is actually taken on,
+   * and a consumer aiming at `point` needs to know how much of the target it can
+   * see rather than how big the element is.
+   */
+  visibleBox: Box;
+  /** Min side of `visibleBox` — the limiting dimension for resolving the target at all. */
   minSide: number;
   /**
    * Distance from the click point to the nearest OTHER target's box, screenshot px.
@@ -223,10 +271,38 @@ export interface GroundingIssue {
   selector?: string;
 }
 
+/** One `--at` answer: what a click at this screenshot coordinate would reach. */
+export interface GroundingProbe {
+  /** As given, in screenshot px. */
+  point: { x: number; y: number };
+  /** The same point in CSS px, which is where it was dispatched. */
+  cssPoint: { x: number; y: number };
+  /** `stableSelector` of the element that takes the click, or null for nothing. */
+  hit: string | null;
+  /** The action-map row this landed on, when it landed on one. */
+  targetId?: string;
+  /**
+   * The nearest element from the hit up to `<body>` that carries a role, an
+   * `onclick` or a non-negative `tabindex` — what the click would most likely
+   * set off, when the hit itself is not in the map.
+   *
+   * Absent means nothing on that path declares itself interactive, which is the
+   * closest this gate can honestly get to "the click does nothing". Added
+   * because a run read the old `(not a target)` and said: it "never says whether
+   * #promo is inert or itself clickable; 'not a target' means 'not in the
+   * actionable list,' not 'safe to slip onto.'"
+   */
+  wouldReach?: string;
+  /** Outside the frame, so no click could be sent there at all. */
+  offFrame?: boolean;
+}
+
 export interface GroundingScanReport {
   source: string;
   frame: AgentFrame;
   targets: GroundingTarget[];
+  /** Present only when `--at` was passed. Absent means "not asked", never "clean". */
+  probes?: GroundingProbe[];
   /** Candidates the in-page cap dropped. */
   capped: number;
   issues: GroundingIssue[];
@@ -249,6 +325,18 @@ export interface GroundingScanOptions extends PageLoadOptions {
   aimMargin?: number;
   /** Write a numbered set-of-mark screenshot here. */
   markPath?: string;
+  /**
+   * `--at x,y` — hit-test these screenshot-px points and report what each one
+   * reaches, without changing the verdict.
+   *
+   * v1's agent found the gap by needing it: it disbelieved an `occluded-target`
+   * line, was right to, and had "no coordinate-hit-test command to confirm
+   * whether a specific pixel actually resolves to a given element short of
+   * trusting the report". A map a caller cannot check is a map it has to take on
+   * faith, and the one line it should not have taken on faith was the one it
+   * caught.
+   */
+  at?: readonly { x: number; y: number }[];
 }
 
 const MAX_TARGETS = 300;
@@ -267,8 +355,8 @@ export function resolveAgentFrame(
   const chosen = resolution ?? resolveResolutionForViewport(viewport.width);
   const box = typeof chosen === "string" ? RESOLUTION_PRESETS[chosen] : chosen;
   const label = typeof chosen === "string"
-    ? `${chosen} (${box.maxWidth}x${box.maxHeight})`
-    : `${box.maxWidth}x${box.maxHeight}`;
+    ? `${chosen}, cap ${box.maxWidth}x${box.maxHeight}`
+    : `cap ${box.maxWidth}x${box.maxHeight}`;
   // `min(1, ...)` because `resizePngBuffer` returns the original when it already
   // fits: a preset LARGER than the viewport must not scale the coordinates up.
   const scale = Math.min(1, box.maxWidth / viewport.width, box.maxHeight / viewport.height);
@@ -338,23 +426,40 @@ export function analyzeGroundingSamples(
     options.resolution,
   );
 
-  const targets: GroundingTarget[] = input.targets.map((sample, i) => ({
+  const targets: GroundingTarget[] = input.targets.map((sample, i) => {
+    // The point that reaches the target beats the point at its centre.
+    const aim = sample.reachable ?? sample.clickPoint;
+    return {
     id: `t${i + 1}`,
     selector: sample.selector,
     role: sample.role,
     label: shorten(sample.visibleText || sample.name),
     point: {
-      x: Math.round(sample.clickPoint.x * frame.scale),
-      y: Math.round(sample.clickPoint.y * frame.scale),
+      x: Math.round(aim.x * frame.scale),
+      y: Math.round(aim.y * frame.scale),
     },
-    cssPoint: { x: Math.round(sample.clickPoint.x), y: Math.round(sample.clickPoint.y) },
+    cssPoint: { x: Math.round(aim.x), y: Math.round(aim.y) },
+    ...(sample.reachable
+      ? {
+        aimedOffCentre: {
+          reason: "occluded" as const,
+          centre: {
+            x: Math.round(sample.clickPoint.x * frame.scale),
+            y: Math.round(sample.clickPoint.y * frame.scale),
+          },
+          room: Math.round(sample.reachable.room * frame.scale),
+        },
+      }
+      : {}),
     box: scaleBox(sample.bbox, frame.scale),
+    visibleBox: scaleBox(sample.bbox, frame.scale),
     minSide: 0,
     disabled: sample.disabled,
     inFrame: sample.inFrame,
     clipped: sample.clipped,
     risks: [],
-  }));
+    };
+  });
 
   // Second pass: the two geometric properties that are relations between targets
   // rather than facts about one. `minSide` uses the VISIBLE box — a card half
@@ -365,11 +470,41 @@ export function analyzeGroundingSamples(
     const visible = {
       x: Math.max(target.box.x, 0),
       y: Math.max(target.box.y, 0),
-      width: Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0),
-      height: Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0),
+      width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
+      height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
     };
+    if (sample.inFrame) {
+      target.visibleBox = visible;
+      // The collector already clamps the click point into the visible part, so
+      // a clipped target's coordinate is off its own centre too — say so, with
+      // the margin the frame edge leaves. Occlusion has already claimed the
+      // field when both apply: it is the one that decides whether the click
+      // reaches the element at all.
+      const boxCentre = {
+        x: Math.round(target.box.x + target.box.width / 2),
+        y: Math.round(target.box.y + target.box.height / 2),
+      };
+      // The condition is that the frame CUT the box, not that the two centres
+      // differ: `point` and `boxCentre` are rounded from different quantities,
+      // so they disagree by a pixel on perfectly ordinary targets, and the first
+      // version of this labelled three nav links and a table button `clipped`
+      // with 7px of room. A cut box is a fact; a ±1 disagreement is arithmetic.
+      const cut = visible.width !== target.box.width || visible.height !== target.box.height;
+      if (!target.aimedOffCentre && cut) {
+        target.aimedOffCentre = {
+          reason: "clipped",
+          centre: boxCentre,
+          room: Math.max(0, Math.round(Math.min(
+            target.point.x - visible.x,
+            visible.x + visible.width - target.point.x,
+            target.point.y - visible.y,
+            visible.y + visible.height - target.point.y,
+          ))),
+        };
+      }
+    }
     target.minSide = sample.inFrame
-      ? Math.max(0, Math.min(visible.width, visible.height))
+      ? Math.min(visible.width, visible.height)
       : Math.min(target.box.width, target.box.height);
     if (!sample.inFrame) continue;
     let margin = Number.POSITIVE_INFINITY;
@@ -405,17 +540,23 @@ export function analyzeGroundingSamples(
   for (const target of actionable) {
     const sample = sampleOf.get(target.id)!;
     if (!sample.centreHit && !sample.forwardedByLabel) {
+      const centre = target.aimedOffCentre?.centre ?? target.point;
       raise(target, {
         kind: "occluded-target",
         severity: "suspect",
         selector: target.selector,
         message: `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})`
-          + ` is painted at (${target.point.x},${target.point.y}) but a click there goes to`
+          + ` is covered at its own centre (${centre.x},${centre.y}): a click there goes to`
           + ` ${sample.interceptedBy ?? "nothing"}`
-          + (sample.hitFraction > 0
-            ? ` — ${Math.round(sample.hitFraction * 100)}% of the box still routes here, so aim off-centre or raise this element`
-            : " — no point inside the box routes here at all")
-          + ".",
+          // Say where it CAN be clicked, when it can. The alternative — telling an
+          // agent a target is hopeless and letting it aim at the covered centre
+          // anyway — is what v1's haiku run did, and it activated the interceptor.
+          + (target.aimedOffCentre
+            ? `. This map aims at (${target.point.x},${target.point.y}) instead, which does reach it,`
+              + ` with ${target.aimedOffCentre.room}px of room before the nearest thing that is not`
+              + ` this element — still a defect, because anything aiming at the centre misses.`
+            : ` — and no point inside the box routes here, so nothing can click it`
+              + ` until ${sample.interceptedBy ?? "the interceptor"} moves or drops pointer-events.`),
       });
     }
     if (!sample.visibleText.trim() && !sample.hasGlyph) {
@@ -429,13 +570,23 @@ export function analyzeGroundingSamples(
       });
     }
     if (target.minSide < precisionFloor) {
+      // The number quoted has to be the one that tripped the rule. It used to be
+      // the full box, and on a form row at the bottom of the frame that read
+      // "#publish (button \"Send\") is 34x18 screenshot px — under the 10px
+      // floor": a self-contradicting line, because the 18 is the element's
+      // height and the 6 the frame leaves of it is what the rule measured.
+      const cut = target.visibleBox.width !== target.box.width
+        || target.visibleBox.height !== target.box.height;
       raise(target, {
         kind: "imprecise-target",
         severity: "warn",
         selector: target.selector,
         message: `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})`
-          + ` is ${target.box.width}x${target.box.height} screenshot px at ${frame.resolution}`
-          + ` — under the ${precisionFloor}px floor, so the target is a few pixels wide in the image the model reads.`,
+          + ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame`
+          + (cut
+            ? ` — the frame cuts it (the element is ${target.box.width}x${target.box.height}); this gate measures the initial frame and never scrolls, so scroll it into view and re-run before aiming`
+            : ` — the whole element`)
+          + `, under the ${precisionFloor}px floor either way: a few pixels for the model to aim at.`,
       });
     }
     if (target.aimMargin !== undefined && target.aimMargin < aimFloor && target.nearest) {
@@ -663,6 +814,45 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
       }
     }
 
+    // The centre is intercepted — so find a point that is NOT, before saying
+    // the target is unreachable. A 3x3 grid answers "is the centre clear", and
+    // reporting that as "no point inside the box routes here at all" is a
+    // different and much stronger claim, which on a button 86% covered by a
+    // promo ribbon was simply false: a 17px strip on its right edge routed to
+    // it the whole time. The sweep is a real search on a fine grid, and the
+    // point it returns is the middle of the largest clear pocket rather than
+    // the first hit — a coordinate one pixel inside the boundary is not one to
+    // hand an agent that rounds.
+    let reach = null;
+    if (inFrame && !centreHit && !forwardedByLabel) {
+      const w = right - left;
+      const h = bottom - top;
+      // Cap the work: an occluded target is rare, but the page decides how many.
+      const step = Math.max(1, Math.ceil(Math.sqrt((w * h) / 400)));
+      const clear = [];
+      const blocked = [];
+      for (let py = top + step / 2; py < bottom; py += step) {
+        for (let px = left + step / 2; px < right; px += step) {
+          const hit = document.elementFromPoint(px, py);
+          (hit === el || (hit && el.contains(hit)) ? clear : blocked).push([px, py]);
+        }
+      }
+      if (clear.length > 0) {
+        let best = null;
+        let bestRoom = -1;
+        for (const [px, py] of clear) {
+          // Room = how far this point is from anything that is not the target,
+          // counting the box edges, so the winner sits in open space.
+          let room = Math.min(px - left, right - px, py - top, bottom - py);
+          for (const [bx, by] of blocked) {
+            room = Math.min(room, Math.max(Math.abs(px - bx), Math.abs(py - by)));
+          }
+          if (room > bestRoom) { bestRoom = room; best = [px, py]; }
+        }
+        reach = { x: best[0], y: best[1], room: Math.max(0, Math.round(bestRoom)), sampled: clear.length + blocked.length, clear: clear.length };
+      }
+    }
+
     targets.push({
       selector: stableSelector(el),
       tag: el.tagName.toLowerCase(),
@@ -676,6 +866,7 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
       centreHit,
       ...(interceptor ? { interceptedBy: interceptor } : {}),
       ...(forwardedByLabel ? { forwardedByLabel: true } : {}),
+      ...(reach ? { reachable: reach } : {}),
       disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
       inFrame,
       clipped: rect.left < 0 || rect.top < 0 || rect.right > vw || rect.bottom > vh,
@@ -699,6 +890,9 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
     const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">;
     const report = analyzeGroundingSamples({ source: options.source, ...collected }, options);
+    if (options.at && options.at.length > 0) {
+      report.probes = await probePoints(page, options.at, report);
+    }
     if (options.markPath) {
       // The screenshot is taken AFTER the hit testing, from the same page state,
       // so the coordinates drawn on it are the coordinates that were measured.
@@ -711,6 +905,69 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
     }
     return report;
   });
+}
+
+/**
+ * Answer `--at`: dispatch each point at the live page and say what takes it.
+ *
+ * The points arrive in SCREENSHOT px, because that is the space the caller has
+ * a coordinate in — the map's, the marked PNG's, and its own answer's. One
+ * divide by the frame's scale is the whole conversion, and doing it here rather
+ * than asking the caller to is the point: a caller that could do the arithmetic
+ * reliably would not need the check.
+ */
+async function probePoints(
+  page: import("playwright").Page,
+  points: readonly { x: number; y: number }[],
+  report: GroundingScanReport,
+): Promise<GroundingProbe[]> {
+  const { scale, width, height } = report.frame;
+  const out: GroundingProbe[] = [];
+  for (const point of points) {
+    const cssPoint = { x: Math.round(point.x / scale), y: Math.round(point.y / scale) };
+    if (point.x < 0 || point.y < 0 || point.x >= width || point.y >= height) {
+      out.push({ point, cssPoint, hit: null, offFrame: true });
+      continue;
+    }
+    const probed = await page.evaluate(
+      ([x, y, selectorJs]) => {
+        // eslint-disable-next-line no-eval
+        const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (el: Element) => string;
+        const el = document.elementFromPoint(x, y);
+        if (!el) return { hit: null, wouldReach: null };
+        let node: Element | null = el;
+        let wouldReach: string | null = null;
+        while (node && node.tagName !== "BODY") {
+          const tabindex = node.getAttribute("tabindex");
+          if (node.getAttribute("role")
+            || node.hasAttribute("onclick")
+            || (tabindex !== null && Number(tabindex) >= 0)
+            || /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)) {
+            wouldReach = stableSelector(node);
+            break;
+          }
+          node = node.parentElement;
+        }
+        return { hit: stableSelector(el), wouldReach };
+      },
+      [cssPoint.x, cssPoint.y, STABLE_SELECTOR_JS] as const,
+    ) as { hit: string | null; wouldReach: string | null };
+    const find = (selector: string | null) =>
+      selector ? report.targets.find((t) => t.selector === selector) : undefined;
+    // A hit on a button's own icon is a hit on the button: `elementFromPoint`
+    // returns the innermost element, which is often a child the map does not
+    // list. Resolving the enclosing control back to its row is what stops that
+    // reading as "not in this map" when the click does exactly what was wanted.
+    const row = find(probed.hit) ?? find(probed.wouldReach);
+    out.push({
+      point,
+      cssPoint,
+      hit: probed.hit,
+      ...(row ? { targetId: row.id } : {}),
+      ...(!row && probed.wouldReach ? { wouldReach: probed.wouldReach } : {}),
+    });
+  }
+  return out;
 }
 
 /**
@@ -825,7 +1082,8 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
   lines.push(`status: ${status}`);
   lines.push(
     `frame: ${report.frame.width}x${report.frame.height} screenshot px`
-    + ` — ${report.frame.resolution}, scale ${report.frame.scale.toFixed(2)}`,
+    + ` — ${report.frame.resolution}, scale ${report.frame.scale.toFixed(2)}`
+    + ` (every coordinate below is in these ${report.frame.width}x${report.frame.height} pixels)`,
   );
   lines.push(
     `targets: ${inFrame.length} actionable in frame`
@@ -848,6 +1106,24 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     }
     if (inFrame.length > 20) {
       lines.push(`  ${DIM}… ${inFrame.length - 20} more — --json emits the full map${RESET}`);
+    }
+  }
+  if (report.probes && report.probes.length > 0) {
+    lines.push("");
+    lines.push("Probes (--at, screenshot px):");
+    for (const probe of report.probes) {
+      const where = probe.offFrame
+        ? `${RED}outside the ${report.frame.width}x${report.frame.height} frame${RESET}`
+        : probe.hit
+          ? `${probe.hit}${
+            probe.targetId
+              ? ` ${DIM}(${probe.targetId})${RESET}`
+              : probe.wouldReach
+                ? ` ${YELLOW}(not in this map, and the click would set off ${probe.wouldReach})${RESET}`
+                : ` ${DIM}(not in this map; nothing up to <body> declares itself interactive)${RESET}`
+          }`
+          : `${YELLOW}nothing${RESET}`;
+      lines.push(`  (${probe.point.x},${probe.point.y}) ${DIM}= css (${probe.cssPoint.x},${probe.cssPoint.y})${RESET} -> ${where}`);
     }
   }
   if (shown.length > 0) {

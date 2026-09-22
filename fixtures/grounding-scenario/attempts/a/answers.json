@@ -1,0 +1,8 @@
+{
+  "renew":         { "x": 473, "y": 96 },
+  "manage-globex": { "x": 458, "y": 203 },
+  "export-csv":    { "x": 60,  "y": 293 },
+  "publish":       { "x": 218, "y": 357 },
+  "audit-log":     { "x": 225, "y": 14 },
+  "account-menu":  { "x": 621, "y": 14 }
+}

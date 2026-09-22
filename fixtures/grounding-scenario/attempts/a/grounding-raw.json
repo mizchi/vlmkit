@@ -1,0 +1,707 @@
+{
+  "gate": "check.grounding",
+  "command": "check grounding",
+  "verdict": "fail",
+  "counts": {
+    "suspect": 1,
+    "warn": 12,
+    "info": 0
+  },
+  "findings": [
+    {
+      "rule": "label-mismatch",
+      "severity": "warn",
+      "message": "button.avatar reads \"RM\" on screen but its accessible name is \"Account menu\" — an agent told to click one of the two cannot find the other.",
+      "selector": "button.avatar"
+    },
+    {
+      "rule": "occluded-target",
+      "severity": "suspect",
+      "message": "#renew-now (button \"Renew plan\") is painted at (447,96) but a click there goes to #promo — no point inside the box routes here at all.",
+      "selector": "#renew-now"
+    },
+    {
+      "rule": "imprecise-target",
+      "severity": "warn",
+      "message": "button.refresh (button \"Refresh invoices\") shows 7x7 screenshot px at medium (640x480) — the whole element, under the 10px floor either way: a few pixels for the model to aim at.",
+      "selector": "button.refresh"
+    },
+    {
+      "rule": "crowded-target",
+      "severity": "warn",
+      "message": "button.refresh's click point is 3px from button.export (button \"Export invoices as CSV\") — a coordinate off by 6px activates the neighbour instead.",
+      "selector": "button.refresh"
+    },
+    {
+      "rule": "imprecise-target",
+      "severity": "warn",
+      "message": "button.export (button \"Export invoices as CSV\") shows 7x7 screenshot px at medium (640x480) — the whole element, under the 10px floor either way: a few pixels for the model to aim at.",
+      "selector": "button.export"
+    },
+    {
+      "rule": "crowded-target",
+      "severity": "warn",
+      "message": "button.export's click point is 3px from button.trash (button \"Delete draft invoice\") — a coordinate off by 6px activates the neighbour instead.",
+      "selector": "button.export"
+    },
+    {
+      "rule": "imprecise-target",
+      "severity": "warn",
+      "message": "button.trash (button \"Delete draft invoice\") shows 7x7 screenshot px at medium (640x480) — the whole element, under the 10px floor either way: a few pixels for the model to aim at.",
+      "selector": "button.trash"
+    },
+    {
+      "rule": "crowded-target",
+      "severity": "warn",
+      "message": "button.trash's click point is 4px from button.export (button \"Export invoices as CSV\") — a coordinate off by 6px activates the neighbour instead.",
+      "selector": "button.trash"
+    },
+    {
+      "rule": "imprecise-target",
+      "severity": "warn",
+      "message": "#contact (textbox \"billing@northwind.example\") shows 130x6 screenshot px at medium (640x480) — the frame cuts it (the element is 130x18), so scroll it into view before aiming, under the 10px floor either way: a few pixels for the model to aim at.",
+      "selector": "#contact"
+    },
+    {
+      "rule": "imprecise-target",
+      "severity": "warn",
+      "message": "#revert (button \"Revert\") shows 36x6 screenshot px at medium (640x480) — the frame cuts it (the element is 36x18), so scroll it into view before aiming, under the 10px floor either way: a few pixels for the model to aim at.",
+      "selector": "#revert"
+    },
+    {
+      "rule": "imprecise-target",
+      "severity": "warn",
+      "message": "#publish (button \"Send\") shows 34x6 screenshot px at medium (640x480) — the frame cuts it (the element is 34x18), so scroll it into view before aiming, under the 10px floor either way: a few pixels for the model to aim at.",
+      "selector": "#publish"
+    },
+    {
+      "rule": "label-mismatch",
+      "severity": "warn",
+      "message": "#publish reads \"Send\" on screen but its accessible name is \"Publish changes\" — an agent told to click one of the two cannot find the other.",
+      "selector": "#publish"
+    },
+    {
+      "rule": "ambiguous-target",
+      "severity": "warn",
+      "message": "3 buttons in the frame all read \"Manage\" (t7 at 458,177, t8 at 458,203, t9 at 458,230) — distinguishable only by their surrounding text (Acme Freight Team 18 Manage / Globex Media Enterprise 240 Man… / Initech Labs Starter 4 Manage), so an accessible name carrying it would let an agent name one.",
+      "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(2) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(4) > button:nth-of-type(1)"
+    }
+  ],
+  "suppressed": [],
+  "retuned": [],
+  "report": {
+    "source": "fixtures/grounding-scenario/pages/console.html",
+    "frame": {
+      "resolution": "medium (640x480)",
+      "width": 640,
+      "height": 360,
+      "scale": 0.5,
+      "viewportWidth": 1280,
+      "viewportHeight": 720
+    },
+    "targets": [
+      {
+        "id": "t1",
+        "selector": "html > body:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(1)",
+        "role": "link",
+        "label": "Overview",
+        "point": {
+          "x": 122,
+          "y": 14
+        },
+        "cssPoint": {
+          "x": 244,
+          "y": 28
+        },
+        "box": {
+          "x": 107,
+          "y": 7,
+          "width": 31,
+          "height": 14
+        },
+        "visibleBox": {
+          "x": 107,
+          "y": 7,
+          "width": 31,
+          "height": 14
+        },
+        "minSide": 14,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [],
+        "nearest": "t2",
+        "aimMargin": 25
+      },
+      {
+        "id": "t2",
+        "selector": "a.on",
+        "role": "link",
+        "label": "Billing",
+        "point": {
+          "x": 159,
+          "y": 14
+        },
+        "cssPoint": {
+          "x": 318,
+          "y": 28
+        },
+        "box": {
+          "x": 147,
+          "y": 7,
+          "width": 23,
+          "height": 14
+        },
+        "visibleBox": {
+          "x": 147,
+          "y": 7,
+          "width": 23,
+          "height": 14
+        },
+        "minSide": 14,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [],
+        "nearest": "t1",
+        "aimMargin": 21
+      },
+      {
+        "id": "t3",
+        "selector": "html > body:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(3)",
+        "role": "link",
+        "label": "Usage",
+        "point": {
+          "x": 191,
+          "y": 14
+        },
+        "cssPoint": {
+          "x": 382,
+          "y": 28
+        },
+        "box": {
+          "x": 181,
+          "y": 7,
+          "width": 20,
+          "height": 14
+        },
+        "visibleBox": {
+          "x": 181,
+          "y": 7,
+          "width": 20,
+          "height": 14
+        },
+        "minSide": 14,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [],
+        "nearest": "t4",
+        "aimMargin": 20
+      },
+      {
+        "id": "t4",
+        "selector": "html > body:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(4)",
+        "role": "link",
+        "label": "Audit log",
+        "point": {
+          "x": 225,
+          "y": 14
+        },
+        "cssPoint": {
+          "x": 451,
+          "y": 28
+        },
+        "box": {
+          "x": 211,
+          "y": 7,
+          "width": 29,
+          "height": 14
+        },
+        "visibleBox": {
+          "x": 211,
+          "y": 7,
+          "width": 29,
+          "height": 14
+        },
+        "minSide": 14,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [],
+        "nearest": "t3",
+        "aimMargin": 24
+      },
+      {
+        "id": "t5",
+        "selector": "button.avatar",
+        "role": "button",
+        "label": "RM",
+        "point": {
+          "x": 621,
+          "y": 14
+        },
+        "cssPoint": {
+          "x": 1241,
+          "y": 28
+        },
+        "box": {
+          "x": 613,
+          "y": 6,
+          "width": 15,
+          "height": 15
+        },
+        "visibleBox": {
+          "x": 613,
+          "y": 6,
+          "width": 15,
+          "height": 15
+        },
+        "minSide": 15,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "label-mismatch"
+        ],
+        "nearest": "t6",
+        "aimMargin": 160.1
+      },
+      {
+        "id": "t6",
+        "selector": "#renew-now",
+        "role": "button",
+        "label": "Renew plan",
+        "point": {
+          "x": 447,
+          "y": 96
+        },
+        "cssPoint": {
+          "x": 894,
+          "y": 192
+        },
+        "box": {
+          "x": 417,
+          "y": 86,
+          "width": 61,
+          "height": 19
+        },
+        "visibleBox": {
+          "x": 417,
+          "y": 86,
+          "width": 61,
+          "height": 19
+        },
+        "minSide": 19,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "occluded-target"
+        ],
+        "nearest": "t7",
+        "aimMargin": 73
+      },
+      {
+        "id": "t7",
+        "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(2) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(4) > button:nth-of-type(1)",
+        "role": "button",
+        "label": "Manage",
+        "point": {
+          "x": 458,
+          "y": 177
+        },
+        "cssPoint": {
+          "x": 917,
+          "y": 353
+        },
+        "box": {
+          "x": 439,
+          "y": 169,
+          "width": 38,
+          "height": 15
+        },
+        "visibleBox": {
+          "x": 439,
+          "y": 169,
+          "width": 38,
+          "height": 15
+        },
+        "minSide": 15,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "ambiguous-target"
+        ],
+        "nearest": "t8",
+        "aimMargin": 19
+      },
+      {
+        "id": "t8",
+        "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(2) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(4) > button:nth-of-type(1)",
+        "role": "button",
+        "label": "Manage",
+        "point": {
+          "x": 458,
+          "y": 203
+        },
+        "cssPoint": {
+          "x": 917,
+          "y": 406
+        },
+        "box": {
+          "x": 439,
+          "y": 196,
+          "width": 38,
+          "height": 15
+        },
+        "visibleBox": {
+          "x": 439,
+          "y": 196,
+          "width": 38,
+          "height": 15
+        },
+        "minSide": 15,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "ambiguous-target"
+        ],
+        "nearest": "t7",
+        "aimMargin": 19
+      },
+      {
+        "id": "t9",
+        "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(2) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(4) > button:nth-of-type(1)",
+        "role": "button",
+        "label": "Manage",
+        "point": {
+          "x": 458,
+          "y": 230
+        },
+        "cssPoint": {
+          "x": 917,
+          "y": 459
+        },
+        "box": {
+          "x": 439,
+          "y": 222,
+          "width": 38,
+          "height": 15
+        },
+        "visibleBox": {
+          "x": 439,
+          "y": 222,
+          "width": 38,
+          "height": 15
+        },
+        "minSide": 15,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "ambiguous-target"
+        ],
+        "nearest": "t8",
+        "aimMargin": 19
+      },
+      {
+        "id": "t10",
+        "selector": "button.refresh",
+        "role": "button",
+        "label": "Refresh invoices",
+        "point": {
+          "x": 53,
+          "y": 293
+        },
+        "cssPoint": {
+          "x": 106,
+          "y": 585
+        },
+        "box": {
+          "x": 49,
+          "y": 289,
+          "width": 7,
+          "height": 7
+        },
+        "visibleBox": {
+          "x": 49,
+          "y": 289,
+          "width": 7,
+          "height": 7
+        },
+        "minSide": 7,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "imprecise-target",
+          "crowded-target"
+        ],
+        "nearest": "t11",
+        "aimMargin": 3
+      },
+      {
+        "id": "t11",
+        "selector": "button.export",
+        "role": "button",
+        "label": "Export invoices as CSV",
+        "point": {
+          "x": 60,
+          "y": 293
+        },
+        "cssPoint": {
+          "x": 120,
+          "y": 585
+        },
+        "box": {
+          "x": 56,
+          "y": 289,
+          "width": 7,
+          "height": 7
+        },
+        "visibleBox": {
+          "x": 56,
+          "y": 289,
+          "width": 7,
+          "height": 7
+        },
+        "minSide": 7,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "imprecise-target",
+          "crowded-target"
+        ],
+        "nearest": "t12",
+        "aimMargin": 3
+      },
+      {
+        "id": "t12",
+        "selector": "button.trash",
+        "role": "button",
+        "label": "Delete draft invoice",
+        "point": {
+          "x": 67,
+          "y": 293
+        },
+        "cssPoint": {
+          "x": 134,
+          "y": 585
+        },
+        "box": {
+          "x": 63,
+          "y": 289,
+          "width": 7,
+          "height": 7
+        },
+        "visibleBox": {
+          "x": 63,
+          "y": 289,
+          "width": 7,
+          "height": 7
+        },
+        "minSide": 7,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": false,
+        "risks": [
+          "imprecise-target",
+          "crowded-target"
+        ],
+        "nearest": "t11",
+        "aimMargin": 4
+      },
+      {
+        "id": "t13",
+        "selector": "#contact",
+        "role": "textbox",
+        "label": "billing@northwind.example",
+        "point": {
+          "x": 88,
+          "y": 357
+        },
+        "cssPoint": {
+          "x": 175,
+          "y": 714
+        },
+        "box": {
+          "x": 23,
+          "y": 354,
+          "width": 130,
+          "height": 18
+        },
+        "visibleBox": {
+          "x": 23,
+          "y": 354,
+          "width": 130,
+          "height": 6
+        },
+        "minSide": 6,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": true,
+        "risks": [
+          "imprecise-target"
+        ],
+        "nearest": "t12",
+        "aimMargin": 63.6
+      },
+      {
+        "id": "t14",
+        "selector": "#revert",
+        "role": "button",
+        "label": "Revert",
+        "point": {
+          "x": 177,
+          "y": 357
+        },
+        "cssPoint": {
+          "x": 353,
+          "y": 714
+        },
+        "box": {
+          "x": 159,
+          "y": 354,
+          "width": 36,
+          "height": 18
+        },
+        "visibleBox": {
+          "x": 159,
+          "y": 354,
+          "width": 36,
+          "height": 6
+        },
+        "minSide": 6,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": true,
+        "risks": [
+          "imprecise-target"
+        ],
+        "nearest": "t13",
+        "aimMargin": 24
+      },
+      {
+        "id": "t15",
+        "selector": "#publish",
+        "role": "button",
+        "label": "Send",
+        "point": {
+          "x": 218,
+          "y": 357
+        },
+        "cssPoint": {
+          "x": 435,
+          "y": 714
+        },
+        "box": {
+          "x": 201,
+          "y": 354,
+          "width": 34,
+          "height": 18
+        },
+        "visibleBox": {
+          "x": 201,
+          "y": 354,
+          "width": 34,
+          "height": 6
+        },
+        "minSide": 6,
+        "disabled": false,
+        "inFrame": true,
+        "clipped": true,
+        "risks": [
+          "imprecise-target",
+          "label-mismatch"
+        ],
+        "nearest": "t14",
+        "aimMargin": 23
+      }
+    ],
+    "capped": 0,
+    "issues": [
+      {
+        "kind": "label-mismatch",
+        "severity": "warn",
+        "selector": "button.avatar",
+        "message": "button.avatar reads \"RM\" on screen but its accessible name is \"Account menu\" — an agent told to click one of the two cannot find the other."
+      },
+      {
+        "kind": "occluded-target",
+        "severity": "suspect",
+        "selector": "#renew-now",
+        "message": "#renew-now (button \"Renew plan\") is painted at (447,96) but a click there goes to #promo — no point inside the box routes here at all."
+      },
+      {
+        "kind": "imprecise-target",
+        "severity": "warn",
+        "selector": "button.refresh",
+        "message": "button.refresh (button \"Refresh invoices\") shows 7x7 screenshot px at medium (640x480) — the whole element, under the 10px floor either way: a few pixels for the model to aim at."
+      },
+      {
+        "kind": "crowded-target",
+        "severity": "warn",
+        "selector": "button.refresh",
+        "message": "button.refresh's click point is 3px from button.export (button \"Export invoices as CSV\") — a coordinate off by 6px activates the neighbour instead."
+      },
+      {
+        "kind": "imprecise-target",
+        "severity": "warn",
+        "selector": "button.export",
+        "message": "button.export (button \"Export invoices as CSV\") shows 7x7 screenshot px at medium (640x480) — the whole element, under the 10px floor either way: a few pixels for the model to aim at."
+      },
+      {
+        "kind": "crowded-target",
+        "severity": "warn",
+        "selector": "button.export",
+        "message": "button.export's click point is 3px from button.trash (button \"Delete draft invoice\") — a coordinate off by 6px activates the neighbour instead."
+      },
+      {
+        "kind": "imprecise-target",
+        "severity": "warn",
+        "selector": "button.trash",
+        "message": "button.trash (button \"Delete draft invoice\") shows 7x7 screenshot px at medium (640x480) — the whole element, under the 10px floor either way: a few pixels for the model to aim at."
+      },
+      {
+        "kind": "crowded-target",
+        "severity": "warn",
+        "selector": "button.trash",
+        "message": "button.trash's click point is 4px from button.export (button \"Export invoices as CSV\") — a coordinate off by 6px activates the neighbour instead."
+      },
+      {
+        "kind": "imprecise-target",
+        "severity": "warn",
+        "selector": "#contact",
+        "message": "#contact (textbox \"billing@northwind.example\") shows 130x6 screenshot px at medium (640x480) — the frame cuts it (the element is 130x18), so scroll it into view before aiming, under the 10px floor either way: a few pixels for the model to aim at."
+      },
+      {
+        "kind": "imprecise-target",
+        "severity": "warn",
+        "selector": "#revert",
+        "message": "#revert (button \"Revert\") shows 36x6 screenshot px at medium (640x480) — the frame cuts it (the element is 36x18), so scroll it into view before aiming, under the 10px floor either way: a few pixels for the model to aim at."
+      },
+      {
+        "kind": "imprecise-target",
+        "severity": "warn",
+        "selector": "#publish",
+        "message": "#publish (button \"Send\") shows 34x6 screenshot px at medium (640x480) — the frame cuts it (the element is 34x18), so scroll it into view before aiming, under the 10px floor either way: a few pixels for the model to aim at."
+      },
+      {
+        "kind": "label-mismatch",
+        "severity": "warn",
+        "selector": "#publish",
+        "message": "#publish reads \"Send\" on screen but its accessible name is \"Publish changes\" — an agent told to click one of the two cannot find the other."
+      },
+      {
+        "kind": "ambiguous-target",
+        "severity": "warn",
+        "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(2) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(4) > button:nth-of-type(1)",
+        "message": "3 buttons in the frame all read \"Manage\" (t7 at 458,177, t8 at 458,203, t9 at 458,230) — distinguishable only by their surrounding text (Acme Freight Team 18 Manage / Globex Media Enterprise 240 Man… / Initech Labs Starter 4 Manage), so an accessible name carrying it would let an agent name one."
+      }
+    ]
+  }
+}

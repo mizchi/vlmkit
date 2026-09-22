@@ -684,6 +684,9 @@ vlmkit check grounding <url> --resolution medium        # a preset from image-re
 # The action map as JSON, and as a numbered overlay on the screenshot.
 vlmkit check grounding <url> --json
 vlmkit check grounding <url> --mark marked.png
+
+# What would a click at this coordinate actually reach?
+vlmkit check grounding <url> --at 473,96 --at 447,96
 ```
 
 A computer-use agent receives a PNG, names a target in words, emits a pixel
@@ -715,6 +718,20 @@ and no API key: the judgement calls a vision model would make here are the ones
 it gets wrong, and the ones it cannot make ("which element receives a click at
 613,284?") are the ones that decide the turn.
 
+A row's `point` is the coordinate to emit, and it is not always the box's
+centre: when something covers that centre the gate sweeps the box and aims at
+the middle of the largest clear pocket instead, with `aimedOffCentre` saying
+where the centre was, why the point moved (`occluded` or `clipped`) and how much
+room the new point has. A map whose coordinate does not reach its own target is
+worse than no map — measured: a model handed the covered centre emitted it and
+activated the banner on top of the button.
+
+`--at x,y` (repeatable) hit-tests a coordinate you already have — one of yours,
+or one this report printed — and names the element a click there would reach. A
+hit on a control's own icon resolves to that control; a hit on nothing in the
+map says whether anything above it is interactive, rather than leaving "not a
+target" to be read as "harmless".
+
 `--mark <png>` draws the same map onto the screenshot as numbered boxes, red
 where a row carries a risk — the set-of-mark prompt a vision model grounds
 against far more reliably than raw pixels. Marks are drawn at the downscaled
@@ -735,7 +752,13 @@ takes no clicks, so hit testing calls it clean), keyboard behaviour is
 `vlmkit inspect explore`.
 
 Fixtures: [`fixtures/grounding/`](../fixtures/grounding/) — `agent-hostile.html`
-trips every rule, `groundable.html` trips none.
+trips every rule, `groundable.html` trips none, `partly-covered.html` is the
+sweep's own case. The gate is validated against agents rather than only against
+tests: [`fixtures/grounding-scenario/`](../fixtures/grounding-scenario/) hands a
+subagent one screenshot and six things a user asked for and scores its
+coordinates by dispatching them at the live page —
+[v1](./reports/2026-09-21-grounding-scenario-v1.md),
+[v2](./reports/2026-09-21-grounding-scenario-v2.md).
 
 ### Cost (which gates and rules your CI is paying for)
 

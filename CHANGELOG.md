@@ -263,6 +263,36 @@ Dates are YYYY-MM-DD.
   intact page plus a single overriding rule). Study: `docs/design/composition-metrics.md`. Report:
   `docs/reports/2026-09-21-composition-principles-v1.md`.
 
+- **The action map's click point is now a coordinate that reaches its target.** When something covers a
+  target's centre the collector sweeps the box and returns the middle of the largest clear pocket, with the
+  room around it; the row carries `aimedOffCentre` saying where the centre was and why the point moved
+  (`occluded` or `clipped`). The gate used to report `"no point inside the box routes here at all"` from a 3x3
+  hit test, which on a button 86% covered by a promo ribbon was simply false — a 17px strip on its right edge
+  routed to it the whole time. A subagent took that line at face value, emitted the covered centre, and
+  activated the ribbon. An agent following the map verbatim scores 6/6 on the scenario now and 5/6 before; the
+  finding stays a suspect, because a promo over a CTA is still a defect.
+- **`--at x,y` (repeatable)** hit-tests a coordinate the caller already has and says which element a click
+  there would reach, in screenshot px. Asked for by the run that was right to disbelieve the line above and
+  had "no coordinate-hit-test command to confirm whether a specific pixel actually resolves to a given element
+  short of trusting the report". It reproduces both of that round's misses in one command. A hit on a
+  control's own icon resolves back to that control's row, and a hit on nothing in the map says whether
+  anything up to `<body>` is interactive rather than the ambiguous "not a target" — "'not a target' means 'not
+  in the actionable list,' not 'safe to slip onto.'"
+- **Findings quote the frame, not the preset's cap.** Every message said `at medium (640x480)` while the frame
+  was 640x360: `medium` is a cap, and a 16:9 viewport under it comes out 640x360. "That parenthetical never
+  matches the real frame size, in every single finding line." The header now names the cap as a cap and says
+  once that every coordinate below is in the frame's pixels.
+- **`imprecise-target` quotes the size it measured.** It printed the element's own box beside a verdict taken
+  from the part of it inside the frame — `"#publish (button \"Send\") is 34x18 screenshot px — under the 10px
+  floor"`, a line that contradicts itself. It now reads `shows 34x6 … the frame cuts it (the element is
+  34x18)`, names the fold as the cause, and says the gate measures the initial frame and never scrolls. Rows
+  carry `visibleBox`.
+- **Scenario and reports**: `fixtures/grounding-scenario/` — a billing console, six tasks phrased as a user
+  would phrase them, and a scorer that dispatches each answer at the live page and asks the browser who
+  receives it. Two arms, because "the tool helped" is unfalsifiable without one: in v1 the tool won the task
+  the image cannot answer (three unlabelled 7x7 colour chips) and lost the task the control got right by
+  reading pixels. `docs/reports/2026-09-21-grounding-scenario-v{1,2}.md`.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**
