@@ -212,6 +212,73 @@ test("a cut target's message says the gate never scrolls", () => {
   );
 });
 
+test("a target hidden by a scroll container is out of the frame, not occluded", () => {
+  // v3's finding, unanimous across three agents: the gate called seven list rows
+  // `occluded-target` "by html" and advised moving html. They were scrolled out
+  // of a 218px scrollport. The hit test's answer is meaningless there, so the
+  // row is not a finding at all — it is inventory with a scroll attached.
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [target({
+        selector: "#list > button:nth-of-type(9)",
+        inFrame: false,
+        centreHit: false,
+        interceptedBy: "html",
+        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0 },
+      })],
+    }),
+    UNSCALED,
+  );
+  assert.deepEqual(report.issues, [], "nothing here is a defect of the page");
+  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 332, dx: 0 });
+});
+
+test("the scroll a caller needs is in screenshot px, like every other number", () => {
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [target({
+        inFrame: false,
+        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12 },
+      })],
+    }),
+    { resolution: { maxWidth: 640, maxHeight: 480 } },
+  );
+  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 166, dx: -6 });
+});
+
+test("the prose names the container, the count and the nearest scroll", () => {
+  // The control arm, with no tool at all, wrote the spec for this block: "A
+  // DOM-aware tool would have told me directly '12 tickets, scrolled to 4/12'
+  // instead of me inferring clipping from pixels."
+  const hidden = (n: number, dy: number) => target({
+    selector: `#list > button:nth-of-type(${n})`,
+    visibleText: `Row ${n}`,
+    inFrame: false,
+    clippedBy: { selector: "#list", scrollable: true, dy, dx: 0 },
+  });
+  const text = formatGroundingReport(
+    analyzeGroundingSamples(input({ targets: [hidden(5, 44), hidden(6, 74), hidden(7, 105)] }), UNSCALED),
+  );
+  assert.match(text, /Out of the frame \(3\) — scroll first, then re-run/);
+  assert.match(text, /#list: hides 3 target\(s\) — scroll it \(nearest needs 44px\)/);
+  assert.match(text, /t1 button "Row 5" \(dy 44px\)/);
+});
+
+test("a container that cannot scroll says the content is unreachable", () => {
+  const text = formatGroundingReport(
+    analyzeGroundingSamples(
+      input({
+        targets: [target({
+          inFrame: false,
+          clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0 },
+        })],
+      }),
+      UNSCALED,
+    ),
+  );
+  assert.match(text, /#locked: hides 1 target\(s\) — it does not scroll/);
+});
+
 test("findings quote the frame, not the preset's cap", () => {
   // v1's agent: "every message says 'at medium (640x480)' though the actual
   // frame is 640x360 … that parenthetical never matches the real frame size, in
@@ -668,6 +735,29 @@ test("E2E: a probe says what a click would set off, not just that it is off the 
   // — so the absence of `wouldReach` is the claim, and it is a measured one.
   assert.equal(report.probes![1]!.wouldReach, undefined, "nothing up to body declares itself interactive");
   assert.equal(report.probes![2]!.targetId, undefined);
+});
+
+test("E2E: a row scrolled out of its list is reported with the scroll that reveals it", { timeout: 180_000 }, async () => {
+  // Two 90px lists of 40px rows: one scrolls, one does not. The fourth row of
+  // each is painted nowhere, and only one of them can be brought into view.
+  const report = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/scrolled-list.html") });
+  const row4 = report.targets.find((t) => t.selector === "#row-4")!;
+  assert.equal(row4.inFrame, false, "it is inside the viewport and painted nowhere");
+  assert.equal(row4.clippedBy?.selector, "#scroller");
+  assert.equal(row4.clippedBy?.scrollable, true);
+  assert.ok(row4.clippedBy!.dy > 0, "the list has to scroll down to reach it");
+
+  const locked = report.targets.find((t) => t.selector === "#locked-4")!;
+  assert.equal(locked.clippedBy?.scrollable, false, "overflow:hidden cannot be scrolled to");
+
+  // The rule that used to fire on all of these fires on none of them.
+  assert.deepEqual(report.issues.filter((i) => i.kind === "occluded-target"), []);
+
+  // A row only half inside its list is still actionable, and its click point is
+  // in the half that is painted rather than at the box's centre.
+  const row3 = report.targets.find((t) => t.selector === "#row-3")!;
+  assert.equal(row3.inFrame, true);
+  assert.ok(row3.point.y < row3.box.y + row3.box.height / 2, "aimed into the visible part");
 });
 
 test("E2E: --mark writes the overlay at the frame's own resolution", { timeout: 180_000 }, async () => {

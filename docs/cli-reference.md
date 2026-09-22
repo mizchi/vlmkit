@@ -726,6 +726,21 @@ room the new point has. A map whose coordinate does not reach its own target is
 worse than no map — measured: a model handed the covered centre emitted it and
 activated the banner on top of the button.
 
+`inFrame` on a row means **painted**, not "inside the viewport": visibility is
+measured against every clipping ancestor, so a list item scrolled out of a
+220px scrollport is out of the frame exactly as a control below the page fold
+is. Such a row is not a finding — a list with more rows than fit is ordinary
+markup — and instead carries `clippedBy`: the container, whether it **scrolls**,
+and how far it would have to (`dy` / `dx`). The report groups them under *Out of
+the frame — scroll first, then re-run*, so a caller with a wheel can plan the
+scroll rather than infer from pixels that a list exists at all. Before this, such
+rows were reported as `occluded-target` "by `html`" with the advice to move
+`html`; three agents in a row worked the remedy out from the screenshot instead.
+
+The map describes **the frame it measured**. Controls that appear only after an
+interaction — a detail panel's buttons, a menu's items — are not in it, and
+re-running the gate after the action is the way to see them.
+
 `--at x,y` (repeatable) hit-tests a coordinate you already have — one of yours,
 or one this report printed — and names the element a click there would reach. A
 hit on a control's own icon resolves to that control; a hit on nothing in the
@@ -758,7 +773,9 @@ tests: [`fixtures/grounding-scenario/`](../fixtures/grounding-scenario/) hands a
 subagent one screenshot and six things a user asked for and scores its
 coordinates by dispatching them at the live page —
 [v1](./reports/2026-09-21-grounding-scenario-v1.md),
-[v2](./reports/2026-09-21-grounding-scenario-v2.md).
+[v2](./reports/2026-09-21-grounding-scenario-v2.md),
+[v3](./reports/2026-09-22-grounding-scenario-v3.md) — the last of which measures a
+whole flow, with a harness that clicks and hands back the next screenshot.
 
 ### Cost (which gates and rules your CI is paying for)
 

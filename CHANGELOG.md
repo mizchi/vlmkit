@@ -293,6 +293,28 @@ Dates are YYYY-MM-DD.
   the image cannot answer (three unlabelled 7x7 colour chips) and lost the task the control got right by
   reading pixels. `docs/reports/2026-09-21-grounding-scenario-v{1,2}.md`.
 
+- **`check grounding` measures visibility against clipping ancestors, not the viewport.** `inFrame` on a row
+  now means *painted*: a list item scrolled out of a 218px scrollport is out of the frame exactly as a control
+  below the page fold is. Such a row stops being a finding — a list with more rows than fit is ordinary markup
+  — and carries `clippedBy` instead: the container, whether it **scrolls**, and how far it would have to
+  (`dy` / `dx`, in screenshot px). The report groups them under *Out of the frame — scroll first, then
+  re-run*. A target only half inside its container is now aimed at the half that is painted.
+  Before this, seven rows of a twelve-row list reported as `occluded-target` "by `html`" — `html` being merely
+  what is drawn where the row is not — with the advice that "nothing can click it until html moves or drops
+  pointer-events". Three subagents driving the page hit that line; one refused it ("the actual fix is scrolling
+  the list, which the harness supports and the tool never names as an option"), one worked the remedy out of
+  the screenshot, and the one with no tool at all wrote the replacement's spec: "A DOM-aware tool would have
+  told me directly '12 tickets, scrolled to 4/12' instead of me inferring clipping from pixels." The page goes
+  from `status: suspect` with seven false suspects to `status: ok` with a scroll plan.
+- **v3 of the grounding scenario measures a flow rather than a frame** (`fixtures/grounding-scenario/`):
+  `act.mjs` takes a click or a wheel at a screenshot-px point and hands back the next screenshot, and
+  `score-flow.mjs` replays the session and reads the DOM the actions produced — not the attempt's account of
+  them, since "did my click work" is the claim under test. The harness replays rather than holding a browser
+  open, so a run is reproducible from `session.json` alone. Report:
+  `docs/reports/2026-09-22-grounding-scenario-v3.md`, which also records what the round did **not** establish:
+  all three arms finished in four actions, so the fix removed a false verdict without moving a score, and a
+  task that discriminates would have to make the pixels insufficient.
+
 ## 0.22.0 — 2026-09-09
 
 **`vlmkit-anim`: scenes in Markdown, and mermaid diagrams as scenes.**

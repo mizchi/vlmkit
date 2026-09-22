@@ -1,0 +1,40 @@
+{
+  "page": "inbox",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "scale": 0.5,
+  "actions": [
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 93,
+        "y": 150
+      },
+      "dy": 240
+    },
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 93,
+        "y": 150
+      },
+      "dy": 240
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 93,
+        "y": 70
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 250,
+        "y": 111
+      }
+    }
+  ]
+}
