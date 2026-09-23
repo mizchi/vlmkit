@@ -14,14 +14,18 @@
 </head>
 <body>
 <button id="open">Open ticket</button>
+<!-- Wired, and nothing about it is observable. -->
+<button id="refresh">Refresh</button>
 <div id="panel"></div>
 <script>
+  document.getElementById("refresh").addEventListener("click", () => { void 0; });
   document.getElementById("open").addEventListener("click", () => {
     document.getElementById("panel").innerHTML = `
       <div class="toolbar" role="toolbar" aria-label="Ticket actions">
         <button id="archive" aria-label="Archive"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" fill="#374151"/></svg></button>
         <button id="delete" aria-label="Delete"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="#b91c1c"/></svg></button>
       </div>`;
+    document.getElementById("open").setAttribute("aria-expanded", "true");
   });
 </script>
 </body>

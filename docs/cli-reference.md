@@ -759,6 +759,32 @@ both tool-using agents find the second screen's Archive button by sampling pixel
 colours, six pixels from Delete. The spelling is the one a harness logs, so an
 agent's own action history pastes in as-is.
 
+With `--after`, the report also says **what the last action changed**. It compares
+the screen before that action with the screen after it. For a click it names what
+the click landed on, hit-tested on the screen it was sent to. It then lists the
+controls that came onto the screen or left it, controls whose ARIA state
+(`current`, `pressed`, `checked`, `selected`, `expanded`, `disabled`) or look
+(`color`, `background-color`, `text-decoration-line`, `opacity`, `font-weight`)
+changed, and painted text that appeared or went. For example:
+
+```
+What the last action (click (560,50)) changed:
+  the click went to t15 "Archive"
+  ~ t8 "Checkout webhook retries exhausted for region eu-west-1…" changed color, text-decoration-line
+  ~ t15 "Archive" changed background-color — its :hover style, and the pointer is now on it
+  + text "Archived."
+```
+
+A restyle is called `:hover` only when the pointer arrived on the control or left
+it, and a `:hover` rule in the page's own stylesheets sets that same property.
+"Nothing on screen" says what was compared, not that the click missed. When the
+click reached a control, the line adds that the control may have done something
+the page does not show. This answers "did my click work", which a map of one
+screen cannot. The round that added it had a tool-using agent write "the tool's
+action map does not track this state change; I had to trust the screenshot". An
+agent without the tool archived the right ticket, read the "Archived."
+confirmation as a menu item, clicked it five times and reported failure.
+
 The map describes **the frame it measured**. Controls that appear only after an
 interaction — a detail panel's buttons, a menu's items — are not in it, and
 re-running the gate after the action is the way to see them.

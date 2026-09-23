@@ -133,6 +133,9 @@ a line of this report, before acting on it.
 "wheel x,y dy") replays actions before measuring, so the map, --at and
 --mark describe the screen those actions leave -- a detail panel a click
 opened, the rows a scroll revealed. Screenshot px throughout, dy included.
+The report then says what the LAST action changed: what the click landed
+on, controls that came or went or changed state or look, and text that
+appeared or went -- "did it work", which one screen's map cannot answer.
 
 Complements rather than repeats: WCAG touch size is \`check a11y touch\`,
 keyboard behavior is \`check interactions\`, and whether an action had a

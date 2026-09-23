@@ -65,6 +65,13 @@ import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import {
+  SCREEN_STATE_JS,
+  type ScreenChange,
+  type ScreenState,
+  diffScreens,
+  formatScreenChange,
+} from "./grounding-change.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import {
   RESOLUTION_PRESETS,
@@ -369,6 +376,12 @@ export interface GroundingScanReport {
   after?: GroundingAction[];
   /** Where the page was after `after`, when an action navigated away from `source`. */
   navigatedTo?: string;
+  /**
+   * What the LAST `after` action changed: the screen before it against the
+   * screen after it. See `grounding-change.ts` for why, and for what an empty
+   * change does and does not mean.
+   */
+  changed?: ScreenChange;
   targets: GroundingTarget[];
   /** Present only when `--at` was passed. Absent means "not asked", never "clean". */
   probes?: GroundingProbe[];
@@ -1078,14 +1091,53 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
     // redirect of the source.
     const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
     const loadedAt = page.url();
+    // The screen before the LAST action is read on the way through, so the
+    // report can say what that action changed — the replay has both screens,
+    // and a map of the second one alone cannot answer "did it work".
+    let before: ScreenState | undefined;
+    let landed: { hit: string | null; wouldReach: string | null } | undefined;
     if (options.after && options.after.length > 0) {
-      await replayActions(page, options.after, resolveAgentFrame(viewport, options.resolution));
+      const frame = resolveAgentFrame(viewport, options.resolution);
+      await replayActions(page, options.after.slice(0, -1), frame);
+      before = await readScreenState(page);
+      // What the last click will land on, asked of the screen it lands on —
+      // the one question "nothing changed" cannot answer by itself: whether
+      // the click missed, or reached a control that shows nothing.
+      const last = options.after[options.after.length - 1]!;
+      if (last.kind === "click") {
+        landed = await hitTest(page, { x: Math.round(last.at.x / frame.scale), y: Math.round(last.at.y / frame.scale) });
+      }
+      await replayActions(page, options.after.slice(-1), frame);
     }
     const collected = await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">;
     const report = analyzeGroundingSamples({ source: options.source, ...collected }, options);
     if (options.after && options.after.length > 0) {
       report.after = options.after.map((a) => ({ ...a, at: { ...a.at } }));
       if (page.url() !== loadedAt) report.navigatedTo = page.url();
+      if (before) {
+        const now = await readScreenState(page, collected.targets);
+        const idOf = new Map(report.targets.map((t) => [t.selector, t.id]));
+        // Where the pointer was and is, so a change that is only `:hover` can
+        // say so: every action leaves the pointer where it acted.
+        const frame = resolveAgentFrame(viewport, options.resolution);
+        const css = (a: GroundingAction) => ({ x: Math.round(a.at.x / frame.scale), y: Math.round(a.at.y / frame.scale) });
+        const last = options.after[options.after.length - 1]!;
+        const prev = options.after[options.after.length - 2];
+        report.changed = diffScreens(before, now, last, (sel) => idOf.get(sel), {
+          ...(prev ? { before: css(prev) } : {}),
+          after: css(last),
+        });
+        if (landed) {
+          // Resolved against the screen the click landed on: a row the click
+          // removed is still the row it reached.
+          const reached = before.targets.find((t) => t.selector === landed.hit)
+            ?? before.targets.find((t) => t.selector === landed.wouldReach);
+          const targetId = reached ? idOf.get(reached.selector) : undefined;
+          report.changed.landedOn = reached
+            ? { selector: reached.selector, label: reached.label, ...(targetId ? { targetId } : {}) }
+            : { selector: landed.hit ?? "nothing", label: "", ...(landed.wouldReach ? { wouldReach: landed.wouldReach } : {}) };
+        }
+      }
     }
     if (options.at && options.at.length > 0) {
       report.probes = await probePoints(page, options.at, report);
@@ -1102,6 +1154,29 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
     }
     return report;
   });
+}
+
+/**
+ * Read one screen for `diffScreens`: the map's own rows (collected afresh when
+ * the caller has none), their ARIA states and look, and the painted text.
+ */
+async function readScreenState(
+  page: import("playwright").Page,
+  samples?: readonly GroundingTargetSample[],
+): Promise<ScreenState> {
+  const targets = samples
+    ?? (await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">).targets;
+  const labels = distinctLabels(targets.map((t) => t.visibleText || t.name));
+  const selectors = targets.map((t) => t.selector);
+  const rest = await page.evaluate(
+    // eslint-disable-next-line no-eval
+    ([src, sels]) => (0, eval)(`(${src})`)(sels),
+    [SCREEN_STATE_JS, selectors] as const,
+  ) as Omit<ScreenState, "targets">;
+  return {
+    targets: targets.map((t, i) => ({ selector: t.selector, label: labels[i]!, onScreen: t.inFrame, box: t.bbox })),
+    ...rest,
+  };
 }
 
 /** `click (85,123)` / `wheel (85,150) dy 89` — how an action is quoted back. */
@@ -1143,6 +1218,41 @@ async function replayActions(
 }
 
 /**
+ * What takes a click at a CSS-px point: the element `elementFromPoint` returns,
+ * and the nearest element from it up to `<body>` that declares itself
+ * interactive. Shared by `--at` and by the report of what the last `--after`
+ * click reached.
+ */
+async function hitTest(
+  page: import("playwright").Page,
+  cssPoint: { x: number; y: number },
+): Promise<{ hit: string | null; wouldReach: string | null }> {
+  return await page.evaluate(
+    ([x, y, selectorJs]) => {
+      // eslint-disable-next-line no-eval
+      const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (el: Element) => string;
+      const el = document.elementFromPoint(x, y);
+      if (!el) return { hit: null, wouldReach: null };
+      let node: Element | null = el;
+      let wouldReach: string | null = null;
+      while (node && node.tagName !== "BODY") {
+        const tabindex = node.getAttribute("tabindex");
+        if (node.getAttribute("role")
+          || node.hasAttribute("onclick")
+          || (tabindex !== null && Number(tabindex) >= 0)
+          || /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)) {
+          wouldReach = stableSelector(node);
+          break;
+        }
+        node = node.parentElement;
+      }
+      return { hit: stableSelector(el), wouldReach };
+    },
+    [cssPoint.x, cssPoint.y, STABLE_SELECTOR_JS] as const,
+  ) as { hit: string | null; wouldReach: string | null };
+}
+
+/**
  * Answer `--at`: dispatch each point at the live page and say what takes it.
  *
  * The points arrive in SCREENSHOT px, because that is the space the caller has
@@ -1164,29 +1274,7 @@ async function probePoints(
       out.push({ point, cssPoint, hit: null, offFrame: true });
       continue;
     }
-    const probed = await page.evaluate(
-      ([x, y, selectorJs]) => {
-        // eslint-disable-next-line no-eval
-        const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (el: Element) => string;
-        const el = document.elementFromPoint(x, y);
-        if (!el) return { hit: null, wouldReach: null };
-        let node: Element | null = el;
-        let wouldReach: string | null = null;
-        while (node && node.tagName !== "BODY") {
-          const tabindex = node.getAttribute("tabindex");
-          if (node.getAttribute("role")
-            || node.hasAttribute("onclick")
-            || (tabindex !== null && Number(tabindex) >= 0)
-            || /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)) {
-            wouldReach = stableSelector(node);
-            break;
-          }
-          node = node.parentElement;
-        }
-        return { hit: stableSelector(el), wouldReach };
-      },
-      [cssPoint.x, cssPoint.y, STABLE_SELECTOR_JS] as const,
-    ) as { hit: string | null; wouldReach: string | null };
+    const probed = await hitTest(page, cssPoint);
     const find = (selector: string | null) =>
       selector ? report.targets.find((t) => t.selector === selector) : undefined;
     // A hit on a button's own icon is a hit on the button: `elementFromPoint`
@@ -1335,6 +1423,12 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     + (report.capped > 0 ? `, ${report.capped} dropped by the cap` : "")
     + `)`,
   );
+  // First after the header: after acting, "did it work" is the question a
+  // caller has, and it is the one a map of the new screen cannot answer.
+  if (report.changed) {
+    lines.push("");
+    lines.push(...formatScreenChange(report.changed, describeAction));
+  }
   // Out of the frame but in the page, with what to do about it. Listed as its own
   // block rather than dropped: a caller that cannot see these cannot plan the
   // scroll that reveals them, and the round that added it had every agent infer
