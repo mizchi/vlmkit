@@ -57,6 +57,7 @@ import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { parseSelectorAllowRules, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 
 // ---------------------------------------------------------------------------
 // Thresholds. Each one names the measurement that set it.
@@ -168,20 +169,7 @@ export interface CompositionInput {
  * paragraphs rather than of every wrapper that inherits one.
  */
 export const COLLECT_COMPOSITION = `(() => {
-  const visible = (el) => typeof el.checkVisibility === "function"
-    ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })
-    : getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
-  const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0; };
-  const path = (el) => {
-    const parts = [];
-    for (let cur = el; cur && cur !== document.body && parts.length < 3; cur = cur.parentElement) {
-      let p = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift(p + "#" + cur.id); break; }
-      if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\\s+/)[0];
-      parts.unshift(p);
-    }
-    return parts.join(">");
-  };
+  ${STYLE_SAMPLING_JS}
   const boxes = [];
   const indexOf = new Map();
   for (const el of document.querySelectorAll("body *")) {

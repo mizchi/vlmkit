@@ -102,6 +102,7 @@ import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
 import { parseSelectorAllowRules, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 
 // ---------------------------------------------------------------------------
 // Thresholds. Both are WCAG's, which is the point: a number this file chose
@@ -250,21 +251,11 @@ export interface ColorRolesReport extends ColorRolesInput {
  */
 export const COLLECT_COLOR_ROLES = `(() => {
   ${CONTRAST_BACKGROUND_JS}
+  ${STYLE_SAMPLING_JS}
 
   const hex = (c) => "#" + c.slice(0, 3).map((n) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, "0")).join("");
-  const path = (el) => {
-    const parts = [];
-    for (let cur = el; cur && cur !== document.body && parts.length < 3; cur = cur.parentElement) {
-      let s = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift(s + "#" + cur.id); break; }
-      const cls = (cur.className || "").toString().trim().split(/\\s+/).filter(Boolean)[0];
-      if (cls) s += "." + cls;
-      parts.unshift(s);
-    }
-    return parts.join(">");
-  };
   const SKIP_TAGS = new Set(["script", "style", "head", "meta", "link", "title", "noscript", "template", "br", "wbr"]);
-  const visible = (el) => {
+  const painted = (el) => {
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden" || cs.display === "contents") return false;
     if (inheritedOpacity(el) < 0.05) return false;
@@ -314,7 +305,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
     const tag = el.tagName.toLowerCase();
     if (SKIP_TAGS.has(tag)) continue;
     if (el.closest("svg") && tag !== "svg") continue;
-    if (!visible(el)) continue;
+    if (!painted(el)) continue;
     boxes++;
     const cs = getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -347,7 +338,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
   const OPAQUE_INPUT_TYPES = new Set(["hidden", "submit", "button", "reset", "image", "color", "range", "checkbox", "radio", "file"]);
   const controls = [], controlsSkipped = [];
   for (const el of document.querySelectorAll("input, textarea, select, [contenteditable=true]")) {
-    if (!visible(el)) continue;
+    if (!painted(el)) continue;
     const tag = el.tagName.toLowerCase();
     if (tag === "input" && OPAQUE_INPUT_TYPES.has((el.getAttribute("type") || "text").toLowerCase())) continue;
     const sel = path(el);
@@ -386,9 +377,9 @@ export const COLLECT_COLOR_ROLES = `(() => {
   for (const a of document.querySelectorAll("a[href]")) if (a.parentElement) flows.add(a.parentElement);
   const links = [];
   for (const flow of flows) {
-    if (!visible(flow)) continue;
+    if (!painted(flow)) continue;
     const kids = [];
-    for (const c of flow.children) if (c.matches("a[href]") && visible(c)) kids.push(c);
+    for (const c of flow.children) if (c.matches("a[href]") && painted(c)) kids.push(c);
     if (kids.length === 0) continue;
     const flowCs = getComputedStyle(flow);
     const bodyInk = parseColor(flowCs.color);
@@ -420,7 +411,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
   // css-tricks' nav — every link wrapping a span — outvote the page's real link
   // colour, 404 white to 410 blue, because each nav link counted twice.
   for (const el of document.querySelectorAll(INTERACTIVE_SEL)) {
-    if (!isInteractive(el) || !visible(el)) continue;
+    if (!isInteractive(el) || !painted(el)) continue;
     const cs = getComputedStyle(el);
     const fg = parseColor(cs.color);
     if (!fg) continue;

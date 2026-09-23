@@ -38,6 +38,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 import {
   type SelectorAllowRule,
   parseSelectorAllowRules,
@@ -279,21 +280,8 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
       throw new Error('invalid --exclude selector "' + selector + '": ' + error.message);
     }
   });
-  const visible = (el) => typeof el.checkVisibility === "function"
-    ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })
-    : getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
-  const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0; };
+  ${STYLE_SAMPLING_JS}
   const STATE = ":disabled,[aria-disabled=true],[aria-pressed=true],[aria-expanded=true],[aria-current],[aria-selected=true],:checked";
-  const path = (el) => {
-    const parts = [];
-    for (let cur = el; cur && cur !== document.body && parts.length < 3; cur = cur.parentElement) {
-      let p = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift(p + "#" + cur.id); break; }
-      if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\\s+/)[0];
-      parts.unshift(p);
-    }
-    return parts.join(">");
-  };
   // Text the browser paints that the DOM does not expose as a child text node:
   // input[type=button] paints its \`value\`, a text input paints its value and
   // placeholder, a select paints the chosen option. textContent is "" for all

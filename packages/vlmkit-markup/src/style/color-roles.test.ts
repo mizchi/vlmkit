@@ -301,6 +301,7 @@ describe("COLLECT_COLOR_ROLES", () => {
       p.cued a { text-decoration: underline; }
     </style>
     <div class="panel">
+      <svg class="icon" width="12" height="12" style="border: 2px solid #aa11bb"></svg>
       <input id="ghost" type="email"><input id="marked" type="email"><input id="shadowed" type="email">
       <p>A sentence long enough to count as prose with <a href="#x">a bare link</a> in it.</p>
       <p class="cued">A sentence long enough to count as prose with <a href="#y">an underlined link</a> in it.</p>
@@ -313,6 +314,14 @@ describe("COLLECT_COLOR_ROLES", () => {
 
       // oklch() on the body resolves, which is the whole of the parser fix.
       assert.equal(input.baseHex, "#fbfcfd");
+
+      // The selector a colour's sample carries is the shared one. This collector
+      // used to name the icon below `div.panel>svg.[object`, reading an SVG's
+      // class through toString(); STYLE_SAMPLING_JS does not read it at all.
+      // Each painted side is its own sample, so this is "every sample", not "one".
+      const iconBorder = input.palette.marks.find((m) => m.hex === "#aa11bb");
+      assert.ok(iconBorder && iconBorder.samples.length > 0, "the icon's border is a mark");
+      assert.deepEqual([...new Set(iconBorder.samples)], ["div.panel>svg"]);
       assert.deepEqual(input.unreadable, [], "nothing on this page is unreadable");
 
       const byId = new Map(input.controls.map((c) => [c.selector.replace(/^.*#/, "#"), c]));
