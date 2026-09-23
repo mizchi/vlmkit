@@ -41,8 +41,7 @@ const INSTRUCTION_FILES = [
 ];
 
 test("the code exports one OpenAI model id, in the OpenRouter catalogue's shape", () => {
-  // The `openai/` prefix is the load-bearing half: it is what makes this an OpenRouter id rather
-  // than an OpenAI one, and dropping it is how a reader concludes there is a direct OpenAI client.
+  // The `openai/` prefix identifies the OpenRouter catalogue route used by the LLM client.
   assert.match(OPENAI_DEFAULT_MODEL, /^openai\/[a-z0-9.\-]+$/);
 });
 
@@ -62,7 +61,7 @@ test("every instruction file names that exact model and no other OpenAI default"
   }
 });
 
-test("no instruction file sends an agent to a provider or key that does not exist", () => {
+test("no LLM instruction sends an agent to the image-generation key or a missing provider", () => {
   for (const file of INSTRUCTION_FILES) {
     const text = read(file);
     // Mentioning the failure is the point of the docs, so what is forbidden is the INSTRUCTION:
@@ -76,7 +75,7 @@ test("no instruction file sends an agent to a provider or key that does not exis
     assert.doesNotMatch(
       text,
       /(?:export|set)\s+OPENAI_API_KEY=/,
-      `${file} tells an agent to set OPENAI_API_KEY, which nothing in this repo reads`,
+      `${file} tells an agent to set the image-generation key for the LLM provider`,
     );
   }
 });

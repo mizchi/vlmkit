@@ -304,10 +304,10 @@ const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set([
 /**
  * The OpenAI model this project reaches for by default, and the one place its id is written.
  *
- * OpenAI is **not** a provider name here — there is no `api.openai.com` client and no
- * `OPENAI_API_KEY` anywhere in the codebase. Its models are served through OpenRouter, which is
- * why the id carries the `openai/` prefix: that string is an OpenRouter catalogue id, not an
- * OpenAI one.
+ * OpenAI is **not** an LLM provider name here. This client serves its OpenAI models through
+ * OpenRouter, which is why the id carries the `openai/` prefix: that string is an OpenRouter
+ * catalogue id. The separate image-generation client calls `api.openai.com` and reads
+ * `OPENAI_API_KEY`.
  *
  * Exported so the docs can be pinned to it. `tests/agent-model-defaults.test.mjs` asserts that
  * `AGENTS.md`, `.claude/CLAUDE.md` and `docs/configuration.md` all name this exact model, because

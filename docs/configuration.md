@@ -118,8 +118,9 @@ Only the `VLMKIT_*` names are supported. Project state is written below
 
 ### Reaching an OpenAI model
 
-There is no `openai` provider and no `OPENAI_API_KEY`: OpenAI models are served through OpenRouter,
-which is what the `openai/` prefix on the id means. `VLMKIT_LLM_PROVIDER=openai` fails with
+The LLM client has no `openai` provider: its OpenAI models are served through OpenRouter,
+which is what the `openai/` prefix on the id means. The separate image-generation client uses
+`OPENAI_API_KEY` and the OpenAI Images API. `VLMKIT_LLM_PROVIDER=openai` fails with
 `INVALID_PROVIDER` — the message names this route.
 
 ```sh
