@@ -487,6 +487,23 @@ test("adjacent full-size buttons are not crowded; two tiny icons are", () => {
   assert.deepEqual(icons.issues.filter((i) => i.kind === "imprecise-target"), []);
 });
 
+test("a finding names the map row it is about, and the neighbour's row", () => {
+  // v4: "plus a crowded-target warn: 'click point is 5px from
+  // #list > button:nth-of-type(9)'" — filed under t8, the row about to be
+  // clicked. The warning was t9's.
+  const row = (n: number, y: number, height: number) => target({
+    selector: `#list > button:nth-of-type(${n})`,
+    visibleText: `Row ${n}`,
+    bbox: { x: 0, y, width: 300, height },
+    clickPoint: { x: 150, y: y + height / 2 },
+  });
+  const report = analyzeGroundingSamples(input({ targets: [row(8, 0, 56), row(9, 56, 8)] }), UNSCALED);
+  const crowded = report.issues.find((i) => i.kind === "crowded-target")!;
+  assert.equal(crowded.targetId, "t2");
+  assert.match(crowded.message, /is 4px from t1 #list > button:nth-of-type\(8\)/);
+  assert.match(formatGroundingReport(report), / t2 crowded-target: /);
+});
+
 test("a container enclosing the target is not a neighbour a miss lands on", () => {
   const report = analyzeGroundingSamples(
     input({

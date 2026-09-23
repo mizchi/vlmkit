@@ -312,6 +312,15 @@ export interface GroundingIssue {
   severity: "warn" | "suspect";
   message: string;
   selector?: string;
+  /**
+   * The action-map row this finding is about, when it is about one.
+   *
+   * The map names rows `t8`; the findings named them by selector alone. v4's
+   * larger model read `#list > button:nth-of-type(9)'s click point is 5px from
+   * #list > button:nth-of-type(8)` beside a map it navigated by id, and filed
+   * the warning under t8 — the row it was about to click — rather than t9.
+   */
+  targetId?: string;
 }
 
 /** One `--at` answer: what a click at this screenshot coordinate would reach. */
@@ -659,7 +668,7 @@ export function analyzeGroundingSamples(
   const issues: GroundingIssue[] = [];
   const raise = (target: GroundingTarget, issue: GroundingIssue) => {
     target.risks.push(issue.kind);
-    issues.push(issue);
+    issues.push({ ...issue, targetId: target.id });
   };
   /** Findings are about what an agent can act on now: not disabled, not below the fold. */
   const actionable = targets.filter((t, i) => !t.disabled && input.targets[i]!.inFrame);
@@ -730,7 +739,7 @@ export function analyzeGroundingSamples(
         severity: "warn",
         selector: target.selector,
         message: `${target.selector}'s click point is ${Math.round(target.aimMargin)}px from`
-          + ` ${neighbour.selector} (${neighbour.role}${neighbour.label ? ` "${neighbour.label}"` : ""})`
+          + ` ${neighbour.id} ${neighbour.selector} (${neighbour.role}${neighbour.label ? ` "${neighbour.label}"` : ""})`
           + ` — a coordinate off by ${aimFloor}px activates the neighbour instead.`,
       });
     }
@@ -1398,7 +1407,7 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     for (const entry of shown) {
       const issue = entry.row;
       const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.kind}: ${issue.message}${retuneNote(entry)}`);
+      lines.push(`  ${icon} ${issue.targetId ? `${issue.targetId} ` : ""}${issue.kind}: ${issue.message}${retuneNote(entry)}`);
     }
   } else if (note === undefined) {
     lines.push("");
