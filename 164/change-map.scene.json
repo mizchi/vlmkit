@@ -1,0 +1,87 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #164: Dogfood jev-lint on TypeScript and MoonBit",
+  "layout": "grid",
+  "canvas": {
+    "width": 640,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "ai/src",
+      "label": "ai/src",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "tests",
+      "to": "ai/src",
+      "hidden": true
+    }
+  ],
+  "sequence": [
+    {
+      "show": [
+        "root",
+        "docs",
+        "ai/src",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root",
+        "docs",
+        "ai/src",
+        "tests"
+      ],
+      "caption": "1/1 Dogfood jev-lint on TypeScript and MoonBit"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 7
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+78 −12"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root",
+        "docs",
+        "ai/src",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 7 files · +78 −12 · 4 areas, 1 import edges between them"
+    }
+  ]
+}
