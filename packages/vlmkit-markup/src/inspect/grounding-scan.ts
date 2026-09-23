@@ -423,6 +423,42 @@ function shorten(text: string, max = 48): string {
 }
 
 /**
+ * `shorten` for a set of labels, which never cuts a label before the word that
+ * tells it apart from another one.
+ *
+ * Found by building the v4 scenario, before any agent ran: three tickets titled
+ * "Checkout webhook retries exhausted for region …" differ only in the region,
+ * the list paints all three as "Checkout webhook retries exhaust…", and the map
+ * — which reads the full name the screen cannot show — printed two of them as
+ * `"Checkout webhook retries exhausted for region e…"`. The one fact the tool
+ * had and the picture did not was the one its 48-character cut threw away.
+ *
+ * So the cut moves: to the end of the word holding the first character in which
+ * this label differs from its closest sibling, when that is past `max`. Labels
+ * that differ early are shortened exactly as before. Identical labels are left
+ * to `ambiguous-target` — no prefix separates them.
+ */
+export function distinctLabels(texts: readonly string[], max = 48): string[] {
+  const norm = texts.map((text) => text.replace(/\s+/g, " ").trim());
+  const lower = norm.map((text) => text.toLowerCase());
+  return norm.map((one, i) => {
+    if (one.length <= max) return one;
+    let differsAt = 0;
+    for (let j = 0; j < norm.length; j++) {
+      if (j === i || lower[j] === lower[i]) continue;
+      const a = lower[i]!;
+      const b = lower[j]!;
+      let k = 0;
+      while (k < a.length && k < b.length && a[k] === b[k]) k++;
+      differsAt = Math.max(differsAt, k);
+    }
+    const space = one.indexOf(" ", differsAt);
+    const keep = Math.max(max - 1, space === -1 ? one.length : space);
+    return keep >= one.length ? one : `${one.slice(0, keep)}…`;
+  });
+}
+
+/**
  * Pure post-process: samples in CSS px -> action map in screenshot px + findings.
  *
  * Split out for the same reason every other gate here splits it out — the
@@ -444,6 +480,7 @@ export function analyzeGroundingSamples(
     options.resolution,
   );
 
+  const labels = distinctLabels(input.targets.map((sample) => sample.visibleText || sample.name));
   const targets: GroundingTarget[] = input.targets.map((sample, i) => {
     // The point that reaches the target beats the point at its centre.
     const aim = sample.reachable ?? sample.clickPoint;
@@ -451,7 +488,7 @@ export function analyzeGroundingSamples(
     id: `t${i + 1}`,
     selector: sample.selector,
     role: sample.role,
-    label: shorten(sample.visibleText || sample.name),
+    label: labels[i]!,
     point: {
       x: Math.round(aim.x * frame.scale),
       y: Math.round(aim.y * frame.scale),

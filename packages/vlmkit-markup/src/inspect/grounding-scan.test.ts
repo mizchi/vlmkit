@@ -10,6 +10,7 @@ import {
   type GroundingScanInput,
   type GroundingTargetSample,
   analyzeGroundingSamples,
+  distinctLabels,
   drawActionMarks,
   findDisambiguator,
   formatGroundingReport,
@@ -523,6 +524,44 @@ test("findDisambiguator picks the nearest level that separates every member", ()
   ];
   assert.deepEqual(findDisambiguator(rows), ["ACME Corp", "Globex"]);
   assert.equal(findDisambiguator([target({ ancestorTexts: ["Row"] }), target({ ancestorTexts: ["Row"] })]), undefined);
+});
+
+test("a label is never cut before the word that tells it from a sibling", () => {
+  const titles = [
+    "Checkout webhook retries exhausted for region us-east-1 Wayne Enterprises · 4h",
+    "Checkout webhook retries exhausted for region eu-west-1 Wayne Enterprises · 12h",
+    "Checkout webhook retries exhausted for region eu-central-1 Wayne Enterprises · 15h",
+    "Invoice PDF is blank for multi-currency accounts Acme Freight · 1h",
+  ];
+  const labels = distinctLabels(titles);
+  // The 48-character cut printed eu-west-1 and eu-central-1 as the same
+  // "…for region e…". Each now runs to the end of the word that differs.
+  assert.equal(labels[1], "Checkout webhook retries exhausted for region eu-west-1…");
+  assert.equal(labels[2], "Checkout webhook retries exhausted for region eu-central-1…");
+  assert.equal(labels[0], "Checkout webhook retries exhausted for region us-east-1…");
+  assert.equal(new Set(labels).size, labels.length);
+  // A label that differs early is shortened exactly as before.
+  assert.equal(labels[3], "Invoice PDF is blank for multi-currency account…");
+});
+
+test("identical labels are left to ambiguous-target, not lengthened", () => {
+  const same = "Manage subscription for the enterprise workspace plan";
+  assert.deepEqual(distinctLabels([same, same]), [`${same.slice(0, 47)}…`, `${same.slice(0, 47)}…`]);
+});
+
+test("the map row carries the lengthened label", () => {
+  const row = (name: string, y: number) =>
+    target({ name, visibleText: name, bbox: { x: 0, y, width: 300, height: 40 }, clickPoint: { x: 150, y: y + 20 } });
+  const report = analyzeGroundingSamples(input({
+    targets: [
+      row("Checkout webhook retries exhausted for region eu-west-1", 0),
+      row("Checkout webhook retries exhausted for region eu-central-1", 60),
+    ],
+  }), UNSCALED);
+  assert.deepEqual(report.targets.map((t) => t.label), [
+    "Checkout webhook retries exhausted for region eu-west-1",
+    "Checkout webhook retries exhausted for region eu-central-1",
+  ]);
 });
 
 test("the prose reports the frame, the map and the truncation", () => {
