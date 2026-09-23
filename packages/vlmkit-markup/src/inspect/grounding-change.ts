@@ -11,7 +11,7 @@
  *     this state change; I had to trust the screenshot instead";
  *   - the smaller model WITHOUT it archived the right ticket on its seventh
  *     action, read the "Archived." confirmation as a menu item called Archive,
- *     clicked it five times, and reported that it had failed.
+ *     clicked it four times, and reported that it had failed.
  *
  * A map is a picture of one screen, so "did it work" was never in it. The
  * replay already holds both screens, though: the one before the last action and
@@ -72,7 +72,7 @@ export interface ScreenChange {
    * still take it.
    *
    * v4's control arm read "Archived." — the confirmation of a click that had
-   * worked — as a menu item, and clicked the words five times. A caller told
+   * worked — as a menu item, and clicked the words four times. A caller told
    * "the click went to p.flash, which is not a control" has the answer.
    */
   landedOn?: ChangedControl & { wouldReach?: string };
