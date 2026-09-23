@@ -18,12 +18,35 @@
  * (`tests/pages-site.test.mjs`) owns the whole layout, so there is one place where "solitaire is
  * at /solitaire/" is written down.
  */
+import { existsSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(scriptPath), "..");
+
+/**
+ * The published half of a judgment log (`examples/sites/judge.mjs`): its rendered page and every
+ * screenshot the log names. Derived from the log rather than typed out here — a log names dozens of
+ * screens — and still an allowlist, not a directory walk: the raw log, the gate outputs (the page
+ * inlines them) and any stray file in `judgment/shots/` stay unpublished, and a screen the log names
+ * but the tree lacks fails the build at `copyFile` like any other missing asset.
+ *
+ * @param {string} sourceDir repo-relative directory that may hold `judgment/log.jsonl`
+ * @returns {string[]} paths relative to `sourceDir`; empty when there is no log
+ */
+export function judgmentAssets(sourceDir, root = repoRoot) {
+  const log = join(root, sourceDir, "judgment", "log.jsonl");
+  if (!existsSync(log)) return [];
+  const screens = readFileSync(log, "utf8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line))
+    .filter((event) => event.kind === "shot")
+    .flatMap((event) => event.tiles.map((tile) => `judgment/${tile.file}`));
+  return ["judgment/index.html", ...screens];
+}
 
 /**
  * @typedef {object} SiteSection
@@ -109,9 +132,12 @@ export async function buildSite({
       : resolvedOutputDir;
     await mkdir(sectionOutput, { recursive: true });
     await Promise.all(
-      section.assets.map((asset) =>
-        copyFile(join(sectionSource, asset), join(sectionOutput, asset)),
-      ),
+      section.assets.map(async (asset) => {
+        const target = join(sectionOutput, asset);
+        // A log's screens live two levels down (`judgment/shots/`); runtime files are flat.
+        await mkdir(dirname(target), { recursive: true });
+        await copyFile(join(sectionSource, asset), target);
+      }),
     );
     built.push({
       id: section.id,
