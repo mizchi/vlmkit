@@ -1,0 +1,47 @@
+# Dogfood the semantic rules on product code and tests. Planted fixtures,
+# generated MoonBit output, and historical design runs are outside these roots.
+files: [src, packages, tests, scripts, package.json]
+exclude: [packages/vlmkit-markup/_build]
+
+languages:
+  moonbit:
+    libraryPath: .jev-lint/parsers/moonbit.dylib
+    extensions: [mbt]
+    expandoChar: _
+
+# Keep the first pass focused enough to inspect each finding by hand.
+rules:
+  typescript/catch-hides-failure: on
+  moonbit/catch-hides-failure: on
+  typescript/comment-describes-declaration: on
+  # MoonBit's bare `///|` separators have no claim: 188 of 239 matches in
+  # the initial dry-run captured only that marker.
+  moonbit/comment-describes-declaration: off
+  typescript/doc-errors-match-body: on
+  moonbit/doc-errors-match-body: on
+  typescript/error-message-matches-condition: on
+  moonbit/error-message-matches-condition: on
+  typescript/fn-name-promises: on
+  moonbit/fn-name-promises: on
+  typescript/log-level-matches-event: on
+  moonbit/log-level-matches-event: on
+  typescript/pure-name-is-pure: on
+  moonbit/pure-name-is-pure: on
+  typescript/safe-name-is-safe: on
+  moonbit/safe-name-is-safe: on
+  json/script-name-does: on
+  typescript/test-name-verifies-claim: on
+  moonbit/test-name-verifies-claim: on
+  typescript/tests-cover-failure-paths: on
+  moonbit/tests-cover-failure-paths: on
+  typescript/type-name-describes-shape: on
+  moonbit/type-name-describes-shape: on
+  moonbit/comment-describes-block: on
+  moonbit/idempotent-name: on
+  moonbit/log-message-matches-event: on
+  moonbit/module-name-describes-contents: on
+  moonbit/module-naming-consistent: on
+  moonbit/snapshot-only-behaviour-claim: on
+  moonbit/test-name-describes-code: on
+  moonbit/trait-name-describes-methods: on
+  moonbit/var-name-describes-value: on
