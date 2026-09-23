@@ -193,7 +193,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Drag and drop: a `dragstart` source that is not draggable, a `drop` target with no `dragover` — both are handlers that can never fire | `vlmkit scan handlers page.html` (same gate; see `fixtures/handlers/drag-and-drop.html`) |
 | Drag and drop that *looks* wired: a `dragover` that forgets `preventDefault`, a `dragstart` that transfers nothing | `vlmkit scan handlers page.html --probe-drag` (fires the sequence; runs the page's handlers) |
 | A scripted user flow with deterministic post-condition asserts | `vlmkit verify flow page.html --flow flow.json` |
-| Can a screenshot-driven (computer-use) agent act on the page: does a click at each control's own centre reach it, does its label name one target, is it still resolvable after the screenshot is downscaled | `vlmkit check grounding page.html` (`--json` emits the action map, `--mark out.png` draws it; see `fixtures/grounding/`) |
+| Can a screenshot-driven (computer-use) agent act on the page: does a click at each control's own centre reach it, does its label name one target, is it still resolvable after the screenshot is downscaled | `vlmkit check grounding page.html` (`--json` emits the action map, `--mark out.png` draws it, `--after "click x,y"` maps the screen an action leaves; see `fixtures/grounding/`) |
 
 ### Compare, repair, maintain
 

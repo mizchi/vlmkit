@@ -60,9 +60,9 @@ under test.
 
 - `pages/<name>.html` — the page under test. **Off-limits to every attempt**: it
   is the answer key for half the tasks. Attempts may point tools *at* it.
-- `act.mjs` — the v3 harness: click / wheel / shot / reset, by replay.
-- `score-flow.mjs` — the v3 scorer: replays a session, reads the DOM, checks the
-  goal. Also off-limits.
+- `act.mjs` — the v3/v4 harness: click / move / wheel / shot / reset, by replay.
+- `score-flow.mjs` — the v3/v4 scorer: replays a session, reads the DOM, checks
+  the goal against the session's own page's answer sheet. Also off-limits.
 - `shots/<name>.png` — the one artifact both arms get: the viewport shot at
   1280x720 and reduced to the resolution `check grounding` reports by default
   for that width (640x360, scale 0.5), with the same resampling `image-resize.ts`
@@ -135,6 +135,31 @@ helping.
 finding, and carries `clippedBy` — the container, whether it scrolls, and how far.
 The page went from `status: suspect` with seven false suspects to `status: ok`
 with a scroll plan.
+
+## `triage.html` and its one job (v4)
+
+v3 ended with every arm finishing from pixels alone, so no score could move:
+"A task that discriminates would have to make the pixels insufficient." This page
+does that twice. The job is **archive the checkout-webhook ticket for
+`eu-west-1`**, three actions at best — scroll, open, archive — scored on the DOM,
+with any delete / spam / snooze and any other archive counting against.
+
+| hazard | why it is here |
+|---|---|
+| three tickets from one customer are titled "Checkout webhook retries exhausted for region …" and the list **cuts every title before the region** | the three rows paint the same text; only the detail panel, or the page's own text, says which is which. The look-alike on the first screen (`us-east-1`) is not the target |
+| the detail panel's actions are **icons only** — Archive, Report spam, Delete, Snooze — 15 screenshot px each, named on hover and in `aria-label` | the second screen, which v3's G8 said the map could not see; three of the four take the ticket out of the queue, and at 0.5x the spam octagon reads much like the snooze clock |
+
+The harness gained what the page needs: `--page`, a `move` verb (hover — the one
+way the control arm can read a tooltip), and wheel `dy` in screenshot px for new
+sessions, so a harness action and `check grounding --after` replay to the same
+screen. v3's sessions carry no `wheelUnits` and replay as they did.
+
+One defect was found by **building** the page, before any agent ran, and was
+fixed before the round so it would not spend itself on a known loss: the map cut
+every label at 48 characters, and printed `eu-west-1` and `eu-central-1` as the
+same `"Checkout webhook retries exhausted for region e…"` — the one fact the tool
+had and the picture did not, thrown away by the formatter. A label now runs to
+the end of the word that tells it from its closest sibling.
 
 ## Rounds
 
