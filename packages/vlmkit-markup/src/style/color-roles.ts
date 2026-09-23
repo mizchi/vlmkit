@@ -57,8 +57,9 @@
  * - **`color-only-link`** (WCAG 1.4.1 Use of Color, technique G183, which names
  *   3:1 exactly): a link inside a flow that also holds its own prose, marked off
  *   from that prose by colour alone — no underline, no weight step, no border,
- *   no fill — and under 3:1 against it. 8 of 4899 links in a flow, 0.16%, every
- *   one verified.
+ *   no fill — and under 3:1 against it. 8 of 2627 painted links in a flow, 0.3%,
+ *   every one verified. (4899 when collapsed `<details>` content still counted —
+ *   see `painted` in the collector; the 8 are the same eight.)
  *
  * The "flow also holds prose" condition is the whole rule, the same way
  * `measureProximity`'s "boundary must be a preceding sibling" is. danluu.com is
@@ -255,10 +256,19 @@ export const COLLECT_COLOR_ROLES = `(() => {
 
   const hex = (c) => "#" + c.slice(0, 3).map((n) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, "0")).join("");
   const SKIP_TAGS = new Set(["script", "style", "head", "meta", "link", "title", "noscript", "template", "br", "wbr"]);
+  // Colour's own answer to "is this on the page", because the shared visible() is
+  // shaped for geometry: it skips an off-screen content-visibility: auto section,
+  // and a footer drawn that way is still paint the page has. What colour must not
+  // count is content that is never painted until someone opens it. A closed
+  // details element is exactly that, and checkVisibility says so whatever it is
+  // asked, while its descendants still report a size, because asking for one
+  // forces layout. Reading only the size put 5615 collapsed elements into
+  // css-tricks' palette and made its comment boxes the page's largest surface.
   const painted = (el) => {
-    const cs = getComputedStyle(el);
-    if (cs.display === "none" || cs.visibility === "hidden" || cs.display === "contents") return false;
-    if (inheritedOpacity(el) < 0.05) return false;
+    const shown = typeof el.checkVisibility === "function"
+      ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+      : visible(el);
+    if (!shown || inheritedOpacity(el) < 0.05) return false;
     const r = el.getBoundingClientRect();
     return r.width >= 1 && r.height >= 1;
   };
