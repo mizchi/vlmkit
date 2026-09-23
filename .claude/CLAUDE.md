@@ -316,12 +316,23 @@ vlmkit check color       page.html   # the palette by role, and where colour alo
 | Principle | Where it lives | The measurable claim |
 |---|---|---|
 | 近接 proximity | `check composition` / `proximity-inversion` (warn) | A label's gap to its content is >=1.5x its gap to the boundary above AND >=8px wider, so it groups upward |
-| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two **siblings** sit on rails 2-8px apart, so the same edge was available to both. A12 in `check integrity` covers the same window between siblings |
+| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two **siblings** sit on rails 2-8px apart, so the same edge was available to both. A12 in `check integrity` (`near-misalignment`) shares the 2-8px window but needs siblings that already share an edge exactly, so it is **not** a duplicate: of the three rail mutants it catches `rail-broken` only, and misses `-shrink` and `-nested` (measured 2026-09-24) |
 | 反復 repetition | `check design` / `component-drift` | Instances per distinct style signature, below 3x |
 | 対比 contrast | `check composition` / `flat-heading-step`, `no-type-contrast` (warn) | Two DECLARED heading levels render at one size and weight; or nothing is >=1.3x body size and nothing >=200 weight heavier |
 
 Both report **inconsistency, never which value is correct**, and nothing exceeds
 `warn` — taste stays with humans.
+
+**The three share their plumbing — a fourth style gate reuses it rather than copying a sibling.**
+Each collector splices `STYLE_SAMPLING_JS` (`style/style-sampling.ts`: `visible` / `px` / `path`),
+and each judge filters `--allow` through `selectorAllowFilter` (`inspect/selector-exemption.ts`).
+Composition had been pasted from design and colour re-typed from both; the re-typed copies were
+where the defects were — an SVG's class read as `svg.[object`, a mistyped `--allow` that said
+nothing. `path` matters most: it is the selector every finding carries and the string `--allow`
+matches, so two spellings of it break exemptions across gates. A gate that needs a different
+answer names it next to its collector instead of redefining the shared word — colour's `painted`
+keeps an off-screen `content-visibility: auto` footer that the shared `visible` skips, and drops
+closed-`<details>` content, which a size test alone had counted as paint.
 
 ### What was rejected, so it does not get re-proposed
 
