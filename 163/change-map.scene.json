@@ -1,0 +1,160 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #163: 3つ目のインストール経路（プラグインマーケットプレイス）と、存在しなかったブラウザスクリプト構文テスト",
+  "layout": "grid",
+  "canvas": {
+    "width": 1283,
+    "height": 366
+  },
+  "nodes": [
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "examples/vlmkit-intro-page",
+      "label": "examples/vlmkit-intro-page",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": ".claude-plugin",
+      "label": ".claude-plugin",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "src/util",
+      "label": "src/util",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        ".apm/skills",
+        ".claude-plugin",
+        ".claude",
+        "root",
+        "docs",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude-plugin",
+        ".claude",
+        "root",
+        "docs",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "caption": "1/2 Add a plugin-marketplace install route and pin the skill/doc surface"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 18
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+362 −27"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude-plugin",
+        ".claude",
+        "root",
+        "docs",
+        "examples/vlmkit-intro-page",
+        "skills/vlmkit",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "markup/src",
+        "src/util"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "markup/src",
+        "src/util"
+      ],
+      "caption": "2/2 Sweep every browser script, and parse it"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 21
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+627 −71"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "markup/src",
+        "src/util"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 21 files · +627 −71 · 10 areas, 0 import edges between them"
+    }
+  ]
+}
