@@ -8,12 +8,19 @@
  * nothing here could click. This can.
  *
  *   node act.mjs <letter> click  <x>,<y>          # dispatch a click at a screenshot px point
+ *   node act.mjs <letter> move   <x>,<y>          # move the pointer there (hover), no click
  *   node act.mjs <letter> wheel  <x>,<y> <dy>     # scroll at a point (positive = down)
  *   node act.mjs <letter> shot                    # re-shoot without acting
  *   node act.mjs <letter> reset                   # forget every action and start over
+ *   node act.mjs <letter> --page triage shot      # first call only: which page the session is on
  *
  * Coordinates are in the SAME screenshot pixels as `shots/<page>.png` and the
- * action map — one contract across the whole scenario.
+ * action map — one contract across the whole scenario. From v4 that includes
+ * `wheel`'s dy: a v3 session's dy was a CSS-px wheel delta, which is half the
+ * screenshot px the gate's own "nearest needs 34px" is denominated in, and once
+ * `check grounding --after` could replay the same action the two had to agree or
+ * a pasted scroll would land on a different screen. Sessions written before the
+ * change carry no `wheelUnits` and replay exactly as they did.
  *
  * **Replay, not a daemon.** Every call reloads the page from scratch and replays
  * the whole action list from `attempts/<letter>/session.json` before doing the
@@ -31,9 +38,9 @@ import { resizePngBuffer } from "@mizchi/vlmkit-core/image-resize.ts";
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const VIEWPORT = { width: 1280, height: 720 };
 export const SCALE = 0.5;
-const PAGE = "inbox";
+const DEFAULT_PAGE = "inbox";
 
-const usage = "usage: node act.mjs <letter> click|wheel|shot|reset [x,y] [dy]";
+const usage = "usage: node act.mjs <letter> [--page <name>] click|move|wheel|shot|reset [x,y] [dy]";
 
 /** Parse `x,y` in screenshot px. A malformed point is an error, never a (0,0) click. */
 export function parsePoint(raw) {
@@ -50,7 +57,7 @@ export const toCss = (p) => ({ x: Math.round(p.x / SCALE), y: Math.round(p.y / S
  * Exported so the scorer rebuilds the same state the attempt reached rather than
  * reading a claim about it.
  */
-export async function replay(actions, { pageName = PAGE } = {}) {
+export async function replay(actions, { pageName = DEFAULT_PAGE, wheelUnits = "css" } = {}) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: VIEWPORT });
@@ -58,9 +65,10 @@ export async function replay(actions, { pageName = PAGE } = {}) {
   for (const action of actions) {
     const css = toCss(action.at);
     if (action.kind === "click") await page.mouse.click(css.x, css.y);
+    else if (action.kind === "move") await page.mouse.move(css.x, css.y);
     else if (action.kind === "wheel") {
       await page.mouse.move(css.x, css.y);
-      await page.mouse.wheel(0, action.dy);
+      await page.mouse.wheel(0, wheelUnits === "screenshot" ? Math.round(action.dy / SCALE) : action.dy);
     }
     // Settle: the page is scripted, so a frame is enough, and a fixed wait keeps
     // the replay deterministic in a way `networkidle` on a file:// page is not.
@@ -69,8 +77,17 @@ export async function replay(actions, { pageName = PAGE } = {}) {
   return { browser, page };
 }
 
+/** Replay a whole session file's actions, honouring the units it was written in. */
+export function replaySession(session) {
+  return replay(session.actions, { pageName: session.page ?? DEFAULT_PAGE, wheelUnits: session.wheelUnits ?? "css" });
+}
+
 async function main() {
-  const [letter, kind, pointRaw, dyRaw] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const pageAt = args.indexOf("--page");
+  const pageFlag = pageAt === -1 ? undefined : args[pageAt + 1];
+  if (pageAt !== -1) args.splice(pageAt, 2);
+  const [letter, kind, pointRaw, dyRaw] = args;
   if (!letter || !kind) { console.error(usage); process.exit(1); }
   const dir = join(HERE, "attempts", letter);
   const sessionPath = join(dir, "session.json");
@@ -78,19 +95,23 @@ async function main() {
 
   let session = existsSync(sessionPath)
     ? JSON.parse(await readFile(sessionPath, "utf8"))
-    : { page: PAGE, viewport: VIEWPORT, scale: SCALE, actions: [] };
+    : { page: pageFlag ?? DEFAULT_PAGE, viewport: VIEWPORT, scale: SCALE, wheelUnits: "screenshot", actions: [] };
+  if (pageFlag && pageFlag !== session.page) {
+    console.error(`this session is on ${session.page}; --page ${pageFlag} only chooses the page of a new session`);
+    process.exit(1);
+  }
 
   if (kind === "reset") {
     session.actions = [];
     await writeFile(sessionPath, JSON.stringify(session, null, 2));
     console.log("session reset — 0 actions");
-  } else if (kind === "click" || kind === "wheel") {
+  } else if (kind === "click" || kind === "move" || kind === "wheel") {
     const at = parsePoint(pointRaw);
     if (at.x < 0 || at.y < 0 || at.x >= VIEWPORT.width * SCALE || at.y >= VIEWPORT.height * SCALE) {
       console.error(`(${at.x},${at.y}) is outside the ${VIEWPORT.width * SCALE}x${VIEWPORT.height * SCALE} frame`);
       process.exit(1);
     }
-    const action = kind === "click" ? { kind, at } : { kind, at, dy: Number(dyRaw ?? 0) };
+    const action = kind === "wheel" ? { kind, at, dy: Number(dyRaw ?? 0) } : { kind, at };
     if (kind === "wheel" && !Number.isFinite(action.dy)) {
       console.error("wheel needs a scroll amount: node act.mjs <letter> wheel <x>,<y> <dy>");
       process.exit(1);
@@ -102,7 +123,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { browser, page } = await replay(session.actions);
+  const { browser, page } = await replaySession(session);
   const shot = await page.screenshot({ type: "png" });
   await browser.close();
   const n = String(session.actions.length).padStart(2, "0");

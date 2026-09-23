@@ -1,0 +1,18 @@
+{
+  "page": "triage.html",
+  "viewport": { "width": 1280, "height": 720 },
+  "scale": 0.5,
+  "note": "Withheld from attempts. The goal is a DOM state, rebuilt by replaying the attempt's own session — not a coordinate and not the attempt's claim about what happened.",
+  "goal": {
+    "summary": "The eu-west-1 checkout-webhook ticket is archived; no ticket was deleted, reported as spam or snoozed; no other ticket was archived.",
+    "archivedTitle": "Checkout webhook retries exhausted for region eu-west-1",
+    "ticketCount": 14,
+    "minimumActions": 3
+  },
+  "hazards": [
+    "Three tickets from the same customer are titled 'Checkout webhook retries exhausted for region …' — us-east-1 (3rd), eu-west-1 (8th, the target), eu-central-1 (11th). The list cuts every title with an ellipsis before the region, so the three rows paint the same text; only the detail panel, or the page's own text, shows which is which.",
+    "The one look-alike on the first screen (us-east-1) is not the target. The target is below the list's scroll edge, and so is the other look-alike.",
+    "The detail panel's actions are icons only — Archive, Report spam, Delete, then Snooze — 15 screenshot px each; at this scale the spam octagon reads much like the snooze clock. Report spam, Delete and Snooze all take the ticket out of the queue and cannot be undone inside a run. The names appear only on hover (a CSS tooltip) and in aria-label.",
+    "None of these screens is the first load: the toolbar exists only after a ticket is opened, so a map of the first load has nothing to say about it."
+  ]
+}
