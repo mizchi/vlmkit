@@ -142,16 +142,34 @@ rules for intentional deviations live in `approval.json`
 (`vlmkit manifest`). See the [CLI reference](./cli-reference.md) for
 the snapshot, workflow, and diff-pr sections.
 
-## Agent Skills (APM)
+## Agent Skills
 
 vlmkit ships seventeen coding-agent skills under `.claude/skills/`. They wrap
-the most common workflows as standalone, agent-readable playbooks.
-Other repos can install them via [APM](https://agentskills.io):
+the most common workflows as standalone, agent-readable playbooks, and are
+published three ways from one source.
 
 ```bash
-# Install a single skill into the current repo's .claude/skills/
+# The whole router, via APM (https://agentskills.io)
+apm install mizchi/vlmkit
+
+# …or the skills CLI, which needs no APM
+npx skills add mizchi/vlmkit
+
+# …or one skill only, into the current repo's .claude/skills/
 apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 ```
+
+Inside Claude Code, as a plugin:
+
+```
+/plugin marketplace add mizchi/vlmkit
+/plugin install vlmkit@vlmkit
+```
+
+The marketplace manifest is `.claude-plugin/marketplace.json`, and its one
+plugin points at `./skills/vlmkit` — the same package the skills CLI publishes,
+rather than a fourth copy. `tests/skill-package.test.mjs` asserts that, because
+each copy is somewhere `pnpm sync:skills` has to be remembered.
 
 | Skill | Entry workflow | Use when |
 |---|---|---|

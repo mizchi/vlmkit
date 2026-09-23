@@ -79,6 +79,14 @@ apm install mizchi/vlmkit
 npx skills add mizchi/vlmkit
 ```
 
+Inside Claude Code the same package installs as a plugin — no shell, and
+`/plugin marketplace update` picks up new workflows:
+
+```
+/plugin marketplace add mizchi/vlmkit
+/plugin install vlmkit@vlmkit
+```
+
 The APM bootstrap above is the [official recommended installer](https://microsoft.github.io/apm/getting-started/installation/)
 and resolves the latest binary for the current platform. It avoids depending on
 a stale package-manager formula.
@@ -89,13 +97,14 @@ no skill-selection step in the normal workflow. On first use, the agent detects
 the repository's package manager, reuses or adds `@mizchi/vlmkit` locally, and
 installs Chromium only if a selected gate reports it missing.
 
-Both installers expose one visible `vlmkit` skill. The 11 specialized workflows
-are internal resources bundled under that entry, so the agent selects them
-without adding 11 separate skills or copying the vlmkit source repository.
+All three installers expose one visible `vlmkit` skill. The 17 specialized
+workflows are internal resources bundled under that entry, so the agent selects
+them without adding 17 separate skills or copying the vlmkit source repository.
 
-See the [agent skill catalog](./.claude/skills/README.md) for all 11
+See the [agent skill catalog](./.claude/skills/README.md) for all 17
 specialized skills, grouped by general verification, UI creation, test
-generation, comparison and monitoring, and evaluation and hardening.
+generation, comparison and monitoring, evaluation and hardening, and
+explanation and figures.
 
 ## When to use what
 

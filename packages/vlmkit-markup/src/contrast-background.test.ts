@@ -114,8 +114,10 @@ describe("parseColor", () => {
     assert.equal(CONTRAST_BACKGROUND_JS.includes("`"), false, "no backticks in the fragment");
     assert.equal(CONTRAST_BACKGROUND_JS.includes("${"), false, "no interpolation in the fragment");
     // The regex character classes have to survive the template literal: `\s`
-    // written singly is eaten and splits on the letter s. See
-    // src/util/browser-script-escapes.test.ts, which does not cover a `_JS` name.
+    // written singly is eaten and splits on the letter s. The repo-wide sweep in
+    // src/util/browser-script-escapes.test.ts reads `_JS` names now — it did not
+    // when this was written — and names this constant so the coverage cannot be
+    // lost again by a rename. This assertion stays as the local, exact one.
     assert.match(CONTRAST_BACKGROUND_JS, /split\(\/\[,\\\/\\s\]\+\//);
   });
 });

@@ -12,6 +12,8 @@ Dates are YYYY-MM-DD.
 - Add `check copy --forbid <file>` to detect prohibited copy, including hidden text.
 - Add bundled workflows for explanatory animations, code-grounded diagrams, D2 diagrams and HTML slide decks,
   with figure fact checks and slide review tools.
+- Install the agent skills inside Claude Code with `/plugin marketplace add mizchi/vlmkit`, alongside the
+  existing APM and skills-CLI routes.
 - Fix contrast checks for modern CSS colours such as `oklch()` and `lab()`.
 - Reduce false positives in composition and grounding checks.
 - Fix wrapped bullets, blockquotes and ordered lists in generated slide decks.

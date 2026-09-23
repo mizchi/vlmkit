@@ -35,19 +35,34 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-/** The docs a reader copies commands out of. */
+/**
+ * The docs a reader copies commands out of.
+ *
+ * The 17 `.claude/skills/*​/SKILL.md` are in here for the same reason the four
+ * reference docs are, and arguably a stronger one: a skill is read by an AGENT,
+ * which types what it says without the human pause that catches a typo. They
+ * were outside this check until a full audit went looking for rot and found
+ * none — 0 stale verbs, 0 stale vlmkit flags, 0 stale subcommands across 3968
+ * lines. Being clean today is exactly when to nail a surface down.
+ */
 const REFERENCE_DOCS = [
   "README.md",
   "docs/cli-reference.md",
   "docs/configuration.md",
   "docs/markup-assist.md",
+  ".claude/skills/README.md",
+  ...readdirSync(join(repoRoot, ".claude/skills"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `.claude/skills/${entry.name}/SKILL.md`)
+    .filter((doc) => existsSync(join(repoRoot, doc)))
+    .sort(),
 ];
 
 const FLAG = /--[a-z][a-z0-9-]{2,}/g;
@@ -61,7 +76,14 @@ const FLAG = /--[a-z][a-z0-9-]{2,}/g;
  * write and hard to pattern-match, and because this list is the audit trail — an entry that
  * later becomes real is one that must be deleted here.
  */
-const DOCUMENTED_AS_ABSENT = new Set(["--capture-spec"]);
+const DOCUMENTED_AS_ABSENT = new Set([
+  "--capture-spec",
+  // `d2-diagram`'s install line: "the installer; it rejects the obsolete --tala
+  // flag". A flag named in order to warn the reader off it belongs here and not
+  // in THIRD_PARTY_FLAGS — filing it as d2's failed the "is the exemption still
+  // earned" check correctly, because no doc line runs `d2 --tala`.
+  "--tala",
+]);
 
 /**
  * Flags of a binary the docs tell the reader to run that is NOT vlmkit.
@@ -81,6 +103,11 @@ const DOCUMENTED_AS_ABSENT = new Set(["--capture-spec"]);
 const THIRD_PARTY_FLAGS = new Map([
   ["--layout", "d2"],
   ["--ascii-mode", "d2"],
+  // Named once the `d2-diagram` skill came under this check: the skill tells the
+  // reader to type it at `d2`, whose source this repository does not contain.
+  // `--tala-seeds` needed no entry — `d2-facts.mjs` passes it, and the skill
+  // assets are swept — which is the distinction this map is for.
+  ["--stdout-format", "d2"],
 ]);
 
 function documentedFlags() {
@@ -100,7 +127,7 @@ function documentedFlags() {
  * flag existing only in a comment counts as existing — acceptable, since the defect class is a
  * flag mentioned in NO source file at all.
  */
-function knownFlags() {
+function knownFlags({ skillAssets = true } = {}) {
   const grep = (args) => {
     try {
       return execFileSync("grep", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
@@ -122,7 +149,12 @@ function knownFlags() {
     // Only paths that exist: `e2e/` was here until the capture spec was retired, and grep
     // exits 2 (not 1) on a missing path, so the helper above rethrows and all three tests in
     // this file fail with a message about nothing.
+    // `.claude/skills` is in here because a skill ships its own scripts —
+    // `d2-facts.mjs` takes `--from-svg`, `--expect`, `--seeds`, `build-deck.mjs`
+    // takes `--out`, `--salt` — and a skill documenting its OWN flag read as a
+    // phantom until this path was swept. Six false positives, all real flags.
     ...["src", "packages", "worker", "Taskfile.pkl", "justfile", ".github"]
+      .concat(skillAssets ? [".claude/skills"] : [])
       .filter((p) => existsSync(join(repoRoot, p))),
   ]);
   const flags = new Set();
@@ -197,6 +229,56 @@ function missingFlags(documented, known) {
     .filter(([flag]) => !THIRD_PARTY_FLAGS.has(flag));
 }
 
+/**
+ * Every `<group> <subcommand>` pair the dispatcher accepts.
+ *
+ * Two sources, because a group's members come from two places: a gate declares
+ * its own path (`command: ["check", "color"]`), and the GROUPS table carries the
+ * members that are not gates — `check palette` is one, which is why it is real
+ * even though no gate is named `palette`.
+ */
+async function declaredPairs() {
+  const { loadGateRegistry, resetGateRegistryCache } = await import("../src/cli/gate-registry.ts");
+  resetGateRegistryCache();
+  const registry = await loadGateRegistry({ builtinsOnly: true });
+  const pairs = new Set();
+  for (const { gate } of registry.list()) {
+    if (gate.command.length >= 2) pairs.add(gate.command.slice(0, 2).join(" "));
+  }
+  const source = readFileSync(join(repoRoot, "src/cli/cli.ts"), "utf8");
+  const groupsBlock = source.slice(source.indexOf("const GROUPS"));
+  let group = null;
+  for (const line of groupsBlock.split("\n")) {
+    const opening = line.match(/^ {2}([a-z][a-z0-9-]*):\s*\{/);
+    if (opening) { group = opening[1]; continue; }
+    const member = line.match(/^ {4}([a-z][a-z0-9-]*):\s*\{/);
+    if (member && group) pairs.add(`${group} ${member[1]}`);
+    if (/^ {2}\}/.test(line)) group = null;
+  }
+  return pairs;
+}
+
+/** `vlmkit <group> <subcommand>` as the docs type it, in code contexts only. */
+function documentedPairs(groupVerbs) {
+  const found = new Map();
+  for (const doc of REFERENCE_DOCS) {
+    const text = readFileSync(join(repoRoot, doc), "utf8");
+    const chunks = [...text.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1])
+      .concat([...text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]));
+    for (const chunk of chunks) {
+      for (const line of chunk.split("\n")) {
+        if (line.trim().startsWith("#")) continue;
+        for (const m of line.matchAll(/(?:^|[\s(|$])(?:npx\s+)?vlmkit\s+([a-z][a-z0-9-]*)\s+([a-z][a-z0-9-]*)/g)) {
+          if (!groupVerbs.has(m[1])) continue;
+          const pair = `${m[1]} ${m[2]}`;
+          if (!found.has(pair)) found.set(pair, doc);
+        }
+      }
+    }
+  }
+  return found;
+}
+
 describe("flags in the reference docs", () => {
   it("all exist in the code", () => {
     const documented = documentedFlags();
@@ -223,13 +305,19 @@ describe("flags in the reference docs", () => {
     // be absent from vlmkit's own source: the day vlmkit grows a `--layout`, this fails and the
     // entry has to go, which puts the flag back under the existence check.
     const texts = REFERENCE_DOCS.map((doc) => [doc, readFileSync(join(repoRoot, doc), "utf8")]);
-    const known = knownFlags();
+    // vlmkit's OWN source, without the skill assets. A skill script that shells
+    // out to d2 necessarily types d2's flags — `d2-facts.mjs` builds
+    // `--layout=${layout}` and `--tala-seeds=${seeds}` — so sweeping the skills
+    // for this particular question reports all three d2 exemptions as vlmkit
+    // flags and demands they be dropped. The exemption means "not vlmkit's",
+    // and a skill's helper is not vlmkit.
+    const vlmkitOwn = knownFlags({ skillAssets: false });
     for (const [flag, binary] of THIRD_PARTY_FLAGS) {
       const onItsBinarysLine = texts.some(([, text]) =>
         text.split("\n").some((line) => line.includes(flag) && new RegExp(`\`?\\b${binary}\\s`).test(line)),
       );
       assert.ok(onItsBinarysLine, `${flag} is exempt as ${binary}'s, but no doc line runs ${binary} with it`);
-      assert.equal(known.has(flag), false, `${flag} now exists in vlmkit — drop the exemption`);
+      assert.equal(vlmkitOwn.has(flag), false, `${flag} now exists in vlmkit — drop the exemption`);
     }
   });
 
@@ -275,5 +363,36 @@ describe("flags in the reference docs", () => {
     assert.deepEqual(caught, [], "with the allowlist entry, the live corpus stays green");
     const withoutAllowlist = [...asItWas].filter(([flag]) => !known.has(flag)).map(([f]) => f);
     assert.deepEqual(withoutAllowlist, ["--capture-spec"], "and without it, the flag is reported");
+  });
+
+  it("every documented group subcommand is one the dispatcher accepts", async () => {
+    // The verb check above validates the FIRST token only, so `vlmkit check
+    // whatever` passes as long as `check` is a group. That gap was found by
+    // doubting `check palette` — six skill lines tell the reader to type it and
+    // no gate is named `palette` — and it turned out real, registered through
+    // the GROUPS table. The doubt was worth a check rather than an edit, and
+    // this is the check.
+    const pairs = await declaredPairs();
+    const groupVerbs = new Set([...pairs].map((pair) => pair.split(" ")[0]));
+    const documented = documentedPairs(groupVerbs);
+    // Guards against a silently empty run, the way the flag check does.
+    assert.ok(pairs.size > 30, `only ${pairs.size} group subcommands declared`);
+    assert.ok(documented.size > 20, `only ${documented.size} group subcommands found in the docs`);
+
+    const unknown = [...documented].filter(([pair]) => !pairs.has(pair));
+    assert.deepEqual(
+      unknown.map(([pair, doc]) => `vlmkit ${pair} (${doc})`),
+      [],
+      "a group subcommand in the docs that the dispatcher does not have. A renamed gate leaves "
+      + "the group verb valid, so the first-token check stays green and the reader gets a usage "
+      + "dump instead of the command.",
+    );
+
+    // Non-vacuity, and the reason the `vlmkit ` prefix is required: without it
+    // this scanner reads English inside code spans — "the build exits 0",
+    // "diff with", "verify is" — and reported eleven phantoms, every one prose.
+    assert.equal(pairs.has("check color"), true, "the newest gate is registered");
+    assert.equal(pairs.has("check palette"), true, "and a non-gate group member is too");
+    assert.equal(pairs.has("check nonexistent"), false);
   });
 });

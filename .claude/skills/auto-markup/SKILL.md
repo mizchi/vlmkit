@@ -1,6 +1,6 @@
 ---
 name: auto-markup
-description: End-to-end automatic markup — recreate a page or component as HTML/CSS from a target screenshot (or UI Contract IR), driven by deterministic signal tools with an optional VLM assist. Pipeline; scaffold the landmark skeleton (contract scaffold), converge composition (build page - missing/extra components, ordering, stacking gaps), converge each part (build component + report.json), then audit decoration (check palette / tokens / theme). Works with any agent model including Haiku; the tools are pure Playwright + pixel math, no API key required. Use when asked to implement markup from a design image, rebuild a page to match a reference, or prove a screenshot-to-HTML loop converges.
+description: End-to-end automatic markup — recreate a page or component as HTML/CSS from a target screenshot (or UI Contract IR), driven by deterministic signal tools with an optional VLM assist. Pipeline; scaffold the landmark skeleton (contract scaffold), converge composition (build page - missing/extra components, ordering, stacking gaps), converge each part (build component + report.json), then audit decoration (check palette / color / tokens / theme). Works with any agent model including Haiku; the tools are pure Playwright + pixel math, no API key required. Use when asked to implement markup from a design image, rebuild a page to match a reference, or prove a screenshot-to-HTML loop converges.
 metadata:
   internal: true
 ---
@@ -180,11 +180,21 @@ must serve both via `prefers-color-scheme`:
 
 ```bash
 vlmkit check palette target.png current-render.png   # missing = forgot a color; extra = hard-coded literal
+vlmkit check color current.html                      # what each colour is FOR: base / body ink / link ink,
+                                                     # plus a field with no visible boundary (WCAG 1.4.11) and
+                                                     # a link marked off from its prose by colour alone (1.4.1)
 vlmkit check tokens current.html                     # off-scale radius/spacing/z-index/shadow
 vlmkit check theme current.html                      # unthemed hard-coded colors (if theming required)
 vlmkit check animation current.html                  # if you authored animations: each one visibly moves
                                                      # (dead animations flagged), settle time, reduced-motion parity
 ```
+
+`check palette` and `check color` are not the same question. `palette` compares
+two IMAGES and answers "did I use the target's colours" — a forgotten token or a
+hard-coded literal. `color` reads the RENDERED page and answers "is each colour
+doing a job a reader can follow": it names the base, the body ink and the link
+ink, and reports the two places colour is the only thing carrying a meaning.
+A page can match the target's palette exactly and still fail `check color`.
 
 `check animation` is also why your own `build page` / `diff png` runs can
 look nondeterministic: an `infinite-animation` issue names the selector to
