@@ -69,6 +69,18 @@ export async function replay(actions, { pageName = PAGE } = {}) {
   return { browser, page };
 }
 
+/**
+ * One frame as an attempt sees it: the viewport, reduced to the resolution
+ * `check grounding` reports for that width (`medium`, so 640x360 at `SCALE`).
+ * `shoot.mjs` makes the scenario's first frame and this file every frame after
+ * it, and the two carried their own copies of this step and of the viewport —
+ * so a change to either would have left an attempt aiming at one frame size and
+ * shown another.
+ */
+export async function frame(page) {
+  return resizePngBuffer(await page.screenshot({ type: "png" }), { resolution: "medium" });
+}
+
 async function main() {
   const [letter, kind, pointRaw, dyRaw] = process.argv.slice(2);
   if (!letter || !kind) { console.error(usage); process.exit(1); }
@@ -103,11 +115,11 @@ async function main() {
   }
 
   const { browser, page } = await replay(session.actions);
-  const shot = await page.screenshot({ type: "png" });
+  const png = await frame(page);
   await browser.close();
   const n = String(session.actions.length).padStart(2, "0");
   const out = join(dir, `shot-${n}.png`);
-  await writeFile(out, resizePngBuffer(shot, { resolution: "medium" }));
+  await writeFile(out, png);
 
   const last = session.actions[session.actions.length - 1];
   const did = kind === "reset"
