@@ -42,6 +42,7 @@ import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 import {
   type SelectorAllowRule,
   parseSelectorAllowRules,
+  selectorAllowFilter,
 } from "../inspect/selector-exemption.ts";
 
 /** One visible element's style signature within its inferred role. */
@@ -487,8 +488,7 @@ export function judgeDesignPolicy(
   const minReuse = options.minReuse ?? DEFAULT_MIN_REUSE;
   const minInstances = options.minInstances ?? DEFAULT_MIN_INSTANCES;
   const outlierMax = options.outlierMaxUses ?? DEFAULT_OUTLIER_MAX_USES;
-  const allowRules = parseDesignAllowRules(options.allow ?? []);
-  const usedAllow = new Set<string>();
+  const allow = selectorAllowFilter(parseDesignAllowRules(options.allow ?? []));
 
   const byRole = new Map<string, DesignSample[]>();
   for (const s of input.samples) {
@@ -543,18 +543,13 @@ export function judgeDesignPolicy(
     // Allowed instances leave the arithmetic before it is done: a deliberate primary
     // button should not drag the role's reuse figure down, which is the whole reason
     // `--min-reuse` could not serve as this lever.
-    const allowedHere: { selector: string; reason: string }[] = [];
+    const allowedBefore = allow.allowed.length;
     for (const [key, group] of [...counts.entries()]) {
-      const kept = group.filter((sample) => {
-        const rule = allowRules.find((r) => sample.selector.includes(r.selector));
-        if (!rule) return true;
-        allowedHere.push({ selector: sample.selector, reason: rule.reason });
-        usedAllow.add(rule.raw);
-        return false;
-      });
+      const kept = group.filter((sample) => allow.keep(sample.selector));
       if (kept.length === 0) counts.delete(key);
       else counts.set(key, kept);
     }
+    const allowedHere = allow.allowed.slice(allowedBefore);
     const judged = [...counts.values()].flat();
 
     const signatures = counts.size;
@@ -745,7 +740,7 @@ export function judgeDesignPolicy(
     // A rule that matched nothing is stale or misspelled, and either way it is widening
     // the blind spot for a variant that is no longer there — the property `check
     // integrity --allow` established and the adoption report praised by name.
-    unusedAllow: allowRules.filter((r) => !usedAllow.has(r.raw)).map((r) => r.raw),
+    unusedAllow: allow.unused(),
     textFreeSamples,
     textFreeFolded,
     spacingValues: spacingCounts.size,

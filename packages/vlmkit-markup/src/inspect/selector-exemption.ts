@@ -97,7 +97,7 @@ export function applySelectorAllowRules<T>(
   const used = new Set<string>();
   for (const finding of findings) {
     const selector = selectorOf(finding);
-    const rule = selector === undefined ? undefined : rules.find((r) => selector.includes(r.selector));
+    const rule = selector === undefined ? undefined : matchSelectorAllowRule(rules, selector);
     if (!rule) {
       kept.push(finding);
       continue;
@@ -106,6 +106,50 @@ export function applySelectorAllowRules<T>(
     exempted.push({ finding, rule });
   }
   return { kept, exempted, unused: rules.filter((r) => !used.has(r.raw)) };
+}
+
+/** The one matching rule, for both helpers here: the first rule whose selector the path contains. */
+function matchSelectorAllowRule(
+  rules: readonly SelectorAllowRule[],
+  selector: string,
+): SelectorAllowRule | undefined {
+  return rules.find((r) => selector.includes(r.selector));
+}
+
+export interface SelectorAllowFilter {
+  /** True when no rule exempts this selector. A match is recorded, never dropped. */
+  keep(selector: string): boolean;
+  /** Every row a rule signed off, with that rule's reason — listed, never silently gone. */
+  readonly allowed: { selector: string; reason: string }[];
+  /** Rules that matched nothing, as the user wrote them. */
+  unused(): string[];
+}
+
+/**
+ * `applySelectorAllowRules` for a gate that filters while it measures.
+ *
+ * The style gates exempt several kinds of row from one set of rules — instances,
+ * labels, rails, controls, links — so there is no single finished list to
+ * partition. `check design`, `check composition` and `check color` each wrote
+ * this closure themselves, and the third copy dropped the part that counts: it
+ * never recorded which rules matched, so a mistyped `--allow` in `check color`
+ * did nothing and said nothing, where the other two print "N --allow rule(s)
+ * matched nothing". One definition means the three cannot drift apart again.
+ */
+export function selectorAllowFilter(rules: readonly SelectorAllowRule[]): SelectorAllowFilter {
+  const allowed: { selector: string; reason: string }[] = [];
+  const used = new Set<string>();
+  return {
+    allowed,
+    keep: (selector) => {
+      const rule = matchSelectorAllowRule(rules, selector);
+      if (!rule) return true;
+      allowed.push({ selector, reason: rule.reason });
+      used.add(rule.raw);
+      return false;
+    },
+    unused: () => rules.filter((r) => !used.has(r.raw)).map((r) => r.raw),
+  };
 }
 
 /**

@@ -56,7 +56,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
-import { parseSelectorAllowRules, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { parseSelectorAllowRules, selectorAllowFilter, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
 import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 
 // ---------------------------------------------------------------------------
@@ -803,17 +803,9 @@ export function judgeComposition(
   options: Pick<CompositionOptions, "allow"> = {},
 ): Omit<CompositionReport, "source"> {
   const { boxes, viewport } = input;
-  const allowRules = parseCompositionAllowRules(options.allow ?? []);
-  const usedAllow = new Set<string>();
-  const allowed: { selector: string; reason: string }[] = [];
   /** An allowed row leaves the verdict and is still listed — the repo-wide exemption property. */
-  const keep = (selector: string): boolean => {
-    const rule = allowRules.find((r) => selector.includes(r.selector));
-    if (!rule) return true;
-    allowed.push({ selector, reason: rule.reason });
-    usedAllow.add(rule.raw);
-    return false;
-  };
+  const allow = selectorAllowFilter(parseCompositionAllowRules(options.allow ?? []));
+  const { keep } = allow;
 
   const { labels, unjudged } = measureProximity(boxes);
   const rails = measureRails(boxes, viewport.width);
@@ -925,8 +917,8 @@ export function judgeComposition(
   return {
     labels, labelsUnjudged: unjudged, rails, separation, hierarchy, findings,
     boxes: boxes.length,
-    allowed,
-    unusedAllow: allowRules.filter((r) => !usedAllow.has(r.raw)).map((r) => r.raw),
+    allowed: allow.allowed,
+    unusedAllow: allow.unused(),
     verdict: carries ? "unbalanced" : !judgedAnything ? "not-judged" : "composed",
   };
 }

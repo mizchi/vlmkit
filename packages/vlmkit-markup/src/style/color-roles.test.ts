@@ -271,6 +271,22 @@ describe("judgeColorRoles", () => {
     );
     assert.deepEqual(report.findings.filter((f) => f.kind === "control-boundary-invisible"), []);
     assert.equal(report.controls.length, 1, "an exemption hides the finding, not the measurement");
+    assert.deepEqual(report.unusedAllow, [], "and a rule that matched is not reported as unused");
+  });
+
+  it("says when an --allow rule matched nothing, as design and composition do", () => {
+    // This gate filtered with its own copy of the allow closure, and the copy
+    // never recorded which rules matched: a mistyped selector did nothing and
+    // said nothing. The three style gates share one filter now.
+    const bad = control({ selector: "input#search", best: 0, fillHex: null, borderHex: null });
+    const report = judgeColorRoles(
+      input({ controls: [bad], links: [link()] }),
+      { allow: ["input#serach;typo'd, so it exempts nothing"] },
+    );
+    assert.deepEqual(report.unusedAllow, ["input#serach;typo'd, so it exempts nothing"]);
+    assert.equal(report.findings.filter((f) => f.kind === "control-boundary-invisible").length, 1, "the finding stands");
+    const text = formatColorRolesReport(report).replace(/\x1b\[[0-9;]*m/g, "");
+    assert.match(text, /1 --allow rule\(s\) matched nothing: input#serach/);
   });
 });
 

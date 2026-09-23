@@ -102,7 +102,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
-import { parseSelectorAllowRules, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { parseSelectorAllowRules, selectorAllowFilter, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
 import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 
 // ---------------------------------------------------------------------------
@@ -232,6 +232,8 @@ export interface ColorRolesReport extends ColorRolesInput {
   linkInk: ColorUse | null;
   /** Rows a `--allow` rule signed off. Listed, never silently gone. */
   allowed: { selector: string; reason: string }[];
+  /** `--allow` rules that matched nothing, as written: a typo is otherwise silent. */
+  unusedAllow: string[];
   findings: ColorFinding[];
   verdict: "consistent" | "color-dependent" | "not-judged";
 }
@@ -535,19 +537,13 @@ export function judgeColorRoles(
   input: ColorRolesInput,
   options: { source?: string; allow?: readonly string[] } = {},
 ): ColorRolesReport {
-  const allowRules = parseColorAllowRules(options.allow ?? []);
-  const allowed: { selector: string; reason: string }[] = [];
   /**
    * An allowed row leaves the verdict and is still listed — the repo-wide
    * exemption property, so a sign-off reads as a decision rather than as
    * silence. Substring, not equality, because a selector is a generated path.
    */
-  const keep = (selector: string): boolean => {
-    const rule = allowRules.find((r) => selector.includes(r.selector));
-    if (!rule) return true;
-    allowed.push({ selector, reason: rule.reason });
-    return false;
-  };
+  const allow = selectorAllowFilter(parseColorAllowRules(options.allow ?? []));
+  const { keep } = allow;
 
   const findings: ColorFinding[] = [];
   const controls = invisibleControls(input.controls).filter((c) => keep(c.selector));
@@ -653,7 +649,8 @@ export function judgeColorRoles(
     base: findBase(input),
     bodyInk: findBodyInk(input),
     linkInk: findLinkInk(input),
-    allowed,
+    allowed: allow.allowed,
+    unusedAllow: allow.unused(),
     findings,
     verdict: !judgedAnything ? "not-judged" : carries ? "color-dependent" : "consistent",
   };
@@ -742,6 +739,10 @@ export function formatColorRolesReport(report: ColorRolesReport, rules?: RuleVie
     out.push("");
     out.push(`${BOLD}Signed off${RESET} ${DIM}(--allow; off the verdict, still listed)${RESET}`);
     for (const a of report.allowed) out.push(`  ${DIM}-${RESET} ${a.selector} — ${a.reason}`);
+  }
+  if (report.unusedAllow.length > 0) {
+    out.push("");
+    out.push(`${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`);
   }
   out.push("");
   return out.join("\n");
