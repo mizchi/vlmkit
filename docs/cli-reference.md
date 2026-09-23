@@ -688,6 +688,9 @@ vlmkit check grounding <url> --mark marked.png
 
 # What would a click at this coordinate actually reach?
 vlmkit check grounding <url> --at 473,96 --at 447,96
+
+# The screen after some actions: replay them first, then map what is there.
+vlmkit check grounding <url> --after "wheel 85,120 89" --after "click 85,172"
 ```
 
 A computer-use agent receives a PNG, names a target in words, emits a pixel
@@ -733,10 +736,23 @@ measured against every clipping ancestor, so a list item scrolled out of a
 is. Such a row is not a finding — a list with more rows than fit is ordinary
 markup — and instead carries `clippedBy`: the container, whether it **scrolls**,
 and how far it would have to (`dy` / `dx`). The report groups them under *Out of
-the frame — scroll first, then re-run*, so a caller with a wheel can plan the
-scroll rather than infer from pixels that a list exists at all. Before this, such
+the frame*, with the scroll that reaches the nearest one spelled as an action —
+`--after "wheel 85,120 34"`, at a point inside the container — so a caller with
+a wheel can plan the scroll rather than infer from pixels that a list exists at
+all. Before this, such
 rows were reported as `occluded-target` "by `html`" with the advice to move
 `html`; three agents in a row worked the remedy out from the screenshot instead.
+
+`--after` (repeatable, in order) replays computer-use actions before anything is
+measured — `"click x,y"`, `"move x,y"` (hover) and `"wheel x,y dy"`, in
+screenshot px like every other number here, `dy` included — so the map, `--at`
+and `--mark` describe the screen those actions leave: the detail panel a click
+opened, the rows a scroll revealed, the tooltip a hover drew. The report's
+`screen:` line says which screen it measured, either way. Without it the gate
+maps the first load however often it is re-run, and the round that named the gap had
+both tool-using agents find the second screen's Archive button by sampling pixel
+colours, six pixels from Delete. The spelling is the one a harness logs, so an
+agent's own action history pastes in as-is.
 
 The map describes **the frame it measured**. Controls that appear only after an
 interaction — a detail panel's buttons, a menu's items — are not in it, and

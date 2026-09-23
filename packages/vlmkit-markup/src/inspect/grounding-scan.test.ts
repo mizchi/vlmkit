@@ -225,13 +225,13 @@ test("a target hidden by a scroll container is out of the frame, not occluded", 
         inFrame: false,
         centreHit: false,
         interceptedBy: "html",
-        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0 },
+        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } },
       })],
     }),
     UNSCALED,
   );
   assert.deepEqual(report.issues, [], "nothing here is a defect of the page");
-  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 332, dx: 0 });
+  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } });
 });
 
 test("the scroll a caller needs is in screenshot px, like every other number", () => {
@@ -239,12 +239,12 @@ test("the scroll a caller needs is in screenshot px, like every other number", (
     input({
       targets: [target({
         inFrame: false,
-        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12 },
+        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12, wheelAt: { x: 180, y: 300 } },
       })],
     }),
     { resolution: { maxWidth: 640, maxHeight: 480 } },
   );
-  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 166, dx: -6 });
+  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 166, dx: -6, wheelAt: { x: 90, y: 150 } });
 });
 
 test("the prose names the container, the count and the nearest scroll", () => {
@@ -255,14 +255,27 @@ test("the prose names the container, the count and the nearest scroll", () => {
     selector: `#list > button:nth-of-type(${n})`,
     visibleText: `Row ${n}`,
     inFrame: false,
-    clippedBy: { selector: "#list", scrollable: true, dy, dx: 0 },
+    clippedBy: { selector: "#list", scrollable: true, dy, dx: 0, wheelAt: { x: 180, y: 300 } },
   });
   const text = formatGroundingReport(
     analyzeGroundingSamples(input({ targets: [hidden(5, 44), hidden(6, 74), hidden(7, 105)] }), UNSCALED),
   );
-  assert.match(text, /Out of the frame \(3\) — scroll first, then re-run/);
-  assert.match(text, /#list: hides 3 target\(s\) — scroll it \(nearest needs 44px\)/);
+  assert.match(text, /Out of the frame \(3\) — scroll, then re-run with the scroll as --after/);
+  // The scroll is printed as the action that performs it, at a point inside the
+  // container, so it pastes back in as-is.
+  assert.match(text, /#list: hides 3 target\(s\) — scroll it \(nearest needs 44px: --after "wheel 180,300 44"\)/);
   assert.match(text, /t1 button "Row 5" \(dy 44px\)/);
+});
+
+test("the prose says which screen it measured", () => {
+  const first = formatGroundingReport(analyzeGroundingSamples(input({ targets: [target()] }), UNSCALED));
+  assert.match(first, /screen: as first loaded — --after "click x,y" measures the screen an action leaves/);
+  const report = analyzeGroundingSamples(input({ targets: [target()] }), UNSCALED);
+  report.after = [
+    { kind: "wheel", at: { x: 85, y: 150 }, dy: 89 },
+    { kind: "click", at: { x: 85, y: 123 } },
+  ];
+  assert.match(formatGroundingReport(report), /screen: after wheel \(85,150\) dy 89, then click \(85,123\)$/m);
 });
 
 test("a container that cannot scroll says the content is unreachable", () => {
@@ -271,7 +284,7 @@ test("a container that cannot scroll says the content is unreachable", () => {
       input({
         targets: [target({
           inFrame: false,
-          clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0 },
+          clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0, wheelAt: { x: 180, y: 300 } },
         })],
       }),
       UNSCALED,
@@ -797,6 +810,43 @@ test("E2E: a row scrolled out of its list is reported with the scroll that revea
   const row3 = report.targets.find((t) => t.selector === "#row-3")!;
   assert.equal(row3.inFrame, true);
   assert.ok(row3.point.y < row3.box.y + row3.box.height / 2, "aimed into the visible part");
+});
+
+test("E2E: --after maps the screen a click leaves, not the first load", { timeout: 180_000 }, async () => {
+  // v3: "it measures the page as first loaded only, so Reply/Archive/Delete never
+  // appear anywhere in its output … even though they're the only way to finish".
+  const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
+  const first = await runGroundingScan({ source });
+  assert.deepEqual(first.targets.map((t) => t.label), ["Open ticket"]);
+  assert.equal(first.after, undefined, "no --after, no claim about one");
+
+  const open = first.targets[0]!;
+  const after = await runGroundingScan({ source, after: [{ kind: "click", at: open.point }], at: [open.point] });
+  assert.deepEqual(after.targets.map((t) => t.label), ["Open ticket", "Archive", "Delete"]);
+  assert.deepEqual(after.after, [{ kind: "click", at: open.point }]);
+  // --at is answered on the same screen the map describes.
+  assert.equal(after.probes![0]!.targetId, open.id);
+});
+
+test("E2E: the wheel the report prints is the wheel that reveals the row", { timeout: 180_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/grounding/scrolled-list.html");
+  const first = await runGroundingScan({ source });
+  const hidden = first.targets.find((t) => t.selector === "#row-4")!;
+  const { wheelAt, dy } = hidden.clippedBy!;
+  assert.match(formatGroundingReport(first), new RegExp(`--after "wheel ${wheelAt.x},${wheelAt.y} \\d+"`));
+
+  const scrolled = await runGroundingScan({ source, after: [{ kind: "wheel", at: wheelAt, dy }] });
+  const row4 = scrolled.targets.find((t) => t.selector === "#row-4")!;
+  assert.equal(row4.inFrame, true, "the printed dy, sent as printed, brings it into the frame");
+  assert.equal(row4.clippedBy, undefined);
+});
+
+test("E2E: an --after point outside the frame is a usage error, not a click at the edge", { timeout: 180_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
+  await assert.rejects(
+    runGroundingScan({ source, after: [{ kind: "click", at: { x: 700, y: 10 } }] }),
+    /--after click \(700,10\): outside the 640x360 frame/,
+  );
 });
 
 test("E2E: --mark writes the overlay at the frame's own resolution", { timeout: 180_000 }, async () => {

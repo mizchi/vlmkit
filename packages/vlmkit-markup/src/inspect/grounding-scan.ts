@@ -64,6 +64,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import {
   RESOLUTION_PRESETS,
@@ -157,7 +158,19 @@ export interface GroundingTargetSample {
    * with no tool at all, specified it: "A DOM-aware tool would have told me
    * directly '12 tickets, scrolled to 4/12'."
    */
-  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number };
+  clippedBy?: {
+    selector: string;
+    scrollable: boolean;
+    dy: number;
+    dx: number;
+    /**
+     * Middle of the container's painted box — a point a wheel there scrolls
+     * this container rather than the page. Carried so the report can print a
+     * `--after "wheel x,y dy"` a caller can paste, rather than leaving it to
+     * find a point inside the list by eye.
+     */
+    wheelAt: { x: number; y: number };
+  };
   /**
    * Own visible text of up to three ancestors, nearest first, for disambiguation.
    *
@@ -263,7 +276,7 @@ export interface GroundingTarget {
   inFrame: boolean;
   clipped: boolean;
   /** See `GroundingTargetSample.clippedBy`. Scaled into screenshot px. */
-  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number };
+  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number; wheelAt: { x: number; y: number } };
   /**
    * Rule ids this target tripped. Present on the row as well as in `issues` so a
    * caller consuming the action map alone — which is the point of the action map —
@@ -315,9 +328,26 @@ export interface GroundingProbe {
   offFrame?: boolean;
 }
 
+/**
+ * One computer-use action, in SCREENSHOT px like everything else here — `wheel`'s
+ * `dy` included (positive = down), so a scroll `clippedBy` asks for can be sent
+ * as printed.
+ */
+export type GroundingAction =
+  | { kind: "click"; at: { x: number; y: number } }
+  | { kind: "move"; at: { x: number; y: number } }
+  | { kind: "wheel"; at: { x: number; y: number }; dy: number };
+
 export interface GroundingScanReport {
   source: string;
   frame: AgentFrame;
+  /**
+   * The actions replayed before measuring (`--after`), in order. Absent means the
+   * map is of the page as first loaded.
+   */
+  after?: GroundingAction[];
+  /** Where the page was after `after`, when an action navigated away from `source`. */
+  navigatedTo?: string;
   targets: GroundingTarget[];
   /** Present only when `--at` was passed. Absent means "not asked", never "clean". */
   probes?: GroundingProbe[];
@@ -355,6 +385,19 @@ export interface GroundingScanOptions extends PageLoadOptions {
    * caught.
    */
   at?: readonly { x: number; y: number }[];
+  /**
+   * `--after "click x,y"` — actions to replay, in screenshot px, before anything
+   * is measured, so the map is of the screen those actions leave.
+   *
+   * v3's agents finished the job the map could not see: "it measures the page as
+   * first loaded only, so Reply/Archive/Delete never appear anywhere in its
+   * output … I had to locate the Archive button myself by sampling screenshot
+   * pixel colors", six pixels from Delete; and "after scrolling changes the page,
+   * the grounding map becomes stale." Re-running a gate that loads a URL gives
+   * back the first screen however often it is run. Replaying the caller's own
+   * actions is how the second screen gets measured at all.
+   */
+  after?: readonly GroundingAction[];
 }
 
 const MAX_TARGETS = 300;
@@ -519,6 +562,10 @@ export function analyzeGroundingSamples(
           scrollable: sample.clippedBy.scrollable,
           dy: Math.round(sample.clippedBy.dy * frame.scale),
           dx: Math.round(sample.clippedBy.dx * frame.scale),
+          wheelAt: {
+            x: Math.round(sample.clippedBy.wheelAt.x * frame.scale),
+            y: Math.round(sample.clippedBy.wheelAt.y * frame.scale),
+          },
         },
       }
       : {}),
@@ -867,6 +914,10 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
           scrollable,
           dy: Math.round(rect.top < pr.top ? rect.top - pr.top : rect.bottom > pr.bottom ? rect.bottom - pr.bottom : 0),
           dx: Math.round(rect.left < pr.left ? rect.left - pr.left : rect.right > pr.right ? rect.right - pr.right : 0),
+          wheelAt: {
+            x: Math.round((Math.max(pr.left, 0) + Math.min(pr.right, vw)) / 2),
+            y: Math.round((Math.max(pr.top, 0) + Math.min(pr.bottom, vh)) / 2),
+          },
         };
       }
       void before;
@@ -988,9 +1039,19 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
       const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
+    // Before the actions: a click that follows a link is the caller's doing, not a
+    // redirect of the source.
     const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
+    const loadedAt = page.url();
+    if (options.after && options.after.length > 0) {
+      await replayActions(page, options.after, resolveAgentFrame(viewport, options.resolution));
+    }
     const collected = await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">;
     const report = analyzeGroundingSamples({ source: options.source, ...collected }, options);
+    if (options.after && options.after.length > 0) {
+      report.after = options.after.map((a) => ({ ...a, at: { ...a.at } }));
+      if (page.url() !== loadedAt) report.navigatedTo = page.url();
+    }
     if (options.at && options.at.length > 0) {
       report.probes = await probePoints(page, options.at, report);
     }
@@ -1006,6 +1067,44 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
     }
     return report;
   });
+}
+
+/** `click (85,123)` / `wheel (85,150) dy 89` — how an action is quoted back. */
+export function describeAction(action: GroundingAction): string {
+  return `${action.kind} (${action.at.x},${action.at.y})${action.kind === "wheel" ? ` dy ${action.dy}` : ""}`;
+}
+
+/**
+ * Replay `--after` on the live page: screenshot px -> CSS px, one divide, then
+ * the same mouse calls a computer-use harness makes.
+ *
+ * The settle is a fixed 120ms, not a network or DOM condition, for the same
+ * reason the scenario's harness uses one: a scripted page repaints within a
+ * frame, a wheel scroll is applied asynchronously, and a fixed wait makes the
+ * replay give the same screen every time.
+ */
+async function replayActions(
+  page: import("playwright").Page,
+  actions: readonly GroundingAction[],
+  frame: AgentFrame,
+): Promise<void> {
+  for (const action of actions) {
+    const { x, y } = action.at;
+    if (x < 0 || y < 0 || x >= frame.width || y >= frame.height) {
+      throw new UsageError(
+        `--after ${describeAction(action)}: outside the ${frame.width}x${frame.height} frame`
+        + " — coordinates are screenshot px, like the map's.",
+      );
+    }
+    const css = { x: Math.round(x / frame.scale), y: Math.round(y / frame.scale) };
+    if (action.kind === "click") await page.mouse.click(css.x, css.y);
+    else if (action.kind === "move") await page.mouse.move(css.x, css.y);
+    else {
+      await page.mouse.move(css.x, css.y);
+      await page.mouse.wheel(0, Math.round(action.dy / frame.scale));
+    }
+    await page.waitForTimeout(120);
+  }
 }
 
 /**
@@ -1186,6 +1285,15 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     + ` — ${report.frame.resolution}, scale ${report.frame.scale.toFixed(2)}`
     + ` (every coordinate below is in these ${report.frame.width}x${report.frame.height} pixels)`,
   );
+  // Which screen this is. A map of the first load read as a map of the screen an
+  // agent is looking at after three actions is the v3 failure, so it is stated
+  // either way — and the plain case names the flag that measures the other.
+  lines.push(
+    report.after && report.after.length > 0
+      ? `screen: after ${report.after.map(describeAction).join(", then ")}`
+        + (report.navigatedTo ? ` (now at ${report.navigatedTo})` : "")
+      : `screen: as first loaded — --after "click x,y" measures the screen an action leaves`,
+  );
   lines.push(
     `targets: ${inFrame.length} actionable in frame`
     + ` (${report.targets.length - inFrame.length} disabled or out of the frame`
@@ -1199,15 +1307,17 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
   const offscreen = report.targets.filter((t) => !t.inFrame && !t.disabled && t.clippedBy);
   if (offscreen.length > 0) {
     lines.push("");
-    lines.push(`Out of the frame (${offscreen.length}) — scroll first, then re-run:`);
+    lines.push(`Out of the frame (${offscreen.length}) — scroll, then re-run with the scroll as --after:`);
     const byContainer = new Map<string, typeof offscreen>();
     for (const t of offscreen) {
       const key = t.clippedBy!.selector;
       byContainer.set(key, [...(byContainer.get(key) ?? []), t]);
     }
     for (const [selector, rows] of byContainer) {
+      const nearest = rows.map((r) => r.clippedBy!.dy).reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b);
+      const wheel = rows[0]!.clippedBy!.wheelAt;
       const how = rows[0]!.clippedBy!.scrollable
-        ? `scroll it (nearest needs ${rows.map((r) => r.clippedBy!.dy).reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)}px)`
+        ? `scroll it (nearest needs ${nearest}px: --after "wheel ${wheel.x},${wheel.y} ${nearest}")`
         : `it does not scroll — this content cannot be reached by scrolling`;
       lines.push(`  ${selector}: hides ${rows.length} target(s) — ${how}`);
       for (const t of rows.slice(0, 6)) {
