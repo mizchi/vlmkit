@@ -148,9 +148,21 @@ export interface GroundingTargetSample {
   /** The box extends past the visible area — the frame's edge, or a container's. */
   clipped: boolean;
   /**
-   * The nearest ancestor that hides this target entirely, when one does, with
-   * how far it would have to scroll for the target to come into view (CSS px,
-   * positive = down / right).
+   * The part of the box actually painted — inside the viewport AND every
+   * clipping ancestor — in CSS px. Present when `inFrame`.
+   *
+   * The action map's `visibleBox` used to be the box cut by the frame alone, so
+   * a row that its list's scroll edge cut to a 1px strip was reported as the
+   * full 149x28, and the only finding it earned was `crowded-target` "0px
+   * from" the row above. v4's smaller model took that at its word and scrolled
+   * "to separate t8 from t7 above it"; the row was not crowded, it was barely
+   * on screen.
+   */
+  painted?: Box;
+  /**
+   * The nearest ancestor that cuts this target — hides it entirely, or in part
+   * — when one does, with how far it would have to scroll for the whole box to
+   * come into view (CSS px, positive = down / right).
    *
    * The round that added this had all three agents work out the remedy from the
    * picture instead: "the actual fix is scrolling the list, which the harness
@@ -579,12 +591,16 @@ export function analyzeGroundingSamples(
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i]!;
     const sample = input.targets[i]!;
-    const visible = {
-      x: Math.max(target.box.x, 0),
-      y: Math.max(target.box.y, 0),
-      width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
-      height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
-    };
+    // The painted part when the collector measured one — which accounts for
+    // every clipping ancestor — and the frame's cut of the box otherwise.
+    const visible = sample.painted
+      ? scaleBox(sample.painted, frame.scale)
+      : {
+        x: Math.max(target.box.x, 0),
+        y: Math.max(target.box.y, 0),
+        width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
+        height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
+      };
     if (sample.inFrame) {
       target.visibleBox = visible;
       // The collector already clamps the click point into the visible part, so
@@ -694,11 +710,17 @@ export function analyzeGroundingSamples(
         severity: "warn",
         selector: target.selector,
         message: `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})`
-          + ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame`
-          + (cut
-            ? ` — the frame cuts it (the element is ${target.box.width}x${target.box.height}); this gate measures the initial frame and never scrolls, so scroll it into view and re-run before aiming`
-            : ` — the whole element`)
-          + `, under the ${precisionFloor}px floor either way: a few pixels for the model to aim at.`,
+          + ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame,`
+          + ` under the ${precisionFloor}px floor: a few pixels for the model to aim at`
+          + (cut && target.clippedBy
+            ? ` — ${target.clippedBy.selector} cuts it (the element is ${target.box.width}x${target.box.height});`
+              + (target.clippedBy.scrollable
+                ? ` scroll it ${target.clippedBy.dy}px (--after "wheel ${target.clippedBy.wheelAt.x},${target.clippedBy.wheelAt.y} ${target.clippedBy.dy}") and re-run before aiming`
+                : ` it does not scroll, so this is all of it there is to aim at`)
+            : cut
+              ? ` — the frame cuts it (the element is ${target.box.width}x${target.box.height}); scroll it into view (--after "wheel x,y dy") and re-run before aiming`
+              : ` — the whole element`)
+          + `.`,
       });
     }
     if (target.aimMargin !== undefined && target.aimMargin < aimFloor && target.nearest) {
@@ -904,10 +926,13 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
         left: Math.max(clip.left, pr.left), top: Math.max(clip.top, pr.top),
         right: Math.min(clip.right, pr.right), bottom: Math.min(clip.bottom, pr.bottom),
       };
-      // Blame the FIRST ancestor that actually hides it, and say how far it would
-      // have to scroll — a caller with a wheel needs the delta, not the fact.
-      if (!clippedBy && (rect.bottom <= pr.top || rect.top >= pr.bottom
-        || rect.right <= pr.left || rect.left >= pr.right)) {
+      // Blame the FIRST ancestor that cuts it — hides it entirely or in part —
+      // and say how far it would have to scroll for the whole box to show: a
+      // caller with a wheel needs the delta, not the fact. Half a pixel of
+      // slack, because a box and its container disagree by subpixel rounding
+      // on perfectly ordinary layouts.
+      if (!clippedBy && (rect.top < pr.top - 0.5 || rect.bottom > pr.bottom + 0.5
+        || rect.left < pr.left - 0.5 || rect.right > pr.right + 0.5)) {
         const scrollable = SCROLLS.test(ps.overflowY) || SCROLLS.test(ps.overflowX);
         clippedBy = {
           selector: stableSelector(p),
@@ -1021,6 +1046,7 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
       disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
       inFrame,
       clipped: rect.left < left || rect.top < top || rect.right > right || rect.bottom > bottom,
+      ...(inFrame ? { painted: { x: left, y: top, width: right - left, height: bottom - top } } : {}),
       ...(clippedBy ? { clippedBy } : {}),
       ancestorTexts: ancestorTexts(el),
     });
@@ -1337,7 +1363,12 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
       const shownRisks = [...new Set(t.risks)].filter((risk) => rules?.effective(risk) !== "off");
       const risk = shownRisks.length > 0 ? ` ${RED}[${shownRisks.join(",")}]${RESET}` : "";
       const label = t.label ? ` "${t.label}"` : ` ${DIM}(no visible label)${RESET}`;
-      lines.push(`  ${t.id} ${t.role}${label} @ (${t.point.x},${t.point.y}) ${t.box.width}x${t.box.height} ${DIM}${t.selector}${RESET}${risk}`);
+      // The painted size when something cuts the box: "149x28" on a row showing
+      // one pixel of itself is the number v4's smaller model aimed by.
+      const size = t.visibleBox.width !== t.box.width || t.visibleBox.height !== t.box.height
+        ? `${t.visibleBox.width}x${t.visibleBox.height} painted of ${t.box.width}x${t.box.height}`
+        : `${t.box.width}x${t.box.height}`;
+      lines.push(`  ${t.id} ${t.role}${label} @ (${t.point.x},${t.point.y}) ${size} ${DIM}${t.selector}${RESET}${risk}`);
     }
     if (inFrame.length > 20) {
       lines.push(`  ${DIM}… ${inFrame.length - 20} more — --json emits the full map${RESET}`);

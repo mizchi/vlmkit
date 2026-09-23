@@ -192,7 +192,7 @@ test("an ordinary target is not labelled clipped by a rounding disagreement", ()
   assert.equal(report.targets[0]!.aimedOffCentre, undefined);
 });
 
-test("a cut target's message says the gate never scrolls", () => {
+test("a cut target's message says how to scroll it into view", () => {
   // 5 of its 40 px are inside the frame, so it is under the precision floor and
   // the fold is why — which is exactly when the advice to scroll applies.
   const report = analyzeGroundingSamples(
@@ -206,11 +206,46 @@ test("a cut target's message says the gate never scrolls", () => {
     UNSCALED,
   );
   // "doesn't clarify whether scrolling occurred during measurement or if the
-  // screenshot is pre-scrolled" — it did not, and now it says so.
+  // screenshot is pre-scrolled" — it did not, and the message names the flag
+  // that measures the scrolled screen.
   assert.match(
     report.issues.find((i) => i.kind === "imprecise-target")!.message,
-    /measures the initial frame and never scrolls, so scroll it into view and re-run/,
+    /the frame cuts it \(the element is 120x40\); scroll it into view \(--after "wheel x,y dy"\) and re-run/,
   );
+});
+
+test("a row its list cuts to a strip is measured on the strip, and the list is named", () => {
+  // v4, the smaller model with the tool: after two wheels the target row sat
+  // under the list's bottom edge with 1px of it painted. The map said 149x28 and
+  // the only finding was `crowded-target` "0px from" the row above; it scrolled
+  // again "to separate t8 from t7 above it". The row was not crowded — it was
+  // barely on screen, which is `imprecise-target`, with the list as the cause.
+  const row = (n: number, y: number, painted?: { x: number; y: number; width: number; height: number }) => target({
+    selector: `#list > button:nth-of-type(${n})`,
+    visibleText: `Row ${n}`,
+    bbox: { x: 22, y, width: 298, height: 55 },
+    clickPoint: { x: 171, y: painted ? painted.y + painted.height / 2 : y + 27 },
+    ...(painted
+      ? {
+        painted,
+        clipped: true,
+        clippedBy: { selector: "#list", scrollable: true, dy: 53, dx: 0, wheelAt: { x: 171, y: 240 } },
+      }
+      : { painted: { x: 22, y, width: 298, height: 55 } }),
+  });
+  const report = analyzeGroundingSamples(
+    input({ targets: [row(7, 314), row(8, 369, { x: 22, y: 369, width: 298, height: 2 })] }),
+    { resolution: "medium" },
+  );
+  const t8 = report.targets[1]!;
+  assert.deepEqual(t8.visibleBox, { x: 11, y: 185, width: 149, height: 1 });
+  assert.equal(t8.minSide, 1);
+  assert.equal(t8.aimedOffCentre?.reason, "clipped");
+  const issue = report.issues.find((i) => i.kind === "imprecise-target")!;
+  assert.match(issue.message, /shows 149x1 screenshot px/);
+  assert.match(issue.message, /#list cuts it \(the element is 149x28\); scroll it 27px \(--after "wheel 86,120 27"\)/);
+  // The map row says the same: what is painted, of how much.
+  assert.match(formatGroundingReport(report), /t2 button "Row 8" @ \(\d+,\d+\) 149x1 painted of 149x28/);
 });
 
 test("a target hidden by a scroll container is out of the frame, not occluded", () => {

@@ -739,7 +739,12 @@ and how far it would have to (`dy` / `dx`). The report groups them under *Out of
 the frame*, with the scroll that reaches the nearest one spelled as an action —
 `--after "wheel 85,120 34"`, at a point inside the container — so a caller with
 a wheel can plan the scroll rather than infer from pixels that a list exists at
-all. Before this, such
+all. A row the container cuts only **in part** is measured on what is painted:
+`visibleBox`, `minSide` and the map's `149x1 painted of 149x28` all describe the
+strip, it carries the same `clippedBy`, and a strip under the precision floor is
+an `imprecise-target` that names the container and the scroll. Measuring it
+against the frame alone reported a 1px strip as a full row whose only problem was
+being `crowded-target` "0px from" the row above. Before this, such
 rows were reported as `occluded-target` "by `html`" with the advice to move
 `html`; three agents in a row worked the remedy out from the screenshot instead.
 
