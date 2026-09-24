@@ -14,13 +14,13 @@
       "hidden": true
     },
     {
-      "id": "examples/vlmkit-intro-page",
-      "label": "examples/vlmkit-intro-page",
+      "id": "markup/src",
+      "label": "markup/src",
       "hidden": true
     },
     {
-      "id": "markup/src",
-      "label": "markup/src",
+      "id": "examples/vlmkit-intro-page",
+      "label": "examples/vlmkit-intro-page",
       "hidden": true
     },
     {
@@ -59,6 +59,11 @@
       "hidden": true
     },
     {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
       "id": "ci",
       "label": "ci",
       "hidden": true
@@ -69,13 +74,8 @@
       "hidden": true
     },
     {
-      "id": ".apm/skills",
-      "label": ".apm/skills",
-      "hidden": true
-    },
-    {
-      "id": "skills/vlmkit",
-      "label": "skills/vlmkit",
+      "id": "other (2 areas)",
+      "label": "other (2 areas)",
       "hidden": true
     }
   ],
@@ -111,6 +111,11 @@
       "hidden": true
     },
     {
+      "from": "examples/vlmkit-intro-page",
+      "to": "examples/sites",
+      "hidden": true
+    },
+    {
       "from": "tests",
       "to": "examples/sites",
       "hidden": true
@@ -127,7 +132,7 @@
       "highlight": [
         "markup/src"
       ],
-      "caption": "1/14 Share one sampling fragment across the three style gates"
+      "caption": "1/15 Share one sampling fragment across the three style gates"
     },
     {
       "value": {
@@ -162,7 +167,7 @@
         "docs/reports",
         "markup/src"
       ],
-      "caption": "2/14 check color: stop counting collapsed <details> content as paint"
+      "caption": "2/15 check color: stop counting collapsed <details> content as paint"
     },
     {
       "value": {
@@ -191,7 +196,7 @@
       "highlight": [
         "markup/src"
       ],
-      "caption": "3/14 One --allow filter for the three style gates"
+      "caption": "3/15 One --allow filter for the three style gates"
     },
     {
       "value": {
@@ -225,7 +230,7 @@
       "highlight": [
         "fixtures/grounding-scenario"
       ],
-      "caption": "4/14 grounding-scenario: the first frame and every later one, made once"
+      "caption": "4/15 grounding-scenario: the first frame and every later one, made once"
     },
     {
       "value": {
@@ -259,7 +264,7 @@
       "highlight": [
         ".claude"
       ],
-      "caption": "5/14 CLAUDE.md: the style gates share their plumbing; A12 is not rail-near-m…"
+      "caption": "5/15 CLAUDE.md: the style gates share their plumbing; A12 is not rail-near-m…"
     },
     {
       "value": {
@@ -295,7 +300,7 @@
         "examples/sites",
         "scripts"
       ],
-      "caption": "6/14 examples/sites: a judgment log that keeps what was seen, not only what …"
+      "caption": "6/15 examples/sites: a judgment log that keeps what was seen, not only what …"
     },
     {
       "value": {
@@ -324,7 +329,7 @@
       "highlight": [
         "examples/sites"
       ],
-      "caption": "7/14 judge.mjs: WebP screens, a one-time recode, and walks that say when the…"
+      "caption": "7/15 judge.mjs: WebP screens, a one-time recode, and walks that say when the…"
     },
     {
       "value": {
@@ -361,7 +366,7 @@
         "markup/markup-core",
         "markup/src"
       ],
-      "caption": "8/14 Gates: the false reports six demo-site builders hit, each with a test"
+      "caption": "8/15 Gates: the false reports six demo-site builders hit, each with a test"
     },
     {
       "value": {
@@ -397,7 +402,7 @@
       "highlight": [
         "src/cli"
       ],
-      "caption": "9/14 gates run: name each warn's page, and print warned jobs under --show-ou…"
+      "caption": "9/15 gates run: name each warn's page, and print warned jobs under --show-ou…"
     },
     {
       "value": {
@@ -425,13 +430,13 @@
       "highlight": [
         "examples/sites"
       ],
-      "caption": "10/14 examples/sites: six demo sites, each built by an agent and judged in a …"
+      "caption": "10/15 judge.mjs: render a log to the same bytes on every machine"
     },
     {
       "value": {
         "id": "files",
         "label": "files changed",
-        "text": 1349
+        "text": 45
       },
       "ms": 0
     },
@@ -439,7 +444,71 @@
       "value": {
         "id": "lines",
         "label": "lines",
-        "text": "+86294 −225"
+        "text": "+3416 −227"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "examples/sites"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "root"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root",
+        "examples/sites"
+      ],
+      "caption": "11/15 judge.mjs: one SQLite file per log; a finished round keeps one walk per…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 46
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3871 −359"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root",
+        "examples/sites"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "examples/sites"
+      ],
+      "caption": "12/15 examples/sites: six demo sites, each built by an agent and judged in a …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 100
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+18996 −359"
       },
       "ms": 0
     },
@@ -459,13 +528,13 @@
       "highlight": [
         "examples/vlmkit-intro-page"
       ],
-      "caption": "11/14 Landing page: a visual review in four rounds, kept as a judgment log"
+      "caption": "13/15 Landing page: a visual review in four rounds, kept as a judgment log"
     },
     {
       "value": {
         "id": "files",
         "label": "files changed",
-        "text": 2100
+        "text": 107
       },
       "ms": 0
     },
@@ -473,7 +542,7 @@
       "value": {
         "id": "lines",
         "label": "lines",
-        "text": "+92994 −254"
+        "text": "+19869 −388"
       },
       "ms": 0
     },
@@ -498,13 +567,13 @@
         "scripts",
         "tests"
       ],
-      "caption": "12/14 Pages: publish the demo sites and every judgment log, with a gallery"
+      "caption": "14/15 Pages: publish the demo sites and every judgment log, with a gallery"
     },
     {
       "value": {
         "id": "files",
         "label": "files changed",
-        "text": 2231
+        "text": 117
       },
       "ms": 0
     },
@@ -512,7 +581,7 @@
       "value": {
         "id": "lines",
         "label": "lines",
-        "text": "+95380 −303"
+        "text": "+20854 −480"
       },
       "ms": 0
     },
@@ -528,25 +597,23 @@
     },
     {
       "show": [
-        ".apm/skills",
-        "skills/vlmkit"
+        "other (2 areas)"
       ],
       "ms": 0
     },
     {
       "highlight": [
-        ".apm/skills",
+        "other (2 areas)",
         ".claude",
-        "docs/reports",
-        "skills/vlmkit"
+        "docs/reports"
       ],
-      "caption": "13/14 markup-assist: then look at it; the demo-sites report"
+      "caption": "15/15 markup-assist: then look at it; the demo-sites report"
     },
     {
       "value": {
         "id": "files",
         "label": "files changed",
-        "text": 2235
+        "text": 121
       },
       "ms": 0
     },
@@ -554,49 +621,20 @@
       "value": {
         "id": "lines",
         "label": "lines",
-        "text": "+95682 −306"
+        "text": "+21198 −483"
       },
       "ms": 0
     },
     {
       "unhighlight": [
-        ".apm/skills",
+        "other (2 areas)",
         ".claude",
-        "docs/reports",
-        "skills/vlmkit"
+        "docs/reports"
       ],
       "ms": 0
     },
     {
-      "highlight": [
-        "examples/sites"
-      ],
-      "caption": "14/14 judge.mjs: render a log to the same bytes on every machine"
-    },
-    {
-      "value": {
-        "id": "files",
-        "label": "files changed",
-        "text": 2235
-      },
-      "ms": 0
-    },
-    {
-      "value": {
-        "id": "lines",
-        "label": "lines",
-        "text": "+95730 −308"
-      },
-      "ms": 0
-    },
-    {
-      "unhighlight": [
-        "examples/sites"
-      ],
-      "ms": 0
-    },
-    {
-      "note": "14 commits · 2235 files · +95730 −308 · 14 areas, 7 import edges between them"
+      "note": "15 commits · 121 files · +21198 −483 · 14 areas, 8 import edges between them"
     }
   ]
 }
