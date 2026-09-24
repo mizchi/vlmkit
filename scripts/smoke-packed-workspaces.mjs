@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageDirectories = [
+  "vlmkit-judge",
   "vlmkit-core",
   "vlmkit-ai",
   "vlmkit-capture",
@@ -131,6 +132,12 @@ const { extractBreakpoints } = await import("@mizchi/vlmkit-capture/viewport-dis
 assert.deepEqual(extractBreakpoints("@media (min-width: 640px) {}").map(({ value }) => value), [640]);
 const { estimateCost } = await import("@mizchi/vlmkit-heal/cost.ts");
 assert.equal(estimateCost({ promptCostPerToken: 2, completionCostPerToken: 3 }, { promptTokens: 4, completionTokens: 5 }), 23);
+const judge = await import("@mizchi/vlmkit-judge/composition.ts");
+const judgeShim = await import("@mizchi/vlmkit-markup/style/composition.ts");
+assert.equal(judgeShim.judgeComposition, judge.judgeComposition, "markup re-exports the judge, not a copy");
+const { UsageError: CoreUsageError } = await import("@mizchi/vlmkit-core/cli-error.ts");
+const { UsageError: JudgeUsageError } = await import("@mizchi/vlmkit-judge/errors.ts");
+assert.equal(CoreUsageError, JudgeUsageError, "one UsageError identity across packages");
 const { computeGridGcd } = await import("@mizchi/vlmkit-markup/markup-core-grid.ts");
 assert.equal(computeGridGcd(12, 18), 6);
 const { listComponentGoals } = await import("@mizchi/vlmkit-markup/component/component-goal.ts");

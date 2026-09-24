@@ -91,6 +91,7 @@
     "@mizchi/vlmkit-core": "workspace:*",
     "@mizchi/vlmkit-generate": "workspace:*",
     "@mizchi/vlmkit-heal": "workspace:*",
+    "@mizchi/vlmkit-judge": "workspace:*",
     "@mizchi/vlmkit-markup": "workspace:*",
     "@mizchi/vlmkit-mcp": "workspace:*",
     "@mizchi/vlmkit-plan": "workspace:*",

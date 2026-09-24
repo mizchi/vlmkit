@@ -54,6 +54,9 @@ importers:
       '@mizchi/vlmkit-heal':
         specifier: workspace:*
         version: link:packages/vlmkit-heal
+      '@mizchi/vlmkit-judge':
+        specifier: workspace:*
+        version: link:packages/vlmkit-judge
       '@mizchi/vlmkit-markup':
         specifier: workspace:*
         version: link:packages/vlmkit-markup
@@ -153,6 +156,9 @@ importers:
       '@jsquash/webp':
         specifier: ^1
         version: 1.5.0
+      '@mizchi/vlmkit-judge':
+        specifier: workspace:*
+        version: link:../vlmkit-judge
       pixelmatch:
         specifier: ^7.1.0
         version: 7.1.0
@@ -187,6 +193,8 @@ importers:
         specifier: '>=1.61 <2'
         version: 1.61.1
 
+  packages/vlmkit-judge: {}
+
   packages/vlmkit-markup:
     dependencies:
       '@mizchi/vlmkit-ai':
@@ -201,6 +209,9 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
+      '@mizchi/vlmkit-judge':
+        specifier: workspace:*
+        version: link:../vlmkit-judge
       pixelmatch:
         specifier: ^7.1.0
         version: 7.1.0

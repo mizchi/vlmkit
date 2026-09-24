@@ -60,6 +60,7 @@
     "@mizchi/vlmkit-animation-eval": "workspace:*",
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",
+    "@mizchi/vlmkit-judge": "workspace:*",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0"
   },

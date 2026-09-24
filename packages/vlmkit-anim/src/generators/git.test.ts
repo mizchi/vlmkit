@@ -17,10 +17,11 @@ import { areaOf, changeMapScene, readWorkspace, workspaceScene } from "./git.ts"
 const REPO = resolve(import.meta.dirname!, "../../../..");
 
 describe("workspaceScene", () => {
-  it("reads this workspace: core depends on nothing, anim on animation-eval, the CLI on everything; compiles clean", () => {
+  it("reads this workspace: judge depends on nothing, core on judge, anim on animation-eval, the CLI on everything; compiles clean", () => {
     const pkgs = readWorkspace(REPO);
     const by = new Map(pkgs.map((p) => [p.id, p]));
-    assert.deepEqual(by.get("core")!.deps, []);
+    assert.deepEqual(by.get("judge")!.deps, []);
+    assert.deepEqual(by.get("core")!.deps, ["judge"]);
     assert.deepEqual(by.get("anim")!.deps, ["ai", "animation-eval"]);
     assert.ok(by.get("vlmkit (cli)")!.deps.includes("anim"));
     const scene = workspaceScene(REPO);
@@ -28,7 +29,7 @@ describe("workspaceScene", () => {
     const diags = checkAnimation(tl, scene);
     assert.deepEqual(diags.filter((d) => d.severity === "error"), [], formatDiagnostics(diags));
     const text = explain(tl);
-    assert.match(text, /core: depends on nothing else in the workspace/);
+    assert.match(text, /judge: depends on nothing else in the workspace/);
     assert.match(text, /anim → (ai, )?animation-eval/);
     // One beat per layer, not one per package, and the readout rides each beat.
     assert.ok((tl.steps ?? []).filter((s) => /packages so far = \d+/.test(s.caption ?? "")).length >= 3);

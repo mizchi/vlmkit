@@ -17,15 +17,11 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
 
-/**
- * A bad flag or missing argument — the caller's typo, not a defect. Thrown by
- * `arg-reader` and printed as one line, because a stack trace for
- * `--concurrency abc` buries the one sentence that fixes it.
- */
-export class UsageError extends Error {
-  override readonly name = "UsageError";
-}
+// `UsageError` is defined in the pure bottom layer so judges can throw it without
+// `node:fs`; re-exported so this stays the one place the CLI imports it from.
+export { UsageError };
 
 /**
  * The `playwright` peer range. Duplicated from this package's own

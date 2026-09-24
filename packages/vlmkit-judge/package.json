@@ -1,0 +1,44 @@
+{
+  "name": "@mizchi/vlmkit-judge",
+  "version": "0.23.0",
+  "description": "Pure, browser-independent judges for vlmkit: composition, colour roles and design-policy rules over a plain geometry/style snapshot. No Playwright, no DOM, no Node built-ins.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vlmkit.git",
+    "directory": "packages/vlmkit-judge"
+  },
+  "homepage": "https://github.com/mizchi/vlmkit/tree/main/packages/vlmkit-judge#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vlmkit/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-judge",
+    "prepack": "pnpm build",
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-judge/src"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./*.ts": {
+      "types": "./dist/*.d.mts",
+      "import": "./dist/*.mjs"
+    }
+  }
+}
