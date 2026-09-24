@@ -62,7 +62,13 @@ const GATE_GROUPS = new Set(["check", "scan", "stress", "verify"]);
 /** Shorter than this, a look cannot have said what was in the picture. */
 export const MIN_LOOK_CHARS = 80;
 const MAX_TILES = 16;
-const JPEG_QUALITY = 78;
+/**
+ * Screens are WebP at this quality, encoded by Chromium from a lossless capture. The first round
+ * wrote JPEG at 78: 1245 screens across seven logs came to 63.4 MB, and the same screens as WebP
+ * at 0.75 are 34.4 MB with the text as legible (first measured on 12 checkout screens: 732 KB →
+ * 350 KB). `recode` did the conversion and says so in each log.
+ */
+const WEBP_QUALITY = 0.75;
 const PREFIX = Object.freeze({
   round: "R",
   gate: "G",
@@ -113,6 +119,21 @@ function append(siteDir, event) {
   appendFileSync(logPaths(siteDir).log, `${JSON.stringify(event)}\n`);
 }
 
+/**
+ * Where a screen's file is now. The first round's logs wrote JPEG; `recode` re-encoded them as WebP
+ * and recorded that it did, rather than rewriting the shots it had logged — the log stays
+ * append-only, and a reader of it can see the pictures were converted after the fact.
+ */
+export function tileFile(events, file) {
+  return events.some((e) => e.kind === "recode" && e.to === "webp") ? file.replace(/\.jpg$/, ".webp") : file;
+}
+
+/** Every file the log's page needs published: the page itself and every screen, as on disk now. */
+export function publishedFiles(events) {
+  const screens = events.filter((e) => e.kind === "shot").flatMap((e) => e.tiles.map((t) => `judgment/${tileFile(events, t.file)}`));
+  return ["judgment/index.html", ...screens];
+}
+
 export function nextId(events, kind) {
   return `${PREFIX[kind]}${events.filter((e) => e.kind === kind).length + 1}`;
 }
@@ -140,6 +161,9 @@ export function clean(text) {
     .replaceAll(REPO, ".");
 }
 
+/** A recorded command as a reader should see it: this checkout's absolute path as $PWD. */
+export const displayCommand = (cmd) => cmd.replaceAll(`file://${REPO}/`, "file://$PWD/").replaceAll(`${REPO}/`, "");
+
 const shellQuote = (arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
 
 // ---------------------------------------------------------------------------------------------
@@ -154,6 +178,11 @@ function parse(argv, { values = [], booleans = [] } = {}) {
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    // Everything after a bare `--` is text, so a fix can say "--measure 42rem -> 36rem".
+    if (arg === "--") {
+      rest.push(...argv.slice(i + 1));
+      break;
+    }
     if (!arg.startsWith("--")) {
       rest.push(arg);
       continue;
@@ -166,7 +195,7 @@ function parse(argv, { values = [], booleans = [] } = {}) {
     } else if (booleans.includes(name)) {
       flags[name] = true;
     } else {
-      fail(`unknown flag --${name}`);
+      fail(`unknown flag --${name} (text that starts with a dash goes after --, or in a heredoc with -)`);
     }
   }
   return { flags, rest };
@@ -498,6 +527,32 @@ function pageUrl(siteDir, page) {
 async function settle(page) {
   await page.evaluate(() => document.fonts?.ready).catch(() => {});
   await page.waitForTimeout(400);
+  // A step that focuses or clicks on a page with `scroll-behavior: smooth` leaves the page still
+  // scrolling, and the shutter caught it mid-way (the landing review's S39 vs its element shot).
+  // Wait until the window and every scroller hold still for three frames, at most two seconds.
+  await page
+    .evaluate(
+      () =>
+        new Promise((done) => {
+          const read = () => {
+            let sum = window.scrollX * 7 + window.scrollY;
+            for (const el of document.querySelectorAll("*")) if (el.scrollTop || el.scrollLeft) sum += el.scrollTop * 3 + el.scrollLeft;
+            return sum;
+          };
+          let last = read();
+          let still = 0;
+          const started = performance.now();
+          const tick = () => {
+            const now = read();
+            still = now === last ? still + 1 : 0;
+            last = now;
+            if (still >= 3 || performance.now() - started > 2000) done();
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+    )
+    .catch(() => {});
 }
 
 async function doStep(page, step) {
@@ -546,10 +601,45 @@ function measureInsets() {
     if (position !== "fixed" && position !== "sticky") continue;
     const r = el.getBoundingClientRect();
     if (r.width < vw / 2 || r.height === 0 || r.bottom <= 0 || r.top >= vh) continue;
+    // A closed drawer is pinned too — translated off the side of the screen, or hidden. Counted,
+    // it capped the step at 60% of the screen and the docs phone walk took 12 screens for 7.
+    if (r.right <= 0 || r.left >= vw) continue;
+    const s = getComputedStyle(el);
+    if (s.visibility === "hidden" || Number(s.opacity) === 0) continue;
     if (r.top <= 1) top = Math.max(top, r.bottom);
     else if (r.bottom >= vh - 1) bottom = Math.max(bottom, vh - r.top);
   }
   return { top: Math.round(Math.min(top, vh * 0.4)), bottom: Math.round(Math.min(bottom, vh * 0.4)) };
+}
+
+/**
+ * PNG bytes → WebP bytes, by the browser's own encoder (no image dependency here). A blank page
+ * of the browser that took the shot decodes it into a canvas and encodes it back.
+ */
+async function encodeWebp(browser, bytes, quality = WEBP_QUALITY, mime = "image/png") {
+  const page = await browser.newPage();
+  try {
+    const b64 = await page.evaluate(
+      async ([data, q, type]) => {
+        const img = new Image();
+        img.src = `data:${type};base64,${data}`;
+        await img.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        const blob = await new Promise((resolveBlob) => canvas.toBlob(resolveBlob, "image/webp", q));
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return btoa(bin);
+      },
+      [Buffer.from(bytes).toString("base64"), quality, mime],
+    );
+    return Buffer.from(b64, "base64");
+  } finally {
+    await page.close();
+  }
 }
 
 async function capture(siteDir, id, url, viewport, options) {
@@ -558,6 +648,7 @@ async function capture(siteDir, id, url, viewport, options) {
   const tiles = [];
   const errors = [];
   let pageHeight = null;
+  let cutShort = false;
   try {
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
@@ -573,10 +664,11 @@ async function capture(siteDir, id, url, viewport, options) {
     for (const step of options.steps) await doStep(page, step);
     await settle(page);
 
-    const file = (n) => `shots/${id}-${n}.jpg`;
+    const file = (n) => `shots/${id}-${n}.webp`;
     // `w` / `h` are CSS pixels, so a render can reserve each thumbnail's box before it loads.
     const shoot = async (target, n, extra = {}, size = viewport) => {
-      await target.screenshot({ path: join(logPaths(siteDir).dir, file(n)), type: "jpeg", quality: JPEG_QUALITY });
+      const png = await target.screenshot({ type: "png" });
+      writeFileSync(join(logPaths(siteDir).dir, file(n)), await encodeWebp(browser, png));
       tiles.push({ file: file(n), w: Math.round(size.width), h: Math.round(size.height), ...extra });
     };
     if (options.element) {
@@ -598,7 +690,8 @@ async function capture(siteDir, id, url, viewport, options) {
       }, options.scrollEl);
       if (!box) fail(`--scroll-el ${options.scrollEl}: nothing on the page matches`);
       pageHeight = box.total;
-      for (let y = 0, n = 1; y !== null && n <= options.maxTiles; n++) {
+      let y = 0;
+      for (let n = 1; y !== null && n <= options.maxTiles; n++) {
         await page.evaluate(
           ([selector, top]) => {
             const el = selector ? document.querySelector(selector) : document.scrollingElement;
@@ -613,13 +706,15 @@ async function capture(siteDir, id, url, viewport, options) {
         await shoot(page, n, { scrollY: y, ...(insets.top || insets.bottom ? { insets } : {}) });
         y = nextOffset(y, box.total, box.view, insets);
       }
+      // The cap ended the walk while there was still a next screen to take.
+      cutShort = y !== null;
     } else {
       await shoot(page, 1);
     }
   } finally {
     await browser.close();
   }
-  return { tiles, errors, pageHeight };
+  return { tiles, errors, pageHeight, cutShort };
 }
 
 async function cmdShot(siteDir, argv) {
@@ -629,7 +724,7 @@ async function cmdShot(siteDir, argv) {
     const events = readLog(siteDir);
     currentRound(events);
     const id = nextId(events, "shot");
-    const { tiles, errors, pageHeight } = await capture(siteDir, id, url, viewport, options);
+    const { tiles, errors, pageHeight, cutShort } = await capture(siteDir, id, url, viewport, options);
     const mode = options.element ? "element" : options.full ? "full" : "viewport";
     const event = stamp(events, "shot", {
       page: options.page,
@@ -643,6 +738,7 @@ async function cmdShot(siteDir, argv) {
       steps: options.steps,
       label: options.label,
       pageHeight,
+      ...(cutShort ? { stoppedShort: true } : {}),
       tiles,
       errors,
     });
@@ -650,18 +746,34 @@ async function cmdShot(siteDir, argv) {
     const state = [options.dark && "dark", options.reducedMotion && "reduced motion", ...options.steps.map(describeStep)]
       .filter(Boolean)
       .join(", ");
-    const what = mode === "full" ? `full page, ${tiles.length} screen(s) of ${pageHeight}px` : mode;
+    // In the header line, not only after the file list: a reader filtering for `[judge]` lines
+    // missed the warning below and looked at a phone walk that never reached the footer.
+    const what = mode === "full"
+      ? `full page, ${tiles.length} screen(s) of ${pageHeight}px${cutShort ? `, STOPPED SHORT of the end (--max-tiles ${options.maxTiles})` : ""}`
+      : mode;
     console.log(`[judge] ${id} — ${options.page} @ ${viewport.name} ${viewport.width}x${viewport.height}, ${what}${state ? ` (${state})` : ""}`);
     for (const tile of tiles) {
       const at = tile.scrollY === undefined ? "" : `  (scrollY ${tile.scrollY})`;
       console.log(`  ${join(logPaths(siteDir).dir, tile.file)}${at}`);
     }
-    if (tiles.length === options.maxTiles && pageHeight > tiles.at(-1).scrollY + viewport.height) {
+    if (cutShort) {
       console.log(`  ! stopped at ${options.maxTiles} screens; the page goes on — pass --max-tiles to see the rest`);
     }
     for (const error of errors) console.log(`  ! page error while shooting: ${error}`);
     console.log(`Read every file above, then: judge.mjs <site> look ${id} - <<'EOF' … what you saw … EOF`);
   }
+}
+
+/**
+ * Whether a full-page shot ended before the page did (the `--max-tiles` cap). Recorded on the shot
+ * since the landing page's fourth round; for an older window walk it is worked out from the last
+ * screen, and an older `--scroll-el` walk (its container height was not kept) counts as complete.
+ */
+export function stoppedShort(shot) {
+  if (shot.mode !== "full") return false;
+  if (typeof shot.stoppedShort === "boolean") return shot.stoppedShort;
+  if (shot.scrollEl || !shot.pageHeight) return false;
+  return (shot.tiles.at(-1).scrollY ?? 0) + shot.viewport.height < shot.pageHeight - 1;
 }
 
 export function describeStep(step) {
@@ -703,22 +815,33 @@ export function checkLog(events) {
     }
     if (fixes.length) {
       const lastFix = fixes.at(-1);
-      const verified = events.some(
-        (e) => e.kind === "verify" && e.defect === defect.id && events.indexOf(e) > events.indexOf(lastFix),
-      );
-      if (!verified) problems.push(`${defect.id} was fixed (${lastFix.id}) and nothing checked it since — verify ${defect.id} --by <L#|G#>`);
+      const after = (e) => events.indexOf(e) > events.indexOf(lastFix);
+      const verified = events.some((e) => e.kind === "verify" && e.defect === defect.id && after(e));
+      // A fix later found to be a misdiagnosis is closed by saying so, not by verifying it.
+      const closedSince = notesAbout(defect.id).some((note) => CLOSING_KINDS.has(note.noteKind) && after(note));
+      if (!verified && !closedSince) problems.push(`${defect.id} was fixed (${lastFix.id}) and nothing checked it since — verify ${defect.id} --by <L#|G#>`);
     }
   }
 
   const last = rounds.at(-1);
   const inLast = events.filter((e) => e.round === last.id);
   if (!inLast.some((e) => e.kind === "gate")) problems.push(`the last round (${last.id}) ran no gate`);
+  // A walk the tile cap cut off is not a full page: it is the page minus its end, which is where a
+  // footer change lives.
   const fullShots = inLast.filter((e) => e.kind === "shot" && e.mode === "full");
-  if (!fullShots.some((shot) => shot.viewport.width >= 1024)) {
-    problems.push(`the last round (${last.id}) has no full-page shot at desktop width — shot <page> --full --viewport desktop`);
-  }
-  if (!fullShots.some((shot) => shot.viewport.width <= 480)) {
-    problems.push(`the last round (${last.id}) has no full-page shot at phone width — shot <page> --full --viewport mobile`);
+  for (const [width, flag, fits] of [["desktop", "desktop", (w) => w >= 1024], ["phone", "mobile", (w) => w <= 480]]) {
+    const atWidth = fullShots.filter((shot) => fits(shot.viewport.width));
+    if (atWidth.some((shot) => !stoppedShort(shot))) continue;
+    if (!atWidth.length) {
+      problems.push(`the last round (${last.id}) has no full-page shot at ${width} width — shot <page> --full --viewport ${flag}`);
+      continue;
+    }
+    const short = atWidth.at(-1);
+    const enough = Math.ceil(short.pageHeight / short.viewport.height) + 2;
+    problems.push(
+      `the last round (${last.id})'s full-page shot at ${width} width, ${short.id}, stopped at ${short.tiles.length} ` +
+        `screens before the page ended — shot <page> --full --viewport ${flag} --max-tiles ${enough}`,
+    );
   }
 
   const lastRunOf = new Map();
@@ -737,7 +860,10 @@ export function checkLog(events) {
 function cmdCheck(siteDir) {
   const problems = checkLog(readLog(siteDir));
   if (!problems.length) {
-    console.log("[judge] the log is complete");
+    console.log(
+      "[judge] the log meets its done conditions — every screen looked at, every defect closed, the last round " +
+        "gated and shot at both widths. The brief's \"States to show\" are still yours to check.",
+    )
     return 0;
   }
   console.log(`[judge] ${problems.length} thing(s) before this log can say done:`);
@@ -834,7 +960,7 @@ const escapeHtml = (text) =>
 
 function shotCaption(shot) {
   const parts = [`${shot.viewport.width}×${shot.viewport.height}`];
-  if (shot.mode === "full") parts.push(`full page, ${shot.tiles.length} screen(s)`);
+  if (shot.mode === "full") parts.push(`full page, ${shot.tiles.length} screen(s)${stoppedShort(shot) ? " — stopped before the end" : ""}`);
   else if (shot.mode === "element") parts.push(`element ${shot.element}`);
   if (shot.scale !== 1) parts.push(`@${shot.scale}x`);
   if (shot.dark) parts.push("dark");
@@ -901,6 +1027,14 @@ details summary { cursor: pointer; color: var(--muted); font-size: 0.875rem; }
 footer { margin-top: 3rem; color: var(--muted); font-size: 0.875rem; }
 `;
 
+/** One sentence saying the screens were converted after the round, when they were. */
+function recodeNote(events) {
+  const r = events.find((e) => e.kind === "recode");
+  if (!r) return "";
+  const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+  return ` The ${r.count} screens were taken as JPEG and re-encoded as WebP (quality ${r.quality}) after the round: ${mb(r.bytesBefore)} → ${mb(r.bytesAfter)}.`;
+}
+
 const para = (text) =>
   String(text)
     .split(/\n{2,}/)
@@ -941,10 +1075,11 @@ export function renderHtml(events, { briefText = null, readOutput = () => "" } =
       case "gate": {
         const lines = readGateOutput(e).split("\n").length;
         const head = headlineText(e);
-        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><span class="chip ${e.exit === 0 ? "pass" : "fail"}">exit ${e.exit}</span><code>${escapeHtml(e.cmd)}</code></header>${e.verdict ? `<p>${escapeHtml(e.verdict)}</p>` : ""}${head ? `<p class="id">${escapeHtml(head)}</p>` : ""}<details><summary>output, ${lines} line(s), ${(e.ms / 1000).toFixed(1)}s</summary><pre>${escapeHtml(readGateOutput(e))}</pre></details>${raised(e.id)}</article>`;
+        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><span class="chip ${e.exit === 0 ? "pass" : "fail"}">exit ${e.exit}</span><code>${escapeHtml(displayCommand(e.cmd))}</code></header>${e.verdict ? `<p>${escapeHtml(e.verdict)}</p>` : ""}${head ? `<p class="id">${escapeHtml(head)}</p>` : ""}<details><summary>output, ${lines} line(s), ${(e.ms / 1000).toFixed(1)}s</summary><pre>${escapeHtml(readGateOutput(e))}</pre></details>${raised(e.id)}</article>`;
       }
       case "shot": {
         const tiles = e.tiles
+          .map((t) => ({ ...t, file: tileFile(events, t.file) }))
           .map((t, i) => `<a href="${t.file}" title="screen ${i + 1}${t.scrollY === undefined ? "" : `, scrollY ${t.scrollY}`}"><img src="${t.file}" alt="${e.id} screen ${i + 1}" width="${t.w}" height="${t.h}" class="${t.h > t.w ? "tall" : "wide"}" loading="lazy"></a>`)
           .join("");
         const looks = looksOf(e.id)
@@ -1003,7 +1138,7 @@ ${defectTable}
 <h2>Rounds</h2>
 ${rounds}
 ${s.done ? "" : `<p class="lede">This log has not been marked done.</p>`}
-<footer>Rendered by <code>examples/sites/judge.mjs</code> from <code>judgment/log.jsonl</code>. Every gate output above is the command's own, with colour codes stripped.</footer>
+<footer>Rendered by <code>examples/sites/judge.mjs</code> from <code>judgment/log.jsonl</code>. Every gate output above is the command's own, with colour codes stripped.${recodeNote(events)}</footer>
 </main>
 </body>
 </html>
@@ -1059,7 +1194,7 @@ export function renderMarkdown(events) {
         out.push(...raised(e.id, "  "));
       } else if (e.kind === "shot") {
         out.push(`- **${e.id}** ${shotCaption(e)}${e.label ? ` — ${e.label}` : ""}`, "");
-        out.push(`  ${e.tiles.map((t) => `<img src="judgment/${t.file}" height="${t.h > t.w ? 240 : 160}" alt="${e.id}">`).join(" ")}`, "");
+        out.push(`  ${e.tiles.map((t) => `<img src="judgment/${tileFile(events, t.file)}" height="${t.h > t.w ? 240 : 160}" alt="${e.id}">`).join(" ")}`, "");
         for (const look of events.filter((x) => x.kind === "look" && x.shot === e.id)) {
           const where = `${look.tile ? ` screen ${look.tile}` : ""}${look.round !== e.round ? `, in ${look.round}` : ""}`;
           out.push(`  - 👁 **${look.id}**${where ? ` (${where.trim()})` : ""}: ${flat(look.text)}`);
@@ -1078,6 +1213,8 @@ export function renderMarkdown(events) {
     out.push("");
   }
   if (!s.done) out.push("_This log has not been marked done._", "");
+  const recoded = recodeNote(events);
+  if (recoded) out.push(`_${recoded.trim()}_`, "");
   return `${out.join("\n").trimEnd()}\n`;
 }
 
@@ -1092,6 +1229,33 @@ export function renderSite(siteDir) {
   const briefFile = init?.brief ? resolve(siteDir, init.brief) : null;
   const briefText = briefFile && existsSync(briefFile) ? readFileSync(briefFile, "utf8") : null;
   return { html: renderHtml(events, { briefText, readOutput }), markdown: renderMarkdown(events) };
+}
+
+async function cmdRecode(siteDir) {
+  const events = readLog(siteDir);
+  if (events.some((e) => e.kind === "recode")) fail("this log's screens were already recoded");
+  const dir = logPaths(siteDir).dir;
+  const jpgs = events.filter((e) => e.kind === "shot").flatMap((e) => e.tiles.map((t) => t.file)).filter((f) => f.endsWith(".jpg"));
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  let bytesBefore = 0;
+  let bytesAfter = 0;
+  try {
+    for (const file of jpgs) {
+      const path = join(dir, file);
+      const jpeg = readFileSync(path);
+      const webp = await encodeWebp(browser, jpeg, WEBP_QUALITY, "image/jpeg");
+      writeFileSync(path.replace(/\.jpg$/, ".webp"), webp);
+      rmSync(path);
+      bytesBefore += jpeg.length;
+      bytesAfter += webp.length;
+    }
+  } finally {
+    await browser.close();
+  }
+  append(siteDir, { kind: "recode", t: new Date().toISOString(), from: "jpg", to: "webp", quality: WEBP_QUALITY, count: jpgs.length, bytesBefore, bytesAfter });
+  console.log(`[judge] ${jpgs.length} screen(s) re-encoded: ${(bytesBefore / 1048576).toFixed(1)} MB → ${(bytesAfter / 1048576).toFixed(1)} MB`);
+  cmdRender(siteDir);
 }
 
 function cmdRender(siteDir) {
@@ -1120,13 +1284,19 @@ const USAGE = `node examples/sites/judge.mjs <site-dir> <command> [...]
   note   [--about id] [--kind ${NOTE_KINDS.join("|")}] text
   status | check                                        where the log stands / what it still needs
   done   text                                           final summary; refuses until check passes, then renders
-  render                                                write judgment/index.html and JUDGMENT.md`;
+  render                                                write judgment/index.html and JUDGMENT.md
+  recode                                                re-encode a JPEG-era log's screens as WebP, once, and say so in the log`;
 
 export async function main(argv) {
   const [siteArg, command, ...rest] = argv;
   if (!siteArg || !command || siteArg === "--help" || command === "--help") {
     console.log(USAGE);
     return siteArg && command ? 0 : 1;
+  }
+  // `judge.mjs <site> defect --help` answered "unknown flag --help"; every command takes it.
+  if (rest.includes("--help") || rest.includes("-h")) {
+    console.log(USAGE);
+    return 0;
   }
   const siteDir = resolve(siteArg);
   if (!existsSync(siteDir)) fail(`no site directory ${siteArg}`);
@@ -1158,6 +1328,8 @@ export async function main(argv) {
       return cmdDone(siteDir, rest);
     case "render":
       return cmdRender(siteDir) ?? 0;
+    case "recode":
+      return (await cmdRecode(siteDir)) ?? 0;
     default:
       fail(`unknown command ${command}\n\n${USAGE}`);
   }

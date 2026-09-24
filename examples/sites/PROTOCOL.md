@@ -60,6 +60,18 @@ shutter), `--element sel` for a close-up, `--scale 2` for fine detail, `--dark`,
 - **Screenshots are the only way you see the page.** `shot` prints one file per screen; **Read every
   one with the Read tool before you write its look.** A look you did not read is worse than none.
 
+What caught people out in the first rounds:
+
+- A full-page walk stops at 16 screens. A longer page says `STOPPED SHORT of the end` in the shot's
+  own `[judge]` line, and `check` will not count that shot as the round's full page — pass
+  `--max-tiles` (the check names a number that reaches the end).
+- `--element` shoots the **first** match. `footer` matched a pull quote's `<footer>` on the landing
+  page; name the one you mean (`.site-footer`).
+- Text that starts with a dash (`--measure 42rem …`) goes after `--`, or in a heredoc with `-`.
+- Screens are saved as WebP and are what the log page publishes. What a gate writes with
+  `--output-dir` lands under `test-results/`, which is ignored and never published — the log keeps
+  each run's whole output instead.
+
 ## The loop
 
 1. `round "first draft"`: build a complete first version of everything in the brief. Run the gate

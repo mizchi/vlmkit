@@ -16,12 +16,16 @@ import {
   MIN_LOOK_CHARS,
   checkLog,
   clean,
+  displayCommand,
   gateSummary,
   nextOffset,
   parseShotArgs,
+  publishedFiles,
   readLog,
   renderHtml,
   renderSite,
+  stoppedShort,
+  tileFile,
 } from "./judge.mjs";
 
 const JUDGE = join(dirname(fileURLToPath(import.meta.url)), "judge.mjs");
@@ -146,6 +150,11 @@ describe("checkLog", () => {
     const accepted = [...baseLog(), { kind: "defect", id: "D1", round: "R1", from: "G1", by: "gate", text: "x" }];
     accepted.push({ kind: "note", id: "N1", round: "R1", about: "D1", noteKind: "accepted", text: "on purpose" });
     assert.deepEqual(checkLog(accepted), []);
+    // A fix later found to be a misdiagnosis is closed by saying so after it, not by a verify.
+    const misread = [...baseLog(), { kind: "defect", id: "D1", round: "R1", from: "G1", by: "gate", text: "x" }];
+    misread.push({ kind: "fix", id: "F1", round: "R1", defect: "D1", text: "y" });
+    misread.push({ kind: "note", id: "N1", round: "R1", about: "D1", noteKind: "false-positive", text: "the gate was wrong" });
+    assert.deepEqual(checkLog(misread), []);
     const decision = [...baseLog(), { kind: "defect", id: "D1", round: "R1", from: "G1", by: "gate", text: "x" }];
     decision.push({ kind: "note", id: "N1", round: "R1", about: "D1", noteKind: "decision", text: "thinking" });
     assert.match(checkLog(decision)[0], /^D1 is open/, "a decision note is not a reason for leaving it");
@@ -160,6 +169,25 @@ describe("checkLog", () => {
     ]);
   });
 
+  it("does not take a walk the tile cap cut short as the round's full page", () => {
+    // The landing page's fourth round: a phone walk stopped at 16 screens of 14008px, above the
+    // footer the round had changed, and the log would have called the page seen.
+    const events = baseLog().map((e) => (e.id === "S2" ? { ...e, pageHeight: 4000, stoppedShort: true } : e));
+    assert.deepEqual(checkLog(events), [
+      "the last round (R1)'s full-page shot at phone width, S2, stopped at 3 screens before the page ended — " +
+        "shot <page> --full --viewport mobile --max-tiles 7",
+    ]);
+    const walked = { ...events.find((e) => e.id === "S2"), id: "S3", stoppedShort: undefined };
+    delete walked.stoppedShort;
+    events.push(walked, { kind: "look", id: "L3", round: "R1", shot: "S3", tile: null, text: "x".repeat(MIN_LOOK_CHARS) });
+    // Without the flag (a log from before it was recorded), the last screen says where the walk ended.
+    assert.equal(stoppedShort(walked), true, "3 screens of 800px from 0 do not reach 4000px");
+    walked.tiles = walked.tiles.map((t, i) => ({ ...t, scrollY: [0, 1600, 3200][i] }));
+    assert.equal(stoppedShort(walked), false, "the last screen at 3200 ends at the page's 4000px");
+    assert.deepEqual(checkLog(events), [], "a complete walk at the same width closes it");
+    assert.equal(stoppedShort({ ...walked, mode: "element" }), false, "only a full-page walk can stop short");
+  });
+
   it("holds the last run of each command to exit 0 unless a note accepts it", () => {
     const events = baseLog();
     events.push({ kind: "gate", id: "G2", round: "R1", cmd: "vlmkit check color index.html", exit: 1, headline: [] });
@@ -169,6 +197,25 @@ describe("checkLog", () => {
     events.push({ kind: "gate", id: "G4", round: "R1", cmd: "vlmkit check a11y touch index.html", exit: 1, headline: [] });
     events.push({ kind: "note", id: "N1", round: "R1", about: "G4", noteKind: "false-positive", text: "why" });
     assert.deepEqual(checkLog(events), []);
+  });
+});
+
+describe("tileFile / publishedFiles / displayCommand", () => {
+  it("resolves a JPEG-era screen to its WebP once the log says it was recoded", () => {
+    const events = baseLog();
+    assert.equal(tileFile(events, "shots/S1-1.jpg"), "shots/S1-1.jpg");
+    assert.deepEqual(publishedFiles(events).slice(0, 2), ["judgment/index.html", "judgment/shots/S1-1.jpg"]);
+    events.push({ kind: "recode", from: "jpg", to: "webp", quality: 0.75, count: 5, bytesBefore: 10, bytesAfter: 5 });
+    assert.equal(tileFile(events, "shots/S1-1.jpg"), "shots/S1-1.webp");
+    assert.equal(tileFile(events, "shots/S9-1.webp"), "shots/S9-1.webp", "a screen taken as WebP stays as it is");
+    assert.equal(publishedFiles(events).length, 1 + 2 + 3);
+  });
+
+  it("shows a recorded command without this checkout's absolute path", () => {
+    assert.equal(
+      displayCommand(`vlmkit check a11y contrast 'file://${REPO}/examples/sites/docs/index.html?theme=dark'`),
+      "vlmkit check a11y contrast 'file://$PWD/examples/sites/docs/index.html?theme=dark'",
+    );
   });
 });
 
@@ -321,5 +368,68 @@ describe("the CLI, end to end", () => {
     assert.equal(readFileSync(join(site, "judgment", "index.html"), "utf8"), first.html);
     assert.match(first.markdown, /\| D1 \| eye \(L1 on S1\) \|/);
     assert.match(first.html, /defects found by eye/);
+  });
+  it("does not count a closed drawer, pinned but off the side of the screen, as an inset", () => {
+    const page = join(root, "site", "drawer.html");
+    writeFileSync(page, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>d</title><style>
+      body{margin:0} header{position:sticky;top:0;height:60px;background:#123}
+      nav{position:fixed;top:0;left:0;width:300px;height:100%;transform:translateX(-100%);background:#eee}
+      section{height:1600px}</style></head><body><header></header><nav>menu</nav><section>a</section></body></html>`);
+    const run = judge("shot", "drawer.html", "--full", "--viewport", "375x800");
+    assert.equal(run.status, 0, run.stderr);
+    const shot = readLog(site).filter((e) => e.kind === "shot").at(-1);
+    assert.deepEqual(shot.tiles[0].insets, { top: 60, bottom: 0 }, "only the header is pinned on screen");
+    assert.ok(shot.tiles[0].file.endsWith(".webp"), "screens are WebP");
+    judge("look", shot.id, "The sticky header is the only pinned band; the closed drawer never appears on screen here.");
+  });
+
+  it("takes text after -- as text, and answers --help on any command", () => {
+    const fix = judge("note", "--kind", "decision", "--", "--measure 42rem -> 36rem, the brief's 70 characters");
+    assert.equal(fix.status, 0, fix.stderr);
+    assert.equal(readLog(site).filter((e) => e.kind === "note").at(-1).text, "--measure 42rem -> 36rem, the brief's 70 characters");
+    assert.match(judge("note", "--measure", "x").stderr, /goes after --/);
+    const help = judge("defect", "--help");
+    assert.equal(help.status, 0);
+    assert.match(help.stdout, /defect --from L#\|G#/);
+  });
+
+  it("says in the shot's own line, and in the log, when the tile cap stopped a walk", () => {
+    const run = judge("shot", "index.html", "--full", "--viewport", "desktop", "--max-tiles", "2");
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /^\[judge\] S\d+ .*2 screen\(s\) of 1900px, STOPPED SHORT of the end \(--max-tiles 2\)/m);
+    const shot = readLog(site).filter((e) => e.kind === "shot").at(-1);
+    assert.equal(shot.stoppedShort, true);
+    assert.equal(stoppedShort(shot), true);
+    const whole = judge("shot", "index.html", "--full", "--viewport", "desktop");
+    assert.doesNotMatch(whole.stdout, /STOPPED SHORT/);
+    assert.equal("stoppedShort" in readLog(site).filter((e) => e.kind === "shot").at(-1), false, "a complete walk records nothing extra");
+  });
+
+  it("recodes a JPEG-era log's screens as WebP once, and says so rather than rewriting the shots", async () => {
+    const old = join(root, "old-site");
+    mkdirSync(join(old, "judgment", "shots"), { recursive: true });
+    mkdirSync(join(old, "judgment", "gates"), { recursive: true });
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch();
+    const tab = await browser.newPage({ viewport: { width: 320, height: 200 } });
+    await tab.setContent("<p style='font:20px sans-serif'>A screen from the first round</p>");
+    await tab.screenshot({ path: join(old, "judgment", "shots", "S1-1.jpg"), type: "jpeg", quality: 78 });
+    await browser.close();
+    const events = [
+      { kind: "init", t: "", title: "Old site", pattern: "fixture", brief: null },
+      { kind: "round", id: "R1", t: "", actor: "builder", title: "first draft" },
+      { kind: "shot", id: "S1", round: "R1", t: "", page: "index.html", viewport: { name: "x", width: 320, height: 200 }, scale: 1, dark: false, reducedMotion: false, mode: "viewport", element: null, scrollEl: null, steps: [], label: null, pageHeight: null, tiles: [{ file: "shots/S1-1.jpg", w: 320, h: 200 }], errors: [] },
+    ];
+    writeFileSync(join(old, "judgment", "log.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+    const run = spawnSync(process.execPath, [JUDGE, old, "recode"], { encoding: "utf8" });
+    assert.equal(run.status, 0, run.stderr);
+    assert.ok(!existsSync(join(old, "judgment", "shots", "S1-1.jpg")), "the JPEG is gone");
+    assert.ok(existsSync(join(old, "judgment", "shots", "S1-1.webp")), "the WebP is there");
+    const log = readLog(old);
+    assert.equal(log.find((e) => e.kind === "shot").tiles[0].file, "shots/S1-1.jpg", "the shot is not rewritten");
+    assert.deepEqual(Object.keys(log.at(-1)).sort(), ["bytesAfter", "bytesBefore", "count", "from", "kind", "quality", "t", "to"]);
+    assert.match(readFileSync(join(old, "judgment", "index.html"), "utf8"), /src="shots\/S1-1\.webp"/);
+    assert.match(readFileSync(join(old, "JUDGMENT.md"), "utf8"), /re-encoded as WebP/);
+    assert.match(spawnSync(process.execPath, [JUDGE, old, "recode"], { encoding: "utf8" }).stderr, /already recoded/);
   });
 });
