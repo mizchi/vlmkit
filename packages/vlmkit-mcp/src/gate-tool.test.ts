@@ -186,13 +186,13 @@ describe("required-ness follows `required`, not `positional`", () => {
         notRequired.push(`${gate.command.join(" ")} :: ${input.name}`);
       }
     }
-    // `check integrity`, `check copy`, `check color` and `check design` are the intended exceptions — each
+    // `check integrity`, `check copy`, `check color`, `check design` and `check composition` are the intended exceptions — each
     // takes element rects (a scene) via `--elements` instead of a page. Anything else
     // appearing here means a gate is relying on the removed shortcut and its MCP schema just
     // went optional.
     assert.deepEqual(
       notRequired.sort(),
-      ["check color :: source", "check copy :: source", "check design :: source", "check integrity :: source"],
+      ["check color :: source", "check composition :: source", "check copy :: source", "check design :: source", "check integrity :: source"],
       "a positional-0 input without `required: true` is now OPTIONAL in the MCP schema — "
       + "add `required: true` unless it is genuinely optional",
     );
@@ -245,5 +245,13 @@ describe("required-ness follows `required`, not `positional`", () => {
     assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
     assert.equal(tool.inputSchema.elements!.isOptional(), true);
     assert.deepEqual(gateToolArgv(designGate, { elements: "scene.json" }, { description: "" }), ["--elements", "scene.json"]);
+  });
+
+  it("leaves check composition's source optional so scene mode is callable", async () => {
+    const { compositionGate } = await import("@mizchi/vlmkit-markup/gates/composition.gate.ts");
+    const tool = gateTool(compositionGate, { description: "x" });
+    assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
+    assert.equal(tool.inputSchema.elements!.isOptional(), true);
+    assert.deepEqual(gateToolArgv(compositionGate, { elements: "scene.json" }, { description: "" }), ["--elements", "scene.json"]);
   });
 });

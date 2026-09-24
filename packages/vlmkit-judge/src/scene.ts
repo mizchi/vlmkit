@@ -683,9 +683,13 @@ function alignmentGroups(
  * the play field does not make gaps a reader reads as grouping.
  */
 export function sceneToCompositionInput(
-  elements: readonly SceneElement[],
+  allElements: readonly SceneElement[],
   viewport: { width: number; height: number },
 ): CompositionInput {
+  // The page collector skips boxes under 2px on either axis (a rule, a spacer, a 1px
+  // separator is not a layout box a reader groups by), and their children then hang off the
+  // next recorded ancestor. Same here, so both sources judge the same boxes.
+  const elements = allElements.filter((element) => element.width >= 2 && element.height >= 2);
   const byPath = new Map(elements.map((element) => [element.path, element]));
   const index = new Map(elements.map((element, i) => [element.path, i]));
   const boxes: CompositionBox[] = elements.map((element, i) => {
@@ -704,7 +708,10 @@ export function sceneToCompositionInput(
       position: element.overlay ? "absolute" : "static",
       fontSize: element.fontSize ?? 16,
       fontWeight: element.fontWeight ?? 400,
-      bg: element.background ?? "transparent",
+      // Serialised the way Chromium's computed style is, because the judge decides whether a
+      // box paints its own boundary by comparing this string with its parent's: `#fff` under
+      // `#ffffff` must read as one colour, and an unpainted box as `rgba(0, 0, 0, 0)`.
+      bg: computedColorString(element.background),
       border: element.border ?? 0,
       radius: element.radius ?? 0,
       textLen: (element.text ?? "").trim().length,

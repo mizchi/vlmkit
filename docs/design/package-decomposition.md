@@ -235,6 +235,19 @@ Still to do on the DOM side:
   `rgb(59, 130, 246)` land in one signature. `design-scene-parity.test.ts` runs the real
   collector and the scene adapter on one page and requires identical roles, reuse, and drift
   messages (the dominant style spelled out). Dropping the adapter's radius mapping fails it.
+- ~~`check composition` from the CLI on a scene.~~ Done: `vlmkit check composition --elements`.
+  `sceneToCompositionInput` already fed the judge from a library call (`scene-graph.test.ts`);
+  the gate, the runner and the MCP schema now reach it too. Two adapter fixes came with it,
+  both toward what the page collector does: boxes under 2px on either axis are dropped (a
+  1px rule is not a layout box, and keeping it changed the stack a heading was measured in),
+  and backgrounds are serialised as Chromium does, because the judge decides whether a box
+  paints its own group edge by comparing that string with its parent's — `#1b1f24` under
+  `rgb(27, 31, 36)` had read as a painted panel and hidden an inversion.
+
+  `composition-scene-parity.test.ts` runs the real `COLLECT_COMPOSITION` and a scene of the
+  same page over all seven `fixtures/composition/` pages plus one page with a radius-only
+  section and a 1px rule, and requires the **whole report** to match, selectors mapped back.
+  Dropping the 2px filter, the radius mapping or the font weight each fails it.
 
 Next judges to move, ranked by pure functions already exported:
 

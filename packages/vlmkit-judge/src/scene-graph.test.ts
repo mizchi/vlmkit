@@ -64,4 +64,20 @@ describe("composition judge on a non-DOM scene graph", () => {
     assert.equal(report.findings.filter((f) => f.kind === "proximity-inversion").length, 0);
     assert.deepEqual(report.allowed.map((a) => a.selector), ["menu[0]>video[0]>title[0]"]);
   });
+
+  it("compares backgrounds as colours, not as the strings a scene spelled them with", () => {
+    // A section filled in the menu's own colour paints no boundary, so its title's gaps are
+    // still judged; one in a different colour groups its contents itself. The judge compares
+    // the page's computed-style strings, so `#1b1f24` under `rgb(27, 31, 36)` has to reach it
+    // as one colour — spelled two ways, it read as a painted panel and hid the inversion.
+    const painted = (menuBg: string, sectionBg: string) => sceneFromTree(menu(10, 40)).map((e) => (
+      e.path === "menu[0]" ? { ...e, background: menuBg }
+        : /^menu\[0\]>\w+\[0\]$/.test(e.path) ? { ...e, background: sectionBg }
+          : e
+    ));
+    const inversions = (elements: ReturnType<typeof painted>) =>
+      judgeComposition(sceneToCompositionInput(elements, viewport)).findings.filter((f) => f.kind === "proximity-inversion").length;
+    assert.equal(inversions(painted("rgb(27, 31, 36)", "#1b1f24")), 1, "same colour, two spellings");
+    assert.equal(inversions(painted("#000", "#1b1f24")), 0, "a panel in its own colour is its own group");
+  });
 });

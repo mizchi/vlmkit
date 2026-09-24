@@ -497,6 +497,20 @@ Elements are grouped by `role` (any string: `button`, `card`, `tab`…), or by h
 produces. Elements without a role are counted as skipped by `tag`. `--exclude` is refused:
 a scene holds only what you wrote into it.
 
+#### `check composition` on a scene
+
+```bash
+vlmkit check composition --elements scene.json [--viewport 1280]
+```
+
+Every element is a box, parented by its nearest recorded ancestor. A heading is `heading: 1-6`
+or an `h1`-`h6` tag; `font_size` / `font_weight` carry the type hierarchy; `background`,
+`border` and `radius` say whether a box paints its own group edge (a title inside such a box
+is not judged for proximity); `overlay: true` takes a box out of flow, as `position: absolute`
+does on a page. Boxes under 2px on either axis are not layout boxes and are dropped, as the page
+collector drops them. The frame is `--viewport` wide, or as wide as its rightmost element; rails
+are measured as a fraction of that width. Findings and `--allow` use scene paths.
+
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
@@ -506,7 +520,7 @@ vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config; --elements for a scene)
-vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy
+vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy (--elements for a scene)
 vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning (--elements for a scene)
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)

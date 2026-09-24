@@ -5,6 +5,7 @@
  * `@mizchi/vlmkit-judge/composition.ts`, which runs on a snapshot and never on a
  * page. They are re-exported here so every existing import keeps working.
  */
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
@@ -22,6 +23,7 @@ import {
   type CompositionJudgeOptions,
   type CompositionReport,
 } from "@mizchi/vlmkit-judge/composition.ts";
+import { parseSceneElements, sceneToCompositionInput } from "@mizchi/vlmkit-judge/scene.ts";
 
 export * from "@mizchi/vlmkit-judge/composition.ts";
 
@@ -121,19 +123,38 @@ export async function runCompositionCheck(options: CompositionOptions): Promise<
     if (redirect) {
       judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
     }
-    const report: CompositionReport = { source: options.source, ...judged };
-    appendRunLedger({
-      tool: "check-composition",
-      source: options.source,
-      headline: {
-        verdict: report.verdict,
-        proximity: report.labels.filter((l) => l.inverted).length,
-        flatSteps: report.hierarchy.flat.length,
-        railNearMisses: report.rails.near.length,
-      },
-    });
-    return report;
+    return recordCompositionRun({ source: options.source, ...judged });
   });
+}
+
+/**
+ * `check composition --elements scene.json`: the same judge on a scene instead of a page — a
+ * canvas or WebGPU frame, a native screen, a game HUD. The frame is as wide as `--viewport`
+ * or, without it, as its rightmost element, and as tall as its lowest; rails are measured as
+ * a fraction of that width, so a scene whose root covers the frame should record it.
+ */
+export async function runSceneCompositionCheck(
+  options: Pick<CompositionOptions, "allow" | "viewport"> & { elementsPath: string },
+): Promise<CompositionReport> {
+  const elements = parseSceneElements(await readFile(options.elementsPath, "utf8"));
+  const width = options.viewport ?? Math.max(0, ...elements.map((e) => e.left + e.width));
+  const height = Math.max(0, ...elements.map((e) => e.top + e.height));
+  const judged = judgeComposition(sceneToCompositionInput(elements, { width, height }), options);
+  return recordCompositionRun({ source: options.elementsPath, ...judged });
+}
+
+function recordCompositionRun(report: CompositionReport): CompositionReport {
+  appendRunLedger({
+    tool: "check-composition",
+    source: report.source,
+    headline: {
+      verdict: report.verdict,
+      proximity: report.labels.filter((l) => l.inverted).length,
+      flatSteps: report.hierarchy.flat.length,
+      railNearMisses: report.rails.near.length,
+    },
+  });
+  return report;
 }
 
 // ---------------------------------------------------------------------------
