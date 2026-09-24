@@ -1,7 +1,7 @@
 {
   "format": "vlmkit-anim/scene@1",
   "kind": "diagram",
-  "title": "PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2)",
+  "title": "PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)",
   "layout": "grid",
   "canvas": {
     "width": 640,
@@ -24,13 +24,13 @@
       "hidden": true
     },
     {
-      "id": "judge",
-      "label": "judge",
+      "id": ".claude",
+      "label": ".claude",
       "hidden": true
     },
     {
-      "id": ".claude",
-      "label": ".claude",
+      "id": "judge",
+      "label": "judge",
       "hidden": true
     },
     {
@@ -67,7 +67,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "1/2 Define the scene contract and move colour arithmetic into the judge (ph…"
+      "caption": "1/3 Define the scene contract and move colour arithmetic into the judge (ph…"
     },
     {
       "value": {
@@ -103,7 +103,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "2/2 Move check color's contrast ratios from the page into the judge"
+      "caption": "2/3 Move check color's contrast ratios from the page into the judge"
     },
     {
       "value": {
@@ -131,7 +131,41 @@
       "ms": 0
     },
     {
-      "note": "2 commits · 19 files · +1585 −530 · 6 areas, 1 import edges between them"
+      "highlight": [
+        ".claude",
+        "docs/design",
+        "judge/src",
+        "markup/src"
+      ],
+      "caption": "3/3 Move check integrity's text contrast arithmetic from the page into the …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 22
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1780 −593"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs/design",
+        "judge/src",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "3 commits · 22 files · +1780 −593 · 6 areas, 1 import edges between them"
     }
   ]
 }

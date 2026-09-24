@@ -1,18 +1,19 @@
-## PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2)
+## PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)
 
-![PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2)](./change-map.gif)
+![PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)](./change-map.gif)
 
 <details><summary>Every step</summary>
 
 ![steps](./change-map.sheet.png)
 
 ```
-PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2) — 5 steps, 2660ms, 13 nodes
- 1. [    0ms] PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2)
- 2. [  350ms] 1/2 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
- 3. [ 1050ms] 2/2 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
- 4. [ 1750ms] 2 commits · 19 files · +1585 −530 · 6 areas, 1 import edges between them
- 5. [ 2450ms] (end)
+PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2) — 6 steps, 3360ms, 13 nodes
+ 1. [    0ms] PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)
+ 2. [  350ms] 1/3 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
+ 3. [ 1050ms] 2/3 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
+ 4. [ 1750ms] 3/3 Move check integrity's text contrast arithmetic from the page into the … · files changed = 22 · lines = +1780 −593
+ 5. [ 2450ms] 3 commits · 22 files · +1780 −593 · 6 areas, 1 import edges between them
+ 6. [ 3150ms] (end)
 ```
 
 </details>
