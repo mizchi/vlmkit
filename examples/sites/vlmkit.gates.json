@@ -1,0 +1,77 @@
+{
+  "webServer": {
+    "command": "node ../vlmkit-intro-page/server.mjs",
+    "url": "http://127.0.0.1:4190/sites/",
+    "reuseExistingServer": true
+  },
+  "defaults": {
+    "gates": [
+      "check integrity"
+    ]
+  },
+  "pages": [
+    {
+      "id": "gallery",
+      "source": "http://127.0.0.1:4190/sites/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-gallery"
+      ]
+    },
+    {
+      "id": "checkout",
+      "source": "http://127.0.0.1:4190/sites/checkout/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-checkout"
+      ]
+    },
+    {
+      "id": "dashboard",
+      "source": "http://127.0.0.1:4190/sites/dashboard/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-dashboard"
+      ]
+    },
+    {
+      "id": "docs",
+      "source": "http://127.0.0.1:4190/sites/docs/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-docs"
+      ]
+    },
+    {
+      "id": "docs-cli",
+      "source": "http://127.0.0.1:4190/sites/docs/cli.html",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-docs-cli"
+      ]
+    },
+    {
+      "id": "docs-migrations",
+      "source": "http://127.0.0.1:4190/sites/docs/migrations.html",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-docs-migrations"
+      ]
+    },
+    {
+      "id": "kanban",
+      "source": "http://127.0.0.1:4190/sites/kanban/?animate=0",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-kanban"
+      ]
+    },
+    {
+      "id": "magazine",
+      "source": "http://127.0.0.1:4190/sites/magazine/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-magazine"
+      ]
+    },
+    {
+      "id": "shop",
+      "source": "http://127.0.0.1:4190/sites/shop/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-shop"
+      ]
+    }
+  ]
+}
