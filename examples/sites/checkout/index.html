@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Choose your plan (step 1 of 4) · Pantry Club</title>
+  <meta name="description" content="Demo checkout for Pantry Club, a fictional weekly meal-kit subscription. No payment is taken and nothing is sent.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%232d6a4f'/%3E%3Cpath d='M9 21h22a11 11 0 0 1-22 0Z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="6.2" r="1.15" fill="currentColor"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M10 5.4v5.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1.3" fill="#fff"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.8 10.4l3.4 3.4 7-7.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M5.8 10.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 20 20"><path d="M5.5 7.75L10 12.25l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bag" viewBox="0 0 20 20"><path d="M4.4 7h11.2l-.9 9.3a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.4 7V5.6a2.6 2.6 0 0 1 5.2 0V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 20 20"><path d="M2.5 5.5h9v8h-9zM11.5 8.5h3l2.5 2.6v2.4h-5.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="6" cy="14.5" r="1.6" fill="#fff" stroke="currentColor" stroke-width="1.5"/><circle cx="14.2" cy="14.5" r="1.6" fill="#fff" stroke="currentColor" stroke-width="1.5"/></symbol>
+  </svg>
+
+  <header class="site-header">
+    <div class="demo-notice" role="note">
+      <div class="wrap demo-notice__inner">
+        <svg class="icon demo-notice__icon" aria-hidden="true" focusable="false"><use href="#i-info"></use></svg>
+        <p><strong>This is a demo. No payment is taken.</strong> Pantry Club is fictional, and nothing you type leaves this page.</p>
+      </div>
+    </div>
+    <div class="brand-bar">
+      <div class="wrap brand-bar__inner">
+        <p class="brand">
+          <svg class="brand__mark" viewBox="0 0 40 40" width="36" height="36" aria-hidden="true" focusable="false">
+            <rect width="40" height="40" rx="11" fill="#2d6a4f"/>
+            <path d="M8.5 21h23a11.5 11.5 0 0 1-23 0Z" fill="#fff"/>
+            <path d="M20.6 19.2c.1-5.4 3.3-8.6 8.7-8.7-.1 5.4-3.3 8.6-8.7 8.7Z" fill="#b7dfc5"/>
+            <path d="M19.4 19.2c-4.5-.1-7.2-2.8-7.3-7.3 4.5.1 7.2 2.8 7.3 7.3Z" fill="#e3f2e8"/>
+          </svg>
+          <span class="brand__name">Pantry Club</span>
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap checkout" id="main">
+    <aside class="summary" id="summary" aria-labelledby="summary-title">
+      <button type="button" class="summary-toggle" id="summary-toggle" aria-expanded="false" aria-controls="summary-panel">
+        <span class="summary-toggle__label">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bag"></use></svg>
+          <span id="summary-toggle-text">Show order summary</span>
+          <svg class="icon summary-toggle__chevron" aria-hidden="true" focusable="false"><use href="#i-chevron"></use></svg>
+        </span>
+        <span class="summary-toggle__total" data-out="total">$64.74</span>
+      </button>
+
+      <div class="summary-panel" id="summary-panel">
+        <h2 class="summary__title" id="summary-title">Order summary</h2>
+
+        <div class="summary-item">
+          <div class="summary-item__art" aria-hidden="true">
+            <svg viewBox="0 0 48 48" width="44" height="44" focusable="false">
+              <path d="M24 7.5 40.5 15.8 24 24.1 7.5 15.8Z" fill="#ead3ad"/>
+              <path d="M7.5 15.8 24 24.1v17.4L7.5 33.2Z" fill="#d6b27f"/>
+              <path d="M40.5 15.8 24 24.1v17.4l16.5-8.3Z" fill="#c49b64"/>
+              <path d="M15.8 11.6 32.3 19.9v5.2" fill="none" stroke="#b98f58" stroke-width="2.2" stroke-linejoin="round"/>
+              <path d="M29 33.4c.2-4.1 2.6-6.6 6.7-6.8-.2 4.1-2.6 6.6-6.7 6.8Z" fill="#2d6a4f"/>
+            </svg>
+          </div>
+          <div class="summary-item__text">
+            <p class="summary-item__name" data-html="planNameHtml"><span class="nw">2 people ·</span> <span class="nw">3 meals a week</span></p>
+            <p class="summary-item__meta" data-html="planMetaHtml"><span class="nw">6 servings ·</span> <span class="nw">$9.99 each</span></p>
+          </div>
+        </div>
+
+        <dl class="summary-facts">
+          <div class="summary-facts__row">
+            <dt>Dietary preferences</dt>
+            <dd data-out="dietsShort">None</dd>
+          </div>
+          <div class="summary-facts__row">
+            <dt>First delivery</dt>
+            <dd data-out="firstDeliveryShort">Pick a day</dd>
+          </div>
+        </dl>
+
+        <dl class="summary-lines">
+          <div class="summary-lines__row">
+            <dt>Subtotal</dt>
+            <dd data-out="subtotal">$59.94</dd>
+          </div>
+          <div class="summary-lines__row summary-lines__row--promo" id="summary-promo" hidden>
+            <dt>Promo <span class="code-tag">WELCOME10</span></dt>
+            <dd data-out="discount">&minus;$5.99</dd>
+          </div>
+          <div class="summary-lines__row">
+            <dt>Shipping</dt>
+            <dd class="summary-lines__free">Free</dd>
+          </div>
+          <div class="summary-lines__row">
+            <dt>Tax (8%)</dt>
+            <dd data-out="tax">$4.80</dd>
+          </div>
+          <div class="summary-lines__row summary-lines__row--total">
+            <dt>Total today</dt>
+            <dd data-out="total">$64.74</dd>
+          </div>
+        </dl>
+        <p class="summary-note" data-out="renewalNote">Then $64.74 a week, tax included. Skip a week or cancel any time.</p>
+      </div>
+    </aside>
+
+    <div class="flow">
+      <ol class="steps" id="steps" role="list" aria-label="Checkout progress">
+        <li class="steps__item is-current" data-step="1" aria-current="step">
+          <span class="steps__marker" aria-hidden="true"><span class="steps__num">1</span><svg class="steps__check" focusable="false"><use href="#i-check"></use></svg></span>
+          <span class="steps__label">Plan<span class="visually-hidden steps__state"></span></span>
+        </li>
+        <li class="steps__item" data-step="2">
+          <span class="steps__marker" aria-hidden="true"><span class="steps__num">2</span><svg class="steps__check" focusable="false"><use href="#i-check"></use></svg></span>
+          <span class="steps__label">Delivery<span class="visually-hidden steps__state"></span></span>
+        </li>
+        <li class="steps__item" data-step="3">
+          <span class="steps__marker" aria-hidden="true"><span class="steps__num">3</span><svg class="steps__check" focusable="false"><use href="#i-check"></use></svg></span>
+          <span class="steps__label">Payment<span class="visually-hidden steps__state"></span></span>
+        </li>
+        <li class="steps__item" data-step="4">
+          <span class="steps__marker" aria-hidden="true"><span class="steps__num">4</span><svg class="steps__check" focusable="false"><use href="#i-check"></use></svg></span>
+          <span class="steps__label">Review<span class="visually-hidden steps__state"></span></span>
+        </li>
+      </ol>
+
+      <!-- Step 1 · Plan -->
+      <form class="panel step" id="step-1" data-step="1" aria-labelledby="step-1-title" novalidate>
+        <div class="step__head">
+          <h1 class="step__title" id="step-1-title" tabindex="-1">Choose your plan</h1>
+          <p class="step__intro">Fresh ingredients and easy recipes, delivered every week. Skip a week or cancel any time.</p>
+        </div>
+        <div class="error-summary" id="errors-1" tabindex="-1" aria-labelledby="errors-1-title" hidden></div>
+
+        <fieldset class="group">
+          <legend class="group__legend">Box size</legend>
+          <div class="plans">
+            <label class="plan">
+              <input class="plan__input" type="radio" name="plan" value="2p3m" checked>
+              <span class="plan__body">
+                <span class="plan__radio" aria-hidden="true"></span>
+                <span class="plan__title"><span class="plan__people">2 people</span><span class="plan__sep" aria-hidden="true"> · </span><span class="visually-hidden">, </span><span class="plan__meals">3 meals a week</span></span>
+                <span class="plan__meta"><span class="visually-hidden">, </span>6 servings<span class="plan__dot" aria-hidden="true"> · </span><span class="visually-hidden">, </span>$9.99 per serving</span>
+                <span class="plan__price"><span class="visually-hidden">, </span><span class="plan__amount">$59.94</span> <span class="plan__per">a week</span></span>
+              </span>
+            </label>
+            <label class="plan">
+              <input class="plan__input" type="radio" name="plan" value="4p3m">
+              <span class="plan__body">
+                <span class="plan__radio" aria-hidden="true"></span>
+                <span class="plan__title"><span class="plan__people">4 people</span><span class="plan__sep" aria-hidden="true"> · </span><span class="visually-hidden">, </span><span class="plan__meals">3 meals a week</span></span>
+                <span class="plan__meta"><span class="visually-hidden">, </span>12 servings<span class="plan__dot" aria-hidden="true"> · </span><span class="visually-hidden">, </span>$8.99 per serving</span>
+                <span class="plan__price"><span class="visually-hidden">, </span><span class="plan__amount">$107.88</span> <span class="plan__per">a week</span></span>
+                <span class="plan__badge"><span class="visually-hidden">, </span>Best value</span>
+              </span>
+            </label>
+            <label class="plan">
+              <input class="plan__input" type="radio" name="plan" value="2p5m">
+              <span class="plan__body">
+                <span class="plan__radio" aria-hidden="true"></span>
+                <span class="plan__title"><span class="plan__people">2 people</span><span class="plan__sep" aria-hidden="true"> · </span><span class="visually-hidden">, </span><span class="plan__meals">5 meals a week</span></span>
+                <span class="plan__meta"><span class="visually-hidden">, </span>10 servings<span class="plan__dot" aria-hidden="true"> · </span><span class="visually-hidden">, </span>$9.49 per serving</span>
+                <span class="plan__price"><span class="visually-hidden">, </span><span class="plan__amount">$94.90</span> <span class="plan__per">a week</span></span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="group" aria-describedby="diet-hint">
+          <legend class="group__legend">Dietary preferences <span class="optional">(optional)</span></legend>
+          <p class="hint group__hint" id="diet-hint">We’ll steer your weekly menu around these.</p>
+          <div class="choices">
+            <label class="choice">
+              <input class="choice__input" type="checkbox" name="diet" value="Vegetarian">
+              <span class="choice__body"><span class="choice__box" aria-hidden="true"><svg focusable="false"><use href="#i-check"></use></svg></span>Vegetarian</span>
+            </label>
+            <label class="choice">
+              <input class="choice__input" type="checkbox" name="diet" value="No pork">
+              <span class="choice__body"><span class="choice__box" aria-hidden="true"><svg focusable="false"><use href="#i-check"></use></svg></span>No pork</span>
+            </label>
+            <label class="choice">
+              <input class="choice__input" type="checkbox" name="diet" value="Dairy-free">
+              <span class="choice__body"><span class="choice__box" aria-hidden="true"><svg focusable="false"><use href="#i-check"></use></svg></span>Dairy-free</span>
+            </label>
+            <label class="choice">
+              <input class="choice__input" type="checkbox" name="diet" value="Nut-free">
+              <span class="choice__body"><span class="choice__box" aria-hidden="true"><svg focusable="false"><use href="#i-check"></use></svg></span>Nut-free</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="field field--day">
+          <label class="field__label" for="day">Delivery day</label>
+          <p class="hint" id="day-hint">Boxes arrive between 8 am and 8 pm. You can change the day later.</p>
+          <div class="select">
+            <select class="input" id="day" name="day" aria-describedby="day-hint">
+              <option value="">Select a day</option>
+              <option value="mon">Monday</option>
+              <option value="tue">Tuesday</option>
+              <option value="wed">Wednesday</option>
+              <option value="thu">Thursday</option>
+              <option value="fri">Friday</option>
+              <option value="sat">Saturday</option>
+            </select>
+            <svg class="select__chevron" aria-hidden="true" focusable="false"><use href="#i-chevron"></use></svg>
+          </div>
+          <p class="field__note" id="day-note" hidden>
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-truck"></use></svg>
+            <span>Your first box arrives <strong data-out="firstDeliveryLong"></strong>.</span>
+          </p>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn btn--primary">Continue</button>
+        </div>
+      </form>
+
+      <!-- Step 2 · Delivery -->
+      <form class="panel step" id="step-2" data-step="2" aria-labelledby="step-2-title" novalidate hidden>
+        <div class="step__head">
+          <h1 class="step__title" id="step-2-title" tabindex="-1">Delivery details</h1>
+          <p class="step__intro">Where should we bring your box?</p>
+        </div>
+        <div class="error-summary" id="errors-2" tabindex="-1" aria-labelledby="errors-2-title" hidden></div>
+
+        <div class="fields">
+          <div class="field field--full">
+            <label class="field__label" for="full-name">Full name</label>
+            <input class="input" id="full-name" name="fullName" type="text" autocomplete="name" autocapitalize="words" spellcheck="false">
+          </div>
+          <div class="field field--full">
+            <label class="field__label" for="email">Email</label>
+            <p class="hint" id="email-hint">For your receipt and delivery updates.</p>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" spellcheck="false" aria-describedby="email-hint">
+          </div>
+          <div class="field field--full">
+            <label class="field__label" for="phone">Phone <span class="optional">(optional)</span></label>
+            <p class="hint" id="phone-hint">Only used if there’s a problem with a delivery.</p>
+            <input class="input input--short" id="phone" name="phone" type="tel" autocomplete="tel" aria-describedby="phone-hint">
+          </div>
+          <div class="field field--full">
+            <label class="field__label" for="address1">Address line 1</label>
+            <input class="input" id="address1" name="address1" type="text" autocomplete="address-line1">
+          </div>
+          <div class="field field--full">
+            <label class="field__label" for="address2">Address line 2 <span class="optional">(optional)</span></label>
+            <input class="input" id="address2" name="address2" type="text" autocomplete="address-line2">
+          </div>
+          <div class="field field--city">
+            <label class="field__label" for="city">City</label>
+            <input class="input" id="city" name="city" type="text" autocomplete="address-level2">
+          </div>
+          <div class="field field--state">
+            <label class="field__label" for="state">State</label>
+            <div class="select">
+              <select class="input" id="state" name="state" autocomplete="address-level1">
+                <option value="">Select</option>
+                <option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option>
+              </select>
+              <svg class="select__chevron" aria-hidden="true" focusable="false"><use href="#i-chevron"></use></svg>
+            </div>
+          </div>
+          <div class="field field--zip">
+            <label class="field__label" for="zip">ZIP code</label>
+            <input class="input" id="zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" spellcheck="false">
+          </div>
+          <div class="field field--full">
+            <label class="field__label" for="instructions">Delivery instructions <span class="optional">(optional)</span></label>
+            <p class="hint" id="instructions-hint">A gate code, or a safe place to leave the box.</p>
+            <textarea class="input textarea" id="instructions" name="instructions" rows="3" maxlength="200" aria-describedby="instructions-hint instructions-count"></textarea>
+            <p class="counter" id="instructions-count">200 characters left</p>
+            <p class="visually-hidden" id="instructions-live" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn--secondary" data-action="back">Back</button>
+          <button type="submit" class="btn btn--primary">Continue</button>
+        </div>
+      </form>
+
+      <!-- Step 3 · Payment -->
+      <form class="panel step" id="step-3" data-step="3" aria-labelledby="step-3-title" novalidate hidden>
+        <div class="step__head">
+          <h1 class="step__title" id="step-3-title" tabindex="-1">Payment</h1>
+          <p class="step__intro">Use a test card: this demo never charges or stores it.</p>
+        </div>
+        <div class="error-summary" id="errors-3" tabindex="-1" aria-labelledby="errors-3-title" hidden></div>
+
+        <fieldset class="group">
+          <legend class="group__legend">Card details</legend>
+          <div class="fields">
+            <div class="field field--full">
+              <label class="field__label" for="card-number">Card number</label>
+              <p class="hint" id="card-number-hint">Try the test number 4242 4242 4242 4242.</p>
+              <input class="input input--card" id="card-number" name="cardNumber" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" spellcheck="false" aria-describedby="card-number-hint">
+            </div>
+            <div class="field field--half">
+              <label class="field__label" for="expiry">Expiry date</label>
+              <p class="hint" id="expiry-hint">MM/YY</p>
+              <input class="input" id="expiry" name="expiry" type="text" inputmode="numeric" autocomplete="cc-exp" maxlength="5" spellcheck="false" aria-describedby="expiry-hint">
+            </div>
+            <div class="field field--half">
+              <label class="field__label" for="cvc">Security code (CVC)</label>
+              <p class="hint" id="cvc-hint">3 digits on the back</p>
+              <input class="input" id="cvc" name="cvc" type="text" inputmode="numeric" autocomplete="cc-csc" maxlength="4" spellcheck="false" aria-describedby="cvc-hint">
+            </div>
+            <div class="field field--full">
+              <label class="field__label" for="card-name">Name on card</label>
+              <input class="input" id="card-name" name="cardName" type="text" autocomplete="cc-name" autocapitalize="words" spellcheck="false">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend class="group__legend">Billing address</legend>
+          <label class="choice choice--wide">
+            <input class="choice__input" type="checkbox" id="billing-same" name="billingSame" checked aria-controls="billing-fields">
+            <span class="choice__body"><span class="choice__box" aria-hidden="true"><svg focusable="false"><use href="#i-check"></use></svg></span>Billing address is the same as delivery</span>
+          </label>
+          <p class="billing-preview" id="billing-preview" data-html="addressPhrases"></p>
+          <div class="fields billing-fields" id="billing-fields" hidden>
+            <div class="field field--full">
+              <label class="field__label" for="billing-address1">Billing address line 1</label>
+              <input class="input" id="billing-address1" name="billingAddress1" type="text" autocomplete="billing address-line1">
+            </div>
+            <div class="field field--full">
+              <label class="field__label" for="billing-address2">Billing address line 2 <span class="optional">(optional)</span></label>
+              <input class="input" id="billing-address2" name="billingAddress2" type="text" autocomplete="billing address-line2">
+            </div>
+            <div class="field field--city">
+              <label class="field__label" for="billing-city">City</label>
+              <input class="input" id="billing-city" name="billingCity" type="text" autocomplete="billing address-level2">
+            </div>
+            <div class="field field--state">
+              <label class="field__label" for="billing-state">State</label>
+              <div class="select">
+                <select class="input" id="billing-state" name="billingState" autocomplete="billing address-level1"></select>
+                <svg class="select__chevron" aria-hidden="true" focusable="false"><use href="#i-chevron"></use></svg>
+              </div>
+            </div>
+            <div class="field field--zip">
+              <label class="field__label" for="billing-zip">ZIP code</label>
+              <input class="input" id="billing-zip" name="billingZip" type="text" inputmode="numeric" autocomplete="billing postal-code" maxlength="10" spellcheck="false">
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="field promo">
+          <label class="field__label promo__label" for="promo">Promo code <span class="optional">(optional)</span></label>
+          <p class="hint" id="promo-hint">New members can use WELCOME10 for 10% off the first box.</p>
+          <div class="promo__row">
+            <input class="input promo__input" id="promo" name="promo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="promo-hint promo-message">
+            <button type="button" class="btn btn--secondary promo__button" id="promo-apply">Apply</button>
+          </div>
+          <p class="promo__message" id="promo-message" role="status"></p>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn--secondary" data-action="back">Back</button>
+          <button type="submit" class="btn btn--primary">Continue</button>
+        </div>
+      </form>
+
+      <!-- Step 4 · Review -->
+      <form class="panel step" id="step-4" data-step="4" aria-labelledby="step-4-title" novalidate hidden>
+        <div class="step__head">
+          <h1 class="step__title" id="step-4-title" tabindex="-1">Review your order</h1>
+          <p class="step__intro">Check the details, then place your order.</p>
+        </div>
+        <div class="error-summary" id="errors-4" tabindex="-1" aria-labelledby="errors-4-title" hidden></div>
+
+        <div class="review">
+          <section class="review__block" aria-labelledby="review-plan-title">
+            <div class="review__head">
+              <h2 class="review__title" id="review-plan-title">Plan</h2>
+              <a class="review__edit" href="#step-1" data-edit="1">Edit<span class="visually-hidden"> plan</span></a>
+            </div>
+            <dl class="review__list">
+              <div class="review__row"><dt>Box</dt><dd data-out="planLine"></dd></div>
+              <div class="review__row"><dt>Dietary preferences</dt><dd data-out="dietsLong"></dd></div>
+              <div class="review__row"><dt>Delivery day</dt><dd data-out="dayLine"></dd></div>
+            </dl>
+          </section>
+          <section class="review__block" aria-labelledby="review-delivery-title">
+            <div class="review__head">
+              <h2 class="review__title" id="review-delivery-title">Delivery</h2>
+              <a class="review__edit" href="#step-2" data-edit="2">Edit<span class="visually-hidden"> delivery details</span></a>
+            </div>
+            <dl class="review__list">
+              <div class="review__row"><dt>Name</dt><dd data-out="fullName"></dd></div>
+              <div class="review__row"><dt>Contact</dt><dd data-out="contact"></dd></div>
+              <div class="review__row"><dt>Address</dt><dd data-out="addressBlock"></dd></div>
+              <div class="review__row"><dt>Instructions</dt><dd data-out="instructionsLine"></dd></div>
+            </dl>
+          </section>
+          <section class="review__block" aria-labelledby="review-payment-title">
+            <div class="review__head">
+              <h2 class="review__title" id="review-payment-title">Payment</h2>
+              <a class="review__edit" href="#step-3" data-edit="3">Edit<span class="visually-hidden"> payment</span></a>
+            </div>
+            <dl class="review__list">
+              <div class="review__row"><dt>Card</dt><dd data-out="cardLine"></dd></div>
+              <div class="review__row"><dt>Billing address</dt><dd data-out="billingLine"></dd></div>
+              <div class="review__row"><dt>Promo code</dt><dd data-out="promoLine"></dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <div class="field field--terms">
+          <label class="choice choice--wide choice--terms">
+            <input class="choice__input" type="checkbox" id="terms" name="terms">
+            <span class="choice__body"><span class="choice__box" aria-hidden="true"><svg focusable="false"><use href="#i-check"></use></svg></span><span>I agree to the subscription terms: my box renews every week at <strong data-out="renewal">$64.74</strong> until I skip or cancel.</span></span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn--secondary" data-action="back">Back</button>
+          <button type="submit" class="btn btn--primary">Place order</button>
+        </div>
+      </form>
+
+      <!-- Confirmation -->
+      <section class="panel confirmation" id="confirmation" aria-labelledby="confirmation-title" hidden>
+        <svg class="confirmation__icon" aria-hidden="true" focusable="false"><use href="#i-check-circle"></use></svg>
+        <h1 class="confirmation__title" id="confirmation-title" tabindex="-1">Thanks — your first box is on its way.</h1>
+        <p class="confirmation__lead">Your weekly plan is set up. Here’s what we have on file.</p>
+        <dl class="confirmation__facts">
+          <div class="confirmation__fact"><dt>Order number</dt><dd class="confirmation__order">PC-20417</dd></div>
+          <div class="confirmation__fact"><dt>First delivery</dt><dd data-out="firstDeliveryFull"></dd></div>
+          <div class="confirmation__fact"><dt>Plan</dt><dd data-out="planName"></dd></div>
+          <div class="confirmation__fact"><dt>Delivering to</dt><dd data-html="addressPhrases"></dd></div>
+        </dl>
+        <p class="confirmation__note">A real order would send a receipt to <strong data-out="email"></strong>. This demo sent nothing and charged nothing.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Pantry Club is a fictional brand made for a vlmkit demo. Prices, dates and the order number are sample data.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

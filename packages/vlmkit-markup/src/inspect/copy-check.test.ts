@@ -413,3 +413,35 @@ test("the forbid list shares the manifest's parser, so its headings are comments
   assert.equal(report.forbidLines, 1);
   assert.deepEqual(report.forbiddenLines.map((f) => f.line), ["kept verbatim"]);
 });
+
+/**
+ * Copy that crosses inline markup with no space in it — the ordinary shape of Japanese product
+ * copy. The shop demo (2026-09-23) could not verify its own price: "¥4,180（税込）" came back
+ * copy-invisible with reason "unknown", because every text node was its own line in the visible
+ * text while innerText had the line whole. Blocks, <br> and table cells must still separate.
+ */
+test("inline runs join the way they read; blocks, <br> and cells still separate (E2E)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "copy-inline-"));
+  try {
+    const html = `<!doctype html><html lang="ja"><body>
+      <h1><span>汐見</span><span>窯</span> マグカップ</h1>
+      <p class="price">¥4,180<small>（税込）</small></p>
+      <p>青<b>磁</b>釉の<span style="display:inline-block">うつわ</span></p>
+      <p>Free shipping over <strong>¥5,000</strong>.</p>
+      <div>foo</div><div>bar</div>
+      <p>line one<br>line two</p>
+      <table><tr><td>cell</td><td>mate</td></tr></table>
+    </body></html>`;
+    const page = join(dir, "page.html");
+    const manifest = join(dir, "copy.txt");
+    await writeFile(page, html);
+    await writeFile(manifest, ["汐見窯 マグカップ", "¥4,180（税込）", "青磁釉のうつわ", "Free shipping over ¥5,000.", "foobar", "line oneline two", "cellmate"].join("\n"));
+
+    const report = await runCopyCheck({ source: page, manifestPath: manifest });
+    assert.deepEqual(report.invisibleLines, [], "nothing that is on screen reads as invisible");
+    // Joined across a block, a <br> or a cell boundary, these strings are not on the page.
+    assert.deepEqual(report.missingLines, ["foobar", "line oneline two", "cellmate"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

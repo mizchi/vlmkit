@@ -316,12 +316,23 @@ vlmkit check color       page.html   # the palette by role, and where colour alo
 | Principle | Where it lives | The measurable claim |
 |---|---|---|
 | 近接 proximity | `check composition` / `proximity-inversion` (warn) | A label's gap to its content is >=1.5x its gap to the boundary above AND >=8px wider, so it groups upward |
-| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two **siblings** sit on rails 2-8px apart, so the same edge was available to both. A12 in `check integrity` covers the same window between siblings |
+| 整列 alignment | `check composition` / `rail-near-miss` (**info**) | Two **siblings** sit on rails 2-8px apart, so the same edge was available to both. A12 in `check integrity` (`near-misalignment`) shares the 2-8px window but needs siblings that already share an edge exactly, so it is **not** a duplicate: of the three rail mutants it catches `rail-broken` only, and misses `-shrink` and `-nested` (measured 2026-09-24) |
 | 反復 repetition | `check design` / `component-drift` | Instances per distinct style signature, below 3x |
 | 対比 contrast | `check composition` / `flat-heading-step`, `no-type-contrast` (warn) | Two DECLARED heading levels render at one size and weight; or nothing is >=1.3x body size and nothing >=200 weight heavier |
 
 Both report **inconsistency, never which value is correct**, and nothing exceeds
 `warn` — taste stays with humans.
+
+**The three share their plumbing — a fourth style gate reuses it rather than copying a sibling.**
+Each collector splices `STYLE_SAMPLING_JS` (`style/style-sampling.ts`: `visible` / `px` / `path`),
+and each judge filters `--allow` through `selectorAllowFilter` (`inspect/selector-exemption.ts`).
+Composition had been pasted from design and colour re-typed from both; the re-typed copies were
+where the defects were — an SVG's class read as `svg.[object`, a mistyped `--allow` that said
+nothing. `path` matters most: it is the selector every finding carries and the string `--allow`
+matches, so two spellings of it break exemptions across gates. A gate that needs a different
+answer names it next to its collector instead of redefining the shared word — colour's `painted`
+keeps an off-screen `content-visibility: auto` footer that the shared `visible` skips, and drops
+closed-`<details>` content, which a size test alone had counted as paint.
 
 ### What was rejected, so it does not get re-proposed
 
@@ -411,6 +422,63 @@ elements inspected, the bogus row gone, four real AA failures found. 566 of that
 page's 576 text-bearing elements were unreadable; the other 13 corpus pages had
 none, plus 4 `oklch()` backgrounds on MDN. So the blindness is narrow in
 population and **total** where it applies.
+
+## Demo sites and judgment logs (`examples/sites/`)
+
+Six agent-built sites (docs, shop, dashboard, magazine, checkout, kanban), the landing page and the
+gallery that lists them are published on Pages **beside the log of how each was judged**:
+`/sites/<name>/` and `/sites/<name>/judgment/`, `/judgment/` for the landing page, `/sites/judgment/`
+for the gallery. Solitaire predates the log and its card says so. Every gate run and screenshot goes
+through `examples/sites/judge.mjs`, which keeps a run's exit code and whole output, takes one screen
+per image, and makes a defect name the look or gate run that found it:
+
+```bash
+J="node examples/sites/judge.mjs examples/sites/docs"
+$J status; $J check                                  # where the log stands; what it needs before done
+$J round --actor reviewer "what this pass is"        # any change to a judged page is a new round
+$J gate check integrity index.html                   # any vlmkit command, paths relative to the site dir
+$J shot index.html --full --viewport desktop,mobile  # then Read EVERY file it prints
+$J look S12 - <<'EOF' … what is in the picture … EOF
+$J done - <<'EOF' … EOF                              # refuses until check passes; renders the log page
+node examples/sites/gallery.mjs                      # after any log changes: the gallery is generated
+node examples/vlmkit-intro-page/server.mjs           # the Pages layout on :4190 — the gallery and the landing log only resolve there
+```
+
+The protocol is `examples/sites/PROTOCOL.md`; the round's findings are
+`docs/reports/2026-09-23-demo-sites-v1.md` — **135 of 179 defects across the eight logs were found by
+looking, not by a gate**, which is why `markup-assist`'s done condition now ends with "then look at it".
+
+- **A log is one file, `judgment.sqlite`** (events, every gate output, the screens it keeps), next to
+  `JUDGMENT.md` (text, no pictures; links into the published page). `judgment/` beside it is a
+  gitignored **export** — the screens `shot` writes for you to Read, the page `render` writes — so
+  never commit it and never treat it as the record. The loose-file version was 2107 files for eight
+  logs. Query it with any SQLite reader: `events(seq, kind, id, round, json)`, `outputs(path, text)`,
+  `screens(path, webp)`.
+- **A finished round keeps one full-page walk per width.** `done` (and `render`) drop every other
+  screen of the rounds it closes — close-ups, states, repeat walks — keeping the last walk at desktop,
+  tablet and phone width that shows the page as a visitor lands on it. The shots, looks and defects
+  stay; only their pictures go (1418 screens → 554 on the first eight logs). So **write every look
+  before `done`**: `look` refuses a shot whose screens are gone, and a state you want pictured after
+  the round has to be shot again.
+- **Held by tests, not by care.** `examples/sites/sites.test.mjs`: every log passes its own `check`
+  and ends in `done`, its database holds exactly the gate outputs it names and the screens it keeps,
+  and its committed `JUDGMENT.md` equals a fresh render; the gallery equals a fresh `gallery.mjs`.
+  `tests/pages-site.test.mjs`: the published tree is the manifest file for file, byte for byte
+  against the database for a log's page and screens, and all ~1300 relative links on the 19
+  published pages resolve. The deploy workflow also runs
+  `gates run --config examples/sites/vlmkit.gates.json` (its `webServer` starts the intro server).
+- **Published half only.** `build-pages.mjs` publishes a log's page and the screens it keeps, read
+  out of its `judgment.sqlite`. The database itself (raw events, gate outputs the page inlines) and
+  whatever a gate wrote to `test-results/` stay in the repo or local.
+- **The local server reads the logs per request**, so a screen taken while it runs is served without
+  a restart. It still builds the runtime-file routes at startup.
+- **`shot --element` takes the first match** (`footer` hit a pull quote's `<footer>`), and a full
+  walk stops at 16 screens — the `[judge]` line says `STOPPED SHORT` and `check` refuses the shot as
+  the round's full page until `--max-tiles` reaches the end.
+- **No gate emulates `prefers-color-scheme`.** A page that follows the OS theme gets its dark theme
+  judged by eye (`shot --dark`); the demo sites use `?theme=dark` so the gates can reach it.
+- **`--allow` matches the path a gate prints** (`ul.grid>li.card>div.body>h2>a`), not a CSS selector,
+  and says "matched nothing" when it does not apply.
 
 ## Measuring Gate / Rule Execution Cost
 

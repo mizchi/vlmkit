@@ -57,8 +57,9 @@
  * - **`color-only-link`** (WCAG 1.4.1 Use of Color, technique G183, which names
  *   3:1 exactly): a link inside a flow that also holds its own prose, marked off
  *   from that prose by colour alone — no underline, no weight step, no border,
- *   no fill — and under 3:1 against it. 8 of 4899 links in a flow, 0.16%, every
- *   one verified.
+ *   no fill — and under 3:1 against it. 8 of 2627 painted links in a flow, 0.3%,
+ *   every one verified. (4899 when collapsed `<details>` content still counted —
+ *   see `painted` in the collector; the 8 are the same eight.)
  *
  * The "flow also holds prose" condition is the whole rule, the same way
  * `measureProximity`'s "boundary must be a preceding sibling" is. danluu.com is
@@ -88,11 +89,10 @@
  *   direction backwards.
  */
 
-import { pathToFileURL } from "node:url";
 import { resolve, dirname } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -101,7 +101,8 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
-import { parseSelectorAllowRules, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { parseSelectorAllowRules, selectorAllowFilter, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 
 // ---------------------------------------------------------------------------
 // Thresholds. Both are WCAG's, which is the point: a number this file chose
@@ -230,6 +231,8 @@ export interface ColorRolesReport extends ColorRolesInput {
   linkInk: ColorUse | null;
   /** Rows a `--allow` rule signed off. Listed, never silently gone. */
   allowed: { selector: string; reason: string }[];
+  /** `--allow` rules that matched nothing, as written: a typo is otherwise silent. */
+  unusedAllow: string[];
   findings: ColorFinding[];
   verdict: "consistent" | "color-dependent" | "not-judged";
 }
@@ -250,24 +253,23 @@ export interface ColorRolesReport extends ColorRolesInput {
  */
 export const COLLECT_COLOR_ROLES = `(() => {
   ${CONTRAST_BACKGROUND_JS}
+  ${STYLE_SAMPLING_JS}
 
   const hex = (c) => "#" + c.slice(0, 3).map((n) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, "0")).join("");
-  const path = (el) => {
-    const parts = [];
-    for (let cur = el; cur && cur !== document.body && parts.length < 3; cur = cur.parentElement) {
-      let s = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift(s + "#" + cur.id); break; }
-      const cls = (cur.className || "").toString().trim().split(/\\s+/).filter(Boolean)[0];
-      if (cls) s += "." + cls;
-      parts.unshift(s);
-    }
-    return parts.join(">");
-  };
   const SKIP_TAGS = new Set(["script", "style", "head", "meta", "link", "title", "noscript", "template", "br", "wbr"]);
-  const visible = (el) => {
-    const cs = getComputedStyle(el);
-    if (cs.display === "none" || cs.visibility === "hidden" || cs.display === "contents") return false;
-    if (inheritedOpacity(el) < 0.05) return false;
+  // Colour's own answer to "is this on the page", because the shared visible() is
+  // shaped for geometry: it skips an off-screen content-visibility: auto section,
+  // and a footer drawn that way is still paint the page has. What colour must not
+  // count is content that is never painted until someone opens it. A closed
+  // details element is exactly that, and checkVisibility says so whatever it is
+  // asked, while its descendants still report a size, because asking for one
+  // forces layout. Reading only the size put 5615 collapsed elements into
+  // css-tricks' palette and made its comment boxes the page's largest surface.
+  const painted = (el) => {
+    const shown = typeof el.checkVisibility === "function"
+      ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+      : visible(el);
+    if (!shown || inheritedOpacity(el) < 0.05) return false;
     const r = el.getBoundingClientRect();
     return r.width >= 1 && r.height >= 1;
   };
@@ -314,7 +316,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
     const tag = el.tagName.toLowerCase();
     if (SKIP_TAGS.has(tag)) continue;
     if (el.closest("svg") && tag !== "svg") continue;
-    if (!visible(el)) continue;
+    if (!painted(el)) continue;
     boxes++;
     const cs = getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -347,7 +349,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
   const OPAQUE_INPUT_TYPES = new Set(["hidden", "submit", "button", "reset", "image", "color", "range", "checkbox", "radio", "file"]);
   const controls = [], controlsSkipped = [];
   for (const el of document.querySelectorAll("input, textarea, select, [contenteditable=true]")) {
-    if (!visible(el)) continue;
+    if (!painted(el)) continue;
     const tag = el.tagName.toLowerCase();
     if (tag === "input" && OPAQUE_INPUT_TYPES.has((el.getAttribute("type") || "text").toLowerCase())) continue;
     const sel = path(el);
@@ -386,9 +388,9 @@ export const COLLECT_COLOR_ROLES = `(() => {
   for (const a of document.querySelectorAll("a[href]")) if (a.parentElement) flows.add(a.parentElement);
   const links = [];
   for (const flow of flows) {
-    if (!visible(flow)) continue;
+    if (!painted(flow)) continue;
     const kids = [];
-    for (const c of flow.children) if (c.matches("a[href]") && visible(c)) kids.push(c);
+    for (const c of flow.children) if (c.matches("a[href]") && painted(c)) kids.push(c);
     if (kids.length === 0) continue;
     const flowCs = getComputedStyle(flow);
     const bodyInk = parseColor(flowCs.color);
@@ -420,7 +422,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
   // css-tricks' nav — every link wrapping a span — outvote the page's real link
   // colour, 404 white to 410 blue, because each nav link counted twice.
   for (const el of document.querySelectorAll(INTERACTIVE_SEL)) {
-    if (!isInteractive(el) || !visible(el)) continue;
+    if (!isInteractive(el) || !painted(el)) continue;
     const cs = getComputedStyle(el);
     const fg = parseColor(cs.color);
     if (!fg) continue;
@@ -534,19 +536,13 @@ export function judgeColorRoles(
   input: ColorRolesInput,
   options: { source?: string; allow?: readonly string[] } = {},
 ): ColorRolesReport {
-  const allowRules = parseColorAllowRules(options.allow ?? []);
-  const allowed: { selector: string; reason: string }[] = [];
   /**
    * An allowed row leaves the verdict and is still listed — the repo-wide
    * exemption property, so a sign-off reads as a decision rather than as
    * silence. Substring, not equality, because a selector is a generated path.
    */
-  const keep = (selector: string): boolean => {
-    const rule = allowRules.find((r) => selector.includes(r.selector));
-    if (!rule) return true;
-    allowed.push({ selector, reason: rule.reason });
-    return false;
-  };
+  const allow = selectorAllowFilter(parseColorAllowRules(options.allow ?? []));
+  const { keep } = allow;
 
   const findings: ColorFinding[] = [];
   const controls = invisibleControls(input.controls).filter((c) => keep(c.selector));
@@ -652,7 +648,8 @@ export function judgeColorRoles(
     base: findBase(input),
     bodyInk: findBodyInk(input),
     linkInk: findLinkInk(input),
-    allowed,
+    allowed: allow.allowed,
+    unusedAllow: allow.unused(),
     findings,
     verdict: !judgedAnything ? "not-judged" : carries ? "color-dependent" : "consistent",
   };
@@ -742,6 +739,10 @@ export function formatColorRolesReport(report: ColorRolesReport, rules?: RuleVie
     out.push(`${BOLD}Signed off${RESET} ${DIM}(--allow; off the verdict, still listed)${RESET}`);
     for (const a of report.allowed) out.push(`  ${DIM}-${RESET} ${a.selector} — ${a.reason}`);
   }
+  if (report.unusedAllow.length > 0) {
+    out.push("");
+    out.push(`${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`);
+  }
   out.push("");
   return out.join("\n");
 }
@@ -765,8 +766,9 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
       withAuthState({ viewport: { width, height: 900 } }, options.storageState),
     );
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
+    // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
-    const url = isUrl ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await page.goto(url, {
       waitUntil: options.waitUntil ?? "networkidle",
       timeout: options.timeout ?? 30000,

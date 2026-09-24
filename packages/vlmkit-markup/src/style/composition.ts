@@ -47,8 +47,7 @@
  */
 
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -56,7 +55,8 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
-import { parseSelectorAllowRules, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { parseSelectorAllowRules, selectorAllowFilter, type SelectorAllowRule } from "../inspect/selector-exemption.ts";
+import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 
 // ---------------------------------------------------------------------------
 // Thresholds. Each one names the measurement that set it.
@@ -168,20 +168,7 @@ export interface CompositionInput {
  * paragraphs rather than of every wrapper that inherits one.
  */
 export const COLLECT_COMPOSITION = `(() => {
-  const visible = (el) => typeof el.checkVisibility === "function"
-    ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })
-    : getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
-  const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0; };
-  const path = (el) => {
-    const parts = [];
-    for (let cur = el; cur && cur !== document.body && parts.length < 3; cur = cur.parentElement) {
-      let p = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift(p + "#" + cur.id); break; }
-      if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\\s+/)[0];
-      parts.unshift(p);
-    }
-    return parts.join(">");
-  };
+  ${STYLE_SAMPLING_JS}
   const boxes = [];
   const indexOf = new Map();
   for (const el of document.querySelectorAll("body *")) {
@@ -815,17 +802,9 @@ export function judgeComposition(
   options: Pick<CompositionOptions, "allow"> = {},
 ): Omit<CompositionReport, "source"> {
   const { boxes, viewport } = input;
-  const allowRules = parseCompositionAllowRules(options.allow ?? []);
-  const usedAllow = new Set<string>();
-  const allowed: { selector: string; reason: string }[] = [];
   /** An allowed row leaves the verdict and is still listed — the repo-wide exemption property. */
-  const keep = (selector: string): boolean => {
-    const rule = allowRules.find((r) => selector.includes(r.selector));
-    if (!rule) return true;
-    allowed.push({ selector, reason: rule.reason });
-    usedAllow.add(rule.raw);
-    return false;
-  };
+  const allow = selectorAllowFilter(parseCompositionAllowRules(options.allow ?? []));
+  const { keep } = allow;
 
   const { labels, unjudged } = measureProximity(boxes);
   const rails = measureRails(boxes, viewport.width);
@@ -937,8 +916,8 @@ export function judgeComposition(
   return {
     labels, labelsUnjudged: unjudged, rails, separation, hierarchy, findings,
     boxes: boxes.length,
-    allowed,
-    unusedAllow: allowRules.filter((r) => !usedAllow.has(r.raw)).map((r) => r.raw),
+    allowed: allow.allowed,
+    unusedAllow: allow.unused(),
     verdict: carries ? "unbalanced" : !judgedAnything ? "not-judged" : "composed",
   };
 }
@@ -953,8 +932,9 @@ export async function runCompositionCheck(options: CompositionOptions): Promise<
       withAuthState({ viewport: { width, height: 900 } }, options.storageState),
     );
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
+    // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
-    const url = isUrl ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await page.goto(url, {
       waitUntil: options.waitUntil ?? "networkidle",
       timeout: options.timeout ?? 30000,

@@ -491,8 +491,14 @@ export function formatBatchSummary(
   const gates = [...new Set(summary.jobs.map((j) => j.gate))];
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit batch${RESET}`);
+  // A product only when it is one: per-page `extraGates` give pages different gate lists, and
+  // "4 page(s) x 5 gate(s) = 8 job(s)" (four pages, one shared gate, four one-page contrast runs)
+  // read as arithmetic that does not add up.
+  const plan = pages.size * gates.length === summary.jobs.length
+    ? `${pages.size} page(s) x ${gates.length} gate(s) = ${summary.jobs.length} job(s)`
+    : `${summary.jobs.length} job(s) over ${pages.size} page(s), ${gates.length} distinct gate command(s)`;
   lines.push(
-    `${DIM}${pages.size} page(s) x ${gates.length} gate(s) = ${summary.jobs.length} job(s),`
+    `${DIM}${plan},`
     + ` concurrency ${summary.concurrency}`
     + (summary.shard ? `, shard ${summary.shard.index}/${summary.shard.total}` : "")
     + `${RESET}`,
@@ -523,12 +529,13 @@ export function formatBatchSummary(
   );
   // Warns a passing job found, said on the summary. Without this the adoption path
   // reported `ALL PASS (6/6)` and showed none of ten findings — the one number an
-  // adopting project is running the tool to get.
+  // adopting project is running the tool to get. Each row names its page: four pages
+  // under one gate printed as four identical `1  check integrity` rows.
+  const warned = summary.jobs
+    .filter((j) => j.exitCode === 0)
+    .map((j) => ({ job: j, gate: gateVerb(j.gate), warns: reportedWarns(j.output) }))
+    .filter((j) => j.warns > 0);
   if (!options.showOutput) {
-    const warned = summary.jobs
-      .filter((j) => j.exitCode === 0)
-      .map((j) => ({ gate: gateVerb(j.gate), warns: reportedWarns(j.output) }))
-      .filter((j) => j.warns > 0);
     const total = warned.reduce((sum, j) => sum + j.warns, 0);
     if (total > 0) {
       lines.push("");
@@ -536,7 +543,7 @@ export function formatBatchSummary(
         `${YELLOW}${total} warn(s)${RESET} in ${warned.length} passing gate(s) — not shown above,`
         + ` and they did not fail the run:`,
       );
-      for (const j of warned) lines.push(`${DIM}    ${String(j.warns).padStart(3)}  ${j.gate}${RESET}`);
+      for (const j of warned) lines.push(`${DIM}    ${String(j.warns).padStart(3)}  ${j.gate}  ${j.job.page}${RESET}`);
       lines.push(
         `${DIM}See them: --show-output, or --output <dir> to keep every log.`
         + ` Gate on one: --rule <id>=suspect.${RESET}`,
@@ -599,6 +606,18 @@ export function formatBatchSummary(
       lines.push("");
     }
   }
+  // `--show-output` is where the warn summary above sends a reader, so it prints the passing
+  // jobs that warned as well as the failing ones. It printed failing jobs only, and also
+  // dropped the summary, so on the landing page's review (2026-09-23) four warns a plain
+  // run announced appeared nowhere in the run its hint asked for.
+  if (options.showOutput && warned.length > 0) {
+    lines.push(`${BOLD}Warnings${RESET} ${DIM}(passing jobs)${RESET}`);
+    for (const { job } of warned) {
+      lines.push(`${BOLD}${DIM}--- ${job.gate} ${job.page}${RESET}`);
+      lines.push(job.output.trimEnd());
+      lines.push("");
+    }
+  }
   const slowJobs = [...summary.jobs].sort((a, b) => b.durationMs - a.durationMs).slice(0, 5);
   if (summary.jobs.length > 5) {
     lines.push(`${BOLD}Slowest jobs${RESET} ${DIM}(shard against these)${RESET}`);
@@ -623,7 +642,8 @@ Options:
   --concurrency <n>     Parallel jobs (default: min(4, cores - 1))
   --shard <i/n>         Run only shard i of n (1-based, stride-sliced)
   --output <dir>        Write every job's log plus batch-summary.json
-  --show-output         Print failing jobs' reports inline
+  --show-output         Print the reports of failing jobs, and of passing jobs
+                        that warned, inline
   --json                Print the summary as JSON
   --quiet               No per-job progress lines
   --advisory            Print failures but exit 0

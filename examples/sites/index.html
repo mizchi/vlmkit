@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vlmkit demo sites</title>
+<meta name="description" content="Sites built by agents with vlmkit, each published next to the log of how it was judged.">
+<style>
+:root { color-scheme: light dark; --bg:#f6f5f1; --panel:#ffffff; --ink:#1d1d1b; --muted:#5d5b55; --line:#dcd9d0;
+  --eye:#7a3fb0; --gate:#1f5f8b; --accent:#1f5f8b; }
+@media (prefers-color-scheme: dark) { :root { --bg:#161614; --panel:#1f1f1c; --ink:#ecebe6; --muted:#a9a69c; --line:#3a3934;
+  --eye:#d2a8f5; --gate:#8cc4ea; --accent:#8cc4ea; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; }
+main { max-width: 76rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+a { color: inherit; text-underline-offset: 0.15em; }
+.kicker { margin: 0 0 0.25rem; color: var(--muted); font-size: 0.9375rem; }
+h1 { margin: 0 0 0.75rem; font-size: clamp(1.75rem, 4vw, 2.75rem); line-height: 1.15; max-width: 22ch; }
+.lede { margin: 0 0 1.5rem; color: var(--muted); max-width: 44rem; font-size: 1.0625rem; }
+.totals { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin: 0 0 2.5rem; padding: 0; list-style: none; color: var(--muted); }
+.totals b { color: var(--ink); font-size: 1.25rem; margin-right: 0.25rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); gap: 1.25rem; margin: 0; padding: 0; list-style: none; }
+.card { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; border-bottom: 1px solid var(--line); }
+.card .body { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem 1.125rem 1.125rem; flex: 1; }
+.card h2 { margin: 0; font-size: 1.1875rem; line-height: 1.3; }
+.card h2 a { text-decoration: none; } .card h2 a:hover { text-decoration: underline; }
+.pattern { margin: 0; color: var(--muted); font-size: 0.9375rem; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 0.25rem 0 0; }
+/* Label on top, number at the foot of its cell: when "found by a gate" wraps, the three numbers
+   in a row still share a line. */
+.stats div { margin: 0; display: flex; flex-direction: column; justify-content: space-between; }
+.stats dt { color: var(--muted); font-size: 0.8125rem; } .stats dd { margin: 0; font-size: 1.125rem; font-weight: 650; }
+.stats .eye dd { color: var(--eye); } .stats .gate dd { color: var(--gate); }
+.note { margin: 0; color: var(--muted); font-size: 0.9375rem; }
+.links { display: flex; flex-wrap: wrap; gap: 0 1.25rem; margin: auto 0 0; padding-top: 0.5rem; font-weight: 600; }
+/* 44px tall, like every text link on the landing page (AAA), and never broken inside: a link that
+   wraps leaves a word alone on its own line. A card's title link is left its own height: it goes
+   where "Open the site" goes, which is the 44px target (WCAG's "equivalent" exception), and a
+   44px box around a one-line title set it further from its subtitle than a two-line one. */
+.links a, .kicker a { display: inline-flex; align-items: center; min-height: 44px; }
+/* A ring around the target, clear of its text, in the accent both schemes already carry. */
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.links a, footer a { white-space: nowrap; }
+/* The Japanese titles carry lang="ja", so they break between phrases, not inside a word. */
+:lang(ja) { word-break: auto-phrase; }
+.method { margin-top: 3.5rem; max-width: 46rem; }
+.method h2 { font-size: 1.375rem; margin: 0 0 0.75rem; }
+.method p, .method li { color: var(--muted); }
+footer { margin-top: 3rem; color: var(--muted); font-size: 0.875rem; }
+</style>
+</head>
+<body>
+<main>
+<p class="kicker"><a href="../">vlmkit</a> · demo sites</p>
+<h1>Sites built by agents, and how each one was judged</h1>
+<p class="lede">Each demo site was built from a one-page brief by an agent using vlmkit's gates and its own eyes, and the landing page was reviewed the same way. Next to each page is its judgment log: every gate run with its whole output, every screenshot that was looked at with what was seen in it, and whether each defect was found by a gate or only by looking.</p>
+<ul class="totals"><li><b>7</b>logged pages</li><li><b>645</b>gate runs</li><li><b>1342</b>screens looked at</li><li><b>127</b>defects found by eye</li><li><b>43</b>defects found by a gate</li></ul>
+<ul class="grid"><li class="card"><a href="../" tabindex="-1" aria-hidden="true"><img src="../judgment/shots/S73-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2><a href="../">vlmkit landing page</a></h2><p class="pattern">product landing page (review) · English</p><dl class="stats"><div><dt>rounds</dt><dd>4</dd></div><div><dt>gate runs</dt><dd>119</dd></div><div><dt>screens seen</dt><dd>624</dd></div><div class="eye"><dt>found by eye</dt><dd>31</dd></div><div class="gate"><dt>found by a gate</dt><dd>3</dd></div><div><dt>looks</dt><dd>108</dd></div></dl><p class="links"><a href="../">Open the site</a><a href="../judgment/">How it was judged</a></p></div></li><li class="card"><a href="../solitaire/" tabindex="-1" aria-hidden="true"><img src="../demo-solitaire.png" width="1024" height="660" alt="" loading="lazy"></a><div class="body"><h2><a href="../solitaire/">Klondike solitaire</a></h2><p class="pattern">game — drag and drop and animation · English</p><p class="note">Judged before the judgment log existed. Its README's table records which defects the gates, the tests and screenshots found — without the pictures.</p><p class="links"><a href="../solitaire/">Open the site</a><a href="https://github.com/mizchi/vlmkit/tree/main/examples/solitaire#what-the-gates-found">How it was judged</a></p></div></li><li class="card"><a href="./checkout/" tabindex="-1" aria-hidden="true"><img src="./checkout/judgment/shots/S44-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2><a href="./checkout/">Pantry Club checkout</a></h2><p class="pattern">multi-step form / checkout · English</p><dl class="stats"><div><dt>rounds</dt><dd>5</dd></div><div><dt>gate runs</dt><dd>72</dd></div><div><dt>screens seen</dt><dd>84</dd></div><div class="eye"><dt>found by eye</dt><dd>12</dd></div><div class="gate"><dt>found by a gate</dt><dd>4</dd></div><div><dt>looks</dt><dd>47</dd></div></dl><p class="links"><a href="./checkout/">Open the site</a><a href="./checkout/judgment/">How it was judged</a></p></div></li><li class="card"><a href="./dashboard/" tabindex="-1" aria-hidden="true"><img src="./dashboard/judgment/shots/S42-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2><a href="./dashboard/">Keel Analytics — Overview</a></h2><p class="pattern">SaaS analytics dashboard (app shell) · English</p><dl class="stats"><div><dt>rounds</dt><dd>5</dd></div><div><dt>gate runs</dt><dd>56</dd></div><div><dt>screens seen</dt><dd>64</dd></div><div class="eye"><dt>found by eye</dt><dd>11</dd></div><div class="gate"><dt>found by a gate</dt><dd>5</dd></div><div><dt>looks</dt><dd>44</dd></div></dl><p class="links"><a href="./dashboard/">Open the site</a><a href="./dashboard/judgment/">How it was judged</a></p></div></li><li class="card"><a href="./docs/" tabindex="-1" aria-hidden="true"><img src="./docs/judgment/shots/S60-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2><a href="./docs/">Quarry documentation</a></h2><p class="pattern">documentation site · English</p><dl class="stats"><div><dt>rounds</dt><dd>5</dd></div><div><dt>gate runs</dt><dd>163</dd></div><div><dt>screens seen</dt><dd>235</dd></div><div class="eye"><dt>found by eye</dt><dd>21</dd></div><div class="gate"><dt>found by a gate</dt><dd>8</dd></div><div><dt>looks</dt><dd>63</dd></div></dl><p class="links"><a href="./docs/">Open the site</a><a href="./docs/judgment/">How it was judged</a></p></div></li><li class="card"><a href="./kanban/" tabindex="-1" aria-hidden="true"><img src="./kanban/judgment/shots/S57-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2><a href="./kanban/">Sprintboard</a></h2><p class="pattern">interactive app — kanban board with drag and drop · English</p><dl class="stats"><div><dt>rounds</dt><dd>5</dd></div><div><dt>gate runs</dt><dd>89</dd></div><div><dt>screens seen</dt><dd>68</dd></div><div class="eye"><dt>found by eye</dt><dd>13</dd></div><div class="gate"><dt>found by a gate</dt><dd>8</dd></div><div><dt>looks</dt><dd>59</dd></div></dl><p class="links"><a href="./kanban/">Open the site</a><a href="./kanban/judgment/">How it was judged</a></p></div></li><li class="card"><a href="./magazine/" tabindex="-1" aria-hidden="true"><img src="./magazine/judgment/shots/S39-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2 lang="ja"><a href="./magazine/">ほとり — 海辺の町の古本屋が、夜だけ店を開ける理由</a></h2><p class="pattern">editorial long-form article · Japanese</p><dl class="stats"><div><dt>rounds</dt><dd>6</dd></div><div><dt>gate runs</dt><dd>71</dd></div><div><dt>screens seen</dt><dd>150</dd></div><div class="eye"><dt>found by eye</dt><dd>26</dd></div><div class="gate"><dt>found by a gate</dt><dd>11</dd></div><div><dt>looks</dt><dd>43</dd></div></dl><p class="links"><a href="./magazine/">Open the site</a><a href="./magazine/judgment/">How it was judged</a></p></div></li><li class="card"><a href="./shop/" tabindex="-1" aria-hidden="true"><img src="./shop/judgment/shots/S58-1.webp" width="1280" height="800" alt="" loading="lazy"></a><div class="body"><h2 lang="ja"><a href="./shop/">汐見窯 マグカップ 青磁</a></h2><p class="pattern">e-commerce product page · Japanese</p><dl class="stats"><div><dt>rounds</dt><dd>5</dd></div><div><dt>gate runs</dt><dd>75</dd></div><div><dt>screens seen</dt><dd>117</dd></div><div class="eye"><dt>found by eye</dt><dd>13</dd></div><div class="gate"><dt>found by a gate</dt><dd>4</dd></div><div><dt>looks</dt><dd>60</dd></div></dl><p class="links"><a href="./shop/">Open the site</a><a href="./shop/judgment/">How it was judged</a></p></div></li></ul>
+<section class="method" aria-labelledby="method-title">
+<h2 id="method-title">How the logs were kept</h2>
+<p>Every log was written by <a href="https://github.com/mizchi/vlmkit/blob/main/examples/sites/judge.mjs">one small tool</a> as the work happened, under <a href="https://github.com/mizchi/vlmkit/blob/main/examples/sites/PROTOCOL.md">one protocol</a>:</p>
+<ul>
+<li>a gate runs through it, so its exit code and its whole output are kept rather than a summary of them;</li>
+<li>a screenshot is taken through it, one screen per image, and a look is recorded against the image it describes; each finished round keeps the pictures of one full-page walk per width, so you can open them and disagree;</li>
+<li>a defect must name the look or the gate run that found it, and a fix must be checked by a later look or run before the log can be marked done.</li>
+</ul>
+</section>
+<footer>Generated by <code>examples/sites/gallery.mjs</code> from each page's <code>judgment.sqlite</code>. <a href="./judgment/">How this page was judged</a>.</footer>
+</main>
+</body>
+</html>

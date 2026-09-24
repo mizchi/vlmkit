@@ -57,6 +57,7 @@ import { resolve } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
+import { ACCESSIBLE_NAME_JS } from "./accessible-name.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
@@ -85,7 +86,10 @@ export interface GroundingTargetSample {
   tag: string;
   /** ARIA role, explicit or implicit. `generic` for `[onclick]` / `[tabindex]` with no role. */
   role: string;
-  /** Accessible name: aria-label / aria-labelledby / text / value / placeholder / title. */
+  /**
+   * Accessible name, from the shared `ACCESSIBLE_NAME_JS`. This script had its own, which used a
+   * field's VALUE and never read `<label>`, so a labelled radio came out as `t1 radio "2p3m"`.
+   */
   name: string;
   /**
    * Text actually PAINTED inside the box — `innerText`, so display:none subtrees
@@ -697,6 +701,7 @@ export function findDisambiguator(samples: GroundingTargetSample[]): string[] | 
 /** In-page collector. */
 export const COLLECT_GROUNDING_SCRIPT = `(() => {
   ${STABLE_SELECTOR_JS}
+  ${ACCESSIBLE_NAME_JS}
 
   // Leaf roles only. A \`listbox\` or \`tablist\` is a container an agent aims
   // INTO, and reporting the container as its own target would double every
@@ -735,22 +740,6 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
     const tabindex = el.getAttribute("tabindex");
     if (tabindex !== null && Number(tabindex) >= 0) return "generic";
     return "";
-  };
-
-  const accessibleName = (el) => {
-    const labelled = (el.getAttribute("aria-labelledby") || "")
-      .split(/\\s+/).filter(Boolean)
-      .map((id) => (document.getElementById(id) || {}).textContent || "")
-      .join(" ").trim();
-    return (el.getAttribute("aria-label")
-      || labelled
-      || (el.tagName === "INPUT" || el.tagName === "TEXTAREA"
-        ? (el.value || el.getAttribute("placeholder") || "")
-        : "")
-      || (el.innerText || el.textContent || "")
-      || el.getAttribute("title")
-      || (el.querySelector("img") || {}).alt
-      || "").replace(/\\s+/g, " ").trim().slice(0, 120);
   };
 
   const paintsGlyph = (el) => {
@@ -920,7 +909,7 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
       selector: stableSelector(el),
       tag: el.tagName.toLowerCase(),
       role,
-      name: accessibleName(el),
+      name: accessibleName(el).slice(0, 120),
       visibleText: (el.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 120),
       hasGlyph: paintsGlyph(el),
       bbox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },

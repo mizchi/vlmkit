@@ -28,9 +28,8 @@
  *   vlmkit check design <html-or-url> [--min-reuse 3] [--json] [--advisory]
  */
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -38,9 +37,11 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 import {
   type SelectorAllowRule,
   parseSelectorAllowRules,
+  selectorAllowFilter,
 } from "../inspect/selector-exemption.ts";
 
 /** One visible element's style signature within its inferred role. */
@@ -279,21 +280,8 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
       throw new Error('invalid --exclude selector "' + selector + '": ' + error.message);
     }
   });
-  const visible = (el) => typeof el.checkVisibility === "function"
-    ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })
-    : getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
-  const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0; };
+  ${STYLE_SAMPLING_JS}
   const STATE = ":disabled,[aria-disabled=true],[aria-pressed=true],[aria-expanded=true],[aria-current],[aria-selected=true],:checked";
-  const path = (el) => {
-    const parts = [];
-    for (let cur = el; cur && cur !== document.body && parts.length < 3; cur = cur.parentElement) {
-      let p = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift(p + "#" + cur.id); break; }
-      if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\\s+/)[0];
-      parts.unshift(p);
-    }
-    return parts.join(">");
-  };
   // Text the browser paints that the DOM does not expose as a child text node:
   // input[type=button] paints its \`value\`, a text input paints its value and
   // placeholder, a select paints the chosen option. textContent is "" for all
@@ -499,8 +487,7 @@ export function judgeDesignPolicy(
   const minReuse = options.minReuse ?? DEFAULT_MIN_REUSE;
   const minInstances = options.minInstances ?? DEFAULT_MIN_INSTANCES;
   const outlierMax = options.outlierMaxUses ?? DEFAULT_OUTLIER_MAX_USES;
-  const allowRules = parseDesignAllowRules(options.allow ?? []);
-  const usedAllow = new Set<string>();
+  const allow = selectorAllowFilter(parseDesignAllowRules(options.allow ?? []));
 
   const byRole = new Map<string, DesignSample[]>();
   for (const s of input.samples) {
@@ -555,18 +542,13 @@ export function judgeDesignPolicy(
     // Allowed instances leave the arithmetic before it is done: a deliberate primary
     // button should not drag the role's reuse figure down, which is the whole reason
     // `--min-reuse` could not serve as this lever.
-    const allowedHere: { selector: string; reason: string }[] = [];
+    const allowedBefore = allow.allowed.length;
     for (const [key, group] of [...counts.entries()]) {
-      const kept = group.filter((sample) => {
-        const rule = allowRules.find((r) => sample.selector.includes(r.selector));
-        if (!rule) return true;
-        allowedHere.push({ selector: sample.selector, reason: rule.reason });
-        usedAllow.add(rule.raw);
-        return false;
-      });
+      const kept = group.filter((sample) => allow.keep(sample.selector));
       if (kept.length === 0) counts.delete(key);
       else counts.set(key, kept);
     }
+    const allowedHere = allow.allowed.slice(allowedBefore);
     const judged = [...counts.values()].flat();
 
     const signatures = counts.size;
@@ -757,7 +739,7 @@ export function judgeDesignPolicy(
     // A rule that matched nothing is stale or misspelled, and either way it is widening
     // the blind spot for a variant that is no longer there — the property `check
     // integrity --allow` established and the adoption report praised by name.
-    unusedAllow: allowRules.filter((r) => !usedAllow.has(r.raw)).map((r) => r.raw),
+    unusedAllow: allow.unused(),
     textFreeSamples,
     textFreeFolded,
     spacingValues: spacingCounts.size,
@@ -778,8 +760,9 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
     if (options.har) {
       await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     }
+    // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
-    const url = isUrl ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await page.goto(url, {
       waitUntil: options.waitUntil ?? "networkidle",
       timeout: options.timeout ?? 30000,

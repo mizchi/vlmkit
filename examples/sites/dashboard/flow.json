@@ -1,0 +1,130 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    {
+      "label": "Choose the 90-day range",
+      "do": { "action": "click", "selector": "label.seg:nth-of-type(3)" },
+      "expect": [
+        { "assert": "text", "selector": "#range-label", "contains": "Last 90 days" },
+        { "assert": "text", "selector": "#range-dates", "contains": "Jun 25 – Sep 22, 2026" },
+        { "assert": "text", "selector": "[data-kpi=visitors] .kpi-value", "contains": "143,800" },
+        { "assert": "text", "selector": "[data-kpi=conversion] .delta", "contains": "−2.0%" },
+        { "assert": "text", "selector": "[data-kpi=visitors] .delta-ctx", "contains": "vs previous 90 days" },
+        { "assert": "text", "selector": "#channels-total", "contains": "143,800" },
+        { "assert": "count", "selector": ".c-pt", "equals": 90 }
+      ]
+    },
+    {
+      "label": "Focus the latest day on the chart",
+      "do": { "action": "focus", "selector": ".c-pt[data-i=\"89\"]" },
+      "expect": [
+        { "assert": "visible", "selector": "#chart-tip" },
+        { "assert": "text", "selector": "#chart-tip", "contains": "Tue, Sep 22" }
+      ]
+    },
+    {
+      "label": "ArrowLeft moves one day back",
+      "do": { "action": "press", "key": "ArrowLeft" },
+      "expect": [
+        { "assert": "focused", "selector": ".c-pt[data-i=\"88\"]" },
+        { "assert": "attr", "selector": ".c-pt[data-i=\"88\"]", "name": "tabindex", "equals": "0" },
+        { "assert": "attr", "selector": ".c-pt[data-i=\"89\"]", "name": "tabindex", "equals": "-1" },
+        { "assert": "text", "selector": "#chart-tip", "contains": "Mon, Sep 21" }
+      ]
+    },
+    {
+      "label": "Home jumps to the first day of the range",
+      "do": { "action": "press", "key": "Home" },
+      "expect": [
+        { "assert": "focused", "selector": ".c-pt[data-i=\"0\"]" },
+        { "assert": "text", "selector": "#chart-tip", "contains": "Thu, Jun 25" }
+      ]
+    },
+    {
+      "label": "Sort the orders by amount",
+      "do": { "action": "click", "selector": "th.num .sort" },
+      "expect": [
+        { "assert": "attr", "selector": "th.num", "name": "aria-sort", "equals": "ascending" },
+        { "assert": "count", "selector": "th[aria-sort]", "equals": 1 },
+        { "assert": "text", "selector": "#orders-body tr:first-child .cell-amount", "contains": "$37.80" }
+      ]
+    },
+    {
+      "label": "Sort by amount again: largest first",
+      "do": { "action": "click", "selector": "th.num .sort" },
+      "expect": [
+        { "assert": "attr", "selector": "th.num", "name": "aria-sort", "equals": "descending" },
+        { "assert": "text", "selector": "#orders-body tr:first-child .cell-amount", "contains": "$318.90" },
+        { "assert": "text", "selector": "#orders-status", "contains": "Showing 1–6 of 12 orders" }
+      ]
+    },
+    {
+      "label": "Go to page 2",
+      "do": { "action": "click", "selector": ".pager-btn[data-page=\"2\"]" },
+      "expect": [
+        { "assert": "text", "selector": "#orders-status", "contains": "Showing 7–12 of 12 orders" },
+        { "assert": "attr", "selector": ".pager-btn[data-page=\"2\"]", "name": "aria-current", "equals": "page" },
+        { "assert": "attr", "selector": ".pager-btn[data-page=\"next\"]", "name": "aria-disabled", "equals": "true" },
+        { "assert": "attr", "selector": ".pager-btn[data-page=\"prev\"]", "name": "aria-disabled", "equals": "false" },
+        { "assert": "count", "selector": "#orders-body tr", "equals": 6 }
+      ]
+    },
+    {
+      "label": "Next does nothing on the last page",
+      "do": { "action": "click", "selector": ".pager-btn[data-page=\"next\"]", "force": true },
+      "expect": [
+        { "assert": "text", "selector": "#orders-status", "contains": "Showing 7–12 of 12 orders" }
+      ]
+    },
+    {
+      "label": "Collapse the sidebar to icons",
+      "do": { "action": "click", "selector": "#sidebar-toggle" },
+      "expect": [
+        { "assert": "attr", "selector": "html", "name": "data-sidebar", "equals": "collapsed" },
+        { "assert": "attr", "selector": "#sidebar-toggle", "name": "aria-expanded", "equals": "false" },
+        { "assert": "attr", "selector": "#sidebar-toggle", "name": "aria-label", "equals": "Expand sidebar" }
+      ]
+    },
+    {
+      "label": "Open the account menu from the keyboard",
+      "do": { "action": "press", "key": "Enter", "selector": "#user-button" },
+      "expect": [
+        { "assert": "visible", "selector": "#user-menu" },
+        { "assert": "attr", "selector": "#user-button", "name": "aria-expanded", "equals": "true" },
+        { "assert": "focused", "selector": "#user-menu > [role=menuitem]:first-child" }
+      ]
+    },
+    {
+      "label": "ArrowDown reaches the theme switch",
+      "do": { "action": "press", "key": "ArrowDown" },
+      "expect": [
+        { "assert": "focused", "selector": "#theme-item" }
+      ]
+    },
+    {
+      "label": "Switch to the light theme",
+      "do": { "action": "press", "key": "Enter" },
+      "expect": [
+        { "assert": "attr", "selector": "html", "name": "data-theme", "equals": "light" },
+        { "assert": "attr", "selector": "#theme-item", "name": "aria-checked", "equals": "true" },
+        { "assert": "visible", "selector": "#user-menu" }
+      ]
+    },
+    {
+      "label": "Escape closes the menu and returns focus",
+      "do": { "action": "press", "key": "Escape" },
+      "expect": [
+        { "assert": "hidden", "selector": "#user-menu" },
+        { "assert": "attr", "selector": "#user-button", "name": "aria-expanded", "equals": "false" },
+        { "assert": "focused", "selector": "#user-button" }
+      ]
+    },
+    {
+      "label": "Export CSV confirms the file",
+      "do": { "action": "click", "selector": "#export" },
+      "expect": [
+        { "assert": "text", "selector": "#toast", "contains": "keel-overview-last-90-days.csv" }
+      ]
+    }
+  ]
+}

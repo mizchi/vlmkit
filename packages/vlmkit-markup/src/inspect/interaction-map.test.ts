@@ -85,6 +85,18 @@ test("live disclosure raises no dead-disclosure issue", () => {
   assert.ok(!issues.some((i) => i.kind === "dead-disclosure"));
 });
 
+test("a control whose markup declares a no-op is not called inert for doing nothing", () => {
+  // The dashboard demo's pager: Previous is aria-disabled on page 1 and "Page 1" is
+  // aria-current, and both were reported as dead controls on every run (2026-09-23).
+  const silent = { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: false, focusMovedTo: null };
+  const issues = deriveInteractionIssues(mapOf(
+    element({ index: 0, key: "button|Previous", name: "Previous", declaresNoOp: true, activation: silent }),
+    element({ index: 1, key: "button|Page 1", name: "Page 1", declaresNoOp: true, activation: silent }),
+    element({ index: 2, key: "button|Save", name: "Save", activation: silent }),
+  ));
+  assert.deepEqual(issues.filter((i) => i.kind === "inert-control").map((i) => i.element), ['button "Save" (main>button)']);
+});
+
 test("broken aria-controls id is a suspect", () => {
   const issues = deriveInteractionIssues(mapOf(element({
     activation: { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: true, focusMovedTo: null, brokenControlsId: "nope" },
@@ -386,4 +398,38 @@ test("E2E: a focus indicator drawn on a DESCENDANT (APG span.focus pattern) is n
   assert.equal(btn.tabReachable, true);
   assert.equal(btn.focusIndicator, true); // descendant ring counts
   assert.ok(!deriveInteractionIssues(map).some((i) => i.kind === "no-focus-indicator"));
+});
+
+/**
+ * Four false readings from one round of demo sites (2026-09-23), on one page: controls named by
+ * their `value` or not at all although each has a `<label>` (checkout, shop); a native checkbox
+ * whose only effect is its own tick reported dead (checkout); a pager that swaps its rows and
+ * announces the new range reported dead because its layout did not change (dashboard); and a
+ * button that renames itself on activation read as focus moving (docs).
+ */
+test("E2E: labels name controls, and a tick, an announcement or a rename is not a dead control", { timeout: 240_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "interactions-names-"));
+  const page = join(dir, "page.html");
+  writeFileSync(page, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>names</title></head><body>
+    <label><input type="radio" name="plan" value="2p3m" checked> 2 people</label>
+    <label><input type="radio" name="plan" value="4p3m"> 4 people</label>
+    <label for="email">Email</label> <input id="email" type="email">
+    <label for="day">Delivery day</label> <select id="day"><option>Select a day</option><option>Monday</option></select>
+    <label for="qty">Quantity</label> <input id="qty" type="number" value="1" min="1" max="10">
+    <label><input type="checkbox" id="terms"> I agree to the terms</label>
+    <button id="next" onclick="document.getElementById('status').textContent = 'Page 2 of 2'">Next</button>
+    <p id="status" aria-live="polite">Page 1 of 2</p>
+    <button id="copy" onclick="this.textContent = 'Copied'">Copy</button>
+  </body></html>`);
+  const map = await buildInteractionMap({ source: page });
+  const named = map.elements.map((e) => `${e.role}|${e.name}`);
+  for (const key of ["radio|2 people", "radio|4 people", "textbox|Email", "combobox|Delivery day", "spinbutton|Quantity", "checkbox|I agree to the terms"]) {
+    assert.ok(named.includes(key), `${key} in ${JSON.stringify(named)}`);
+  }
+  const byName = new Map(map.elements.map((e) => [e.name, e]));
+  assert.deepEqual(byName.get("I agree to the terms")!.activation!.ariaDelta, { checked: ["false", "true"] });
+  assert.equal(byName.get("Copy")!.activation!.focusMovedWithin, undefined, "renaming itself is not focus moving");
+  assert.equal(byName.get("Next")!.activation!.liveRegionChanged, true);
+  const inert = deriveInteractionIssues(map).filter((i) => i.kind === "inert-control").map((i) => i.message);
+  assert.deepEqual(inert, [], "the tick, the announcement and the rename are all responses");
 });

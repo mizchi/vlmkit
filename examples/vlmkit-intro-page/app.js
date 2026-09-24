@@ -129,13 +129,32 @@ for (const tab of commandTabs) {
   });
 }
 
+/*
+ * Without clipboard access (permission denied, an insecure origin, an embedded viewer), the
+ * command is selected so that one keystroke copies it, and the status says so. The fallback used
+ * to print the bare command in the status line under THEN. It read as a third command and never
+ * said the copy had failed.
+ */
+function selectCommandText() {
+  const code = copyButton?.closest("[data-testid='install-command']")?.querySelector("code");
+  const selection = window.getSelection();
+  if (!code || !selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(code);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 copyButton?.addEventListener("click", async () => {
   const command = copyButton.dataset.copyInstall ?? "";
   try {
     await navigator.clipboard.writeText(command);
+    copyStatus.dataset.state = "copied";
     copyStatus.textContent = translate(locale, "start.copied");
   } catch {
-    copyStatus.textContent = command;
+    selectCommandText();
+    copyStatus.dataset.state = "failed";
+    copyStatus.textContent = translate(locale, "start.copyFailed");
   }
 });
 

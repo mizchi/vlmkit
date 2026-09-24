@@ -58,6 +58,12 @@ html {
   scroll-behavior: smooth;
 }
 
+/*
+ * Running text avoids a lone last word. Without this the phone ended the status line on "key",
+ * the start note on "once." and an install description on "npx.". The desktop ended paragraphs on
+ * "now:" and "needed.". `pretty` only moves the last few breaks, so one-line text is untouched.
+ * The hero h1 was measured with it and is unchanged. The headings set `balance` below.
+ */
 body {
   margin: 0;
   min-width: 320px;
@@ -65,6 +71,7 @@ body {
   color: var(--surface-text);
   line-height: 1.6;
   text-rendering: optimizeLegibility;
+  text-wrap: pretty;
 }
 
 .dogfood-notice {
@@ -119,6 +126,62 @@ dd {
   margin: 0;
 }
 
+/*
+ * Headings break by phrase, not by leftover width.
+ *
+ * An h3 used to inherit the body's 1.6 line-height, so a wrapped one ("Measure in a real /
+ * browser") read as two separate lines. `balance` also stops the one-word widows ("…from pixels /
+ * alone.", "Shared by people and / agents").
+ *
+ * The section h2s are two phrases split by a <br>. Balancing the h2 as a whole cannot help: its
+ * widest line is usually in the other phrase ("Measure the / page / you have now."). So each
+ * phrase is an inline-block and is balanced on its own ("Measure / the page"). The <br> stays,
+ * because the accessible name ("Measure the page you have now.") relies on it for its space.
+ * The hero h1 is deliberately not included. Balancing "VLM-assisted UI." on a phone picks the
+ * hyphen break ("VLM- / assisted UI."), which is worse than the natural wrap.
+ */
+h3 {
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+h2 > span[data-i18n] {
+  display: inline-block;
+  text-wrap: balance;
+}
+
+/*
+ * Japanese.
+ *
+ * `font-synthesis: none` on :root is right for the Latin faces, but in Japanese it removed the
+ * headings' weight wherever the Japanese face has no bold (common on Linux). "VLMで実装し、"
+ * rendered bold VLM next to thin kana. Synthesis only runs when no real bold face exists, so on a
+ * Mac (Hiragino W6) or on Windows (Yu Gothic Bold) nothing changes. The families are named after
+ * the Latin ones, so Latin glyphs keep coming from the system UI face.
+ *
+ * `auto-phrase` makes Japanese break between phrases, never inside a word, as the English does.
+ * It covers every piece of text. It began with headings and labels ("まず、いまのペー / ジを",
+ * "ブラウザで検証す / る。", "キー不 / 要"), then the display leads. The small descriptions still
+ * split loanwords at desktop width ("レスポンシ / ブ", "ペー / ジを再現", "モジュー / ル構成")
+ * under headings that no longer did. Measured with the rule on the whole document: inside-word
+ * breaks 10→2 at 1280, 16→2 at 375 and 19→4 at 320, two more lines per page, and no overflow.
+ * What remains is the segmenter's own misses ("振る / 舞い", "は / み出す").
+ * `line-break: strict` keeps ー and small kana from starting a line ("ワークフロ / ー").
+ */
+html:lang(ja) {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic UI",
+    "Yu Gothic", Meiryo, sans-serif;
+  font-synthesis: weight;
+  line-break: strict;
+  word-break: auto-phrase;
+  /* The emergency exit auto-phrase lacks: a phrase longer than the line may still break inside.
+     "やりたいことから、" is 324px at 36px. Unbreakable, it widened the one-column 04 intro grid
+     and overflowed a 320px viewport by 19px. `anywhere` also lowers min-content, which is what
+     sized that grid track. */
+  overflow-wrap: anywhere;
+}
+
 .skip-link {
   position: fixed;
   z-index: 20;
@@ -164,8 +227,10 @@ dd {
   gap: clamp(8px, 1.4vw, 20px);
 }
 
+/* No `overflow: hidden` here. It clipped the 4px-offset focus ring of both toggles down to a
+   3px sliver between them, so keyboard focus on JA/EN and on the theme switch looked the same.
+   The buttons sit inside the border, so there was nothing for it to clip. */
 .display-controls {
-  overflow: hidden;
   border: 1px solid var(--line-dark);
 }
 
@@ -252,11 +317,15 @@ dd {
   font-weight: 620;
 }
 
+/* min-width as well as min-height: "Skill" measured 41×44, the one header target under the 44px
+   (WCAG 2.5.5) the rest of the header meets. */
 .site-nav a,
 .header-link {
   display: inline-flex;
+  min-width: 44px;
   min-height: 44px;
   align-items: center;
+  justify-content: center;
   padding-right: 5px;
   padding-left: 5px;
   text-decoration: none;
@@ -280,15 +349,32 @@ dd {
   color: var(--chrome-text);
 }
 
+/*
+ * `max-width` includes the gutters. With max-width: var(--max) on this padded box, the content
+ * came out 2×gutter narrower than every section that caps its CONTENT at --max inside a padded
+ * full-width band (proof, demo, commands, skills). The page's left edge jumped from x=51 to x=71
+ * and back at 1280, by more on wider screens. .measurement-strip, .workflow and .principle
+ * follow the same rule.
+ *
+ * Rows: the heading spans both columns, then copy | console, top-aligned so the CTAs stay high.
+ * `align-content` keeps the old vertical centring when the min-height leaves room. The column
+ * gap is unchanged. The rows are spaced by the heading's margin, so the grid's row gap is 0.
+ */
 .hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(390px, 0.9fr);
-  gap: clamp(44px, 6vw, 80px);
-  align-items: center;
-  max-width: var(--max);
+  column-gap: clamp(44px, 6vw, 80px);
+  align-content: center;
+  align-items: start;
+  max-width: calc(var(--max) + 2 * var(--gutter));
   min-height: min(720px, calc(100svh - 102px));
   margin: 0 auto;
   padding: clamp(68px, 8vw, 104px) var(--gutter);
+}
+
+.hero-heading {
+  grid-column: 1 / -1;
+  margin-bottom: 28px;
 }
 
 .eyebrow,
@@ -314,8 +400,9 @@ dd {
   color: var(--acid);
 }
 
+/* No max-width. The h1 now has the whole row, and a 760px cap would re-wrap "Verified in the
+   browser." (~835px at 66.56px in a wide sans) onto a lone "browser." line. */
 .hero h1 {
-  max-width: 760px;
   font-size: clamp(44px, 5.2vw, 68px);
   line-height: 1.04;
   letter-spacing: -0.035em;
@@ -328,7 +415,6 @@ dd {
 
 .hero-lead {
   max-width: 620px;
-  margin-top: 28px;
   color: rgba(241, 240, 232, 0.73);
   font-size: clamp(15px, 1.35vw, 18px);
   line-height: 1.7;
@@ -381,12 +467,18 @@ dd {
   overflow-wrap: anywhere;
 }
 
+/* The label and the command are two flex items. When they do not fit on one line, the whole command
+   drops to its own line. Inline, a phone broke it inside the URL ("…aka.ms/apm-" / "unix | sh").
+   The 13px column gap is the old space plus the 7px margin, so a desktop is unchanged. */
 .hero-bootstrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 13px;
   margin-top: 10px;
 }
 
 .hero-bootstrap code {
-  margin-left: 7px;
   color: rgba(241, 240, 232, 0.72);
 }
 
@@ -489,9 +581,13 @@ dd {
   content: "RECORDED RUN";
 }
 
+/* gap + wrap: on a phone the two labels met with ~6px between them and read as one phrase,
+   "SCREENSHOT → HTML HAIKU / 4 ROUNDS". */
 .hero-console figcaption {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 4px 16px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--line-dark);
   color: rgba(241, 240, 232, 0.54);
@@ -616,7 +712,7 @@ dd {
 .measurement-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  max-width: var(--max);
+  max-width: calc(var(--max) + 2 * var(--gutter));
   margin: 0 auto;
   padding: 0 var(--gutter) 28px;
   list-style: none;
@@ -655,7 +751,7 @@ dd {
   display: grid;
   grid-template-columns: minmax(0, 0.83fr) minmax(420px, 1.17fr);
   gap: clamp(50px, 10vw, 150px);
-  max-width: var(--max);
+  max-width: calc(var(--max) + 2 * var(--gutter));
   margin: 0 auto;
 }
 
@@ -672,8 +768,11 @@ dd {
   color: var(--surface-muted-strong);
 }
 
+/* `.demo h2` was missing when the playable-demo section landed, so its heading rendered at the
+   browser default (24px) beside 55px everywhere else. */
 .section-heading h2,
 .proof h2,
+.demo h2,
 .commands-intro h2,
 .principle h2,
 .skills h2,
@@ -740,9 +839,12 @@ dd {
   background: #f7f7f7;
 }
 
+/* align-content: start. At 641–900px the caption is a grid cell as tall as the image beside it,
+   and its two rows used to split that height, putting the note ~170px below its title. */
 .proof-gallery figcaption {
   display: grid;
   grid-template-columns: auto 1fr;
+  align-content: start;
   column-gap: 12px;
   padding: 18px;
 }
@@ -772,12 +874,16 @@ dd {
   border-left: 1px solid var(--line);
 }
 
+/* The figures hang from the top, so every number in a row sits on one line. Centring lifted a
+   number by half a line whenever its label wrapped and a neighbour's did not ("1.40%" over "6/6" at
+   768 in ja, "≤2px" over "6/6" on a phone). The extra top padding keeps a one-line cell's figure
+   about where centring had it. The demo metrics below do the same. */
 .proof-metrics article {
   display: grid;
   min-height: 130px;
-  align-content: center;
+  align-content: start;
   gap: 4px;
-  padding: 22px;
+  padding: 32px 22px 22px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -1008,9 +1114,9 @@ dd {
 .demo-metrics li {
   display: grid;
   min-height: 104px;
-  align-content: center;
+  align-content: start;
   gap: 4px;
-  padding: 18px;
+  padding: 24px 18px 18px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -1147,6 +1253,13 @@ dd {
   color: var(--chrome-text);
 }
 
+/* In dark theme this band (#111715) sat between two #131916 sections, and 03 → 04 → 05 read as
+   one field with no edge. The chrome colour and a hairline give it back the band it is in light. */
+html[data-theme="dark"] .commands {
+  border-block: 1px solid var(--chrome-line);
+  background: var(--chrome);
+}
+
 .commands-intro,
 .command-deck {
   max-width: var(--max);
@@ -1169,14 +1282,24 @@ dd {
   color: rgba(241, 240, 232, 0.63);
 }
 
+/*
+ * 34fr / 66fr, not 0.34fr / 0.66fr: the same ratio, but it always fills the row. When the first
+ * track clamps to 260px (a deck under ~765px wide, i.e. tablets), the fr left over is 0.66. Below
+ * 1, the grid hands out only 66% of the remaining width, and a ~150px dead band ran down the
+ * right of the deck.
+ */
 .command-deck {
   display: grid;
-  grid-template-columns: minmax(260px, 0.34fr) minmax(0, 0.66fr);
+  grid-template-columns: minmax(260px, 34fr) minmax(0, 66fr);
   margin-top: 64px;
   border: 1px solid var(--line-dark);
 }
 
+/* Above the terminal in paint order. Grid items paint atomically in DOM order, so the terminal
+   covered the right edge of a focused tab's ring and left only two horizontal bars of it. */
 .command-tabs {
+  position: relative;
+  z-index: 1;
   display: grid;
   align-content: start;
   border-right: 1px solid var(--line-dark);
@@ -1256,6 +1379,12 @@ dd {
   font-size: 12px;
 }
 
+/* The scenario lines are padded into columns ("copy       PASS"). Normal white-space collapsed the
+   padding, so the second column started at a different x on every line. */
+.terminal-output > span {
+  white-space: pre-wrap;
+}
+
 .terminal-verdict {
   margin-top: 8px;
   color: var(--acid);
@@ -1263,7 +1392,7 @@ dd {
 }
 
 .principle {
-  max-width: var(--max);
+  max-width: calc(var(--max) + 2 * var(--gutter));
   margin: 0 auto;
 }
 
@@ -1344,13 +1473,23 @@ dd {
   color: var(--surface-text);
 }
 
+/* 82fr / 118fr for the same reason as the command deck: at 901–~990px the second track clamps
+   to 460px, and a leftover 0.82fr left ~50px of the row empty on the right. */
 .skills-layout {
   display: grid;
-  grid-template-columns: minmax(0, 0.82fr) minmax(460px, 1.18fr);
+  grid-template-columns: minmax(0, 82fr) minmax(460px, 118fr);
   gap: clamp(50px, 9vw, 130px);
   max-width: var(--max);
   margin: 0 auto;
   align-items: start;
+}
+
+/* The catalog and installers run ~2,000px down the right column. Without this, the left column
+   was empty for two whole screens under a ~450px intro. The intro stays in view instead, and it
+   is released when the section ends. */
+.skills-intro {
+  position: sticky;
+  top: 40px;
 }
 
 .skills-intro > p:not(.section-number, .skills-note) {
@@ -1379,9 +1518,12 @@ dd {
   min-width: 0;
 }
 
+/* One column at every width: the routing examples sit under the description as full-width rows.
+   Beside it they had a ~200px column, and each quote was squeezed into ~50px next to its chip
+   ("“Turn / this / spec / into / stable / tests.”"). */
 .skill-entry {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
   padding: clamp(24px, 4vw, 38px);
   border: 1px solid var(--line);
@@ -1409,10 +1551,14 @@ dd {
   font-size: 13px;
 }
 
+/* margin and padding reset too: list-style alone left the UA's 40px padding-left on the <ul>,
+   which indented the rows from the card's own text. */
 .routing-examples {
   display: grid;
   gap: 8px;
   align-content: center;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
@@ -1553,11 +1699,21 @@ dd {
   overflow-wrap: anywhere;
 }
 
+/*
+ * 85fr / 115fr: the fr fix from .command-deck. At ~920px the 450px minimum clamps, and a
+ * leftover 0.85fr left ~48px empty on the right.
+ * The inline padding keeps the content on the page's --max rail once the viewport is wider than
+ * --max plus the gutters. This band is full-bleed, so it cannot cap its own width the way
+ * .workflow does, and on a wide screen its text sat at the gutter while the sections above
+ * started ~44px further in.
+ */
 .start {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(450px, 1.15fr);
+  grid-template-columns: minmax(0, 85fr) minmax(450px, 115fr);
   gap: clamp(50px, 8vw, 120px);
   align-items: center;
+  padding-right: max(var(--gutter), calc((100% - var(--max)) / 2));
+  padding-left: max(var(--gutter), calc((100% - var(--max)) / 2));
   border-top: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--surface-text);
@@ -1621,9 +1777,20 @@ dd {
   background: var(--paper);
 }
 
+/* In dark theme --ink (#111715) on the panel's --surface (#131916) is ~1:1. The page's closing
+   command lost its bar, and COPY floated. The skill command bars get the same edge for
+   consistency. */
+html[data-theme="dark"] .install-command,
+html[data-theme="dark"] .skill-command {
+  background: var(--chrome);
+  box-shadow: inset 0 0 0 1px var(--chrome-line);
+}
+
+/* baseline: the 9px THEN label sat above the 12px command's baseline when top-aligned. */
 .install-next {
   display: grid;
   grid-template-columns: auto 1fr;
+  align-items: baseline;
   gap: 14px;
   margin-top: 14px;
   color: var(--surface-muted-strong);
@@ -1636,12 +1803,21 @@ dd {
   letter-spacing: 0.08em;
 }
 
+/* padding-bottom so a message does not sit on the docs button below it. With no message, the
+   min-height (box-sizing: border-box) keeps the empty line at the same 28px. */
 .copy-status {
   min-height: 28px;
   padding-top: 8px;
+  padding-bottom: 8px;
   color: var(--green-text);
   font-size: 12px;
   font-weight: 750;
+}
+
+/* A failure is not a success: muted ink, not the "done" green. */
+.copy-status[data-state="failed"] {
+  color: var(--surface-muted-strong);
+  font-weight: 650;
 }
 
 .button-dark {
@@ -1667,20 +1843,47 @@ dd {
 }
 
 .site-footer p {
-  /* 0.46 measured 4.25:1. Nine-pixel monospace is exactly the text that needs the floor
-     most, not least. */
+  /* 0.46 measured 4.25:1. Small monospace is exactly the text that needs the floor most, not
+     least. 11px, not 9: the tagline is the page's closing line, and at 9px it read as fine print. */
   color: rgba(241, 240, 232, 0.52);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.04em;
+  /* At 11px the tagline no longer fits a phone's 335px and wrapped "…Ship with / proof.". */
+  text-wrap: balance;
 }
 
-.site-footer p:last-child {
+.site-footer > p:last-child {
   justify-self: end;
 }
 
 .brand-footer {
   font-size: 18px;
+}
+
+/* The tagline and, under it, the links to the demo sites and to this page's judgment log. The
+   centre column is sized to the tagline, so the links fit under it at every width the three
+   columns hold; beside the licence they had the right column's leftover and broke mid-link. */
+.footer-center {
+  display: grid;
+  justify-items: center;
+  /* Room for the focus ring, which is drawn 7px outside a link's 44px box (3px outline, 4px
+     offset): with no gap it ran through the tagline above. */
+  gap: 10px;
+}
+
+.site-footer .footer-links a {
+  /* Underlined, and at the tagline's ink rather than dimmer: a link in fine print still has to
+     read as one by more than its colour. Never broken inside: "How this page / was judged"
+     read as two links. 44px tall like every other text link here, so the page's touch targets
+     meet AAA without leaning on the inline exception. */
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  white-space: nowrap;
 }
 
 @keyframes pulse {
@@ -1689,8 +1892,11 @@ dd {
 }
 
 @media (max-width: 900px) {
+  /* padding-top: in two rows, row 1 is exactly as tall as the controls group, so the group sat
+     flush against the header's top edge while the brand was centred. */
   .site-header {
     grid-template-columns: 1fr auto;
+    padding-top: 8px;
   }
 
   /*
@@ -1708,11 +1914,14 @@ dd {
     display: none;
   }
 
+  /* margin-left -5px cancels the link's own 5px padding-left, so "Playable demo" starts on the
+     brand's edge rather than 5px inside it. */
   .site-nav {
     grid-column: 1 / -1;
     grid-row: 2;
     gap: 0;
     margin-top: -4px;
+    margin-left: -5px;
     padding-bottom: 8px;
     font-size: 12px;
   }
@@ -1738,8 +1947,18 @@ dd {
     min-height: auto;
   }
 
+  /* The grid's row gap is 0 now that the heading is a row of its own, so the space between the
+     copy and the console that the gap used to give is a margin. */
   .hero-console {
     width: min(100%, 620px);
+    margin-top: clamp(44px, 6vw, 80px);
+  }
+
+  /* One column: the label is spaced by its own 28px margin, as in 03, 04 and 06. The column gap
+     would otherwise stack on it as a 40–61px row gap. */
+  .proof-heading,
+  .demo-heading {
+    row-gap: 0;
   }
 
   .proof-gallery,
@@ -1759,9 +1978,12 @@ dd {
     margin-top: 18px;
   }
 
+  /* The caption column's floor is 220px, so "参照スクリーンショット" (154px at 14px, one phrase)
+     fits on a line at every tablet width. With a 180px floor it had 120–148px and broke inside
+     the word ("参照スクリーンショッ / ト" at 768). The screenshot gives up at most 40px, at 641. */
   .proof-gallery figure {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr);
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.42fr);
   }
 
   .proof-shot {
@@ -1788,6 +2010,10 @@ dd {
   .skills-layout {
     grid-template-columns: 1fr;
     gap: 56px;
+  }
+
+  .skills-intro {
+    position: static;
   }
 
   .skill-entry,
@@ -1844,9 +2070,12 @@ dd {
   }
 
   .hero-grid {
-    gap: 70px;
     padding-top: 72px;
     padding-bottom: 82px;
+  }
+
+  .hero-console {
+    margin-top: 70px;
   }
 
   .hero h1 {
@@ -1959,11 +2188,22 @@ dd {
     width: 100%;
   }
 
+  /* The quote over its skill: beside an 18-character chip, the quote was left ~140px and broke
+     into three short lines. */
+  .routing-examples li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
   .site-footer {
     grid-template-columns: 1fr;
   }
 
-  .site-footer p:last-child {
+  .footer-center {
+    justify-items: start;
+  }
+
+  .site-footer > p:last-child {
     justify-self: start;
   }
 }

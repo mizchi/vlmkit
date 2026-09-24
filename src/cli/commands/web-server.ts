@@ -20,6 +20,8 @@
  *     blamed on the tool having no `webServer` at all.
  */
 import { type ChildProcess, spawn } from "node:child_process";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { resolve } from "node:path";
 import type { GateWebServer } from "@mizchi/vlmkit-core/gate-config.ts";
 import { shouldReuseExistingServer } from "@mizchi/vlmkit-core/gate-config.ts";
@@ -28,6 +30,8 @@ import { DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.t
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 250;
+/** One probe's patience: a server that accepts the connection and never answers is not serving. */
+const PROBE_TIMEOUT_MS = 2_000;
 
 export interface StartedWebServer {
   /** Stop the server. Safe to call more than once. */
@@ -44,15 +48,34 @@ export interface StartedWebServer {
  * path exists. A dev server whose root 404s while the routes work is common, and
  * refusing to proceed there would be a readiness probe that is wrong more often
  * than the thing it is checking.
+ *
+ * Asked over `node:http`, not `fetch`. The Fetch standard refuses a list of "bad
+ * ports" before it connects — 4190, 5060, 6000, 6665-6669, 10080 among them — so
+ * a server on one never "responded": the vlmkit landing page's own server is on
+ * 4190, and a config that reused it spawned a second copy, which died on
+ * EADDRINUSE and was reported as "the command itself is the thing to fix".
  */
-async function responds(url: string, signal?: AbortSignal): Promise<boolean> {
-  try {
-    const init: RequestInit = { redirect: "manual", ...(signal ? { signal } : {}) };
-    await fetch(url, init);
-    return true;
-  } catch {
-    return false;
-  }
+function responds(url: string): Promise<boolean> {
+  return new Promise((settle) => {
+    let target: URL;
+    try {
+      target = new URL(url);
+    } catch {
+      settle(false);
+      return;
+    }
+    const request = (target.protocol === "https:" ? httpsRequest : httpRequest)(
+      target,
+      { method: "GET", timeout: PROBE_TIMEOUT_MS },
+      (response) => {
+        response.resume();
+        settle(true);
+      },
+    );
+    request.on("timeout", () => request.destroy());
+    request.on("error", () => settle(false));
+    request.end();
+  });
 }
 
 async function waitForResponse(url: string, timeoutMs: number, child?: ChildProcess): Promise<void> {

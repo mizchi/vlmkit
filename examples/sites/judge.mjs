@@ -1,0 +1,1593 @@
+#!/usr/bin/env node
+/**
+ * The judgment log: how a demo site was judged, recorded while it was being judged.
+ *
+ *   node examples/sites/judge.mjs <site-dir> <command> [...]
+ *
+ * A page an agent builds comes with two kinds of evidence, and the intro page kept only one of
+ * them. Gate output is easy to keep and easy to trust. What the builder SAW is neither: the intro
+ * page's visual findings survive as sentences in commit messages, with no picture of what was
+ * looked at, so a reader cannot tell a look from a guess. This file makes both first-class:
+ *
+ * - `gate` runs a vlmkit gate in the site directory and keeps its exit code and its whole output,
+ *   verbatim. A paraphrase of a gate is a claim; the output is the evidence.
+ * - `shot` takes screenshots one screen per image, at native resolution — a whole page at 1280px
+ *   squeezed into one image is too small to read, for a model or a person — and `look` records
+ *   what was seen in them. A look names its shot, so a reader can open the same picture and
+ *   disagree with it. Once a round is done the log keeps the pictures of one full-page walk per
+ *   width (`keptShots`); the looks at the others stay, without them.
+ * - `defect` must say where it came from, a look or a gate run. That is what lets a log answer
+ *   "how many of these did only the eye find", which is the question the intro page cannot.
+ *
+ * `check` is the log's own done condition. `render` writes `JUDGMENT.md` (for reading in the
+ * repository) and `judgment/index.html` (the page published next to the site) from
+ * `judgment.sqlite`, and is deterministic, so a test can hold the committed render to the log.
+ *
+ * The log is append-only and written only by this file. Editing it by hand defeats the point.
+ */
+import { spawn } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, "..", "..");
+/** The CLI a `gate` runs. Overridable so the tests can stand a stub in for a real browser run. */
+const VLMKIT = () => process.env.JUDGE_VLMKIT ?? join(REPO, "dist", "vlmkit.mjs");
+
+/** The three widths `check integrity` measures by default, so a look and a gate see one page. */
+export const VIEWPORTS = Object.freeze({
+  desktop: Object.freeze({ width: 1280, height: 800 }),
+  tablet: Object.freeze({ width: 768, height: 1024 }),
+  mobile: Object.freeze({ width: 375, height: 812 }),
+});
+export const ACTORS = Object.freeze(["builder", "reviewer"]);
+/**
+ * Why something stays as it is. `accepted`: real, and left on purpose. `false-positive`: the gate
+ * was wrong about this page (say how you know). `superseded`: a later run replaced this command.
+ * `decision` and `tool` are free notes — a choice made, or a problem with the tooling itself.
+ */
+export const NOTE_KINDS = Object.freeze(["decision", "false-positive", "accepted", "superseded", "tool"]);
+const CLOSING_KINDS = new Set(["accepted", "false-positive", "superseded"]);
+/** Gate commands take `--ledger`, which is how `gate` gets a structured headline for free. */
+const GATE_GROUPS = new Set(["check", "scan", "stress", "verify"]);
+/** Shorter than this, a look cannot have said what was in the picture. */
+export const MIN_LOOK_CHARS = 80;
+const MAX_TILES = 16;
+/**
+ * Screens are WebP at this quality, encoded by Chromium from a lossless capture. The first round
+ * wrote JPEG at 78: 1245 screens across seven logs came to 63.4 MB, and the same screens as WebP
+ * at 0.75 are 34.4 MB with the text as legible (first measured on 12 checkout screens: 732 KB →
+ * 350 KB). The first round's logs were converted after the fact, and each says so in a `recode`
+ * event.
+ */
+const WEBP_QUALITY = 0.75;
+const PREFIX = Object.freeze({
+  round: "R",
+  gate: "G",
+  shot: "S",
+  look: "L",
+  defect: "D",
+  fix: "F",
+  verify: "V",
+  note: "N",
+});
+
+class JudgeError extends Error {}
+const fail = (message) => {
+  throw new JudgeError(message);
+};
+
+// ---------------------------------------------------------------------------------------------
+// The log
+
+/**
+ * Where a log lives. The log is ONE file, `judgment.sqlite`: every event in order, every gate
+ * run's whole output, and the screens it keeps. It used to be a directory of loose files — a JSONL
+ * log, a text file per gate run and a WebP per screen, 2107 files across the first eight logs —
+ * which made every judged page a change of a thousand files. `judgment/` next to it is only an
+ * export, never committed: the screens `shot` writes for the builder to Read, and the page
+ * `render` writes, both regenerated from the database.
+ */
+export function logPaths(siteDir) {
+  const dir = join(siteDir, "judgment");
+  return {
+    db: join(siteDir, "judgment.sqlite"),
+    dir,
+    shots: join(dir, "shots"),
+    html: join(dir, "index.html"),
+    md: join(siteDir, "JUDGMENT.md"),
+  };
+}
+
+/**
+ * `node:sqlite` is built into Node, so the log needs no dependency, and it still prints an
+ * ExperimentalWarning when it loads — a line of noise at the top of every command an agent runs.
+ * That one warning is dropped; any other passes through.
+ */
+let sqlite = null;
+function database() {
+  if (!sqlite) {
+    const emit = process.emitWarning;
+    process.emitWarning = (warning, ...rest) => {
+      if (!String(warning).startsWith("SQLite is an experimental feature")) emit.call(process, warning, ...rest);
+    };
+    try {
+      sqlite = process.getBuiltinModule("node:sqlite");
+    } finally {
+      process.emitWarning = emit;
+    }
+  }
+  return sqlite.DatabaseSync;
+}
+
+/** Commented, because `.schema` in an SQLite shell is where a reader first meets the file. */
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS events (
+  seq   INTEGER PRIMARY KEY, -- the order it happened in
+  kind  TEXT NOT NULL,       -- init round gate shot look defect fix verify note done recode
+  id    TEXT,                -- R1 G3 S12 L4 D2 F2 V2 N1; null for init, done and recode
+  round TEXT,                -- the round it belongs to; a round's own id for a round
+  json  TEXT NOT NULL        -- the whole event, as judge.mjs wrote it
+);
+CREATE TABLE IF NOT EXISTS outputs (
+  path TEXT PRIMARY KEY,     -- as its gate event names it: gates/G3.txt
+  text TEXT NOT NULL         -- the run's whole output, colour codes stripped
+);
+CREATE TABLE IF NOT EXISTS screens (
+  path TEXT PRIMARY KEY,     -- as its shot names it: shots/S12-1.webp
+  webp BLOB NOT NULL
+);`;
+
+/** Run `work` with the log's database open, and close it whatever happens. */
+function withLog(siteDir, work, { write = false } = {}) {
+  const DatabaseSync = database();
+  const db = new DatabaseSync(logPaths(siteDir).db, write ? {} : { readOnly: true });
+  try {
+    if (write) db.exec(SCHEMA);
+    return work(db);
+  } finally {
+    db.close();
+  }
+}
+
+export function readLog(siteDir) {
+  if (!existsSync(logPaths(siteDir).db)) return [];
+  return withLog(siteDir, (db) =>
+    db
+      .prepare("SELECT seq, json FROM events ORDER BY seq")
+      .all()
+      .map(({ seq, json }) => {
+        try {
+          return JSON.parse(json);
+        } catch {
+          throw new JudgeError(`judgment.sqlite event ${seq} is not JSON — was it edited by hand?`);
+        }
+      }),
+  );
+}
+
+/**
+ * Append one event with the gate output or the screens it names, in one transaction, so the log
+ * never names something it does not hold.
+ */
+function append(siteDir, event, { outputs = {}, screens = {} } = {}) {
+  withLog(
+    siteDir,
+    (db) => {
+      db.exec("BEGIN");
+      try {
+        const output = db.prepare("INSERT INTO outputs (path, text) VALUES (?, ?)");
+        for (const [path, text] of Object.entries(outputs)) output.run(path, text);
+        const screen = db.prepare("INSERT INTO screens (path, webp) VALUES (?, ?)");
+        for (const [path, bytes] of Object.entries(screens)) screen.run(path, bytes);
+        db.prepare("INSERT INTO events (kind, id, round, json) VALUES (?, ?, ?, ?)").run(
+          event.kind,
+          event.id ?? null,
+          event.kind === "round" ? event.id : (event.round ?? null),
+          JSON.stringify(event),
+        );
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+    { write: true },
+  );
+}
+
+/** Every gate output the log holds, by the path its gate event names. */
+export function readOutputs(siteDir) {
+  if (!existsSync(logPaths(siteDir).db)) return new Map();
+  return withLog(siteDir, (db) => new Map(db.prepare("SELECT path, text FROM outputs").all().map((r) => [r.path, r.text])));
+}
+
+/** The path of every screen the log holds. */
+export function storedScreens(siteDir) {
+  if (!existsSync(logPaths(siteDir).db)) return [];
+  return withLog(siteDir, (db) => db.prepare("SELECT path FROM screens ORDER BY path").all().map((r) => r.path));
+}
+
+/** One screen's WebP bytes, or null when the log does not hold it. */
+export function readScreen(siteDir, path) {
+  if (!existsSync(logPaths(siteDir).db)) return null;
+  return withLog(siteDir, (db) => {
+    const row = db.prepare("SELECT webp FROM screens WHERE path = ?").get(path);
+    return row ? Buffer.from(row.webp) : null;
+  });
+}
+
+/**
+ * Where a screen's file is now. The first round's logs wrote JPEG; `recode` re-encoded them as WebP
+ * and recorded that it did, rather than rewriting the shots it had logged — the log stays
+ * append-only, and a reader of it can see the pictures were converted after the fact.
+ */
+export function tileFile(events, file) {
+  return events.some((e) => e.kind === "recode" && e.to === "webp") ? file.replace(/\.jpg$/, ".webp") : file;
+}
+
+/** Every file the log's page needs published: the page itself and every screen the log keeps. */
+export function publishedFiles(events) {
+  return ["judgment/index.html", ...keptScreens(events).map((file) => `judgment/${file}`)];
+}
+
+/**
+ * The published half of a log, each file with the bytes to publish: its page, rendered, and the
+ * screens it keeps, read out of `judgment.sqlite` when asked for — so the Pages build and the local
+ * server publish what the log holds now. Empty for a directory with no log. The database itself is
+ * not published; the page already carries every gate output and every look.
+ */
+export function publishedJudgment(siteDir) {
+  if (!existsSync(logPaths(siteDir).db)) return [];
+  return publishedFiles(readLog(siteDir)).map((path) => ({
+    path,
+    bytes:
+      path === "judgment/index.html"
+        ? () => Buffer.from(renderSite(siteDir).html)
+        : () => readScreen(siteDir, path.slice("judgment/".length)) ?? fail(`judgment.sqlite holds no ${path}`),
+  }));
+}
+
+export function nextId(events, kind) {
+  return `${PREFIX[kind]}${events.filter((e) => e.kind === kind).length + 1}`;
+}
+
+const byId = (events, id) => events.find((e) => e.id === id);
+
+function currentRound(events) {
+  const round = events.filter((e) => e.kind === "round").at(-1);
+  if (!round) fail('start a round first: judge.mjs <site> round "first draft"');
+  return round;
+}
+
+function stamp(events, kind, fields) {
+  return { kind, id: nextId(events, kind), round: currentRound(events).id, t: new Date().toISOString(), ...fields };
+}
+
+/** Strip ANSI colour, keep only what a `\r` progress line finally showed, and drop this machine's path. */
+export function clean(text) {
+  return text
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+    .split("\n")
+    .map((line) => line.split("\r").at(-1))
+    .join("\n")
+    .replaceAll(`${REPO}/`, "")
+    .replaceAll(REPO, ".");
+}
+
+/**
+ * Where a recorded absolute path sits in this repository, whichever machine recorded it: the
+ * longest tail of at least two segments that exists here, with its query or fragment kept. Null
+ * for a path outside the repository (a scratch `--output-dir`), which is shown as it was typed.
+ */
+function repoRelative(path) {
+  const [bare] = path.split(/[?#]/);
+  const parts = bare.split("/");
+  // parts[0] is the empty string before the leading slash; parts[1] is never a repo-relative path.
+  for (let i = 2; i < parts.length - 1; i++) {
+    if (existsSync(join(REPO, ...parts.slice(i)))) return path.slice(parts.slice(0, i).join("/").length + 1);
+  }
+  return null;
+}
+
+/**
+ * A recorded command as a reader should see it: a path into the repository as `$PWD/…` (a
+ * `file://` URL) or repo-relative (a bare path). The root is found from the path itself rather
+ * than from this checkout's location, so a log renders to the same bytes on every machine: the
+ * first version replaced only this checkout's root, and CI, checked out elsewhere, rendered the
+ * recording machine's `/home/user/vlmkit` verbatim and found every committed log page stale.
+ * A URL's path (`http://host/sites/docs/`) is never touched.
+ */
+export const displayCommand = (cmd) =>
+  cmd.replace(/(file:\/\/)(\/[^\s'"]+)|(^|[\s'"=])(\/[^\s'"]+)/g, (whole, scheme, url, lead, bare) => {
+    const rel = repoRelative(url ?? bare);
+    if (rel === null) return whole;
+    return scheme ? `file://$PWD/${rel}` : `${lead}${rel}`;
+  });
+
+const shellQuote = (arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
+
+// ---------------------------------------------------------------------------------------------
+// Arguments
+
+/**
+ * Split argv into flags and positionals. `values` flags take the next argument; everything else
+ * starting with `--` is boolean. `-` alone is a positional (it means "read stdin").
+ */
+function parse(argv, { values = [], booleans = [] } = {}) {
+  const flags = {};
+  const rest = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    // Everything after a bare `--` is text, so a fix can say "--measure 42rem -> 36rem".
+    if (arg === "--") {
+      rest.push(...argv.slice(i + 1));
+      break;
+    }
+    if (!arg.startsWith("--")) {
+      rest.push(arg);
+      continue;
+    }
+    const name = arg.slice(2);
+    if (values.includes(name)) {
+      const value = argv[++i];
+      if (value === undefined) fail(`--${name} needs a value`);
+      flags[name] = value;
+    } else if (booleans.includes(name)) {
+      flags[name] = true;
+    } else {
+      fail(`unknown flag --${name} (text that starts with a dash goes after --, or in a heredoc with -)`);
+    }
+  }
+  return { flags, rest };
+}
+
+/** Free text: the remaining arguments joined, or stdin when the only one is `-` (for a heredoc). */
+function takeText(rest, what) {
+  const text = rest.length === 1 && rest[0] === "-" ? readFileSync(0, "utf8") : rest.join(" ");
+  const trimmed = text.trim();
+  if (!trimmed) fail(`${what} needs text — as arguments, or \`-\` and a heredoc`);
+  return trimmed;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Commands that only write the log
+
+function cmdInit(siteDir, argv) {
+  const { flags } = parse(argv, { values: ["title", "pattern", "brief"] });
+  if (!flags.title) fail('init needs --title "…"');
+  const events = readLog(siteDir);
+  if (events.some((e) => e.kind === "init")) fail("this site's log is already initialised");
+  const paths = logPaths(siteDir);
+  let brief = null;
+  if (flags.brief) {
+    const file = resolve(flags.brief);
+    if (!existsSync(file)) fail(`no brief at ${flags.brief}`);
+    brief = relative(siteDir, file);
+  }
+  append(siteDir, {
+    kind: "init",
+    t: new Date().toISOString(),
+    title: flags.title,
+    pattern: flags.pattern ?? null,
+    brief,
+  });
+  console.log(`[judge] log started: ${relative(process.cwd(), paths.db)}`);
+}
+
+function cmdRound(siteDir, argv) {
+  const { flags, rest } = parse(argv, { values: ["actor"] });
+  const events = readLog(siteDir);
+  if (!events.some((e) => e.kind === "init")) fail("run init first");
+  const previous = events.filter((e) => e.kind === "round").at(-1);
+  const actor = flags.actor ?? previous?.actor ?? "builder";
+  if (!ACTORS.includes(actor)) fail(`--actor must be one of ${ACTORS.join(", ")}`);
+  const title = takeText(rest, "round");
+  const event = { kind: "round", id: nextId(events, "round"), t: new Date().toISOString(), actor, title };
+  append(siteDir, event);
+  console.log(`[judge] ${event.id} (${actor}): ${title}`);
+}
+
+function parseShotRef(events, ref) {
+  const m = /^(S\d+)(?::(\d+))?$/.exec(ref ?? "");
+  if (!m) fail(`expected a shot id like S3 or S3:2 (tile 2), got ${JSON.stringify(ref)}`);
+  const shot = byId(events, m[1]);
+  if (!shot || shot.kind !== "shot") fail(`no shot ${m[1]} in this log`);
+  const tile = m[2] === undefined ? null : Number(m[2]);
+  if (tile !== null && (tile < 1 || tile > shot.tiles.length)) {
+    fail(`${m[1]} has ${shot.tiles.length} tile(s); there is no tile ${tile}`);
+  }
+  return { shot, tile };
+}
+
+function cmdLook(siteDir, argv) {
+  const { rest } = parse(argv);
+  const events = readLog(siteDir);
+  const { shot, tile } = parseShotRef(events, rest[0]);
+  if (!keptShots(events).has(shot.id)) {
+    fail(
+      `${shot.id}'s screens went when its round was done (a round keeps one full-page walk per width), so ` +
+        "nothing is left to have read — take the shot again and look at that.",
+    );
+  }
+  const text = takeText(rest.slice(1), "look");
+  if (text.length < MIN_LOOK_CHARS) {
+    fail(
+      `a look is the evidence that the picture was read — say what is in it (layout, hierarchy, ` +
+        `spacing, wrapping, colour, state, and anything off against the brief). ${text.length} ` +
+        `characters is not that; write at least ${MIN_LOOK_CHARS}.`,
+    );
+  }
+  const event = stamp(events, "look", { shot: shot.id, tile, text });
+  append(siteDir, event);
+  const covers = tile === null ? `all ${shot.tiles.length} tile(s)` : `tile ${tile}`;
+  console.log(`[judge] ${event.id} recorded for ${shot.id} (${covers})`);
+}
+
+function cmdDefect(siteDir, argv) {
+  const { flags, rest } = parse(argv, { values: ["from", "where"] });
+  const events = readLog(siteDir);
+  const source = byId(events, flags.from ?? "");
+  if (!source || (source.kind !== "look" && source.kind !== "gate")) {
+    fail(
+      "a defect needs --from <L#|G#>: the look that saw it or the gate run that reported it. " +
+        "If you noticed it some other way, take a shot of it and look first.",
+    );
+  }
+  const text = takeText(rest, "defect");
+  const event = stamp(events, "defect", {
+    from: source.id,
+    by: source.kind === "look" ? "eye" : "gate",
+    where: flags.where ?? null,
+    text,
+  });
+  append(siteDir, event);
+  console.log(`[judge] ${event.id} (found by ${event.by}, ${source.id}): ${text.split("\n")[0]}`);
+}
+
+function requireDefect(events, id) {
+  const defect = byId(events, id ?? "");
+  if (!defect || defect.kind !== "defect") fail(`no defect ${JSON.stringify(id)} in this log`);
+  return defect;
+}
+
+function cmdFix(siteDir, argv) {
+  const { rest } = parse(argv);
+  const events = readLog(siteDir);
+  const defect = requireDefect(events, rest[0]);
+  const text = takeText(rest.slice(1), "fix");
+  const event = stamp(events, "fix", { defect: defect.id, text });
+  append(siteDir, event);
+  console.log(`[judge] ${event.id} fixes ${defect.id} — now re-shoot or re-run, and verify ${defect.id} --by <L#|G#>`);
+}
+
+function cmdVerify(siteDir, argv) {
+  const { flags, rest } = parse(argv, { values: ["by"] });
+  const events = readLog(siteDir);
+  const defect = requireDefect(events, rest[0]);
+  const lastFix = events.filter((e) => e.kind === "fix" && e.defect === defect.id).at(-1);
+  if (!lastFix) fail(`${defect.id} has no fix to verify`);
+  const evidence = byId(events, flags.by ?? "");
+  if (!evidence || (evidence.kind !== "look" && evidence.kind !== "gate")) {
+    fail("verify needs --by <L#|G#>: the look or gate run that shows the fix working");
+  }
+  if (events.indexOf(evidence) < events.indexOf(lastFix)) {
+    fail(`${evidence.id} was recorded before ${lastFix.id} — evidence for a fix has to come after it`);
+  }
+  const text = rest.length > 1 ? takeText(rest.slice(1), "verify") : null;
+  const event = stamp(events, "verify", { defect: defect.id, by: evidence.id, text });
+  append(siteDir, event);
+  console.log(`[judge] ${event.id}: ${defect.id} verified by ${evidence.id}`);
+}
+
+function cmdNote(siteDir, argv) {
+  const { flags, rest } = parse(argv, { values: ["about", "kind"] });
+  const events = readLog(siteDir);
+  const noteKind = flags.kind ?? "decision";
+  if (!NOTE_KINDS.includes(noteKind)) fail(`--kind must be one of ${NOTE_KINDS.join(", ")}`);
+  if (flags.about && !byId(events, flags.about)) fail(`--about ${flags.about}: no such id in this log`);
+  if (CLOSING_KINDS.has(noteKind) && !flags.about) fail(`a ${noteKind} note must say --about which gate run or defect`);
+  const text = takeText(rest, "note");
+  const event = stamp(events, "note", { about: flags.about ?? null, noteKind, text });
+  append(siteDir, event);
+  console.log(`[judge] ${event.id} (${noteKind}${event.about ? ` about ${event.about}` : ""})`);
+}
+
+// ---------------------------------------------------------------------------------------------
+// gate
+
+function run(command, args, cwd, timeoutMs) {
+  return new Promise((resolvePromise) => {
+    const child = spawn(command, args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.on("data", (chunk) => (output += chunk));
+    child.stderr.on("data", (chunk) => (output += chunk));
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      resolvePromise({ code: timedOut ? 124 : (code ?? (signal ? 128 : 1)), output, timedOut });
+    });
+  });
+}
+
+async function cmdGate(siteDir, args) {
+  if (!args.length) fail("gate needs a vlmkit command, e.g. gate check integrity index.html");
+  const events = readLog(siteDir);
+  currentRound(events);
+  const id = nextId(events, "gate");
+  const scratch = mkdtempSync(join(tmpdir(), "judge-"));
+  const ledger = join(scratch, "ledger.jsonl");
+  const wantsLedger = GATE_GROUPS.has(args[0]) && !args.includes("--ledger") && !args.includes("--no-ledger");
+  const timeoutMs = Number(process.env.JUDGE_GATE_TIMEOUT_MS ?? 15 * 60_000);
+  const started = Date.now();
+  const result = await run(
+    process.execPath,
+    [VLMKIT(), ...args, ...(wantsLedger ? ["--ledger", ledger] : [])],
+    siteDir,
+    timeoutMs,
+  );
+  const ms = Date.now() - started;
+  let headline = [];
+  if (existsSync(ledger)) {
+    headline = readFileSync(ledger, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .map((entry) => ({ tool: entry.tool, ...entry.headline }));
+  }
+  rmSync(scratch, { recursive: true, force: true });
+
+  const text = clean(result.output) + (result.timedOut ? `\n[judge] killed after ${timeoutMs}ms\n` : "");
+  const output = `gates/${id}.txt`;
+  const verdict = text.split("\n").map((line) => line.trim()).find((line) => /^verdict:/i.test(line)) ?? null;
+  const event = stamp(events, "gate", {
+    cmd: ["vlmkit", ...args].map(shellQuote).join(" "),
+    exit: result.code,
+    ms,
+    verdict,
+    headline,
+    output,
+  });
+  append(siteDir, event, { outputs: { [output]: text } });
+  process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+  console.log(`[judge] ${id} recorded — exit ${result.code}, ${(ms / 1000).toFixed(1)}s, the whole output kept in judgment.sqlite`);
+  return result.code;
+}
+
+// ---------------------------------------------------------------------------------------------
+// shot
+
+function parseViewport(spec) {
+  if (VIEWPORTS[spec]) return { name: spec, ...VIEWPORTS[spec] };
+  const m = /^(\d+)x(\d+)$/.exec(spec);
+  if (!m) fail(`--viewport takes desktop, tablet, mobile or WxH, got ${JSON.stringify(spec)}`);
+  return { name: spec, width: Number(m[1]), height: Number(m[2]) };
+}
+
+/**
+ * Read `shot`'s arguments in order, because the steps before the shutter are a sequence: a
+ * `--click` then a `--press Tab` is not the same page as the other way round.
+ */
+export function parseShotArgs(argv) {
+  const options = {
+    page: null,
+    viewports: [],
+    full: false,
+    dark: false,
+    reducedMotion: false,
+    element: null,
+    scrollEl: null,
+    scale: 1,
+    label: null,
+    maxTiles: MAX_TILES,
+    steps: [],
+  };
+  const take = (i, flag) => {
+    const value = argv[i + 1];
+    if (value === undefined) fail(`${flag} needs a value`);
+    return value;
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    switch (arg) {
+      case "--viewport":
+        for (const spec of take(i, arg).split(",")) options.viewports.push(parseViewport(spec.trim()));
+        i++;
+        break;
+      case "--full":
+        options.full = true;
+        break;
+      case "--dark":
+        options.dark = true;
+        break;
+      case "--reduced-motion":
+        options.reducedMotion = true;
+        break;
+      case "--element":
+        options.element = take(i, arg);
+        i++;
+        break;
+      case "--scroll-el":
+        options.scrollEl = take(i, arg);
+        i++;
+        break;
+      case "--scale":
+        options.scale = Number(take(i, arg));
+        if (!(options.scale >= 1 && options.scale <= 3)) fail("--scale is 1, 2 or 3");
+        i++;
+        break;
+      case "--label":
+        options.label = take(i, arg);
+        i++;
+        break;
+      case "--max-tiles":
+        options.maxTiles = Number(take(i, arg));
+        i++;
+        break;
+      case "--click":
+      case "--hover":
+      case "--focus":
+      case "--press":
+      case "--type":
+      case "--scroll-to":
+      case "--wait":
+        options.steps.push({ do: arg.slice(2), arg: take(i, arg) });
+        i++;
+        break;
+      case "--fill": {
+        const selector = take(i, arg);
+        const value = argv[i + 2];
+        if (value === undefined) fail("--fill needs a selector and a value: --fill '#email' 'a@b.c'");
+        options.steps.push({ do: "fill", arg: selector, value });
+        i += 2;
+        break;
+      }
+      default:
+        if (arg.startsWith("--")) fail(`unknown shot flag ${arg}`);
+        if (options.page) fail(`one page per shot — got ${options.page} and ${arg}`);
+        options.page = arg;
+    }
+  }
+  if (!options.page) fail("shot needs a page: a file in the site (index.html, index.html?theme=dark) or a URL");
+  if (options.full && options.element) fail("--full and --element are different shots — take two");
+  if (!options.viewports.length) options.viewports.push({ name: "desktop", ...VIEWPORTS.desktop });
+  return options;
+}
+
+function pageUrl(siteDir, page) {
+  if (/^(https?|file):/.test(page)) return page;
+  const cut = page.search(/[?#]/);
+  const path = cut < 0 ? page : page.slice(0, cut);
+  const suffix = cut < 0 ? "" : page.slice(cut);
+  const file = resolve(siteDir, path);
+  if (!existsSync(file)) fail(`no file ${path} in ${relative(process.cwd(), siteDir) || "."}`);
+  return pathToFileURL(file).href + suffix;
+}
+
+async function settle(page) {
+  await page.evaluate(() => document.fonts?.ready).catch(() => {});
+  await page.waitForTimeout(400);
+  // A step that focuses or clicks on a page with `scroll-behavior: smooth` leaves the page still
+  // scrolling, and the shutter caught it mid-way (the landing review's S39 vs its element shot).
+  // Wait until the window and every scroller hold still for three frames, at most two seconds.
+  await page
+    .evaluate(
+      () =>
+        new Promise((done) => {
+          const read = () => {
+            let sum = window.scrollX * 7 + window.scrollY;
+            for (const el of document.querySelectorAll("*")) if (el.scrollTop || el.scrollLeft) sum += el.scrollTop * 3 + el.scrollLeft;
+            return sum;
+          };
+          let last = read();
+          let still = 0;
+          const started = performance.now();
+          const tick = () => {
+            const now = read();
+            still = now === last ? still + 1 : 0;
+            last = now;
+            if (still >= 3 || performance.now() - started > 2000) done();
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+    )
+    .catch(() => {});
+}
+
+async function doStep(page, step) {
+  const timeout = 5000;
+  const where = () => page.locator(step.arg).first();
+  try {
+    if (step.do === "click") await where().click({ timeout });
+    else if (step.do === "hover") await where().hover({ timeout });
+    else if (step.do === "focus") await where().focus({ timeout });
+    else if (step.do === "scroll-to") await where().scrollIntoViewIfNeeded({ timeout });
+    else if (step.do === "fill") await where().fill(step.value, { timeout });
+    else if (step.do === "press") await page.keyboard.press(step.arg);
+    else if (step.do === "type") await page.keyboard.type(step.arg);
+    else if (step.do === "wait") await page.waitForTimeout(Number(step.arg));
+  } catch (error) {
+    fail(`--${step.do} ${step.arg}: ${String(error.message).split("\n")[0]}`);
+  }
+  await page.waitForTimeout(250);
+}
+
+/**
+ * Where the next screen starts. A full viewport step would be right on a page with nothing pinned,
+ * and wrong on almost every real one: a sticky header covers the top of every screen after the
+ * first, so the strip of content that scrolled under it would never be in any picture. The step is
+ * the viewport minus what is pinned to its top and bottom edges (`insets`), never under half a
+ * screen, and the last screen sits flush with the end. `null` when this screen reached the end.
+ */
+export function nextOffset(y, total, view, insets = { top: 0, bottom: 0 }) {
+  if (y + view >= total) return null;
+  const step = Math.max(Math.round(view / 2), view - insets.top - insets.bottom);
+  return Math.min(y + step, total - view);
+}
+
+/**
+ * Heights pinned to the viewport's top and bottom edges right now: fixed or stuck elements at least
+ * half the viewport wide (a header, a bottom tab bar, a cookie banner — not a floating button),
+ * each capped at 40% of the screen so a full-screen overlay does not stall the walk.
+ */
+function measureInsets() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let top = 0;
+  let bottom = 0;
+  for (const el of document.querySelectorAll("body *")) {
+    const position = getComputedStyle(el).position;
+    if (position !== "fixed" && position !== "sticky") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < vw / 2 || r.height === 0 || r.bottom <= 0 || r.top >= vh) continue;
+    // A closed drawer is pinned too — translated off the side of the screen, or hidden. Counted,
+    // it capped the step at 60% of the screen and the docs phone walk took 12 screens for 7.
+    if (r.right <= 0 || r.left >= vw) continue;
+    const s = getComputedStyle(el);
+    if (s.visibility === "hidden" || Number(s.opacity) === 0) continue;
+    if (r.top <= 1) top = Math.max(top, r.bottom);
+    else if (r.bottom >= vh - 1) bottom = Math.max(bottom, vh - r.top);
+  }
+  return { top: Math.round(Math.min(top, vh * 0.4)), bottom: Math.round(Math.min(bottom, vh * 0.4)) };
+}
+
+/**
+ * PNG bytes → WebP bytes, by the browser's own encoder (no image dependency here). A blank page
+ * of the browser that took the shot decodes it into a canvas and encodes it back.
+ */
+async function encodeWebp(browser, bytes, quality = WEBP_QUALITY) {
+  const page = await browser.newPage();
+  try {
+    const b64 = await page.evaluate(
+      async ([data, q]) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${data}`;
+        await img.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        const blob = await new Promise((resolveBlob) => canvas.toBlob(resolveBlob, "image/webp", q));
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return btoa(bin);
+      },
+      [Buffer.from(bytes).toString("base64"), quality],
+    );
+    return Buffer.from(b64, "base64");
+  } finally {
+    await page.close();
+  }
+}
+
+async function capture(id, url, viewport, options) {
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  const tiles = [];
+  /** Each tile's WebP bytes, by the path the shot names it with. */
+  const images = {};
+  const errors = [];
+  let pageHeight = null;
+  let cutShort = false;
+  try {
+    const context = await browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      deviceScaleFactor: options.scale,
+      colorScheme: options.dark ? "dark" : "light",
+      reducedMotion: options.reducedMotion ? "reduce" : "no-preference",
+    });
+    const page = await context.newPage();
+    page.on("pageerror", (error) => errors.push(String(error.message)));
+    page.on("console", (message) => message.type() === "error" && errors.push(message.text()));
+    await page.goto(url, { waitUntil: "load" });
+    await settle(page);
+    for (const step of options.steps) await doStep(page, step);
+    await settle(page);
+
+    const file = (n) => `shots/${id}-${n}.webp`;
+    // `w` / `h` are CSS pixels, so a render can reserve each thumbnail's box before it loads.
+    const shoot = async (target, n, extra = {}, size = viewport) => {
+      const png = await target.screenshot({ type: "png" });
+      images[file(n)] = await encodeWebp(browser, png);
+      tiles.push({ file: file(n), w: Math.round(size.width), h: Math.round(size.height), ...extra });
+    };
+    if (options.element) {
+      const element = page.locator(options.element).first();
+      try {
+        await element.scrollIntoViewIfNeeded({ timeout: 5000 });
+      } catch {
+        fail(`--element ${options.element}: nothing on the page matches`);
+      }
+      await page.waitForTimeout(200);
+      const box = await element.boundingBox();
+      if (!box) fail(`--element ${options.element}: it has no box (display: none?)`);
+      await shoot(element, 1, {}, box);
+    } else if (options.full) {
+      const box = await page.evaluate((selector) => {
+        const el = selector ? document.querySelector(selector) : document.scrollingElement;
+        if (!el) return null;
+        return { total: el.scrollHeight, view: selector ? el.clientHeight : window.innerHeight };
+      }, options.scrollEl);
+      if (!box) fail(`--scroll-el ${options.scrollEl}: nothing on the page matches`);
+      pageHeight = box.total;
+      let y = 0;
+      for (let n = 1; y !== null && n <= options.maxTiles; n++) {
+        await page.evaluate(
+          ([selector, top]) => {
+            const el = selector ? document.querySelector(selector) : document.scrollingElement;
+            el.scrollTo({ top, behavior: "instant" });
+          },
+          [options.scrollEl, y],
+        );
+        // Scroll-linked effects (a reveal, a scroll-spy, a sticky header's shadow) get a frame to land.
+        await page.waitForTimeout(350);
+        // Inside a scroll container the page's own pinned bars do not cover the container's content.
+        const insets = options.scrollEl ? { top: 0, bottom: 0 } : await page.evaluate(measureInsets);
+        await shoot(page, n, { scrollY: y, ...(insets.top || insets.bottom ? { insets } : {}) });
+        y = nextOffset(y, box.total, box.view, insets);
+      }
+      // The cap ended the walk while there was still a next screen to take.
+      cutShort = y !== null;
+    } else {
+      await shoot(page, 1);
+    }
+  } finally {
+    await browser.close();
+  }
+  return { tiles, images, errors, pageHeight, cutShort };
+}
+
+/** Write screens into `judgment/`, the export the builder Reads them from. */
+function exportScreens(siteDir, images) {
+  const { dir } = logPaths(siteDir);
+  for (const [path, bytes] of Object.entries(images)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), bytes);
+  }
+}
+
+async function cmdShot(siteDir, argv) {
+  const options = parseShotArgs(argv);
+  const url = pageUrl(siteDir, options.page);
+  for (const viewport of options.viewports) {
+    const events = readLog(siteDir);
+    currentRound(events);
+    const id = nextId(events, "shot");
+    const { tiles, images, errors, pageHeight, cutShort } = await capture(id, url, viewport, options);
+    const mode = options.element ? "element" : options.full ? "full" : "viewport";
+    const event = stamp(events, "shot", {
+      page: options.page,
+      viewport: { name: viewport.name, width: viewport.width, height: viewport.height },
+      scale: options.scale,
+      dark: options.dark,
+      reducedMotion: options.reducedMotion,
+      mode,
+      element: options.element,
+      scrollEl: options.scrollEl,
+      steps: options.steps,
+      label: options.label,
+      pageHeight,
+      ...(cutShort ? { stoppedShort: true } : {}),
+      tiles,
+      errors,
+    });
+    append(siteDir, event, { screens: images });
+    exportScreens(siteDir, images);
+    const state = [options.dark && "dark", options.reducedMotion && "reduced motion", ...options.steps.map(describeStep)]
+      .filter(Boolean)
+      .join(", ");
+    // In the header line, not only after the file list: a reader filtering for `[judge]` lines
+    // missed the warning below and looked at a phone walk that never reached the footer.
+    const what = mode === "full"
+      ? `full page, ${tiles.length} screen(s) of ${pageHeight}px${cutShort ? `, STOPPED SHORT of the end (--max-tiles ${options.maxTiles})` : ""}`
+      : mode;
+    console.log(`[judge] ${id} — ${options.page} @ ${viewport.name} ${viewport.width}x${viewport.height}, ${what}${state ? ` (${state})` : ""}`);
+    for (const tile of tiles) {
+      const at = tile.scrollY === undefined ? "" : `  (scrollY ${tile.scrollY})`;
+      console.log(`  ${join(logPaths(siteDir).dir, tile.file)}${at}`);
+    }
+    if (cutShort) {
+      console.log(`  ! stopped at ${options.maxTiles} screens; the page goes on — pass --max-tiles to see the rest`);
+    }
+    for (const error of errors) console.log(`  ! page error while shooting: ${error}`);
+    console.log(`Read every file above, then: judge.mjs <site> look ${id} - <<'EOF' … what you saw … EOF`);
+  }
+}
+
+/**
+ * Whether a full-page shot ended before the page did (the `--max-tiles` cap). Recorded on the shot
+ * since the landing page's fourth round; for an older window walk it is worked out from the last
+ * screen, and an older `--scroll-el` walk (its container height was not kept) counts as complete.
+ */
+export function stoppedShort(shot) {
+  if (shot.mode !== "full") return false;
+  if (typeof shot.stoppedShort === "boolean") return shot.stoppedShort;
+  if (shot.scrollEl || !shot.pageHeight) return false;
+  return (shot.tiles.at(-1).scrollY ?? 0) + shot.viewport.height < shot.pageHeight - 1;
+}
+
+export function describeStep(step) {
+  return step.do === "fill" ? `fill ${step.arg} "${step.value}"` : `${step.do} ${step.arg}`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// What a log keeps
+
+/** A query entry that spells a default rather than a state. */
+const DEFAULT_QUERY = new Set(["lang=en", "theme=light", "animate=0"]);
+
+/**
+ * Whether a shot shows the page as a visitor lands on it: no steps before the shutter, no forced
+ * dark scheme, and nothing in its query but a default. Taking simply the last walk put checkout's
+ * confirmation screen and the landing page's dark theme where its first screen belonged.
+ */
+export function landing(shot) {
+  const query = (shot.page.split(/[?#]/)[1] ?? "").split("&").filter((kv) => kv && !DEFAULT_QUERY.has(kv));
+  return !shot.dark && shot.steps.length === 0 && query.length === 0 && !shot.page.includes("#");
+}
+
+/** The widths a round keeps one walk at — the ones `check` and `check integrity` measure. */
+const WIDTH_CLASSES = Object.freeze([(w) => w >= 1024, (w) => w > 480 && w < 1024, (w) => w <= 480]);
+
+/**
+ * The shots whose screens the log keeps. A round is a checkpoint: once a `done` closes it, the log
+ * keeps one full-page walk per width (desktop, tablet, phone) — the last that shows the page as a
+ * visitor lands on it, else the last that reached the end of the page, else the last — and lets the
+ * other screens go. What was seen in them stays: every shot, look and defect is still in the log,
+ * only the pictures are not. Shots taken since the last `done` keep theirs: that work is still
+ * being looked at.
+ *
+ * The rule is for size. Keeping every screen came to 1418 images and 39 MB across the first eight
+ * logs, most of them the builder's working views (a close-up of a focus ring, a menu half-open).
+ */
+export function keptShots(events) {
+  const cut = events.findLastIndex((e) => e.kind === "done");
+  const closed = events.slice(0, Math.max(cut, 0));
+  const kept = new Set(events.slice(cut + 1).filter((e) => e.kind === "shot").map((e) => e.id));
+  for (const round of closed.filter((e) => e.kind === "round")) {
+    const walks = closed.filter((e) => e.kind === "shot" && e.round === round.id && e.mode === "full");
+    for (const fits of WIDTH_CLASSES) {
+      const atWidth = walks.filter((shot) => fits(shot.viewport.width));
+      const whole = atWidth.filter((shot) => !stoppedShort(shot));
+      const pick = whole.filter(landing).at(-1) ?? whole.at(-1) ?? atWidth.at(-1);
+      if (pick) kept.add(pick.id);
+    }
+  }
+  return kept;
+}
+
+/** The screens the log keeps, by the path its shots name them with. */
+export function keptScreens(events) {
+  const kept = keptShots(events);
+  return events.filter((e) => e.kind === "shot" && kept.has(e.id)).flatMap((e) => e.tiles.map((t) => tileFile(events, t.file)));
+}
+
+/** Drop the screens a closed round no longer keeps, and give their space back. How many went. */
+function dropUnkept(siteDir) {
+  const keep = new Set(keptScreens(readLog(siteDir)));
+  return withLog(
+    siteDir,
+    (db) => {
+      const drop = db.prepare("SELECT path FROM screens").all().map((r) => r.path).filter((path) => !keep.has(path));
+      if (!drop.length) return 0;
+      db.exec("BEGIN");
+      const remove = db.prepare("DELETE FROM screens WHERE path = ?");
+      for (const path of drop) remove.run(path);
+      db.exec("COMMIT");
+      // Without it the file keeps its size: SQLite only marks the pages free.
+      db.exec("VACUUM");
+      return drop.length;
+    },
+    { write: true },
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// check
+
+/**
+ * What a log needs before it can say the site is done. Every entry names the id to act on and the
+ * command that closes it, because the reader of this list is the agent that has to fix it.
+ */
+export function checkLog(events) {
+  const problems = [];
+  if (!events.some((e) => e.kind === "init")) return ["the log was never initialised (init --title …)"];
+  const rounds = events.filter((e) => e.kind === "round");
+  if (!rounds.length) return ["no round yet (round \"first draft\")"];
+  const notesAbout = (id) => events.filter((e) => e.kind === "note" && e.about === id);
+
+  for (const shot of events.filter((e) => e.kind === "shot")) {
+    const looks = events.filter((e) => e.kind === "look" && e.shot === shot.id);
+    if (looks.some((look) => look.tile === null)) continue;
+    const seen = new Set(looks.map((look) => look.tile));
+    const missing = shot.tiles.map((_, i) => i + 1).filter((n) => !seen.has(n));
+    if (missing.length === shot.tiles.length) {
+      problems.push(`${shot.id} was never looked at — Read its file(s) and record: look ${shot.id} - <<'EOF' …`);
+    } else if (missing.length) {
+      problems.push(`${shot.id}: tile(s) ${missing.join(", ")} never looked at — look ${shot.id}:${missing[0]} …`);
+    }
+  }
+
+  for (const defect of events.filter((e) => e.kind === "defect")) {
+    const fixes = events.filter((e) => e.kind === "fix" && e.defect === defect.id);
+    const closed = notesAbout(defect.id).some((note) => CLOSING_KINDS.has(note.noteKind));
+    if (!fixes.length && !closed) {
+      problems.push(`${defect.id} is open — fix ${defect.id} …, or say why it stays: note --about ${defect.id} --kind accepted …`);
+      continue;
+    }
+    if (fixes.length) {
+      const lastFix = fixes.at(-1);
+      const after = (e) => events.indexOf(e) > events.indexOf(lastFix);
+      const verified = events.some((e) => e.kind === "verify" && e.defect === defect.id && after(e));
+      // A fix later found to be a misdiagnosis is closed by saying so, not by verifying it.
+      const closedSince = notesAbout(defect.id).some((note) => CLOSING_KINDS.has(note.noteKind) && after(note));
+      if (!verified && !closedSince) problems.push(`${defect.id} was fixed (${lastFix.id}) and nothing checked it since — verify ${defect.id} --by <L#|G#>`);
+    }
+  }
+
+  const last = rounds.at(-1);
+  const inLast = events.filter((e) => e.round === last.id);
+  if (!inLast.some((e) => e.kind === "gate")) problems.push(`the last round (${last.id}) ran no gate`);
+  // A walk the tile cap cut off is not a full page: it is the page minus its end, which is where a
+  // footer change lives.
+  const fullShots = inLast.filter((e) => e.kind === "shot" && e.mode === "full");
+  for (const [width, flag, fits] of [["desktop", "desktop", (w) => w >= 1024], ["phone", "mobile", (w) => w <= 480]]) {
+    const atWidth = fullShots.filter((shot) => fits(shot.viewport.width));
+    if (atWidth.some((shot) => !stoppedShort(shot))) continue;
+    if (!atWidth.length) {
+      problems.push(`the last round (${last.id}) has no full-page shot at ${width} width — shot <page> --full --viewport ${flag}`);
+      continue;
+    }
+    const short = atWidth.at(-1);
+    const enough = Math.ceil(short.pageHeight / short.viewport.height) + 2;
+    problems.push(
+      `the last round (${last.id})'s full-page shot at ${width} width, ${short.id}, stopped at ${short.tiles.length} ` +
+        `screens before the page ended — shot <page> --full --viewport ${flag} --max-tiles ${enough}`,
+    );
+  }
+
+  const lastRunOf = new Map();
+  for (const gate of events.filter((e) => e.kind === "gate")) lastRunOf.set(gate.cmd, gate);
+  for (const gate of lastRunOf.values()) {
+    if (gate.exit === 0) continue;
+    if (notesAbout(gate.id).some((note) => CLOSING_KINDS.has(note.noteKind))) continue;
+    problems.push(
+      `${gate.id} is the last run of \`${gate.cmd}\` and it exited ${gate.exit} — fix and re-run, or ` +
+        `note --about ${gate.id} --kind accepted|false-positive|superseded …`,
+    );
+  }
+  return problems;
+}
+
+function cmdCheck(siteDir) {
+  const problems = checkLog(readLog(siteDir));
+  if (!problems.length) {
+    console.log(
+      "[judge] the log meets its done conditions — every screen looked at, every defect closed, the last round " +
+        "gated and shot at both widths. The brief's \"States to show\" are still yours to check.",
+    )
+    return 0;
+  }
+  console.log(`[judge] ${problems.length} thing(s) before this log can say done:`);
+  for (const problem of problems) console.log(`  - ${problem}`);
+  return 1;
+}
+
+async function cmdDone(siteDir, argv) {
+  const events = readLog(siteDir);
+  const problems = checkLog(events);
+  if (problems.length) {
+    cmdCheck(siteDir);
+    return 1;
+  }
+  const text = takeText(parse(argv).rest, "done");
+  append(siteDir, { kind: "done", round: currentRound(events).id, t: new Date().toISOString(), text });
+  // The rounds this closes let go of the screens they do not keep (keptShots), then it renders.
+  await cmdRender(siteDir);
+  return 0;
+}
+
+function cmdStatus(siteDir) {
+  const events = readLog(siteDir);
+  const count = (kind) => events.filter((e) => e.kind === kind).length;
+  const round = events.filter((e) => e.kind === "round").at(-1);
+  console.log(
+    `[judge] ${round ? `${round.id} (${round.actor}): ${round.title}` : "no round yet"} — ` +
+      `${count("gate")} gate run(s), ${count("shot")} shot(s), ${count("look")} look(s), ` +
+      `${count("defect")} defect(s), ${count("fix")} fix(es), ${count("note")} note(s)`,
+  );
+  const problems = checkLog(events);
+  for (const problem of problems) console.log(`  - ${problem}`);
+}
+
+// ---------------------------------------------------------------------------------------------
+// render
+
+export function summarize(events) {
+  const of = (kind) => events.filter((e) => e.kind === kind);
+  const defects = of("defect");
+  const gates = of("gate");
+  const shots = of("shot");
+  const kept = keptShots(events);
+  return {
+    init: events.find((e) => e.kind === "init") ?? null,
+    done: events.filter((e) => e.kind === "done").at(-1) ?? null,
+    rounds: of("round").length,
+    gates: gates.length,
+    gatesFailed: gates.filter((g) => g.exit !== 0).length,
+    shots: shots.length,
+    screens: shots.reduce((n, s) => n + s.tiles.length, 0),
+    kept: shots.filter((s) => kept.has(s.id)).reduce((n, s) => n + s.tiles.length, 0),
+    looks: of("look").length,
+    defects: defects.length,
+    byEye: defects.filter((d) => d.by === "eye").length,
+    byGate: defects.filter((d) => d.by === "gate").length,
+    fixed: defects.filter((d) => of("fix").some((f) => f.defect === d.id)).length,
+    falsePositives: of("note").filter((n) => n.noteKind === "false-positive").length,
+  };
+}
+
+function defectRows(events) {
+  return events
+    .filter((e) => e.kind === "defect")
+    .map((defect) => {
+      const source = byId(events, defect.from);
+      const shot = source?.kind === "look" ? byId(events, source.shot) : null;
+      const fixes = events.filter((e) => e.kind === "fix" && e.defect === defect.id);
+      const verifies = events.filter((e) => e.kind === "verify" && e.defect === defect.id);
+      const closing = events.filter(
+        (e) => e.kind === "note" && e.about === defect.id && CLOSING_KINDS.has(e.noteKind),
+      );
+      return { defect, source, shot, fixes, verifies, closing };
+    });
+}
+
+/** The run-ledger headline of a gate run as one line of counts (`report` is a local path, so it goes). */
+function headlineText(gate) {
+  return gate.headline
+    .map((h) =>
+      Object.entries(h)
+        .filter(([key]) => key !== "tool" && key !== "report")
+        .map(([key, value]) => `${key} ${typeof value === "object" ? JSON.stringify(value) : value}`)
+        .join(" · "),
+    )
+    .filter(Boolean)
+    .join(" — ");
+}
+
+/** One line for a gate run: its own `verdict:` line, or the headline when it prints none. */
+export function gateSummary(gate) {
+  return gate.verdict ?? headlineText(gate);
+}
+
+const escapeHtml = (text) =>
+  String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+
+function shotCaption(shot) {
+  const parts = [`${shot.viewport.width}×${shot.viewport.height}`];
+  if (shot.mode === "full") parts.push(`full page, ${shot.tiles.length} screen(s)${stoppedShort(shot) ? " — stopped before the end" : ""}`);
+  else if (shot.mode === "element") parts.push(`element ${shot.element}`);
+  if (shot.scale !== 1) parts.push(`@${shot.scale}x`);
+  if (shot.dark) parts.push("dark");
+  if (shot.reducedMotion) parts.push("reduced motion");
+  for (const step of shot.steps) parts.push(describeStep(step));
+  return `${shot.page} · ${parts.join(" · ")}`;
+}
+
+const STYLE = `
+:root { color-scheme: light dark; --bg:#f6f5f1; --panel:#ffffff; --ink:#1d1d1b; --muted:#5d5b55; --line:#dcd9d0;
+  --eye:#7a3fb0; --eye-bg:#f3ebfa; --gate:#1f5f8b; --gate-bg:#e6f0f7; --pass:#1e6b3a; --pass-bg:#e4f3e8; --fail:#a3261c; --fail-bg:#fbe9e7; --code:#f0eee8; }
+@media (prefers-color-scheme: dark) { :root { --bg:#161614; --panel:#1f1f1c; --ink:#ecebe6; --muted:#a9a69c; --line:#3a3934;
+  --eye:#d2a8f5; --eye-bg:#2c2136; --gate:#8cc4ea; --gate-bg:#1a2a36; --pass:#8fd6a4; --pass-bg:#18291e; --fail:#f4a39b; --fail-bg:#35201e; --code:#262622; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; }
+main { max-width: 72rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+a { color: inherit; text-underline-offset: 0.15em; }
+.kicker { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.875rem; letter-spacing: 0.06em; text-transform: uppercase; }
+h1 { margin: 0 0 0.75rem; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.2; }
+h2 { margin: 3rem 0 1rem; font-size: 1.5rem; line-height: 1.3; }
+h4 { margin: 0; font-size: 1rem; }
+.lede { margin: 0 0 1.5rem; color: var(--muted); max-width: 46rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
+.stats li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 1rem; }
+.stats b { display: block; font-size: 1.5rem; line-height: 1.2; }
+.stats span { color: var(--muted); font-size: 0.875rem; }
+.chip { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
+.chip.eye { color: var(--eye); background: var(--eye-bg); } .chip.gate { color: var(--gate); background: var(--gate-bg); }
+.chip.pass { color: var(--pass); background: var(--pass-bg); } .chip.fail { color: var(--fail); background: var(--fail-bg); }
+.chip.actor { color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+td p { margin: 0 0 0.375rem; } td p:last-child { margin: 0; }
+@media (max-width: 40rem) {
+  /* Five columns in 343px leave each one a word wide; below this width a row is a card. */
+  table, tbody, tr, td { display: block; } thead { display: none; }
+  tr { border-bottom: 1px solid var(--line); padding: 0.5rem 0; } tr:last-child { border-bottom: 0; }
+  td { border: 0; padding: 0.25rem 0.75rem; }
+  td::before { content: attr(data-label); display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); }
+}
+.id { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.8125rem; color: var(--muted); }
+.round { margin: 2.5rem 0 0; }
+.round > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.75rem; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+.round > header h3 { margin: 0; font-size: 1.25rem; line-height: 1.3; }
+.entry { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.875rem 1rem; margin: 0 0 0.75rem; }
+.entry > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.625rem; margin-bottom: 0.375rem; }
+.entry p { margin: 0.25rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+code, pre { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.8125rem; }
+code { overflow-wrap: anywhere; }
+pre { margin: 0.5rem 0 0; padding: 0.75rem; background: var(--code); border-radius: 8px; overflow-x: auto; max-height: 32rem; line-height: 1.45; }
+details summary { cursor: pointer; color: var(--muted); font-size: 0.875rem; }
+.tiles { display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.25rem 0 0.5rem; }
+.tiles a { flex: none; display: block; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); }
+.tiles img { display: block; width: auto; height: 11rem; }
+.tiles img.tall { height: 18rem; }
+.look { border-left: 3px solid var(--eye); padding: 0.25rem 0 0.25rem 0.75rem; margin: 0.75rem 0 0; }
+.look p { margin: 0.25rem 0 0; }
+.raised { margin: 0.5rem 0 0 0.75rem; padding: 0.5rem 0.75rem; border-radius: 8px; background: var(--fail-bg); }
+.raised p { margin: 0.125rem 0 0; }
+.done { border-color: var(--pass); }
+footer { margin-top: 3rem; color: var(--muted); font-size: 0.875rem; }
+`;
+
+/** One sentence saying the screens were converted after the round, when they were. */
+function recodeNote(events) {
+  const r = events.find((e) => e.kind === "recode");
+  if (!r) return "";
+  const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+  return ` The ${r.count} screens were taken as JPEG and re-encoded as WebP (quality ${r.quality}) after the round: ${mb(r.bytesBefore)} → ${mb(r.bytesAfter)}.`;
+}
+
+const para = (text) =>
+  String(text)
+    .split(/\n{2,}/)
+    .map((chunk) => `<p>${escapeHtml(chunk)}</p>`)
+    .join("");
+
+/** The judgment log as a page. `briefText` is the brief's contents, when there is one. */
+export function renderHtml(events, { briefText = null, readOutput = () => "" } = {}) {
+  const readGateOutput = (gate) => readOutput(gate.output).trimEnd();
+  const s = summarize(events);
+  const title = s.init?.title ?? "Untitled site";
+  const rows = defectRows(events);
+  const kept = keptShots(events);
+  const looksOf = (shotId) => events.filter((e) => e.kind === "look" && e.shot === shotId);
+  const raisedFrom = (id) => events.filter((e) => e.kind === "defect" && e.from === id);
+
+  const raised = (id) =>
+    raisedFrom(id)
+      .map((d) => `<div class="raised"><span class="id">${d.id}</span> <b>defect</b>${d.where ? ` <code>${escapeHtml(d.where)}</code>` : ""}${para(d.text)}</div>`)
+      .join("");
+
+  const defectTable = rows.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Defect</th><th>Found by</th><th>What</th><th>Fix</th><th>Checked by</th></tr></thead><tbody>${rows
+        .map(({ defect, source, shot, fixes, verifies, closing }) => {
+          const found = defect.by === "eye"
+            ? `<span class="chip eye">eye</span> <span class="id">${source?.id} on <a href="#${shot?.id}">${shot?.id}</a></span>`
+            : `<span class="chip gate">gate</span> <span class="id"><a href="#${source?.id}">${source?.id}</a></span>`;
+          const fix = fixes.length
+            ? fixes.map((f) => para(f.text)).join("")
+            : closing.map((n) => `<p><span class="chip actor">${n.noteKind}</span> ${escapeHtml(n.text)}</p>`).join("") || "<p>—</p>";
+          const checked = verifies.length ? verifies.map((v) => `<span class="id">${v.by}</span>`).join(", ") : "—";
+          return `<tr id="${defect.id}"><td class="id" data-label="Defect">${defect.id}</td><td data-label="Found by">${found}</td><td data-label="What">${defect.where ? `<p><code>${escapeHtml(defect.where)}</code></p>` : ""}${para(defect.text)}</td><td data-label="Fix">${fix}</td><td data-label="Checked by">${checked}</td></tr>`;
+        })
+        .join("")}</tbody></table></div>`
+    : `<p class="lede">No defects were recorded.</p>`;
+
+  const entry = (e) => {
+    switch (e.kind) {
+      case "gate": {
+        const lines = readGateOutput(e).split("\n").length;
+        const head = headlineText(e);
+        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><span class="chip ${e.exit === 0 ? "pass" : "fail"}">exit ${e.exit}</span><code>${escapeHtml(displayCommand(e.cmd))}</code></header>${e.verdict ? `<p>${escapeHtml(e.verdict)}</p>` : ""}${head ? `<p class="id">${escapeHtml(head)}</p>` : ""}<details><summary>output, ${lines} line(s), ${(e.ms / 1000).toFixed(1)}s</summary><pre>${escapeHtml(readGateOutput(e))}</pre></details>${raised(e.id)}</article>`;
+      }
+      case "shot": {
+        const tiles = kept.has(e.id)
+          ? `<div class="tiles">${e.tiles
+              .map((t) => ({ ...t, file: tileFile(events, t.file) }))
+              .map((t, i) => `<a href="${t.file}" title="screen ${i + 1}${t.scrollY === undefined ? "" : `, scrollY ${t.scrollY}`}"><img src="${t.file}" alt="${e.id} screen ${i + 1}" width="${t.w}" height="${t.h}" class="${t.h > t.w ? "tall" : "wide"}" loading="lazy"></a>`)
+              .join("")}</div>`
+          : `<p class="id">${e.tiles.length} screen(s), looked at when taken; not kept once the round was done — a round keeps one full-page walk per width.</p>`;
+        const looks = looksOf(e.id)
+          .map((l) => `<div class="look"><span class="id">${l.id}${l.tile ? ` · screen ${l.tile}` : ""}${l.round !== e.round ? ` · ${l.round}` : ""}</span> <span class="chip eye">saw</span>${para(l.text)}${raised(l.id)}</div>`)
+          .join("");
+        const errors = e.errors.length ? `<p class="id">page errors: ${escapeHtml(e.errors.join(" | "))}</p>` : "";
+        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><h4>${escapeHtml(e.label ?? shotCaption(e))}</h4></header>${e.label ? `<p class="id">${escapeHtml(shotCaption(e))}</p>` : ""}${tiles}${errors}${looks}</article>`;
+      }
+      case "fix":
+        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><b>fix</b> for <a class="id" href="#${e.defect}">${e.defect}</a></header>${para(e.text)}</article>`;
+      case "verify":
+        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><b>verified</b> <a class="id" href="#${e.defect}">${e.defect}</a> by <a class="id" href="#${e.by}">${e.by}</a></header>${e.text ? para(e.text) : ""}</article>`;
+      case "note":
+        return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><span class="chip actor">${e.noteKind}</span>${e.about ? `about <a class="id" href="#${e.about}">${e.about}</a>` : ""}</header>${para(e.text)}</article>`;
+      case "done":
+        return `<article class="entry done"><header><span class="chip pass">done</span></header>${para(e.text)}</article>`;
+      default:
+        return "";
+    }
+  };
+
+  const rounds = events
+    .filter((e) => e.kind === "round")
+    .map((round) => {
+      // Looks and defects hang off their shot or gate run; everything else is in the order it happened.
+      const body = events
+        .filter((e) => e.round === round.id && !(e.kind === "look" && byId(events, e.shot)) && !(e.kind === "defect"))
+        .map(entry)
+        .join("");
+      const orphanLooks = events.filter((e) => e.kind === "look" && e.round === round.id && byId(events, e.shot)?.round !== round.id);
+      const lateLooks = orphanLooks.length
+        ? `<p class="id">Also in this round: ${orphanLooks.map((l) => `${l.id} on <a href="#${l.shot}">${l.shot}</a>`).join(", ")}.</p>`
+        : "";
+      return `<section class="round" id="${round.id}"><header><h3>${round.id} · ${escapeHtml(round.title)}</h3><span class="chip actor">${round.actor}</span></header>${body}${lateLooks}</section>`;
+    })
+    .join("");
+
+  const stat = (value, label) => `<li><b>${value}</b><span>${label}</span></li>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)} — judgment log</title>
+<style>${STYLE}</style>
+</head>
+<body>
+<main>
+<p class="kicker">vlmkit demo · judgment log</p>
+<h1>${escapeHtml(title)}</h1>
+<p class="lede">How this ${escapeHtml(s.init?.pattern ?? "site")} was judged, in the order it happened: every gate run with its whole output, every screenshot that was looked at with what was seen in it, and where each defect came from. Each finished round keeps the pictures of one full-page walk per width; the other shots keep what was seen in them. <a href="../">Open the site</a>.</p>
+<ul class="stats">${stat(s.rounds, "rounds")}${stat(s.gates, `gate runs, ${s.gatesFailed} failing`)}${stat(s.screens, `screens in ${s.shots} shots, ${s.kept} kept`)}${stat(s.looks, "looks recorded")}${stat(s.byEye, "defects found by eye")}${stat(s.byGate, "defects found by a gate")}${stat(s.falsePositives, "gate false positives")}</ul>
+${briefText ? `<details><summary>The brief the builder was given</summary><pre>${escapeHtml(briefText)}</pre></details>` : ""}
+<h2>Defects</h2>
+${defectTable}
+<h2>Rounds</h2>
+${rounds}
+${s.done ? "" : `<p class="lede">This log has not been marked done.</p>`}
+<footer>Rendered by <code>examples/sites/judge.mjs</code> from <code>judgment.sqlite</code>. Every gate output above is the command's own, with colour codes stripped.${recodeNote(events)}</footer>
+</main>
+</body>
+</html>
+`;
+}
+
+/**
+ * The same log as Markdown, for reading on GitHub. It carries no pictures: they are in
+ * `judgment.sqlite`, and on the published page, which `pageUrl` names (and each shot and gate run
+ * links into) when the Pages site publishes this log.
+ */
+export function renderMarkdown(events, { pageUrl = null } = {}) {
+  const s = summarize(events);
+  const title = s.init?.title ?? "Untitled site";
+  const kept = keptShots(events);
+  const out = [];
+  const cell = (text) => String(text).replaceAll("|", "\\|").replaceAll("\n", "<br>");
+  out.push(`# ${title} — judgment log`, "");
+  out.push(
+    `How this ${s.init?.pattern ?? "site"} was judged, in order. Rendered from \`judgment.sqlite\` by ` +
+      "`examples/sites/judge.mjs`; " +
+      (pageUrl
+        ? `the published page, with the screens the log keeps and every gate output, is <${pageUrl}>.`
+        : "`judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`."),
+    "",
+  );
+  out.push(
+    `**${s.rounds}** rounds · **${s.gates}** gate runs (${s.gatesFailed} failing) · **${s.screens}** screens in ${s.shots} shots (${s.kept} kept) · ` +
+      `**${s.looks}** looks · defects: **${s.byEye}** by eye, **${s.byGate}** by a gate · ${s.falsePositives} gate false positive(s)`,
+    "",
+  );
+  if (s.init?.brief) out.push(`Brief: [\`${s.init.brief}\`](${s.init.brief})`, "");
+
+  out.push("## Defects", "");
+  const rows = defectRows(events);
+  if (!rows.length) out.push("No defects were recorded.", "");
+  else {
+    out.push("| | found by | what | fix | checked by |", "|---|---|---|---|---|");
+    for (const { defect, source, shot, fixes, verifies, closing } of rows) {
+      const found = defect.by === "eye" ? `eye (${source?.id} on ${shot?.id})` : `gate (${source?.id})`;
+      const fix = fixes.length ? fixes.map((f) => f.text).join(" / ") : closing.map((n) => `${n.noteKind}: ${n.text}`).join(" / ") || "—";
+      const what = `${defect.where ? `\`${defect.where}\` ` : ""}${defect.text}`;
+      out.push(`| ${defect.id} | ${found} | ${cell(what)} | ${cell(fix)} | ${verifies.map((v) => v.by).join(", ") || "—"} |`);
+    }
+    out.push("");
+  }
+
+  out.push("## Rounds", "");
+  const flat = (text) => text.replaceAll("\n", " ");
+  const raised = (id, indent) =>
+    events
+      .filter((e) => e.kind === "defect" && e.from === id)
+      .map((d) => `${indent}- ✗ **${d.id}** defect${d.where ? ` \`${d.where}\`` : ""}: ${flat(d.text)}`);
+  for (const round of events.filter((e) => e.kind === "round")) {
+    out.push(`### ${round.id} · ${round.title} (${round.actor})`, "");
+    // As in the page: looks sit under the shot they are about, defects under what found them.
+    for (const e of events.filter((x) => x.round === round.id && x.kind !== "defect" && !(x.kind === "look" && byId(events, x.shot)))) {
+      if (e.kind === "gate") {
+        const summary = gateSummary(e);
+        out.push(`- **${e.id}** \`${e.cmd}\` → exit ${e.exit}${summary ? ` — ${summary}` : ""}${pageUrl ? ` ([output](${pageUrl}#${e.id}))` : ""}`);
+        out.push(...raised(e.id, "  "));
+      } else if (e.kind === "shot") {
+        const screens = !kept.has(e.id) ? " (screens not kept)" : pageUrl ? ` ([screens](${pageUrl}#${e.id}))` : "";
+        out.push(`- **${e.id}** ${shotCaption(e)}${e.label ? ` — ${e.label}` : ""}${screens}`);
+        for (const look of events.filter((x) => x.kind === "look" && x.shot === e.id)) {
+          const where = `${look.tile ? ` screen ${look.tile}` : ""}${look.round !== e.round ? `, in ${look.round}` : ""}`;
+          out.push(`  - 👁 **${look.id}**${where ? ` (${where.trim()})` : ""}: ${flat(look.text)}`);
+          out.push(...raised(look.id, "    "));
+        }
+      } else if (e.kind === "fix") {
+        out.push(`- **${e.id}** fix for ${e.defect}: ${flat(e.text)}`);
+      } else if (e.kind === "verify") {
+        out.push(`- **${e.id}** ${e.defect} verified by ${e.by}${e.text ? `: ${flat(e.text)}` : ""}`);
+      } else if (e.kind === "note") {
+        out.push(`- **${e.id}** ${e.noteKind}${e.about ? ` about ${e.about}` : ""}: ${flat(e.text)}`);
+      } else if (e.kind === "done") {
+        out.push(`- **done**: ${flat(e.text)}`);
+      }
+    }
+    out.push("");
+  }
+  if (!s.done) out.push("_This log has not been marked done._", "");
+  const recoded = recodeNote(events);
+  if (recoded) out.push(`_${recoded.trim()}_`, "");
+  return `${out.join("\n").trimEnd()}\n`;
+}
+
+/** `pageUrl`: where the Pages site publishes this log's page, for JUDGMENT.md to link to. */
+export function renderSite(siteDir, { pageUrl = null } = {}) {
+  const events = readLog(siteDir);
+  const outputs = readOutputs(siteDir);
+  const readOutput = (path) => outputs.get(path) ?? "(output missing from judgment.sqlite)";
+  const init = events.find((e) => e.kind === "init");
+  const briefFile = init?.brief ? resolve(siteDir, init.brief) : null;
+  const briefText = briefFile && existsSync(briefFile) ? readFileSync(briefFile, "utf8") : null;
+  return { html: renderHtml(events, { briefText, readOutput }), markdown: renderMarkdown(events, { pageUrl }) };
+}
+
+/**
+ * Where the Pages manifest (`scripts/build-pages.mjs`) publishes this log's page; null for a log it
+ * does not publish. Imported when asked for: the manifest imports this file, and reads every log.
+ */
+async function publishedPageUrl(siteDir) {
+  const { judgmentPageUrl } = await import("../../scripts/build-pages.mjs");
+  return judgmentPageUrl?.(relative(REPO, siteDir).split(sep).join("/")) ?? null;
+}
+
+/** Write `judgment/` — the log's page and the screens it keeps — and nothing else into it. */
+function exportJudgment(siteDir, html) {
+  const paths = logPaths(siteDir);
+  const keep = new Set(keptScreens(readLog(siteDir)));
+  mkdirSync(paths.shots, { recursive: true });
+  writeFileSync(paths.html, html);
+  withLog(siteDir, (db) => {
+    const screen = db.prepare("SELECT webp FROM screens WHERE path = ?");
+    for (const path of keep) writeFileSync(join(paths.dir, path), screen.get(path).webp);
+  });
+  for (const file of readdirSync(paths.shots)) if (!keep.has(`shots/${file}`)) rmSync(join(paths.shots, file));
+}
+
+async function cmdRender(siteDir) {
+  const dropped = dropUnkept(siteDir);
+  const { html, markdown } = renderSite(siteDir, { pageUrl: await publishedPageUrl(siteDir) });
+  const paths = logPaths(siteDir);
+  writeFileSync(paths.md, markdown);
+  exportJudgment(siteDir, html);
+  if (dropped) console.log(`[judge] ${dropped} screen(s) of finished rounds let go — each round keeps one full-page walk per width`);
+  console.log(`[judge] rendered ${relative(process.cwd(), paths.md)}, and ${relative(process.cwd(), paths.html)} with its screens`);
+}
+
+// ---------------------------------------------------------------------------------------------
+
+const USAGE = `node examples/sites/judge.mjs <site-dir> <command> [...]
+
+  init   --title "…" [--pattern docs] [--brief path]   start the log, once
+  round  "title" [--actor builder|reviewer]            start a round; what follows belongs to it
+  gate   <vlmkit command…>                              run a gate in the site dir; exit code + whole output kept
+  shot   <page> [--viewport desktop|tablet|mobile|WxH[,…]] [--full] [--element sel] [--scroll-el sel]
+         [--dark] [--reduced-motion] [--scale 2] [--label "…"]
+         [--click sel] [--hover sel] [--focus sel] [--press Key] [--type text] [--fill sel value]
+         [--scroll-to sel] [--wait ms]                  screenshots, one screen per file; Read each one
+  look   S#[:tile] - <<'EOF' … EOF                       what you saw in a shot you READ (≥${MIN_LOOK_CHARS} chars)
+  defect --from L#|G# [--where "sel or area"] text     something wrong, and which look or gate found it
+  fix    D# text                                        what you changed for it
+  verify D# --by L#|G# [text]                           the later look or gate run showing the fix works
+  note   [--about id] [--kind ${NOTE_KINDS.join("|")}] text
+  status | check                                        where the log stands / what it still needs
+  done   text                                           final summary; refuses until check passes; the rounds it
+                                                        closes keep one full-page walk per width, then it renders
+  render                                                write JUDGMENT.md, and judgment/ (the log's page and screens)`;
+
+export async function main(argv) {
+  const [siteArg, command, ...rest] = argv;
+  if (!siteArg || !command || siteArg === "--help" || command === "--help") {
+    console.log(USAGE);
+    return siteArg && command ? 0 : 1;
+  }
+  // `judge.mjs <site> defect --help` answered "unknown flag --help"; every command takes it.
+  if (rest.includes("--help") || rest.includes("-h")) {
+    console.log(USAGE);
+    return 0;
+  }
+  const siteDir = resolve(siteArg);
+  if (!existsSync(siteDir)) fail(`no site directory ${siteArg}`);
+  if (command !== "init" && !existsSync(logPaths(siteDir).db)) fail(`no log in ${siteArg} — run init first`);
+  switch (command) {
+    case "init":
+      return cmdInit(siteDir, rest) ?? 0;
+    case "round":
+      return cmdRound(siteDir, rest) ?? 0;
+    case "gate":
+      return cmdGate(siteDir, rest);
+    case "shot":
+      return (await cmdShot(siteDir, rest)) ?? 0;
+    case "look":
+      return cmdLook(siteDir, rest) ?? 0;
+    case "defect":
+      return cmdDefect(siteDir, rest) ?? 0;
+    case "fix":
+      return cmdFix(siteDir, rest) ?? 0;
+    case "verify":
+      return cmdVerify(siteDir, rest) ?? 0;
+    case "note":
+      return cmdNote(siteDir, rest) ?? 0;
+    case "status":
+      return cmdStatus(siteDir) ?? 0;
+    case "check":
+      return cmdCheck(siteDir);
+    case "done":
+      return cmdDone(siteDir, rest);
+    case "render":
+      return (await cmdRender(siteDir)) ?? 0;
+    default:
+      fail(`unknown command ${command}\n\n${USAGE}`);
+  }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main(process.argv.slice(2)).then(
+    (code) => {
+      process.exitCode = code ?? 0;
+    },
+    (error) => {
+      console.error(error instanceof JudgeError ? `judge: ${error.message}` : error);
+      process.exitCode = 2;
+    },
+  );
+}

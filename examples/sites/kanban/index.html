@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website relaunch · Sprintboard</title>
+<meta name="description" content="Sprintboard is a fictional team task board. This is its Website relaunch board: four columns, drag and drop, and a full keyboard alternative.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%235b4ee8'/%3E%3Crect x='7' y='8' width='5' height='16' rx='2' fill='white'/%3E%3Crect x='13.5' y='8' width='5' height='11' rx='2' fill='white'/%3E%3Crect x='20' y='8' width='5' height='7' rx='2' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script>
+  /* ?animate=0 switches the drop transition off before anything paints. */
+  (function () {
+    try {
+      if (/(?:^|[?&])animate=0(?:&|$)/.test(window.location.search.slice(1))) {
+        document.documentElement.classList.add('no-motion');
+      }
+    } catch (e) { /* no location: keep motion on */ }
+  })();
+</script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#board">Skip to board</a>
+
+<header class="app-header">
+  <div class="appbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#6366f1"/>
+            <stop offset="1" stop-color="#8b5cf6"/>
+          </linearGradient>
+        </defs>
+        <rect width="32" height="32" rx="9" fill="url(#brand-grad)"/>
+        <rect x="7" y="8" width="5" height="16" rx="2" fill="#fff"/>
+        <rect x="13.5" y="8" width="5" height="11" rx="2" fill="#fff" fill-opacity=".85"/>
+        <rect x="20" y="8" width="5" height="7" rx="2" fill="#fff" fill-opacity=".7"/>
+      </svg>
+      <span class="brand-name">Sprintboard</span>
+    </div>
+
+    <div class="search" role="search">
+      <label class="sr-only" for="search">Search card titles</label>
+      <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5l3.25 3.25" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input id="search" type="search" placeholder="Search card titles" autocomplete="off" spellcheck="false">
+    </div>
+
+    <button class="btn btn-primary new-task" id="new-task" type="button">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      New task
+    </button>
+  </div>
+
+  <div class="board-head">
+    <div class="board-title">
+      <h1 id="board-title">Website relaunch</h1>
+      <p class="board-meta">Sprint 14 · Sep 14 – 25 · <span id="card-total">14 cards</span></p>
+    </div>
+    <div class="team-wrap">
+      <ul class="team" aria-label="Team">
+        <li><span class="avatar" style="--av:#6d28d9" aria-hidden="true">AK</span><span class="sr-only">Ana Kowalski</span></li>
+        <li><span class="avatar" style="--av:#0e7490" aria-hidden="true">MR</span><span class="sr-only">Marco Reyes</span></li>
+        <li><span class="avatar" style="--av:#c2410c" aria-hidden="true">PN</span><span class="sr-only">Priya Nair</span></li>
+        <li><span class="avatar" style="--av:#15803d" aria-hidden="true">JW</span><span class="sr-only">Jonas Weber</span></li>
+        <li><span class="avatar" style="--av:#be185d" aria-hidden="true">LO</span><span class="sr-only">Lea Okafor</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <fieldset class="chips">
+      <legend class="sr-only">Show cards labelled</legend>
+      <label class="chip"><input type="radio" name="label-filter" value="all" checked><span>All</span></label>
+      <label class="chip"><input type="radio" name="label-filter" value="design"><span><i class="dot dot--design" aria-hidden="true"></i>Design</span></label>
+      <label class="chip"><input type="radio" name="label-filter" value="frontend"><span><i class="dot dot--frontend" aria-hidden="true"></i>Frontend</span></label>
+      <label class="chip"><input type="radio" name="label-filter" value="backend"><span><i class="dot dot--backend" aria-hidden="true"></i>Backend</span></label>
+      <label class="chip"><input type="radio" name="label-filter" value="bug"><span><i class="dot dot--bug" aria-hidden="true"></i>Bug</span></label>
+    </fieldset>
+    <p class="filter-summary"><span id="filter-summary" role="status">Showing all 14 cards</span>
+      <button class="link-btn" id="clear-filters" type="button" hidden>Clear filters</button></p>
+  </div>
+</header>
+
+<nav class="col-switch" aria-label="Jump to column">
+  <button type="button" data-jump="0" aria-current="true">Backlog</button>
+  <button type="button" data-jump="1" aria-current="false">In progress</button>
+  <button type="button" data-jump="2" aria-current="false">Review</button>
+  <button type="button" data-jump="3" aria-current="false">Done</button>
+</nav>
+
+<main class="board" id="board" tabindex="-1" aria-labelledby="board-title">
+
+  <section class="column" id="col-backlog" data-col="backlog" style="--st:var(--st-backlog)" aria-labelledby="col-backlog-title">
+    <div class="column-head">
+      <h2 class="column-title" id="col-backlog-title"><span class="status-dot" aria-hidden="true"></span>Backlog</h2>
+      <span class="count" data-count>5<span class="sr-only"> cards</span></span>
+      <button class="icon-btn col-add" type="button" data-add="backlog" aria-label="Add a card to Backlog">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p class="wip-alert" data-wip-alert hidden></p>
+    <ol class="card-list" data-list aria-labelledby="col-backlog-title"></ol>
+    <p class="column-note" data-note hidden></p>
+    <div class="column-foot">
+      <button class="add-card-btn" type="button" data-add="backlog" aria-label="Add a card to Backlog">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add a card
+      </button>
+      <form class="add-form" data-form hidden novalidate>
+        <label class="add-label" for="new-backlog">Card title</label>
+        <textarea class="add-input" id="new-backlog" rows="2" maxlength="120" placeholder="What needs doing?"></textarea>
+        <p class="add-error" data-error hidden>Give the card a title first.</p>
+        <div class="add-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Add</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-cancel>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="column" id="col-progress" data-col="progress" style="--st:var(--st-progress)" aria-labelledby="col-progress-title">
+    <div class="column-head">
+      <h2 class="column-title" id="col-progress-title"><span class="status-dot" aria-hidden="true"></span>In progress</h2>
+      <span class="count count--wip" data-count><span class="count-tag">WIP</span>3 / 3<span class="sr-only"> cards, limit 3</span></span>
+      <button class="icon-btn col-add" type="button" data-add="progress" aria-label="Add a card to In progress">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p class="wip-alert" data-wip-alert hidden></p>
+    <ol class="card-list" data-list aria-labelledby="col-progress-title"></ol>
+    <p class="column-note" data-note hidden></p>
+    <div class="column-foot">
+      <button class="add-card-btn" type="button" data-add="progress" aria-label="Add a card to In progress">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add a card
+      </button>
+      <form class="add-form" data-form hidden novalidate>
+        <label class="add-label" for="new-progress">Card title</label>
+        <textarea class="add-input" id="new-progress" rows="2" maxlength="120" placeholder="What needs doing?"></textarea>
+        <p class="add-error" data-error hidden>Give the card a title first.</p>
+        <div class="add-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Add</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-cancel>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="column" id="col-review" data-col="review" style="--st:var(--st-review)" aria-labelledby="col-review-title">
+    <div class="column-head">
+      <h2 class="column-title" id="col-review-title"><span class="status-dot" aria-hidden="true"></span>Review</h2>
+      <span class="count" data-count>2<span class="sr-only"> cards</span></span>
+      <button class="icon-btn col-add" type="button" data-add="review" aria-label="Add a card to Review">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p class="wip-alert" data-wip-alert hidden></p>
+    <ol class="card-list" data-list aria-labelledby="col-review-title"></ol>
+    <p class="column-note" data-note hidden></p>
+    <div class="column-foot">
+      <button class="add-card-btn" type="button" data-add="review" aria-label="Add a card to Review">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add a card
+      </button>
+      <form class="add-form" data-form hidden novalidate>
+        <label class="add-label" for="new-review">Card title</label>
+        <textarea class="add-input" id="new-review" rows="2" maxlength="120" placeholder="What needs doing?"></textarea>
+        <p class="add-error" data-error hidden>Give the card a title first.</p>
+        <div class="add-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Add</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-cancel>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="column" id="col-done" data-col="done" style="--st:var(--st-done)" aria-labelledby="col-done-title">
+    <div class="column-head">
+      <h2 class="column-title" id="col-done-title"><span class="status-dot" aria-hidden="true"></span>Done</h2>
+      <span class="count" data-count>4<span class="sr-only"> cards</span></span>
+      <button class="icon-btn col-add" type="button" data-add="done" aria-label="Add a card to Done">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <p class="wip-alert" data-wip-alert hidden></p>
+    <ol class="card-list" data-list aria-labelledby="col-done-title"></ol>
+    <p class="column-note" data-note hidden></p>
+    <div class="column-foot">
+      <button class="add-card-btn" type="button" data-add="done" aria-label="Add a card to Done">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Add a card
+      </button>
+      <form class="add-form" data-form hidden novalidate>
+        <label class="add-label" for="new-done">Card title</label>
+        <textarea class="add-input" id="new-done" rows="2" maxlength="120" placeholder="What needs doing?"></textarea>
+        <p class="add-error" data-error hidden>Give the card a title first.</p>
+        <div class="add-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Add</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-cancel>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<!-- What a sighted keyboard user sees while a card has focus or is picked up. The live region below carries the same news for screen readers. -->
+<div class="kb-hint" id="kb-hint" aria-hidden="true" hidden>
+  <p class="kb-hint-status" id="kb-hint-status"></p>
+  <p class="kb-hint-keys" id="kb-hint-keys"></p>
+</div>
+
+<div class="sr-only" id="announcer" aria-live="assertive" aria-atomic="true"></div>
+<p id="dnd-help" hidden>Press Space to pick the card up, the arrow keys to move it, Space to drop it and Escape to cancel. Press Enter to open it.</p>
+
+<div class="menu" id="card-menu" role="menu" hidden></div>
+
+<dialog class="dialog" id="card-dialog" aria-labelledby="dlg-title">
+  <div class="dlg-head">
+    <p class="dlg-kicker"><span class="status-dot" id="dlg-dot" aria-hidden="true"></span><span id="dlg-col">Backlog</span><span aria-hidden="true">·</span><span id="dlg-id">SB-101</span></p>
+    <h2 class="dlg-title" id="dlg-title">Card</h2>
+    <button class="icon-btn dlg-close" type="button" id="dlg-close" aria-label="Close">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="dlg-body">
+    <div class="dlg-labels" id="dlg-labels"></div>
+    <dl class="dlg-facts">
+      <div><dt>Assignee</dt><dd id="dlg-assignee">—</dd></div>
+      <div><dt>Due date</dt><dd id="dlg-due">—</dd></div>
+      <div><dt>Priority</dt><dd id="dlg-priority">—</dd></div>
+    </dl>
+    <section class="dlg-section" aria-labelledby="dlg-desc-title">
+      <h3 id="dlg-desc-title">Description</h3>
+      <p class="dlg-desc" id="dlg-desc"></p>
+    </section>
+    <section class="dlg-section" aria-labelledby="dlg-check-title">
+      <div class="dlg-section-head">
+        <h3 id="dlg-check-title">Checklist</h3>
+        <p class="dlg-progress-text" id="dlg-progress-text"></p>
+      </div>
+      <div class="progress" aria-hidden="true"><span id="dlg-progress-bar"></span></div>
+      <ul class="checklist" id="dlg-checklist" aria-labelledby="dlg-check-title"></ul>
+      <p class="dlg-empty" id="dlg-check-empty" hidden>No checklist on this card yet.</p>
+    </section>
+  </div>
+</dialog>
+</body>
+</html>

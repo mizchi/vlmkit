@@ -13,20 +13,20 @@
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { resizePngBuffer } from "@mizchi/vlmkit-core/image-resize.ts";
+import { fileURLToPath } from "node:url";
+// The first frame is a replay of no actions, made by the same `frame` as every
+// frame after it — so the picture an attempt starts from and the coordinates it
+// sends back cannot be denominated in two different frame sizes.
+import { frame, replay } from "./act.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const pageName = process.argv[2] ?? "console";
 
-const { chromium } = await import("playwright");
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-await page.goto(pathToFileURL(join(HERE, "pages", `${pageName}.html`)).href, { waitUntil: "networkidle" });
-const shot = await page.screenshot({ type: "png" });
+const { browser, page } = await replay([], { pageName });
+const png = await frame(page);
 await browser.close();
 
 const out = join(HERE, "shots", `${pageName}.png`);
 await mkdir(dirname(out), { recursive: true });
-await writeFile(out, resizePngBuffer(shot, { resolution: "medium" }));
+await writeFile(out, png);
 console.log(`wrote ${out}`);

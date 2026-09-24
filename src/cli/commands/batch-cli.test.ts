@@ -192,12 +192,47 @@ describe("formatBatchSummary", () => {
     assert.match(text, /--show-output/);
   });
 
-  it("stays quiet about warns when --show-output already prints them", () => {
+  it("states the plan as a product only when every page runs every gate", () => {
+    // The landing page's review (2026-09-23) read "4 page(s) x 5 gate(s) = 8 job(s)": one shared
+    // gate, and a contrast run per page that differs only by its --output-dir.
+    const pages = ["en-light", "en-dark", "ja-light", "ja-dark"];
+    const uneven = plain(formatBatchSummary(summary(pages.flatMap((page) => [
+      job({ page, gate: "check integrity" }),
+      job({ page, gate: `check a11y contrast --output-dir out/${page}` }),
+    ]))));
+    assert.match(uneven, /8 job\(s\) over 4 page\(s\), 5 distinct gate command\(s\)/);
+    assert.doesNotMatch(uneven, / x 5 gate/);
+    const even = plain(formatBatchSummary(summary(pages.flatMap((page) => [
+      job({ page, gate: "check integrity" }),
+      job({ page, gate: "check design" }),
+    ]))));
+    assert.match(even, /4 page\(s\) x 2 gate\(s\) = 8 job\(s\)/);
+  });
+
+  it("prints the warned passing jobs' reports under --show-output, instead of the count", () => {
+    // The count's own hint is `--show-output`, which printed failing jobs only and dropped the
+    // count: the landing page's review (2026-09-23) saw four warns announced, followed the hint,
+    // and got a run in which they appeared nowhere.
     const text = plain(formatBatchSummary(
-      summary([job({ output: "  exits 0 — 5 warn(s) did not fail this command." })]),
+      summary([
+        job({ page: "en.html", gate: "check integrity", output: "  exits 0 — 1 warn(s) did not fail this command.\n  ! [near-misalignment] a @768" }),
+        job({ page: "ja.html", gate: "check integrity", output: "verdict: CLEAN" }),
+      ]),
       { showOutput: true },
     ));
     assert.doesNotMatch(text, /warn\(s\) in \d+ passing gate/);
+    assert.match(text, /Warnings \(passing jobs\)/);
+    assert.match(text, /--- check integrity en\.html/);
+    assert.match(text, /\[near-misalignment\] a @768/);
+    assert.doesNotMatch(text, /--- check integrity ja\.html/);
+  });
+
+  it("names the page on each warn row, so one gate over four pages is four distinct rows", () => {
+    const text = plain(formatBatchSummary(summary(["en-light", "ja-light"].map((page) =>
+      job({ page: `http://127.0.0.1:4190/?${page}`, gate: "check integrity", output: "  exits 0 — 1 warn(s) did not fail this command." }),
+    ))));
+    assert.match(text, /1\s+check integrity\s+http:\/\/127\.0\.0\.1:4190\/\?en-light/);
+    assert.match(text, /1\s+check integrity\s+http:\/\/127\.0\.0\.1:4190\/\?ja-light/);
   });
 
   it("does not count warns from a FAILING job, whose re-run hint already covers it", () => {

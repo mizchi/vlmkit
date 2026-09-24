@@ -386,6 +386,29 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
   if (!root) return { visible: "", invisible: [] };
   const parts = [];
   const invisible = [];
+  // Text nodes are joined the way they read. Each used to be its own line, so any copy that
+  // crosses inline markup with no space in it could never match: <span>汐見</span><span>窯</span>
+  // and ¥4,180<small>（税込）</small> — the ordinary shape of Japanese product copy — came back
+  // "found ONLY in text a user cannot see" while innerText, and the reader, had them whole. Now
+  // two visible runs in one block container join with nothing between them (their own spaces
+  // stay), and a new block, a <br> or a <select> starts a new line.
+  const blockCache = new Map();
+  const blockOf = (el) => {
+    if (blockCache.has(el)) return blockCache.get(el);
+    let block = el;
+    while (block && block.parentElement) {
+      const display = getComputedStyle(block).display;
+      if (!(display.startsWith("inline") || display === "contents")) break;
+      block = block.parentElement;
+    }
+    blockCache.set(el, block);
+    return block;
+  };
+  let lastBlock = null;
+  const push = (text, block) => {
+    parts.push(block !== null && block === lastBlock ? text : "\\n" + text);
+    lastBlock = block;
+  };
   // Open shadow roots hold real, on-screen text that innerText and a
   // document-scoped TreeWalker both miss (2026-08-01 hard-target audit: a
   // custom element's visible badge copy was reported copy-missing). Every
@@ -400,9 +423,13 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
     }
   }
   for (const scope of roots) {
-  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (n) => n.nodeType === 3 || n.tagName === "BR" ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+  });
+  lastBlock = null;
   let node;
   while ((node = walker.nextNode())) {
+    if (node.nodeType === 1) { lastBlock = null; continue; }
     if (!node.data || !node.data.trim()) continue;
     const el = node.parentElement;
     if (!el) continue;
@@ -419,7 +446,7 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
     if (select) {
       if (typeof select.checkVisibility !== "function" ||
         select.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) {
-        parts.push(node.data);
+        push(node.data, null);
       }
       continue;
     }
@@ -448,10 +475,10 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
       continue;
     }
     if (camouflaged(el, cs)) { drop("camouflage"); continue; }
-    parts.push(text);
+    push(text, blockOf(el));
   }
   }
-  return { visible: parts.join("\\n"), invisible };
+  return { visible: parts.join(""), invisible };
 })()`;
 
 /**

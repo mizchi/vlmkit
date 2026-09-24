@@ -140,6 +140,30 @@ literally what the definition says — the page's most numerous non-body link
 colour — and chasing the brand colour instead would need a "what counts as an
 accent" threshold, which is the trap Part 3 records.
 
+> **Correction (2026-09-24).** Two rows above were measured on content that is never
+> painted. The collector's visibility test read an element's size, and a closed
+> `<details>` element's descendants still report one, because asking for a size forces
+> layout. So the palette counted 5615 collapsed elements on css-tricks, 3372 on MDN, 554 on
+> mdn-learn and 479 on a11yproject. It now asks `checkVisibility` — which reports collapsed
+> content as hidden — without the `content-visibility: auto` flag, so Smashing's off-screen
+> footer, which is real paint, still counts. Findings and verdicts are unchanged on all
+> fifteen pages, so Part 4's eight `color-only-link` rows are the same eight, now out of
+> 2627 painted links in a flow rather than 4899 (0.3%, not 0.16%). The named colours that
+> moved:
+>
+> ```
+> page          base      body ink   link ink
+> csstricks     #262626   #000000    #0089c7    was #eaeaea / #434343: its collapsed comments
+> a11yproject   #f7f7f7   #000000    #707070    was #232d71: every one of 147 in the collapsed checklist
+> ```
+>
+> css-tricks is a straight correction: `#eaeaea` appears nowhere on its rendered page, which
+> is a `#262626` frame round a white article. a11yproject's old `#232d71` was never on the
+> initial screen, and the new value, `#707070`, is its grey nav: 18 of them outnumber the 7
+> visible prose links in `#3b4bbf`. That is Smashing's case, not a reader's colour. So the count
+> above is **eleven of fourteen**, not twelve, and the twelfth was only correct by counting
+> links nobody can see.
+
 ## Part 3 — what was rejected
 
 Three candidates, measured on the same 14 pages. **The first two run backwards**,

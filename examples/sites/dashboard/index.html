@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overview · Keel Analytics</title>
+  <meta name="description" content="Keel Analytics demo: the Overview screen of a fictional web-analytics product, showing the fictional Harbor &amp; Pine store.">
+  <script>
+    /* Before first paint: honour ?theme=light|dark, and pick the sidebar's default for this width. */
+    (function () {
+      var root = document.documentElement;
+      var m = /[?&]theme=(light|dark)(?:&|$)/.exec(window.location.search);
+      if (m) root.setAttribute('data-theme', m[1]);
+      root.setAttribute('data-sidebar', window.matchMedia('(min-width: 1280px)').matches ? 'expanded' : 'collapsed');
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="app">
+    <nav class="sidebar" id="sidebar" aria-label="Main">
+      <div class="brand">
+        <svg class="brand-mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+          <rect class="brand-mark-bg" width="28" height="28" rx="8"/>
+          <path class="brand-mark-ink" d="M13.25 5.5v8.75H7.5z"/>
+          <path class="brand-mark-ink" d="M14.75 8.5v5.75h4.5z"/>
+          <path class="brand-mark-ink" d="M5.75 15.75h16.5l-2.4 4a1.5 1.5 0 01-1.29.75H9.44a1.5 1.5 0 01-1.29-.75z"/>
+          <path class="brand-mark-ink" d="M13 20.5h2l-.45 3h-1.1z"/>
+        </svg>
+        <span class="brand-name">Keel Analytics</span>
+      </div>
+
+      <ul class="nav-list">
+        <li>
+          <a class="nav-link" href="index.html" aria-current="page" data-label="Overview">
+            <svg class="nav-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="5.5" height="7" rx="1.5"/><rect x="11.5" y="3" width="5.5" height="4" rx="1.5"/><rect x="11.5" y="10" width="5.5" height="7" rx="1.5"/><rect x="3" y="13" width="5.5" height="4" rx="1.5"/></svg>
+            <span class="nav-label">Overview</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="#traffic" data-label="Traffic" data-demo="Traffic">
+            <svg class="nav-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M2.5 14l4.25-4.5 3.25 3 3.5-4.75 4 3.75"/><path d="M2.5 17.5h15"/></svg>
+            <span class="nav-label">Traffic</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="#conversions" data-label="Conversions" data-demo="Conversions">
+            <svg class="nav-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 4h14l-5.25 6.25V16l-3.5-1.75v-4L3 4z"/></svg>
+            <span class="nav-label">Conversions</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" href="#customers" data-label="Customers" data-demo="Customers">
+            <svg class="nav-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="7.5" cy="7" r="3"/><path d="M2.5 16.5c.6-2.9 2.6-4.5 5-4.5s4.4 1.6 5 4.5"/><path d="M12.5 4.25a3 3 0 010 5.5"/><path d="M14.75 12.25c1.4.6 2.4 2 2.75 4.25"/></svg>
+            <span class="nav-label">Customers</span>
+          </a>
+        </li>
+        <li class="nav-item-end">
+          <a class="nav-link" href="#settings" data-label="Settings" data-demo="Settings">
+            <svg class="nav-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 5.5h8"/><path d="M15 5.5h2"/><circle cx="13" cy="5.5" r="2"/><path d="M3 14.5h2"/><path d="M9 14.5h8"/><circle cx="7" cy="14.5" r="2"/></svg>
+            <span class="nav-label">Settings</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-foot">
+        <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="Collapse sidebar">
+          <svg class="nav-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.5"/><path d="M7.75 3.5v13"/><path class="toggle-chevron" d="M13.25 7.75L11 10l2.25 2.25"/></svg>
+          <span class="sidebar-toggle-label">Collapse</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="page-title">
+          <svg class="brand-mark brand-mark--compact" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+            <rect class="brand-mark-bg" width="28" height="28" rx="8"/>
+            <path class="brand-mark-ink" d="M13.25 5.5v8.75H7.5z"/>
+            <path class="brand-mark-ink" d="M14.75 8.5v5.75h4.5z"/>
+            <path class="brand-mark-ink" d="M5.75 15.75h16.5l-2.4 4a1.5 1.5 0 01-1.29.75H9.44a1.5 1.5 0 01-1.29-.75z"/>
+            <path class="brand-mark-ink" d="M13 20.5h2l-.45 3h-1.1z"/>
+          </svg>
+          <div class="page-title-text">
+            <h1>Overview</h1>
+            <p class="page-meta">
+              <span class="meta-item">Harbor &amp; Pine</span>
+              <span class="meta-item"><span id="range-label">Last 30 days</span></span>
+              <span class="meta-item" id="range-dates">Aug 24 – Sep 22, 2026</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <fieldset class="segmented" id="range">
+            <legend class="sr-only">Date range</legend>
+            <label class="seg"><input type="radio" name="range" value="7"><span>7 days</span></label>
+            <label class="seg"><input type="radio" name="range" value="30" checked><span>30 days</span></label>
+            <label class="seg"><input type="radio" name="range" value="90"><span>90 days</span></label>
+          </fieldset>
+          <button class="btn" id="export" type="button">
+            <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.5v7.25"/><path d="M5 7l3 3 3-3"/><path d="M2.75 11v1.25c0 .7.55 1.25 1.25 1.25h8c.7 0 1.25-.55 1.25-1.25V11"/></svg>
+            <span>Export CSV</span>
+          </button>
+        </div>
+
+        <div class="user">
+          <button class="avatar-btn" id="user-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu, Maya Rahman">
+            <span aria-hidden="true">MR</span>
+          </button>
+          <div class="menu" id="user-menu-panel" hidden>
+            <p class="menu-head">
+              <span class="menu-name">Maya Rahman</span>
+              <span class="menu-email">maya@harborpine.example</span>
+            </p>
+            <div class="menu-list" id="user-menu" role="menu" aria-label="Account">
+              <button class="menu-item" type="button" role="menuitem" tabindex="-1" data-demo="Account settings">Account settings</button>
+              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked="false" tabindex="-1" id="theme-item">
+                <span>Light theme</span><span class="switch" aria-hidden="true"></span>
+              </button>
+              <div class="menu-sep" role="separator"></div>
+              <button class="menu-item" type="button" role="menuitem" tabindex="-1" data-demo="Sign out">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="main" id="main" tabindex="-1">
+        <div class="main-inner">
+          <section class="kpis" aria-labelledby="kpis-title">
+            <h2 class="sr-only" id="kpis-title">Key metrics</h2>
+            <div class="kpi-grid">
+              <div class="card kpi" data-kpi="visitors" role="group" aria-labelledby="kpi-visitors">
+                <h3 class="kpi-label" id="kpi-visitors">Visitors</h3>
+                <div class="kpi-main">
+                  <p class="kpi-value">&nbsp;</p>
+                  <svg class="spark" aria-hidden="true" focusable="false"></svg>
+                </div>
+                <p class="kpi-delta"><span class="delta"></span><span class="delta-ctx"></span></p>
+              </div>
+              <div class="card kpi" data-kpi="conversion" role="group" aria-labelledby="kpi-conversion">
+                <h3 class="kpi-label" id="kpi-conversion">Conversion rate</h3>
+                <div class="kpi-main">
+                  <p class="kpi-value">&nbsp;</p>
+                  <svg class="spark" aria-hidden="true" focusable="false"></svg>
+                </div>
+                <p class="kpi-delta"><span class="delta"></span><span class="delta-ctx"></span></p>
+              </div>
+              <div class="card kpi" data-kpi="revenue" role="group" aria-labelledby="kpi-revenue">
+                <h3 class="kpi-label" id="kpi-revenue">Revenue</h3>
+                <div class="kpi-main">
+                  <p class="kpi-value">&nbsp;</p>
+                  <svg class="spark" aria-hidden="true" focusable="false"></svg>
+                </div>
+                <p class="kpi-delta"><span class="delta"></span><span class="delta-ctx"></span></p>
+              </div>
+              <div class="card kpi" data-kpi="aov" role="group" aria-labelledby="kpi-aov">
+                <h3 class="kpi-label" id="kpi-aov">Average order value</h3>
+                <div class="kpi-main">
+                  <p class="kpi-value">&nbsp;</p>
+                  <svg class="spark" aria-hidden="true" focusable="false"></svg>
+                </div>
+                <p class="kpi-delta"><span class="delta"></span><span class="delta-ctx"></span></p>
+              </div>
+            </div>
+          </section>
+
+          <div class="overview-row">
+            <section class="card chart-card" aria-labelledby="chart-title">
+              <div class="card-head">
+                <div>
+                  <h2 class="card-title" id="chart-title">Daily visitors</h2>
+                  <p class="card-sub" id="chart-sub">Aug 24 – Sep 22 against Jul 25 – Aug 23</p>
+                </div>
+                <ul class="legend" aria-label="Legend">
+                  <li><svg class="legend-key" viewBox="0 0 24 8" aria-hidden="true" focusable="false"><line class="legend-cur" x1="1" y1="4" x2="23" y2="4"/></svg>This period</li>
+                  <li><svg class="legend-key" viewBox="0 0 24 8" aria-hidden="true" focusable="false"><line class="legend-prev" x1="1" y1="4" x2="23" y2="4"/></svg>Previous period</li>
+                </ul>
+              </div>
+              <div class="chart" id="chart">
+                <svg class="chart-svg" id="chart-svg" role="group" aria-roledescription="line chart" aria-label="Daily visitors"></svg>
+                <div class="tooltip" id="chart-tip" aria-hidden="true" hidden></div>
+              </div>
+            </section>
+
+            <section class="card channels-card" aria-labelledby="channels-title">
+              <div class="card-head">
+                <div>
+                  <h2 class="card-title" id="channels-title">Top channels</h2>
+                  <p class="card-sub">Visitors by source</p>
+                </div>
+              </div>
+              <ol class="channels" id="channels"></ol>
+              <p class="channels-total"><span>Total visitors</span><span class="channel-value" id="channels-total">&nbsp;</span><span class="channel-pct">100%</span></p>
+            </section>
+          </div>
+
+          <section class="card orders-card" aria-labelledby="orders-title">
+            <div class="card-head">
+              <div>
+                <h2 class="card-title" id="orders-title">Recent orders</h2>
+                <p class="card-sub">The 12 latest orders, across every channel</p>
+              </div>
+            </div>
+            <div class="table-frame" id="orders-frame">
+            <div class="table-scroll" id="orders-scroll">
+              <table class="orders">
+                <thead>
+                  <tr>
+                    <th scope="col" class="col-id"><button class="sort" type="button" data-key="id">Order<svg class="sort-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path class="sort-up" d="M3.5 5L6 2.5 8.5 5"/><path class="sort-down" d="M3.5 7L6 9.5 8.5 7"/></svg></button></th>
+                    <th scope="col"><button class="sort" type="button" data-key="customer">Customer<svg class="sort-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path class="sort-up" d="M3.5 5L6 2.5 8.5 5"/><path class="sort-down" d="M3.5 7L6 9.5 8.5 7"/></svg></button></th>
+                    <th scope="col" aria-sort="descending"><button class="sort" type="button" data-key="at">Date<svg class="sort-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path class="sort-up" d="M3.5 5L6 2.5 8.5 5"/><path class="sort-down" d="M3.5 7L6 9.5 8.5 7"/></svg></button></th>
+                    <th scope="col"><button class="sort" type="button" data-key="channel">Channel<svg class="sort-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path class="sort-up" d="M3.5 5L6 2.5 8.5 5"/><path class="sort-down" d="M3.5 7L6 9.5 8.5 7"/></svg></button></th>
+                    <th scope="col"><button class="sort" type="button" data-key="status">Status<svg class="sort-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path class="sort-up" d="M3.5 5L6 2.5 8.5 5"/><path class="sort-down" d="M3.5 7L6 9.5 8.5 7"/></svg></button></th>
+                    <th scope="col" class="num"><button class="sort" type="button" data-key="amount">Amount<svg class="sort-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path class="sort-up" d="M3.5 5L6 2.5 8.5 5"/><path class="sort-down" d="M3.5 7L6 9.5 8.5 7"/></svg></button></th>
+                  </tr>
+                </thead>
+                <tbody id="orders-body"></tbody>
+              </table>
+            </div>
+            </div>
+            <div class="table-foot">
+              <p class="table-status" id="orders-status" aria-live="polite">Showing 1–6 of 12 orders</p>
+              <nav class="pager" aria-label="Orders pages">
+                <button class="btn pager-btn" type="button" data-page="prev" aria-disabled="true">
+                  <svg class="pager-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg><span>Previous</span>
+                </button>
+                <button class="btn pager-btn pager-num" type="button" data-page="1" aria-current="page" aria-label="Page 1">1</button>
+                <button class="btn pager-btn pager-num" type="button" data-page="2" aria-label="Page 2">2</button>
+                <button class="btn pager-btn" type="button" data-page="next">
+                  <span>Next</span><svg class="pager-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.5L10.5 8 6 12.5"/></svg>
+                </button>
+              </nav>
+            </div>
+          </section>
+
+          <p class="page-foot">Keel Analytics is a fictional product; Harbor &amp; Pine is a fictional store. Data through Tue, Sep 22, 2026.</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <p class="sr-only" id="announcer" aria-live="polite"></p>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

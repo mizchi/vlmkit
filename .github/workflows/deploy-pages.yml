@@ -1,8 +1,10 @@
 name: Deploy vlmkit Pages site
 
 # The site is composed from several examples (scripts/build-pages.mjs): the intro page at the
-# root and the solitaire demo at /solitaire/. Every section's own contract tests and gates run
-# before the artifact is built, so nothing reaches the public site unverified.
+# root, the solitaire demo at /solitaire/, and at /sites/ a gallery of six agent-built demo sites,
+# each published beside the log of how it was judged (examples/sites/). Every section's own
+# contract tests and gates run before the artifact is built, so nothing reaches the public site
+# unverified.
 
 on:
   push:
@@ -10,12 +12,14 @@ on:
     paths:
       - "examples/vlmkit-intro-page/**"
       - "examples/solitaire/**"
+      - "examples/sites/**"
       - "scripts/build-pages.mjs"
       - ".github/workflows/deploy-pages.yml"
   pull_request:
     paths:
       - "examples/vlmkit-intro-page/**"
       - "examples/solitaire/**"
+      - "examples/sites/**"
       - "scripts/build-pages.mjs"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
@@ -81,6 +85,14 @@ jobs:
       - name: Verify the composed site layout
         run: pnpm exec vitest run tests/pages-site.test.mjs
 
+      # A published log says "this is how the site was judged", and the claim is only as good as
+      # the files behind it: every log complete by its own `check` and ended in `done`, every
+      # screenshot it names in the tree, its committed page what the log renders to today, and the
+      # gallery's numbers the logs' numbers. judge.test.mjs is the log tool's own contract, and
+      # takes real screenshots in Chromium.
+      - name: Verify the demo sites and their judgment logs
+        run: pnpm exec vitest run examples/sites/
+
       - name: Run vlmkit dogfood state matrix
         shell: bash
         run: |
@@ -98,6 +110,17 @@ jobs:
           node --experimental-strip-types src/cli/vlmkit.ts gates run \
             --config examples/vlmkit-intro-page/vlmkit.gates.json \
             --output test-results/vlmkit-intro-page-gates \
+            --show-output
+
+      # Integrity at three widths and contrast on every published demo page and the gallery, served
+      # the way Pages serves them (under /sites/). The config's webServer brings the intro page's
+      # server up. The judged gate sets are in each site's log; this is the tripwire for a change
+      # made after the judging.
+      - name: Run vlmkit gates on the demo sites and the gallery
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts gates run \
+            --config examples/sites/vlmkit.gates.json \
+            --output test-results/demo-sites-gates \
             --show-output
 
       # Gated with `?animate=0&seed=1`: the deal is a ~960ms staggered flight and the shuffle is

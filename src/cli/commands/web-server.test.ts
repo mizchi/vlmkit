@@ -155,6 +155,34 @@ describe("withWebServer", () => {
     }
   });
 
+  it("adopts a server on a port the Fetch standard refuses to connect to", async () => {
+    // The landing page's server is on 4190, one of fetch's "bad ports". The probe used fetch, never
+    // saw the server, spawned a second one that died on EADDRINUSE, and blamed "the command itself".
+    const { createServer } = await import("node:http");
+    let listener: ReturnType<typeof createServer> | undefined;
+    let port: number | undefined;
+    for (const candidate of [10080, 6666, 6667, 6668, 6669, 6665, 5061, 5060, 4190]) {
+      const attempt = createServer((_, response) => response.end("ok"));
+      const bound = await new Promise<boolean>((ok) => {
+        attempt.once("error", () => ok(false));
+        attempt.listen(candidate, "127.0.0.1", () => ok(true));
+      });
+      if (bound) {
+        listener = attempt;
+        port = candidate;
+        break;
+      }
+    }
+    assert.ok(listener && port, "no port from fetch's bad-port list could be bound here");
+    try {
+      const spec: GateWebServer = { command: "exit 9", url: `http://127.0.0.1:${port}/`, timeout: 5_000, reuseExistingServer: true };
+      const started = await startWebServer(spec, tmpdir(), () => {});
+      assert.equal(started.reused, true, `a server answering on ${port} is adopted, not started again`);
+    } finally {
+      await new Promise((closed) => listener!.close(closed));
+    }
+  });
+
   it("blames the command, not the timeout, when the server dies before serving", async () => {
     const spec: GateWebServer = {
       command: "exit 3",

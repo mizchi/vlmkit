@@ -1,0 +1,153 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "steps": [
+    {
+      "label": "検索 opens the search panel and moves focus into the field",
+      "do": {
+        "action": "click",
+        "selector": "#search-toggle"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#search-toggle",
+          "name": "aria-expanded",
+          "equals": "true"
+        },
+        {
+          "assert": "visible",
+          "selector": "#search-panel"
+        },
+        {
+          "assert": "focused",
+          "selector": "#search-input"
+        }
+      ]
+    },
+    {
+      "label": "type a section name",
+      "do": {
+        "action": "fill",
+        "selector": "#search-input",
+        "value": "本"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#search-input"
+        }
+      ]
+    },
+    {
+      "label": "Enter submits the form and lists the two 本 articles",
+      "do": {
+        "action": "press",
+        "key": "Enter",
+        "selector": "#search-input"
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": "#search-status",
+          "contains": "「本」に一致する記事が2件あります。"
+        },
+        {
+          "assert": "count",
+          "selector": "#search-results li",
+          "equals": 2
+        }
+      ]
+    },
+    {
+      "label": "Escape closes the panel and returns focus to the 検索 button",
+      "do": {
+        "action": "press",
+        "key": "Escape",
+        "selector": "#search-input"
+      },
+      "expect": [
+        {
+          "assert": "hidden",
+          "selector": "#search-panel"
+        },
+        {
+          "assert": "attr",
+          "selector": "#search-toggle",
+          "name": "aria-expanded",
+          "equals": "false"
+        },
+        {
+          "assert": "focused",
+          "selector": "#search-toggle"
+        }
+      ]
+    },
+    {
+      "label": "リンクをコピー is pressed; the live region exists before anything is written to it",
+      "do": {
+        "action": "click",
+        "selector": "#copy-link"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#share-status",
+          "name": "role",
+          "equals": "status"
+        }
+      ]
+    },
+    {
+      "label": "within 100ms (the clipboard promise has settled) the confirmation is shown",
+      "do": {
+        "action": "wait",
+        "ms": 100
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": "#share-status",
+          "contains": "リンクをコピーしました"
+        },
+        {
+          "assert": "visible",
+          "selector": "#share-status"
+        }
+      ]
+    },
+    {
+      "label": "保存 toggles on",
+      "do": {
+        "action": "click",
+        "selector": "#save"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#save",
+          "name": "aria-pressed",
+          "equals": "true"
+        }
+      ]
+    },
+    {
+      "label": "保存 toggles off again",
+      "do": {
+        "action": "press",
+        "key": "Enter",
+        "selector": "#save"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#save",
+          "name": "aria-pressed",
+          "equals": "false"
+        }
+      ]
+    }
+  ]
+}

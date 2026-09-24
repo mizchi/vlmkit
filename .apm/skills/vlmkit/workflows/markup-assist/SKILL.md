@@ -1,6 +1,6 @@
 ---
 name: markup-assist
-description: General-purpose deterministic verification for any HTML/CSS work — no API key, no reference design required, no project setup. Route by task; run the matching vlmkit gate (integrity / copy / layout / breakpoints / scroll / handlers / interactions / verify markup); read the kickback; fix; re-run to green. Use whenever you wrote or edited markup and want to know if it is actually correct — broken-page defects, copy fidelity, responsive boundaries, keyboard operability, design-target match — instead of eyeballing a screenshot. Works standalone in any repo via `npx vlmkit`; this is the drop-in generalist skill, distinct from the full-workflow skills (auto-markup / mock-markup / dynamic-markup).
+description: General-purpose deterministic verification for any HTML/CSS work — no API key, no reference design required, no project setup. Route by task; run the matching vlmkit gate (integrity / copy / layout / breakpoints / scroll / handlers / interactions / verify markup); read the kickback; fix; re-run to green. Use whenever you wrote or edited markup and want to know if it is actually correct — broken-page defects, copy fidelity, responsive boundaries, keyboard operability, design-target match — and then look at the screenshots, because the gates do not see what a page means. Works standalone in any repo via `npx vlmkit`; this is the drop-in generalist skill, distinct from the full-workflow skills (auto-markup / mock-markup / dynamic-markup).
 metadata:
   internal: true
 ---
@@ -80,6 +80,17 @@ check interactions → no suspects
 
 Re-run only the failing gate while iterating; re-run the whole set
 once before declaring done. Warns are acceptable; suspects are not.
+
+**Then look at it.** Green gates are not the end of the loop. Take
+full-page screenshots at desktop and phone width (one screen per image,
+so text stays readable) and of every state the task names — a menu
+open, an error shown, a second theme — read each one, and write down
+what is in it before deciding it is fine. A defect the eye finds is a
+defect: fix it, re-shoot, look again. In this repo's demo-site round
+(2026-09-23, six sites built by agents with every gate available) 96 of
+136 defects were found only by looking — a word stranded on its own
+line, a layout cramped at 768px, a state that did not show, a drawing
+that read as something else — against 40 found by a gate.
 
 ## Rules the gates enforce (do not fight them)
 

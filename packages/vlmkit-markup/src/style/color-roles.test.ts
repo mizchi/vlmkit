@@ -271,6 +271,22 @@ describe("judgeColorRoles", () => {
     );
     assert.deepEqual(report.findings.filter((f) => f.kind === "control-boundary-invisible"), []);
     assert.equal(report.controls.length, 1, "an exemption hides the finding, not the measurement");
+    assert.deepEqual(report.unusedAllow, [], "and a rule that matched is not reported as unused");
+  });
+
+  it("says when an --allow rule matched nothing, as design and composition do", () => {
+    // This gate filtered with its own copy of the allow closure, and the copy
+    // never recorded which rules matched: a mistyped selector did nothing and
+    // said nothing. The three style gates share one filter now.
+    const bad = control({ selector: "input#search", best: 0, fillHex: null, borderHex: null });
+    const report = judgeColorRoles(
+      input({ controls: [bad], links: [link()] }),
+      { allow: ["input#serach;typo'd, so it exempts nothing"] },
+    );
+    assert.deepEqual(report.unusedAllow, ["input#serach;typo'd, so it exempts nothing"]);
+    assert.equal(report.findings.filter((f) => f.kind === "control-boundary-invisible").length, 1, "the finding stands");
+    const text = formatColorRolesReport(report).replace(/\x1b\[[0-9;]*m/g, "");
+    assert.match(text, /1 --allow rule\(s\) matched nothing: input#serach/);
   });
 });
 
@@ -301,10 +317,18 @@ describe("COLLECT_COLOR_ROLES", () => {
       p.cued a { text-decoration: underline; }
     </style>
     <div class="panel">
+      <svg class="icon" width="12" height="12" style="border: 2px solid #aa11bb"></svg>
       <input id="ghost" type="email"><input id="marked" type="email"><input id="shadowed" type="email">
       <p>A sentence long enough to count as prose with <a href="#x">a bare link</a> in it.</p>
       <p class="cued">A sentence long enough to count as prose with <a href="#y">an underlined link</a> in it.</p>
-    </div>`;
+      <details><summary>More</summary>
+        <div style="background: #abcdef; width: 200px; height: 50px">collapsed, never painted</div>
+      </details>
+    </div>
+    <div style="height: 2000px"></div>
+    <footer style="content-visibility: auto; contain-intrinsic-size: auto 80px">
+      <div style="background: #fedcba; height: 40px">below the fold, painted when reached</div>
+    </footer>`;
     const browser = await chromium.launch();
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
@@ -313,6 +337,23 @@ describe("COLLECT_COLOR_ROLES", () => {
 
       // oklch() on the body resolves, which is the whole of the parser fix.
       assert.equal(input.baseHex, "#fbfcfd");
+
+      // The selector a colour's sample carries is the shared one. This collector
+      // used to name the icon below `div.panel>svg.[object`, reading an SVG's
+      // class through toString(); STYLE_SAMPLING_JS does not read it at all.
+      // What counts as paint. A closed details element's content is never drawn
+      // until opened, yet its box still reports a size (asking forces layout), so
+      // a size test alone counts it; checkVisibility does not. An off-screen
+      // content-visibility: auto section IS the page's paint, so it stays, which
+      // is why this is not the shared visible(), a geometry answer that skips it.
+      const surfaces = input.palette.surfaces.map((s) => s.hex);
+      assert.equal(surfaces.includes("#abcdef"), false, "collapsed details content is not painted");
+      assert.equal(surfaces.includes("#fedcba"), true, "an off-screen content-visibility: auto footer is");
+
+      // Each painted side is its own sample, so this is "every sample", not "one".
+      const iconBorder = input.palette.marks.find((m) => m.hex === "#aa11bb");
+      assert.ok(iconBorder && iconBorder.samples.length > 0, "the icon's border is a mark");
+      assert.deepEqual([...new Set(iconBorder.samples)], ["div.panel>svg"]);
       assert.deepEqual(input.unreadable, [], "nothing on this page is unreadable");
 
       const byId = new Map(input.controls.map((c) => [c.selector.replace(/^.*#/, "#"), c]));
