@@ -484,6 +484,19 @@ vlmkit check color --elements scene.json
 Findings name elements by `path`, and `--allow` matches that path. A field or link with
 nothing opaque behind it is listed as skipped rather than measured against an assumed white.
 
+#### `check design` on a scene
+
+```bash
+vlmkit check design --elements scene.json
+```
+
+Elements are grouped by `role` (any string: `button`, `card`, `tab`…), or by heading level
+(`heading: 1` or an `h1`-`h6` tag). Within a role, `padding` (one number or
+`[top, right, bottom, left]`), `radius`, `border`, `background`, `font_size` and
+`font_weight` form the style signature, which is the same signature a page's computed style
+produces. Elements without a role are counted as skipped by `tag`. `--exclude` is refused:
+a scene holds only what you wrote into it.
+
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
@@ -492,7 +505,7 @@ vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 A
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
-vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
+vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config; --elements for a scene)
 vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy
 vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning (--elements for a scene)
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components

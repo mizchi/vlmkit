@@ -206,8 +206,19 @@ Still to do on the DOM side:
   one's threshold first: not all of them use 0.03928.
 - Let the DOM collectors emit `SceneElement`s directly, so one page collection feeds
   integrity, composition and colour. That is the "collect once, judge many" of phase 3.
-- A `DesignSample` adapter for `check design`. Its signature is a joined style string, so the
-  scene would need a `signature` field or the judge would need to build one from the fields.
+- ~~A `DesignSample` adapter for `check design`.~~ Done: `vlmkit check design --elements`.
+  The judge now builds the signature: `COLLECT_DESIGN_SAMPLES` ships `DesignStyleSample`
+  facts (padding, radius, border width, background, font size and weight, text-free), and
+  `designSample` joins them into the `signature` / `boxSignature` / `described` strings the
+  page used to build. Old-shape samples are still accepted. **`check design --json` on 16
+  pages is byte-identical before and after**; between them those pages have 117 roles, with
+  both drift and coherent verdicts.
+
+  `sceneToDesignPolicyInput` groups elements by `role` (free-form here, as an ARIA role is)
+  or heading level. It serialises backgrounds the way Chromium does, so `#3b82f6` and
+  `rgb(59, 130, 246)` land in one signature. `design-scene-parity.test.ts` runs the real
+  collector and the scene adapter on one page and requires identical roles, reuse, and drift
+  messages (the dominant style spelled out). Dropping the adapter's radius mapping fails it.
 
 Next judges to move, ranked by pure functions already exported:
 

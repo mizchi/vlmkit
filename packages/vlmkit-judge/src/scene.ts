@@ -21,6 +21,7 @@ import { UsageError } from "./errors.ts";
 import { blendColor, compositeBackground, parseColor, toHex, type Rgb, type Rgba } from "./color.ts";
 import type { CompositionBox, CompositionInput } from "./composition.ts";
 import type { ColorRolesInput, ColorUse, ControlSample, LinkSample } from "./color-roles.ts";
+import type { DesignPolicyInput, DesignSpacingSample, DesignStyleSample } from "./design-policy.ts";
 import {
   findTextCollisions,
   judgeAlignment,
@@ -99,6 +100,8 @@ export interface SceneElement {
   border?: number;
   /** Corner radius, px. */
   radius?: number;
+  /** px: one number for all four sides, or `[top, right, bottom, left]`. Part of the style signature `check design` compares. */
+  padding?: number | [number, number, number, number];
 
   // --- role: unlocks check color's two WCAG rules ---------------------------------
   /**
@@ -108,8 +111,12 @@ export interface SceneElement {
    * its nearest recorded ancestor (WCAG 1.4.1 compares their inks) and the flow's own `text`
    * — without the link's — being the prose it counts. `button`: interactive,
    * counted in the interactive ink but judged by neither rule.
+   *
+   * `check design` reads the role too, as the DOM path reads an ARIA role: elements that
+   * share one are expected to share a style. Any string groups there (`card`, `tab`, …);
+   * only the three above mean anything to `check color`.
    */
-  role?: "field" | "link" | "button";
+  role?: string;
   /** Resolved colour of the border `border` px wide. A field's strongest drawn edge. */
   borderColor?: string;
   /** A link's non-colour cue. */
@@ -176,7 +183,8 @@ export function parseSceneElements(source: string | unknown): SceneElement[] {
       ...(num(record.heading) !== undefined ? { heading: num(record.heading)! } : {}),
       ...(num(record.border) !== undefined ? { border: num(record.border)! } : {}),
       ...(num(record.radius) !== undefined ? { radius: num(record.radius)! } : {}),
-      ...(str(record.role) ? { role: parseRole(str(record.role)!, index) } : {}),
+      ...(str(record.role) ? { role: str(record.role)! } : {}),
+      ...(parsePadding(record.padding) ? { padding: parsePadding(record.padding)! } : {}),
       ...(str(pick("borderColor", "border_color")) ? { borderColor: str(pick("borderColor", "border_color"))! } : {}),
       ...(record.underline === true ? { underline: true } : {}),
       ...(record.shadow === true ? { shadow: true } : {}),
@@ -745,6 +753,9 @@ function backgroundBehind(
   return { kind: "none" };
 }
 
+/** The roles `check color` reads; any other role is `check design`'s grouping only. */
+const COLOR_ROLES = new Set(["field", "link", "button"]);
+
 /**
  * The `check color` snapshot for a scene: the palette by role, and the samples the two WCAG
  * rules read — fields from `role: "field"`, links from `role: "link"` with their nearest
@@ -795,7 +806,7 @@ export function sceneToColorRolesInput(
     if ((element.border ?? 0) > 0 && border && border[3] > 0.05) {
       add(tally.marks, toHex(border), Math.round((element.border ?? 0) * 2 * (element.width + element.height)), element.path);
     }
-    if (element.role && element.color) {
+    if (COLOR_ROLES.has(element.role ?? "") && element.color) {
       const ink = inkOf(element);
       if (ink) add(tally.interactive, ink, area, element.path);
     }
@@ -863,13 +874,78 @@ export function sceneToColorRolesInput(
 }
 
 // ---------------------------------------------------------------------------
+// check design
 
-const ROLES = new Set(["field", "link", "button"]);
-function parseRole(role: string, index: number): "field" | "link" | "button" {
-  if (!ROLES.has(role)) {
-    throw new UsageError(`elements[${index}].role is "${role}"; the roles check color reads are field, link and button.`);
+/**
+ * A colour as Chromium's `getComputedStyle` spells it — `rgb(r, g, b)`, `rgba(r, g, b, a)`,
+ * and `rgba(0, 0, 0, 0)` for nothing — because the design signature compares backgrounds as
+ * strings. A scene's `#262b33` and `rgb(38, 43, 51)` must land in one signature.
+ */
+function computedColorString(value: string | undefined): string {
+  const c = parseColor(value);
+  if (!c || c[3] <= 0) return "rgba(0, 0, 0, 0)";
+  const rgb = c.slice(0, 3).map(Math.round).join(", ");
+  if (c[3] >= 1) return `rgb(${rgb})`;
+  return `rgba(${rgb}, ${Number(c[3].toFixed(3))})`;
+}
+
+const SIDES = ["Top", "Right", "Bottom", "Left"] as const;
+
+/**
+ * The `check design` snapshot for a scene: one style sample per element that has a role,
+ * and its padding as spacing samples.
+ *
+ * The role is what the DOM path infers from an ARIA role or the tag: here it is `role`, or
+ * `h1`-`h6` for a heading. Elements without one are skipped and tallied by `tag`, as the
+ * page does, so a scene that declared no roles reads as "nothing judged" rather than as
+ * coherent. The signature fields are the page's — padding, corner radius, border width,
+ * background, font size and weight — and `designSample` joins them, so a scene is compared
+ * in the same signature space as a page.
+ */
+export function sceneToDesignPolicyInput(elements: readonly SceneElement[]): DesignPolicyInput {
+  const samples: DesignStyleSample[] = [];
+  const spacing: DesignSpacingSample[] = [];
+  const skippedTags: Record<string, number> = {};
+  let skipped = 0;
+  for (const element of elements) {
+    if (element.width < 2 || element.height < 2) continue;
+    const pad = element.padding;
+    const padding: [number, number, number, number] = pad === undefined
+      ? [0, 0, 0, 0]
+      : typeof pad === "number" ? [pad, pad, pad, pad] : pad;
+    padding.forEach((value, i) => {
+      if (value > 0) spacing.push({ selector: element.path, property: `padding${SIDES[i]}`, value });
+    });
+    const headingFromTag = /^h[1-6]$/i.test(element.tag) ? element.tag.toLowerCase() : undefined;
+    const role = element.role ?? (element.heading ? `h${element.heading}` : headingFromTag);
+    if (!role) {
+      skipped++;
+      skippedTags[element.tag] = (skippedTags[element.tag] ?? 0) + 1;
+      continue;
+    }
+    samples.push({
+      role,
+      selector: element.path,
+      padding,
+      radius: element.radius ?? 0,
+      borderWidth: element.border ?? 0,
+      background: computedColorString(element.background),
+      fontSize: element.fontSize ?? 16,
+      fontWeight: String(element.fontWeight ?? 400),
+      textFree: !(element.text ?? "").trim(),
+    });
   }
-  return role as "field" | "link" | "button";
+  return { samples, spacing, skipped, skippedTags, statefulSkipped: 0 };
+}
+
+// ---------------------------------------------------------------------------
+
+function parsePadding(value: unknown): number | [number, number, number, number] | undefined {
+  if (num(value) !== undefined) return num(value)!;
+  if (Array.isArray(value) && value.length === 4 && value.every((v) => num(v) !== undefined)) {
+    return value as [number, number, number, number];
+  }
+  return undefined;
 }
 
 function str(value: unknown): string | undefined {

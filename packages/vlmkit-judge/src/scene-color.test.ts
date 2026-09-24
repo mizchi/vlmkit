@@ -96,10 +96,10 @@ describe("parsing the colour fields", () => {
     assert.equal(element!.shadow, true);
   });
 
-  it("rejects a role no rule reads, naming the ones that exist", () => {
-    assert.throws(
-      () => parseSceneElements([{ path: "a", tag: "x", top: 0, left: 0, width: 1, height: 1, role: "checkbox" }]),
-      /field, link and button/,
-    );
+  it("keeps any other role for check design's grouping, and check color ignores it", () => {
+    const [element] = parseSceneElements([{ path: "a", tag: "x", top: 0, left: 0, width: 10, height: 10, role: "card", color: "#123456" }]);
+    assert.equal(element!.role, "card");
+    const input = sceneToColorRolesInput([element!], { width: 10, height: 10 });
+    assert.deepEqual(input.interactiveInk, [], "a card is not interactive ink");
   });
 });

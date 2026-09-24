@@ -18,12 +18,14 @@ import {
   formatDesignReport,
   parseDesignAllowRules,
   runDesignPolicyCheck,
+  runSceneDesignPolicyCheck,
   type DesignPolicyOptions,
   type DesignPolicyReport,
 } from "../style/design-policy.ts";
-import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
-export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions>({
+export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions & { elementsPath?: string }>({
   id: "check.design",
   command: ["check", "design"],
   title: "Design-system coherence",
@@ -62,7 +64,13 @@ docs/design/design-policy-metrics.md`,
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check (omit when using --elements)", positional: 0 },
+    {
+      name: "elements",
+      placeholder: "scene.json",
+      kind: "path",
+      description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Groups by `role`; padding/radius/border/background/font form the signature",
+    },
     { name: "min-reuse", kind: "number", description: "Times each style must be reused", defaultDescription: "3" },
     { name: "min-instances", kind: "number", description: "Instances before a role is judged", defaultDescription: "3" },
     {
@@ -89,7 +97,29 @@ docs/design/design-policy-metrics.md`,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check design <html-or-url>", ["--min-reuse", "--min-instances", "--exclude", "--allow"]);
+    const valueFlags = ["--min-reuse", "--min-instances", "--exclude", "--allow", "--elements"];
+    const elements = readFlag(argv, "elements");
+    if (elements) {
+      // Mutually exclusive with a page, as in `check integrity` and `check color`.
+      if (firstPositionalOrUndefined(argv, valueFlags)) {
+        throw new UsageError("check design takes either a page source or --elements, not both.");
+      }
+      if (readAll(argv, "exclude").length > 0) {
+        throw new UsageError("--exclude scopes a page's DOM; a scene is already the elements you chose to write, so leave the vendor subtree out of it.");
+      }
+      const minReuse = readNumber(argv, "min-reuse", { min: 0 });
+      const minInstances = readInt(argv, "min-instances", { min: 1 });
+      const allow = readAll(argv, "allow");
+      parseDesignAllowRules(allow);
+      return {
+        source: elements,
+        elementsPath: elements,
+        ...(minReuse !== undefined ? { minReuse } : {}),
+        ...(minInstances !== undefined ? { minInstances } : {}),
+        ...(allow.length > 0 ? { allow } : {}),
+      };
+    }
+    const source = firstPositional(argv, "vlmkit check design <html-or-url> | --elements <scene.json>", valueFlags);
     // Validated at read time: `--min-reuse abc` used to become NaN, and since
     // every `reuse >= NaN` comparison is false, the gate reported every role
     // as drifting instead of saying the flag was wrong.
@@ -117,7 +147,9 @@ docs/design/design-policy-metrics.md`,
       ...(har ? { har } : {}),
     };
   },
-  run: (options) => runDesignPolicyCheck(options),
+  run: (options) => (options.elementsPath
+    ? runSceneDesignPolicyCheck({ ...options, elementsPath: options.elementsPath })
+    : runDesignPolicyCheck(options)),
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,
