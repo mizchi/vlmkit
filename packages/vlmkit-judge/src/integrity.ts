@@ -1,0 +1,1120 @@
+/**
+ * Reference-free page integrity gate (`check integrity`).
+ *
+ * The reference-full gates (verify markup, check copy --target) need a
+ * target image or manifest. Creative/zero-shot markup has neither —
+ * but a page can still be *defective* in ways that need no reference:
+ * JS errors that stopped UI construction, an empty render, broken
+ * resources, colliding or clipped text, collapsed containers,
+ * horizontal page overflow, and a stylesheet that never applied.
+ *
+ * This is Layer A of docs/design/creative-markup-eval.md: every probe
+ * is deterministic (DOM measurement + pixel math), every finding
+ * carries selector attribution, and every *exempted* candidate is kept
+ * in the report with its reason — exemption is the tool's judgment,
+ * never the consuming agent's.
+ *
+ * Defect classes (A1-A9):
+ *   A1 js-error            pageerror/console.error, construction vs post-load
+ *   A2 degenerate-render   screenshot has no components / almost no ink
+ *   A3 broken-image / failed-stylesheet / broken-font
+ *   A4 text-collision      in-flow text blocks overlap (overlay layers exempt)
+ *   A5 text-clipped        text cut behind overflow:hidden (ellipsis exempt)
+ *   A6 collapsed-container zero-height box with tall in-flow children
+ *   A7 page-overflow-x / clipped-content / nested-scroll (scan scroll reuse)
+ *   A8 unstyled-page       every declared stylesheet failed to load (wire-detected)
+ *   A9 all of the above swept across multiple viewports
+ *   A10 container-protrusion  in-flow child sticks out of a painted parent
+ *                             (positioned overlays and breakouts exempt)
+ *   A11 invisible-text / low-contrast-text  solid backgrounds only;
+ *                             composite backgrounds are skipped visibly
+ *   A12 near-misalignment  siblings share an edge exactly, one is 2-8px off
+ *
+ * CLI:
+ *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
+ */
+import type { IntegrityAllowRule } from "./integrity-allow.ts";
+
+export type IntegrityFindingKind =
+  | "js-error"
+  | "degenerate-render"
+  | "broken-image"
+  | "failed-stylesheet"
+  | "broken-font"
+  | "text-collision"
+  | "text-clipped"
+  | "collapsed-container"
+  | "page-overflow-x"
+  | "clipped-content"
+  | "nested-scroll"
+  | "unstyled-page"
+  | "container-protrusion"
+  | "invisible-text"
+  | "low-contrast-text"
+  | "near-misalignment"
+  | "occluded-text"
+  | "redirected"
+  // Not a defect in the page: the run's own network fixture is out of date.
+  | "stale-har-fixture";
+
+export interface IntegrityFinding {
+  kind: IntegrityFindingKind;
+  /** fail = defect (flips the verdict); warn = suspicious but not conclusive. */
+  severity: "fail" | "warn";
+  /**
+   * Canonical viewport width for this finding: the WIDEST width it was observed
+   * at. Widest rather than "first swept" because the sweep is sorted internally
+   * — attribution must not depend on the order the caller listed its widths in.
+   */
+  viewport: number;
+  /**
+   * Every swept width where this finding appeared, widest first. A defect
+   * present everywhere reads very differently from a mobile-only one, and the
+   * single `viewport` field could not tell them apart.
+   */
+  viewports?: number[];
+  selector?: string;
+  message: string;
+  evidence?: Record<string, unknown>;
+}
+
+/**
+ * A candidate the tool matched but exempted on an intentional-pattern
+ * rule. Kept in the report so the exemption is visibly the TOOL's
+ * judgment — a reviewing agent audits the rule, it does not re-litigate
+ * the finding.
+ */
+export interface IntegrityExemption {
+  kind: IntegrityFindingKind;
+  viewport: number;
+  selector?: string;
+  reason: string;
+}
+
+export interface IntegrityViewportStats {
+  width: number;
+  height: number;
+  components: number;
+  inkRatio: number;
+  textBlocks: number;
+}
+
+export interface IntegrityReport {
+  source: string;
+  verdict: "clean" | "defects";
+  /**
+   * `--allow` rules that matched nothing this run. Surfaced so an exemption
+   * outliving the pattern it covered gets deleted instead of quietly widening
+   * the blind spot.
+   */
+  unusedAllowRules?: IntegrityAllowRule[];
+  findings: IntegrityFinding[];
+  exempted: IntegrityExemption[];
+  viewports: IntegrityViewportStats[];
+  /** Paste-ready fix list, one line per fail/warn, selector-attributed. */
+  kickback: string[];
+}
+
+// ---------------------------------------------------------------------------
+// A1 — runtime errors
+
+/**
+ * Which origin an error came from.
+ *
+ * `unknown` is not `first`. A console message with no location — and the browser omits one
+ * for some internal notices — must not be attributed to the page's own code just because
+ * nothing contradicted it.
+ */
+export type RuntimeParty = "first" | "third" | "unknown";
+
+export interface RuntimeEvent {
+  type: "pageerror" | "console-error";
+  text: string;
+  /** Whether the error fired before or after the window load event. */
+  phase: "construction" | "post-load";
+  /**
+   * The script or document URL the browser attributed the error to — a `pageerror`'s first
+   * stack frame, or a console message's own location. Absent when it reported none.
+   */
+  sourceUrl?: string;
+  /**
+   * First- or third-party, by origin. Optional: an event recorded before this field
+   * existed, or built by hand, is treated as `first` and keeps its old severity — the
+   * conservative direction, since `third` is what downgrades a fail to a warn.
+   */
+  party?: RuntimeParty;
+}
+
+/**
+ * The first URL in a stack trace — the frame the exception was thrown from.
+ *
+ * Exported and pure because the alternative is asserting on it through a browser. Matches
+ * `http(s)` and `file` because a `check integrity` run on a local HTML file gets `file://`
+ * frames, and treating those as "no source" would leave every local run unattributed.
+ */
+export function firstStackUrl(stack: string | undefined): string | undefined {
+  if (!stack) return undefined;
+  const match = /(?:https?|file):\/\/[^\s)'"]+/.exec(stack);
+  return match?.[0];
+}
+
+/**
+ * First- or third-party, by comparing origins.
+ *
+ * `file://` URLs have origin `"null"` in the URL parser, so a local run is compared on the
+ * directory prefix instead — otherwise every frame of a `file://` page reads as
+ * third-party and the gate stops failing on the page's own broken script.
+ */
+export function classifyRuntimeParty(url: string | undefined, pageUrl: string): RuntimeParty {
+  if (!url) return "unknown";
+  if (url.startsWith("file://") || pageUrl.startsWith("file://")) {
+    if (!url.startsWith("file://") || !pageUrl.startsWith("file://")) return "third";
+    const dir = (u: string) => u.slice(0, u.lastIndexOf("/") + 1);
+    return dir(url) === dir(pageUrl) ? "first" : "third";
+  }
+  try {
+    return new URL(url).origin === new URL(pageUrl).origin ? "first" : "third";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Drop console errors that are the browser narrating a request failure already reported
+ * from the wire.
+ *
+ * Chromium logs `Failed to load resource: …` with the failed URL as the message's own
+ * location, and `judgeNetworkFailures` reports that same URL with the resource type, the
+ * reason, and the right severity. Keeping both produced the vite.dev dogfood's seven warns
+ * for one cause, with the useful row buried among the echoes.
+ *
+ * Only the exact-URL matches go: a console error thrown from *inside* a third-party script
+ * whose fetch failed is a different fact and stays, now attributed to that script's origin.
+ */
+export function correlateRuntimeEvents(
+  events: readonly RuntimeEvent[],
+  netFailures: readonly NetworkFailure[],
+): { events: RuntimeEvent[]; suppressed: RuntimeEvent[] } {
+  const failedUrls = new Set(netFailures.map((f) => f.url));
+  const kept: RuntimeEvent[] = [];
+  const suppressed: RuntimeEvent[] = [];
+  for (const e of events) {
+    const echoesAFailedRequest = e.type === "console-error"
+      && e.sourceUrl !== undefined
+      && failedUrls.has(e.sourceUrl)
+      && /failed to load resource|net::ERR_|ERR_[A-Z_]+/i.test(e.text);
+    (echoesAFailedRequest ? suppressed : kept).push(e);
+  }
+  return { events: kept, suppressed };
+}
+
+/** `cdn.example.com` from a URL, for a message that has to stay one line. */
+function hostOf(url: string | undefined): string {
+  if (!url) return "unknown origin";
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
+export function classifyRuntimeEvents(events: RuntimeEvent[], viewport: number): IntegrityFinding[] {
+  const findings: IntegrityFinding[] = [];
+  for (const e of events) {
+    // Absent party means "not measured", which keeps the pre-attribution severity. Only an
+    // explicit `third` downgrades, and only `third` because that is the one case where the
+    // page's own code is demonstrably not at fault.
+    const third = e.party === "third";
+    const from = third ? ` from third-party script ${hostOf(e.sourceUrl)}` : "";
+    const evidence = {
+      phase: e.phase,
+      text: e.text,
+      ...(e.sourceUrl !== undefined ? { sourceUrl: e.sourceUrl } : {}),
+      ...(e.party !== undefined ? { party: e.party } : {}),
+    };
+    if (e.type === "pageerror") {
+      // A third-party throw during construction is NOT a fail. It is the vendor's bug or a
+      // blocked request, and the page's own build is what this gate is for — the same call
+      // `judgeNetworkFailures` already makes for a cross-origin script that 404s.
+      const fatal = e.phase === "construction" && !third;
+      findings.push({
+        kind: "js-error",
+        severity: fatal ? "fail" : "warn",
+        viewport,
+        message: fatal
+          ? `Uncaught exception during construction (before load): ${e.text} — the UI likely failed to build; fix the script before styling.`
+          : third
+            ? `Uncaught exception${from} during ${e.phase}: ${e.text} — the page's own scripts are unaffected; check whether the request was blocked before blaming your code.`
+            : `Uncaught exception after load: ${e.text} — initial render survived, but interactions may be broken.`,
+        evidence,
+      });
+    } else {
+      findings.push({
+        kind: "js-error",
+        severity: "warn",
+        viewport,
+        message: `console.error${from} during ${e.phase}: ${e.text}`,
+        evidence: { ...evidence, channel: "console" },
+      });
+    }
+  }
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// A2 — degenerate render (pixel side)
+
+/** Fraction of pixels that differ from the corner-sampled background. */
+export function measureInkRatio(data: Uint8Array, width: number, height: number, tolerance = 12): number {
+  if (width <= 0 || height <= 0) return 0;
+  const corners = [
+    0,
+    (width - 1) * 4,
+    (height - 1) * width * 4,
+    ((height - 1) * width + width - 1) * 4,
+  ];
+  const counts = new Map<string, { n: number; r: number; g: number; b: number }>();
+  for (const i of corners) {
+    const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+    const k = `${r >> 3},${g >> 3},${b >> 3}`;
+    const c = counts.get(k) ?? { n: 0, r: 0, g: 0, b: 0 };
+    c.n++; c.r += r; c.g += g; c.b += b;
+    counts.set(k, c);
+  }
+  let bg = { n: -1, r: 255, g: 255, b: 255 };
+  for (const c of counts.values()) if (c.n > bg.n) bg = c;
+  const bgR = Math.round(bg.r / bg.n), bgG = Math.round(bg.g / bg.n), bgB = Math.round(bg.b / bg.n);
+  let ink = 0;
+  const total = width * height;
+  for (let p = 0; p < total; p++) {
+    const i = p * 4;
+    if (Math.abs(data[i]! - bgR) > tolerance
+      || Math.abs(data[i + 1]! - bgG) > tolerance
+      || Math.abs(data[i + 2]! - bgB) > tolerance) ink++;
+  }
+  return ink / total;
+}
+
+export interface RenderStats {
+  componentCount: number;
+  inkRatio: number;
+  /** DOM-side text blocks — a text-only page has few extractable components
+   * (glyphs fall under minArea) but is NOT degenerate. */
+  textBlocks: number;
+}
+
+export function judgeRender(stats: RenderStats, viewport: number): IntegrityFinding | null {
+  const { componentCount, inkRatio, textBlocks } = stats;
+  if (componentCount === 0 && textBlocks === 0) {
+    return {
+      kind: "degenerate-render",
+      severity: "fail",
+      viewport,
+      message: `The rendered page contains no visual components and no text (ink ratio ${(inkRatio * 100).toFixed(2)}%) — nothing but background painted. Usual causes: a construction-phase JS error, a failed stylesheet, or content never appended to the DOM.`,
+      evidence: { componentCount, inkRatio, textBlocks },
+    };
+  }
+  if (textBlocks > 0 && inkRatio < 0.001 && componentCount === 0) {
+    return {
+      kind: "degenerate-render",
+      severity: "fail",
+      viewport,
+      message: `The DOM holds ${textBlocks} text block(s) but almost nothing painted (ink ratio ${(inkRatio * 100).toFixed(2)}%) — the text is likely invisible (foreground equals background, zero-size font, or off-screen).`,
+      evidence: { componentCount, inkRatio, textBlocks },
+    };
+  }
+  if (inkRatio < 0.005 && componentCount < 3 && textBlocks < 5) {
+    return {
+      kind: "degenerate-render",
+      severity: "warn",
+      viewport,
+      message: `Near-empty render: ${componentCount} component(s), ${textBlocks} text block(s), ${(inkRatio * 100).toFixed(2)}% ink. If the brief calls for a full page, most of it is missing.`,
+      evidence: { componentCount, inkRatio, textBlocks },
+    };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// A3 — broken resources
+
+export interface ResourceSample {
+  brokenImages: { selector: string; src: string }[];
+  brokenFonts: string[];
+}
+
+export function judgeResources(sample: ResourceSample, viewport: number): IntegrityFinding[] {
+  const findings: IntegrityFinding[] = [];
+  for (const img of sample.brokenImages) {
+    findings.push({
+      kind: "broken-image",
+      severity: "fail",
+      viewport,
+      selector: img.selector,
+      message: `${img.selector} failed to load its image (${img.src}) — naturalWidth is 0; the page shows a broken-image box or nothing.`,
+      evidence: { src: img.src },
+    });
+  }
+  for (const family of sample.brokenFonts) {
+    findings.push({
+      kind: "broken-font",
+      severity: "warn",
+      viewport,
+      message: `@font-face "${family}" failed to load — text falls back to the next family in the stack.`,
+      evidence: { family },
+    });
+  }
+  return findings;
+}
+
+/**
+ * Subresource load failures observed on the wire (requestfailed +
+ * non-OK responses). This is the authoritative stylesheet/script/font
+ * detector: Chromium attaches an empty CSSStyleSheet to a 404
+ * `<link>` — `link.sheet != null` even when the file never existed —
+ * so DOM-side checks cannot see a dead stylesheet.
+ */
+export interface NetworkFailure {
+  url: string;
+  /** Playwright resourceType: stylesheet | image | font | script | fetch | xhr | ... */
+  resourceType: string;
+  reason: string;
+  /** Origin differs from the page's — third-party resource (danluu
+   * dogfood: a failing analytics beacon must not hard-fail the page's
+   * own markup integrity; a failing same-origin build script must). */
+  crossOrigin?: boolean;
+  /**
+   * The request failed because a `--har` recording has no entry for it, not because
+   * the page's resource is broken. Reported against the fixture instead, since
+   * "re-record the HAR" and "fix the page" are different jobs.
+   */
+  harMiss?: boolean;
+}
+
+export function judgeNetworkFailures(failures: NetworkFailure[], viewport: number): IntegrityFinding[] {
+  const findings: IntegrityFinding[] = [];
+  // A request the `--har` recording never held is a stale fixture, not a broken
+  // page, and the two need different work. Grouped into one finding rather than one
+  // per URL: the action is "re-record", once, however many endpoints have appeared.
+  const misses = failures.filter((f) => f.harMiss === true);
+  if (misses.length > 0) {
+    const tails = misses.slice(0, 4).map((f) => f.url);
+    findings.push({
+      kind: "stale-har-fixture",
+      severity: "fail",
+      viewport,
+      message: `${misses.length} request(s) were aborted because the \`--har\` recording has no entry for them`
+        + `: ${tails.join(", ")}${misses.length > 4 ? `, and ${misses.length - 4} more` : ""}.`
+        + ` The page was measured WITHOUT them, so every finding in this run is suspect.`
+        + ` Re-record the HAR over the same navigation — this is a stale fixture, not a broken page.`,
+      evidence: { urls: misses.map((f) => f.url) },
+    });
+  }
+  for (const f of failures) {
+    // Already reported against the fixture above; blaming the page for it as well
+    // would be the original defect with an extra line.
+    if (f.harMiss === true) continue;
+    const tail = f.url.split("/").pop() ?? f.url;
+    switch (f.resourceType) {
+      case "stylesheet":
+        findings.push({
+          kind: "failed-stylesheet",
+          severity: f.crossOrigin ? "warn" : "fail",
+          viewport,
+          message: f.crossOrigin
+            ? `Third-party stylesheet ${tail} failed to load (${f.reason}) — its rules are not applied; the page's own styling is unaffected.`
+            : `Stylesheet ${tail} failed to load (${f.reason}) — its rules are not applied.`,
+          evidence: { url: f.url, reason: f.reason, crossOrigin: f.crossOrigin ?? false },
+        });
+        break;
+      case "script":
+        findings.push({
+          kind: "js-error",
+          severity: f.crossOrigin ? "warn" : "fail",
+          viewport,
+          message: f.crossOrigin
+            ? `Third-party script ${tail} failed to load (${f.reason}) — usually analytics/widgets; the page's own scripts are unaffected.`
+            : `Script ${tail} failed to load (${f.reason}) — everything it builds or wires is missing.`,
+          evidence: { url: f.url, reason: f.reason, text: `script-load:${tail}`, crossOrigin: f.crossOrigin ?? false },
+        });
+        break;
+      case "font":
+        findings.push({
+          kind: "broken-font",
+          severity: "warn",
+          viewport,
+          message: `Font ${tail} failed to load (${f.reason}) — text falls back to the next family in the stack.`,
+          evidence: { url: f.url, reason: f.reason },
+        });
+        break;
+      case "image":
+        findings.push({
+          kind: "broken-image",
+          severity: "fail",
+          viewport,
+          message: `Image ${tail} failed to load (${f.reason}).`,
+          evidence: { url: f.url, reason: f.reason },
+        });
+        break;
+      case "fetch":
+      case "xhr":
+        findings.push({
+          kind: "js-error",
+          severity: "warn",
+          viewport,
+          message: `Data request ${tail} failed (${f.reason}) — content depending on it is missing.`,
+          evidence: { url: f.url, reason: f.reason, text: `request:${tail}` },
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// A4 — text collision
+
+export interface IntegrityTextBlock {
+  selector: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Some ancestor (or self) is position:absolute/fixed — an overlay layer. */
+  overlay: boolean;
+  /** Effective z-index: nearest non-auto value on self/ancestors, else 0. */
+  zIndex: number;
+  /** Inside an aria-hidden="true" subtree (decorative). */
+  ariaHidden: boolean;
+  /**
+   * Vertical slack (px) between this block's line box and the actual glyph
+   * ink inside it, per edge — half of (line-box height - (ascent+descent))
+   * from canvas font metrics. Used to shrink boxes to their ink band before
+   * the overlap test, which is what keeps a `line-height: 0.8` or negative
+   * `margin-bottom` pull-up from reading as a collision. Absent (0) when
+   * the metrics were unavailable.
+   */
+  inkInset?: number;
+  /**
+   * The box before ancestor clipping, when clipping removed area from it.
+   *
+   * `x/y/width/height` above are the box of the parts that are actually
+   * PAINTED — intersected with every `overflow != visible` ancestor, the same
+   * clamp `COLLECT_OCCLUSIONS` applies and for the same reason. Without it a
+   * text run clipped away by a masked "fade out" container still overlapped
+   * whatever section is laid out below it, and the pair was reported as a
+   * `fail`. Measured on vite.dev's front page: 3 fails at 375/768, every one
+   * of them a testimonial wall clipped by `overflow: clip` + a
+   * `mask-image: linear-gradient(...)` at 800px, overlapping the next
+   * section's real headings 57px past the clip.
+   */
+  unclipped?: { x: number; y: number; width: number; height: number };
+  /** Nearest clipping ancestor that removed area, for the exemption line. */
+  clippedBy?: string;
+  /** Nothing of this text is painted — every rect fell outside the clip. */
+  clippedAway?: boolean;
+}
+
+export interface TextCollisionOptions {
+  /** Minimum horizontal ink overlap (px) before a pair is considered. Default 6. */
+  minOverlapPx?: number;
+  /**
+   * Vertical ink overlap as a fraction of the SHORTER block's ink height.
+   * Default 0.5 — the two glyph bands must genuinely sit on top of each
+   * other, not merely graze.
+   *
+   * This replaced an overlap-area / smaller-block-area ratio (0.25), which
+   * measured the wrong thing: the corpus in
+   * fixtures/collision-fp-corpus shows a real 25x12px graze scoring 0.172
+   * by area while a legitimate `line-height: 1` stack scores 0.077 and a
+   * designed pull-up 0.137 — overlapping populations. By ink fraction the
+   * same three are 1.000 / 0.077 / 0.137: a 7x gap around this threshold.
+   */
+  minInkOverlapFraction?: number;
+  maxFindings?: number;
+}
+
+function clip(text: string, n = 40): string {
+  return text.length > n ? `${text.slice(0, n - 1)}…` : text;
+}
+
+export function findTextCollisions(
+  blocks: IntegrityTextBlock[],
+  viewport: number,
+  options: TextCollisionOptions = {},
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const minPx = options.minOverlapPx ?? 6;
+  const minInkFraction = options.minInkOverlapFraction ?? 0.5;
+  const maxFindings = options.maxFindings ?? 12;
+  const raw: { a: IntegrityTextBlock; b: IntegrityTextBlock; ox: number; oy: number; area: number }[] = [];
+  const exempted: IntegrityExemption[] = [];
+
+  // Clipped-away text is not painted anywhere, so it cannot collide with anything — but
+  // dropping it silently would make this gate quietly measure less than it says. Each such
+  // block that WOULD have collided on its pre-clip box gets one exemption naming the clipper,
+  // which is the reviewable form: the reader sees the pair was considered and why it is not a
+  // finding. One per block rather than one per pair, because a single clipped testimonial wall
+  // overlaps every heading laid out beneath it.
+  const painted = blocks.filter((b) => !b.clippedAway);
+  const clippedAway = blocks.filter((b) => b.clippedAway);
+  const boxesOverlap = (a: IntegrityTextBlock, b: IntegrityTextBlock) => {
+    const ab = a.unclipped ?? a, bb = b.unclipped ?? b;
+    return Math.min(ab.x + ab.width, bb.x + bb.width) - Math.max(ab.x, bb.x) >= minPx
+      && Math.min(ab.y + ab.height, bb.y + bb.height) - Math.max(ab.y, bb.y) >= minPx;
+  };
+  for (const gone of clippedAway) {
+    if (!painted.some((other) => boxesOverlap(gone, other))) continue;
+    exempted.push({
+      kind: "text-collision",
+      viewport,
+      selector: gone.selector,
+      reason: `clipped away by ${gone.clippedBy ?? "an ancestor"} (overflow is not visible) — `
+        + `its box still overlaps text below the clip, but no glyph is painted there`,
+    });
+  }
+
+  for (let i = 0; i < painted.length; i++) {
+    for (let j = i + 1; j < painted.length; j++) {
+      const a = painted[i]!, b = painted[j]!;
+      // One block containing the other is nesting (a wrapper block whose
+      // own text and a child block both bucketed), not a collision.
+      const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      // Compare INK bands vertically, not line boxes. Designed negative
+      // leading (`line-height: 0.8`) and the kicker/heading pull-up
+      // (`margin-bottom: -0.15em`) overlap boxes by several px while the
+      // glyphs keep a clear gap — measured 2px on the kicker idiom, which
+      // this gate used to report as a collision. Shrinking each block to its
+      // measured ink band can only REMOVE findings, so it carries none of
+      // the cry-wolf risk of lowering the floor itself.
+      const aInk = a.inkInset ?? 0;
+      const bInk = b.inkInset ?? 0;
+      const aTop = a.y + aInk, aBottom = a.y + a.height - aInk;
+      const bTop = b.y + bInk, bBottom = b.y + b.height - bInk;
+      const oy = Math.min(aBottom, bBottom) - Math.max(aTop, bTop);
+      if (ox < minPx || oy < minPx) continue;
+      const contains = (o: IntegrityTextBlock, p: IntegrityTextBlock) =>
+        o.x <= p.x && o.y <= p.y && o.x + o.width >= p.x + p.width && o.y + o.height >= p.y + p.height;
+      if (contains(a, b) || contains(b, a)) continue;
+      const area = ox * oy;
+      // Require the glyph bands to genuinely intersect vertically, measured
+      // against the shorter block's ink height. An area ratio cannot express
+      // this: a real graze and a designed negative-leading stack land in the
+      // same range by area, but are 1.000 vs 0.077-0.137 by ink fraction.
+      const minInkHeight = Math.min(
+        Math.max(1, a.height - 2 * aInk),
+        Math.max(1, b.height - 2 * bInk),
+      );
+      if (oy < Math.max(2, minInkFraction * minInkHeight)) continue;
+
+      const pair = { a, b, ox, oy: Math.round(oy * 10) / 10, area };
+      if (a.ariaHidden || b.ariaHidden) {
+        exempted.push({
+          kind: "text-collision",
+          viewport,
+          selector: `${a.selector} x ${b.selector}`,
+          reason: "one side is aria-hidden (decorative layer)",
+        });
+        continue;
+      }
+      if (a.overlay !== b.overlay) {
+        exempted.push({
+          kind: "text-collision",
+          viewport,
+          selector: `${a.selector} x ${b.selector}`,
+          reason: "intentional overlay: one block sits in a positioned (absolute/fixed) layer above the flow",
+        });
+        continue;
+      }
+      if (a.overlay && b.overlay && a.zIndex !== b.zIndex) {
+        exempted.push({
+          kind: "text-collision",
+          viewport,
+          selector: `${a.selector} x ${b.selector}`,
+          reason: `intentional stacking: both are positioned layers with distinct z-index (${a.zIndex} vs ${b.zIndex})`,
+        });
+        continue;
+      }
+      raw.push(pair);
+    }
+  }
+
+  raw.sort((p, q) => q.area - p.area);
+  const findings = raw.slice(0, maxFindings).map((p) => ({
+    kind: "text-collision" as const,
+    severity: "fail" as const,
+    viewport,
+    selector: `${p.a.selector} x ${p.b.selector}`,
+    message: `"${clip(p.a.text)}" (${p.a.selector}) overlaps "${clip(p.b.text)}" (${p.b.selector}) by ${p.ox}x${p.oy}px — same-layer text blocks must not overlap; check negative margins, absolute offsets, or missing clearing.`,
+    evidence: { overlapX: p.ox, overlapY: p.oy, a: p.a.selector, b: p.b.selector },
+  }));
+  if (raw.length > maxFindings) {
+    findings.push({
+      kind: "text-collision",
+      severity: "fail",
+      viewport,
+      selector: "(page)",
+      message: `…and ${raw.length - maxFindings} more colliding pair(s) beyond the report cap — the layout is systematically broken at this width.`,
+      evidence: { overlapX: 0, overlapY: 0, a: "(capped)", b: "(capped)" },
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A5 — clipped text
+
+export interface ClipCandidate {
+  selector: string;
+  text: string;
+  clipX: number;
+  clipY: number;
+  textOverflow: string;
+  lineClamp: string;
+  /** px² of the element's direct text rects that remain inside its box. */
+  textVisibleArea: number;
+  /** ≤2px on both axes — the sr-only/visually-hidden box shape. */
+  srOnlyShaped: boolean;
+  /** background-image or ::before/::after content present — image-replacement signal. */
+  replacement: boolean;
+}
+
+export function judgeClippedText(
+  candidates: ClipCandidate[],
+  viewport: number,
+  maxFindings = 12,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    if (c.textOverflow === "ellipsis") {
+      exempted.push({ kind: "text-clipped", viewport, selector: c.selector, reason: "text-overflow: ellipsis — intentional truncation" });
+      continue;
+    }
+    if (c.lineClamp !== "none" && c.lineClamp !== "") {
+      exempted.push({ kind: "text-clipped", viewport, selector: c.selector, reason: `-webkit-line-clamp: ${c.lineClamp} — intentional truncation` });
+      continue;
+    }
+    // Partial cut vs full hide (csszengarden dogfood, 2026-07-30): a
+    // genuinely broken box cuts PART of the text; image replacement
+    // (Kellum padding, text-indent 100%/-9999px) and sr-only hide ALL
+    // of it. Fully-hidden text with a replacement signal is a pattern,
+    // not a defect.
+    if (c.textVisibleArea < 4) {
+      if (c.srOnlyShaped || c.replacement) {
+        exempted.push({
+          kind: "text-clipped",
+          viewport,
+          selector: c.selector,
+          reason: c.srOnlyShaped
+            ? "visually-hidden (sr-only) pattern — 1px box, text for AT only"
+            : "image replacement — text fully hidden, background-image/pseudo-content carries the visual",
+        });
+        continue;
+      }
+      if (findings.length >= maxFindings) continue;
+      findings.push({
+        kind: "text-clipped",
+        severity: "warn",
+        viewport,
+        selector: c.selector,
+        message: `${c.selector} hides ALL of its text ("${clip(c.text)}") behind overflow:hidden but shows no replacement signal (no background-image, pseudo-content, or sr-only box) — either an unfinished visually-hidden pattern or an accidental full clip; verify intent.`,
+        evidence: { clipX: c.clipX, clipY: c.clipY, textVisibleArea: c.textVisibleArea },
+      });
+      continue;
+    }
+    if (findings.length >= maxFindings) continue;
+    const axis = c.clipX >= c.clipY ? `${c.clipX}px of text horizontally` : `${c.clipY}px of text vertically`;
+    findings.push({
+      kind: "text-clipped",
+      severity: "fail",
+      viewport,
+      selector: c.selector,
+      message: `${c.selector} cuts off ${axis} behind overflow:hidden ("${clip(c.text)}") — readers lose content; widen the box, let it wrap, or add an intentional ellipsis.`,
+      evidence: { clipX: c.clipX, clipY: c.clipY },
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A6 — collapsed containers
+
+export interface CollapseCandidate {
+  selector: string;
+  height: number;
+  tallestChild: number;
+  /** At least one tall child participates in normal flow (not absolute/fixed). */
+  anyInFlowChild: boolean;
+  overflowHidden: boolean;
+}
+
+export function judgeCollapsedContainers(
+  candidates: CollapseCandidate[],
+  viewport: number,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    if (!c.anyInFlowChild) {
+      exempted.push({ kind: "collapsed-container", viewport, selector: c.selector, reason: "zero-height positioning anchor: all tall children are absolute/fixed" });
+      continue;
+    }
+    if (c.overflowHidden) {
+      exempted.push({ kind: "collapsed-container", viewport, selector: c.selector, reason: "overflow:hidden collapse — reads as an intentional hide (accordion/animation pattern)" });
+      continue;
+    }
+    findings.push({
+      kind: "collapsed-container",
+      severity: "fail",
+      viewport,
+      selector: c.selector,
+      message: `${c.selector} is ${c.height}px tall but holds in-flow children up to ${c.tallestChild}px — the container collapsed (classic float/height:0 bug); its content paints over whatever follows.`,
+      evidence: { height: c.height, tallestChild: c.tallestChild },
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A8 — unstyled page
+
+export interface StyleFingerprint {
+  declaredStylesheets: number;
+  /** Resolved URLs of the declared <link rel=stylesheet> elements. */
+  declaredHrefs?: string[];
+  loadedStylesheets: number;
+  styleElements: number;
+  inlineStyleAttrs: number;
+}
+
+// The earlier UA-default-fingerprint warn branch (serif font + 8px body
+// margin + link blue despite loaded stylesheets) was retired 2026-07-30:
+// zero true positives since launch, one false positive (danluu.com's
+// deliberate 4-rule minimalism), and the class it aimed at is carried by
+// the wire-detected fail branch below.
+export function judgeUnstyled(fp: StyleFingerprint, viewport: number): IntegrityFinding | null {
+  const declaredAny = fp.declaredStylesheets + fp.styleElements > 0;
+  if (!declaredAny) return null; // intentionally bare page — not this gate's call
+  if (fp.declaredStylesheets > 0 && fp.loadedStylesheets === 0 && fp.styleElements === 0) {
+    return {
+      kind: "unstyled-page",
+      severity: "fail",
+      viewport,
+      message: `All ${fp.declaredStylesheets} declared stylesheet(s) failed to load and there is no <style> fallback — the page renders with UA defaults.`,
+      evidence: { ...fp },
+    };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// A10 — container protrusion (bbox sticks out of a painted parent)
+
+export interface ProtrusionCandidate {
+  parent: string;
+  /** "(text)" when the parent's own text overflows its box. */
+  child: string;
+  /** Largest px the child border-box exceeds the parent padding box by. */
+  amount: number;
+  /** Child is absolute/fixed — badge/notification overlay pattern. */
+  positioned: boolean;
+  /** Child carries a negative horizontal margin — full-bleed breakout. */
+  negBreakout: boolean;
+  /** Protrusion axis for the message. */
+  axis: "horizontal" | "vertical";
+}
+
+export function judgeProtrusions(
+  candidates: ProtrusionCandidate[],
+  viewport: number,
+  maxFindings = 12,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    const sel = `${c.child} out of ${c.parent}`;
+    if (c.positioned) {
+      exempted.push({ kind: "container-protrusion", viewport, selector: sel, reason: "positioned overlay (badge/notification pattern) — the protrusion is authored" });
+      continue;
+    }
+    if (c.negBreakout && c.axis === "horizontal") {
+      exempted.push({ kind: "container-protrusion", viewport, selector: sel, reason: "negative horizontal margin — full-bleed/breakout pattern" });
+      continue;
+    }
+    if (findings.length >= maxFindings) continue;
+    findings.push({
+      kind: "container-protrusion",
+      severity: "fail",
+      viewport,
+      selector: sel,
+      message: c.child === "(text)"
+        ? `Text inside ${c.parent} sticks out ${c.amount}px past its painted box (overflow is visible) — a long word or fixed width; allow wrapping (overflow-wrap) or widen the box.`
+        : `${c.child} sticks out ${c.amount}px (${c.axis}) past its painted parent ${c.parent} — the child is wider/taller than the container allows; shrink it, let it wrap, or make the overflow an authored overlay (position + z-index).`,
+      evidence: { parent: c.parent, child: c.child, amount: c.amount, axis: c.axis },
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A11 — invisible / low-contrast text (solid backgrounds only)
+
+export interface ContrastCandidate {
+  selector: string;
+  text: string;
+  /** WCAG contrast ratio after alpha/opacity compositing. */
+  ratio: number;
+  fg: string;
+  bg: string;
+  disabled: boolean;
+  /** text-shadow present — may carry the contrast the fill lacks. */
+  shadowed: boolean;
+  /** Computed font-size in px, so the message can say which WCAG floor applied. */
+  fontSizePx?: number;
+  /** WCAG "large text": >=24px, or >=18.66px at weight 700+. */
+  large?: boolean;
+  /** The applicable floor: 3 for large text, 4.5 otherwise. */
+  floor?: number;
+}
+
+export function judgeTextContrast(
+  candidates: ContrastCandidate[],
+  skippedComposite: number,
+  viewport: number,
+  maxFindings = 12,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  // Low-contrast findings are grouped by COLOUR PAIR, not emitted per element.
+  //
+  // A three-row table produced three identical warnings differing only in the row
+  // index, and v6's adopting agent counted what that adds up to: "the same contrast
+  // defect is reported 8 times across two gates […] Three CSS colours, eight lines."
+  // Its conclusion is why this is worth fixing rather than tolerating — "eight lines
+  // for three CSS colours is how a gate becomes something people pass `--advisory`
+  // to."
+  //
+  // The pair plus the applicable floor is the right identity because that is the
+  // shape of the fix: one CSS declaration. Nothing about *where* is lost — the
+  // selectors travel in the evidence, and the message names the first few.
+  const lowContrast = new Map<string, ContrastCandidate[]>();
+  for (const c of candidates) {
+    if (c.disabled) {
+      exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "disabled control — reduced contrast is the platform convention" });
+      continue;
+    }
+    if (c.shadowed) {
+      exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)" });
+      continue;
+    }
+    if (c.ratio < 1.15) {
+      // `invisible-text` stays per element: it is a `fail`, and an invisible element
+      // is a defect at that element rather than a colour choice to revisit.
+      if (findings.length >= maxFindings) continue;
+      findings.push({
+        kind: "invisible-text",
+        severity: "fail",
+        viewport,
+        selector: c.selector,
+        message: `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
+        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
+      });
+      continue;
+    }
+    const key = `${c.fg}\u0000${c.bg}\u0000${c.floor ?? 3}`;
+    lowContrast.set(key, [...(lowContrast.get(key) ?? []), c]);
+  }
+  for (const group of lowContrast.values()) {
+    if (findings.length >= maxFindings) break;
+    const first = group[0]!;
+    const where = group.length === 1
+      ? first.selector
+      : `${group.slice(0, 3).map((c) => c.selector).join(", ")}${group.length > 3 ? `, and ${group.length - 3} more` : ""}`;
+    findings.push({
+      kind: "low-contrast-text",
+      severity: "warn",
+      viewport,
+      // The canonical selector stays the first one, so per-selector tooling and
+      // `--allow` keep working the way they did.
+      selector: first.selector,
+      // Name the floor that applied and why, rather than the old "below the 3:1
+      // floor even for large text" — which was true, read as the contrast
+      // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
+      message: `${first.fg} on ${first.bg} is contrast ${first.ratio.toFixed(2)}:1`
+        + ` — below the ${(first.floor ?? 3).toString()}:1 WCAG AA floor`
+        + (first.fontSizePx !== undefined ? ` for ${first.fontSizePx}px ${first.large ? "large" : "body"} text` : "")
+        + `. ${group.length} element(s): ${where}.`
+        + ` First is "${clip(first.text)}".`,
+      evidence: {
+        ratio: first.ratio,
+        fg: first.fg,
+        bg: first.bg,
+        elements: group.length,
+        selectors: group.map((c) => c.selector),
+        ...(first.floor !== undefined ? { floor: first.floor } : {}),
+        ...(first.fontSizePx !== undefined ? { fontSizePx: first.fontSizePx } : {}),
+      },
+    });
+  }
+  if (skippedComposite > 0) {
+    exempted.push({
+      kind: "low-contrast-text",
+      viewport,
+      selector: "(page)",
+      reason: `${skippedComposite} text block(s) skipped: background-image/gradient in the stack — composite-background contrast is not deterministically measurable (Layer B territory)`,
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A12 — near-misalignment (exactly aligned and clearly offset are both fine;
+// a 2-8px deviation from siblings that otherwise share an edge is a bug)
+
+export interface AlignmentGroup {
+  parent: string;
+  children: { selector: string; left: number; right: number; centerX: number; top: number }[];
+}
+
+const ALIGN_AXES = ["left", "centerX", "right", "top"] as const;
+
+export function judgeAlignment(
+  groups: AlignmentGroup[],
+  viewport: number,
+  maxFindings = 8,
+): IntegrityFinding[] {
+  const findings: IntegrityFinding[] = [];
+  const flagged = new Set<string>();
+  for (const group of groups) {
+    if (group.children.length < 3) continue;
+    // Per axis: the modal value (rounded to .5px) among the children.
+    const modes = new Map<(typeof ALIGN_AXES)[number], { value: number; count: number }>();
+    for (const axis of ALIGN_AXES) {
+      const counts = new Map<number, number>();
+      for (const ch of group.children) {
+        const v = Math.round(ch[axis] * 2) / 2;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      let best = { value: 0, count: 0 };
+      for (const [value, count] of counts) if (count > best.count) best = { value, count };
+      modes.set(axis, best);
+    }
+    for (const axis of ALIGN_AXES) {
+      const mode = modes.get(axis)!;
+      // Require a real shared edge: at least 2 exact members AND at most
+      // 2 deviants (a majority is aligned; scattered values mean the axis
+      // is simply not the alignment axis of this group).
+      if (mode.count < 2 || group.children.length - mode.count > 2) continue;
+      for (const ch of group.children) {
+        const dev = Math.abs(Math.round(ch[axis] * 2) / 2 - mode.value);
+        if (dev < 2 || dev > 8) continue;
+        // Exactly aligned on another axis (e.g. a centered item in a
+        // left-aligned stack) reads as intentional — skip.
+        const alignedElsewhere = ALIGN_AXES.some((other) => {
+          if (other === axis) return false;
+          const m = modes.get(other)!;
+          return m.count >= 2 && Math.abs(Math.round(ch[other] * 2) / 2 - m.value) < 1;
+        });
+        if (alignedElsewhere) continue;
+        if (flagged.has(ch.selector) || findings.length >= maxFindings) continue;
+        flagged.add(ch.selector);
+        findings.push({
+          kind: "near-misalignment",
+          severity: "warn",
+          viewport,
+          selector: ch.selector,
+          message: `${ch.selector} is off its siblings' shared ${axis === "centerX" ? "center line" : `${axis} edge`} by ${dev}px inside ${group.parent} — siblings align exactly; a 2-8px deviation is almost always an accident (stray margin/padding), not a design choice.`,
+          evidence: { axis, deviation: dev, parent: group.parent, sharedValue: mode.value },
+        });
+      }
+    }
+  }
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// A13 — occluded text (z-index / paint-order cover)
+//
+// Text painted OVER by an opaque non-related element. First observed in the
+// wild in S19 (game UI): a CSS figure's absolutely-positioned part covered
+// "Block 0" and half the enemy HP at 375px while every other probe stayed
+// clean — text-collision is text-vs-text, invisible-text is style-based,
+// and neither sees paint order. Detection is hit-testing: sample points on
+// each text rect's glyph band and ask elementFromPoint who actually paints
+// there. A point is occluded when the hit element is unrelated (not self,
+// ancestor, or descendant — whitespace points hit ancestors and stay fine)
+// AND the occluder paints opaquely (solid background-color alpha >= 0.5, a
+// background-image, or a replaced element). Transparent overlays — the
+// stretched-link card pattern, scrims under 0.5 alpha — never flag, which
+// is what kept this probe demand-gated until a real case appeared.
+// Coverage note: samples only what is inside the viewport at load (no
+// scroll sweep), which matches how the defect class was observed.
+//
+// Hit-testing has one blind spot that has to be closed deliberately:
+// `elementFromPoint` skips `pointer-events: none` elements, and that is
+// exactly how decorative overlays are built (gradient scrims, absolutely
+// positioned SVG/CSS art, ::before washes). An occluder that paints over
+// text but opts out of hit-testing would be invisible to the probe — the
+// S19 defect class with one extra declaration. So sampling runs with
+// pointer-events forced back on page-wide, then restores. False positives
+// stay closed by the opaque-paint requirement: a transparent click-catcher
+// now hit-tests on top but still never flags.
+
+export interface OcclusionCandidate {
+  selector: string;
+  text: string;
+  occluder: string;
+  /** occluded sample points / total sampled points, 0..1 */
+  coverage: number;
+  sampled: number;
+  ariaHidden: boolean;
+  /**
+   * The occluder is a viewport-pinned bar (position fixed / sticky) and the
+   * page has enough scroll range for this text to move out from under it —
+   * the standard bottom-bar-over-scrollable-content pattern (S15's mobile
+   * cart bar), readable after a scroll, so exempt rather than fail.
+   */
+  pinnedEscapable: boolean;
+}
+
+
+export function findOccludedText(
+  candidates: OcclusionCandidate[],
+  viewport: number,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    if (c.ariaHidden) {
+      exempted.push({
+        kind: "occluded-text",
+        viewport,
+        selector: c.selector,
+        reason: "aria-hidden subtree — decorative text; being painted over is not a reading defect",
+      });
+      continue;
+    }
+    if (c.pinnedEscapable) {
+      exempted.push({
+        kind: "occluded-text",
+        viewport,
+        selector: c.selector,
+        reason: `under viewport-pinned bar ${c.occluder} — scrollable content moves out from beneath it (fixed/sticky bar pattern)`,
+      });
+      continue;
+    }
+    findings.push({
+      kind: "occluded-text",
+      severity: "fail",
+      viewport,
+      selector: c.selector,
+      message: `"${clip(c.text)}" (${c.selector}) is painted over by an opaque element ${c.occluder} @${viewport} — ${Math.round(c.coverage * 100)}% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.`,
+      evidence: { text: c.text, occluder: c.occluder, coverage: c.coverage },
+    });
+  }
+  return { findings, exempted };
+}
+

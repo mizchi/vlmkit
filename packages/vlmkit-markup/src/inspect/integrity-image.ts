@@ -6,11 +6,15 @@
  * look at and the gate reports `clean` on a frame that may be visibly broken. The same
  * applies to native renderers (GLFW / SDL / wgpu), Flutter / Skia, and engine editor UIs.
  *
- * The measurement functions in `integrity-check.ts` are reused unchanged. They were already
+ * The measurement functions in `@mizchi/vlmkit-judge/integrity.ts` are reused unchanged —
+ * the same ones the browser path in `integrity-check.ts` calls. They were already
  * pure over candidate structs — `findTextCollisions(IntegrityTextBlock[])`,
  * `judgeProtrusions(ProtrusionCandidate[])` and so on — so this file is an adapter, not a
  * second implementation of the rules. **That is the whole point: the DOM becomes one adapter
  * among several rather than the only way in.**
+ *
+ * Imported from the judge package rather than through `integrity-check.ts`, so this adapter
+ * never loads the Playwright runner it has no use for.
  *
  * ## What it will not do
  *
@@ -45,7 +49,7 @@ import {
   judgeCollapsedContainers,
   judgeProtrusions,
   measureInkRatio,
-} from "./integrity-check.ts";
+} from "@mizchi/vlmkit-judge/integrity.ts";
 
 /**
  * One element rect, as the caller's renderer knows it.

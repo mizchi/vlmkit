@@ -12,3 +12,5 @@ export * from "./allow.ts";
 export * from "./composition.ts";
 export * from "./color-roles.ts";
 export * from "./design-policy.ts";
+export * from "./integrity.ts";
+export * from "./integrity-allow.ts";

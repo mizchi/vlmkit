@@ -135,6 +135,9 @@ assert.equal(estimateCost({ promptCostPerToken: 2, completionCostPerToken: 3 }, 
 const judge = await import("@mizchi/vlmkit-judge/composition.ts");
 const judgeShim = await import("@mizchi/vlmkit-markup/style/composition.ts");
 assert.equal(judgeShim.judgeComposition, judge.judgeComposition, "markup re-exports the judge, not a copy");
+const integrity = await import("@mizchi/vlmkit-judge/integrity.ts");
+const integrityShim = await import("@mizchi/vlmkit-markup/inspect/integrity-check.ts");
+assert.equal(integrityShim.findTextCollisions, integrity.findTextCollisions, "integrity judges are re-exported, not copied");
 const { UsageError: CoreUsageError } = await import("@mizchi/vlmkit-core/cli-error.ts");
 const { UsageError: JudgeUsageError } = await import("@mizchi/vlmkit-judge/errors.ts");
 assert.equal(CoreUsageError, JudgeUsageError, "one UsageError identity across packages");

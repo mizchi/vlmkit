@@ -1,7 +1,8 @@
 # Package decomposition: split by layer, not by feature
 
-Status: phase 1 landed (`@mizchi/vlmkit-judge`). Phases 2-5 are proposals with
-the measurements they rest on. The agent-facing surface — `vlmkit` CLI verbs,
+Status: phase 1 landed (`@mizchi/vlmkit-judge`: the three design-quality gates,
+then `check integrity`). Phases 2-5 are proposals with the measurements they
+rest on. The agent-facing surface — `vlmkit` CLI verbs,
 flags, JSON reports, MCP tools, skills — does not change in any phase. Import
 paths don't change either: every module that moves leaves a re-export behind.
 
@@ -55,8 +56,22 @@ Moved, with every original path re-exporting the moved symbols:
 | `vlmkit-markup/src/style/design-policy.ts` (judge half) | `vlmkit-judge/src/design-policy.ts` | 595 |
 | `vlmkit-markup/src/inspect/selector-exemption.ts` | `vlmkit-judge/src/allow.ts` | 170 |
 | `UsageError` from `vlmkit-core/src/cli-error.ts` | `vlmkit-judge/src/errors.ts` | 13 |
+| `vlmkit-markup/src/inspect/integrity-check.ts` (15 judges, A1-A13 types) | `vlmkit-judge/src/integrity.ts` | 1,119 |
+| `vlmkit-markup/src/inspect/integrity-exemption.ts` | `vlmkit-judge/src/integrity-allow.ts` | 188 |
 
-Why these three first: they are the design-quality gates (`check design`,
+`check integrity` followed as the largest single win: 15 exported judges and
+9 in-page collectors in one 2,172-line file, now 1,119 lines of judges and 1,088
+of collectors + runner. Its judges already had a second, non-browser caller:
+`integrity-image.ts`, the image mode `vlmkit#116` asked for on behalf of a
+canvas/WebGPU game engine (a frame PNG plus an element-rect JSON — the DOM as
+one adapter among several). That adapter imported the judges *through*
+`integrity-check.ts`, so it loaded 21 modules including `playwright` to call
+pure functions. It now imports `@mizchi/vlmkit-judge/integrity.ts` directly and
+its built module graph is 2 modules with no `playwright` (checked by walking
+`dist/`). That is the scene-graph case of phase 2 already in production, with
+its adapter living beside the DOM one.
+
+Why the three design-quality gates came first: they are the design-quality gates (`check design`,
 `check composition`, `check color`), they already share their plumbing, and
 their inputs are the most scene-shaped — boxes with a parent index, a rect,
 font size and weight, paint. They are also the gates whose thresholds carry
@@ -110,15 +125,14 @@ Then define the scene contract once. It's roughly the union of
 `CompositionBox`, `DesignSample` and `ColorUse`: `{ path, parent, role, rect,
 position, font{size,weight}, paint{bg,fg,border,radius}, text{len,leaf} }`.
 Ship two adapters for it: the DOM collector, and a scene-graph one, the adapter
-that `scene-graph.test.ts` currently keeps inline. Do that after `integrity`
-has moved, because integrity's inputs are the ones that will stress the
-contract (occlusion, clipping, text collision).
+that `scene-graph.test.ts` currently keeps inline. Integrity's inputs are the ones that will stress that
+contract (occlusion, clipping, text collision), and `integrity-image.ts`'s
+element-rect JSON is the existing non-DOM shape to reconcile it with.
 
 Next judges to move, ranked by pure functions already exported:
 
 | Module | Lines | Exported pure judges | Note |
 |---|---:|---:|---|
-| `inspect/integrity-check.ts` | 2,172 | 15 | 9 collectors; largest single win |
 | `a11y-touch.ts` | 549 | 2 | |
 | `inspect/grounding-scan.ts` | 1,228 | 2 | |
 | `inspect/copy-check.ts` | 981 | 1 | |
