@@ -32,7 +32,7 @@
     {
       "id": "core",
       "label": "core",
-      "hidden": false
+      "hidden": true
     },
     {
       "id": "generate",
@@ -43,6 +43,11 @@
       "id": "heal",
       "label": "heal",
       "hidden": true
+    },
+    {
+      "id": "judge",
+      "label": "judge",
+      "hidden": false
     },
     {
       "id": "markup",
@@ -98,6 +103,11 @@
     },
     {
       "from": "vlmkit (cli)",
+      "to": "judge",
+      "hidden": true
+    },
+    {
+      "from": "vlmkit (cli)",
       "to": "markup",
       "hidden": true
     },
@@ -134,6 +144,11 @@
     {
       "from": "capture",
       "to": "core",
+      "hidden": true
+    },
+    {
+      "from": "core",
+      "to": "judge",
       "hidden": true
     },
     {
@@ -177,6 +192,11 @@
       "hidden": true
     },
     {
+      "from": "markup",
+      "to": "judge",
+      "hidden": true
+    },
+    {
       "from": "mcp",
       "to": "core",
       "hidden": true
@@ -195,15 +215,41 @@
   "sequence": [
     {
       "highlight": [
-        "core"
+        "judge"
       ],
-      "caption": "core: depends on nothing else in the workspace"
+      "caption": "judge: depends on nothing else in the workspace"
     },
     {
       "value": {
         "id": "n",
         "label": "packages so far",
         "text": 1
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "judge"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "core"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "core"
+      ],
+      "caption": "core → judge"
+    },
+    {
+      "value": {
+        "id": "n",
+        "label": "packages so far",
+        "text": 2
       },
       "ms": 0
     },
@@ -233,7 +279,7 @@
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 4
+        "text": 5
       },
       "ms": 0
     },
@@ -263,13 +309,13 @@
         "markup",
         "plan"
       ],
-      "caption": "anim → ai, animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core; plan → ai"
+      "caption": "anim → ai, animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core, judge; plan → ai"
     },
     {
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 9
+        "text": 10
       },
       "ms": 0
     },
@@ -299,7 +345,7 @@
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 10
+        "text": 11
       },
       "ms": 0
     },
@@ -319,13 +365,13 @@
       "highlight": [
         "vlmkit (cli)"
       ],
-      "caption": "vlmkit (cli) → ai, anim, animation-eval, capture, core, generate, heal, markup, mcp, plan"
+      "caption": "vlmkit (cli) → ai, anim, animation-eval, capture, core, generate, heal, judge, markup, mcp, plan"
     },
     {
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 11
+        "text": 12
       },
       "ms": 0
     },
@@ -336,7 +382,7 @@
       "ms": 0
     },
     {
-      "note": "11 packages, 26 workspace dependencies, 5 layers deep"
+      "note": "12 packages, 29 workspace dependencies, 6 layers deep"
     }
   ]
 }

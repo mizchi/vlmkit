@@ -1,0 +1,197 @@
+# Package decomposition: split by layer, not by feature
+
+Status: phase 1 landed (`@mizchi/vlmkit-judge`: the three design-quality gates,
+then `check integrity`). Phases 2-5 are proposals with the measurements they
+rest on. The agent-facing surface — `vlmkit` CLI verbs,
+flags, JSON reports, MCP tools, skills — does not change in any phase. Import
+paths don't change either: every module that moves leaves a re-export behind.
+
+## What was measured (2026-09-24)
+
+| Package | Source lines (non-test) | What it actually holds |
+|---|---:|---|
+| `vlmkit-markup` | 47,098 | 28 of 30 gates, *and* their collectors, judges, formatters, Playwright runners, the MoonBit markup core, and the markup-synthesis loop |
+| `src/` (root CLI) | 37,846 | CLI router (6k), VRT snapshot/compare (6k), experiments (15k), API server, demos |
+| `vlmkit-anim` | 15,420 | explanatory animation IR, compilers, runtime, CLI |
+| `vlmkit-core` | 11,181 | plugin runtime + pixel diff engine + **1,894 lines of Playwright-bound driver code** (`browser-launch`, `page-open`, `page-load`, `mask`, `element-compare`) |
+| `vlmkit-capture` | 3,269 | Crater / Playwright capture, viewport discovery |
+| others | ~7,500 | `ai`, `heal`, `generate`, `plan`, `mcp`, `animation-eval` |
+
+The weight is not spread across features. It sits in the fact that **every
+check module holds the same four layers in one file**:
+
+```
+COLLECT_X   = `(() => { … })()`   // in-page JS: DOM + getComputedStyle → plain snapshot
+judgeX(input, opts)               // pure: snapshot → findings + verdict
+formatXReport(report, rules)      // presentation: ANSI prose, markdown
+runXCheck(options)                // driver: withBrowser → goto → settle → evaluate → judge → ledger
+```
+
+35 modules in `vlmkit-markup` call `withBrowser` themselves, and 17 hold 30
+in-page collector scripts. The judges were already pure *in intent* — "pure,
+so every threshold above is testable without a browser" is in the source — but
+living next to `runXCheck` meant they inherited its imports. The one real leak
+found: `selector-exemption.ts` (the `--allow` parser that every style gate
+uses) was pure except for `UsageError`, whose module imports `node:fs`.
+
+So the proposed packages follow the layers, and each of the four areas you
+named corresponds to one layer:
+
+| Layer | Package | The contract it owns |
+|---|---|---|
+| Pure judgement: geometry, colour, rules | `@mizchi/vlmkit-judge` (new) | snapshot types in, findings out. No DOM, no Playwright, no `node:*` |
+| Browser as a computer | collectors (`COLLECT_*`), phase 2 | DOM → snapshot. Strings with no imports, run by whatever driver there is |
+| Driver | `@mizchi/vlmkit-capture` + core's Playwright half, phase 3 | open / settle / evaluate / screenshot behind one interface |
+| Generation loop + eval datasets | `vlmkit-markup` (what remains), `heal`, `generate`, `plan` | agents converge markup against the gates |
+| Diagrams for explanation | `vlmkit-anim` (+ d2 skills), phase 5 | separate library |
+
+## Phase 1 (done): `@mizchi/vlmkit-judge`
+
+Moved, with every original path re-exporting the moved symbols:
+
+| From | To | Lines |
+|---|---|---:|
+| `vlmkit-markup/src/style/composition.ts` (judge half) | `vlmkit-judge/src/composition.ts` | 854 |
+| `vlmkit-markup/src/style/color-roles.ts` (judge half) | `vlmkit-judge/src/color-roles.ts` | 450 |
+| `vlmkit-markup/src/style/design-policy.ts` (judge half) | `vlmkit-judge/src/design-policy.ts` | 595 |
+| `vlmkit-markup/src/inspect/selector-exemption.ts` | `vlmkit-judge/src/allow.ts` | 170 |
+| `UsageError` from `vlmkit-core/src/cli-error.ts` | `vlmkit-judge/src/errors.ts` | 13 |
+| `vlmkit-markup/src/inspect/integrity-check.ts` (15 judges, A1-A13 types) | `vlmkit-judge/src/integrity.ts` | 1,119 |
+| `vlmkit-markup/src/inspect/integrity-exemption.ts` | `vlmkit-judge/src/integrity-allow.ts` | 188 |
+
+`check integrity` followed as the largest single win: 15 exported judges and
+9 in-page collectors in one 2,172-line file, now 1,119 lines of judges and 1,088
+of collectors + runner. Its judges already had a second, non-browser caller:
+`integrity-image.ts`, the image mode `vlmkit#116` asked for on behalf of a
+canvas/WebGPU game engine (a frame PNG plus an element-rect JSON — the DOM as
+one adapter among several). That adapter imported the judges *through*
+`integrity-check.ts`, so it loaded 21 modules including `playwright` to call
+pure functions. It now imports `@mizchi/vlmkit-judge/integrity.ts` directly and
+its built module graph is 2 modules with no `playwright` (checked by walking
+`dist/`). That is the scene-graph case of phase 2 already in production, with
+its adapter living beside the DOM one.
+
+Why the three design-quality gates came first: they are the design-quality gates (`check design`,
+`check composition`, `check color`), they already share their plumbing, and
+their inputs are the most scene-shaped — boxes with a parent index, a rect,
+font size and weight, paint. They are also the gates whose thresholds carry
+the most measurement history, so moving them unchanged (a line-range slice,
+not a rewrite) is the safest proof that the split is mechanical.
+
+What holds the layer in place:
+
+- `vlmkit-judge/src/purity.test.ts` fails if any source file imports anything
+  outside the package or touches `window` / `document` / `process` / `Buffer` /
+  `require`. Mutation-checked: adding `import … from "node:fs"` to `allow.ts`
+  fails it.
+- `vlmkit-judge/src/scene-graph.test.ts` runs `judgeComposition` on a game
+  settings menu written as a scene graph (positions local to the parent, as an
+  engine stores them). It catches a title that drifted toward the section above
+  it and honours an `--allow` written against the scene path. Its adapter is
+  kept in the test on purpose: see phase 2.
+- `UsageError` moved to the bottom layer and `cli-error.ts` re-exports the same
+  class, so `instanceof UsageError` is one identity everywhere.
+  `scripts/smoke-packed-workspaces.mjs` asserts that on the packed tarballs,
+  and that `vlmkit-markup/style/composition.ts` re-exports the judge rather than
+  holding a copy.
+
+Dependency direction after phase 1: `judge ← core ← capture ← markup`. Judge
+depends on nothing.
+
+## Phase 2: the snapshot is the contract (collector ↔ judge)
+
+For a game's scene graph to use the judges, the snapshot has to hold **facts**,
+not conclusions the browser already reached. Today the boundary is wherever it
+was convenient:
+
+- `COLLECT_COLOR_ROLES` computes `contrastRatio(blendColor(…))` *inside the
+  page* and ships the ratio. A scene graph would have to reimplement that to
+  produce a `ControlBoundary`. The composite and the ratio belong in the judge;
+  the collector should ship the resolved colours.
+- Contrast / luminance math exists five times in TypeScript (`asset-check`,
+  `component-from-image` ×2, `spec-checks`, `page-compose-diff`) plus the
+  in-page copy in `CONTRAST_BACKGROUND_JS`. One `vlmkit-judge/color.ts` would
+  replace the TypeScript ones. The in-page copy stays, because some of it can
+  only be done by the browser — see below.
+
+What **is** browser computation and stays in the collector: layout (rects),
+`getComputedStyle`, and colour-space conversion. `CONTRAST_BACKGROUND_JS` reads
+`lab()` / `oklch()` back by rasterising a pixel, which is the browser's own
+gamut mapping. That was the fix that took `check a11y contrast` from 10 to 501
+inspected elements on tailwindcss.com. A pure judge must not try to redo it.
+The rule: **the collector resolves, the judge decides.**
+
+Then define the scene contract once. It's roughly the union of
+`CompositionBox`, `DesignSample` and `ColorUse`: `{ path, parent, role, rect,
+position, font{size,weight}, paint{bg,fg,border,radius}, text{len,leaf} }`.
+Ship two adapters for it: the DOM collector, and a scene-graph one, the adapter
+that `scene-graph.test.ts` currently keeps inline. Integrity's inputs are the ones that will stress that
+contract (occlusion, clipping, text collision), and `integrity-image.ts`'s
+element-rect JSON is the existing non-DOM shape to reconcile it with.
+
+Next judges to move, ranked by pure functions already exported:
+
+| Module | Lines | Exported pure judges | Note |
+|---|---:|---:|---|
+| `a11y-touch.ts` | 549 | 2 | |
+| `inspect/grounding-scan.ts` | 1,228 | 2 | |
+| `inspect/copy-check.ts` | 981 | 1 | |
+| `stress/breakpoint-check.ts`, `inspect/scroll-scan.ts`, `a11y-contrast.ts`, `a11y-focus-order.ts` | 400-640 each | 1 | |
+
+`handler-map.ts` (4,384 lines, 0 exported judges) and `interaction-map.ts` are
+driver-shaped: they patch and probe a live page. They belong in phase 3, not
+here.
+
+## Phase 3: one driver interface
+
+Each of the 35 `runXCheck` functions repeats the same sequence: `withBrowser` →
+`newPage(withAuthState(…))` → optional `routeFromHAR` → `goto` → `settlePage`
+→ `describeRedirect` → `evaluate(COLLECT)` → judge → `appendRunLedger`.
+Extract that sequence as a `collect(source, script, opts)` behind an interface
+that covers `goto / evaluate / screenshot / setViewport / route`, and move
+core's 1,894 Playwright-bound lines to `vlmkit-capture` (renamed in spirit to
+the driver), with core re-exporting as usual.
+
+That interface is where the alternatives plug in:
+
+- `mizchi/chaosdriver` for debugging: the same collect call replayed under
+  perturbation.
+- A `jev-ultrafast`-style driver (browser-use/jev-ultrafast): a warm browser
+  and a cheaper round trip per evaluate.
+  `docs/reports/2026-08-06-gate-rule-cost-bench.md` measured `run` at ~100% of
+  a gate's wall clock, and four gates at ~60% of a sweep. So the driver is the
+  only layer where speed can be bought.
+
+Collect once, judge many is the payoff: `check design`, `check composition`
+and `check color` each launch a browser today to read nearly the same boxes.
+
+## Phase 4: loop and datasets
+
+What stays in `vlmkit-markup` after phases 2-3 is the generation side: verify
+/ autofix, component-from-image, contract scaffold, story-vrt, the MoonBit
+markup core. Together with `heal` / `generate` / `plan`, that is the markup
+loop. The evaluation data it's judged against is spread around today:
+`fixtures/`, `design-runs/`, `examples/sites/*/judgment.sqlite`,
+`examples/markup-vrt-eval/`, `fixtures/composition/` paired mutants. Give it
+one manifest (id, source, what it's for, expected verdicts per gate) before
+moving any files, so a dataset entry can be judged by name.
+
+## Phase 5: diagrams out
+
+`vlmkit-anim` already has **zero** static imports of other workspace packages.
+It reaches `animation-eval` and `ai` only through optional peers and dynamic
+import. Moving it to its own repository is a repo move: `docs/anim-ir.md`,
+`fixtures/anim-scenario/`, the `explain-with-anim` / `explanatory-animation` /
+`d2-*` skills, the `pr-visual` workflow. The shared evaluator
+(`vlmkit-animation-eval`) stays here as the thing both depend on.
+
+## What did not change, and what to watch
+
+- CLI verbs, flags, `--json` shapes, MCP tools, skills: untouched. The gates
+  still import from their old module paths.
+- `@mizchi/*` resolves through `exports` to `dist/`, so the new package has to
+  be built before a typecheck or a CLI run sees it. `pnpm build:packages`
+  orders it first, because core now depends on it.
+- A re-export shim (`export * from …`) keeps the old path working. Remove
+  those shims only in a major version, after the CHANGELOG says where each
+  symbol went.

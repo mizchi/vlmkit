@@ -136,6 +136,7 @@ describe("package manifest for publishable CLI", () => {
       "@mizchi/vlmkit-core",
       "@mizchi/vlmkit-generate",
       "@mizchi/vlmkit-heal",
+      "@mizchi/vlmkit-judge",
       "@mizchi/vlmkit-markup",
       "@mizchi/vlmkit-mcp",
       "@mizchi/vlmkit-plan",

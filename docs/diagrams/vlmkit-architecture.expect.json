@@ -9,6 +9,7 @@
     "core",
     "generate",
     "heal",
+    "judge",
     "markup",
     "mcp",
     "plan"
@@ -21,6 +22,7 @@
     "vlmkit (cli)->core",
     "vlmkit (cli)->generate",
     "vlmkit (cli)->heal",
+    "vlmkit (cli)->judge",
     "vlmkit (cli)->markup",
     "vlmkit (cli)->mcp",
     "vlmkit (cli)->plan",
@@ -29,6 +31,7 @@
     "anim->animation-eval",
     "animation-eval->core",
     "capture->core",
+    "core->judge",
     "generate->ai",
     "heal->ai",
     "heal->capture",
@@ -37,6 +40,7 @@
     "markup->animation-eval",
     "markup->capture",
     "markup->core",
+    "markup->judge",
     "mcp->core",
     "mcp->markup",
     "plan->ai"

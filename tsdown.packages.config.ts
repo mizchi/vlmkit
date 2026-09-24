@@ -1,6 +1,7 @@
 import { defineConfig } from "tsdown";
 
 const publicWorkspacePackages = [
+  "vlmkit-judge",
   "vlmkit-core",
   "vlmkit-ai",
   "vlmkit-capture",
