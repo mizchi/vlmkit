@@ -91,8 +91,8 @@ layout is the compiler's and may move on the next edit. Say the id.
   (`SendUserFile` when available; otherwise the path). A GIF for a walk,
   an SVG for a structure.
 - In a PR or issue: paste the `<name>.md` that `pr` / `repo` write, or the
-  figure with the beats under it. `vlmkit-anim pr` already runs on every
-  same-repo PR through the `pr-visual` workflow; do not post a second one.
+  figure with the beats under it. `vlmkit-anim pr --mermaid` already runs on
+  every same-repo PR of this repository through the `pr-visual` workflow; do not post a second one.
 - In docs: a ```` ```vlm-anim ```` fence (the animation) or ```` ```vlm-anim still ````
   (the figure) with the scene inline, so the page stays checkable; or the
   SVG committed next to the page.

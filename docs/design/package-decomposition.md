@@ -45,6 +45,22 @@ named corresponds to one layer:
 | Generation loop + eval datasets | `vlmkit-markup` (what remains), `heal`, `generate`, `plan` | agents converge markup against the gates |
 | Diagrams for explanation | `vlmkit-anim` (+ d2 skills), phase 5 | separate library |
 
+How one check runs across those layers once phase 2 is done — two sources, one judge:
+
+```mermaid
+flowchart LR
+  subgraph browser["browser (Playwright driver)"]
+    page["page"] --> collect["COLLECT_* script<br/>resolves colours, boxes, styles"]
+  end
+  subgraph other["any other renderer"]
+    engine["game engine / canvas"] --> scene["scene JSON<br/>(--elements)"]
+  end
+  collect -->|"samples"| judge
+  scene -->|"sceneTo*Input"| judge
+  judge["@mizchi/vlmkit-judge<br/>pure: composites, measures, decides"] --> report["findings + verdict"]
+  report --> fmt["formatter · ledger · exit code<br/>(core plugin runner)"]
+```
+
 ## Phase 1 (done): `@mizchi/vlmkit-judge`
 
 Moved, with every original path re-exporting the moved symbols:

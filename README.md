@@ -129,15 +129,70 @@ marked `[key]`.
 Task-routing recipes and done-condition sets:
 [`docs/markup-assist.md`](./docs/markup-assist.md).
 
-## The workspace, drawn by itself
+## The workspace
 
-![vlmkit — the workspace and its dependencies](./docs/diagrams/vlmkit-architecture.gif)
+```mermaid
+flowchart BT
+  subgraph L0["layer 0"]
+    p8["judge"]
+  end
+  subgraph L1["layer 1"]
+    p5["core"]
+  end
+  subgraph L2["layer 2"]
+    p1["ai"]
+    p3["animation-eval"]
+    p4["capture"]
+  end
+  subgraph L3["layer 3"]
+    p2["anim"]
+    p6["generate"]
+    p7["heal"]
+    p9["markup"]
+    p11["plan"]
+  end
+  subgraph L4["layer 4"]
+    p10["mcp"]
+  end
+  subgraph L5["layer 5"]
+    p0["vlmkit (cli)"]
+  end
+  p0 --> p1
+  p0 --> p2
+  p0 --> p3
+  p0 --> p4
+  p0 --> p5
+  p0 --> p6
+  p0 --> p7
+  p0 --> p8
+  p0 --> p9
+  p0 --> p10
+  p0 --> p11
+  p1 --> p5
+  p2 --> p1
+  p2 --> p3
+  p3 --> p5
+  p4 --> p5
+  p5 --> p8
+  p6 --> p1
+  p7 --> p1
+  p7 --> p4
+  p7 --> p5
+  p9 --> p1
+  p9 --> p3
+  p9 --> p4
+  p9 --> p5
+  p9 --> p8
+  p10 --> p5
+  p10 --> p9
+  p11 --> p1
+```
 
-Eleven packages, layer by layer from `core` to the CLI, generated from the manifests by
-`vlmkit-anim repo` ([every step](./docs/diagrams/vlmkit-architecture.sheet.png), regenerate with
-`pnpm anim:diagrams`). Every pull request gets the same treatment: the `pr-visual` workflow
-runs `vlmkit-anim pr` and posts the change map — one beat per commit, the areas it touched,
-the imports between them — as a comment on the PR.
+Twelve packages, layer by layer from `judge` (no dependencies) to the CLI; an arrow points from a
+package to one it depends on. Generated from the manifests by `vlmkit-anim repo --mermaid`, and a
+test fails when this block drifts from them. Every pull request gets the same treatment: the
+`pr-visual` workflow runs `vlmkit-anim pr --mermaid` and keeps one comment on the PR with the
+change map — the areas it touched, the imports between them, and the commits as a table.
 
 ## Documentation
 

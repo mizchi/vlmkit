@@ -202,27 +202,68 @@ function importEdges(root: string, head: string, changed: Set<string>, areas: Se
 
 const truncate = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** The change map of `base..head` as a `diagram`: areas appear as commits touch them, edges are imports, readouts count. */
-export function changeMapScene(opts: ChangeMapOptions): ChangeMap {
+/** What a range of commits changed, by area: shared by the animated change map and the mermaid one. */
+export interface ChangeSummary {
+  head: string;
+  commits: Commit[];
+  /** Kept areas, most-touched first, then `other (N areas)` when areas were merged. */
+  areas: string[];
+  /** The area a path is drawn in — its own, or the merged `other`. */
+  area: (path: string) => string;
+  /** `from` imports `to`, between kept areas. */
+  edges: { from: string; to: string }[];
+  /** Per area: distinct files touched and lines added / removed across the range. */
+  perArea: Map<string, { files: number; added: number; removed: number }>;
+  files: number;
+  added: number;
+  removed: number;
+}
+
+/** Read `base..head` once and reduce it to areas, import edges and counts. */
+export function summarizeChanges(opts: ChangeMapOptions): ChangeSummary {
   const head = opts.head ?? "HEAD";
   const commits = readCommits(opts.root, opts.base, head);
-  const perArea = new Map<string, number>();
+  const touchCount = new Map<string, number>();
   const changed = new Set<string>();
   for (const c of commits) for (const path of c.files.keys()) {
     changed.add(path);
-    perArea.set(areaOf(path), (perArea.get(areaOf(path)) ?? 0) + 1);
+    touchCount.set(areaOf(path), (touchCount.get(areaOf(path)) ?? 0) + 1);
   }
   const maxAreas = opts.maxAreas ?? 14;
-  const ranked = [...perArea.entries()].sort((a, b) => b[1] - a[1]).map(([a]) => a);
+  const ranked = [...touchCount.entries()].sort((a, b) => b[1] - a[1]).map(([a]) => a);
   const kept = new Set(ranked.slice(0, ranked.length > maxAreas ? maxAreas - 1 : maxAreas));
   const merged = ranked.filter((a) => !kept.has(a));
   const OTHER = merged.length ? `other (${merged.length} areas)` : undefined;
   const area = (path: string): string => (kept.has(areaOf(path)) ? areaOf(path) : OTHER!);
   const areas = [...kept, ...(OTHER ? [OTHER] : [])];
   const areaSet = new Set(areas);
+  const edges = importEdges(opts.root, head, changed, new Set(kept)).filter((e) => areaSet.has(e.from) && areaSet.has(e.to));
 
+  const perArea = new Map<string, { files: number; added: number; removed: number }>();
+  const filesByArea = new Map<string, Set<string>>();
+  let added = 0;
+  let removed = 0;
+  for (const c of commits) for (const [path, [a, r]] of c.files) {
+    const key = area(path);
+    const entry = perArea.get(key) ?? { files: 0, added: 0, removed: 0 };
+    entry.added += a;
+    entry.removed += r;
+    const seen = filesByArea.get(key) ?? new Set<string>();
+    seen.add(path);
+    filesByArea.set(key, seen);
+    entry.files = seen.size;
+    perArea.set(key, entry);
+    added += a;
+    removed += r;
+  }
+  return { head, commits, areas, area, edges, perArea, files: changed.size, added, removed };
+}
+
+/** The change map of `base..head` as a `diagram`: areas appear as commits touch them, edges are imports, readouts count. */
+export function changeMapScene(opts: ChangeMapOptions): ChangeMap {
+  const { head, commits, areas, area, edges: areaEdges } = summarizeChanges(opts);
   const nodes: DiagramNode[] = areas.map((a) => ({ id: a, label: a, hidden: true }));
-  const edges = importEdges(opts.root, head, changed, new Set(kept)).filter((e) => areaSet.has(e.from) && areaSet.has(e.to)).map((e) => ({ ...e, hidden: true }));
+  const edges = areaEdges.map((e) => ({ ...e, hidden: true }));
 
   const sequence: DiagramStep[] = [];
   const shown = new Set<string>();
@@ -274,4 +315,68 @@ export function changeMapScene(opts: ChangeMapOptions): ChangeMap {
     sequence,
   };
   return { scene, commits: commits.length, files, added, removed, areas };
+}
+
+// ---- mermaid ---------------------------------------------------------------------
+
+/** A label mermaid will print as written: quotes and angle brackets as entities, `|` kept out of tables. */
+const mermaidLabel = (text: string): string => text.replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;");
+const tableCell = (text: string): string => text.replace(/\|/g, "\\|").replace(/\n/g, " ");
+
+/**
+ * The change map of `base..head` as Markdown with a mermaid flowchart — what this repository
+ * posts on a pull request, because GitHub renders it inline and a reviewer can read it without
+ * playing anything. The same summary as the animated map: one box per area with its file and
+ * line counts, an arrow where one changed area imports another, and a table of the commits in
+ * order with the areas each touched.
+ */
+export function changeMapMermaid(opts: ChangeMapOptions): { markdown: string; summary: ChangeSummary } {
+  const summary = summarizeChanges(opts);
+  const { commits, areas, area, edges, perArea } = summary;
+  const title = opts.title ?? `Changes in ${opts.base}..${summary.head === "HEAD" ? "HEAD" : summary.head.slice(0, 7)}`;
+  const id = new Map(areas.map((a, i) => [a, `a${i}`]));
+  const lines: string[] = [`## ${title}`, ""];
+  if (!commits.length) {
+    lines.push(`No commits in \`${opts.base}..${summary.head}\`.`);
+    return { markdown: lines.join("\n") + "\n", summary };
+  }
+  lines.push(
+    `${commits.length} commit${commits.length === 1 ? "" : "s"} · ${summary.files} files · +${summary.added} −${summary.removed}`
+    + ` · ${areas.length} area${areas.length === 1 ? "" : "s"}, ${edges.length} import edge${edges.length === 1 ? "" : "s"} between them`,
+    "",
+    "```mermaid",
+    "flowchart LR",
+  );
+  for (const a of areas) {
+    const n = perArea.get(a) ?? { files: 0, added: 0, removed: 0 };
+    lines.push(`  ${id.get(a)}["${mermaidLabel(a)}<br/>${n.files} file${n.files === 1 ? "" : "s"} · +${n.added} −${n.removed}"]`);
+  }
+  for (const e of edges) lines.push(`  ${id.get(e.from)} -->|imports| ${id.get(e.to)}`);
+  lines.push("```", "", "| # | commit | areas | lines |", "|---:|---|---|---|");
+  commits.forEach((c, i) => {
+    const touched = [...new Set([...c.files.keys()].map(area))];
+    let a = 0;
+    let r = 0;
+    for (const [x, y] of c.files.values()) { a += x; r += y; }
+    lines.push(`| ${i + 1} | \`${c.sha.slice(0, 7)}\` ${tableCell(c.subject)} | ${touched.map((t) => `\`${tableCell(t)}\``).join(", ")} | +${a} −${r} |`);
+  });
+  return { markdown: lines.join("\n") + "\n", summary };
+}
+
+/** The workspace's packages and their workspace dependencies, layered, as a mermaid flowchart. */
+export function workspaceMermaid(root: string, title = "vlmkit — the workspace"): string {
+  const pkgs = readWorkspace(root);
+  const layer = layersOf(pkgs);
+  const id = new Map(pkgs.map((p, i) => [p.id, `p${i}`]));
+  const lines = [`## ${title}`, "", "```mermaid", "flowchart BT"];
+  const byLayer = new Map<number, WorkspacePackage[]>();
+  for (const p of pkgs) byLayer.set(layer.get(p.id) ?? 0, [...(byLayer.get(layer.get(p.id) ?? 0) ?? []), p]);
+  for (const [n, list] of [...byLayer.entries()].sort((a, b) => a[0] - b[0])) {
+    lines.push(`  subgraph L${n}["layer ${n}"]`);
+    for (const p of list) lines.push(`    ${id.get(p.id)}["${mermaidLabel(p.id)}"]`);
+    lines.push("  end");
+  }
+  for (const p of pkgs) for (const d of p.deps) if (id.has(d)) lines.push(`  ${id.get(p.id)} --> ${id.get(d)}`);
+  lines.push("```", "", "Arrows point from a package to the workspace packages it depends on; layer 0 depends on none.");
+  return lines.join("\n") + "\n";
 }

@@ -102,4 +102,6 @@ vlmkit-anim pr --base origin/main --title "PR #12: …" --out pr  # one beat per
 
 Both write the scene, a GIF, a contact sheet and a markdown file with the narration and both
 images embedded — paste it into the pull request, or let a workflow do it on every push (this
-repository's `pr-visual` workflow does). The scene is kept so the picture stays editable.
+repository's `pr-visual` workflow does, with `--mermaid`). The scene is kept so the picture stays editable.
+`--mermaid` writes only `<name>.md` instead — the same map as a mermaid flowchart plus a table of
+commits, which GitHub renders inline and which needs no browser.
