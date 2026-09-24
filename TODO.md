@@ -259,6 +259,55 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ## Backlog (prioritize after evaluation)
 
+### デモサイトと判断ログ(#165)の残件(2026-09-24)
+#165(`examples/sites/` の6サイト、判断ログ `examples/sites/judge.mjs`、Pages 公開)で片付かなかったもの。
+経緯と数字は `docs/reports/2026-09-23-demo-sites-v1.md`、報告者の原文は各ログの `note --kind tool`
+(`sqlite3 <site>/judgment.sqlite "select json from events where kind = 'note'"`)。
+- [ ] **`src/cli/version.test.ts` が main で赤** — #165 の CI `test` で唯一の失敗(3934/3935)。
+  CHANGELOG の先頭は `## 0.24.0 — 2026-09-23`(f8c583a)なのに、root と 11 パッケージの
+  `package.json` と `packages/vlmkit-core/src/version.ts` の `VLMKIT_VERSION` は 0.23.0 のまま。
+  直すなら 0.22.0 / 0.23.0 と同じ 0.24.0 の刻印:
+  - `package.json` ×12、`VLMKIT_VERSION`、`skills/vlmkit/SKILL.md` と `.apm/skills/vlmkit/SKILL.md` の
+    3行(written against / `--version` の出力例 / `install @mizchi/vlmkit@…`、`tests/skill-package.test.mjs`
+    が照合)、ランディングの hero eyebrow(`examples/vlmkit-intro-page/index.html`、`page.test.mjs` が照合)。
+  - 0.24.0 のノートに #165 の利用者向け変更を足す: `check a11y focus` の逆向き誤報、
+    `check interactions` / `check grounding` の `<label>` 由来の名前と「押しても何も起きないのが正しい」
+    コントロール、`scan scroll` の sr-only、`check copy` のインライン要素をまたぐ文言、`?query` 付きの
+    ページ指定、`gates run` の警告のページ名と `--show-output`、`webServer` の 4190 番、`--allow` の
+    3ゲート共通化と閉じた `<details>`、デモサイトの公開。
+  - eyebrow が変わるのでランディングの判断ログに1ラウンド、ランディングカードの数字とサムネイルが
+    変わるのでギャラリーのログにも1ラウンド(`judge.mjs <dir> round --actor reviewer …`)。
+  - npm の最新は 0.22.0(0.23.0 は未公開)。公開は手動で、ワークフローはない。
+- [ ] **`check integrity` が大きなページで読み込みタイムアウトする** — ランディングの判断ログページ
+  (`/judgment/`、HTML 約 500 KB、lazy 画像 158 枚)で `page load timed out (Timeout 30000ms exceeded)`。
+  全画像を持っていた旧版(624 枚)でも同じなので保存形式ではなくゲート側。ログページはデプロイの
+  ゲート対象外。load 待ちか計測かの切り分けから。
+- [ ] **ランディングの VRT ベースラインを Mac で更新** — `tests/vlmkit/*-snapshots/*-darwin.png` は CI で
+  走らない macOS 画像で、#165 の見た目の変更のあと `just vrt-update` が要る。
+- [ ] **デプロイ後の確認** — `/vlmkit/sites/`、8 つのログページ、`JUDGMENT.md` から公開ページへの
+  リンク(`#S12` / `#G3` のアンカー)が実際に解決するか。
+- [ ] ビルダーが報告して残したゲートの課題:
+  - `check copy` がモーダルの中や操作で出る文言に届かない(shop, magazine)
+  - `check scroll` が固定 1.5 画面しかスクロールせず、下のほうの sticky に届かない。スナップ判定が
+    `scroll-padding` を見ない(shop, landing, kanban)
+  - `check breakpoints` がメディアクエリしか見つけず、コンテナクエリを見ない(docs)
+  - `stress i18n` が折り返しを箱の高さから推定するので、引き伸ばされたグリッドセルを折り返しと読む(magazine)
+  - `scan handlers --probe-drag` がキャンセルの基準を直前のドロップの遷移中に取る(kanban)
+  - `check animation` / `check motion` がスクロールしないので、スクロール連動の動きがないことになる(magazine)
+  - `check a11y touch` に `--viewport` がなく、渡しても黙ってデスクトップを測る(landing N30)
+  - 祖先の `overflow: hidden` で切れたフォーカスリングが両方のフォーカスゲートを通る(landing)
+  - `check composition` が太さを computed style から読むので、太字フェイスの欠落や
+    `font-synthesis: none` のときに嘘になる(landing)
+  - `near-misalignment` が何も描かない箱の端も測るので、塗りの 48px ボタンと透明な 44px リンクの行が
+    「2px ずれ」になる(見える端は 0.3px で一致。landing N27, dashboard N4)
+  - `prefers-color-scheme` をエミュレートできるゲートがなく、OS に従うダークテーマはゲートにかけられない
+    (全ビルダーが `?theme=dark` で回避、ギャラリー N5)
+- [ ] 目が繰り返し見つけたものからルールを作る候補(ペアのミュータントと実ページのコーパスで閾値を決めてから):
+  - 最終行が1語 / CJK 1〜2文字、または区切り記号で始まる行(6サイトで 27 件の改行欠陥)。まず英語
+    ページ上の `lang` なしの日本語タイトルを疑う。行ボックスは `Range.getClientRects()` で測れる
+  - min-content まで縮んで1文字・1音節ごとに折れるテキスト(magazine D30、docs D24)。幅 2em 未満で
+    数文字以上を持つブロックが候補信号
+
 ### 美的/デザインポリシー指標(2026-08-01 feasibility study)
 検討記録: `docs/design/design-policy-metrics.md`、計測スクリプト:
 `src/util/design-policy-probe.mjs`
