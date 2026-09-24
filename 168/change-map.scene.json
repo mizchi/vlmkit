@@ -72,7 +72,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "1/5 Define the scene contract and move colour arithmetic into the judge (ph…"
+      "caption": "1/6 Define the scene contract and move colour arithmetic into the judge (ph…"
     },
     {
       "value": {
@@ -108,7 +108,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "2/5 Move check color's contrast ratios from the page into the judge"
+      "caption": "2/6 Move check color's contrast ratios from the page into the judge"
     },
     {
       "value": {
@@ -142,7 +142,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "3/5 Move check integrity's text contrast arithmetic from the page into the …"
+      "caption": "3/6 Move check integrity's text contrast arithmetic from the page into the …"
     },
     {
       "value": {
@@ -178,7 +178,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "4/5 Run check color on a scene: vlmkit check color --elements"
+      "caption": "4/6 Run check color on a scene: vlmkit check color --elements"
     },
     {
       "value": {
@@ -217,7 +217,7 @@
       "highlight": [
         "mcp/src"
       ],
-      "caption": "5/5 Treat check color's page source as optional over MCP, like the other --…"
+      "caption": "5/6 Treat check color's page source as optional over MCP, like the other --…"
     },
     {
       "value": {
@@ -242,7 +242,47 @@
       "ms": 0
     },
     {
-      "note": "5 commits · 25 files · +2258 −614 · 7 areas, 1 import edges between them"
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src",
+        "mcp/src"
+      ],
+      "caption": "6/6 Run check design on a scene: vlmkit check design --elements"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 30
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2663 −666"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src",
+        "mcp/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "6 commits · 30 files · +2663 −666 · 7 areas, 1 import edges between them"
     }
   ]
 }
