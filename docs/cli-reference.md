@@ -467,6 +467,23 @@ rule sets, so a combined run's verdict would be ambiguous.
 Text drawn wider than its box is **not** reported as clipped unless a `clip` rect says so:
 on a canvas that overdraws, which the collision and protrusion rules cover.
 
+#### `check color` on a scene
+
+The same schema, with a `role` on the elements the two WCAG rules read:
+
+```bash
+vlmkit check color --elements scene.json
+```
+
+| field | unlocks |
+|---|---|
+| `role: "field"` + `background` somewhere behind it + `border` / `border_color` (or `shadow` / `outline`) | `control-boundary-invisible` (WCAG 1.4.11) |
+| `role: "link"` + `color`, inside a recorded ancestor with `color` and `text` (its prose) | `color-only-link`, `link-no-cue` (WCAG 1.4.1); `underline`, a `font_weight` step, `border` or `background` count as the cue |
+| `role: "button"` | counted in the interactive ink, judged by neither rule |
+
+Findings name elements by `path`, and `--allow` matches that path. A field or link with
+nothing opaque behind it is listed as skipped rather than measured against an assumed white.
+
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
@@ -477,7 +494,7 @@ vlmkit check palette       <target.png> [current.png]  # Dominant colors, or pal
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
 vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy
-vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning
+vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning (--elements for a scene)
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check grounding     <html|url>          # Screenshot-space action map for a computer-use agent (see below)

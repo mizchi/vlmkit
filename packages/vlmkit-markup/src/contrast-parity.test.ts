@@ -8,7 +8,9 @@ import {
   type Rgb,
   type Rgba,
 } from "@mizchi/vlmkit-judge/color.ts";
-import { sceneContrastCandidates, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";
+import { sceneContrastCandidates, sceneToColorRolesInput, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";
+import { judgeColorRoles, type ColorRolesInput } from "@mizchi/vlmkit-judge/color-roles.ts";
+import { COLLECT_COLOR_ROLES } from "./style/color-roles.ts";
 import { textContrastCandidates, type TextContrastSample } from "@mizchi/vlmkit-judge/integrity.ts";
 import { CONTRAST_BACKGROUND_JS } from "./contrast-background.ts";
 import { COLLECT_TEXT_CONTRAST, type ContrastCandidate } from "./inspect/integrity-check.ts";
@@ -123,6 +125,86 @@ describe("text contrast: DOM collector vs scene adapter on one page", () => {
       assert.ok(dom.candidates.length >= 5, `fixture should produce candidates, got ${JSON.stringify(dom.candidates)}`);
       assert.deepEqual(sort(fromScene.candidates), sort(dom.candidates));
       assert.deepEqual(fromScene.refused, [], "every text element in the fixture sits on an opaque background");
+    } finally {
+      await browser.close();
+    }
+  });
+});
+
+/**
+ * `check color` on one page two ways: the real `COLLECT_COLOR_ROLES`, and the same page
+ * collected as a scene with roles taken from the tags. Borders are uniform and the body
+ * paints an opaque background, which is where the two collectors describe the same facts;
+ * inside that, the judge must measure every field and link identically.
+ */
+const COLOR_HTML = `<!doctype html><html><body style="margin:0;background:#f7f7f5;color:#222;font:16px sans-serif">
+  <div style="background:#ffffff;padding:16px">
+    <input id="faint" style="background:#ffffff;border:1px solid #eeeeee">
+    <input id="framed" style="background:#ffffff;border:1px solid #767676">
+    <input id="filled" style="background:#e4e4e4;border:0">
+    <textarea id="shadowed" style="background:#ffffff;border:0;box-shadow:0 0 0 1px #999"></textarea>
+  </div>
+  <p style="color:#333333">A sentence long enough to be prose with <a href="#a" style="color:#3a6ea5;text-decoration:none">a bare link</a> inside it.</p>
+  <p style="color:#333333;background:rgba(0,0,120,0.08)">Another sentence of prose with <a href="#b" style="color:#555555;text-decoration:underline">an underlined link</a> in it.</p>
+  <p style="color:#444444">Prose once more, where <a href="#c" style="color:#444444;text-decoration:none">the link is the body ink</a> exactly.</p>
+</body></html>`;
+
+const COLLECT_COLOR_SCENE = `(() => {
+  const out = [];
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+      const siblings = n.parentElement ? Array.from(n.parentElement.children).filter((c) => c.tagName === n.tagName) : [n];
+      parts.unshift(n.tagName.toLowerCase() + "[" + siblings.indexOf(n) + "]");
+    }
+    return parts.join(">");
+  };
+  for (const el of [document.body, ...document.body.querySelectorAll("*")]) {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    // Each text node trimmed on its own, the way the page's ownText() counts a flow's prose:
+    // the spaces either side of an inline link are layout, not characters of the sentence.
+    let direct = "";
+    for (const n of el.childNodes) if (n.nodeType === 3) direct += (n.nodeValue || "").trim();
+    const tag = el.tagName.toLowerCase();
+    const role = tag === "input" || tag === "textarea" ? "field" : tag === "a" ? "link" : undefined;
+    const border = parseFloat(s.borderTopWidth) || 0;
+    out.push({
+      path: pathOf(el), tag: tag,
+      top: r.top, left: r.left, width: r.width, height: r.height,
+      ...(direct.trim() ? { text: direct } : {}),
+      color: s.color,
+      background: s.backgroundColor,
+      fontWeight: parseFloat(s.fontWeight),
+      ...(role ? { role: role } : {}),
+      ...(border > 0 && s.borderTopStyle !== "none" ? { border: border, borderColor: s.borderTopColor } : {}),
+      ...(s.textDecorationLine.indexOf("underline") !== -1 ? { underline: true } : {}),
+      ...(s.boxShadow !== "none" ? { shadow: true } : {}),
+    });
+  }
+  return out;
+})()`;
+
+describe("check color: DOM collector vs scene adapter on one page", () => {
+  it("measure every field and link the same", async () => {
+    const browser = await chromium.launch();
+    try {
+      const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
+      await tab.setContent(COLOR_HTML);
+      const dom = judgeColorRoles(await tab.evaluate(COLLECT_COLOR_ROLES) as ColorRolesInput);
+      const elements = await tab.evaluate(COLLECT_COLOR_SCENE) as SceneElement[];
+      const scene = judgeColorRoles(sceneToColorRolesInput(elements, { width: 800, height: 600 }));
+
+      const controls = (r: typeof dom) => r.controls.map((c) => ({ onHex: c.onHex, fillHex: c.fillHex, fillRatio: c.fillRatio, borderHex: c.borderHex, borderRatio: c.borderRatio, best: c.best, hasShadow: c.hasShadow }));
+      const links = (r: typeof dom) => r.links.map((l) => ({ linkHex: l.linkHex, bodyHex: l.bodyHex, vsBody: l.vsBody, underlined: l.underlined, sameInk: l.sameInk, proseChars: l.proseChars }));
+      assert.equal(dom.controls.length, 4);
+      assert.equal(dom.links.length, 3);
+      assert.deepEqual(controls(scene), controls(dom));
+      assert.deepEqual(links(scene), links(dom));
+      const findingKinds = (r: typeof dom) => r.findings.map((f) => f.kind).sort();
+      assert.deepEqual(findingKinds(scene), findingKinds(dom));
+      assert.ok(findingKinds(dom).includes("control-boundary-invisible"), findingKinds(dom).join(", "));
+      assert.ok(findingKinds(dom).includes("color-only-link"), findingKinds(dom).join(", "));
     } finally {
       await browser.close();
     }

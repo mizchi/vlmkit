@@ -18,8 +18,9 @@
  * say so rather than claiming a parent the data cannot prove.
  */
 import { UsageError } from "./errors.ts";
-import { parseColor, type Rgba } from "./color.ts";
+import { blendColor, compositeBackground, parseColor, toHex, type Rgb, type Rgba } from "./color.ts";
 import type { CompositionBox, CompositionInput } from "./composition.ts";
+import type { ColorRolesInput, ColorUse, ControlSample, LinkSample } from "./color-roles.ts";
 import {
   findTextCollisions,
   judgeAlignment,
@@ -98,6 +99,24 @@ export interface SceneElement {
   border?: number;
   /** Corner radius, px. */
   radius?: number;
+
+  // --- role: unlocks check color's two WCAG rules ---------------------------------
+  /**
+   * What the element is for, which only the scene's author knows — a DOM infers it from
+   * the tag, a canvas has no tags. `field`: a text control whose extent is the affordance
+   * (WCAG 1.4.11 reads its boundary). `link`: a link inside a flow of prose, the flow being
+   * its nearest recorded ancestor (WCAG 1.4.1 compares their inks) and the flow's own `text`
+   * — without the link's — being the prose it counts. `button`: interactive,
+   * counted in the interactive ink but judged by neither rule.
+   */
+  role?: "field" | "link" | "button";
+  /** Resolved colour of the border `border` px wide. A field's strongest drawn edge. */
+  borderColor?: string;
+  /** A link's non-colour cue. */
+  underline?: boolean;
+  /** A field draws its edge with a shadow or a painted outline instead of a border. */
+  shadow?: boolean;
+  outline?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,8 +176,13 @@ export function parseSceneElements(source: string | unknown): SceneElement[] {
       ...(num(record.heading) !== undefined ? { heading: num(record.heading)! } : {}),
       ...(num(record.border) !== undefined ? { border: num(record.border)! } : {}),
       ...(num(record.radius) !== undefined ? { radius: num(record.radius)! } : {}),
+      ...(str(record.role) ? { role: parseRole(str(record.role)!, index) } : {}),
+      ...(str(pick("borderColor", "border_color")) ? { borderColor: str(pick("borderColor", "border_color"))! } : {}),
+      ...(record.underline === true ? { underline: true } : {}),
+      ...(record.shadow === true ? { shadow: true } : {}),
+      ...(record.outline === true ? { outline: true } : {}),
     };
-    for (const key of ["color", "background"] as const) {
+    for (const key of ["color", "background", "borderColor"] as const) {
       const value = element[key];
       if (value !== undefined && parseColor(value) === null) {
         throw new UsageError(
@@ -697,6 +721,156 @@ export function sceneToCompositionInput(
 }
 
 // ---------------------------------------------------------------------------
+// check color
+
+/**
+ * What is painted behind an element, walking its recorded ancestors (and itself, when
+ * `includeSelf`) the way the page's `textBackgroundLayers` walks the DOM: stop at an image,
+ * stop at the first opaque layer. A scene has no default canvas colour, so a walk that never
+ * reaches an opaque layer answers `none` rather than assuming white.
+ */
+function backgroundBehind(
+  element: SceneElement,
+  byPath: ReadonlyMap<string, SceneElement>,
+  includeSelf: boolean,
+): { kind: "ok"; bg: Rgb } | { kind: "image" } | { kind: "none" } {
+  const layers: Rgba[] = [];
+  let node: SceneElement | undefined = includeSelf ? element : nearestRecordedAncestor(element, byPath);
+  for (; node; node = nearestRecordedAncestor(node, byPath)) {
+    if (node.backgroundImage) return { kind: "image" };
+    const c = node.background !== undefined ? parseColor(node.background) : null;
+    if (c && c[3] > 0) layers.push(c);
+    if (c && c[3] >= 1) return { kind: "ok", bg: compositeBackground(layers) };
+  }
+  return { kind: "none" };
+}
+
+/**
+ * The `check color` snapshot for a scene: the palette by role, and the samples the two WCAG
+ * rules read — fields from `role: "field"`, links from `role: "link"` with their nearest
+ * recorded ancestor as the prose flow.
+ *
+ * The same shape `COLLECT_COLOR_ROLES` returns, so `judgeColorRoles` cannot tell which
+ * renderer drew the frame. Two honest differences from the page, both refusals: a field
+ * with no opaque background behind it lands in `controlsSkipped` with that reason, and a
+ * link whose flow has none gets `behind: null`, which the judge already treats as "not
+ * measurable" (as it does text over an image). Selectors are scene paths, because that is
+ * the one identifier a scene guarantees unique and the string `--allow` matches.
+ */
+export function sceneToColorRolesInput(
+  elements: readonly SceneElement[],
+  viewport: { width: number; height: number },
+): ColorRolesInput {
+  const byPath = new Map(elements.map((element) => [element.path, element]));
+  const tally = { surfaces: new Map<string, ColorUse>(), ink: new Map<string, ColorUse>(), marks: new Map<string, ColorUse>(), interactive: new Map<string, ColorUse>() };
+  const add = (into: Map<string, ColorUse>, hex: string, area: number, sample: string): void => {
+    const entry = into.get(hex) ?? { hex, area: 0, count: 0, samples: [] };
+    entry.area += area;
+    entry.count++;
+    if (entry.samples.length < 3) entry.samples.push(sample);
+    into.set(hex, entry);
+  };
+  /** Text colour as painted: composited when it is translucent and something opaque is behind it. */
+  const inkOf = (element: SceneElement): string | null => {
+    const fg = parseColor(element.color);
+    if (!fg) return null;
+    if (fg[3] >= 1) return toHex(fg);
+    const behind = backgroundBehind(element, byPath, true);
+    return behind.kind === "ok" ? toHex(blendColor(behind.bg, fg)) : null;
+  };
+
+  const controls: ControlSample[] = [];
+  const controlsSkipped: { selector: string; reason: string }[] = [];
+  const links: LinkSample[] = [];
+
+  for (const element of elements) {
+    const area = Math.round(element.width * element.height);
+    const own = parseColor(element.background);
+    if (own && own[3] > 0.05) add(tally.surfaces, toHex(own), area, element.path);
+    if ((element.text ?? "").trim() && element.color) {
+      const ink = inkOf(element);
+      if (ink) add(tally.ink, ink, area, element.path);
+    }
+    const border = parseColor(element.borderColor);
+    if ((element.border ?? 0) > 0 && border && border[3] > 0.05) {
+      add(tally.marks, toHex(border), Math.round((element.border ?? 0) * 2 * (element.width + element.height)), element.path);
+    }
+    if (element.role && element.color) {
+      const ink = inkOf(element);
+      if (ink) add(tally.interactive, ink, area, element.path);
+    }
+
+    if (element.role === "field") {
+      const behind = backgroundBehind(element, byPath, false);
+      if (behind.kind !== "ok") {
+        controlsSkipped.push({
+          selector: element.path,
+          reason: behind.kind === "image"
+            ? "background-image behind the control"
+            : "no opaque background behind the control in the scene",
+        });
+      } else {
+        controls.push({
+          selector: element.path,
+          tag: element.tag,
+          on: behind.bg,
+          fill: own && own[3] > 0.05 ? own : null,
+          borders: (element.border ?? 0) > 0 && border && border[3] > 0.05 ? [border] : [],
+          hasShadow: element.shadow === true,
+          hasOutline: element.outline === true,
+        });
+      }
+    }
+
+    if (element.role === "link") {
+      const flow = nearestRecordedAncestor(element, byPath);
+      const link = parseColor(element.color);
+      const body = flow ? parseColor(flow.color) : null;
+      if (!flow || !link || !body) continue;
+      const behind = backgroundBehind(flow, byPath, true);
+      links.push({
+        selector: element.path,
+        flow: flow.path,
+        proseChars: (flow.text ?? "").trim().length,
+        link,
+        body,
+        behind: behind.kind === "ok" ? behind.bg : null,
+        underlined: element.underline === true,
+        weightStep: Math.abs((element.fontWeight ?? 400) - (flow.fontWeight ?? 400)),
+        hasFill: !!own && own[3] > 0.05,
+        hasBorder: (element.border ?? 0) > 0,
+      });
+    }
+  }
+
+  const rank = (m: Map<string, ColorUse>) => [...m.values()].sort((a, b) => b.area - a.area);
+  const roots = elements.filter((element) => !nearestRecordedAncestor(element, byPath));
+  const base = roots.length > 0 ? backgroundBehind(roots[0]!, byPath, true) : { kind: "none" as const };
+  return {
+    palette: { surfaces: rank(tally.surfaces), ink: rank(tally.ink), marks: rank(tally.marks) },
+    // Empty when the root paints nothing: findBase then names no base instead of a white
+    // the frame may not contain.
+    baseHex: base.kind === "ok" ? toHex(base.bg) : "",
+    interactiveInk: rank(tally.interactive),
+    controls,
+    controlsSkipped,
+    links,
+    // The parser refuses an unresolved colour outright, so nothing reaches here unread.
+    unreadable: [],
+    boxes: elements.length,
+    viewport,
+  };
+}
+
+// ---------------------------------------------------------------------------
+
+const ROLES = new Set(["field", "link", "button"]);
+function parseRole(role: string, index: number): "field" | "link" | "button" {
+  if (!ROLES.has(role)) {
+    throw new UsageError(`elements[${index}].role is "${role}"; the roles check color reads are field, link and button.`);
+  }
+  return role as "field" | "link" | "button";
+}
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;

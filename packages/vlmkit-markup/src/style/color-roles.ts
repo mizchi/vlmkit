@@ -7,7 +7,7 @@
  */
 
 import { resolve, dirname } from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
@@ -28,6 +28,7 @@ import {
   type ColorRolesReport,
   type ColorUse,
 } from "@mizchi/vlmkit-judge/color-roles.ts";
+import { parseSceneElements, sceneToColorRolesInput } from "@mizchi/vlmkit-judge/scene.ts";
 
 export * from "@mizchi/vlmkit-judge/color-roles.ts";
 
@@ -358,6 +359,33 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
     if (redirect) {
       report.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
     }
+    return await finishColorRoles(report, options);
+  });
+}
+
+/**
+ * `check color --elements scene.json`: the same judge over a scene instead of a page — a
+ * canvas / WebGPU frame, a native toolkit, a game's HUD. No browser is started. The scene
+ * contract (`@mizchi/vlmkit-judge/scene.ts`) says which fields each rule reads: `role`,
+ * `color`, `background`, `border` + `border_color`, `underline`, `shadow` / `outline`.
+ */
+export async function runSceneColorRolesCheck(
+  options: Pick<ColorRolesOptions, "allow" | "reportPath" | "viewport"> & { elementsPath: string },
+): Promise<ColorRolesReport> {
+  const elements = parseSceneElements(await readFile(options.elementsPath, "utf8"));
+  const width = options.viewport ?? Math.max(0, ...elements.map((e) => e.left + e.width));
+  const height = Math.max(0, ...elements.map((e) => e.top + e.height));
+  const input = sceneToColorRolesInput(elements, { width, height });
+  const report = judgeColorRoles(input, { source: options.elementsPath, allow: options.allow });
+  return await finishColorRoles(report, { source: options.elementsPath, reportPath: options.reportPath });
+}
+
+/** The run ledger and the optional markdown report, whichever source the snapshot came from. */
+async function finishColorRoles(
+  report: ColorRolesReport,
+  options: { source: string; reportPath?: string },
+): Promise<ColorRolesReport> {
+  {
     appendRunLedger({
       tool: "check-color",
       source: options.source,
@@ -377,7 +405,7 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
       await writeFile(target, markdownReport(report), "utf8");
     }
     return report;
-  });
+  }
 }
 
 function markdownReport(report: ColorRolesReport): string {

@@ -184,10 +184,23 @@ Still to do on the DOM side:
   --json` on 16 pages was byte-identical before and after. One of those pages was built to
   cross the cap: 80 low-contrast rows, with text over gradients before and after the 60th
   candidate. Between them the 16 pages have 32 contrast findings and 27 contrast exemptions.
-- A scene adapter for `check color`. The arithmetic no longer needs a browser, but the
-  roles still come from the DOM: which element is a text field, which link sits in a prose
-  flow. A scene would need a `role` (`field`, `link`) and the flow's own text length to
-  produce `ControlSample` / `LinkSample`.
+- ~~A scene adapter for `check color`.~~ Done: `vlmkit check color --elements scene.json`.
+  The scene declares what a DOM infers from tags: `role: field | link | button`. It adds the
+  few facts the two rules read: `border` + `border_color`, `underline`, `shadow` /
+  `outline`. A link's flow is its nearest recorded ancestor, and that ancestor's own `text`
+  is the prose. `sceneToColorRolesInput` builds the same `ColorRolesInput` the collector
+  returns, so the judge cannot tell the sources apart.
+
+  Two refusals differ from the page. A field with nothing opaque behind it lands in
+  `controlsSkipped` with that reason. A link whose flow has nothing opaque behind it gets
+  `behind: null`, which the judge already treats as unmeasurable. Neither is measured
+  against a white the frame may not contain.
+
+  **Held to the page by a test:** `contrast-parity.test.ts` renders four fields and three
+  prose links. It collects them with the real `COLLECT_COLOR_ROLES` and also as a scene with
+  roles taken from tags, and requires identical `onHex` / `fillRatio` / `borderRatio` /
+  `best` / `vsBody` / cues and identical findings. Dropping the adapter's `underline`
+  mapping fails it.
 - Replace the five TypeScript copies of contrast/luminance (`asset-check`,
   `component-from-image` ×2, `spec-checks`, `page-compose-diff`) with `color.ts`. Check each
   one's threshold first: not all of them use 0.03928.

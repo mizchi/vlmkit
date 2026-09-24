@@ -21,7 +21,8 @@ import { readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import {
   COLOR_ALLOW_HELP,
   parseColorAllowRules,
@@ -29,9 +30,10 @@ import {
   type ColorRolesReport,
   formatColorRolesReport,
   runColorRolesCheck,
+  runSceneColorRolesCheck,
 } from "../style/color-roles.ts";
 
-export const colorGate = defineGate<ColorRolesReport, ColorRolesOptions>({
+export const colorGate = defineGate<ColorRolesReport, ColorRolesOptions & { elementsPath?: string }>({
   id: "check.color",
   command: ["check", "color"],
   title: "Colour roles and colour-only meaning",
@@ -124,7 +126,11 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
   inputs: [
     {
       name: "source", placeholder: "html-or-url", kind: "path-or-url",
-      description: "Page to check", positional: 0, required: true,
+      description: "Page to check (omit when using --elements)", positional: 0,
+    },
+    {
+      name: "elements", placeholder: "scene.json", kind: "path",
+      description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Needs `role: field|link` and resolved colours",
     },
     {
       name: "viewport", kind: "number",
@@ -144,7 +150,26 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check color <html-or-url>", [
+    const elements = readFlag(argv, "elements");
+    if (elements) {
+      // Mutually exclusive with a page, as in `check integrity`: the two inputs are judged by
+      // the same rules, but a run that measured one of two named inputs would be ambiguous.
+      if (firstPositionalOrUndefined(argv, ["--viewport", "--allow", "--storage-state", "--report", "--elements"])) {
+        throw new UsageError("check color takes either a page source or --elements, not both.");
+      }
+      const viewport = readInt(argv, "viewport", { min: 1 });
+      const allow = readAll(argv, "allow");
+      parseColorAllowRules(allow);
+      const reportPath = readFlag(argv, "report");
+      return {
+        source: elements,
+        elementsPath: elements,
+        ...(viewport !== undefined ? { viewport } : {}),
+        ...(allow.length > 0 ? { allow } : {}),
+        ...(reportPath ? { reportPath } : {}),
+      };
+    }
+    const source = firstPositional(argv, "vlmkit check color <html-or-url> | --elements <scene.json>", [
       "--viewport", "--allow", "--storage-state", "--report",
     ]);
     const viewport = readInt(argv, "viewport", { min: 200 });
@@ -166,7 +191,9 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
       ...(pageLoad.har ? { har: pageLoad.har } : {}),
     };
   },
-  run: (options) => runColorRolesCheck(options),
+  run: (options) => (options.elementsPath
+    ? runSceneColorRolesCheck({ ...options, elementsPath: options.elementsPath })
+    : runColorRolesCheck(options)),
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,
