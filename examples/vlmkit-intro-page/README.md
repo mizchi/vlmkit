@@ -7,9 +7,31 @@ markup loop、決定論的ゲート、Playwright VRT で検証します。ヘッ
 GitHub Pages: <https://mizchi.github.io/vlmkit/>
 
 このリポジトリの Pages サイトは複数ページで構成されています。紹介ページが `/`、
-DnD とアニメーションのドッグフード対象である Klondike solitaire が `/solitaire/` です。
+DnD とアニメーションのドッグフード対象である Klondike solitaire が `/solitaire/`、
+エージェントが作った6つのデモサイトとその一覧が `/sites/` です
+(`examples/sites/`)。紹介ページ自身の視覚レビューの記録は `/judgment/` に、
+各デモサイトの記録は `/sites/<name>/judgment/` に公開されます。
 公開されるファイルの一覧と URL は `scripts/build-pages.mjs` の `siteSections` が唯一の定義で、
 `tests/pages-site.test.mjs` が検証します。
+
+## 判断の記録 (`judgment.sqlite`)
+
+このページの見た目の判断は `judgment.sqlite` の1ファイルに残っています。ゲートの実行結果は全文、
+スクリーンショットは1画面1枚、そのそれぞれに「何が見えたか」の記述が付き、欠陥はそれを
+見つけたのが目かゲートかを必ず記録します。画像は、終わったラウンドごとに幅ごと1本のフルページ
+撮影だけを残します (見たものの記述はすべて残ります)。記録の書き方は `examples/sites/PROTOCOL.md`、
+ツールは `examples/sites/judge.mjs` です。`JUDGMENT.md` は同じ記録をテキストにしたもので、
+公開ページ (`/judgment/`) にリンクしています。
+
+```sh
+node examples/sites/judge.mjs examples/vlmkit-intro-page status
+node examples/sites/judge.mjs examples/vlmkit-intro-page render   # JUDGMENT.md と judgment/ (ページと画像、コミットしない)
+```
+
+ページを変えたら、新しいラウンドでゲートと全画面のショットを取り直し、見たものを記録してから
+`done` します。`examples/sites/sites.test.mjs` は、記録が自分の完了条件を満たし、データベースが
+残すべき画像とゲート出力をちょうど持ち、コミット済みの `JUDGMENT.md` が記録から再生成したものと
+一致することを検証します。
 
 まずリポジトリルートで vlmkit をビルドします。
 

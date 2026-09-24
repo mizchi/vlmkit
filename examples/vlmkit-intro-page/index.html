@@ -78,7 +78,14 @@
     <main id="main">
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-grid">
-          <div class="hero-copy">
+          <!--
+            The heading is its own grid item so it can span both columns on a desktop. Inside the
+            copy column (558px at 1280) each phrase wrapped, "VLM-assisted / UI. / Verified in the /
+            browser." in English and "ブラウザで検証す / る。" in Japanese, and the four-line
+            headline pushed both CTAs below an 800px first screen. Across the full row each phrase
+            fits on its line. Below 900px the grid is one column and the order is unchanged.
+          -->
+          <div class="hero-heading">
             <!-- Kept in step with the published package by `page.test.mjs`; this said v0.9.0
                  through two releases because nothing was checking it. -->
             <p class="eyebrow"><span>vlmkit / UI verification</span><span>Node.js 24+</span><span>v0.23.0</span></p>
@@ -86,6 +93,8 @@
               <span data-i18n="hero.line1">VLM-assisted UI.</span><br />
               <span data-i18n="hero.line2">Verified in the browser.</span>
             </h1>
+          </div>
+          <div class="hero-copy">
             <p class="hero-lead" data-i18n="hero.vlmLead">vlmkit connects an AI agent's VLM vision to real-browser measurements, so it can implement UI from screenshots, find breakage, fix it, and prove the result.</p>
             <div class="hero-skill-installers" data-testid="hero-skill-installers">
               <p data-i18n="hero.installLead">Install one skill. The AI picks and runs the right UI workflow.</p>
@@ -264,6 +273,9 @@
             <div class="demo-actions">
               <a class="button button-dark" href="./solitaire/"><span data-i18n="demo.play">Play the demo</span> <span aria-hidden="true">→</span></a>
               <a class="demo-changelog" href="https://github.com/mizchi/vlmkit/blob/main/CHANGELOG.md"><span data-i18n="demo.changelog">Read what 0.11 changed</span> <span aria-hidden="true">↗</span></a>
+              <!-- The gallery of the six demo sites, each beside the log of how it was judged. Relative
+                   for the same reason as the solitaire link: /vlmkit/sites/ on Pages. -->
+              <a class="demo-changelog" href="./sites/"><span data-i18n="demo.sites">Six more sites, and how each was judged</span> <span aria-hidden="true">→</span></a>
             </div>
           </div>
         </div>
@@ -519,7 +531,12 @@
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>vlmkit</span>
       </a>
-      <p data-i18n="footer.tagline">Measure the page. Fix the fact. Ship with proof.</p>
+      <div class="footer-center">
+        <p data-i18n="footer.tagline">Measure the page. Fix the fact. Ship with proof.</p>
+        <!-- This page's own visual review is published at ./judgment/, the gallery at ./sites/.
+             Under the tagline, not beside the licence: the right column is sized for a short item. -->
+        <p class="footer-links"><a href="./sites/" data-i18n="footer.sites">Demo sites</a> · <a href="./judgment/" data-i18n="footer.judged">How this page was judged</a></p>
+      </div>
       <p>MIT · mizchi</p>
     </footer>
   </body>
