@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="142 -5 645 215" width="645" height="215" data-t="1960" data-duration="1960">
+<rect x="142" y="-5" width="645" height="215" fill="#ffffff"/>
+<g id="title" data-shape="text" transform="translate(438 22)"><text font-size="18" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">PR #167: Fold the 0.24.0 changelog section into 0.23.0</tspan></text></g>
+<g id="root" data-shape="rect" transform="translate(320 175)"><rect x="-28" y="-18.2" width="56" height="36.4" rx="6" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text font-size="14" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">root</tspan></text></g>
+<g id="token" data-shape="circle" transform="translate(0 0)" opacity="0"><circle r="6" fill="#f59e0b" stroke="#1f2328" stroke-width="1.5"/></g>
+<g id="value-files-label" data-shape="text" transform="translate(656 56)"><text font-size="12" fill="#9ca3af" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">files changed:</tspan></text></g>
+<g id="value-files" data-shape="text" transform="translate(761.6 56)"><text font-size="14" fill="#f59e0b" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">1</tspan></text></g>
+<g id="value-lines-label" data-shape="text" transform="translate(656 80)"><text font-size="12" fill="#9ca3af" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">lines:</tspan></text></g>
+<g id="value-lines" data-shape="text" transform="translate(704 80)"><text font-size="14" fill="#f59e0b" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">+6 −7</tspan></text></g>
+</svg>

@@ -1,0 +1,57 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #167: Fold the 0.24.0 changelog section into 0.23.0",
+  "layout": "grid",
+  "canvas": {
+    "width": 640,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    }
+  ],
+  "edges": [],
+  "sequence": [
+    {
+      "show": [
+        "root"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "root"
+      ],
+      "caption": "1/1 Fold the 0.24.0 changelog section into 0.23.0"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 1
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+6 −7"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "root"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 1 files · +6 −7 · 1 areas, 0 import edges between them"
+    }
+  ]
+}
