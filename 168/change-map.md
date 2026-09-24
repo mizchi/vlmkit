@@ -1,20 +1,21 @@
-## PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2)
+## PR #168: Scene contract in @mizchi/vlmkit-judge: colour arithmetic, both contrast collectors, and check color on a scene (phase 2)
 
-![PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2)](./change-map.gif)
+![PR #168: Scene contract in @mizchi/vlmkit-judge: colour arithmetic, both contrast collectors, and check color on a scene (phase 2)](./change-map.gif)
 
 <details><summary>Every step</summary>
 
 ![steps](./change-map.sheet.png)
 
 ```
-PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2) — 7 steps, 4060ms, 13 nodes
- 1. [    0ms] PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2)
- 2. [  350ms] 1/4 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
- 3. [ 1050ms] 2/4 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
- 4. [ 1750ms] 3/4 Move check integrity's text contrast arithmetic from the page into the … · files changed = 22 · lines = +1780 −593
- 5. [ 2450ms] 4/4 Run check color on a scene: vlmkit check color --elements · files changed = 24 · lines = +2243 −610
- 6. [ 3150ms] 4 commits · 24 files · +2243 −610 · 6 areas, 1 import edges between them
- 7. [ 3850ms] (end)
+PR #168: Scene contract in @mizchi/vlmkit-judge: colour arithmetic, both contrast collectors, and check color on a scene (phase 2) — 8 steps, 4760ms, 14 nodes
+ 1. [    0ms] PR #168: Scene contract in @mizchi/vlmkit-judge: colour arithmetic, both contrast collectors, and check color on a scene (phase 2)
+ 2. [  350ms] 1/5 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
+ 3. [ 1050ms] 2/5 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
+ 4. [ 1750ms] 3/5 Move check integrity's text contrast arithmetic from the page into the … · files changed = 22 · lines = +1780 −593
+ 5. [ 2450ms] 4/5 Run check color on a scene: vlmkit check color --elements · files changed = 24 · lines = +2243 −610
+ 6. [ 3150ms] 5/5 Treat check color's page source as optional over MCP, like the other --… · files changed = 25 · lines = +2258 −614
+ 7. [ 3850ms] 5 commits · 25 files · +2258 −614 · 7 areas, 1 import edges between them
+ 8. [ 4550ms] (end)
 ```
 
 </details>
