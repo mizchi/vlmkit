@@ -7,11 +7,12 @@
 ![steps](./change-map.sheet.png)
 
 ```
-PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2) — 4 steps, 1960ms, 13 nodes
+PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2) — 5 steps, 2660ms, 13 nodes
  1. [    0ms] PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2)
- 2. [  350ms] 1/1 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
- 3. [ 1050ms] 1 commit · 15 files · +1335 −504 · 6 areas, 1 import edges between them
- 4. [ 1750ms] (end)
+ 2. [  350ms] 1/2 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
+ 3. [ 1050ms] 2/2 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
+ 4. [ 1750ms] 2 commits · 19 files · +1585 −530 · 6 areas, 1 import edges between them
+ 5. [ 2450ms] (end)
 ```
 
 </details>

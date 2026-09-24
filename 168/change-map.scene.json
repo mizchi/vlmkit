@@ -19,16 +19,6 @@
       "hidden": true
     },
     {
-      "id": ".claude",
-      "label": ".claude",
-      "hidden": true
-    },
-    {
-      "id": "docs",
-      "label": "docs",
-      "hidden": true
-    },
-    {
       "id": "docs/design",
       "label": "docs/design",
       "hidden": true
@@ -36,6 +26,16 @@
     {
       "id": "judge",
       "label": "judge",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
       "hidden": true
     }
   ],
@@ -67,7 +67,7 @@
         "judge/src",
         "markup/src"
       ],
-      "caption": "1/1 Define the scene contract and move colour arithmetic into the judge (ph…"
+      "caption": "1/2 Define the scene contract and move colour arithmetic into the judge (ph…"
     },
     {
       "value": {
@@ -97,7 +97,41 @@
       "ms": 0
     },
     {
-      "note": "1 commit · 15 files · +1335 −504 · 6 areas, 1 import edges between them"
+      "highlight": [
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src"
+      ],
+      "caption": "2/2 Move check color's contrast ratios from the page into the judge"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 19
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1585 −530"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 19 files · +1585 −530 · 6 areas, 1 import edges between them"
     }
   ]
 }
