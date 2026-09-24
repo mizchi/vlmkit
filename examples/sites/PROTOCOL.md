@@ -68,9 +68,15 @@ What caught people out in the first rounds:
 - `--element` shoots the **first** match. `footer` matched a pull quote's `<footer>` on the landing
   page; name the one you mean (`.site-footer`).
 - Text that starts with a dash (`--measure 42rem …`) goes after `--`, or in a heredoc with `-`.
-- Screens are saved as WebP and are what the log page publishes. What a gate writes with
-  `--output-dir` lands under `test-results/`, which is ignored and never published — the log keeps
-  each run's whole output instead.
+- The log is one file, `judgment.sqlite` in your site directory: every event, every gate run's whole
+  output, and the screens. The files `shot` prints are an export of those screens into `judgment/`,
+  there for you to Read. What a gate writes with `--output-dir` lands under `test-results/`, which is
+  ignored and never published — the log keeps each run's whole output instead.
+- **A finished round keeps one full-page walk per width.** When `done` closes a round, the log keeps
+  the screens of its last full-page walk at desktop, tablet and phone width (the page as a visitor
+  lands on it, when there is one) and lets the others go — close-ups, states, repeat walks. The
+  shots and what you wrote about them stay; the pictures do not. So write every look before `done`,
+  and take a state you want pictured in the log as a full-page walk, or again in the next round.
 
 ## The loop
 
@@ -113,8 +119,8 @@ brief defines), `check a11y focus`, `check a11y touch`, `scan scroll`, `scan han
 
 ## Rules of the room
 
-- **Stay in your directory.** Edit nothing outside `examples/sites/<name>/`. Do not edit anything
-  under `judgment/` by hand. Do not commit, and do not run `pnpm install` or `pnpm build` —
+- **Stay in your directory.** Edit nothing outside `examples/sites/<name>/`. Do not edit
+  `judgment.sqlite` or anything under `judgment/` by hand. Do not commit, and do not run `pnpm install` or `pnpm build` —
   `dist/` is shared with other agents and is already built. No servers are needed: gates and shots
   take `index.html` straight from disk.
 - **Work independently.** Do not read the other sites in `examples/sites/` or their logs, and do not

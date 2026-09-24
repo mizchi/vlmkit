@@ -18,13 +18,20 @@ import {
   clean,
   displayCommand,
   gateSummary,
+  keptShots,
+  logPaths,
   nextOffset,
   parseShotArgs,
   publishedFiles,
+  publishedJudgment,
   readLog,
+  readOutputs,
+  readScreen,
   renderHtml,
+  renderMarkdown,
   renderSite,
   stoppedShort,
+  storedScreens,
   tileFile,
 } from "./judge.mjs";
 
@@ -200,6 +207,77 @@ describe("checkLog", () => {
   });
 });
 
+describe("keptShots", () => {
+  /** Two rounds, and a done that closes both: each has walks at every width, a dark one, a close-up. */
+  function closedLog() {
+    const walk = (id, round, width, extra = {}) => ({
+      kind: "shot",
+      id,
+      round,
+      page: "index.html",
+      mode: "full",
+      dark: false,
+      viewport: { name: "x", width, height: 800 },
+      pageHeight: 1600,
+      tiles: [{ file: `shots/${id}-1.webp`, w: width, h: 800, scrollY: 0 }, { file: `shots/${id}-2.webp`, w: width, h: 800, scrollY: 800 }],
+      steps: [],
+      errors: [],
+      ...extra,
+    });
+    return [
+      { kind: "init", title: "t" },
+      { kind: "round", id: "R1", actor: "builder", title: "first draft" },
+      walk("S1", "R1", 1280),
+      walk("S2", "R1", 375),
+      walk("S3", "R1", 1280, { dark: true }),
+      walk("S4", "R1", 1280, { mode: "element", element: ".card", tiles: [{ file: "shots/S4-1.webp", w: 300, h: 200 }] }),
+      { kind: "round", id: "R2", actor: "builder", title: "fix pass" },
+      walk("S5", "R2", 1280, { page: "index.html?theme=dark" }),
+      walk("S6", "R2", 768),
+      walk("S7", "R2", 375, { stoppedShort: true }),
+      walk("S8", "R2", 375),
+      walk("S9", "R2", 375, { stoppedShort: true }),
+      { kind: "done", round: "R2", text: "done" },
+    ];
+  }
+
+  it("keeps every shot until a done closes its round", () => {
+    const open = closedLog().filter((e) => e.kind !== "done");
+    assert.deepEqual([...keptShots(open)].sort(), ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9"]);
+  });
+
+  it("keeps one full-page walk per width of each closed round: the page as a visitor lands on it, whole", () => {
+    // R1: the light desktop walk over the later dark one, the phone walk; never the close-up.
+    // R2: the dark-query walk when it is the only desktop one, the tablet walk, and the last phone
+    // walk that reached the end over the two the tile cap cut short.
+    assert.deepEqual([...keptShots(closedLog())].sort(), ["S1", "S2", "S5", "S6", "S8"]);
+    assert.deepEqual(publishedFiles(closedLog()), [
+      "judgment/index.html",
+      ...["S1", "S2", "S5", "S6", "S8"].flatMap((id) => [`judgment/shots/${id}-1.webp`, `judgment/shots/${id}-2.webp`]),
+    ]);
+  });
+
+  it("keeps whatever was shot after the last done, the start of the next round's work", () => {
+    const events = [...closedLog(), { kind: "round", id: "R3", actor: "reviewer", title: "review" }];
+    events.push({ ...closedLog().find((e) => e.id === "S4"), id: "S10", round: "R3" });
+    assert.ok(keptShots(events).has("S10"));
+    assert.ok(!keptShots(events).has("S4"));
+  });
+
+  it("says on the page and in the Markdown which shots kept no pictures, and links the rest", () => {
+    const events = closedLog();
+    const html = renderHtml(events);
+    assert.match(html, /id="S4">(?:(?!<\/article>).)*1 screen\(s\), looked at when taken; not kept once the round was done/s);
+    assert.doesNotMatch(html, /src="shots\/S4-1\.webp"/, "no picture for a screen the log let go");
+    assert.match(html, /src="shots\/S1-1\.webp"/);
+    assert.match(html, /screens in 9 shots, 10 kept/);
+    const md = renderMarkdown(events, { pageUrl: "https://example.test/judgment/" });
+    assert.match(md, /- \*\*S4\*\* .* \(screens not kept\)$/m);
+    assert.match(md, /- \*\*S1\*\* .* \(\[screens\]\(https:\/\/example\.test\/judgment\/#S1\)\)$/m);
+    assert.doesNotMatch(md, /<img/, "the Markdown carries no pictures");
+  });
+});
+
 describe("tileFile / publishedFiles / displayCommand", () => {
   it("resolves a JPEG-era screen to its WebP once the log says it was recoded", () => {
     const events = baseLog();
@@ -311,9 +389,10 @@ describe("the CLI, end to end", () => {
     assert.equal(g2.exit, 1);
     assert.equal(g1.verdict, "verdict: DRIFT (2 finding(s))");
     assert.deepEqual(g1.headline, [{ tool: "check-stub", findings: 2 }], "the headline comes from the run's own ledger line");
-    const saved = readFileSync(join(site, "judgment", g1.output), "utf8");
+    const saved = readOutputs(site).get(g1.output);
     assert.ok(!saved.includes("\x1b["), "the kept output has no colour codes");
     assert.match(saved, /args: check stub index\.html/);
+    assert.ok(!existsSync(join(site, "judgment", "gates")), "an output lives in the database, not in a file of its own");
   });
 
   it("takes a full page as screens that step short of the pinned header and bar", () => {
@@ -324,7 +403,13 @@ describe("the CLI, end to end", () => {
     // 800 tall, 100 pinned on top and 50 at the bottom: each step is 650 and the last is flush.
     assert.deepEqual(shot.tiles.map((t) => t.scrollY), [0, 650, 1100]);
     assert.deepEqual(shot.tiles[0].insets, { top: 100, bottom: 50 });
-    for (const tile of shot.tiles) assert.ok(existsSync(join(site, "judgment", tile.file)), `${tile.file} exists`);
+    for (const tile of shot.tiles) {
+      // The log holds the screen; the file the builder Reads is its export, byte for byte.
+      const file = join(site, "judgment", tile.file);
+      assert.ok(existsSync(file), `${tile.file} is exported`);
+      assert.ok(readScreen(site, tile.file).equals(readFileSync(file)), `${tile.file} is the screen the log holds`);
+      assert.ok(run.stdout.includes(file), "the shot prints the path to Read");
+    }
     assert.match(run.stdout, /Read every file above/);
   });
 
@@ -379,6 +464,19 @@ describe("the CLI, end to end", () => {
     assert.ok(existsSync(join(site, "JUDGMENT.md")));
   });
 
+  it("lets go of the screens a finished round does not keep, and will not take a look at them after", () => {
+    // R1 walked the page at desktop (S1) and phone (S3) width and took one close-up (S2).
+    assert.deepEqual([...keptShots(readLog(site))].sort(), ["S1", "S3"]);
+    const stored = storedScreens(site);
+    assert.ok(!stored.includes("shots/S2-1.webp"), "the close-up went");
+    assert.ok(!existsSync(join(site, "judgment", "shots", "S2-1.webp")), "and so did its export");
+    for (const id of ["S1", "S3"]) {
+      for (const tile of readLog(site).find((e) => e.id === id).tiles) assert.ok(stored.includes(tile.file), `${tile.file} kept`);
+    }
+    assert.ok(readLog(site).some((e) => e.kind === "look" && e.shot === "S2"), "what was seen in it stays");
+    assert.match(judge("look", "S2", "x".repeat(100)).stderr, /S2's screens went when its round was done/);
+  });
+
   it("renders the same bytes from the same log", () => {
     const first = renderSite(site);
     const second = renderSite(site);
@@ -424,31 +522,28 @@ describe("the CLI, end to end", () => {
     assert.equal("stoppedShort" in readLog(site).filter((e) => e.kind === "shot").at(-1), false, "a complete walk records nothing extra");
   });
 
-  it("recodes a JPEG-era log's screens as WebP once, and says so rather than rewriting the shots", async () => {
-    const old = join(root, "old-site");
-    mkdirSync(join(old, "judgment", "shots"), { recursive: true });
-    mkdirSync(join(old, "judgment", "gates"), { recursive: true });
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch();
-    const tab = await browser.newPage({ viewport: { width: 320, height: 200 } });
-    await tab.setContent("<p style='font:20px sans-serif'>A screen from the first round</p>");
-    await tab.screenshot({ path: join(old, "judgment", "shots", "S1-1.jpg"), type: "jpeg", quality: 78 });
-    await browser.close();
-    const events = [
-      { kind: "init", t: "", title: "Old site", pattern: "fixture", brief: null },
-      { kind: "round", id: "R1", t: "", actor: "builder", title: "first draft" },
-      { kind: "shot", id: "S1", round: "R1", t: "", page: "index.html", viewport: { name: "x", width: 320, height: 200 }, scale: 1, dark: false, reducedMotion: false, mode: "viewport", element: null, scrollEl: null, steps: [], label: null, pageHeight: null, tiles: [{ file: "shots/S1-1.jpg", w: 320, h: 200 }], errors: [] },
-    ];
-    writeFileSync(join(old, "judgment", "log.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + "\n");
-    const run = spawnSync(process.execPath, [JUDGE, old, "recode"], { encoding: "utf8" });
-    assert.equal(run.status, 0, run.stderr);
-    assert.ok(!existsSync(join(old, "judgment", "shots", "S1-1.jpg")), "the JPEG is gone");
-    assert.ok(existsSync(join(old, "judgment", "shots", "S1-1.webp")), "the WebP is there");
-    const log = readLog(old);
-    assert.equal(log.find((e) => e.kind === "shot").tiles[0].file, "shots/S1-1.jpg", "the shot is not rewritten");
-    assert.deepEqual(Object.keys(log.at(-1)).sort(), ["bytesAfter", "bytesBefore", "count", "from", "kind", "quality", "t", "to"]);
-    assert.match(readFileSync(join(old, "judgment", "index.html"), "utf8"), /src="shots\/S1-1\.webp"/);
-    assert.match(readFileSync(join(old, "JUDGMENT.md"), "utf8"), /re-encoded as WebP/);
-    assert.match(spawnSync(process.execPath, [JUDGE, old, "recode"], { encoding: "utf8" }).stderr, /already recoded/);
+  it("keeps the whole log in one SQLite file that any SQLite reader can query", () => {
+    const events = readLog(site);
+    const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
+    const db = new DatabaseSync(logPaths(site).db, { readOnly: true });
+    try {
+      // The columns beside the JSON are what `sqlite3 judgment.sqlite "select … where kind = 'gate'"` reads.
+      const rows = db.prepare("SELECT kind, id, round FROM events ORDER BY seq").all().map((r) => ({ ...r }));
+      assert.deepEqual(
+        rows,
+        events.map((e) => ({ kind: e.kind, id: e.id ?? null, round: e.kind === "round" ? e.id : (e.round ?? null) })),
+      );
+      const outputs = db.prepare("SELECT count(*) AS n FROM outputs").get().n;
+      assert.equal(outputs, events.filter((e) => e.kind === "gate").length, "one output per gate run");
+    } finally {
+      db.close();
+    }
+    // The published half is read out of the database: the page, and the screens the log keeps.
+    const published = publishedJudgment(site);
+    assert.deepEqual(published.map((p) => p.path), publishedFiles(events));
+    const screen = published.find((p) => p.path.endsWith(".webp"));
+    assert.ok(screen.bytes().equals(readScreen(site, screen.path.slice("judgment/".length))));
+    assert.equal(published[0].bytes().toString("utf8"), renderSite(site).html);
+    assert.doesNotMatch(judge("status").stderr, /ExperimentalWarning/, "node:sqlite's warning stays out of every command's output");
   });
 });
