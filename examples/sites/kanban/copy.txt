@@ -1,0 +1,9 @@
+Sprintboard
+Website relaunch
+Backlog
+In progress
+Review
+Done
+New task
+Overdue
+Add a card

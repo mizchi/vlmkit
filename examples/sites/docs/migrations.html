@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Migrations · Quarry docs</title>
+<meta name="description" content="How a Quarry migration runs, how to rehearse it with a dry run, and how to roll it back.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.2 20.8 7.1 12 12 3.2 7.1Z' fill='%230f766e'/%3E%3Cpath d='M3.2 7.1 12 12v9.8l-8.8-4.9Z' fill='%230b4f4a'/%3E%3Cpath d='M20.8 7.1 12 12v9.8l8.8-4.9Z' fill='%2359b3a8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="quarry.css">
+<script src="quarry.js"></script>
+</head>
+<body id="top">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+<div class="header-inner">
+<div class="header-brand">
+<button class="menu-button" type="button" data-drawer-open aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Menu</span></button>
+<a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="mark-top" d="M12 2.2 20.8 7.1 12 12 3.2 7.1Z"/><path class="mark-left" d="M3.2 7.1 12 12v9.8l-8.8-4.9Z"/><path class="mark-right" d="M20.8 7.1 12 12v9.8l8.8-4.9Z"/></svg><span class="brand-name">Quarry</span></a>
+<span class="version" title="Documentation for Quarry 2.4">v2.4</span>
+</div>
+<div class="header-search">
+<div class="search" role="search">
+<label class="visually-hidden" for="search-header">Filter pages and sections</label>
+<svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input class="search-input" id="search-header" type="search" placeholder="Filter pages and sections" autocomplete="off" spellcheck="false" data-nav-filter aria-controls="sidebar-nav">
+<kbd class="search-kbd" aria-hidden="true">/</kbd>
+</div>
+</div>
+<div class="header-actions">
+<button class="icon-button theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme"><svg class="icon-moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><svg class="icon-sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.75v2M10 16.25v2M1.75 10h2M16.25 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+</div>
+</div>
+</header>
+<div class="layout">
+<div class="sidebar" id="sidebar" tabindex="-1">
+<div class="drawer-head">
+<span class="drawer-title">Documentation</span>
+<button class="icon-button drawer-close" type="button" data-drawer-close aria-label="Close menu"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 5.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+</div>
+<div class="drawer-search">
+<div class="search" role="search">
+<label class="visually-hidden" for="search-drawer">Filter pages and sections</label>
+<svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input class="search-input" id="search-drawer" type="search" placeholder="Filter pages and sections" autocomplete="off" spellcheck="false" data-nav-filter aria-controls="sidebar-nav">
+<kbd class="search-kbd" aria-hidden="true">/</kbd>
+</div>
+</div>
+<nav class="nav" id="sidebar-nav" aria-label="Documentation">
+<div class="nav-group">
+<p class="nav-group-label" id="nav-guides">Guides</p>
+<ul class="nav-list" aria-labelledby="nav-guides">
+<li class="nav-page">
+<a class="nav-page-link" href="index.html">Getting started</a>
+<ul class="nav-sections">
+<li><a href="index.html#what-quarry-is">What Quarry is</a></li>
+<li><a href="index.html#install-quarry">Install Quarry</a></li>
+<li><a href="index.html#your-first-migration">Your first migration</a></li>
+<li><a href="index.html#next-steps">Next steps</a></li>
+</ul>
+</li>
+<li class="nav-page">
+<a class="nav-page-link" href="migrations.html" aria-current="page">Migrations</a>
+<ul class="nav-sections">
+<li><a href="#how-a-migration-runs" aria-current="true">How a migration runs</a></li>
+<li><a href="#dry-runs">Dry runs</a></li>
+<li><a href="#rolling-back-a-migration">Rolling back a migration</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="nav-group">
+<p class="nav-group-label" id="nav-reference">Reference</p>
+<ul class="nav-list" aria-labelledby="nav-reference">
+<li class="nav-page">
+<a class="nav-page-link" href="cli.html">CLI reference</a>
+<ul class="nav-sections">
+<li><a href="cli.html#global-options">Global options</a></li>
+<li><a href="cli.html#quarry-init" class="nav-cmd">quarry init</a></li>
+<li><a href="cli.html#quarry-plan" class="nav-cmd">quarry plan</a></li>
+<li><a href="cli.html#quarry-run" class="nav-cmd">quarry run</a></li>
+<li><a href="cli.html#quarry-status" class="nav-cmd">quarry status</a></li>
+<li><a href="cli.html#quarry-cutover" class="nav-cmd">quarry cutover</a></li>
+<li><a href="cli.html#quarry-rollback" class="nav-cmd">quarry rollback</a></li>
+<li><a href="cli.html#quarry-verify" class="nav-cmd">quarry verify</a></li>
+<li><a href="cli.html#exit-codes">Exit codes</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p class="nav-empty" hidden>No pages or sections match “<span class="nav-empty-term"></span>”.</p>
+</nav>
+</div>
+<div class="scrim" hidden></div>
+<main id="content" class="content" tabindex="-1">
+<article class="doc">
+<p class="eyebrow">Guides</p>
+<h1>Migrations</h1>
+<p class="lede">A migration copies a database while your application keeps using it. This page covers the four phases, dry runs and rolling back.</p>
+<h2 id="how-a-migration-runs">How a migration runs</h2>
+<p>Every migration goes through the same four phases, in order. <code>quarry status</code> names the current one, and a run that stops in any phase can be resumed.</p>
+<ol class="phases" aria-label="The four phases of a migration">
+<li class="phase"><span class="phase-name">Plan</span><span class="phase-desc">Compare schemas and size every table</span></li>
+<li class="phase"><span class="phase-name">Copy</span><span class="phase-desc">Bulk-copy rows in parallel ranges</span></li>
+<li class="phase"><span class="phase-name">Catch-up</span><span class="phase-desc">Replay the writes made during the copy</span></li>
+<li class="phase"><span class="phase-name">Cut-over</span><span class="phase-desc">Pause writes and switch to the target</span></li>
+</ol>
+
+<h3 id="plan">Plan</h3>
+<p>Quarry reads both schemas, checks that every table has a primary key or a unique index it can page through, and splits large tables into ranges. The plan is saved in <code>.quarry/plan.json</code>, so a resumed run copies exactly the same ranges.</p>
+
+<h3 id="copy">Copy</h3>
+<p>Before the first batch, Quarry records the source’s current position in its change log, the <em>start position</em>, so that nothing written during the copy is missed. Workers then copy ranges in parallel (<code>--parallel</code>, 4 by default), each in batches of <code>--batch-size</code> rows.</p>
+
+<h3 id="catch-up">Catch-up</h3>
+<p>When the copy finishes, Quarry replays every change made since the start position, oldest first, and keeps streaming new ones. The target is now a live replica of the source, and the lag shown by <code>quarry status</code> settles at a few hundred milliseconds.</p>
+
+<h3 id="cut-over">Cut-over</h3>
+<p><code>quarry cutover</code> makes the source read-only, waits until the target has applied the final change, and runs your switch-over hook. Writes are paused only for that window. Quarry then starts <em>reverse replication</em>, copying writes from the target back to the source, so that you can still roll back.</p>
+
+<h2 id="dry-runs">Dry runs</h2>
+<p><strong>A dry run changes nothing.</strong> It connects with the same credentials as a real run and checks everything that could stop a migration halfway: permissions on both sides, a primary key on every table, free disk on the target, and whether the source can stream its changes. It then reads one sample batch per table into memory to time it.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> run <span class="tok-flag">--dry-run</span>
+<span class="tok-out">Dry run for shop · nothing will be written
+
+  <span class="tok-ok">✓</span> source  replication permission
+  <span class="tok-ok">✓</span> source  4 tables readable, all with primary keys
+  <span class="tok-ok">✓</span> target  schema compatible, 1 table to create
+  <span class="tok-ok">✓</span> target  212 GB free, 70.3 GB needed
+  <span class="tok-warn">!</span> orders  sample batch took 1.8 s (expected under 1 s)
+
+Estimated copy time 1 h 52 min · catch-up about 4 min
+1 warning, 0 errors · safe to run</span></code></pre>
+</div>
+<p>Warnings do not stop a real run; errors do. Fix the errors and dry-run again until the report ends in <em>safe to run</em>. A slow sample batch, like the one on <code>orders</code> above, usually means the target is missing an index that the source has.</p>
+<div class="callout callout-note" role="note">
+<p class="callout-title"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span>Note</span></p>
+<p>Dry-run against production, not a staging copy. The checks only mean something when they see the real permissions, table sizes and load.</p>
+</div>
+
+<h2 id="rolling-back-a-migration">Rolling back a migration</h2>
+<p>How you roll back depends on whether you have cut over yet. In both cases the command is <code>quarry rollback</code>; it reads the state of the migration and does the right thing.</p>
+
+<h3 id="before-cut-over">Before cut-over</h3>
+<p>Your application still writes to the source, so nothing needs to move back. Stop <code>quarry run</code> with <kbd>Ctrl</kbd>+<kbd>C</kbd> and roll back:</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> rollback</code></pre>
+</div>
+<p>This drops the tables Quarry created on the target and releases the replication slot on the source. Tables that already existed on the target are left alone; pass <code>--keep-target</code> to keep the copied ones too.</p>
+
+<h3 id="after-cut-over">After cut-over</h3>
+<p>After a cut-over, reverse replication runs for 24 hours by default. While it runs, a rollback is a second cut-over in the other direction: writes pause briefly, the source catches up, and your rollback hook points the application back at it.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> rollback <span class="tok-flag">--yes</span></code></pre>
+</div>
+<div class="callout callout-warning" role="note">
+<p class="callout-title"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.9 14.6 13.4H1.4Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.3v3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r=".85" fill="currentColor"/></svg><span>Warning</span></p>
+<p>Once reverse replication stops, a rollback can no longer bring the source up to date: writes made on the target after that point exist only there. If you need longer to decide, cut over with <code>quarry cutover --keep-reverse 72h</code>.</p>
+</div>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<h3 id="copy-stalls">The copy stalls on one table</h3>
+<p><code>quarry status</code> shows one worker busy and the rest idle. The table has no primary key, so Quarry cannot split it into ranges and copies it as one. Add a primary key, or name a unique index for Quarry to page through in <code>quarry.toml</code>.</p>
+
+<h3 id="lag-grows">Replication lag keeps growing</h3>
+<p>The target applies changes more slowly than the source produces them. Raise <code>--apply-workers</code>, and check the target for missing indexes on foreign keys: every replayed update has to find its row.</p>
+
+<h3 id="cutover-times-out">Cut-over times out</h3>
+<p><code>quarry cutover</code> waits 30 seconds for the lag to reach zero. If a long-running transaction holds the source open, the cut-over is abandoned and the source is made writable again. Nothing is lost. Find the transaction with <code>quarry status --verbose</code>, end it, and cut over again.</p>
+
+<h3 id="permission-denied">Permission denied on the source</h3>
+<p>On PostgreSQL the source role needs the <code>REPLICATION</code> attribute and <code>SELECT</code> on every table in the plan. <code>quarry run --dry-run</code> names the exact permission that is missing.</p>
+<nav class="pager" aria-label="Previous and next page">
+<a class="pager-link pager-prev" href="index.html"><span class="pager-dir"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Previous</span> <span class="pager-title">Getting started</span></a><a class="pager-link pager-next" href="cli.html"><span class="pager-dir">Next<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> <span class="pager-title">CLI reference</span></a>
+</nav>
+</article>
+</main>
+<footer class="site-footer">
+<div class="footer-inner">
+<p class="footer-about"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="mark-top" d="M12 2.2 20.8 7.1 12 12 3.2 7.1Z"/><path class="mark-left" d="M3.2 7.1 12 12v9.8l-8.8-4.9Z"/><path class="mark-right" d="M20.8 7.1 12 12v9.8l8.8-4.9Z"/></svg><span>Quarry moves data between databases while both stay online.</span></p>
+<p class="footer-updated">Last updated <time datetime="2026-09-12">12 September 2026</time></p>
+</div>
+</footer>
+<nav class="toc" aria-labelledby="toc-title">
+<p class="toc-title" id="toc-title">On this page</p>
+<ul class="toc-list">
+<li><a href="#how-a-migration-runs" aria-current="true">How a migration runs</a>
+<ul>
+<li><a href="#plan">Plan</a></li>
+<li><a href="#copy">Copy</a></li>
+<li><a href="#catch-up">Catch-up</a></li>
+<li><a href="#cut-over">Cut-over</a></li>
+</ul></li>
+<li><a href="#dry-runs">Dry runs</a></li>
+<li><a href="#rolling-back-a-migration">Rolling back a migration</a>
+<ul>
+<li><a href="#before-cut-over">Before cut-over</a></li>
+<li><a href="#after-cut-over">After cut-over</a></li>
+</ul></li>
+<li><a href="#troubleshooting">Troubleshooting</a>
+<ul>
+<li><a href="#copy-stalls">The copy stalls on one table</a></li>
+<li><a href="#lag-grows">Replication lag keeps growing</a></li>
+<li><a href="#cutover-times-out">Cut-over times out</a></li>
+<li><a href="#permission-denied">Permission denied on the source</a></li>
+</ul></li>
+</ul>
+<a class="toc-top" href="#top">Back to top</a>
+</nav>
+</div>
+<div class="visually-hidden" id="announcer" role="status" aria-live="polite"></div>
+</body>
+</html>

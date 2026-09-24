@@ -1,0 +1,23 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    {
+      "label": "Click Copy on the Homebrew install block",
+      "do": { "action": "click", "selector": "#install-quarry ~ .code-block .copy-button" },
+      "expect": [ { "assert": "focused", "selector": "#install-quarry ~ .code-block .copy-button" } ]
+    },
+    {
+      "label": "once the asynchronous clipboard write resolves, the button and the live region say Copied",
+      "do": { "action": "wait", "ms": 300 },
+      "expect": [
+        { "assert": "text", "selector": "#install-quarry ~ .code-block .copy-button", "contains": "Copied" },
+        { "assert": "text", "selector": "#announcer", "contains": "Copied" }
+      ]
+    },
+    {
+      "label": "and the button goes back to Copy after 2.5 s",
+      "do": { "action": "wait", "ms": 2600 },
+      "expect": [ { "assert": "text", "selector": "#install-quarry ~ .code-block .copy-button", "contains": "Copy" } ]
+    }
+  ]
+}

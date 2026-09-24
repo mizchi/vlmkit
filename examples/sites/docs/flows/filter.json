@@ -1,0 +1,135 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "steps": [
+    {
+      "label": "/ from anywhere on the page jumps to the filter field",
+      "do": {
+        "action": "press",
+        "key": "/"
+      },
+      "expect": [
+        {
+          "assert": "focused",
+          "selector": "#search-header"
+        }
+      ]
+    },
+    {
+      "label": "Typing filters the sidebar to matching page and section titles",
+      "do": {
+        "action": "fill",
+        "selector": "#search-header",
+        "value": "roll"
+      },
+      "expect": [
+        {
+          "assert": "count",
+          "selector": "#sidebar-nav .nav-sections li:not([hidden])",
+          "equals": 2
+        },
+        {
+          "assert": "count",
+          "selector": "#sidebar-nav mark",
+          "equals": 2
+        },
+        {
+          "assert": "visible",
+          "selector": "#sidebar-nav a[href='migrations.html#rolling-back-a-migration']"
+        },
+        {
+          "assert": "visible",
+          "selector": "#sidebar-nav a[href='cli.html#quarry-rollback']"
+        },
+        {
+          "assert": "hidden",
+          "selector": "#sidebar-nav a[href='#install-quarry']"
+        }
+      ]
+    },
+    {
+      "label": "A term that matches nothing says so",
+      "do": {
+        "action": "fill",
+        "selector": "#search-header",
+        "value": "zebra"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": ".nav-empty"
+        },
+        {
+          "assert": "text",
+          "selector": ".nav-empty",
+          "contains": "zebra"
+        }
+      ]
+    },
+    {
+      "label": "Escape clears the filter and every section comes back",
+      "do": {
+        "action": "press",
+        "key": "Escape",
+        "selector": "#search-header"
+      },
+      "expect": [
+        {
+          "assert": "count",
+          "selector": "#sidebar-nav .nav-sections li:not([hidden])",
+          "equals": 17
+        },
+        {
+          "assert": "hidden",
+          "selector": ".nav-empty"
+        }
+      ]
+    },
+    {
+      "label": "Enter opens the first match: 'dry' then Enter lands on migrations.html",
+      "do": {
+        "action": "fill",
+        "selector": "#search-header",
+        "value": "dry"
+      },
+      "expect": [
+        {
+          "assert": "count",
+          "selector": "#sidebar-nav .nav-sections li:not([hidden])",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "label": "and the first match is followed",
+      "do": {
+        "action": "press",
+        "key": "Enter",
+        "selector": "#search-header"
+      },
+      "expect": []
+    },
+    {
+      "label": "after the navigation",
+      "do": {
+        "action": "wait",
+        "ms": 800
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": "h1",
+          "contains": "Migrations"
+        },
+        {
+          "assert": "attr",
+          "selector": ".nav-page-link[href='migrations.html']",
+          "name": "aria-current",
+          "equals": "page"
+        }
+      ]
+    }
+  ]
+}

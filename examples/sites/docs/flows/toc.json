@@ -1,0 +1,99 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "steps": [
+    {
+      "label": "Following a contents link marks that section in both columns",
+      "do": {
+        "action": "click",
+        "selector": ".toc-list a[href='#dry-runs']"
+      },
+      "expect": []
+    },
+    {
+      "label": "after the smooth scroll settles",
+      "do": {
+        "action": "wait",
+        "ms": 1200
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": ".toc-list a[href='#dry-runs']",
+          "name": "aria-current",
+          "equals": "true"
+        },
+        {
+          "assert": "attr",
+          "selector": ".nav-sections a[href='#dry-runs']",
+          "name": "aria-current",
+          "equals": "true"
+        },
+        {
+          "assert": "count",
+          "selector": ".toc-list a[aria-current]",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "label": "Jumping to a section whose first subsection is close below still marks that section",
+      "do": {
+        "action": "click",
+        "selector": ".toc-list a[href='#rolling-back-a-migration']"
+      },
+      "expect": []
+    },
+    {
+      "label": "after the scroll: Rolling back a migration, not Before cut-over",
+      "do": {
+        "action": "wait",
+        "ms": 1200
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": ".toc-list a[href='#rolling-back-a-migration']",
+          "name": "aria-current",
+          "equals": "true"
+        },
+        {
+          "assert": "count",
+          "selector": ".toc-list a[aria-current]",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "label": "Troubleshooting, whose first h3 sits ~50px under it",
+      "do": {
+        "action": "click",
+        "selector": ".toc-list a[href='#troubleshooting']"
+      },
+      "expect": []
+    },
+    {
+      "label": "after the scroll: Troubleshooting is marked in both columns",
+      "do": {
+        "action": "wait",
+        "ms": 1200
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": ".toc-list a[href='#troubleshooting']",
+          "name": "aria-current",
+          "equals": "true"
+        },
+        {
+          "assert": "attr",
+          "selector": ".nav-sections a[href='#troubleshooting']",
+          "name": "aria-current",
+          "equals": "true"
+        }
+      ]
+    }
+  ]
+}

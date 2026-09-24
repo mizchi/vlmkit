@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started · Quarry docs</title>
+<meta name="description" content="Install Quarry and run your first online database migration in four steps.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.2 20.8 7.1 12 12 3.2 7.1Z' fill='%230f766e'/%3E%3Cpath d='M3.2 7.1 12 12v9.8l-8.8-4.9Z' fill='%230b4f4a'/%3E%3Cpath d='M20.8 7.1 12 12v9.8l8.8-4.9Z' fill='%2359b3a8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="quarry.css">
+<script src="quarry.js"></script>
+</head>
+<body id="top">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+<div class="header-inner">
+<div class="header-brand">
+<button class="menu-button" type="button" data-drawer-open aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Menu</span></button>
+<a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="mark-top" d="M12 2.2 20.8 7.1 12 12 3.2 7.1Z"/><path class="mark-left" d="M3.2 7.1 12 12v9.8l-8.8-4.9Z"/><path class="mark-right" d="M20.8 7.1 12 12v9.8l8.8-4.9Z"/></svg><span class="brand-name">Quarry</span></a>
+<span class="version" title="Documentation for Quarry 2.4">v2.4</span>
+</div>
+<div class="header-search">
+<div class="search" role="search">
+<label class="visually-hidden" for="search-header">Filter pages and sections</label>
+<svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input class="search-input" id="search-header" type="search" placeholder="Filter pages and sections" autocomplete="off" spellcheck="false" data-nav-filter aria-controls="sidebar-nav">
+<kbd class="search-kbd" aria-hidden="true">/</kbd>
+</div>
+</div>
+<div class="header-actions">
+<button class="icon-button theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme"><svg class="icon-moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><svg class="icon-sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.75v2M10 16.25v2M1.75 10h2M16.25 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+</div>
+</div>
+</header>
+<div class="layout">
+<div class="sidebar" id="sidebar" tabindex="-1">
+<div class="drawer-head">
+<span class="drawer-title">Documentation</span>
+<button class="icon-button drawer-close" type="button" data-drawer-close aria-label="Close menu"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 5.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+</div>
+<div class="drawer-search">
+<div class="search" role="search">
+<label class="visually-hidden" for="search-drawer">Filter pages and sections</label>
+<svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input class="search-input" id="search-drawer" type="search" placeholder="Filter pages and sections" autocomplete="off" spellcheck="false" data-nav-filter aria-controls="sidebar-nav">
+<kbd class="search-kbd" aria-hidden="true">/</kbd>
+</div>
+</div>
+<nav class="nav" id="sidebar-nav" aria-label="Documentation">
+<div class="nav-group">
+<p class="nav-group-label" id="nav-guides">Guides</p>
+<ul class="nav-list" aria-labelledby="nav-guides">
+<li class="nav-page">
+<a class="nav-page-link" href="index.html" aria-current="page">Getting started</a>
+<ul class="nav-sections">
+<li><a href="#what-quarry-is" aria-current="true">What Quarry is</a></li>
+<li><a href="#install-quarry">Install Quarry</a></li>
+<li><a href="#your-first-migration">Your first migration</a></li>
+<li><a href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+<li class="nav-page">
+<a class="nav-page-link" href="migrations.html">Migrations</a>
+<ul class="nav-sections">
+<li><a href="migrations.html#how-a-migration-runs">How a migration runs</a></li>
+<li><a href="migrations.html#dry-runs">Dry runs</a></li>
+<li><a href="migrations.html#rolling-back-a-migration">Rolling back a migration</a></li>
+<li><a href="migrations.html#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="nav-group">
+<p class="nav-group-label" id="nav-reference">Reference</p>
+<ul class="nav-list" aria-labelledby="nav-reference">
+<li class="nav-page">
+<a class="nav-page-link" href="cli.html">CLI reference</a>
+<ul class="nav-sections">
+<li><a href="cli.html#global-options">Global options</a></li>
+<li><a href="cli.html#quarry-init" class="nav-cmd">quarry init</a></li>
+<li><a href="cli.html#quarry-plan" class="nav-cmd">quarry plan</a></li>
+<li><a href="cli.html#quarry-run" class="nav-cmd">quarry run</a></li>
+<li><a href="cli.html#quarry-status" class="nav-cmd">quarry status</a></li>
+<li><a href="cli.html#quarry-cutover" class="nav-cmd">quarry cutover</a></li>
+<li><a href="cli.html#quarry-rollback" class="nav-cmd">quarry rollback</a></li>
+<li><a href="cli.html#quarry-verify" class="nav-cmd">quarry verify</a></li>
+<li><a href="cli.html#exit-codes">Exit codes</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p class="nav-empty" hidden>No pages or sections match “<span class="nav-empty-term"></span>”.</p>
+</nav>
+</div>
+<div class="scrim" hidden></div>
+<main id="content" class="content" tabindex="-1">
+<article class="doc">
+<p class="eyebrow">Guides</p>
+<h1>Getting started</h1>
+<p class="lede">Quarry moves data between databases while both stay online. This guide installs the CLI and runs a first migration, start to finish.</p>
+<h2 id="what-quarry-is">What Quarry is</h2>
+<p>Quarry is a command-line tool for online database migrations. It copies every table from a <em>source</em> database to a <em>target</em>, then keeps the target in step by replaying the source’s change log until you switch over. Your application keeps reading and writing the source the whole time; the only pause is the cut-over itself, which usually takes a few seconds.</p>
+<p>It is built for the moves that are hard to schedule downtime for:</p>
+<ul>
+<li>Upgrading to a new major version of PostgreSQL or MySQL.</li>
+<li>Moving a database to a new host, region or provider.</li>
+<li>Splitting one large database into several smaller ones.</li>
+</ul>
+<p>Quarry reads the source through its replication stream and writes to the target with ordinary SQL, so there is nothing to install on either server. Every copy is resumable: if the process stops, <code>quarry run --resume</code> carries on from the last committed batch.</p>
+
+<h2 id="install-quarry">Install Quarry</h2>
+<p>Quarry is a single binary with no runtime dependencies. On macOS or Linux, install it with Homebrew:</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">brew</span> install quarry-data/tap/quarry</code></pre>
+</div>
+<p>Or use the install script, which downloads the release for your platform and puts <code>quarry</code> in <code>/usr/local/bin</code>:</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">curl</span> <span class="tok-flag">-fsSL</span> <span class="tok-str">https://quarry.example/install.sh</span> | <span class="tok-cmd">sh</span></code></pre>
+</div>
+<p>Check that the binary is on your <code>PATH</code>:</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> <span class="tok-flag">--version</span>
+<span class="tok-out">quarry 2.4.1 (build 5c1e9a2, 2 September 2026)</span></code></pre>
+</div>
+<div class="callout callout-note" role="note">
+<p class="callout-title"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span>Note</span></p>
+<p>Quarry connects to the source as a user that can read every table and open a replication connection. On PostgreSQL that is a role with the <code>REPLICATION</code> attribute. <a href="migrations.html#troubleshooting">Troubleshooting</a> lists the errors you see without it.</p>
+</div>
+
+<h2 id="your-first-migration">Your first migration</h2>
+<p>This walk-through moves a database called <code>shop</code> from a PostgreSQL 13 server to a new PostgreSQL 16 server. It takes four steps, and nothing is written anywhere until the last one.</p>
+<ol class="steps">
+<li class="step">
+<h3 id="step-describe">Describe the source and target</h3>
+<p>In an empty directory, run <code>quarry init</code> with both connection strings. It writes them to <code>quarry.toml</code>, which later commands read.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> init \
+    <span class="tok-flag">--source</span> <span class="tok-str">postgres://quarry@db-old.internal:5432/shop</span> \
+    <span class="tok-flag">--target</span> <span class="tok-str">postgres://quarry@db-new.internal:5432/shop</span></code></pre>
+</div>
+<p>Passwords are never written to the file. Quarry reads them from <code>QUARRY_SOURCE_PASSWORD</code> and <code>QUARRY_TARGET_PASSWORD</code> when it runs, so <code>quarry.toml</code> is safe to keep in version control.</p>
+</li>
+<li class="step">
+<h3 id="step-plan">Review the plan</h3>
+<p><code>quarry plan</code> connects to both databases, compares their schemas and prints what it will copy. It writes nothing.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> plan
+<span class="tok-out">Plan for shop  (PostgreSQL 13.14 → 16.4)
+
+  TABLE              ROWS      SIZE   STRATEGY
+  orders       18,204,511   41.2 GB   parallel, 8 ranges
+  order_items  52,930,047   27.9 GB   parallel, 8 ranges
+  customers     1,204,332    1.1 GB   single range
+  products         84,210   96.0 MB   single range
+
+4 tables · 70.3 GB · estimated copy time 1 h 52 min</span></code></pre>
+</div>
+<p>Tables missing on the target are created by <code>quarry run</code>. If a table exists on both sides with different columns, the plan stops with an error before anything is copied.</p>
+</li>
+<li class="step">
+<h3 id="step-dry-run">Rehearse with a dry run</h3>
+<p>A dry run checks permissions on both sides, confirms that the source can stream its changes, and times a sample batch from each table. A dry run changes nothing.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> run <span class="tok-flag">--dry-run</span></code></pre>
+</div>
+<p>The report ends with <em>safe to run</em> or with the errors to fix first. <a href="migrations.html#dry-runs">Dry runs</a> explains every line of it.</p>
+</li>
+<li class="step">
+<h3 id="step-run">Run the migration and cut over</h3>
+<p>Start the migration. Quarry copies every table, catches up on the writes that arrived during the copy, and then keeps replaying new writes until you cut over.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> run</code></pre>
+</div>
+<p>In a second terminal, <code>quarry status --watch</code> shows the phase and the replication lag. Once the lag stays under a second, switch your application to the target:</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> cutover</code></pre>
+</div>
+<p>Cut-over blocks writes on the source, waits for the last changes to reach the target, and runs your switch-over hook. Writes pause only for that window, typically two to five seconds.</p>
+</li>
+</ol>
+
+<h2 id="next-steps">Next steps</h2>
+<ul>
+<li><a href="migrations.html#how-a-migration-runs">How a migration runs</a> explains the four phases and what each needs from your databases.</li>
+<li><a href="migrations.html#rolling-back-a-migration">Rolling back a migration</a> shows how to return to the source after a cut-over.</li>
+<li>The <a href="cli.html">CLI reference</a> lists every command and option.</li>
+</ul>
+<nav class="pager" aria-label="Previous and next page">
+<a class="pager-link pager-next" href="migrations.html"><span class="pager-dir">Next<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> <span class="pager-title">Migrations</span></a>
+</nav>
+</article>
+</main>
+<footer class="site-footer">
+<div class="footer-inner">
+<p class="footer-about"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="mark-top" d="M12 2.2 20.8 7.1 12 12 3.2 7.1Z"/><path class="mark-left" d="M3.2 7.1 12 12v9.8l-8.8-4.9Z"/><path class="mark-right" d="M20.8 7.1 12 12v9.8l8.8-4.9Z"/></svg><span>Quarry moves data between databases while both stay online.</span></p>
+<p class="footer-updated">Last updated <time datetime="2026-09-12">12 September 2026</time></p>
+</div>
+</footer>
+<nav class="toc" aria-labelledby="toc-title">
+<p class="toc-title" id="toc-title">On this page</p>
+<ul class="toc-list">
+<li><a href="#what-quarry-is" aria-current="true">What Quarry is</a></li>
+<li><a href="#install-quarry">Install Quarry</a></li>
+<li><a href="#your-first-migration">Your first migration</a>
+<ul>
+<li><a href="#step-describe">Describe the source and target</a></li>
+<li><a href="#step-plan">Review the plan</a></li>
+<li><a href="#step-dry-run">Rehearse with a dry run</a></li>
+<li><a href="#step-run">Run the migration and cut over</a></li>
+</ul></li>
+<li><a href="#next-steps">Next steps</a></li>
+</ul>
+<a class="toc-top" href="#top">Back to top</a>
+</nav>
+</div>
+<div class="visually-hidden" id="announcer" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "viewport": { "width": 375, "height": 740 },
+  "steps": [
+    {
+      "label": "Menu opens the drawer as a modal dialog and moves focus into it",
+      "do": { "action": "click", "selector": ".menu-button" },
+      "expect": [
+        { "assert": "attr", "selector": ".menu-button", "name": "aria-expanded", "equals": "true" },
+        { "assert": "attr", "selector": "#sidebar", "name": "role", "equals": "dialog" },
+        { "assert": "attr", "selector": "#sidebar", "name": "aria-modal", "equals": "true" },
+        { "assert": "visible", "selector": "#sidebar-nav" },
+        { "assert": "focused", "selector": ".drawer-close" }
+      ]
+    },
+    {
+      "label": "Shift+Tab from the first control wraps to the last link",
+      "do": { "action": "press", "key": "Shift+Tab" },
+      "expect": [ { "assert": "focused", "selector": "#sidebar-nav .nav-group:last-of-type .nav-sections li:last-child a" } ]
+    },
+    {
+      "label": "Tab from the last link wraps back to the close button",
+      "do": { "action": "press", "key": "Tab" },
+      "expect": [ { "assert": "focused", "selector": ".drawer-close" } ]
+    },
+    {
+      "label": "Tab reaches the drawer's filter field",
+      "do": { "action": "press", "key": "Tab" },
+      "expect": [ { "assert": "focused", "selector": "#search-drawer" } ]
+    },
+    {
+      "label": "Escape closes the drawer and returns focus to Menu at once",
+      "do": { "action": "press", "key": "Escape" },
+      "expect": [
+        { "assert": "attr", "selector": ".menu-button", "name": "aria-expanded", "equals": "false" },
+        { "assert": "focused", "selector": ".menu-button" }
+      ]
+    },
+    {
+      "label": "and once the 0.22s slide-out has finished, the drawer is out of the page",
+      "do": { "action": "wait", "ms": 400 },
+      "expect": [
+        { "assert": "hidden", "selector": "#sidebar-nav" },
+        { "assert": "hidden", "selector": ".scrim" }
+      ]
+    }
+  ]
+}

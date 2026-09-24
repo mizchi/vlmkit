@@ -1,0 +1,21 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    {
+      "label": "The toggle switches to dark and reports it",
+      "do": { "action": "click", "selector": ".theme-toggle" },
+      "expect": [
+        { "assert": "attr", "selector": "html", "name": "data-theme", "equals": "dark" },
+        { "assert": "attr", "selector": ".theme-toggle", "name": "aria-pressed", "equals": "true" }
+      ]
+    },
+    {
+      "label": "And back to light",
+      "do": { "action": "click", "selector": ".theme-toggle" },
+      "expect": [
+        { "assert": "attr", "selector": "html", "name": "data-theme", "equals": "light" },
+        { "assert": "attr", "selector": ".theme-toggle", "name": "aria-pressed", "equals": "false" }
+      ]
+    }
+  ]
+}

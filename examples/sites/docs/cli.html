@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLI reference · Quarry docs</title>
+<meta name="description" content="Every Quarry command and its options, with defaults and exit codes.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.2 20.8 7.1 12 12 3.2 7.1Z' fill='%230f766e'/%3E%3Cpath d='M3.2 7.1 12 12v9.8l-8.8-4.9Z' fill='%230b4f4a'/%3E%3Cpath d='M20.8 7.1 12 12v9.8l8.8-4.9Z' fill='%2359b3a8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="quarry.css">
+<script src="quarry.js"></script>
+</head>
+<body id="top">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+<div class="header-inner">
+<div class="header-brand">
+<button class="menu-button" type="button" data-drawer-open aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Menu</span></button>
+<a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="mark-top" d="M12 2.2 20.8 7.1 12 12 3.2 7.1Z"/><path class="mark-left" d="M3.2 7.1 12 12v9.8l-8.8-4.9Z"/><path class="mark-right" d="M20.8 7.1 12 12v9.8l8.8-4.9Z"/></svg><span class="brand-name">Quarry</span></a>
+<span class="version" title="Documentation for Quarry 2.4">v2.4</span>
+</div>
+<div class="header-search">
+<div class="search" role="search">
+<label class="visually-hidden" for="search-header">Filter pages and sections</label>
+<svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input class="search-input" id="search-header" type="search" placeholder="Filter pages and sections" autocomplete="off" spellcheck="false" data-nav-filter aria-controls="sidebar-nav">
+<kbd class="search-kbd" aria-hidden="true">/</kbd>
+</div>
+</div>
+<div class="header-actions">
+<button class="icon-button theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme"><svg class="icon-moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><svg class="icon-sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.75v2M10 16.25v2M1.75 10h2M16.25 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+</div>
+</div>
+</header>
+<div class="layout">
+<div class="sidebar" id="sidebar" tabindex="-1">
+<div class="drawer-head">
+<span class="drawer-title">Documentation</span>
+<button class="icon-button drawer-close" type="button" data-drawer-close aria-label="Close menu"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 5.5 9 9m0-9-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+</div>
+<div class="drawer-search">
+<div class="search" role="search">
+<label class="visually-hidden" for="search-drawer">Filter pages and sections</label>
+<svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input class="search-input" id="search-drawer" type="search" placeholder="Filter pages and sections" autocomplete="off" spellcheck="false" data-nav-filter aria-controls="sidebar-nav">
+<kbd class="search-kbd" aria-hidden="true">/</kbd>
+</div>
+</div>
+<nav class="nav" id="sidebar-nav" aria-label="Documentation">
+<div class="nav-group">
+<p class="nav-group-label" id="nav-guides">Guides</p>
+<ul class="nav-list" aria-labelledby="nav-guides">
+<li class="nav-page">
+<a class="nav-page-link" href="index.html">Getting started</a>
+<ul class="nav-sections">
+<li><a href="index.html#what-quarry-is">What Quarry is</a></li>
+<li><a href="index.html#install-quarry">Install Quarry</a></li>
+<li><a href="index.html#your-first-migration">Your first migration</a></li>
+<li><a href="index.html#next-steps">Next steps</a></li>
+</ul>
+</li>
+<li class="nav-page">
+<a class="nav-page-link" href="migrations.html">Migrations</a>
+<ul class="nav-sections">
+<li><a href="migrations.html#how-a-migration-runs">How a migration runs</a></li>
+<li><a href="migrations.html#dry-runs">Dry runs</a></li>
+<li><a href="migrations.html#rolling-back-a-migration">Rolling back a migration</a></li>
+<li><a href="migrations.html#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="nav-group">
+<p class="nav-group-label" id="nav-reference">Reference</p>
+<ul class="nav-list" aria-labelledby="nav-reference">
+<li class="nav-page">
+<a class="nav-page-link" href="cli.html" aria-current="page">CLI reference</a>
+<ul class="nav-sections">
+<li><a href="#global-options" aria-current="true">Global options</a></li>
+<li><a href="#quarry-init" class="nav-cmd">quarry init</a></li>
+<li><a href="#quarry-plan" class="nav-cmd">quarry plan</a></li>
+<li><a href="#quarry-run" class="nav-cmd">quarry run</a></li>
+<li><a href="#quarry-status" class="nav-cmd">quarry status</a></li>
+<li><a href="#quarry-cutover" class="nav-cmd">quarry cutover</a></li>
+<li><a href="#quarry-rollback" class="nav-cmd">quarry rollback</a></li>
+<li><a href="#quarry-verify" class="nav-cmd">quarry verify</a></li>
+<li><a href="#exit-codes">Exit codes</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p class="nav-empty" hidden>No pages or sections match “<span class="nav-empty-term"></span>”.</p>
+</nav>
+</div>
+<div class="scrim" hidden></div>
+<main id="content" class="content" tabindex="-1">
+<article class="doc">
+<p class="eyebrow">Reference</p>
+<h1>CLI reference</h1>
+<p class="lede">Every command and option, with defaults. Options can also be set in <code>quarry.toml</code>; a flag on the command line wins.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> &lt;command&gt; [options]</code></pre>
+</div>
+
+<h2 id="global-options">Global options</h2>
+<p>These work with every command.</p>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for every command</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--config</span> <span class="nw">&lt;path&gt;</span></code></td><td class="def" role="cell"><code>quarry.toml</code></td><td class="desc" role="cell">Configuration file to read, relative to the current directory.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--log-level</span> <span class="nw">&lt;level&gt;</span></code></td><td class="def" role="cell"><code>info</code></td><td class="desc" role="cell">One of <code>error</code>, <code>warn</code>, <code>info</code> or <code>debug</code>.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--json</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Print machine-readable JSON instead of text.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--no-color</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Turn off coloured output. Also set by <code>NO_COLOR</code>.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--help</span></code></td><td class="def none" role="cell">—</td><td class="desc" role="cell">Show help for the command and exit.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--version</span></code></td><td class="def none" role="cell">—</td><td class="desc" role="cell">Print the version and exit.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="environment-variables">Environment variables</h3>
+<p>Passwords are read from the environment and never from <code>quarry.toml</code>.</p>
+<div class="table-wrap">
+<table class="plain stack" role="table">
+<caption>Environment variables</caption>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Variable</th><th scope="col" role="columnheader">Used for</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td role="cell"><code>QUARRY_SOURCE_PASSWORD</code></td><td role="cell">Password for the source connection.</td></tr>
+<tr role="row"><td role="cell"><code>QUARRY_TARGET_PASSWORD</code></td><td role="cell">Password for the target connection.</td></tr>
+<tr role="row"><td role="cell"><code>QUARRY_CONFIG</code></td><td role="cell">Same as <code>--config</code>.</td></tr>
+<tr role="row"><td role="cell"><code>NO_COLOR</code></td><td role="cell">Same as <code>--no-color</code> when set to any value.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-init"><code>quarry init</code></h2>
+<p>Create <code>quarry.toml</code> in the current directory from two connection strings.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> init <span class="tok-flag">--source</span> &lt;url&gt; <span class="tok-flag">--target</span> &lt;url&gt; [options]</code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry init</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--source</span> <span class="nw">&lt;url&gt;</span></code></td><td class="def req" role="cell">Required</td><td class="desc" role="cell">Connection string of the database to copy from.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--target</span> <span class="nw">&lt;url&gt;</span></code></td><td class="def req" role="cell">Required</td><td class="desc" role="cell">Connection string of the database to copy to.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--tables</span> <span class="nw">&lt;list&gt;</span></code></td><td class="def" role="cell">all tables</td><td class="desc" role="cell">Comma-separated tables to include.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--force</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Overwrite an existing <code>quarry.toml</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-plan"><code>quarry plan</code></h2>
+<p>Compare the source and target schemas and print what a run would copy. Writes nothing.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> plan [options]</code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry plan</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--tables</span> <span class="nw">&lt;list&gt;</span></code></td><td class="def" role="cell">from config</td><td class="desc" role="cell">Only plan these tables.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--exclude</span> <span class="nw">&lt;list&gt;</span></code></td><td class="def" role="cell">none</td><td class="desc" role="cell">Leave these tables out.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--ranges</span> <span class="nw">&lt;n&gt;</span></code></td><td class="def" role="cell">auto</td><td class="desc" role="cell">Split each large table into this many ranges.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--output</span> <span class="nw">&lt;file&gt;</span></code></td><td class="def" role="cell">none</td><td class="desc" role="cell">Also write the plan to a file.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-run"><code>quarry run</code></h2>
+<p>Run a migration: plan, copy and catch-up, then keep replaying changes until <code>quarry cutover</code>.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> run [options]</code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry run</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--dry-run</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Check permissions, schema and disk, time a sample batch per table, and stop. A dry run changes nothing.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--parallel</span> <span class="nw">&lt;n&gt;</span></code></td><td class="def" role="cell"><code>4</code></td><td class="desc" role="cell">Copy workers. Each works on one range at a time.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--batch-size</span> <span class="nw">&lt;rows&gt;</span></code></td><td class="def" role="cell"><code>5000</code></td><td class="desc" role="cell">Rows per insert batch.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--apply-workers</span> <span class="nw">&lt;n&gt;</span></code></td><td class="def" role="cell"><code>2</code></td><td class="desc" role="cell">Workers that replay changes during catch-up.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--resume</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Continue a stopped run from its last committed batch.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--cutover</span> <span class="nw">&lt;mode&gt;</span></code></td><td class="def" role="cell"><code>manual</code></td><td class="desc" role="cell"><code>manual</code> waits for <code>quarry cutover</code>; <code>auto</code> cuts over as soon as the lag is under <code>--max-lag</code>.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--max-lag</span> <span class="nw">&lt;duration&gt;</span></code></td><td class="def" role="cell"><code>1s</code></td><td class="desc" role="cell">Lag at which an automatic cut-over may start.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-status"><code>quarry status</code></h2>
+<p>Show the phase, progress and replication lag of the migration in the current directory.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Terminal</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-prompt" aria-hidden="true">$ </span><span class="tok-cmd">quarry</span> status
+<span class="tok-out">shop · catch-up
+  copied   72,423,100 of 72,423,100 rows (100%)
+  lag      340 ms
+  started  12 September 2026, 14:02 UTC</span></code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry status</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--watch</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Refresh every 2 seconds until interrupted.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--verbose</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Also list workers and open transactions on the source.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-cutover"><code>quarry cutover</code></h2>
+<p>Switch writes from the source to the target.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> cutover [options]</code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry cutover</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--timeout</span> <span class="nw">&lt;duration&gt;</span></code></td><td class="def" role="cell"><code>30s</code></td><td class="desc" role="cell">How long to wait for the lag to reach zero before giving up.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--hook</span> <span class="nw">&lt;command&gt;</span></code></td><td class="def" role="cell">from config</td><td class="desc" role="cell">Command that points your application at the target.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--keep-reverse</span> <span class="nw">&lt;duration&gt;</span></code></td><td class="def" role="cell"><code>24h</code></td><td class="desc" role="cell">How long to replicate target writes back to the source.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--yes</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Skip the confirmation prompt.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-rollback"><code>quarry rollback</code></h2>
+<p>Undo a migration. Before cut-over it removes what Quarry created on the target; after cut-over it switches writes back to the source, as long as reverse replication is still running.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> rollback [options]</code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry rollback</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--keep-target</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Before cut-over: keep the copied tables on the target.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--hook</span> <span class="nw">&lt;command&gt;</span></code></td><td class="def" role="cell">from config</td><td class="desc" role="cell">After cut-over: command that points your application back at the source.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--yes</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Skip the confirmation prompt.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="quarry-verify"><code>quarry verify</code></h2>
+<p>Compare the source and target table by table: row counts, and checksums of a sample of rows.</p>
+<div class="code-block">
+<div class="code-head"><span class="code-label">Usage</span><button class="copy-button" type="button" data-copy><svg class="icon-copy" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.75 3.25v-.1A1.65 1.65 0 0 0 9.1 1.5H3.9a1.65 1.65 0 0 0-1.65 1.65v5.2A1.65 1.65 0 0 0 3.9 10h.1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><svg class="icon-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8.5 3.2 3.2L13 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="copy-label">Copy</span></button></div>
+<pre><code><span class="tok-cmd">quarry</span> verify [options]</code></pre>
+</div>
+<div class="table-wrap">
+<table class="options stack" role="table">
+<caption>Options for quarry verify</caption>
+<colgroup><col class="col-opt"><col class="col-def"><col class="col-desc"></colgroup>
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Option</th><th scope="col" role="columnheader">Default</th><th scope="col" role="columnheader">Description</th></tr></thead>
+<tbody role="rowgroup">
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--tables</span> <span class="nw">&lt;list&gt;</span></code></td><td class="def" role="cell">all planned</td><td class="desc" role="cell">Only verify these tables.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--sample</span> <span class="nw">&lt;percent&gt;</span></code></td><td class="def" role="cell"><code>1</code></td><td class="desc" role="cell">Share of rows to checksum, from 0 to 100.</td></tr>
+<tr role="row"><td class="opt" role="cell"><code><span class="nw">--full</span></code></td><td class="def" role="cell">off</td><td class="desc" role="cell">Checksum every row. Slow on large tables.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="exit-codes">Exit codes</h2>
+<p>Every command exits with one of these codes, so scripts can tell a failed cut-over from a bad flag.</p>
+<div class="table-wrap">
+<table class="plain">
+<caption>Exit codes</caption>
+<thead><tr><th scope="col">Code</th><th scope="col">Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>0</code></td><td>Success.</td></tr>
+<tr><td><code>1</code></td><td>The command failed; the error is printed.</td></tr>
+<tr><td><code>2</code></td><td>Invalid option or configuration.</td></tr>
+<tr><td><code>3</code></td><td>A dry run found errors.</td></tr>
+<tr><td><code>4</code></td><td>Cut-over timed out; the source is writable again.</td></tr>
+<tr><td><code>5</code></td><td><code>quarry verify</code> found differences.</td></tr>
+</tbody>
+</table>
+</div>
+<nav class="pager" aria-label="Previous and next page">
+<a class="pager-link pager-prev" href="migrations.html"><span class="pager-dir"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Previous</span> <span class="pager-title">Migrations</span></a>
+</nav>
+</article>
+</main>
+<footer class="site-footer">
+<div class="footer-inner">
+<p class="footer-about"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="mark-top" d="M12 2.2 20.8 7.1 12 12 3.2 7.1Z"/><path class="mark-left" d="M3.2 7.1 12 12v9.8l-8.8-4.9Z"/><path class="mark-right" d="M20.8 7.1 12 12v9.8l8.8-4.9Z"/></svg><span>Quarry moves data between databases while both stay online.</span></p>
+<p class="footer-updated">Last updated <time datetime="2026-09-12">12 September 2026</time></p>
+</div>
+</footer>
+<nav class="toc" aria-labelledby="toc-title">
+<p class="toc-title" id="toc-title">On this page</p>
+<ul class="toc-list">
+<li><a href="#global-options" aria-current="true">Global options</a>
+<ul>
+<li><a href="#environment-variables">Environment variables</a></li>
+</ul></li>
+<li><a href="#quarry-init"><span class="toc-cmd">quarry init</span></a></li>
+<li><a href="#quarry-plan"><span class="toc-cmd">quarry plan</span></a></li>
+<li><a href="#quarry-run"><span class="toc-cmd">quarry run</span></a></li>
+<li><a href="#quarry-status"><span class="toc-cmd">quarry status</span></a></li>
+<li><a href="#quarry-cutover"><span class="toc-cmd">quarry cutover</span></a></li>
+<li><a href="#quarry-rollback"><span class="toc-cmd">quarry rollback</span></a></li>
+<li><a href="#quarry-verify"><span class="toc-cmd">quarry verify</span></a></li>
+<li><a href="#exit-codes">Exit codes</a></li>
+</ul>
+<a class="toc-top" href="#top">Back to top</a>
+</nav>
+</div>
+<div class="visually-hidden" id="announcer" role="status" aria-live="polite"></div>
+</body>
+</html>

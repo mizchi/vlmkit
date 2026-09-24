@@ -1,0 +1,92 @@
+{
+  "steps": [
+    {
+      "label": "the header cart opens the empty drawer",
+      "do": { "action": "click", "selector": "#cart-open" },
+      "expect": [
+        { "assert": "visible", "selector": "#cart-drawer" },
+        { "assert": "visible", "selector": "#cart-empty" },
+        { "assert": "hidden", "selector": "#cart-foot" },
+        { "assert": "count", "selector": "#cart-lines > li", "equals": 0 }
+      ]
+    },
+    {
+      "label": "買い物を続ける in the empty drawer closes it and returns focus to the cart button",
+      "do": { "action": "click", "selector": "#cart-empty [data-close]" },
+      "expect": [
+        { "assert": "hidden", "selector": "#cart-drawer" },
+        { "assert": "focused", "selector": "#cart-open" }
+      ]
+    },
+    {
+      "label": "step the quantity up to 2",
+      "do": { "action": "click", "selector": "#qty-inc" },
+      "expect": [
+        { "assert": "attr", "selector": "#qty", "name": "aria-valuenow", "equals": "2" },
+        { "assert": "attr", "selector": "#qty-dec", "name": "aria-disabled", "equals": "false" }
+      ]
+    },
+    {
+      "label": "カートに入れる opens the drawer with two mugs",
+      "do": { "action": "click", "selector": "#add-to-cart" },
+      "expect": [
+        { "assert": "visible", "selector": "#cart-drawer" },
+        { "assert": "focused", "selector": "#cart-close" },
+        { "assert": "count", "selector": "#cart-lines > li", "equals": 1 },
+        { "assert": "text", "selector": "#cart-lines", "contains": "青磁" },
+        { "assert": "text", "selector": "#cart-lines", "contains": "S 240ml" },
+        { "assert": "text", "selector": "#cart-subtotal", "contains": "¥8,360" },
+        { "assert": "text", "selector": "#cart-count", "contains": "2" },
+        { "assert": "visible", "selector": "#checkout" }
+      ]
+    },
+    {
+      "label": "Escape closes the drawer and returns focus",
+      "do": { "action": "press", "key": "Escape" },
+      "expect": [
+        { "assert": "hidden", "selector": "#cart-drawer" },
+        { "assert": "focused", "selector": "#add-to-cart" }
+      ]
+    },
+    {
+      "label": "choose 飴釉 and M",
+      "do": { "action": "click", "selector": "input[name=glaze][value=ameyu]" },
+      "expect": [
+        { "assert": "attr", "selector": "html", "name": "data-glaze", "equals": "ameyu" },
+        { "assert": "text", "selector": "#product-title", "contains": "飴釉" }
+      ]
+    },
+    {
+      "label": "size M",
+      "do": { "action": "click", "selector": "input[name=size][value=M]" },
+      "expect": [
+        { "assert": "text", "selector": ".buybar-variant", "contains": "M 320ml" }
+      ]
+    },
+    {
+      "label": "a second variant becomes a second line",
+      "do": { "action": "click", "selector": "#add-to-cart" },
+      "expect": [
+        { "assert": "count", "selector": "#cart-lines > li", "equals": 2 },
+        { "assert": "text", "selector": "#cart-count", "contains": "4" },
+        { "assert": "text", "selector": "#cart-subtotal", "contains": "¥16,720" }
+      ]
+    },
+    {
+      "label": "remove the first line",
+      "do": { "action": "click", "selector": "#cart-lines > li:first-child .cart-remove" },
+      "expect": [
+        { "assert": "count", "selector": "#cart-lines > li", "equals": 1 },
+        { "assert": "text", "selector": "#cart-count", "contains": "2" },
+        { "assert": "text", "selector": "#cart-lines", "contains": "飴釉" }
+      ]
+    },
+    {
+      "label": "close button closes",
+      "do": { "action": "click", "selector": "#cart-close" },
+      "expect": [
+        { "assert": "hidden", "selector": "#cart-drawer" }
+      ]
+    }
+  ]
+}

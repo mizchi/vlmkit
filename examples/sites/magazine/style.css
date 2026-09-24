@@ -1,0 +1,648 @@
+/* ほとり — one feature article. No build step, no web fonts, no network. */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+:root {
+  color-scheme: light;
+
+  --paper: #f6f2ea;
+  --paper-deep: #ede6d8;
+  --ink: #1d2733;
+  --ink-soft: #4a5360;
+  --ink-mute: #5b636e;
+  --rule: #d8d0c0;
+  --accent: #a4462b;
+  --accent-tint: #f1e0d4;
+  --focus: #1d2733;
+
+  /* Body text is Mincho wherever a Mincho exists. The last named face before the
+     generic is a Japanese Gothic on purpose: on a device with no Japanese serif at
+     all, the generic `serif` for lang=ja can resolve to a Chinese font (it does on
+     Linux with only WenQuanYi), which gives the body Chinese glyph forms and a
+     different design from the headings. */
+  --serif: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", YuMincho, "Noto Serif JP", "Noto Serif CJK JP", "Source Han Serif JP", "BIZ UDPMincho", "IPAexMincho", "IPAPMincho", "IPAMincho", "IPAGothic", serif;
+  /* Where only the IPA fonts exist: IPAGothic for Japanese (full-width 、。（）),
+     with DejaVu Sans named just before it so Latin and digits are proportional —
+     IPAGothic's own Latin is fixed-pitch, and IPAPGothic halves the punctuation. */
+  --sans: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", YuGothic, "Noto Sans JP", "Noto Sans CJK JP", "Source Han Sans JP", "BIZ UDPGothic", Meiryo, "IPAexGothic", "DejaVu Sans", "IPAGothic", sans-serif;
+
+  --gutter: 20px;
+  --measure: 694px;      /* 37 full-width characters of 18px body text at 0.04em tracking */
+  --body-size: 16px;
+}
+
+@media (min-width: 700px) {
+  :root { --gutter: 40px; --body-size: 18px; }
+}
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  text-autospace: normal;
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
+
+img, svg { max-width: 100%; }
+
+a { color: inherit; }
+
+/* every heading breaks between phrases, into lines of even length */
+h1, h2, h3 { word-break: auto-phrase; text-wrap: balance; }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.wrap {
+  width: min(100% - 2 * var(--gutter), 1160px);
+  margin-inline: auto;
+}
+
+/* ------------------------------------------------------------ skip link */
+.skip {
+  position: absolute;
+  left: var(--gutter);
+  top: 12px;
+  z-index: 60;
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+.skip:focus { transform: none; }
+
+/* ------------------------------------------------------------ reading progress */
+.progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 50;
+  pointer-events: none;
+  background: rgba(29, 39, 51, .08);
+}
+.progress__bar {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+.is-ready .progress__bar { transition: transform .12s linear; }
+[data-animate="off"] .progress__bar { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .is-ready .progress__bar { transition: none; }
+}
+
+/* ------------------------------------------------------------ masthead */
+.masthead { border-bottom: 1px solid var(--rule); }
+.masthead__inner {
+  display: flex;
+  align-items: center;
+  gap: 16px 40px;
+  padding-block: 20px;
+}
+.brand { display: flex; align-items: baseline; gap: 16px; margin-right: auto; }
+.wordmark {
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.wordmark__mark {
+  width: 30px;
+  height: 18px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.wordmark__text {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  line-height: 1;
+}
+.tagline {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: var(--ink-mute);
+}
+
+.sections ul {
+  display: flex;
+  gap: 4px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sections a {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+.sections a:hover { border-bottom-color: var(--rule); }
+.sections a[aria-current="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+.btn {
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+.btn:hover { background: var(--paper-deep); }
+/* 検索 open: the button takes the panel's colour and its icon becomes a close mark */
+.btn--search .icon--close { display: none; }
+.btn--search[aria-expanded="true"] { background: var(--paper-deep); }
+.btn--search[aria-expanded="true"] .icon--open { display: none; }
+.btn--search[aria-expanded="true"] .icon--close { display: block; }
+.icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ------------------------------------------------------------ search panel */
+.search-panel {
+  border-top: 1px solid var(--rule);
+  background: var(--paper-deep);
+}
+.search { padding-block: 24px 28px; max-width: 640px; }
+.search__label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.search__row { display: flex; gap: 10px; }
+.search__input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--ink-soft);
+  border-radius: 4px;
+  background: #fffdf8;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.search__row .btn { min-height: 44px; }
+/* the native cancel mark is system blue; draw it in ink instead */
+.search__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  background:
+    linear-gradient(45deg, transparent 43%, var(--ink-soft) 43% 57%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, var(--ink-soft) 43% 57%, transparent 57%);
+}
+.search__hint { margin: 8px 0 0; font-size: 13px; color: var(--ink-mute); }
+.search__status { margin: 12px 0 0; font-size: 14px; }
+.search__status:empty { display: none; }
+.search__results { margin: 8px 0 0; padding: 0; list-style: none; }
+.search__results a { display: inline-block; padding: 6px 0; font-size: 15px; text-underline-offset: .3em; }
+
+/* ------------------------------------------------------------ article header */
+.story-head {
+  display: grid;
+  gap: 32px;
+  padding-block: 32px 0;
+}
+.story-head__text { order: 2; }
+.art { order: 1; margin: 0; }
+.art__svg { display: block; width: 100%; height: auto; border-radius: 3px; }
+
+.kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 20px;
+  font-size: 13px;
+  letter-spacing: .08em;
+}
+.category {
+  display: inline-block;
+  padding: 3px 12px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.series { color: var(--ink-soft); }
+
+.story-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 28px;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: .04em;
+  word-break: auto-phrase;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 24px 0 0;
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.95;
+  color: var(--ink-soft);
+  word-break: auto-phrase;
+  text-wrap: pretty;
+}
+.lede rt, .story-body rt { font-size: .5em; letter-spacing: 0; }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 0;
+  margin: 28px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  letter-spacing: .06em;
+  color: var(--ink-soft);
+}
+.meta__item + .meta__item::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin: 0 14px;
+  vertical-align: -2px;
+  background: var(--rule);
+}
+.meta a { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: .3em; }
+
+@media (min-width: 1000px) {
+  .story-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 620px);
+    align-items: center;
+    gap: 64px;
+    padding-block: 48px 8px;
+  }
+  .story-head__text { order: 1; }
+  .art { order: 2; }
+  .story-title { font-size: 42px; line-height: 1.45; }
+  .lede { font-size: 17px; }
+}
+@media (min-width: 700px) and (max-width: 999px) {
+  .art { max-width: 640px; margin-inline: auto; width: 100%; }
+  .story-head__text { max-width: var(--measure); margin-inline: auto; }
+  .story-title { font-size: 36px; }
+}
+
+/* ------------------------------------------------------------ body */
+.story-body { padding-top: 40px; }
+.chapter > * {
+  width: min(100% - 2 * var(--gutter), var(--measure));
+  margin-inline: auto;
+}
+.chapter > p,
+.interview .utterance {
+  font-family: var(--serif);
+  font-size: var(--body-size);
+  line-height: 1.9;
+  letter-spacing: .04em;
+  text-align: justify;
+  line-break: strict;
+  text-wrap: pretty;
+}
+.chapter > p { margin-block: 0 1.2em; }
+/* The last four characters of every paragraph are one unbreakable run, so no
+   paragraph ends on a line of one or two kana (text-wrap: pretty does not do this
+   for Japanese in Chromium). The line above absorbs the difference as justification. */
+.tail { white-space: nowrap; }
+
+.chapter > h2 {
+  margin-block: 80px 28px;
+  font-family: var(--sans);
+  font-size: 22px;
+  line-height: 1.55;
+  font-weight: 700;
+  letter-spacing: .06em;
+  word-break: auto-phrase;
+  text-wrap: balance;
+}
+.chapter > h2::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 2px;
+  margin-bottom: 20px;
+  background: var(--accent);
+}
+@media (min-width: 700px) {
+  .chapter > h2 { font-size: 25px; margin-block: 96px 32px; }
+}
+
+.chapter a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .3em;
+}
+.chapter a:hover { text-decoration-thickness: 2px; }
+
+.fnref { font-size: .62em; line-height: 0; vertical-align: .9em; margin-inline: .12em; }
+ruby + .fnref { margin-left: .4em; }
+.fnref a { font-family: var(--sans); font-weight: 700; letter-spacing: .02em; }
+.fnref a:target { background: var(--accent-tint); box-shadow: 0 0 0 3px var(--accent-tint); border-radius: 2px; }
+
+#shop-info, [id^="related-"], #author { scroll-margin-top: 32px; }
+/* a footnote jump lands a quarter of the way down, with the lines before it in view */
+[id^="note-"], [id^="ref-"] { scroll-margin-top: 25vh; }
+
+/* interview */
+.interview {
+  display: grid;
+  /* one speaker column for every turn, as wide as the longest name */
+  grid-template-columns: minmax(3em, max-content) minmax(0, 1fr);
+  column-gap: 14px;
+  margin-block: 8px 40px;
+  padding-block: 28px 8px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.turn {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  margin: 0 0 20px;
+}
+.speaker {
+  white-space: nowrap;
+  padding-top: .5em;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--accent);
+}
+.turn--q .speaker { color: var(--ink-soft); }
+.turn--q .utterance { color: var(--ink-soft); }
+
+/* figure */
+.chapter > .figure {
+  width: min(100% - 2 * var(--gutter), 880px);
+  margin-block: 48px 56px;
+}
+.figure__svg { display: block; width: 100%; height: auto; }
+.figure figcaption {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink-mute);
+  text-wrap: pretty;
+}
+
+/* pull quote */
+.chapter > .pullquote {
+  margin-block: 56px 16px;
+  padding-block: 32px 28px;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+}
+.pullquote blockquote { margin: 0; }
+.pullquote blockquote p {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.75;
+  font-weight: 700;
+  letter-spacing: .05em;
+  word-break: auto-phrase;
+  text-wrap: balance;
+}
+.pullquote figcaption { margin-top: 16px; font-size: 13px; color: var(--ink-soft); letter-spacing: .06em; }
+@media (min-width: 700px) {
+  .pullquote blockquote p { font-size: 26px; }
+  /* Where each sentence fits a line, break between them rather than wherever balance likes:
+     otherwise the second sentence's subject (誰かが) ends the first line. */
+  .pullquote .pq-sentence { display: inline-block; }
+}
+
+/* shop info */
+.chapter > .shop-info {
+  margin-block: 48px 0;
+  padding: 24px 28px 20px;
+  background: var(--paper-deep);
+}
+.shop-info__kicker { margin: 0; font-size: 12px; letter-spacing: .12em; color: var(--ink-mute); }
+.shop-info__name { margin: 6px 0 10px; font-size: 17px; letter-spacing: .06em; }
+.shop-info__list {
+  display: grid;
+  /* one label column for every row, as wide as the longest label */
+  grid-template-columns: minmax(5.5em, max-content) minmax(0, 1fr);
+  column-gap: 12px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.shop-info__list div { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; padding-block: 6px; border-top: 1px solid var(--rule); }
+.shop-info__list dt { font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.shop-info__list dd { margin: 0; }
+
+/* ------------------------------------------------------------ notes */
+.notes {
+  width: min(100% - 2 * var(--gutter), var(--measure));
+  margin: 72px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--ink);
+}
+/* one style for the secondary heads: 注, the author's name, 関連する記事 */
+.notes__title,
+.author__name,
+.related__title { font-size: 20px; font-weight: 700; letter-spacing: .08em; }
+.notes__title { margin: 0 0 12px; }
+.notes__list {
+  display: grid;
+  grid-template-columns: minmax(3em, max-content) minmax(0, 1fr);
+  column-gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.note {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  padding-block: 10px;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--ink-soft);
+}
+.note p { margin: 0; }
+.note__num { font-weight: 700; color: var(--ink); white-space: nowrap; }
+.note:target {
+  background: var(--accent-tint);
+  box-shadow: -12px 0 0 var(--accent-tint), 12px 0 0 var(--accent-tint);
+}
+.backref {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: .3em;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ after the article */
+.after {
+  width: min(100% - 2 * var(--gutter), var(--measure));
+  margin: 64px auto 0;
+}
+.share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-block: 20px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.share__label { margin: 0 4px 0 0; font-size: 13px; color: var(--ink-soft); letter-spacing: .06em; }
+.btn--save[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.btn--save[aria-pressed="true"] .icon { fill: currentColor; }
+.share__status { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+.share__status:not(:empty)::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 10px;
+  margin-right: 10px;
+  border: solid var(--accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.author {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 20px;
+  padding-block: 32px 8px;
+}
+.author__mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--serif);
+  font-size: 26px;
+}
+.author__kicker { margin: 0; font-size: 12px; letter-spacing: .12em; color: var(--ink-mute); }
+.author__name { margin: 4px 0 8px; }
+.author__kana { font-size: 13px; font-weight: 400; color: var(--ink-soft); letter-spacing: .04em; }
+.author__bio { margin: 0; font-size: 14px; line-height: 1.85; color: var(--ink-soft); }
+
+/* related */
+.related {
+  margin-top: 96px;
+  padding-block: 56px 80px;
+  background: var(--paper-deep);
+}
+.related__title { margin: 0 0 28px; }
+.related__list {
+  display: grid;
+  gap: 36px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 700px) {
+  .related__list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+}
+.card__link { display: block; text-decoration: none; }
+.card__svg { display: block; width: 100%; height: auto; border-radius: 2px; }
+.card__cat { display: block; margin-top: 14px; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--accent); }
+.card__title { margin: 6px 0 2px; font-size: 17px; line-height: 1.6; letter-spacing: .04em; }
+.card__date { display: block; font-size: 13px; line-height: 1.5; color: var(--ink-mute); }
+.card__link:hover .card__title { text-decoration: underline; text-underline-offset: .3em; }
+.card:target .card__title { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: .3em; }
+
+/* ------------------------------------------------------------ footer */
+.site-footer {
+  padding-block: 48px 40px;
+  background: var(--ink);
+  color: #e8e3d9;
+  --focus: #f6f2ea;
+}
+.site-footer__inner { display: grid; gap: 20px; }
+.site-footer__mark { margin: 0; font-family: var(--serif); font-size: 24px; font-weight: 700; letter-spacing: .16em; }
+.site-footer__tagline { margin: 4px 0 0; font-size: 12px; color: #b9bfc8; letter-spacing: .08em; }
+.site-footer__nav ul { display: flex; flex-wrap: wrap; gap: 0 24px; margin: 0; padding: 0; list-style: none; }
+.site-footer__nav a { display: inline-block; padding: 8px 0; font-size: 13px; }
+.site-footer__note { margin: 0; font-size: 12px; line-height: 1.8; color: #b9bfc8; max-width: 44em; }
+.site-footer__copy { margin: 0; font-size: 12px; color: #b9bfc8; }
+
+/* ------------------------------------------------------------ small screens */
+/* The one-row masthead needs ~910px with the tagline and ~590px without it. */
+@media (max-width: 1099px) {
+  .tagline { display: none; }
+}
+@media (min-width: 700px) and (max-width: 999px) {
+  .masthead__inner { gap: 16px 28px; }
+  .sections ul { gap: 4px 20px; }
+}
+
+@media (max-width: 699px) {
+  .masthead__inner { flex-wrap: wrap; padding-block: 16px 4px; gap: 4px 12px; }
+  .wordmark__text { font-size: 26px; }
+  .sections { order: 3; width: 100%; }
+  .sections ul { justify-content: space-between; gap: 0; }
+  .story-head { padding-top: 20px; }
+
+  /* byline on its own line; date | reading time below it, so no row starts with a bar */
+  .meta__item:first-child { flex-basis: 100%; }
+  .meta__item:nth-child(2)::before { display: none; }
+
+  /* label above, both buttons on one row, the confirmation wraps below them */
+  .share__label { flex-basis: 100%; }
+
+  /* related: a short list with thumbnails, not three more full-width pictures */
+  .related { margin-top: 64px; padding-block: 40px 56px; }
+  .related__list { gap: 20px; }
+  .card__link {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: 16px;
+    align-items: start;
+  }
+  .card__svg { grid-row: 1 / span 3; }
+  .card__cat { margin-top: 0; }
+  .card__title { font-size: 16px; }
+}

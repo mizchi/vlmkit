@@ -1,0 +1,276 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    {
+      "label": "Step 1: Continue with no delivery day shows the error summary and moves focus to it",
+      "do": { "action": "click", "selector": "#step-1 button[type=submit]" },
+      "expect": [
+        { "assert": "visible", "selector": "#errors-1" },
+        { "assert": "focused", "selector": "#errors-1" },
+        { "assert": "text", "selector": "#errors-1", "contains": "Select a delivery day" },
+        { "assert": "attr", "selector": "#day", "name": "aria-invalid", "equals": "true" },
+        { "assert": "attr", "selector": "#day", "name": "aria-describedby", "equals": "day-hint day-error" },
+        { "assert": "visible", "selector": "#day-error" }
+      ]
+    },
+    {
+      "label": "Choosing a day re-validates the field and clears the summary",
+      "do": { "action": "press", "selector": "#day", "key": "ArrowDown" },
+      "expect": [
+        { "assert": "count", "selector": "#day-error", "equals": 0 },
+        { "assert": "hidden", "selector": "#errors-1" },
+        { "assert": "text", "selector": "#day-note", "contains": "Monday, October 12" },
+        { "assert": "text", "selector": "#summary-panel", "contains": "Mon, Oct 12" }
+      ]
+    },
+    {
+      "label": "The 4-person radio card updates the order summary",
+      "do": { "action": "click", "selector": ".plan:has(input[value='4p3m'])" },
+      "expect": [
+        { "assert": "text", "selector": "#summary-panel", "contains": "4 people · 3 meals a week" },
+        { "assert": "text", "selector": "#summary-panel", "contains": "$107.88" },
+        { "assert": "text", "selector": "#summary-panel", "contains": "$116.51" }
+      ]
+    },
+    {
+      "label": "A dietary preference shows in the summary",
+      "do": { "action": "click", "selector": ".choice:has(input[value='Vegetarian'])" },
+      "expect": [
+        { "assert": "text", "selector": "#summary-panel", "contains": "Vegetarian" }
+      ]
+    },
+    {
+      "label": "Continue moves to step 2, marks it current and focuses its heading",
+      "do": { "action": "click", "selector": "#step-1 button[type=submit]" },
+      "expect": [
+        { "assert": "hidden", "selector": "#step-1" },
+        { "assert": "visible", "selector": "#step-2" },
+        { "assert": "focused", "selector": "#step-2-title" },
+        { "assert": "text", "selector": "#step-2-title", "contains": "Delivery details" },
+        { "assert": "attr", "selector": "#steps [data-step='2']", "name": "aria-current", "equals": "step" },
+        { "assert": "text", "selector": "#steps [data-step='1']", "contains": "completed" }
+      ]
+    },
+    {
+      "label": "Step 2: Continue with empty fields lists six errors and ties each message to its field",
+      "do": { "action": "click", "selector": "#step-2 button[type=submit]" },
+      "expect": [
+        { "assert": "focused", "selector": "#errors-2" },
+        { "assert": "count", "selector": "#errors-2 li", "equals": 6 },
+        { "assert": "attr", "selector": "#full-name", "name": "aria-invalid", "equals": "true" },
+        { "assert": "attr", "selector": "#full-name", "name": "aria-describedby", "equals": "full-name-error" },
+        { "assert": "attr", "selector": "#zip", "name": "aria-invalid", "equals": "true" },
+        { "assert": "count", "selector": "#phone[aria-invalid]", "equals": 0 },
+        { "assert": "count", "selector": ".field__error .icon", "equals": 6 }
+      ]
+    },
+    {
+      "label": "An error-summary link moves focus to its field",
+      "do": { "action": "click", "selector": "#errors-2 a[href='#email']" },
+      "expect": [
+        { "assert": "focused", "selector": "#email" }
+      ]
+    },
+    {
+      "label": "Fill the name",
+      "do": { "action": "fill", "selector": "#full-name", "value": "Jordan Rivera" },
+      "expect": [{ "assert": "focused", "selector": "#full-name" }]
+    },
+    {
+      "label": "Leaving the name field re-validates it (error gone, summary down to five)",
+      "do": { "action": "fill", "selector": "#email", "value": "jordan@example" },
+      "expect": [
+        { "assert": "count", "selector": "#full-name[aria-invalid]", "equals": 0 },
+        { "assert": "count", "selector": "#full-name-error", "equals": 0 },
+        { "assert": "count", "selector": "#errors-2 li", "equals": 5 }
+      ]
+    },
+    {
+      "label": "Leaving a malformed email shows the format message",
+      "do": { "action": "focus", "selector": "#address1" },
+      "expect": [
+        { "assert": "text", "selector": "#email-error", "contains": "like name@example.com" }
+      ]
+    },
+    {
+      "label": "Correct the email",
+      "do": { "action": "fill", "selector": "#email", "value": "jordan@example.com" },
+      "expect": [{ "assert": "focused", "selector": "#email" }]
+    },
+    {
+      "label": "Address line 1",
+      "do": { "action": "fill", "selector": "#address1", "value": "1450 Alder Street" },
+      "expect": [{ "assert": "count", "selector": "#email-error", "equals": 0 }]
+    },
+    {
+      "label": "City",
+      "do": { "action": "fill", "selector": "#city", "value": "Portland" },
+      "expect": [{ "assert": "count", "selector": "#address1-error", "equals": 0 }]
+    },
+    {
+      "label": "State by typeahead",
+      "do": { "action": "type", "selector": "#state", "text": "Oregon" },
+      "expect": [{ "assert": "count", "selector": "#state-error", "equals": 0 }]
+    },
+    {
+      "label": "ZIP code",
+      "do": { "action": "fill", "selector": "#zip", "value": "97214" },
+      "expect": [{ "assert": "count", "selector": "#city-error", "equals": 0 }]
+    },
+    {
+      "label": "Delivery instructions count down from 200",
+      "do": { "action": "fill", "selector": "#instructions", "value": "Leave it on the porch" },
+      "expect": [
+        { "assert": "text", "selector": "#instructions-count", "contains": "179 characters left" },
+        { "assert": "count", "selector": "#zip-error", "equals": 0 }
+      ]
+    },
+    {
+      "label": "Continue to step 3",
+      "do": { "action": "click", "selector": "#step-2 button[type=submit]" },
+      "expect": [
+        { "assert": "visible", "selector": "#step-3" },
+        { "assert": "focused", "selector": "#step-3-title" },
+        { "assert": "attr", "selector": "#steps [data-step='3']", "name": "aria-current", "equals": "step" },
+        { "assert": "text", "selector": "#billing-preview", "contains": "1450 Alder Street, Portland, OR 97214" }
+      ]
+    },
+    {
+      "label": "Step 3: Continue with no card lists four errors",
+      "do": { "action": "click", "selector": "#step-3 button[type=submit]" },
+      "expect": [
+        { "assert": "focused", "selector": "#errors-3" },
+        { "assert": "count", "selector": "#errors-3 li", "equals": 4 },
+        { "assert": "attr", "selector": "#card-number", "name": "aria-invalid", "equals": "true" }
+      ]
+    },
+    {
+      "label": "Card number",
+      "do": { "action": "fill", "selector": "#card-number", "value": "4242424242424242" },
+      "expect": [{ "assert": "focused", "selector": "#card-number" }]
+    },
+    {
+      "label": "Expiry (the slash is inserted as you type)",
+      "do": { "action": "fill", "selector": "#expiry", "value": "1228" },
+      "expect": [{ "assert": "count", "selector": "#card-number-error", "equals": 0 }]
+    },
+    {
+      "label": "Security code",
+      "do": { "action": "fill", "selector": "#cvc", "value": "123" },
+      "expect": [{ "assert": "count", "selector": "#expiry-error", "equals": 0 }]
+    },
+    {
+      "label": "Name on card",
+      "do": { "action": "fill", "selector": "#card-name", "value": "Jordan Rivera" },
+      "expect": [{ "assert": "count", "selector": "#cvc-error", "equals": 0 }]
+    },
+    {
+      "label": "Unticking 'same as delivery' reveals the billing fields",
+      "do": { "action": "click", "selector": ".choice:has(#billing-same)" },
+      "expect": [
+        { "assert": "visible", "selector": "#billing-fields" },
+        { "assert": "visible", "selector": "#billing-address1" },
+        { "assert": "count", "selector": "#card-name-error", "equals": 0 }
+      ]
+    },
+    {
+      "label": "Ticking it again hides them",
+      "do": { "action": "click", "selector": ".choice:has(#billing-same)" },
+      "expect": [
+        { "assert": "hidden", "selector": "#billing-fields" }
+      ]
+    },
+    {
+      "label": "Type an unknown promo code",
+      "do": { "action": "fill", "selector": "#promo", "value": "SAVE20" },
+      "expect": [{ "assert": "focused", "selector": "#promo" }]
+    },
+    {
+      "label": "An unknown promo code is rejected with a message",
+      "do": { "action": "click", "selector": "#promo-apply" },
+      "expect": [
+        { "assert": "text", "selector": "#promo-message", "contains": "isn’t a valid promo code" },
+        { "assert": "attr", "selector": "#promo", "name": "aria-invalid", "equals": "true" },
+        { "assert": "hidden", "selector": "#summary-promo" }
+      ]
+    },
+    {
+      "label": "Type WELCOME10 in lower case",
+      "do": { "action": "fill", "selector": "#promo", "value": "welcome10" },
+      "expect": [{ "assert": "focused", "selector": "#promo" }]
+    },
+    {
+      "label": "WELCOME10 takes 10% off and the summary follows",
+      "do": { "action": "click", "selector": "#promo-apply" },
+      "expect": [
+        { "assert": "text", "selector": "#promo-message", "contains": "WELCOME10 applied" },
+        { "assert": "count", "selector": "#promo[aria-invalid]", "equals": 0 },
+        { "assert": "visible", "selector": "#summary-promo" },
+        { "assert": "text", "selector": "#summary-promo", "contains": "$10.79" },
+        { "assert": "text", "selector": "#summary-panel", "contains": "$104.86" },
+        { "assert": "text", "selector": "#promo-apply", "contains": "Remove" }
+      ]
+    },
+    {
+      "label": "Continue to review",
+      "do": { "action": "click", "selector": "#step-3 button[type=submit]" },
+      "expect": [
+        { "assert": "visible", "selector": "#step-4" },
+        { "assert": "focused", "selector": "#step-4-title" },
+        { "assert": "text", "selector": "#step-4-title", "contains": "Review your order" },
+        { "assert": "text", "selector": "#step-4", "contains": "Card ending 4242, expires 12/28" },
+        { "assert": "text", "selector": "#step-4", "contains": "1450 Alder Street" },
+        { "assert": "text", "selector": "#step-4", "contains": "WELCOME10" },
+        { "assert": "text", "selector": "#step-4", "contains": "Vegetarian" },
+        { "assert": "visible", "selector": "#step-4 button[type=submit]" },
+        { "assert": "text", "selector": "#step-4 button[type=submit]", "contains": "Place order" }
+      ]
+    },
+    {
+      "label": "Edit on the Delivery block goes back to step 2",
+      "do": { "action": "click", "selector": "a[data-edit='2']" },
+      "expect": [
+        { "assert": "visible", "selector": "#step-2" },
+        { "assert": "focused", "selector": "#step-2-title" }
+      ]
+    },
+    {
+      "label": "…and Continue returns straight to review",
+      "do": { "action": "click", "selector": "#step-2 button[type=submit]" },
+      "expect": [
+        { "assert": "visible", "selector": "#step-4" },
+        { "assert": "focused", "selector": "#step-4-title" }
+      ]
+    },
+    {
+      "label": "Place order without agreeing to the terms is stopped",
+      "do": { "action": "click", "selector": "#step-4 button[type=submit]" },
+      "expect": [
+        { "assert": "focused", "selector": "#errors-4" },
+        { "assert": "attr", "selector": "#terms", "name": "aria-invalid", "equals": "true" },
+        { "assert": "hidden", "selector": "#confirmation" }
+      ]
+    },
+    {
+      "label": "Agree to the terms",
+      "do": { "action": "click", "selector": ".choice:has(#terms)" },
+      "expect": [
+        { "assert": "count", "selector": "#terms-error", "equals": 0 }
+      ]
+    },
+    {
+      "label": "Place order replaces the form with the confirmation",
+      "do": { "action": "click", "selector": "#step-4 button[type=submit]" },
+      "expect": [
+        { "assert": "visible", "selector": "#confirmation" },
+        { "assert": "hidden", "selector": "#step-4" },
+        { "assert": "hidden", "selector": "#steps" },
+        { "assert": "focused", "selector": "#confirmation-title" },
+        { "assert": "text", "selector": "#confirmation-title", "contains": "Thanks — your first box is on its way." },
+        { "assert": "text", "selector": "#confirmation", "contains": "PC-20417" },
+        { "assert": "text", "selector": "#confirmation", "contains": "Monday, October 12, 2026" },
+        { "assert": "text", "selector": "#summary-panel", "contains": "$104.86" }
+      ]
+    }
+  ]
+}
