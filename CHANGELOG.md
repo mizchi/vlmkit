@@ -3,8 +3,11 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## 0.24.0 — 2026-09-23
+## 0.23.0 — 2026-09-23
 
+- Add `vlmkit-anim why` to explain canvas size, layering, container allocation and edge routing.
+- Include the elements responsible for oversized canvases and crossings in `check` diagnostics.
+- Size container bands by their content and share canvas estimation between module maps and diagrams.
 - Add `check composition` to detect spacing, alignment and heading-hierarchy inconsistencies.
 - Add `check color` to inspect palette roles, text-field boundaries and links distinguished only by colour.
 - Add `check grounding` with actionable screenshot coordinates, numbered markers (`--mark`), coordinate
@@ -17,12 +20,8 @@ Dates are YYYY-MM-DD.
 - Fix contrast checks for modern CSS colours such as `oklch()` and `lab()`.
 - Reduce false positives in composition and grounding checks.
 - Fix wrapped bullets, blockquotes and ordered lists in generated slide decks.
-
-## 0.23.0 — 2026-09-09
-
-- Add `vlmkit-anim why` to explain canvas size, layering, container allocation and edge routing.
-- Include the elements responsible for oversized canvases and crossings in `check` diagnostics.
-- Size container bands by their content and share canvas estimation between module maps and diagrams.
+- Add `@mizchi/vlmkit-judge`, the browser-independent judges behind `check composition`, `check color`,
+  `check design` and `check integrity`; existing import paths re-export them unchanged.
 
 ## 0.22.0 — 2026-09-09
 
