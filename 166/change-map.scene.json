@@ -1,0 +1,169 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #166: Split the pure judges out as @mizchi/vlmkit-judge (phase 1 of the layer split)",
+  "layout": "grid",
+  "canvas": {
+    "width": 846,
+    "height": 438
+  },
+  "nodes": [
+    {
+      "id": "judge/src",
+      "label": "judge/src",
+      "hidden": true
+    },
+    {
+      "id": "docs/diagrams",
+      "label": "docs/diagrams",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
+      "hidden": true
+    },
+    {
+      "id": "judge",
+      "label": "judge",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "anim/src",
+      "label": "anim/src",
+      "hidden": true
+    },
+    {
+      "id": "core",
+      "label": "core",
+      "hidden": true
+    },
+    {
+      "id": "core/src",
+      "label": "core/src",
+      "hidden": true
+    },
+    {
+      "id": "markup",
+      "label": "markup",
+      "hidden": true
+    },
+    {
+      "id": "scripts",
+      "label": "scripts",
+      "hidden": true
+    },
+    {
+      "id": "src/util",
+      "label": "src/util",
+      "hidden": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "core/src",
+      "to": "judge/src",
+      "hidden": true
+    },
+    {
+      "from": "markup/src",
+      "to": "judge/src",
+      "hidden": true
+    },
+    {
+      "from": "markup/src",
+      "to": "core/src",
+      "hidden": true
+    }
+  ],
+  "sequence": [
+    {
+      "show": [
+        ".claude",
+        "docs/design",
+        "docs/diagrams",
+        "root",
+        "anim/src",
+        "core",
+        "core/src",
+        "judge",
+        "judge/src",
+        "markup",
+        "markup/src",
+        "scripts",
+        "src/util"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs/design",
+        "docs/diagrams",
+        "root",
+        "anim/src",
+        "core",
+        "core/src",
+        "judge",
+        "judge/src",
+        "markup",
+        "markup/src",
+        "scripts",
+        "src/util"
+      ],
+      "caption": "1/1 Split the pure judges out as @mizchi/vlmkit-judge (phase 1 of layer spl…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 32
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2709 −2122"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs/design",
+        "docs/diagrams",
+        "root",
+        "anim/src",
+        "core",
+        "core/src",
+        "judge",
+        "judge/src",
+        "markup",
+        "markup/src",
+        "scripts",
+        "src/util"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 32 files · +2709 −2122 · 13 areas, 3 import edges between them"
+    }
+  ]
+}
