@@ -42,10 +42,10 @@ import {
   judgeTextContrast,
   judgeUnstyled,
   measureInkRatio,
+  textContrastCandidates,
   type AlignmentGroup,
   type ClipCandidate,
   type CollapseCandidate,
-  type ContrastCandidate,
   type IntegrityExemption,
   type IntegrityFinding,
   type IntegrityReport,
@@ -58,6 +58,7 @@ import {
   type RuntimeEvent,
   type StyleFingerprint,
   type TextCollisionOptions,
+  type TextContrastSample,
 } from "@mizchi/vlmkit-judge/integrity.ts";
 
 export * from "@mizchi/vlmkit-judge/integrity.ts";
@@ -502,10 +503,13 @@ export const COLLECT_PROTRUSIONS = `(() => {
 export const COLLECT_TEXT_CONTRAST = `(() => {
   ${STABLE_SELECTOR_JS}
   ${CONTRAST_BACKGROUND_JS}
-  const candidates = [];
-  let skippedComposite = 0;
+  // Samples, not candidates: this script resolves what only the page knows — which text is
+  // painted, its colour, the background layers behind it, its inherited opacity — and ships
+  // it. Compositing, the ratio, the WCAG floor and the 60-candidate cap are the judge's
+  // (textContrastCandidates in @mizchi/vlmkit-judge/integrity.ts), so a scene from any other
+  // renderer is measured by the same code.
+  const samples = [];
   for (const el of Array.from(document.querySelectorAll("body *"))) {
-    if (candidates.length >= 60) break;
     let direct = "";
     for (const n of el.childNodes) if (n.nodeType === 3) direct += n.nodeValue || "";
     if (!direct.trim()) continue;
@@ -545,39 +549,29 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
     // Shared with check a11y contrast via CONTRAST_BACKGROUND_JS. It used to be inline here and
     // reimplemented, differently and worse, in the other gate — which reported the inverse of
     // the truth on a gradient. One resolution, one answer.
-    const resolved = resolveTextBackground(el);
-    if (resolved.composite) { skippedComposite++; continue; }
-    const bg = resolved.bg;
-    const fgColor = parseColor(style.color) || [0, 0, 0, 1];
-    const fg = blendColor(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * inheritedOpacity(el)]);
-    const r = contrastRatio(fg, bg);
+    const selector = stableSelector(el);
+    const text = direct.replace(/\\s+/g, " ").trim().slice(0, 60);
+    const resolved = textBackgroundLayers(el);
+    if (resolved.composite) { samples.push({ selector: selector, text: text, composite: true }); continue; }
     // WCAG's floor depends on the text's size, and this used to be a flat 3:1 —
     // which is the LARGE-text floor applied to everything. A dogfood agent found
     // what that means in practice: 13px body text at 3.03:1 is a WCAG AA failure,
     // \`check a11y contrast\` reports it as "3.03:1 (need 4.5)", and this gate said
-    // CLEAN and exited 0. "Fixing only to satisfy criterion 1 would have left the
-    // low-vision reporter failed with a green gate."
-    //
-    // Large = 24px, or 18.66px at weight 700+ (WCAG 2.2's 18pt / 14pt bold).
-    const fontSizePx = parseFloat(style.fontSize) || 16;
-    const weight = parseFloat(style.fontWeight) || (/bold/i.test(style.fontWeight) ? 700 : 400);
-    const large = fontSizePx >= 24 || (fontSizePx >= 18.66 && weight >= 700);
-    const floor = large ? 3 : 4.5;
-    if (r >= floor) continue;
-    candidates.push({
-      selector: stableSelector(el),
-      text: direct.replace(/\\s+/g, " ").trim().slice(0, 60),
-      ratio: Math.round(r * 100) / 100,
-      fg: "rgb(" + fg.map(Math.round).join(", ") + ")",
-      bg: "rgb(" + bg.map(Math.round).join(", ") + ")",
+    // CLEAN and exited 0. The judge applies the floor; the size and weight it needs are
+    // resolved here.
+    samples.push({
+      selector: selector,
+      text: text,
+      color: parseColor(style.color) || [0, 0, 0, 1],
+      backgrounds: resolved.layers,
+      opacity: inheritedOpacity(el),
+      fontSizePx: parseFloat(style.fontSize) || 16,
+      fontWeight: parseFloat(style.fontWeight) || (/bold/i.test(style.fontWeight) ? 700 : 400),
       disabled: el.closest("[disabled], [aria-disabled='true']") != null,
       shadowed: style.textShadow !== "none",
-      fontSizePx: Math.round(fontSizePx * 10) / 10,
-      large: large,
-      floor: floor,
     });
   }
-  return { candidates, skippedComposite };
+  return { samples };
 })()`;
 
 export const COLLECT_ALIGN_GROUPS = `(() => {
@@ -859,8 +853,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       exempted.push(...protrusions.exempted);
 
       // A11 — invisible / low-contrast text (solid backgrounds only)
-      const contrastSample = await page.evaluate(COLLECT_TEXT_CONTRAST) as { candidates: ContrastCandidate[]; skippedComposite: number };
-      const contrast = judgeTextContrast(contrastSample.candidates, contrastSample.skippedComposite, viewport.width, options.maxFindings ?? 12);
+      const { samples } = await page.evaluate(COLLECT_TEXT_CONTRAST) as { samples: TextContrastSample[] };
+      const measured = textContrastCandidates(samples);
+      const contrast = judgeTextContrast(measured.candidates, measured.skippedComposite, viewport.width, options.maxFindings ?? 12);
       push(contrast.findings);
       exempted.push(...contrast.exempted);
 

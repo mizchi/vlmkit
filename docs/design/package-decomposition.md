@@ -174,6 +174,16 @@ Still to do on the DOM side:
   page is compositing the palette's ink rows (`hex(blendColor(behind.bg, fg))`). That is an
   aggregation keyed by the painted colour, not a verdict, and moving it would mean shipping
   every box.
+- ~~`COLLECT_TEXT_CONTRAST` ships ratios.~~ Done. It now ships `TextContrastSample`s: the
+  text's resolved colour, the background layers behind it (innermost first, from the new
+  in-page `textBackgroundLayers`), its inherited opacity, font size and weight, and the
+  disabled / shadowed flags, or `composite: true` over an image. The judge's
+  `textContrastCandidates` composites, measures, applies the WCAG floor and the 60-candidate
+  cap. The scene adapter builds the same samples and goes through the same function, so the
+  page and a scene no longer have two loops. **Proof that nothing moved:** `check integrity
+  --json` on 16 pages was byte-identical before and after. One of those pages was built to
+  cross the cap: 80 low-contrast rows, with text over gradients before and after the 60th
+  candidate. Between them the 16 pages have 32 contrast findings and 27 contrast exemptions.
 - A scene adapter for `check color`. The arithmetic no longer needs a browser, but the
   roles still come from the DOM: which element is a text field, which link sits in a prose
   flow. A scene would need a `role` (`field`, `link`) and the flow's own text length to

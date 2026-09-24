@@ -18,7 +18,7 @@
  * say so rather than claiming a parent the data cannot prove.
  */
 import { UsageError } from "./errors.ts";
-import { parseColor, formatRgb, measureTextContrast, type Rgba } from "./color.ts";
+import { parseColor, type Rgba } from "./color.ts";
 import type { CompositionBox, CompositionInput } from "./composition.ts";
 import {
   findTextCollisions,
@@ -28,6 +28,7 @@ import {
   judgeProtrusions,
   judgeTextContrast,
   measureInkRatio,
+  textContrastCandidates,
   type AlignmentGroup,
   type ClipCandidate,
   type CollapseCandidate,
@@ -37,6 +38,7 @@ import {
   type IntegrityReport,
   type IntegrityTextBlock,
   type ProtrusionCandidate,
+  type TextContrastSample,
 } from "./integrity.ts";
 
 /** One element, as the renderer that drew it knows it. Coordinates are frame pixels. */
@@ -438,11 +440,10 @@ export function judgeSceneIntegrity(
   };
 }
 
-/** The DOM collector's cap, so a scene and a page are judged over the same population. */
-const CONTRAST_MAX_CANDIDATES = 60;
-
 /**
- * `COLLECT_TEXT_CONTRAST`, over a scene instead of a live page.
+ * `COLLECT_TEXT_CONTRAST`, over a scene instead of a live page: each painted text element as
+ * a `TextContrastSample`, then the same `textContrastCandidates` the page's samples go
+ * through — one loop, one cap, one floor, whichever renderer drew the frame.
  *
  * The one deliberate difference: the page composites a missing background over white,
  * because white IS what a browser paints under an unpainted document. A scene has no such
@@ -455,14 +456,13 @@ export function sceneContrastCandidates(
   byPath: ReadonlyMap<string, SceneElement>,
   viewport: number,
 ): { candidates: ContrastCandidate[]; composite: number; measured: number; refused: IntegrityExemption[] } {
-  const candidates: ContrastCandidate[] = [];
+  const samples: TextContrastSample[] = [];
   const refused: IntegrityExemption[] = [];
-  let composite = 0;
-  let measured = 0;
   for (const element of painted) {
-    if (candidates.length >= CONTRAST_MAX_CANDIDATES) break;
     if (element.opacity === 0) continue;
     if (element.width <= 2 || element.height <= 2) continue;
+    const selector = describeElement(element);
+    const text = (element.text ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
     const backgrounds: Rgba[] = [];
     let opacity = 1;
     let opaque = false;
@@ -475,39 +475,35 @@ export function sceneContrastCandidates(
       if (bg && bg[3] > 0) backgrounds.push(bg);
       if (bg && bg[3] >= 1) opaque = true;
     }
-    if (image) { composite++; continue; }
+    if (image) { samples.push({ selector, text, composite: true }); continue; }
     if (!opaque) {
       refused.push({
         kind: "low-contrast-text",
         viewport,
-        selector: describeElement(element),
+        selector,
         reason: "no opaque `background` on this element or a recorded ancestor — a scene has no default canvas colour, so the contrast is not measured",
       });
       continue;
     }
-    measured++;
-    const m = measureTextContrast({
+    samples.push({
+      selector,
+      text,
       color: parseColor(element.color) ?? [0, 0, 0, 1],
       backgrounds,
       opacity,
       fontSizePx: element.fontSize,
       fontWeight: element.fontWeight,
-    });
-    if (m.ratio >= m.floor) continue;
-    candidates.push({
-      selector: describeElement(element),
-      text: (element.text ?? "").replace(/\s+/g, " ").trim().slice(0, 60),
-      ratio: Math.round(m.ratio * 100) / 100,
-      fg: formatRgb(m.fg),
-      bg: formatRgb(m.bg),
       disabled: element.disabled === true,
       shadowed: element.textShadow === true,
-      fontSizePx: Math.round(m.fontSizePx * 10) / 10,
-      large: m.large,
-      floor: m.floor,
     });
   }
-  return { candidates, composite, measured, refused };
+  const { candidates, skippedComposite } = textContrastCandidates(samples);
+  return {
+    candidates,
+    composite: skippedComposite,
+    measured: samples.filter((sample) => !sample.composite).length,
+    refused,
+  };
 }
 
 /**

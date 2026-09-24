@@ -9,6 +9,7 @@ import {
   type Rgba,
 } from "@mizchi/vlmkit-judge/color.ts";
 import { sceneContrastCandidates, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";
+import { textContrastCandidates, type TextContrastSample } from "@mizchi/vlmkit-judge/integrity.ts";
 import { CONTRAST_BACKGROUND_JS } from "./contrast-background.ts";
 import { COLLECT_TEXT_CONTRAST, type ContrastCandidate } from "./inspect/integrity-check.ts";
 
@@ -107,7 +108,10 @@ describe("text contrast: DOM collector vs scene adapter on one page", () => {
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
       await tab.setContent(HTML);
-      const dom = await tab.evaluate(COLLECT_TEXT_CONTRAST) as { candidates: ContrastCandidate[] };
+      const { samples } = await tab.evaluate(COLLECT_TEXT_CONTRAST) as { samples: TextContrastSample[] };
+      // The page ships facts only; the ratio is never computed in the browser.
+      assert.ok(samples.length > 0 && samples.every((sample) => !("ratio" in sample)), JSON.stringify(samples[0]));
+      const dom = textContrastCandidates(samples);
       const scene = await tab.evaluate(COLLECT_SCENE) as SceneElement[];
       const byPath = new Map(scene.map((e) => [e.path, e]));
       const fromScene = sceneContrastCandidates(scene.filter((e) => e.color !== undefined), byPath, 800);

@@ -34,6 +34,7 @@
  *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
  */
 import type { IntegrityAllowRule } from "./integrity-allow.ts";
+import { formatRgb, measureTextContrast, type Rgba } from "./color.ts";
 
 export type IntegrityFindingKind =
   | "js-error"
@@ -878,6 +879,69 @@ export interface ContrastCandidate {
   large?: boolean;
   /** The applicable floor: 3 for large text, 4.5 otherwise. */
   floor?: number;
+}
+
+/**
+ * One text element as a collector resolved it: its colour, the background layers behind it
+ * and its inherited opacity — facts, not a ratio. `composite` marks text over a background
+ * image, which is refused and counted rather than measured.
+ */
+export interface TextContrastSample {
+  selector: string;
+  /** Whitespace-collapsed, at most 60 characters. */
+  text: string;
+  composite?: boolean;
+  /** Resolved text colour; black when the renderer could not resolve one. */
+  color?: Rgba;
+  /** Resolved background layers, innermost first, up to the first opaque one. */
+  backgrounds?: Rgba[];
+  /** Product of the element's and its ancestors' opacity. */
+  opacity?: number;
+  fontSizePx?: number;
+  fontWeight?: number;
+  disabled?: boolean;
+  shadowed?: boolean;
+}
+
+/** The DOM collector's cap on candidates, kept so every source is judged over one population. */
+export const TEXT_CONTRAST_MAX_CANDIDATES = 60;
+
+/**
+ * Samples in document order to the candidates `judgeTextContrast` reads: composite each over
+ * its background, measure, keep what falls below its WCAG floor. Stops at 60 candidates, and
+ * counts refused samples only up to that point — the order and the cap the page's own loop
+ * had when it did this arithmetic itself.
+ */
+export function textContrastCandidates(
+  samples: readonly TextContrastSample[],
+): { candidates: ContrastCandidate[]; skippedComposite: number } {
+  const candidates: ContrastCandidate[] = [];
+  let skippedComposite = 0;
+  for (const sample of samples) {
+    if (candidates.length >= TEXT_CONTRAST_MAX_CANDIDATES) break;
+    if (sample.composite) { skippedComposite++; continue; }
+    const m = measureTextContrast({
+      color: sample.color ?? [0, 0, 0, 1],
+      backgrounds: sample.backgrounds ?? [],
+      opacity: sample.opacity,
+      fontSizePx: sample.fontSizePx,
+      fontWeight: sample.fontWeight,
+    });
+    if (m.ratio >= m.floor) continue;
+    candidates.push({
+      selector: sample.selector,
+      text: sample.text,
+      ratio: Math.round(m.ratio * 100) / 100,
+      fg: formatRgb(m.fg),
+      bg: formatRgb(m.bg),
+      disabled: sample.disabled === true,
+      shadowed: sample.shadowed === true,
+      fontSizePx: Math.round(m.fontSizePx * 10) / 10,
+      large: m.large,
+      floor: m.floor,
+    });
+  }
+  return { candidates, skippedComposite };
 }
 
 export function judgeTextContrast(
