@@ -14,23 +14,23 @@
       "hidden": true
     },
     {
-      "id": "docs/diagrams",
-      "label": "docs/diagrams",
-      "hidden": true
-    },
-    {
       "id": "markup/src",
       "label": "markup/src",
       "hidden": true
     },
     {
-      "id": "root",
-      "label": "root",
+      "id": "docs/diagrams",
+      "label": "docs/diagrams",
       "hidden": true
     },
     {
       "id": "judge",
       "label": "judge",
+      "hidden": true
+    },
+    {
+      "id": "root",
+      "label": "root",
       "hidden": true
     },
     {
@@ -41,6 +41,11 @@
     {
       "id": "docs/design",
       "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "scripts",
+      "label": "scripts",
       "hidden": true
     },
     {
@@ -61,11 +66,6 @@
     {
       "id": "markup",
       "label": "markup",
-      "hidden": true
-    },
-    {
-      "id": "scripts",
-      "label": "scripts",
       "hidden": true
     },
     {
@@ -126,7 +126,7 @@
         "scripts",
         "src/util"
       ],
-      "caption": "1/1 Split the pure judges out as @mizchi/vlmkit-judge (phase 1 of layer spl…"
+      "caption": "1/2 Split the pure judges out as @mizchi/vlmkit-judge (phase 1 of layer spl…"
     },
     {
       "value": {
@@ -163,7 +163,45 @@
       "ms": 0
     },
     {
-      "note": "1 commit · 32 files · +2709 −2122 · 13 areas, 3 import edges between them"
+      "highlight": [
+        ".claude",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src",
+        "scripts"
+      ],
+      "caption": "2/2 Move the check integrity judges into @mizchi/vlmkit-judge"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 37
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+4099 −3431"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src",
+        "scripts"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "2 commits · 37 files · +4099 −3431 · 13 areas, 3 import edges between them"
     }
   ]
 }
