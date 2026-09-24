@@ -1,19 +1,20 @@
-## PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)
+## PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2)
 
-![PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)](./change-map.gif)
+![PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2)](./change-map.gif)
 
 <details><summary>Every step</summary>
 
 ![steps](./change-map.sheet.png)
 
 ```
-PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2) — 6 steps, 3360ms, 13 nodes
- 1. [    0ms] PR #168: Scene contract, colour arithmetic and check color's ratios in @mizchi/vlmkit-judge (phase 2)
- 2. [  350ms] 1/3 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
- 3. [ 1050ms] 2/3 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
- 4. [ 1750ms] 3/3 Move check integrity's text contrast arithmetic from the page into the … · files changed = 22 · lines = +1780 −593
- 5. [ 2450ms] 3 commits · 22 files · +1780 −593 · 6 areas, 1 import edges between them
- 6. [ 3150ms] (end)
+PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2) — 7 steps, 4060ms, 13 nodes
+ 1. [    0ms] PR #168: Scene contract, colour arithmetic, and both contrast collectors moved into @mizchi/vlmkit-judge (phase 2)
+ 2. [  350ms] 1/4 Define the scene contract and move colour arithmetic into the judge (ph… · files changed = 15 · lines = +1335 −504
+ 3. [ 1050ms] 2/4 Move check color's contrast ratios from the page into the judge · files changed = 19 · lines = +1585 −530
+ 4. [ 1750ms] 3/4 Move check integrity's text contrast arithmetic from the page into the … · files changed = 22 · lines = +1780 −593
+ 5. [ 2450ms] 4/4 Run check color on a scene: vlmkit check color --elements · files changed = 24 · lines = +2243 −610
+ 6. [ 3150ms] 4 commits · 24 files · +2243 −610 · 6 areas, 1 import edges between them
+ 7. [ 3850ms] (end)
 ```
 
 </details>
