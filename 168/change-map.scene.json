@@ -1,0 +1,103 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #168: Scene contract and colour arithmetic in @mizchi/vlmkit-judge (phase 2)",
+  "layout": "grid",
+  "canvas": {
+    "width": 640,
+    "height": 360
+  },
+  "nodes": [
+    {
+      "id": "judge/src",
+      "label": "judge/src",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs",
+      "label": "docs",
+      "hidden": true
+    },
+    {
+      "id": "docs/design",
+      "label": "docs/design",
+      "hidden": true
+    },
+    {
+      "id": "judge",
+      "label": "judge",
+      "hidden": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "markup/src",
+      "to": "judge/src",
+      "hidden": true
+    }
+  ],
+  "sequence": [
+    {
+      "show": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src"
+      ],
+      "caption": "1/1 Define the scene contract and move colour arithmetic into the judge (ph…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 15
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+1335 −504"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude",
+        "docs",
+        "docs/design",
+        "judge",
+        "judge/src",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "1 commit · 15 files · +1335 −504 · 6 areas, 1 import edges between them"
+    }
+  ]
+}
