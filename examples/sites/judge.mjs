@@ -161,8 +161,35 @@ export function clean(text) {
     .replaceAll(REPO, ".");
 }
 
-/** A recorded command as a reader should see it: this checkout's absolute path as $PWD. */
-export const displayCommand = (cmd) => cmd.replaceAll(`file://${REPO}/`, "file://$PWD/").replaceAll(`${REPO}/`, "");
+/**
+ * Where a recorded absolute path sits in this repository, whichever machine recorded it: the
+ * longest tail of at least two segments that exists here, with its query or fragment kept. Null
+ * for a path outside the repository (a scratch `--output-dir`), which is shown as it was typed.
+ */
+function repoRelative(path) {
+  const [bare] = path.split(/[?#]/);
+  const parts = bare.split("/");
+  // parts[0] is the empty string before the leading slash; parts[1] is never a repo-relative path.
+  for (let i = 2; i < parts.length - 1; i++) {
+    if (existsSync(join(REPO, ...parts.slice(i)))) return path.slice(parts.slice(0, i).join("/").length + 1);
+  }
+  return null;
+}
+
+/**
+ * A recorded command as a reader should see it: a path into the repository as `$PWD/…` (a
+ * `file://` URL) or repo-relative (a bare path). The root is found from the path itself rather
+ * than from this checkout's location, so a log renders to the same bytes on every machine: the
+ * first version replaced only this checkout's root, and CI, checked out elsewhere, rendered the
+ * recording machine's `/home/user/vlmkit` verbatim and found every committed log page stale.
+ * A URL's path (`http://host/sites/docs/`) is never touched.
+ */
+export const displayCommand = (cmd) =>
+  cmd.replace(/(file:\/\/)(\/[^\s'"]+)|(^|[\s'"=])(\/[^\s'"]+)/g, (whole, scheme, url, lead, bare) => {
+    const rel = repoRelative(url ?? bare);
+    if (rel === null) return whole;
+    return scheme ? `file://$PWD/${rel}` : `${lead}${rel}`;
+  });
 
 const shellQuote = (arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
 

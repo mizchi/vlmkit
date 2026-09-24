@@ -217,6 +217,25 @@ describe("tileFile / publishedFiles / displayCommand", () => {
       "vlmkit check a11y contrast 'file://$PWD/examples/sites/docs/index.html?theme=dark'",
     );
   });
+
+  it("renders a command the same on every machine, whoever recorded it", () => {
+    // The logs were recorded at /home/user/vlmkit and CI renders them from /home/runner/work/…:
+    // replacing only this checkout's root showed the recording machine's path there, and every
+    // committed log page with a file:// command read as stale in CI.
+    assert.equal(
+      displayCommand("vlmkit check animation 'file:///Users/someone/src/vlmkit/examples/sites/magazine/index.html#note-2'"),
+      "vlmkit check animation 'file://$PWD/examples/sites/magazine/index.html#note-2'",
+    );
+    assert.equal(
+      displayCommand("vlmkit check copy index.html --manifest /home/elsewhere/vlmkit/examples/sites/docs/copy.txt"),
+      "vlmkit check copy index.html --manifest examples/sites/docs/copy.txt",
+    );
+    // Outside the repository, and a URL's path, stay as they were typed.
+    const scratch = "vlmkit check a11y contrast index.html --output-dir /tmp/scratch/a11y-contrast";
+    assert.equal(displayCommand(scratch), scratch);
+    const url = "vlmkit check integrity http://127.0.0.1:4190/sites/docs/";
+    assert.equal(displayCommand(url), url);
+  });
 });
 
 describe("renderHtml", () => {
