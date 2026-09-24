@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="144 -5 1353 384" width="1353" height="384" data-t="10360" data-duration="10360">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="144 -5 1353 384" width="1353" height="384" data-t="11060" data-duration="11060">
 <defs><marker id="arrow-1f2328" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1f2328"/></marker></defs>
 <rect x="144" y="-5" width="1353" height="384" fill="#ffffff"/>
 <g id="title" data-shape="text" transform="translate(658.5 22)"><text font-size="18" fill="#1f2328" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">PR #165: デモサイト6つと、各ページをどう判断したかの記録を Pages に公開</tspan></text></g>
@@ -27,5 +27,5 @@
 <g id="value-files-label" data-shape="text" transform="translate(1333 56)"><text font-size="12" fill="#9ca3af" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">files changed:</tspan></text></g>
 <g id="value-files" data-shape="text" transform="translate(1438.6 56)"><text font-size="14" fill="#f59e0b" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">2235</tspan></text></g>
 <g id="value-lines-label" data-shape="text" transform="translate(1333 80)"><text font-size="12" fill="#9ca3af" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">lines:</tspan></text></g>
-<g id="value-lines" data-shape="text" transform="translate(1381 80)"><text font-size="14" fill="#f59e0b" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">+95682 −306</tspan></text></g>
+<g id="value-lines" data-shape="text" transform="translate(1381 80)"><text font-size="14" fill="#f59e0b" text-anchor="start" dominant-baseline="central" font-family="system-ui, sans-serif"><tspan x="0" y="0">+95730 −308</tspan></text></g>
 </svg>
