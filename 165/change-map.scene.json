@@ -1,0 +1,574 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "diagram",
+  "title": "PR #165: デモサイト6つと、各ページをどう判断したかの記録を Pages に公開",
+  "layout": "grid",
+  "canvas": {
+    "width": 1317,
+    "height": 438
+  },
+  "nodes": [
+    {
+      "id": "examples/sites",
+      "label": "examples/sites",
+      "hidden": true
+    },
+    {
+      "id": "examples/vlmkit-intro-page",
+      "label": "examples/vlmkit-intro-page",
+      "hidden": true
+    },
+    {
+      "id": "markup/src",
+      "label": "markup/src",
+      "hidden": true
+    },
+    {
+      "id": "src/cli",
+      "label": "src/cli",
+      "hidden": true
+    },
+    {
+      "id": ".claude",
+      "label": ".claude",
+      "hidden": true
+    },
+    {
+      "id": "docs/reports",
+      "label": "docs/reports",
+      "hidden": true
+    },
+    {
+      "id": "fixtures/grounding-scenario",
+      "label": "fixtures/grounding-scenario",
+      "hidden": true
+    },
+    {
+      "id": "scripts",
+      "label": "scripts",
+      "hidden": true
+    },
+    {
+      "id": "core/src",
+      "label": "core/src",
+      "hidden": true
+    },
+    {
+      "id": "markup/markup-core",
+      "label": "markup/markup-core",
+      "hidden": true
+    },
+    {
+      "id": "ci",
+      "label": "ci",
+      "hidden": true
+    },
+    {
+      "id": "tests",
+      "label": "tests",
+      "hidden": true
+    },
+    {
+      "id": ".apm/skills",
+      "label": ".apm/skills",
+      "hidden": true
+    },
+    {
+      "id": "skills/vlmkit",
+      "label": "skills/vlmkit",
+      "hidden": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "markup/src",
+      "to": "core/src",
+      "hidden": true
+    },
+    {
+      "from": "fixtures/grounding-scenario",
+      "to": "core/src",
+      "hidden": true
+    },
+    {
+      "from": "scripts",
+      "to": "examples/sites",
+      "hidden": true
+    },
+    {
+      "from": "src/cli",
+      "to": "core/src",
+      "hidden": true
+    },
+    {
+      "from": "examples/sites",
+      "to": "scripts",
+      "hidden": true
+    },
+    {
+      "from": "examples/vlmkit-intro-page",
+      "to": "scripts",
+      "hidden": true
+    },
+    {
+      "from": "tests",
+      "to": "examples/sites",
+      "hidden": true
+    }
+  ],
+  "sequence": [
+    {
+      "show": [
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "markup/src"
+      ],
+      "caption": "1/13 Share one sampling fragment across the three style gates"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 6
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+137 −45"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "docs/reports"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "docs/reports",
+        "markup/src"
+      ],
+      "caption": "2/13 check color: stop counting collapsed <details> content as paint"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 7
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+193 −51"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "docs/reports",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "markup/src"
+      ],
+      "caption": "3/13 One --allow filter for the three style gates"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 9
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+323 −86"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "fixtures/grounding-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "caption": "4/13 grounding-scenario: the first frame and every later one, made once"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 11
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+345 −96"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "fixtures/grounding-scenario"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        ".claude"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".claude"
+      ],
+      "caption": "5/13 CLAUDE.md: the style gates share their plumbing; A12 is not rail-near-m…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 12
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+357 −97"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".claude"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "examples/sites",
+        "scripts"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "examples/sites",
+        "scripts"
+      ],
+      "caption": "6/13 examples/sites: a judgment log that keeps what was seen, not only what …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 23
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2470 −100"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "examples/sites",
+        "scripts"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "examples/sites"
+      ],
+      "caption": "7/13 judge.mjs: WebP screens, a one-time recode, and walks that say when the…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 23
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+2788 −124"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "examples/sites"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "core/src",
+        "markup/markup-core"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "core/src",
+        "markup/markup-core",
+        "markup/src"
+      ],
+      "caption": "8/13 Gates: the false reports six demo-site builders hit, each with a test"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 41
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3244 −207"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "core/src",
+        "markup/markup-core",
+        "markup/src"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "src/cli"
+      ],
+      "caption": "9/13 gates run: name each warn's page, and print warned jobs under --show-ou…"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 45
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+3368 −225"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "src/cli"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "examples/sites"
+      ],
+      "caption": "10/13 examples/sites: six demo sites, each built by an agent and judged in a …"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 1349
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+86294 −225"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "examples/sites"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "examples/vlmkit-intro-page"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "examples/vlmkit-intro-page"
+      ],
+      "caption": "11/13 Landing page: a visual review in four rounds, kept as a judgment log"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 2100
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+92994 −254"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "examples/vlmkit-intro-page"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        "ci",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        "ci",
+        "examples/sites",
+        "examples/vlmkit-intro-page",
+        "scripts",
+        "tests"
+      ],
+      "caption": "12/13 Pages: publish the demo sites and every judgment log, with a gallery"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 2231
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+95380 −303"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        "ci",
+        "examples/sites",
+        "examples/vlmkit-intro-page",
+        "scripts",
+        "tests"
+      ],
+      "ms": 0
+    },
+    {
+      "show": [
+        ".apm/skills",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "highlight": [
+        ".apm/skills",
+        ".claude",
+        "docs/reports",
+        "skills/vlmkit"
+      ],
+      "caption": "13/13 markup-assist: then look at it; the demo-sites report"
+    },
+    {
+      "value": {
+        "id": "files",
+        "label": "files changed",
+        "text": 2235
+      },
+      "ms": 0
+    },
+    {
+      "value": {
+        "id": "lines",
+        "label": "lines",
+        "text": "+95682 −306"
+      },
+      "ms": 0
+    },
+    {
+      "unhighlight": [
+        ".apm/skills",
+        ".claude",
+        "docs/reports",
+        "skills/vlmkit"
+      ],
+      "ms": 0
+    },
+    {
+      "note": "13 commits · 2235 files · +95682 −306 · 14 areas, 7 import edges between them"
+    }
+  ]
+}
