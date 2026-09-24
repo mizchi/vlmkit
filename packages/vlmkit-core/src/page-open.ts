@@ -26,7 +26,7 @@
  * delete a CSS rule), navigate to the source and *then* replace the markup, so
  * the document keeps a base URL its siblings resolve against.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Browser, Page, ViewportSize } from "playwright";
@@ -74,9 +74,27 @@ export function resolveSource(source: string): string {
   return isUrlSource(source) ? source : resolve(source);
 }
 
-/** File path or URL → a URL Playwright can navigate to. */
+/**
+ * File path or URL → a URL Playwright can navigate to.
+ *
+ * A local page is also opened in a STATE — `page.html?theme=dark`, `index.html?step=2`,
+ * `article.html#note-2` — and that suffix belongs to the page, not to the filename.
+ * `pathToFileURL` escapes `?` and `#` into the name (`index.html%3Ftheme=dark`), so every gate
+ * reported `error: file not found: index.html?theme=dark`; three of the six agents building demo
+ * sites (2026-09-23) hit it asking for a second theme or step, and worked around it with an
+ * absolute `file://` URL. The suffix is split off only when the whole string is not itself a
+ * file and the part before the `?` / `#` is, so a file that really has `?` in its name still
+ * opens as that file.
+ */
 export function sourceToUrl(source: string): string {
-  return isUrlSource(source) ? source : pathToFileURL(resolve(source)).href;
+  if (isUrlSource(source)) return source;
+  const whole = resolve(source);
+  const cut = source.search(/[?#]/);
+  if (cut > 0 && !existsSync(whole)) {
+    const file = resolve(source.slice(0, cut));
+    if (existsSync(file)) return pathToFileURL(file).href + source.slice(cut);
+  }
+  return pathToFileURL(whole).href;
 }
 
 /**

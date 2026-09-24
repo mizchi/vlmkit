@@ -41,6 +41,22 @@ describe("isUrlSource / sourceToUrl", () => {
     assert.equal(sourceToUrl("https://example.com/a"), "https://example.com/a");
     assert.equal(sourceToUrl("page.html"), pathToFileURL(resolve("page.html")).href);
   });
+
+  it("keeps a local page's query and fragment as the page's, not as part of its name", () => {
+    const dir = mkdtempSync(join(tmpdir(), "source-query-"));
+    const page = join(dir, "index.html");
+    writeFileSync(page, "<!doctype html><title>t</title>");
+    const base = pathToFileURL(page).href;
+    // Was `…/index.html%3Ftheme=dark`: "error: file not found: index.html?theme=dark".
+    assert.equal(sourceToUrl(`${page}?theme=dark`), `${base}?theme=dark`);
+    assert.equal(sourceToUrl(`${page}#note-2`), `${base}#note-2`);
+    assert.equal(sourceToUrl(`${page}?step=2#errors`), `${base}?step=2#errors`);
+    // A file that really is named with a `?` is that file, and a missing page stays missing.
+    const odd = join(dir, "what?.html");
+    writeFileSync(odd, "<!doctype html><title>t</title>");
+    assert.equal(sourceToUrl(odd), pathToFileURL(odd).href);
+    assert.equal(sourceToUrl(join(dir, "gone.html?x=1")), pathToFileURL(join(dir, "gone.html?x=1")).href);
+  });
 });
 
 describe("openSource / openHtml (real browser)", () => {

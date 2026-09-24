@@ -28,9 +28,8 @@
  *   vlmkit check design <html-or-url> [--min-reuse 3] [--json] [--advisory]
  */
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -761,8 +760,9 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
     if (options.har) {
       await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     }
+    // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
-    const url = isUrl ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await page.goto(url, {
       waitUntil: options.waitUntil ?? "networkidle",
       timeout: options.timeout ?? 30000,

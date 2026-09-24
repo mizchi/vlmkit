@@ -26,6 +26,9 @@ pub struct InteractionElementInput {
   role : String
   has_aria_expanded : Bool
   has_popup : Bool
+  /// `aria-disabled="true"` or `aria-current`: the markup says a press does nothing.
+  /// Optional so a payload from before the field still parses.
+  declares_no_op : Bool?
   tab_reachable : Bool
   /// `None` when the tab walk never reached the element, which is not the same as
   /// "reached it and found no indicator" — the rule only fires on the latter.
@@ -40,6 +43,8 @@ pub struct InteractionActivationInput {
   aria_delta_empty : Bool
   aria_delta_has_expanded : Bool
   layout_changed : Bool
+  /// A live region's text changed on activation. Optional so an older payload still decodes.
+  live_region_changed : Bool?
   focus_moved : Bool
   focus_moved_within : Bool
   broken_controls_id : String?
@@ -129,8 +134,14 @@ pub fn interaction_issues(
           activation.key != "ArrowDown" &&
           activation.aria_delta_empty &&
           !(activation.layout_changed) &&
+          // An announcement is an observable response: a pager that swaps its rows and says
+          // "Showing 7–12 of 12 orders" was reported dead because its layout did not change.
+          !(activation.live_region_changed is Some(true)) &&
           !(activation.focus_moved) &&
-          !(element.has_aria_expanded) {
+          !(element.has_aria_expanded) &&
+          // A disabled Previous on page 1, or the current page's own button, is right to do
+          // nothing — and says so in its markup.
+          !(element.declares_no_op is Some(true)) {
           issues.push(issue("inert-control", "warn", i, key=Some(activation.key)))
         }
         if element.tab_reachable && element.focus_indicator is Some(false) {

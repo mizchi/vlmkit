@@ -122,11 +122,25 @@ export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
     const pos = getComputedStyle(p).position;
     if (pos === "fixed" || pos === "sticky") { pinned = true; break; }
   }
+  // Where the element sits in the DOCUMENT, not on the screen. Each Tab scrolls the next element
+  // into view, so two successive viewport positions are taken in two different scroll states and a
+  // move down a long page reads as a move up: five agents building five different pages reported
+  // the same "[reverse] Focus moved up by 424px" for forward moves (2026-09-23). The window's
+  // scroll and every scrolled ancestor's are added back, so a list in its own scroller compares in
+  // its content's coordinates. A pinned element keeps its screen position; the analyzer already
+  // declines to read order across one.
+  let sx = 0, sy = 0;
+  if (!pinned) {
+    sx = window.scrollX; sy = window.scrollY;
+    for (let p = el.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      sx += p.scrollLeft; sy += p.scrollTop;
+    }
+  }
   return {
     path: shortPath(el),
     tag: el.tagName.toLowerCase(),
     text,
-    bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
+    bbox: { x: r.x + sx, y: r.y + sy, width: r.width, height: r.height },
     tabindexAttr: el.getAttribute("tabindex"),
     pinned,
   };
@@ -252,19 +266,11 @@ export async function runFocusOrder(
     const shot = join(outputDir, "page.png");
     await page.screenshot({ path: shot, fullPage: false });
 
-    // Start from the document. The first Tab moves focus to the
-    // earliest focusable element. We capture activeElement after
-    // each press until either the focus cycles back to the first
-    // element or we hit `maxSteps`.
-    let firstPath: string | null = null;
-    for (let i = 0; i < maxSteps; i++) {
-      await page.keyboard.press("Tab");
-      const sample = await page.evaluate(A11Y_FOCUS_ORDER_SAMPLE_SCRIPT) as Omit<FocusStep, "tabIndex"> | null;
-      if (!sample) break;
-      if (firstPath === null) firstPath = sample.path;
-      else if (sample.path === firstPath && i > 0) break;  // cycled
-      steps.push({ tabIndex: i, ...sample });
-    }
+    // Start from the document and Tab until focus cycles or `maxSteps`. This used to be a second
+    // copy of `collectFocusStepsOnPage` with the cycle test that function had already outgrown —
+    // path alone — so a page whose first stop shares its path with a later one (eight `button`s in
+    // eight `p`s) stopped after ONE step and reported a clean order for a page it never walked.
+    steps.push(...(await collectFocusStepsOnPage(page, maxSteps)));
     await page.close();
     return shot;
   });

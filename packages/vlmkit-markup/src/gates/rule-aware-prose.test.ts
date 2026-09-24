@@ -296,7 +296,7 @@ describe("check scroll", () => {
 describe("scan scroll", () => {
   const report = {
     source: "p.html", page: { viewportWidth: 1280, viewportHeight: 720, scrollWidth: 1400, scrollHeight: 2000, horizontalOverflow: 120, verticalScroll: 1280 },
-    containers: [], deadScrollports: [], clipped: [], expectedScrollports: [],
+    containers: [], deadScrollports: [], clipped: [], visuallyHidden: 0, expectedScrollports: [],
     issues: [{ kind: "page-overflow-x", severity: "suspect", message: "page scrolls 120px sideways", selector: ".hero" }],
   };
 

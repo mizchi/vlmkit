@@ -37,13 +37,12 @@
  * CLI:
  *   vlmkit check interactions <html> [--reference <html>] [--max-elements 30] [--json]
  */
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { callMarkupCoreJson } from "../markup-core-runtime.ts";
+import { ACCESSIBLE_NAME_JS } from "./accessible-name.ts";
 import type { Page } from "playwright";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
@@ -110,6 +109,12 @@ export interface InteractionElement {
   path: string;
   hasAriaExpanded: boolean;
   hasPopup: boolean;
+  /**
+   * The markup says pressing it does nothing: `aria-disabled="true"`, or `aria-current` (the page
+   * or step it names is already the current one). A pager's disabled Previous and its current
+   * page button were reported as dead controls on every run of the dashboard demo (2026-09-23).
+   */
+  declaresNoOp?: boolean;
   tabReachable: boolean;
   /** null when the tab walk never reached it. */
   focusIndicator: boolean | null;
@@ -155,14 +160,16 @@ export interface InteractionIssue {
  */
 export const DISCOVER_SCRIPT = `
 (() => {
+  ${ACCESSIBLE_NAME_JS}
   const IMPLICIT = new Map([
     ["button", "button"], ["summary", "button"], ["select", "combobox"], ["textarea", "textbox"],
   ]);
   const INPUT_ROLES = new Map([
     ["checkbox", "checkbox"], ["radio", "radio"], ["button", "button"], ["submit", "button"],
     ["range", "slider"], ["text", "textbox"], ["email", "textbox"], ["search", "searchbox"],
+    ["tel", "textbox"], ["url", "textbox"], ["password", "textbox"], ["number", "spinbutton"],
   ]);
-  const EXPLICIT = new Set(["button", "tab", "checkbox", "switch", "radio", "menuitem", "combobox", "link", "option", "slider", "textbox", "searchbox", "listbox", "grid"]);
+  const EXPLICIT = new Set(["button", "tab", "checkbox", "switch", "radio", "menuitem", "combobox", "link", "option", "slider", "spinbutton", "textbox", "searchbox", "listbox", "grid"]);
   const focusStyleFingerprint = (root) => {
     // The focus indicator is often drawn on a DESCENDANT (APG wraps tab
     // text in <span class="focus"> and sets outline:none on the button).
@@ -196,12 +203,7 @@ export const DISCOVER_SCRIPT = `
     seen.add(el);
     const ix = out.length;
     el.setAttribute("data-vlmkit-ix", String(ix));
-    const name = (el.getAttribute("aria-label")
-      || (el.getAttribute("aria-labelledby") || "").split(/\\s+/).map((id) => document.getElementById(id)?.textContent || "").join(" ").trim()
-      || el.textContent
-      || el.getAttribute("value")
-      || el.getAttribute("placeholder")
-      || "").replace(/\\s+/g, " ").trim().slice(0, 80);
+    const name = accessibleName(el).slice(0, 80);
     const parts = [];
     let cur = el;
     while (cur && cur !== document.body && parts.length < 4) {
@@ -218,6 +220,8 @@ export const DISCOVER_SCRIPT = `
       path: parts.join(">"),
       hasAriaExpanded: el.hasAttribute("aria-expanded"),
       hasPopup: el.hasAttribute("aria-haspopup"),
+      declaresNoOp: el.getAttribute("aria-disabled") === "true"
+        || (el.hasAttribute("aria-current") && el.getAttribute("aria-current") !== "false"),
       blurredStyle: focusStyleFingerprint(el),
     });
   }
@@ -238,10 +242,17 @@ const FOCUS_SAMPLE_SCRIPT = `
     const s = getComputedStyle(n);
     return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor].join(",");
   }).join("|");
+  // The focused NODE, stamped the first time it is sampled. This was tag#id:text, so a button that
+  // renames itself on activation ("Copy" -> "Copied") read as focus moving to another element.
+  let token = el.getAttribute("data-vlmkit-focus");
+  if (!token) {
+    token = String(document.querySelectorAll("[data-vlmkit-focus]").length + 1);
+    el.setAttribute("data-vlmkit-focus", token);
+  }
   return {
     ix: owner ? Number(owner.getAttribute("data-vlmkit-ix")) : null,
     direct,
-    fingerprint: el.tagName + "#" + (el.id || "") + ":" + (el.textContent || "").trim().slice(0, 24),
+    fingerprint: token,
     focusedStyle,
   };
 })()
@@ -282,7 +293,11 @@ function ariaSnapshotScript(index: number): string {
   return {
     expanded: el.getAttribute("aria-expanded"),
     selected: el.getAttribute("aria-selected"),
-    checked: el.getAttribute("aria-checked"),
+    // A native checkbox or radio carries its state in .checked, not in an attribute: a terms box
+    // ticked with Space changed nothing this read, and was reported as a dead control.
+    checked: el.hasAttribute("aria-checked") || !(el.type === "checkbox" || el.type === "radio")
+      ? el.getAttribute("aria-checked")
+      : (el.indeterminate ? "mixed" : String(el.checked)),
     pressed: el.getAttribute("aria-pressed"),
     open: owner ? owner.hasAttribute("open") : null,
     controls,
@@ -479,6 +494,7 @@ export function deriveInteractionIssues(map: InteractionMapResult): InteractionI
       role: el.role,
       has_aria_expanded: el.hasAriaExpanded,
       has_popup: el.hasPopup,
+      declares_no_op: el.declaresNoOp === true,
       tab_reachable: el.tabReachable,
       focus_indicator: el.focusIndicator ?? undefined,
       activation: el.activation
@@ -487,6 +503,7 @@ export function deriveInteractionIssues(map: InteractionMapResult): InteractionI
           aria_delta_empty: Object.keys(el.activation.ariaDelta).length === 0,
           aria_delta_has_expanded: "expanded" in el.activation.ariaDelta,
           layout_changed: el.activation.layoutChanged,
+          live_region_changed: el.activation.liveRegionChanged === true,
           // The rules ask "did focus move", not where to. `focusMovedTo` is a
           // discovery index and 0 is a valid one, so this must compare to null
           // rather than test truthiness.
@@ -668,6 +685,7 @@ interface DiscoveredElement {
   path: string;
   hasAriaExpanded: boolean;
   hasPopup: boolean;
+  declaresNoOp: boolean;
   blurredStyle: string;
 }
 
@@ -678,7 +696,7 @@ interface DiscoveredElement {
  * `domcontentloaded` for an app whose first paint is what matters.
  */
 async function gotoSource(page: Page, source: string, pageLoad: PageLoadOptions = {}): Promise<void> {
-  const url = /^(https?|file):\/\//.test(source) ? source : pathToFileURL(resolve(source)).href;
+  const url = sourceToUrl(source);
   await applyHar(page, pageLoad.har);
   await page.goto(url, navigationOptions(pageLoad, "load"));
   await settlePage(page);
@@ -817,6 +835,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
         path: d.path,
         hasAriaExpanded: d.hasAriaExpanded,
         hasPopup: d.hasPopup,
+        ...(d.declaresNoOp ? { declaresNoOp: true } : {}),
         tabReachable: tabReached.has(d.index),
         focusIndicator: tabReached.has(d.index) ? tabReached.get(d.index) ?? null : null,
         ...(activation ? { activation } : {}),

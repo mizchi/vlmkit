@@ -30,13 +30,11 @@
  * Integration:
  *   vlmkit check interactions <html> --handlers   (adds surface + cross-check issues)
  */
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
@@ -1968,9 +1966,7 @@ async function probeTouches(
   try {
     await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
-    const url = /^(https?|file):\/\//.test(options.source)
-      ? options.source
-      : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await applyHar(page, options.har);
     await page.goto(url, navigationOptions(options, "load"));
     await settlePage(page);
@@ -2729,9 +2725,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     // and every patch is a chance to alter the page.
     if (anyProbe) await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
-    const url = /^(https?|file):\/\//.test(options.source)
-      ? options.source
-      : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await applyHar(page, options.har);
     // `load` remains the default here (not networkidle): the settle below waits
     // for network idle with a bound, so this gate already survives a page that

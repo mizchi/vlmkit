@@ -127,6 +127,14 @@ export interface ScrollScanReport {
   deadScrollports: { selector: string; overflowX: string; overflowY: string }[];
   /** overflow: hidden/clip with content overflowing past the threshold. */
   clipped: { selector: string; hiddenX: number; hiddenY: number }[];
+  /**
+   * Clipping boxes of 2px or less on both axes that were NOT reported as clipped: the
+   * visually-hidden (sr-only) pattern, whose whole purpose is text for assistive tech only.
+   * `check integrity` exempts the same shape by the same test (`srOnlyShaped`); this gate reported
+   * every one as cut-off content, so five of six demo sites (2026-09-23) carried a false-positive
+   * note per sr-only span, on the same elements the other gate had already cleared.
+   */
+  visuallyHidden: number;
   /** Ready-to-paste UI Contract scrollport expectations for the real containers. */
   expectedScrollports: UiExpectedScrollportContract[];
   issues: ScrollScanIssue[];
@@ -173,6 +181,7 @@ export function analyzeScrollSamples(
   const containers: ScrollContainer[] = [];
   const deadScrollports: ScrollScanReport["deadScrollports"] = [];
   const clipped: ScrollScanReport["clipped"] = [];
+  let visuallyHidden = 0;
 
   for (const el of input.elements) {
     const scrollX = scrollable(el.overflowX) && el.overflowAmountX >= minOverflow;
@@ -193,13 +202,17 @@ export function analyzeScrollSamples(
     }
     if ((scrollable(el.overflowX) || scrollable(el.overflowY))
       && el.overflowAmountX < minOverflow && el.overflowAmountY < minOverflow) {
-      deadScrollports.push({ selector: el.selector, overflowX: el.overflowX, overflowY: el.overflowY });
+      // A <textarea> is overflow: auto by the UA stylesheet — nobody declared a scrollport there.
+      if (el.tagName.toLowerCase() !== "textarea") {
+        deadScrollports.push({ selector: el.selector, overflowX: el.overflowX, overflowY: el.overflowY });
+      }
       continue;
     }
     const hiddenX = clipping(el.overflowX) ? el.overflowAmountX : 0;
     const hiddenY = clipping(el.overflowY) ? el.overflowAmountY : 0;
     if (hiddenX >= clipThreshold || hiddenY >= clipThreshold) {
-      clipped.push({ selector: el.selector, hiddenX, hiddenY });
+      if (el.clientWidth <= 2 && el.clientHeight <= 2) visuallyHidden++;
+      else clipped.push({ selector: el.selector, hiddenX, hiddenY });
     }
   }
   clipped.sort((a, b) => Math.max(b.hiddenX, b.hiddenY) - Math.max(a.hiddenX, a.hiddenY));
@@ -339,6 +352,7 @@ export function analyzeScrollSamples(
     containers,
     deadScrollports,
     clipped: clipped.slice(0, maxFindings),
+    visuallyHidden,
     expectedScrollports,
     issues,
   };
@@ -488,6 +502,9 @@ export function formatScrollScanReport(report: ScrollScanReport, rules?: RuleVie
   lines.push(`status: ${status}`);
   lines.push(`page: ${report.page.scrollWidth}x${report.page.scrollHeight} — horizontal overflow ${report.page.horizontalOverflow}px, vertical scroll ${report.page.verticalScroll}px`);
   lines.push(`scroll containers: ${report.containers.length} (dead scrollports ${report.deadScrollports.length}, clipped ${report.clipped.length})`);
+  if (report.visuallyHidden > 0) {
+    lines.push(`${DIM}  ${report.visuallyHidden} visually-hidden (sr-only) box(es) not reported as clipped — 2px or less on both axes, the shape check integrity exempts${RESET}`);
+  }
   if (report.containers.length > 0) {
     lines.push("");
     lines.push("Scroll containers:");

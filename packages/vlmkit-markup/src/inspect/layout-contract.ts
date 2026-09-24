@@ -36,8 +36,6 @@
  *   vlmkit check layout <html-or-url> --contract contract.json [--json]
  */
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
@@ -46,6 +44,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { FindingSeverity, RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface LayoutRect {
   left: number;
@@ -254,9 +253,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
   /** Deduped across viewports: one typo should be reported once, not once per width. */
   const invalidSelectors = new Set<string>();
   await withBrowser(async (browser) => {
-    const url = /^(https?|file):\/\//.test(options.source)
-      ? options.source
-      : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     const widths = [...new Set(options.contract.rules.map((r) => r.at))].sort((a, b) => b - a);
     for (const width of widths) {
       const height = options.heights?.[width] ?? DEFAULT_HEIGHTS[width] ?? 800;

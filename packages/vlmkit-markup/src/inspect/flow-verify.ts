@@ -23,14 +23,13 @@
  *   vlmkit verify flow <html-or-url> --flow <flow.json> [--json]
  */
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import type { Page } from "playwright";
 import { handleCliError, UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
-import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -229,7 +228,7 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
   let redirected: string | undefined;
   await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
-    const url = /^(https?|file):\/\//.test(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     await applyHar(page, options.har);
     // `load` stays this gate's default milestone — the settle below already
     // bounds a network-idle wait, which is why a flow survives a page that

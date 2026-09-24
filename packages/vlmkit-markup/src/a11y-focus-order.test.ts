@@ -290,3 +290,37 @@ describe("viewport-pinned focus steps", () => {
     assert.deepEqual(findings.map((f) => f.kind), ["reverse"]);
   });
 });
+
+/**
+ * Tab scrolls the next element into view, so positions sampled from the viewport are taken in a
+ * different scroll state each step. Five agents building five different demo sites (docs, shop,
+ * checkout, magazine, kanban) each got `[reverse] Focus moved up by …px` for forward moves on
+ * their long pages. This page is the smallest version of theirs: a column of buttons taller than
+ * the viewport, then a list inside its own scroller. DOM order and visual order agree everywhere,
+ * so any `reverse` is the gate's.
+ */
+describe("runFocusOrder on a page that scrolls while it is tabbed", () => {
+  it("reads a forward move down a long page, and down a scrolled list, as forward", async () => {
+    const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { runFocusOrder } = await import("./a11y-focus-order.ts");
+    const dir = mkdtempSync(join(tmpdir(), "focus-scroll-"));
+    try {
+      const column = Array.from({ length: 8 }, (_, i) => `<p style="height:160px;margin:0"><button>Step ${i}</button></p>`).join("");
+      const list = Array.from({ length: 8 }, (_, i) => `<div style="height:40px"><button>Item ${i}</button></div>`).join("");
+      writeFileSync(
+        join(dir, "page.html"),
+        `<!doctype html><html><head><meta charset="utf-8"><title>t</title></head><body style="margin:0">
+          <main>${column}</main><div id="scroller" style="height:120px;overflow:auto">${list}</div></body></html>`,
+      );
+      const report = await runFocusOrder({ source: join(dir, "page.html"), outputDir: join(dir, "out"), quiet: true });
+      assert.equal(report.steps.length, 16, "every button was reached");
+      assert.deepEqual(report.findings.filter((f) => f.kind === "reverse").map((f) => f.message), []);
+      const ys = report.steps.map((s) => s.bbox.y);
+      assert.deepEqual(ys, [...ys].sort((a, b) => a - b), "positions only ever increase down the page");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

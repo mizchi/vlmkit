@@ -201,3 +201,24 @@ test("does not sum overlapping relief into a claim larger than the overflow", ()
   assert.ok(issue);
   assert.doesNotMatch(issue!.message, /no single element relieves/);
 });
+
+/**
+ * Five of six demo sites (2026-09-23) carried a false-positive note per screen-reader-only span:
+ * `! clipped-content #meta-SB-103 > span:nth-of-type(5): … clips 173px of its content behind
+ * overflow: hidden`, on the same elements `check integrity` exempted as the sr-only pattern. And
+ * a checkout's plain <textarea> came back as a "dead scrollport" for the UA's own overflow: auto.
+ */
+test("the sr-only box is not cut-off content, and a textarea is not a declared scrollport", () => {
+  const report = analyzeScrollSamples(input({
+    elements: [
+      el({ selector: "span.sr-only", overflowX: "hidden", overflowY: "hidden", overflowAmountX: 173, overflowAmountY: 18, clientWidth: 1, clientHeight: 1 }),
+      el({ selector: "div.card", overflowX: "hidden", overflowY: "hidden", overflowAmountX: 0, overflowAmountY: 40, clientWidth: 300, clientHeight: 120 }),
+      el({ selector: "textarea#notes", tagName: "TEXTAREA", overflowX: "auto", overflowY: "auto", overflowAmountX: 0, overflowAmountY: 0 }),
+      el({ selector: "div.panel", overflowX: "visible", overflowY: "auto", overflowAmountX: 0, overflowAmountY: 0 }),
+    ],
+  }));
+  assert.deepEqual(report.clipped.map((c) => c.selector), ["div.card"], "a real clip still reports");
+  assert.equal(report.visuallyHidden, 1);
+  assert.deepEqual(report.deadScrollports.map((d) => d.selector), ["div.panel"], "an authored dead scrollport still reports");
+  assert.match(formatScrollScanReport(report), /1 visually-hidden \(sr-only\) box\(es\) not reported as clipped/);
+});
