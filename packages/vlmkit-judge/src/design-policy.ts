@@ -56,6 +56,48 @@ export interface DesignSample {
   described: string;
 }
 
+/**
+ * One element's style as a collector resolved it: the numbers, not the signature.
+ *
+ * **The collector resolves, the judge decides.** The page used to join these into the
+ * `signature` / `boxSignature` / `described` strings itself, which meant only a browser could
+ * produce a sample. It now ships the fields and `designSample` builds the strings, so a scene
+ * from any renderer is compared in the same signature space.
+ */
+export interface DesignStyleSample {
+  role: string;
+  selector: string;
+  /** top, right, bottom, left — px, one decimal. */
+  padding: [number, number, number, number];
+  /** Top-left corner radius, px. */
+  radius: number;
+  /** Top border width, px. */
+  borderWidth: number;
+  /** As the renderer serialises it; compared as a string, so one renderer, one spelling. */
+  background: string;
+  fontSize: number;
+  /** As serialised (`"400"`, `"700"`). */
+  fontWeight: string;
+  /** Paints no text whose size or weight the font controls — see `DesignSample.textFree`. */
+  textFree: boolean;
+}
+
+/** The signature strings `COLLECT_DESIGN_SAMPLES` used to build in the page, byte for byte. */
+export function designSample(s: DesignStyleSample): DesignSample {
+  const box = [...s.padding, s.radius, s.borderWidth, s.background];
+  const font = [s.fontSize, s.fontWeight];
+  return {
+    role: s.role,
+    selector: s.selector,
+    boxSignature: box.join("|"),
+    signature: box.concat(font).join("|"),
+    textFree: s.textFree,
+    described: "padding " + box.slice(0, 4).join("/") + ", radius " + box[4]
+      + ", " + (s.textFree ? "no painted text" : font[0] + "px/" + font[1])
+      + ", border " + box[5] + ", bg " + box[6],
+  };
+}
+
 export interface DesignSpacingSample {
   selector: string;
   property: string;
@@ -63,7 +105,11 @@ export interface DesignSpacingSample {
 }
 
 export interface DesignPolicyInput {
-  samples: DesignSample[];
+  /**
+   * Style facts from a collector, or signatures already built — the shape this field had
+   * before the strings moved here, still accepted so a saved snapshot judges the same.
+   */
+  samples: (DesignStyleSample | DesignSample)[];
   spacing: DesignSpacingSample[];
   /**
    * Elements skipped because no role could be inferred deterministically.
@@ -321,9 +367,13 @@ ON A SMALL ROLE, PASS --min-instances TOO. Allowing 1 of 3 leaves 2, under the d
 cannot reach 3x however low the instance floor goes.`
 
 export function judgeDesignPolicy(
-  input: DesignPolicyInput,
+  rawInput: DesignPolicyInput,
   options: DesignJudgeOptions = {},
 ): Omit<DesignPolicyReport, "source"> {
+  const input = {
+    ...rawInput,
+    samples: rawInput.samples.map((sample) => "signature" in sample ? sample : designSample(sample)),
+  };
   const minReuse = options.minReuse ?? DEFAULT_MIN_REUSE;
   const minInstances = options.minInstances ?? DEFAULT_MIN_INSTANCES;
   const outlierMax = options.outlierMaxUses ?? DEFAULT_OUTLIER_MAX_USES;

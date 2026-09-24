@@ -36,7 +36,7 @@ import { compileScene, SceneValidationError } from "./compile/index.ts";
 import { checkDiffExpectation, DIFF_SHEET, diffFacts, diffScene, formatDiffFacts, type DiffExpectation } from "./diff.ts";
 import { formatImport, importMermaid, mermaidSource, type ImportAs } from "./import/mermaid.ts";
 import { checkExpectation, EXPECT_SHEET, formatCompared, sceneFacts, validateExpectation, type Expectation } from "./expect.ts";
-import { changeMapScene, workspaceExpectation, workspaceScene } from "./generators/git.ts";
+import { changeMapMermaid, changeMapScene, workspaceExpectation, workspaceMermaid, workspaceScene } from "./generators/git.ts";
 import { importFacts } from "./generators/imports.ts";
 import { renderFrameSvg, sampleTimes } from "./render-svg.ts";
 import { RUNTIME_SOURCE, renderEmbedHtml } from "./runtime.ts";
@@ -111,11 +111,12 @@ Commands
                                   what is directly inside them, nesting, arrows tail->head, what is lit, defects),
                                   <name>.facts.json (what the scene draws); a reading is scored name by name into
                                   <name>.still-score.md — read / missed / invented / reversed / misplaced.
-  repo [--root .] [--out dir] [--title T] [--no-images]
+  repo [--root .] [--out dir] [--title T] [--no-images | --mermaid]
                                   The workspace's architecture as an animation: packages appear layer by layer
                                   with the dependencies that place them there. Writes <out>/repo.scene.json,
                                   repo.gif, repo.sheet.png, repo.md (the explain text with both images embedded)
                                   and repo.expect.json (the fact sheet a hand-drawn map is checked against).
+                                  --mermaid writes only repo.md: the layers as a mermaid flowchart, no browser.
   import mermaid <diagram.mmd | page.md> [--as diagram|flowchart|modules] [--nth N] [--title T] [--out scene.json]
                                   A mermaid diagram (or the first \`\`\`mermaid fence of a Markdown page, --nth for
                                   another) as a scene: flowchart / graph → \`flowchart\` when it has a decision {}
@@ -136,10 +137,12 @@ Commands
                                   relative import that crosses from one to another is a dependency "a->b". Test
                                   files are skipped unless --tests. Prints the sheet when --out is not given, so a
                                   map drawn by hand from the code is checked against the code.
-  pr --base <ref> [--head HEAD] [--root .] [--out dir] [--title T] [--name pr] [--no-images]
+  pr --base <ref> [--head HEAD] [--root .] [--out dir] [--title T] [--name pr] [--no-images | --mermaid]
                                   The change map of base..head: one beat per commit, the areas it touched light
                                   up, import edges between changed areas, running file / line counts. Same four
-                                  files, named <name>.*; paste <name>.md into the pull request.
+                                  files, named <name>.*; paste <name>.md into the pull request. --mermaid writes
+                                  only <name>.md: the areas and their import edges as a mermaid flowchart and the
+                                  commits as a table — renders inline on GitHub, needs no browser.
   schema [--kind <kind>]          The writing guide: field list and a minimal example for a kind, or the index.
 
 Options
@@ -320,6 +323,29 @@ export async function runAnimCli(argv: string[]): Promise<number> {
     const root = resolve(readFlag(rest, "--root") ?? ".");
     const name = readFlag(rest, "--name") ?? verb;
     const out = readFlag(rest, "--out") ?? join(".vlmkit-anim", name);
+    if (hasFlag(rest, "--mermaid")) {
+      // Markdown with a mermaid flowchart: what this repository posts and commits, because it
+      // renders inline on GitHub and reads without playing anything. No browser, no images.
+      let markdown: string;
+      let summary: Record<string, unknown> = {};
+      if (verb === "repo") markdown = workspaceMermaid(root, readFlag(rest, "--title"));
+      else {
+        const base = readFlag(rest, "--base");
+        if (!base) throw new UsageError("vlmkit-anim pr needs --base <ref> (the branch or commit the changes are against, e.g. --base origin/main)");
+        const map = changeMapMermaid({ root, base, head: readFlag(rest, "--head"), title: readFlag(rest, "--title") });
+        markdown = map.markdown;
+        summary = { commits: map.summary.commits.length, files: map.summary.files, added: map.summary.added, removed: map.summary.removed, areas: map.summary.areas };
+      }
+      const mdPath = join(out, `${name}.md`);
+      await mkdir(out, { recursive: true });
+      await writeFile(mdPath, markdown);
+      if (json) console.log(JSON.stringify({ ok: true, files: [mdPath], ...summary }, null, 2));
+      else {
+        console.log(`${name}: ${mdPath}`);
+        if (summary.commits !== undefined) console.log(`  ${summary.commits} commit(s), ${summary.files} file(s), +${summary.added} −${summary.removed}, ${(summary.areas as string[]).length} area(s)`);
+      }
+      return 0;
+    }
     let scene: Scene;
     let summary: Record<string, unknown> = {};
     if (verb === "repo") scene = workspaceScene(root, readFlag(rest, "--title"));

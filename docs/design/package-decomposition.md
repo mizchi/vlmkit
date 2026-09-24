@@ -45,6 +45,22 @@ named corresponds to one layer:
 | Generation loop + eval datasets | `vlmkit-markup` (what remains), `heal`, `generate`, `plan` | agents converge markup against the gates |
 | Diagrams for explanation | `vlmkit-anim` (+ d2 skills), phase 5 | separate library |
 
+How one check runs across those layers once phase 2 is done — two sources, one judge:
+
+```mermaid
+flowchart LR
+  subgraph browser["browser (Playwright driver)"]
+    page["page"] --> collect["COLLECT_* script<br/>resolves colours, boxes, styles"]
+  end
+  subgraph other["any other renderer"]
+    engine["game engine / canvas"] --> scene["scene JSON<br/>(--elements)"]
+  end
+  collect -->|"samples"| judge
+  scene -->|"sceneTo*Input"| judge
+  judge["@mizchi/vlmkit-judge<br/>pure: composites, measures, decides"] --> report["findings + verdict"]
+  report --> fmt["formatter · ledger · exit code<br/>(core plugin runner)"]
+```
+
 ## Phase 1 (done): `@mizchi/vlmkit-judge`
 
 Moved, with every original path re-exporting the moved symbols:
@@ -100,6 +116,46 @@ depends on nothing.
 
 ## Phase 2: the snapshot is the contract (collector ↔ judge)
 
+Status: the contract and the colour arithmetic landed. What is left is below the first
+"Next" heading.
+
+### What landed
+
+- **The scene contract is the image-mode elements file.** `@mizchi/vlmkit-judge/scene.ts`
+  defines `SceneElement`. It is the `--elements` JSON that `check integrity` and `check copy`
+  already accepted in image mode, which is itself a superset of `diff png --elements-json`.
+  So no second shape exists, and an engine that already emits the file speaks the contract.
+  New optional fields carry paint (`color`, `background`, `background_image`, `opacity`,
+  `text_shadow`, `disabled`) and type (`font_size`, `font_weight`, `heading`, `border`,
+  `radius`). The parser, the integrity adapter (`judgeSceneIntegrity`) and the skipped-rule
+  list moved there from `integrity-image.ts`, which is now the 112-line half that reads files.
+- **Two adapters out of the contract**: `judgeSceneIntegrity` for `check integrity`, and
+  `sceneToCompositionInput` for `check composition`. **One adapter into it**:
+  `sceneFromTree` flattens an engine-style graph (positions local to the parent) into frame
+  space. `scene-graph.test.ts` now uses the library adapters, not an inline one.
+- **`@mizchi/vlmkit-judge/color.ts`**: `parseColor` (resolved colours only), `blendColor`,
+  `contrastRatio`, `compositeBackground`, `textContrastFloor`, `measureTextContrast`. These are
+  the page's own functions, including the 0.03928 threshold and the output rounding.
+- **The rule, end to end, in one place.** Image mode now runs `invisible-text` and
+  `low-contrast-text` whenever text elements carry `color`. The engine hands over the RGBA it
+  paints, and the judge composites and measures. An elements file without paint reports
+  byte-for-byte what it did before, skipped-rule order included.
+- **Held to the browser by a test, not by care.** `vlmkit-markup/src/contrast-parity.test.ts`
+  runs `CONTRAST_BACKGROUND_JS`'s functions in Node against `color.ts` over a grid of
+  inputs. It then runs the real `COLLECT_TEXT_CONTRAST` on a page, collects the same page as a
+  scene, and requires identical candidates (colours, ratio, floor, font size). A mutation
+  check confirms it bites: dropping opacity from `measureTextContrast` fails it on the one
+  faded element.
+
+One deliberate difference from the page: a browser composites a missing background over
+white, because white is what it paints under an unpainted document. A scene has no such
+default (an engine's clear colour is whatever it is). So a text element with no opaque
+background on itself or a recorded ancestor is **refused and listed**, not measured against
+a white the frame may not contain.
+
+### Next
+
+
 For a game's scene graph to use the judges, the snapshot has to hold **facts**,
 not conclusions the browser already reached. Today the boundary is wherever it
 was convenient:
@@ -121,13 +177,64 @@ gamut mapping. That was the fix that took `check a11y contrast` from 10 to 501
 inspected elements on tailwindcss.com. A pure judge must not try to redo it.
 The rule: **the collector resolves, the judge decides.**
 
-Then define the scene contract once. It's roughly the union of
-`CompositionBox`, `DesignSample` and `ColorUse`: `{ path, parent, role, rect,
-position, font{size,weight}, paint{bg,fg,border,radius}, text{len,leaf} }`.
-Ship two adapters for it: the DOM collector, and a scene-graph one, the adapter
-that `scene-graph.test.ts` currently keeps inline. Integrity's inputs are the ones that will stress that
-contract (occlusion, clipping, text collision), and `integrity-image.ts`'s
-element-rect JSON is the existing non-DOM shape to reconcile it with.
+Still to do on the DOM side:
+
+- ~~Move the in-page ratios out of `COLLECT_COLOR_ROLES`.~~ Done. The collector now ships
+  `ControlSample` (the composited surface behind the field, its own fill, each painted
+  border's colour) and `LinkSample` (both inks, and the surface under them or `null` over
+  an image). The judge's `controlBoundary` / `linkCue` compute `fillRatio`, `borderRatio`,
+  `best` and `vsBody` with `color.ts`. `judgeColorRoles` still accepts the old measured rows,
+  so a saved snapshot judges the same. **Proof that nothing moved:** `check color --json` on
+  15 pages (css-challenge fixtures, the demo sites, a composition fixture; 17 controls and
+  ~200 links, several with findings) was byte-identical before and after. What stays in the
+  page is compositing the palette's ink rows (`hex(blendColor(behind.bg, fg))`). That is an
+  aggregation keyed by the painted colour, not a verdict, and moving it would mean shipping
+  every box.
+- ~~`COLLECT_TEXT_CONTRAST` ships ratios.~~ Done. It now ships `TextContrastSample`s: the
+  text's resolved colour, the background layers behind it (innermost first, from the new
+  in-page `textBackgroundLayers`), its inherited opacity, font size and weight, and the
+  disabled / shadowed flags, or `composite: true` over an image. The judge's
+  `textContrastCandidates` composites, measures, applies the WCAG floor and the 60-candidate
+  cap. The scene adapter builds the same samples and goes through the same function, so the
+  page and a scene no longer have two loops. **Proof that nothing moved:** `check integrity
+  --json` on 16 pages was byte-identical before and after. One of those pages was built to
+  cross the cap: 80 low-contrast rows, with text over gradients before and after the 60th
+  candidate. Between them the 16 pages have 32 contrast findings and 27 contrast exemptions.
+- ~~A scene adapter for `check color`.~~ Done: `vlmkit check color --elements scene.json`.
+  The scene declares what a DOM infers from tags: `role: field | link | button`. It adds the
+  few facts the two rules read: `border` + `border_color`, `underline`, `shadow` /
+  `outline`. A link's flow is its nearest recorded ancestor, and that ancestor's own `text`
+  is the prose. `sceneToColorRolesInput` builds the same `ColorRolesInput` the collector
+  returns, so the judge cannot tell the sources apart.
+
+  Two refusals differ from the page. A field with nothing opaque behind it lands in
+  `controlsSkipped` with that reason. A link whose flow has nothing opaque behind it gets
+  `behind: null`, which the judge already treats as unmeasurable. Neither is measured
+  against a white the frame may not contain.
+
+  **Held to the page by a test:** `contrast-parity.test.ts` renders four fields and three
+  prose links. It collects them with the real `COLLECT_COLOR_ROLES` and also as a scene with
+  roles taken from tags, and requires identical `onHex` / `fillRatio` / `borderRatio` /
+  `best` / `vsBody` / cues and identical findings. Dropping the adapter's `underline`
+  mapping fails it.
+- Replace the five TypeScript copies of contrast/luminance (`asset-check`,
+  `component-from-image` ×2, `spec-checks`, `page-compose-diff`) with `color.ts`. Check each
+  one's threshold first: not all of them use 0.03928.
+- Let the DOM collectors emit `SceneElement`s directly, so one page collection feeds
+  integrity, composition and colour. That is the "collect once, judge many" of phase 3.
+- ~~A `DesignSample` adapter for `check design`.~~ Done: `vlmkit check design --elements`.
+  The judge now builds the signature: `COLLECT_DESIGN_SAMPLES` ships `DesignStyleSample`
+  facts (padding, radius, border width, background, font size and weight, text-free), and
+  `designSample` joins them into the `signature` / `boxSignature` / `described` strings the
+  page used to build. Old-shape samples are still accepted. **`check design --json` on 16
+  pages is byte-identical before and after**; between them those pages have 117 roles, with
+  both drift and coherent verdicts.
+
+  `sceneToDesignPolicyInput` groups elements by `role` (free-form here, as an ARIA role is)
+  or heading level. It serialises backgrounds the way Chromium does, so `#3b82f6` and
+  `rgb(59, 130, 246)` land in one signature. `design-scene-parity.test.ts` runs the real
+  collector and the scene adapter on one page and requires identical roles, reuse, and drift
+  messages (the dominant style spelled out). Dropping the adapter's radius mapping fails it.
 
 Next judges to move, ranked by pure functions already exported:
 

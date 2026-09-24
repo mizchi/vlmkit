@@ -10,6 +10,7 @@
  *   vlmkit check design <html-or-url> [--min-reuse 3] [--json] [--advisory]
  */
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
@@ -26,6 +27,8 @@ import {
   type DesignPolicyInput,
   type DesignPolicyReport,
 } from "@mizchi/vlmkit-judge/design-policy.ts";
+
+import { parseSceneElements, sceneToDesignPolicyInput } from "@mizchi/vlmkit-judge/scene.ts";
 
 export * from "@mizchi/vlmkit-judge/design-policy.ts";
 
@@ -145,23 +148,19 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
     // Rendered height is deliberately NOT in the signature: a button that is
     // taller only because its label wrapped is not a design inconsistency.
     //
-    // Split into box and font halves so the judge can compare a text-free
-    // element on the box alone; the joined string is still the signature.
-    const box = [
-      px(cs.paddingTop), px(cs.paddingRight), px(cs.paddingBottom), px(cs.paddingLeft),
-      px(cs.borderTopLeftRadius), px(cs.borderTopWidth), cs.backgroundColor,
-    ];
-    const font = [px(cs.fontSize), cs.fontWeight];
-    const textFree = !paintsText(el);
+    // The style FACTS, not the signature: the judge's designSample() joins them
+    // (box and font halves, so a text-free element compares on the box alone),
+    // which is what lets a scene from another renderer be compared the same way.
     samples.push({
       role,
       selector: path(el),
-      boxSignature: box.join("|"),
-      signature: box.concat(font).join("|"),
-      textFree,
-      described: "padding " + box.slice(0, 4).join("/") + ", radius " + box[4]
-        + ", " + (textFree ? "no painted text" : font[0] + "px/" + font[1])
-        + ", border " + box[5] + ", bg " + box[6],
+      padding: [px(cs.paddingTop), px(cs.paddingRight), px(cs.paddingBottom), px(cs.paddingLeft)],
+      radius: px(cs.borderTopLeftRadius),
+      borderWidth: px(cs.borderTopWidth),
+      background: cs.backgroundColor,
+      fontSize: px(cs.fontSize),
+      fontWeight: cs.fontWeight,
+      textFree: !paintsText(el),
     });
   }
   return { samples, spacing, skipped, skippedTags, statefulSkipped, exclusions, excludedElements };
@@ -197,18 +196,35 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
     if (redirect) {
       judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
     }
-    const report: DesignPolicyReport = { source: options.source, ...judged };
-    appendRunLedger({
-      tool: "check-design",
-      source: options.source,
-      headline: {
-        verdict: report.verdict,
-        drifting: report.findings.filter((f) => f.kind === "component-drift").length,
-        roles: report.roles.length,
-      },
-    });
-    return report;
+    return recordDesignRun({ source: options.source, ...judged });
   });
+}
+
+/**
+ * `check design --elements scene.json`: the same judge over a scene — a canvas / WebGPU
+ * frame, a native toolkit, a game HUD. No browser is started. Elements group by `role` (or
+ * a heading level), and their `padding`, `radius`, `border`, `background`, `font_size` and
+ * `font_weight` form the signature, as the page's computed style does.
+ */
+export async function runSceneDesignPolicyCheck(
+  options: DesignJudgeOptions & { elementsPath: string },
+): Promise<DesignPolicyReport> {
+  const elements = parseSceneElements(await readFile(options.elementsPath, "utf8"));
+  const judged = judgeDesignPolicy(sceneToDesignPolicyInput(elements), options);
+  return recordDesignRun({ source: options.elementsPath, ...judged });
+}
+
+function recordDesignRun(report: DesignPolicyReport): DesignPolicyReport {
+  appendRunLedger({
+    tool: "check-design",
+    source: report.source,
+    headline: {
+      verdict: report.verdict,
+      drifting: report.findings.filter((f) => f.kind === "component-drift").length,
+      roles: report.roles.length,
+    },
+  });
+  return report;
 }
 
 export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView): string {

@@ -12,7 +12,8 @@ import { afterAll, describe, it } from "vitest";
 import { checkAnimation, explain } from "../check.ts";
 import { compileScene } from "../compile/index.ts";
 import { formatDiagnostics } from "../validate.ts";
-import { areaOf, changeMapScene, readWorkspace, workspaceScene } from "./git.ts";
+import { readFileSync } from "node:fs";
+import { areaOf, changeMapMermaid, changeMapScene, readWorkspace, workspaceMermaid, workspaceScene } from "./git.ts";
 
 const REPO = resolve(import.meta.dirname!, "../../../..");
 
@@ -33,6 +34,25 @@ describe("workspaceScene", () => {
     assert.match(text, /anim → (ai, )?animation-eval/);
     // One beat per layer, not one per package, and the readout rides each beat.
     assert.ok((tl.steps ?? []).filter((s) => /packages so far = \d+/.test(s.caption ?? "")).length >= 3);
+  });
+});
+
+describe("workspaceMermaid", () => {
+  it("draws every workspace dependency as an edge, packages grouped by layer", () => {
+    const md = workspaceMermaid(REPO);
+    const fence = md.match(/```mermaid\n([\s\S]*?)```/)![1]!;
+    const ids = new Map([...fence.matchAll(/(p\d+)\["([^"]+)"\]/g)].map((m) => [m[2]!, m[1]!]));
+    for (const p of readWorkspace(REPO)) {
+      assert.ok(ids.has(p.id), `${p.id} missing`);
+      for (const d of p.deps) assert.ok(fence.includes(`  ${ids.get(p.id)} --> ${ids.get(d)}\n`), `${p.id} --> ${d}`);
+    }
+    assert.match(fence, /subgraph L0\["layer 0"\]\n\s+p\d+\["judge"\]\n\s+end/);
+  });
+
+  it("the README's workspace diagram is the current one", () => {
+    // README carries the flowchart inline; regenerate with `vlmkit-anim repo --mermaid` when a package or dependency changes.
+    const fence = workspaceMermaid(REPO).match(/```mermaid\n[\s\S]*?```/)![0];
+    assert.ok(readFileSync(join(REPO, "README.md"), "utf8").includes(fence), "README.md's ```mermaid workspace block is stale:\n" + fence);
   });
 });
 
@@ -99,6 +119,22 @@ describe("changeMapScene", () => {
     assert.deepEqual(diags, [], formatDiagnostics(diags));
     assert.ok(tl.canvas.width >= 640 && tl.canvas.height > 360, `canvas ${tl.canvas.width}×${tl.canvas.height}`);
     git("reset", "-q", "--hard", "main~1");
+  });
+
+  it("--mermaid: the same range as a flowchart of areas and a table of commits", () => {
+    const { markdown, summary } = changeMapMermaid({ root: dir, base: "main~2", head: "main", title: 'two "commits" <here>' });
+    assert.equal(summary.commits.length, 2);
+    assert.match(markdown, /^## two "commits" <here>\n/);
+    assert.match(markdown, /2 commits · 4 files · \+6 −1 · 4 areas, 1 import edge between them/);
+    const fence = markdown.match(/```mermaid\n([\s\S]*?)```/)![1]!;
+    assert.match(fence, /^flowchart LR\n/);
+    const node = (area: string) => fence.match(new RegExp(`(a\\d+)\\["${area}<br/>`))?.[1];
+    assert.ok(node("markup/src") && node("core/src"), fence);
+    assert.match(fence, new RegExp(`${node("markup/src")} -->\\|imports\\| ${node("core/src")}`));
+    assert.match(fence, /"core\/src<br\/>1 file · \+2 −1"/);
+    assert.match(markdown, /\| 1 \| `[0-9a-f]{7}` markup reads core; a guide \| `docs`, `markup\/src` \| \+3 −0 \|/);
+    assert.match(markdown, /\| 2 \| `[0-9a-f]{7}` core grows, a test \| `core\/src`, `tests` \| \+3 −1 \|/);
+    assert.equal(changeMapMermaid({ root: dir, base: "main", head: "main" }).markdown, "## Changes in main..main\n\nNo commits in `main..main`.\n");
   });
 
   it("an empty range is a scene that says so", () => {

@@ -1122,8 +1122,11 @@ Each writes four files under `--out`: `<name>.scene.json`, `<name>.gif`,
 `<name>.sheet.png` and `<name>.md` — the narration with both images embedded,
 ready to paste into a pull request. Without a browser the images are skipped
 and a `<name>.sheet.html` plus the final frame as SVG are written instead.
-The repository's `pr-visual` workflow runs `pr` on every pull request and
-keeps one comment on it up to date with the result.
+`--mermaid` writes `<name>.md` alone: the areas and their import edges as a
+mermaid flowchart and the commits as a table (for `repo`, the layers as
+subgraphs) — no browser, renders inline on GitHub. The repository's
+`pr-visual` workflow runs `pr --mermaid` on every pull request and keeps one
+comment on it up to date with the result.
 
 ## Writing a scene in TypeScript
 

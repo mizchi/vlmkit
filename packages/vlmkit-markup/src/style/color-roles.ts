@@ -7,7 +7,7 @@
  */
 
 import { resolve, dirname } from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
@@ -28,6 +28,7 @@ import {
   type ColorRolesReport,
   type ColorUse,
 } from "@mizchi/vlmkit-judge/color-roles.ts";
+import { parseSceneElements, sceneToColorRolesInput } from "@mizchi/vlmkit-judge/scene.ts";
 
 export * from "@mizchi/vlmkit-judge/color-roles.ts";
 
@@ -151,12 +152,6 @@ export const COLLECT_COLOR_ROLES = `(() => {
     if (behind.composite) { controlsSkipped.push({ selector: sel, reason: "background-image behind the control" }); continue; }
     const cs = getComputedStyle(el);
     const own = parseColor(cs.backgroundColor);
-    const fillRatio = own && own[3] > 0.05 ? contrastRatio(blendColor(behind.bg, own), behind.bg) : 0;
-    let borderRatio = 0, borderHex = null;
-    for (const b of drawnBorders(cs)) {
-      const rr = contrastRatio(blendColor(behind.bg, b.color), behind.bg);
-      if (rr > borderRatio) { borderRatio = rr; borderHex = hex(b.color); }
-    }
     // An outline only stands in for a boundary when it is actually painted. A
     // reset that writes a 1px solid TRANSPARENT outline — to reserve the space a
     // focus ring will need — would otherwise suppress a real finding, which is
@@ -166,14 +161,14 @@ export const COLLECT_COLOR_ROLES = `(() => {
     const outlinePainted = outlineW > 0
       && cs.outlineStyle !== "none" && cs.outlineStyle !== "hidden"
       && !!outlineColor && outlineColor[3] > 0.05;
+    // Resolved colours, not ratios: the judge's controlBoundary() does the arithmetic,
+    // so a control from any renderer is measured by the same code as this one.
     controls.push({
-      selector: sel, tag: tag, onHex: hex(behind.bg),
-      fillHex: own && own[3] > 0.05 ? hex(own) : null,
-      fillRatio: Math.round(fillRatio * 100) / 100,
-      borderHex: borderHex, borderRatio: Math.round(borderRatio * 100) / 100,
+      selector: sel, tag: tag, on: behind.bg,
+      fill: own && own[3] > 0.05 ? own : null,
+      borders: drawnBorders(cs).map((b) => b.color),
       hasShadow: (cs.boxShadow || "none") !== "none",
       hasOutline: outlinePainted,
-      best: Math.round(Math.max(fillRatio, borderRatio) * 100) / 100,
     });
   }
 
@@ -197,16 +192,17 @@ export const COLLECT_COLOR_ROLES = `(() => {
       if (!linkInk) continue;
       const bordered = drawnBorders(cs).length > 0;
       const fill = parseColor(cs.backgroundColor);
+      // The two inks and the surface under them; the judge's linkCue() composites and
+      // compares. A background image behind the flow is shipped as null — refused, not
+      // guessed — exactly as the ratio used to be.
       links.push({
         selector: path(a), flow: path(flow), proseChars: prose,
-        linkHex: hex(linkInk), bodyHex: hex(bodyInk),
-        vsBody: behind.composite ? null
-          : Math.round(contrastRatio(blendColor(behind.bg, linkInk), blendColor(behind.bg, bodyInk)) * 100) / 100,
+        link: linkInk, body: bodyInk,
+        behind: behind.composite ? null : behind.bg,
         underlined: (cs.textDecorationLine || "").indexOf("underline") !== -1,
         weightStep: Math.abs((Number(cs.fontWeight) || 400) - (Number(flowCs.fontWeight) || 400)),
         hasFill: !!(fill && fill[3] > 0.05),
         hasBorder: bordered,
-        sameInk: hex(linkInk) === hex(bodyInk),
       });
     }
   }
@@ -363,6 +359,33 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
     if (redirect) {
       report.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
     }
+    return await finishColorRoles(report, options);
+  });
+}
+
+/**
+ * `check color --elements scene.json`: the same judge over a scene instead of a page — a
+ * canvas / WebGPU frame, a native toolkit, a game's HUD. No browser is started. The scene
+ * contract (`@mizchi/vlmkit-judge/scene.ts`) says which fields each rule reads: `role`,
+ * `color`, `background`, `border` + `border_color`, `underline`, `shadow` / `outline`.
+ */
+export async function runSceneColorRolesCheck(
+  options: Pick<ColorRolesOptions, "allow" | "reportPath" | "viewport"> & { elementsPath: string },
+): Promise<ColorRolesReport> {
+  const elements = parseSceneElements(await readFile(options.elementsPath, "utf8"));
+  const width = options.viewport ?? Math.max(0, ...elements.map((e) => e.left + e.width));
+  const height = Math.max(0, ...elements.map((e) => e.top + e.height));
+  const input = sceneToColorRolesInput(elements, { width, height });
+  const report = judgeColorRoles(input, { source: options.elementsPath, allow: options.allow });
+  return await finishColorRoles(report, { source: options.elementsPath, reportPath: options.reportPath });
+}
+
+/** The run ledger and the optional markdown report, whichever source the snapshot came from. */
+async function finishColorRoles(
+  report: ColorRolesReport,
+  options: { source: string; reportPath?: string },
+): Promise<ColorRolesReport> {
+  {
     appendRunLedger({
       tool: "check-color",
       source: options.source,
@@ -382,7 +405,7 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
       await writeFile(target, markdownReport(report), "utf8");
     }
     return report;
-  });
+  }
 }
 
 function markdownReport(report: ColorRolesReport): string {

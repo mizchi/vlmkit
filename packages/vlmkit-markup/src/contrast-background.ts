@@ -45,6 +45,7 @@
  *   parseColor(cssColor)            -> [r, g, b, a] | null
  *   blendColor(base, over)          -> [r, g, b]        (base is [r,g,b], over is [r,g,b,a])
  *   contrastRatio(a, b)             -> number           (WCAG 2.x, both args [r,g,b])
+ *   textBackgroundLayers(el)        -> { composite: boolean, layers: [r, g, b, a][] }  (innermost first)
  *   resolveTextBackground(el)       -> { composite: boolean, bg: [r, g, b] }
  *   inheritedOpacity(el)            -> number           (product of the ancestor chain)
  *
@@ -160,23 +161,33 @@ export const CONTRAST_BACKGROUND_JS = `
     const l1 = lum(a), l2 = lum(b);
     return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   }
-  function resolveTextBackground(el) {
-    const chain = [];
+  // The layers behind an element, resolved to sRGB, innermost first, up to and including the
+  // first opaque one. This is the RESOLVING half — what only the browser knows. Compositing
+  // them is arithmetic, and a collector that ships layers leaves it to the judge
+  // (compositeBackground in @mizchi/vlmkit-judge/color.ts), so every snapshot source is
+  // measured by one piece of code.
+  function textBackgroundLayers(el) {
+    const layers = [];
     for (let p = el; p; p = p.parentElement) {
       const ps = getComputedStyle(p);
       // A background image is the stopping condition, not a layer to skip: what is behind the
       // text becomes a pixel question, and answering it from computed style means inventing a
       // colour. Report the refusal instead.
-      if ((ps.backgroundImage || "none") !== "none") return { composite: true, bg: [255, 255, 255] };
+      if ((ps.backgroundImage || "none") !== "none") return { composite: true, layers: [] };
       const c = parseColor(ps.backgroundColor);
-      if (c && c[3] > 0) chain.push(c);
+      if (c && c[3] > 0) layers.push(c);
       // An opaque colour hides everything behind it, so the walk is done.
       if (c && c[3] >= 1) break;
     }
+    return { composite: false, layers: layers };
+  }
+  function resolveTextBackground(el) {
+    const resolved = textBackgroundLayers(el);
+    if (resolved.composite) return { composite: true, bg: [255, 255, 255] };
     // Outermost first, so each layer composites onto what is already under it. White is the
     // canvas the browser paints on when nothing else does.
     let bg = [255, 255, 255];
-    for (const c of chain.reverse()) bg = blendColor(bg, c);
+    for (const c of resolved.layers.slice().reverse()) bg = blendColor(bg, c);
     return { composite: false, bg: bg };
   }
   function inheritedOpacity(el) {

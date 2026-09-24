@@ -443,20 +443,59 @@ vlmkit check integrity --elements elements.json --image frame.png
 | `text` | `text-collision` |
 | `text_measured: {width,height}` + `clip: {top,left,width,height}` | `text-clipped` |
 | `overlay`, `z_index`, `aria_hidden` | excludes layered / decorative text from collisions |
+| `color` on text + an opaque `background` on it or a recorded ancestor | `invisible-text`, `low-contrast-text` |
+| `font_size`, `font_weight` | the WCAG floor (3:1 for large text, 4.5:1 otherwise) |
+| `opacity`, `background_image`, `disabled`, `text_shadow` | opacity multiplies down the path; text over an image, disabled or shadowed text is exempted and listed |
+
+Colours must be **resolved** (`rgb()`, `rgba()` or `#hex`): the renderer knows the sRGB it
+paints, and vlmkit does the compositing and the WCAG arithmetic, the same code the browser
+path uses. `oklch()` or a named colour is refused with the field named. A text element with
+no opaque background anywhere up its path is not measured against an assumed white; it is
+listed as exempted with that reason.
 
 Containment comes from `path` prefixes (`hud[0]>bar[0]`), so protrusion, collapsed
 containers and near-misalignment need no extra fields. Because the capture may omit
 uninteresting nodes, findings name the **nearest recorded ancestor** rather than claiming
 a parent.
 
-**Six of eighteen rules are evaluable this way**, and the report lists the other twelve
-with the reason each needs a DOM. That is deliberate: a `clean` verdict is only worth
+**Six of eighteen rules are evaluable from rects alone, eight with paint**, and the report
+lists the rest with the reason each needs a DOM. That is deliberate: a `clean` verdict is only worth
 what it rules out, so the gap is printed next to the verdict rather than left implicit.
 `--elements` and a page source are mutually exclusive — the two modes evaluate different
 rule sets, so a combined run's verdict would be ambiguous.
 
 Text drawn wider than its box is **not** reported as clipped unless a `clip` rect says so:
 on a canvas that overdraws, which the collision and protrusion rules cover.
+
+#### `check color` on a scene
+
+The same schema, with a `role` on the elements the two WCAG rules read:
+
+```bash
+vlmkit check color --elements scene.json
+```
+
+| field | unlocks |
+|---|---|
+| `role: "field"` + `background` somewhere behind it + `border` / `border_color` (or `shadow` / `outline`) | `control-boundary-invisible` (WCAG 1.4.11) |
+| `role: "link"` + `color`, inside a recorded ancestor with `color` and `text` (its prose) | `color-only-link`, `link-no-cue` (WCAG 1.4.1); `underline`, a `font_weight` step, `border` or `background` count as the cue |
+| `role: "button"` | counted in the interactive ink, judged by neither rule |
+
+Findings name elements by `path`, and `--allow` matches that path. A field or link with
+nothing opaque behind it is listed as skipped rather than measured against an assumed white.
+
+#### `check design` on a scene
+
+```bash
+vlmkit check design --elements scene.json
+```
+
+Elements are grouped by `role` (any string: `button`, `card`, `tab`…), or by heading level
+(`heading: 1` or an `h1`-`h6` tag). Within a role, `padding` (one number or
+`[top, right, bottom, left]`), `radius`, `border`, `background`, `font_size` and
+`font_weight` form the style signature, which is the same signature a page's computed style
+produces. Elements without a role are counted as skipped by `tag`. `--exclude` is refused:
+a scene holds only what you wrote into it.
 
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
@@ -466,9 +505,9 @@ vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 A
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
-vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
+vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config; --elements for a scene)
 vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy
-vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning
+vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning (--elements for a scene)
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check grounding     <html|url>          # Screenshot-space action map for a computer-use agent (see below)

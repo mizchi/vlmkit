@@ -204,6 +204,17 @@ describe("coverage is reported, not implied", () => {
       assert.ok(report.skippedRules.some((r) => r.rule === needsDom), `${needsDom} must be listed`);
     }
   });
+
+  it("runs the contrast rules once text carries paint, and stops listing them as skipped", async () => {
+    const path = await withElements([
+      { ...ROOT, background: "#1b1f24" },
+      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "Health 42", color: "#5a6068", font_size: 14 },
+    ]);
+    const report = await runImageIntegrityCheck({ elementsPath: path });
+    assert.ok(kinds(report).includes("low-contrast-text"), kinds(report).join(", "));
+    assert.ok(!report.skippedRules.some((r) => r.rule === "low-contrast-text"));
+    assert.equal(report.skippedRules.length, IMAGE_MODE_SKIPPED_RULES.length - 2);
+  });
 });
 
 describe("parsing", () => {
