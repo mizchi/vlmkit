@@ -151,12 +151,6 @@ export const COLLECT_COLOR_ROLES = `(() => {
     if (behind.composite) { controlsSkipped.push({ selector: sel, reason: "background-image behind the control" }); continue; }
     const cs = getComputedStyle(el);
     const own = parseColor(cs.backgroundColor);
-    const fillRatio = own && own[3] > 0.05 ? contrastRatio(blendColor(behind.bg, own), behind.bg) : 0;
-    let borderRatio = 0, borderHex = null;
-    for (const b of drawnBorders(cs)) {
-      const rr = contrastRatio(blendColor(behind.bg, b.color), behind.bg);
-      if (rr > borderRatio) { borderRatio = rr; borderHex = hex(b.color); }
-    }
     // An outline only stands in for a boundary when it is actually painted. A
     // reset that writes a 1px solid TRANSPARENT outline — to reserve the space a
     // focus ring will need — would otherwise suppress a real finding, which is
@@ -166,14 +160,14 @@ export const COLLECT_COLOR_ROLES = `(() => {
     const outlinePainted = outlineW > 0
       && cs.outlineStyle !== "none" && cs.outlineStyle !== "hidden"
       && !!outlineColor && outlineColor[3] > 0.05;
+    // Resolved colours, not ratios: the judge's controlBoundary() does the arithmetic,
+    // so a control from any renderer is measured by the same code as this one.
     controls.push({
-      selector: sel, tag: tag, onHex: hex(behind.bg),
-      fillHex: own && own[3] > 0.05 ? hex(own) : null,
-      fillRatio: Math.round(fillRatio * 100) / 100,
-      borderHex: borderHex, borderRatio: Math.round(borderRatio * 100) / 100,
+      selector: sel, tag: tag, on: behind.bg,
+      fill: own && own[3] > 0.05 ? own : null,
+      borders: drawnBorders(cs).map((b) => b.color),
       hasShadow: (cs.boxShadow || "none") !== "none",
       hasOutline: outlinePainted,
-      best: Math.round(Math.max(fillRatio, borderRatio) * 100) / 100,
     });
   }
 
@@ -197,16 +191,17 @@ export const COLLECT_COLOR_ROLES = `(() => {
       if (!linkInk) continue;
       const bordered = drawnBorders(cs).length > 0;
       const fill = parseColor(cs.backgroundColor);
+      // The two inks and the surface under them; the judge's linkCue() composites and
+      // compares. A background image behind the flow is shipped as null — refused, not
+      // guessed — exactly as the ratio used to be.
       links.push({
         selector: path(a), flow: path(flow), proseChars: prose,
-        linkHex: hex(linkInk), bodyHex: hex(bodyInk),
-        vsBody: behind.composite ? null
-          : Math.round(contrastRatio(blendColor(behind.bg, linkInk), blendColor(behind.bg, bodyInk)) * 100) / 100,
+        link: linkInk, body: bodyInk,
+        behind: behind.composite ? null : behind.bg,
         underlined: (cs.textDecorationLine || "").indexOf("underline") !== -1,
         weightStep: Math.abs((Number(cs.fontWeight) || 400) - (Number(flowCs.fontWeight) || 400)),
         hasFill: !!(fill && fill[3] > 0.05),
         hasBorder: bordered,
-        sameInk: hex(linkInk) === hex(bodyInk),
       });
     }
   }

@@ -163,10 +163,21 @@ The rule: **the collector resolves, the judge decides.**
 
 Still to do on the DOM side:
 
-- Move the in-page ratios out of `COLLECT_COLOR_ROLES`. It ships `best` / `vsBody` ratios.
-  Once it ships the resolved colours instead, the judge can compute them with `color.ts`, and
-  `check color` can run on a scene. The parity test's second half is the template for proving
-  the move changes nothing.
+- ~~Move the in-page ratios out of `COLLECT_COLOR_ROLES`.~~ Done. The collector now ships
+  `ControlSample` (the composited surface behind the field, its own fill, each painted
+  border's colour) and `LinkSample` (both inks, and the surface under them or `null` over
+  an image). The judge's `controlBoundary` / `linkCue` compute `fillRatio`, `borderRatio`,
+  `best` and `vsBody` with `color.ts`. `judgeColorRoles` still accepts the old measured rows,
+  so a saved snapshot judges the same. **Proof that nothing moved:** `check color --json` on
+  15 pages (css-challenge fixtures, the demo sites, a composition fixture; 17 controls and
+  ~200 links, several with findings) was byte-identical before and after. What stays in the
+  page is compositing the palette's ink rows (`hex(blendColor(behind.bg, fg))`). That is an
+  aggregation keyed by the painted colour, not a verdict, and moving it would mean shipping
+  every box.
+- A scene adapter for `check color`. The arithmetic no longer needs a browser, but the
+  roles still come from the DOM: which element is a text field, which link sits in a prose
+  flow. A scene would need a `role` (`field`, `link`) and the flow's own text length to
+  produce `ControlSample` / `LinkSample`.
 - Replace the five TypeScript copies of contrast/luminance (`asset-check`,
   `component-from-image` ×2, `spec-checks`, `page-compose-diff`) with `color.ts`. Check each
   one's threshold first: not all of them use 0.03928.

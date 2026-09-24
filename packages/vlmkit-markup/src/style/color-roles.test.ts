@@ -11,6 +11,8 @@ import {
   type ControlBoundary,
   type LinkCue,
   colorOnlyLinks,
+  controlBoundary,
+  linkCue,
   findBase,
   findBodyInk,
   findLinkInk,
@@ -356,7 +358,12 @@ describe("COLLECT_COLOR_ROLES", () => {
       assert.deepEqual([...new Set(iconBorder.samples)], ["div.panel>svg"]);
       assert.deepEqual(input.unreadable, [], "nothing on this page is unreadable");
 
-      const byId = new Map(input.controls.map((c) => [c.selector.replace(/^.*#/, "#"), c]));
+      // The collector ships resolved colours; the judge measures them. Measure here the
+      // way judgeColorRoles does, so the assertions below read boundaries, not samples.
+      const controls = input.controls.map((c) => "on" in c ? controlBoundary(c) : c);
+      const links = input.links.map((l) => "link" in l ? linkCue(l) : l);
+      assert.ok(input.controls.every((c) => "on" in c), "the collector ships samples, not ratios");
+      const byId = new Map(controls.map((c) => [c.selector.replace(/^.*#/, "#"), c]));
       const ghost = byId.get("#ghost");
       assert.ok(ghost, "the bare field was collected");
       assert.equal(ghost.hasOutline, false, "a transparent outline paints nothing and is not a boundary");
@@ -367,7 +374,7 @@ describe("COLLECT_COLOR_ROLES", () => {
       assert.equal(byId.get("#shadowed")?.hasShadow, true, "a shadow does draw an edge");
       assert.equal(invisibleControls([byId.get("#shadowed")!]).length, 0);
 
-      const { weak } = colorOnlyLinks(input.links);
+      const { weak } = colorOnlyLinks(links);
       assert.equal(weak.length, 1, "the bare link fires, the underlined one does not");
       assert.match(weak[0]?.selector ?? "", /a$/);
       assert.ok((weak[0]?.proseChars ?? 0) >= PROSE_FLOOR_CHARS);

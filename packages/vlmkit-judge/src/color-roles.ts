@@ -90,6 +90,7 @@
  */
 
 import { parseSelectorAllowRules, selectorAllowFilter, type SelectorAllowRule } from "./allow.ts";
+import { blendColor, contrastRatio, toHex, type Rgb, type Rgba } from "./color.ts";
 
 // ---------------------------------------------------------------------------
 // Thresholds. Both are WCAG's, which is the point: a number this file chose
@@ -156,6 +157,94 @@ export interface ControlBoundary {
   best: number;
 }
 
+/**
+ * A text field as the collector resolved it: colours, not ratios.
+ *
+ * **The collector resolves, the judge decides.** The page used to compute `fillRatio`,
+ * `borderRatio` and `best` itself and ship only the numbers, so nothing but a browser could
+ * produce a control the judge would read. It now ships what it resolved — the composited
+ * surface behind the field, the field's own fill, each painted border's colour — and
+ * `controlBoundary` does the arithmetic, the same `color.ts` every snapshot source uses.
+ */
+export interface ControlSample {
+  selector: string;
+  tag: string;
+  /** The surface behind the control, composited to opaque sRGB. */
+  on: Rgb;
+  /** The control's own fill, when it paints one (alpha > 0.05). */
+  fill: Rgba | null;
+  /** Each painted border side's colour, in top/right/bottom/left order. */
+  borders: Rgba[];
+  hasShadow: boolean;
+  hasOutline: boolean;
+}
+
+/**
+ * A control's boundary, measured: the strongest edge it draws against the surface behind it.
+ * The first border wins a tie, which is the order the page's own loop used.
+ */
+export function controlBoundary(sample: ControlSample): ControlBoundary {
+  const fillRatio = sample.fill ? contrastRatio(blendColor(sample.on, sample.fill), sample.on) : 0;
+  let borderRatio = 0;
+  let borderHex: string | null = null;
+  for (const color of sample.borders) {
+    const ratio = contrastRatio(blendColor(sample.on, color), sample.on);
+    if (ratio > borderRatio) { borderRatio = ratio; borderHex = toHex(color); }
+  }
+  return {
+    selector: sample.selector,
+    tag: sample.tag,
+    onHex: toHex(sample.on),
+    fillHex: sample.fill ? toHex(sample.fill) : null,
+    fillRatio: round2(fillRatio),
+    borderHex,
+    borderRatio: round2(borderRatio),
+    hasShadow: sample.hasShadow,
+    hasOutline: sample.hasOutline,
+    best: round2(Math.max(fillRatio, borderRatio)),
+  };
+}
+
+/** A link in a prose flow, as the collector resolved it. */
+export interface LinkSample {
+  selector: string;
+  flow: string;
+  proseChars: number;
+  /** The link's ink and the prose's, as declared (alpha kept). */
+  link: Rgba;
+  body: Rgba;
+  /**
+   * The surface both sit on, composited — or null when a background image is behind the
+   * flow, which makes the comparison a pixel question and is refused rather than guessed.
+   */
+  behind: Rgb | null;
+  underlined: boolean;
+  weightStep: number;
+  hasFill: boolean;
+  hasBorder: boolean;
+}
+
+/** A link's cues, measured: the contrast between its ink and the prose's, both composited. */
+export function linkCue(sample: LinkSample): LinkCue {
+  return {
+    selector: sample.selector,
+    flow: sample.flow,
+    proseChars: sample.proseChars,
+    linkHex: toHex(sample.link),
+    bodyHex: toHex(sample.body),
+    vsBody: sample.behind === null
+      ? null
+      : round2(contrastRatio(blendColor(sample.behind, sample.link), blendColor(sample.behind, sample.body))),
+    underlined: sample.underlined,
+    weightStep: sample.weightStep,
+    hasFill: sample.hasFill,
+    hasBorder: sample.hasBorder,
+    sameInk: toHex(sample.link) === toHex(sample.body),
+  };
+}
+
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
 export interface LinkCue {
   selector: string;
   /** The block holding both the link and the prose it sits in. */
@@ -195,9 +284,15 @@ export interface ColorRolesInput {
   /** The composited page background: the base even when nothing declares one. */
   baseHex: string;
   interactiveInk: ColorUse[];
-  controls: ControlBoundary[];
+  /**
+   * Resolved samples from a collector, or already-measured boundaries — the shape this
+   * field had before the ratios moved here, still accepted so a saved snapshot judges the
+   * same. The report always carries the measured form.
+   */
+  controls: (ControlSample | ControlBoundary)[];
   controlsSkipped: { selector: string; reason: string }[];
-  links: LinkCue[];
+  /** Resolved samples or already-measured cues, as for `controls`. */
+  links: (LinkSample | LinkCue)[];
   /**
    * Declared colours the parser refused. Never silently dropped: the round that
    * built this gate found `check a11y contrast` inspecting 10 of 1068 elements
@@ -208,8 +303,10 @@ export interface ColorRolesInput {
   viewport: { width: number; height: number };
 }
 
-export interface ColorRolesReport extends ColorRolesInput {
+export interface ColorRolesReport extends Omit<ColorRolesInput, "controls" | "links"> {
   source: string;
+  controls: ControlBoundary[];
+  links: LinkCue[];
   /** The largest surface, or the composited page background when none is declared. */
   base: ColorUse | null;
   /** The ink most of the page's text is set in. */
@@ -312,10 +409,19 @@ export function colorOnlyLinks(links: readonly LinkCue[]): { weak: LinkCue[]; no
   };
 }
 
+/** A collector's resolved sample, or a row measured before the ratios moved into the judge. */
+const isControlSample = (c: ControlSample | ControlBoundary): c is ControlSample => "on" in c;
+const isLinkSample = (l: LinkSample | LinkCue): l is LinkSample => "link" in l;
+
 export function judgeColorRoles(
-  input: ColorRolesInput,
+  rawInput: ColorRolesInput,
   options: { source?: string; allow?: readonly string[] } = {},
 ): ColorRolesReport {
+  const input = {
+    ...rawInput,
+    controls: rawInput.controls.map((c) => isControlSample(c) ? controlBoundary(c) : c),
+    links: rawInput.links.map((l) => isLinkSample(l) ? linkCue(l) : l),
+  };
   /**
    * An allowed row leaves the verdict and is still listed — the repo-wide
    * exemption property, so a sign-off reads as a decision rather than as

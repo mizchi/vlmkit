@@ -15,7 +15,7 @@ report.verdict; // "composed" | "unbalanced" | "not-judged"
 | Module | Judge | Used by |
 |---|---|---|
 | `composition.ts` | `judgeComposition` — 近接 / 整列 / 対比 | `vlmkit check composition` |
-| `color-roles.ts` | `judgeColorRoles` — palette by role, WCAG 1.4.11 / 1.4.1 | `vlmkit check color` |
+| `color-roles.ts` | `judgeColorRoles` — palette by role, WCAG 1.4.11 / 1.4.1; `controlBoundary` / `linkCue` measure the collector's resolved colours | `vlmkit check color` |
 | `design-policy.ts` | `judgeDesignPolicy` — style-signature reuse | `vlmkit check design` |
 | `integrity.ts` | `findTextCollisions`, `judgeClippedText`, `judgeProtrusions`, `judgeTextContrast`, `findOccludedText`, … (A1-A13) | `vlmkit check integrity`, including its no-DOM image mode |
 | `integrity-allow.ts` | `<kind>[@<selector>][@<viewport>];<reason>` exemptions | `vlmkit check integrity --allow` |

@@ -89,6 +89,15 @@ export function compositeBackground(innermostFirst: readonly Rgba[]): [number, n
   return bg;
 }
 
+/**
+ * `#rrggbb` from the first three channels, clamped and rounded — the collector's `hex()`,
+ * so a colour keys the same row whichever side of the page boundary names it. Alpha is
+ * dropped: callers composite first when they mean the painted colour.
+ */
+export function toHex(c: readonly number[]): string {
+  return "#" + c.slice(0, 3).map((n) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, "0")).join("");
+}
+
 /** `rgb(r, g, b)` with rounded channels — the form every contrast finding prints. */
 export function formatRgb(c: Rgb): string {
   return `rgb(${c.map(Math.round).join(", ")})`;
