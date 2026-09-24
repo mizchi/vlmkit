@@ -1037,7 +1037,7 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
     lines.push("");
     lines.push(`${GREEN}No integrity defects detected.${RESET}`);
   }
-  // Image mode evaluates 6 of 18 rules. A bare "No integrity defects detected." would let
+  // Image mode evaluates 6 of 18 rules (8 with paint). A bare "No integrity defects detected." would let
   // that read as full coverage, which is the one way this feature could do harm: the value
   // of a gate is what a clean result rules out, and a clean result over a third of the
   // rules rules out a third as much. Printed next to the verdict, not in a footnote.

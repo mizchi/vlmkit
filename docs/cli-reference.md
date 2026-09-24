@@ -443,14 +443,23 @@ vlmkit check integrity --elements elements.json --image frame.png
 | `text` | `text-collision` |
 | `text_measured: {width,height}` + `clip: {top,left,width,height}` | `text-clipped` |
 | `overlay`, `z_index`, `aria_hidden` | excludes layered / decorative text from collisions |
+| `color` on text + an opaque `background` on it or a recorded ancestor | `invisible-text`, `low-contrast-text` |
+| `font_size`, `font_weight` | the WCAG floor (3:1 for large text, 4.5:1 otherwise) |
+| `opacity`, `background_image`, `disabled`, `text_shadow` | opacity multiplies down the path; text over an image, disabled or shadowed text is exempted and listed |
+
+Colours must be **resolved** (`rgb()`, `rgba()` or `#hex`): the renderer knows the sRGB it
+paints, and vlmkit does the compositing and the WCAG arithmetic, the same code the browser
+path uses. `oklch()` or a named colour is refused with the field named. A text element with
+no opaque background anywhere up its path is not measured against an assumed white; it is
+listed as exempted with that reason.
 
 Containment comes from `path` prefixes (`hud[0]>bar[0]`), so protrusion, collapsed
 containers and near-misalignment need no extra fields. Because the capture may omit
 uninteresting nodes, findings name the **nearest recorded ancestor** rather than claiming
 a parent.
 
-**Six of eighteen rules are evaluable this way**, and the report lists the other twelve
-with the reason each needs a DOM. That is deliberate: a `clean` verdict is only worth
+**Six of eighteen rules are evaluable from rects alone, eight with paint**, and the report
+lists the rest with the reason each needs a DOM. That is deliberate: a `clean` verdict is only worth
 what it rules out, so the gap is printed next to the verdict rather than left implicit.
 `--elements` and a page source are mutually exclusive — the two modes evaluate different
 rule sets, so a combined run's verdict would be ambiguous.

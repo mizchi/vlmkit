@@ -100,6 +100,46 @@ depends on nothing.
 
 ## Phase 2: the snapshot is the contract (collector ↔ judge)
 
+Status: the contract and the colour arithmetic landed. What is left is below the first
+"Next" heading.
+
+### What landed
+
+- **The scene contract is the image-mode elements file.** `@mizchi/vlmkit-judge/scene.ts`
+  defines `SceneElement`. It is the `--elements` JSON that `check integrity` and `check copy`
+  already accepted in image mode, which is itself a superset of `diff png --elements-json`.
+  So no second shape exists, and an engine that already emits the file speaks the contract.
+  New optional fields carry paint (`color`, `background`, `background_image`, `opacity`,
+  `text_shadow`, `disabled`) and type (`font_size`, `font_weight`, `heading`, `border`,
+  `radius`). The parser, the integrity adapter (`judgeSceneIntegrity`) and the skipped-rule
+  list moved there from `integrity-image.ts`, which is now the 112-line half that reads files.
+- **Two adapters out of the contract**: `judgeSceneIntegrity` for `check integrity`, and
+  `sceneToCompositionInput` for `check composition`. **One adapter into it**:
+  `sceneFromTree` flattens an engine-style graph (positions local to the parent) into frame
+  space. `scene-graph.test.ts` now uses the library adapters, not an inline one.
+- **`@mizchi/vlmkit-judge/color.ts`**: `parseColor` (resolved colours only), `blendColor`,
+  `contrastRatio`, `compositeBackground`, `textContrastFloor`, `measureTextContrast`. These are
+  the page's own functions, including the 0.03928 threshold and the output rounding.
+- **The rule, end to end, in one place.** Image mode now runs `invisible-text` and
+  `low-contrast-text` whenever text elements carry `color`. The engine hands over the RGBA it
+  paints, and the judge composites and measures. An elements file without paint reports
+  byte-for-byte what it did before, skipped-rule order included.
+- **Held to the browser by a test, not by care.** `vlmkit-markup/src/contrast-parity.test.ts`
+  runs `CONTRAST_BACKGROUND_JS`'s functions in Node against `color.ts` over a grid of
+  inputs. It then runs the real `COLLECT_TEXT_CONTRAST` on a page, collects the same page as a
+  scene, and requires identical candidates (colours, ratio, floor, font size). A mutation
+  check confirms it bites: dropping opacity from `measureTextContrast` fails it on the one
+  faded element.
+
+One deliberate difference from the page: a browser composites a missing background over
+white, because white is what it paints under an unpainted document. A scene has no such
+default (an engine's clear colour is whatever it is). So a text element with no opaque
+background on itself or a recorded ancestor is **refused and listed**, not measured against
+a white the frame may not contain.
+
+### Next
+
+
 For a game's scene graph to use the judges, the snapshot has to hold **facts**,
 not conclusions the browser already reached. Today the boundary is wherever it
 was convenient:
@@ -121,13 +161,19 @@ gamut mapping. That was the fix that took `check a11y contrast` from 10 to 501
 inspected elements on tailwindcss.com. A pure judge must not try to redo it.
 The rule: **the collector resolves, the judge decides.**
 
-Then define the scene contract once. It's roughly the union of
-`CompositionBox`, `DesignSample` and `ColorUse`: `{ path, parent, role, rect,
-position, font{size,weight}, paint{bg,fg,border,radius}, text{len,leaf} }`.
-Ship two adapters for it: the DOM collector, and a scene-graph one, the adapter
-that `scene-graph.test.ts` currently keeps inline. Integrity's inputs are the ones that will stress that
-contract (occlusion, clipping, text collision), and `integrity-image.ts`'s
-element-rect JSON is the existing non-DOM shape to reconcile it with.
+Still to do on the DOM side:
+
+- Move the in-page ratios out of `COLLECT_COLOR_ROLES`. It ships `best` / `vsBody` ratios.
+  Once it ships the resolved colours instead, the judge can compute them with `color.ts`, and
+  `check color` can run on a scene. The parity test's second half is the template for proving
+  the move changes nothing.
+- Replace the five TypeScript copies of contrast/luminance (`asset-check`,
+  `component-from-image` ×2, `spec-checks`, `page-compose-diff`) with `color.ts`. Check each
+  one's threshold first: not all of them use 0.03928.
+- Let the DOM collectors emit `SceneElement`s directly, so one page collection feeds
+  integrity, composition and colour. That is the "collect once, judge many" of phase 3.
+- A `DesignSample` adapter for `check design`. Its signature is a joined style string, so the
+  scene would need a `signature` field or the judge would need to build one from the fields.
 
 Next judges to move, ranked by pure functions already exported:
 

@@ -180,7 +180,7 @@ ${ALLOW_HELP}`,
     const warns = report.findings.length - fails;
     const image = report as IntegrityImageReport;
     // In image mode the count of rules that did NOT run belongs in the headline, not
-    // buried in the report body. `CLEAN` covering six of eighteen rules is a different
+    // buried in the report body. `CLEAN` covering six (or eight) of eighteen rules is a different
     // claim from `CLEAN` covering all of them, and the difference has to be visible at
     // the point someone reads the verdict.
     const coverage = image.skippedRules

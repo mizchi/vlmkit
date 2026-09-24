@@ -14,3 +14,5 @@ export * from "./color-roles.ts";
 export * from "./design-policy.ts";
 export * from "./integrity.ts";
 export * from "./integrity-allow.ts";
+export * from "./color.ts";
+export * from "./scene.ts";
