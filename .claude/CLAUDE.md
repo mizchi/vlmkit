@@ -135,6 +135,34 @@ is how Playwright's own `mount` fixture works. Consequences:
   `components/Button/Primary` get separate baselines. List the canonical spelling
   in `vlmkit.gates.json`.
 
+## Accessibility with no DOM (`scan a11y` → `check a11y tree`)
+
+```bash
+vlmkit scan a11y https://example.com/flutter-app/ --click Practice --out a11y.json   # Flutter web
+vlmkit scan a11y ui.xml --density 420 --frame frame.png --out a11y.json            # Android uiautomator dump
+vlmkit check a11y tree a11y.json      # unlabelled-control / unreachable-content / contrast-below-aa / target-undersized
+```
+
+For apps whose DOM is not the UI — Flutter web paints a canvas and its accessibility DOM is
+transparent, so the DOM gates' contrast rules read every label as 1.00:1 — and for platforms
+with no DOM at all. The contract is `vlmkit-a11y/1` (`@mizchi/vlmkit-judge/a11y-tree.ts`):
+role, name, rect, states, actions, plus the frame. Paint comes **only from the frame's pixels**,
+never from the tree. Any platform's script can write the file; `docs/a11y-tree.md` has the
+schema and `docs/reports/2026-09-25-a11y-tree-v1.md` the round on ofc-app's real build.
+
+Three things measured there, not to re-learn:
+
+- Pixel contrast drops ink components that are rules or outlines — spanning the rect's width
+  AND thin or spanning its height. Width alone dropped whole glyphs in a tight text rect.
+- Text size is the tallest inked-row run / 0.9, never the rect's height: a rect-height floor
+  held 14px red card labels to 3:1 and passed them at 3.68:1.
+- `scan a11y` pins `--locale en-US`: a Flutter build with no locale throws in `Intl.Locale`
+  before its first frame, and the page reads as not-Flutter.
+
+In this sandbox Chromium cannot verify the egress proxy's CA, so a live site is replayed from a
+HAR recorded through Node (`NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt NODE_USE_ENV_PROXY=1`)
+with `--har` — never by turning TLS verification off.
+
 ## Explanatory animations (`vlmkit-anim`) and their evaluation loop
 
 ```bash
@@ -633,10 +661,10 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. Plan for the rest of the split: `docs/design/package-decomposition.md`. |
+| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 29 of the 31 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 31 of the 33 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -666,6 +694,7 @@ There are **three** publication routes and still only those **two** copies. The 
 
 | File | Contents |
 |---------|------|
+| `docs/a11y-tree.md` | **Accessibility with no DOM**: the `vlmkit-a11y/1` contract (role / name / rect / states / actions + frame), `scan a11y`'s Flutter web and Android collectors, `check a11y tree`'s four rules, and how a collector for another platform writes the file |
 | `docs/markup-assist.md` | Context-free guide to the deterministic markup gates (CLI / MCP / skill install, task routing, done-condition recipes) |
 | `docs/cli-reference.md` | Complete command reference moved out of README (groups, examples, workflow/API/HTTP, architecture, project structure) |
 | `docs/configuration.md` | Setup detail moved out of README (install, MCP/skill, env vars, snapshot/CI config, APM skills catalog) |
@@ -676,7 +705,7 @@ There are **three** publication routes and still only those **two** copies. The 
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 31 gates + 192 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 33 gates + 198 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

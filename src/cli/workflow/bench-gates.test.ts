@@ -74,13 +74,15 @@ describe("which gates the bench can run", () => {
     assert.equal(isBenchable(stub([{ name: "url", kind: "string", description: "Crater URL" }])), false);
   });
 
-  it("selects 22 of the 31 built-ins, and every one of them takes a page", async () => {
+  it("selects 23 of the 33 built-ins, and every one of them takes a page", async () => {
     // The count is a canary: a new gate that takes a page should join the bench
     // by existing, and one that does not must not be dragged in.
     resetGateRegistryCache();
     const registry = await loadGateRegistry({ builtinsOnly: true });
     const benchable = registry.list().filter(({ gate }) => isBenchable(gate));
-    assert.equal(benchable.length, 22, benchable.map(({ gate }) => gate.id).join(", "));
+    // 22 → 23: `scan a11y`. Its page is a Flutter one; on any other it refuses at `load`,
+    // so the bench shows one fast error row rather than waiting out the timeout.
+    assert.equal(benchable.length, 23, benchable.map(({ gate }) => gate.id).join(", "));
     for (const { gate } of benchable) {
       const positional = (gate.inputs ?? []).find((i) => i.positional === 0);
       assert.equal(positional?.kind, "path-or-url", `${gate.id} positional is not a page`);
@@ -88,6 +90,7 @@ describe("which gates the bench can run", () => {
     // And the excluded ones are excluded for a stated reason, not by accident.
     const excluded = registry.list().filter(({ gate }) => !isBenchable(gate)).map(({ gate }) => gate.id);
     assert.deepEqual(excluded.sort(), [
+      "check.a11y.tree",
       "check.asset",
       "check.crater",
       "check.drift.component",

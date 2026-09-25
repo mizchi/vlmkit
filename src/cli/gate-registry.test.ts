@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 31);
+    assert.equal(r.list().length, 33);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 185 tunable rules in total", async () => {
+  it("declares 198 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -217,8 +217,13 @@ describe("composed built-in registry", () => {
     // 191 → 192: `scan style`, one page load for check design / composition / color. Its only
     //       rule is `redirected`: a snapshot of the login screen would be judged three times.
     //       docs/reports/2026-09-23-color-roles-v1.md keeps the list.
+    // 192 → 198: accessibility from a platform tree, for apps with no DOM to read (Flutter,
+    //       Android, and whatever writes vlmkit-a11y/1). `scan a11y` has `redirected` and
+    //       `semantics-empty` — an app whose tree never built reads as an empty page that
+    //       passes; `check a11y tree` has `unlabelled-control`, `unreachable-content`,
+    //       `contrast-below-aa` (on the frame's pixels) and `target-undersized`.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 192);
+    assert.equal(total, 198);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -240,6 +245,7 @@ describe("composed built-in registry", () => {
       "check.a11y.contrast",
       "check.a11y.focus",
       "check.a11y.touch",
+      "check.a11y.tree",
       "check.animation",
       "check.asset",
       "check.breakpoints",
@@ -261,6 +267,7 @@ describe("composed built-in registry", () => {
       "check.story",
       "check.theme",
       "check.tokens",
+      "scan.a11y",
       "scan.handlers",
       "scan.scroll",
       "scan.style",
