@@ -1,5 +1,6 @@
 import type { A11yNode, SpecInvariant } from "@mizchi/vlmkit-core/types.ts";
 import { INTERACTIVE_ROLES } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { contrastRatio as wcagContrast } from "@mizchi/vlmkit-judge/color.ts";
 
 export interface SpecContrastColor {
   r: number;
@@ -481,17 +482,7 @@ function requiredContrastRatio(fontSize: number, fontWeight: number): number {
 }
 
 function contrastRatio(a: SpecContrastColor, b: SpecContrastColor): number {
-  const la = relativeLuminance(a);
-  const lb = relativeLuminance(b);
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
-
-function relativeLuminance(color: SpecContrastColor): number {
-  const channel = (value: number) => {
-    const normalized = value / 255;
-    return normalized <= 0.03928 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+  return wcagContrast([a.r, a.g, a.b], [b.r, b.g, b.b]);
 }
 
 function formatContrastRatio(value: number): string {

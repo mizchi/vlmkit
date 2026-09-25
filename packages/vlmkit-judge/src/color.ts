@@ -65,11 +65,18 @@ export function relativeLuminance(c: Rgb): number {
   return 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
 }
 
+/**
+ * WCAG 2.x contrast ratio between two relative luminances, 1 to 21. Order does not matter.
+ * For a caller that already has luminances — an average over many pixels, say — rather than
+ * two colours.
+ */
+export function luminanceContrast(l1: number, l2: number): number {
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
 /** WCAG 2.x contrast ratio, 1 to 21. Order does not matter. */
 export function contrastRatio(a: Rgb, b: Rgb): number {
-  const l1 = relativeLuminance(a);
-  const l2 = relativeLuminance(b);
-  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  return luminanceContrast(relativeLuminance(a), relativeLuminance(b));
 }
 
 /**
