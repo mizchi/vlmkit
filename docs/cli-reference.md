@@ -682,7 +682,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-30 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+31 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
@@ -998,6 +998,9 @@ vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
   # --min-area <px>      min filled px per component (default 200)
   # --preset game-ui     = --min-area 24 --top-n 24, for small high-contrast frames
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
+vlmkit scan style <html|url> [--out snap.json] # One page load for check design / composition / color; then
+                                               # `vlmkit check design|composition|color --from snap.json`
+                                               # judges it with no browser, same report as the live run
 vlmkit scan scroll <html|url>                  # Annotation-free scroll inventory: real scroll containers
                                                # (axis / overflow px / bbox), unintended page overflow-x
                                                # with offenders, overflow:hidden cut-off suspects, nested

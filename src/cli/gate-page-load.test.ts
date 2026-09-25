@@ -142,11 +142,11 @@ describe("page-load options on the gates that navigate", () => {
 
   it("covers every one of them, with the exceptions named and justified", async () => {
     const gates = await navigatingGates();
-    // 26 as of 2026-09-23: 24 with a `path-or-url` source plus the two that take
+    // 27 as of 2026-09-25: 25 with a `path-or-url` source plus the two that take
     // a URL through a flag. A new one lands here first, which is the cheapest
     // place to notice it needs these flags. (23 → 24 `check grounding`,
-    // 24 → 25 `check composition`, 25 → 26 `check color`.)
-    assert.equal(gates.length, 26, gates.map(command).join(", "));
+    // 24 → 25 `check composition`, 25 → 26 `check color`, 26 → 27 `scan style`.)
+    assert.equal(gates.length, 27, gates.map(command).join(", "));
 
     const missing: string[] = [];
     for (const gate of gates) {

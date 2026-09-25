@@ -10,7 +10,7 @@ paths don't change either: every module that moves leaves a re-export behind.
 
 | Package | Source lines (non-test) | What it actually holds |
 |---|---:|---|
-| `vlmkit-markup` | 47,098 | 28 of 30 gates, *and* their collectors, judges, formatters, Playwright runners, the MoonBit markup core, and the markup-synthesis loop |
+| `vlmkit-markup` | 47,098 | 28 of 30 gates (29 of 31 since `scan style`), *and* their collectors, judges, formatters, Playwright runners, the MoonBit markup core, and the markup-synthesis loop |
 | `src/` (root CLI) | 37,846 | CLI router (6k), VRT snapshot/compare (6k), experiments (15k), API server, demos |
 | `vlmkit-anim` | 15,420 | explanatory animation IR, compilers, runtime, CLI |
 | `vlmkit-core` | 11,181 | plugin runtime + pixel diff engine + **1,894 lines of Playwright-bound driver code** (`browser-launch`, `page-open`, `page-load`, `mask`, `element-compare`) |
@@ -220,8 +220,26 @@ Still to do on the DOM side:
 - Replace the five TypeScript copies of contrast/luminance (`asset-check`,
   `component-from-image` ×2, `spec-checks`, `page-compose-diff`) with `color.ts`. Check each
   one's threshold first: not all of them use 0.03928.
-- Let the DOM collectors emit `SceneElement`s directly, so one page collection feeds
-  integrity, composition and colour. That is the "collect once, judge many" of phase 3.
+- **Collect once, judge many — first step done: `vlmkit scan style`.** One page load runs
+  the collectors of `check design`, `check composition` and `check color`, whose runners had
+  each loaded the same page the same way (1280x900, `networkidle`, `settlePage(250)`, the
+  same redirect check), and writes their output to one snapshot; `check design|composition|
+  color --from snap.json` judges it with no browser. Each runner is now collect +
+  `judgeCollected…`, and the live run and the `--from` run go through the same second half,
+  so the reports are equal — `style-snapshot.test.ts` requires it field for field on six pages
+  that cover each gate's findings, and the CLI's `--json` was identical on the shop demo.
+  On that page three live runs took 5.3s; `scan style` 1.9s and three `--from` judgements
+  2.5s, which is almost all CLI start-up — the page is loaded once instead of three times.
+
+  **Why not one merged `SceneElement` list yet.** The scene's single `role` cannot carry both
+  vocabularies: `check design` groups by `button` / `input:text` / `h2` and ignores links,
+  `check color` needs `field` / `link`. Writing either one into `role` changes the other
+  gate's verdict — `role: "link"` on every anchor makes design start grouping links. The
+  snapshot keeps each collector's own output, so nothing moves. Merging needs the scene to
+  say both (a colour role beside the design role, or the colour adapter inferring fields and
+  links from `tag`), and `check integrity` / `check copy` joining the capture is the step
+  after that; integrity's multi-viewport sweep and copy's disclosure sweep both change the
+  page, so they cannot share a load as-is.
 - ~~A `DesignSample` adapter for `check design`.~~ Done: `vlmkit check design --elements`.
   The judge now builds the signature: `COLLECT_DESIGN_SAMPLES` ships `DesignStyleSample`
   facts (padding, radius, border width, background, font size and weight, text-free), and

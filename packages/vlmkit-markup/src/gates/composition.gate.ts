@@ -21,17 +21,19 @@ import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.t
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFromSnapshotFlag, readStyleSnapshot } from "../style/style-snapshot.ts";
 import {
   COMPOSITION_ALLOW_HELP,
   type CompositionOptions,
   type CompositionReport,
   formatCompositionReport,
   parseCompositionAllowRules,
+  judgeCollectedComposition,
   runCompositionCheck,
   runSceneCompositionCheck,
 } from "../style/composition.ts";
 
-export const compositionGate = defineGate<CompositionReport, CompositionOptions & { elementsPath?: string }>({
+export const compositionGate = defineGate<CompositionReport, CompositionOptions & { elementsPath?: string; fromPath?: string }>({
   id: "check.composition",
   command: ["check", "composition"],
   title: "Composition principles (proximity / alignment / contrast)",
@@ -116,6 +118,10 @@ docs/design/composition-metrics.md`,
       description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Boxes, `heading`, font size / weight, background, border and radius are what it reads",
     },
     {
+      name: "from", placeholder: "snapshot.json", kind: "path",
+      description: "A `scan style` snapshot instead of a page: judged with no browser, same report as the live run",
+    },
+    {
       name: "viewport", kind: "number",
       description: "Viewport width; composition is a function of width, so it is reported (with --elements: the frame width)",
       defaultDescription: "1280; with --elements, the scene's rightmost edge",
@@ -133,6 +139,12 @@ docs/design/composition-metrics.md`,
   ],
   parse: (argv) => {
     const valueFlags = ["--viewport", "--allow", "--storage-state", "--elements"];
+    const from = readFromSnapshotFlag(argv, "check composition", valueFlags);
+    if (from) {
+      const allow = readAll(argv, "allow");
+      parseCompositionAllowRules(allow);
+      return { source: from, fromPath: from, ...(allow.length > 0 ? { allow } : {}) };
+    }
     const elements = readFlag(argv, "elements");
     if (elements) {
       // Mutually exclusive with a page, as in `check integrity`, `check color` and `check design`.
@@ -168,9 +180,15 @@ docs/design/composition-metrics.md`,
       ...(pageLoad.har ? { har: pageLoad.har } : {}),
     };
   },
-  run: (options) => (options.elementsPath
-    ? runSceneCompositionCheck({ ...options, elementsPath: options.elementsPath })
-    : runCompositionCheck(options)),
+  run: async (options) => {
+    if (options.fromPath) {
+      const snapshot = await readStyleSnapshot(options.fromPath);
+      return judgeCollectedComposition(snapshot.composition, snapshot.redirect, { ...options, source: snapshot.source });
+    }
+    return options.elementsPath
+      ? runSceneCompositionCheck({ ...options, elementsPath: options.elementsPath })
+      : runCompositionCheck(options);
+  },
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,

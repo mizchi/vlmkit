@@ -43,6 +43,7 @@ describe("markup gate plugin", () => {
         "check tokens",
         "scan handlers",
         "scan scroll",
+        "scan style",
         "stress i18n",
         "stress media",
         "verify flow",

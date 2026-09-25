@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 30);
+    assert.equal(r.list().length, 31);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -214,9 +214,11 @@ describe("composed built-in registry", () => {
     //       neither is a threshold this repo chose — and three further candidates were measured
     //       on 14 designed pages and rejected, including scoring base/main/accent against
     //       70:25:5, which every one of those pages misses by 15 to 55 points.
+    // 191 → 192: `scan style`, one page load for check design / composition / color. Its only
+    //       rule is `redirected`: a snapshot of the login screen would be judged three times.
     //       docs/reports/2026-09-23-color-roles-v1.md keeps the list.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 191);
+    assert.equal(total, 192);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -261,6 +263,7 @@ describe("composed built-in registry", () => {
       "check.tokens",
       "scan.handlers",
       "scan.scroll",
+      "scan.style",
       "stress.i18n",
       "stress.media",
       "verify.flow",

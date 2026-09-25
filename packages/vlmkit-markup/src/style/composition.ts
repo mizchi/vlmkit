@@ -119,12 +119,24 @@ export async function runCompositionCheck(options: CompositionOptions): Promise<
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
     const input = await page.evaluate(COLLECT_COMPOSITION) as CompositionInput;
-    const judged = judgeComposition(input, options);
-    if (redirect) {
-      judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
-    }
-    return recordCompositionRun({ source: options.source, ...judged });
+    return judgeCollectedComposition(input, redirect, options);
   });
+}
+
+/**
+ * The judging half of `runCompositionCheck`, for boxes collected earlier — by this runner, or
+ * by `scan style` into a snapshot. Same judge, redirect finding and ledger entry.
+ */
+export function judgeCollectedComposition(
+  input: CompositionInput,
+  redirect: string | null,
+  options: CompositionJudgeOptions & { source: string },
+): CompositionReport {
+  const judged = judgeComposition(input, options);
+  if (redirect) {
+    judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
+  }
+  return recordCompositionRun({ source: options.source, ...judged });
 }
 
 /**
