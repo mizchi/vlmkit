@@ -41,6 +41,7 @@ import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
+import { luminanceContrast, relativeLuminance } from "@mizchi/vlmkit-judge/color.ts";
 
 export type AssetIssueKind =
   | "aspect-mismatch"
@@ -80,18 +81,10 @@ export interface AssetCheckReport {
 
 const ALPHA_FLOOR = 16;
 
-function luminance(r: number, g: number, b: number): number {
-  const lin = (c: number) => {
-    const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-function contrastRatio(l1: number, l2: number): number {
-  const [hi, lo] = l1 >= l2 ? [l1, l2] : [l2, l1];
-  return (hi + 0.05) / (lo + 0.05);
-}
+// WCAG luminance and contrast come from the judge's one definition. This file used the IEC
+// sRGB threshold (0.04045) where WCAG writes 0.03928; on 8-bit channels the two cannot differ
+// (the band between them, 10.02-10.31, holds no integer), which color.test.ts checks.
+const luminance = (r: number, g: number, b: number): number => relativeLuminance([r, g, b]);
 
 export function parseHexColor(hex: string): { r: number; g: number; b: number } {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -182,7 +175,7 @@ export function analyzeAssetPng(png: PNG, options: AnalyzeAssetOptions): AssetCh
     }
     if (edgeIdx.length > 0) {
       const meanLum = edgeIdx.reduce((s, i) => s + luminance(data[i]!, data[i + 1]!, data[i + 2]!), 0) / edgeIdx.length;
-      edgeContrast = contrastRatio(meanLum, bgLum);
+      edgeContrast = luminanceContrast(meanLum, bgLum);
     }
   }
 

@@ -129,6 +129,7 @@ export {
   type ComponentContractRuntime,
   type ComponentProbeState,
 } from "./component-contract-plan.ts";
+import { contrastRatio } from "@mizchi/vlmkit-judge/color.ts";
 
 export interface ComponentFromImageOptions {
   targetImagePath: string;
@@ -289,19 +290,6 @@ function rgbDistance(a: [number, number, number], b: [number, number, number]): 
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
-function relativeLuma(rgb: [number, number, number]): number {
-  const channel = (value: number): number => {
-    const normalized = value / 255;
-    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
-}
-
-function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
-  const high = Math.max(relativeLuma(a), relativeLuma(b));
-  const low = Math.min(relativeLuma(a), relativeLuma(b));
-  return (high + 0.05) / (low + 0.05);
-}
 
 export function suggestDeviceScaleFactorForTarget(
   viewport: { width: number; height: number },
@@ -929,6 +917,8 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ExpressiveMenu
       return bodyBg ? [bodyBg[0], bodyBg[1], bodyBg[2]] : undefined;
     }
 
+    // In-page: this callback is serialized into the browser, so it cannot import the judge's
+    // color.ts and carries its own copy of the WCAG formula (same 0.03928 threshold).
     function channel(value: number): number {
       const normalized = value / 255;
       return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;

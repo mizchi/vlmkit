@@ -217,9 +217,17 @@ Still to do on the DOM side:
   roles taken from tags, and requires identical `onHex` / `fillRatio` / `borderRatio` /
   `best` / `vsBody` / cues and identical findings. Dropping the adapter's `underline`
   mapping fails it.
-- Replace the five TypeScript copies of contrast/luminance (`asset-check`,
-  `component-from-image` ×2, `spec-checks`, `page-compose-diff`) with `color.ts`. Check each
-  one's threshold first: not all of them use 0.03928.
+- ~~Replace the TypeScript copies of contrast/luminance with `color.ts`.~~ Done. There were
+  seven, not five (`page-compose-diff` had none; `handler-map`'s drag-legibility proxy and a
+  Lab conversion in `design-md-tokens` were not on the list). The four that run in Node —
+  `asset-check`, `component-from-image`, `spec-checks`, `handler-map` — now import
+  `relativeLuminance` / `contrastRatio` / the new `luminanceContrast`. The threshold question
+  answered itself: `asset-check` used IEC's 0.04045, which disagrees with WCAG's 0.03928 only
+  for a channel in 10.02-10.31, where no 8-bit value lies, and `**` / `Math.pow` agree bit for
+  bit on all 256 channels, so every replacement returns what the copy did. Three copies stay,
+  each for a reason: the in-page script (`contrast-background.ts`), one `page.evaluate`
+  callback in `component-from-image`, and `design-md-tokens`' sRGB→Lab. `tests/contrast-single-
+  definition.test.mjs` lists them and fails on an eighth.
 - **Collect once, judge many — first step done: `vlmkit scan style`.** One page load runs
   the collectors of `check design`, `check composition` and `check color`, whose runners had
   each loaded the same page the same way (1280x900, `networkidle`, `settlePage(250)`, the
