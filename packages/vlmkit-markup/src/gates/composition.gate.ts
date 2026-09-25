@@ -19,7 +19,8 @@ import { readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import {
   COMPOSITION_ALLOW_HELP,
   type CompositionOptions,
@@ -27,9 +28,10 @@ import {
   formatCompositionReport,
   parseCompositionAllowRules,
   runCompositionCheck,
+  runSceneCompositionCheck,
 } from "../style/composition.ts";
 
-export const compositionGate = defineGate<CompositionReport, CompositionOptions>({
+export const compositionGate = defineGate<CompositionReport, CompositionOptions & { elementsPath?: string }>({
   id: "check.composition",
   command: ["check", "composition"],
   title: "Composition principles (proximity / alignment / contrast)",
@@ -107,12 +109,16 @@ docs/design/composition-metrics.md`,
   inputs: [
     {
       name: "source", placeholder: "html-or-url", kind: "path-or-url",
-      description: "Page to check", positional: 0, required: true,
+      description: "Page to check (omit when using --elements)", positional: 0,
+    },
+    {
+      name: "elements", placeholder: "scene.json", kind: "path",
+      description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Boxes, `heading`, font size / weight, background, border and radius are what it reads",
     },
     {
       name: "viewport", kind: "number",
-      description: "Viewport width; composition is a function of width, so it is reported",
-      defaultDescription: "1280",
+      description: "Viewport width; composition is a function of width, so it is reported (with --elements: the frame width)",
+      defaultDescription: "1280; with --elements, the scene's rightmost edge",
     },
     {
       name: "allow", placeholder: "<selector>;<reason>", kind: "string", repeatable: true,
@@ -126,9 +132,24 @@ docs/design/composition-metrics.md`,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check composition <html-or-url>", [
-      "--viewport", "--allow", "--storage-state",
-    ]);
+    const valueFlags = ["--viewport", "--allow", "--storage-state", "--elements"];
+    const elements = readFlag(argv, "elements");
+    if (elements) {
+      // Mutually exclusive with a page, as in `check integrity`, `check color` and `check design`.
+      if (firstPositionalOrUndefined(argv, valueFlags)) {
+        throw new UsageError("check composition takes either a page source or --elements, not both.");
+      }
+      const viewport = readInt(argv, "viewport", { min: 1 });
+      const allow = readAll(argv, "allow");
+      parseCompositionAllowRules(allow);
+      return {
+        source: elements,
+        elementsPath: elements,
+        ...(viewport !== undefined ? { viewport } : {}),
+        ...(allow.length > 0 ? { allow } : {}),
+      };
+    }
+    const source = firstPositional(argv, "vlmkit check composition <html-or-url> | --elements <scene.json>", valueFlags);
     // Validated at read time so a typo'd width fails in milliseconds rather
         // than rendering the page at NaN and reporting on nothing.
     const viewport = readInt(argv, "viewport", { min: 200 });
@@ -147,7 +168,9 @@ docs/design/composition-metrics.md`,
       ...(pageLoad.har ? { har: pageLoad.har } : {}),
     };
   },
-  run: (options) => runCompositionCheck(options),
+  run: (options) => (options.elementsPath
+    ? runSceneCompositionCheck({ ...options, elementsPath: options.elementsPath })
+    : runCompositionCheck(options)),
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,
