@@ -5,8 +5,10 @@ import {
   compositeBackground,
   contrastRatio,
   formatRgb,
+  luminanceContrast,
   measureTextContrast,
   parseColor,
+  relativeLuminance,
   textContrastFloor,
 } from "./color.ts";
 
@@ -44,6 +46,28 @@ describe("contrastRatio", () => {
 
   it("does not depend on argument order", () => {
     assert.equal(contrastRatio([10, 20, 30], [200, 210, 220]), contrastRatio([200, 210, 220], [10, 20, 30]));
+  });
+  it("is luminanceContrast over the two relative luminances", () => {
+    const a = [30, 90, 200] as const;
+    const b = [250, 240, 180] as const;
+    assert.equal(contrastRatio(a, b), luminanceContrast(relativeLuminance(a), relativeLuminance(b)));
+    assert.equal(luminanceContrast(0.2, 0.7), luminanceContrast(0.7, 0.2));
+  });
+});
+
+describe("relativeLuminance", () => {
+  it("gives the same answer with IEC's 0.04045 threshold as with WCAG's 0.03928, on every 8-bit channel", () => {
+    // Why the copies that used IEC's threshold could be replaced exactly: the two linearisations
+    // only disagree for a channel in (0.03928, 0.04045] of 255, i.e. 10.02-10.31, and no 8-bit
+    // value lies there. asset-check.ts (IEC) and the WCAG copies were one formula all along.
+    const lin = (v: number, threshold: number) => {
+      const c = v / 255;
+      return c <= threshold ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    for (let v = 0; v <= 255; v++) {
+      assert.equal(lin(v, 0.04045), lin(v, 0.03928), `channel ${v}`);
+      assert.equal(relativeLuminance([v, v, v]), 0.2126 * lin(v, 0.04045) + 0.7152 * lin(v, 0.04045) + 0.0722 * lin(v, 0.04045), `grey ${v}`);
+    }
   });
 });
 

@@ -40,6 +40,7 @@ import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { PNG } from "pngjs";
 import type { Browser, ElementHandle, JSHandle, Page } from "playwright";
+import { luminanceContrast, relativeLuminance } from "@mizchi/vlmkit-judge/color.ts";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -1125,18 +1126,10 @@ export interface DragTimelineStep {
  */
 function inkPaperContrast(png: Buffer): number {
   const img = PNG.sync.read(png);
-  const channel = (v: number) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
   const lum: number[] = [];
   for (let i = 0; i < img.data.length; i += 4) {
     if (img.data[i + 3]! < 8) continue;
-    lum.push(
-      0.2126 * channel(img.data[i]!)
-      + 0.7152 * channel(img.data[i + 1]!)
-      + 0.0722 * channel(img.data[i + 2]!),
-    );
+    lum.push(relativeLuminance([img.data[i]!, img.data[i + 1]!, img.data[i + 2]!]));
   }
   // Too few pixels to have deciles worth the name. 1 reads as "no contrast measured" and the
   // caller drops the row rather than grading it.
@@ -1145,7 +1138,7 @@ function inkPaperContrast(png: Buffer): number {
   const mean = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
   const ink = Math.max(1, Math.round(lum.length * 0.02));
   const paper = Math.max(1, Math.round(lum.length * 0.1));
-  return (mean(lum.slice(-paper)) + 0.05) / (mean(lum.slice(0, ink)) + 0.05);
+  return luminanceContrast(mean(lum.slice(-paper)), mean(lum.slice(0, ink)));
 }
 
 /**
