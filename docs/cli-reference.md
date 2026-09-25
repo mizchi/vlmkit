@@ -362,9 +362,22 @@ text nodes in the DOM.
 
 Three of the five copy rules run here; `redirected` and `copy-image-mismatch` need a
 navigation result and a reference screenshot, and are named in the report's coverage block.
-`copy-invisible` covers 2 of its 7 reason classes — `zero-size` and, with `--image`,
-`unpainted` (a text bbox the frame shows as flat means the glyphs were never drawn: missing
-font, alpha 0, skipped draw call). The other five need computed styles.
+`copy-invisible` sorts drawn text with the page's own reason classes, as far as the scene
+carries the facts for them, and the coverage block names which ran:
+
+| class | from | means |
+|---|---|---|
+| `zero-size` | geometry | an empty box |
+| `visually-hidden` | geometry | a box, or its `clip`, under 4px² — the sr-only shape |
+| `hidden` | `opacity` on the text or a recorded ancestor | their product under 0.02 |
+| `transparent` | `color` | the text colour's alpha under 0.02 |
+| `camouflage` | `color` + `background` | within 8 per channel of the nearest opaque background behind it; an image behind or a `text_shadow` rescues it |
+| `unpainted` | `--image` | the text bbox is flat in the frame: the glyphs were never drawn (missing font, alpha 0, skipped draw call) |
+
+`unreachable` never runs: the page decides it from the scroll extent and every ancestor's
+overflow clip, which element rects do not carry. Camouflage over nothing opaque is left
+unjudged and counted — the page compares against white there, and a scene has no default
+canvas colour.
 
 One rule is new and only fires here: **`copy-truncated`**. It needs `textMeasured` and a
 `clip` rect, and it exists because the manifest matches the string the *renderer* reports —

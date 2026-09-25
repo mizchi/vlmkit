@@ -248,6 +248,16 @@ Still to do on the DOM side:
   same page over all seven `fixtures/composition/` pages plus one page with a radius-only
   section and a 1px rule, and requires the **whole report** to match, selectors mapped back.
   Dropping the 2px filter, the radius mapping or the font weight each fails it.
+- ~~`check copy` judged in the judge package.~~ Done. `analyzeCopy` and its types moved to
+  `@mizchi/vlmkit-judge/copy.ts` (re-exported from `copy-check.ts`), and the element-rect path
+  became `judgeSceneCopy`: `copy-image.ts` only reads the files and the frame's pixels, which
+  reach the judge as an `ink` callback. The scene path also stopped ignoring paint. It had
+  run 2 of `copy-invisible`'s 7 reason classes whatever the scene said, so a HUD string at
+  `opacity: 0` or drawn in its panel's colour passed as visible; it now runs `hidden`,
+  `transparent`, `visually-hidden` and `camouflage` whenever the scene carries `opacity` /
+  `color` / `background`, and names the classes that could not run. `copy-scene-parity.test.ts`
+  puts one line per hiding vector on a page and requires the real collectors and the scene to
+  sort every line the same way; removing any one of the four classes fails it.
 
 Next judges to move, ranked by pure functions already exported:
 
@@ -255,7 +265,6 @@ Next judges to move, ranked by pure functions already exported:
 |---|---:|---:|---|
 | `a11y-touch.ts` | 549 | 2 | |
 | `inspect/grounding-scan.ts` | 1,228 | 2 | |
-| `inspect/copy-check.ts` | 981 | 1 | |
 | `stress/breakpoint-check.ts`, `inspect/scroll-scan.ts`, `a11y-contrast.ts`, `a11y-focus-order.ts` | 400-640 each | 1 | |
 
 `handler-map.ts` (4,384 lines, 0 exported judges) and `interaction-map.ts` are

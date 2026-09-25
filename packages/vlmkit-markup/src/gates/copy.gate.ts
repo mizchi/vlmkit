@@ -146,15 +146,18 @@ WebGPU / native UIs where the DOM holds one <canvas> and every text rule
 finds nothing. Each row carries {path, tag, top, left, width, height, text}
 plus optional {textMeasured, clip} — the same schema as
 "check integrity --elements". No browser is started. Mutually exclusive with
-a page source. With --image <frame.png> each text bbox is also checked for
-ink, so a string the renderer reports but never painted (missing font,
-alpha 0, skipped draw call) reads as copy-invisible (reason: unpainted)
+a page source. Paint fields sort drawn text the way the page does: opacity
+down the chain (hidden), a text color with alpha 0 (transparent), a box or
+clip under 4px^2 (visually-hidden), a color within 8 of the opaque background
+behind it (camouflage). With --image <frame.png> each text bbox is also
+checked for ink, so a string the renderer reports but never painted (missing
+font, alpha 0, skipped draw call) reads as copy-invisible (reason: unpainted)
 instead of passing.
 
-${COPY_IMAGE_SKIPPED_RULES.length} rule(s) cannot run in element-rect mode and
-copy-invisible covers 2 of its 7 reason classes there; every gap is printed
-under "Coverage" next to the verdict, because a clean result is worth what it
-rules out.`,
+${COPY_IMAGE_SKIPPED_RULES.length} rule(s) cannot run in element-rect mode, and copy-invisible runs
+only the reason classes the scene carries facts for (unreachable never); every
+gap is printed under "Coverage" next to the verdict, because a clean result is
+worth what it rules out.`,
   rules: [
     {
       id: "placeholder-text",

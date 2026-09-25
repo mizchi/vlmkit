@@ -22,6 +22,7 @@ import { blendColor, compositeBackground, parseColor, toHex, type Rgb, type Rgba
 import type { CompositionBox, CompositionInput } from "./composition.ts";
 import type { ColorRolesInput, ColorUse, ControlSample, LinkSample } from "./color-roles.ts";
 import type { DesignPolicyInput, DesignSpacingSample, DesignStyleSample } from "./design-policy.ts";
+import { analyzeCopy, normalizeWhitespace, type CopyCheckReport, type InvisibleReason } from "./copy.ts";
 import {
   findTextCollisions,
   judgeAlignment,
@@ -980,4 +981,329 @@ function parseRect(
   if (parts.some((part) => part === undefined)) return undefined;
   const [top, left, width, height] = parts as [number, number, number, number];
   return { top, left, width, height };
+}
+
+// ---------------------------------------------------------------------------
+// check copy
+
+/** `check copy` rules a scene cannot support, each with the reason. Reported, not hidden. */
+export const SCENE_COPY_SKIPPED_RULES: readonly { rule: string; reason: string }[] = [
+  { rule: "redirected", reason: "needs a navigation result; element rects carry no URL" },
+  {
+    rule: "copy-image-mismatch",
+    reason: "needs a reference screenshot to crop and transcribe (--target), which this mode does not accept",
+  },
+];
+
+/** One element whose text is drawn but cut off by its own clip rect. */
+export interface SceneCopyTruncation {
+  selector: string;
+  text: string;
+  /** Px of text beyond the clip rect, per axis. */
+  clippedX: number;
+  clippedY: number;
+  /** Manifest lines this element's text satisfies — satisfied on paper, unreadable in fact. */
+  manifestLines: string[];
+}
+
+export interface SceneCopyReport extends CopyCheckReport {
+  /** Rules that cannot run on a scene, and why. */
+  skippedRules: { rule: string; reason: string }[];
+  /** Rules that ran but had no input — e.g. no element carried `text`. */
+  inertRules: { rule: string; reason: string }[];
+  /** Coverage caveats that are not per-rule (partial reason classes, unchecked elements). */
+  coverageNotes: string[];
+  truncated: SceneCopyTruncation[];
+  elements: number;
+  textElements: number;
+}
+
+/** What the frame's pixels say about one text element's box. */
+export type SceneInkVerdict = "painted" | "unpainted" | "off-frame";
+
+export interface SceneCopyOptions {
+  /** Named in the report (the frame image, or the elements file). */
+  source: string;
+  manifestLines?: string[];
+  /** Copy that must be gone (`--forbid`). */
+  forbiddenLines?: string[];
+  /** Invisible-match reason classes accepted as satisfied (`--allow-invisible`). */
+  allowInvisible?: InvisibleReason[];
+  /**
+   * Pixel evidence for the `unpainted` class: whether the frame has ink inside an element's
+   * box. The caller reads the image; the judge only needs the answer, so it stays free of
+   * any image decoder. Omitted, the class does not run and the report says so.
+   */
+  ink?: (element: SceneElement) => SceneInkVerdict;
+  /** The frame image's name, for the coverage note when `ink` ran. */
+  inkSource?: string;
+}
+
+/**
+ * Px of text beyond the clip rect below which truncation is not worth reporting — the floor
+ * image-mode `check integrity` uses for `text-clipped`. Sub-pixel layout and glyph-metric
+ * rounding routinely produce 1-2px of overhang on text that reads fine.
+ */
+const COPY_TRUNCATION_FLOOR = 4;
+/** Opacity or colour alpha below which text is unseen — `COLLECT_TEXT_VISIBILITY`'s 0.02. */
+const COPY_UNSEEN_ALPHA = 0.02;
+/** px^2 of box a string needs to be legible — the page's `reachableArea < 4` (a 1x1 sr-only box). */
+const COPY_MIN_AREA = 4;
+/** Max RGB channel distance at which text reads as its background — the page's `camouflaged`. */
+const CAMOUFLAGE_CHANNEL_DELTA = 8;
+
+function inheritedOpacity(element: SceneElement, byPath: ReadonlyMap<string, SceneElement>): number {
+  let opacity = element.opacity ?? 1;
+  for (let node = nearestRecordedAncestor(element, byPath); node; node = nearestRecordedAncestor(node, byPath)) {
+    opacity *= node.opacity ?? 1;
+  }
+  return opacity;
+}
+
+/**
+ * Text drawn in (nearly) the colour behind it, the page's `camouflaged`: the nearest opaque
+ * (alpha >= 0.9) background up the recorded chain, within 8 on every channel. A text shadow
+ * or an image behind rescues it. `null` when nothing opaque is behind the text: the page
+ * compares against white there, a scene has no default canvas, so the question is left
+ * unanswered rather than answered for a white the frame may not contain.
+ */
+function camouflaged(element: SceneElement, byPath: ReadonlyMap<string, SceneElement>): boolean | null {
+  const fg = parseColor(element.color);
+  if (!fg) return null;
+  if (element.textShadow) return false;
+  for (let node: SceneElement | undefined = element; node; node = nearestRecordedAncestor(node, byPath)) {
+    if (node.backgroundImage) return false;
+    const bg = parseColor(node.background);
+    if (bg && bg[3] >= 0.9) {
+      return Math.max(Math.abs(fg[0] - bg[0]), Math.abs(fg[1] - bg[1]), Math.abs(fg[2] - bg[2])) <= CAMOUFLAGE_CHANNEL_DELTA;
+    }
+  }
+  return null;
+}
+
+/**
+ * Why a text element cannot be read, in the order `COLLECT_TEXT_VISIBILITY` asks the page:
+ * hidden (opacity down the chain), zero-size (no box), transparent (the text colour's own
+ * alpha), visually-hidden (a box — or a clip — too small to hold a legible glyph), then
+ * camouflage. `null` for text a reader can see, as far as the scene says.
+ *
+ * `unreachable` is the one class never returned: the page decides it from the scroll extent
+ * and every ancestor's overflow clip, and element rects carry neither.
+ */
+export function sceneTextVisibility(
+  element: SceneElement,
+  byPath: ReadonlyMap<string, SceneElement>,
+): Exclude<InvisibleReason, "unreachable" | "unpainted" | "unknown"> | null {
+  if (inheritedOpacity(element, byPath) < COPY_UNSEEN_ALPHA) return "hidden";
+  if (element.width <= 0 || element.height <= 0) return "zero-size";
+  const fg = parseColor(element.color);
+  if (fg && fg[3] < COPY_UNSEEN_ALPHA) return "transparent";
+  const clip = element.clip;
+  const w = clip ? Math.min(element.left + element.width, clip.left + clip.width) - Math.max(element.left, clip.left) : element.width;
+  const h = clip ? Math.min(element.top + element.height, clip.top + clip.height) - Math.max(element.top, clip.top) : element.height;
+  if (Math.max(0, w) * Math.max(0, h) < COPY_MIN_AREA) return "visually-hidden";
+  if (camouflaged(element, byPath) === true) return "camouflage";
+  return null;
+}
+
+/** Px of text beyond the element's own clip rect, or `null` when it fits (or cannot be known). */
+function copyTruncation(element: SceneElement): { clippedX: number; clippedY: number } | null {
+  // Both fields required, deliberately. `textMeasured` alone says the string is wider than
+  // its box, which on a canvas means it *overdraws* its neighbours — a collision, not a
+  // truncation, and naming it "cut off" would send the reader after the wrong repair. Image
+  // mode `check integrity` draws the same line for the same reason.
+  if (!element.textMeasured || !element.clip) return null;
+  const clippedX = Math.round(element.textMeasured.width - element.clip.width);
+  const clippedY = Math.round(element.textMeasured.height - element.clip.height);
+  if (clippedX < COPY_TRUNCATION_FLOOR && clippedY < COPY_TRUNCATION_FLOOR) return null;
+  return { clippedX: Math.max(0, clippedX), clippedY: Math.max(0, clippedY) };
+}
+
+/**
+ * `check copy` on a scene: the renderer's own strings, sorted into what a reader sees and
+ * what they cannot (with the page's reason classes), then judged by the same `analyzeCopy`
+ * the DOM path uses — placeholder scan, manifest, forbid list, invisible-reason attribution.
+ *
+ * Reading order is (top, left), the order `COLLECT_TEXT_BLOCKS` sorts blocks into, so a
+ * manifest line may span two adjacent drawn strings as it may span two text nodes. On top of
+ * the page's rules a scene adds `copy-truncated`: a string whose measured extent runs past its
+ * own clip rect, which only the renderer can measure.
+ *
+ * Coverage is reported, not implied. Which of the seven invisible-reason classes ran depends
+ * on what the scene carries — geometry always, `opacity` for hidden, a text `color` for
+ * transparent and camouflage, the frame's pixels for unpainted — and the note names both the
+ * classes that ran and the ones that could not.
+ */
+export function judgeSceneCopy(elements: readonly SceneElement[], options: SceneCopyOptions): SceneCopyReport {
+  const byPath = new Map(elements.map((element) => [element.path, element]));
+  const manifestLines = options.manifestLines;
+
+  const withText = elements
+    .filter((element) => (element.text ?? "").trim().length > 0)
+    .sort((a, b) => a.top - b.top || a.left - b.left);
+
+  const visible: string[] = [];
+  const invisibleChunks: { reason: string; text: string }[] = [];
+  const truncated: SceneCopyTruncation[] = [];
+  let offFrame = 0;
+  let inkChecked = 0;
+  let camouflageUnjudged = 0;
+
+  for (const element of withText) {
+    const text = element.text!;
+    const reason = sceneTextVisibility(element, byPath);
+    if (reason) {
+      invisibleChunks.push({ reason, text });
+      continue;
+    }
+    if (element.color !== undefined && camouflaged(element, byPath) === null) camouflageUnjudged++;
+    if (options.ink) {
+      const verdict = options.ink(element);
+      if (verdict === "off-frame") {
+        offFrame++;
+      } else {
+        inkChecked++;
+        if (verdict === "unpainted") {
+          invisibleChunks.push({ reason: "unpainted", text });
+          continue;
+        }
+      }
+    }
+    visible.push(text);
+    const cut = copyTruncation(element);
+    if (cut) {
+      truncated.push({
+        selector: describeElement(element),
+        text,
+        clippedX: cut.clippedX,
+        clippedY: cut.clippedY,
+        manifestLines: (manifestLines ?? []).filter((line) =>
+          normalizeWhitespace(text).includes(normalizeWhitespace(line))
+        ),
+      });
+    }
+  }
+
+  // Raw text carries every string the engine says it drew, visible or not — that is what
+  // `analyzeCopy` needs to tell copy-invisible (rendered but unseeable) from copy-missing
+  // (never rendered at all).
+  const rawParts = [...visible, ...invisibleChunks.map((chunk) => chunk.text)];
+  const judged = analyzeCopy({
+    source: options.source,
+    pageText: rawParts.join("\n"),
+    visibleText: visible.join("\n"),
+    invisibleChunks,
+    ...(options.allowInvisible ? { allowInvisible: options.allowInvisible } : {}),
+    ...(manifestLines ? { manifestLines } : {}),
+    ...(options.forbiddenLines ? { forbiddenLines: options.forbiddenLines } : {}),
+  });
+
+  // Truncation is reported for every clipped text element, not only manifest-carrying ones:
+  // the reported pain (vlmkit#118) is a dynamic number outgrowing its box, and no static
+  // manifest lists those. This overlaps image-mode `check integrity`'s `text-clipped` by
+  // design — integrity answers "is this frame broken", copy answers "can the user read the
+  // strings".
+  for (const cut of truncated) {
+    const axis = cut.clippedX >= cut.clippedY ? `${cut.clippedX}px horizontally` : `${cut.clippedY}px vertically`;
+    const satisfied = cut.manifestLines.length > 0
+      ? ` It satisfies manifest line(s) ${cut.manifestLines.map((l) => `"${l}"`).join(", ")} on paper,`
+        + ` but the user cannot read all of it.`
+      : "";
+    judged.issues.push({
+      kind: "copy-truncated",
+      severity: "suspect",
+      message: `${cut.selector} draws "${cut.text}" but its measured text runs ${axis} past the clip rect,`
+        + ` so it renders cut off.${satisfied}`
+        + ` Shorten the string, widen the box, or shrink the type.`,
+    });
+  }
+
+  const inertRules: { rule: string; reason: string }[] = [];
+  if (withText.length === 0) {
+    inertRules.push({ rule: "placeholder-text", reason: "no element carried `text`; nothing to scan" });
+  }
+  // Ordered so `copy-missing` gets exactly one reason: no manifest is the more fundamental
+  // absence, and reporting both would read as two independent gaps.
+  if (manifestLines === undefined) {
+    inertRules.push({ rule: "copy-missing", reason: "no --manifest given; there is nothing to require" });
+  } else if (withText.length === 0) {
+    inertRules.push({
+      rule: "copy-missing",
+      reason: "no element carried `text`, so every manifest line reports missing for want of input rather than for a real absence",
+    });
+  }
+  if (withText.every((element) => !element.textMeasured || !element.clip)) {
+    inertRules.push({
+      rule: "copy-truncated",
+      reason: withText.some((element) => element.textMeasured)
+        ? "no element declared both `textMeasured` and a `clip` rect; text wider than its box overdraws rather than truncating unless a clip says otherwise"
+        : "no element carried `textMeasured`; only the renderer knows the drawn extent",
+    });
+  }
+
+  const coverageNotes = [copyReasonCoverage(withText, byPath, options.ink !== undefined)];
+  if (camouflageUnjudged > 0) {
+    coverageNotes.push(
+      `${camouflageUnjudged} text element(s) carry a colour but nothing opaque behind them, so camouflage`
+      + " went unjudged for them: a scene has no default canvas colour to compare against.",
+    );
+  }
+  if (!options.ink) {
+    coverageNotes.push(
+      "No --image: text the engine reports but never actually painted (missing font, alpha 0,"
+      + " skipped draw call) cannot be detected. Pass the frame PNG to enable the ink check.",
+    );
+  } else {
+    coverageNotes.push(`Ink checked in ${inkChecked} text bbox(es) against ${options.inkSource ?? "the frame"}.`);
+    if (offFrame > 0) {
+      coverageNotes.push(
+        `${offFrame} text element(s) lie outside the frame, so their ink went unchecked. Element`
+        + " rects carry no scroll or clip-chain data, so \"never drawn\" and \"scrolled out of this"
+        + " frame\" are indistinguishable and neither is reported.",
+      );
+    }
+  }
+  coverageNotes.push(
+    "No disclosure-state sweep: opening <details> and clicking tabs needs a live page, so copy"
+    + " only reachable through an interaction is absent from this input, not hidden in it.",
+  );
+
+  return {
+    ...judged,
+    skippedRules: [...SCENE_COPY_SKIPPED_RULES],
+    inertRules,
+    coverageNotes,
+    truncated,
+    elements: elements.length,
+    textElements: withText.length,
+  };
+}
+
+/** Which of the page's seven invisible-reason classes this scene could evaluate, and why not the rest. */
+function copyReasonCoverage(
+  withText: readonly SceneElement[],
+  byPath: ReadonlyMap<string, SceneElement>,
+  ink: boolean,
+): string {
+  const hasOpacity = withText.some((element) => {
+    for (let node: SceneElement | undefined = element; node; node = nearestRecordedAncestor(node, byPath)) {
+      if (node.opacity !== undefined) return true;
+    }
+    return false;
+  });
+  const hasColor = withText.some((element) => element.color !== undefined);
+  const classes: { reason: string; runs: boolean; needs: string }[] = [
+    { reason: "zero-size", runs: true, needs: "" },
+    { reason: "visually-hidden", runs: true, needs: "" },
+    { reason: "hidden", runs: hasOpacity, needs: "an `opacity` on the text or an ancestor" },
+    { reason: "transparent", runs: hasColor, needs: "a text `color`" },
+    { reason: "camouflage", runs: hasColor, needs: "a text `color` and a `background` behind it" },
+    { reason: "unpainted", runs: ink, needs: "the frame's pixels, --image on the CLI" },
+    { reason: "unreachable", runs: false, needs: "a scroll extent and every ancestor's overflow clip, which element rects do not carry" },
+  ];
+  const ran = classes.filter((c) => c.runs);
+  const not = classes.filter((c) => !c.runs);
+  // "7", not INVISIBLE_REASONS.length: `unknown` is the attribution fallback, not a class.
+  return `copy-invisible covers ${ran.length} of its 7 reason classes here: ${ran.map((c) => c.reason).join(", ")}.`
+    + (not.length > 0 ? ` Not evaluated: ${not.map((c) => `${c.reason} (needs ${c.needs})`).join("; ")}.` : "");
 }
