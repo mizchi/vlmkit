@@ -1,0 +1,96 @@
+{
+  "page": "triage",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "scale": 0.5,
+  "wheelUnits": "screenshot",
+  "actions": [
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 118
+      }
+    },
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 100
+      },
+      "dy": 80
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 176
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 191,
+        "y": 108
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 189,
+        "y": 106
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 195,
+        "y": 107
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 560,
+        "y": 48
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 190,
+        "y": 127
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 189,
+        "y": 127
+      }
+    },
+    {
+      "kind": "move",
+      "at": {
+        "x": 400,
+        "y": 300
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 190,
+        "y": 125
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 188,
+        "y": 126
+      }
+    }
+  ]
+}

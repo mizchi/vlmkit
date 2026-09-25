@@ -28,6 +28,7 @@ import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { RESOLUTION_PRESETS, type ResolutionPreset } from "@mizchi/vlmkit-core/image-resize.ts";
 import {
+  type GroundingAction,
   type GroundingScanOptions,
   type GroundingScanReport,
   formatGroundingReport,
@@ -78,6 +79,34 @@ export function parseAtPoints(argv: readonly string[]): { x: number; y: number }
   return out;
 }
 
+/**
+ * `--after "click 85,123" --after "wheel 85,150 89"` — the actions to replay
+ * before measuring, in order, in screenshot px.
+ *
+ * Spelled the way a computer-use harness logs them, verb then point, so a
+ * caller's own action history pastes in as-is. Repeatable for the same reason
+ * `--at` is. A malformed action is a UsageError, never a click at (0,0): a
+ * replay that silently did something else would map a screen nobody reached.
+ */
+export function parseAfterActions(argv: readonly string[]): GroundingAction[] {
+  const out: GroundingAction[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== "--after") continue;
+    const raw = argv[i + 1] ?? "";
+    const m = raw.trim().match(/^(click|move|wheel)[\s:]+(-?\d+)\s*,\s*(-?\d+)(?:[\s:]+(-?\d+))?$/i);
+    const kind = m?.[1]?.toLowerCase();
+    if (!m || (kind === "wheel") !== (m[4] !== undefined)) {
+      throw new UsageError(
+        `--after ${JSON.stringify(raw)}: expected "click x,y", "move x,y" or "wheel x,y dy"`
+        + " — screenshot px, like the map's (e.g. --after \"wheel 85,150 89\").",
+      );
+    }
+    const at = { x: Number(m[2]), y: Number(m[3]) };
+    out.push(kind === "wheel" ? { kind: "wheel", at, dy: Number(m[4]) } : kind === "move" ? { kind: "move", at } : { kind: "click", at });
+  }
+  return out;
+}
+
 export const groundingGate = defineGate<GroundingScanReport, GroundingScanOptions>({
   id: "check.grounding",
   command: ["check", "grounding"],
@@ -99,6 +128,14 @@ usable for grounding a click without a VLM.
 --at x,y (repeatable) hit-tests a coordinate you already have and says
 which element a click there would reach -- for checking an answer, or
 a line of this report, before acting on it.
+
+--after "click x,y" (repeatable, in order; also "move x,y" and
+"wheel x,y dy") replays actions before measuring, so the map, --at and
+--mark describe the screen those actions leave -- a detail panel a click
+opened, the rows a scroll revealed. Screenshot px throughout, dy included.
+The report then says what the LAST action changed: what the click landed
+on, controls that came or went or changed state or look, and text that
+appeared or went -- "did it work", which one screen's map cannot answer.
 
 Complements rather than repeats: WCAG touch size is \`check a11y touch\`,
 keyboard behavior is \`check interactions\`, and whether an action had a
@@ -178,6 +215,13 @@ finding.`,
     { name: "aim-margin", placeholder: "px", kind: "number", description: "Click-point-to-neighbour distance in screenshot px below which a miss hits the neighbour", defaultDescription: "6" },
     { name: "mark", placeholder: "png", kind: "path", description: "Write a numbered set-of-mark screenshot here" },
     { name: "at", placeholder: "x,y", kind: "string", description: "Hit-test this screenshot-px point and report what a click there reaches", repeatable: true },
+    {
+      name: "after",
+      placeholder: "action",
+      kind: "string",
+      description: "Replay \"click x,y\" / \"move x,y\" / \"wheel x,y dy\" (screenshot px) before measuring",
+      repeatable: true,
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -187,6 +231,7 @@ finding.`,
       "--aim-margin",
       "--mark",
       "--at",
+      "--after",
     ]);
     const precisionFloor = optionalInt(argv, "precision-floor", { min: 1 });
     const aimMargin = optionalInt(argv, "aim-margin", { min: 0 });
@@ -194,6 +239,7 @@ finding.`,
     const resolution = parseResolution(argv);
     const markPath = readFlag(argv, "mark");
     const at = parseAtPoints(argv);
+    const after = parseAfterActions(argv);
     return {
       source,
       ...(resolution !== undefined ? { resolution } : {}),
@@ -202,6 +248,7 @@ finding.`,
       ...(viewport ? { viewport } : {}),
       ...(markPath ? { markPath } : {}),
       ...(at.length > 0 ? { at } : {}),
+      ...(after.length > 0 ? { after } : {}),
       ...parsePageLoad(argv),
     };
   },

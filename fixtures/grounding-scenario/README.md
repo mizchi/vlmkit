@@ -60,9 +60,9 @@ under test.
 
 - `pages/<name>.html` — the page under test. **Off-limits to every attempt**: it
   is the answer key for half the tasks. Attempts may point tools *at* it.
-- `act.mjs` — the v3 harness: click / wheel / shot / reset, by replay.
-- `score-flow.mjs` — the v3 scorer: replays a session, reads the DOM, checks the
-  goal. Also off-limits.
+- `act.mjs` — the v3/v4 harness: click / move / wheel / shot / reset, by replay.
+- `score-flow.mjs` — the v3/v4 scorer: replays a session, reads the DOM, checks
+  the goal against the session's own page's answer sheet. Also off-limits.
 - `shots/<name>.png` — the one artifact both arms get: the viewport shot at
   1280x720 and reduced to the resolution `check grounding` reports by default
   for that width (640x360, scale 0.5), with the same resampling `image-resize.ts`
@@ -136,6 +136,31 @@ finding, and carries `clippedBy` — the container, whether it scrolls, and how 
 The page went from `status: suspect` with seven false suspects to `status: ok`
 with a scroll plan.
 
+## `triage.html` and its one job (v4)
+
+v3 ended with every arm finishing from pixels alone, so no score could move:
+"A task that discriminates would have to make the pixels insufficient." This page
+does that twice. The job is **archive the checkout-webhook ticket for
+`eu-west-1`**, three actions at best — scroll, open, archive — scored on the DOM,
+with any delete / spam / snooze and any other archive counting against.
+
+| hazard | why it is here |
+|---|---|
+| three tickets from one customer are titled "Checkout webhook retries exhausted for region …" and the list **cuts every title before the region** | the three rows paint the same text; only the detail panel, or the page's own text, says which is which. The look-alike on the first screen (`us-east-1`) is not the target |
+| the detail panel's actions are **icons only** — Archive, Report spam, Delete, Snooze — 15 screenshot px each, named on hover and in `aria-label` | the second screen, which v3's G8 said the map could not see; three of the four take the ticket out of the queue, and at 0.5x the spam octagon reads much like the snooze clock |
+
+The harness gained what the page needs: `--page`, a `move` verb (hover — the one
+way the control arm can read a tooltip), and wheel `dy` in screenshot px for new
+sessions, so a harness action and `check grounding --after` replay to the same
+screen. v3's sessions carry no `wheelUnits` and replay as they did.
+
+One defect was found by **building** the page, before any agent ran, and was
+fixed before the round so it would not spend itself on a known loss: the map cut
+every label at 48 characters, and printed `eu-west-1` and `eu-central-1` as the
+same `"Checkout webhook retries exhausted for region e…"` — the one fact the tool
+had and the picture did not, thrown away by the formatter. A label now runs to
+the end of the word that tells it from its closest sibling.
+
 ## Rounds
 
 | round | agents | scores | what changed in the tool since |
@@ -143,6 +168,7 @@ with a scroll plan.
 | v1 | `a` sonnet+tool, `b` haiku+tool, `c` sonnet control | 6/6, **5/6**, 5/6 | as merged in [#155](https://github.com/mizchi/vlmkit/pull/155) |
 | v2 | `d` haiku+tool, `e` sonnet+tool | **6/6**, 6/6 | the map aims at a reachable point; `--at`; findings quote the frame |
 | v3 | `f` sonnet+tool, `g` haiku+tool, `h` control — the `inbox.html` flow | 4 actions each, all reached | visibility measured against clipping ancestors; `clippedBy` and the *Out of the frame* block |
+| v4 | `i` sonnet+tool, `j` haiku+tool, `k` sonnet control, `l` haiku control — the `triage.html` flow | **3**, 6, 11, 12 — all reached; `l` reported failure | labels cut after the word that differs; `--after`; painted `visibleBox`; findings carry the map id; *what the last action changed* |
 
 v1's two arms failed on **opposite** tasks: the tool won `export-csv`, which the
 image cannot answer (three unlabelled 7x7 colour chips — the control guessed by
@@ -152,7 +178,15 @@ it. Only the agent that used the tool *and* contradicted one of its lines scored
 doing exactly what `b` did: taking the tool's number. An agent that follows the
 map verbatim and reasons about nothing scores 6/6 now and 5/6 before.
 
-Reports: `docs/reports/2026-09-21-grounding-scenario-v{1,2}.md`.
+v4 is the first flow round the tool changed: both tool arms went straight to the
+target, both controls opened look-alikes, and the smaller control archived the
+right ticket on its seventh action, read the "Archived." confirmation as a menu
+item and reported that it had failed. That is why `--after` now says what the
+last action changed and where the click went.
+
+Reports: `docs/reports/2026-09-21-grounding-scenario-v{1,2}.md`,
+`docs/reports/2026-09-22-grounding-scenario-v3.md`,
+`docs/reports/2026-09-23-grounding-scenario-v4.md`.
 
 Two defects were found by **building** the scenario, before any agent ran, and
 both are recorded because a realistic page found them where the synthetic

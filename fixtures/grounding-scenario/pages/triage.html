@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Helpdesk — Triage</title>
+<style>
+  :root { --ink:#15171c; --muted:#6b7280; --line:#e4e6eb; --accent:#1d4ed8; --bg:#f6f7f9; --card:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  header { background:var(--card); border-bottom:1px solid var(--line); height:52px;
+           display:flex; align-items:center; gap:18px; padding:0 20px; }
+  .brand { font-weight:650; font-size:15px; }
+  .crumb { color:var(--muted); font-size:13px; }
+  .spacer { flex:1; }
+  .who { width:28px; height:28px; border-radius:50%; background:#e0e7ff; color:#3730a3;
+         font-size:11px; font-weight:700; display:grid; place-items:center; }
+  main { display:flex; gap:16px; padding:18px 20px; align-items:flex-start; }
+
+  /* ---- Left: a scroll container of single-line rows. A title that does not fit
+     the column is cut with an ellipsis, as every helpdesk list does. ---- */
+  .list-card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+               width:300px; overflow:hidden; }
+  .list-head { padding:12px 14px 8px; font-size:11px; text-transform:uppercase;
+               letter-spacing:.06em; color:var(--muted); font-weight:600;
+               border-bottom:1px solid var(--line); display:flex; }
+  .list-head .count { margin-left:auto; font-weight:500; letter-spacing:0; text-transform:none; }
+  .list { height:262px; overflow-y:auto; }
+  .ticket { display:block; width:100%; text-align:left; background:#fff; border:0;
+            border-bottom:1px solid var(--line); padding:9px 14px; cursor:pointer; font:inherit; }
+  .ticket:hover { background:#f9fafb; }
+  .ticket[aria-current="true"] { background:#eef2ff; }
+  .ticket .t { display:block; font-weight:550; font-size:13px;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ticket .m { display:block; color:var(--muted); font-size:11px; }
+  .ticket[data-state="archived"] .t { text-decoration:line-through; color:var(--muted); }
+
+  /* ---- Right: the detail panel, empty until a ticket is chosen ---- */
+  .detail { background:var(--card); border:1px solid var(--line); border-radius:10px;
+            flex:1; min-height:306px; padding:14px 18px; }
+  .empty { color:var(--muted); font-size:13px; }
+  .detail-head { display:flex; align-items:flex-start; gap:16px; }
+  .detail-head .titles { flex:1; }
+  .detail h2 { font-size:15px; margin:0 0 4px; }
+  .detail .meta { color:var(--muted); font-size:12px; margin:0 0 14px; }
+  .detail .body { font-size:13px; margin:0 0 18px; max-width:52ch; }
+
+  /* The toolbar is icons only, like every mail client's. The names are in
+     aria-label; the words appear on hover. */
+  .toolbar { display:flex; gap:2px; }
+  .tool { position:relative; width:30px; height:30px; border:0; border-radius:6px;
+          background:transparent; color:#374151; cursor:pointer; display:grid; place-items:center; padding:0; }
+  .tool:hover { background:#f3f4f6; }
+  .tool svg { width:17px; height:17px; }
+  .tool.sep { margin-left:10px; }
+  .tool:hover::after { content:attr(data-tip); position:absolute; top:34px; left:50%;
+                       transform:translateX(-50%); background:#111827; color:#fff; font-size:11px;
+                       padding:3px 7px; border-radius:4px; white-space:nowrap; z-index:2; }
+  .reply { height:32px; padding:0 14px; border-radius:7px; font-size:13px; cursor:pointer;
+           background:var(--accent); color:#fff; border:0; font-weight:600; }
+  .flash { margin-top:14px; font-size:12px; color:#047857; }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">Helpdesk</span>
+  <span class="crumb">Triage · Billing queue</span>
+  <span class="spacer"></span>
+  <span class="who" aria-hidden="true">RM</span>
+</header>
+
+<main>
+  <section class="list-card">
+    <div class="list-head">Open tickets <span class="count">14</span></div>
+    <div class="list" id="list">
+      <button class="ticket" data-id="t1"><span class="t">Invoice PDF is blank for multi-currency accounts</span><span class="m">Acme Freight · 1h</span></button>
+      <button class="ticket" data-id="t2"><span class="t">SSO login loop after password reset</span><span class="m">Globex Media · 3h</span></button>
+      <button class="ticket" data-id="t3"><span class="t">Checkout webhook retries exhausted for region us-east-1</span><span class="m">Wayne Enterprises · 4h</span></button>
+      <button class="ticket" data-id="t4"><span class="t">Seat count mismatch on annual plan</span><span class="m">Umbrella Co · 6h</span></button>
+      <button class="ticket" data-id="t5"><span class="t">Cannot remove teammate from workspace</span><span class="m">Soylent · 7h</span></button>
+      <button class="ticket" data-id="t6"><span class="t">Dark mode contrast on invoices</span><span class="m">Hooli · 9h</span></button>
+      <button class="ticket" data-id="t7"><span class="t">API key rotation docs are outdated</span><span class="m">Massive Dynamic · 10h</span></button>
+      <button class="ticket" data-id="t8"><span class="t">Checkout webhook retries exhausted for region eu-west-1</span><span class="m">Wayne Enterprises · 12h</span></button>
+      <button class="ticket" data-id="t9"><span class="t">Webhook signature returns 401</span><span class="m">Stark Industries · 13h</span></button>
+      <button class="ticket" data-id="t10"><span class="t">Slow billing dashboard on mobile</span><span class="m">Cyberdyne · 14h</span></button>
+      <button class="ticket" data-id="t11"><span class="t">Checkout webhook retries exhausted for region eu-central-1</span><span class="m">Wayne Enterprises · 15h</span></button>
+      <button class="ticket" data-id="t12"><span class="t">CSV export encoding garbled</span><span class="m">Tyrell Corp · 18h</span></button>
+      <button class="ticket" data-id="t13"><span class="t">Refund stuck in pending</span><span class="m">Vandelay · 20h</span></button>
+      <button class="ticket" data-id="t14"><span class="t">Tax ID rejected for EU customer</span><span class="m">Oscorp · 22h</span></button>
+    </div>
+  </section>
+
+  <section class="detail" id="detail">
+    <p class="empty">Select a ticket to read it.</p>
+  </section>
+</main>
+
+<script>
+  const DETAIL = document.getElementById("detail");
+  const BODIES = {
+    t3: "Retries stop after the third attempt on us-east-1. Low volume there; the customer asked us to watch it rather than fix it today.",
+    t8: "Retries stop after the third attempt even though the endpoint returns 500. eu-west-1 carries most of their checkout volume.",
+    t11: "Retries stop after the third attempt on eu-central-1. Duplicate of an earlier report; keep it open until that one closes.",
+  };
+  const ICONS = {
+    archive: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="3.5" width="15" height="4" rx="1"/><path d="M4 7.5v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-8M8 11h4"/></svg>',
+    spam: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 2.5h6l4.5 4.5v6L13 17.5H7L2.5 13V7z"/><path d="M10 6.5v4.5M10 13.5v.5"/></svg>',
+    delete: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 5.5h13M8 5.5V3.5h4v2M5.5 5.5l.8 11a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-11"/></svg>',
+    snooze: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10.5" r="6.5"/><path d="M10 7v3.5l2.5 1.5"/></svg>',
+  };
+  let current = null;
+
+  // Every action on a ticket is final inside a run: nothing here can be undone
+  // except by starting over.
+  function settle(state, message) {
+    current.dataset.state = state;
+    if (state !== "archived") {
+      current.hidden = true;
+      DETAIL.innerHTML = `<p class="empty">${message}</p>`;
+    } else {
+      DETAIL.insertAdjacentHTML("beforeend", `<p class="flash">${message}</p>`);
+    }
+  }
+
+  document.getElementById("list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".ticket");
+    if (!btn) return;
+    for (const t of document.querySelectorAll(".ticket")) t.removeAttribute("aria-current");
+    btn.setAttribute("aria-current", "true");
+    current = btn;
+    const title = btn.querySelector(".t").textContent;
+    const meta = btn.querySelector(".m").textContent;
+    DETAIL.innerHTML = `
+      <div class="detail-head">
+        <div class="titles">
+          <h2 id="detail-title">${title}</h2>
+          <p class="meta">${meta}</p>
+        </div>
+        <div class="toolbar" role="toolbar" aria-label="Ticket actions">
+          <button class="tool" data-act="archive" aria-label="Archive" data-tip="Archive">${ICONS.archive}</button>
+          <button class="tool" data-act="spam" aria-label="Report spam" data-tip="Report spam">${ICONS.spam}</button>
+          <button class="tool" data-act="delete" aria-label="Delete" data-tip="Delete">${ICONS.delete}</button>
+          <button class="tool sep" data-act="snooze" aria-label="Snooze until tomorrow" data-tip="Snooze">${ICONS.snooze}</button>
+        </div>
+      </div>
+      <p class="body">${BODIES[btn.dataset.id] ?? "No description was attached to this ticket."}</p>
+      <button class="reply" id="reply">Reply</button>`;
+    DETAIL.querySelector(".toolbar").addEventListener("click", (ev) => {
+      const tool = ev.target.closest(".tool");
+      if (!tool) return;
+      const act = tool.dataset.act;
+      if (act === "archive") settle("archived", "Archived.");
+      if (act === "spam") settle("spam", "Reported as spam.");
+      if (act === "delete") settle("deleted", "Deleted.");
+      if (act === "snooze") settle("snoozed", "Snoozed until tomorrow.");
+    });
+  });
+</script>
+</body>
+</html>
