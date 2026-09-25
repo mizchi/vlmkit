@@ -355,12 +355,25 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
     const input = await page.evaluate(COLLECT_COLOR_ROLES) as ColorRolesInput;
-    const report = judgeColorRoles(input, { source: options.source, allow: options.allow });
-    if (redirect) {
-      report.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
-    }
-    return await finishColorRoles(report, options);
+    return await judgeCollectedColorRoles(input, redirect, options);
   });
+}
+
+/**
+ * The judging half of `runColorRolesCheck`, for a palette collected earlier — by this runner,
+ * or by `scan style` into a snapshot. Same judge, redirect finding, ledger entry and
+ * `--report` file.
+ */
+export async function judgeCollectedColorRoles(
+  input: ColorRolesInput,
+  redirect: string | null,
+  options: Pick<ColorRolesOptions, "source" | "allow" | "reportPath">,
+): Promise<ColorRolesReport> {
+  const report = judgeColorRoles(input, { source: options.source, allow: options.allow });
+  if (redirect) {
+    report.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
+  }
+  return await finishColorRoles(report, options);
 }
 
 /**

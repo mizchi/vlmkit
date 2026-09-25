@@ -17,6 +17,7 @@ import {
   DESIGN_ALLOW_HELP,
   formatDesignReport,
   parseDesignAllowRules,
+  judgeCollectedDesign,
   runDesignPolicyCheck,
   runSceneDesignPolicyCheck,
   type DesignPolicyOptions,
@@ -24,8 +25,9 @@ import {
 } from "../style/design-policy.ts";
 import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFromSnapshotFlag, readStyleSnapshot } from "../style/style-snapshot.ts";
 
-export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions & { elementsPath?: string }>({
+export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions & { elementsPath?: string; fromPath?: string }>({
   id: "check.design",
   command: ["check", "design"],
   title: "Design-system coherence",
@@ -71,6 +73,10 @@ docs/design/design-policy-metrics.md`,
       kind: "path",
       description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Groups by `role`; padding/radius/border/background/font form the signature",
     },
+    {
+      name: "from", placeholder: "snapshot.json", kind: "path",
+      description: "A `scan style` snapshot instead of a page: judged with no browser, same report as the live run",
+    },
     { name: "min-reuse", kind: "number", description: "Times each style must be reused", defaultDescription: "3" },
     { name: "min-instances", kind: "number", description: "Instances before a role is judged", defaultDescription: "3" },
     {
@@ -98,6 +104,20 @@ docs/design/design-policy-metrics.md`,
   ],
   parse: (argv) => {
     const valueFlags = ["--min-reuse", "--min-instances", "--exclude", "--allow", "--elements"];
+    const from = readFromSnapshotFlag(argv, "check design", valueFlags, ["exclude"]);
+    if (from) {
+      const minReuse = readNumber(argv, "min-reuse", { min: 0 });
+      const minInstances = readInt(argv, "min-instances", { min: 1 });
+      const allow = readAll(argv, "allow");
+      parseDesignAllowRules(allow);
+      return {
+        source: from,
+        fromPath: from,
+        ...(minReuse !== undefined ? { minReuse } : {}),
+        ...(minInstances !== undefined ? { minInstances } : {}),
+        ...(allow.length > 0 ? { allow } : {}),
+      };
+    }
     const elements = readFlag(argv, "elements");
     if (elements) {
       // Mutually exclusive with a page, as in `check integrity` and `check color`.
@@ -147,9 +167,15 @@ docs/design/design-policy-metrics.md`,
       ...(har ? { har } : {}),
     };
   },
-  run: (options) => (options.elementsPath
-    ? runSceneDesignPolicyCheck({ ...options, elementsPath: options.elementsPath })
-    : runDesignPolicyCheck(options)),
+  run: async (options) => {
+    if (options.fromPath) {
+      const snapshot = await readStyleSnapshot(options.fromPath);
+      return judgeCollectedDesign(snapshot.design, snapshot.redirect, { ...options, source: snapshot.source });
+    }
+    return options.elementsPath
+      ? runSceneDesignPolicyCheck({ ...options, elementsPath: options.elementsPath })
+      : runDesignPolicyCheck(options);
+  },
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,

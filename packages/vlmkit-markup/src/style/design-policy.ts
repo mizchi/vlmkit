@@ -192,12 +192,25 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
     const input = await page.evaluate(buildDesignSampleScript(options.exclude)) as DesignPolicyInput;
-    const judged = judgeDesignPolicy(input, options);
-    if (redirect) {
-      judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
-    }
-    return recordDesignRun({ source: options.source, ...judged });
+    return judgeCollectedDesign(input, redirect, options);
   });
+}
+
+/**
+ * The judging half of `runDesignPolicyCheck`, for samples collected earlier — by this runner,
+ * or by `scan style` into a snapshot. Same judge, same redirect finding, same ledger entry,
+ * so a run from a snapshot reports exactly what the live run would have.
+ */
+export function judgeCollectedDesign(
+  input: DesignPolicyInput,
+  redirect: string | null,
+  options: DesignJudgeOptions & { source: string },
+): DesignPolicyReport {
+  const judged = judgeDesignPolicy(input, options);
+  if (redirect) {
+    judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
+  }
+  return recordDesignRun({ source: options.source, ...judged });
 }
 
 /**

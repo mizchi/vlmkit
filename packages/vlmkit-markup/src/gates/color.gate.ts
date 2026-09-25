@@ -23,17 +23,19 @@ import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.t
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFromSnapshotFlag, readStyleSnapshot } from "../style/style-snapshot.ts";
 import {
   COLOR_ALLOW_HELP,
   parseColorAllowRules,
   type ColorRolesOptions,
   type ColorRolesReport,
   formatColorRolesReport,
+  judgeCollectedColorRoles,
   runColorRolesCheck,
   runSceneColorRolesCheck,
 } from "../style/color-roles.ts";
 
-export const colorGate = defineGate<ColorRolesReport, ColorRolesOptions & { elementsPath?: string }>({
+export const colorGate = defineGate<ColorRolesReport, ColorRolesOptions & { elementsPath?: string; fromPath?: string }>({
   id: "check.color",
   command: ["check", "color"],
   title: "Colour roles and colour-only meaning",
@@ -133,6 +135,10 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
       description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Needs `role: field|link` and resolved colours",
     },
     {
+      name: "from", placeholder: "snapshot.json", kind: "path",
+      description: "A `scan style` snapshot instead of a page: judged with no browser, same report as the live run",
+    },
+    {
       name: "viewport", kind: "number",
       description: "Viewport width; which controls and links are visible depends on it",
       defaultDescription: "1280",
@@ -150,6 +156,13 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
+    const from = readFromSnapshotFlag(argv, "check color", ["--viewport", "--allow", "--storage-state", "--report", "--elements"]);
+    if (from) {
+      const allow = readAll(argv, "allow");
+      parseColorAllowRules(allow);
+      const reportPath = readFlag(argv, "report");
+      return { source: from, fromPath: from, ...(allow.length > 0 ? { allow } : {}), ...(reportPath ? { reportPath } : {}) };
+    }
     const elements = readFlag(argv, "elements");
     if (elements) {
       // Mutually exclusive with a page, as in `check integrity`: the two inputs are judged by
@@ -191,9 +204,15 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
       ...(pageLoad.har ? { har: pageLoad.har } : {}),
     };
   },
-  run: (options) => (options.elementsPath
-    ? runSceneColorRolesCheck({ ...options, elementsPath: options.elementsPath })
-    : runColorRolesCheck(options)),
+  run: async (options) => {
+    if (options.fromPath) {
+      const snapshot = await readStyleSnapshot(options.fromPath);
+      return await judgeCollectedColorRoles(snapshot.color, snapshot.redirect, { ...options, source: snapshot.source });
+    }
+    return options.elementsPath
+      ? runSceneColorRolesCheck({ ...options, elementsPath: options.elementsPath })
+      : runColorRolesCheck(options);
+  },
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,
