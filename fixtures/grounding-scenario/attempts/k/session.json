@@ -1,0 +1,93 @@
+{
+  "page": "triage",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "scale": 0.5,
+  "wheelUnits": "screenshot",
+  "actions": [
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 120
+      },
+      "dy": 200
+    },
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 120
+      },
+      "dy": 200
+    },
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 120
+      },
+      "dy": 200
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 92
+      }
+    },
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 120
+      },
+      "dy": -400
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 68
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 110
+      }
+    },
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 120
+      },
+      "dy": 150
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 90
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 105
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 560,
+        "y": 51
+      }
+    }
+  ]
+}

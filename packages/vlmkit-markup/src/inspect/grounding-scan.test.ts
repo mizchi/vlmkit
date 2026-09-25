@@ -10,12 +10,14 @@ import {
   type GroundingScanInput,
   type GroundingTargetSample,
   analyzeGroundingSamples,
+  distinctLabels,
   drawActionMarks,
   findDisambiguator,
   formatGroundingReport,
   resolveAgentFrame,
   runGroundingScan,
 } from "./grounding-scan.ts";
+import { type ScreenState, diffScreens, formatScreenChange } from "./grounding-change.ts";
 
 function target(overrides: Partial<GroundingTargetSample> = {}): GroundingTargetSample {
   return {
@@ -191,7 +193,7 @@ test("an ordinary target is not labelled clipped by a rounding disagreement", ()
   assert.equal(report.targets[0]!.aimedOffCentre, undefined);
 });
 
-test("a cut target's message says the gate never scrolls", () => {
+test("a cut target's message says how to scroll it into view", () => {
   // 5 of its 40 px are inside the frame, so it is under the precision floor and
   // the fold is why — which is exactly when the advice to scroll applies.
   const report = analyzeGroundingSamples(
@@ -205,11 +207,46 @@ test("a cut target's message says the gate never scrolls", () => {
     UNSCALED,
   );
   // "doesn't clarify whether scrolling occurred during measurement or if the
-  // screenshot is pre-scrolled" — it did not, and now it says so.
+  // screenshot is pre-scrolled" — it did not, and the message names the flag
+  // that measures the scrolled screen.
   assert.match(
     report.issues.find((i) => i.kind === "imprecise-target")!.message,
-    /measures the initial frame and never scrolls, so scroll it into view and re-run/,
+    /the frame cuts it \(the element is 120x40\); scroll it into view \(--after "wheel x,y dy"\) and re-run/,
   );
+});
+
+test("a row its list cuts to a strip is measured on the strip, and the list is named", () => {
+  // v4, the smaller model with the tool: after two wheels the target row sat
+  // under the list's bottom edge with 1px of it painted. The map said 149x28 and
+  // the only finding was `crowded-target` "0px from" the row above; it scrolled
+  // again "to separate t8 from t7 above it". The row was not crowded — it was
+  // barely on screen, which is `imprecise-target`, with the list as the cause.
+  const row = (n: number, y: number, painted?: { x: number; y: number; width: number; height: number }) => target({
+    selector: `#list > button:nth-of-type(${n})`,
+    visibleText: `Row ${n}`,
+    bbox: { x: 22, y, width: 298, height: 55 },
+    clickPoint: { x: 171, y: painted ? painted.y + painted.height / 2 : y + 27 },
+    ...(painted
+      ? {
+        painted,
+        clipped: true,
+        clippedBy: { selector: "#list", scrollable: true, dy: 53, dx: 0, wheelAt: { x: 171, y: 240 } },
+      }
+      : { painted: { x: 22, y, width: 298, height: 55 } }),
+  });
+  const report = analyzeGroundingSamples(
+    input({ targets: [row(7, 314), row(8, 369, { x: 22, y: 369, width: 298, height: 2 })] }),
+    { resolution: "medium" },
+  );
+  const t8 = report.targets[1]!;
+  assert.deepEqual(t8.visibleBox, { x: 11, y: 185, width: 149, height: 1 });
+  assert.equal(t8.minSide, 1);
+  assert.equal(t8.aimedOffCentre?.reason, "clipped");
+  const issue = report.issues.find((i) => i.kind === "imprecise-target")!;
+  assert.match(issue.message, /shows 149x1 screenshot px/);
+  assert.match(issue.message, /#list cuts it \(the element is 149x28\); scroll it 27px \(--after "wheel 86,120 27"\)/);
+  // The map row says the same: what is painted, of how much.
+  assert.match(formatGroundingReport(report), /t2 button "Row 8" @ \(\d+,\d+\) 149x1 painted of 149x28/);
 });
 
 test("a target hidden by a scroll container is out of the frame, not occluded", () => {
@@ -224,13 +261,13 @@ test("a target hidden by a scroll container is out of the frame, not occluded", 
         inFrame: false,
         centreHit: false,
         interceptedBy: "html",
-        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0 },
+        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } },
       })],
     }),
     UNSCALED,
   );
   assert.deepEqual(report.issues, [], "nothing here is a defect of the page");
-  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 332, dx: 0 });
+  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } });
 });
 
 test("the scroll a caller needs is in screenshot px, like every other number", () => {
@@ -238,12 +275,12 @@ test("the scroll a caller needs is in screenshot px, like every other number", (
     input({
       targets: [target({
         inFrame: false,
-        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12 },
+        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12, wheelAt: { x: 180, y: 300 } },
       })],
     }),
     { resolution: { maxWidth: 640, maxHeight: 480 } },
   );
-  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 166, dx: -6 });
+  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 166, dx: -6, wheelAt: { x: 90, y: 150 } });
 });
 
 test("the prose names the container, the count and the nearest scroll", () => {
@@ -254,14 +291,27 @@ test("the prose names the container, the count and the nearest scroll", () => {
     selector: `#list > button:nth-of-type(${n})`,
     visibleText: `Row ${n}`,
     inFrame: false,
-    clippedBy: { selector: "#list", scrollable: true, dy, dx: 0 },
+    clippedBy: { selector: "#list", scrollable: true, dy, dx: 0, wheelAt: { x: 180, y: 300 } },
   });
   const text = formatGroundingReport(
     analyzeGroundingSamples(input({ targets: [hidden(5, 44), hidden(6, 74), hidden(7, 105)] }), UNSCALED),
   );
-  assert.match(text, /Out of the frame \(3\) — scroll first, then re-run/);
-  assert.match(text, /#list: hides 3 target\(s\) — scroll it \(nearest needs 44px\)/);
+  assert.match(text, /Out of the frame \(3\) — scroll, then re-run with the scroll as --after/);
+  // The scroll is printed as the action that performs it, at a point inside the
+  // container, so it pastes back in as-is.
+  assert.match(text, /#list: hides 3 target\(s\) — scroll it \(nearest needs 44px: --after "wheel 180,300 44"\)/);
   assert.match(text, /t1 button "Row 5" \(dy 44px\)/);
+});
+
+test("the prose says which screen it measured", () => {
+  const first = formatGroundingReport(analyzeGroundingSamples(input({ targets: [target()] }), UNSCALED));
+  assert.match(first, /screen: as first loaded — --after "click x,y" measures the screen an action leaves/);
+  const report = analyzeGroundingSamples(input({ targets: [target()] }), UNSCALED);
+  report.after = [
+    { kind: "wheel", at: { x: 85, y: 150 }, dy: 89 },
+    { kind: "click", at: { x: 85, y: 123 } },
+  ];
+  assert.match(formatGroundingReport(report), /screen: after wheel \(85,150\) dy 89, then click \(85,123\)$/m);
 });
 
 test("a container that cannot scroll says the content is unreachable", () => {
@@ -270,7 +320,7 @@ test("a container that cannot scroll says the content is unreachable", () => {
       input({
         targets: [target({
           inFrame: false,
-          clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0 },
+          clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0, wheelAt: { x: 180, y: 300 } },
         })],
       }),
       UNSCALED,
@@ -438,6 +488,23 @@ test("adjacent full-size buttons are not crowded; two tiny icons are", () => {
   assert.deepEqual(icons.issues.filter((i) => i.kind === "imprecise-target"), []);
 });
 
+test("a finding names the map row it is about, and the neighbour's row", () => {
+  // v4: "plus a crowded-target warn: 'click point is 5px from
+  // #list > button:nth-of-type(9)'" — filed under t8, the row about to be
+  // clicked. The warning was t9's.
+  const row = (n: number, y: number, height: number) => target({
+    selector: `#list > button:nth-of-type(${n})`,
+    visibleText: `Row ${n}`,
+    bbox: { x: 0, y, width: 300, height },
+    clickPoint: { x: 150, y: y + height / 2 },
+  });
+  const report = analyzeGroundingSamples(input({ targets: [row(8, 0, 56), row(9, 56, 8)] }), UNSCALED);
+  const crowded = report.issues.find((i) => i.kind === "crowded-target")!;
+  assert.equal(crowded.targetId, "t2");
+  assert.match(crowded.message, /is 4px from t1 #list > button:nth-of-type\(8\)/);
+  assert.match(formatGroundingReport(report), / t2 crowded-target: /);
+});
+
 test("a container enclosing the target is not a neighbour a miss lands on", () => {
   const report = analyzeGroundingSamples(
     input({
@@ -523,6 +590,44 @@ test("findDisambiguator picks the nearest level that separates every member", ()
   ];
   assert.deepEqual(findDisambiguator(rows), ["ACME Corp", "Globex"]);
   assert.equal(findDisambiguator([target({ ancestorTexts: ["Row"] }), target({ ancestorTexts: ["Row"] })]), undefined);
+});
+
+test("a label is never cut before the word that tells it from a sibling", () => {
+  const titles = [
+    "Checkout webhook retries exhausted for region us-east-1 Wayne Enterprises · 4h",
+    "Checkout webhook retries exhausted for region eu-west-1 Wayne Enterprises · 12h",
+    "Checkout webhook retries exhausted for region eu-central-1 Wayne Enterprises · 15h",
+    "Invoice PDF is blank for multi-currency accounts Acme Freight · 1h",
+  ];
+  const labels = distinctLabels(titles);
+  // The 48-character cut printed eu-west-1 and eu-central-1 as the same
+  // "…for region e…". Each now runs to the end of the word that differs.
+  assert.equal(labels[1], "Checkout webhook retries exhausted for region eu-west-1…");
+  assert.equal(labels[2], "Checkout webhook retries exhausted for region eu-central-1…");
+  assert.equal(labels[0], "Checkout webhook retries exhausted for region us-east-1…");
+  assert.equal(new Set(labels).size, labels.length);
+  // A label that differs early is shortened exactly as before.
+  assert.equal(labels[3], "Invoice PDF is blank for multi-currency account…");
+});
+
+test("identical labels are left to ambiguous-target, not lengthened", () => {
+  const same = "Manage subscription for the enterprise workspace plan";
+  assert.deepEqual(distinctLabels([same, same]), [`${same.slice(0, 47)}…`, `${same.slice(0, 47)}…`]);
+});
+
+test("the map row carries the lengthened label", () => {
+  const row = (name: string, y: number) =>
+    target({ name, visibleText: name, bbox: { x: 0, y, width: 300, height: 40 }, clickPoint: { x: 150, y: y + 20 } });
+  const report = analyzeGroundingSamples(input({
+    targets: [
+      row("Checkout webhook retries exhausted for region eu-west-1", 0),
+      row("Checkout webhook retries exhausted for region eu-central-1", 60),
+    ],
+  }), UNSCALED);
+  assert.deepEqual(report.targets.map((t) => t.label), [
+    "Checkout webhook retries exhausted for region eu-west-1",
+    "Checkout webhook retries exhausted for region eu-central-1",
+  ]);
 });
 
 test("the prose reports the frame, the map and the truncation", () => {
@@ -639,6 +744,82 @@ test("a mark on a target at the frame edge is pushed back in rather than clipped
 const REPO_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
 const hostile = join(REPO_ROOT, "fixtures/grounding/agent-hostile.html");
 const groundable = join(REPO_ROOT, "fixtures/grounding/groundable.html");
+
+// ---- what the last --after action changed (grounding-change.ts) ----
+
+function screen(overrides: Partial<ScreenState> = {}): ScreenState {
+  return { targets: [], controls: {}, texts: [], ...overrides };
+}
+const LOOK_PLAIN = { color: "rgb(0, 0, 0)", "background-color": "rgb(255, 255, 255)", "text-decoration-line": "none", opacity: "1", "font-weight": "400" };
+const click = { kind: "click" as const, at: { x: 10, y: 10 } };
+
+test("an archive click reads as the row restyled and the confirmation text, not as nothing", () => {
+  // v4: "`t8` still lists as a plain actionable button, `"disabled": false` …
+  // no archived flag anywhere in the report … I had to trust the screenshot."
+  const row = { selector: "#row-8", label: "Checkout … eu-west-1…", onScreen: true, box: { x: 0, y: 0, width: 300, height: 55 } };
+  const archive = { selector: "#archive", label: "Archive", onScreen: true, box: { x: 1110, y: 90, width: 30, height: 30 } };
+  const before = screen({
+    targets: [row, archive],
+    controls: { "#row-8": { states: ["current"], look: LOOK_PLAIN }, "#archive": { states: [], look: LOOK_PLAIN, hover: ["background-color"] } },
+    texts: ["Checkout webhook retries exhausted for region eu-west-1", "Reply"],
+  });
+  const after = screen({
+    targets: [row, archive],
+    controls: {
+      "#row-8": { states: ["current"], look: { ...LOOK_PLAIN, color: "rgb(107, 114, 128)", "text-decoration-line": "line-through" } },
+      "#archive": { states: [], look: { ...LOOK_PLAIN, "background-color": "rgb(243, 244, 246)" }, hover: ["background-color"] },
+    },
+    texts: ["Checkout webhook retries exhausted for region eu-west-1", "Reply", "Archived."],
+  });
+  const ids = new Map([["#row-8", "t8"], ["#archive", "t15"]]);
+  const change = diffScreens(before, after, { kind: "click", at: { x: 560, y: 50 } }, (s) => ids.get(s), {
+    before: { x: 170, y: 322 },
+    after: { x: 1120, y: 100 },
+  });
+  assert.deepEqual(change.restyled.map((c) => [c.targetId, c.properties, c.hoverOnly]), [
+    ["t8", ["color", "text-decoration-line"], undefined],
+    ["t15", ["background-color"], "entered"],
+  ]);
+  assert.deepEqual(change.textAdded, ["Archived."]);
+  const text = formatScreenChange(change, () => "click (560,50)").join("\n");
+  assert.match(text, /~ t8 "Checkout … eu-west-1…" changed color, text-decoration-line$/m);
+  assert.match(text, /~ t15 "Archive" changed background-color — its :hover style, and the pointer is now on it/);
+  assert.match(text, /\+ text "Archived\."/);
+});
+
+test("a restyle under the pointer is only called hover when a :hover rule sets that property", () => {
+  // The first version went by pointer position alone and filed an archived
+  // row's strike-through as "possibly just hover".
+  const row = { selector: "#row", label: "Row", onScreen: true, box: { x: 0, y: 0, width: 100, height: 40 } };
+  const before = screen({ targets: [row], controls: { "#row": { states: [], look: LOOK_PLAIN, hover: ["background-color"] } } });
+  const after = screen({
+    targets: [row],
+    controls: { "#row": { states: [], look: { ...LOOK_PLAIN, "text-decoration-line": "line-through" }, hover: ["background-color"] } },
+  });
+  const change = diffScreens(before, after, click, undefined, { before: { x: 10, y: 10 }, after: { x: 500, y: 10 } });
+  assert.equal(change.restyled[0]!.hoverOnly, undefined, "the pointer left, but no :hover rule strikes text through");
+});
+
+test("rows a scroll moved come and go by whether they are painted, not by existing", () => {
+  const t = (n: number, onScreen: boolean) => ({ selector: `#r${n}`, label: `Row ${n}`, onScreen });
+  const change = diffScreens(
+    screen({ targets: [t(1, true), t(2, true), t(3, false)], texts: ["Row 1", "Row 2"] }),
+    screen({ targets: [t(1, false), t(2, true), t(3, true)], texts: ["Row 2", "Row 3"] }),
+    { kind: "wheel", at: { x: 10, y: 10 }, dy: 40 },
+  );
+  assert.deepEqual(change.appeared.map((c) => c.selector), ["#r3"]);
+  assert.deepEqual(change.disappeared.map((c) => c.selector), ["#r1"]);
+  assert.deepEqual(change.textAdded, ["Row 3"]);
+  assert.deepEqual(change.textRemoved, ["Row 1"]);
+});
+
+test("text is compared as a multiset: a second copy of a title is new text", () => {
+  // Opening a ticket paints its full title in the detail panel while the list
+  // row still carries the same string.
+  const change = diffScreens(screen({ texts: ["Title", "Other"] }), screen({ texts: ["Title", "Other", "Title"] }), click);
+  assert.deepEqual(change.textAdded, ["Title"]);
+  assert.deepEqual(change.textRemoved, []);
+});
 
 test("E2E: every rule fires on the hostile fixture, on the element that causes it", { timeout: 180_000 }, async () => {
   const report = await runGroundingScan({ source: hostile });
@@ -758,6 +939,68 @@ test("E2E: a row scrolled out of its list is reported with the scroll that revea
   const row3 = report.targets.find((t) => t.selector === "#row-3")!;
   assert.equal(row3.inFrame, true);
   assert.ok(row3.point.y < row3.box.y + row3.box.height / 2, "aimed into the visible part");
+});
+
+test("E2E: --after maps the screen a click leaves, not the first load", { timeout: 180_000 }, async () => {
+  // v3: "it measures the page as first loaded only, so Reply/Archive/Delete never
+  // appear anywhere in its output … even though they're the only way to finish".
+  const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
+  const first = await runGroundingScan({ source });
+  assert.deepEqual(first.targets.map((t) => t.label), ["Open ticket", "Refresh"]);
+  assert.equal(first.after, undefined, "no --after, no claim about one");
+  assert.equal(first.changed, undefined);
+
+  const open = first.targets[0]!;
+  const after = await runGroundingScan({ source, after: [{ kind: "click", at: open.point }], at: [open.point] });
+  assert.deepEqual(after.targets.map((t) => t.label), ["Open ticket", "Refresh", "Archive", "Delete"]);
+  assert.deepEqual(after.after, [{ kind: "click", at: open.point }]);
+  // --at is answered on the same screen the map describes.
+  assert.equal(after.probes![0]!.targetId, open.id);
+
+  // And the report says what that click did, in the map's ids.
+  const changed = after.changed!;
+  assert.equal(changed.landedOn?.targetId, open.id);
+  assert.deepEqual(changed.appeared.map((c) => c.label), ["Archive", "Delete"]);
+  assert.deepEqual(changed.restated.map((c) => [c.targetId, c.added]), [[open.id, ["expanded"]]]);
+});
+
+test("E2E: a click that changes nothing says where it went and that nothing showed", { timeout: 180_000 }, async () => {
+  // v3's `Mark all read`: wired, invisible. "Nothing changed" alone reads as
+  // "the click missed"; with the landing it reads as what it is.
+  const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
+  const first = await runGroundingScan({ source });
+  const refresh = first.targets.find((t) => t.label === "Refresh")!;
+  const report = await runGroundingScan({ source, after: [{ kind: "click", at: refresh.point }] });
+  assert.equal(report.changed!.landedOn?.targetId, refresh.id);
+  const text = formatGroundingReport(report);
+  assert.match(text, new RegExp(`the click went to ${refresh.id} "Refresh"`));
+  assert.match(text, /nothing on screen — .*the control may still have done something the page does not show/);
+
+  // A click on bare background lands on something that is not a control.
+  const blank = await runGroundingScan({ source, after: [{ kind: "click", at: { x: 500, y: 300 } }] });
+  assert.equal(blank.changed!.landedOn?.label, "");
+  assert.match(formatGroundingReport(blank), /the click went to \S+, which is not in the map — nothing up to <body> declares itself interactive/);
+});
+
+test("E2E: the wheel the report prints is the wheel that reveals the row", { timeout: 180_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/grounding/scrolled-list.html");
+  const first = await runGroundingScan({ source });
+  const hidden = first.targets.find((t) => t.selector === "#row-4")!;
+  const { wheelAt, dy } = hidden.clippedBy!;
+  assert.match(formatGroundingReport(first), new RegExp(`--after "wheel ${wheelAt.x},${wheelAt.y} \\d+"`));
+
+  const scrolled = await runGroundingScan({ source, after: [{ kind: "wheel", at: wheelAt, dy }] });
+  const row4 = scrolled.targets.find((t) => t.selector === "#row-4")!;
+  assert.equal(row4.inFrame, true, "the printed dy, sent as printed, brings it into the frame");
+  assert.equal(row4.clippedBy, undefined);
+});
+
+test("E2E: an --after point outside the frame is a usage error, not a click at the edge", { timeout: 180_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
+  await assert.rejects(
+    runGroundingScan({ source, after: [{ kind: "click", at: { x: 700, y: 10 } }] }),
+    /--after click \(700,10\): outside the 640x360 frame/,
+  );
 });
 
 test("E2E: --mark writes the overlay at the frame's own resolution", { timeout: 180_000 }, async () => {

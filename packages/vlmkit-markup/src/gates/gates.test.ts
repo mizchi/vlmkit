@@ -5,7 +5,7 @@ import { createGateRegistry } from "@mizchi/vlmkit-core/plugin/registry.ts";
 import { validateGateDefinition } from "@mizchi/vlmkit-core/plugin/rules.ts";
 import { formatGateHelp } from "@mizchi/vlmkit-core/plugin/runner.ts";
 import { markupGatesPlugin } from "./index.ts";
-import { parseAtPoints } from "./grounding.gate.ts";
+import { parseAfterActions, parseAtPoints } from "./grounding.gate.ts";
 
 /**
  * These assertions are about the *declarations*, not the measurements: they
@@ -508,5 +508,28 @@ describe("check grounding --at", () => {
     assert.throws(() => parseAtPoints(["--at", "473"]), UsageError);
     assert.throws(() => parseAtPoints(["--at", "473x96"]), UsageError);
     assert.throws(() => parseAtPoints(["--at"]), UsageError);
+  });
+});
+
+describe("check grounding --after", () => {
+  it("reads actions in order, spelled the way a harness logs them", () => {
+    assert.deepEqual(
+      parseAfterActions(["page.html", "--after", "wheel 85,150 89", "--after", "click 85,123", "--after", "move:10,20"]),
+      [
+        { kind: "wheel", at: { x: 85, y: 150 }, dy: 89 },
+        { kind: "click", at: { x: 85, y: 123 } },
+        { kind: "move", at: { x: 10, y: 20 } },
+      ],
+    );
+    assert.deepEqual(parseAfterActions(["page.html"]), []);
+  });
+
+  it("rejects an action it would have to guess at", () => {
+    // A replay that quietly did something else maps a screen nobody reached.
+    assert.throws(() => parseAfterActions(["--after", "click 85"]), UsageError);
+    assert.throws(() => parseAfterActions(["--after", "wheel 85,150"]), UsageError, "a wheel needs its dy");
+    assert.throws(() => parseAfterActions(["--after", "click 85,123 40"]), UsageError, "a click has no dy");
+    assert.throws(() => parseAfterActions(["--after", "drag 1,2"]), UsageError);
+    assert.throws(() => parseAfterActions(["--after"]), UsageError);
   });
 });

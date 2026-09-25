@@ -65,6 +65,14 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import {
+  SCREEN_STATE_JS,
+  type ScreenChange,
+  type ScreenState,
+  diffScreens,
+  formatScreenChange,
+} from "./grounding-change.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import {
   RESOLUTION_PRESETS,
@@ -151,9 +159,21 @@ export interface GroundingTargetSample {
   /** The box extends past the visible area — the frame's edge, or a container's. */
   clipped: boolean;
   /**
-   * The nearest ancestor that hides this target entirely, when one does, with
-   * how far it would have to scroll for the target to come into view (CSS px,
-   * positive = down / right).
+   * The part of the box actually painted — inside the viewport AND every
+   * clipping ancestor — in CSS px. Present when `inFrame`.
+   *
+   * The action map's `visibleBox` used to be the box cut by the frame alone, so
+   * a row that its list's scroll edge cut to a 1px strip was reported as the
+   * full 149x28, and the only finding it earned was `crowded-target` "0px
+   * from" the row above. v4's smaller model took that at its word and scrolled
+   * "to separate t8 from t7 above it"; the row was not crowded, it was barely
+   * on screen.
+   */
+  painted?: Box;
+  /**
+   * The nearest ancestor that cuts this target — hides it entirely, or in part
+   * — when one does, with how far it would have to scroll for the whole box to
+   * come into view (CSS px, positive = down / right).
    *
    * The round that added this had all three agents work out the remedy from the
    * picture instead: "the actual fix is scrolling the list, which the harness
@@ -161,7 +181,19 @@ export interface GroundingTargetSample {
    * with no tool at all, specified it: "A DOM-aware tool would have told me
    * directly '12 tickets, scrolled to 4/12'."
    */
-  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number };
+  clippedBy?: {
+    selector: string;
+    scrollable: boolean;
+    dy: number;
+    dx: number;
+    /**
+     * Middle of the container's painted box — a point a wheel there scrolls
+     * this container rather than the page. Carried so the report can print a
+     * `--after "wheel x,y dy"` a caller can paste, rather than leaving it to
+     * find a point inside the list by eye.
+     */
+    wheelAt: { x: number; y: number };
+  };
   /**
    * Own visible text of up to three ancestors, nearest first, for disambiguation.
    *
@@ -267,7 +299,7 @@ export interface GroundingTarget {
   inFrame: boolean;
   clipped: boolean;
   /** See `GroundingTargetSample.clippedBy`. Scaled into screenshot px. */
-  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number };
+  clippedBy?: { selector: string; scrollable: boolean; dy: number; dx: number; wheelAt: { x: number; y: number } };
   /**
    * Rule ids this target tripped. Present on the row as well as in `issues` so a
    * caller consuming the action map alone — which is the point of the action map —
@@ -291,6 +323,15 @@ export interface GroundingIssue {
   severity: "warn" | "suspect";
   message: string;
   selector?: string;
+  /**
+   * The action-map row this finding is about, when it is about one.
+   *
+   * The map names rows `t8`; the findings named them by selector alone. v4's
+   * larger model read `#list > button:nth-of-type(9)'s click point is 5px from
+   * #list > button:nth-of-type(8)` beside a map it navigated by id, and filed
+   * the warning under t8 — the row it was about to click — rather than t9.
+   */
+  targetId?: string;
 }
 
 /** One `--at` answer: what a click at this screenshot coordinate would reach. */
@@ -319,9 +360,32 @@ export interface GroundingProbe {
   offFrame?: boolean;
 }
 
+/**
+ * One computer-use action, in SCREENSHOT px like everything else here — `wheel`'s
+ * `dy` included (positive = down), so a scroll `clippedBy` asks for can be sent
+ * as printed.
+ */
+export type GroundingAction =
+  | { kind: "click"; at: { x: number; y: number } }
+  | { kind: "move"; at: { x: number; y: number } }
+  | { kind: "wheel"; at: { x: number; y: number }; dy: number };
+
 export interface GroundingScanReport {
   source: string;
   frame: AgentFrame;
+  /**
+   * The actions replayed before measuring (`--after`), in order. Absent means the
+   * map is of the page as first loaded.
+   */
+  after?: GroundingAction[];
+  /** Where the page was after `after`, when an action navigated away from `source`. */
+  navigatedTo?: string;
+  /**
+   * What the LAST `after` action changed: the screen before it against the
+   * screen after it. See `grounding-change.ts` for why, and for what an empty
+   * change does and does not mean.
+   */
+  changed?: ScreenChange;
   targets: GroundingTarget[];
   /** Present only when `--at` was passed. Absent means "not asked", never "clean". */
   probes?: GroundingProbe[];
@@ -359,6 +423,19 @@ export interface GroundingScanOptions extends PageLoadOptions {
    * caught.
    */
   at?: readonly { x: number; y: number }[];
+  /**
+   * `--after "click x,y"` — actions to replay, in screenshot px, before anything
+   * is measured, so the map is of the screen those actions leave.
+   *
+   * v3's agents finished the job the map could not see: "it measures the page as
+   * first loaded only, so Reply/Archive/Delete never appear anywhere in its
+   * output … I had to locate the Archive button myself by sampling screenshot
+   * pixel colors", six pixels from Delete; and "after scrolling changes the page,
+   * the grounding map becomes stale." Re-running a gate that loads a URL gives
+   * back the first screen however often it is run. Replaying the caller's own
+   * actions is how the second screen gets measured at all.
+   */
+  after?: readonly GroundingAction[];
 }
 
 const MAX_TARGETS = 300;
@@ -427,6 +504,42 @@ function shorten(text: string, max = 48): string {
 }
 
 /**
+ * `shorten` for a set of labels, which never cuts a label before the word that
+ * tells it apart from another one.
+ *
+ * Found by building the v4 scenario, before any agent ran: three tickets titled
+ * "Checkout webhook retries exhausted for region …" differ only in the region,
+ * the list paints all three as "Checkout webhook retries exhaust…", and the map
+ * — which reads the full name the screen cannot show — printed two of them as
+ * `"Checkout webhook retries exhausted for region e…"`. The one fact the tool
+ * had and the picture did not was the one its 48-character cut threw away.
+ *
+ * So the cut moves: to the end of the word holding the first character in which
+ * this label differs from its closest sibling, when that is past `max`. Labels
+ * that differ early are shortened exactly as before. Identical labels are left
+ * to `ambiguous-target` — no prefix separates them.
+ */
+export function distinctLabels(texts: readonly string[], max = 48): string[] {
+  const norm = texts.map((text) => text.replace(/\s+/g, " ").trim());
+  const lower = norm.map((text) => text.toLowerCase());
+  return norm.map((one, i) => {
+    if (one.length <= max) return one;
+    let differsAt = 0;
+    for (let j = 0; j < norm.length; j++) {
+      if (j === i || lower[j] === lower[i]) continue;
+      const a = lower[i]!;
+      const b = lower[j]!;
+      let k = 0;
+      while (k < a.length && k < b.length && a[k] === b[k]) k++;
+      differsAt = Math.max(differsAt, k);
+    }
+    const space = one.indexOf(" ", differsAt);
+    const keep = Math.max(max - 1, space === -1 ? one.length : space);
+    return keep >= one.length ? one : `${one.slice(0, keep)}…`;
+  });
+}
+
+/**
  * Pure post-process: samples in CSS px -> action map in screenshot px + findings.
  *
  * Split out for the same reason every other gate here splits it out — the
@@ -448,6 +561,7 @@ export function analyzeGroundingSamples(
     options.resolution,
   );
 
+  const labels = distinctLabels(input.targets.map((sample) => sample.visibleText || sample.name));
   const targets: GroundingTarget[] = input.targets.map((sample, i) => {
     // The point that reaches the target beats the point at its centre.
     const aim = sample.reachable ?? sample.clickPoint;
@@ -455,7 +569,7 @@ export function analyzeGroundingSamples(
     id: `t${i + 1}`,
     selector: sample.selector,
     role: sample.role,
-    label: shorten(sample.visibleText || sample.name),
+    label: labels[i]!,
     point: {
       x: Math.round(aim.x * frame.scale),
       y: Math.round(aim.y * frame.scale),
@@ -486,6 +600,10 @@ export function analyzeGroundingSamples(
           scrollable: sample.clippedBy.scrollable,
           dy: Math.round(sample.clippedBy.dy * frame.scale),
           dx: Math.round(sample.clippedBy.dx * frame.scale),
+          wheelAt: {
+            x: Math.round(sample.clippedBy.wheelAt.x * frame.scale),
+            y: Math.round(sample.clippedBy.wheelAt.y * frame.scale),
+          },
         },
       }
       : {}),
@@ -499,12 +617,16 @@ export function analyzeGroundingSamples(
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i]!;
     const sample = input.targets[i]!;
-    const visible = {
-      x: Math.max(target.box.x, 0),
-      y: Math.max(target.box.y, 0),
-      width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
-      height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
-    };
+    // The painted part when the collector measured one — which accounts for
+    // every clipping ancestor — and the frame's cut of the box otherwise.
+    const visible = sample.painted
+      ? scaleBox(sample.painted, frame.scale)
+      : {
+        x: Math.max(target.box.x, 0),
+        y: Math.max(target.box.y, 0),
+        width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
+        height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
+      };
     if (sample.inFrame) {
       target.visibleBox = visible;
       // The collector already clamps the click point into the visible part, so
@@ -563,7 +685,7 @@ export function analyzeGroundingSamples(
   const issues: GroundingIssue[] = [];
   const raise = (target: GroundingTarget, issue: GroundingIssue) => {
     target.risks.push(issue.kind);
-    issues.push(issue);
+    issues.push({ ...issue, targetId: target.id });
   };
   /** Findings are about what an agent can act on now: not disabled, not below the fold. */
   const actionable = targets.filter((t, i) => !t.disabled && input.targets[i]!.inFrame);
@@ -614,11 +736,17 @@ export function analyzeGroundingSamples(
         severity: "warn",
         selector: target.selector,
         message: `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})`
-          + ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame`
-          + (cut
-            ? ` — the frame cuts it (the element is ${target.box.width}x${target.box.height}); this gate measures the initial frame and never scrolls, so scroll it into view and re-run before aiming`
-            : ` — the whole element`)
-          + `, under the ${precisionFloor}px floor either way: a few pixels for the model to aim at.`,
+          + ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame,`
+          + ` under the ${precisionFloor}px floor: a few pixels for the model to aim at`
+          + (cut && target.clippedBy
+            ? ` — ${target.clippedBy.selector} cuts it (the element is ${target.box.width}x${target.box.height});`
+              + (target.clippedBy.scrollable
+                ? ` scroll it ${target.clippedBy.dy}px (--after "wheel ${target.clippedBy.wheelAt.x},${target.clippedBy.wheelAt.y} ${target.clippedBy.dy}") and re-run before aiming`
+                : ` it does not scroll, so this is all of it there is to aim at`)
+            : cut
+              ? ` — the frame cuts it (the element is ${target.box.width}x${target.box.height}); scroll it into view (--after "wheel x,y dy") and re-run before aiming`
+              : ` — the whole element`)
+          + `.`,
       });
     }
     if (target.aimMargin !== undefined && target.aimMargin < aimFloor && target.nearest) {
@@ -628,7 +756,7 @@ export function analyzeGroundingSamples(
         severity: "warn",
         selector: target.selector,
         message: `${target.selector}'s click point is ${Math.round(target.aimMargin)}px from`
-          + ` ${neighbour.selector} (${neighbour.role}${neighbour.label ? ` "${neighbour.label}"` : ""})`
+          + ` ${neighbour.id} ${neighbour.selector} (${neighbour.role}${neighbour.label ? ` "${neighbour.label}"` : ""})`
           + ` — a coordinate off by ${aimFloor}px activates the neighbour instead.`,
       });
     }
@@ -809,16 +937,23 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
         left: Math.max(clip.left, pr.left), top: Math.max(clip.top, pr.top),
         right: Math.min(clip.right, pr.right), bottom: Math.min(clip.bottom, pr.bottom),
       };
-      // Blame the FIRST ancestor that actually hides it, and say how far it would
-      // have to scroll — a caller with a wheel needs the delta, not the fact.
-      if (!clippedBy && (rect.bottom <= pr.top || rect.top >= pr.bottom
-        || rect.right <= pr.left || rect.left >= pr.right)) {
+      // Blame the FIRST ancestor that cuts it — hides it entirely or in part —
+      // and say how far it would have to scroll for the whole box to show: a
+      // caller with a wheel needs the delta, not the fact. Half a pixel of
+      // slack, because a box and its container disagree by subpixel rounding
+      // on perfectly ordinary layouts.
+      if (!clippedBy && (rect.top < pr.top - 0.5 || rect.bottom > pr.bottom + 0.5
+        || rect.left < pr.left - 0.5 || rect.right > pr.right + 0.5)) {
         const scrollable = SCROLLS.test(ps.overflowY) || SCROLLS.test(ps.overflowX);
         clippedBy = {
           selector: stableSelector(p),
           scrollable,
           dy: Math.round(rect.top < pr.top ? rect.top - pr.top : rect.bottom > pr.bottom ? rect.bottom - pr.bottom : 0),
           dx: Math.round(rect.left < pr.left ? rect.left - pr.left : rect.right > pr.right ? rect.right - pr.right : 0),
+          wheelAt: {
+            x: Math.round((Math.max(pr.left, 0) + Math.min(pr.right, vw)) / 2),
+            y: Math.round((Math.max(pr.top, 0) + Math.min(pr.bottom, vh)) / 2),
+          },
         };
       }
       void before;
@@ -922,6 +1057,7 @@ export const COLLECT_GROUNDING_SCRIPT = `(() => {
       disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
       inFrame,
       clipped: rect.left < left || rect.top < top || rect.right > right || rect.bottom > bottom,
+      ...(inFrame ? { painted: { x: left, y: top, width: right - left, height: bottom - top } } : {}),
       ...(clippedBy ? { clippedBy } : {}),
       ancestorTexts: ancestorTexts(el),
     });
@@ -940,9 +1076,58 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
       const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
+    // Before the actions: a click that follows a link is the caller's doing, not a
+    // redirect of the source.
     const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
+    const loadedAt = page.url();
+    // The screen before the LAST action is read on the way through, so the
+    // report can say what that action changed — the replay has both screens,
+    // and a map of the second one alone cannot answer "did it work".
+    let before: ScreenState | undefined;
+    let landed: { hit: string | null; wouldReach: string | null } | undefined;
+    if (options.after && options.after.length > 0) {
+      const frame = resolveAgentFrame(viewport, options.resolution);
+      await replayActions(page, options.after.slice(0, -1), frame);
+      before = await readScreenState(page);
+      // What the last click will land on, asked of the screen it lands on —
+      // the one question "nothing changed" cannot answer by itself: whether
+      // the click missed, or reached a control that shows nothing.
+      const last = options.after[options.after.length - 1]!;
+      if (last.kind === "click") {
+        landed = await hitTest(page, { x: Math.round(last.at.x / frame.scale), y: Math.round(last.at.y / frame.scale) });
+      }
+      await replayActions(page, options.after.slice(-1), frame);
+    }
     const collected = await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">;
     const report = analyzeGroundingSamples({ source: options.source, ...collected }, options);
+    if (options.after && options.after.length > 0) {
+      report.after = options.after.map((a) => ({ ...a, at: { ...a.at } }));
+      if (page.url() !== loadedAt) report.navigatedTo = page.url();
+      if (before) {
+        const now = await readScreenState(page, collected.targets);
+        const idOf = new Map(report.targets.map((t) => [t.selector, t.id]));
+        // Where the pointer was and is, so a change that is only `:hover` can
+        // say so: every action leaves the pointer where it acted.
+        const frame = resolveAgentFrame(viewport, options.resolution);
+        const css = (a: GroundingAction) => ({ x: Math.round(a.at.x / frame.scale), y: Math.round(a.at.y / frame.scale) });
+        const last = options.after[options.after.length - 1]!;
+        const prev = options.after[options.after.length - 2];
+        report.changed = diffScreens(before, now, last, (sel) => idOf.get(sel), {
+          ...(prev ? { before: css(prev) } : {}),
+          after: css(last),
+        });
+        if (landed) {
+          // Resolved against the screen the click landed on: a row the click
+          // removed is still the row it reached.
+          const reached = before.targets.find((t) => t.selector === landed.hit)
+            ?? before.targets.find((t) => t.selector === landed.wouldReach);
+          const targetId = reached ? idOf.get(reached.selector) : undefined;
+          report.changed.landedOn = reached
+            ? { selector: reached.selector, label: reached.label, ...(targetId ? { targetId } : {}) }
+            : { selector: landed.hit ?? "nothing", label: "", ...(landed.wouldReach ? { wouldReach: landed.wouldReach } : {}) };
+        }
+      }
+    }
     if (options.at && options.at.length > 0) {
       report.probes = await probePoints(page, options.at, report);
     }
@@ -958,6 +1143,102 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
     }
     return report;
   });
+}
+
+/**
+ * Read one screen for `diffScreens`: the map's own rows (collected afresh when
+ * the caller has none), their ARIA states and look, and the painted text.
+ */
+async function readScreenState(
+  page: import("playwright").Page,
+  samples?: readonly GroundingTargetSample[],
+): Promise<ScreenState> {
+  const targets = samples
+    ?? (await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">).targets;
+  const labels = distinctLabels(targets.map((t) => t.visibleText || t.name));
+  const selectors = targets.map((t) => t.selector);
+  const rest = await page.evaluate(
+    // eslint-disable-next-line no-eval
+    ([src, sels]) => (0, eval)(`(${src})`)(sels),
+    [SCREEN_STATE_JS, selectors] as const,
+  ) as Omit<ScreenState, "targets">;
+  return {
+    targets: targets.map((t, i) => ({ selector: t.selector, label: labels[i]!, onScreen: t.inFrame, box: t.bbox })),
+    ...rest,
+  };
+}
+
+/** `click (85,123)` / `wheel (85,150) dy 89` — how an action is quoted back. */
+export function describeAction(action: GroundingAction): string {
+  return `${action.kind} (${action.at.x},${action.at.y})${action.kind === "wheel" ? ` dy ${action.dy}` : ""}`;
+}
+
+/**
+ * Replay `--after` on the live page: screenshot px -> CSS px, one divide, then
+ * the same mouse calls a computer-use harness makes.
+ *
+ * The settle is a fixed 120ms, not a network or DOM condition, for the same
+ * reason the scenario's harness uses one: a scripted page repaints within a
+ * frame, a wheel scroll is applied asynchronously, and a fixed wait makes the
+ * replay give the same screen every time.
+ */
+async function replayActions(
+  page: import("playwright").Page,
+  actions: readonly GroundingAction[],
+  frame: AgentFrame,
+): Promise<void> {
+  for (const action of actions) {
+    const { x, y } = action.at;
+    if (x < 0 || y < 0 || x >= frame.width || y >= frame.height) {
+      throw new UsageError(
+        `--after ${describeAction(action)}: outside the ${frame.width}x${frame.height} frame`
+        + " — coordinates are screenshot px, like the map's.",
+      );
+    }
+    const css = { x: Math.round(x / frame.scale), y: Math.round(y / frame.scale) };
+    if (action.kind === "click") await page.mouse.click(css.x, css.y);
+    else if (action.kind === "move") await page.mouse.move(css.x, css.y);
+    else {
+      await page.mouse.move(css.x, css.y);
+      await page.mouse.wheel(0, Math.round(action.dy / frame.scale));
+    }
+    await page.waitForTimeout(120);
+  }
+}
+
+/**
+ * What takes a click at a CSS-px point: the element `elementFromPoint` returns,
+ * and the nearest element from it up to `<body>` that declares itself
+ * interactive. Shared by `--at` and by the report of what the last `--after`
+ * click reached.
+ */
+async function hitTest(
+  page: import("playwright").Page,
+  cssPoint: { x: number; y: number },
+): Promise<{ hit: string | null; wouldReach: string | null }> {
+  return await page.evaluate(
+    ([x, y, selectorJs]) => {
+      // eslint-disable-next-line no-eval
+      const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (el: Element) => string;
+      const el = document.elementFromPoint(x, y);
+      if (!el) return { hit: null, wouldReach: null };
+      let node: Element | null = el;
+      let wouldReach: string | null = null;
+      while (node && node.tagName !== "BODY") {
+        const tabindex = node.getAttribute("tabindex");
+        if (node.getAttribute("role")
+          || node.hasAttribute("onclick")
+          || (tabindex !== null && Number(tabindex) >= 0)
+          || /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)) {
+          wouldReach = stableSelector(node);
+          break;
+        }
+        node = node.parentElement;
+      }
+      return { hit: stableSelector(el), wouldReach };
+    },
+    [cssPoint.x, cssPoint.y, STABLE_SELECTOR_JS] as const,
+  ) as { hit: string | null; wouldReach: string | null };
 }
 
 /**
@@ -982,29 +1263,7 @@ async function probePoints(
       out.push({ point, cssPoint, hit: null, offFrame: true });
       continue;
     }
-    const probed = await page.evaluate(
-      ([x, y, selectorJs]) => {
-        // eslint-disable-next-line no-eval
-        const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (el: Element) => string;
-        const el = document.elementFromPoint(x, y);
-        if (!el) return { hit: null, wouldReach: null };
-        let node: Element | null = el;
-        let wouldReach: string | null = null;
-        while (node && node.tagName !== "BODY") {
-          const tabindex = node.getAttribute("tabindex");
-          if (node.getAttribute("role")
-            || node.hasAttribute("onclick")
-            || (tabindex !== null && Number(tabindex) >= 0)
-            || /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)) {
-            wouldReach = stableSelector(node);
-            break;
-          }
-          node = node.parentElement;
-        }
-        return { hit: stableSelector(el), wouldReach };
-      },
-      [cssPoint.x, cssPoint.y, STABLE_SELECTOR_JS] as const,
-    ) as { hit: string | null; wouldReach: string | null };
+    const probed = await hitTest(page, cssPoint);
     const find = (selector: string | null) =>
       selector ? report.targets.find((t) => t.selector === selector) : undefined;
     // A hit on a button's own icon is a hit on the button: `elementFromPoint`
@@ -1138,12 +1397,27 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     + ` — ${report.frame.resolution}, scale ${report.frame.scale.toFixed(2)}`
     + ` (every coordinate below is in these ${report.frame.width}x${report.frame.height} pixels)`,
   );
+  // Which screen this is. A map of the first load read as a map of the screen an
+  // agent is looking at after three actions is the v3 failure, so it is stated
+  // either way — and the plain case names the flag that measures the other.
+  lines.push(
+    report.after && report.after.length > 0
+      ? `screen: after ${report.after.map(describeAction).join(", then ")}`
+        + (report.navigatedTo ? ` (now at ${report.navigatedTo})` : "")
+      : `screen: as first loaded — --after "click x,y" measures the screen an action leaves`,
+  );
   lines.push(
     `targets: ${inFrame.length} actionable in frame`
     + ` (${report.targets.length - inFrame.length} disabled or out of the frame`
     + (report.capped > 0 ? `, ${report.capped} dropped by the cap` : "")
     + `)`,
   );
+  // First after the header: after acting, "did it work" is the question a
+  // caller has, and it is the one a map of the new screen cannot answer.
+  if (report.changed) {
+    lines.push("");
+    lines.push(...formatScreenChange(report.changed, describeAction));
+  }
   // Out of the frame but in the page, with what to do about it. Listed as its own
   // block rather than dropped: a caller that cannot see these cannot plan the
   // scroll that reveals them, and the round that added it had every agent infer
@@ -1151,15 +1425,17 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
   const offscreen = report.targets.filter((t) => !t.inFrame && !t.disabled && t.clippedBy);
   if (offscreen.length > 0) {
     lines.push("");
-    lines.push(`Out of the frame (${offscreen.length}) — scroll first, then re-run:`);
+    lines.push(`Out of the frame (${offscreen.length}) — scroll, then re-run with the scroll as --after:`);
     const byContainer = new Map<string, typeof offscreen>();
     for (const t of offscreen) {
       const key = t.clippedBy!.selector;
       byContainer.set(key, [...(byContainer.get(key) ?? []), t]);
     }
     for (const [selector, rows] of byContainer) {
+      const nearest = rows.map((r) => r.clippedBy!.dy).reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b);
+      const wheel = rows[0]!.clippedBy!.wheelAt;
       const how = rows[0]!.clippedBy!.scrollable
-        ? `scroll it (nearest needs ${rows.map((r) => r.clippedBy!.dy).reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)}px)`
+        ? `scroll it (nearest needs ${nearest}px: --after "wheel ${wheel.x},${wheel.y} ${nearest}")`
         : `it does not scroll — this content cannot be reached by scrolling`;
       lines.push(`  ${selector}: hides ${rows.length} target(s) — ${how}`);
       for (const t of rows.slice(0, 6)) {
@@ -1179,7 +1455,12 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
       const shownRisks = [...new Set(t.risks)].filter((risk) => rules?.effective(risk) !== "off");
       const risk = shownRisks.length > 0 ? ` ${RED}[${shownRisks.join(",")}]${RESET}` : "";
       const label = t.label ? ` "${t.label}"` : ` ${DIM}(no visible label)${RESET}`;
-      lines.push(`  ${t.id} ${t.role}${label} @ (${t.point.x},${t.point.y}) ${t.box.width}x${t.box.height} ${DIM}${t.selector}${RESET}${risk}`);
+      // The painted size when something cuts the box: "149x28" on a row showing
+      // one pixel of itself is the number v4's smaller model aimed by.
+      const size = t.visibleBox.width !== t.box.width || t.visibleBox.height !== t.box.height
+        ? `${t.visibleBox.width}x${t.visibleBox.height} painted of ${t.box.width}x${t.box.height}`
+        : `${t.box.width}x${t.box.height}`;
+      lines.push(`  ${t.id} ${t.role}${label} @ (${t.point.x},${t.point.y}) ${size} ${DIM}${t.selector}${RESET}${risk}`);
     }
     if (inFrame.length > 20) {
       lines.push(`  ${DIM}… ${inFrame.length - 20} more — --json emits the full map${RESET}`);
@@ -1209,7 +1490,7 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     for (const entry of shown) {
       const issue = entry.row;
       const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.kind}: ${issue.message}${retuneNote(entry)}`);
+      lines.push(`  ${icon} ${issue.targetId ? `${issue.targetId} ` : ""}${issue.kind}: ${issue.message}${retuneNote(entry)}`);
     }
   } else if (note === undefined) {
     lines.push("");

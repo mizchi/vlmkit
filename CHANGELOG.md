@@ -12,6 +12,10 @@ Dates are YYYY-MM-DD.
 - Add `check color` to inspect palette roles, text-field boundaries and links distinguished only by colour.
 - Add `check grounding` with actionable screenshot coordinates, numbered markers (`--mark`), coordinate
   hit testing (`--at`) and scroll guidance for clipped targets.
+- Add `check grounding --after` to map the screen that clicks, hovers and scrolls leave, not only the first
+  load, and to report what the last action changed and where its click landed. Map labels are no longer cut
+  before the word that tells two targets apart, a row its scroll container cuts is measured on the strip
+  that is painted, and each finding names its map row.
 - Add `check copy --forbid <file>` to detect prohibited copy, including hidden text.
 - Add bundled workflows for explanatory animations, code-grounded diagrams, D2 diagrams and HTML slide decks,
   with figure fact checks and slide review tools.

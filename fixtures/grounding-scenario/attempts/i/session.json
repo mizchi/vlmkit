@@ -1,0 +1,33 @@
+{
+  "page": "triage",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "scale": 0.5,
+  "wheelUnits": "screenshot",
+  "actions": [
+    {
+      "kind": "wheel",
+      "at": {
+        "x": 85,
+        "y": 120
+      },
+      "dy": 100
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 85,
+        "y": 161
+      }
+    },
+    {
+      "kind": "click",
+      "at": {
+        "x": 560,
+        "y": 50
+      }
+    }
+  ]
+}
