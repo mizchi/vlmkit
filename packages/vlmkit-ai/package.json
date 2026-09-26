@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",
-    "@google/generative-ai": "^0.24.1"
+    "@google/generative-ai": "^0.24.1",
+    "pngjs": "^7.0.0"
   }
 }

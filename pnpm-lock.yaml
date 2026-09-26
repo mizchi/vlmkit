@@ -105,6 +105,9 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
 
   packages/vlmkit-anim:
     dependencies:

@@ -17,6 +17,10 @@ Dates are YYYY-MM-DD.
   before the word that tells two targets apart, a row its scroll container cuts is measured on the strip
   that is painted, and each finding names its map row.
 - Add `check copy --forbid <file>` to detect prohibited copy, including hidden text.
+- Add a provider-neutral zoom loop to `@mizchi/vlmkit-ai` (`analyzeWithZoom`, `runZoomLoop`): a vision model
+  crops and magnifies the full-resolution original through a `zoom` tool, over OpenAI-compatible,
+  Anthropic and Gemini APIs, or a plain-text `ZOOM` protocol for models without function calling.
+  `vlm-bench --zoom` asks each model with and without it.
 - Add `check responsive`, a property-based responsive check: the page's media queries partition the width
   range, generated viewports (plus height, `--text-scale` and colour scheme) are checked with the integrity
   layout judges and a new `text-starved` rule, and each failure is shrunk to its exact width range, anchored
