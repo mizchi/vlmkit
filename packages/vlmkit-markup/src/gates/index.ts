@@ -25,6 +25,7 @@
 
 import { definePlugin } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { a11yContrastGate, a11yFocusGate, a11yTouchGate } from "./a11y.gate.ts";
+import { a11yScanGate, a11yTreeGate } from "./a11y-tree.gate.ts";
 import { animationGate } from "./animation.gate.ts";
 import { assetGate } from "./asset.gate.ts";
 import { breakpointsGate } from "./breakpoints.gate.ts";
@@ -52,7 +53,9 @@ import { verifyFlowGate, verifyMarkupGate } from "./verify.gate.ts";
 export {
   a11yContrastGate,
   a11yFocusGate,
+  a11yScanGate,
   a11yTouchGate,
+  a11yTreeGate,
   animationGate,
   assetGate,
   breakpointsGate,
@@ -93,6 +96,9 @@ export const markupGatesPlugin = definePlugin({
     a11yContrastGate,
     a11yTouchGate,
     a11yFocusGate,
+    // Accessibility from a platform tree (Flutter, Android, …): collect, then judge.
+    a11yScanGate,
+    a11yTreeGate,
     // Responsive / dynamic behavior.
     breakpointsGate,
     scrollGate,

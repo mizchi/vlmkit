@@ -530,6 +530,8 @@ are measured as a fraction of that width. Findings and `--allow` use scene paths
 vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 AA default, 2.5.5 AAA via --level)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
+vlmkit check a11y tree     <a11y.json>         # No DOM: names, reach, pixel contrast, target size from a platform's
+                                               # accessibility tree + frame (Flutter, Android, …) — docs/a11y-tree.md
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config; --elements for a scene)
@@ -682,7 +684,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-31 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+33 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
@@ -998,6 +1000,9 @@ vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
   # --min-area <px>      min filled px per component (default 200)
   # --preset game-ui     = --min-area 24 --top-n 24, for small high-contrast frames
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
+vlmkit scan a11y <url|dump.xml> [--out a11y.json] # A platform's accessibility tree + frame as vlmkit-a11y/1:
+                                               # Flutter web (semantics switched on, --click to reach a
+                                               # screen) or an Android uiautomator dump (--density dpi)
 vlmkit scan style <html|url> [--out snap.json] # One page load for check design / composition / color; then
                                                # `vlmkit check design|composition|color --from snap.json`
                                                # judges it with no browser, same report as the live run
