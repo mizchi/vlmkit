@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greenbox — order summary</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 "Liberation Sans", Arial, sans-serif; color: #1f2522; background: #fff; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 24px; }
+@media (min-width: 900px) { main { grid-template-columns: minmax(0, 1fr) 360px; } }
+h1 { font-size: 24px; margin: 0; }
+/* Pattern: media object — thumbnail, a text column that takes what is left, and a price that keeps its width. */
+.summary { border: 1px solid #dfe3e0; border-radius: 12px; padding: 16px; }
+.item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #eef1ef; }
+.item__thumb { flex: 0 0 56px; height: 56px; border-radius: 8px; background: linear-gradient(135deg, #9bc59d, #4f8a5b); }
+.item__text { flex: 1 1 auto; min-width: 0; }
+.item__name { margin: 0; font-weight: 700; }
+.item__meta { margin: 0; font-size: 14px; color: #5a635e; }
+.item__price { flex: 0 0 auto; font-weight: 700; white-space: nowrap; }
+.total { display: flex; justify-content: space-between; padding-top: 12px; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Your plan</h1>
+    <p>Fresh ingredients for the week, delivered on Thursdays. Skip or pause any week from your account.</p>
+  </section>
+  <aside class="summary" aria-label="Order summary">
+    <div class="item">
+      <div class="item__thumb" role="img" aria-label="Vegetable box"></div>
+      <div class="item__text">
+        <p class="item__name">2 people · 3 meals a week</p>
+        <p class="item__meta">6 servings · $9.99 per serving</p>
+      </div>
+      <div class="item__price">$59.94</div>
+    </div>
+    <div class="item">
+      <div class="item__thumb" role="img" aria-label="Fruit add-on"></div>
+      <div class="item__text">
+        <p class="item__name">Seasonal fruit add-on</p>
+        <p class="item__meta">Weekly · cancel any time</p>
+      </div>
+      <div class="item__price">$12.00</div>
+    </div>
+    <div class="total"><span>Total per week</span><span>$71.94</span></div>
+  </aside>
+</main>
+</body>
+</html>

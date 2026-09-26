@@ -135,6 +135,47 @@ is how Playwright's own `mount` fixture works. Consequences:
   `components/Button/Primary` get separate baselines. List the canonical spelling
   in `vlmkit.gates.json`.
 
+## Responsive layout as a property-based test (`check responsive`)
+
+```bash
+vlmkit check responsive page.html                    # seed 1, 60 cases: every transition's two sides + random viewports per regime
+vlmkit check responsive page.html --text-scale 2     # also generate root font-size 1..2x (WCAG 1.4.4)
+vlmkit check responsive page.html --width 768 --height 900   # replay one case — every failure prints this line
+vlmkit check responsive fixtures/responsive-patterns/mutants/card-grid--fixed-four.html   # a worked failure
+```
+
+The viewport is a generated input; the page's own media queries partition it (`matchMedia` decides,
+parsed numbers only seed the sampling, so em / range syntax / `calc()` partition correctly); the
+properties are `check integrity`'s layout judges run per case plus `text-starved`. Each case is one
+resize of one loaded page, never a reload. A failure is shrunk before it is shown — every dimension
+but width back to the base case (so `needs height=578` means it only happens on short screens), then
+the width to its exact failing interval, which is anchored to the transitions, then ddmin over the
+declarations whose override clears it. Pure half: `@mizchi/vlmkit-judge/pbt.ts` (seeded generator,
+`shrinkRecord`, `failingInterval`, `minimizeSubset`) and `responsive.ts` (regimes, anchoring, ranking,
+`judgeStarvedText`); browser half: `packages/vlmkit-markup/src/stress/responsive-pbt.ts`, whose
+`runResponsiveOnPage(page, { properties })` takes a caller's own properties.
+
+Three things measured while building it, not to re-learn:
+
+- **The page's CSS is read and edited through the DevTools protocol, not the CSSOM.** A sheet
+  linked from a `file:` page is cross-origin in Chromium (so is a CDN one) and `cssRules` throws:
+  the CSSOM version tested no declaration on any demo site. `stress/responsive-css.ts` uses
+  `CSS.getMatchedStylesForNode` (the cascade as computed, in order) and `CSS.setMediaText`.
+  Never "fix" this with `--allow-file-access-from-files` — that hands the page under test the disk.
+- **A suggested breakpoint is tried, not printed.** The conditions on both sides of the anchoring
+  transition are rewritten, the interval re-checked and every property re-checked there; only
+  then does the report say `verified`. A move that trades the failure for another says what it breaks.
+- **The first declaration that clears a squeeze is usually `padding: 0`.** It clears almost any of
+  them and names nothing, so candidates are ranked — rules inside the anchoring `@media` (or an
+  `@container`) first, sizing and wrapping before spacing, larger forced size first — and the first
+  single override that clears it wins, with two alternatives. `text-starved` holds display type
+  (≥24px) to the 4em tier only: a 42px Japanese headline in four lines of five characters is a
+  typographic choice, and was the one false positive on the live corpus.
+
+Catalog of eleven responsive patterns with one mutant each (every intact page silent, every mutant
+reported with its breakpoint and cause): `fixtures/responsive-patterns/` (`build.mjs` writes the
+mutants). Round: `docs/reports/2026-09-26-responsive-pbt-v1.md`.
+
 ## Accessibility with no DOM (`scan a11y` → `check a11y tree`)
 
 ```bash
@@ -661,10 +702,10 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. Plan for the rest of the split: `docs/design/package-decomposition.md`. |
+| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 31 of the 33 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 32 of the 34 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -705,7 +746,7 @@ There are **three** publication routes and still only those **two** copies. The 
 | `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 33 gates + 198 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 34 gates + 208 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

@@ -56,6 +56,7 @@ Regression? the diff heatmap shows where.
 **3. Go deeper when you need it** (each one command, still key-free):
 exact copy present → `check copy page.html --manifest copy.txt` ·
 responsive boundaries → `check breakpoints page.html --sweep` ·
+every width in between, shrunk to the breakpoint that bounds a failure → `check responsive page.html` ·
 keyboard operability → `check interactions page.html` · match a
 design screenshot → `verify markup attempt.html --target design.png`.
 The full routing table is below. Using a coding agent? Add the MCP
@@ -184,6 +185,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Need | Command |
 |---|---|
 | Responsive boundaries are exact (no off-by-one at 768px, no width with horizontal overflow) | `vlmkit check breakpoints page.html --sweep` |
+| Nothing breaks at any width inside a regime — each failure shrunk to its width range, the breakpoint to move (tried) and the declaration that causes it | `vlmkit check responsive page.html` (`--text-scale 2` for WCAG 1.4.4) |
 | Discover which breakpoints the CSS declares | `vlmkit scan breakpoints page.html` |
 | Scroll inventory: containers, page overflow-x, clipped content | `vlmkit scan scroll page.html` |
 | Sticky sticks / fixed holds / snap lands | `vlmkit check scroll page.html` |

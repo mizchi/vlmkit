@@ -684,7 +684,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-33 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+34 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
@@ -1040,6 +1040,13 @@ vlmkit check breakpoints <html|url>            # Boundary quickcheck: render at 
                                                # matches a neighbor — catches off-by-one media queries
                                                # (a width styled by neither/both regimes), elements that
                                                # vanish exactly on the boundary, overflow at boundary widths
+vlmkit check responsive <html|url>             # Property-based responsive check: the page's media queries
+                                               # partition the width range; every transition's two sides and
+                                               # seeded random viewports per regime (height, --text-scale,
+                                               # scheme) are checked with integrity's layout judges plus
+                                               # text-starved; each failure is shrunk to its exact width
+                                               # range, anchored to a breakpoint, and explained by ddmin over
+                                               # the declarations that clear it. --seed / --runs / --width
 vlmkit check crater                            # Crater BiDi backend smoke check
 
 # Stress tests.

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgerly — pricing</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 "Liberation Sans", Arial, sans-serif; color: #17202b; background: #fff; }
+main { max-width: 1120px; margin: 0 auto; padding: 32px 16px; }
+h1 { text-align: center; font-size: 30px; margin: 0 0 24px; }
+/* Pattern: pricing cards, written desktop-first: three fixed columns, two on tablets, one on phones. */
+.plans { display: grid; grid-template-columns: repeat(3, 20rem); justify-content: center; gap: 24px; margin: 0; padding: 0; list-style: none; }
+@media (min-width: 769px) and (max-width: 1099px) { .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) { .plans { grid-template-columns: minmax(0, 1fr); } }
+.plan { padding: 24px; border: 1px solid #d9dee5; border-radius: 14px; }
+.plan h2 { margin: 0 0 4px; font-size: 20px; }
+.price { margin: 0 0 12px; font-size: 32px; font-weight: 700; }
+.price small { font-size: 15px; font-weight: 400; color: #5b6573; }
+.plan ul { margin: 0 0 16px; padding-left: 20px; }
+.plan a { display: block; text-align: center; padding: 10px; border-radius: 8px; background: #1f4fd1; color: #fff; text-decoration: none; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pick a plan</h1>
+  <ul class="plans">
+    <li class="plan"><h2>Solo</h2><p class="price">$9 <small>/ month</small></p><ul><li>One ledger</li><li>Bank sync</li></ul><a href="#">Start Solo</a></li>
+    <li class="plan"><h2>Team</h2><p class="price">$29 <small>/ month</small></p><ul><li>Five ledgers</li><li>Shared approvals</li></ul><a href="#">Start Team</a></li>
+    <li class="plan"><h2>Firm</h2><p class="price">$79 <small>/ month</small></p><ul><li>Unlimited ledgers</li><li>Audit export</li></ul><a href="#">Talk to us</a></li>
+  </ul>
+</main>
+</body>
+</html>

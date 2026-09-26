@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宵待書房マガジン — masthead</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.7 "IPAPGothic", "Liberation Sans", sans-serif; color: #22201c; background: #fbf8f2; }
+h1, main p, .brand__tag { word-break: auto-phrase; }
+a { color: inherit; }
+/* Pattern: masthead that stacks on narrow screens and becomes one row once it fits. */
+.masthead { border-bottom: 1px solid #d8d0c2; background: #fff; }
+.masthead__inner { display: flex; flex-direction: column; gap: 10px; max-width: 1200px; margin: 0 auto; padding: 14px 16px; }
+.brand { display: flex; flex-direction: column; }
+.brand__name { font-size: 22px; font-weight: 700; letter-spacing: 0.04em; text-decoration: none; }
+.brand__tag { margin: 0; font-size: 13px; color: #6a6358; }
+.nav { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 0; list-style: none; }
+.nav a { text-decoration: none; }
+.nav a:hover { text-decoration: underline; }
+.search { align-self: flex-start; font: inherit; font-size: 14px; padding: 4px 14px; border: 1px solid #8c8374; border-radius: 999px; background: #fff; }
+@media (min-width: 1024px) {
+  .masthead__inner { flex-direction: row; align-items: center; gap: 28px; }
+  .nav { flex-wrap: nowrap; margin-left: auto; }
+  .search { align-self: center; }
+}
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 28px; line-height: 1.4; margin: 0 0 12px; }
+</style>
+<style data-mutation="masthead--row-too-early">
+@media (min-width: 560px) { .masthead__inner { flex-direction: row; align-items: center; gap: 28px; } .nav { flex-wrap: nowrap; margin-left: auto; } .search { align-self: center; } }
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead__inner">
+    <div class="brand">
+      <a class="brand__name" href="#">宵待書房マガジン</a>
+      <p class="brand__tag">海辺の町の小さな本屋から、暮らしと本の話を</p>
+    </div>
+    <ul class="nav">
+      <li><a href="#">ほとり</a></li>
+      <li><a href="#">特集</a></li>
+      <li><a href="#">暮らし</a></li>
+      <li><a href="#">インタビュー</a></li>
+      <li><a href="#">書評</a></li>
+      <li><a href="#">お知らせ</a></li>
+    </ul>
+    <button class="search" type="button">検索</button>
+  </div>
+</header>
+<main>
+  <h1>夜にだけ開く本屋</h1>
+  <p>日が沈むと、シャッターが上がる。海辺の町の小さな本屋は、夜にだけ店を開ける。潮の匂いのする棚に、店主が選んだ本が三百冊ほど並んでいる。</p>
+  <p>昼は漁港で働き、夜は本を売る。そんな暮らしを十年続けてきた店主に、店のこと、町のこと、本のことを聞いた。</p>
+</main>
+</body>
+</html>

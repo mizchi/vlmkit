@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quarry docs — three-column reference</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.6 "Liberation Sans", Arial, sans-serif; color: #1c2430; background: #fff; }
+/* Pattern: column drop. Nav joins at 768px, the table of contents at 1200px. */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; max-width: 1280px; margin: 0 auto; padding: 24px 16px; }
+.nav, .toc { display: none; }
+@media (min-width: 768px) {
+  .layout { grid-template-columns: 220px minmax(0, 1fr); padding: 32px 24px; }
+  .nav { display: block; }
+}
+@media (min-width: 1200px) {
+  .layout { grid-template-columns: 220px minmax(0, 1fr) 200px; }
+  .toc { display: block; }
+}
+.nav ul, .toc ul { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+.nav li, .toc li { padding: 5px 0; }
+.nav a, .toc a { color: #28406b; text-decoration: none; }
+.article { min-width: 0; }
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 12px; }
+h2 { font-size: 20px; margin: 28px 0 8px; }
+pre { margin: 12px 0; padding: 12px 14px; overflow-x: auto; background: #f3f5f8; border-radius: 8px; font: 14px/1.5 "Liberation Mono", monospace; }
+.callout { padding: 12px 16px; border-left: 4px solid #3d6bc4; background: #eef3fb; border-radius: 0 8px 8px 0; }
+</style>
+<style data-mutation="sidebar-layout--rigid-article">
+@media (min-width: 768px) { .article { min-width: 38rem; } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="nav" aria-label="Sections">
+    <ul>
+      <li><a href="#">Overview</a></li>
+      <li><a href="#">quarry plan</a></li>
+      <li><a href="#">quarry run</a></li>
+      <li><a href="#">quarry rollback</a></li>
+      <li><a href="#">Exit codes</a></li>
+    </ul>
+  </nav>
+  <main class="article">
+    <h1>quarry run</h1>
+    <p>Runs a plan against the source and target databases. The command is resumable: run it again with the same plan and it continues from the last checkpoint.</p>
+    <pre><code>quarry run --plan plans/orders.toml --parallel 8 --checkpoint .quarry/orders.ckpt</code></pre>
+    <h2 id="options">Options</h2>
+    <p>Every option can also be set in the plan file. A flag given on the command line wins over the file.</p>
+    <p class="callout">Run <code>quarry plan</code> first: it estimates the size of each range and warns about tables without a primary key.</p>
+    <h2 id="exit">Exit codes</h2>
+    <p>0 when the run finished, 3 when it paused at a checkpoint, and 1 for any error that needs a person to look at it.</p>
+  </main>
+  <aside class="toc" aria-label="On this page">
+    <ul>
+      <li><a href="#options">Options</a></li>
+      <li><a href="#exit">Exit codes</a></li>
+    </ul>
+  </aside>
+</div>
+</body>
+</html>

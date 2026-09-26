@@ -40,6 +40,7 @@ nothing — failing on a suspect is the default.
 | Question | Gate |
 |---|---|
 | Responsive boundaries exact, no overflow at any width | `vlmkit check breakpoints page.html --sweep` |
+| Nothing breaks at any width inside a regime (text starved, overflow, clipping, collisions) — shrunk to the width range, the breakpoint and the declaration | `vlmkit check responsive page.html` |
 | Scroll containers / page overflow-x inventory | `vlmkit scan scroll page.html` |
 | Sticky/fixed/snap actually behave | `vlmkit check scroll page.html` |
 | Animations visibly run, settle, respect reduced-motion | `vlmkit check animation page.html` |
@@ -75,7 +76,7 @@ check copy --manifest → 0 missing, 0 placeholders
 scan scroll → no page-overflow-x
 scan handlers → no pointer-only suspects
 check interactions → no suspects
-(+ check breakpoints --sweep when responsiveness is specified)
+(+ check breakpoints --sweep and check responsive when responsiveness is specified)
 ```
 
 Re-run only the failing gate while iterating; re-run the whole set

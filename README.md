@@ -114,7 +114,7 @@ marked `[key]`.
 | You want to… | Reach for |
 |---|---|
 | Check the page you just wrote/edited, no reference | `check integrity` (broken-page scan, 3 viewports) · `check copy --manifest` (copy present, visibly, verbatim) · `check layout --contract` · `scan scroll` / `scan handlers` |
-| Verify behavior, not pixels | `check breakpoints --sweep` · `check interactions` · `check scroll` / `check animation` · `verify flow --flow` |
+| Verify behavior, not pixels | `check breakpoints --sweep` · `check responsive` (every width, shrunk to breakpoint + declaration) · `check interactions` · `check scroll` / `check animation` · `verify flow --flow` |
 | Drive the page from a screenshot (computer use) | `check grounding` — action map in screenshot px, which element a click at each point actually reaches, `--mark` for a numbered overlay |
 | Match a target design | `verify markup --target` (done verdict + fix list) · `build page` / `build component` · `scan mock` (normalize @2x exports) |
 | Track changes over time (VRT) | `snapshot` (baseline → per-viewport diff → `snapshot approve`) · `watch` · `diff-pr` · `baseline` |

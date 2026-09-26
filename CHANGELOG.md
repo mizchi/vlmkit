@@ -17,6 +17,10 @@ Dates are YYYY-MM-DD.
   before the word that tells two targets apart, a row its scroll container cuts is measured on the strip
   that is painted, and each finding names its map row.
 - Add `check copy --forbid <file>` to detect prohibited copy, including hidden text.
+- Add `check responsive`, a property-based responsive check: the page's media queries partition the width
+  range, generated viewports (plus height, `--text-scale` and colour scheme) are checked with the integrity
+  layout judges and a new `text-starved` rule, and each failure is shrunk to its exact width range, anchored
+  to a breakpoint (whose move is tried before it is suggested) and explained by the declaration that causes it.
 - Add bundled workflows for explanatory animations, code-grounded diagrams, D2 diagrams and HTML slide decks,
   with figure fact checks and slide review tools.
 - Install the agent skills inside Claude Code with `/plugin marketplace add mizchi/vlmkit`, alongside the
