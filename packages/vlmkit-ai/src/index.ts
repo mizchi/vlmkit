@@ -88,3 +88,21 @@ export {
   parseDiff,
   type LLMProvider,
 } from "./intent.ts";
+
+// ---- Zoom: let a vision model crop and magnify the original (any provider) ----
+export {
+  analyzeWithZoom,
+  createZoomDriver,
+  runZoomLoop,
+  parseZoomRequests,
+  openAiCompatibleDriver,
+  anthropicDriver,
+  geminiDriver,
+  DEFAULT_IMAGE_BUDGET,
+  type ImageBudget,
+  type ZoomAnalysis,
+  type ZoomCoordinates,
+  type ZoomLoopOptions,
+  type ZoomLoopResult,
+  type VisionChatDriver,
+} from "./zoom.ts";

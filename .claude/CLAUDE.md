@@ -108,6 +108,41 @@ Full bench: `docs/reports/2026-05-22-vlm-llm-coverage-bench.md`.
 - `moonshotai/kimi-k2.5`, `moonshotai/kimi-k2.6` — return 0 fixes despite VLM CHANGE list (emits prose-only, not structured JSON). LLM latency 40-100s also disqualifies them.
 - `qwen/qwen3-coder` — generates plausible-looking fixes that over-correct the whole page (diff 4.1% → 46.7%); apply-and-rollback catches it but the loop never recovers.
 
+## Zoom: let any VLM crop and magnify the original (`@mizchi/vlmkit-ai/zoom.ts`)
+
+```bash
+# Bench a model with and without zoom on the same image (needs that provider's key)
+node --experimental-strip-types src/experiments/benchmark/vlm-bench.ts --zoom --max-zooms 6 qwen/qwen3-vl-30b-a3b-instruct
+```
+
+```ts
+import { analyzeWithZoom } from "@mizchi/vlmkit-ai/zoom.ts";
+const res = await analyzeWithZoom(await resolveModel("claude:claude-haiku-4-5-20251001"),
+  [{ png: baseline, label: "Baseline" }, { png: current, label: "Current" }], "What changed?", { maxZooms: 4 });
+// res.content, res.costUsd, res.zoom.zooms (view box + original box per zoom)
+```
+
+The technique of Anthropic's multimodal zoom cookbook, **with nothing provider-specific**: the loop
+(`runZoomLoop`) talks to a `VisionChatDriver`, and three drivers render one transcript onto three wire
+formats by `fetch` — OpenAI-compatible (OpenRouter, vLLM, Ollama), Anthropic, Gemini. Rules that make
+it work, not to re-learn:
+
+- **We choose the size the model sees.** Each image is resized to a budget (`DEFAULT_IMAGE_BUDGET`,
+  1568px / 1.15MP) and the model is told `Image i (WxH pixels)`; a box it names is mapped onto the
+  **original** and cropped there, then magnified to the budget. Providers that resize again by their
+  own rules (OpenAI's high-detail path, Gemini tiling) can shift pixel boxes — use
+  `coordinates: "normalized"` (0–1000) for those.
+- **Where a zoom result's image goes is the only real provider difference.** Anthropic: inside
+  `tool_result`. Gemini: beside `functionResponse`. OpenAI-compatible: `tool` messages take text only,
+  so the crop follows as a user image labelled with the call id.
+- **Models without function calling use the text protocol** (`protocol: "text"`, or a driver with
+  `nativeTools: false`): the reply carries `ZOOM <image> <x1> <y1> <x2> <y2>` lines.
+- A bad box or unparseable arguments are **answered** with an error, never dropped — an unanswered
+  tool call is a 400 on the next request everywhere. The budget ends in a wrap-up turn with no tool.
+
+Not yet measured on vlmkit's own tasks: the sandbox this was written in had no provider key. Run the
+bench above before turning it on anywhere by default.
+
 ## Component-focused VRT (fixing one component with a small image)
 
 ```bash

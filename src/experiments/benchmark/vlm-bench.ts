@@ -8,6 +8,7 @@
  *   node src/vlm-bench.ts gemma-3-27b              # run specific model
  *   node src/vlm-bench.ts gemma-3-27b llama-3.2    # compare models
  *   node src/vlm-bench.ts --image heatmap.png gemma-3-27b
+ *   node src/vlm-bench.ts --zoom qwen3-vl claude:claude-haiku-4-5-20251001   # each model also asked with zoom
  *
  * Environment: OPENROUTER_API_KEY required for execution (not for --list)
  */
@@ -15,12 +16,13 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { listModels, resolveModel, createVlmClient, type VlmModel, type VlmResponse } from "@mizchi/vlmkit-ai/vlm-client.ts";
+import { analyzeWithZoom } from "@mizchi/vlmkit-ai/zoom.ts";
 import { getArg, getFloatArg, getIntArg, hasFlag, getPositionalArgs } from "@mizchi/vlmkit-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 // Named explicitly: argv cannot tell `--limit 30` from `--md model-name`,
 // and assuming every flag takes a value dropped a model after `--md`.
-const modelArgs = getPositionalArgs(["image", "max-cost", "limit"]);
+const modelArgs = getPositionalArgs(["image", "max-cost", "limit", "max-zooms"]);
 
 const IMAGE_PATH = getArg("image", "");
 const TMP = join(process.cwd(), "test-results", "vlm-bench");
@@ -156,6 +158,25 @@ Be specific. One change per line. Format: "- [element] property: old → new (se
       const msg = e.message?.slice(0, 80) ?? "unknown error";
       console.log(`${RED}ERROR ${msg}${RESET}`);
       results.push({ model: model.id, response: null, error: msg });
+    }
+    // --zoom: the same question again, with the zoom tool, so the two answers sit side by side.
+    if (hasFlag("zoom")) {
+      const label = `${model.id} +zoom`;
+      process.stdout.write(`  ${label.padEnd(50)} `);
+      try {
+        const resp = await analyzeWithZoom(model, [{ png: Buffer.from(imageBase64, "base64") }], prompt, {
+          maxTokens: 512,
+          maxZooms: getIntArg("max-zooms", 6, { min: 0 }),
+        });
+        const costStr = resp.costUsd === 0 ? `${GREEN}FREE${RESET}` : `$${resp.costUsd.toFixed(6)}`;
+        console.log(`${GREEN}${String(resp.latencyMs).padStart(5)}ms${RESET} ${costStr.padStart(16)} ${DIM}${resp.totalTokens}tok ${resp.zoom.zooms.length} zoom(s) (${resp.zoom.protocol})${RESET}`);
+        results.push({ model: label, response: resp });
+        await writeFile(join(TMP, `${model.id.replace(/\//g, "_")}.zoom.txt`), resp.content);
+      } catch (e: any) {
+        const msg = e.message?.slice(0, 80) ?? "unknown error";
+        console.log(`${RED}ERROR ${msg}${RESET}`);
+        results.push({ model: label, response: null, error: msg });
+      }
     }
   }
 
