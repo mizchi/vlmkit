@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 33);
+    assert.equal(r.list().length, 34);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -222,8 +222,14 @@ describe("composed built-in registry", () => {
     //       `semantics-empty` — an app whose tree never built reads as an empty page that
     //       passes; `check a11y tree` has `unlabelled-control`, `unreachable-content`,
     //       `contrast-below-aa` (on the frame's pixels) and `target-undersized`.
+    // 198 → 208: `check responsive`, the viewport as a generated input. Seven rules are
+    //       `check integrity`'s layout judges run at generated cases (same ids, same
+    //       severities), plus `text-starved` (warn) — text squeezed to a word or a character
+    //       per line, found by eye 17 times on the demo sites and by no gate —
+    //       `untested-media-feature` (info), which says which conditions the generator could
+    //       not vary rather than implying they were covered, and `redirected`.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 198);
+    assert.equal(total, 208);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -263,6 +269,7 @@ describe("composed built-in registry", () => {
       "check.layout",
       "check.motion",
       "check.perf",
+      "check.responsive",
       "check.scroll",
       "check.story",
       "check.theme",

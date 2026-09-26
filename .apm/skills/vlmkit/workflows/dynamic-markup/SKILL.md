@@ -84,6 +84,32 @@ elements hold their viewport position, engaged sticky elements stick
 at their `top`, mandatory snap containers land on a child snap edge —
 including the "no child declares scroll-snap-align" miss).
 
+### B1b. `check responsive attempt.html` — every regime, not only its edges
+
+`check breakpoints` proves each boundary is consistent with its neighbours;
+it cannot say whether the layout a regime selects *fits* anywhere inside it.
+`check responsive` treats the viewport as a generated input: the page's own
+media queries partition the width range, both sides of every transition are
+checked, then seeded random viewports visit every regime, each with
+`check integrity`'s layout judges plus `text-starved` (text squeezed to a
+word or a character per line — the "cramped at an in-between width" class
+the demo sites found only by eye). A failure is shrunk before it is shown:
+
+- **the width range it fails over, to the pixel**, and where that range sits
+  against the breakpoints — `starts exactly at the 768px breakpoint … clears
+  at 826px` means the layout was switched on too early;
+- **the breakpoint move, tried**: the condition is rewritten in the CSSOM and
+  the range re-checked, so `verified` means the failure clears there and
+  nothing else fails; `tried and rejected` names what the move breaks;
+- **the declaration**: the first single override (ranked: rules switched on
+  by that breakpoint, then sizing before spacing) that clears it, with up to
+  two alternatives.
+
+Fix the named declaration or take the verified move, then re-run with the
+printed `--width` line to confirm that one case, and once more without it.
+Add `--text-scale 2` when the spec asks for WCAG 1.4.4 text resize; a
+failure that needs it says `needs textScale=…`.
+
 ### B2. `scan scroll attempt.html`
 
 Proves the scroll requirements are real:

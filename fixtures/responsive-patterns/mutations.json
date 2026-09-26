@@ -1,0 +1,147 @@
+{
+  "$comment": "One mutant per pattern: the intact page plus ONE change, either a CSS block injected before </head> (`inject`) or one literal edit (`replace`). `build.mjs` writes mutants/<id>.html from these; `expect` is what check responsive must report, and `from` names the demo-site defect the mutant reproduces.",
+  "mutants": [
+    {
+      "id": "masthead--row-too-early",
+      "pattern": "masthead",
+      "from": "magazine D30: at tablet width the one-row masthead does not fit and its links wrap a character at a time",
+      "inject": "@media (min-width: 560px) { .masthead__inner { flex-direction: row; align-items: center; gap: 28px; } .nav { flex-wrap: nowrap; margin-left: auto; } .search { align-self: center; } }",
+      "expect": {
+        "kind": "text-starved",
+        "anchor": "starts-at-breakpoint",
+        "lo": 560,
+        "causeProperty": [
+          "flex-wrap",
+          "flex-direction"
+        ]
+      }
+    },
+    {
+      "id": "card-grid--fixed-four",
+      "pattern": "card-grid",
+      "from": "docs D24: at 768-1000px the four phase cards stay in one row inside a 432px article",
+      "inject": "@media (min-width: 768px) { .phases { grid-template-columns: repeat(4, minmax(0, 1fr)); } }",
+      "expect": {
+        "kind": "text-starved",
+        "anchor": "starts-at-breakpoint",
+        "lo": 768,
+        "causeProperty": "grid-template-columns"
+      }
+    },
+    {
+      "id": "sidebar-layout--rigid-article",
+      "pattern": "sidebar-layout",
+      "from": "constructed: a column given a fixed minimum no longer fits once the sidebar joins",
+      "inject": "@media (min-width: 768px) { .article { min-width: 38rem; } }",
+      "expect": {
+        "kind": "page-overflow-x",
+        "anchor": "starts-at-breakpoint",
+        "lo": 768,
+        "causeProperty": "min-width"
+      }
+    },
+    {
+      "id": "data-table--clipped-scroller",
+      "pattern": "data-table",
+      "from": "dashboard D5, variant: the orders table is wider than its card; here the scroller clips instead of scrolling",
+      "inject": ".table-wrap { overflow: hidden; }",
+      "expect": {
+        "kind": "clipped-content",
+        "anchor": "starts-at-breakpoint",
+        "lo": 600
+      }
+    },
+    {
+      "id": "form-row--rigid-input",
+      "pattern": "form-row",
+      "from": "shop D7: at 320px the newsletter row is 324px wide — the email field's width pushes the button past the edge",
+      "inject": ".row { flex-wrap: nowrap; } .row input { min-width: 17rem; }",
+      "expect": {
+        "kind": "page-overflow-x",
+        "anchor": "inside-regime",
+        "lo": 320,
+        "causeProperty": [
+          "min-width",
+          "flex-wrap"
+        ]
+      }
+    },
+    {
+      "id": "media-object--rigid-price",
+      "pattern": "media-object",
+      "from": "checkout D1 / D3, variant: a price column that keeps its width squeezes the item name",
+      "inject": ".item__price { flex-basis: 11rem; text-align: right; }",
+      "expect": {
+        "kind": "text-starved",
+        "anchor": "inside-regime",
+        "causeProperty": [
+          "flex-basis",
+          "flex"
+        ]
+      }
+    },
+    {
+      "id": "hero--fixed-height",
+      "pattern": "hero",
+      "from": "constructed: a hero sized to the viewport cuts its own copy on a short (landscape) screen",
+      "inject": ".hero { height: 100vh; min-height: 0; overflow: hidden; }",
+      "expect": {
+        "kind": "clipped-content",
+        "needs": "height"
+      }
+    },
+    {
+      "id": "drawer--peeking",
+      "pattern": "drawer",
+      "from": "constructed: a fixed drawer sized in vw and pushed out in rem lands over the content beside it",
+      "inject": "@media (max-width: 767px) { .drawer { width: 85vw; transform: translateX(-18rem); } }",
+      "expect": {
+        "kind": "occluded-text",
+        "causeProperty": [
+          "transform",
+          "width"
+        ]
+      }
+    },
+    {
+      "id": "pricing--orphan-width",
+      "pattern": "pricing",
+      "from": "fixtures/dogfood-dataviz-2026-08-11: a query bound off by one leaves exactly 768px to the desktop grid",
+      "replace": [
+        "@media (max-width: 1099px)",
+        "@media (min-width: 769px) and (max-width: 1099px)"
+      ],
+      "expect": {
+        "kind": "page-overflow-x",
+        "anchor": "whole-regime",
+        "lo": 768,
+        "hi": 768
+      }
+    },
+    {
+      "id": "toolbar--fixed-height",
+      "pattern": "toolbar",
+      "from": "constructed, WCAG 1.4.4: controls sized in px around text sized in rem clip it when the reader's text is larger",
+      "inject": ".toolbar button { height: 2.25rem; min-height: 0; overflow: hidden; height: 36px; }",
+      "args": [
+        "--text-scale",
+        "2"
+      ],
+      "expect": {
+        "kind": "text-clipped",
+        "needs": "textScale"
+      }
+    },
+    {
+      "id": "container-card--early-row",
+      "pattern": "container-card",
+      "from": "constructed: a container query switched on before its row fits (docs noted check breakpoints cannot see container queries)",
+      "inject": "@container (min-width: 16rem) { .card { grid-template-columns: 11rem minmax(0, 1fr); align-items: start; } .card__img { aspect-ratio: 1; } }",
+      "expect": {
+        "kind": "text-starved",
+        "anchor": "inside-regime",
+        "causeProperty": "grid-template-columns"
+      }
+    }
+  ]
+}

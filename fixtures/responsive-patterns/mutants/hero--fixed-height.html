@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidewater — landing hero</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.55 "Liberation Sans", Arial, sans-serif; color: #10202a; background: #fff; }
+/* Pattern: split hero — stacked on phones, text beside the illustration from 900px. Its height follows its content. */
+.hero { display: grid; gap: 24px; align-items: center; min-height: min(70vh, 36rem); padding: 32px 16px; background: #e8f3f6; }
+@media (min-width: 900px) { .hero { grid-template-columns: 1.1fr 1fr; padding: 48px max(24px, calc((100vw - 1120px) / 2)); } }
+.hero h1 { margin: 0 0 12px; font-size: clamp(28px, 5vw, 48px); line-height: 1.15; }
+.hero p { margin: 0 0 20px; font-size: 18px; color: #2c434f; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-block; padding: 12px 20px; border-radius: 8px; font-weight: 700; text-decoration: none; }
+.btn--primary { background: #0e5a73; color: #fff; }
+.btn--ghost { border: 2px solid #0e5a73; color: #0e5a73; }
+.art { aspect-ratio: 4 / 3; border-radius: 16px; background: radial-gradient(circle at 30% 30%, #ffd98a 0 18%, transparent 19%), linear-gradient(180deg, #7cc3d6 0 55%, #2f7f99 55% 100%); }
+section.below { max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+</style>
+<style data-mutation="hero--fixed-height">
+.hero { height: 100vh; min-height: 0; overflow: hidden; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div>
+    <h1>Tide tables that plan the trip for you</h1>
+    <p>Tidewater reads the forecast, the tide and the daylight and tells you when the crossing is safe.</p>
+    <div class="actions"><a class="btn btn--primary" href="#">Start free</a><a class="btn btn--ghost" href="#">See a sample plan</a></div>
+  </div>
+  <div class="art" role="img" aria-label="Sun over a calm sea"></div>
+</header>
+<section class="below">
+  <h2>Built for small boats</h2>
+  <p>Kayaks, dinghies and paddleboards need a wider margin than the charts give. Tidewater keeps one for you.</p>
+</section>
+</body>
+</html>

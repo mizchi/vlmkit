@@ -40,6 +40,7 @@ import { handlersGate } from "./handlers.gate.ts";
 import { integrityGate } from "./integrity.gate.ts";
 import { interactionsGate } from "./interactions.gate.ts";
 import { layoutGate } from "./layout.gate.ts";
+import { responsiveGate } from "./responsive.gate.ts";
 import { motionGate } from "./motion.gate.ts";
 import { scrollGate } from "./scroll.gate.ts";
 import { storyGate } from "./story.gate.ts";
@@ -74,6 +75,7 @@ export {
   layoutGate,
   mediaVariantsGate,
   motionGate,
+  responsiveGate,
   scrollGate,
   storyGate,
   scrollScanGate,
@@ -101,6 +103,7 @@ export const markupGatesPlugin = definePlugin({
     a11yTreeGate,
     // Responsive / dynamic behavior.
     breakpointsGate,
+    responsiveGate,
     scrollGate,
     storyGate,
     scrollScanGate,

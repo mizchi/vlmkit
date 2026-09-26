@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Celadon &amp; Clay — newsletter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.6 "Liberation Sans", Arial, sans-serif; color: #202624; background: #f6f3ee; }
+main { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+h2 { font-size: 22px; margin: 0 0 6px; }
+p { margin: 0 0 16px; color: #4a524e; }
+/* Pattern: inline form row — the field grows, the button keeps its size, and the row wraps when both do not fit. */
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.row input { flex: 1 1 14rem; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid #8a948f; border-radius: 8px; background: #fff; }
+.row button { flex: 0 0 auto; font: inherit; font-weight: 700; padding: 10px 18px; border: 0; border-radius: 8px; background: #2f5d50; color: #fff; }
+.fine { margin-top: 10px; font-size: 13px; color: #5d6662; }
+</style>
+<style data-mutation="form-row--rigid-input">
+.row { flex-wrap: nowrap; } .row input { min-width: 17rem; }
+</style>
+</head>
+<body>
+<main>
+  <section aria-labelledby="nl-title">
+    <h2 id="nl-title">Kiln notes, once a month</h2>
+    <p>New glazes, studio sales and the occasional firing gone wrong. No more than one email a month.</p>
+    <form class="row" onsubmit="return false">
+      <label class="sr-only" for="email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+      <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+      <button type="submit">Subscribe</button>
+    </form>
+    <p class="fine">Unsubscribe from any email. We never share the list.</p>
+  </section>
+</main>
+</body>
+</html>

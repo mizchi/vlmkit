@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draftboard — editor toolbar</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 100%; }
+body { margin: 0; font: 1rem/1.5 "Liberation Sans", Arial, sans-serif; color: #1a1f26; background: #fff; }
+/* Pattern: toolbar that wraps, with controls sized in rem so they grow with the reader's text size. */
+.toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem 1rem; border-bottom: 1px solid #dde2e8; background: #f6f8fa; }
+.toolbar button { min-height: 2.25rem; padding: 0.25rem 0.75rem; font: inherit; line-height: 1.5; border: 1px solid #b8c1cc; border-radius: 0.375rem; background: #fff; }
+main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem; }
+h1 { font-size: 1.75rem; margin: 0 0 0.75rem; }
+</style>
+<style data-mutation="toolbar--fixed-height">
+.toolbar button { height: 2.25rem; min-height: 0; overflow: hidden; height: 36px; }
+</style>
+</head>
+<body>
+<div class="toolbar" role="toolbar" aria-label="Formatting">
+  <button type="button">Bold</button>
+  <button type="button">Italic</button>
+  <button type="button">Heading</button>
+  <button type="button">Link</button>
+  <button type="button">Quote</button>
+  <button type="button">Publish</button>
+</div>
+<main>
+  <h1>Untitled draft</h1>
+  <p>Write something. Draftboard saves every few seconds and keeps the last fifty versions.</p>
+</main>
+</body>
+</html>

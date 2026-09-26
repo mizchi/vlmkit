@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stackhouse — product cards with container queries</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 "Liberation Sans", Arial, sans-serif; color: #1b1e24; background: #f5f6f8; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 26px; margin: 0 0 16px; }
+/* Pattern: cards laid out by their own width (container queries), in a grid laid out by the viewport's. */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.slot { container-type: inline-size; }
+.card { display: grid; gap: 12px; padding: 14px; border-radius: 12px; background: #fff; border: 1px solid #dfe2e7; }
+.card__img { aspect-ratio: 16 / 10; border-radius: 8px; background: linear-gradient(135deg, #c8d4e6, #8298bb); }
+.card h2 { margin: 0; font-size: 17px; }
+.card p { margin: 0; font-size: 14px; color: #4f5663; }
+@container (min-width: 26rem) {
+  .card { grid-template-columns: 9rem minmax(0, 1fr); align-items: start; }
+  .card__img { aspect-ratio: 1; }
+}
+</style>
+<style data-mutation="container-card--early-row">
+@container (min-width: 16rem) { .card { grid-template-columns: 11rem minmax(0, 1fr); align-items: start; } .card__img { aspect-ratio: 1; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Storage, by the shelf</h1>
+  <ul class="grid">
+    <li class="slot"><article class="card"><div class="card__img" role="img" aria-label="Oak shelf"></div><div><h2>Oak wall shelf</h2><p>Solid oak, hidden brackets, holds 20 kg along its length.</p></div></article></li>
+    <li class="slot"><article class="card"><div class="card__img" role="img" aria-label="Steel rack"></div><div><h2>Steel pantry rack</h2><p>Five adjustable tiers in powder-coated steel, for tins and jars.</p></div></article></li>
+    <li class="slot"><article class="card"><div class="card__img" role="img" aria-label="Crate set"></div><div><h2>Stacking crates</h2><p>Three sizes of pine crate that lock together into a low bookcase.</p></div></article></li>
+    <li class="slot"><article class="card"><div class="card__img" role="img" aria-label="Hanging rail"></div><div><h2>Hanging rail</h2><p>A ceiling rail with eight hooks for the hallway or a shop floor.</p></div></article></li>
+  </ul>
+</main>
+</body>
+</html>

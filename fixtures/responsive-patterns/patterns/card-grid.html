@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quarry docs — migration phases</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.6 "Liberation Sans", Arial, sans-serif; color: #1c2430; background: #fff; }
+/* Pattern: docs shell (sidebar from 768px) with a card grid that flows by available width. */
+.shell { display: grid; grid-template-columns: 1fr; gap: 32px; max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+.sidebar { display: none; }
+@media (min-width: 768px) {
+  .shell { grid-template-columns: 240px minmax(0, 1fr); padding: 32px 24px; }
+  .sidebar { display: block; }
+}
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar li { padding: 6px 0; border-bottom: 1px solid #eef0f3; }
+.sidebar a { color: #28406b; text-decoration: none; }
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 12px; }
+.lede { margin: 0 0 24px; color: #414b5a; }
+.phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.phase { padding: 16px; border: 1px solid #d5dbe3; border-radius: 10px; background: #f7f9fb; }
+.phase h3 { margin: 0 0 6px; font-size: 16px; }
+.phase p { margin: 0; font-size: 14px; line-height: 1.5; color: #414b5a; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="sidebar" aria-label="Guide">
+    <ul>
+      <li><a href="#">Getting started</a></li>
+      <li><a href="#">Planning a migration</a></li>
+      <li><a href="#">Rolling back</a></li>
+      <li><a href="#">CLI reference</a></li>
+    </ul>
+  </nav>
+  <article>
+    <h1>How a migration runs</h1>
+    <p class="lede">Every migration moves through the same four phases. Each one can be paused, and each one reports its progress to the plan file.</p>
+    <ol class="phases">
+      <li class="phase"><h3>Snapshot</h3><p>Copies the schema and takes a consistent read point on the source.</p></li>
+      <li class="phase"><h3>Backfill</h3><p>Copies rows in parallel ranges while the source keeps taking writes.</p></li>
+      <li class="phase"><h3>Catch-up</h3><p>Replays the writes that landed during the backfill until lag is small.</p></li>
+      <li class="phase"><h3>Cut-over</h3><p>Pauses writes for a moment, drains the last changes and switches traffic.</p></li>
+    </ol>
+  </article>
+</div>
+</body>
+</html>
