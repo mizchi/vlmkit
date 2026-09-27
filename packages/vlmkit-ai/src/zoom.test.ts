@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { clampBox, fitToBudget, toViewBox, viewBoxToOriginal, zoomSize } from "./zoom-geometry.ts";
 import { cropImage, decodeImage, encodePngImage, prepareZoomSource, resample, zoomInto, type RgbaImage } from "./zoom-image.ts";
-import { parseZoomRequests, runZoomLoop, zoomCallFromArgs, type DriverTurn, type VisionChatDriver, type ZoomTurn } from "./zoom-loop.ts";
+import { parseZoomRequests, runSingleLook, runZoomLoop, zoomCallFromArgs, type DriverTurn, type VisionChatDriver, type ZoomTurn } from "./zoom-loop.ts";
 import { anthropicDriver, geminiDriver, openAiCompatibleDriver } from "./zoom-drivers.ts";
 
 /** A white image with a 1px black vertical rule at `ruleX` and a red block in a corner. */
@@ -175,6 +175,25 @@ describe("runZoomLoop", () => {
     const result = await runZoomLoop(driver, [{ png: image, label: "Baseline" }, { png: png(canvas(400, 300)), label: "Current" }], "Diff?");
     assert.equal(result.zooms[0]!.imageIndex, 1);
     assert.match(JSON.stringify(driver.seen[0]![0]), /Current — Image 1 \(400x300 pixels\)/);
+  });
+});
+
+describe("runSingleLook: the control arm", () => {
+  it("shows the same images at the same size, offers no tool and never mentions zooming", async () => {
+    const image = png(canvas(3000, 1000, 1501));
+    const control = scripted(true, [{ text: " answer ", calls: [], usage: { promptTokens: 7, completionTokens: 3 } }]);
+    const result = await runSingleLook(control, [{ png: image, label: "Current" }], "What is there?");
+    assert.equal(result.answer, "answer");
+    assert.deepEqual(result.usage, { promptTokens: 7, completionTokens: 3 });
+    assert.deepEqual(control.offered, [false]);
+    const shown = JSON.stringify(control.seen[0]);
+    assert.match(shown, /Current — Image 0 \(1568x522 pixels\)/);
+    assert.doesNotMatch(shown, /zoom/i, "a control that is told about a tool it lacks is not a control");
+
+    const loop = scripted(true, [{ text: "answer", calls: [] }]);
+    await runZoomLoop(loop, [{ png: image, label: "Current" }], "What is there?");
+    const images = (turns: ZoomTurn[]) => turns[0]!.role === "user" ? turns[0]!.parts.filter((p) => p.type === "image") : [];
+    assert.deepEqual(images(control.seen[0]!), images(loop.seen[0]!), "both arms send identical image bytes");
   });
 });
 

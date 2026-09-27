@@ -21,6 +21,9 @@ Dates are YYYY-MM-DD.
   crops and magnifies the full-resolution original through a `zoom` tool, over OpenAI-compatible,
   Anthropic and Gemini APIs, or a plain-text `ZOOM` protocol for models without function calling.
   `vlm-bench --zoom` asks each model with and without it.
+- Add a zoom accuracy bench (`src/experiments/benchmark/zoom-accuracy/`): known-answer changes planted in
+  full-page captures, each model asked with a single look (`runSingleLook`, new) and with zoom, scored from
+  JSON answers and paired per case with a sign test. `--self-check` validates the cases without a key.
 - Add `check responsive`, a property-based responsive check: the page's media queries partition the width
   range, generated viewports (plus height, `--text-scale` and colour scheme) are checked with the integrity
   layout judges and a new `text-starved` rule, and each failure is shrunk to its exact width range, anchored

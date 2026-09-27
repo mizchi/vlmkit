@@ -140,8 +140,29 @@ it work, not to re-learn:
 - A bad box or unparseable arguments are **answered** with an error, never dropped — an unanswered
   tool call is a 400 on the next request everywhere. The budget ends in a wrap-up turn with no tool.
 
-Not yet measured on vlmkit's own tasks: the sandbox this was written in had no provider key. Run the
-bench above before turning it on anywhere by default.
+**Whether zoom makes answers right is a separate bench** — `vlm-bench --zoom` only prints latency,
+tokens and cost. The accuracy bench plants one change with a known answer in a full-page 2x capture of
+each CSS-challenge fixture (a digit in ≤14px text, a short label's colour, an element nudged 3-4px, or
+nothing) and asks each model twice through the same driver, images and wording: `runSingleLook` (one
+turn, no tool) and `runZoomLoop`. Answers are JSON, scored without reading prose; the report pairs the
+two arms per case (fixed / broken by zoom) with an exact sign test, because 36 cases cannot carry a bare
+accuracy difference.
+
+```bash
+B="node --experimental-strip-types src/experiments/benchmark/zoom-accuracy/zoom-accuracy.ts"
+$B --self-check                                   # no key: 36 cases, oracle must score 36/36, "unchanged" 9/36
+$B bytedance/ui-tars-1.5-7b claude:claude-haiku-4-5-20251001 --md docs/reports/YYYY-MM-DD-zoom-accuracy.md
+$B --rescore --md report.md                       # re-score saved answers (test-results/zoom-accuracy/answers/)
+$B --max-edge 1024 …                              # a harsher view budget, as a provider that resizes again would
+```
+
+Two things measured building it: the first full-page capture of `page.html` is 2 device px shorter than
+every later one, so captures repeat until two agree (without it every `none` case differs everywhere);
+and at the default budget a 2x capture is shown at ~0.8 CSS scale, where 12px text is still legible to a
+careful eye — so a small single-look/zoom gap on `text` is a finding, not a broken bench.
+
+Not yet run against a live model: the sandbox this was written in had no provider key. Run the accuracy
+bench before turning zoom on anywhere by default.
 
 ## Component-focused VRT (fixing one component with a small image)
 

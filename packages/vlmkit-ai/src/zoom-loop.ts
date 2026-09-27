@@ -185,6 +185,57 @@ function textProtocolInstructions(coordinates: ZoomCoordinates): string {
     + "You will get the magnified regions back. When you can answer, reply with the answer and no ZOOM line.";
 }
 
+/** The opening message: each image labelled with its index and the size it is shown at, then the question. */
+function introParts(
+  images: readonly ZoomImageInput[],
+  sources: readonly ZoomSource[],
+  question: string,
+  coordinates: ZoomCoordinates,
+  instructions: string,
+): ZoomPart[] {
+  const intro: ZoomPart[] = [];
+  sources.forEach((src, i) => {
+    const label = images[i]!.label ? `${images[i]!.label} — ` : "";
+    intro.push({ type: "text", text: `${label}Image ${i} (${src.view.width}x${src.view.height} pixels):` });
+    intro.push({ type: "image", png: src.viewPng });
+  });
+  const coordNote = coordinates === "pixels"
+    ? "Coordinates are absolute pixels of the image as shown, origin top-left."
+    : "Coordinates are 0-1000 of each image's width and height, origin top-left.";
+  intro.push({ type: "text", text: `${question}\n\n${coordNote}${instructions ? ` ${instructions}` : ""}` });
+  return intro;
+}
+
+export interface SingleLookResult {
+  answer: string;
+  usage: ZoomUsage;
+  stop?: string;
+}
+
+/**
+ * The control arm of a zoom measurement: the same driver, the same images resized to the same
+ * budget, the same labels and question — and one turn with no tool. Comparing this against
+ * `runZoomLoop` isolates what zooming adds; comparing against a different client would also
+ * measure the difference between two request builders.
+ */
+export async function runSingleLook(
+  driver: VisionChatDriver,
+  images: readonly ZoomImageInput[],
+  question: string,
+  options: Pick<ZoomLoopOptions, "maxTokens" | "budget" | "coordinates"> = {},
+): Promise<SingleLookResult> {
+  if (images.length === 0) throw new RangeError("runSingleLook needs at least one image");
+  const budget = options.budget ?? DEFAULT_IMAGE_BUDGET;
+  const sources = images.map((img) => prepareZoomSource(img.png, budget));
+  const intro = introParts(images, sources, question, options.coordinates ?? "pixels", "");
+  const reply = await driver.turn([{ role: "user", parts: intro }], { maxTokens: options.maxTokens ?? 2048 });
+  return {
+    answer: reply.text.trim(),
+    usage: { promptTokens: reply.usage?.promptTokens ?? 0, completionTokens: reply.usage?.completionTokens ?? 0 },
+    ...(reply.stop ? { stop: reply.stop } : {}),
+  };
+}
+
 /**
  * Run the loop. `images` are PNGs at any size; each is shown at `budget` and labelled with its
  * index and size. The answer is the model's last reply with no zoom request.
@@ -204,21 +255,9 @@ export async function runZoomLoop(
   if (protocol === "native" && !driver.nativeTools) throw new Error(`${driver.model}: this driver has no native tools; use protocol "text"`);
 
   const sources: ZoomSource[] = images.map((img) => prepareZoomSource(img.png, budget));
-  const intro: ZoomPart[] = [];
-  sources.forEach((src, i) => {
-    const label = images[i]!.label ? `${images[i]!.label} — ` : "";
-    intro.push({ type: "text", text: `${label}Image ${i} (${src.view.width}x${src.view.height} pixels):` });
-    intro.push({ type: "image", png: src.viewPng });
-  });
-  const coordNote = coordinates === "pixels"
-    ? "Coordinates are absolute pixels of the image as shown, origin top-left."
-    : "Coordinates are 0-1000 of each image's width and height, origin top-left.";
-  intro.push({
-    type: "text",
-    text: `${question}\n\n${coordNote} ${protocol === "native"
-      ? "Use the zoom tool to examine any detail too small to read confidently."
-      : textProtocolInstructions(coordinates)}`,
-  });
+  const intro = introParts(images, sources, question, coordinates, protocol === "native"
+    ? "Use the zoom tool to examine any detail too small to read confidently."
+    : textProtocolInstructions(coordinates));
 
   const transcript: ZoomTurn[] = [{ role: "user", parts: intro }];
   const tool = zoomToolSpec(images.length, coordinates);

@@ -94,6 +94,7 @@ export {
   analyzeWithZoom,
   createZoomDriver,
   runZoomLoop,
+  runSingleLook,
   parseZoomRequests,
   openAiCompatibleDriver,
   anthropicDriver,
@@ -104,5 +105,6 @@ export {
   type ZoomCoordinates,
   type ZoomLoopOptions,
   type ZoomLoopResult,
+  type SingleLookResult,
   type VisionChatDriver,
 } from "./zoom.ts";
