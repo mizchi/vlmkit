@@ -10,6 +10,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { PNG } from "pngjs";
 import type { Browser } from "playwright";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import type { BenchCase, CaseKind, CssBox, Expected } from "./score.ts";
 
 export interface BuildOptions {
@@ -186,7 +187,7 @@ export async function buildCases(browser: Browser, options: BuildOptions): Promi
       const page = await browser.newPage({ viewport: { width: options.viewportWidth, height: 900 }, deviceScaleFactor: dsf });
       try {
         await page.goto(`file://${fixture}`, { waitUntil: "load" });
-        await page.evaluate(() => document.fonts.ready);
+        await settlePage(page);
         const shot = () => page.screenshot({ fullPage: true, animations: "disabled", caret: "hide" });
         // The first full-page capture of page.html came back 2 device px shorter than every one
         // after it (the resize a full-page capture does settles the layout), which made its
