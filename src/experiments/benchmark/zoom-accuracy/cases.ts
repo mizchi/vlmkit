@@ -21,6 +21,8 @@ export interface BuildOptions {
   deviceScaleFactor: number;
   viewportWidth: number;
   outDir: string;
+  /** Planted cases per fixture and kind, each its own seeded choice (default 1). `none` gets one per fixture. */
+  variants?: number;
 }
 
 export interface BuiltCase extends BenchCase {
@@ -40,7 +42,9 @@ type Planted = { expected: Expected; target: string; box: CssBox } | { skip: str
 /**
  * Runs in the page. Picks one element for `kind` with a seeded choice, changes it, and says
  * what the right answer is. Candidates are leaf elements that are visible and small — the
- * point of the bench is detail a downscaled view can lose.
+ * point of the bench is detail a downscaled view can lose — and unobstructed: v1 planted
+ * "50+" → "00+" under a blurred modal, which no reader and no zoom could read, so it measured
+ * nothing and was the one miss of every arm.
  */
 function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
   let state = args.seed >>> 0 || 1;
@@ -68,6 +72,18 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
     const cs = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.5;
   };
+  // Topmost at its own centre, and no filtered or faded ancestor between it and the page.
+  const unobstructed = (el: Element) => {
+    for (let e: Element | null = el; e; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.filter !== "none" || Number(cs.opacity) < 0.95) return false;
+    }
+    el.scrollIntoView({ block: "center", inline: "center" });
+    const r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    window.scrollTo(0, 0);
+    return !!hit && (hit === el || el.contains(hit));
+  };
   const leaves = [...document.querySelectorAll("body *")].filter((el) =>
     el.children.length === 0 && (el.textContent ?? "").trim() !== "" && visible(el)
     && !["SCRIPT", "STYLE", "TITLE", "OPTION"].includes(el.tagName));
@@ -80,8 +96,8 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
   if (args.kind === "text") {
     const candidates = leaves.filter((el) => {
       const t = el.textContent!.trim();
-      return parseFloat(getComputedStyle(el).fontSize) <= 14 && /\d/.test(t) && t.length <= 60;
-    });
+      return parseFloat(getComputedStyle(el).fontSize) <= 13 && /\d/.test(t) && t.length <= 60;
+    }).filter(unobstructed);
     const el = pick(candidates);
     if (!el) return { skip: "no small text with a digit" };
     const node = [...el.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && /\d/.test(n.textContent ?? ""));
@@ -115,16 +131,26 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
     const candidates = leaves.filter((el) => {
       const t = el.textContent!.trim();
       return parseFloat(getComputedStyle(el).fontSize) <= 16 && t.length >= 2 && t.length <= 40;
-    });
+    }).filter(unobstructed);
     const el = pick(candidates);
     if (!el) return { skip: "no short small label" };
     const oldColor = hex(getComputedStyle(el).color);
-    const palette = ["#dc2626", "#16a34a", "#2563eb", "#9333ea", "#ea580c"];
     const channels = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
     const dist = (a: string, b: string) => Math.max(...channels(a).map((v, i) => Math.abs(v - channels(b)[i]!)));
-    // The farthest palette colour: the bench asks whether a colour can be READ, not whether a
-    // near-invisible shift can be noticed, so the planted colour is always a distinct one.
-    const newColor = [...palette].sort((a, b) => dist(b, oldColor) - dist(a, oldColor))[0]!;
+    const fromHsl = (h: number, sat: number, l: number) => {
+      const f = (n: number) => {
+        const k = (n + h / 30) % 12;
+        const c = l - sat * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+        return Math.round(c * 255).toString(16).padStart(2, "0");
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    };
+    // A seeded hue, not a palette value: v1 planted the farthest of five Tailwind 600s and
+    // readers named #ea580c exactly in 14 of 18 answers, which is recall, not reading. The
+    // colour must still differ visibly from the old one (>= 96 on some channel).
+    let newColor = oldColor;
+    for (let i = 0; i < 24 && dist(newColor, oldColor) < 96; i++) newColor = fromHsl(rand() * 360, 0.55 + rand() * 0.35, 0.35 + rand() * 0.25);
+    if (dist(newColor, oldColor) < 96) return { skip: "no visibly different colour found" };
     const box = boxOf(el);
     (el as HTMLElement).style.setProperty("color", newColor, "important");
     return { expected: { kind: "color", oldColor, newColor }, target: pathOf(el), box };
@@ -135,14 +161,18 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
       if (!visible(el)) return false;
       const r = el.getBoundingClientRect();
       return r.width >= 16 && r.width <= 320 && r.height >= 12 && r.height <= 64 && (el.textContent ?? "").trim() !== "";
-    });
+    }).filter(unobstructed);
     const el = pick(candidates);
     if (!el) return { skip: "no small element to move" };
-    const [dx, dy] = pick([[4, 0], [-4, 0], [0, 4], [3, 0]])!;
+    // 1-6px in one of four directions, scored exactly: v1's four fixed shifts (±4,0 / 0,4 / 3,0)
+    // with ±1px tolerance let "4 in the direction it looked" pass once a shift was noticed.
+    const size = 1 + Math.floor(rand() * 6);
+    const [ux, uy] = pick([[1, 0], [-1, 0], [0, 1], [0, -1]])!;
+    const dx = ux! * size, dy = uy! * size;
     const box = boxOf(el);
     // `translate` moves the painted box without re-running layout, so exactly one element moves.
     (el as HTMLElement).style.setProperty("translate", `${dx}px ${dy}px`, "important");
-    return { expected: { kind: "offset", dx: dx!, dy: dy! }, target: pathOf(el), box };
+    return { expected: { kind: "offset", dx, dy }, target: pathOf(el), box };
   }
 
   return { expected: { kind: "none" }, target: "", box: { x1: 0, y1: 0, x2: 0, y2: 0 } };
@@ -182,8 +212,9 @@ export async function buildCases(browser: Browser, options: BuildOptions): Promi
   const skipped: BuildResult["skipped"] = [];
   const dsf = options.deviceScaleFactor;
   for (const fixture of options.fixtures) {
-    for (const kind of options.kinds) {
-      const id = `${basename(fixture).replace(/\.html?$/, "")}-${kind}`;
+    const variants = Math.max(1, options.variants ?? 1);
+    for (const [kind, v] of options.kinds.flatMap((k) => Array.from({ length: k === "none" ? 1 : variants }, (_, i) => [k, i] as const))) {
+      const id = `${basename(fixture).replace(/\.html?$/, "")}-${kind}${v === 0 ? "" : `-${v + 1}`}`;
       const page = await browser.newPage({ viewport: { width: options.viewportWidth, height: 900 }, deviceScaleFactor: dsf });
       try {
         await page.goto(`file://${fixture}`, { waitUntil: "load" });

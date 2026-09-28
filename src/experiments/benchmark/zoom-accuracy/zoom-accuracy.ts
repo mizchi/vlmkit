@@ -261,7 +261,7 @@ async function main() {
     return;
   }
   const outDir = resolve(getArg("out", "test-results/zoom-accuracy"));
-  const models = getPositionalArgs(["out", "fixtures", "kinds", "seed", "scale", "width", "max-zooms", "max-tokens", "max-edge", "max-pixels", "coordinates", "md", "arms", "arm", "export-agent", "import-agent", "model"]);
+  const models = getPositionalArgs(["out", "fixtures", "kinds", "seed", "variants", "scale", "width", "max-zooms", "max-tokens", "max-edge", "max-pixels", "coordinates", "md", "arms", "arm", "export-agent", "import-agent", "model"]);
   const fixtureNames = getArg("fixtures", "");
   const fixtures = (fixtureNames ? fixtureNames.split(",").map((f) => (f.endsWith(".html") ? f : `${f}.html`)) : readdirSync(FIXTURE_DIR).filter((f) => f.endsWith(".html")).sort())
     .map((f) => join(FIXTURE_DIR, f));
@@ -294,7 +294,7 @@ async function main() {
     }
   } else {
     const buildOptions: BuildOptions = {
-      fixtures, kinds, seed: getIntArg("seed", 1), deviceScaleFactor: getIntArg("scale", 2, { min: 1, max: 4 }),
+      fixtures, kinds, seed: getIntArg("seed", 1), variants: getIntArg("variants", 1, { min: 1, max: 10 }), deviceScaleFactor: getIntArg("scale", 2, { min: 1, max: 4 }),
       viewportWidth: getIntArg("width", 1440, { min: 320 }), outDir,
     };
     const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");

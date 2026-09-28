@@ -5,7 +5,7 @@
  *
  * What a case plants is chosen so a single look at a downscaled full-page screenshot can
  * plausibly miss it and a magnified crop cannot: a digit in small text, the colour of a
- * short label, an element nudged a few CSS pixels. A `none` case plants nothing and scores
+ * short label, an element nudged 1-6 CSS pixels. A `none` case plants nothing and scores
  * whether the model invents a change.
  */
 
@@ -63,8 +63,11 @@ export interface CaseScore {
 export const LOCATE_SLACK_PX = 24;
 /** Max per-channel error for a colour read to count; text antialiasing lightens small glyphs. */
 export const COLOR_TOLERANCE = 48;
-/** CSS px a read shift may be off by. */
-export const OFFSET_TOLERANCE_PX = 1;
+/**
+ * CSS px a read shift may be off by: none. Shifts are 1-6px, and a 2x capture holds each CSS px
+ * as two device px, so an exact read is possible from a magnified crop — which is the question.
+ */
+export const OFFSET_TOLERANCE_PX = 0;
 
 export function buildPrompt(c: Pick<BenchCase, "page" | "deviceScaleFactor">): string {
   return [

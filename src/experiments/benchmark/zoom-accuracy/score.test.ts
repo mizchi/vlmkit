@@ -69,8 +69,9 @@ describe("scoreAnswer", () => {
     assert.equal(wrong.correct, false);
     assert.match(wrong.note!, /off by/);
   });
-  it("offset: direction and magnitude both matter, ±1px allowed", () => {
-    assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"-3,0"}').correct, true);
+  it("offset: direction and exact magnitude both matter", () => {
+    assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"-4,0"}').correct, true);
+    assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"-3,0"}').correct, false, "off by one is wrong now");
     assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"4,0"}').correct, false);
   });
   it("location is scored separately from correctness", () => {
