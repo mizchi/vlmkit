@@ -36,6 +36,7 @@ import {
   type ZoomCoordinates,
 } from "@mizchi/vlmkit-ai/zoom.ts";
 import { buildCases, loadCases, type BuildOptions, type BuiltCase } from "./cases.ts";
+import { agentZoom, exportPacket, importAnswers } from "./agent-packet.ts";
 import {
   buildPrompt,
   CASE_KINDS,
@@ -231,9 +232,36 @@ function printTable(reports: readonly ArmReport[]) {
   console.log();
 }
 
+const SELF = "node --experimental-strip-types src/experiments/benchmark/zoom-accuracy/zoom-accuracy.ts";
+
+async function exportAgent(cases: readonly BuiltCase[], outDir: string, to: string, opts: { maxZooms: number; budget: ImageBudget; coordinates: ZoomCoordinates }) {
+  const arm = getArg("arm", "") as Arm;
+  if (arm !== "single" && arm !== "zoom") throw new Error("--export-agent needs --arm single|zoom (one packet per arm, answered by separate agents)");
+  const packet = resolve(to);
+  const helper = `${SELF} --agent-zoom ${packet}`;
+  const r = await exportPacket(cases, outDir, packet, arm, { ...opts, seed: getIntArg("seed", 1) }, helper);
+  await writeFile(join(outDir, "run-options.json"), JSON.stringify({ maxZooms: opts.maxZooms, budget: opts.budget, coordinates: opts.coordinates, maxTokens: 0 }, null, 2));
+  console.log(`  ${CYAN}${r.tasks} task(s)${RESET} for the ${arm} arm in ${packet} — hand the agent ${join(packet, "BRIEF.md")}, then:`);
+  console.log(`  ${DIM}${SELF} --import-agent ${join(packet, "answers.json")} --arm ${arm} --model agent --out ${outDir}${RESET}`);
+}
+
 async function main() {
+  // The zoom helper an agent runs from inside a packet: no browser, no case build.
+  const zi = process.argv.indexOf("--agent-zoom");
+  if (zi >= 0) {
+    const [packet, task, image, ...box] = process.argv.slice(zi + 1, zi + 8);
+    const nums = box.map(Number);
+    if (!packet || !task || image === undefined || nums.length !== 4 || !nums.every(Number.isFinite)) {
+      console.error(`usage: ${SELF} --agent-zoom <packet> <task> <image 0|1> <x1> <y1> <x2> <y2>`);
+      process.exit(2);
+    }
+    const r = await agentZoom(resolve(packet), task, Number(image), nums as [number, number, number, number]);
+    console.log(r.text);
+    if (r.png) console.log(r.png);
+    return;
+  }
   const outDir = resolve(getArg("out", "test-results/zoom-accuracy"));
-  const models = getPositionalArgs(["out", "fixtures", "kinds", "seed", "scale", "width", "max-zooms", "max-tokens", "max-edge", "max-pixels", "coordinates", "md", "arms"]);
+  const models = getPositionalArgs(["out", "fixtures", "kinds", "seed", "scale", "width", "max-zooms", "max-tokens", "max-edge", "max-pixels", "coordinates", "md", "arms", "arm", "export-agent", "import-agent", "model"]);
   const fixtureNames = getArg("fixtures", "");
   const fixtures = (fixtureNames ? fixtureNames.split(",").map((f) => (f.endsWith(".html") ? f : `${f}.html`)) : readdirSync(FIXTURE_DIR).filter((f) => f.endsWith(".html")).sort())
     .map((f) => join(FIXTURE_DIR, f));
@@ -249,8 +277,21 @@ async function main() {
 
   await mkdir(outDir, { recursive: true });
   let cases: BuiltCase[];
-  if (hasFlag("rescore")) {
+  const exportTo = getArg("export-agent", "");
+  const importFrom = getArg("import-agent", "");
+  if (hasFlag("rescore") || importFrom || (exportTo && hasFlag("reuse"))) {
     cases = (await loadCases(outDir)).cases;
+    if (importFrom) {
+      const arm = getArg("arm", "") as Arm;
+      if (arm !== "single" && arm !== "zoom") throw new Error("--import-agent needs --arm single|zoom");
+      const model = getArg("model", "agent");
+      const r = await importAnswers(outDir, resolve(importFrom), arm, model);
+      console.log(`  imported ${r.imported} answer(s) as ${model} / ${arm}${r.missing.length ? `  ${YELLOW}missing: ${r.missing.join(", ")}${RESET}` : ""}`);
+    }
+    if (exportTo) {
+      await exportAgent(cases, outDir, exportTo, opts);
+      return;
+    }
   } else {
     const buildOptions: BuildOptions = {
       fixtures, kinds, seed: getIntArg("seed", 1), deviceScaleFactor: getIntArg("scale", 2, { min: 1, max: 4 }),
@@ -266,9 +307,13 @@ async function main() {
       console.log(`  oracle ${check.oracle}/${cases.length}, always-unchanged ${check.blind}/${cases.length} (expected ${check.none})`);
       if (check.oracle !== cases.length || check.blind !== check.none) process.exit(1);
     }
+    if (exportTo) {
+      await exportAgent(cases, outDir, exportTo, opts);
+      return;
+    }
     if (hasFlag("render-only") || hasFlag("self-check")) return;
     if (models.length === 0) {
-      console.log(`  ${YELLOW}No models given. Pass model ids, or --render-only / --rescore.${RESET}`);
+      console.log(`  ${YELLOW}No models given. Pass model ids, or --render-only / --rescore / --export-agent (no API key: the agent's own vision).${RESET}`);
       process.exit(1);
     }
     // What the answers were collected with, so a later --rescore reports the run, not its own flags.

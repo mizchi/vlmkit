@@ -156,6 +156,20 @@ $B --rescore --md report.md                       # re-score saved answers (test
 $B --max-edge 1024 …                              # a harsher view budget, as a provider that resizes again would
 ```
 
+**No API key: the agent's own vision is the model.** Do not stop at "no key" — export a packet per
+arm, hand each to a fresh subagent that is given only the packet's `BRIEF.md`, and import what it writes:
+
+```bash
+$B --export-agent /tmp/p-single --arm single          # builds the cases; tasks under shuffled ids, images at the budget size
+$B --export-agent /tmp/p-zoom --arm zoom --reuse      # same tasks; BRIEF.md adds the zoom helper (--agent-zoom), same budget as the loop
+$B --import-agent /tmp/p-zoom/answers.json --arm zoom --model agent --md report.md
+```
+
+The packet is blind by construction and a test holds it there: no case id, fixture name or path to
+`cases.json` appears in any file or file name in it — an id like `page-text` is the answer. Give each
+arm to a different agent (one that has zoomed remembers the crops), and say in the report that the
+arms were an agent's: it has a shell and its honesty is the one thing the packet cannot enforce.
+
 Two things measured building it: the first full-page capture of `page.html` is 2 device px shorter than
 every later one, so captures repeat until two agree (without it every `none` case differs everywhere);
 and at the default budget a 2x capture is shown at ~0.8 CSS scale, where 12px text is still legible to a
