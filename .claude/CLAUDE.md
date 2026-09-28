@@ -175,8 +175,13 @@ every later one, so captures repeat until two agree (without it every `none` cas
 and at the default budget a 2x capture is shown at ~0.8 CSS scale, where 12px text is still legible to a
 careful eye — so a small single-look/zoom gap on `text` is a finding, not a broken bench.
 
-Not yet run against a live model: the sandbox this was written in had no provider key. Run the accuracy
-bench before turning zoom on anywhere by default.
+**Measured once, with the coding agent's own vision** (`docs/reports/2026-09-28-zoom-accuracy-agent-v1.md`):
+35/36 both arms at the default budget (no discordant pair — no effect), and at `--max-edge 768` zoom
+fixed 2 of the single look's 3 misses and broke none (p = 0.5: suggestive, not shown), for ~1.4x the
+tokens and 3-4x the time. So zoom stays opt-in, worth it where a provider shows a small image. The
+same report lists what makes the bench too easy to separate the arms — the planted colour is a
+nameable Tailwind value, offsets come from four guessable shifts, and a case under a blurred modal
+is unreadable either way — fix those before trusting a second number. No provider model has run it.
 
 ## Component-focused VRT (fixing one component with a small image)
 
