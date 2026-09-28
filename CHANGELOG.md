@@ -27,6 +27,9 @@ Dates are YYYY-MM-DD.
 - Add the zoom accuracy bench's agent mode (`--export-agent` / `--agent-zoom` / `--import-agent`): with no API
   key, blind packets let the coding agent's own vision be the model. First measurement:
   `docs/reports/2026-09-28-zoom-accuracy-agent-v1.md`.
+- Harden the zoom accuracy bench's cases (seeded hues, exact 1–6px shifts, unobstructed targets,
+  `--variants`); with them zoom scored 58/58 against a single look's 48/58 (p = 0.002),
+  `docs/reports/2026-09-28-zoom-accuracy-agent-v2.md`.
 - Add `check responsive`, a property-based responsive check: the page's media queries partition the width
   range, generated viewports (plus height, `--text-scale` and colour scheme) are checked with the integrity
   layout judges and a new `text-starved` rule, and each failure is shrunk to its exact width range, anchored
