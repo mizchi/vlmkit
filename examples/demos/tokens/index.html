@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spacing and radii off the design scale · vlmkit demos</title>
+<meta name="description" content="Hard-coded values audited against a spacing, radius, z-index and shadow scale. Nothing on this page looks wrong at a glance, and that is the point." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Does it look designed?</span></header>
+<main class="demo">
+  <p class="command"><code>check tokens</code></p>
+  <h1>Spacing and radii off the design scale</h1>
+  <p class="lead">Hard-coded values audited against a spacing, radius, z-index and shadow scale. Nothing on this page looks wrong at a glance, and that is the point.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/design-tokens/off-scale/page.html">fixtures/design-tokens/off-scale/page.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check tokens fixtures/design-tokens/off-scale/page.html --output-dir {out}</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="800" height="520" alt="The page. The defects are in the numbers, not in the picture." loading="lazy" /></a>
+        <figcaption>The page. The defects are in the numbers, not in the picture.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>Twenty values off the scale, each with the nearest value on it: 14px and 18px paddings between 12, 16 and 20; radii of 5, 7 and 9px; eight distinct shadows where five tiers are allowed. The markdown report beside the run has one row per value.</p>
+    <h2>The fix</h2>
+    <p>Snap each value to the nearest token.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check tokens fixtures/design-tokens/off-scale/page.html --output-dir {out}</code> · exit 0</p>
+    <pre class="output">  vlmkit check tokens
+  source: fixtures/design-tokens/off-scale/page.html  inspected: 11 element(s)
+  ! 20 finding(s)
+    border-radius   3 violation(s)
+    margin          3 violation(s)
+    padding         12 violation(s)
+    z-index         1 violation(s)
+    box-shadow      8 distinct (allowed: 5)
+  report: &lt;out&gt;/report.md
+  exits 0 — 20 warn(s) did not fail this command. To gate on one: --rule scale-violation=suspect (also: shadow-tier-excess)
+</pre>
+    <details><summary>The markdown report it wrote</summary><pre class="output"># Design-token conformance report
+
+Source: `fixtures/design-tokens/off-scale/page.html` at 1280×720
+Inspected **11** visible element(s).
+
+## Scales
+
+- radius:  `0, 2, 4, 6, 8, 12, 16, 20, 24, 32, 48, 999`
+- spacing: `0, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96`
+- z-index: `0, 1, 10, 100, 1000, 9999`
+- shadow tiers (max distinct): `5`
+- tolerance: `±0.5px`
+
+## Violations: 19 scale + 1 shadow-tier
+
+### border-radius: 3 violation(s)
+
+| Element | Side | Value | Nearest in-scale | Δ |
+|---|---|---|---|---|
+| `div.bad-card` | — | 7.00 | 6 | 1.00 |
+| `div.bad-card&gt;button.btn-bad` | — | 5.00 | 4 | 1.00 |
+| `div.floating` | — | 9.00 | 8 | 1.00 |
+
+### margin: 3 violation(s)
+
+| Element | Side | Value | Nearest in-scale | Δ |
+|---|---|---|---|---|
+| `div.header` | bottom | 23.00 | 24 | -1.00 |
+| `div.bad-card` | top | 17.00 | 16 | 1.00 |
+| `div.bad-card` | bottom | 17.00 | 16 | 1.00 |
+
+### padding: 12 violation(s)
+
+| Element | Side | Value | Nearest in-scale | Δ |
+|---|---|---|---|---|
+| `div.header` | top | 14.00 | 12 | 2.00 |
+| `div.header` | right | 14.00 | 12 | 2.00 |
+| `div.header` | bottom | 14.00 | 12 | 2.00 |
+| `div.header` | left | 14.00 | 12 | 2.00 |
+| `div.bad-card` | top | 18.00 | 16 | 2.00 |
+| `div.bad-card` | right | 22.00 | 20 | 2.00 |
+| `div.bad-card` | bottom | 18.00 | 16 | 2.00 |
+| `div.bad-card` | left | 22.00 | 20 | 2.00 |
+| `div.bad-card&gt;button.btn-bad` | top | 11.00 | 12 | -1.00 |
+| `div.bad-card&gt;button.btn-bad` | right | 19.00 | 20 | -1.00 |
+| `div.bad-card&gt;button.btn-bad` | bottom | 11.00 | 12 | -1.00 |
+| `div.bad-card&gt;button.btn-bad` | left | 19.00 | 20 | -1.00 |
+
+### z-index: 1 violation(s)
+
+| Element | Side | Value | Nearest in-scale | Δ |
+|---|---|---|---|---|
+| `div.floating` | — | 5.00 | 1 | 4.00 |
+
+### box-shadow: 8 distinct tier(s) (allowed: 5)
+
+Distinct normalized shadow values found:
+
+- `#000000@0.05 0px 1px 1px 0px`
+- `#000000@0.05 0px 1px 2px 0px`
+- `#000000@0.075 0px 2px 5px 0px`
+- `#000000@0.08 0px 1px 3px 0px`
+- `#000000@0.1 0px 2px 4px 0px`
+- `#000000@0.1 0px 3px 6px 0px`
+- `#000000@0.15 0px 4px 8px 0px`
+- `#000000@0.2 0px 6px 10px 0px`
+
+## Suggested next step
+
+1. Replace each violating value with its nearest in-scale equivalent (the &quot;Nearest in-scale&quot; column).
+2. If a value needs to be off-scale (intentional outlier), document why in a comment — the violation is a code smell, not a hard ban.
+3. Consolidate `box-shadow` values into a small named tier set (e.g., `--shadow-sm`, `--shadow-md`, `--shadow-lg`) and reference the variables instead of inline values.
+4. Re-run `vlmkit check tokens`. The violation count should drop.
+</pre></details>
+  </section>
+
+  <nav class="pager">
+      <a href="../color/">← Links you can only tell apart by colour</a>
+      <a href="../diff/">A header that grew 48px and pushed everything down →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

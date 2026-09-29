@@ -86,6 +86,7 @@ export const messages = Object.freeze({
     "demo.play": "デモを遊ぶ",
     "demo.changelog": "0.11 の変更点を読む",
     "demo.sites": "ほかに6つのサイトと、それぞれの判断の記録",
+    "demo.features": "15の機能を、1つずつの欠陥で",
     "workflow.line1": "目視の感想を、",
     "workflow.line2": "修正できる事実へ。",
     "workflow.leadBefore": "壊れた場所と測定値を返す",
@@ -168,6 +169,7 @@ export const messages = Object.freeze({
     "start.docs": "GitHub でドキュメントを読む",
     "footer.tagline": "ページを測る。事実を直す。証拠とともに出荷する。",
     "footer.sites": "デモサイト",
+    "footer.demos": "機能デモ",
     "footer.judged": "このページの判断の記録",
   }),
   en: Object.freeze({
@@ -256,6 +258,7 @@ export const messages = Object.freeze({
     "demo.play": "Play the demo",
     "demo.changelog": "Read what 0.11 changed",
     "demo.sites": "Six more sites, and how each was judged",
+    "demo.features": "Fifteen features, one defect each",
     "workflow.line1": "Turn visual opinions",
     "workflow.line2": "into fixable facts.",
     "workflow.leadBefore": "A",
@@ -339,6 +342,7 @@ export const messages = Object.freeze({
     "start.docs": "Read the docs on GitHub",
     "footer.tagline": "Measure the page. Fix the fact. Ship with proof.",
     "footer.sites": "Demo sites",
+    "footer.demos": "Feature demos",
     "footer.judged": "How this page was judged",
   }),
 });

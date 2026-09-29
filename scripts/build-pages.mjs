@@ -22,6 +22,8 @@ import { copyFile, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishedJudgment } from "../examples/sites/judge.mjs";
+import { DEMOS, demoFiles } from "../examples/demos/demos.mjs";
+import { readResult } from "../examples/demos/render.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(scriptPath), "..");
@@ -58,6 +60,18 @@ const section = (id, sourceDir, basePath, assets) =>
  * repository's, not the site's.
  */
 const demoSite = (name, files) => section(`sites-${name}`, `examples/sites/${name}`, `sites/${name}`, files);
+
+/**
+ * The feature demos (`examples/demos/`): the gallery, its stylesheet, and per demo its page, the
+ * page under test and the images its capture kept — derived from the manifest and each demo's
+ * `result.json`, so a new demo is published by adding it there. `result.json` itself is the
+ * repository's (the page inlines its output).
+ */
+const demoAssets = () => [
+  "demos.css",
+  "index.html",
+  ...DEMOS.flatMap((demo) => demoFiles(demo, readResult(demo.id, join(repoRoot, "examples/demos"))).map((f) => `${demo.id}/${f}`)),
+];
 
 /**
  * @typedef {object} SiteSection
@@ -101,6 +115,9 @@ export const siteSections = Object.freeze([
   demoSite("kanban", ["app.js", "index.html", "styles.css"]),
   demoSite("magazine", ["index.html", "main.js", "style.css"]),
   demoSite("shop", ["app.js", "index.html", "styles.css"]),
+  // One page per feature: a page with a known defect, the command that finds it, its whole
+  // output and screenshots from the same run (`examples/demos/capture.mjs`).
+  section("demos", "examples/demos", "demos", demoAssets()),
 ]);
 
 /**
@@ -158,7 +175,11 @@ export async function buildSite({
       ? join(resolvedOutputDir, section.basePath)
       : resolvedOutputDir;
     await mkdir(sectionOutput, { recursive: true });
-    await Promise.all(section.assets.map((asset) => copyFile(join(sectionSource, asset), join(sectionOutput, asset))));
+    // Most sections are flat; the demos keep one directory per demo.
+    await Promise.all(section.assets.map(async (asset) => {
+      await mkdir(dirname(join(sectionOutput, asset)), { recursive: true });
+      await copyFile(join(sectionSource, asset), join(sectionOutput, asset));
+    }));
     const judgment = section.judgment ?? [];
     for (const { path, bytes } of judgment) {
       // A log's screens live two levels down (`judgment/shots/`); runtime files are flat.

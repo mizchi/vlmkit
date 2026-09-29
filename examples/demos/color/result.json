@@ -1,0 +1,14 @@
+{
+  "exit": 0,
+  "output": "\nvlmkit check color\nsource: fixtures/color/link-color-only-broken.html\n\nverdict: COLOR-DEPENDENT (1 finding(s))\n  exits 0 — 1 warn(s) did not fail this command. To gate on one: --rule color-only-link=suspect\n  measured: 1 control(s), 5 link(s) in a text flow — from 27 visible box(es)\n\nPalette (by painted area; reported, never judged — see the rejected candidates in the module docs)\n  surfaces  2 distinct\n    #fbfcfd   85.0%     1 el\n    #ffffff   15.0%     3 el  div.shell>div.card\n  ink       4 distinct\n    #16233a   71.6%     8 el  div.shell>h1\n    #1145c4   13.5%     5 el  div.shell>p>a\n    #5b6b85   13.3%     3 el  div.shell>p.muted\n    #ffffff    1.5%     1 el  div.shell>form>button\n  marks     2 distinct\n    #cdd6e4   53.6%     4 el  div.shell>div.card\n    #6b7280   46.4%     4 el  input#email\n  base #fbfcfd, body ink #16233a, link ink #1145c4 on 5 element(s)\n\nFindings\n  ! [color-only-link]: div.shell>p>a — #1145c4 link inside #16233a prose at 2:1, with no underline, weight step, border or fill to mark it — so colour is the only thing saying it is a link (2 element(s), e.g. in div.shell>p). WCAG 1.4.1 technique G183 asks for 3:1 against the surrounding text when colour is the only cue. This is disjoint from check a11y contrast, which measures the link against its BACKGROUND and passes.\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "Blue links in dark-blue prose, no underline.",
+      "width": 1024,
+      "height": 640,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check color fixtures/color/link-color-only-broken.html"
+}

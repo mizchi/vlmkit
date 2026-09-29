@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Copy that drifted from the spec · vlmkit demos</title>
+<meta name="description" content="The manifest (copy.txt, published here as manifest.txt) is the copy the page must show, verbatim. The page reworded the button, hid a pricing note in the page's own colour, and shipped a placeholder quote." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Is the page broken?</span></header>
+<main class="demo">
+  <p class="command"><code>check copy --manifest</code></p>
+  <h1>Copy that drifted from the spec</h1>
+  <p class="lead">The manifest (<code>copy.txt</code>, published here as <code>manifest.txt</code>) is the copy the page must show, verbatim. The page reworded the button, hid a pricing note in the page's own colour, and shipped a placeholder quote.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/examples/demos/copy/page.html">examples/demos/copy/page.html</a> · <a href="./manifest.txt">manifest.txt</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check copy examples/demos/copy/page.html --manifest examples/demos/copy/copy.txt</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="1024" height="640" alt="What a visitor sees: &quot;Try it free&quot;, an empty gap where the note is (white on white), and the placeholder quote." loading="lazy" /></a>
+        <figcaption>What a visitor sees: &quot;Try it free&quot;, an empty gap where the note is (white on white), and the placeholder quote.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>The hidden note IS in the DOM, so a text search passes it. The gate reports it as <code>copy-invisible</code> with the reason class (<code>camouflage</code>) because a user cannot see it.</p>
+    <h2>The fix</h2>
+    <p>Restore &quot;Start a free trial&quot;, give <code>.note</code> a real colour, and write the testimonial.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check copy examples/demos/copy/page.html --manifest examples/demos/copy/copy.txt</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">vlmkit check copy
+source: examples/demos/copy/page.html
+
+status: suspect
+rendered text: 283 chars
+manifest: 5 line(s), missing 1, 1 invisible-only
+
+Issues:
+  x placeholder-text: Placeholder &quot;lorem ipsum&quot; found in rendered text: &quot;…ree for open-source projects. Lorem ipsum dolor sit amet, consectetur a…&quot; — replace with the real copy from the target.
+  x placeholder-text: Placeholder &quot;dolor sit amet&quot; found in rendered text: &quot;…-source projects. Lorem ipsum dolor sit amet, consectetur adipiscing elit.…&quot; — replace with the real copy from the target.
+  x copy-missing: Manifest line not found in rendered text: &quot;Start a free trial&quot; (comparison is whitespace-normalized, case-sensitive).
+  x copy-invisible: Manifest line found ONLY in text a user cannot see (reason: camouflage): &quot;Free for open-source projects.&quot;. Invisible text does not satisfy the copy gate — render it visibly or remove the hidden copy. If this invisibility is deliberate (e.g. assistive-tech-only copy), re-run with --allow-invisible camouflage.
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../integrity/">← A pricing page that breaks on smaller screens</a>
+      <a href="../responsive/">A card grid that needs 826px, switched on at 768px →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

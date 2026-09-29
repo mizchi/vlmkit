@@ -1,0 +1,14 @@
+{
+  "exit": 1,
+  "output": "vlmkit check grounding\nsource: fixtures/grounding/partly-covered.html (1280x720)\n\nstatus: suspect\nframe: 1280x720 screenshot px — cap 1280x720, scale 1.00 (every coordinate below is in these 1280x720 pixels)\nscreen: as first loaded — --after \"click x,y\" measures the screen an action leaves\ntargets: 2 actionable in frame (0 disabled or out of the frame)\n\nAction map (click point in screenshot px):\n  t1 button \"Proceed to checkout\" @ (208,58) 200x40 #cta [occluded-target]\n  t2 button \"Save\" @ (100,124) 120x40 #save\n\nIssues:\n  x t1 occluded-target: #cta (button \"Proceed to checkout\") is covered at its own centre (140,60): a click there goes to #veil. This map aims at (208,58) instead, which does reach it, with 18px of room before the nearest thing that is not this element — still a defect, because anything aiming at the centre misses.\n",
+  "images": [
+    {
+      "file": "evidence-1.webp",
+      "caption": "The numbered overlay, red where the coordinate carries a risk. `--resolution 1280x720` keeps the frame at full size for this page; by default the map is given in the downscaled frame a model is sent (640x360 here).",
+      "width": 520,
+      "height": 170,
+      "kind": "evidence"
+    }
+  ],
+  "command": "vlmkit check grounding fixtures/grounding/partly-covered.html --resolution 1280x720 --mark {out}/mark.png"
+}

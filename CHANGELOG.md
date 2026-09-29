@@ -38,6 +38,10 @@ Dates are YYYY-MM-DD.
   with figure fact checks and slide review tools.
 - Install the agent skills inside Claude Code with `/plugin marketplace add mizchi/vlmkit`, alongside the
   existing APM and skills-CLI routes.
+- Publish a feature demo gallery at <https://mizchi.github.io/vlmkit/demos/> (`examples/demos/`): fifteen
+  pages, each a page with a known defect (mostly the repo's own fixtures), the command that finds it, its
+  whole output and screenshots from the same run. `capture.mjs` re-runs them; the README's demo table is
+  generated from the same manifest.
 - Fix contrast checks for modern CSS colours such as `oklch()` and `lab()`.
 - Reduce false positives in composition and grounding checks.
 - Fix wrapped bullets, blockquotes and ordered lists in generated slide decks.

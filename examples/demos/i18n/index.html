@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Buttons that overflow when the copy gets longer · vlmkit demos</title>
+<meta name="description" content="Every text run is lengthened 1.4x, roughly what translating English into German does, and the layout is measured again. No translations needed." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>What changed?</span></header>
+<main class="demo">
+  <p class="command"><code>stress i18n</code></p>
+  <h1>Buttons that overflow when the copy gets longer</h1>
+  <p class="lead">Every text run is lengthened 1.4x, roughly what translating English into German does, and the layout is measured again. No translations needed.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/i18n-stress/button-overflow/page.html">fixtures/i18n-stress/button-overflow/page.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit stress i18n fixtures/i18n-stress/button-overflow/page.html --output-dir {out}</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="640" height="360" alt="Before inflation, everything fits." loading="lazy" /></a>
+        <figcaption>Before inflation, everything fits.</figcaption>
+      </figure>
+      <figure class="evidence">
+        <a href="evidence-1.webp"><img src="evidence-1.webp" width="480" height="240" alt="After 1.4x inflation (each word padded with X): the heading ends in an ellipsis, the button label runs past its edge, the line under it takes two." loading="lazy" /></a>
+        <figcaption>After 1.4x inflation (each word padded with X): the heading ends in an ellipsis, the button label runs past its edge, the line under it takes two.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>A fixed-width button and heading overflow, and a paragraph doubles in height. Each finding carries the scroll width against the box.</p>
+    <h2>The fix</h2>
+    <p>Replace the fixed widths with <code>min-width</code> and let text wrap.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit stress i18n fixtures/i18n-stress/button-overflow/page.html --output-dir {out}</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">  vlmkit stress i18n
+  html: fixtures/i18n-stress/button-overflow/page.html  inflate: 1.4x
+  ✗ 3 overflow / wrap issue(s) across 5 inspected element(s)
+    [horizontal-overflow] div.card&gt;button.btn — scrollW 137 &gt; clientW 120
+    [horizontal-overflow] div.card&gt;h2 — scrollW 257 &gt; clientW 200
+    [vertical-wrap] div.card&gt;p — h 21 → 42
+  report: &lt;out&gt;/report.md
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../diff/">← A header that grew 48px and pushed everything down</a>
+      <a href="../zoom/">Letting a vision model zoom into the original →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

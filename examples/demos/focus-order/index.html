@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A toolbar whose Tab order runs backwards · vlmkit demos</title>
+<meta name="description" content="Tab is pressed through the page and every focus step is placed on screen. tabindex values put Cut, Copy and Paste in reverse." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Can it be operated?</span></header>
+<main class="demo">
+  <p class="command"><code>check a11y focus</code></p>
+  <h1>A toolbar whose Tab order runs backwards</h1>
+  <p class="lead">Tab is pressed through the page and every focus step is placed on screen. <code>tabindex</code> values put Cut, Copy and Paste in reverse.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/a11y-focus-order/reversed/page.html">fixtures/a11y-focus-order/reversed/page.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check a11y focus fixtures/a11y-focus-order/reversed/page.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="800" height="360" alt="Visual order Paste · Copy · Cut left to right; focus goes Cut → Copy → Paste." loading="lazy" /></a>
+        <figcaption>Visual order Paste · Copy · Cut left to right; focus goes Cut → Copy → Paste.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>Each finding names the two controls and their x positions, so the jump is visible in numbers rather than by pressing Tab.</p>
+    <h2>The fix</h2>
+    <p>Drop the positive <code>tabindex</code> values and let DOM order match visual order.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check a11y focus fixtures/a11y-focus-order/reversed/page.html</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">  vlmkit check a11y focus
+  source: fixtures/a11y-focus-order/reversed/page.html
+  captured 6 focus step(s)
+  ✗ 2 finding(s)
+    [reverse] Focus moved left within the same row (from `div.toolbar&gt;button.btn-cut` at x=189 to `div.toolbar&gt;button.btn-copy` at x=116). Visual order is L-to-R; check `tabindex` or DOM order.
+    [reverse] Focus moved left within the same row (from `div.toolbar&gt;button.btn-copy` at x=116 to `div.toolbar&gt;button.btn-paste` at x=40). Visual order is L-to-R; check `tabindex` or DOM order.
+  report: test-results/a11y-focus-order/page-f9e12f4a/report.md
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../interactions/">← A Save button that does nothing on Enter</a>
+      <a href="../grounding/">A checkout button an agent would miss →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

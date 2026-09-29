@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Headings that sit closer to the section above · vlmkit demos</title>
+<meta name="description" content="Proximity, alignment and contrast as measurements. This fixture is the intact composition page plus one rule that swaps the gaps around each heading." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Does it look designed?</span></header>
+<main class="demo">
+  <p class="command"><code>check composition</code></p>
+  <h1>Headings that sit closer to the section above</h1>
+  <p class="lead">Proximity, alignment and contrast as measurements. This fixture is the intact composition page plus one rule that swaps the gaps around each heading.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/composition/proximity-broken.html">fixtures/composition/proximity-broken.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check composition fixtures/composition/proximity-broken.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="1024" height="900" alt="Each outlined heading is closer to the block above it than to the text it introduces." loading="lazy" /></a>
+        <figcaption>Each outlined heading is closer to the block above it than to the text it introduces.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>Each heading is 12px under the block above and 44px over the content it labels, so it reads as belonging upward. The gate reports the ambiguity and the gap that would remove it, never which gap is correct.</p>
+    <h2>The fix</h2>
+    <p>Put more space above each heading than below it.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check composition fixtures/composition/proximity-broken.html</code> · exit 0</p>
+    <pre class="output">
+vlmkit check composition
+source: fixtures/composition/proximity-broken.html
+
+verdict: UNBALANCED (4 finding(s))
+  exits 0 — 4 warn(s) did not fail this command. To gate on one: --rule proximity-inversion=suspect
+  measured: 4 label(s), 3 heading level(s), 21 wide block(s) on 2 left / 2 right rail(s) — from 30 visible box(es)
+  5 label(s) not judged: they open a box that paints its own group edge, so nothing above them could be mis-grouped with
+
+Type hierarchy (largest instance of each declared level)
+  h1     40px / 700   div.shell&gt;header.masthead&gt;h1
+  h2     26px / 700   div.shell&gt;section&gt;h2
+  h3     18px / 700   section&gt;div.subsection&gt;h3
+  body 15px, largest 40px (2.67x), heaviest +300 weight
+
+Group gaps: 16px between heading-led groups vs 44px inside them (0.36x, 6 sample(s)). Context only — intact pages measure 0.86-3.00x, so this cannot carry a verdict.
+
+Findings
+  ! [proximity-inversion]: div.shell&gt;section&gt;h2 (h2) sits 12px below div.shell&gt;header.masthead but 44px above the content it labels, inside div.shell&gt;section — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 19px, or widen the gap above it. This reports the ambiguity, not which gap is correct.
+  ! [proximity-inversion]: section&gt;div.subsection&gt;h3 (h3) sits 28px below div.shell&gt;section&gt;p but 44px above the content it labels, inside div.shell&gt;section&gt;div.subsection — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 41px, or widen the gap above it. This reports the ambiguity, not which gap is correct.
+  ! [proximity-inversion]: div.shell&gt;section&gt;h2 (h2) sits 12px below div.shell&gt;section but 44px above the content it labels, inside div.shell&gt;section — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 19px, or widen the gap above it. This reports the ambiguity, not which gap is correct.
+  ! [proximity-inversion]: div.shell&gt;section&gt;h2 (h2) sits 11.9px below div.shell&gt;section but 44px above the content it labels, inside div.shell&gt;section — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 18.9px, or widen the gap above it. This reports the ambiguity, not which gap is correct.
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../a11y-tree/">← An app with no DOM to read</a>
+      <a href="../color/">Links you can only tell apart by colour →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

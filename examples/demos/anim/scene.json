@@ -1,0 +1,47 @@
+{
+  "format": "vlmkit-anim/scene@1",
+  "kind": "graph",
+  "title": "Shortest path A → E",
+  "nodes": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "edges": [
+    {
+      "from": "A",
+      "to": "B",
+      "weight": 4
+    },
+    {
+      "from": "A",
+      "to": "C",
+      "weight": 1
+    },
+    {
+      "from": "C",
+      "to": "B",
+      "weight": 2
+    },
+    {
+      "from": "B",
+      "to": "D",
+      "weight": 1
+    },
+    {
+      "from": "C",
+      "to": "D",
+      "weight": 5
+    },
+    {
+      "from": "D",
+      "to": "E",
+      "weight": 3
+    }
+  ],
+  "algorithm": "dijkstra",
+  "start": "A",
+  "goal": "E"
+}

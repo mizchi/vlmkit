@@ -1,0 +1,104 @@
+<!doctype html>
+<!--
+  A stand-in for a Flutter web build, for `vlmkit scan a11y`'s tests: the app is painted into
+  a canvas, and its accessibility DOM appears only after the 1x1 placeholder is clicked, and
+  is transparent — exactly the two properties that make DOM gates read a Flutter app as an
+  empty page. It carries one of each defect `check a11y tree` judges:
+
+    "Seed hint"  #aaaaaa on white, 2.32:1           contrast-below-aa
+    a text field with no name                         unlabelled-control
+    a 20x20 "Info" button beside "Start"              target-undersized
+    "log 3".."log 6" below the 812px fold, no scroll  unreachable-content (one finding, 4 nodes)
+
+  and one of each thing it must NOT report: a disabled low-contrast button (exempt), a 20x20
+  "Help" button with nothing within 24px (2.5.8's spacing exception), a 17px
+  button inside a 40px tappable row (enclosed), and a scrolling list whose items run past the
+  fold (reachable). `?semantics=off` never builds the tree, for the semantics-empty rule.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: #fff; overflow: hidden; }
+  canvas { position: absolute; left: 0; top: 0; }
+  flt-semantics-host { position: absolute; left: 0; top: 0; filter: opacity(0%); color: transparent; }
+  flt-semantics, h1 { display: block; font-size: 14px; line-height: 1; }
+</style>
+</head>
+<body>
+<flutter-view>
+  <canvas id="c" width="375" height="1100"></canvas>
+</flutter-view>
+<script>
+  const ctx = document.getElementById("c").getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 375, 1100);
+  ctx.textBaseline = "top";
+  const text = (s, x, y, color, px = 14) => { ctx.fillStyle = color; ctx.font = px + "px sans-serif"; ctx.fillText(s, x, y); };
+  text("Settings", 16, 16, "#000", 26);
+  text("Seed hint", 16, 70, "#aaaaaa");
+  text("Start", 26, 110, "#1a1a1a");
+  ctx.strokeStyle = "#555"; ctx.strokeRect(16.5, 100.5, 120, 36);
+  text("Next", 26, 160, "#bbbbbb");
+  ctx.strokeStyle = "#999"; ctx.strokeRect(16.5, 250.5, 343, 40); text("Place here", 24, 262, "#111");
+  text("i", 142, 110, "#000");
+  text("?", 300, 110, "#000");
+  for (let i = 0; i < 7; i++) text("log " + i, 16, 700 + i * 40, "#222");
+
+  const nodes = [
+    { id: 1, style: "left:0;top:0;width:375px;height:1100px", children: [
+      { id: 2, tag: "h1", text: "Settings", style: "left:16px;top:14px;width:120px;height:30px" },
+      { id: 3, span: "Seed hint", style: "left:16px;top:68px;width:80px;height:18px" },
+      { id: 4, role: "button", tappable: true, text: "Start", style: "left:16px;top:100px;width:121px;height:37px" },
+      { id: 5, role: "button", text: "Next", disabled: true, style: "left:16px;top:150px;width:80px;height:30px" },
+      { id: 6, role: "button", tappable: true, text: "Info", style: "left:138px;top:108px;width:20px;height:20px" },
+      { id: 11, role: "button", tappable: true, text: "Help", style: "left:296px;top:108px;width:20px;height:20px" },
+      { id: 7, style: "left:16px;top:200px;width:200px;height:30px", input: true },
+      { id: 8, tappable: true, style: "left:16px;top:250px;width:344px;height:41px", children: [
+        { id: 9, role: "button", tappable: true, text: "Place here", style: "left:24px;top:260px;width:80px;height:17px" },
+      ] },
+      { id: 10, style: "left:0;top:690px;width:375px;height:300px", children: [0, 1, 2, 3, 4, 5, 6].map((i) =>
+        ({ id: 20 + i, span: "log " + i, style: `left:16px;top:${700 + i * 40}px;width:60px;height:18px` })) },
+      { id: 30, scroll: true, style: "left:200px;top:300px;width:150px;height:200px", children: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((i) =>
+        ({ id: 40 + i, span: "row " + i, style: `left:200px;top:${300 + i * 40}px;width:100px;height:18px` })) },
+    ] },
+  ];
+  // Page coordinates in `style`; each element is placed relative to its parent's, as nesting
+  // requires.
+  const build = (parent, list, px, py) => {
+    for (const n of list) {
+      const [, left, top, rest] = n.style.match(/^left:(\d+)(?:px)?;top:(\d+)(?:px)?;(.*)$/);
+      let el = document.createElement(n.tag ?? "flt-semantics");
+      if (n.input) {
+        const input = document.createElement("input");
+        input.style.cssText = "position:static;width:100%;height:100%;border:0;padding:0";
+        el.appendChild(input);
+      } else if (n.text) el.textContent = n.text;
+      else if (n.span) { const s = document.createElement("span"); s.textContent = n.span; el.appendChild(s); }
+      el.id = "flt-semantic-node-" + n.id;
+      el.style.cssText = `position:absolute;margin:0;left:${left - px}px;top:${top - py}px;${rest}`;
+      if (n.role) el.setAttribute("role", n.role);
+      if (n.tappable) el.setAttribute("flt-tappable", "");
+      if (n.disabled) el.setAttribute("aria-disabled", "true");
+      if (n.scroll) el.style.overflowY = "scroll";
+      parent.appendChild(el);
+      if (n.children) build(el, n.children, Number(left), Number(top));
+    }
+  };
+  // Absolute positions are page coordinates, as Flutter lays its semantics nodes out; nesting
+  // carries the tree. The placeholder builds the host only when clicked, after a delay.
+  if (!location.search.includes("semantics=off")) {
+    const placeholder = document.createElement("flt-semantics-placeholder");
+    placeholder.setAttribute("role", "button");
+    placeholder.setAttribute("aria-label", "Enable accessibility");
+    placeholder.style.cssText = "position:absolute;left:-1px;top:-1px;width:1px;height:1px";
+    placeholder.addEventListener("click", () => setTimeout(() => {
+      const host = document.createElement("flt-semantics-host");
+      document.body.appendChild(host);
+      build(host, nodes, 0, 0);
+      placeholder.remove();
+    }, 150));
+    setTimeout(() => document.body.appendChild(placeholder), 100);
+  }
+</script>
+</body>
+</html>

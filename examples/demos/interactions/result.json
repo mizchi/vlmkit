@@ -1,0 +1,14 @@
+{
+  "exit": 0,
+  "output": "vlmkit check interactions\nsource: fixtures/interact/dropdown-form/page.html\n\nstatus: ok\n  exits 0 — 1 warn(s) did not fail this command. To gate on one: --rule inert-control=suspect\ninteractive elements: 3\n\n  - [button] \"Region: United States ▾\" focus✓ | Enter: layout change\n  - [textbox] \"Email address\" focus✓\n  - [button] \"Save\" focus✓ | Enter: no response\n\nIssues:\n  warn [inert-control] button \"Save\" (form>button.submit-btn) shows no observable response to Enter — no ARIA change, no layout change. Dead control, or its response is outside this probe.\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "Save looks like every other button, and does nothing on Enter.",
+      "width": 800,
+      "height": 260,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check interactions fixtures/interact/dropdown-form/page.html"
+}

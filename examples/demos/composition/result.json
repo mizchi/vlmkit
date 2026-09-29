@@ -1,0 +1,14 @@
+{
+  "exit": 0,
+  "output": "\nvlmkit check composition\nsource: fixtures/composition/proximity-broken.html\n\nverdict: UNBALANCED (4 finding(s))\n  exits 0 — 4 warn(s) did not fail this command. To gate on one: --rule proximity-inversion=suspect\n  measured: 4 label(s), 3 heading level(s), 21 wide block(s) on 2 left / 2 right rail(s) — from 30 visible box(es)\n  5 label(s) not judged: they open a box that paints its own group edge, so nothing above them could be mis-grouped with\n\nType hierarchy (largest instance of each declared level)\n  h1     40px / 700   div.shell>header.masthead>h1\n  h2     26px / 700   div.shell>section>h2\n  h3     18px / 700   section>div.subsection>h3\n  body 15px, largest 40px (2.67x), heaviest +300 weight\n\nGroup gaps: 16px between heading-led groups vs 44px inside them (0.36x, 6 sample(s)). Context only — intact pages measure 0.86-3.00x, so this cannot carry a verdict.\n\nFindings\n  ! [proximity-inversion]: div.shell>section>h2 (h2) sits 12px below div.shell>header.masthead but 44px above the content it labels, inside div.shell>section — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 19px, or widen the gap above it. This reports the ambiguity, not which gap is correct.\n  ! [proximity-inversion]: section>div.subsection>h3 (h3) sits 28px below div.shell>section>p but 44px above the content it labels, inside div.shell>section>div.subsection — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 41px, or widen the gap above it. This reports the ambiguity, not which gap is correct.\n  ! [proximity-inversion]: div.shell>section>h2 (h2) sits 12px below div.shell>section but 44px above the content it labels, inside div.shell>section — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 19px, or widen the gap above it. This reports the ambiguity, not which gap is correct.\n  ! [proximity-inversion]: div.shell>section>h2 (h2) sits 11.9px below div.shell>section but 44px above the content it labels, inside div.shell>section — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward. Reduce the gap under it below 18.9px, or widen the gap above it. This reports the ambiguity, not which gap is correct.\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "Each outlined heading is closer to the block above it than to the text it introduces.",
+      "width": 1024,
+      "height": 900,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check composition fixtures/composition/proximity-broken.html"
+}

@@ -1,0 +1,24 @@
+{
+  "exit": 0,
+  "output": "planted: table>thead>tr>th moved dx=-2, dy=0 CSS px (the known answer; seed 1)\npage: 1440x939 CSS px at 2x → original 2880x1878\nview sent to the model (DEFAULT_IMAGE_BUDGET 1568px / 1.15MP): 1327x865\npixel diff bounds: (508,641.5)-(582,650.5) CSS px\n\nzoom Image 0 → Zoomed into (423,546)-(581,644) of the image you see at 1327x865px: a 343x214px region of the original, returned magnified to 1357x847px.\nzoom Image 1 → Zoomed into (423,546)-(581,644) of the image you see at 1327x865px: a 343x214px region of the original, returned magnified to 1357x847px.\noriginal box: (918,1185)-(1261,1399)\n",
+  "images": [
+    {
+      "file": "view.webp",
+      "caption": "Image 1 as the model is sent it: 1327x865, about 0.92x of CSS size. The box is the zoom asked for below.",
+      "width": 1327,
+      "height": 865
+    },
+    {
+      "file": "zoom-baseline.webp",
+      "caption": "One zoom into Image 0 (baseline), cropped from the full-resolution original.",
+      "width": 1357,
+      "height": 847
+    },
+    {
+      "file": "zoom-current.webp",
+      "caption": "The same box in Image 1 (current).",
+      "width": 1357,
+      "height": 847
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "exit": 1,
+  "output": "  vlmkit check a11y focus\n  source: fixtures/a11y-focus-order/reversed/page.html\n  captured 6 focus step(s)\n  ✗ 2 finding(s)\n    [reverse] Focus moved left within the same row (from `div.toolbar>button.btn-cut` at x=189 to `div.toolbar>button.btn-copy` at x=116). Visual order is L-to-R; check `tabindex` or DOM order.\n    [reverse] Focus moved left within the same row (from `div.toolbar>button.btn-copy` at x=116 to `div.toolbar>button.btn-paste` at x=40). Visual order is L-to-R; check `tabindex` or DOM order.\n  report: test-results/a11y-focus-order/page-f9e12f4a/report.md\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "Visual order Paste · Copy · Cut left to right; focus goes Cut → Copy → Paste.",
+      "width": 800,
+      "height": 360,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check a11y focus fixtures/a11y-focus-order/reversed/page.html"
+}

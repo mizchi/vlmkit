@@ -1,0 +1,14 @@
+{
+  "exit": 0,
+  "output": "vlmkit check responsive\nsource: fixtures/responsive-patterns/mutants/card-grid--fixed-four.html\n\nstatus: warn\n  exits 0 — 1 warn(s) did not fail this command. To gate on one: --rule text-starved=suspect\nseed 1 · 60 cases · widths 320-1440 · heights 480-1000\nmedia: 1 condition(s) → 2 width regime(s) (transitions at 768px)\n  320-767px     30 case(s) clean\n  768-1440px    30 case(s) 8/30 case(s) failing (min-width: 768px)\nproperties: page-overflow-x, clipped-content, text-collision, text-clipped, container-protrusion, occluded-text, collapsed-container, text-starved\n\n! text-starved ol.phases > li:nth-of-type(1) > p:nth-of-type(1) +3: ol.phases > li:nth-of-type(2) > p:nth-of-type(1), ol.phases > li:nth-of-type(3) > p:nth-of-type(1), ol.phases > li:nth-of-type(4) > p:nth-of-type(1)\n    fails at 768-825px (8 generated case(s); shrunk from 768x900 in 12 checks)\n    starts exactly at the 768px breakpoint ((min-width: 768px) switches on) and clears at 826px with no breakpoint there — the layout switched on at 768px needs 826px\n    → move the breakpoint: (min-width: 768px) → (min-width: 826px): verified — rewritten in the stylesheet, the failure clears at 768, 797, 825px and nothing else fails there\n    \"Copies the schema and takes a consisten…\" (ol.phases > li:nth-of-type(1) > p:nth-of-type(1)) wraps into 8 lines of ~8.3 characters in a box 69px (4.9em) wide — squeezed below what its text needs; give the item room (let the row wrap, drop a column, or move the breakpoint).\n    cause: `grid-template-columns: repeat(4, minmax(0, 1fr))` (ancestor ol.phases) — .phases in <style> in card-grid--fixed-four.html, @media (min-width: 768px); overriding it to `none` clears it at 768, 797, 825px; also clears it alone: `grid-template-columns: 240px minmax(0, 1fr)` (ancestor div.shell) — .shell in <style> in card-grid--fixed-four.html, @media (min-width: 768px); `padding: 16px` (ancestor ol.phases > li:nth-of-type(1)) — .phase in <style> in card-grid--fixed-four.html\n    reproduce: vlmkit check responsive fixtures/responsive-patterns/mutants/card-grid--fixed-four.html --width 768 --height 900\n\ntiming: partition 333ms · cases 3236ms · shrink 1981ms\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "768px, the first failing width: 69px-wide columns, eight lines of eight characters.",
+      "width": 768,
+      "height": 900,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check responsive fixtures/responsive-patterns/mutants/card-grid--fixed-four.html"
+}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Focus order bug</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; }
+  h1 { font-size: 22px; }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  /* BUG: flex `order:` rearranges visual position without changing DOM order.
+     Keyboard users tab through in DOM order (Cut, Copy, Paste) while
+     visually it reads Paste, Copy, Cut. */
+  .btn-cut   { order: 3; }
+  .btn-copy  { order: 2; }
+  .btn-paste { order: 1; }
+
+  .toolbar button {
+    padding: 8px 16px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 8px;
+  }
+  .actions button {
+    padding: 10px 20px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+  <h1>Document editor</h1>
+  <div class="toolbar">
+    <button class="btn-cut">Cut</button>
+    <button class="btn-copy">Copy</button>
+    <button class="btn-paste">Paste</button>
+  </div>
+  <input type="text" placeholder="Type here">
+  <div class="actions">
+    <button>Save</button>
+    <button>Cancel</button>
+  </div>
+</body>
+</html>

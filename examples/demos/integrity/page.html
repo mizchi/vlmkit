@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Plans — Harbor</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1c2430; background: #f6f7f9; }
+  header { padding: 24px 32px; background: #102a43; color: #fff; }
+  header h1 { margin: 0; font-size: 28px; }
+  main { padding: 32px; }
+  /* Defect 1: three fixed-width cards in a row that never wraps. */
+  .plans { display: flex; gap: 24px; }
+  .plan { flex: 0 0 300px; position: relative; padding: 24px; border: 1px solid #d5dae1; border-radius: 12px; background: #fff; }
+  .plan h2 { margin: 0 0 8px; font-size: 20px; }
+  .price { margin: 0; font-size: 36px; font-weight: 700; }
+  /* Defect 2: the badge is pinned where the price is drawn. */
+  .badge { position: absolute; top: 58px; left: 28px; padding: 2px 10px; border-radius: 999px; background: #ffd666; font-size: 18px; font-weight: 700; }
+  /* Defect 3: a fixed height that is too short for the list. */
+  .features { height: 52px; overflow: hidden; margin: 12px 0 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<header><h1>Pick a plan</h1></header>
+<main>
+  <div class="plans">
+    <section class="plan">
+      <h2>Starter</h2>
+      <p class="price">$9</p>
+      <ul class="features"><li>One project</li><li>Community support</li><li>7-day history</li></ul>
+    </section>
+    <section class="plan">
+      <h2>Team</h2>
+      <p class="price">$49</p>
+      <span class="badge">Save 20% yearly</span>
+      <ul class="features"><li>Ten projects</li><li>Email support</li><li>90-day history</li></ul>
+    </section>
+    <section class="plan">
+      <h2>Scale</h2>
+      <p class="price">$199</p>
+      <ul class="features"><li>Unlimited projects</li><li>A named engineer</li><li>Full history</li></ul>
+    </section>
+  </div>
+</main>
+</body>
+</html>

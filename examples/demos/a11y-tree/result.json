@@ -1,0 +1,17 @@
+{
+  "exit": 0,
+  "output": "\nvlmkit scan a11y  flutter-web\nsource: fixtures/a11y-tree/flutter-like.html\n\ntree:  <out>/a11y.json  (375x812)\nframe: <out>/a11y.png\n  36 node(s), 30 named, 7 operable\n\njudge it without a browser:\n  vlmkit check a11y tree <out>/a11y.json\n",
+  "images": [
+    {
+      "file": "evidence-1.webp",
+      "caption": "The frame the contrast was measured on (375x812).",
+      "width": 375,
+      "height": 812,
+      "kind": "evidence"
+    }
+  ],
+  "thenExit": 1,
+  "thenOutput": "\nvlmkit check a11y tree  flutter-web, 375x812\nsource: <out>/a11y.json  frame: <out>/a11y.png\n\n36 node(s), 6 operable; 9 text node(s) measured on the frame, 21 skipped (disabled, outside-frame, no-ink)\ntouch floor 24 (AA); 1 undersized but spaced (2.5.8 exception); 1 smaller target(s) inside a target that meets it, judged as that one\n\n✗ [unlabelled-control] textfield with no accessible name (200x30 at 16,200) — a screen reader announces only \"textfield\"\n✗ [unreachable-content] 4 named node(s) past the bottom edge with nothing that scrolls to them — first: \"log 3\" (60x18 at 16,820) in n1>n10\n✗ [contrast-below-aa] \"Seed hint\" 2.32:1, needs 4.5:1 — rgb(170, 170, 170) on rgb(255, 255, 255) (text 12.2, measured)\n✗ [target-undersized] 20x20 (min side 20, need 24) — \"Info\"\n",
+  "command": "vlmkit scan a11y fixtures/a11y-tree/flutter-like.html --out {out}/a11y.json",
+  "thenCommand": "vlmkit check a11y tree {out}/a11y.json"
+}

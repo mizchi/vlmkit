@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Links you can only tell apart by colour · vlmkit demos</title>
+<meta name="description" content="The palette by role (surfaces, ink, marks, by painted area) and two WCAG rules. Here the links in the prose have no underline and are 2:1 against the text around them." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Does it look designed?</span></header>
+<main class="demo">
+  <p class="command"><code>check color</code></p>
+  <h1>Links you can only tell apart by colour</h1>
+  <p class="lead">The palette by role (surfaces, ink, marks, by painted area) and two WCAG rules. Here the links in the prose have no underline and are 2:1 against the text around them.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/color/link-color-only-broken.html">fixtures/color/link-color-only-broken.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check color fixtures/color/link-color-only-broken.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="1024" height="640" alt="Blue links in dark-blue prose, no underline." loading="lazy" /></a>
+        <figcaption>Blue links in dark-blue prose, no underline.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p><code>check a11y contrast</code> passes these links: they are readable against the background. This is the other criterion (WCAG 1.4.1), the link against the sentence it sits in.</p>
+    <h2>The fix</h2>
+    <p>Underline in-prose links, or reach 3:1 against the body ink.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check color fixtures/color/link-color-only-broken.html</code> · exit 0</p>
+    <pre class="output">
+vlmkit check color
+source: fixtures/color/link-color-only-broken.html
+
+verdict: COLOR-DEPENDENT (1 finding(s))
+  exits 0 — 1 warn(s) did not fail this command. To gate on one: --rule color-only-link=suspect
+  measured: 1 control(s), 5 link(s) in a text flow — from 27 visible box(es)
+
+Palette (by painted area; reported, never judged — see the rejected candidates in the module docs)
+  surfaces  2 distinct
+    #fbfcfd   85.0%     1 el
+    #ffffff   15.0%     3 el  div.shell&gt;div.card
+  ink       4 distinct
+    #16233a   71.6%     8 el  div.shell&gt;h1
+    #1145c4   13.5%     5 el  div.shell&gt;p&gt;a
+    #5b6b85   13.3%     3 el  div.shell&gt;p.muted
+    #ffffff    1.5%     1 el  div.shell&gt;form&gt;button
+  marks     2 distinct
+    #cdd6e4   53.6%     4 el  div.shell&gt;div.card
+    #6b7280   46.4%     4 el  input#email
+  base #fbfcfd, body ink #16233a, link ink #1145c4 on 5 element(s)
+
+Findings
+  ! [color-only-link]: div.shell&gt;p&gt;a — #1145c4 link inside #16233a prose at 2:1, with no underline, weight step, border or fill to mark it — so colour is the only thing saying it is a link (2 element(s), e.g. in div.shell&gt;p). WCAG 1.4.1 technique G183 asks for 3:1 against the surrounding text when colour is the only cue. This is disjoint from check a11y contrast, which measures the link against its BACKGROUND and passes.
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../composition/">← Headings that sit closer to the section above</a>
+      <a href="../tokens/">Spacing and radii off the design scale →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "exit": 1,
+  "output": "vlmkit check integrity\nsource: examples/demos/integrity/page.html\n\nverdict: DEFECTS (2 fail, 3 warn, 0 exempted)\n  1280x800: 4 component(s), ink 88.9%, 17 text block(s)\n  768x900: 4 component(s), ink 9.8%, 17 text block(s)\n  375x700: 4 component(s), ink 7.5%, 17 text block(s)\n\nFindings:\n  x [page-overflow-x] @768,375: The page scrolls horizontally by 212px at 768px viewport width — sticking out: div.plans > section:nth-of-type(3) (right edge 980px), div.plans > section:nth-of-type(3) > h2:nth-of-type(1) (right edge 955px), div.plans > section:nth-of-type(3) > p:nth-of-type(1) (right edge 955px).\n  x [occluded-text] div.plans > section:nth-of-type(2) > p:nth-of-type(1) @1280,768: \"$49\" (div.plans > section:nth-of-type(2) > p:nth-of-type(1)) is painted over by an opaque element span.badge @1280 — 75% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.\n  ! [clipped-content] div.plans > section:nth-of-type(1) > ul:nth-of-type(1) @1280,768,375: div.plans > section:nth-of-type(1) > ul:nth-of-type(1) clips 20px of its content behind overflow: hidden — cut-off content unless the oversize is decorative.\n  ! [clipped-content] div.plans > section:nth-of-type(2) > ul:nth-of-type(1) @1280,768,375: div.plans > section:nth-of-type(2) > ul:nth-of-type(1) clips 20px of its content behind overflow: hidden — cut-off content unless the oversize is decorative.\n  ! [clipped-content] div.plans > section:nth-of-type(3) > ul:nth-of-type(1) @1280,768,375: div.plans > section:nth-of-type(3) > ul:nth-of-type(1) clips 20px of its content behind overflow: hidden — cut-off content unless the oversize is decorative.\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "1280px: the badge covers the $49 price, and each list has lost its third item to the fixed height.",
+      "width": 1280,
+      "height": 360,
+      "kind": "page"
+    },
+    {
+      "file": "shot-2.webp",
+      "caption": "768px: the third card runs 212px past the viewport.",
+      "width": 768,
+      "height": 360,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check integrity examples/demos/integrity/page.html"
+}

@@ -1,0 +1,14 @@
+{
+  "exit": 1,
+  "output": "vlmkit check copy\nsource: examples/demos/copy/page.html\n\nstatus: suspect\nrendered text: 283 chars\nmanifest: 5 line(s), missing 1, 1 invisible-only\n\nIssues:\n  x placeholder-text: Placeholder \"lorem ipsum\" found in rendered text: \"…ree for open-source projects. Lorem ipsum dolor sit amet, consectetur a…\" — replace with the real copy from the target.\n  x placeholder-text: Placeholder \"dolor sit amet\" found in rendered text: \"…-source projects. Lorem ipsum dolor sit amet, consectetur adipiscing elit.…\" — replace with the real copy from the target.\n  x copy-missing: Manifest line not found in rendered text: \"Start a free trial\" (comparison is whitespace-normalized, case-sensitive).\n  x copy-invisible: Manifest line found ONLY in text a user cannot see (reason: camouflage): \"Free for open-source projects.\". Invisible text does not satisfy the copy gate — render it visibly or remove the hidden copy. If this invisibility is deliberate (e.g. assistive-tech-only copy), re-run with --allow-invisible camouflage.\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "What a visitor sees: \"Try it free\", an empty gap where the note is (white on white), and the placeholder quote.",
+      "width": 1024,
+      "height": 640,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check copy examples/demos/copy/page.html --manifest examples/demos/copy/copy.txt"
+}

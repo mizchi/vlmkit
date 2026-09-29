@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A checkout button an agent would miss · vlmkit demos</title>
+<meta name="description" content="For computer-use agents: an action map in screenshot pixels, and for each target whether a click there actually reaches it. --mark draws the numbered overlay an agent would be handed." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Can it be operated?</span></header>
+<main class="demo">
+  <p class="command"><code>check grounding --mark</code></p>
+  <h1>A checkout button an agent would miss</h1>
+  <p class="lead">For computer-use agents: an action map in screenshot pixels, and for each target whether a click there actually reaches it. <code>--mark</code> draws the numbered overlay an agent would be handed.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/grounding/partly-covered.html">fixtures/grounding/partly-covered.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check grounding fixtures/grounding/partly-covered.html --resolution 1280x720 --mark {out}/mark.png</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="evidence">
+        <a href="evidence-1.webp"><img src="evidence-1.webp" width="520" height="170" alt="The numbered overlay, red where the coordinate carries a risk. `--resolution 1280x720` keeps the frame at full size for this page; by default the map is given in the downscaled frame a model is sent (640x360 here)." loading="lazy" /></a>
+        <figcaption>The numbered overlay, red where the coordinate carries a risk. <code>--resolution 1280x720</code> keeps the frame at full size for this page; by default the map is given in the downscaled frame a model is sent (640x360 here).</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>A transparent veil covers the button's centre. The map moves t1's click point to a spot that does reach it, and still reports the defect, because anything aiming at the centre misses.</p>
+    <h2>The fix</h2>
+    <p>Remove the veil, or give it <code>pointer-events: none</code>.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check grounding fixtures/grounding/partly-covered.html --resolution 1280x720 --mark {out}/mark.png</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">vlmkit check grounding
+source: fixtures/grounding/partly-covered.html (1280x720)
+
+status: suspect
+frame: 1280x720 screenshot px — cap 1280x720, scale 1.00 (every coordinate below is in these 1280x720 pixels)
+screen: as first loaded — --after &quot;click x,y&quot; measures the screen an action leaves
+targets: 2 actionable in frame (0 disabled or out of the frame)
+
+Action map (click point in screenshot px):
+  t1 button &quot;Proceed to checkout&quot; @ (208,58) 200x40 #cta [occluded-target]
+  t2 button &quot;Save&quot; @ (100,124) 120x40 #save
+
+Issues:
+  x t1 occluded-target: #cta (button &quot;Proceed to checkout&quot;) is covered at its own centre (140,60): a click there goes to #veil. This map aims at (208,58) instead, which does reach it, with 18px of room before the nearest thing that is not this element — still a defect, because anything aiming at the centre misses.
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../focus-order/">← A toolbar whose Tab order runs backwards</a>
+      <a href="../contrast/">Pale text that fails WCAG contrast →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

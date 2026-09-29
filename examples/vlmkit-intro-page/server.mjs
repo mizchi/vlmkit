@@ -28,6 +28,10 @@ const contentTypes = new Map([
   [".png", "image/png"],
   // Judgment-log screens (`examples/sites/judge.mjs` writes WebP).
   [".webp", "image/webp"],
+  // The feature demos (`examples/demos/`) also publish an animation, a scene and a copy manifest.
+  [".gif", "image/gif"],
+  [".json", "application/json; charset=utf-8"],
+  [".txt", "text/plain; charset=utf-8"],
 ]);
 
 /** @type {Map<string, { read: () => Promise<Buffer>, contentType: string }>} */
@@ -42,9 +46,11 @@ for (const section of siteSections) {
     assets.set(`${prefix}/${asset}`, route);
     // Every directory index, with and without the trailing slash — a link written as
     // `./solitaire/` and one written as `./solitaire` must both arrive.
-    if (asset === "index.html") {
-      assets.set(`${prefix}/`, route);
-      if (prefix) assets.set(prefix, route);
+    // The demos keep an index per demo directory (`demos/integrity/index.html`).
+    if (asset === "index.html" || asset.endsWith("/index.html")) {
+      const dir = `${prefix}/${asset.slice(0, -"index.html".length)}`;
+      assets.set(dir, route);
+      if (dir !== "/") assets.set(dir.slice(0, -1), route);
     }
   }
 }

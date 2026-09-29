@@ -1,0 +1,21 @@
+{
+  "exit": 1,
+  "output": "  vlmkit stress i18n\n  html: fixtures/i18n-stress/button-overflow/page.html  inflate: 1.4x\n  ✗ 3 overflow / wrap issue(s) across 5 inspected element(s)\n    [horizontal-overflow] div.card>button.btn — scrollW 137 > clientW 120\n    [horizontal-overflow] div.card>h2 — scrollW 257 > clientW 200\n    [vertical-wrap] div.card>p — h 21 → 42\n  report: <out>/report.md\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "Before inflation, everything fits.",
+      "width": 640,
+      "height": 360,
+      "kind": "page"
+    },
+    {
+      "file": "evidence-1.webp",
+      "caption": "After 1.4x inflation (each word padded with X): the heading ends in an ellipsis, the button label runs past its edge, the line under it takes two.",
+      "width": 480,
+      "height": 240,
+      "kind": "evidence"
+    }
+  ],
+  "command": "vlmkit stress i18n fixtures/i18n-stress/button-overflow/page.html --output-dir {out}"
+}

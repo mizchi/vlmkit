@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pale text that fails WCAG contrast · vlmkit demos</title>
+<meta name="description" content="Every text-bearing element's colour against the background actually behind it, with the threshold its size earns (4.5:1, or 3:1 for large text)." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Can everyone read it?</span></header>
+<main class="demo">
+  <p class="command"><code>check a11y contrast</code></p>
+  <h1>Pale text that fails WCAG contrast</h1>
+  <p class="lead">Every text-bearing element's colour against the background actually behind it, with the threshold its size earns (4.5:1, or 3:1 for large text).</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/a11y-contrast/low-contrast/page.html">fixtures/a11y-contrast/low-contrast/page.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check a11y contrast fixtures/a11y-contrast/low-contrast/page.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="800" height="420" alt="The four failures, outlined. The first line and the button pass." loading="lazy" /></a>
+        <figcaption>The four failures, outlined. The first line and the button pass.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>The large pale line passes at 3:1 only because it is large, and fails anyway at 2.54:1. Colours the browser serialises as <code>oklch()</code> or <code>lab()</code> are read back from a rasterised pixel, so none are skipped.</p>
+    <h2>The fix</h2>
+    <p>Darken the four inks to at least the ratio each needs.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check a11y contrast fixtures/a11y-contrast/low-contrast/page.html</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">  vlmkit check a11y contrast
+  html: fixtures/a11y-contrast/low-contrast/page.html
+  inspected 7 text-bearing element(s)
+  ✗ 4 contrast failure(s)
+    p.small-pale — 1.47:1 (need 4.5) — `#d1d5db` on `#ffffff` — &quot;Small pale text fails at 1.6:1.&quot;
+    p&gt;a.light-link — 1.80:1 (need 4.5) — `#93c5fd` on `#ffffff` — &quot;Read documentation&quot;
+    p.too-muted — 2.54:1 (need 4.5) — `#9ca3af` on `#ffffff` — &quot;This subtitle is too muted to read comfortably.&quot;
+    p.large-pale — 2.54:1 (need 3) — `#9ca3af` on `#ffffff` — &quot;Large pale text passes at 3:1 because of font size.&quot;
+  report: test-results/a11y-contrast/page-e9578509/report.md
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../grounding/">← A checkout button an agent would miss</a>
+      <a href="../a11y-tree/">An app with no DOM to read →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>vlmkit demos</title>
+<meta name="description" content="Every vlmkit feature on a page with a known defect: the command, the screenshots, and the whole output." />
+<link rel="stylesheet" href="./demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit</a><span>Demos</span></header>
+<main class="index">
+  <h1>vlmkit, one defect at a time</h1>
+  <p class="lead">Each demo is a page with something wrong in it and the command that finds it. The output on every page is what the command printed. The screenshots are from the same run, and the outlines mark only elements the tool itself named. Most pages are the repository's own test fixtures, so the same commands work from a clone.</p>
+  <pre class="cmd"><code>npm install -D @mizchi/vlmkit
+npx playwright install chromium
+npx vlmkit check integrity http://localhost:3000/</code></pre>
+  <section>
+    <h2>Is the page broken?</h2>
+    <p>Reference-free checks for the page you just wrote. No baseline, no design file, no API key.</p>
+    <ul class="cards">
+      <li class="card">
+        <a href="./integrity/">
+          <img src="./integrity/shot-1.webp" width="1280" height="360" alt="" loading="lazy" />
+          <span class="command"><code>check integrity</code></span>
+          <strong>A pricing page that breaks on smaller screens</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./copy/">
+          <img src="./copy/shot-1.webp" width="1024" height="640" alt="" loading="lazy" />
+          <span class="command"><code>check copy --manifest</code></span>
+          <strong>Copy that drifted from the spec</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./responsive/">
+          <img src="./responsive/shot-1.webp" width="768" height="900" alt="" loading="lazy" />
+          <span class="command"><code>check responsive</code></span>
+          <strong>A card grid that needs 826px, switched on at 768px</strong>
+        </a>
+      </li>
+    </ul>
+  </section>
+  <section>
+    <h2>Can it be operated?</h2>
+    <p>Keyboards, focus order, and agents that click on a screenshot.</p>
+    <ul class="cards">
+      <li class="card">
+        <a href="./interactions/">
+          <img src="./interactions/shot-1.webp" width="800" height="260" alt="" loading="lazy" />
+          <span class="command"><code>check interactions</code></span>
+          <strong>A Save button that does nothing on Enter</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./focus-order/">
+          <img src="./focus-order/shot-1.webp" width="800" height="360" alt="" loading="lazy" />
+          <span class="command"><code>check a11y focus</code></span>
+          <strong>A toolbar whose Tab order runs backwards</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./grounding/">
+          <img src="./grounding/evidence-1.webp" width="520" height="170" alt="" loading="lazy" />
+          <span class="command"><code>check grounding --mark</code></span>
+          <strong>A checkout button an agent would miss</strong>
+        </a>
+      </li>
+    </ul>
+  </section>
+  <section>
+    <h2>Can everyone read it?</h2>
+    <p>Contrast measured on rendered pixels, including apps with no DOM at all.</p>
+    <ul class="cards">
+      <li class="card">
+        <a href="./contrast/">
+          <img src="./contrast/shot-1.webp" width="800" height="420" alt="" loading="lazy" />
+          <span class="command"><code>check a11y contrast</code></span>
+          <strong>Pale text that fails WCAG contrast</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./a11y-tree/">
+          <img src="./a11y-tree/evidence-1.webp" width="375" height="812" alt="" loading="lazy" />
+          <span class="command"><code>scan a11y → check a11y tree</code></span>
+          <strong>An app with no DOM to read</strong>
+        </a>
+      </li>
+    </ul>
+  </section>
+  <section>
+    <h2>Does it look designed?</h2>
+    <p>Proximity, colour roles and a spacing scale. These report inconsistency, never taste.</p>
+    <ul class="cards">
+      <li class="card">
+        <a href="./composition/">
+          <img src="./composition/shot-1.webp" width="1024" height="900" alt="" loading="lazy" />
+          <span class="command"><code>check composition</code></span>
+          <strong>Headings that sit closer to the section above</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./color/">
+          <img src="./color/shot-1.webp" width="1024" height="640" alt="" loading="lazy" />
+          <span class="command"><code>check color</code></span>
+          <strong>Links you can only tell apart by colour</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./tokens/">
+          <img src="./tokens/shot-1.webp" width="800" height="520" alt="" loading="lazy" />
+          <span class="command"><code>check tokens</code></span>
+          <strong>Spacing and radii off the design scale</strong>
+        </a>
+      </li>
+    </ul>
+  </section>
+  <section>
+    <h2>What changed?</h2>
+    <p>Two versions of a page, or one page under a longer language.</p>
+    <ul class="cards">
+      <li class="card">
+        <a href="./diff/">
+          <img src="./diff/evidence-1.webp" width="1129" height="620" alt="" loading="lazy" />
+          <span class="command"><code>diff html</code></span>
+          <strong>A header that grew 48px and pushed everything down</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./i18n/">
+          <img src="./i18n/shot-1.webp" width="640" height="360" alt="" loading="lazy" />
+          <span class="command"><code>stress i18n</code></span>
+          <strong>Buttons that overflow when the copy gets longer</strong>
+        </a>
+      </li>
+    </ul>
+  </section>
+  <section>
+    <h2>Vision models and figures</h2>
+    <p>Letting a VLM zoom into the original, and figures that are checked against what they claim.</p>
+    <ul class="cards">
+      <li class="card">
+        <a href="./zoom/">
+          <img src="./zoom/view.webp" width="1327" height="865" alt="" loading="lazy" />
+          <span class="command"><code>@mizchi/vlmkit-ai/zoom.ts</code></span>
+          <strong>Letting a vision model zoom into the original</strong>
+        </a>
+      </li>
+      <li class="card">
+        <a href="./anim/">
+          <img src="./anim/graph-dijkstra.gif" alt="" loading="lazy" />
+          <span class="command"><code>vlmkit-anim check</code></span>
+          <strong>An algorithm as a checked animation</strong>
+        </a>
+      </li>
+    </ul>
+  </section>
+  <p class="more">Whole sites built by agents, each with the log of how it was judged: <a href="../sites/">demo sites</a>. A playable card game used as a drag-and-drop target: <a href="../solitaire/">solitaire</a>.</p>
+</main>
+<footer class="foot"><a href="../">vlmkit</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a> · regenerate with <code>node --experimental-strip-types examples/demos/capture.mjs</code></footer>
+</body>
+</html>

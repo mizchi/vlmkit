@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A card grid that needs 826px, switched on at 768px · vlmkit demos</title>
+<meta name="description" content="Every viewport width is a generated test case; the page's own media queries partition them. One of the eleven mutants in the responsive pattern catalog forces four columns from 768px." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Is the page broken?</span></header>
+<main class="demo">
+  <p class="command"><code>check responsive</code></p>
+  <h1>A card grid that needs 826px, switched on at 768px</h1>
+  <p class="lead">Every viewport width is a generated test case; the page's own media queries partition them. One of the eleven mutants in the responsive pattern catalog forces four columns from 768px.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/responsive-patterns/mutants/card-grid--fixed-four.html">fixtures/responsive-patterns/mutants/card-grid--fixed-four.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check responsive fixtures/responsive-patterns/mutants/card-grid--fixed-four.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="768" height="900" alt="768px, the first failing width: 69px-wide columns, eight lines of eight characters." loading="lazy" /></a>
+        <figcaption>768px, the first failing width: 69px-wide columns, eight lines of eight characters.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>The failure is shrunk before it is shown: to the exact interval 768-825px, to the declaration that causes it, and to a breakpoint move that was rewritten in the stylesheet and re-checked before the report calls it <code>verified</code>.</p>
+    <h2>The fix</h2>
+    <p>Move the breakpoint to <code>(min-width: 826px)</code>, or let the grid drop a column.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check responsive fixtures/responsive-patterns/mutants/card-grid--fixed-four.html</code> · exit 0</p>
+    <pre class="output">vlmkit check responsive
+source: fixtures/responsive-patterns/mutants/card-grid--fixed-four.html
+
+status: warn
+  exits 0 — 1 warn(s) did not fail this command. To gate on one: --rule text-starved=suspect
+seed 1 · 60 cases · widths 320-1440 · heights 480-1000
+media: 1 condition(s) → 2 width regime(s) (transitions at 768px)
+  320-767px     30 case(s) clean
+  768-1440px    30 case(s) 8/30 case(s) failing (min-width: 768px)
+properties: page-overflow-x, clipped-content, text-collision, text-clipped, container-protrusion, occluded-text, collapsed-container, text-starved
+
+! text-starved ol.phases &gt; li:nth-of-type(1) &gt; p:nth-of-type(1) +3: ol.phases &gt; li:nth-of-type(2) &gt; p:nth-of-type(1), ol.phases &gt; li:nth-of-type(3) &gt; p:nth-of-type(1), ol.phases &gt; li:nth-of-type(4) &gt; p:nth-of-type(1)
+    fails at 768-825px (8 generated case(s); shrunk from 768x900 in 12 checks)
+    starts exactly at the 768px breakpoint ((min-width: 768px) switches on) and clears at 826px with no breakpoint there — the layout switched on at 768px needs 826px
+    → move the breakpoint: (min-width: 768px) → (min-width: 826px): verified — rewritten in the stylesheet, the failure clears at 768, 797, 825px and nothing else fails there
+    &quot;Copies the schema and takes a consisten…&quot; (ol.phases &gt; li:nth-of-type(1) &gt; p:nth-of-type(1)) wraps into 8 lines of ~8.3 characters in a box 69px (4.9em) wide — squeezed below what its text needs; give the item room (let the row wrap, drop a column, or move the breakpoint).
+    cause: `grid-template-columns: repeat(4, minmax(0, 1fr))` (ancestor ol.phases) — .phases in &lt;style&gt; in card-grid--fixed-four.html, @media (min-width: 768px); overriding it to `none` clears it at 768, 797, 825px; also clears it alone: `grid-template-columns: 240px minmax(0, 1fr)` (ancestor div.shell) — .shell in &lt;style&gt; in card-grid--fixed-four.html, @media (min-width: 768px); `padding: 16px` (ancestor ol.phases &gt; li:nth-of-type(1)) — .phase in &lt;style&gt; in card-grid--fixed-four.html
+    reproduce: vlmkit check responsive fixtures/responsive-patterns/mutants/card-grid--fixed-four.html --width 768 --height 900
+
+timing: partition 333ms · cases 3236ms · shrink 1981ms
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../copy/">← Copy that drifted from the spec</a>
+      <a href="../interactions/">A Save button that does nothing on Enter →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

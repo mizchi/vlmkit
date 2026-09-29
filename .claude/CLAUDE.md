@@ -638,6 +638,28 @@ looking, not by a gate**, which is why `markup-assist`'s done condition now ends
 - **`--allow` matches the path a gate prints** (`ul.grid>li.card>div.body>h2>a`), not a CSS selector,
   and says "matched nothing" when it does not apply.
 
+## Feature demos (`examples/demos/`)
+
+```bash
+pnpm build                                                        # capture runs the CLI from dist/
+node --experimental-strip-types examples/demos/capture.mjs        # every demo: run, shoot, render (+ README table)
+node --experimental-strip-types examples/demos/capture.mjs copy zoom
+node examples/demos/render.mjs                                    # prose edits in demos.mjs only — no browser
+```
+
+One page per feature at `/demos/<id>/` on Pages, listed in the README's generated table. `demos.mjs` is the
+manifest (page under test, the command, prose, shots); `capture.mjs` runs each command for real and keeps
+its output in `<id>/result.json`; `render.mjs` is pure. Rules the pipeline enforces, not to work around:
+
+- **The page under test is a fixture, copied byte for byte** (`demos.test.mjs` compares them). Change the
+  fixture and re-capture; never edit `<id>/page.html` of a fixture-backed demo.
+- **An outline on a screenshot may only mark a selector the command printed** — `capture.mjs` refuses
+  otherwise. `check copy` prints text, not selectors, so its shot has no outlines.
+- **Every number in a demo's prose is in its output.** Re-read the prose after a re-capture; the output
+  changes when a gate does. (Found building it: `check copy` passes an ellipsis-truncated line on purpose —
+  integrity calls `text-overflow: ellipsis` intentional — so that defect was dropped rather than claimed.)
+- A published copy manifest is `manifest.txt`: the Pages test refuses any published `copy.txt`.
+
 ## Measuring Gate / Rule Execution Cost
 
 ```bash

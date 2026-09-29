@@ -51,7 +51,7 @@ async function walk(dir, prefix = "") {
   return out;
 }
 
-test("the site manifest: the landing page at the root, solitaire, and the gallery and six demo sites under /sites/", async () => {
+test("the site manifest: the landing page at the root, solitaire, the gallery and six demo sites under /sites/, and the feature demos under /demos/", async () => {
   const { siteSections } = await import("../scripts/build-pages.mjs");
 
   assert.deepEqual(
@@ -61,8 +61,16 @@ test("the site manifest: the landing page at the root, solitaire, and the galler
       { id: "solitaire", sourceDir: "examples/solitaire", basePath: "solitaire" },
       { id: "sites", sourceDir: "examples/sites", basePath: "sites" },
       ...DEMO_SITES.map((name) => ({ id: `sites-${name}`, sourceDir: `examples/sites/${name}`, basePath: `sites/${name}` })),
+      { id: "demos", sourceDir: "examples/demos", basePath: "demos" },
     ],
   );
+  // The demos publish what the manifest and each capture name, never their result.json or the
+  // capture tooling beside them.
+  const demos = siteSections.find((s) => s.id === "demos");
+  assert.ok(demos.assets.includes("index.html") && demos.assets.includes("demos.css"));
+  for (const asset of demos.assets) {
+    assert.doesNotMatch(asset, /(^|\/)(result\.json|[^/]+\.mjs)$/, `demos/${asset} is tooling, not a page`);
+  }
   assert.deepEqual(siteSections[0].assets, [
     "app.js",
     "content.js",
@@ -111,6 +119,7 @@ test("the build publishes exactly the manifest, byte-identical to the sources", 
     "app.js",
     "content.js",
     "demo-solitaire.png",
+    "demos",
     "index.html",
     "judgment",
     "preferences.js",
@@ -216,6 +225,15 @@ test("the pages link to each other", async () => {
     assert.match(await read(`sites/${name}/judgment/index.html`), /href="\.\.\/"/, `${name}'s log links its site`);
   }
   assert.match(await read("judgment/index.html"), /href="\.\.\/"/, "the landing page's log links the landing page");
+  // The feature demos: reached from the landing page, linking every demo, each linking back.
+  const { DEMOS } = await import("../examples/demos/demos.mjs");
+  const demos = await read("demos/index.html");
+  assert.match(intro, /href="\.\/demos\/"/, "the landing page links the demos");
+  assert.match(demos, /href="\.\.\/"/);
+  for (const demo of DEMOS) {
+    assert.match(demos, new RegExp(`href="\\./${demo.id}/"`), `the demos index links ${demo.id}`);
+    assert.match(await read(`demos/${demo.id}/index.html`), /href="\.\.\/"/, `${demo.id} links the demos index`);
+  }
   // The gallery was judged like the pages it lists, and links its own log.
   assert.match(gallery, /href="\.\/judgment\/"/);
   assert.match(await read("sites/judgment/index.html"), /href="\.\.\/"/, "the gallery's log links the gallery");

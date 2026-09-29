@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>An app with no DOM to read · vlmkit demos</title>
+<meta name="description" content="A canvas app paints its UI and exposes only an accessibility tree, so DOM contrast rules read every label as 1.00:1. scan a11y writes the tree plus the frame; check a11y tree judges it, with contrast taken from the frame's pixels." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Can everyone read it?</span></header>
+<main class="demo">
+  <p class="command"><code>scan a11y → check a11y tree</code></p>
+  <h1>An app with no DOM to read</h1>
+  <p class="lead">A canvas app paints its UI and exposes only an accessibility tree, so DOM contrast rules read every label as 1.00:1. <code>scan a11y</code> writes the tree plus the frame; <code>check a11y tree</code> judges it, with contrast taken from the frame's pixels.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/a11y-tree/flutter-like.html">fixtures/a11y-tree/flutter-like.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit scan a11y fixtures/a11y-tree/flutter-like.html --out {out}/a11y.json
+vlmkit check a11y tree {out}/a11y.json</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="evidence">
+        <a href="evidence-1.webp"><img src="evidence-1.webp" width="375" height="812" alt="The frame the contrast was measured on (375x812)." loading="lazy" /></a>
+        <figcaption>The frame the contrast was measured on (375x812).</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>Four kinds of finding from one frame: a text field with no name, content past the bottom that nothing scrolls to, a 2.32:1 hint, and a 20x20 target.</p>
+    <h2>The fix</h2>
+    <p>Label the field, make the log scrollable, darken the hint, grow the Info target to 24px.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit scan a11y fixtures/a11y-tree/flutter-like.html --out {out}/a11y.json</code> · exit 0</p>
+    <pre class="output">
+vlmkit scan a11y  flutter-web
+source: fixtures/a11y-tree/flutter-like.html
+
+tree:  &lt;out&gt;/a11y.json  (375x812)
+frame: &lt;out&gt;/a11y.png
+  36 node(s), 30 named, 7 operable
+
+judge it without a browser:
+  vlmkit check a11y tree &lt;out&gt;/a11y.json
+</pre>
+    <p class="exit"><code>vlmkit check a11y tree {out}/a11y.json</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">
+vlmkit check a11y tree  flutter-web, 375x812
+source: &lt;out&gt;/a11y.json  frame: &lt;out&gt;/a11y.png
+
+36 node(s), 6 operable; 9 text node(s) measured on the frame, 21 skipped (disabled, outside-frame, no-ink)
+touch floor 24 (AA); 1 undersized but spaced (2.5.8 exception); 1 smaller target(s) inside a target that meets it, judged as that one
+
+✗ [unlabelled-control] textfield with no accessible name (200x30 at 16,200) — a screen reader announces only &quot;textfield&quot;
+✗ [unreachable-content] 4 named node(s) past the bottom edge with nothing that scrolls to them — first: &quot;log 3&quot; (60x18 at 16,820) in n1&gt;n10
+✗ [contrast-below-aa] &quot;Seed hint&quot; 2.32:1, needs 4.5:1 — rgb(170, 170, 170) on rgb(255, 255, 255) (text 12.2, measured)
+✗ [target-undersized] 20x20 (min side 20, need 24) — &quot;Info&quot;
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../contrast/">← Pale text that fails WCAG contrast</a>
+      <a href="../composition/">Headings that sit closer to the section above →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

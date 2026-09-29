@@ -2195,6 +2195,12 @@ html[data-theme="dark"] .skill-command {
     gap: 4px;
   }
 
+}
+
+/* The footer collapses on its own, earlier than the page's 640px: with three links under the
+   tagline the centre column needs ~380px, and between 641 and ~700px it took the licence's room
+   and broke "MIT · mizchi" after the dot. */
+@media (max-width: 720px) {
   .site-footer {
     grid-template-columns: 1fr;
   }
@@ -2205,6 +2211,17 @@ html[data-theme="dark"] .skill-command {
 
   .site-footer > p:last-child {
     justify-self: start;
+  }
+
+  /* One link per line in the single column, without the separators: wrapped, the line broke
+     before a dot and "· How this page was judged" read as a bullet. */
+  .site-footer .footer-links {
+    display: grid;
+    justify-items: start;
+  }
+
+  .site-footer .footer-links .sep {
+    display: none;
   }
 }
 

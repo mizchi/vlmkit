@@ -1,0 +1,14 @@
+{
+  "exit": 1,
+  "output": "  vlmkit check a11y contrast\n  html: fixtures/a11y-contrast/low-contrast/page.html\n  inspected 7 text-bearing element(s)\n  ✗ 4 contrast failure(s)\n    p.small-pale — 1.47:1 (need 4.5) — `#d1d5db` on `#ffffff` — \"Small pale text fails at 1.6:1.\"\n    p>a.light-link — 1.80:1 (need 4.5) — `#93c5fd` on `#ffffff` — \"Read documentation\"\n    p.too-muted — 2.54:1 (need 4.5) — `#9ca3af` on `#ffffff` — \"This subtitle is too muted to read comfortably.\"\n    p.large-pale — 2.54:1 (need 3) — `#9ca3af` on `#ffffff` — \"Large pale text passes at 3:1 because of font size.\"\n  report: test-results/a11y-contrast/page-e9578509/report.md\n",
+  "images": [
+    {
+      "file": "shot-1.webp",
+      "caption": "The four failures, outlined. The first line and the button pass.",
+      "width": 800,
+      "height": 420,
+      "kind": "page"
+    }
+  ],
+  "command": "vlmkit check a11y contrast fixtures/a11y-contrast/low-contrast/page.html"
+}

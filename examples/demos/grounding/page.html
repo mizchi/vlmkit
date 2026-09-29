@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Partly covered call to action</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 40px; background: #fff; }
+  .wrap { position: relative; width: 200px; height: 40px; }
+  .cta { width: 200px; height: 40px; font-size: 14px; }
+  /* Covers the left 150px of a 200px button: the centre is taken, the right
+     50px are not. A 3x3 hit test samples 50/100/150 and sees none of them. */
+  .veil { position: absolute; left: 0; top: 0; width: 152px; height: 40px; background: rgba(255, 214, 0, .5); }
+  .icon-btn { margin-top: 24px; height: 40px; width: 120px; font-size: 14px; }
+  .icon-btn .glyph { display: inline-block; width: 16px; height: 16px; background: #1d4ed8; vertical-align: -3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <button class="cta" id="cta">Proceed to checkout</button>
+  <div class="veil" id="veil"></div>
+</div>
+<button class="icon-btn" id="save"><span class="glyph"></span> Save</button>
+</body>
+</html>

@@ -2,7 +2,8 @@ name: Deploy vlmkit Pages site
 
 # The site is composed from several examples (scripts/build-pages.mjs): the intro page at the
 # root, the solitaire demo at /solitaire/, and at /sites/ a gallery of six agent-built demo sites,
-# each published beside the log of how it was judged (examples/sites/). Every section's own
+# each published beside the log of how it was judged (examples/sites/), and at /demos/ one page per
+# feature with the output and screenshots of its command (examples/demos/). Every section's own
 # contract tests and gates run before the artifact is built, so nothing reaches the public site
 # unverified.
 
@@ -13,6 +14,7 @@ on:
       - "examples/vlmkit-intro-page/**"
       - "examples/solitaire/**"
       - "examples/sites/**"
+      - "examples/demos/**"
       - "scripts/build-pages.mjs"
       - ".github/workflows/deploy-pages.yml"
   pull_request:
@@ -20,6 +22,7 @@ on:
       - "examples/vlmkit-intro-page/**"
       - "examples/solitaire/**"
       - "examples/sites/**"
+      - "examples/demos/**"
       - "scripts/build-pages.mjs"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
@@ -81,6 +84,12 @@ jobs:
       # half a published game is actually played with. ~15s.
       - name: Win a game of solitaire by dragging
         run: node examples/solitaire/playthrough.mjs --solve --seed 7 --gestures --verbose
+
+      # Each demo's page under test is a byte copy of its fixture, every image it shows exists, every
+      # outline marks something the command printed, and the pages equal a fresh render. No
+      # browser: capturing again is `examples/demos/capture.mjs`, run by hand after a change.
+      - name: Verify the feature demos
+        run: pnpm exec vitest run examples/demos/
 
       - name: Verify the composed site layout
         run: pnpm exec vitest run tests/pages-site.test.mjs

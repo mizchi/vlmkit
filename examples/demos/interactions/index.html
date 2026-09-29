@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A Save button that does nothing on Enter · vlmkit demos</title>
+<meta name="description" content="Every control is focused and pressed from the keyboard, and the page is watched for a response: an ARIA change, a layout change, a navigation." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Can it be operated?</span></header>
+<main class="demo">
+  <p class="command"><code>check interactions</code></p>
+  <h1>A Save button that does nothing on Enter</h1>
+  <p class="lead">Every control is focused and pressed from the keyboard, and the page is watched for a response: an ARIA change, a layout change, a navigation.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/interact/dropdown-form/page.html">fixtures/interact/dropdown-form/page.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check interactions fixtures/interact/dropdown-form/page.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="800" height="260" alt="Save looks like every other button, and does nothing on Enter." loading="lazy" /></a>
+        <figcaption>Save looks like every other button, and does nothing on Enter.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>The dropdown answers Enter with a layout change. The Save button answers with nothing, so it is reported as an inert control.</p>
+    <h2>The fix</h2>
+    <p>Make Save a real submit (or handle <code>keydown</code>), so the keyboard gets what the mouse gets.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check interactions fixtures/interact/dropdown-form/page.html</code> · exit 0</p>
+    <pre class="output">vlmkit check interactions
+source: fixtures/interact/dropdown-form/page.html
+
+status: ok
+  exits 0 — 1 warn(s) did not fail this command. To gate on one: --rule inert-control=suspect
+interactive elements: 3
+
+  - [button] &quot;Region: United States ▾&quot; focus✓ | Enter: layout change
+  - [textbox] &quot;Email address&quot; focus✓
+  - [button] &quot;Save&quot; focus✓ | Enter: no response
+
+Issues:
+  warn [inert-control] button &quot;Save&quot; (form&gt;button.submit-btn) shows no observable response to Enter — no ARIA change, no layout change. Dead control, or its response is outside this probe.
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../responsive/">← A card grid that needs 826px, switched on at 768px</a>
+      <a href="../focus-order/">A toolbar whose Tab order runs backwards →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

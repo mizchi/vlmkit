@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A pricing page that breaks on smaller screens · vlmkit demos</title>
+<meta name="description" content="Three cards in a row that never wraps, a badge pinned on top of a price, and feature lists cut off by a fixed height. The page looks fine in the editor's preview width." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Is the page broken?</span></header>
+<main class="demo">
+  <p class="command"><code>check integrity</code></p>
+  <h1>A pricing page that breaks on smaller screens</h1>
+  <p class="lead">Three cards in a row that never wraps, a badge pinned on top of a price, and feature lists cut off by a fixed height. The page looks fine in the editor's preview width.</p>
+  <p class="links"><a href="./page.html">Open the page under test</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/examples/demos/integrity/page.html">examples/demos/integrity/page.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>vlmkit check integrity examples/demos/integrity/page.html</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="shot-1.webp"><img src="shot-1.webp" width="1280" height="360" alt="1280px: the badge covers the $49 price, and each list has lost its third item to the fixed height." loading="lazy" /></a>
+        <figcaption>1280px: the badge covers the $49 price, and each list has lost its third item to the fixed height.</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="shot-2.webp"><img src="shot-2.webp" width="768" height="360" alt="768px: the third card runs 212px past the viewport." loading="lazy" /></a>
+        <figcaption>768px: the third card runs 212px past the viewport.</figcaption>
+      </figure>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>It sweeps 1280, 768 and 375px in one run. The overflow is reported with the element that sticks out and its right edge; the badge is found by sampling the price's glyphs and seeing 75% of them land on the badge instead.</p>
+    <h2>The fix</h2>
+    <p>Let <code>.plans</code> wrap (or stack below 768px), move the badge out of the price's box, and drop the fixed <code>height</code> on <code>.features</code>.</p>
+  </section>
+
+  <section>
+    <h2>What vlmkit printed</h2>
+    <p class="exit"><code>vlmkit check integrity examples/demos/integrity/page.html</code> · exit 1 — the command fails, as a gate in CI would</p>
+    <pre class="output">vlmkit check integrity
+source: examples/demos/integrity/page.html
+
+verdict: DEFECTS (2 fail, 3 warn, 0 exempted)
+  1280x800: 4 component(s), ink 88.9%, 17 text block(s)
+  768x900: 4 component(s), ink 9.8%, 17 text block(s)
+  375x700: 4 component(s), ink 7.5%, 17 text block(s)
+
+Findings:
+  x [page-overflow-x] @768,375: The page scrolls horizontally by 212px at 768px viewport width — sticking out: div.plans &gt; section:nth-of-type(3) (right edge 980px), div.plans &gt; section:nth-of-type(3) &gt; h2:nth-of-type(1) (right edge 955px), div.plans &gt; section:nth-of-type(3) &gt; p:nth-of-type(1) (right edge 955px).
+  x [occluded-text] div.plans &gt; section:nth-of-type(2) &gt; p:nth-of-type(1) @1280,768: &quot;$49&quot; (div.plans &gt; section:nth-of-type(2) &gt; p:nth-of-type(1)) is painted over by an opaque element span.badge @1280 — 75% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.
+  ! [clipped-content] div.plans &gt; section:nth-of-type(1) &gt; ul:nth-of-type(1) @1280,768,375: div.plans &gt; section:nth-of-type(1) &gt; ul:nth-of-type(1) clips 20px of its content behind overflow: hidden — cut-off content unless the oversize is decorative.
+  ! [clipped-content] div.plans &gt; section:nth-of-type(2) &gt; ul:nth-of-type(1) @1280,768,375: div.plans &gt; section:nth-of-type(2) &gt; ul:nth-of-type(1) clips 20px of its content behind overflow: hidden — cut-off content unless the oversize is decorative.
+  ! [clipped-content] div.plans &gt; section:nth-of-type(3) &gt; ul:nth-of-type(1) @1280,768,375: div.plans &gt; section:nth-of-type(3) &gt; ul:nth-of-type(1) clips 20px of its content behind overflow: hidden — cut-off content unless the oversize is decorative.
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <span></span>
+      <a href="../copy/">Copy that drifted from the spec →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>

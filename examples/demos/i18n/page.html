@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pricing</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; background: #f9fafb; }
+  .card {
+    max-width: 360px;
+    margin: 0 auto;
+    padding: 24px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    /* BUG: explicit width prevents the heading from growing — extra
+       text will horizontally overflow. */
+    width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  p { margin: 0 0 16px; color: #4b5563; font-size: 14px; line-height: 1.5; }
+  .btn {
+    display: inline-block;
+    padding: 10px 16px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    /* BUG: fixed width — long German strings get clipped. */
+    width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .footer-note {
+    margin-top: 12px;
+    color: #9ca3af;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h2>Premium plan</h2>
+    <p>Get unlimited access to all features.</p>
+    <button class="btn">Subscribe</button>
+    <div class="footer-note">Cancel anytime within 30 days.</div>
+  </div>
+</body>
+</html>

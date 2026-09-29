@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Off-scale values</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; background: #f3f4f6; }
+  /* Some elements use scale-compliant values */
+  .ok-card {
+    padding: 16px;
+    margin: 24px 0;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  /* BUG: off-scale radius (7px instead of 8), padding 18 (not 16 or 20),
+     margin 17 (not 16 or 20) */
+  .bad-card {
+    padding: 18px 22px;
+    margin: 17px 0;
+    border-radius: 7px;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.075);  /* unique shadow */
+  }
+  .btn-ok {
+    padding: 12px 20px;
+    border-radius: 6px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    margin-right: 8px;
+  }
+  /* BUG: off-scale radius 5, padding 11/19 */
+  .btn-bad {
+    padding: 11px 19px;
+    border-radius: 5px;
+    background: #6b7280;
+    color: white;
+    border: none;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);  /* unique shadow */
+  }
+  /* BUG: z-index 5 not on scale */
+  .floating {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 5;
+    padding: 8px 12px;
+    background: #ef4444;
+    color: white;
+    border-radius: 9px;  /* BUG: off-scale */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);  /* unique shadow #3 */
+  }
+  .header {
+    box-shadow: 0 6px 10px rgba(0,0,0,0.2);  /* unique shadow #4 */
+    padding: 14px;  /* BUG: 14 not on scale */
+    margin-bottom: 23px;  /* BUG: 23 not on scale */
+  }
+  .small-shadow-1 { box-shadow: 0 1px 1px rgba(0,0,0,0.05); padding: 8px; }
+  .small-shadow-2 { box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 8px; }
+  .small-shadow-3 { box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 8px; }
+</style>
+</head>
+<body>
+  <div class="header">Header bar</div>
+  <div class="ok-card">
+    <h2>Conformant card</h2>
+    <button class="btn-ok">OK button</button>
+  </div>
+  <div class="bad-card">
+    <h2>Off-scale card</h2>
+    <button class="btn-bad">Off-scale button</button>
+  </div>
+  <div class="floating">Floating</div>
+  <div class="small-shadow-1">Shadow 1</div>
+  <div class="small-shadow-2">Shadow 2</div>
+  <div class="small-shadow-3">Shadow 3</div>
+</body>
+</html>

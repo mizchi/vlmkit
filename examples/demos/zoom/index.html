@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Letting a vision model zoom into the original · vlmkit demos</title>
+<meta name="description" content="A full-page 2x capture of a dashboard is shown to a model at a little under its CSS size, and one table header moved 2px. The zoom tool lets the model name a box and get it back cropped from the full-resolution original and magnified, from any provider's model." />
+<link rel="stylesheet" href="../demos.css" />
+</head>
+<body>
+<header class="bar"><a href="../">vlmkit demos</a><span>Vision models and figures</span></header>
+<main class="demo">
+  <p class="command"><code>@mizchi/vlmkit-ai/zoom.ts</code></p>
+  <h1>Letting a vision model zoom into the original</h1>
+  <p class="lead">A full-page 2x capture of a dashboard is shown to a model at a little under its CSS size, and one table header moved 2px. The zoom tool lets the model name a box and get it back cropped from the full-resolution original and magnified, from any provider's model.</p>
+  <p class="links"><a href="./page.html">Open the fixture</a> · <a href="https://github.com/mizchi/vlmkit/blob/main/fixtures/css-challenge/dashboard.html">fixtures/css-challenge/dashboard.html</a></p>
+
+  <section>
+    <h2>Run it</h2>
+    <pre class="cmd"><code>import { prepareZoomSource, zoomInto } from &quot;@mizchi/vlmkit-ai/zoom.ts&quot;;
+// or the whole loop, with any provider's model:
+// analyzeWithZoom(model, [{ png: baseline, label: &quot;Baseline&quot; }, { png: current, label: &quot;Current&quot; }], &quot;What changed?&quot;, { maxZooms: 4 })</code></pre>
+  </section>
+
+  <section class="figures">
+      <figure class="shot">
+        <a href="view.webp"><img src="view.webp" width="1327" height="865" alt="Image 1 as the model is sent it: 1327x865, about 0.92x of CSS size. The box is the zoom asked for below." loading="lazy" /></a>
+        <figcaption>Image 1 as the model is sent it: 1327x865, about 0.92x of CSS size. The box is the zoom asked for below.</figcaption>
+      </figure>
+      <div class="pair">
+      <figure class="shot">
+        <a href="zoom-baseline.webp"><img src="zoom-baseline.webp" width="1357" height="847" alt="One zoom into Image 0 (baseline), cropped from the full-resolution original." loading="lazy" /></a>
+        <figcaption>One zoom into Image 0 (baseline), cropped from the full-resolution original.</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="zoom-current.webp"><img src="zoom-current.webp" width="1357" height="847" alt="The same box in Image 1 (current)." loading="lazy" /></a>
+        <figcaption>The same box in Image 1 (current).</figcaption>
+      </figure>
+      </div>
+  </section>
+
+  <section>
+    <h2>What to look at</h2>
+    <p>In the view the model is sent, the shift is under two pixels. In the zoom it is plain: CUSTOMER starts level with &quot;Alice Johnson&quot; in the baseline and left of it in the current image. In the agent-mode accuracy bench, zoom scored 58/58 against 48/58 for one look, and the whole gain was exact values like this one.</p>
+    <h2>The fix</h2>
+    <p>Turn zoom on when the answer is a measurement (a shift in pixels, a colour value), not just to notice a change.</p>
+  </section>
+
+  <section>
+    <h2>What the code returned</h2>
+    
+    <pre class="output">planted: table&gt;thead&gt;tr&gt;th moved dx=-2, dy=0 CSS px (the known answer; seed 1)
+page: 1440x939 CSS px at 2x → original 2880x1878
+view sent to the model (DEFAULT_IMAGE_BUDGET 1568px / 1.15MP): 1327x865
+pixel diff bounds: (508,641.5)-(582,650.5) CSS px
+
+zoom Image 0 → Zoomed into (423,546)-(581,644) of the image you see at 1327x865px: a 343x214px region of the original, returned magnified to 1357x847px.
+zoom Image 1 → Zoomed into (423,546)-(581,644) of the image you see at 1327x865px: a 343x214px region of the original, returned magnified to 1357x847px.
+original box: (918,1185)-(1261,1399)
+</pre>
+
+  </section>
+
+  <nav class="pager">
+      <a href="../i18n/">← Buttons that overflow when the copy gets longer</a>
+      <a href="../anim/">An algorithm as a checked animation →</a>
+  </nav>
+</main>
+<footer class="foot"><a href="../">All demos</a> · <a href="../../">vlmkit</a> · <a href="../../sites/">Demo sites and how each was judged</a> · <a href="https://github.com/mizchi/vlmkit">GitHub</a></footer>
+</body>
+</html>
