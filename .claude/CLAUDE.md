@@ -217,6 +217,27 @@ move in `diff` anyway. Usage rank is not quality: `seedream-4.5`, third by OpenR
 `meta/muse-image` scored 3/3 at $0.010 but needs the account's 18+ confirmation
 (`openrouter.ai/settings/preferences`), so it is not the default. `recraft/recraft-v4.1-vector` returns SVG.
 
+### This repository's own art (`scripts/readme-art.mjs`)
+
+The README hero and the icon set (README tables, every `examples/*/README.md` heading, the demo
+gallery's group headings, published at `/icons/` on Pages) are generated with that default model from
+`scripts/readme-art.manifest.mjs` — one prompt per file, and `docs/assets/art.lock.json` records the
+hash of the prompt each file was made from.
+
+```bash
+OPENROUTER_API_KEY=… node --experimental-strip-types scripts/readme-art.mjs            # missing or stale only
+OPENROUTER_API_KEY=… node --experimental-strip-types scripts/readme-art.mjs wrench     # redo one; then LOOK at it
+```
+
+`tests/readme-art.test.mjs` fails when a prompt changes without regenerating, when an icon is unused,
+and when a README names an icon the manifest does not have. Measured building it, not to re-learn:
+line icons on transparent vanished on GitHub's dark theme and were unreadable at 20px, so every icon is
+a filled `#2563eb` tile with a white glyph; the anchor icon is sent as `inputReferences` to every
+other one (OpenRouter's `input_references` takes `{ type: "image_url", image_url: { url } }` — a bare
+string or `{ url }` is a 400), which is what keeps 21 icons one set; about 1 in 5 tiles comes back with
+a dark smudge of shadow on its edge, so look at every icon on light AND dark before committing and
+regenerate the ones that have it.
+
 ## Component-focused VRT (fixing one component with a small image)
 
 ```bash

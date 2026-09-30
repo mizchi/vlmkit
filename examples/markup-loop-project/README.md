@@ -1,4 +1,4 @@
-# Markup Loop Project Example
+# <img src="../../docs/assets/icons/target.webp" width="32" height="32" alt="" align="top" /> Markup Loop Project Example
 
 This is a minimal standalone UI project that reproduces the drop-in markup loop.
 

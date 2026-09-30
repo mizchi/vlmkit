@@ -71,7 +71,7 @@ export function renderDemo(demo, result, neighbours = {}) {
   ].join("\n      ");
   return `${head(`${demo.title} · vlmkit demos`, demo.lead.replace(/`/g, ""), "../demos.css")}
 <body>
-<header class="bar"><a href="../">vlmkit demos</a><span>${esc(group.title)}</span></header>
+<header class="bar"><a href="../">vlmkit demos</a><span><img class="icon" src="../../icons/${group.icon}.webp" width="20" height="20" alt="" /> ${esc(group.title)}</span></header>
 <main class="demo">
   <p class="command"><code>${esc(demo.command)}</code></p>
   <h1>${esc(demo.title)}</h1>
@@ -131,7 +131,7 @@ export function renderIndex(results) {
 npx playwright install chromium
 npx vlmkit check integrity http://localhost:3000/</code></pre>
 ${GROUPS.map((g) => `  <section>
-    <h2>${esc(g.title)}</h2>
+    <h2><img class="icon" src="../icons/${g.icon}.webp" width="28" height="28" alt="" /> ${esc(g.title)}</h2>
     <p>${prose(g.blurb)}</p>
     <ul class="cards">
 ${cards(g)}
@@ -157,7 +157,9 @@ export function renderReadmeBlock(dir = here) {
   const rows = DEMOS.map((d) => {
     const thumb = figuresOf(d, readResult(d.id, dir))[0];
     const img = thumb ? `<a href="${PAGES}${d.id}/"><img src="examples/demos/${d.id}/${thumb.file}" width="220" alt="" /></a>` : "";
-    return `| ${img} | [${d.title}](${PAGES}${d.id}/) | \`${d.command.replace(/\|/g, "\\|")}\` |`;
+    const group = GROUPS.find((g) => g.id === d.group);
+    const icon = `<img src="docs/assets/icons/${group.icon}.webp" width="20" height="20" alt="${esc(group.title)}" />`;
+    return `| ${img} | ${icon} [${d.title}](${PAGES}${d.id}/) | \`${d.command.replace(/\|/g, "\\|")}\` |`;
   });
   return [
     README_START,

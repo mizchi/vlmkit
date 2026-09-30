@@ -1,4 +1,4 @@
-# Markup VRT Eval
+# <img src="../../docs/assets/icons/clipboard.webp" width="32" height="32" alt="" align="top" /> Markup VRT Eval
 
 Dogfood harness for measuring the VLMKit Playwright workflow while building a
 new UI screen.

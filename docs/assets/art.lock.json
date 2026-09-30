@@ -1,0 +1,115 @@
+{
+  "model": "openai/gpt-image-2.5-flare",
+  "entries": {
+    "bell-off": {
+      "hash": "79f47a49974a",
+      "costUsd": 0.014332,
+      "date": "2026-09-30"
+    },
+    "card": {
+      "hash": "96733be50e1e",
+      "costUsd": 0.014332,
+      "date": "2026-09-30"
+    },
+    "clipboard": {
+      "hash": "3ea4cebabd16",
+      "costUsd": 0.014337,
+      "date": "2026-09-30"
+    },
+    "compare": {
+      "hash": "0a22882b7437",
+      "costUsd": 0.014352,
+      "date": "2026-09-30"
+    },
+    "component": {
+      "hash": "6f0d4ca13129",
+      "costUsd": 0.014362,
+      "date": "2026-09-30"
+    },
+    "contrast": {
+      "hash": "9fa912f6e430",
+      "costUsd": 0.014372,
+      "date": "2026-09-30"
+    },
+    "gallery": {
+      "hash": "80a5cfac035a",
+      "costUsd": 0.014342,
+      "date": "2026-09-30"
+    },
+    "history": {
+      "hash": "1f18e6c2ecd6",
+      "costUsd": 0.014342,
+      "date": "2026-09-30"
+    },
+    "image-check": {
+      "hash": "1eca9a5e09c0",
+      "costUsd": 0.014372,
+      "date": "2026-09-30"
+    },
+    "keyboard": {
+      "hash": "d31942460b80",
+      "costUsd": 0.014342,
+      "date": "2026-09-30"
+    },
+    "layout-grid": {
+      "hash": "cf533e16f07d",
+      "costUsd": 0.014357,
+      "date": "2026-09-30"
+    },
+    "page-check": {
+      "hash": "3789d83691fa",
+      "costUsd": 0.01372,
+      "date": "2026-09-30"
+    },
+    "plug": {
+      "hash": "cc25609f06ed",
+      "costUsd": 0.014347,
+      "date": "2026-09-30"
+    },
+    "pointer": {
+      "hash": "0346511e9a2b",
+      "costUsd": 0.014347,
+      "date": "2026-09-30"
+    },
+    "puzzle": {
+      "hash": "aaa8c5438478",
+      "costUsd": 0.014322,
+      "date": "2026-09-30"
+    },
+    "readme-hero": {
+      "hash": "6546b6727b28",
+      "costUsd": 0.00607,
+      "date": "2026-09-30"
+    },
+    "responsive": {
+      "hash": "e18fcfcbaa0b",
+      "costUsd": 0.014337,
+      "date": "2026-09-30"
+    },
+    "slides": {
+      "hash": "2d4f174368b9",
+      "costUsd": 0.014357,
+      "date": "2026-09-30"
+    },
+    "stack": {
+      "hash": "690b11056479",
+      "costUsd": 0.014332,
+      "date": "2026-09-30"
+    },
+    "target": {
+      "hash": "2a0b3d045432",
+      "costUsd": 0.014347,
+      "date": "2026-09-30"
+    },
+    "wrench": {
+      "hash": "fbf7f8a68753",
+      "costUsd": 0.014302,
+      "date": "2026-09-30"
+    },
+    "zoom": {
+      "hash": "740e0d51201e",
+      "costUsd": 0.014342,
+      "date": "2026-09-30"
+    }
+  }
+}

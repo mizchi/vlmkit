@@ -1,4 +1,4 @@
-# Gate plugin example
+# <img src="../../docs/assets/icons/puzzle.webp" width="32" height="32" alt="" align="top" /> Gate plugin example
 
 A self-contained project that adds two gates of its own. It has its own
 `vlmkit.config.json`, so it runs as-is:

@@ -1,4 +1,4 @@
-# vlmkit intro page
+# <img src="../../docs/assets/icons/page-check.webp" width="32" height="32" alt="" align="top" /> vlmkit intro page
 
 vlmkit 自身を紹介する、依存なしの静的ページです。このページ自体を vlmkit の
 markup loop、決定論的ゲート、Playwright VRT で検証します。ヘッダーから

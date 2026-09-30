@@ -149,6 +149,9 @@ describe("OpenRouter route", () => {
       model: "meta/muse-image", prompt: "x", n: 1, aspect_ratio: "16:9", quality: "high",
     });
     assert.throws(() => buildOpenRouterBody(m, { prompt: " " }), /non-empty/);
+    assert.deepEqual(buildOpenRouterBody(m, { prompt: "x", inputReferences: ["data:image/png;base64,AA=="] }).input_references, [
+      { type: "image_url", image_url: { url: "data:image/png;base64,AA==" } },
+    ]);
   });
 
   it("takes OpenRouter's billed cost and media type from the response", () => {

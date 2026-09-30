@@ -54,6 +54,12 @@ export interface ImageGenRequest {
   background?: ImageGenBackground;
   /** OpenRouter only (e.g. `16:9`); the OpenAI route takes `size`. */
   aspectRatio?: string;
+  /**
+   * OpenRouter only: images the model draws from — a style to match, a subject to edit. URLs or
+   * `data:` URLs. Sent as `input_references`, which takes chat-style `image_url` parts (a bare
+   * string or `{ url }` is a 400).
+   */
+  inputReferences?: string[];
 }
 
 export interface ImageGenUsage {
@@ -79,6 +85,7 @@ export interface OpenRouterImageBody {
   aspect_ratio?: string;
   quality?: ImageGenQuality;
   background?: ImageGenBackground;
+  input_references?: { type: "image_url"; image_url: { url: string } }[];
 }
 
 export interface ImageGenRequestBody {
@@ -198,6 +205,9 @@ export function buildOpenRouterBody(model: ImageGenModel, req: ImageGenRequest):
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
     ...(req.quality ? { quality: req.quality } : {}),
     ...(req.background ? { background: req.background } : {}),
+    ...(req.inputReferences?.length
+      ? { input_references: req.inputReferences.map((url) => ({ type: "image_url" as const, image_url: { url } })) }
+      : {}),
   };
 }
 

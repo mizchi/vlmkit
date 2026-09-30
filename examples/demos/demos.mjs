@@ -26,12 +26,12 @@
 /** @typedef {{ viewport: [number, number], full?: boolean, mark?: string[], caption: string, clip?: { x: number, y: number, width: number, height: number } }} Shot */
 
 export const GROUPS = Object.freeze([
-  { id: "broken", title: "Is the page broken?", blurb: "Reference-free checks for the page you just wrote. No baseline, no design file, no API key." },
-  { id: "operable", title: "Can it be operated?", blurb: "Keyboards, focus order, and agents that click on a screenshot." },
-  { id: "readable", title: "Can everyone read it?", blurb: "Contrast measured on rendered pixels, including apps with no DOM at all." },
-  { id: "design", title: "Does it look designed?", blurb: "Proximity, colour roles and a spacing scale. These report inconsistency, never taste." },
-  { id: "change", title: "What changed?", blurb: "Two versions of a page, or one page under a longer language." },
-  { id: "vision", title: "Vision models and figures", blurb: "Letting a VLM zoom into the original, and figures that are checked against what they claim." },
+  { id: "broken", icon: "page-check", title: "Is the page broken?", blurb: "Reference-free checks for the page you just wrote. No baseline, no design file, no API key." },
+  { id: "operable", icon: "keyboard", title: "Can it be operated?", blurb: "Keyboards, focus order, and agents that click on a screenshot." },
+  { id: "readable", icon: "contrast", title: "Can everyone read it?", blurb: "Contrast measured on rendered pixels, including apps with no DOM at all." },
+  { id: "design", icon: "layout-grid", title: "Does it look designed?", blurb: "Proximity, colour roles and a spacing scale. These report inconsistency, never taste." },
+  { id: "change", icon: "compare", title: "What changed?", blurb: "Two versions of a page, or one page under a longer language." },
+  { id: "vision", icon: "zoom", title: "Vision models and figures", blurb: "Letting a VLM zoom into the original, and figures that are checked against what they claim." },
 ]);
 
 export const DEMOS = Object.freeze([

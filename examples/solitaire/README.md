@@ -1,4 +1,4 @@
-# Klondike Solitaire — a DnD + animation dogfood target
+# <img src="../../docs/assets/icons/card.webp" width="32" height="32" alt="" align="top" /> Klondike Solitaire — a DnD + animation dogfood target
 
 Windows' `sol.exe`, rebuilt in plain HTML/CSS/JS: seven tableau piles, four foundations, stock
 and waste, full Klondike rules, HTML5 drag and drop, keyboard play, and the bouncing victory

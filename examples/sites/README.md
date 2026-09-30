@@ -1,4 +1,4 @@
-# Demo sites, and how each one was judged
+# <img src="../../docs/assets/icons/stack.webp" width="32" height="32" alt="" align="top" /> Demo sites, and how each one was judged
 
 Six static sites, each built by a fresh agent from a one-page brief using vlmkit's gates and its own
 eyes, each published next to the log of how it was judged:

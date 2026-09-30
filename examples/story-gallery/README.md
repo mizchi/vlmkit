@@ -1,4 +1,4 @@
-# Component-focused VRT with `check story`
+# <img src="../../docs/assets/icons/component.webp" width="32" height="32" alt="" align="top" /> Component-focused VRT with `check story`
 
 Fixing one component with a full-page diff is the wrong instrument. The image is
 large, the diff cascades — nudge a header and every row below it reports as

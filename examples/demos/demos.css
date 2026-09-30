@@ -49,6 +49,9 @@ pre code { background: none; padding: 0; }
 main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
 h1 { margin: 0.2em 0 0.4em; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; }
 h2 { margin: 1.8em 0 0.5em; font-size: 20px; }
+/* Generated tiles (scripts/readme-art.mjs): a filled square reads on both themes, so no filter. */
+img.icon { display: inline-block; vertical-align: -0.35em; margin-right: 4px; }
+h2 img.icon { vertical-align: -0.3em; margin-right: 8px; }
 .lead { max-width: 70ch; font-size: 18px; color: var(--muted); }
 .command { margin: 0; }
 .command code { font-size: 14px; color: var(--accent); }

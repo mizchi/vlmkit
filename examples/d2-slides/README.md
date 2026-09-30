@@ -1,4 +1,4 @@
-# d2-slides — the worked example
+# <img src="../../docs/assets/icons/slides.webp" width="32" height="32" alt="" align="top" /> d2-slides — the worked example
 
 `deck.md` is a real deck: eight slides about the `d2-diagram` validation rounds,
 every figure a ```d2 fence laid out by TALA. `built/` is what the builder makes

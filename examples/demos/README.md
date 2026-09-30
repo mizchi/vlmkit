@@ -1,4 +1,4 @@
-# Feature demos
+# <img src="../../docs/assets/icons/gallery.webp" width="32" height="32" alt="" align="top" /> Feature demos
 
 One page per vlmkit feature, published at <https://mizchi.github.io/vlmkit/demos/>: a page with a known
 defect, the command that finds it, its whole output and screenshots from the same run.

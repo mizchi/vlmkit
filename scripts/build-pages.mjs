@@ -23,6 +23,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishedJudgment } from "../examples/sites/judge.mjs";
 import { DEMOS, demoFiles } from "../examples/demos/demos.mjs";
+import { ICONS, ICON_DIR, iconFile } from "./readme-art.manifest.mjs";
 import { readResult } from "../examples/demos/render.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -118,6 +119,9 @@ export const siteSections = Object.freeze([
   // One page per feature: a page with a known defect, the command that finds it, its whole
   // output and screenshots from the same run (`examples/demos/capture.mjs`).
   section("demos", "examples/demos", "demos", demoAssets()),
+  // The generated icon set (`scripts/readme-art.mjs`), which the demo gallery links as `../icons/`.
+  // The README reaches the same files through the repository, so they live once, in docs/assets.
+  section("icons", ICON_DIR, "icons", ICONS.map((i) => iconFile(i.id).slice(ICON_DIR.length + 1))),
 ]);
 
 /**

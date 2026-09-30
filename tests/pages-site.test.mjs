@@ -51,7 +51,7 @@ async function walk(dir, prefix = "") {
   return out;
 }
 
-test("the site manifest: the landing page at the root, solitaire, the gallery and six demo sites under /sites/, and the feature demos under /demos/", async () => {
+test("the site manifest: the landing page at the root, solitaire, the gallery and six demo sites under /sites/, the feature demos under /demos/ and their icons under /icons/", async () => {
   const { siteSections } = await import("../scripts/build-pages.mjs");
 
   assert.deepEqual(
@@ -62,6 +62,7 @@ test("the site manifest: the landing page at the root, solitaire, the gallery an
       { id: "sites", sourceDir: "examples/sites", basePath: "sites" },
       ...DEMO_SITES.map((name) => ({ id: `sites-${name}`, sourceDir: `examples/sites/${name}`, basePath: `sites/${name}` })),
       { id: "demos", sourceDir: "examples/demos", basePath: "demos" },
+      { id: "icons", sourceDir: "docs/assets/icons", basePath: "icons" },
     ],
   );
   // The demos publish what the manifest and each capture name, never their result.json or the
@@ -120,6 +121,7 @@ test("the build publishes exactly the manifest, byte-identical to the sources", 
     "content.js",
     "demo-solitaire.png",
     "demos",
+    "icons",
     "index.html",
     "judgment",
     "preferences.js",
