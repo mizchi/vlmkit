@@ -6,8 +6,9 @@ imagegen or, when `OPENROUTER_API_KEY` is set, with an OpenRouter image model. C
 image generation of its own; it can only write the code that draws a figure. This round picks the
 OpenRouter model.
 
-**Result: `openai/gpt-image-2.5-flare`.** It scored 3/3 on our three figure briefs, at the lowest
-price measured ($0.009–0.015 an image) and 11–15s per image. Two other OpenAI models, `gpt-image-2`
+**Result: `openai/gpt-image-2.5-flare`, with `meta/muse-image` beside it.** Flare scored 3/3 on our
+three figure briefs at the lowest price measured ($0.009–0.015 an image) and 11–15s per image.
+Muse also scored 3/3 at a flat $0.010, taking 21–36s, and drew the most literal zoom of the round. Two other OpenAI models, `gpt-image-2`
 and `gpt-image-2.5-sunburst`, also scored 3/3 at the same price, 4–7s slower. `gemini-3-pro-image`
 and `riverflow-v2.5-pro` scored 3/3 at nine times the price, and Riverflow takes over a minute.
 `seedream-4.5` is the third most used image model on OpenRouter and scored 0/3.
@@ -19,7 +20,7 @@ and `riverflow-v2.5-pro` scored 3/3 at nine times the price, and Riverflow takes
    spatial relations, mirrors, negation and editing. All 16 pages were fetched and summed per model
    (the table below). They measure whether a model follows a prompt, not whether its picture works
    as a technical figure.
-2. **Our three briefs**, run on 13 models through `POST /api/v1/images` with `aspect_ratio: 16:9`.
+2. **Our three briefs**, run on 14 models through `POST /api/v1/images` with `aspect_ratio: 16:9`.
    The popularity order comes from OpenRouter's image-model collection, ranked by 7-day tokens.
 
 ## OpenRouter benchmarks (summed over all 16 pages)
@@ -64,6 +65,7 @@ something wrong.
 | Model | zoom | vrt | ja | score | $/image | time |
 |---|---|---|---|---|---|---|
 | openai/gpt-image-2.5-flare | ✓ | ✓ | ✓ | 3 | 0.009–0.015 | 11–15s |
+| meta/muse-image | ✓ | ✓ | ✓ | 3 | 0.010 | 21–36s |
 | openai/gpt-image-2 | ✓ | ✓ | ✓ | 3 | 0.009–0.015 | 15–22s |
 | openai/gpt-image-2.5-sunburst | ✓ | ✓ | ✓ | 3 | 0.009–0.015 | 17–21s |
 | google/gemini-3-pro-image | ✓ | ✓ | ✓ | 3 | 0.135 | 17–22s |
@@ -77,8 +79,8 @@ something wrong.
 | krea/krea-2-medium-turbo | △ zoom shows more | ✗ no move | ✗ one label of three | 0.5 | 0.015 | 18–19s |
 | bytedance-seed/seedream-4.5 | ✗ zoom empty | ✗ added a photo, no move | ✗ first arrow reversed | 0 | 0.040 | 11–13s |
 
-`meta/muse-image` refused to run until the account confirms 18+ in OpenRouter's settings, so it is
-not in the table. The whole round cost $2.07.
+`meta/muse-image` refused to run (403) until the account confirmed 18+ at
+`openrouter.ai/settings/preferences`, so it was run after the other 13. The whole round cost $2.10.
 
 Contact sheets (each tile is labelled with its model):
 
@@ -89,7 +91,7 @@ Contact sheets (each tile is labelled with its model):
 ## What the briefs showed
 
 - **Nearly every model gets the text right. What it gets wrong is the relationship the figure
-  claims.** 12 of 13 models wrote the caption exactly, and 12 of 13 wrote all three Japanese
+  claims.** 13 of 14 models wrote the caption exactly, and 13 of 14 wrote all three Japanese
   labels. Five models, Nano Banana 2 among them, drew a `current` panel identical to `baseline`,
   then marked a move in the `diff` panel. Their figures contradict themselves. Check an
   illustration for what it asserts, not only for what it says.
@@ -106,11 +108,11 @@ Contact sheets (each tile is labelled with its model):
 | Need | Model |
 |---|---|
 | Default illustration or concept figure | `openai/gpt-image-2.5-flare` |
-| Second opinion, same price | `openai/gpt-image-2` / `openai/gpt-image-2.5-sunburst` |
+| Second opinion, same price | `meta/muse-image` (needs the 18+ setting), `openai/gpt-image-2` / `openai/gpt-image-2.5-sunburst` |
 | Editable output (SVG) | `recraft/recraft-v4.1-vector` — check the relationships it draws |
 | Fast iteration (~10s) | `google/gemini-3.1-flash-image`, 4–7x the price, weaker on spatial logic |
 | Avoid for figures | `bytedance-seed/seedream-4.5`, `krea/krea-2-medium-turbo`, `google/gemini-3.1-flash-lite-image` |
 
 Figures that state structure (dependencies, flows, states, sequences, measurements) are still
 drawn with code: mermaid, D2 or vlmkit-anim. Only code-drawn figures can be checked against the
-code, and a generated image in this round got a spatial relation wrong 5 times in 13.
+code, and a generated image in this round got a spatial relation wrong 5 times in 14.
