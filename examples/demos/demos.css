@@ -55,7 +55,9 @@ h2 { margin: 1.8em 0 0.5em; font-size: 20px; }
 .links { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
 
 pre { overflow-x: auto; margin: 0.5em 0; padding: 14px 16px; border-radius: 8px; }
-pre.cmd { background: var(--code-bg); font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+/* Wrapped, not scrolled: on a phone a one-line command was cut at the edge ("…demos/integ"), and a
+   command is the one thing on the page a reader copies. Long paths break anywhere, spaces first. */
+pre.cmd { background: var(--code-bg); font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 pre.output { max-height: 36em; background: var(--out-bg); color: var(--out-ink); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .exit { margin: 1em 0 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 details summary { cursor: pointer; margin-top: 1em; }
