@@ -46,8 +46,10 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - run: pnpm build
-      # The same install-from-tarball check package-install-smoke runs, against what is about to ship.
-      - run: pnpm exec playwright install-deps chromium
+      # The same install-from-tarball checks package-install-smoke runs, against what is about to ship.
+      # The browser itself, not only its system libraries: smoke:bundled-json runs a real gate, and
+      # v0.23.0's first run stopped there with "no chromium browser executable installed".
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm smoke:pack:workspaces
       - run: pnpm smoke:bundled-json
       - name: Publish
