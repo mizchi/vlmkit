@@ -1,0 +1,560 @@
+{
+ "schema": "vlmkit-image-gen-eval/1",
+ "date": "2026-09-30",
+ "scorer": "coding agent's own vision (Claude Code), by eye on the contact sheets",
+ "briefs": {
+  "zoom": "b577ec2122d3",
+  "vrt": "45c3aee6c961",
+  "ja": "d00ad7ed8574"
+ },
+ "runs": [
+  {
+   "model": "black-forest-labs/flux.2-pro",
+   "brief": "ja",
+   "costUsd": 0.045,
+   "latencyMs": 11708,
+   "file": "ja--black-forest-labs__flux.2-pro.jpeg"
+  },
+  {
+   "model": "black-forest-labs/flux.2-pro",
+   "brief": "vrt",
+   "costUsd": 0.045,
+   "latencyMs": 13897,
+   "file": "vrt--black-forest-labs__flux.2-pro.jpeg"
+  },
+  {
+   "model": "black-forest-labs/flux.2-pro",
+   "brief": "zoom",
+   "costUsd": 0.045,
+   "latencyMs": 14361,
+   "file": "zoom--black-forest-labs__flux.2-pro.jpeg"
+  },
+  {
+   "model": "bytedance-seed/seedream-4.5",
+   "brief": "ja",
+   "costUsd": 0.04,
+   "latencyMs": 11705,
+   "file": "ja--bytedance-seed__seedream-4.5.jpeg"
+  },
+  {
+   "model": "bytedance-seed/seedream-4.5",
+   "brief": "vrt",
+   "costUsd": 0.04,
+   "latencyMs": 12588,
+   "file": "vrt--bytedance-seed__seedream-4.5.jpeg"
+  },
+  {
+   "model": "bytedance-seed/seedream-4.5",
+   "brief": "zoom",
+   "costUsd": 0.04,
+   "latencyMs": 11480,
+   "file": "zoom--bytedance-seed__seedream-4.5.jpeg"
+  },
+  {
+   "model": "bytedance-seed/seedream-5-0-lite",
+   "brief": "ja",
+   "costUsd": 0.035,
+   "latencyMs": 67125,
+   "file": "ja--bytedance-seed__seedream-5-0-lite.jpeg"
+  },
+  {
+   "model": "bytedance-seed/seedream-5-0-lite",
+   "brief": "vrt",
+   "costUsd": 0.035,
+   "latencyMs": 37074,
+   "file": "vrt--bytedance-seed__seedream-5-0-lite.jpeg"
+  },
+  {
+   "model": "bytedance-seed/seedream-5-0-lite",
+   "brief": "zoom",
+   "costUsd": 0.035,
+   "latencyMs": 37699,
+   "file": "zoom--bytedance-seed__seedream-5-0-lite.jpeg"
+  },
+  {
+   "model": "google/gemini-3-pro-image",
+   "brief": "ja",
+   "costUsd": 0.134574,
+   "latencyMs": 17313,
+   "file": "ja--google__gemini-3-pro-image.png"
+  },
+  {
+   "model": "google/gemini-3-pro-image",
+   "brief": "vrt",
+   "costUsd": 0.134646,
+   "latencyMs": 20894,
+   "file": "vrt--google__gemini-3-pro-image.png"
+  },
+  {
+   "model": "google/gemini-3-pro-image",
+   "brief": "zoom",
+   "costUsd": 0.13466,
+   "latencyMs": 22044,
+   "file": "zoom--google__gemini-3-pro-image.png"
+  },
+  {
+   "model": "google/gemini-3.1-flash-image",
+   "brief": "ja",
+   "costUsd": 0.0672435,
+   "latencyMs": 9114,
+   "file": "ja--google__gemini-3.1-flash-image.png"
+  },
+  {
+   "model": "google/gemini-3.1-flash-image",
+   "brief": "vrt",
+   "costUsd": 0.0672615,
+   "latencyMs": 10200,
+   "file": "vrt--google__gemini-3.1-flash-image.png"
+  },
+  {
+   "model": "google/gemini-3.1-flash-image",
+   "brief": "zoom",
+   "costUsd": 0.067265,
+   "latencyMs": 11119,
+   "file": "zoom--google__gemini-3.1-flash-image.png"
+  },
+  {
+   "model": "google/gemini-3.1-flash-lite-image",
+   "brief": "ja",
+   "costUsd": 0.03362175,
+   "latencyMs": 3788,
+   "file": "ja--google__gemini-3.1-flash-lite-image.jpeg"
+  },
+  {
+   "model": "google/gemini-3.1-flash-lite-image",
+   "brief": "vrt",
+   "costUsd": 0.03363075,
+   "latencyMs": 3230,
+   "file": "vrt--google__gemini-3.1-flash-lite-image.jpeg"
+  },
+  {
+   "model": "google/gemini-3.1-flash-lite-image",
+   "brief": "zoom",
+   "costUsd": 0.0336325,
+   "latencyMs": 3242,
+   "file": "zoom--google__gemini-3.1-flash-lite-image.jpeg"
+  },
+  {
+   "model": "krea/krea-2-medium-turbo",
+   "brief": "ja",
+   "costUsd": 0.015,
+   "latencyMs": 17776,
+   "file": "ja--krea__krea-2-medium-turbo.png"
+  },
+  {
+   "model": "krea/krea-2-medium-turbo",
+   "brief": "vrt",
+   "costUsd": 0.015,
+   "latencyMs": 19203,
+   "file": "vrt--krea__krea-2-medium-turbo.png"
+  },
+  {
+   "model": "krea/krea-2-medium-turbo",
+   "brief": "zoom",
+   "costUsd": 0.015,
+   "latencyMs": 17711,
+   "file": "zoom--krea__krea-2-medium-turbo.png"
+  },
+  {
+   "model": "meta/muse-image",
+   "brief": "ja",
+   "costUsd": 0.01,
+   "latencyMs": 20943,
+   "file": "ja--meta__muse-image.webp"
+  },
+  {
+   "model": "meta/muse-image",
+   "brief": "vrt",
+   "costUsd": 0.01,
+   "latencyMs": 36235,
+   "file": "vrt--meta__muse-image.webp"
+  },
+  {
+   "model": "meta/muse-image",
+   "brief": "zoom",
+   "costUsd": 0.01,
+   "latencyMs": 21212,
+   "file": "zoom--meta__muse-image.webp"
+  },
+  {
+   "model": "openai/gpt-image-2",
+   "brief": "ja",
+   "costUsd": 0.01489,
+   "latencyMs": 19913,
+   "file": "ja--openai__gpt-image-2.png"
+  },
+  {
+   "model": "openai/gpt-image-2",
+   "brief": "vrt",
+   "costUsd": 0.00904,
+   "latencyMs": 14545,
+   "file": "vrt--openai__gpt-image-2.png"
+  },
+  {
+   "model": "openai/gpt-image-2",
+   "brief": "zoom",
+   "costUsd": 0.015075,
+   "latencyMs": 22173,
+   "file": "zoom--openai__gpt-image-2.png"
+  },
+  {
+   "model": "openai/gpt-image-2.5-flare",
+   "brief": "ja",
+   "costUsd": 0.01489,
+   "latencyMs": 12296,
+   "file": "ja--openai__gpt-image-2.5-flare.png"
+  },
+  {
+   "model": "openai/gpt-image-2.5-flare",
+   "brief": "vrt",
+   "costUsd": 0.00904,
+   "latencyMs": 10887,
+   "file": "vrt--openai__gpt-image-2.5-flare.png"
+  },
+  {
+   "model": "openai/gpt-image-2.5-flare",
+   "brief": "zoom",
+   "costUsd": 0.015075,
+   "latencyMs": 15008,
+   "file": "zoom--openai__gpt-image-2.5-flare.png"
+  },
+  {
+   "model": "openai/gpt-image-2.5-sunburst",
+   "brief": "ja",
+   "costUsd": 0.01489,
+   "latencyMs": 18077,
+   "file": "ja--openai__gpt-image-2.5-sunburst.png"
+  },
+  {
+   "model": "openai/gpt-image-2.5-sunburst",
+   "brief": "vrt",
+   "costUsd": 0.00904,
+   "latencyMs": 16601,
+   "file": "vrt--openai__gpt-image-2.5-sunburst.png"
+  },
+  {
+   "model": "openai/gpt-image-2.5-sunburst",
+   "brief": "zoom",
+   "costUsd": 0.015075,
+   "latencyMs": 20535,
+   "file": "zoom--openai__gpt-image-2.5-sunburst.png"
+  },
+  {
+   "model": "qwen/qwen-image-3-pro",
+   "brief": "ja",
+   "costUsd": 0.04,
+   "latencyMs": 47619,
+   "file": "ja--qwen__qwen-image-3-pro.png"
+  },
+  {
+   "model": "qwen/qwen-image-3-pro",
+   "brief": "vrt",
+   "costUsd": 0.04,
+   "latencyMs": 42828,
+   "file": "vrt--qwen__qwen-image-3-pro.png"
+  },
+  {
+   "model": "qwen/qwen-image-3-pro",
+   "brief": "zoom",
+   "costUsd": 0.04,
+   "latencyMs": 66845,
+   "file": "zoom--qwen__qwen-image-3-pro.png"
+  },
+  {
+   "model": "recraft/recraft-v4.1-vector",
+   "brief": "ja",
+   "costUsd": 0.08,
+   "latencyMs": 9128,
+   "file": "ja--recraft__recraft-v4.1-vector.svg"
+  },
+  {
+   "model": "recraft/recraft-v4.1-vector",
+   "brief": "vrt",
+   "costUsd": 0.08,
+   "latencyMs": 9313,
+   "file": "vrt--recraft__recraft-v4.1-vector.svg"
+  },
+  {
+   "model": "recraft/recraft-v4.1-vector",
+   "brief": "zoom",
+   "costUsd": 0.08,
+   "latencyMs": 8794,
+   "file": "zoom--recraft__recraft-v4.1-vector.svg"
+  },
+  {
+   "model": "sourceful/riverflow-v2.5-pro",
+   "brief": "ja",
+   "costUsd": 0.135172,
+   "latencyMs": 78854,
+   "file": "ja--sourceful__riverflow-v2.5-pro.webp"
+  },
+  {
+   "model": "sourceful/riverflow-v2.5-pro",
+   "brief": "vrt",
+   "costUsd": 0.136359,
+   "latencyMs": 76000,
+   "file": "vrt--sourceful__riverflow-v2.5-pro.webp"
+  },
+  {
+   "model": "sourceful/riverflow-v2.5-pro",
+   "brief": "zoom",
+   "costUsd": 0.136338,
+   "latencyMs": 82020,
+   "file": "zoom--sourceful__riverflow-v2.5-pro.webp"
+  }
+ ],
+ "scores": [
+  {
+   "model": "black-forest-labs/flux.2-pro",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "black-forest-labs/flux.2-pro",
+   "brief": "vrt",
+   "verdict": "fail",
+   "note": "diff in the wrong panel"
+  },
+  {
+   "model": "black-forest-labs/flux.2-pro",
+   "brief": "zoom",
+   "verdict": "partial",
+   "note": "garbled text"
+  },
+  {
+   "model": "bytedance-seed/seedream-4.5",
+   "brief": "ja",
+   "verdict": "fail",
+   "note": "first arrow reversed"
+  },
+  {
+   "model": "bytedance-seed/seedream-4.5",
+   "brief": "vrt",
+   "verdict": "fail",
+   "note": "added a photo, no move"
+  },
+  {
+   "model": "bytedance-seed/seedream-4.5",
+   "brief": "zoom",
+   "verdict": "fail",
+   "note": "zoom empty"
+  },
+  {
+   "model": "bytedance-seed/seedream-5-0-lite",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "bytedance-seed/seedream-5-0-lite",
+   "brief": "vrt",
+   "verdict": "partial",
+   "note": "button not moved"
+  },
+  {
+   "model": "bytedance-seed/seedream-5-0-lite",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "google/gemini-3-pro-image",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "google/gemini-3-pro-image",
+   "brief": "vrt",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "google/gemini-3-pro-image",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "google/gemini-3.1-flash-image",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "google/gemini-3.1-flash-image",
+   "brief": "vrt",
+   "verdict": "partial",
+   "note": "button not moved"
+  },
+  {
+   "model": "google/gemini-3.1-flash-image",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "google/gemini-3.1-flash-lite-image",
+   "brief": "ja",
+   "verdict": "partial",
+   "note": "extra labels"
+  },
+  {
+   "model": "google/gemini-3.1-flash-lite-image",
+   "brief": "vrt",
+   "verdict": "partial",
+   "note": "extra labels"
+  },
+  {
+   "model": "google/gemini-3.1-flash-lite-image",
+   "brief": "zoom",
+   "verdict": "fail",
+   "note": "zoom shows more than the mark"
+  },
+  {
+   "model": "krea/krea-2-medium-turbo",
+   "brief": "ja",
+   "verdict": "fail",
+   "note": "one label of three"
+  },
+  {
+   "model": "krea/krea-2-medium-turbo",
+   "brief": "vrt",
+   "verdict": "fail",
+   "note": "no move"
+  },
+  {
+   "model": "krea/krea-2-medium-turbo",
+   "brief": "zoom",
+   "verdict": "partial",
+   "note": "zoom shows more"
+  },
+  {
+   "model": "meta/muse-image",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "meta/muse-image",
+   "brief": "vrt",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "meta/muse-image",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2",
+   "brief": "vrt",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2.5-flare",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2.5-flare",
+   "brief": "vrt",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2.5-flare",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2.5-sunburst",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2.5-sunburst",
+   "brief": "vrt",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "openai/gpt-image-2.5-sunburst",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "qwen/qwen-image-3-pro",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "qwen/qwen-image-3-pro",
+   "brief": "vrt",
+   "verdict": "partial",
+   "note": "button not moved"
+  },
+  {
+   "model": "qwen/qwen-image-3-pro",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "recraft/recraft-v4.1-vector",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "recraft/recraft-v4.1-vector",
+   "brief": "vrt",
+   "verdict": "partial",
+   "note": "button not moved"
+  },
+  {
+   "model": "recraft/recraft-v4.1-vector",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "sourceful/riverflow-v2.5-pro",
+   "brief": "ja",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "sourceful/riverflow-v2.5-pro",
+   "brief": "vrt",
+   "verdict": "pass",
+   "note": ""
+  },
+  {
+   "model": "sourceful/riverflow-v2.5-pro",
+   "brief": "zoom",
+   "verdict": "pass",
+   "note": ""
+  }
+ ]
+}

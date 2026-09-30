@@ -28,6 +28,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 import { OPENAI_DEFAULT_MODEL } from "../packages/vlmkit-ai/src/llm-client.ts";
+import { IMAGE_GEN_DEFAULT_MODEL } from "../packages/vlmkit-ai/src/image-gen-client.ts";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (path) => readFileSync(join(repoRoot, path), "utf8");
@@ -53,10 +54,11 @@ test("every instruction file names that exact model and no other OpenAI default"
       `${file} must name ${OPENAI_DEFAULT_MODEL} — it is what an OpenAI-based agent is told to set`,
     );
     // Any other `openai/...` id in the same file is a second answer to one question. `:batch` and
-    // the `-pro` variants are real models, so this is about consistency, not about them.
+    // the `-pro` variants are real models, so this is about consistency, not about them. The image
+    // default answers a different question (which model draws a figure) and is pinned below.
     const others = [...text.matchAll(/openai\/[a-z0-9.\-]+(?::batch)?/g)]
       .map((m) => m[0])
-      .filter((id) => id !== OPENAI_DEFAULT_MODEL);
+      .filter((id) => id !== OPENAI_DEFAULT_MODEL && id !== IMAGE_GEN_DEFAULT_MODEL);
     assert.deepEqual(others, [], `${file} names a second OpenAI model: ${others.join(", ")}`);
   }
 });
@@ -78,6 +80,12 @@ test("no LLM instruction sends an agent to the image-generation key or a missing
       `${file} tells an agent to set the image-generation key for the LLM provider`,
     );
   }
+});
+
+test("CLAUDE.md names the image-generation default the code uses", () => {
+  // The id lives in image-gen-client.ts and the saved bench evaluation holds it to full marks
+  // (src/experiments/benchmark/image-gen/score.test.ts); this holds the instructions to the code.
+  assert.ok(read(".claude/CLAUDE.md").includes(IMAGE_GEN_DEFAULT_MODEL));
 });
 
 test("AGENTS.md defers to CLAUDE.md rather than restating it", () => {

@@ -184,6 +184,39 @@ look's 48/58: 10 fixed, 0 broken, p = 0.002**. The whole gain is exact values �
 Cost ~1.4x tokens, ~3x time. So: turn zoom on when the answer is a measurement, not to notice a change.
 No provider model has run it yet.
 
+## Generated figures (raster images)
+
+Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
+code (mermaid, D2, vlmkit-anim), because only a code-drawn figure can be checked against the code.
+Claude has no image generation of its own. What code draws badly (an illustration, a concept picture,
+a page that has to look like a page) is generated: Codex uses its own imagegen; anyone with
+`OPENROUTER_API_KEY` uses `createImageGenClient()` from `@mizchi/vlmkit-ai/image-gen-client.ts`, whose
+default is **`openai/gpt-image-2.5-flare`** (`VLMKIT_IMAGE_MODEL` overrides it).
+
+```bash
+B="node --experimental-strip-types src/experiments/benchmark/image-gen/image-gen-bench.ts"
+$B --list                                   # OpenRouter's Images API catalogue
+$B                                          # re-run every model of the saved evaluation (~$2, OPENROUTER_API_KEY)
+$B openai/gpt-image-2.5-flare meta/muse-image --out test-results/image-gen/new
+$B --report test-results/image-gen/new/evaluation.json --md table.md   # after scoring: validate + rank
+```
+
+The bench asks every model for three briefs with checkable claims (`briefs.ts`: a zoom whose enlarged
+view must match its mark, a VRT diff whose panels must agree, exact Japanese labels with arrows the right
+way). **It has no automatic score** — a run writes `evaluation.json` with every verdict null and one
+contact sheet per brief, and a scorer (a person, or an agent's own vision) fills in pass / partial / fail
+with a note. The saved round is `docs/reports/data/2026-09-30-image-gen/evaluation.json`
+(`docs/reports/2026-09-30-image-gen-model-bench.md`); `score.test.ts` fails when a brief is edited (the
+old verdicts answered a different question: re-run and save a new evaluation) and when the default model
+does not have full marks in it. To change the default: re-run, score, save the new evaluation beside the
+old one, point `SAVED_EVALUATION` at it, then change `IMAGE_GEN_DEFAULT_MODEL`.
+
+Measured 2026-09-30, not to re-learn: nearly every model writes the exact text (13 of 14); what fails is
+the relationship the figure claims — 5 of 14 drew a `current` panel identical to `baseline` and marked a
+move in `diff` anyway. Usage rank is not quality: `seedream-4.5`, third by OpenRouter usage, scored 0/3.
+`meta/muse-image` scored 3/3 at $0.010 but needs the account's 18+ confirmation
+(`openrouter.ai/settings/preferences`), so it is not the default. `recraft/recraft-v4.1-vector` returns SVG.
+
 ## Component-focused VRT (fixing one component with a small image)
 
 ```bash
@@ -776,6 +809,7 @@ VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page -
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
+| `VLMKIT_IMAGE_MODEL` | Image-generation model (any OpenRouter id, or `gpt-image-2` for api.openai.com) | openai/gpt-image-2.5-flare |
 | `DEBUG_VLMKIT` | Enable debug logs | — |
 
 ### Which model to set, by who is asking
@@ -789,8 +823,9 @@ Set your own family's model so a run is reproducible from the transcript. The sa
 - **Codex / any OpenAI-based agent**: `VLMKIT_VLM_MODEL=openai/gpt-5.6-luna` and
   `VLMKIT_LLM_PROVIDER=openrouter VLMKIT_LLM_MODEL=openai/gpt-5.6-luna`.
 
-`openai` is **not** a provider name — there is no `api.openai.com` client and no `OPENAI_API_KEY`
-in this codebase, and the `openai/` in the id is an OpenRouter catalogue prefix. Setting
+`openai` is **not** an LLM provider name — the LLM and VLM clients have no `api.openai.com` route
+(only the image client's bare `gpt-image-2` does, with `OPENAI_API_KEY`), and the `openai/` in the id
+is an OpenRouter catalogue prefix. Setting
 `VLMKIT_LLM_PROVIDER=openai` fails with `INVALID_PROVIDER`; the message now names the route, and
 `OPENAI_DEFAULT_MODEL` in `packages/vlmkit-ai/src/llm-client.ts` is the one place the id is written.
 

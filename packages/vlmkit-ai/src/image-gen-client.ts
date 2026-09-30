@@ -1,5 +1,12 @@
 /**
- * Image generation client (OpenAI gpt-image-2).
+ * Image generation client: OpenRouter's Images API (the default route) or the OpenAI Images API.
+ *
+ * `IMAGE_GEN_DEFAULT_MODEL` is the model the figure bench chose
+ * (`src/experiments/benchmark/image-gen/`, evaluation saved under
+ * `docs/reports/data/2026-09-30-image-gen/`); `VLMKIT_IMAGE_MODEL` overrides it. Any
+ * `vendor/model` id is an OpenRouter model and needs `OPENROUTER_API_KEY`; its cost is the one
+ * OpenRouter reports in `usage.cost`. The two bare ids in the registry (`gpt-image-2`, the dated
+ * snapshot) call `api.openai.com` directly with `OPENAI_API_KEY`.
  *
  * Mirrors the vlm-client / llm-client split: a small registry of known
  * models, pure builders + parsers that can be unit-tested without a network
@@ -25,9 +32,13 @@ export type ImageGenQuality = "low" | "medium" | "high" | "auto";
 export type ImageGenOutputFormat = "png" | "jpeg" | "webp";
 export type ImageGenBackground = "opaque" | "transparent" | "auto";
 
+/** The figure bench's choice: 3/3 on its briefs at the lowest price measured (2026-09-30). */
+export const IMAGE_GEN_DEFAULT_MODEL = "openai/gpt-image-2.5-flare";
+
 export interface ImageGenModel {
   id: string;
-  provider: "openai";
+  /** `openai`: api.openai.com + OPENAI_API_KEY. `openrouter`: openrouter.ai + OPENROUTER_API_KEY. */
+  provider: "openai" | "openrouter";
   /** USD per 1M tokens (matches OpenAI's published pricing table). */
   costPer1MInputTextTokens: number;
   costPer1MInputImageTokens: number;
@@ -41,6 +52,8 @@ export interface ImageGenRequest {
   n?: number;
   outputFormat?: ImageGenOutputFormat;
   background?: ImageGenBackground;
+  /** OpenRouter only (e.g. `16:9`); the OpenAI route takes `size`. */
+  aspectRatio?: string;
 }
 
 export interface ImageGenUsage {
@@ -52,9 +65,20 @@ export interface ImageGenUsage {
 export interface ImageGenResponse {
   model: string;
   images: Uint8Array[];
+  /** One per image when the API names it (`image/png`, `image/svg+xml`, …). */
+  mediaTypes: (string | null)[];
   usage: ImageGenUsage | null;
   costUsd: number;
   latencyMs: number;
+}
+
+export interface OpenRouterImageBody {
+  model: string;
+  prompt: string;
+  n: number;
+  aspect_ratio?: string;
+  quality?: ImageGenQuality;
+  background?: ImageGenBackground;
 }
 
 export interface ImageGenRequestBody {
@@ -100,15 +124,25 @@ export function listImageGenModels(): ImageGenModel[] {
   return IMAGE_GEN_MODELS.map((m) => ({ ...m }));
 }
 
+const OPENROUTER_ID = /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9.:\-]*$/;
+
 export function resolveImageGenModel(id: string): ImageGenModel {
   const hit = IMAGE_GEN_MODELS.find((m) => m.id === id);
-  if (!hit) {
-    throw new VrtConfigError(
-      "INVALID_MODEL",
-      `Unknown image generation model: "${id}". Known: ${IMAGE_GEN_MODELS.map((m) => m.id).join(", ")}`,
-    );
+  if (hit) return { ...hit };
+  // A catalogue id is not listed here: OpenRouter's image catalogue changes weekly, and the price
+  // comes back with every response, so a copy of either would only go stale.
+  if (OPENROUTER_ID.test(id)) {
+    return { id, provider: "openrouter", costPer1MInputTextTokens: 0, costPer1MInputImageTokens: 0, costPer1MOutputImageTokens: 0 };
   }
-  return { ...hit };
+  throw new VrtConfigError(
+    "INVALID_MODEL",
+    `Unknown image generation model: "${id}". Known: ${IMAGE_GEN_MODELS.map((m) => m.id).join(", ")}, or any OpenRouter id (vendor/model)`,
+  );
+}
+
+/** `VLMKIT_IMAGE_MODEL`, else the bench's default. */
+export function defaultImageGenModelId(env: Record<string, string | undefined> = process.env): string {
+  return env.VLMKIT_IMAGE_MODEL?.trim() || IMAGE_GEN_DEFAULT_MODEL;
 }
 
 // ---- Pure builders / parsers ----
@@ -148,9 +182,32 @@ export function buildGenerationBody(model: ImageGenModel, req: ImageGenRequest):
   };
 }
 
+export function buildOpenRouterBody(model: ImageGenModel, req: ImageGenRequest): OpenRouterImageBody {
+  if (!req.prompt || !req.prompt.trim()) {
+    throw new VrtConfigError("INVALID_REQUEST", "image-gen: prompt must be a non-empty string");
+  }
+  const n = req.n ?? 1;
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new VrtConfigError("INVALID_REQUEST", `image-gen: n must be a positive integer, got ${n}`);
+  }
+  // Only what the caller set: each OpenRouter model accepts a different subset of parameters.
+  return {
+    model: model.id,
+    prompt: req.prompt,
+    n,
+    ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
+    ...(req.quality ? { quality: req.quality } : {}),
+    ...(req.background ? { background: req.background } : {}),
+  };
+}
+
 interface RawGenerationResponse {
-  data?: Array<{ b64_json?: string; url?: string }>;
+  data?: Array<{ b64_json?: string; url?: string; media_type?: string }>;
   usage?: {
+    /** OpenRouter: what the call was billed, in USD. */
+    cost?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
     input_tokens?: number;
     output_tokens?: number;
     total_tokens?: number;
@@ -160,24 +217,30 @@ interface RawGenerationResponse {
 
 export interface ParsedGeneration {
   images: Uint8Array[];
+  mediaTypes: (string | null)[];
   usage: ImageGenUsage | null;
+  /** The provider's own figure (OpenRouter `usage.cost`), when it gives one. */
+  reportedCostUsd: number | null;
 }
 
 export function parseGenerationResponse(json: RawGenerationResponse): ParsedGeneration {
   const images: Uint8Array[] = [];
+  const mediaTypes: (string | null)[] = [];
   for (const entry of json.data ?? []) {
     if (!entry || typeof entry.b64_json !== "string") continue;
     images.push(new Uint8Array(Buffer.from(entry.b64_json, "base64")));
+    mediaTypes.push(entry.media_type ?? null);
   }
   const u = json.usage;
   const usage: ImageGenUsage | null = u
     ? {
-        inputTextTokens: u.input_tokens_details?.text_tokens ?? u.input_tokens ?? 0,
+        inputTextTokens: u.input_tokens_details?.text_tokens ?? u.input_tokens ?? u.prompt_tokens ?? 0,
         inputImageTokens: u.input_tokens_details?.image_tokens ?? 0,
-        outputTokens: u.output_tokens ?? 0,
+        outputTokens: u.output_tokens ?? u.completion_tokens ?? 0,
       }
     : null;
-  return { images, usage };
+  const reportedCostUsd = typeof u?.cost === "number" ? u.cost : null;
+  return { images, mediaTypes, usage, reportedCostUsd };
 }
 
 export function estimateImageGenCost(model: ImageGenModel, usage: ImageGenUsage | null): number {
@@ -197,23 +260,28 @@ export interface CreateImageGenClientOptions {
   baseUrl?: string;
 }
 
+/** With no model: `VLMKIT_IMAGE_MODEL`, else `IMAGE_GEN_DEFAULT_MODEL`. */
 export function createImageGenClient(
-  modelOrId: ImageGenModel | string,
+  modelOrId: ImageGenModel | string = defaultImageGenModelId(),
   options?: CreateImageGenClientOptions,
 ): ImageGenClient {
   const model = typeof modelOrId === "string" ? resolveImageGenModel(modelOrId) : modelOrId;
+  const openRouter = model.provider === "openrouter";
+  const keyName = openRouter ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY";
   const throwIfMissing = options?.throwIfMissing ?? true;
-  const apiKey = options?.apiKey ?? process.env.OPENAI_API_KEY;
+  const apiKey = options?.apiKey ?? process.env[keyName];
   if (!apiKey && throwIfMissing) {
-    throw new VrtConfigError("MISSING_KEY", `OPENAI_API_KEY is required for ${model.id}`);
+    throw new VrtConfigError("MISSING_KEY", `${keyName} is required for ${model.id}`);
   }
-  const baseUrl = options?.baseUrl ?? "https://api.openai.com";
+  const baseUrl = options?.baseUrl ?? (openRouter ? "https://openrouter.ai" : "https://api.openai.com");
+  const path = openRouter ? "/api/v1/images" : "/v1/images/generations";
+  const provider = openRouter ? "OpenRouter" : "OpenAI";
   return {
     model,
     async generate(req: ImageGenRequest): Promise<ImageGenResponse> {
-      const body = buildGenerationBody(model, req);
+      const body = openRouter ? buildOpenRouterBody(model, req) : buildGenerationBody(model, req);
       const started = Date.now();
-      const res = await fetch(`${baseUrl}/v1/images/generations`, {
+      const res = await fetch(`${baseUrl}${path}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey ?? ""}`,
@@ -226,7 +294,7 @@ export function createImageGenClient(
       try {
         json = JSON.parse(text);
       } catch {
-        throw new Error(`image-gen: non-JSON response from OpenAI (status ${res.status}): ${text.slice(0, 200)}`);
+        throw new Error(`image-gen: non-JSON response from ${provider} (status ${res.status}): ${text.slice(0, 200)}`);
       }
       if (!res.ok) {
         const message = json.error?.message ?? text.slice(0, 200);
@@ -236,8 +304,9 @@ export function createImageGenClient(
       return {
         model: model.id,
         images: parsed.images,
+        mediaTypes: parsed.mediaTypes,
         usage: parsed.usage,
-        costUsd: estimateImageGenCost(model, parsed.usage),
+        costUsd: parsed.reportedCostUsd ?? estimateImageGenCost(model, parsed.usage),
         latencyMs: Date.now() - started,
       };
     },

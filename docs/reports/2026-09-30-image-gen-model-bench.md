@@ -116,3 +116,24 @@ Contact sheets (each tile is labelled with its model):
 Figures that state structure (dependencies, flows, states, sequences, measurements) are still
 drawn with code: mermaid, D2 or vlmkit-anim. Only code-drawn figures can be checked against the
 code, and a generated image in this round got a spatial relation wrong 5 times in 14.
+
+## Saved, and how to run it again
+
+The round is saved as `docs/reports/data/2026-09-30-image-gen/evaluation.json`: every run (model,
+brief, cost, latency, file name), every verdict with its note, who scored it, and a hash of each brief.
+The briefs and their checks are `src/experiments/benchmark/image-gen/briefs.ts`, and
+`IMAGE_GEN_DEFAULT_MODEL` in `packages/vlmkit-ai/src/image-gen-client.ts` is set to
+`openai/gpt-image-2.5-flare`. Flare is the default over Muse because it is about twice as fast at a
+comparable price and needs no account setting.
+
+```bash
+B="node --experimental-strip-types src/experiments/benchmark/image-gen/image-gen-bench.ts"
+$B                                   # every model above, every brief → test-results/image-gen/<date>/
+$B --report test-results/image-gen/<date>/evaluation.json --md table.md
+```
+
+A run writes the images, `sheet-<brief>.jpg` and an unscored `evaluation.json`. Score each image
+against the brief's checks, record the scorer, then `--report` validates the file and ranks the models.
+`score.test.ts` holds the saved evaluation to the current briefs, so editing a prompt fails the suite
+until a new round is saved. It also holds the default model to full marks in that evaluation.
+

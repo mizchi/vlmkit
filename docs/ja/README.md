@@ -76,8 +76,9 @@ vlmkit api status [--url http://localhost:3456]   # サーバーヘルスチェ�
 | `GEMINI_API_KEY` | Google AI API キー | — |
 | `ANTHROPIC_API_KEY` | Anthropic API キー | — |
 
-`openai` というプロバイダは存在せず、`OPENAI_API_KEY` も使いません。OpenAI のモデルは
-OpenRouter 経由で、id の `openai/` はその接頭辞です。`VLMKIT_LLM_PROVIDER=openai` は
+`openai` という LLM プロバイダは存在しません。OpenAI のモデルは OpenRouter 経由で、id の
+`openai/` はその接頭辞です（`OPENAI_API_KEY` を読むのは画像生成クライアントの `gpt-image-2` 直結経路だけで、
+画像生成の既定は OpenRouter の `openai/gpt-image-2.5-flare`、`VLMKIT_IMAGE_MODEL` で変更できます）。`VLMKIT_LLM_PROVIDER=openai` は
 `INVALID_PROVIDER` になります（エラーメッセージが下の経路を案内します）。
 
 ```sh

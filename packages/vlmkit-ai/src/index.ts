@@ -42,7 +42,10 @@ export {
 // ---- Image generation clients ----
 export {
   buildGenerationBody,
+  buildOpenRouterBody,
   createImageGenClient,
+  defaultImageGenModelId,
+  IMAGE_GEN_DEFAULT_MODEL,
   estimateImageGenCost,
   listImageGenModels,
   parseGenerationResponse,
@@ -58,6 +61,7 @@ export {
   type ImageGenResponse,
   type ImageGenSize,
   type ImageGenUsage,
+  type OpenRouterImageBody,
   type ParsedGeneration,
 } from "./image-gen-client.ts";
 

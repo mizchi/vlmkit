@@ -101,6 +101,7 @@ agent the task routing and the fix-loop discipline (assumes only that
 | `VLMKIT_LLM_PROVIDER` | LLM provider — `gemini` \| `anthropic` \| `openrouter` | gemini |
 | `VLMKIT_LLM_MODEL` | LLM model | provider default (`openrouter`: qwen/qwen3-vl-8b-instruct) |
 | `VLMKIT_VLM_MODEL` | VLM model (OpenRouter id, or `gemini:` / `claude:` for a direct call) | bytedance/ui-tars-1.5-7b |
+| `VLMKIT_IMAGE_MODEL` | Image-generation model (any OpenRouter id, or `gpt-image-2` for api.openai.com) | openai/gpt-image-2.5-flare |
 | `VLMKIT_BASE_URL` | Base URL for workflow capture | — |
 | `VLMKIT_CAPTURE_BACKEND` | Capture backend override | playwright |
 | `VLMKIT_CONFIG_PATH` / `VLMKIT_CONFIG_FILE` | Config path override | — |
@@ -119,8 +120,9 @@ Only the `VLMKIT_*` names are supported. Project state is written below
 ### Reaching an OpenAI model
 
 The LLM client has no `openai` provider: its OpenAI models are served through OpenRouter,
-which is what the `openai/` prefix on the id means. The separate image-generation client uses
-`OPENAI_API_KEY` and the OpenAI Images API. `VLMKIT_LLM_PROVIDER=openai` fails with
+which is what the `openai/` prefix on the id means. The separate image-generation client defaults to
+OpenRouter's Images API (`OPENROUTER_API_KEY`, model `VLMKIT_IMAGE_MODEL`); only its bare `gpt-image-2`
+id uses `OPENAI_API_KEY` and the OpenAI Images API. `VLMKIT_LLM_PROVIDER=openai` fails with
 `INVALID_PROVIDER` — the message names this route.
 
 ```sh

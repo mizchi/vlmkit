@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## Unreleased
+
+- The image-generation client (`createImageGenClient`) now routes through OpenRouter's Images API by
+  default, with `openai/gpt-image-2.5-flare` as its default model (`VLMKIT_IMAGE_MODEL` overrides it).
+  The bare `gpt-image-2` ids still call the OpenAI Images API directly.
+- Add an image-generation bench (`src/experiments/benchmark/image-gen/`): three figure briefs with
+  checkable claims, contact sheets per brief, and a saved, scored evaluation of 14 models.
+
 ## 0.23.0 — 2026-09-30
 
 - Add `vlmkit-anim why` to explain canvas size, layering, container allocation and edge routing.

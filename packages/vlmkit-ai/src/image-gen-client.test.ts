@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   buildGenerationBody,
+  buildOpenRouterBody,
+  createImageGenClient,
+  defaultImageGenModelId,
+  IMAGE_GEN_DEFAULT_MODEL,
   estimateImageGenCost,
   parseGenerationResponse,
   resolveImageGenModel,
@@ -121,5 +125,69 @@ describe("estimateImageGenCost", () => {
     });
     // 100 * 5 + 4000 * 30 = 500 + 120000 = 120500 ; /1e6 = 0.1205
     assert.equal(cost, 0.1205);
+  });
+});
+
+describe("OpenRouter route", () => {
+  it("resolves any vendor/model id as an OpenRouter model, and the default is one", () => {
+    const m = resolveImageGenModel(IMAGE_GEN_DEFAULT_MODEL);
+    assert.equal(m.provider, "openrouter");
+    assert.equal(resolveImageGenModel("recraft/recraft-v4.1-vector").provider, "openrouter");
+    assert.throws(() => resolveImageGenModel("gpt image 2"), /image generation model/i);
+  });
+
+  it("VLMKIT_IMAGE_MODEL overrides the default, and a blank one does not", () => {
+    assert.equal(defaultImageGenModelId({}), IMAGE_GEN_DEFAULT_MODEL);
+    assert.equal(defaultImageGenModelId({ VLMKIT_IMAGE_MODEL: "meta/muse-image" }), "meta/muse-image");
+    assert.equal(defaultImageGenModelId({ VLMKIT_IMAGE_MODEL: "  " }), IMAGE_GEN_DEFAULT_MODEL);
+  });
+
+  it("sends only the parameters the caller set", () => {
+    const m = resolveImageGenModel("meta/muse-image");
+    assert.deepEqual(buildOpenRouterBody(m, { prompt: "x" }), { model: "meta/muse-image", prompt: "x", n: 1 });
+    assert.deepEqual(buildOpenRouterBody(m, { prompt: "x", aspectRatio: "16:9", quality: "high" }), {
+      model: "meta/muse-image", prompt: "x", n: 1, aspect_ratio: "16:9", quality: "high",
+    });
+    assert.throws(() => buildOpenRouterBody(m, { prompt: " " }), /non-empty/);
+  });
+
+  it("takes OpenRouter's billed cost and media type from the response", () => {
+    const parsed = parseGenerationResponse({
+      data: [{ b64_json: Buffer.from("svg").toString("base64"), media_type: "image/svg+xml" }],
+      usage: { cost: 0.08, prompt_tokens: 6, completion_tokens: 4175 },
+    });
+    assert.equal(parsed.reportedCostUsd, 0.08);
+    assert.deepEqual(parsed.mediaTypes, ["image/svg+xml"]);
+    assert.equal(parsed.usage?.outputTokens, 4175);
+  });
+
+  it("posts to /api/v1/images with the OpenRouter key", async () => {
+    const calls: { url: string; auth: string | null; body: unknown }[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url, auth: new Headers(init.headers).get("authorization"), body: JSON.parse(String(init.body)) });
+      return new Response(JSON.stringify({ data: [{ b64_json: "AA==", media_type: "image/png" }], usage: { cost: 0.012 } }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const client = createImageGenClient(undefined, { apiKey: "k", baseUrl: "http://or.test" });
+      const res = await client.generate({ prompt: "p", aspectRatio: "16:9" });
+      assert.equal(client.model.id, defaultImageGenModelId());
+      assert.equal(calls[0].url, "http://or.test/api/v1/images");
+      assert.equal(calls[0].auth, "Bearer k");
+      assert.equal(res.costUsd, 0.012);
+      assert.deepEqual(res.mediaTypes, ["image/png"]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("names the OpenRouter key when it is missing", () => {
+    const saved = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    try {
+      assert.throws(() => createImageGenClient("openai/gpt-image-2"), /OPENROUTER_API_KEY/);
+    } finally {
+      if (saved !== undefined) process.env.OPENROUTER_API_KEY = saved;
+    }
   });
 });

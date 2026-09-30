@@ -35,7 +35,9 @@ export VLMKIT_VLM_MODEL=openai/gpt-5.6-luna
 The LLM client uses OpenRouter for OpenAI models; `openai` is not one of its three provider names
 (`gemini | anthropic | openrouter`), so setting it
 fails with `INVALID_PROVIDER` — which is exactly what happened to the run that produced this file.
-The separate image-generation client calls `api.openai.com` and reads `OPENAI_API_KEY`.
+The separate image-generation client defaults to OpenRouter (`OPENROUTER_API_KEY`); only its bare
+`gpt-image-2` id calls `api.openai.com` with `OPENAI_API_KEY`. A Codex agent generating a figure uses
+its own imagegen — see "Generated figures" in `.claude/CLAUDE.md`.
 **The `openai/` in the model id is an OpenRouter catalogue prefix, not a provider.**
 
 The other spelling that dead-ends is a half-name. Model ids are resolved against the OpenRouter
