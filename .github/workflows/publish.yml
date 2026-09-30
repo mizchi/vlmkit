@@ -1,0 +1,54 @@
+name: Publish to npm
+
+# Publishes every public package on a `v*` tag, through npm Trusted Publishing: npm exchanges this
+# job's OIDC token for a short-lived publish credential, so no npm token secret exists. Each
+# package's trusted publisher on npmjs.com must name this repository and this file
+# (`publish.yml`). Provenance is attached by npm automatically for a trusted publish.
+#
+#   git tag v0.23.0 && git push origin v0.23.0
+#
+# scripts/publish-npm.mjs checks the tag against every package version, packs each package with
+# pnpm (which rewrites `workspace:` ranges), refuses a tarball that still has one, and publishes
+# dependencies first. A version already on npm is skipped, so a failed run can be re-run as is.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@latest && npm --version
+      - run: pnpm install --frozen-lockfile
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - run: pnpm build
+      # The same install-from-tarball check package-install-smoke runs, against what is about to ship.
+      - run: pnpm exec playwright install-deps chromium
+      - run: pnpm smoke:pack:workspaces
+      - run: pnpm smoke:bundled-json
+      - name: Publish
+        run: node scripts/publish-npm.mjs ${{ startsWith(github.ref, 'refs/tags/') && format('--tag {0}', github.ref_name) || '' }}

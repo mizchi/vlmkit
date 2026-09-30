@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## 0.23.0 — 2026-09-23
+## 0.23.0 — 2026-09-30
 
 - Add `vlmkit-anim why` to explain canvas size, layering, container allocation and edge routing.
 - Include the elements responsible for oversized canvases and crossings in `check` diagnostics.

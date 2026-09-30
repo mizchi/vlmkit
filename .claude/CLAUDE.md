@@ -829,6 +829,21 @@ There are **three** publication routes and still only those **two** copies. The 
 
 **Commands invoked from `.github/workflows/` are checked by `tests/workflow-commands.test.mjs`.** Renaming or removing a CLI verb fails that test rather than a 15-minute browser job — or, worse, than nothing at all when the workflow step ends in `|| true`.
 
+## Releasing to npm (`.github/workflows/publish.yml`)
+
+```bash
+node scripts/publish-npm.mjs --dry-run      # pack all 11 public packages, npm publish --dry-run; no credential needed
+git tag v0.23.0 && git push origin v0.23.0  # the release: publish.yml runs the script with --tag
+```
+
+npm **Trusted Publishing** (OIDC): no token exists anywhere, and each package's trusted publisher on
+npmjs.com names this repo and `publish.yml`. The script refuses a tag that is not the packages' one
+version, packs with pnpm (a tarball still holding a `workspace:` range stops the run before the first
+publish) and publishes dependencies first (`judge` → … → the root CLI); a version already on npm is
+skipped, so a failed run is re-run as is. A trusted publisher can only be added to a package that
+exists, so **a new package's first version is published by hand** — `@mizchi/vlmkit-judge` was the
+case at 0.23.0.
+
 ## Documentation Structure
 
 | File | Contents |
