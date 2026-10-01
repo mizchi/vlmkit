@@ -1,6 +1,6 @@
 ---
 name: markup-assist
-description: General-purpose deterministic verification for any HTML/CSS work — no API key, no reference design required, no project setup. Route by task; run the matching vlmkit gate (integrity / copy / layout / breakpoints / scroll / handlers / interactions / verify markup); read the kickback; fix; re-run to green. Use whenever you wrote or edited markup and want to know if it is actually correct — broken-page defects, copy fidelity, responsive boundaries, keyboard operability, design-target match — and then look at the screenshots, because the gates do not see what a page means. Works standalone in any repo via `npx vlmkit`; this is the drop-in generalist skill, distinct from the full-workflow skills (auto-markup / mock-markup / dynamic-markup).
+description: General-purpose deterministic verification for any HTML/CSS work — no API key, no reference design required, no project setup. Route by task; run the matching vlmkit gate (integrity / copy / layout / breakpoints / scroll / handlers / interactions / verify markup); read the kickback; fix; re-run to green. Use whenever you wrote or edited markup and want to know if it is actually correct — broken-page defects, copy fidelity, responsive boundaries, keyboard operability, design-target match, an app with no DOM to read (Flutter web, Android) — and then look at the screenshots, because the gates do not see what a page means. Works standalone in any repo via `npx vlmkit`; this is the drop-in generalist skill, distinct from the full-workflow skills (auto-markup / mock-markup / dynamic-markup).
 metadata:
   internal: true
 ---
@@ -50,6 +50,15 @@ nothing — failing on a suspect is the default.
 | Drag and drop that looks wired but is not (`dragover` without `preventDefault`, `dragstart` transferring nothing) | `vlmkit scan handlers page.html --probe-drag` |
 | A scripted flow reaches its post-conditions | `vlmkit verify flow page.html --flow flow.json` |
 | Can an agent that only sees a screenshot click the right thing? (a control whose own centre routes to an overlay, six rows that all read `Edit`, a target too small at the resolution the model reads) | `vlmkit check grounding page.html` |
+
+**The UI is not the DOM** (Flutter web paints a canvas, an Android app, a game or WebGPU renderer).
+The DOM gates read such a page as empty or every label as 1.00:1, so judge what the platform
+announces and what its pixels show instead:
+
+| Question | Gate |
+|---|---|
+| Is every control named, reachable, legible and big enough? (Flutter web URL, or an Android uiautomator dump + screencap) | `vlmkit scan a11y <url\|ui.xml> --out a11y.json`, then `vlmkit check a11y tree a11y.json` — contrast is read from the frame's pixels, never from the tree |
+| A renderer that can list what it drew (boxes, text, colours) | `--elements elements.json` on `check integrity` · `check copy` · `check color` · `check design` · `check composition` |
 
 **Against a target design:**
 

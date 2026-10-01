@@ -1,6 +1,6 @@
 ---
 name: vlmkit
-description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, Playwright/VRT, or a visual regression — and whenever they ask to explain, walk through, animate, illustrate or diagram how something works, or to draw a module, dependency or architecture map, or a D2 / TALA diagram that shows in the terminal, or slides / a deck / a presentation. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
+description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, design consistency, colour or contrast, accessibility (including an app whose UI is not the DOM: Flutter web, Android, a canvas renderer), Playwright/VRT, or a visual regression — and whenever they ask to explain, walk through, animate, illustrate or diagram how something works, or to draw a module, dependency or architecture map, or a D2 / TALA diagram that shows in the terminal, or slides / a deck / a presentation. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
 ---
 
 # vlmkit — Skill Router and CLI Guide
@@ -93,6 +93,7 @@ second only when the task genuinely crosses boundaries.
 | Task shape | Primary skill | Capability |
 |---|---|---|
 | Edited HTML/CSS; no reference design | `./workflows/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
+| Accessibility of an app whose UI is not the DOM (Flutter web, Android, a game or WebGPU renderer) | `./workflows/markup-assist/SKILL.md` ("The UI is not the DOM") | `scan a11y` → `check a11y tree`, contrast read from the frame's pixels; `--elements` for a renderer that lists what it drew |
 | Raw mock, retina export, or screenshot with no reference HTML | `./workflows/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
 | Target screenshot or UI Contract IR | `./workflows/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
 | Responsive, scroll, interaction, or animation behavior | `./workflows/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
@@ -115,33 +116,66 @@ in the [vlmkit skill catalog](https://github.com/mizchi/vlmkit/tree/main/.claude
 
 ## CLI Commands
 
-All commands run from the **project root**. See `docs/api-design.md` for API design details.
+Every gate below is deterministic: Playwright + DOM / pixel math, no VLM and no
+API key. `vlmkit <group> --help` lists the rest, `vlmkit rules` the rules each
+gate can tune.
 
-### Basic
+### Is the page right? (no reference design)
+
+```bash
+vlmkit check integrity page.html               # Broken-page defects at 3 viewports: JS errors, collisions, clipping, overflow, invisible text
+vlmkit check copy page.html --manifest copy.txt # Required copy present, exactly (--forbid: copy that must not appear, hidden text included)
+vlmkit check layout page.html --contract l.json # A brief's structure per viewport: widths, per-row counts, order
+vlmkit check design page.html                  # Consistency with itself: component styles reused, spacing on its own scale
+vlmkit check composition page.html             # Proximity, alignment rails, declared heading hierarchy
+vlmkit check color page.html                   # Palette by role; field boundaries and links told apart by colour alone
+vlmkit scan style page.html --out snap.json    # One page load for design / composition / color (each takes --from snap.json)
+vlmkit check tokens|theme|motion page.html     # Design-token scale, dark-mode parity, CSS motion
+vlmkit check grounding page.html               # Can an agent acting on a screenshot hit the right target?
+```
+
+### Accessibility
+
+```bash
+vlmkit check a11y contrast|touch|focus page.html     # WCAG AA contrast, target size, focus order / traps
+vlmkit check interactions page.html                  # Keyboard probes → ARIA state transitions
+vlmkit stress i18n|media page.html                   # Long text; forced colours / reduced motion / print / RTL / 200% zoom
+vlmkit scan a11y <url|ui.xml> --out a11y.json        # Flutter web or Android: the platform's tree + its frame
+vlmkit check a11y tree a11y.json                     # Names, reach, pixel contrast, target size, judged from that tree
+```
+
+### Behavior
+
+```bash
+vlmkit check responsive page.html              # Property-based widths per media-query regime, shrunk to the range, breakpoint and declaration
+vlmkit check breakpoints page.html --sweep     # B-1 / B / B+1 per breakpoint, widths in between
+vlmkit check scroll page.html                  # Sticky / fixed / snap actually behave
+vlmkit check animation page.html               # Animations run, settle, respect reduced motion
+vlmkit scan handlers page.html                 # Clickable divs, pointer-only controls, unfireable drag and drop
+vlmkit verify flow page.html --flow flow.json  # A scripted flow reaches its post-conditions
+```
+
+### Against a target, a baseline, or another render
+
+```bash
+vlmkit verify markup attempt.html --target target.png   # One verdict + full kickback
+vlmkit build page|component target.png attempt.html     # Missing / extra / misordered components; converge one crop
+vlmkit scan mock mock@2x.png                            # Normalize a raw mock to a @1x target
+vlmkit check story <story-id>... --gallery <url>        # One component, at component size, against its baseline
+vlmkit diff html a.html b.html                          # Two files or URLs across viewports
+vlmkit diff png a.png b.png --elements-html page.html   # Two screenshots; selector candidates + shift estimates
+vlmkit snapshot <url>...                                # URL → baseline + diff
+vlmkit contract introspect|scaffold|validate ...        # UI Contract IR
+vlmkit heal selector page.html ".broken"                # Selector replacement candidates
+```
+
+## Developing vlmkit itself (source repository only)
+
+The rest of this page is for work inside the `mizchi/vlmkit` repository:
+`pkf run …` tasks and source paths do not exist in a consumer project.
 
 ```bash
 pnpm test                      # Unit tests (all workspace packages)
-vlmkit snapshot <url>...       # URL → baseline + diff
-vlmkit diff html a.html b.html # Compare two HTML files / URLs
-vlmkit diff agent <report>     # Agent-friendly Markdown diff report
-```
-
-### Markup assistance (automatic markup)
-
-All deterministic — no VLM / API key required.
-
-```bash
-vlmkit build component <target.png> <current.html>  # Converge HTML toward a target screenshot
-vlmkit build page <target.png> <current.html>       # Multi-component composition diff (missing/extra/order/gaps)
-vlmkit scan component <screenshot.png>              # Detect + crop components
-vlmkit contract introspect <html|url>               # Existing markup → UI Contract IR
-vlmkit contract scaffold <ui.contract.json>         # UI Contract IR → HTML/CSS scaffold
-vlmkit contract validate <ui.contract.json>         # Validate the IR
-vlmkit check palette <target.png> [current.png]     # Dominant colors / palette diff
-vlmkit check tokens|theme|motion <html>             # Design-system audits
-vlmkit check a11y contrast|touch|focus <html>       # A11y gates
-vlmkit stress i18n|media <html>                     # Overflow / media-variant stress
-vlmkit heal selector <html|url> ".broken"           # Selector replacement candidates
 ```
 
 ### CSS Challenge (detection rate benchmark)
@@ -175,7 +209,7 @@ pkf run vlmkit-demo-multistep     # Multi-step
 
 ## Agent Workflow
 
-### Basic Loop
+### Basic Loop (source repository)
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -285,7 +319,8 @@ This repository is a pnpm workspace. See `.claude/CLAUDE.md` § Package Layout f
 ├── e2e/                       # Screenshot + a11y collection specs
 ├── fixtures/                  # Test fixtures (a11y, migration, wireframe, ...)
 ├── packages/
-│   ├── vlmkit-core/           # Pixel/CSS/DOM/a11y diff engine + shared types
+│   ├── vlmkit-judge/          # Pure judges (snapshot in, findings out); scene and a11y-tree contracts
+│   ├── vlmkit-core/           # Pixel/CSS/DOM/a11y diff engine + shared types, gate plugin runtime
 │   ├── vlmkit-capture/        # Playwright / Crater capture, viewport discovery
 │   ├── vlmkit-ai/             # VLM/LLM clients, 2-stage reasoning pipeline
 │   ├── vlmkit-markup/         # Markup tooling: build/scan component, contract
@@ -293,7 +328,10 @@ This repository is a pnpm workspace. See `.claude/CLAUDE.md` § Package Layout f
 │   │                          #   selector-heal (all deterministic, no VLM)
 │   ├── vlmkit-plan/           # Spec + UI observations → structured test plan
 │   ├── vlmkit-generate/       # Plan → Playwright spec (diagnostics-driven retries)
-│   └── vlmkit-heal/           # Failing-test heal loop (model escalation + budget)
+│   ├── vlmkit-heal/           # Failing-test heal loop (model escalation + budget)
+│   ├── vlmkit-mcp/            # MCP server exposing the gates
+│   ├── vlmkit-anim/           # `vlmkit-anim`: explanatory animations and checked still figures
+│   └── vlmkit-animation-eval/ # Frame-sampled animation evaluator shared with `check animation`
 ├── src/
 │   ├── cli/                   # `vlmkit` CLI entry + router + commands
 │   ├── api/                   # Hono HTTP API server

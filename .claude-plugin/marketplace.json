@@ -11,7 +11,7 @@
       "source": "./skills/vlmkit",
       "strict": false,
       "displayName": "vlmkit",
-      "description": "Automatic frontend quality router. Describe the outcome — implement this mock, check this page, turn these criteria into tests, explain how this works — and it picks one of 17 bundled workflows and runs its deterministic gates to green. No API key: the gates are Playwright + pixel math, and the agent's own vision is the only VLM.",
+      "description": "Automatic frontend quality router. Describe the outcome — implement this mock, check this page, audit its design and colour, check a Flutter or Android app's accessibility, turn these criteria into tests, explain how this works — and it picks one of 17 bundled workflows and runs its deterministic gates to green. No API key: the gates are Playwright + pixel math, and the agent's own vision is the only VLM.",
       "author": { "name": "mizchi", "url": "https://github.com/mizchi" },
       "homepage": "https://mizchi.github.io/vlmkit/",
       "repository": "https://github.com/mizchi/vlmkit",
