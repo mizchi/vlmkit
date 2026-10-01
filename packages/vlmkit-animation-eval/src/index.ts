@@ -12,6 +12,7 @@
  * Needs a browser: `playwright` is a required peer.
  */
 export {
+  clockSettledAt,
   computeOscillation,
   computeSettleMs,
   deriveAnimationIssues,
@@ -21,6 +22,7 @@ export {
   runAnimationEval,
   unionBbox,
 } from "./animation-eval.ts";
+export { VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
 export type {
   AnimationEvalIssue,
   AnimationEvalIssueKind,
@@ -28,9 +30,11 @@ export type {
   AnimationEvalReport,
   AnimationFrameStat,
   AnimationTimingSample,
+  ClockMotion,
   DeriveIssuesInput,
   EvaluatedAnimation,
   FrameDeltaStat,
   OscillationInfo,
   ReducedMotionRemaining,
+  SeekIneffective,
 } from "./animation-eval.ts";

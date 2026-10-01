@@ -155,7 +155,14 @@ Evaluates every authored animation by rendered frames:
   check the brief's duration before "fixing".
 - **`uncontrolled-motion` (warn)** — something moves that WAAPI cannot
   pause (rAF script, video, GIF). If you didn't author it, you probably
-  vendored it; either remove it or mask it in every capture.
+  vendored it; either remove it or mask it in every capture. Re-run with
+  `--virtual-time` first: it holds the page clock (rAF, timers, `Date`) and
+  measures script-driven motion like an animation — where it moves, when it
+  settles, whether it honours reduced motion. What still moves then is video,
+  an animated image or a worker.
+- **`clock-motion-unsettled` (warn, `--virtual-time` only)** — a rAF / timer
+  loop is still changing the page at the end of the window (2s by default,
+  `--clock-window`). Stop the loop when its work is done.
 - **`seek-ineffective` (suspect)** — the gate seeked an animation and either
   the page had cancelled / re-created it (a re-render, `animation` toggled on a
   timer) or seeking back to a sample did not reproduce its frame (a ticker

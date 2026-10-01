@@ -81,11 +81,13 @@ Commands
   html <file> [--out page.html] [--no-autoplay] [--loop] [--title T]
                                   Self-contained page embedding the <vlm-anim> runtime and the timeline.
   runtime [--out vlm-anim.js]     The runtime script alone, for a site that embeds many animations.
-  eval <page.html|url> [--samples N] [--viewport WxH] [--strip strip.png]
+  eval <page.html|url> [--samples N] [--viewport WxH] [--strip strip.png] [--real-clock]
                                   Measure the page's Web Animations frame by frame — visible effect, settle time,
                                   reduced-motion, motion outside the API — with the evaluator vlmkit's
                                   \`check animation\` gate uses (@mizchi/vlmkit-animation-eval + playwright).
-                                  Exit 1 on a suspect finding.
+                                  The page clock is held (\`check animation --virtual-time\`): the runtime's
+                                  master clock is a rAF loop that would overwrite every seek. --real-clock
+                                  measures on the wall clock instead. Exit 1 on a suspect finding.
   still <scene.json> --out <fig.svg|fig.png> [--step N | --at ms] [--full]
                                   One frame as a figure without the caption band, cropped to what is drawn
                                   (--full keeps the canvas) — the end by default: a \`modules\` map, a filled
@@ -295,6 +297,10 @@ export async function runAnimCli(argv: string[]): Promise<number> {
       ...(samples !== undefined ? { samples } : {}),
       ...(viewportMatch ? { viewport: { width: Number(viewportMatch[1]), height: Number(viewportMatch[2]) } } : {}),
       ...(stripPath ? { stripPath } : {}),
+      // Held by default: an autoplaying page's master clock is a rAF loop that sets every
+      // animation's currentTime each frame, so on the wall clock each seek is overwritten and
+      // every animation comes back `seek-ineffective`.
+      virtualTime: !rest.includes("--real-clock"),
     });
     if (json) console.log(JSON.stringify(report, null, 2));
     else console.log(evaluator.formatAnimationEvalReport(report));

@@ -44,7 +44,8 @@ import { composeFilmstrip, scalePngData } from "@mizchi/vlmkit-core/filmstrip.ts
 import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
-import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyHar, settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -148,6 +149,40 @@ export interface SeekIneffective {
   detail: string;
 }
 
+/**
+ * Motion driven by the page's own script — rAF loops, timers, a canvas — sampled by advancing
+ * the virtual clock (`virtual-clock.ts`) with every WAAPI animation held at rest.
+ */
+export interface ClockMotion {
+  /** Virtual-time span sampled, from document start. */
+  windowMs: number;
+  /** The instant of each sample, in ms of virtual time. */
+  times: number[];
+  /** Delta from the previous sample (the first from the t=0 baseline). */
+  frames: FrameDeltaStat[];
+  motionBbox: { x: number; y: number; width: number; height: number } | null;
+  visible: boolean;
+  /**
+   * The last sampled instant whose interval moved pixels; `null` when the final interval still
+   * moved, i.e. the motion had not stopped by the end of the window.
+   */
+  settledAtMs: number | null;
+  /** Exceptions thrown by page callbacks while the clock advanced (they do not stop it). */
+  errors: string[];
+}
+
+/** Pure: the settle instant of a clock sweep — null when its last interval still moved. */
+export function clockSettledAt(times: number[], frames: FrameDeltaStat[], minChangedPixels: number): number | null {
+  let settled = 0;
+  for (let i = 0; i < frames.length; i++) {
+    if (frames[i]!.changedPixels >= minChangedPixels) {
+      if (i === frames.length - 1) return null;
+      settled = times[i]!;
+    }
+  }
+  return settled;
+}
+
 export interface ReducedMotionRemaining {
   selector: string;
   name: string;
@@ -160,7 +195,8 @@ export type AnimationEvalIssueKind =
   | "reduced-motion-ignored"
   | "long-settle"
   | "uncontrolled-motion"
-  | "seek-ineffective";
+  | "seek-ineffective"
+  | "clock-motion-unsettled";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -189,6 +225,10 @@ export interface AnimationEvalReport {
    * video, or GIF — is moving the page on its own.
    */
   uncontrolledMotion?: FrameDeltaStat;
+  /** True when the page clock was held (`--virtual-time`); `uncontrolledMotion` then excludes script-driven motion. */
+  virtualTime?: boolean;
+  /** Script-driven motion sampled on the virtual clock. Present only with `--virtual-time`. */
+  clockMotion?: ClockMotion;
   issues: AnimationEvalIssue[];
   /** Written sample frames (when --frames was passed). */
   framePaths?: string[];
@@ -232,6 +272,14 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   reducedMotionDurationFloorMs?: number;
   /** Skip the reduced-motion emulation pass. */
   skipReducedMotion?: boolean;
+  /**
+   * Hold the page clock (rAF, `performance.now`, `Date`, timers) from document start and drive
+   * it from the evaluator, so script-driven motion is sampled instead of reported as
+   * uncontrolled. See `virtual-clock.ts`.
+   */
+  virtualTime?: boolean;
+  /** Virtual-time span to sample script-driven motion over (default 2000ms). */
+  clockWindowMs?: number;
   /** Write each sampled frame PNG into this directory. */
   framesDir?: string;
   /**
@@ -352,6 +400,8 @@ export interface DeriveIssuesInput {
   infinite: { selector: string; name: string }[];
   reducedMotion?: { remainingCount: number; remaining: ReducedMotionRemaining[] };
   uncontrolledMotion?: FrameDeltaStat;
+  virtualTime?: boolean;
+  clockMotion?: ClockMotion;
 }
 
 export function deriveAnimationIssues(
@@ -412,6 +462,25 @@ export function deriveAnimationIssues(
     });
   }
 
+  const clock = input.clockMotion;
+  if (clock?.visible && clock.settledAtMs === null) {
+    const b = clock.motionBbox!;
+    issues.push({
+      kind: "clock-motion-unsettled",
+      severity: "warn",
+      message: `Script-driven motion at (${b.x},${b.y}) ${b.width}x${b.height} is still changing at ${clock.windowMs}ms of virtual time`
+        + ` — a requestAnimationFrame / timer loop that never stops, so the page never settles.`
+        + ` Stop the loop once its work is done, and check \`matchMedia("(prefers-reduced-motion: reduce)")\` in the script;`
+        + ` if it is meant to run forever, mask the region in captures.`,
+    });
+  } else if (clock?.visible && clock.settledAtMs !== null && clock.settledAtMs > settleThreshold) {
+    issues.push({
+      kind: "long-settle",
+      severity: "warn",
+      message: `Script-driven motion keeps going until ${Math.round(clock.settledAtMs)}ms of virtual time (threshold ${settleThreshold}ms) — captures inside this window are nondeterministic.`,
+    });
+  }
+
   if (input.settleMs !== null && input.settleMs > settleThreshold) {
     issues.push({
       kind: "long-settle",
@@ -426,7 +495,10 @@ export function deriveAnimationIssues(
     issues.push({
       kind: "uncontrolled-motion",
       severity: "warn",
-      message: `The page moved between two back-to-back captures with every WAAPI animation held still (${m.changedPixels}px${where}) — a rAF/JS-driven animation, video, or GIF the Web Animations API cannot enumerate or pause. Per-animation frame deltas overlapping this region may be contaminated (a dead animation can read as visible), the page never settles for VRT, and reduced-motion emulation does not affect it. Mask the region or stub the ticker for capture.`,
+      message: input.virtualTime
+        // With the clock held, script timing is ruled out — what is left is what no clock reaches.
+        ? `The page moved between two back-to-back captures with every WAAPI animation AND the page clock held (${m.changedPixels}px${where}) — video, an animated image, a worker, or something else no page clock drives. Per-animation frame deltas overlapping this region may be contaminated, and the page never settles for VRT. Mask the region for capture.`
+        : `The page moved between two back-to-back captures with every WAAPI animation held still (${m.changedPixels}px${where}) — a rAF/JS-driven animation, video, or GIF the Web Animations API cannot enumerate or pause. Per-animation frame deltas overlapping this region may be contaminated (a dead animation can read as visible), the page never settles for VRT, and reduced-motion emulation does not affect it. Re-run with \`--virtual-time\` to hold rAF / timer-driven motion and measure it; mask what still moves.`,
     });
   }
 
@@ -446,7 +518,10 @@ export function deriveAnimationIssues(
         + `${input.reducedMotion.remaining.length > 4 ? `, and ${input.reducedMotion.remaining.length - 4} more` : ""}`
         + ` — motion is not reduced for users who requested it.`
         + ` Add \`@media (prefers-reduced-motion: reduce)\` and either set \`animation: none\` on them`
-        + ` or shorten each duration below ${durationFloor}ms.`,
+        + ` or shorten each duration below ${durationFloor}ms.`
+        + (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
+          ? ` For the script-driven motion, read \`matchMedia("(prefers-reduced-motion: reduce)")\` and skip or shorten the loop.`
+          : ""),
     });
   }
 
@@ -652,6 +727,53 @@ async function collectAnimations(page: import("playwright").Page): Promise<Anima
   return [...live, ...finished];
 }
 
+async function advanceClock(page: import("playwright").Page, timeMs: number): Promise<void> {
+  await page.evaluate(
+    (t) => (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(t),
+    timeMs,
+  );
+}
+
+/**
+ * Advance the held clock across `windowMs` in `count` steps, capturing after each, starting
+ * from `baseline` (the page at virtual 0). Every WAAPI animation must already be held.
+ */
+async function sampleClock(
+  page: import("playwright").Page,
+  baseline: RgbaFrame,
+  shot: (label: string) => Promise<RgbaFrame>,
+  windowMs: number,
+  count: number,
+  tolerance: number,
+  minChangedPixels: number,
+  label: string,
+): Promise<ClockMotion> {
+  const times = Array.from({ length: count }, (_, i) => Math.round((windowMs * (i + 1)) / count));
+  const frames: FrameDeltaStat[] = [];
+  let previous = baseline;
+  let motionBbox: ClockMotion["motionBbox"] = null;
+  for (const t of times) {
+    await advanceClock(page, t);
+    const frame = await shot(`${label}-${t}ms`);
+    const delta = frameDelta(previous, frame, tolerance);
+    frames.push(delta);
+    if (delta.changedPixels >= minChangedPixels) motionBbox = unionBbox(motionBbox, delta.bbox);
+    previous = frame;
+  }
+  const errors = await page.evaluate(
+    () => [...((window as unknown as { __vlmkitClock: { errors: string[] } }).__vlmkitClock.errors)],
+  );
+  return {
+    windowMs,
+    times,
+    frames,
+    motionBbox,
+    visible: frames.some((f) => f.changedPixels >= minChangedPixels),
+    settledAtMs: clockSettledAt(times, frames, minChangedPixels),
+    errors: errors.slice(0, 5),
+  };
+}
+
 export async function runAnimationEval(options: AnimationEvalOptions): Promise<AnimationEvalReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const samples = Math.max(1, options.samples ?? 4);
@@ -672,12 +794,24 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     // Before anything the document does: an animation with no `fill` mode is
     // removed from `getAnimations()` the moment it finishes, so it has to be
     // caught as it starts. See RECORD_ANIMATION_STARTS_SCRIPT.
+    // The clock first, so nothing the page schedules ever sees a real one.
+    if (options.virtualTime) await p.addInitScript(VIRTUAL_CLOCK_SCRIPT);
     await p.addInitScript(RECORD_ANIMATION_STARTS_SCRIPT);
     if (options.html !== undefined) {
       await p.setContent(options.html, navigationOptions(options));
+    } else if (options.virtualTime) {
+      // Not `navigatePage`: its settle for a relaxed --wait-until also waits for animations
+      // with a cap on the page's own setTimeout, which the held clock never fires (and the
+      // recorder holds every animation, so none would finish). The network-idle and font
+      // halves are kept; the two timer-based ones are switched off.
+      await applyHar(p, options.har);
+      await p.goto(pageUrl!, navigationOptions(options));
+      await settlePage(p, 0, 0);
     } else {
       await navigatePage(p, pageUrl!, options);
     }
+    // Zero-delay work queued during load runs now, at virtual 0, before anything is read.
+    if (options.virtualTime) await advanceClock(p, 0);
   };
 
   return await withBrowser(async (browser) => {
@@ -814,7 +948,18 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         const replay = frameDelta(region(firstSample.frame), region(again), tolerance);
         if (replayReadback) seekIneffective = { reason: "readback", detail: replayReadback };
         else if (replay.changedPixels >= minChangedPixels) {
-          seekIneffective = { reason: "replay", detail: `${replay.changedPixels}px differed at ${Math.round(firstSample.timeMs)}ms` };
+          // One mismatch is not enough. A capture can land before the compositor applies a
+          // seek, so one of the two frames may simply be early: measured on a pure-CSS page
+          // (promo/attempt-haiku-r2, an `alternate infinite` badge) at 2 runs in 30, both
+          // with and without the clock. A race leaves two of the three frames equal; motion
+          // the seek does not control makes all three differ. So: once more, and only three
+          // mutually different frames count.
+          await seek(timing.index, firstSample.timeMs);
+          const third = await shot(`anim-${timing.index}-replay-2`);
+          const differs = (a: RgbaFrame, b: RgbaFrame) => frameDelta(region(a), region(b), tolerance).changedPixels >= minChangedPixels;
+          if (differs(firstSample.frame, third) && differs(again, third)) {
+            seekIneffective = { reason: "replay", detail: `${replay.changedPixels}px differed at ${Math.round(firstSample.timeMs)}ms, and again on a second replay` };
+          }
         }
       }
       await seek(timing.index, restTimeForAnimation(timing));
@@ -829,6 +974,14 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(seekIneffective ? { seekIneffective } : {}),
       });
     }
+    // Script-driven motion, after the WAAPI half so neither contaminates the other: every
+    // WAAPI animation is back at rest, and the clock has not moved since the baseline.
+    const clockWindowMs = options.clockWindowMs ?? 2000;
+    const clockSamples = Math.max(8, samples * 2);
+    const clockMotion = options.virtualTime
+      ? await sampleClock(page, baseline, shot, clockWindowMs, clockSamples, tolerance, minChangedPixels, "clock")
+      : undefined;
+
     let strip: AnimationEvalReport["strip"];
     if (options.stripPath && evaluated.some((a) => a.motionBbox)) {
       // The strip is sampled on ONE shared clock, unlike the per-animation
@@ -1022,12 +1175,21 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     // animations that still run with a non-trivial duration. Duration-zero
     // tricks (`animation-duration: 0.01ms`) count as honored.
     let reducedMotion: AnimationEvalReport["reducedMotion"];
-    if (!options.skipReducedMotion && timings.length > 0) {
+    // Also when the only motion is script-driven: that page has no WAAPI animation to count,
+    // and skipping the pass there would make a rAF loop that ignores the preference pass.
+    if (!options.skipReducedMotion && (timings.length > 0 || clockMotion?.visible)) {
       const durationFloor = options.reducedMotionDurationFloorMs ?? 100;
       const rmPage = await browser.newPage({ viewport });
       await rmPage.emulateMedia({ reducedMotion: "reduce" });
       await loadPage(rmPage);
       const rmTimings = await collectAnimations(rmPage);
+      // Script-driven motion under the same emulation: a rAF loop that ignores the preference
+      // is the same failure as a CSS animation that does, and was invisible before the clock.
+      let rmClock: ClockMotion | undefined;
+      if (options.virtualTime) {
+        const rmShot = async () => pngFromBuffer(await rmPage.screenshot({ animations: "allow" }));
+        rmClock = await sampleClock(rmPage, await rmShot(), rmShot, clockWindowMs, clockSamples, tolerance, minChangedPixels, "rm-clock");
+      }
       await rmPage.close();
       // Not `playState === "running"`. The question here is not "is it moving at
       // this instant" but "did this page run motion for someone who asked for
@@ -1048,6 +1210,17 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       const remaining = rmTimings
         .filter((t) => t.playState !== "paused" && t.playState !== "idle" && t.durationMs >= durationFloor)
         .map((t) => ({ selector: t.selector, name: t.name, durationMs: t.durationMs }));
+      if (rmClock?.visible && rmClock.motionBbox) {
+        const b = rmClock.motionBbox;
+        const lasted = rmClock.settledAtMs ?? rmClock.windowMs;
+        if (lasted >= durationFloor) {
+          remaining.push({
+            selector: `(script-driven motion at ${b.x},${b.y} ${b.width}x${b.height})`,
+            name: "requestAnimationFrame / timers",
+            durationMs: lasted,
+          });
+        }
+      }
       reducedMotion = { remainingCount: remaining.length, remaining };
     }
 
@@ -1058,6 +1231,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         infinite,
         ...(reducedMotion ? { reducedMotion } : {}),
         ...(uncontrolledMotion ? { uncontrolledMotion } : {}),
+        ...(options.virtualTime ? { virtualTime: true } : {}),
+        ...(clockMotion ? { clockMotion } : {}),
       },
       {
         settleThresholdMs: options.settleThresholdMs,
@@ -1074,6 +1249,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       infinite,
       ...(reducedMotion ? { reducedMotion } : {}),
       ...(uncontrolledMotion ? { uncontrolledMotion } : {}),
+      ...(options.virtualTime ? { virtualTime: true } : {}),
+      ...(clockMotion ? { clockMotion } : {}),
       issues,
       ...(framePaths.length > 0 ? { framePaths } : {}),
       ...(strip ? { strip } : {}),
@@ -1085,7 +1262,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   const lines: string[] = [];
   const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check animation${RESET}`);
-  lines.push(`${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${RESET}`);
+  lines.push(`${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${report.virtualTime ? ", page clock held (--virtual-time)" : ""}${RESET}`);
   lines.push("");
   lines.push(`status: ${status}`);
   lines.push(`animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`);
@@ -1123,6 +1300,18 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     const m = report.uncontrolledMotion;
     const where = m.bbox ? ` at (${m.bbox.x},${m.bbox.y}) ${m.bbox.width}x${m.bbox.height}` : "";
     lines.push(`uncontrolled motion: ${m.changedPixels}px${where} (rAF / video / GIF — frame deltas may be contaminated)${ruleTag("uncontrolled-motion")}`);
+  }
+  if (report.clockMotion) {
+    const c = report.clockMotion;
+    const where = c.motionBbox ? ` at (${c.motionBbox.x},${c.motionBbox.y}) ${c.motionBbox.width}x${c.motionBbox.height}` : "";
+    lines.push(
+      !c.visible
+        ? `script-driven motion: none in ${c.windowMs}ms of virtual time`
+        : c.settledAtMs === null
+          ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
+          : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
+    );
+    if (c.errors.length > 0) lines.push(`${DIM}  page callbacks threw while the clock advanced: ${c.errors.join(" | ")}${RESET}`);
   }
   if (report.evaluated.length > 0) {
     lines.push("");

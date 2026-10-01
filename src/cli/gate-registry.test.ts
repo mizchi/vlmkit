@@ -231,8 +231,11 @@ describe("composed built-in registry", () => {
     // 208 → 209: `check animation` / `seek-ineffective` (suspect) — frames are only evidence
     //       about an animation when seeking it is what changed them. A page re-creating its
     //       element every 100ms read as `visible` before; the pixels were its own re-render.
+    // 209 → 210: `check animation` / `clock-motion-unsettled` (warn), with `--virtual-time`:
+    //       the page clock held and driven by the gate, so a rAF / timer loop that never
+    //       stops is measured as one instead of being `uncontrolled-motion`.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 209);
+    assert.equal(total, 210);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

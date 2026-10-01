@@ -36,7 +36,15 @@ and plays in a browser or a GitHub comment. Needs no extra dependency.
 
 \`--strip out.png\` (or \`.webp\`) writes the sampled frames as ONE image, a row per
 animation, cropped to the motion each one produced — the form to paste into a
-review. \`--frames dir\` writes them as separate files instead.`,
+review. \`--frames dir\` writes them as separate files instead.
+
+\`--virtual-time\` holds the page clock — requestAnimationFrame, performance.now,
+Date, setTimeout, setInterval — from document start and advances it itself, so
+script-driven motion (a rAF loop, a GSAP ticker, a canvas, a timer carousel) is
+sampled like an animation instead of reported as \`uncontrolled-motion\`, and
+stops contaminating the WAAPI frames. What still moves with the clock held is
+video, an animated image or a worker. A page can also draw on demand: it gets a
+\`vlmkit:seek\` event with \`detail.timeMs\` and \`detail.waitUntil(promise)\`.`,
   rules: [
     {
       id: "no-visible-effect",
@@ -63,6 +71,12 @@ review. \`--frames dir\` writes them as separate files instead.`,
       severity: "suspect",
       docs: "The page cancelled or replaced the animation, or replaying a sample did not reproduce its frame — its pixels are not a measurement of it, so it is reported neither visible nor dead.",
     },
+    {
+      id: "clock-motion-unsettled",
+      title: "Script-driven motion still changing at the end of the virtual-time window",
+      severity: "warn",
+      docs: "Only with --virtual-time: a requestAnimationFrame / timer loop that never stops, measured on the held page clock.",
+    },
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
@@ -81,10 +95,16 @@ review. \`--frames dir\` writes them as separate files instead.`,
     },
     { name: "settle-threshold", placeholder: "ms", kind: "number", description: "long-settle threshold", defaultDescription: "3000" },
     { name: "skip-reduced-motion", kind: "boolean", description: "Skip the reduced-motion emulation pass" },
+    {
+      name: "virtual-time",
+      kind: "boolean",
+      description: "Hold the page clock (rAF, performance.now, Date, timers) and drive it, so script-driven motion is measured instead of reported as uncontrolled",
+    },
+    { name: "clock-window", placeholder: "ms", kind: "number", description: "Virtual-time span to sample script-driven motion over (--virtual-time)", defaultDescription: "2000" },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames", "--strip", "--strip-max-width", "--strip-window", "--strip-selector"]);
+    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames", "--strip", "--strip-max-width", "--strip-window", "--strip-selector", "--clock-window"]);
     const samples = optionalInt(argv, "samples", { min: 1 });
     const maxAnimations = optionalInt(argv, "max-animations", { min: 1 });
     const settleThresholdMs = optionalInt(argv, "settle-threshold", { min: 0 });
@@ -94,6 +114,8 @@ review. \`--frames dir\` writes them as separate files instead.`,
     const stripWindowMs = optionalInt(argv, "strip-window", { min: 1 });
     const stripSelector = readFlag(argv, "strip-selector");
     const stripAnimated = hasFlag(argv, "strip-animated");
+    const virtualTime = hasFlag(argv, "virtual-time");
+    const clockWindowMs = optionalInt(argv, "clock-window", { min: 1 });
     const viewport = viewportFlag(argv);
     return {
       source,
@@ -104,6 +126,8 @@ review. \`--frames dir\` writes them as separate files instead.`,
       ...(framesDir ? { framesDir } : {}),
       ...(stripPath ? { stripPath } : {}),
       ...(stripAnimated ? { stripAnimated } : {}),
+      ...(virtualTime ? { virtualTime } : {}),
+      ...(clockWindowMs !== undefined ? { clockWindowMs } : {}),
       ...(stripMaxWidth !== undefined ? { stripMaxWidth } : {}),
       ...(stripWindowMs !== undefined ? { stripWindowMs } : {}),
       ...(stripSelector ? { stripSelector } : {}),

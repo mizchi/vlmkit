@@ -1338,6 +1338,9 @@ animation page.html` evaluates it like any other page (visible effect, settle
 time, reduced-motion honoured). `vlmkit-anim eval page.html` runs the same
 evaluator without installing vlmkit: it needs the one package that holds the
 measurement (`@mizchi/vlmkit-animation-eval`) plus `playwright`, both optional
-peers of `vlmkit-anim`. Expect an `uncontrolled-motion` warning on an
-autoplaying page — the runtime's master clock is a rAF loop the Web Animations
-API cannot pause — and none with `html --no-autoplay`.
+peers of `vlmkit-anim`. On an autoplaying page the runtime's master clock is a
+rAF loop that sets every animation's time each frame, so on the wall clock it
+overwrites the gate's seeks: `check animation` reports `uncontrolled-motion`
+and `seek-ineffective` for each animation. Hold the clock with
+`vlmkit check animation page.html --virtual-time` — `vlmkit-anim eval` does by
+default (`--real-clock` turns it off) — or emit with `html --no-autoplay`.

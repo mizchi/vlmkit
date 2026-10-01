@@ -185,11 +185,24 @@ describe("vlmkit check animation on an embedded page", () => {
     const tl = compileScene(EXAMPLES.vector);
     const file = join(dir, "vector.html");
     writeFileSync(file, renderEmbedHtml(tl, { autoplay: true }));
-    const report = await runAnimationEval({ source: file, viewport: { width: 600, height: 400 }, samples: 4, maxAnimations: 8 });
+    // The page clock held, as `vlmkit-anim eval` does: the runtime's master clock is a rAF loop
+    // that rewrites every animation's currentTime each frame, so on the wall clock each seek is
+    // overwritten and the gate (rightly) reports every animation `seek-ineffective`.
+    const report = await runAnimationEval({ source: file, viewport: { width: 600, height: 400 }, samples: 4, maxAnimations: 8, virtualTime: true });
     assert.ok(report.animationCount > 0, "gate found no animations");
     assert.ok(report.evaluated.length > 0, "gate evaluated no animation frame by frame");
     const suspects = report.issues.filter((f) => f.severity === "suspect");
     assert.deepEqual(suspects.map((f) => f.kind), [], JSON.stringify(report.issues, null, 2));
     assert.equal(report.reducedMotion?.remainingCount ?? 0, 0, "motion still running under prefers-reduced-motion");
+    assert.equal(report.uncontrolledMotion, undefined, "with the clock held, the master clock no longer moves the page on its own");
+    assert.ok(report.clockMotion?.settledAtMs !== null, "an autoplaying scene ends, so its clock-driven motion settles");
+  }, 120_000);
+
+  it("on the wall clock the master clock overwrites every seek, and the gate says so", async () => {
+    const tl = compileScene(EXAMPLES.vector);
+    const file = join(dir, "vector-real.html");
+    writeFileSync(file, renderEmbedHtml(tl, { autoplay: true }));
+    const report = await runAnimationEval({ source: file, viewport: { width: 600, height: 400 }, samples: 4, maxAnimations: 8, skipReducedMotion: true });
+    assert.ok(report.issues.some((f) => f.kind === "seek-ineffective"), JSON.stringify(report.issues.map((f) => f.kind)));
   }, 120_000);
 });
