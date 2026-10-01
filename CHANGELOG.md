@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.23.1 — 2026-10-01
+
+- Route image generation through OpenRouter's Images API in `@mizchi/vlmkit-ai`'s `createImageGenClient()`:
+  any `vendor/model` id runs there with `OPENROUTER_API_KEY`, the default is `openai/gpt-image-2.5-flare`
+  (`IMAGE_GEN_DEFAULT_MODEL`, overridden by `VLMKIT_IMAGE_MODEL`), and requests take `aspectRatio` and
+  `inputReferences`. A bare `gpt-image-2` still goes to api.openai.com.
+- Add a re-runnable image-generation model bench with the 2026-09-30 evaluation of 14 models saved beside it
+  (`docs/reports/2026-09-30-image-gen-model-bench.md`).
+- The agent skill's router (and the Claude Code plugin) now routes accessibility for apps whose UI is not the
+  DOM — Flutter web, Android, canvas renderers — to `scan a11y` → `check a11y tree`, and lists the 0.23 gates
+  (`check design`, `check composition`, `check color`, `check responsive`, `check grounding`, `scan style`).
+- The `spec-to-playwright` CI templates run in `mcr.microsoft.com/playwright:v1.63.0-noble`.
+
 ## 0.23.0 — 2026-09-30
 
 - Add `vlmkit-anim why` to explain canvas size, layering, container allocation and edge routing.
