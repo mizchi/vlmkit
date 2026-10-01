@@ -43,7 +43,10 @@ jobs:
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
-      - run: pnpm exec playwright install-deps chromium
+      # The browser itself, not only its system libraries: smoke:bundled-json runs a real gate.
+      # `install-deps` alone passed while the runner image happened to carry the pinned build, and
+      # stopped with "no chromium browser executable installed" on the bump to 1.63 (build 1243).
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm smoke:pack:workspaces
       - run: pnpm smoke:pack:markup-loop
       # The bundled CLI's route to MoonBit is a global set by
