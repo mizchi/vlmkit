@@ -268,6 +268,48 @@ is how Playwright's own `mount` fixture works. Consequences:
   `components/Button/Primary` get separate baselines. List the canonical spelling
   in `vlmkit.gates.json`.
 
+## Motion: the page clock held (`check animation --virtual-time`, `check integrity --timeline`)
+
+```bash
+vlmkit check animation page.html --virtual-time        # rAF / GSAP / canvas / timer motion measured, not "uncontrolled"
+vlmkit check integrity page.html --timeline            # layout judged at instants of the page's motion
+vlmkit check integrity page.html --timeline-at 0,250,500
+```
+
+Three ideas from HyperFrames (heygen-com/hyperframes), adapted. `virtual-clock.ts` in
+`@mizchi/vlmkit-animation-eval` holds `requestAnimationFrame`, `performance.now`, `Date`,
+`setTimeout` and `setInterval` at virtual 0 from document start and only the evaluator advances it,
+one 60fps frame at a time with timers in order; `HOLD_TIMELINE_SCRIPT` pauses every animation as it
+begins and seeks them all to one page time. `--timeline` runs integrity's layout judges at each
+instant and tiers by persistence (`tierByPersistence`, `@mizchi/vlmkit-judge/persistence.ts`).
+`seek-ineffective` (suspect) says when an animation's frames do not measure it. Measured building
+them, not to re-learn:
+
+- **A replay mismatch is not enough.** A capture can land before the compositor applies a seek: one
+  replay flagged a pure-CSS `alternate infinite` badge in 2 runs of 30. Only three mutually
+  different frames count (0 of 50 after; a rAF ticker over the element still fires every run).
+- **`vlmkit-anim`'s runtime needs the clock.** Its master clock is a rAF loop that rewrites every
+  animation's `currentTime` each frame, so on the wall clock every seek is overwritten and every
+  animation is `seek-ineffective` — correctly. `vlmkit-anim eval` holds the clock by default.
+- **Mid-motion contrast is judged at full opacity only.** Without that, six of the eight
+  dogfood-animation pages flipped to `defects` on their entrance fades; a fade at 40% is the
+  animation. Text at full opacity whose background has not arrived is still held (`background-late.html`).
+- **Held needs time as well as samples:** two consecutive instants AND ≥200ms. Instants from
+  animation boundaries bunch up, and a solitaire card crossing its neighbour for 10ms of the deal
+  read as held.
+- **"Absent once it stops" is a separate rest instant**, past every finite animation's end and 2s —
+  never the last instant asked for (`--timeline-at 0,250,500` ends mid-motion). It also replaces the
+  wall-clock settled sweep as "rest": that sweep caught a rAF card mid-motion and called it resting.
+- **Load with the clock held must not wait on page timers.** `settlePage`'s animation wait races a
+  page `setTimeout` that never fires; both paths call `settlePage(page, 0, 0)`.
+- The contrast collector resolves background from **ancestors only**: white text over a dark
+  *sibling* reads as invisible at rest, with or without the timeline.
+
+Fixtures: `fixtures/integrity-timeline/` (held, transient, clean, at-rest, script, fade-in,
+background-late). On the 21 animated pages of the repo `--timeline` changes no verdict and adds no
+held finding (8 transient glimpses, 7 of them the solitaire deal). Round:
+`docs/reports/2026-10-01-hyperframes-motion-v1.md`.
+
 ## Responsive layout as a property-based test (`check responsive`)
 
 ```bash

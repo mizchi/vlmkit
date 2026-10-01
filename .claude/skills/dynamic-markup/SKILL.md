@@ -160,6 +160,11 @@ Evaluates every authored animation by rendered frames:
   measures script-driven motion like an animation — where it moves, when it
   settles, whether it honours reduced motion. What still moves then is video,
   an animated image or a worker.
+- **Defects that exist only mid-motion** are `check integrity`'s, not this
+  gate's: `vlmkit check integrity page.html --timeline` judges the layout at
+  instants of the entrance with the clock and animations held. A finding held
+  across instants (≥200ms) keeps its severity; a one-instant glimpse is info;
+  text mid-fade is not judged for contrast.
 - **`clock-motion-unsettled` (warn, `--virtual-time` only)** — a rAF / timer
   loop is still changing the page at the end of the window (2s by default,
   `--clock-window`). Stop the loop when its work is done.

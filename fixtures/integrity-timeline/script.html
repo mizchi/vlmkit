@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Script-driven card over the label</title>
+<style>
+  body { margin: 0; font: 16px/1.4 system-ui, sans-serif; color: #1f2328; background: #fff; }
+  main { position: relative; height: 320px; padding: 24px; }
+  .label { position: absolute; left: 360px; top: 60px; margin: 0; font-size: 18px; }
+  .card { position: absolute; left: 24px; top: 40px; width: 220px; height: 80px; padding: 12px; box-sizing: border-box;
+          background: #2255cc; color: #fff; border-radius: 8px; }
+</style></head>
+<body><main>
+  <p class="label">Shipping estimate: 3 days</p>
+  <div class="card">Order summary</div>
+</main>
+<script>
+  const card = document.querySelector(".card");
+  const t0 = performance.now();
+  (function loop(now) {
+    const t = now - t0;
+    const x = t < 300 ? (t / 300) * 330 : t < 900 ? 330 : Math.min(720, 330 + ((t - 900) / 300) * 390);
+    card.style.transform = "translateX(" + x + "px)";
+    if (t < 1200) requestAnimationFrame(loop);
+  })(t0);
+</script></body></html>

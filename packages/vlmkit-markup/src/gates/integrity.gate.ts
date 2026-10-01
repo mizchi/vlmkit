@@ -52,6 +52,16 @@ clipped text, collapsed containers, page overflow, and unstyled pages —
 swept across multiple viewports. Deterministic (DOM + pixels, no VLM);
 intentional-pattern exemptions are reported, not silently dropped.
 
+--timeline also judges the page across its motion: the page clock (rAF, timers,
+Date) and every animation are held, and at each instant of page time the layout
+judges run on what is there — text collision, clipping, protrusion, occlusion,
+invisible / low-contrast text, collapse, overflow. A finding the settled page
+also has is left to the ordinary run. One HELD across consecutive instants is
+reported at its rule's severity ("While the page moves ..."); one seen at a
+single instant is listed as transient and carries no weight. Instants default to
+each animation's start, middle and end plus 0/250/500/1000/2000ms;
+--timeline-at 0,150,300 names them.
+
 ${ALLOW_HELP}`,
   rules: [
     { id: "js-error", title: "Uncaught JS error", severity: "suspect", docs: "Construction-phase errors mean the page never finished building." },
@@ -101,6 +111,8 @@ ${ALLOW_HELP}`,
       description: "Playwright storage state, to measure pages behind a login (or set VLMKIT_STORAGE_STATE)",
     },
     { name: "allow", kind: "string", description: "Exempt an intentional pattern (see below)", repeatable: true },
+    { name: "timeline", kind: "boolean", description: "Also judge layout across the page's motion (clock and animations held), tiered by persistence" },
+    { name: "timeline-at", placeholder: "ms,ms,...", kind: "number-list", description: "The instants of page time --timeline judges at", defaultDescription: "each animation's start/middle/end + 0,250,500,1000,2000" },
     // Spread, not re-declared. Hand-written copies of these three drifted from the
     // fragment: v5's CI agent found the `--wait-until` hint present on `check copy`
     // and `check breakpoints` and absent here — "and integrity is the gate you reach
@@ -147,6 +159,11 @@ ${ALLOW_HELP}`,
     // Parsed before the browser starts, so a typo in an exemption fails in
     // milliseconds instead of after a three-viewport sweep.
     const allow = parseAllowRules(readAll(argv, "allow"));
+    const timelineAt = numberList(argv, "timeline-at");
+    if (timelineAt && timelineAt.some((t) => t < 0 || !Number.isFinite(t))) {
+      throw new UsageError("--timeline-at takes instants in ms of page time, e.g. --timeline-at 0,150,300");
+    }
+    const timeline = argv.includes("--timeline") || (timelineAt !== undefined && timelineAt.length > 0);
     return {
       source,
       ...(widths && widths.length > 0
@@ -158,22 +175,34 @@ ${ALLOW_HELP}`,
       ...(storageState ? { storageState } : {}),
       ...(har ? { har } : {}),
       ...(allow.length > 0 ? { allow } : {}),
+      ...(timeline ? { timeline: timelineAt && timelineAt.length > 0 ? { at: timelineAt } : {} } : {}),
     };
   },
   run: (options) => (options.imageMode
     ? runImageIntegrityCheck(options.imageMode)
     : runIntegrityCheck(options)),
-  findings: (report): Finding[] =>
-    report.findings.map((finding) => ({
+  findings: (report): Finding[] => [
+    ...report.findings.map((finding) => ({
       rule: finding.kind,
       // The one severity translation in the codebase: integrity says "fail"
       // where every other gate says "suspect".
-      severity: finding.severity === "fail" ? "suspect" : "warn",
+      severity: finding.severity === "fail" ? "suspect" as const : "warn" as const,
       message: finding.message,
       ...(finding.selector ? { selector: finding.selector } : {}),
       viewport: finding.viewport,
       ...(finding.evidence ? { evidence: finding.evidence } : {}),
     })),
+    // A glimpse mid-motion: in the findings so --json and the ledger see it, at `info`, which
+    // never affects a verdict.
+    ...(report.timeline?.transient ?? []).map(({ finding, seenAtMs, run }) => ({
+      rule: finding.kind,
+      severity: "info" as const,
+      message: `Only at ${seenAtMs.join("/")}ms of page time (transient): ${finding.message}`,
+      ...(finding.selector ? { selector: finding.selector } : {}),
+      viewport: finding.viewport,
+      evidence: { ...(finding.evidence ?? {}), timeline: { seenAtMs, run } },
+    })),
+  ],
   format: formatIntegrityReport,
   headline: (report) => {
     const fails = report.findings.filter((f) => f.severity === "fail").length;

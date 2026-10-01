@@ -22,7 +22,7 @@ export {
   runAnimationEval,
   unionBbox,
 } from "./animation-eval.ts";
-export { VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
+export { HOLD_TIMELINE_SCRIPT, VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
 export type {
   AnimationEvalIssue,
   AnimationEvalIssueKind,

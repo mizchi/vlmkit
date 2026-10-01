@@ -114,6 +114,30 @@ export interface IntegrityReport {
   viewports: IntegrityViewportStats[];
   /** Paste-ready fix list, one line per fail/warn, selector-attributed. */
   kickback: string[];
+  /** Present with `--timeline` / `--timeline-at`: the layout judges run across the page's motion. */
+  timeline?: IntegrityTimeline;
+}
+
+/**
+ * `check integrity --timeline`: the layout judges run at instants of the page's own motion,
+ * with every animation and the page clock held at each one. Findings the settled page also
+ * has are left to the ordinary run; the rest are tiered by persistence
+ * (`tierByPersistence`): a `held` one is in `findings` like any other, at its rule's
+ * severity, with `evidence.timeline`; a `transient` one is listed here and carries no weight.
+ */
+export interface IntegrityTimeline {
+  /** The instants judged at each width, in ms of page time. */
+  instants: { viewport: number; atMs: number[] }[];
+  /** How many held findings were added to `findings`. */
+  held: number;
+  /** Seen at no two consecutive instants: a glimpse no user dwells on. */
+  transient: IntegrityTimelineRow[];
+}
+
+export interface IntegrityTimelineRow {
+  finding: IntegrityFinding;
+  seenAtMs: number[];
+  run: { fromMs: number; toMs: number; samples: number };
 }
 
 // ---------------------------------------------------------------------------

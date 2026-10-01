@@ -131,3 +131,60 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
     pending: () => ({ timers: timers.size, frames: rafQueue.length }),
   };
 })()`;
+
+/**
+ * Every animation held from the instant it begins, with that instant recorded, so the whole
+ * page can be put at one moment of its timeline: `window.__vlmkitSeekTimeline(t)` seeks every
+ * held animation to `t - startAt`, and `__vlmkitTimelineAnimations()` lists what is held for
+ * picking instants. Used by `check integrity --timeline` together with `VIRTUAL_CLOCK_SCRIPT`,
+ * which holds the script half of the same moment.
+ *
+ * `startAt` is read off the virtual clock when one is installed (the page time a script that
+ * started the animation saw), else `performance.now()`. CSS animations and transitions run on
+ * `document.timeline`, which is real time: one that starts at load is caught at `transitionrun`
+ * / `animationstart` with the page clock still at 0, and its own `currentTime` already counts
+ * its delay, so `t - 0` is right. One a script starts later is caught when the browser next
+ * renders, which can be after the virtual clock has moved on — its `startAt` is then late by up
+ * to the advance that started it. That bound is the honest limit of seeking CSS by page time.
+ */
+export const HOLD_TIMELINE_SCRIPT = `(() => {
+  if (window.__vlmkitTimeline) return;
+  const held = [];
+  window.__vlmkitTimeline = held;
+  const clockNow = () => (window.__vlmkitClock ? window.__vlmkitClock.now() : performance.now());
+  const hold = (anim) => {
+    if (!anim || held.some((h) => h.anim === anim)) return;
+    held.push({ anim, startAt: clockNow() });
+    try { anim.pause(); } catch {}
+  };
+  const onStart = (event) => {
+    const target = event.target;
+    if (!target || !target.getAnimations) return;
+    for (const anim of target.getAnimations()) hold(anim);
+  };
+  document.addEventListener("animationstart", onStart, true);
+  document.addEventListener("transitionrun", onStart, true);
+  const nativeAnimate = Element.prototype.animate;
+  Element.prototype.animate = function (...args) {
+    const anim = nativeAnimate.apply(this, args);
+    hold(anim);
+    return anim;
+  };
+  window.__vlmkitSeekTimeline = (t) => {
+    // Late arrivals first: anything running that the events missed (an animation already in
+    // its active phase when the listeners attached) is held at the instant it is found.
+    if (document.getAnimations) for (const anim of document.getAnimations()) hold(anim);
+    for (const h of held) {
+      try { h.anim.currentTime = Math.max(0, t - h.startAt); } catch {}
+    }
+  };
+  window.__vlmkitTimelineAnimations = () => held.map((h) => {
+    let timing = {};
+    try { timing = h.anim.effect && h.anim.effect.getComputedTiming ? h.anim.effect.getComputedTiming() : {}; } catch {}
+    return {
+      startMs: h.startAt + (timing.delay || 0),
+      durationMs: typeof timing.duration === "number" ? timing.duration : 0,
+      iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
+    };
+  });
+})()`;

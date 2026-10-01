@@ -25,6 +25,8 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
 import { analyzeScrollSamples, COLLECT_SCROLL_SCRIPT, type ScrollScanInput } from "./scroll-scan.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { tierByPersistence } from "@mizchi/vlmkit-judge/persistence.ts";
+import { sampleIntegrityTimeline } from "./integrity-timeline.ts";
 import {
   classifyRuntimeEvents,
   classifyRuntimeParty,
@@ -49,6 +51,8 @@ import {
   type IntegrityExemption,
   type IntegrityFinding,
   type IntegrityReport,
+  type IntegrityTimeline,
+  type IntegrityTimelineRow,
   type IntegrityTextBlock,
   type IntegrityViewportStats,
   type NetworkFailure,
@@ -656,6 +660,11 @@ export interface IntegrityOptions {
    * into `exempted` with the caller's reason; see integrity-exemption.ts.
    */
   allow?: readonly IntegrityAllowRule[];
+  /**
+   * Also judge the page across its motion (`integrity-timeline.ts`): at `at` (ms of page time)
+   * or, when that is empty, at each animation's start / middle / end plus a coarse grid.
+   */
+  timeline?: { at?: readonly number[] };
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -685,6 +694,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
   const stats: IntegrityViewportStats[] = [];
+  const timelineInstants: IntegrityTimeline["instants"] = [];
+  const timelineTransient: IntegrityTimelineRow[] = [];
+  let timelineHeld = 0;
   // key -> the retained finding, so a repeat at a narrower width records its
   // width instead of being dropped without trace.
   const seen = new Map<string, IntegrityFinding>();
@@ -909,15 +921,94 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       });
       await page.close();
     }
+
+    if (options.timeline) {
+      // "At rest" is the timeline's own rest instant — the page after its motion, with the
+      // clock held (`TimelineSweep.rest`) — not the settled sweep above. That sweep runs on the wall clock, so on a
+      // page whose motion is script-driven it measures whatever moment it happens to land on:
+      // a rAF card sitting over a label at ~1s of load was reported as a resting defect.
+      // Exemptions the sweep made still count as ruled on.
+      const exemptedKeys = new Set(exempted.map((e) => `${e.kind}|${e.selector ?? ""}|`));
+      const collectors = {
+        text: COLLECT_INTEGRITY_TEXT,
+        clip: COLLECT_CLIP_CANDIDATES,
+        collapse: COLLECT_COLLAPSE_CANDIDATES,
+        protrusions: COLLECT_PROTRUSIONS,
+        contrast: COLLECT_TEXT_CONTRAST,
+        occlusions: COLLECT_OCCLUSIONS,
+      };
+      const transientSeen = new Map<string, IntegrityTimelineRow>();
+      const settledRunKeys = new Set(findings.map(dedupeKey));
+      const retiered = new Set<string>();
+      let held = 0;
+      // Every width first, then the decisions: a defect at rest at ANY width is a resting
+      // defect (the sweep merged it into one finding across widths), so a glimpse of it
+      // mid-motion at another width must not take that finding apart.
+      const perViewport: { rows: ReturnType<typeof tierByPersistence<IntegrityFinding>> }[] = [];
+      const restingAnywhere = new Set<string>(exemptedKeys);
+      for (const viewport of viewports) {
+        const { samples, rest } = await sampleIntegrityTimeline(browser, url, viewport, {
+          ...(options.timeline.at ? { at: options.timeline.at } : {}),
+          ...(options.storageState ? { storageState: options.storageState } : {}),
+          ...(options.har ? { har: options.har } : {}),
+          ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
+          ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
+          ...(options.maxFindings !== undefined ? { maxFindings: options.maxFindings } : {}),
+        }, collectors);
+        timelineInstants.push({ viewport: viewport.width, atMs: samples.map((sample) => sample.atMs) });
+        const keyed = samples.map((sample) => ({
+          atMs: sample.atMs,
+          findings: sample.findings.map((f) => ({ key: dedupeKey(f), finding: f })),
+        }));
+        const finalKeys = new Set(rest.findings.map(dedupeKey));
+        for (const key of finalKeys) restingAnywhere.add(key);
+        perViewport.push({ rows: tierByPersistence(keyed, finalKeys) });
+      }
+      for (const { rows } of perViewport) {
+        for (const row of rows) {
+          if (restingAnywhere.has(row.key)) continue;
+          const timeline = { seenAtMs: row.seenAtMs, run: row.run };
+          // The settled sweep reported this, but with the clock held it is gone once the
+          // motion ends: the sweep caught the page mid-motion. Re-tiered like any other.
+          const caughtMidMotion = settledRunKeys.has(row.key);
+          if (caughtMidMotion && !retiered.has(row.key)) {
+            retiered.add(row.key);
+            const index = findings.findIndex((f) => dedupeKey(f) === row.key);
+            if (index >= 0) findings.splice(index, 1);
+            seen.delete(row.key);
+          }
+          const note = caughtMidMotion ? "; the settled run measured it mid-motion" : "";
+          if (row.tier === "held") {
+            const before = findings.length;
+            push([{
+              ...row.finding,
+              message: `While the page moves (held ${row.run.fromMs}-${row.run.toMs}ms of page time, ${row.run.samples} instants; absent once it stops${note}): ${row.finding.message}`,
+              evidence: { ...(row.finding.evidence ?? {}), timeline },
+            }]);
+            if (findings.length > before) held++;
+          } else if (!transientSeen.has(row.key)) {
+            transientSeen.set(row.key, { finding: row.finding, ...timeline });
+          }
+        }
+      }
+      // A defect held at one width and a glimpse at another is held.
+      const heldKeys = new Set(findings.map(dedupeKey));
+      timelineTransient.push(...[...transientSeen].filter(([key]) => !heldKeys.has(key)).map(([, row]) => row));
+      timelineHeld = held;
+    }
   });
 
   // User exemptions apply BEFORE the verdict, and every exempted finding is
   // moved into `exempted` rather than dropped — the suppression stays visible in
   // the report and in --json.
-  const allowed = applyAllowRules(findings, options.allow ?? []);
+  // Transient timeline rows go through the same exemptions, in the same call, so a rule that
+  // only matched a glimpse is not reported as unused.
+  const transientFindings = new Set(timelineTransient.map((row) => row.finding));
+  const allowed = applyAllowRules([...findings, ...transientFindings], options.allow ?? []);
   findings.length = 0;
-  findings.push(...allowed.findings);
+  findings.push(...allowed.findings.filter((f) => !transientFindings.has(f)));
   exempted.push(...allowed.exempted);
+  const keptTransient = new Set(allowed.findings.filter((f) => transientFindings.has(f)));
 
   const order: Record<"fail" | "warn", number> = { fail: 0, warn: 1 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.viewport - b.viewport);
@@ -939,6 +1030,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     viewports: stats,
     kickback,
     ...(allowed.unusedRules.length > 0 ? { unusedAllowRules: allowed.unusedRules } : {}),
+    ...(options.timeline
+      ? { timeline: { instants: timelineInstants, held: timelineHeld, transient: timelineTransient.filter((row) => keptTransient.has(row.finding)) } }
+      : {}),
   };
 }
 
@@ -1075,6 +1169,22 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
         lines.push(`  ${DIM}- [${e.kind}] ${e.selector ?? ""} @${e.viewport}: ${e.reason}${RESET}`);
       }
       if (rows.length > 15) lines.push(`  ${DIM}… ${rows.length - 15} more${RESET}`);
+    }
+  }
+  if (report.timeline) {
+    const t = report.timeline;
+    lines.push("");
+    // The instants are the reading instruction: "held" means held across consecutive ones, so
+    // a reader needs to know how far apart they were.
+    lines.push(`Timeline: ${t.instants.map((i) => `${i.viewport}px at ${i.atMs.join("/")}ms`).join("; ")}`
+      + ` (page time, clock and animations held) — ${t.held} held finding(s) above, ${t.transient.length} transient`);
+    for (const row of t.transient.slice(0, 10)) {
+      const f = row.finding;
+      lines.push(`  ${DIM}- [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}, only at ${row.seenAtMs.join("/")}ms: ${f.message}${RESET}`);
+    }
+    if (t.transient.length > 10) lines.push(`  ${DIM}… ${t.transient.length - 10} more transient${RESET}`);
+    if (t.transient.length > 0) {
+      lines.push(`${DIM}  Transient = seen at no two consecutive instants: a glimpse mid-motion, reported without weight.${RESET}`);
     }
   }
   if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heading that fades in</title>
+<style>
+  body { margin: 0; font: 16px/1.4 system-ui, sans-serif; color: #1f2328; background: #fff; }
+  main { padding: 24px; }
+  @keyframes fade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  h1, p { animation: fade 800ms ease-out 1 both; }
+  p { animation-delay: 150ms; }
+</style></head>
+<body><main>
+  <h1>Release notes</h1>
+  <p>Everything that changed this week, in one place.</p>
+</main></body></html>

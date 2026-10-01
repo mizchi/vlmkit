@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label whose background arrives late</title>
+<style>
+  body { margin: 0; font: 16px/1.4 system-ui, sans-serif; color: #1f2328; background: #fff; }
+  main { padding: 24px; }
+  .band { width: 420px; padding: 26px 24px; border-radius: 8px; background: #1f2a44; }
+  .label { margin: 0; font-size: 18px; color: #fff; }
+  /* The band's colour arrives over 800ms; the label is white, at full opacity, from the start. */
+  @keyframes arrive { from { background-color: #fff; } 60% { background-color: #fff; } to { background-color: #1f2a44; } }
+  .band { animation: arrive 800ms linear 1 both; }
+</style></head>
+<body><main>
+  <div class="band"><p class="label">Free returns within 30 days</p></div>
+</main></body></html>
