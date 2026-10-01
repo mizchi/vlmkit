@@ -113,6 +113,7 @@ export const messages = Object.freeze({
     "principle.lead":
       "エージェントが「できた」と言うことと、ページが正しいことは別です。vlmkit は、見た目の主張を再現可能な測定へ変えます。",
     "principle.quoteFooter": "測る → 直す → もう一度証明する",
+    "principle.artAlt": "レンズがページに点線の枠を提案として投影し、ノギスと定規が同じ枠を測って、一つを合格、一つを不合格にしている。",
     "principle.deterministic.title": "決定論的",
     "principle.deterministic.description":
       "同じ入力には同じ判定。VLM の感想ではなく、幾何とピクセルの測定。",
@@ -286,6 +287,7 @@ export const messages = Object.freeze({
     "principle.lead":
       "An agent saying “done” does not make the page correct. vlmkit turns visual claims into reproducible measurements.",
     "principle.quoteFooter": "Measure → fix → prove it again",
+    "principle.artAlt": "A lens casts dashed boxes onto a web page as proposals; a caliper and a ruler measure the same boxes, passing one and failing another.",
     "principle.deterministic.title": "Deterministic",
     "principle.deterministic.description":
       "The same input gets the same verdict—geometry and pixels, not a VLM's opinion.",

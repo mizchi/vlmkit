@@ -1426,6 +1426,29 @@ html[data-theme="dark"] .commands {
   font-weight: 800;
 }
 
+.principle-art {
+  margin: clamp(48px, 6vw, 80px) 0 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.principle-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Scoped under .principle-art so they outrank the display:block above; written as bare classes
+   they lost to it and both variants painted in the light theme (D37). */
+.principle-art .principle-art-dark,
+html[data-theme="dark"] .principle-art .principle-art-light {
+  display: none;
+}
+
+html[data-theme="dark"] .principle-art .principle-art-dark {
+  display: block;
+}
+
 .principle blockquote footer {
   margin-top: 4px;
   color: var(--surface-muted);

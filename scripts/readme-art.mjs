@@ -17,7 +17,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { createImageGenClient } from "../packages/vlmkit-ai/src/image-gen-client.ts";
-import { ANCHOR_ICON, HERO, HERO_FILE, ICON_PX, ICONS, LOCK_FILE, artHash, iconFile, iconPrompt } from "./readme-art.manifest.mjs";
+import { ANCHOR_ICON, HERO, ICON_PX, ICONS, ILLUSTRATIONS, LOCK_FILE, artHash, iconFile, iconPrompt } from "./readme-art.manifest.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ALPHA_FLOOR = 48;
@@ -30,13 +30,14 @@ const named = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--ch
 const lockPath = join(repoRoot, LOCK_FILE);
 const lock = existsSync(lockPath) ? JSON.parse(readFileSync(lockPath, "utf8")) : { entries: {} };
 
-const entries = [...ICONS.map((i) => ({ ...i, file: iconFile(i.id) })), { ...HERO, file: HERO_FILE }];
+const entries = [...ICONS.map((i) => ({ ...i, file: iconFile(i.id) })), ...ILLUSTRATIONS];
 const stale = (e) => !existsSync(join(repoRoot, e.file)) || lock.entries[e.id]?.hash !== artHash(e);
 const todo = named.length
   ? entries.filter((e) => named.includes(e.id) || (named.includes("hero") && e.id === HERO.id))
   : entries.filter(stale);
-// The anchor goes first: the rest are drawn against it.
-todo.sort((a, b) => (b.id === ANCHOR_ICON) - (a.id === ANCHOR_ICON));
+// The anchor goes first, and an illustration after the one it is drawn against.
+const rank = (e) => (e.id === ANCHOR_ICON ? 0 : e.reference ? 2 : 1);
+todo.sort((a, b) => rank(a) - rank(b));
 if (!todo.length) {
   console.log("all art is current");
   process.exit(0);
@@ -77,19 +78,22 @@ async function finish(bytes, { width, type, alphaFloor }) {
 let spent = 0;
 try {
   for (const e of todo) {
-    const isHero = e.id === HERO.id;
-    const reference = !isHero && e.id !== ANCHOR_ICON ? join(repoRoot, iconFile(ANCHOR_ICON)) : null;
-    if (reference && !existsSync(reference)) throw new Error(`${e.id} is drawn against ${iconFile(ANCHOR_ICON)}, which does not exist yet`);
+    const isIllustration = ILLUSTRATIONS.some((i) => i.id === e.id);
+    const referenceFile = isIllustration
+      ? (e.reference ? ILLUSTRATIONS.find((i) => i.id === e.reference).file : null)
+      : e.id !== ANCHOR_ICON ? iconFile(ANCHOR_ICON) : null;
+    const reference = referenceFile ? join(repoRoot, referenceFile) : null;
+    if (reference && !existsSync(reference)) throw new Error(`${e.id} is drawn against ${referenceFile}, which does not exist yet`);
     const res = await client.generate({
-      prompt: isHero ? HERO.prompt : iconPrompt(e),
-      aspectRatio: isHero ? HERO.aspectRatio : "1:1",
+      prompt: isIllustration ? e.prompt : iconPrompt(e),
+      aspectRatio: isIllustration ? e.aspectRatio : "1:1",
       quality: "medium",
-      ...(isHero ? {} : { background: "transparent" }),
+      ...(isIllustration ? {} : { background: "transparent" }),
       ...(reference ? { inputReferences: [`data:image/webp;base64,${readFileSync(reference).toString("base64")}`] } : {}),
     });
     if (!res.images[0]) throw new Error(`${e.id}: no image in the response`);
-    const out = await finish(res.images[0], isHero
-      ? { width: HERO.width, type: "image/webp" }
+    const out = await finish(res.images[0], isIllustration
+      ? { width: e.width, type: "image/webp" }
       : { width: ICON_PX, type: "image/webp", alphaFloor: ALPHA_FLOOR });
     mkdirSync(dirname(join(repoRoot, e.file)), { recursive: true });
     writeFileSync(join(repoRoot, e.file), out);

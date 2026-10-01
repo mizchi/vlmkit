@@ -51,6 +51,16 @@
       "costUsd": 0.014342,
       "date": "2026-09-30"
     },
+    "landing-principle-dark": {
+      "hash": "5162e5ee6648",
+      "costUsd": 0.014765,
+      "date": "2026-10-01"
+    },
+    "landing-principle-light": {
+      "hash": "72690bc6abcb",
+      "costUsd": 0.00626,
+      "date": "2026-10-01"
+    },
     "layout-grid": {
       "hash": "cf533e16f07d",
       "costUsd": 0.014357,

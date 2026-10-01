@@ -56,14 +56,48 @@ export const ICONS = Object.freeze([
   { id: "component", glyph: "a small rounded card with a heading line and a pill-shaped button inside", usedFor: "examples/story-gallery" },
 ]);
 
-/** The README's opening illustration. Pictured, not diagrammed: it names no command and no flow. */
-export const HERO = Object.freeze({
-  id: "readme-hero",
-  aspectRatio: "21:9",
-  width: 1600,
-  prompt:
-    "Wide flat vector illustration, white background, a limited palette of blue #2563eb, light blue #bfdbfe, slate grey and one red accent #ef4444. A web page is shown on three screens side by side — a phone, a tablet and a desktop monitor. A large magnifying glass hovers over the desktop screen and reveals a small overlapping-text defect marked with a thin red outline. Beside the screens, a small friendly robot and a person look at a checklist whose items carry blue check marks. Clean, calm, generous whitespace, no text, no letters, no logos.",
-});
+/**
+ * Illustrations: pictured, not diagrammed — none names a command or claims a flow, so none can be
+ * wrong about the code. `reference` names another illustration drawn first and sent as an image
+ * the model must follow (a theme variant keeps its composition that way).
+ * @type {readonly { id: string, file: string, aspectRatio: string, width: number, prompt: string, reference?: string, usedIn: string }[]}
+ */
+export const ILLUSTRATIONS = Object.freeze([
+  Object.freeze({
+    id: "readme-hero",
+    file: HERO_FILE,
+    aspectRatio: "21:9",
+    width: 1600,
+    usedIn: "README.md",
+    prompt:
+      "Wide flat vector illustration, white background, a limited palette of blue #2563eb, light blue #bfdbfe, slate grey and one red accent #ef4444. A web page is shown on three screens side by side — a phone, a tablet and a desktop monitor. A large magnifying glass hovers over the desktop screen and reveals a small overlapping-text defect marked with a thin red outline. Beside the screens, a small friendly robot and a person look at a checklist whose items carry blue check marks. Clean, calm, generous whitespace, no text, no letters, no logos.",
+  }),
+  // The landing page's "Vision proposes. Measurements decide." section, in that page's own
+  // palette (styles.css: --surface, --ink, --accent, --green-text, --coral) — the README hero's
+  // white-and-blue sat wrong on it. One file per theme: the page switches with data-theme.
+  Object.freeze({
+    id: "landing-principle-light",
+    file: "examples/vlmkit-intro-page/principle-light.webp",
+    aspectRatio: "21:9",
+    width: 1600,
+    usedIn: "examples/vlmkit-intro-page/index.html",
+    prompt:
+      "Editorial flat vector illustration with thin, uniform line work, filling the canvas edge to edge on a solid #f5f6f3 background. On the left, a camera-like round lens — a vision model — casts three dashed rectangles onto a simple wireframe web page: its proposals. On the right, precise measuring tools — a caliper and a ruler with fine tick marks — measure those same rectangles; one rectangle gets a small check mark in mint #9cc9c2, another a small cross in muted coral #b98b7a. Lines in near-black #111715, fills in mint #9cc9c2 and deep green #376c65, soft grey shading. Calm, technical, generous whitespace. No text, no letters, no numbers, no logos.",
+  }),
+  Object.freeze({
+    id: "landing-principle-dark",
+    file: "examples/vlmkit-intro-page/principle-dark.webp",
+    aspectRatio: "21:9",
+    width: 1600,
+    reference: "landing-principle-light",
+    usedIn: "examples/vlmkit-intro-page/index.html",
+    prompt:
+      "Redraw the reference illustration for a dark theme, keeping its composition, every object, their positions and the thin line style exactly: the background becomes solid #131916 edge to edge, the near-black lines become light #e8ede9, the mint #9cc9c2 and coral #b98b7a accents stay, deep green fills become #2f5f58. No text, no letters, no numbers, no logos.",
+  }),
+]);
+
+/** The README's opening illustration (kept by name: the README and its test point at it). */
+export const HERO = ILLUSTRATIONS[0];
 
 export const iconFile = (id) => `${ICON_DIR}/${id}.webp`;
 export const iconPrompt = (icon) =>
@@ -71,6 +105,9 @@ export const iconPrompt = (icon) =>
 
 /** What the lock records per entry: the prompt, the shape, and for icons the style anchor they were drawn against. */
 export function artHash(entry) {
-  const text = entry.id === HERO.id ? `${HERO.aspectRatio}\n${HERO.width}\n${HERO.prompt}` : `${ICON_PX}\n${iconPrompt(entry)}`;
+  const ill = ILLUSTRATIONS.find((i) => i.id === entry.id);
+  const text = ill
+    ? `${ill.aspectRatio}\n${ill.width}\n${ill.prompt}${ill.reference ? `\nreference:${ill.reference}` : ""}`
+    : `${ICON_PX}\n${iconPrompt(entry)}`;
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }

@@ -219,7 +219,9 @@ move in `diff` anyway. Usage rank is not quality: `seedream-4.5`, third by OpenR
 
 ### This repository's own art (`scripts/readme-art.mjs`)
 
-The README hero and the icon set (README tables, every `examples/*/README.md` heading, the demo
+The README hero, the landing page's section-05 illustration (`examples/vlmkit-intro-page/principle-{light,dark}.webp`,
+one per theme, in that page's palette; the dark one is drawn against the light one as `reference`, so the theme
+switch only recolours it) and the icon set (README tables, every `examples/*/README.md` heading, the demo
 gallery's group headings, published at `/icons/` on Pages) are generated with that default model from
 `scripts/readme-art.manifest.mjs` — one prompt per file, and `docs/assets/art.lock.json` records the
 hash of the prompt each file was made from.

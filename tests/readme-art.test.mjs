@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 import { GROUPS } from "../examples/demos/demos.mjs";
-import { HERO, HERO_FILE, ICON_DIR, ICONS, LOCK_FILE, artHash, iconFile } from "../scripts/readme-art.manifest.mjs";
+import { HERO, HERO_FILE, ICON_DIR, ICONS, ILLUSTRATIONS, LOCK_FILE, artHash, iconFile } from "../scripts/readme-art.manifest.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (p) => readFileSync(join(repoRoot, p));
@@ -24,9 +24,10 @@ const READMES = ["README.md", ...readdirSync(join(repoRoot, "examples"), { withF
   .filter((d) => d.isDirectory() && existsSync(join(repoRoot, "examples", d.name, "README.md")))
   .map((d) => `examples/${d.name}/README.md`)];
 
-test("every icon and the hero exist as webp, and the icon directory holds nothing else", () => {
+test("every icon and illustration exists as webp, and the icon directory holds nothing else", () => {
   for (const icon of ICONS) assert.ok(isWebp(read(iconFile(icon.id))), `${iconFile(icon.id)} is missing or not webp`);
-  assert.ok(isWebp(read(HERO_FILE)), `${HERO_FILE} is missing or not webp`);
+  for (const ill of ILLUSTRATIONS) assert.ok(isWebp(read(ill.file)), `${ill.file} is missing or not webp`);
+  assert.equal(HERO.file, HERO_FILE);
   const listed = new Set(ICONS.map((i) => iconFile(i.id).split("/").pop()));
   const extra = readdirSync(join(repoRoot, ICON_DIR)).filter((f) => !listed.has(f));
   assert.deepEqual(extra, [], "unlisted files in the icon directory — add them to the manifest or delete them");
@@ -35,14 +36,14 @@ test("every icon and the hero exist as webp, and the icon directory holds nothin
 
 test("the lock records the prompt each file was made from — regenerate after editing one", () => {
   const lock = JSON.parse(read(LOCK_FILE).toString("utf8"));
-  for (const entry of [...ICONS, HERO]) {
+  for (const entry of [...ICONS, ...ILLUSTRATIONS]) {
     assert.equal(
       lock.entries[entry.id]?.hash,
       artHash(entry),
       `${entry.id}: its prompt changed since it was generated — run node --experimental-strip-types scripts/readme-art.mjs ${entry.id}`,
     );
   }
-  assert.deepEqual(Object.keys(lock.entries).sort(), [...ICONS, HERO].map((e) => e.id).sort(), "the lock lists exactly the manifest");
+  assert.deepEqual(Object.keys(lock.entries).sort(), [...ICONS, ...ILLUSTRATIONS].map((e) => e.id).sort(), "the lock lists exactly the manifest");
 });
 
 test("every icon is used, and every icon a page names exists", () => {
@@ -56,5 +57,10 @@ test("every icon is used, and every icon a page names exists", () => {
     }
   }
   assert.deepEqual(ICONS.map((i) => i.id).filter((id) => !used.has(id)), [], "icons nothing shows — use them or drop them");
-  assert.match(read("README.md").toString("utf8"), new RegExp(HERO_FILE.replace(/\./g, "\\.")), "the README shows the hero");
+  // Each illustration is shown where the manifest says, by a path relative to that page.
+  for (const ill of ILLUSTRATIONS) {
+    const page = read(ill.usedIn).toString("utf8");
+    const rel = ill.file.startsWith(dirname(ill.usedIn) + "/") ? ill.file.slice(dirname(ill.usedIn).length + 1) : ill.file;
+    assert.ok(page.includes(rel), `${ill.usedIn} does not show ${ill.id} (${rel})`);
+  }
 });

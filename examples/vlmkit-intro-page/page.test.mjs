@@ -458,6 +458,8 @@ test("the local server serves both pages with usable content types", async () =>
     ["/proof-target.png", "image/png"],
     ["/proof-implementation.png", "image/png"],
     ["/proof-diff.png", "image/png"],
+    ["/principle-light.webp", "image/webp"],
+    ["/principle-dark.webp", "image/webp"],
     ["/demo-solitaire.png", "image/png"],
     ["/solitaire/", "text/html"],
     ["/solitaire/game.js", "text/javascript"],

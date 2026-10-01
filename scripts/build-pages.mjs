@@ -96,6 +96,8 @@ export const siteSections = Object.freeze([
     "demo-solitaire.png",
     "index.html",
     "preferences.js",
+    "principle-dark.webp",
+    "principle-light.webp",
     "proof-diff.png",
     "proof-implementation.png",
     "proof-target.png",
