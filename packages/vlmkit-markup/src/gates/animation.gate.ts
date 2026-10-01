@@ -57,6 +57,12 @@ review. \`--frames dir\` writes them as separate files instead.`,
       docs: "Every downstream pixel diff is nondeterministic until the page settles.",
     },
     { id: "uncontrolled-motion", title: "Motion outside the animation API's control", severity: "warn" },
+    {
+      id: "seek-ineffective",
+      title: "Seeking an animation did not control what was captured",
+      severity: "suspect",
+      docs: "The page cancelled or replaced the animation, or replaying a sample did not reproduce its frame — its pixels are not a measurement of it, so it is reported neither visible nor dead.",
+    },
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },

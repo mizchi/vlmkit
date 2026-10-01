@@ -203,6 +203,33 @@ test("a visually dead animation raises no-visible-effect", () => {
   assert.equal(issues[0]!.selector, ".spinner");
 });
 
+test("an animation whose seek did not take raises seek-ineffective instead of a visibility verdict", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [evaluated({
+      visible: false,
+      motionBbox: null,
+      totalChangedPixels: 0,
+      maxFrameRatio: 0,
+      seekIneffective: { reason: "readback", detail: "was no longer on the page" },
+    })],
+    settleMs: 800,
+    infinite: [],
+  });
+  assert.deepEqual(issues.map((i) => i.kind), ["seek-ineffective"], "no-visible-effect must not also fire: the frames say nothing about visibility");
+  assert.equal(issues[0]!.severity, "suspect");
+  assert.match(issues[0]!.message, /cancelled or replaced/);
+});
+
+test("a replay mismatch names the pixels and the instant", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [evaluated({ seekIneffective: { reason: "replay", detail: "7200px differed at 500ms" } })],
+    settleMs: 800,
+    infinite: [],
+  });
+  assert.equal(issues[0]!.kind, "seek-ineffective");
+  assert.match(issues[0]!.message, /7200px differed at 500ms/);
+});
+
 test("infinite animations raise a warn with a mask suggestion", () => {
   const issues = deriveAnimationIssues({
     evaluated: [],
@@ -762,4 +789,39 @@ test("--strip-animated refuses a .webp path, naming why", { timeout: 120_000 }, 
     () => runAnimationEval({ source, stripPath: join(dir, "anim.webp"), stripAnimated: true }),
     /--strip-animated writes APNG.*@jsquash\/webp/s,
   );
+});
+
+/**
+ * `seek-ineffective`: frames the gate took are only evidence about an animation when seeking it
+ * is what changed them. Both pages below were reported `visible` before the rule existed — the
+ * pixels the gate credited to its seeks were the page's own re-render and its own ticker.
+ */
+test("runAnimationEval: an animation the page re-creates is seek-ineffective, not visible", { timeout: 120_000 }, async () => {
+  const report = await evaluate(
+    ".box { width: 120px; height: 60px; background: #2255cc; animation: slide 2000ms linear 1 forwards; }",
+    `<div id="root"><div class="box"></div></div>
+     <script>setInterval(() => { document.getElementById("root").innerHTML = '<div class="box"></div>'; }, 100);</script>`,
+  );
+  const box = report.evaluated.find((a) => a.selector.includes("box"));
+  assert.equal(box?.seekIneffective?.reason, "readback");
+  assert.ok(report.issues.some((i) => i.kind === "seek-ineffective"));
+  assert.ok(!report.issues.some((i) => i.kind === "no-visible-effect"));
+});
+
+test("runAnimationEval: a ticker repainting the animated element makes the replay disagree", { timeout: 120_000 }, async () => {
+  const report = await evaluate(
+    "#a { animation: slide 2000ms linear 1 forwards; }",
+    `<div id="a"></div><script>
+      const a = document.getElementById("a"); let h = 0;
+      (function loop() { h = (h + 7) % 360; a.style.background = "hsl(" + h + ",70%,45%)"; requestAnimationFrame(loop); })();
+    </script>`,
+  );
+  assert.equal(report.evaluated[0]?.seekIneffective?.reason, "replay");
+});
+
+test("runAnimationEval: an ordinary animation's seeks take and its replay reproduces", { timeout: 120_000 }, async () => {
+  const report = await evaluate("#a { animation: slide 400ms linear 1 forwards; }");
+  assert.equal(report.evaluated[0]?.visible, true);
+  assert.equal(report.evaluated[0]?.seekIneffective, undefined);
+  assert.ok(!report.issues.some((i) => i.kind === "seek-ineffective"));
 });

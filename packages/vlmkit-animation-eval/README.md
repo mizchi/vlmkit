@@ -19,7 +19,7 @@ import { runAnimationEval, formatAnimationEvalReport } from "@mizchi/vlmkit-anim
 
 const report = await runAnimationEval({ source: "page.html", samples: 4 });
 console.log(formatAnimationEvalReport(report));
-report.issues; // [{ kind: "no-visible-effect" | "infinite-animation" | "reduced-motion-ignored" | "long-settle" | "uncontrolled-motion", severity, message, selector? }]
+report.issues; // [{ kind: "no-visible-effect" | "infinite-animation" | "reduced-motion-ignored" | "long-settle" | "uncontrolled-motion" | "seek-ineffective", severity, message, selector? }]
 ```
 
 `playwright` is a required peer: the whole job is driving a browser. Depends

@@ -118,6 +118,34 @@ export interface EvaluatedAnimation extends AnimationTimingSample {
   motionBbox: { x: number; y: number; width: number; height: number } | null;
   totalChangedPixels: number;
   maxFrameRatio: number;
+  /**
+   * Why the frames above cannot be trusted as a function of the seeked time, when they cannot.
+   * Absent when every seek took and replaying the first sample reproduced its pixels.
+   */
+  seekIneffective?: SeekIneffective;
+}
+
+/**
+ * Evidence that seeking this animation did not control what was captured. Two independent
+ * kinds, because each misses what the other sees:
+ *
+ * - `readback`: after a seek the Animation was no longer live, had gone `idle`, or did not
+ *   report the time it was set to — the page cancelled or replaced it, so the gate was moving
+ *   an object nothing renders.
+ * - `replay`: seeking back to the first sample time and capturing again did not reproduce that
+ *   frame inside the motion region — something other than this animation's time drives those
+ *   pixels (a script restarting it, a ticker drawing over it).
+ *
+ * The case that made this a rule: a page restarting its animation every 100ms
+ * (`style.animation = "none"; reflow; style.animation = ""`) came back with six `visible`
+ * animations and "No animation issues detected" — every pixel the gate credited to its seeks
+ * was the page's own restart. HyperFrames' `sweep_static` guards the same thing from the other
+ * side: a sweep whose seeks did nothing makes every other green meaningless.
+ */
+export interface SeekIneffective {
+  reason: "readback" | "replay";
+  /** Readback: what the Animation reported instead. Replay: pixels that differed inside the motion region. */
+  detail: string;
 }
 
 export interface ReducedMotionRemaining {
@@ -131,7 +159,8 @@ export type AnimationEvalIssueKind =
   | "infinite-animation"
   | "reduced-motion-ignored"
   | "long-settle"
-  | "uncontrolled-motion";
+  | "uncontrolled-motion"
+  | "seek-ineffective";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -336,6 +365,23 @@ export function deriveAnimationIssues(
   const issues: AnimationEvalIssue[] = [];
 
   for (const anim of input.evaluated) {
+    if (anim.seekIneffective) {
+      // Instead of no-visible-effect, not as well: whether this animation moved pixels is the
+      // one thing these frames cannot say, so neither "dead" nor "visible" is reported for it.
+      const why = anim.seekIneffective.reason === "readback"
+        ? `after a seek the animation ${anim.seekIneffective.detail} — the page cancelled or replaced it, so the gate was moving an object nothing renders`
+        : `seeking back to its first sample did not reproduce that frame (${anim.seekIneffective.detail}) — something other than this animation's time drives those pixels`;
+      issues.push({
+        kind: "seek-ineffective",
+        severity: "suspect",
+        selector: anim.selector,
+        message: `${anim.selector} animation \`${anim.name}\`: ${why}.`
+          + ` Its frame deltas are not measurements of the animation, so it is reported neither visible nor dead.`
+          + ` Look for script that restarts or re-creates it (toggling \`animation\` / a class on a timer, a framework re-render),`
+          + ` or a rAF / canvas ticker painting the same region.`,
+      });
+      continue;
+    }
     if (!anim.visible) {
       issues.push({
         kind: "no-visible-effect",
@@ -662,11 +708,19 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       .filter((t) => t.iterations === null)
       .map((t) => ({ selector: t.selector, name: t.name }));
 
-    const seek = async (index: number, timeMs: number) => {
-      await page.evaluate(
+    // Returns what the Animation reports right after the seek, so a seek that did not take is
+    // visible to the caller instead of being photographed as if it had. `null` = it took.
+    const seek = async (index: number, timeMs: number): Promise<string | null> => {
+      return await page.evaluate(
         ([i, t]) => {
           const anim = (window as unknown as { __vlmkitAnims?: Animation[] }).__vlmkitAnims?.[i as number];
-          if (anim) anim.currentTime = t as number;
+          if (!anim) return "was gone";
+          anim.currentTime = t as number;
+          if (anim.playState === "idle") return "had gone idle (cancelled)";
+          if (!document.getAnimations().includes(anim)) return "was no longer on the page";
+          const now = typeof anim.currentTime === "number" ? anim.currentTime : Number.NaN;
+          if (!(Math.abs(now - (t as number)) <= 1)) return `reported currentTime ${Number.isNaN(now) ? "null" : Math.round(now)}ms instead of ${Math.round(t as number)}ms`;
+          return null;
         },
         [index, timeMs] as const,
       );
@@ -730,13 +784,17 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       let motionBbox: EvaluatedAnimation["motionBbox"] = null;
       let totalChangedPixels = 0;
       let maxFrameRatio = 0;
+      let readback: string | null = null;
+      let firstSample: { timeMs: number; frame: RgbaFrame } | null = null;
       for (let s = 1; s <= samples; s++) {
         const fraction = s / samples;
         // Stay 1ms inside the iteration end: seeking exactly to the end
         // finishes the animation and (fill: none) snaps the start state.
         const timeMs = timing.delayMs + Math.min(timing.durationMs * fraction, timing.durationMs - 1);
-        await seek(timing.index, Math.max(timing.delayMs, timeMs));
+        const seekedTo = Math.max(timing.delayMs, timeMs);
+        readback ??= await seek(timing.index, seekedTo);
         const frame = await shot(`anim-${timing.index}-${Math.round(fraction * 100)}`);
+        firstSample ??= { timeMs: seekedTo, frame };
         if (options.stripPath) rowFrames.push(frame);
         const delta = frameDelta(previous, frame, tolerance);
         frames.push({ fraction, ...delta });
@@ -744,6 +802,20 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         totalChangedPixels += delta.changedPixels;
         maxFrameRatio = Math.max(maxFrameRatio, delta.ratio);
         previous = frame;
+      }
+      // Replay: the first sample again, compared inside the motion region only — the rest of the
+      // page may move on its own (that is `uncontrolled-motion`'s finding, not this one's). Only
+      // when the animation moved something; with no region there is nothing to reproduce.
+      let seekIneffective: SeekIneffective | undefined = readback ? { reason: "readback", detail: readback } : undefined;
+      if (!seekIneffective && firstSample && motionBbox && samples > 1) {
+        const replayReadback = await seek(timing.index, firstSample.timeMs);
+        const again = await shot(`anim-${timing.index}-replay`);
+        const region = (f: RgbaFrame) => cropRegion(f, motionBbox!.x, motionBbox!.y, motionBbox!.width, motionBbox!.height);
+        const replay = frameDelta(region(firstSample.frame), region(again), tolerance);
+        if (replayReadback) seekIneffective = { reason: "readback", detail: replayReadback };
+        else if (replay.changedPixels >= minChangedPixels) {
+          seekIneffective = { reason: "replay", detail: `${replay.changedPixels}px differed at ${Math.round(firstSample.timeMs)}ms` };
+        }
       }
       await seek(timing.index, restTimeForAnimation(timing));
       if (options.stripPath && rowFrames.length > 0) stripRows.push(rowFrames);
@@ -754,6 +826,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         motionBbox,
         totalChangedPixels,
         maxFrameRatio: Number(maxFrameRatio.toFixed(4)),
+        ...(seekIneffective ? { seekIneffective } : {}),
       });
     }
     let strip: AnimationEvalReport["strip"];
@@ -1058,7 +1131,9 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
       const bbox = anim.motionBbox
         ? `(${anim.motionBbox.x},${anim.motionBbox.y}) ${anim.motionBbox.width}x${anim.motionBbox.height}`
         : "none";
-      const visibility = anim.visible ? `${GREEN}visible${RESET}` : `${RED}no visible effect${RESET}`;
+      const visibility = anim.seekIneffective
+        ? `${RED}not measured (seek ineffective)${RESET}`
+        : anim.visible ? `${GREEN}visible${RESET}` : `${RED}no visible effect${RESET}`;
       const osc = computeOscillation(anim);
       // The leg annotation is what makes "1.2s per leg" briefs mechanically
       // checkable — duration alone hides a 2x frequency difference between

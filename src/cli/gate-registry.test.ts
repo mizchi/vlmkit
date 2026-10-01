@@ -228,8 +228,11 @@ describe("composed built-in registry", () => {
     //       per line, found by eye 17 times on the demo sites and by no gate —
     //       `untested-media-feature` (info), which says which conditions the generator could
     //       not vary rather than implying they were covered, and `redirected`.
+    // 208 → 209: `check animation` / `seek-ineffective` (suspect) — frames are only evidence
+    //       about an animation when seeking it is what changed them. A page re-creating its
+    //       element every 100ms read as `visible` before; the pixels were its own re-render.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 208);
+    assert.equal(total, 209);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

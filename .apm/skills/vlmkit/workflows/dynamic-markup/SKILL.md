@@ -156,6 +156,12 @@ Evaluates every authored animation by rendered frames:
 - **`uncontrolled-motion` (warn)** — something moves that WAAPI cannot
   pause (rAF script, video, GIF). If you didn't author it, you probably
   vendored it; either remove it or mask it in every capture.
+- **`seek-ineffective` (suspect)** — the gate seeked an animation and either
+  the page had cancelled / re-created it (a re-render, `animation` toggled on a
+  timer) or seeking back to a sample did not reproduce its frame (a ticker
+  paints the same element). That animation is reported neither visible nor
+  dead, because its frames do not measure it. Fix the restart, not the
+  keyframes.
 
 ### B4. `check motion attempt.html`
 
