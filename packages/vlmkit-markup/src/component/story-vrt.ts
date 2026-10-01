@@ -15,9 +15,9 @@
  * ## What this drives, and what it deliberately does not depend on
  *
  * Playwright's component testing has two halves. The `mount` fixture is one, it
- * lives in `@playwright/test`, and it landed in **1.62** — this repo pins 1.61
- * and Playwright is a peer dependency, so depending on the fixture would force a
- * version bump on every consumer.
+ * lives in `@playwright/test`, and it landed in **1.62**. This repo develops on
+ * 1.63, but Playwright is a peer dependency with a floor of 1.61, so depending on
+ * the fixture would force a version bump on every consumer.
  *
  * The other half is a page-side contract, and it is versionless. Quoting
  * Playwright's own gallery spec: the gallery is "a single page, served by your

@@ -259,8 +259,9 @@ change to one component does not make its neighbours report.
 props })` / `window.unmount()` rendering into `#root` — via `page.evaluate`, which
 is how Playwright's own `mount` fixture works. Consequences:
 
-- **No Playwright version floor.** The `mount` fixture is 1.62+; the repo pins
-  1.61 and this does not use the fixture. Do not add a peer-dep bump for it.
+- **No Playwright version floor.** The `mount` fixture is 1.62+; the peer floor is
+  1.61 (the repo itself develops on 1.63) and this does not use the fixture. Do not
+  add a peer-dep bump for it.
 - The gallery is framework-specific and the project's to own; `examples/story-gallery/README.md`
   carries a React + Vite one to copy. Storybook needs a shim (no `window.mount`).
 - Baselines are keyed on the story id **as written**, so `Button/Primary` and

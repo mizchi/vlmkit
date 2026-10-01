@@ -8,7 +8,9 @@ jobs:
     # need Docker locally.
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.61.1-noble
+      # Keep this tag equal to the @playwright/test version in package.json: the
+      # container ships the browser builds that one release expects.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
