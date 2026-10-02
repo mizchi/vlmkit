@@ -375,7 +375,7 @@ from the docs alone".
 - **The success criterion is a fact sheet, not a green check.** Round 13 had
   five green module maps and two of them were wrong (a true dependency
   deleted, the wrong edge lit). From round 14 every brief ships
-  `facts/<brief>.expect.json` and success is `check --expect` exiting 0;
+  `facts/<brief>.expect.json` and success is `vlmkit-anim check` against that sheet exiting 0;
   from round 18 the tool writes the sheet itself from the code
   (`vlmkit-anim facts`). Whatever your tool draws or emits: find the ground
   truth it can be held to and make the check read it, or a clean run proves
