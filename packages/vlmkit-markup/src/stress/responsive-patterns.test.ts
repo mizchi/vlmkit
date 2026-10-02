@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { runResponsiveCheck } from "./responsive-pbt.ts";
 
 /**

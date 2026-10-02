@@ -17,7 +17,7 @@
  * Plain `node:fs` on purpose, so this runs wherever `pnpm test` does.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

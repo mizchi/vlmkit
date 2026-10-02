@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterAll, afterEach, beforeAll, describe, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, it, vi } from "vite-plus/test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -196,7 +196,7 @@ describe("capture preflight (no browser)", () => {
       { files: string[]; scripts: Record<string, string> };
     assert.ok(!pkg.files.some((f) => f.includes("e2e")),
       `files still mentions e2e: ${JSON.stringify(pkg.files)}`);
-    const build = readFileSync(resolve(REPO_ROOT, "tsdown.config.ts"), "utf8");
+    const build = readFileSync(resolve(REPO_ROOT, "vite.config.ts"), "utf8");
     assert.doesNotMatch(build, /e2e\//, "the build no longer emits a capture spec");
   });
 

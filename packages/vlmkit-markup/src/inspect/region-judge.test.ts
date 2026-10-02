@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { PNG } from "pngjs";
 import {
   buildPairImage,

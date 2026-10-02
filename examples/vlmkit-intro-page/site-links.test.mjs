@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));

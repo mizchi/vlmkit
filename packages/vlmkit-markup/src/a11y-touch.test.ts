@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { analyzeA11yTouch, analyzeA11yTouchSamples, type A11yTouchRawSample } from "./a11y-touch.ts";
 import {

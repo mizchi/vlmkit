@@ -4,7 +4,7 @@ on:
   pull_request:
     # VRT inputs only. The unit-test suite used to run as a step in the `bench`
     # job below, which made this list the trigger for every test in the repo and
-    # left four of the five roots `vitest.config.ts` reads uncovered. The suite
+    # left four of the five roots `vite.config.ts` reads uncovered. The suite
     # moved to `unit-tests.yml`, so this list went back to what VRT itself
     # needs — widening it further would only make a four-job browser workflow
     # run on changes it does not measure.

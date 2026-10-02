@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { resolveIntent, parseReview, buildReviewPrompt } from "./review.ts";
 

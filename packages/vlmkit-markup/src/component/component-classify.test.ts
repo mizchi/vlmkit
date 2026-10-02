@@ -1,5 +1,5 @@
 import { ok, strictEqual } from "node:assert";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { classifyRegion, kindsCanPair, type ComponentKindInfo } from "./component-classify.ts";
 
 /** Build an RGBA buffer via a per-pixel color function. */

@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { VrtConfigError } from "./errors.ts";
 import { createUnifiedLLMClient, createLLMProvider, OPENAI_DEFAULT_MODEL } from "./llm-client.ts";

@@ -31,7 +31,7 @@
  * Walking imports tests the invariant rather than the symptom, needs no build, and
  * names the offending edge — which is what someone who just added the import needs.
  */
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";

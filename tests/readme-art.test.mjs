@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { GROUPS } from "../examples/demos/demos.mjs";
 import { HERO, HERO_FILE, ICON_DIR, ICONS, ILLUSTRATIONS, LOCK_FILE, artHash, iconFile } from "../scripts/readme-art.manifest.mjs";
 

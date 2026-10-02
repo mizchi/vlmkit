@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { matchA11yExpectation, crossValidateWithExpectation, scoreLoop } from "./expectation.ts";
 import type { PageExpectation, A11yDiff, ChangeIntent, UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";

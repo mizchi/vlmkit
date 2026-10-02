@@ -13,7 +13,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { perfGate } from "./perf.gate.ts";
 

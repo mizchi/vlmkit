@@ -37,7 +37,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { ensureMarkupCoreCli } from "./markup-core-runtime.ts";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");

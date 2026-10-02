@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { CSS_BENCH_OUTPUT_ROOT } from "./css-challenge-fixtures.ts";
 import { parseCssChallengeBenchArgs } from "./css-challenge-bench.ts";
 

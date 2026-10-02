@@ -11,7 +11,7 @@
  * wiring left every other test in the repo green, which is why this file exists.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

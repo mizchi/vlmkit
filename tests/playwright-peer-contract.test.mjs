@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 
 const ROOT = resolve(import.meta.dirname, "..");
 
@@ -99,7 +99,7 @@ test("`@playwright/test` is optional, and only the root declares it", () => {
 });
 
 test("the published bin entry routes failures through handleCliError", () => {
-  // Regression guard. `scripts/vlmkit-bundled.mjs` is what `tsdown.config.ts`
+  // Regression guard. `scripts/vlmkit-bundled.mjs` is what `vite.config.ts`
   // builds into `dist/vlmkit.mjs` (the `bin`); `src/cli/vlmkit.ts` is only the
   // workspace entry. When the bundled entry did its own `console.error(error)`,
   // the ENOENT / EISDIR / missing-browser prettifiers were all dead in the
@@ -110,8 +110,8 @@ test("the published bin entry routes failures through handleCliError", () => {
   assert.match(entry, /runCli\(\)\.catch\(handleCliError\);/);
   assert.doesNotMatch(entry, /catch\(\(error\) => \{/);
 
-  // Both entries must agree; `tsdown.config.ts` must still point `bin` here.
-  const tsdown = readFileSync(resolve(ROOT, "tsdown.config.ts"), "utf8");
+  // Both entries must agree; `vite.config.ts` must still point `bin` here.
+  const tsdown = readFileSync(resolve(ROOT, "vite.config.ts"), "utf8");
   assert.match(tsdown, /vlmkit: "scripts\/vlmkit-bundled\.mjs"/);
   assert.match(
     readFileSync(resolve(ROOT, "src/cli/vlmkit.ts"), "utf8"),

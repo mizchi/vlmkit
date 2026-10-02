@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterAll, describe, it } from "vitest";
+import { afterAll, describe, it } from "vite-plus/test";
 import type { Browser, Page } from "playwright";
 import { launchBrowser } from "./browser-launch.ts";
 import { applyMask, formatMaskProblems, MaskTally, parseMaskSelectors } from "./mask.ts";

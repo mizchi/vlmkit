@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 import { judgeComposition, type CompositionInput } from "@mizchi/vlmkit-judge/composition.ts";
 import { sceneToCompositionInput, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";

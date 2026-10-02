@@ -26,7 +26,7 @@ import { spawnSync } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workflowDir = join(repoRoot, ".github/workflows");
@@ -219,7 +219,7 @@ describe("test runners in workflows", async () => {
       assert.deepEqual(
         offenders.map(({ line, text }) => `${file}:${line} ${text.trim()}`),
         [],
-        `use \`pnpm exec vitest run <paths>\`. Every test file in this repo imports from vitest,`
+        `use \`pnpm exec vp test run <paths>\`. Every test file in this repo imports from vitest,`
         + ` which throws when imported outside its runner, so \`node --test\` cannot pass.`,
       );
     });
@@ -231,7 +231,7 @@ describe("test runners in workflows", async () => {
     const sample = [
       "      - run: node --test 'src/**/*.test.ts'",
       "      # `vitest run`, not `node --test` — a comment must not trip the rule",
-      "        run: pnpm exec vitest run packages/vlmkit-heal/src",
+      "        run: pnpm exec vp test run packages/vlmkit-heal/src",
     ];
     const matched = sample.filter((text) => /^\s*-?\s*run:.*\bnode\s+--test\b/.test(text));
     assert.deepEqual(matched, ["      - run: node --test 'src/**/*.test.ts'"]);
@@ -243,7 +243,7 @@ describe("test runners in workflows", async () => {
  *
  * `pnpm test` was one step inside `vrt-compare.yml`'s `bench` job, so the unit
  * tests inherited whatever `paths:` that workflow declared for its own VRT
- * purposes. Four of the five roots `vitest.config.ts` reads were missing from
+ * purposes. Four of the five roots `vite.config.ts` reads were missing from
  * it — `packages/**`, `tests/**`, `examples/**` and `worker/**` — so a PR
  * confined to any of them ran no unit tests at all. `packages/` alone holds 188
  * test files. The suite lives in `unit-tests.yml` now, which is also why this
@@ -266,7 +266,7 @@ describe("test runners in workflows", async () => {
  * does not verify the glob depth (`packages/*​/src/**` is satisfied by
  * `packages/**`, which is correct but coarser), and it says nothing about
  * `push:` triggers or about workflows that run a subset of the suite on purpose
- * (`pnpm test:examples`, `vitest run <file>`).
+ * (`pnpm test:examples`, `vp test run <file>`).
  *
  * It covers where tests LIVE, not where their INPUTS live. 49 test files read
  * `fixtures/`, and no config names that directory, so `fixtures/**` is in the
@@ -282,13 +282,13 @@ describe("test runners in workflows", async () => {
  * moves to a workflow whose trigger happens to be broad enough, this passes
  * while the coupling that caused the original bug is back.
  */
-const vitestConfig = join(repoRoot, "vitest.config.ts");
+const vitestConfig = join(repoRoot, "vite.config.ts");
 
 /** First path segment of each `include` glob — the directory a trigger has to name. */
 async function suiteRoots() {
   const source = await readFile(vitestConfig, "utf8");
   const block = source.match(/include:\s*\[([^\]]*)\]/);
-  assert.ok(block, "could not find the `include` array in vitest.config.ts");
+  assert.ok(block, "could not find the `include` array in vite.config.ts");
   const roots = new Set();
   for (const match of block[1].matchAll(/["']([^"']+)["']/g)) {
     const root = match[1].split("/")[0];
@@ -303,7 +303,7 @@ async function fullSuiteWorkflows() {
   for (const entry of await readdir(workflowDir)) {
     if (!entry.endsWith(".yml") && !entry.endsWith(".yaml")) continue;
     const yaml = await readFile(join(workflowDir, entry), "utf8");
-    // `pnpm test:examples` and `pnpm exec vitest run <paths>` run a subset and
+    // `pnpm test:examples` and `pnpm exec vp test run <paths>` run a subset and
     // are not this invariant's business, so the match has to end at `test`.
     if (/^\s*-?\s*(?:run:\s*)?pnpm test\s*$/m.test(yaml)) hits.push({ file: entry, yaml });
   }

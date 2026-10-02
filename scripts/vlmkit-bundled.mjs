@@ -38,7 +38,7 @@ const { runCli } = await import("../src/cli/cli.ts");
 // `handleCliError`, not `console.error` — and this is the file that matters.
 //
 // `src/cli/vlmkit.ts` has always ended in `.catch(handleCliError)`, but that is
-// the *workspace* entry. `tsdown.config.ts` builds the published `bin` from this
+// the *workspace* entry. `vite.config.ts` (`pack`) builds the published `bin` from this
 // file, which used to dump the raw error object. Every prettifier in
 // `cli-error.ts` — ENOENT, EISDIR, the missing-browser diagnosis — was therefore
 // dead in the shipped CLI while looking alive in the repo. That is exactly what

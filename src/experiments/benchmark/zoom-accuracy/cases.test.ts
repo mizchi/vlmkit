@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import type { Browser } from "playwright";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { buildCases, caseSeed, type BuiltCase } from "./cases.ts";

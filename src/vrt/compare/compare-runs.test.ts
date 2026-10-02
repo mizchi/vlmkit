@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { compareRuns, formatCompareRunsMarkdown, type CrReport } from "./compare-runs.ts";
 
 function report(rows: Array<[viewport: string, ratio: number, cats?: string]>): CrReport {

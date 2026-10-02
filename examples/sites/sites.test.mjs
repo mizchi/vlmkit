@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { judgmentPageUrl, siteSections } from "../../scripts/build-pages.mjs";
 import { galleryEntries, renderGallery } from "./gallery.mjs";
 import { checkLog, keptScreens, logPaths, readLog, readOutputs, renderSite, storedScreens } from "./judge.mjs";

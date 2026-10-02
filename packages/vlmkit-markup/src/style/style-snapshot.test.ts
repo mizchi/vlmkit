@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { judgeCollectedColorRoles, runColorRolesCheck } from "./color-roles.ts";
 import { judgeCollectedComposition, runCompositionCheck } from "./composition.ts";
 import { judgeCollectedDesign, runDesignPolicyCheck } from "./design-policy.ts";

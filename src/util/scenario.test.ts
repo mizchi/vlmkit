@@ -10,7 +10,7 @@
  * 3. 検証パイプラインを実行
  * 4. スコアを評価
  */
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

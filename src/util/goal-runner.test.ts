@@ -10,7 +10,7 @@
  *
  * 各 step で前の step の snapshot が次のベースラインになる。
  */
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

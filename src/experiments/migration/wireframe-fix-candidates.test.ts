@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import type { MatchedBbox } from "@mizchi/vlmkit-markup/component/component-bbox.ts";
 import type { MatchedTextRow } from "@mizchi/vlmkit-core/text-rows.ts";
 import { parseDesignTokens } from "./design-md-tokens.ts";

@@ -7,7 +7,7 @@
  * `fade-in.html` (text fading in — the animation, not a defect) and `background-late.html`
  * (white text at full opacity whose dark background arrives at 480-800ms).
  */
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { runIntegrityCheck } from "./integrity-check.ts";

@@ -11,7 +11,7 @@
  * intended behavior.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import type { RenderSanityResult } from "./vrt/compare/render-sanity.ts";
 
 function isSymmetric(b: RenderSanityResult | undefined, v: RenderSanityResult | undefined): boolean {

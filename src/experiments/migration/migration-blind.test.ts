@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { extractCss } from "../css-challenge/css-challenge-core.ts";
 import {
   buildMigrationBlindCompareOptions,

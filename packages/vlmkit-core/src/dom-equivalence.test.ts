@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { verifyDomEquivalence, type DomFingerprint } from "./dom-equivalence.ts";
 
 function fp(over: Partial<DomFingerprint> = {}): DomFingerprint {

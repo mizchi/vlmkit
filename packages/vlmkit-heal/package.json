@@ -27,9 +27,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-heal",
+    "build": "pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-heal",
     "prepack": "pnpm build",
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-heal/src"
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-heal/src"
   },
   "exports": {
     ".": {

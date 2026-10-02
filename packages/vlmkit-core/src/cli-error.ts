@@ -8,7 +8,7 @@
  *   main().catch(handleCliError);
  *
  * Every CLI entry must go through it, *including* `scripts/vlmkit-bundled.mjs`
- * — that is the one `tsdown.config.ts` builds into the published `bin`. It used
+ * — that is the one `vite.config.ts`'s `pack` block builds into the published `bin`. It used
  * to `console.error(error)` instead, which made everything below dead code in
  * the shipped CLI while it kept working in the workspace (issue #112, item 2).
  * `tests/playwright-peer-contract.test.mjs` guards that.

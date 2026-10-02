@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { sampleRegionColorSample } from "./heatmap.ts";
 import type { PngData } from "./png-utils.ts";

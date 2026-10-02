@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { onTestFinished, test } from "vitest";
+import { onTestFinished, test } from "vite-plus/test";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
 const apmBootstrapCommand = "curl -sSL https://aka.ms/apm-unix | sh";
@@ -546,13 +546,13 @@ test("the GitHub Pages workflow validates and deploys the composed site", async 
    */
   // The directory, so `site-links.test.mjs` is covered too — the live-browser half of this
   // page's contract, split out of this file to keep it runnable in `skill-package.yml`.
-  assert.match(workflow, /pnpm exec vitest run examples\/vlmkit-intro-page\/(?!page)/);
+  assert.match(workflow, /pnpm exec vp test run examples\/vlmkit-intro-page\/(?!page)/);
   // Anchored to a `run:` line, not to the string anywhere in the file — the workflow's own
   // comment explains why `node --test` is wrong here, and a bare /node --test/ matched that.
   assert.doesNotMatch(workflow, /^\s*(?:run:|- run:).*node --test/m);
   assert.match(workflow, /node scripts\/build-pages\.mjs/);
   // Solitaire ships on the same site, so its own tests and gates run in the same job.
-  assert.match(workflow, /pnpm exec vitest run examples\/solitaire\//);
+  assert.match(workflow, /pnpm exec vp test run examples\/solitaire\//);
   assert.match(workflow, /examples\/solitaire\/\*\*/);
   assert.match(workflow, /actions\/configure-pages@v5/);
   assert.match(workflow, /actions\/upload-pages-artifact@v4/);

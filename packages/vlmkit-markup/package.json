@@ -34,12 +34,12 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm moon:build && pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-markup",
+    "build": "pnpm moon:build && pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-markup",
     "prepack": "pnpm build",
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-markup/src",
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-markup/src",
     "moon:test": "moon test markup-core && moon check markup-core-api markup-core-cli",
     "moon:build": "moon build markup-core markup-core-api markup-core-cli --target js",
-    "build:js": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-markup"
+    "build:js": "pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-markup"
   },
   "exports": {
     ".": {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 
 /**
  * The one property this package exists for: nothing in it needs a browser, a

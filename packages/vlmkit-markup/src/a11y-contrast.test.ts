@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { A11Y_CONTRAST_SAMPLE_SCRIPT, analyzeA11yContrastSamples, type A11yContrastRawSample } from "./a11y-contrast.ts";

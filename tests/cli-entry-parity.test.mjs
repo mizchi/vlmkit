@@ -2,7 +2,7 @@
  * The two CLI entry points must dispatch identically.
  *
  * There are two: `src/cli/vlmkit.ts`, which the workspace runs, and
- * `scripts/vlmkit-bundled.mjs`, which `tsdown.config.ts` builds into the published `bin`.
+ * `scripts/vlmkit-bundled.mjs`, which `vite.config.ts` builds into the published `bin`.
  * The bundled one exists only to inject the generated MoonBit bridge before loading the CLI
  * — everything else about it should be the workspace entry.
  *
@@ -29,7 +29,7 @@
  * CLI on load — and the failure being guarded is a source-level divergence, so source is the
  * right thing to read.
  */
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

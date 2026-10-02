@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterAll, describe, it } from "vitest";
+import { afterAll, describe, it } from "vite-plus/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";

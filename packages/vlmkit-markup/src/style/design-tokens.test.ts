@@ -20,7 +20,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, it } from "vitest";
+import { afterAll, describe, it } from "vite-plus/test";
 import { runDesignTokens } from "./design-tokens.ts";
 
 const FIXTURE = `<!doctype html>

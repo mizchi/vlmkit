@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 
 /**
  * Browser scripts are template literals, and a template literal EATS `\s`.

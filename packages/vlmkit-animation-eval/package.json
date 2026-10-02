@@ -26,9 +26,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-animation-eval",
+    "build": "pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-animation-eval",
     "prepack": "pnpm build",
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-animation-eval/src"
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-animation-eval/src"
   },
   "exports": {
     ".": {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { overlapArea, iou } from "./rect-overlap.ts";
 
 const box = (left: number, top: number, width: number, height: number) => ({ left, top, width, height });

@@ -33,4 +33,4 @@ jobs:
       # vitest, which throws on import outside the vitest runner, so this step could not pass at
       # all after the suite migrated on 2026-08-13. Filtered to the package rather than run from
       # its directory: the vitest config lives at the repo root.
-      - run: pnpm exec vitest run packages/vlmkit-heal/src
+      - run: pnpm exec vp test run packages/vlmkit-heal/src

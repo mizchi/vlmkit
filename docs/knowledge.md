@@ -1156,7 +1156,7 @@ question, not a scoping one.
 
 ## The bundled CLI entry has now diverged from its twin three times (2026-08-10)
 
-`scripts/vlmkit-bundled.mjs` is what `tsdown.config.ts` builds into the published `bin`;
+`scripts/vlmkit-bundled.mjs` is what `vite.config.ts`'s `pack` block builds into the published `bin`;
 `src/cli/vlmkit.ts` is what the workspace runs. The bundled one exists only to inject the
 generated MoonBit bridge. Each divergence was **invisible in the repo and total in the shipped
 CLI**:

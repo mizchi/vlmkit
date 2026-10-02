@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { workspaceMermaid } from "../scripts/workspace-map.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");

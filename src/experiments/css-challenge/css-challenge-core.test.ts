@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import type { PaintTreeChange } from "@mizchi/vlmkit-capture/crater-client.ts";
 import type { VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";

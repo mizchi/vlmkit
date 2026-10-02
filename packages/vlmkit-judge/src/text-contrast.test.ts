@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { TEXT_CONTRAST_MAX_CANDIDATES, textContrastCandidates, type TextContrastSample } from "./integrity.ts";
 
 /**

@@ -39,7 +39,7 @@
  * whether the rules are right — they have their own tests.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import {
   callMarkupCoreJson,
   computeUiContractMarkerIssueIds,

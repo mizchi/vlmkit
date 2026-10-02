@@ -8,7 +8,7 @@
     "./*.ts": "./src/*.ts"
   },
   "scripts": {
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-mcp/src"
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-mcp/src"
   },
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",

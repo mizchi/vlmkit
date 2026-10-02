@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 import { STYLE_SAMPLING_JS } from "./style-sampling.ts";
 

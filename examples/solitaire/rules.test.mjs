@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { runInThisContext } from "node:vm";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 
 /**
  * Loaded the way the BROWSER loads it: source read, evaluated as a classic script.

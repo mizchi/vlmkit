@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { IMAGE_GEN_DEFAULT_MODEL } from "../../../../packages/vlmkit-ai/src/image-gen-client.ts";
 import { BRIEFS, briefHash } from "./briefs.ts";
 import { SAVED_EVALUATION } from "./image-gen-bench.ts";

@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { computeTrend, heightToleranceFor, pixelPresence } from "./markup-verify.ts";
 import { kickbackForComposition } from "./markup-verify-report.ts";

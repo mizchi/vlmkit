@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { glob } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 

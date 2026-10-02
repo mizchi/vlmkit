@@ -1,17 +1,36 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /**
- * Vitest configuration.
+ * Vite+ configuration: tests (`vp test`, Vitest 5), library builds (`vp pack`, tsdown 0.23),
+ * and the lint / format settings `vp lint` and `vp fmt` will use.
  *
- * The suite it runs was written against `node:test`, and the migration was a
- * specifier change — `describe`/`it`/`test`/`before`/`after`/`afterEach` have the
- * same names in vitest, and the assertions are `node:assert/strict` either way,
- * so nothing about how a test reads had to change. What vitest adds is coverage
- * (v8, no instrumentation step) and a per-file worker pool.
- *
- * Two settings here are load-bearing and would look arbitrary without the
- * measurement behind them.
+ * Replaces vitest.config.ts, tsdown.config.ts and tsdown.packages.config.ts. The test suite was
+ * written against `node:test`, and the move to Vitest was a specifier change: the assertions are
+ * `node:assert/strict` either way. Vitest adds coverage (v8, with no instrumentation step) and a
+ * pool of workers, one per test file.
  */
+
+/** The workspace packages `vp pack` builds and npm publishes. `vlmkit-mcp` is built by its own script. */
+const publicWorkspacePackages = [
+  "vlmkit-judge",
+  "vlmkit-core",
+  "vlmkit-ai",
+  "vlmkit-capture",
+  "vlmkit-animation-eval",
+  "vlmkit-generate",
+  "vlmkit-plan",
+  "vlmkit-markup",
+  "vlmkit-heal",
+] as const;
+
+/**
+ * tsdown 0.23 changed `deps.resolveDepSubpath` to default false. The old behaviour is kept until
+ * the emitted subpath imports have been checked against consumers. To adopt the new default,
+ * delete this setting and check the packed workspaces (`pnpm smoke:pack:workspaces`).
+ * https://tsdown.dev/options/dependencies#deps-resolvedepsubpath
+ */
+const resolveDepSubpath = true;
+
 export default defineConfig({
   test: {
     include: [
@@ -22,6 +41,11 @@ export default defineConfig({
       "examples/**/*.test.mjs",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**", "**/fixtures/**"],
+
+    // Vitest 5 clears mock call history before each test. No test here relies on calls recorded
+    // by setup or by an earlier test, but this keeps v4's behaviour until that has been checked.
+    // https://viteplus.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    clearMocks: false,
 
     /**
      * Most of this suite drives a real browser. Playwright launches Chromium per
@@ -35,12 +59,11 @@ export default defineConfig({
      * dividing it.
      */
     pool: "forks",
-    // Top-level in Vitest 4. The first draft of this file used
-    // `poolOptions: { forks: { maxForks: 4 } }`, which v4 REMOVED — it printed a
+    // Top-level since Vitest 4. The first draft of this setting used
+    // `poolOptions: { forks: { maxForks: 4 } }`, which v4 REMOVED. It printed a
     // deprecation notice and applied nothing, so the cap this comment justifies was
-    // not in force at all. Exactly the class of silent no-op the gates exist to catch.
+    // not in force at all. That is exactly the kind of silent no-op the gates exist to catch.
     maxWorkers: 4,
-    minWorkers: 1,
 
     /**
      * A browser launch plus a page load plus a settle is routinely past vitest's
@@ -56,11 +79,11 @@ export default defineConfig({
       reporter: ["text-summary", "json-summary", "html"],
       reportsDirectory: "test-results/coverage",
       /**
-       * Coverage is reported over the SOURCE this repo ships, which is the only
-       * number that means anything: `all: true` so an untested file counts as 0%
-       * rather than being absent from the denominator.
+       * Coverage is reported over the SOURCE this repo ships, which is the only number that
+       * means anything. Since Vitest 4 an `include` list is what puts an untested file in the
+       * denominator at 0% (v3's `all: true`). Vitest 5 matches these patterns against relative
+       * paths more precisely; `src/**` and `packages/*` are relative already.
        */
-      all: true,
       include: ["src/**/*.ts", "packages/*/src/**/*.ts"],
       /**
        * A floor, not a target. Measured 2026-08-16: statements 69.9-70.0%, branches 61.2%,
@@ -73,7 +96,7 @@ export default defineConfig({
        * file deleted.
        *
        * These are GLOBAL thresholds, so they only mean anything on a full run (`pnpm
-       * test:coverage`). `vitest run --coverage <one-file>` reports the whole `include` set with
+       * test:coverage`). `vp test run --coverage <one-file>` reports the whole `include` set with
        * one file's tests and fails all four by construction — that is not a regression, it is the
        * wrong command for the question.
        *
@@ -134,5 +157,83 @@ export default defineConfig({
         "src/experiments/migration/migration-fix-loop.ts",
       ],
     },
+  },
+
+  /**
+   * Every build `vp pack` runs, in one list, because `vp pack` has a `--filter` but no `--config`.
+   * A string filter matches a config's `name` or its `cwd` exactly (tsdown's `filterConfig`):
+   * - the root CLI, client and Playwright entry are the configs whose cwd is `.`, so `pnpm build`
+   *   runs `vp pack --filter .`. A `/regex/` filter given on the command line matched nothing.
+   * - each workspace package's own `build` script runs `vp pack --filter @mizchi/<name>`.
+   * A bare `vp pack` builds all of them.
+   */
+  pack: [
+    {
+      name: "vlmkit-root:cli",
+      entry: { vlmkit: "scripts/vlmkit-bundled.mjs" },
+      format: ["esm"],
+      platform: "node",
+      outDir: "dist",
+      clean: true,
+      deps: {
+        alwaysBundle: [/^@mizchi\/vlmkit-/],
+        neverBundle: ["typescript"],
+        resolveDepSubpath,
+      },
+    },
+    {
+      name: "vlmkit-root:client",
+      entry: { client: "src/api/client.ts" },
+      format: ["esm"],
+      platform: "node",
+      dts: true,
+      outDir: "dist",
+      clean: false,
+      deps: { resolveDepSubpath },
+    },
+    {
+      name: "vlmkit-root:playwright",
+      entry: { playwright: "src/playwright.ts" },
+      format: ["esm"],
+      platform: "node",
+      dts: true,
+      outDir: "dist",
+      clean: false,
+      deps: { resolveDepSubpath },
+    },
+    ...publicWorkspacePackages.map((directory) => ({
+      name: `@mizchi/${directory}`,
+      cwd: `packages/${directory}`,
+      entry: ["src/**/*.ts", "!src/**/*.test.ts"],
+      root: "src",
+      outDir: "dist",
+      clean: true,
+      format: ["esm" as const],
+      platform: "node" as const,
+      target: "node24",
+      dts: true,
+      unbundle: true,
+      deps: {
+        neverBundle: [/^@mizchi\/vlmkit-/],
+        resolveDepSubpath,
+      },
+    })),
+  ],
+
+  /**
+   * Settings for `vp lint` and `vp fmt`. NEITHER RUNS YET: no script, hook or CI job calls them,
+   * and the repository has never been formatted by a tool, so a first `vp fmt` rewrites most
+   * files. That rewrite belongs in its own commit. These values only match what the code
+   * already does, so it stays small: double quotes, semicolons, and 120 columns (p99 line
+   * length is 126).
+   */
+  lint: {
+    ignorePatterns: ["**/dist/**", "**/fixtures/**", "**/node_modules/**", "test-results/**", ".pages/**"],
+  },
+  fmt: {
+    printWidth: 120,
+    semi: true,
+    singleQuote: false,
+    ignorePatterns: ["**/dist/**", "**/fixtures/**", "**/node_modules/**", "test-results/**", ".pages/**"],
   },
 });

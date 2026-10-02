@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { UsageError } from "../cli-error.ts";
 import { defineGate, definePlugin, ruleRef } from "./contract.ts";
 import type { Finding, GateDefinition } from "./contract.ts";

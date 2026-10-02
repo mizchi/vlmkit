@@ -17,7 +17,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import { captureRoutes, cdpNodesToTree } from "./route-capture.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "vlmkit-route-capture-"));

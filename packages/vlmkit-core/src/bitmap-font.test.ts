@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { GLYPH_HEIGHT, GLYPH_WIDTH, drawText, fitText, measureText, textHeight } from "./bitmap-font.ts";
 
 function canvas(width: number, height: number) {

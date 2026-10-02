@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { judgeComposition } from "./composition.ts";
 import { sceneFromTree, sceneToCompositionInput, type SceneNode } from "./scene.ts";
 

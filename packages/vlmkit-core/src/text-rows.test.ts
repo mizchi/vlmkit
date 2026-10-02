@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { extractTextRowsFromRgba, matchTextRows, compareRowTypography, type TextRow } from "./text-rows.ts";
 
 /** Synthesize an RGBA buffer: white background with dark horizontal text bands. */

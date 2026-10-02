@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 import { analyzeCopy, type CopyCheckReport } from "@mizchi/vlmkit-judge/copy.ts";
 import { judgeSceneCopy, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";

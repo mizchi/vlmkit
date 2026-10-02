@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { designSample, judgeDesignPolicy } from "./design-policy.ts";
 import { sceneFromTree, sceneToDesignPolicyInput, type SceneNode } from "./scene.ts";
 

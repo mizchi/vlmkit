@@ -25,7 +25,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const packagesDir = join(repoRoot, "packages");
@@ -74,18 +74,20 @@ describe("workspace package test scripts", () => {
 
       // The specific dead combination, named so a revert reads as itself: a `node --test`
       // runner against files that import vitest cannot pass a single one of them.
-      const importsVitest = pkg.tests.filter((f) => readFileSync(f, "utf8").includes('from "vitest"'));
+      // Since Vite+ the import is `vite-plus/test`, a re-export of the same Vitest, with the
+      // same consequence: outside the runner it throws on import.
+      const importsVitest = pkg.tests.filter((f) => /from "(vitest|vite-plus\/test)"/.test(readFileSync(f, "utf8")));
       if (importsVitest.length > 0) {
         assert.doesNotMatch(
           pkg.script,
           /node\s+--test/,
-          `${pkg.name}: ${importsVitest.length} of ${pkg.tests.length} test files import "vitest", `
+          `${pkg.name}: ${importsVitest.length} of ${pkg.tests.length} test files import Vitest, `
           + `so \`node --test\` fails every one of them`,
         );
-        assert.match(pkg.script, /vitest/, `${pkg.name} must run its tests with vitest`);
+        assert.match(pkg.script, /\bvp test run\b/, `${pkg.name} must run its tests with \`vp test run\``);
       }
 
-      // And the filter has to select this package. `vitest run` with a path that matches
+      // And the filter has to select this package. `vp test run` with a path that matches
       // nothing exits 1 on "No test files found", which looks like a broken runner rather
       // than a wrong argument.
       const filters = pkg.script.split(/\s+/).filter((token) => token.includes("/"));

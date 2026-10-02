@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "vitest";
+import { afterEach, describe, it } from "vite-plus/test";
 import {
   getArg,
   getArgValues,

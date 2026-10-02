@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { clampBox, fitToBudget, toViewBox, viewBoxToOriginal, zoomSize } from "./zoom-geometry.ts";
 import { cropImage, decodeImage, encodePngImage, prepareZoomSource, resample, zoomInto, type RgbaImage } from "./zoom-image.ts";
 import { parseZoomRequests, runSingleLook, runZoomLoop, zoomCallFromArgs, type DriverTurn, type VisionChatDriver, type ZoomTurn } from "./zoom-loop.ts";

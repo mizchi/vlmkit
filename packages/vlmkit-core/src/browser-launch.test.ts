@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { BROWSER_ENGINES, BrowserLaunchError, launchBrowser, withBrowser } from "./browser-launch.ts";
 import { handleCliError } from "./cli-error.ts";
 

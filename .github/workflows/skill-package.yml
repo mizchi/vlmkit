@@ -70,7 +70,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Verify skill package contracts
-        run: pnpm exec vitest run tests/skill-package.test.mjs examples/vlmkit-intro-page/page.test.mjs
+        run: pnpm exec vp test run tests/skill-package.test.mjs examples/vlmkit-intro-page/page.test.mjs
 
       - name: Install with APM and skills CLI
         run: node scripts/smoke-skill-installers.mjs

@@ -26,9 +26,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-ai",
+    "build": "pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-ai",
     "prepack": "pnpm build",
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-ai/src"
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-ai/src"
   },
   "exports": {
     ".": {

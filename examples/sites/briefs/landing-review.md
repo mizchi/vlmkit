@@ -33,7 +33,7 @@ eye and whether they still hold. This round is the first one with pictures.
    `check interactions`, `check breakpoints --sweep`, `scan scroll`.
 5. Fix what you find in the page's own files (`index.html`, `styles.css`, `content.js`, `app.js`,
    `preferences.js`, `scenarios.js`, `copy.txt`). Keep its contract tests green —
-   `pnpm exec vitest run examples/vlmkit-intro-page/` — and keep both languages in step: copy lives in
+   `pnpm exec vp test run examples/vlmkit-intro-page/` — and keep both languages in step: copy lives in
    `content.js`, and `copy.txt` is the manifest the page is held to.
 6. Finish with a final round: the gate matrix and the new gates, full-page shots of all four states at
    desktop and phone, `check`, `done`.

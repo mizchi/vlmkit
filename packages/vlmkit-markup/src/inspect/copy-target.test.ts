@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual } from "node:assert";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { PNG } from "pngjs";
 import {
   buildContactSheets,

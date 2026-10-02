@@ -11,7 +11,7 @@
  * the table's, the same distinction that produced `ruleTier`.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { formatCraterSmokeReport } from "./crater-smoke.ts";
 

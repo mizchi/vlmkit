@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { compareLandscapeFromRgba } from "./landscape-diff.ts";
 import type { PngData } from "@mizchi/vlmkit-core/png-utils.ts";

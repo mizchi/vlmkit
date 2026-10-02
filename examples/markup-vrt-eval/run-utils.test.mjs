@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { summarizeVlmRegionDiff } from "./run-utils.mjs";
 
 test("summarizeVlmRegionDiff keeps concise paint change handoff rows", () => {

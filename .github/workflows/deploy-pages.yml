@@ -70,14 +70,14 @@ jobs:
       # contract is in `site-links.test.mjs`, split out so `page.test.mjs` stays runnable in
       # `skill-package.yml`, which has no Playwright.
       - name: Verify intro page contracts
-        run: pnpm exec vitest run examples/vlmkit-intro-page/
+        run: pnpm exec vp test run examples/vlmkit-intro-page/
 
       # The solitaire rules without a browser, then the view WITH one: real drag and drop,
       # keyboard play, the stock, all four animations, and two games PLAYED to 52/52 with the
       # table audited after every ply. This page exists to exercise what a pixel diff cannot see,
       # so a screenshot check would not be a substitute.
       - name: Verify solitaire rules and view
-        run: pnpm exec vitest run examples/solitaire/
+        run: pnpm exec vp test run examples/solitaire/
 
       # A third seed, won entirely through real `dragAndDrop` rather than through `commit`. The
       # suite above proves the game finishes; this proves the DRAG path finishes it, which is the
@@ -89,10 +89,10 @@ jobs:
       # outline marks something the command printed, and the pages equal a fresh render. No
       # browser: capturing again is `examples/demos/capture.mjs`, run by hand after a change.
       - name: Verify the feature demos
-        run: pnpm exec vitest run examples/demos/
+        run: pnpm exec vp test run examples/demos/
 
       - name: Verify the composed site layout
-        run: pnpm exec vitest run tests/pages-site.test.mjs
+        run: pnpm exec vp test run tests/pages-site.test.mjs
 
       # A published log says "this is how the site was judged", and the claim is only as good as
       # the files behind it: every log complete by its own `check` and ended in `done`, every
@@ -100,7 +100,7 @@ jobs:
       # gallery's numbers the logs' numbers. judge.test.mjs is the log tool's own contract, and
       # takes real screenshots in Chromium.
       - name: Verify the demo sites and their judgment logs
-        run: pnpm exec vitest run examples/sites/
+        run: pnpm exec vp test run examples/sites/
 
       - name: Run vlmkit dogfood state matrix
         shell: bash

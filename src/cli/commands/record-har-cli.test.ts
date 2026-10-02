@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { parseArgs } from "./record-har-cli.ts";
 

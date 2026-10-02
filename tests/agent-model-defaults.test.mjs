@@ -26,7 +26,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { OPENAI_DEFAULT_MODEL } from "../packages/vlmkit-ai/src/llm-client.ts";
 import { IMAGE_GEN_DEFAULT_MODEL } from "../packages/vlmkit-ai/src/image-gen-client.ts";
 

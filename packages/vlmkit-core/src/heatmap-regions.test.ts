@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { findHeatmapRegionsFromRgba } from "./heatmap-regions.ts";
 
 /** Synthesize an RGBA buffer with non-hot background + drawn hot rectangles. */

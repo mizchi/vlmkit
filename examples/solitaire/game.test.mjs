@@ -17,7 +17,7 @@
  * pile 2's hidden 6♣ as a 6♠ is exactly the kind of guess a test should not contain.
  */
 import assert from "node:assert/strict";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 
 const URL_BASE = `file://${process.cwd()}/examples/solitaire/index.html`;

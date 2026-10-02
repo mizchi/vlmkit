@@ -11,7 +11,7 @@
  * enforced is a monitoring regression dressed as a config change.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { formatPerfReport } from "./perf.ts";
 

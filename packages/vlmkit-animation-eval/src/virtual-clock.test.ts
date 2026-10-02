@@ -6,7 +6,7 @@
  * Without the clock, every page below came back as `uncontrolled-motion` ("mask the region or
  * stub the ticker") or, for the timer carousel, as nothing at all.
  */
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

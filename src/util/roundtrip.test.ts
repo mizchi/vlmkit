@@ -7,7 +7,7 @@
  *
  * これにより long-cycle の spec → verify パスが統合的に動くことを保証する。
  */
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

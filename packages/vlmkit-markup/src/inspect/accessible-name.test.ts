@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 import { ACCESSIBLE_NAME_JS } from "./accessible-name.ts";
 

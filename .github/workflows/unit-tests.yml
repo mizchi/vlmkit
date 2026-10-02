@@ -4,7 +4,7 @@ name: Unit tests
 # two consequences worth stating, since both are why this file exists:
 #
 #   1. Its trigger was that workflow's `paths:` list, written for VRT. Four of
-#      the five roots `vitest.config.ts` reads were absent from it, so a PR
+#      the five roots `vite.config.ts` reads were absent from it, so a PR
 #      confined to `packages/**`, `tests/**`, `examples/**` or `worker/**` ran
 #      no unit tests and reported green. `packages/` alone holds 188 test files.
 #   2. A test failure reported on the PR as a check named `bench` failing,
@@ -17,7 +17,7 @@ name: Unit tests
 on:
   pull_request:
     paths:
-      # Every root in `vitest.config.ts`'s `include` — where the tests live.
+      # Every root in `vite.config.ts`'s `include` — where the tests live.
       - "src/**"
       - "packages/**"
       - "tests/**"
@@ -38,7 +38,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig*.json"
-      - "vitest.config.ts"
+      - "vite.config.ts"
       - ".github/workflows/unit-tests.yml"
   push:
     branches: [main]

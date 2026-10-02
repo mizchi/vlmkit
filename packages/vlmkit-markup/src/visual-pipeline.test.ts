@@ -6,7 +6,7 @@
  *
  * Playwright 不要: Canvas API の代わりに pngjs で直接 PNG を生成する。
  */
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";

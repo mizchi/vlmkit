@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, it } from "vitest";
+import { afterEach, beforeEach, describe, it } from "vite-plus/test";
 import { createReasoningPipeline } from "./reasoning-pipeline.ts";
 import { resetVisionModelCache } from "./vlm-client.ts";
 import { VrtConfigError } from "./errors.ts";

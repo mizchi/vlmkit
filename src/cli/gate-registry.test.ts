@@ -8,7 +8,7 @@
  * used to be discoverable only by running the CLI.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { loadGateRegistry, resetGateRegistryCache } from "./gate-registry.ts";
 
 /**

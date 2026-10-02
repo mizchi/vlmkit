@@ -26,9 +26,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-capture",
+    "build": "pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-capture",
     "prepack": "pnpm build",
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-capture/src"
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-capture/src"
   },
   "exports": {
     ".": {

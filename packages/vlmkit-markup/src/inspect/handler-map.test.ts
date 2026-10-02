@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

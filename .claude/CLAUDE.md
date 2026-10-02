@@ -773,6 +773,29 @@ This repository is a pnpm workspace.
 
 Cross-package imports use `@mizchi/vlmkit-<pkg>/<path>.ts` or the curated barrel `@mizchi/vlmkit-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those. (This line said `@mizchi/vrt-<pkg>`, which no package has been called since 0.6 — an import written from it does not resolve.)
 
+**Toolchain: Vite+ (`vite-plus`, `vp`).** One `vite.config.ts` holds the test config (`vp test`, Vitest 5),
+every library build (`vp pack`, tsdown 0.23) and the lint / format settings. Tests import from
+`vite-plus/test`, which re-exports Vitest itself, so it throws on import outside the runner just as
+`vitest` did. Run one file with `pnpm exec vp test run <path>`. `pnpm-workspace.yaml` overrides `vite`
+and `vitest` to the copies Vite+ bundles; bump them together with `vite-plus`. Things to know
+before changing it:
+
+- **A `vp pack --filter` string matches a config's `name` or its `cwd` exactly.** A `/regex/` given
+  on the command line matched nothing and exited 0 with no `dist/`. So the root build is
+  `vp pack --filter .` (the three configs whose cwd is the root), and each package's own `build`
+  is `vp pack --filter @mizchi/<name>`. `vp pack` has no `--config`, so all twelve builds live in
+  that one `pack` list.
+- **pnpm stays 10.** `vp migrate` pins pnpm 12 through `devEngines`, even with
+  `VP_PACKAGE_MANAGER=pnpm@10…` set. It also runs Oxfmt over every file it rewrites, which turned an
+  import rename into 24,568 changed lines. The migration was redone by hand for that reason. Never
+  run `vp migrate` on this repository to "update" Vite+: bump the versions instead.
+- **`vp lint` and `vp fmt` are configured but run nowhere** (no script, hook or CI job). The repository
+  has never been formatted by a tool, so the first `vp fmt` is a commit of its own.
+- **`clearMocks: false` and `deps.resolveDepSubpath: true` keep the Vitest 4 / tsdown 0.21 behaviour**, and
+  the comment beside each says how to drop it. With them, `vp pack` emits the same files with the same
+  exported names as tsdown 0.21 did. The JavaScript differs only by `/* @__PURE__ */` notes and constant
+  folding, and the declarations only by inline `export` instead of a trailing export list.
+
 Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all. **Editing a `packages/*/src` file and then running the CLI shows the OLD behavior**: `@mizchi/vlmkit-*` resolves through `exports` to `dist/*.mjs`, so `pnpm build` has to run in between (and never pipe its output to `head` — SIGPIPE leaves a half-deleted `dist/`).
 
 The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.

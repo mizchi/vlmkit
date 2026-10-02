@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 import { existsSync } from "node:fs";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 
 type LegacyImport = {
   file: string;

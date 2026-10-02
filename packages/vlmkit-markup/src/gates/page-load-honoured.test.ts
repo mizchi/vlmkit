@@ -28,7 +28,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, it } from "vite-plus/test";
 import type { AnyGateDefinition } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { a11yTouchGate, breakpointsGate, handlersGate, layoutGate } from "./index.ts";
 

@@ -1,7 +1,7 @@
 /**
  * Coverage exclusions have to earn their place, and the rule is checkable.
  *
- * `vitest.config.ts` drops research and demo RUNNERS from the coverage denominator: entry points
+ * `vite.config.ts` drops research and demo RUNNERS from the coverage denominator: entry points
  * that nothing imports, need an API key or a 30-trial loop to do anything, and are invoked as
  * `node src/...` from `Taskfile.pkl` rather than shipped. 2,802 statements of those made the
  * metric worse at its job — it moved when a bench script was added and not when a gate lost its
@@ -19,18 +19,18 @@ import { readFileSync } from "node:fs";
 import { glob } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Excluded paths under the two runner directories — the ones this rule governs. */
 function excludedRunnerPaths() {
-  const cfg = readFileSync(join(repoRoot, "vitest.config.ts"), "utf8");
+  const cfg = readFileSync(join(repoRoot, "vite.config.ts"), "utf8");
   // From `coverage:` onward. Anchoring on `exclude: [` alone found the WRONG array — vitest has
   // a `test.exclude` for node_modules/dist that appears first — and matched nothing, which the
   // length guard below is what caught.
   const coverage = cfg.slice(cfg.indexOf("coverage: {"));
-  assert.ok(coverage.length > 0, "vitest.config.ts no longer has a coverage block");
+  assert.ok(coverage.length > 0, "vite.config.ts no longer has a coverage block");
   // Quoted paths only, so the rationale prose above the list (which names
   // `migration-compare.ts` as the counter-example) does not read as an entry.
   return [...coverage.matchAll(/"(src\/(?:demo|experiments)\/[^"]+)"/g)].map((m) => m[1]);

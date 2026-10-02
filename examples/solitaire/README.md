@@ -28,7 +28,7 @@ vlmkit check interactions "file://$PWD/examples/solitaire/index.html?animate=0"
 
 # Its own tests: 31 rules cases with no browser, 26 view cases in Chromium —
 # two of which PLAY the game to 52/52, auditing the table after every ply
-pnpm vitest run examples/solitaire/
+pnpm exec vp test run examples/solitaire/
 
 # Prove it is winnable and that the page finishes it, over more seeds
 node examples/solitaire/solve.mjs --seeds 20                    # is each deal solvable at all?

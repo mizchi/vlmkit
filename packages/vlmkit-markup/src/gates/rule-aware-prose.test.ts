@@ -13,7 +13,7 @@
  * writing out every field of eight report types would obscure which ones matter.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { formatA11yContrastReport } from "../a11y-contrast.ts";
 import { formatA11yTouchReport } from "../a11y-touch.ts";

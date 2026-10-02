@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { composeFilmstrip } from "./filmstrip.ts";
 import type { PngData } from "./png-utils.ts";
 import {

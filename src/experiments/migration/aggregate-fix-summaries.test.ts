@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { buildRows, renderMarkdown, renderTsv } from "./aggregate-fix-summaries.ts";
 
 function makeSummary(overrides: Partial<Parameters<typeof renderMarkdown>[0][number]> = {}): Parameters<typeof renderMarkdown>[0][number] {

@@ -6,7 +6,7 @@
  * module loading against 85ms for the formatter alone. Nothing here needs a
  * browser and now nothing here loads one.
  */
-import { describe, it, test } from "vitest";
+import { describe, it, test } from "vite-plus/test";
 import assert from "node:assert/strict";
 import type { ScrollportRegion } from "./semantic-drilldown.ts";
 import type { ComponentCanvasEvidence } from "./component-goal.ts";

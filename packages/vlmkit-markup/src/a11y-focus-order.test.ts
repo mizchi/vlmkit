@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { analyzeFocusOrderSteps, type FocusStep } from "./a11y-focus-order.ts";
 import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";

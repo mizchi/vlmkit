@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { runFlowVerify, type Flow } from "./flow-verify.ts";

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { access, readFile, readdir, stat } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skillsPackage = join(repoRoot, "skills/vlmkit");

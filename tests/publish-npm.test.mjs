@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 import { publicPackages, publishOrder } from "../scripts/publish-npm.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));

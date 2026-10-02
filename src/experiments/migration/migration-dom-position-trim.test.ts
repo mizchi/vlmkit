@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import type { DpEntry, DpEntryWithViewport } from "@mizchi/vlmkit-core/dom-position-styles.ts";
 import { trimDomPositionEntriesByClassPair } from "./migration-compare.ts";
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { parseA11yTree } from "@mizchi/vlmkit-judge/a11y-tree.ts";
 import { runCheckA11yTree } from "./check-a11y-tree.ts";

@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -43,7 +43,7 @@ describe("package manifest for publishable CLI", () => {
     const engines = pkg.engines as Record<string, string> | undefined;
 
     assert.equal(typeof scripts?.build, "string");
-    assert.match(scripts!.build, /\btsdown\b/);
+    assert.match(scripts!.build, /\bvp pack\b/);
     assert.deepEqual(engines, { node: ">=24" });
   });
 
@@ -62,16 +62,16 @@ describe("package manifest for publishable CLI", () => {
     const scripts = pkg.scripts as Record<string, string> | undefined;
 
     assert.ok(scripts, "package.json should define scripts");
-    assert.equal(scripts["test:examples"], "vitest run examples");
+    assert.equal(scripts["test:examples"], "vp test run examples");
     assert.equal(scripts["dogfood:markup-vrt:offline"], "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs");
   });
 
   it("keeps the example tests inside the default suite, wherever the globs live", async () => {
     // This used to read `assert.match(scripts.test, /examples.*test\.mjs/)`, which
-    // stopped meaning anything the moment the runner moved: `vitest run` names no
+    // stopped meaning anything the moment the runner moved: `vp test run` names no
     // globs at all. The guard's intent — an example that breaks fails `pnpm test` —
-    // now has to be checked where the globs actually are.
-    const config = await readFile(new URL("../../vitest.config.ts", import.meta.url), "utf8");
+    // now has to be checked where the globs actually are (vite.config.ts's `test` block).
+    const config = await readFile(new URL("../../vite.config.ts", import.meta.url), "utf8");
     assert.match(config, /"examples\/\*\*\/\*\.test\.mjs"/);
     assert.match(config, /"src\/\*\*\/\*\.test\.ts"/);
     assert.match(config, /"packages\/\*\/src\/\*\*\/\*\.test\.ts"/);
@@ -180,7 +180,7 @@ describe("package manifest for publishable CLI", () => {
   it("keeps TypeScript external when the bundled CLI loads vlmkit-generate", async () => {
     const pkg = await readPackageJson();
     const dependencies = pkg.dependencies as Record<string, string> | undefined;
-    const tsdownConfig = await readFile(resolve(repoRoot, "tsdown.config.ts"), "utf-8");
+    const tsdownConfig = await readFile(resolve(repoRoot, "vite.config.ts"), "utf-8");
 
     assert.match(
       dependencies?.typescript ?? "",
@@ -226,7 +226,7 @@ describe("package manifest for publishable CLI", () => {
       const exports = pkg.exports as Record<string, unknown> | undefined;
       const bin = pkg.bin as Record<string, string> | undefined;
 
-      assert.match(scripts?.build ?? "", /\btsdown\b/, `${name} should build JavaScript with tsdown`);
+      assert.match(scripts?.build ?? "", /\bvp pack --filter /, `${name} should build JavaScript with vp pack`);
       assert.equal(scripts?.prepack, "pnpm build", `${name} should build before packing`);
       assert.deepEqual(engines, { node: ">=24" }, `${name} should declare its Node runtime`);
       assert.deepEqual(publishConfig, { access: "public" }, `${name} should publish publicly`);

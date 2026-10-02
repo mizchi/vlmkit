@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import { afterEach, describe, it } from "vitest";
+import { afterEach, describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 import {

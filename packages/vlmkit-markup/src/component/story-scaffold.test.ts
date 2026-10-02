@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import {
   DEFAULT_NOISE_PIXELS,
   THRESHOLD_CEILING,

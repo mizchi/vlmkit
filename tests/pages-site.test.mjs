@@ -25,7 +25,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { onTestFinished, test } from "vitest";
+import { onTestFinished, test } from "vite-plus/test";
 import { logPaths, publishedFiles, readLog } from "../examples/sites/judge.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));

@@ -8,7 +8,7 @@
  *
  * 全シナリオの結果をスコア化し、ハーネス自体の品質を定量化する。
  */
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

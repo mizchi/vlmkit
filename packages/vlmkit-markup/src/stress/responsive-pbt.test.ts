@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { responsiveGate } from "../gates/responsive.gate.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import {

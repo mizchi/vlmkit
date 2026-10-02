@@ -26,9 +26,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-plan",
+    "build": "pnpm --dir ../.. exec vp pack --filter @mizchi/vlmkit-plan",
     "prepack": "pnpm build",
-    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-plan/src"
+    "test": "pnpm --dir ../.. exec vp test run packages/vlmkit-plan/src"
   },
   "bin": {
     "vlmkit-plan": "./dist/cli.mjs"

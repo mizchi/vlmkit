@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
 import { judgeDesignPolicy, type DesignPolicyInput } from "@mizchi/vlmkit-judge/design-policy.ts";
 import { sceneToDesignPolicyInput, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";

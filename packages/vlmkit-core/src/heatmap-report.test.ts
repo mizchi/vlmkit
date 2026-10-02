@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { resolve, join } from "node:path";
 import { mkdir } from "node:fs/promises";

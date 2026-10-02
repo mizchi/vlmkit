@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, vi } from "vite-plus/test";
 
 /**
  * The Gemini path goes through the `@google/generative-ai` SDK rather than `fetch`, so it needs a
