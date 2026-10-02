@@ -72,12 +72,8 @@ test("buildSemanticDrilldown prioritizes layout flow for coarse landscape change
       landmark({ role: "banner", path: "header[0]", bbox: { left: 0, top: 0, width: 320, height: 80 } }),
       landmark({ role: "main", path: "main[0]", bbox: { left: 0, top: 80, width: 320, height: 420 }, order: 1 }),
     ],
-    landscapeCells: [
-      cell({ x: 0, y: 90, width: 160, height: 120, score: 0.24 }),
-    ],
-    heatmapRegions: [
-      heat({ left: 8, top: 96, width: 80, height: 24, area: 1600, kind: "text" }),
-    ],
+    landscapeCells: [cell({ x: 0, y: 90, width: 160, height: 120, score: 0.24 })],
+    heatmapRegions: [heat({ left: 8, top: 96, width: 80, height: 24, area: 1600, kind: "text" })],
   });
 
   assert.equal(rows.length, 1);
@@ -91,12 +87,8 @@ test("buildSemanticDrilldown separates decoration flow when only local paint dif
     landmarks: [
       landmark({ role: "complementary", path: "aside[0]", bbox: { left: 200, top: 80, width: 120, height: 300 } }),
     ],
-    landscapeCells: [
-      cell({ x: 0, y: 0, width: 80, height: 80, score: 0.01 }),
-    ],
-    heatmapRegions: [
-      heat({ left: 220, top: 120, width: 64, height: 64, area: 3200, kind: "image" }),
-    ],
+    landscapeCells: [cell({ x: 0, y: 0, width: 80, height: 80, score: 0.01 })],
+    heatmapRegions: [heat({ left: 220, top: 120, width: 64, height: 64, area: 3200, kind: "image" })],
   });
 
   assert.equal(rows.length, 1);
@@ -110,12 +102,8 @@ test("selectNextSemanticDrilldown prefers layout before decoration even when dec
       landmark({ role: "complementary", path: "aside[0]", bbox: { left: 0, top: 0, width: 100, height: 100 } }),
       landmark({ role: "region", path: "section[0]", bbox: { left: 120, top: 0, width: 100, height: 100 }, order: 1 }),
     ],
-    landscapeCells: [
-      cell({ x: 120, y: 0, width: 50, height: 50, score: 0.1 }),
-    ],
-    heatmapRegions: [
-      heat({ left: 0, top: 0, width: 100, height: 100, area: 10000 }),
-    ],
+    landscapeCells: [cell({ x: 120, y: 0, width: 50, height: 50, score: 0.1 })],
+    heatmapRegions: [heat({ left: 0, top: 0, width: 100, height: 100, area: 10000 })],
   });
 
   assert.equal(rows[0]!.flow, "decoration");

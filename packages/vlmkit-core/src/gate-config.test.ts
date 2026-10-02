@@ -15,21 +15,39 @@ const json = (value: unknown) => JSON.stringify(value);
 
 describe("parseGateConfig", () => {
   it("accepts a minimal config", () => {
-    const config = parseGateConfig(json({
-      defaults: { gates: ["check integrity"] },
-      pages: [{ source: "index.html" }],
-    }));
+    const config = parseGateConfig(
+      json({
+        defaults: { gates: ["check integrity"] },
+        pages: [{ source: "index.html" }],
+      }),
+    );
     assert.deepEqual(config.pages, [{ id: "index.html", source: "index.html" }]);
     assert.deepEqual(config.defaults?.gates, ["check integrity"]);
   });
 
   it("defaults a page id to its source, and keeps ids unique", () => {
-    const config = parseGateConfig(json({
-      pages: [{ source: "a.html", gates: ["check integrity"] }, { id: "b", source: "b.html", gates: ["check design"] }],
-    }));
-    assert.deepEqual(config.pages.map((p) => p.id), ["a.html", "b"]);
+    const config = parseGateConfig(
+      json({
+        pages: [
+          { source: "a.html", gates: ["check integrity"] },
+          { id: "b", source: "b.html", gates: ["check design"] },
+        ],
+      }),
+    );
+    assert.deepEqual(
+      config.pages.map((p) => p.id),
+      ["a.html", "b"],
+    );
     assert.throws(
-      () => parseGateConfig(json({ pages: [{ id: "x", source: "a.html", gates: ["g"] }, { id: "x", source: "b.html", gates: ["g"] }] })),
+      () =>
+        parseGateConfig(
+          json({
+            pages: [
+              { id: "x", source: "a.html", gates: ["g"] },
+              { id: "x", source: "b.html", gates: ["g"] },
+            ],
+          }),
+        ),
       /duplicate page id "x"/,
     );
   });
@@ -38,35 +56,40 @@ describe("parseGateConfig", () => {
     // A flag records what was silenced but not why, which is exactly the state
     // that gets re-approved a year later without anyone knowing what it was for.
     assert.throws(
-      () => parseGateConfig(json({
-        pages: [{
-          source: "a.html",
-          gates: ["check copy"],
-          suppressions: [{ gate: "check copy", flag: "--allow-invisible hidden" }],
-        }],
-      })),
+      () =>
+        parseGateConfig(
+          json({
+            pages: [
+              {
+                source: "a.html",
+                gates: ["check copy"],
+                suppressions: [{ gate: "check copy", flag: "--allow-invisible hidden" }],
+              },
+            ],
+          }),
+        ),
       /pages\[0\]\.suppressions\[0\]: reason is required/,
     );
   });
 
   it("rejects a malformed or impossible expiry", () => {
-    const withExpiry = (expires: string) => json({
-      pages: [{
-        source: "a.html",
-        gates: ["check copy"],
-        suppressions: [{ gate: "check copy", flag: "--x", reason: "r", expires }],
-      }],
-    });
+    const withExpiry = (expires: string) =>
+      json({
+        pages: [
+          {
+            source: "a.html",
+            gates: ["check copy"],
+            suppressions: [{ gate: "check copy", flag: "--x", reason: "r", expires }],
+          },
+        ],
+      });
     assert.throws(() => parseGateConfig(withExpiry("soon")), /expires must be YYYY-MM-DD/);
     assert.throws(() => parseGateConfig(withExpiry("2026-13-45")), /not a real date/);
     assert.doesNotThrow(() => parseGateConfig(withExpiry("2026-12-01")));
   });
 
   it("refuses a page with no gates from any source", () => {
-    assert.throws(
-      () => parseGateConfig(json({ pages: [{ source: "a.html" }] })),
-      /pages\[0\]: no gates/,
-    );
+    assert.throws(() => parseGateConfig(json({ pages: [{ source: "a.html" }] })), /pages\[0\]: no gates/);
   });
 
   it("refuses an empty page list rather than running nothing", () => {
@@ -109,13 +132,25 @@ describe("gateMatches", () => {
 
 describe("resolveSuppression", () => {
   it("treats the expiry day itself as still valid", () => {
-    assert.equal(resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-08-02" }, "p", NOW).status, "active");
-    assert.equal(resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-08-01" }, "p", NOW).status, "expired");
+    assert.equal(
+      resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-08-02" }, "p", NOW).status,
+      "active",
+    );
+    assert.equal(
+      resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-08-01" }, "p", NOW).status,
+      "expired",
+    );
   });
 
   it("reports days left, negative when overdue", () => {
-    assert.equal(resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-08-12" }, "p", NOW).daysLeft, 10);
-    assert.equal(resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-07-28" }, "p", NOW).daysLeft, -5);
+    assert.equal(
+      resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-08-12" }, "p", NOW).daysLeft,
+      10,
+    );
+    assert.equal(
+      resolveSuppression({ gate: "g", flag: "-f", reason: "r", expires: "2026-07-28" }, "p", NOW).daysLeft,
+      -5,
+    );
   });
 
   it("calls a missing expiry permanent rather than active", () => {
@@ -149,7 +184,10 @@ describe("annotated rule settings", () => {
       },
     });
     assert.deepEqual(config.defaults!.rules, { "check.integrity/low-contrast-text": "warn" });
-    assert.equal(config.defaults!.ruleAnnotations!["check.integrity/low-contrast-text"]!.reason, "brand grey is signed off by design");
+    assert.equal(
+      config.defaults!.ruleAnnotations!["check.integrity/low-contrast-text"]!.reason,
+      "brand grey is signed off by design",
+    );
   });
 
   it("requires a reason in the long form — that is the whole point of it", () => {
@@ -160,7 +198,10 @@ describe("annotated rule settings", () => {
   it("rejects a bad setting or expiry with the JSON path, like every other config defect", () => {
     assert.throws(() => withRules({ "a/b": { setting: "nope", reason: "r" } }), /\["a\/b"\]\.setting/);
     assert.throws(() => withRules({ "a/b": { setting: "off", reason: "r", expires: "soon" } }), /expires.*YYYY-MM-DD/s);
-    assert.throws(() => withRules({ "a/b": { setting: "off", reason: "r", expires: "2026-13-40" } }), /not a real date/);
+    assert.throws(
+      () => withRules({ "a/b": { setting: "off", reason: "r", expires: "2026-13-40" } }),
+      /not a real date/,
+    );
   });
 
   it("enumerates a rule setting in the same inventory as a suppression, tagged by kind", () => {
@@ -192,10 +233,13 @@ describe("annotated rule settings", () => {
 
   it("lets a page renew an expired default rather than inheriting its expiry", () => {
     const plan = resolveGatePlan(
-      withRules(
-        { "check.integrity/text-collision": { setting: "off", reason: "old", expires: "2026-07-01" } },
-        [{ id: "home", source: "index.html", rules: { "check.integrity/text-collision": { setting: "off", reason: "renewed", expires: "2026-12-01" } } }],
-      ),
+      withRules({ "check.integrity/text-collision": { setting: "off", reason: "old", expires: "2026-07-01" } }, [
+        {
+          id: "home",
+          source: "index.html",
+          rules: { "check.integrity/text-collision": { setting: "off", reason: "renewed", expires: "2026-12-01" } },
+        },
+      ]),
       { now: NOW },
     );
     assert.deepEqual(plan.jobs[0]!.rules, { "check.integrity/text-collision": "off" });
@@ -204,10 +248,11 @@ describe("annotated rule settings", () => {
 
   it("resolves default annotations once, not once per page", () => {
     const plan = resolveGatePlan(
-      withRules(
-        { "check.integrity/text-collision": { setting: "off", reason: "shared" } },
-        [{ source: "a.html" }, { source: "b.html" }, { source: "c.html" }],
-      ),
+      withRules({ "check.integrity/text-collision": { setting: "off", reason: "shared" } }, [
+        { source: "a.html" },
+        { source: "b.html" },
+        { source: "c.html" },
+      ]),
       { now: NOW },
     );
     assert.equal(plan.suppressions.filter((s) => s.kind === "rule").length, 1);
@@ -220,37 +265,47 @@ describe("annotated rule settings", () => {
 });
 
 describe("resolveGatePlan", () => {
-  const config: GateConfig = parseGateConfig(json({
-    defaults: { gates: ["check integrity", "check design"] },
-    pages: [
-      {
-        id: "checkout",
-        source: "checkout.html",
-        extraGates: ["check copy --manifest copy.txt"],
-        suppressions: [{
-          gate: "check copy",
-          flag: "--allow-invisible visually-hidden",
-          reason: "skip link is assistive-tech only",
-          owner: "web-platform",
-          expires: "2026-12-01",
-        }],
-      },
-      { id: "game", source: "game.html", gates: ["check design"], suppressions: [{
-        gate: "check design",
-        flag: "--min-reuse 2",
-        reason: "zones intentionally differ",
-        expires: "2026-07-01",
-      }] },
-    ],
-  }));
+  const config: GateConfig = parseGateConfig(
+    json({
+      defaults: { gates: ["check integrity", "check design"] },
+      pages: [
+        {
+          id: "checkout",
+          source: "checkout.html",
+          extraGates: ["check copy --manifest copy.txt"],
+          suppressions: [
+            {
+              gate: "check copy",
+              flag: "--allow-invisible visually-hidden",
+              reason: "skip link is assistive-tech only",
+              owner: "web-platform",
+              expires: "2026-12-01",
+            },
+          ],
+        },
+        {
+          id: "game",
+          source: "game.html",
+          gates: ["check design"],
+          suppressions: [
+            {
+              gate: "check design",
+              flag: "--min-reuse 2",
+              reason: "zones intentionally differ",
+              expires: "2026-07-01",
+            },
+          ],
+        },
+      ],
+    }),
+  );
 
   it("expands defaults plus extras, in order", () => {
     const plan = resolveGatePlan(config, { now: NOW });
-    assert.deepEqual(plan.jobs.filter((j) => j.pageId === "checkout").map((j) => j.baseGate), [
-      "check integrity",
-      "check design",
-      "check copy --manifest copy.txt",
-    ]);
+    assert.deepEqual(
+      plan.jobs.filter((j) => j.pageId === "checkout").map((j) => j.baseGate),
+      ["check integrity", "check design", "check copy --manifest copy.txt"],
+    );
   });
 
   it("appends an active suppression's flag to the matching gate only", () => {
@@ -280,13 +335,18 @@ describe("resolveGatePlan", () => {
   });
 
   it("applies default-scope suppressions to every page", () => {
-    const shared = parseGateConfig(json({
-      defaults: {
-        gates: ["check copy --manifest c.txt"],
-        suppressions: [{ gate: "check copy", flag: "--allow-invisible visually-hidden", reason: "sr-only nav" }],
-      },
-      pages: [{ id: "a", source: "a.html" }, { id: "b", source: "b.html" }],
-    }));
+    const shared = parseGateConfig(
+      json({
+        defaults: {
+          gates: ["check copy --manifest c.txt"],
+          suppressions: [{ gate: "check copy", flag: "--allow-invisible visually-hidden", reason: "sr-only nav" }],
+        },
+        pages: [
+          { id: "a", source: "a.html" },
+          { id: "b", source: "b.html" },
+        ],
+      }),
+    );
     const plan = resolveGatePlan(shared, { now: NOW });
     assert.equal(plan.jobs.length, 2);
     assert.ok(plan.jobs.every((j) => j.gate.endsWith("--allow-invisible visually-hidden")));
@@ -333,6 +393,9 @@ describe("summarizeSuppressions", () => {
   });
 
   it("sorts expired first, then soonest expiry", () => {
-    assert.deepEqual(summarizeSuppressions(rows).rows.map((r) => r.gate), ["a", "b", "c", "d"]);
+    assert.deepEqual(
+      summarizeSuppressions(rows).rows.map((r) => r.gate),
+      ["a", "b", "c", "d"],
+    );
   });
 });

@@ -73,9 +73,7 @@ export function gateToolArgv(
 ): string[] {
   const inputs = (gate.inputs ?? []).filter((i) => !options.omit?.includes(i.name));
   const key = (input: GateInput) => options.aliases?.[input.name] ?? camel(input.name);
-  const positionals = inputs
-    .filter((i) => i.positional !== undefined)
-    .sort((a, b) => a.positional! - b.positional!);
+  const positionals = inputs.filter((i) => i.positional !== undefined).sort((a, b) => a.positional! - b.positional!);
   const argv: string[] = [];
   for (const input of positionals) {
     const value = args[key(input)];
@@ -122,13 +120,14 @@ export function gateToolSummary(
   gate: AnyGateDefinition,
   outcome: { counts: { suspect: number; warn: number }; report: unknown },
 ): string {
-  const state = outcome.counts.suspect === 0
-    ? (outcome.counts.warn > 0 ? `ok (${outcome.counts.warn} warn)` : "ok")
-    : `${outcome.counts.suspect} suspect issue(s)${outcome.counts.warn > 0 ? `, ${outcome.counts.warn} warn` : ""}`;
+  const state =
+    outcome.counts.suspect === 0
+      ? outcome.counts.warn > 0
+        ? `ok (${outcome.counts.warn} warn)`
+        : "ok"
+      : `${outcome.counts.suspect} suspect issue(s)${outcome.counts.warn > 0 ? `, ${outcome.counts.warn} warn` : ""}`;
   const headline = gate.headline?.(outcome.report);
-  return headline
-    ? `${gateToolName(gate)}: ${headline} — ${state}`
-    : `${gateToolName(gate)}: ${state}`;
+  return headline ? `${gateToolName(gate)}: ${headline} — ${state}` : `${gateToolName(gate)}: ${state}`;
 }
 
 /**

@@ -110,7 +110,10 @@ describe("GitHub repo page fixtures", () => {
       }
       const desktopLinks = countNavLinks(desktop);
       const mobileLinks = countNavLinks(mobile);
-      assert.ok(desktopLinks > mobileLinks, `desktop nav links (${desktopLinks}) should exceed mobile (${mobileLinks})`);
+      assert.ok(
+        desktopLinks > mobileLinks,
+        `desktop nav links (${desktopLinks}) should exceed mobile (${mobileLinks})`,
+      );
     });
   });
 
@@ -126,7 +129,10 @@ describe("GitHub repo page fixtures", () => {
     it("should detect image without alt", async () => {
       const broken = await loadTree("github-repo", "regression-nav-broken.a11y.json");
       const issues = verifyA11yTree(broken);
-      assert.ok(issues.some((i) => i.rule === "img-alt-missing"), "should detect img without alt");
+      assert.ok(
+        issues.some((i) => i.rule === "img-alt-missing"),
+        "should detect img without alt",
+      );
     });
 
     it("should detect regression when diffing baseline vs broken", async () => {
@@ -140,10 +146,7 @@ describe("GitHub repo page fixtures", () => {
     it("reasoning should reject refactor that breaks labels", async () => {
       const baseline = await loadTree("github-repo", "baseline-desktop.a11y.json");
       const broken = await loadTree("github-repo", "regression-nav-broken.a11y.json");
-      const diff = diffA11yTrees(
-        snapshotFromTree("page", baseline),
-        snapshotFromTree("page", broken),
-      );
+      const diff = diffA11yTrees(snapshotFromTree("page", baseline), snapshotFromTree("page", broken));
       const intent: ChangeIntent = {
         summary: "refactor: extract header component",
         changeType: "refactor",
@@ -281,10 +284,7 @@ describe("Google search page fixtures", () => {
         walk(tree, false);
         return n;
       }
-      assert.ok(
-        countHeaderLinks(desktop) > countHeaderLinks(mobile),
-        "mobile header should have fewer items",
-      );
+      assert.ok(countHeaderLinks(desktop) > countHeaderLinks(mobile), "mobile header should have fewer items");
     });
   });
 
@@ -307,10 +307,7 @@ describe("Google search page fixtures", () => {
     it("reasoning should reject feature change that empties results", async () => {
       const baseline = await loadTree("google-search", "baseline-desktop.a11y.json");
       const broken = await loadTree("google-search", "regression-results-broken.a11y.json");
-      const diff = diffA11yTrees(
-        snapshotFromTree("page", baseline),
-        snapshotFromTree("page", broken),
-      );
+      const diff = diffA11yTrees(snapshotFromTree("page", baseline), snapshotFromTree("page", broken));
       const intent: ChangeIntent = {
         summary: "refactor: migrate search API client",
         changeType: "refactor",
@@ -352,10 +349,7 @@ describe("responsive diff summary", () => {
       const mobile = await loadTree(site, "baseline-mobile.a11y.json");
       const diff = diffA11yTrees(snap(`${site}-desktop`, desktop), snap(`${site}-mobile`, mobile));
       // Both sites should have significant responsive differences
-      assert.ok(
-        diff.changes.length >= 3,
-        `${site}: expected >=3 responsive changes, got ${diff.changes.length}`,
-      );
+      assert.ok(diff.changes.length >= 3, `${site}: expected >=3 responsive changes, got ${diff.changes.length}`);
       // But responsive changes should NOT be flagged as regression
       // (some may be due to removed elements which the tool flags)
       // The point is that we can detect and quantify the differences
@@ -366,7 +360,16 @@ describe("responsive diff summary", () => {
 // ---- Helper ----
 
 function quickIntrospect(testId: string, tree: A11yNode) {
-  const LANDMARK = new Set(["banner", "main", "navigation", "contentinfo", "form", "region", "search", "complementary"]);
+  const LANDMARK = new Set([
+    "banner",
+    "main",
+    "navigation",
+    "contentinfo",
+    "form",
+    "region",
+    "search",
+    "complementary",
+  ]);
   const INTERACTIVE = new Set(["button", "link", "textbox", "checkbox", "radio", "searchbox", "switch", "combobox"]);
   const landmarks: { role: string; name: string }[] = [];
   const interactive: { role: string; name: string; hasLabel: boolean }[] = [];

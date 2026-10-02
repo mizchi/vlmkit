@@ -9,10 +9,10 @@ import { PNG } from "pngjs";
 export type ResolutionPreset = "low" | "medium" | "high" | "full";
 
 export const RESOLUTION_PRESETS: Record<ResolutionPreset, { maxWidth: number; maxHeight: number }> = {
-  low: { maxWidth: 375, maxHeight: 320 },      // mobile viewport width. ~130 tokens
-  medium: { maxWidth: 640, maxHeight: 480 },    // breakpoint boundary. ~200 tokens
-  high: { maxWidth: 1280, maxHeight: 900 },     // desktop viewport. ~500 tokens
-  full: { maxWidth: 4096, maxHeight: 4096 },    // original size
+  low: { maxWidth: 375, maxHeight: 320 }, // mobile viewport width. ~130 tokens
+  medium: { maxWidth: 640, maxHeight: 480 }, // breakpoint boundary. ~200 tokens
+  high: { maxWidth: 1280, maxHeight: 900 }, // desktop viewport. ~500 tokens
+  full: { maxWidth: 4096, maxHeight: 4096 }, // original size
 };
 
 /**
@@ -42,9 +42,10 @@ export interface ResizeOptions {
 
 /** Resize PNG buffer to fit within the given size. Preserves aspect ratio. */
 export function resizePngBuffer(pngBuffer: Buffer, options: ResizeOptions = {}): Buffer {
-  const preset = typeof options.resolution === "string"
-    ? RESOLUTION_PRESETS[options.resolution]
-    : options.resolution ?? RESOLUTION_PRESETS.medium;
+  const preset =
+    typeof options.resolution === "string"
+      ? RESOLUTION_PRESETS[options.resolution]
+      : (options.resolution ?? RESOLUTION_PRESETS.medium);
 
   const src = PNG.sync.read(pngBuffer);
 
@@ -89,9 +90,10 @@ export function readPngDimensions(buf: Buffer): { width: number; height: number 
 
 /** Resize a base64 PNG to the specified resolution. Returns base64. */
 export function resizeBase64Png(base64: string, options: ResizeOptions = {}): string {
-  const preset = typeof options.resolution === "string"
-    ? RESOLUTION_PRESETS[options.resolution]
-    : options.resolution ?? RESOLUTION_PRESETS.medium;
+  const preset =
+    typeof options.resolution === "string"
+      ? RESOLUTION_PRESETS[options.resolution]
+      : (options.resolution ?? RESOLUTION_PRESETS.medium);
 
   const buf = Buffer.from(base64, "base64");
   const { width, height } = readPngDimensions(buf);

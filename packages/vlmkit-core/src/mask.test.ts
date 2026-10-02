@@ -30,14 +30,13 @@ afterAll(async () => {
 async function fixture(): Promise<Page> {
   const page = await (await getBrowser()).newPage();
   await page.setContent(
-    `<!doctype html><body><div class="keep">K</div><div class="a">A</div>`
-    + `<div class="b">B</div><div class="c">C</div></body>`,
+    `<!doctype html><body><div class="keep">K</div><div class="a">A</div>` +
+      `<div class="b">B</div><div class="c">C</div></body>`,
   );
   return page;
 }
 
-const visibility = (page: Page, selector: string) =>
-  page.$eval(selector, (el) => getComputedStyle(el).visibility);
+const visibility = (page: Page, selector: string) => page.$eval(selector, (el) => getComputedStyle(el).visibility);
 
 describe("applyMask", () => {
   it("hides every valid selector even when one of them is invalid", async () => {

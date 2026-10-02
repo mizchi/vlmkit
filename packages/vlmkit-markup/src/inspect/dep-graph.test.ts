@@ -16,10 +16,7 @@ function makeNode(id: string, opts: Partial<DepNode> = {}): DepNode {
   };
 }
 
-function makeGraph(
-  nodes: DepNode[],
-  edges: Array<[string, string, string[]]>
-): DepGraph {
+function makeGraph(nodes: DepNode[], edges: Array<[string, string, string[]]>): DepGraph {
   const graph: DepGraph = {
     nodes: new Map(nodes.map((n) => [n.id, n])),
     edges: edges.map(([from, to, specifiers]) => ({ from, to, specifiers })),
@@ -38,7 +35,7 @@ describe("findAffectedComponents", () => {
       [
         ["Button.tsx", "utils.ts", ["cn"]],
         ["Header.tsx", "Button.tsx", ["Button"]],
-      ]
+      ],
     );
 
     const affected = findAffectedComponents(graph, ["utils.ts"]);
@@ -51,15 +48,11 @@ describe("findAffectedComponents", () => {
 
   it("should skip non-component files", () => {
     const graph = makeGraph(
-      [
-        makeNode("config.ts"),
-        makeNode("api.ts"),
-        makeNode("Page.tsx", { isComponent: true }),
-      ],
+      [makeNode("config.ts"), makeNode("api.ts"), makeNode("Page.tsx", { isComponent: true })],
       [
         ["api.ts", "config.ts", []],
         ["Page.tsx", "api.ts", []],
-      ]
+      ],
     );
 
     const affected = findAffectedComponents(graph, ["config.ts"]);
@@ -69,15 +62,11 @@ describe("findAffectedComponents", () => {
 
   it("should respect maxDepth", () => {
     const graph = makeGraph(
-      [
-        makeNode("a.ts"),
-        makeNode("b.ts"),
-        makeNode("c.tsx", { isComponent: true }),
-      ],
+      [makeNode("a.ts"), makeNode("b.ts"), makeNode("c.tsx", { isComponent: true })],
       [
         ["b.ts", "a.ts", []],
         ["c.tsx", "b.ts", []],
-      ]
+      ],
     );
 
     const affected = findAffectedComponents(graph, ["a.ts"], { maxDepth: 1 });
@@ -86,14 +75,11 @@ describe("findAffectedComponents", () => {
 
   it("should handle cycles", () => {
     const graph = makeGraph(
-      [
-        makeNode("a.tsx", { isComponent: true }),
-        makeNode("b.tsx", { isComponent: true }),
-      ],
+      [makeNode("a.tsx", { isComponent: true }), makeNode("b.tsx", { isComponent: true })],
       [
         ["a.tsx", "b.tsx", []],
         ["b.tsx", "a.tsx", []],
-      ]
+      ],
     );
 
     const affected = findAffectedComponents(graph, ["a.tsx"]);
@@ -102,10 +88,7 @@ describe("findAffectedComponents", () => {
   });
 
   it("should return empty for no changes", () => {
-    const graph = makeGraph(
-      [makeNode("a.tsx", { isComponent: true })],
-      []
-    );
+    const graph = makeGraph([makeNode("a.tsx", { isComponent: true })], []);
     const affected = findAffectedComponents(graph, ["nonexistent.ts"]);
     assert.equal(affected.length, 0);
   });
@@ -114,12 +97,8 @@ describe("findAffectedComponents", () => {
 describe("graphStats", () => {
   it("should compute correct stats", () => {
     const graph = makeGraph(
-      [
-        makeNode("a.ts"),
-        makeNode("b.tsx", { isComponent: true }),
-        makeNode("c.mbt", { language: "moonbit" }),
-      ],
-      [["b.tsx", "a.ts", ["foo"]]]
+      [makeNode("a.ts"), makeNode("b.tsx", { isComponent: true }), makeNode("c.mbt", { language: "moonbit" })],
+      [["b.tsx", "a.ts", ["foo"]]],
     );
 
     const stats = graphStats(graph);
@@ -141,10 +120,7 @@ describe("graphStats", () => {
 
 describe("findAffectedComponents edge cases", () => {
   it("should include changed file itself if it is a component", () => {
-    const graph = makeGraph(
-      [makeNode("App.tsx", { isComponent: true })],
-      []
-    );
+    const graph = makeGraph([makeNode("App.tsx", { isComponent: true })], []);
     const affected = findAffectedComponents(graph, ["App.tsx"]);
     assert.equal(affected.length, 1);
     assert.equal(affected[0].node.id, "App.tsx");
@@ -164,7 +140,7 @@ describe("findAffectedComponents edge cases", () => {
         ["Shared.tsx", "a.ts", []],
         ["d.tsx", "c.ts", []],
         ["d.tsx", "Shared.tsx", []],
-      ]
+      ],
     );
     // a.ts changed -> Shared.tsx affected (depth 1) -> d.tsx affected (depth 2)
     // c.ts changed -> d.tsx affected (depth 1)
@@ -199,23 +175,35 @@ describe("buildDepGraph", () => {
     await mkdir(TMP, { recursive: true });
     // Create a small project structure
     await mkdir(join(TMP, "src"), { recursive: true });
-    await writeFile(join(TMP, "src", "utils.ts"), `
+    await writeFile(
+      join(TMP, "src", "utils.ts"),
+      `
 export function cn(...args: string[]) { return args.join(" "); }
 export function format(x: number) { return x.toFixed(2); }
-`);
-    await writeFile(join(TMP, "src", "Button.tsx"), `
+`,
+    );
+    await writeFile(
+      join(TMP, "src", "Button.tsx"),
+      `
 import { cn } from "./utils.ts";
 export function Button() { return <button className={cn("btn")}>OK</button>; }
-`);
-    await writeFile(join(TMP, "src", "App.tsx"), `
+`,
+    );
+    await writeFile(
+      join(TMP, "src", "App.tsx"),
+      `
 import { Button } from "./Button.tsx";
 import { format } from "./utils.ts";
 export default function App() { return <div><Button /></div>; }
-`);
-    await writeFile(join(TMP, "src", "standalone.ts"), `
+`,
+    );
+    await writeFile(
+      join(TMP, "src", "standalone.ts"),
+      `
 const x = 42;
 export default x;
-`);
+`,
+    );
   });
 
   afterAll(async () => {
@@ -283,11 +271,14 @@ export default x;
     const tsDir = join(TMP, "ts-imports");
     await mkdir(tsDir, { recursive: true });
     await writeFile(join(tsDir, "lib.ts"), `export const value = 1;`);
-    await writeFile(join(tsDir, "main.ts"), `
+    await writeFile(
+      join(tsDir, "main.ts"),
+      `
 import lib from "./lib.ts";
 const x = require("./lib.ts");
 export { lib, x };
-`);
+`,
+    );
     const graph = await buildDepGraph(tsDir, { languages: ["typescript"] });
 
     const mainNode = [...graph.nodes.values()].find((n) => n.id === "main.ts");
@@ -303,13 +294,16 @@ export { lib, x };
   it("should parse MoonBit @pkg.func imports", async () => {
     const mbtDir = join(TMP, "mbt-imports");
     await mkdir(mbtDir, { recursive: true });
-    await writeFile(join(mbtDir, "main.mbt"), `
+    await writeFile(
+      join(mbtDir, "main.mbt"),
+      `
 fn main {
   let x = @pkg1.helper()
   let y = @pkg2/sub.deep()
   let z = @pkg1.helper() // duplicate, should be deduped
 }
-`);
+`,
+    );
     const graph = await buildDepGraph(mbtDir, { languages: ["moonbit"] });
 
     assert.ok(graph.nodes.size >= 1);
@@ -324,11 +318,14 @@ fn main {
     const rsDir = join(TMP, "rs-imports");
     await mkdir(rsDir, { recursive: true });
     await writeFile(join(rsDir, "lib.rs"), `pub fn helper() {}`);
-    await writeFile(join(rsDir, "main.rs"), `
+    await writeFile(
+      join(rsDir, "main.rs"),
+      `
 use crate::lib::helper;
 use std::collections::{HashMap, HashSet};
 mod parser;
-`);
+`,
+    );
     const graph = await buildDepGraph(rsDir, { languages: ["rust"] });
 
     // Node should be created even though most Rust imports are external
@@ -346,11 +343,14 @@ mod parser;
   it("should skip external TypeScript packages (not relative or @)", async () => {
     const extDir = join(TMP, "ext-pkg");
     await mkdir(extDir, { recursive: true });
-    await writeFile(join(extDir, "main.ts"), `
+    await writeFile(
+      join(extDir, "main.ts"),
+      `
 import { readFile } from "node:fs/promises";
 import lodash from "lodash";
 import { foo } from "./local.ts";
-`);
+`,
+    );
     const graph = await buildDepGraph(extDir, { languages: ["typescript"] });
 
     const mainEdges = graph.edges.filter((e) => e.from === "main.ts");

@@ -185,13 +185,7 @@ const VERTICAL_SHIFT_PROPERTIES = new Set([
  * element Y. Surfaced to the renderer as `[cascade]` so agents see
  * why a candidate on a different selector resolves the suggestion.
  */
-const CASCADING_PROPERTIES = new Set([
-  "height",
-  "min-height",
-  "max-height",
-  "margin-bottom",
-  "padding-bottom",
-]);
+const CASCADING_PROPERTIES = new Set(["height", "min-height", "max-height", "margin-bottom", "padding-bottom"]);
 
 const CANDIDATE_PX_TOLERANCE = 2;
 
@@ -244,9 +238,7 @@ function matchCandidatesForDelta(
 /** Threshold below which a delta is considered subpixel / not actionable. */
 const NEGLIGIBLE_DELTA_PX = 2;
 
-export function generateWireframeFixCandidates(
-  input: WireframeFixInput,
-): WireframeFixSuggestion[] {
+export function generateWireframeFixCandidates(input: WireframeFixInput): WireframeFixSuggestion[] {
   const out: WireframeFixSuggestion[] = [];
 
   // ---- Bbox vertical shifts ----
@@ -302,9 +294,10 @@ export function generateWireframeFixCandidates(
     // shorter. Surface the bbox-height delta when material.
     const INTRINSIC_HEIGHT_DELTA_PX = 8;
     const heightDelta = example.variant.height - example.baseline.height;
-    const intrinsicHint = Math.abs(heightDelta) >= INTRINSIC_HEIGHT_DELTA_PX
-      ? ` ⚠ component height differs intrinsically: ${example.variant.height}px (now) → ${example.baseline.height}px (target). The shift may NOT be a spacing-token issue — check this component's own padding / min-height / font-size before adding margin upstream.`
-      : "";
+    const intrinsicHint =
+      Math.abs(heightDelta) >= INTRINSIC_HEIGHT_DELTA_PX
+        ? ` ⚠ component height differs intrinsically: ${example.variant.height}px (now) → ${example.baseline.height}px (target). The shift may NOT be a spacing-token issue — check this component's own padding / min-height / font-size before adding margin upstream.`
+        : "";
 
     // Magnitudes per viewport for this rank.
     const magnitudes = perVpDeltas.map((p) => Math.abs(p.deltaPx));
@@ -328,21 +321,18 @@ export function generateWireframeFixCandidates(
     const REFLOW_MIN_MAG_PX = 32; // ignore small-asymmetry noise
     const LARGE_MAG_PX = 60; // mag ≥ this implies multi-line / cascade
     if (maxMag >= REFLOW_MIN_MAG_PX && minMag > 0 && maxMag / minMag >= REFLOW_ASYMMETRY) {
-      const dominantVp = perVpDeltas.reduce((best, p) =>
-        Math.abs(p.deltaPx) > Math.abs(best.deltaPx) ? p : best,
-      perVpDeltas[0]);
+      const dominantVp = perVpDeltas.reduce(
+        (best, p) => (Math.abs(p.deltaPx) > Math.abs(best.deltaPx) ? p : best),
+        perVpDeltas[0],
+      );
       const tr = input.textRowsByViewport.find((t) => t.viewport === dominantVp.viewport);
       const baselineRows = tr?.baselineRowCount;
       const variantRows = tr?.variantRowCount;
-      const extraRows = baselineRows !== undefined && variantRows !== undefined
-        ? variantRows - baselineRows
-        : 0;
+      const extraRows = baselineRows !== undefined && variantRows !== undefined ? variantRows - baselineRows : 0;
       const wrapConfirmed = extraRows >= 1;
       const cascadeLikely = Math.abs(dominantVp.deltaPx) >= LARGE_MAG_PX;
       if (wrapConfirmed || cascadeLikely) {
-        const summary = perVpDeltas
-          .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
-          .join(", ");
+        const summary = perVpDeltas.map((p) => `${p.viewport}: ${signed(p.deltaPx)}`).join(", ");
         // Two flavors of suggestion text depending on which gate fired.
         const evidenceTail = wrapConfirmed
           ? `${dominantVp.viewport} variant has +${extraRows} text row${extraRows === 1 ? "" : "s"} above this component vs baseline`
@@ -371,9 +361,7 @@ export function generateWireframeFixCandidates(
     // Distinct enough that one global value can't satisfy both ends.
     const MIN_MAGNITUDE_SPREAD = 8;
     if (signs.size === 1 && maxMag - minMag >= MIN_MAGNITUDE_SPREAD) {
-      const summary = perVpDeltas
-        .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
-        .join(", ");
+      const summary = perVpDeltas.map((p) => `${p.viewport}: ${signed(p.deltaPx)}`).join(", ");
       const direction = perVpDeltas[0].deltaPx > 0 ? "reducing" : "adding";
       const viewportList = perVpDeltas.map((p) => p.viewport);
       // Per-viewport token snapping for each magnitude.
@@ -402,15 +390,19 @@ export function generateWireframeFixCandidates(
           viewport: p.viewport,
           residual: dominantMag - Math.abs(p.deltaPx),
         }));
-      const overshootHint = overshoots.length > 0
-        ? ` ⚠ applying ${dominantMag}px globally would overshoot ${overshoots
-            .map((o) => `${o.viewport} by ${o.residual}px`).join(", ")}`
-        : "";
+      const overshootHint =
+        overshoots.length > 0
+          ? ` ⚠ applying ${dominantMag}px globally would overshoot ${overshoots
+              .map((o) => `${o.viewport} by ${o.residual}px`)
+              .join(", ")}`
+          : "";
       out.push({
         evidence: `component rank=${rank} (bbox ${dims}): magnitude-divergent Δtop across viewports (${summary})`,
-        hypothesis: "baseline uses distinct per-viewport spacing values; variant uses one value everywhere — a global edit will over- or under-correct depending on viewport",
+        hypothesis:
+          "baseline uses distinct per-viewport spacing values; variant uses one value everywhere — a global edit will over- or under-correct depending on viewport",
         suggestion: `use distinct per-viewport spacing values: ${perVpSnap
-          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`).join("; ")}${overshootHint}${intrinsicHint}`,
+          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`)
+          .join("; ")}${overshootHint}${intrinsicHint}`,
         viewports: viewportList,
         confidence: "high",
         deltaPx: maxMag,
@@ -424,9 +416,7 @@ export function generateWireframeFixCandidates(
       // Divergent: this component has opposite-sign deltas across
       // viewports. A single global edit cannot satisfy both — the
       // agent needs a media-query-gated change.
-      const summary = perVpDeltas
-        .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
-        .join(", ");
+      const summary = perVpDeltas.map((p) => `${p.viewport}: ${signed(p.deltaPx)}`).join(", ");
       const maxAbs = Math.max(...perVpDeltas.map((p) => Math.abs(p.deltaPx)));
       const positiveSide = perVpDeltas.filter((p) => p.deltaPx > 0).map((p) => p.viewport);
       const negativeSide = perVpDeltas.filter((p) => p.deltaPx < 0).map((p) => p.viewport);
@@ -438,7 +428,8 @@ export function generateWireframeFixCandidates(
         : undefined;
       out.push({
         evidence: `component rank=${rank} (bbox ${dims}): divergent Δtop across viewports (${summary})`,
-        hypothesis: "the same component has opposite-sign deltas on different viewports — a global edit will fix one side while breaking the other",
+        hypothesis:
+          "the same component has opposite-sign deltas on different viewports — a global edit will fix one side while breaking the other",
         suggestion: `gate the spacing change with a media query: ${positiveSide.length > 0 ? `add ${maxAbs}px on ${positiveSide.join(", ")}` : ""}${positiveSide.length > 0 && negativeSide.length > 0 ? "; " : ""}${negativeSide.length > 0 ? `remove ${maxAbs}px on ${negativeSide.join(", ")}` : ""} (${tokenHint})`,
         viewports: viewportList,
         confidence: "high",
@@ -465,25 +456,24 @@ export function generateWireframeFixCandidates(
       const deltaPx = median;
       const viewports = obs.map((o) => o.viewport);
       const covered = new Set(viewports);
-      const scope: "all" | "subset" = covered.size === allViewports.size && [...allViewports].every((v) => covered.has(v))
-        ? "all"
-        : "subset";
+      const scope: "all" | "subset" =
+        covered.size === allViewports.size && [...allViewports].every((v) => covered.has(v)) ? "all" : "subset";
       const uncovered = [...allViewports].filter((v) => !covered.has(v));
       const snap = input.tokens ? snapSpacing(input.tokens, Math.abs(deltaPx)) : null;
       const tokenHint = snap
         ? `token: ${snap.token.name} (${snap.token.raw}${snap.delta > 0 ? `, ±${snap.delta.toFixed(1)}px` : ""})`
         : `≈ ${Math.abs(deltaPx)}px`;
-      const scopeNote = scope === "subset"
-        ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})`
-        : "";
+      const scopeNote =
+        scope === "subset" ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})` : "";
       const candidates = input.domPositionEntries
         ? matchCandidatesForDelta(Math.abs(deltaPx), viewports, input.domPositionEntries)
         : undefined;
       out.push({
         evidence: `component rank=${rank} (bbox ${dims}): Δtop ${signed(deltaPx)} on ${viewports.join(", ")}${scopeNote}`,
-        hypothesis: deltaPx > 0
-          ? "container above is taller than baseline (extra margin/padding/gap)"
-          : "container above is shorter than baseline (missing margin/padding/gap)",
+        hypothesis:
+          deltaPx > 0
+            ? "container above is taller than baseline (extra margin/padding/gap)"
+            : "container above is shorter than baseline (missing margin/padding/gap)",
         suggestion: `try ${deltaPx > 0 ? "reducing" : "adding"} top spacing by ${Math.abs(deltaPx)}px (${tokenHint})${intrinsicHint}`,
         viewports,
         confidence: confidenceFor({ viewportCount: viewports.length, deltaPx, snapped: !!snap }),
@@ -524,26 +514,20 @@ export function generateWireframeFixCandidates(
     const median = obs.map((o) => o.m.deltaY).sort((a, b) => a - b)[Math.floor(obs.length / 2)];
     const sampleText = obs[0].m.baseline.text?.slice(0, 40) ?? "";
     const snap = input.tokens ? snapSpacing(input.tokens, Math.abs(median)) : null;
-    const tokenHint = snap
-      ? `token: ${snap.token.name} (${snap.token.raw})`
-      : `≈ ${Math.abs(median)}px`;
+    const tokenHint = snap ? `token: ${snap.token.name} (${snap.token.raw})` : `≈ ${Math.abs(median)}px`;
     const covered = new Set(viewports);
-    const scope: "all" | "subset" = covered.size === allTextViewports.size
-      && [...allTextViewports].every((v) => covered.has(v))
-      ? "all"
-      : "subset";
+    const scope: "all" | "subset" =
+      covered.size === allTextViewports.size && [...allTextViewports].every((v) => covered.has(v)) ? "all" : "subset";
     const uncovered = [...allTextViewports].filter((v) => !covered.has(v));
-    const scopeNote = scope === "subset"
-      ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})`
-      : "";
+    const scopeNote =
+      scope === "subset" ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})` : "";
     const candidates = input.domPositionEntries
       ? matchCandidatesForDelta(Math.abs(median), viewports, input.domPositionEntries)
       : undefined;
     out.push({
       evidence: `${obs.length} text-row(s) shifted Δy ${signed(median)} on ${viewports.join(", ")}${scopeNote} (e.g. "${sampleText}")`,
-      hypothesis: median > 0
-        ? "vertical rhythm above this row added space"
-        : "vertical rhythm above this row removed space",
+      hypothesis:
+        median > 0 ? "vertical rhythm above this row added space" : "vertical rhythm above this row removed space",
       suggestion: `try ${median > 0 ? "reducing" : "adding"} margin/padding by ${Math.abs(median)}px (${tokenHint})`,
       viewports,
       confidence: confidenceFor({ viewportCount: viewports.length, deltaPx: median, snapped: !!snap }),
@@ -551,9 +535,11 @@ export function generateWireframeFixCandidates(
       scope,
       perViewport: viewports.map((vp) => ({
         viewport: vp,
-        deltaPx: obs.filter((o) => o.viewport === vp)
-          .map((o) => o.m.deltaY)
-          .sort((a, b) => a - b)[0] ?? median,
+        deltaPx:
+          obs
+            .filter((o) => o.viewport === vp)
+            .map((o) => o.m.deltaY)
+            .sort((a, b) => a - b)[0] ?? median,
       })),
       candidates,
     });
@@ -580,12 +566,15 @@ export function generateWireframeFixCandidates(
   //   - sum |magnitudes| from contributing suggestions
   //   - if cumulative > max(single) + 8px AND group has ≥ 2
   //     contributors, emit the warning
-  const selectorGroups = new Map<string, {
-    sugIdxs: Set<number>;
-    magnitudes: number[];
-    selector: string;
-    viewport: string;
-  }>();
+  const selectorGroups = new Map<
+    string,
+    {
+      sugIdxs: Set<number>;
+      magnitudes: number[];
+      selector: string;
+      viewport: string;
+    }
+  >();
   for (let i = 0; i < out.length; i++) {
     const seen = new Set<string>();
     for (const c of out[i].candidates ?? []) {
@@ -611,7 +600,17 @@ export function generateWireframeFixCandidates(
   // sugIdxs)`.
   const emittedKey = new Set<string>();
   // Group groups by their dedupe key first so we can collect viewports.
-  const collapsed = new Map<string, { leadIdx: number; selector: string; viewports: string[]; sugIdxs: Set<number>; magnitudes: number[]; cumulative: number }>();
+  const collapsed = new Map<
+    string,
+    {
+      leadIdx: number;
+      selector: string;
+      viewports: string[];
+      sugIdxs: Set<number>;
+      magnitudes: number[];
+      cumulative: number;
+    }
+  >();
   for (const { sugIdxs, magnitudes, selector, viewport } of selectorGroups.values()) {
     if (sugIdxs.size < 2) continue;
     const cumulative = magnitudes.reduce((s, m) => s + m, 0);
@@ -625,7 +624,8 @@ export function generateWireframeFixCandidates(
       existing.viewports.push(viewport);
     } else {
       collapsed.set(key, {
-        leadIdx, selector,
+        leadIdx,
+        selector,
         viewports: [viewport],
         sugIdxs,
         magnitudes,
@@ -636,7 +636,8 @@ export function generateWireframeFixCandidates(
   for (const entry of collapsed.values()) {
     const list = entry.magnitudes.map((m) => `${m}px`).join(" + ");
     const vpList = entry.viewports.join(", ");
-    out[entry.leadIdx].suggestion += ` ⚠ ${entry.sugIdxs.size} suggestions converge on ${entry.selector} (${vpList}): cumulative ${list} = ${entry.cumulative}px. Treat each individually and you risk compound overshoot — consolidate into one edit that resolves all together.`;
+    out[entry.leadIdx].suggestion +=
+      ` ⚠ ${entry.sugIdxs.size} suggestions converge on ${entry.selector} (${vpList}): cumulative ${list} = ${entry.cumulative}px. Treat each individually and you risk compound overshoot — consolidate into one edit that resolves all together.`;
     emittedKey.add(`${entry.leadIdx}|${entry.selector}`);
   }
   void emittedKey;
@@ -707,20 +708,20 @@ export function generateWireframeFixCandidates(
     // parent. Agent-h v8: "STRUCTURAL named the parent but not
     // the property — I still had to read the triptych."
     const layoutDeltas = parentLayoutDeltas(par, input.domPositionEntries);
-    const layoutDetail = layoutDeltas.length > 0
-      ? ` parent layout deltas: ${layoutDeltas.join("; ")}`
-      : "";
+    const layoutDetail = layoutDeltas.length > 0 ? ` parent layout deltas: ${layoutDeltas.join("; ")}` : "";
     // V9a: when introducing a parent `gap` rule, list any non-zero
     // pre-existing child margins that will compound — agent-i v9
     // applied a parent gap edit and the unrclear'd child margin-tops
     // caused a +5pp mobile regression.
     const conflicts = conflictingChildMargins(par, layoutDeltas, input.domPositionEntries);
-    const conflictTail = conflicts.length > 0
-      ? ` ⚠ ALSO clear non-zero child margins that will compound with the new gap: ${conflicts.join(", ")}.`
-      : "";
-    const suggestion = layoutDeltas.length > 0
-      ? `change \`${par}\`'s layout to match: ${layoutDeltas.join("; ")}. Resolving these at the parent will fix the ${sugs.size} child suggestions together; per-child patches will compound.${conflictTail}`
-      : `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together. (Parent's layout properties match between baseline and variant — the mismatch must be in child-level properties.)`;
+    const conflictTail =
+      conflicts.length > 0
+        ? ` ⚠ ALSO clear non-zero child margins that will compound with the new gap: ${conflicts.join(", ")}.`
+        : "";
+    const suggestion =
+      layoutDeltas.length > 0
+        ? `change \`${par}\`'s layout to match: ${layoutDeltas.join("; ")}. Resolving these at the parent will fix the ${sugs.size} child suggestions together; per-child patches will compound.${conflictTail}`
+        : `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together. (Parent's layout properties match between baseline and variant — the mismatch must be in child-level properties.)`;
     structuralRow = {
       evidence: `${sugs.size} suggestions all blame children of \`${par}\` with heterogeneous deltas (range ${range}px, ${signs.size > 1 ? "mixed signs" : "same sign"})${layoutDetail}`,
       hypothesis: "patching each child is a local-minima trap; the parent's layout strategy is the actual delta",
@@ -786,10 +787,7 @@ const PARENT_LAYOUT_PROPERTIES = new Set([
  * variant. Returns a list of human-readable diff lines like
  * `display: flex → grid` (current → target convention from agent-e).
  */
-function parentLayoutDeltas(
-  parentPath: string,
-  entries: DpEntryWithViewport[] | undefined,
-): string[] {
+function parentLayoutDeltas(parentPath: string, entries: DpEntryWithViewport[] | undefined): string[] {
   if (!entries) return [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -821,8 +819,8 @@ function conflictingChildMargins(
 ): string[] {
   if (!entries) return [];
   // Only warn when a gap-style property is in the parent deltas.
-  const introducingGap = parentDeltas.some((d) =>
-    d.startsWith("gap:") || d.startsWith("row-gap:") || d.startsWith("column-gap:")
+  const introducingGap = parentDeltas.some(
+    (d) => d.startsWith("gap:") || d.startsWith("row-gap:") || d.startsWith("column-gap:"),
   );
   if (!introducingGap) return [];
   const out: string[] = [];
@@ -862,11 +860,7 @@ function parentPath(p: string): string {
   return segs.slice(0, -1).join(">");
 }
 
-function confidenceFor(input: {
-  viewportCount: number;
-  deltaPx: number;
-  snapped: boolean;
-}): "low" | "medium" | "high" {
+function confidenceFor(input: { viewportCount: number; deltaPx: number; snapped: boolean }): "low" | "medium" | "high" {
   const abs = Math.abs(input.deltaPx);
   if (input.snapped && (input.viewportCount >= 2 || abs >= 16)) return "high";
   if (input.viewportCount >= 2 || abs >= 16) return "medium";

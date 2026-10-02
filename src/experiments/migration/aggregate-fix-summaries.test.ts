@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
 import { buildRows, renderMarkdown, renderTsv } from "./aggregate-fix-summaries.ts";
 
-function makeSummary(overrides: Partial<Parameters<typeof renderMarkdown>[0][number]> = {}): Parameters<typeof renderMarkdown>[0][number] {
+function makeSummary(
+  overrides: Partial<Parameters<typeof renderMarkdown>[0][number]> = {},
+): Parameters<typeof renderMarkdown>[0][number] {
   return {
     path: "/tmp/summary.json",
     target: {
@@ -15,11 +17,11 @@ function makeSummary(overrides: Partial<Parameters<typeof renderMarkdown>[0][num
     outputPath: "/tmp/fixed.html",
     beforeByViewport: [
       { viewport: "mobile", diffRatio: 0.0216 },
-      { viewport: "desktop", diffRatio: 0.0200 },
+      { viewport: "desktop", diffRatio: 0.02 },
     ],
     afterByViewport: [
-      { viewport: "mobile", diffRatio: 0.0100 },
-      { viewport: "desktop", diffRatio: 0.0050 },
+      { viewport: "mobile", diffRatio: 0.01 },
+      { viewport: "desktop", diffRatio: 0.005 },
     ],
     ...overrides,
   };
@@ -31,8 +33,8 @@ describe("buildRows", () => {
     assert.equal(rows.length, 2);
     const mobile = rows.find((r) => r.viewport === "mobile")!;
     assert.equal(mobile.before, 0.0216);
-    assert.equal(mobile.after, 0.0100);
-    assert.ok(mobile.delta !== null && Math.abs(mobile.delta - (-0.0116)) < 1e-9);
+    assert.equal(mobile.after, 0.01);
+    assert.ok(mobile.delta !== null && Math.abs(mobile.delta - -0.0116) < 1e-9);
   });
 
   it("returns null delta when afterByViewport is missing", () => {

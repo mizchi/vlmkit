@@ -57,7 +57,10 @@ export async function loadComponentContractPlan(path: string | undefined): Promi
   const contract = JSON.parse(await readFile(contractPath, "utf-8")) as UiContract;
   const issues = validateUiContract(contract);
   if (issues.length > 0) {
-    const details = issues.slice(0, 5).map((issue) => `${issue.path}: ${issue.message}`).join("; ");
+    const details = issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path}: ${issue.message}`)
+      .join("; ");
     throw new Error(`Invalid UI Contract: ${details}`);
   }
   return deriveComponentContractPlan(contract);

@@ -61,7 +61,10 @@ describe("check a11y focus reads the styled document", { timeout: 180_000 }, () 
   it("finds the reverse-left violation whose geometry is external", async () => {
     const report = await runFocusOrder({ source: FIXTURE, outputDir: await outDir() });
     const reverse = report.findings.filter((f) => f.kind === "reverse");
-    assert.ok(reverse.length > 0, `expected a reverse finding, got ${JSON.stringify(report.findings.map((f) => f.kind))}`);
+    assert.ok(
+      reverse.length > 0,
+      `expected a reverse finding, got ${JSON.stringify(report.findings.map((f) => f.kind))}`,
+    );
     // The x values come from `style.css` (#focus-a at 700, #focus-b at 20) plus the body's
     // 32px padding. Asserting the direction rather than the exact pair: what matters is that
     // the gate saw a large rightward-then-leftward jump, which unstyled markup cannot produce.
@@ -109,11 +112,12 @@ describe("check drift component reads the styled document", { timeout: 180_000 }
     // error naming the URL, not a file-not-found naming a nonsense path.
     const dir = await outDir();
     await assert.rejects(
-      () => runComponentConsistency({
-        htmlPath: "http://127.0.0.1:1/nope.html",
-        selector: ".tile",
-        outputDir: dir,
-      }),
+      () =>
+        runComponentConsistency({
+          htmlPath: "http://127.0.0.1:1/nope.html",
+          selector: ".tile",
+          outputDir: dir,
+        }),
       (error: Error) => {
         // It must have tried to NAVIGATE. Before, `resolve()` produced
         // `<cwd>/http:/127.0.0.1:1/nope.html` and the failure was a file read.

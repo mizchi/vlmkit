@@ -46,7 +46,10 @@ const ONE_VIEWPORT = [{ width: 1280, height: 800 }];
 
 function page(name: string, body: string, head = ""): string {
   const file = join(DIR, name);
-  writeFileSync(file, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>t</title>${head}</head><body>${body}</body></html>`);
+  writeFileSync(
+    file,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>t</title>${head}</head><body>${body}</body></html>`,
+  );
   return file;
 }
 
@@ -55,7 +58,18 @@ function kinds(report: IntegrityReport): string[] {
 }
 
 function block(partial: Partial<IntegrityTextBlock>): IntegrityTextBlock {
-  return { selector: "#x", text: "text", x: 0, y: 0, width: 100, height: 20, overlay: false, zIndex: 0, ariaHidden: false, ...partial };
+  return {
+    selector: "#x",
+    text: "text",
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 20,
+    overlay: false,
+    zIndex: 0,
+    ariaHidden: false,
+    ...partial,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -66,26 +80,31 @@ const plain = (t: string) => t.replace(/\x1B\[[0-9;]*m/g, "");
 
 describe("pure judges", () => {
   test("classifyRuntimeEvents: construction pageerror is fail, post-load is warn", () => {
-    const findings = classifyRuntimeEvents([
-      { type: "pageerror", text: "boom", phase: "construction" },
-      { type: "pageerror", text: "later", phase: "post-load" },
-      { type: "console-error", text: "fetch failed", phase: "post-load" },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => f.severity), ["fail", "warn", "warn"]);
+    const findings = classifyRuntimeEvents(
+      [
+        { type: "pageerror", text: "boom", phase: "construction" },
+        { type: "pageerror", text: "later", phase: "post-load" },
+        { type: "console-error", text: "fetch failed", phase: "post-load" },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => f.severity),
+      ["fail", "warn", "warn"],
+    );
     assert.ok(findings[0]!.message.includes("before load"));
   });
 
   test("firstStackUrl: the frame the exception was thrown from", () => {
     assert.equal(
-      firstStackUrl("TypeError: x\n    at fn (https://cdn.example.com/rive.js:1:2)\n    at https://site.test/app.js:3:4"),
+      firstStackUrl(
+        "TypeError: x\n    at fn (https://cdn.example.com/rive.js:1:2)\n    at https://site.test/app.js:3:4",
+      ),
       "https://cdn.example.com/rive.js:1:2",
     );
     // A local run has `file://` frames, and treating those as "no source" would leave
     // every `check integrity` on an HTML file unattributed.
-    assert.equal(
-      firstStackUrl("Error\n    at file:///tmp/page.html:5:1"),
-      "file:///tmp/page.html:5:1",
-    );
+    assert.equal(firstStackUrl("Error\n    at file:///tmp/page.html:5:1"), "file:///tmp/page.html:5:1");
     assert.equal(firstStackUrl(undefined), undefined);
     assert.equal(firstStackUrl("Error: no frames here"), undefined);
   });
@@ -107,12 +126,36 @@ describe("pure judges", () => {
     // The vite.dev dogfood: a blocked CDN wasm produced seven warns and nothing said the
     // cause was cross-origin, so a reader could not tell "your app throws" from "your
     // sandbox blocked a CDN". A vendor's exception is not the page's build failing.
-    const findings = classifyRuntimeEvents([
-      { type: "pageerror", text: "wasm compile failed", phase: "construction", sourceUrl: "https://cdn.jsdelivr.net/rive.js:1:2", party: "third" },
-      { type: "pageerror", text: "our bug", phase: "construction", sourceUrl: "https://site.test/app.js:1:2", party: "first" },
-      { type: "console-error", text: "Aborted()", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.js:9:9", party: "third" },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => f.severity), ["warn", "fail", "warn"]);
+    const findings = classifyRuntimeEvents(
+      [
+        {
+          type: "pageerror",
+          text: "wasm compile failed",
+          phase: "construction",
+          sourceUrl: "https://cdn.jsdelivr.net/rive.js:1:2",
+          party: "third",
+        },
+        {
+          type: "pageerror",
+          text: "our bug",
+          phase: "construction",
+          sourceUrl: "https://site.test/app.js:1:2",
+          party: "first",
+        },
+        {
+          type: "console-error",
+          text: "Aborted()",
+          phase: "post-load",
+          sourceUrl: "https://cdn.jsdelivr.net/rive.js:9:9",
+          party: "third",
+        },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => f.severity),
+      ["warn", "fail", "warn"],
+    );
     assert.match(findings[0]!.message, /third-party script cdn\.jsdelivr\.net/);
     assert.match(findings[0]!.message, /page's own scripts are unaffected/);
     assert.equal(findings[0]!.evidence?.party, "third");
@@ -126,11 +169,17 @@ describe("pure judges", () => {
   test("classifyRuntimeEvents: an event with no party keeps the pre-attribution severity", () => {
     // Compatibility direction. `third` is what downgrades, so an unmeasured event must not
     // get the downgrade — a recorded run from before the field existed keeps its fail.
-    const findings = classifyRuntimeEvents([
-      { type: "pageerror", text: "boom", phase: "construction" },
-      { type: "pageerror", text: "boom", phase: "construction", party: "unknown" },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => f.severity), ["fail", "fail"]);
+    const findings = classifyRuntimeEvents(
+      [
+        { type: "pageerror", text: "boom", phase: "construction" },
+        { type: "pageerror", text: "boom", phase: "construction", party: "unknown" },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => f.severity),
+      ["fail", "fail"],
+    );
     assert.doesNotMatch(findings[1]!.message, /third-party/);
   });
 
@@ -141,113 +190,213 @@ describe("pure judges", () => {
     const netFailures = [
       { url: "https://cdn.jsdelivr.net/rive.wasm", resourceType: "fetch", reason: "net::ERR_CONNECTION_RESET" },
     ];
-    const { events, suppressed } = correlateRuntimeEvents([
-      { type: "console-error", text: "Failed to load resource: net::ERR_CONNECTION_RESET", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.wasm", party: "third" },
-      // Thrown from INSIDE the vendor script whose fetch failed. Different fact, stays.
-      { type: "console-error", text: "Aborted(both async and sync fetching of the wasm failed)", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.js", party: "third" },
-      // The page's own console.error at a URL that also happens to have failed: kept,
-      // because the text is not the browser narrating a request.
-      { type: "console-error", text: "checkout total mismatch", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.wasm", party: "third" },
-    ], netFailures);
+    const { events, suppressed } = correlateRuntimeEvents(
+      [
+        {
+          type: "console-error",
+          text: "Failed to load resource: net::ERR_CONNECTION_RESET",
+          phase: "post-load",
+          sourceUrl: "https://cdn.jsdelivr.net/rive.wasm",
+          party: "third",
+        },
+        // Thrown from INSIDE the vendor script whose fetch failed. Different fact, stays.
+        {
+          type: "console-error",
+          text: "Aborted(both async and sync fetching of the wasm failed)",
+          phase: "post-load",
+          sourceUrl: "https://cdn.jsdelivr.net/rive.js",
+          party: "third",
+        },
+        // The page's own console.error at a URL that also happens to have failed: kept,
+        // because the text is not the browser narrating a request.
+        {
+          type: "console-error",
+          text: "checkout total mismatch",
+          phase: "post-load",
+          sourceUrl: "https://cdn.jsdelivr.net/rive.wasm",
+          party: "third",
+        },
+      ],
+      netFailures,
+    );
     assert.equal(suppressed.length, 1);
     assert.equal(suppressed[0]!.text, "Failed to load resource: net::ERR_CONNECTION_RESET");
-    assert.deepEqual(events.map((e) => e.text), [
-      "Aborted(both async and sync fetching of the wasm failed)",
-      "checkout total mismatch",
-    ]);
+    assert.deepEqual(
+      events.map((e) => e.text),
+      ["Aborted(both async and sync fetching of the wasm failed)", "checkout total mismatch"],
+    );
   });
 
   test("correlateRuntimeEvents: a resource notice with no matching wire failure is kept", () => {
     // The suppression must be a correlation, not a text filter — otherwise a real broken
     // resource on a run where the wire saw nothing would vanish.
-    const { events, suppressed } = correlateRuntimeEvents([
-      { type: "console-error", text: "Failed to load resource: 404", phase: "post-load", sourceUrl: "https://site.test/missing.js", party: "first" },
-      // A pageerror is never suppressed: a script that failed to load cannot throw, so this
-      // is the page's own code reacting to the failure.
-      { type: "pageerror", text: "Failed to load resource", phase: "post-load", sourceUrl: "https://site.test/gone.js", party: "first" },
-    ], [{ url: "https://site.test/gone.js", resourceType: "script", reason: "404" }]);
+    const { events, suppressed } = correlateRuntimeEvents(
+      [
+        {
+          type: "console-error",
+          text: "Failed to load resource: 404",
+          phase: "post-load",
+          sourceUrl: "https://site.test/missing.js",
+          party: "first",
+        },
+        // A pageerror is never suppressed: a script that failed to load cannot throw, so this
+        // is the page's own code reacting to the failure.
+        {
+          type: "pageerror",
+          text: "Failed to load resource",
+          phase: "post-load",
+          sourceUrl: "https://site.test/gone.js",
+          party: "first",
+        },
+      ],
+      [{ url: "https://site.test/gone.js", resourceType: "script", reason: "404" }],
+    );
     assert.equal(suppressed.length, 0);
     assert.equal(events.length, 2);
   });
 
   test("findTextCollisions: same-layer overlap fails, overlay/aria-hidden exempt, containment skipped", () => {
-    const inFlowPair = findTextCollisions([
-      block({ selector: "#a", x: 0, y: 0, width: 100, height: 20 }),
-      block({ selector: "#b", x: 40, y: 8, width: 100, height: 20 }),
-    ], 1280);
+    const inFlowPair = findTextCollisions(
+      [
+        block({ selector: "#a", x: 0, y: 0, width: 100, height: 20 }),
+        block({ selector: "#b", x: 40, y: 8, width: 100, height: 20 }),
+      ],
+      1280,
+    );
     assert.equal(inFlowPair.findings.length, 1);
     assert.equal(inFlowPair.findings[0]!.severity, "fail");
     assert.match(inFlowPair.findings[0]!.selector!, /#a x #b/);
 
-    const overlay = findTextCollisions([
-      block({ selector: "#caption" }),
-      block({ selector: "#hero-title", x: 20, y: 4, overlay: true, zIndex: 2 }),
-    ], 1280);
+    const overlay = findTextCollisions(
+      [block({ selector: "#caption" }), block({ selector: "#hero-title", x: 20, y: 4, overlay: true, zIndex: 2 })],
+      1280,
+    );
     assert.equal(overlay.findings.length, 0);
     assert.equal(overlay.exempted.length, 1);
     assert.match(overlay.exempted[0]!.reason, /overlay/);
 
-    const decorative = findTextCollisions([
-      block({ selector: "#real" }),
-      block({ selector: "#ghost", x: 10, y: 2, ariaHidden: true }),
-    ], 1280);
+    const decorative = findTextCollisions(
+      [block({ selector: "#real" }), block({ selector: "#ghost", x: 10, y: 2, ariaHidden: true })],
+      1280,
+    );
     assert.equal(decorative.findings.length, 0);
     assert.match(decorative.exempted[0]!.reason, /aria-hidden/);
 
-    const nested = findTextCollisions([
-      block({ selector: "#outer", x: 0, y: 0, width: 200, height: 100 }),
-      block({ selector: "#inner", x: 10, y: 10, width: 50, height: 20 }),
-    ], 1280);
+    const nested = findTextCollisions(
+      [
+        block({ selector: "#outer", x: 0, y: 0, width: 200, height: 100 }),
+        block({ selector: "#inner", x: 10, y: 10, width: 50, height: 20 }),
+      ],
+      1280,
+    );
     assert.equal(nested.findings.length + nested.exempted.length, 0);
   });
 
   test("two absolute layers with distinct z-index are exempt; same z-index collide", () => {
-    const distinct = findTextCollisions([
-      block({ selector: "#toast", overlay: true, zIndex: 10 }),
-      block({ selector: "#modal", x: 30, y: 5, overlay: true, zIndex: 20 }),
-    ], 1280);
+    const distinct = findTextCollisions(
+      [
+        block({ selector: "#toast", overlay: true, zIndex: 10 }),
+        block({ selector: "#modal", x: 30, y: 5, overlay: true, zIndex: 20 }),
+      ],
+      1280,
+    );
     assert.equal(distinct.findings.length, 0);
     assert.equal(distinct.exempted.length, 1);
 
-    const same = findTextCollisions([
-      block({ selector: "#p1", overlay: true, zIndex: 0 }),
-      block({ selector: "#p2", x: 30, y: 5, overlay: true, zIndex: 0 }),
-    ], 1280);
+    const same = findTextCollisions(
+      [
+        block({ selector: "#p1", overlay: true, zIndex: 0 }),
+        block({ selector: "#p2", x: 30, y: 5, overlay: true, zIndex: 0 }),
+      ],
+      1280,
+    );
     assert.equal(same.findings.length, 1);
   });
 
   test("judgeClippedText: clip fails, ellipsis and line-clamp exempt", () => {
     const visible = { textVisibleArea: 800, srOnlyShaped: false, replacement: false };
-    const { findings, exempted } = judgeClippedText([
-      { selector: "#cut", text: "long text", clipX: 60, clipY: 0, textOverflow: "clip", lineClamp: "none", ...visible },
-      { selector: "#ell", text: "long text", clipX: 60, clipY: 0, textOverflow: "ellipsis", lineClamp: "none", ...visible },
-      { selector: "#clamp", text: "long text", clipX: 0, clipY: 40, textOverflow: "clip", lineClamp: "2", ...visible },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => f.selector), ["#cut"]);
+    const { findings, exempted } = judgeClippedText(
+      [
+        {
+          selector: "#cut",
+          text: "long text",
+          clipX: 60,
+          clipY: 0,
+          textOverflow: "clip",
+          lineClamp: "none",
+          ...visible,
+        },
+        {
+          selector: "#ell",
+          text: "long text",
+          clipX: 60,
+          clipY: 0,
+          textOverflow: "ellipsis",
+          lineClamp: "none",
+          ...visible,
+        },
+        {
+          selector: "#clamp",
+          text: "long text",
+          clipX: 0,
+          clipY: 40,
+          textOverflow: "clip",
+          lineClamp: "2",
+          ...visible,
+        },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => f.selector),
+      ["#cut"],
+    );
     assert.equal(exempted.length, 2);
   });
 
   test("judgeClippedText: fully-hidden text — image replacement / sr-only exempt, no-signal warns (csszengarden dogfood)", () => {
     const hidden = { clipX: 0, clipY: 20, textOverflow: "clip", lineClamp: "none", textVisibleArea: 0 };
-    const { findings, exempted } = judgeClippedText([
-      { selector: "#kellum", text: "HTML", ...hidden, srOnlyShaped: false, replacement: true },
-      { selector: "#sr", text: "Skip to content", ...hidden, srOnlyShaped: true, replacement: false },
-      { selector: "#accident", text: "gone", ...hidden, srOnlyShaped: false, replacement: false },
-      { selector: "#partial", text: "partially cut", clipX: 60, clipY: 0, textOverflow: "clip", lineClamp: "none", textVisibleArea: 500, srOnlyShaped: false, replacement: true },
-    ], 1280);
+    const { findings, exempted } = judgeClippedText(
+      [
+        { selector: "#kellum", text: "HTML", ...hidden, srOnlyShaped: false, replacement: true },
+        { selector: "#sr", text: "Skip to content", ...hidden, srOnlyShaped: true, replacement: false },
+        { selector: "#accident", text: "gone", ...hidden, srOnlyShaped: false, replacement: false },
+        {
+          selector: "#partial",
+          text: "partially cut",
+          clipX: 60,
+          clipY: 0,
+          textOverflow: "clip",
+          lineClamp: "none",
+          textVisibleArea: 500,
+          srOnlyShaped: false,
+          replacement: true,
+        },
+      ],
+      1280,
+    );
     assert.equal(exempted.length, 2);
     assert.match(exempted[0]!.reason, /image replacement/);
     assert.match(exempted[1]!.reason, /sr-only/);
-    assert.deepEqual(findings.map((f) => `${f.selector}:${f.severity}`), ["#accident:warn", "#partial:fail"]);
+    assert.deepEqual(
+      findings.map((f) => `${f.selector}:${f.severity}`),
+      ["#accident:warn", "#partial:fail"],
+    );
   });
 
   test("judgeCollapsedContainers: in-flow fail, anchor and overflow-hidden exempt", () => {
-    const { findings, exempted } = judgeCollapsedContainers([
-      { selector: "#float-bug", height: 0, tallestChild: 120, anyInFlowChild: true, overflowHidden: false },
-      { selector: "#anchor", height: 0, tallestChild: 90, anyInFlowChild: false, overflowHidden: false },
-      { selector: "#accordion", height: 0, tallestChild: 200, anyInFlowChild: true, overflowHidden: true },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => f.selector), ["#float-bug"]);
+    const { findings, exempted } = judgeCollapsedContainers(
+      [
+        { selector: "#float-bug", height: 0, tallestChild: 120, anyInFlowChild: true, overflowHidden: false },
+        { selector: "#anchor", height: 0, tallestChild: 90, anyInFlowChild: false, overflowHidden: false },
+        { selector: "#accordion", height: 0, tallestChild: 200, anyInFlowChild: true, overflowHidden: true },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => f.selector),
+      ["#float-bug"],
+    );
     assert.equal(exempted.length, 2);
   });
 
@@ -263,12 +412,18 @@ describe("pure judges", () => {
     // v5's CI agent: "a new endpoint absent from the HAR is *aborted*, surfacing as a
     // broken-resource **defect** rather than 'your fixture is out of date'." Two
     // different jobs — re-record, or fix the page — reported as the same thing.
-    const findings = judgeNetworkFailures([
-      { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
-      { url: "http://localhost:1/new.json", resourceType: "fetch", reason: "net::ERR_FAILED", harMiss: true },
-    ], 1280);
+    const findings = judgeNetworkFailures(
+      [
+        { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
+        { url: "http://localhost:1/new.json", resourceType: "fetch", reason: "net::ERR_FAILED", harMiss: true },
+      ],
+      1280,
+    );
     // One finding, not one per URL: the action is "re-record", once.
-    assert.deepEqual(findings.map((f) => f.kind), ["stale-har-fixture"]);
+    assert.deepEqual(
+      findings.map((f) => f.kind),
+      ["stale-har-fixture"],
+    );
     assert.equal(findings[0]!.severity, "fail");
     assert.match(findings[0]!.message, /2 request\(s\)/);
     assert.match(findings[0]!.message, /later\.css/);
@@ -282,25 +437,45 @@ describe("pure judges", () => {
     // The suppression is keyed on the individual failure, not on "a HAR was used" —
     // a genuinely broken same-origin stylesheet must not be hidden by an unrelated
     // fixture gap.
-    const findings = judgeNetworkFailures([
-      { url: "http://localhost:1/gone.css", resourceType: "stylesheet", reason: "HTTP 404" },
-      { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
-    ], 1280);
+    const findings = judgeNetworkFailures(
+      [
+        { url: "http://localhost:1/gone.css", resourceType: "stylesheet", reason: "HTTP 404" },
+        { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
+      ],
+      1280,
+    );
     assert.deepEqual(findings.map((f) => f.kind).sort(), ["failed-stylesheet", "stale-har-fixture"]);
   });
 
   test("judgeNetworkFailures: same-origin stylesheet/script fail, cross-origin (third-party) warn, font/xhr warn", () => {
-    const findings = judgeNetworkFailures([
-      { url: "file:///x/app.css", resourceType: "stylesheet", reason: "net::ERR_FILE_NOT_FOUND" },
-      { url: "file:///x/app.js", resourceType: "script", reason: "net::ERR_FILE_NOT_FOUND" },
-      { url: "https://cdn.example/beacon.min.js", resourceType: "script", reason: "net::ERR_CONNECTION_RESET", crossOrigin: true },
-      { url: "https://fonts.example/x.css", resourceType: "stylesheet", reason: "HTTP 404", crossOrigin: true },
-      { url: "file:///x/a.woff2", resourceType: "font", reason: "HTTP 404" },
-      { url: "https://x/api", resourceType: "xhr", reason: "HTTP 500" },
-      { url: "file:///x/other", resourceType: "other", reason: "x" },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => `${f.kind}:${f.severity}`),
-      ["failed-stylesheet:fail", "js-error:fail", "js-error:warn", "failed-stylesheet:warn", "broken-font:warn", "js-error:warn"]);
+    const findings = judgeNetworkFailures(
+      [
+        { url: "file:///x/app.css", resourceType: "stylesheet", reason: "net::ERR_FILE_NOT_FOUND" },
+        { url: "file:///x/app.js", resourceType: "script", reason: "net::ERR_FILE_NOT_FOUND" },
+        {
+          url: "https://cdn.example/beacon.min.js",
+          resourceType: "script",
+          reason: "net::ERR_CONNECTION_RESET",
+          crossOrigin: true,
+        },
+        { url: "https://fonts.example/x.css", resourceType: "stylesheet", reason: "HTTP 404", crossOrigin: true },
+        { url: "file:///x/a.woff2", resourceType: "font", reason: "HTTP 404" },
+        { url: "https://x/api", resourceType: "xhr", reason: "HTTP 500" },
+        { url: "file:///x/other", resourceType: "other", reason: "x" },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => `${f.kind}:${f.severity}`),
+      [
+        "failed-stylesheet:fail",
+        "js-error:fail",
+        "js-error:warn",
+        "failed-stylesheet:warn",
+        "broken-font:warn",
+        "js-error:warn",
+      ],
+    );
     assert.match(findings[2]!.message, /Third-party/);
   });
 
@@ -312,13 +487,26 @@ describe("pure judges", () => {
   });
 
   test("judgeProtrusions: in-flow fail, positioned badge and horizontal breakout exempt", () => {
-    const { findings, exempted } = judgeProtrusions([
-      { parent: ".card", child: "#wide-btn", amount: 40, positioned: false, negBreakout: false, axis: "horizontal" },
-      { parent: ".card", child: "#badge", amount: 8, positioned: true, negBreakout: false, axis: "horizontal" },
-      { parent: "article", child: "#bleed-img", amount: 24, positioned: false, negBreakout: true, axis: "horizontal" },
-      { parent: ".note", child: "(text)", amount: 60, positioned: false, negBreakout: false, axis: "horizontal" },
-    ], 1280);
-    assert.deepEqual(findings.map((f) => f.selector), ["#wide-btn out of .card", "(text) out of .note"]);
+    const { findings, exempted } = judgeProtrusions(
+      [
+        { parent: ".card", child: "#wide-btn", amount: 40, positioned: false, negBreakout: false, axis: "horizontal" },
+        { parent: ".card", child: "#badge", amount: 8, positioned: true, negBreakout: false, axis: "horizontal" },
+        {
+          parent: "article",
+          child: "#bleed-img",
+          amount: 24,
+          positioned: false,
+          negBreakout: true,
+          axis: "horizontal",
+        },
+        { parent: ".note", child: "(text)", amount: 60, positioned: false, negBreakout: false, axis: "horizontal" },
+      ],
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => f.selector),
+      ["#wide-btn out of .card", "(text) out of .note"],
+    );
     assert.ok(findings.every((f) => f.severity === "fail"));
     assert.equal(exempted.length, 2);
     assert.match(exempted[0]!.reason, /positioned overlay/);
@@ -326,14 +514,27 @@ describe("pure judges", () => {
   });
 
   test("judgeTextContrast: invisible fail, low-contrast warn, disabled/shadow exempt, composite skip visible", () => {
-    const base = { text: "hello", fg: "rgb(255, 255, 255)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false };
-    const { findings, exempted } = judgeTextContrast([
-      { ...base, selector: "#ghost", ratio: 1.0 },
-      { ...base, selector: "#dim", ratio: 2.4, fg: "rgb(150, 150, 150)" },
-      { ...base, selector: "#off", ratio: 1.2, disabled: true },
-      { ...base, selector: "#shadow", ratio: 1.1, shadowed: true },
-    ], 5, 1280);
-    assert.deepEqual(findings.map((f) => `${f.kind}:${f.severity}`), ["invisible-text:fail", "low-contrast-text:warn"]);
+    const base = {
+      text: "hello",
+      fg: "rgb(255, 255, 255)",
+      bg: "rgb(255, 255, 255)",
+      disabled: false,
+      shadowed: false,
+    };
+    const { findings, exempted } = judgeTextContrast(
+      [
+        { ...base, selector: "#ghost", ratio: 1.0 },
+        { ...base, selector: "#dim", ratio: 2.4, fg: "rgb(150, 150, 150)" },
+        { ...base, selector: "#off", ratio: 1.2, disabled: true },
+        { ...base, selector: "#shadow", ratio: 1.1, shadowed: true },
+      ],
+      5,
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => `${f.kind}:${f.severity}`),
+      ["invisible-text:fail", "low-contrast-text:warn"],
+    );
     assert.equal(exempted.length, 3); // disabled + shadowed + composite aggregate
     assert.match(exempted[2]!.reason, /5 text block\(s\) skipped/);
   });
@@ -356,8 +557,7 @@ describe("pure judges", () => {
     // Only `low-contrast-text` is set. Every other rule is unset, which is the case the old
     // stub could not express — it answered `suspect` for all of them, so the formatter read the
     // table instead of the emitted severity and nothing here noticed.
-    const view = (setting: "off" | "info" | "warn" | "suspect") =>
-      ruleViewFrom({ "low-contrast-text": setting });
+    const view = (setting: "off" | "info" | "warn" | "suspect") => ruleViewFrom({ "low-contrast-text": setting });
 
     const off = plain(formatIntegrityReport(report as never, view("off")));
     assert.doesNotMatch(off, /low-contrast-text/, "an `off` rule must not be printed");
@@ -395,9 +595,7 @@ describe("pure judges", () => {
       verdict: "defects" as const,
       viewports: [],
       exempted: [],
-      findings: [
-        { kind: "js-error", severity: "warn" as const, viewport: 1280, message: "Uncaught after load" },
-      ],
+      findings: [{ kind: "js-error", severity: "warn" as const, viewport: 1280, message: "Uncaught after load" }],
     };
     // `"suspect"` is the fallback because it is what `js-error` is DECLARED as in the gate's
     // rule table, and `RuleView.effective` falls back to exactly that. A stub defaulting to
@@ -418,13 +616,26 @@ describe("pure judges", () => {
     // v6's adopting agent counted the old behaviour: "the same contrast defect is
     // reported 8 times across two gates […] Three CSS colours, eight lines." A
     // three-row table produced three warnings differing only in the row index.
-    const grey = { fg: "rgb(141, 141, 141)", bg: "rgb(255, 255, 255)", floor: 4.5, fontSizePx: 13, large: false, disabled: false, shadowed: false, ratio: 3.32 };
-    const { findings } = judgeTextContrast([
-      { ...grey, selector: "#rows > tr:nth-of-type(1) > td:nth-of-type(4)", text: "open" },
-      { ...grey, selector: "#rows > tr:nth-of-type(2) > td:nth-of-type(4)", text: "shipped" },
-      { ...grey, selector: "#rows > tr:nth-of-type(3) > td:nth-of-type(4)", text: "cancelled" },
-      { ...grey, fg: "rgb(154, 154, 154)", ratio: 2.81, selector: "p.who", text: "signed in as ops@example.com" },
-    ], 0, 1280);
+    const grey = {
+      fg: "rgb(141, 141, 141)",
+      bg: "rgb(255, 255, 255)",
+      floor: 4.5,
+      fontSizePx: 13,
+      large: false,
+      disabled: false,
+      shadowed: false,
+      ratio: 3.32,
+    };
+    const { findings } = judgeTextContrast(
+      [
+        { ...grey, selector: "#rows > tr:nth-of-type(1) > td:nth-of-type(4)", text: "open" },
+        { ...grey, selector: "#rows > tr:nth-of-type(2) > td:nth-of-type(4)", text: "shipped" },
+        { ...grey, selector: "#rows > tr:nth-of-type(3) > td:nth-of-type(4)", text: "cancelled" },
+        { ...grey, fg: "rgb(154, 154, 154)", ratio: 2.81, selector: "p.who", text: "signed in as ops@example.com" },
+      ],
+      0,
+      1280,
+    );
     // Two colours, two findings — not four.
     assert.equal(findings.length, 2);
     assert.match(findings[0]!.message, /3 element\(s\)/);
@@ -442,21 +653,46 @@ describe("pure judges", () => {
   test("judgeTextContrast: the same colours at different floors stay separate findings", () => {
     // Identity is the pair PLUS the applicable floor: the same grey is a defect on
     // 13px body text and acceptable at 32px, and one fix does not serve both.
-    const grey = { fg: "rgb(148, 148, 148)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false, ratio: 2.9, text: "t" };
-    const { findings } = judgeTextContrast([
-      { ...grey, selector: "#body", fontSizePx: 13, large: false, floor: 4.5 },
-      { ...grey, selector: "#heading", fontSizePx: 32, large: true, floor: 3 },
-    ], 0, 1280);
+    const grey = {
+      fg: "rgb(148, 148, 148)",
+      bg: "rgb(255, 255, 255)",
+      disabled: false,
+      shadowed: false,
+      ratio: 2.9,
+      text: "t",
+    };
+    const { findings } = judgeTextContrast(
+      [
+        { ...grey, selector: "#body", fontSizePx: 13, large: false, floor: 4.5 },
+        { ...grey, selector: "#heading", fontSizePx: 32, large: true, floor: 3 },
+      ],
+      0,
+      1280,
+    );
     assert.equal(findings.length, 2);
   });
 
   test("judgeTextContrast: invisible-text stays per element, since it is a fail at that element", () => {
-    const base = { fg: "rgb(255, 255, 255)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false, ratio: 1.0, text: "t" };
-    const { findings } = judgeTextContrast([
-      { ...base, selector: "#a" },
-      { ...base, selector: "#b" },
-    ], 0, 1280);
-    assert.deepEqual(findings.map((f) => `${f.kind}:${f.selector}`), ["invisible-text:#a", "invisible-text:#b"]);
+    const base = {
+      fg: "rgb(255, 255, 255)",
+      bg: "rgb(255, 255, 255)",
+      disabled: false,
+      shadowed: false,
+      ratio: 1.0,
+      text: "t",
+    };
+    const { findings } = judgeTextContrast(
+      [
+        { ...base, selector: "#a" },
+        { ...base, selector: "#b" },
+      ],
+      0,
+      1280,
+    );
+    assert.deepEqual(
+      findings.map((f) => `${f.kind}:${f.selector}`),
+      ["invisible-text:#a", "invisible-text:#b"],
+    );
   });
 
   test("judgeTextContrast: the message names the WCAG floor that applied and the size that chose it", () => {
@@ -467,11 +703,21 @@ describe("pure judges", () => {
     // 4.5)", and `check integrity` said CLEAN and exited 0. Reporting it is only
     // half the fix; the message has to say which floor and why, or a reader cannot
     // tell whether 3.03:1 is acceptable here.
-    const base = { text: "Within budget", fg: "rgb(148, 148, 148)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false };
-    const { findings } = judgeTextContrast([
-      { ...base, selector: "#body", ratio: 3.03, fontSizePx: 13, large: false, floor: 4.5 },
-      { ...base, selector: "#heading", ratio: 2.9, fontSizePx: 32, large: true, floor: 3 },
-    ], 0, 1280);
+    const base = {
+      text: "Within budget",
+      fg: "rgb(148, 148, 148)",
+      bg: "rgb(255, 255, 255)",
+      disabled: false,
+      shadowed: false,
+    };
+    const { findings } = judgeTextContrast(
+      [
+        { ...base, selector: "#body", ratio: 3.03, fontSizePx: 13, large: false, floor: 4.5 },
+        { ...base, selector: "#heading", ratio: 2.9, fontSizePx: 32, large: true, floor: 3 },
+      ],
+      0,
+      1280,
+    );
     assert.match(findings[0]!.message, /below the 4\.5:1 WCAG AA floor for 13px body text/);
     assert.match(findings[1]!.message, /below the 3:1 WCAG AA floor for 32px large text/);
     // The floor travels in the evidence too, so a --json consumer can group by it.
@@ -491,32 +737,58 @@ describe("pure judges", () => {
   });
 
   test("judgeAlignment: 2-8px deviant flagged, exact and clearly-offset silent, other-axis alignment exempt", () => {
-    const child = (selector: string, left: number, top: number, width = 100) =>
-      ({ selector, left, right: left + width, centerX: left + width / 2, top });
+    const child = (selector: string, left: number, top: number, width = 100) => ({
+      selector,
+      left,
+      right: left + width,
+      centerX: left + width / 2,
+      top,
+    });
     // #c is 4px off a shared left edge -> flagged.
-    const flagged = judgeAlignment([{ parent: "#stack", children: [child("#a", 20, 0), child("#b", 20, 40), child("#c", 24, 80)] }], 1280);
+    const flagged = judgeAlignment(
+      [{ parent: "#stack", children: [child("#a", 20, 0), child("#b", 20, 40), child("#c", 24, 80)] }],
+      1280,
+    );
     assert.equal(flagged.length, 1);
     assert.equal(flagged[0]!.selector, "#c");
     assert.equal(flagged[0]!.severity, "warn");
     // Deliberate stagger (>8px) and exact alignment: silent.
-    assert.equal(judgeAlignment([{ parent: "#s", children: [child("#a", 20, 0), child("#b", 60, 40), child("#c", 100, 80)] }], 1280).length, 0);
-    assert.equal(judgeAlignment([{ parent: "#s", children: [child("#a", 20, 0), child("#b", 20, 40), child("#c", 20, 80)] }], 1280).length, 0);
+    assert.equal(
+      judgeAlignment(
+        [{ parent: "#s", children: [child("#a", 20, 0), child("#b", 60, 40), child("#c", 100, 80)] }],
+        1280,
+      ).length,
+      0,
+    );
+    assert.equal(
+      judgeAlignment([{ parent: "#s", children: [child("#a", 20, 0), child("#b", 20, 40), child("#c", 20, 80)] }], 1280)
+        .length,
+      0,
+    );
     // Centered item in a left-aligned stack: off the left edge by 5px but
     // exactly on the shared center line -> intentional, silent.
-    const centered = judgeAlignment([{
-      parent: "#mix",
-      children: [child("#a", 20, 0, 100), child("#b", 20, 40, 100), child("#c", 25, 80, 90)],
-    }], 1280);
+    const centered = judgeAlignment(
+      [
+        {
+          parent: "#mix",
+          children: [child("#a", 20, 0, 100), child("#b", 20, 40, 100), child("#c", 25, 80, 90)],
+        },
+      ],
+      1280,
+    );
     assert.equal(centered.length, 0, JSON.stringify(centered));
   });
 
   test("measureInkRatio: quarter-filled buffer measures ~0.25", () => {
-    const w = 40, h = 40;
+    const w = 40,
+      h = 40;
     const data = new Uint8Array(w * h * 4).fill(255);
     for (let y = 0; y < 20; y++) {
       for (let x = 0; x < 20; x++) {
         const i = (y * w + x) * 4;
-        data[i] = 20; data[i + 1] = 20; data[i + 2] = 20;
+        data[i] = 20;
+        data[i + 1] = 20;
+        data[i + 2] = 20;
       }
     }
     const ratio = measureInkRatio(data, w, h);
@@ -528,22 +800,32 @@ describe("pure judges", () => {
 // S14b — mutation battery (browser)
 
 describe("S14b mutation battery", () => {
-  test("M1 construction throw on a blank body: js-error fail + degenerate-render fail", { timeout: 120_000 }, async () => {
-    const file = page("m1.html", `<script>
+  test(
+    "M1 construction throw on a blank body: js-error fail + degenerate-render fail",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m1.html",
+        `<script>
       throw new Error("init exploded");
       // the builder below never runs
-      </script>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    assert.equal(report.verdict, "defects");
-    const jsError = report.findings.find((f) => f.kind === "js-error");
-    assert.equal(jsError?.severity, "fail");
-    assert.match(jsError!.message, /before load/);
-    assert.ok(kinds(report).includes("degenerate-render"), `got: ${kinds(report)}`);
-  });
+      </script>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      assert.equal(report.verdict, "defects");
+      const jsError = report.findings.find((f) => f.kind === "js-error");
+      assert.equal(jsError?.severity, "fail");
+      assert.match(jsError!.message, /before load/);
+      assert.ok(kinds(report).includes("degenerate-render"), `got: ${kinds(report)}`);
+    },
+  );
 
   test("M2 post-load throw: js-error warn only (initial render survives)", { timeout: 120_000 }, async () => {
-    const file = page("m2.html", `<h1>Title</h1><div style="width:600px;height:300px;background:#334">content</div>
-      <script>setTimeout(() => { throw new Error("interaction handler dead"); }, 50);</script>`);
+    const file = page(
+      "m2.html",
+      `<h1>Title</h1><div style="width:600px;height:300px;background:#334">content</div>
+      <script>setTimeout(() => { throw new Error("interaction handler dead"); }, 50);</script>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
     const jsError = report.findings.find((f) => f.kind === "js-error");
     assert.equal(jsError?.severity, "warn");
@@ -551,8 +833,11 @@ describe("S14b mutation battery", () => {
   });
 
   test("M3 404 image: broken-image fail with src evidence", { timeout: 120_000 }, async () => {
-    const file = page("m3.html", `<h1>Gallery</h1><img id="hero" src="./does-not-exist.png" alt="hero" width="400" height="200">
-      <div style="width:600px;height:200px;background:#586">filler</div>`);
+    const file = page(
+      "m3.html",
+      `<h1>Gallery</h1><img id="hero" src="./does-not-exist.png" alt="hero" width="400" height="200">
+      <div style="width:600px;height:200px;background:#586">filler</div>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
     const broken = report.findings.find((f) => f.kind === "broken-image");
     assert.equal(broken?.severity, "fail");
@@ -560,39 +845,63 @@ describe("S14b mutation battery", () => {
     assert.match(String(broken?.evidence?.src), /does-not-exist/);
   });
 
-  test("M4 same-layer text collision (negative margin + absolute same z): text-collision fail", { timeout: 120_000 }, async () => {
-    const file = page("m4.html", `
+  test(
+    "M4 same-layer text collision (negative margin + absolute same z): text-collision fail",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m4.html",
+        `
       <div id="first" style="width:300px;line-height:20px">The first paragraph of body copy sits here.</div>
       <div id="second" style="width:300px;line-height:20px;margin-top:-14px">The second paragraph got pulled up over it.</div>
       <div style="position:relative;height:120px;width:400px;background:#eee">
         <span id="abs1" style="position:absolute;left:10px;top:10px">Overlapping label one</span>
         <span id="abs2" style="position:absolute;left:24px;top:14px">Overlapping label two</span>
       </div>
-      <div style="width:600px;height:150px;background:#456"></div>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    const collisions = report.findings.filter((f) => f.kind === "text-collision");
-    assert.ok(collisions.length >= 2, `expected both pairs, got ${JSON.stringify(collisions.map((c) => c.selector))}`);
-    assert.ok(collisions.some((c) => c.selector?.includes("#first") && c.selector?.includes("#second")));
-    assert.ok(collisions.some((c) => c.selector?.includes("#abs1") && c.selector?.includes("#abs2")));
-  });
+      <div style="width:600px;height:150px;background:#456"></div>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      const collisions = report.findings.filter((f) => f.kind === "text-collision");
+      assert.ok(
+        collisions.length >= 2,
+        `expected both pairs, got ${JSON.stringify(collisions.map((c) => c.selector))}`,
+      );
+      assert.ok(collisions.some((c) => c.selector?.includes("#first") && c.selector?.includes("#second")));
+      assert.ok(collisions.some((c) => c.selector?.includes("#abs1") && c.selector?.includes("#abs2")));
+    },
+  );
 
-  test("M5 40px box clipping text: text-clipped fail, no duplicate clipped-content row", { timeout: 120_000 }, async () => {
-    const file = page("m5.html", `<div id="tight" style="width:40px;height:20px;overflow:hidden;white-space:nowrap">A headline far too long for this box</div>
-      <div style="width:600px;height:200px;background:#654"></div>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    const clipped = report.findings.filter((f) => f.selector === "#tight");
-    assert.equal(clipped.length, 1, `expected exactly one finding for #tight, got ${JSON.stringify(clipped.map((c) => c.kind))}`);
-    assert.equal(clipped[0]!.kind, "text-clipped");
-    assert.equal(clipped[0]!.severity, "fail");
-  });
+  test(
+    "M5 40px box clipping text: text-clipped fail, no duplicate clipped-content row",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m5.html",
+        `<div id="tight" style="width:40px;height:20px;overflow:hidden;white-space:nowrap">A headline far too long for this box</div>
+      <div style="width:600px;height:200px;background:#654"></div>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      const clipped = report.findings.filter((f) => f.selector === "#tight");
+      assert.equal(
+        clipped.length,
+        1,
+        `expected exactly one finding for #tight, got ${JSON.stringify(clipped.map((c) => c.kind))}`,
+      );
+      assert.equal(clipped[0]!.kind, "text-clipped");
+      assert.equal(clipped[0]!.severity, "fail");
+    },
+  );
 
   test("M6 uncleared floats: collapsed-container fail", { timeout: 120_000 }, async () => {
-    const file = page("m6.html", `
+    const file = page(
+      "m6.html",
+      `
       <div id="cards">
         <div style="float:left;width:200px;height:120px;background:#a33">card A</div>
         <div style="float:left;width:200px;height:120px;background:#3a3">card B</div>
       </div>
-      <p style="clear:none">Text that the floats paint over.</p>`);
+      <p style="clear:none">Text that the floats paint over.</p>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
     const collapsed = report.findings.find((f) => f.kind === "collapsed-container");
     assert.equal(collapsed?.severity, "fail");
@@ -613,7 +922,9 @@ describe("S14b mutation battery", () => {
   // now measured (constrain the element, re-read scrollWidth) rather than
   // guessed from box geometry.
   test("M7b grid shell: overflow blames the rigid child, not the stretched shell", { timeout: 120_000 }, async () => {
-    const file = page("m7b.html", `
+    const file = page(
+      "m7b.html",
+      `
       <div class="shell" style="display:grid;grid-template-columns:200px 1fr">
         <nav class="side"><strong>Nav</strong></nav>
         <main class="main" style="padding:20px">
@@ -621,7 +932,8 @@ describe("S14b mutation battery", () => {
           <p class="lede">Body copy that stretches to whatever the track allows.</p>
           <div class="rigid" style="width:900px;background:#eef">fixed 900px wide</div>
         </main>
-      </div>`);
+      </div>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: [{ width: 375, height: 700 }] });
     const overflow = report.findings.find((f) => f.kind === "page-overflow-x");
     assert.equal(overflow?.severity, "fail");
@@ -632,33 +944,51 @@ describe("S14b mutation battery", () => {
   });
 
   test("M8 404 stylesheet with no fallback: failed-stylesheet + unstyled-page fail", { timeout: 120_000 }, async () => {
-    const file = page("m8.html", `<h1>Heading</h1><p>Body text long enough to paint.</p><a href="#x">a link</a>`,
-      `<link rel="stylesheet" href="./missing.css">`);
+    const file = page(
+      "m8.html",
+      `<h1>Heading</h1><p>Body text long enough to paint.</p><a href="#x">a link</a>`,
+      `<link rel="stylesheet" href="./missing.css">`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
     assert.ok(kinds(report).includes("failed-stylesheet"), `got: ${kinds(report)}`);
     const unstyled = report.findings.find((f) => f.kind === "unstyled-page");
     assert.equal(unstyled?.severity, "fail");
   });
 
-  test("M10 in-flow child wider than its painted card: container-protrusion fail; badge exempt", { timeout: 120_000 }, async () => {
-    const file = page("m10.html", `
+  test(
+    "M10 in-flow child wider than its painted card: container-protrusion fail; badge exempt",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m10.html",
+        `
       <div id="card" style="position:relative;width:300px;border:1px solid #cbd5e1;border-radius:8px;padding:16px;background:#fff">
         <h3>Plan</h3>
         <button id="cta" style="width:400px;display:block">Choose this plan and start today</button>
         <span id="badge" style="position:absolute;top:-10px;right:-10px;background:#4f46e5;color:#fff;padding:2px 8px">New</span>
       </div>
-      <div style="width:600px;height:150px;background:#456;margin-top:24px"></div>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    const prot = report.findings.filter((f) => f.kind === "container-protrusion");
-    assert.equal(prot.length, 1, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
-    assert.match(prot[0]!.selector!, /#cta out of #card/);
-    assert.equal(prot[0]!.severity, "fail");
-    const ex = report.exempted.filter((e) => e.kind === "container-protrusion");
-    assert.ok(ex.some((e) => e.selector?.includes("#badge") && /positioned overlay/.test(e.reason)), JSON.stringify(ex));
-  });
+      <div style="width:600px;height:150px;background:#456;margin-top:24px"></div>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      const prot = report.findings.filter((f) => f.kind === "container-protrusion");
+      assert.equal(prot.length, 1, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+      assert.match(prot[0]!.selector!, /#cta out of #card/);
+      assert.equal(prot[0]!.severity, "fail");
+      const ex = report.exempted.filter((e) => e.kind === "container-protrusion");
+      assert.ok(
+        ex.some((e) => e.selector?.includes("#badge") && /positioned overlay/.test(e.reason)),
+        JSON.stringify(ex),
+      );
+    },
+  );
 
-  test("M11 white-on-white text: invisible-text fail; gradient text skipped visibly", { timeout: 120_000 }, async () => {
-    const file = page("m11.html", `
+  test(
+    "M11 white-on-white text: invisible-text fail; gradient text skipped visibly",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m11.html",
+        `
       <div style="background:#fff;padding:16px">
         <p id="ghost" style="color:#fefefe">This sentence is invisible to every reader.</p>
         <p id="fine">This one is fine.</p>
@@ -666,38 +996,55 @@ describe("S14b mutation battery", () => {
       <div style="background:linear-gradient(#345,#123);padding:16px">
         <p id="on-gradient" style="color:#89a">Composite background text.</p>
       </div>
-      <div style="width:600px;height:150px;background:#456"></div>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    const ghost = report.findings.find((f) => f.selector === "#ghost");
-    assert.equal(ghost?.kind, "invisible-text");
-    assert.equal(ghost?.severity, "fail");
-    assert.ok(report.exempted.some((e) => e.kind === "low-contrast-text" && /skipped/.test(e.reason)),
-      "composite-background skip is visible");
-    assert.ok(!report.findings.some((f) => f.selector === "#fine" || f.selector === "#on-gradient"));
-  });
+      <div style="width:600px;height:150px;background:#456"></div>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      const ghost = report.findings.find((f) => f.selector === "#ghost");
+      assert.equal(ghost?.kind, "invisible-text");
+      assert.equal(ghost?.severity, "fail");
+      assert.ok(
+        report.exempted.some((e) => e.kind === "low-contrast-text" && /skipped/.test(e.reason)),
+        "composite-background skip is visible",
+      );
+      assert.ok(!report.findings.some((f) => f.selector === "#fine" || f.selector === "#on-gradient"));
+    },
+  );
 
-  test("M12 one card 5px off a shared edge: near-misalignment warn; exact grid silent", { timeout: 120_000 }, async () => {
-    const file = page("m12.html", `
+  test(
+    "M12 one card 5px off a shared edge: near-misalignment warn; exact grid silent",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m12.html",
+        `
       <div id="stack" style="padding:20px">
         <div style="width:300px;height:60px;background:#dbe2ea;margin:0 0 12px 0">Row one</div>
         <div style="width:300px;height:60px;background:#dbe2ea;margin:0 0 12px 0">Row two</div>
         <div id="off" style="width:300px;height:60px;background:#dbe2ea;margin:0 0 12px 5px">Row three</div>
         <div style="width:300px;height:60px;background:#dbe2ea">Row four</div>
-      </div>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    const near = report.findings.filter((f) => f.kind === "near-misalignment");
-    assert.equal(near.length, 1, JSON.stringify(near.map((f) => f.selector)));
-    assert.equal(near[0]!.selector, "#off");
-    assert.equal(near[0]!.severity, "warn");
-    assert.equal(report.verdict, "clean"); // warn does not flip the verdict
-  });
+      </div>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      const near = report.findings.filter((f) => f.kind === "near-misalignment");
+      assert.equal(near.length, 1, JSON.stringify(near.map((f) => f.selector)));
+      assert.equal(near[0]!.selector, "#off");
+      assert.equal(near[0]!.severity, "warn");
+      assert.equal(report.verdict, "clean"); // warn does not flip the verdict
+    },
+  );
 
   test("M9 375-only overflow: finding attributed to the 375 viewport", { timeout: 180_000 }, async () => {
-    const file = page("m9.html", `<h1>Responsive-ish</h1>
-      <div style="width:700px;height:100px;background:#933">fixed-width band</div>`);
+    const file = page(
+      "m9.html",
+      `<h1>Responsive-ish</h1>
+      <div style="width:700px;height:100px;background:#933">fixed-width band</div>`,
+    );
     const report = await runIntegrityCheck({
       source: file,
-      viewports: [{ width: 1280, height: 800 }, { width: 375, height: 700 }],
+      viewports: [
+        { width: 1280, height: 800 },
+        { width: 375, height: 700 },
+      ],
     });
     const overflow = report.findings.find((f) => f.kind === "page-overflow-x");
     assert.equal(overflow?.viewport, 375);
@@ -710,7 +1057,9 @@ describe("S14b mutation battery", () => {
 
 describe("S14c false-positive audit", () => {
   test("intentional patterns: verdict clean, candidates visible in exempted", { timeout: 120_000 }, async () => {
-    const file = page("clean.html", `
+    const file = page(
+      "clean.html",
+      `
       <section id="hero" style="position:relative;width:900px;height:300px;background:linear-gradient(#345,#123)">
         <p id="flow-caption" style="padding-top:120px;text-align:center;color:#89a">A subtitle sitting in normal flow</p>
         <h1 id="hero-title" style="position:absolute;left:0;right:0;top:100px;z-index:2;text-align:center;color:#fff">Hero title layered over the caption</h1>
@@ -722,92 +1071,147 @@ describe("S14c false-positive audit", () => {
       </div>
       <div style="margin-top:90px;width:600px;height:180px;background:#464">content block</div>
       <p>Regular closing copy with <a href="#top">a link</a>.</p>`,
-      `<style>body{font-family:system-ui,sans-serif;margin:0;padding:16px}</style>`);
+      `<style>body{font-family:system-ui,sans-serif;margin:0;padding:16px}</style>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    assert.equal(report.verdict, "clean",
-      `expected clean, findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""}`))}`);
+    assert.equal(
+      report.verdict,
+      "clean",
+      `expected clean, findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""}`))}`,
+    );
     const reasons = report.exempted.map((e) => e.reason).join(" | ");
     assert.match(reasons, /overlay|aria-hidden/, "hero overlay pattern recorded as exempted");
     assert.match(reasons, /ellipsis/, "ellipsis truncation recorded as exempted");
     assert.match(reasons, /anchor/, "zero-height positioning anchor recorded as exempted");
   });
 
-  test("image replacement (Kellum, text-indent) and sr-only stay clean; accidental full hide warns", { timeout: 120_000 }, async () => {
-    const file = page("replacement.html", `
+  test(
+    "image replacement (Kellum, text-indent) and sr-only stay clean; accidental full hide warns",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "replacement.html",
+        `
       <a id="kellum" href="#v" style="display:inline-block;overflow:hidden;width:40px;height:0;padding:40px 0 0 0;background:#c33">HTML</a>
       <a id="indent" href="#n" style="display:block;overflow:hidden;width:70px;height:70px;text-indent:100%;white-space:nowrap;background:url('data:image/gif;base64,R0lGODlhAQABAAAAACw=')">Next Designs</a>
       <span id="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Skip to main content</span>
       <div id="accident" style="width:120px;height:0;overflow:hidden">Text nobody replaced</div>
       <div style="width:600px;height:200px;background:#357">content</div>`,
-      `<style>body{font-family:system-ui;margin:0;padding:16px}#kellum::before{content:"\\2605";font-size:32px;color:#fff}</style>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    assert.equal(report.verdict, "clean",
-      `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""} ${f.severity}`))}`);
-    const reasons = report.exempted.filter((e) => e.kind === "text-clipped").map((e) => `${e.selector}:${e.reason}`);
-    assert.ok(reasons.some((r) => r.startsWith("#kellum") && r.includes("image replacement")), reasons.join(" | "));
-    assert.ok(reasons.some((r) => r.startsWith("#indent") && r.includes("image replacement")), reasons.join(" | "));
-    assert.ok(reasons.some((r) => r.startsWith("#sr") && r.includes("sr-only")), reasons.join(" | "));
-    const accident = report.findings.find((f) => f.selector === "#accident");
-    assert.equal(accident?.severity, "warn");
-    assert.match(accident!.message, /no replacement signal/);
-  });
+        `<style>body{font-family:system-ui;margin:0;padding:16px}#kellum::before{content:"\\2605";font-size:32px;color:#fff}</style>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      assert.equal(
+        report.verdict,
+        "clean",
+        `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""} ${f.severity}`))}`,
+      );
+      const reasons = report.exempted.filter((e) => e.kind === "text-clipped").map((e) => `${e.selector}:${e.reason}`);
+      assert.ok(
+        reasons.some((r) => r.startsWith("#kellum") && r.includes("image replacement")),
+        reasons.join(" | "),
+      );
+      assert.ok(
+        reasons.some((r) => r.startsWith("#indent") && r.includes("image replacement")),
+        reasons.join(" | "),
+      );
+      assert.ok(
+        reasons.some((r) => r.startsWith("#sr") && r.includes("sr-only")),
+        reasons.join(" | "),
+      );
+      const accident = report.findings.find((f) => f.selector === "#accident");
+      assert.equal(accident?.severity, "warn");
+      assert.match(accident!.message, /no replacement signal/);
+    },
+  );
 
-  test("M13 opacity:0 ancestor makes descendant text invisible-text (Codex #100 P1)", { timeout: 120_000 }, async () => {
-    const file = page("m13.html", `
+  test(
+    "M13 opacity:0 ancestor makes descendant text invisible-text (Codex #100 P1)",
+    { timeout: 120_000 },
+    async () => {
+      const file = page(
+        "m13.html",
+        `
       <div style="opacity:0;background:#fff;padding:16px">
         <p id="vanished" style="color:#111">Readable color, invisible ancestor.</p>
       </div>
       <p id="fine" style="color:#111">Visible control text.</p>
-      <div style="width:600px;height:150px;background:#456"></div>`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    const gone = report.findings.find((f) => f.selector === "#vanished");
-    assert.ok(gone, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
-    assert.equal(gone!.kind, "invisible-text");
-    assert.ok(!report.findings.some((f) => f.selector === "#fine"));
-  });
+      <div style="width:600px;height:150px;background:#456"></div>`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      const gone = report.findings.find((f) => f.selector === "#vanished");
+      assert.ok(gone, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+      assert.equal(gone!.kind, "invisible-text");
+      assert.ok(!report.findings.some((f) => f.selector === "#fine"));
+    },
+  );
 
-  test("failing @import inside a loaded stylesheet is not unstyled-page (Codex #100 P2)", { timeout: 120_000 }, async () => {
-    const cssFile = join(DIR, "import-parent.css");
-    writeFileSync(cssFile, `@import url("./missing-child.css");\nbody{background:#eef;font-family:system-ui;margin:0;padding:16px}`);
-    const file = page("import-fail.html", `
+  test(
+    "failing @import inside a loaded stylesheet is not unstyled-page (Codex #100 P2)",
+    { timeout: 120_000 },
+    async () => {
+      const cssFile = join(DIR, "import-parent.css");
+      writeFileSync(
+        cssFile,
+        `@import url("./missing-child.css");\nbody{background:#eef;font-family:system-ui;margin:0;padding:16px}`,
+      );
+      const file = page(
+        "import-fail.html",
+        `
       <p style="color:#123">Styled body copy.</p>
       <div style="width:600px;height:150px;background:#456"></div>`,
-      `<link rel="stylesheet" href="./import-parent.css">`);
-    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
-    assert.ok(!report.findings.some((f) => f.kind === "unstyled-page"),
-      `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""}`))}`);
-    assert.ok(report.findings.some((f) => f.kind === "failed-stylesheet" && /missing-child/.test(f.message)),
-      `the missing @import child itself is still reported: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.message}`))}`);
-  });
+        `<link rel="stylesheet" href="./import-parent.css">`,
+      );
+      const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+      assert.ok(
+        !report.findings.some((f) => f.kind === "unstyled-page"),
+        `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""}`))}`,
+      );
+      assert.ok(
+        report.findings.some((f) => f.kind === "failed-stylesheet" && /missing-child/.test(f.message)),
+        `the missing @import child itself is still reported: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.message}`))}`,
+      );
+    },
+  );
 
   // Found by fixtures/collision-fp-corpus (2026-08-01): the kicker/heading
   // pull-up is idiomatic markup whose line BOXES overlap 7px while the
   // glyphs keep a measured 2px gap — the box test called it a collision.
   // Blocks are now shrunk to their measured ink band before the overlap
   // test, which can only remove findings.
-  test("designed negative leading and pull-ups are not collisions; real overlap still is", { timeout: 120_000 }, async () => {
-    const pullUp = page("ink-pullup.html", `
+  test(
+    "designed negative leading and pull-ups are not collisions; real overlap still is",
+    { timeout: 120_000 },
+    async () => {
+      const pullUp = page(
+        "ink-pullup.html",
+        `
       <p class="kicker" style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#5b6270;margin:0">Quarterly report</p>
       <h1 style="font-size:40px;margin:-0.18em 0 0.4em">Settlement volume grew nineteen percent</h1>
-      <p style="max-width:620px">A lede paragraph under the heading.</p>`);
-    const clean = await runIntegrityCheck({ source: pullUp, viewports: ONE_VIEWPORT });
-    assert.equal(
-      clean.findings.filter((f) => f.kind === "text-collision").length, 0,
-      JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
-    );
+      <p style="max-width:620px">A lede paragraph under the heading.</p>`,
+      );
+      const clean = await runIntegrityCheck({ source: pullUp, viewports: ONE_VIEWPORT });
+      assert.equal(
+        clean.findings.filter((f) => f.kind === "text-collision").length,
+        0,
+        JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
+      );
 
-    // The filter must not blind the gate: a genuine overlap still fails.
-    const real = page("ink-real.html", `
+      // The filter must not blind the gate: a genuine overlap still fails.
+      const real = page(
+        "ink-real.html",
+        `
       <div style="position:relative;height:60px;font:16px monospace">
         <span style="position:absolute;left:0;top:20px">Total: 1,240,000 EUR</span>
         <span style="position:absolute;left:60px;top:24px">Refunds: 80 EUR</span>
-      </div>`);
-    const dirty = await runIntegrityCheck({ source: real, viewports: ONE_VIEWPORT });
-    assert.ok(
-      dirty.findings.some((f) => f.kind === "text-collision"),
-      JSON.stringify(dirty.findings.map((f) => f.kind)),
-    );
-  });
+      </div>`,
+      );
+      const dirty = await runIntegrityCheck({ source: real, viewports: ONE_VIEWPORT });
+      assert.ok(
+        dirty.findings.some((f) => f.kind === "text-collision"),
+        JSON.stringify(dirty.findings.map((f) => f.kind)),
+      );
+    },
+  );
 
   // The second half of the ink-extents work (fixtures/collision-fp-corpus):
   // a graze — a few characters overlapping across the FULL ink height — was
@@ -816,28 +1220,36 @@ describe("S14c false-positive audit", () => {
   // designed pull-up 0.137. By ink-overlap FRACTION the same three are
   // 1.000 / 0.077 / 0.137, so the gate now measures that instead.
   test("a character-level graze is reported; legitimate stacks stay clean", { timeout: 120_000 }, async () => {
-    const graze = page("ink-graze.html", `
+    const graze = page(
+      "ink-graze.html",
+      `
       <div style="position:relative;height:40px;font:16px ui-monospace,monospace">
         <span style="position:absolute;left:0px;top:10px;white-space:nowrap">Total: 1,240,000 EUR</span>
         <span style="position:absolute;left:168px;top:10px;white-space:nowrap">Refunds: 80 EUR</span>
-      </div>`);
+      </div>`,
+    );
     const hit = await runIntegrityCheck({ source: graze, viewports: ONE_VIEWPORT });
     assert.equal(
-      hit.findings.filter((f) => f.kind === "text-collision").length, 1,
+      hit.findings.filter((f) => f.kind === "text-collision").length,
+      1,
       JSON.stringify(hit.findings.map((f) => `${f.kind} ${f.selector}`)),
     );
 
     // A solid-set stack (line-height 1, tall metrics) overlaps line boxes by
     // construction and must stay clean.
-    const solid = page("ink-solid.html", `
+    const solid = page(
+      "ink-solid.html",
+      `
       <div style="font:24px/1 'Noto Sans','DejaVu Sans',Verdana,sans-serif;max-width:560px">
         <p style="margin:0">Line one of a block set solid.</p>
         <p style="margin:0">Line two directly beneath it.</p>
         <p style="margin:0">Line three completes the stack.</p>
-      </div>`);
+      </div>`,
+    );
     const clean = await runIntegrityCheck({ source: solid, viewports: ONE_VIEWPORT });
     assert.equal(
-      clean.findings.filter((f) => f.kind === "text-collision").length, 0,
+      clean.findings.filter((f) => f.kind === "text-collision").length,
+      0,
       JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
     );
   });
@@ -857,7 +1269,8 @@ describe("S14c false-positive audit", () => {
       viewports: [{ width: 375, height: 700 }],
     });
     assert.equal(
-      report.findings.filter((f) => f.kind === "text-collision").length, 0,
+      report.findings.filter((f) => f.kind === "text-collision").length,
+      0,
       JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
     );
     // Not silently: a gate that drops a candidate without saying so measures less than it
@@ -871,15 +1284,19 @@ describe("S14c false-positive audit", () => {
     // The other half of the clamp: clipping shrinks a block to its visible part rather than
     // removing it, so a run half inside a scrollport that overlaps something in the visible
     // half is still a finding. Without this the fix would trade one blind spot for another.
-    const file = page("half-clipped-collision.html", `
+    const file = page(
+      "half-clipped-collision.html",
+      `
       <div style="height:40px;overflow:hidden;position:relative;font:16px ui-monospace,monospace">
         <span style="position:absolute;left:0;top:10px;white-space:nowrap">Total: 1,240,000 EUR</span>
         <span style="position:absolute;left:168px;top:10px;white-space:nowrap">Refunds: 80 EUR</span>
         <span style="position:absolute;left:0;top:120px;white-space:nowrap">Past the clip entirely</span>
-      </div>`);
+      </div>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
     assert.equal(
-      report.findings.filter((f) => f.kind === "text-collision").length, 1,
+      report.findings.filter((f) => f.kind === "text-collision").length,
+      1,
       JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector} ${f.message}`)),
     );
   });
@@ -890,7 +1307,9 @@ describe("S14c false-positive audit", () => {
   // Self-style checks miss it because content-visibility skipping is not
   // visibility/display/opacity; checkVisibility() is the test that catches it.
   test("text inside a closed <details> is not a collision candidate", { timeout: 120_000 }, async () => {
-    const file = page("closed-details.html", `
+    const file = page(
+      "closed-details.html",
+      `
       <details>
         <summary>Reference</summary>
         <ul style="margin:0;padding:0;list-style:none">
@@ -899,19 +1318,27 @@ describe("S14c false-positive audit", () => {
           <li><a href="#c">scroll-margin-block</a></li>
         </ul>
       </details>
-      <p>Visible body copy under the collapsed section.</p>`);
+      <p>Visible body copy under the collapsed section.</p>`,
+    );
     const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
     assert.equal(
-      report.findings.filter((f) => f.kind === "text-collision").length, 0,
+      report.findings.filter((f) => f.kind === "text-collision").length,
+      0,
       JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
     );
   });
 
   test("maxFindings caps text-collision rows (Codex #100 P2)", { timeout: 120_000 }, async () => {
-    const rows = Array.from({ length: 5 }, (_, i) =>
-      `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>
-       <p style="position:absolute;top:${20 + i * 40}px;left:120px;width:220px;margin:0">Row ${i} overlapping right text</p>`).join("");
-    const file = page("collision-cap.html", `${rows}<div style="position:absolute;top:260px;width:600px;height:120px;background:#456"></div>`);
+    const rows = Array.from(
+      { length: 5 },
+      (_, i) =>
+        `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>
+       <p style="position:absolute;top:${20 + i * 40}px;left:120px;width:220px;margin:0">Row ${i} overlapping right text</p>`,
+    ).join("");
+    const file = page(
+      "collision-cap.html",
+      `${rows}<div style="position:absolute;top:260px;width:600px;height:120px;background:#456"></div>`,
+    );
     const capped = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT, maxFindings: 1 });
     const collisionRows = capped.findings.filter((f) => f.kind === "text-collision" && f.selector !== "(page)");
     assert.equal(collisionRows.length, 1, JSON.stringify(capped.findings.map((f) => `${f.kind} ${f.selector}`)));
@@ -920,17 +1347,26 @@ describe("S14c false-positive audit", () => {
   });
 
   test("clean multi-viewport run stays clean and reports per-viewport stats", { timeout: 180_000 }, async () => {
-    const file = page("clean-mv.html", `
+    const file = page(
+      "clean-mv.html",
+      `
       <header style="max-width:100%;padding:24px;background:#234;color:#fff"><h1>Site</h1></header>
       <main style="max-width:100%;padding:24px">
         <p>Body copy that wraps normally at any width.</p>
         <div style="max-width:100%;height:160px;background:#487"></div>
       </main>`,
-      `<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif}</style>`);
+      `<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif}</style>`,
+    );
     const report = await runIntegrityCheck({ source: file });
-    assert.equal(report.verdict, "clean",
-      `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""} @${f.viewport}`))}`);
-    assert.deepEqual(report.viewports.map((v) => v.width), [1280, 768, 375]);
+    assert.equal(
+      report.verdict,
+      "clean",
+      `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""} @${f.viewport}`))}`,
+    );
+    assert.deepEqual(
+      report.viewports.map((v) => v.width),
+      [1280, 768, 375],
+    );
     assert.ok(report.viewports.every((v) => v.components > 0));
   });
 });
@@ -938,13 +1374,16 @@ describe("S14c false-positive audit", () => {
 // A13 — occluded text (first demanded by S19: a CSS figure's absolute part
 // painted over "Block 0" / enemy HP while every other probe stayed clean).
 test("M14 opaque sibling painted over text is occluded-text", { timeout: 120_000 }, async () => {
-  const file = page("m14.html", `
+  const file = page(
+    "m14.html",
+    `
     <div style="position:relative;width:600px;height:120px;background:#eee">
       <p id="covered" style="position:absolute;left:20px;top:40px;color:#111">Covered readout text</p>
       <div style="position:absolute;left:0;top:20px;width:280px;height:80px;background:#c94;z-index:2"></div>
       <p id="clear" style="position:absolute;left:320px;top:40px;color:#111">Clear readout text</p>
     </div>
-    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`,
+  );
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   const hit = report.findings.find((f) => f.kind === "occluded-text" && f.selector === "#covered");
   assert.ok(hit, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
@@ -955,13 +1394,16 @@ test("M14 opaque sibling painted over text is occluded-text", { timeout: 120_000
 // but opts out of hit-testing. elementFromPoint skips pointer-events:none,
 // so the probe forces hit-testing back on page-wide while sampling.
 test("M14a2 pointer-events:none decorative overlay is still occluded-text", { timeout: 120_000 }, async () => {
-  const file = page("m14a2.html", `
+  const file = page(
+    "m14a2.html",
+    `
     <div style="position:relative;width:600px;height:120px;background:#eee">
       <p id="covered" style="position:absolute;left:20px;top:40px;color:#111">Covered readout text</p>
       <div style="position:absolute;left:0;top:20px;width:280px;height:80px;background:#c94;z-index:2;pointer-events:none"></div>
       <p id="clear" style="position:absolute;left:320px;top:40px;color:#111">Clear readout text</p>
     </div>
-    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`,
+  );
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   const hit = report.findings.find((f) => f.kind === "occluded-text" && f.selector === "#covered");
   assert.ok(hit, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
@@ -974,14 +1416,17 @@ test("M14a2 pointer-events:none decorative overlay is still occluded-text", { ti
 // span carries the styling. Its background-color alpha is 1, so an
 // alpha-only opacity test called that invisible overlay an opaque occluder.
 test("M14b2 an opacity:0.001 overlay (styled-select pattern) is NOT an occluder", { timeout: 120_000 }, async () => {
-  const file = page("m14b2.html", `
+  const file = page(
+    "m14b2.html",
+    `
     <div style="position:relative;width:300px;height:40px">
       <span class="active_option" style="position:absolute;left:8px;top:10px;color:#111">Name (A to Z)</span>
       <select class="sorter" style="position:absolute;inset:0;width:100%;opacity:0.001;background:#efefef">
         <option>Name (A to Z)</option><option>Price (low to high)</option>
       </select>
     </div>
-    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`,
+  );
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   assert.ok(
     !report.findings.some((f) => f.kind === "occluded-text"),
@@ -990,36 +1435,45 @@ test("M14b2 an opacity:0.001 overlay (styled-select pattern) is NOT an occluder"
 });
 
 test("M14b transparent stretched-link overlay is NOT occluded-text", { timeout: 120_000 }, async () => {
-  const file = page("m14b.html", `
+  const file = page(
+    "m14b.html",
+    `
     <div style="position:relative;width:400px;height:140px;background:#fff;border:1px solid #ccc;padding:16px">
       <h2 style="margin:0;color:#111">Card title stays readable</h2>
       <p style="color:#333">Body copy under a full-card link overlay.</p>
       <a href="#x" style="position:absolute;inset:0;z-index:3" aria-label="Open card"></a>
     </div>
-    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`,
+  );
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
 });
 
 test("M14c fixed bottom bar over scrollable content is exempted, not failed", { timeout: 120_000 }, async () => {
-  const file = page("m14c.html", `
+  const file = page(
+    "m14c.html",
+    `
     <main style="padding:16px">
       ${Array.from({ length: 30 }, (_, i) => `<p style="color:#222">Paragraph ${i + 1} of scrollable content.</p>`).join("")}
     </main>
-    <div style="position:fixed;left:0;right:0;bottom:0;height:64px;background:#14213d;color:#fff;padding:12px">Sticky cart bar</div>`);
+    <div style="position:fixed;left:0;right:0;bottom:0;height:64px;background:#14213d;color:#fff;padding:12px">Sticky cart bar</div>`,
+  );
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
   assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /viewport-pinned bar/.test(e.reason)));
 });
 
 test("M14d aria-hidden decorative text under a figure is exempted", { timeout: 120_000 }, async () => {
-  const file = page("m14d.html", `
+  const file = page(
+    "m14d.html",
+    `
     <div style="position:relative;width:400px;height:120px;background:#fff">
       <span aria-hidden="true" style="position:absolute;left:10px;top:40px;color:#888">{ }</span>
       <div style="position:absolute;left:0;top:0;width:200px;height:120px;background:#5155d6"></div>
       <p style="position:absolute;left:220px;top:40px;color:#111">Visible label</p>
     </div>
-    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`,
+  );
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
   assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /aria-hidden/.test(e.reason)));
@@ -1088,48 +1542,65 @@ test("HAR replay gates a URL after its backing server is offline", { timeout: 40
 // as CLEAN — a green verdict for a page that never rendered. Now: no
 // session => reported as a defect; with a storage state => the real page is
 // measured, defects and all.
-test("storage state unlocks a session-protected page; without it the redirect is a defect", { timeout: 120_000 }, async () => {
-  const { createServer } = await import("node:http");
-  const server = createServer((req, res) => {
-    const authed = /sid=good/.test(req.headers.cookie || "");
-    if (req.url === "/private" && !authed) {
-      res.writeHead(302, { location: "/login" });
-      return res.end();
-    }
-    res.writeHead(200, { "content-type": "text/html" });
-    res.end(req.url === "/private"
-      ? `<!doctype html><body style="margin:0"><h1>Private figures</h1>
+test(
+  "storage state unlocks a session-protected page; without it the redirect is a defect",
+  { timeout: 120_000 },
+  async () => {
+    const { createServer } = await import("node:http");
+    const server = createServer((req, res) => {
+      const authed = /sid=good/.test(req.headers.cookie || "");
+      if (req.url === "/private" && !authed) {
+        res.writeHead(302, { location: "/login" });
+        return res.end();
+      }
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        req.url === "/private"
+          ? `<!doctype html><body style="margin:0"><h1>Private figures</h1>
          <div style="width:900px;background:#eef">wide protected panel</div></body>`
-      : `<!doctype html><body style="margin:0"><h1>Sign in</h1><p>Session required.</p></body>`);
-  });
-  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
-  const port = (server.address() as { port: number }).port;
-  const url = `http://127.0.0.1:${port}/private`;
-  const stateFile = join(DIR, "auth-state.json");
-  writeFileSync(stateFile, JSON.stringify({
-    cookies: [{
-      name: "sid", value: "good", domain: "127.0.0.1", path: "/",
-      expires: -1, httpOnly: false, secure: false, sameSite: "Lax",
-    }],
-    origins: [],
-  }));
-  try {
-    const anon = await runIntegrityCheck({ source: url, viewports: [{ width: 375, height: 700 }] });
-    assert.equal(anon.verdict, "defects");
-    const redirect = anon.findings.find((f) => f.kind === "redirected");
-    assert.ok(redirect, `expected a redirected finding, got: ${kinds(anon)}`);
-    assert.match(redirect!.message, /login wall/i);
-
-    const authed = await runIntegrityCheck({
-      source: url,
-      viewports: [{ width: 375, height: 700 }],
-      storageState: stateFile,
+          : `<!doctype html><body style="margin:0"><h1>Sign in</h1><p>Session required.</p></body>`,
+      );
     });
-    // The real page was measured: no redirect finding, and its own defect shows.
-    assert.ok(!authed.findings.some((f) => f.kind === "redirected"), JSON.stringify(authed.findings));
-    const overflow = authed.findings.find((f) => f.kind === "page-overflow-x");
-    assert.ok(overflow, `expected the protected page's overflow, got: ${kinds(authed)}`);
-  } finally {
-    await new Promise<void>((r) => server.close(() => r()));
-  }
-});
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    const port = (server.address() as { port: number }).port;
+    const url = `http://127.0.0.1:${port}/private`;
+    const stateFile = join(DIR, "auth-state.json");
+    writeFileSync(
+      stateFile,
+      JSON.stringify({
+        cookies: [
+          {
+            name: "sid",
+            value: "good",
+            domain: "127.0.0.1",
+            path: "/",
+            expires: -1,
+            httpOnly: false,
+            secure: false,
+            sameSite: "Lax",
+          },
+        ],
+        origins: [],
+      }),
+    );
+    try {
+      const anon = await runIntegrityCheck({ source: url, viewports: [{ width: 375, height: 700 }] });
+      assert.equal(anon.verdict, "defects");
+      const redirect = anon.findings.find((f) => f.kind === "redirected");
+      assert.ok(redirect, `expected a redirected finding, got: ${kinds(anon)}`);
+      assert.match(redirect!.message, /login wall/i);
+
+      const authed = await runIntegrityCheck({
+        source: url,
+        viewports: [{ width: 375, height: 700 }],
+        storageState: stateFile,
+      });
+      // The real page was measured: no redirect finding, and its own defect shows.
+      assert.ok(!authed.findings.some((f) => f.kind === "redirected"), JSON.stringify(authed.findings));
+      const overflow = authed.findings.find((f) => f.kind === "page-overflow-x");
+      assert.ok(overflow, `expected the protected page's overflow, got: ${kinds(authed)}`);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  },
+);

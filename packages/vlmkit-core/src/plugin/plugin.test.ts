@@ -7,19 +7,8 @@ import { UsageError } from "../cli-error.ts";
 import { defineGate, definePlugin, ruleRef } from "./contract.ts";
 import type { Finding, GateDefinition } from "./contract.ts";
 import { asPlugin, loadPlugins, readPluginSpecifiers } from "./load.ts";
-import {
-  createGateRegistry,
-  editDistance,
-  validateGateCommands,
-  validateRuleSettings,
-} from "./registry.ts";
-import {
-  applyRuleSettings,
-  countFindings,
-  parseRuleSettings,
-  resolveRules,
-  validateGateDefinition,
-} from "./rules.ts";
+import { createGateRegistry, editDistance, validateGateCommands, validateRuleSettings } from "./registry.ts";
+import { applyRuleSettings, countFindings, parseRuleSettings, resolveRules, validateGateDefinition } from "./rules.ts";
 import {
   formatGateHelp,
   formatRuleTable,
@@ -66,9 +55,9 @@ function fakeGate(overrides: Partial<GateDefinition<FakeReport, FakeOptions>> = 
       source: options.source,
       hits: options.strict
         ? [
-          { rule: "bad-thing", severity: "suspect", message: "boom", selector: ".a" },
-          { rule: "odd-thing", severity: "warn", message: "hmm" },
-        ]
+            { rule: "bad-thing", severity: "suspect", message: "boom", selector: ".a" },
+            { rule: "odd-thing", severity: "warn", message: "hmm" },
+          ]
         : [],
     }),
     findings: (report) => report.hits,
@@ -208,10 +197,7 @@ describe("validateRuleSettings", () => {
 
   it("resolves a bare rule id only inside a gate scope", () => {
     assert.deepEqual(validateRuleSettings(registry, { "bad-thing": "off" }, gate), []);
-    assert.match(
-      validateRuleSettings(registry, { "bad-thing": "off" })[0]!,
-      /neither a gate id nor a rule reference/,
-    );
+    assert.match(validateRuleSettings(registry, { "bad-thing": "off" })[0]!, /neither a gate id nor a rule reference/);
   });
 });
 
@@ -271,7 +257,10 @@ describe("applyRuleSettings", () => {
 
   it("suppresses instead of dropping silently", () => {
     const applied = applyRuleSettings(gate, findings, { "check.fake/bad-thing": "off" });
-    assert.deepEqual(applied.findings.map((f) => f.rule), ["odd-thing"]);
+    assert.deepEqual(
+      applied.findings.map((f) => f.rule),
+      ["odd-thing"],
+    );
     assert.equal(applied.suppressed.length, 1);
     assert.equal(applied.suppressed[0]!.via, "check.fake/bad-thing");
   });
@@ -279,7 +268,10 @@ describe("applyRuleSettings", () => {
   it("re-tunes severity and records the change", () => {
     const applied = applyRuleSettings(gate, findings, { "check.fake/bad-thing": "warn" });
     assert.equal(applied.findings.find((f) => f.rule === "bad-thing")!.severity, "warn");
-    assert.deepEqual(applied.retuned.map((r) => [r.from, r.to]), [["suspect", "warn"]]);
+    assert.deepEqual(
+      applied.retuned.map((r) => [r.from, r.to]),
+      [["suspect", "warn"]],
+    );
   });
 
   it("keeps a gate's own severity judgment when no setting applies", () => {
@@ -326,10 +318,10 @@ describe("shared flags", () => {
   });
 
   it("hides them from the gate's own parser", () => {
-    assert.deepEqual(
-      stripSharedFlags(["page.html", "--json", "--rule", "a=off", "--strict", "--fail-on-suspect"]),
-      ["page.html", "--strict"],
-    );
+    assert.deepEqual(stripSharedFlags(["page.html", "--json", "--rule", "a=off", "--strict", "--fail-on-suspect"]), [
+      "page.html",
+      "--strict",
+    ]);
   });
 });
 
@@ -364,11 +356,9 @@ describe("runGate", () => {
   });
 
   it("--rule off can turn a failing run green, and says so", async () => {
-    const outcome = await runGate(
-      fakeGate(),
-      ["page.html", "--strict", "--rule", "check.fake/bad-thing=off"],
-      { ledger: false },
-    );
+    const outcome = await runGate(fakeGate(), ["page.html", "--strict", "--rule", "check.fake/bad-thing=off"], {
+      ledger: false,
+    });
     assert.equal(outcome.verdict, "pass");
     assert.equal(outcome.exitCode, 0);
     assert.match(outcome.text, /1 finding\(s\) suppressed by rule settings/);
@@ -390,7 +380,9 @@ describe("runGate", () => {
 
     // A gate that takes the rule view is trusted to have applied it, and gets no disclaimer.
     const aware = await runGate(
-      fakeGate({ format: (report, rules) => `fake: ${report.hits.length} hit(s), off=${rules?.effective("bad-thing")}` }),
+      fakeGate({
+        format: (report, rules) => `fake: ${report.hits.length} hit(s), off=${rules?.effective("bad-thing")}`,
+      }),
       ["page.html", "--strict", "--rule", "bad-thing=off"],
       { ledger: false },
     );
@@ -449,7 +441,9 @@ describe("runGate", () => {
   });
 
   it("accepts a gate-wide wildcard reference", async () => {
-    const outcome = await runGate(fakeGate(), ["page.html", "--strict", "--rule", "check.fake/*=off"], { ledger: false });
+    const outcome = await runGate(fakeGate(), ["page.html", "--strict", "--rule", "check.fake/*=off"], {
+      ledger: false,
+    });
     assert.equal(outcome.verdict, "pass");
     assert.equal(outcome.rules.suppressed.length, 2);
   });
@@ -569,7 +563,14 @@ describe("runGate timing", () => {
     const plain = await runGate(fakeGate(), ["page.html", "--json"], { ledger: false });
     const parsed = JSON.parse(plain.text) as Record<string, unknown>;
     assert.deepEqual(Object.keys(parsed), [
-      "gate", "command", "verdict", "counts", "findings", "suppressed", "retuned", "report",
+      "gate",
+      "command",
+      "verdict",
+      "counts",
+      "findings",
+      "suppressed",
+      "retuned",
+      "report",
     ]);
     assert.ok(plain.timing.totalMs > 0, "the outcome still carries timing in-process");
 
@@ -617,7 +618,10 @@ describe("runGateCli", () => {
     // escalation existed — `--rule <id>=suspect` — and was findable only in a document.
     const lines: string[] = [];
     const gate = fakeGate({
-      run: () => ({ source: "p.html", hits: [{ rule: "odd-thing", severity: "warn" as const, message: "odd but not fatal" }] }),
+      run: () => ({
+        source: "p.html",
+        hits: [{ rule: "odd-thing", severity: "warn" as const, message: "odd but not fatal" }],
+      }),
       findings: (report) => report.hits,
     });
     const code = await runGateCli(gate, ["p.html"], { out: (t) => lines.push(t), ledger: false });
@@ -629,15 +633,20 @@ describe("runGateCli", () => {
 
   it("stays quiet about warns when there are none, and under --json", async () => {
     const clean: string[] = [];
-    await runGateCli(fakeGate({ run: () => ({ source: "p.html", hits: [] }), findings: () => [] }),
-      ["p.html"], { out: (t) => clean.push(t), ledger: false });
+    await runGateCli(fakeGate({ run: () => ({ source: "p.html", hits: [] }), findings: () => [] }), ["p.html"], {
+      out: (t) => clean.push(t),
+      ledger: false,
+    });
     assert.doesNotMatch(clean.join("\n"), /did not fail this command/);
 
     // Under --json the hint would put prose on a stream a client is parsing.
     const json: string[] = [];
     await runGateCli(
       fakeGate({
-        run: () => ({ source: "p.html", hits: [{ rule: "odd-thing", severity: "warn" as const, message: "odd but not fatal" }] }),
+        run: () => ({
+          source: "p.html",
+          hits: [{ rule: "odd-thing", severity: "warn" as const, message: "odd but not fatal" }],
+        }),
         findings: (report) => report.hits,
       }),
       ["p.html", "--json"],
@@ -853,10 +862,10 @@ describe("the run ledger as a declared output", () => {
   });
 
   it("keeps both flags away from the gate's own parser", () => {
-    assert.deepEqual(
-      stripSharedFlags(["page.html", "--ledger", "runs.jsonl", "--no-ledger", "--strict"]),
-      ["page.html", "--strict"],
-    );
+    assert.deepEqual(stripSharedFlags(["page.html", "--ledger", "runs.jsonl", "--no-ledger", "--strict"]), [
+      "page.html",
+      "--strict",
+    ]);
   });
 
   it("refuses --ledger with no path rather than swallowing the next flag", () => {
@@ -942,10 +951,13 @@ describe("parseRuleSettings comments", () => {
     // it was rejected. v6's adoption agent, told to make the diff self-explanatory:
     // "the only mechanism for 'the tool is wrong about this rule' is the one mechanism
     // with no audit trail" — so the reason could not sit next to the decision.
-    const settings = parseRuleSettings({
-      "//check.design/component-drift": "3 buttons with one primary IS the design",
-      "check.design/component-drift": "info",
-    }, "defaults.rules");
+    const settings = parseRuleSettings(
+      {
+        "//check.design/component-drift": "3 buttons with one primary IS the design",
+        "check.design/component-drift": "info",
+      },
+      "defaults.rules",
+    );
     assert.deepEqual(settings, { "check.design/component-drift": "info" });
   });
 

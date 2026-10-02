@@ -88,12 +88,12 @@ function createAnthropicClient(apiKey: string, model?: string): UnifiedLLMClient
       typeof content === "string"
         ? content
         : content.map((c): AnthropicBlock => {
-          if (c.type === "text") return { type: "text", text: c.text };
-          return {
-            type: "image",
-            source: { type: "base64", media_type: c.mimeType ?? "image/png", data: c.base64 },
-          };
-        });
+            if (c.type === "text") return { type: "text", text: c.text };
+            return {
+              type: "image",
+              source: { type: "base64", media_type: c.mimeType ?? "image/png", data: c.base64 },
+            };
+          });
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -114,13 +114,16 @@ function createAnthropicClient(apiKey: string, model?: string): UnifiedLLMClient
       throw new Error(`Anthropic API error: ${res.status} ${body}`);
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       content: Array<{ type: string; text: string }>;
       usage?: { input_tokens: number; output_tokens: number };
     };
 
     const latencyMs = Date.now() - start;
-    const text = data.content.filter((c) => c.type === "text").map((c) => c.text).join("");
+    const text = data.content
+      .filter((c) => c.type === "text")
+      .map((c) => c.text)
+      .join("");
     const promptTokens = data.usage?.input_tokens ?? 0;
     const completionTokens = data.usage?.output_tokens ?? 0;
 
@@ -138,9 +141,15 @@ function createAnthropicClient(apiKey: string, model?: string): UnifiedLLMClient
   return {
     provider: "anthropic",
     model: modelId,
-    async complete(prompt) { return (await call(prompt, 1024)).content; },
-    async completeWithImages(content, options) { return call(content, options?.maxTokens ?? 1024); },
-    async analyzeDiff(options) { return call(buildDiffContent(options), options.maxTokens ?? 1024); },
+    async complete(prompt) {
+      return (await call(prompt, 1024)).content;
+    },
+    async completeWithImages(content, options) {
+      return call(content, options?.maxTokens ?? 1024);
+    },
+    async analyzeDiff(options) {
+      return call(buildDiffContent(options), options.maxTokens ?? 1024);
+    },
   };
 }
 
@@ -155,17 +164,15 @@ function createGeminiLLMClient(apiKey: string, model?: string): UnifiedLLMClient
     const genModel = genAI.getGenerativeModel({ model: modelId });
     const start = Date.now();
 
-    type GeminiPart =
-      | { text: string }
-      | { inlineData: { mimeType: string; data: string } };
+    type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
     const parts: GeminiPart[] =
       typeof content === "string"
         ? [{ text: content }]
         : content.map((c): GeminiPart => {
-          if (c.type === "text") return { text: c.text };
-          return { inlineData: { mimeType: c.mimeType ?? "image/png", data: c.base64 } };
-        });
+            if (c.type === "text") return { text: c.text };
+            return { inlineData: { mimeType: c.mimeType ?? "image/png", data: c.base64 } };
+          });
 
     const result = await genModel.generateContent({
       contents: [{ role: "user", parts }],
@@ -190,9 +197,15 @@ function createGeminiLLMClient(apiKey: string, model?: string): UnifiedLLMClient
   return {
     provider: "gemini",
     model: modelId,
-    async complete(prompt) { return (await call(prompt, 1024)).content; },
-    async completeWithImages(content, options) { return call(content, options?.maxTokens ?? 1024); },
-    async analyzeDiff(options) { return call(buildDiffContent(options), options.maxTokens ?? 1024); },
+    async complete(prompt) {
+      return (await call(prompt, 1024)).content;
+    },
+    async completeWithImages(content, options) {
+      return call(content, options?.maxTokens ?? 1024);
+    },
+    async analyzeDiff(options) {
+      return call(buildDiffContent(options), options.maxTokens ?? 1024);
+    },
   };
 }
 
@@ -204,23 +217,21 @@ function createOpenRouterLLMClient(apiKey: string, model?: string): UnifiedLLMCl
   async function call(content: MessageContent, maxTokens: number): Promise<LLMResponse> {
     const start = Date.now();
 
-    type OpenRouterBlock =
-      | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string } };
+    type OpenRouterBlock = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
     const messageContent: string | OpenRouterBlock[] =
       typeof content === "string"
         ? content
         : content.map((c): OpenRouterBlock => {
-          if (c.type === "text") return { type: "text", text: c.text };
-          return { type: "image_url", image_url: { url: `data:${c.mimeType ?? "image/png"};base64,${c.base64}` } };
-        });
+            if (c.type === "text") return { type: "text", text: c.text };
+            return { type: "image_url", image_url: { url: `data:${c.mimeType ?? "image/png"};base64,${c.base64}` } };
+          });
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "HTTP-Referer": "https://github.com/mizchi/vrt",
       },
       body: JSON.stringify({
@@ -232,7 +243,7 @@ function createOpenRouterLLMClient(apiKey: string, model?: string): UnifiedLLMCl
 
     if (!res.ok) throw new Error(`OpenRouter API error: ${res.status} ${(await res.text()).slice(0, 200)}`);
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       choices: Array<{ message: { content: string } }>;
       usage?: { prompt_tokens: number; completion_tokens: number };
     };
@@ -252,9 +263,15 @@ function createOpenRouterLLMClient(apiKey: string, model?: string): UnifiedLLMCl
   return {
     provider: "openrouter",
     model: modelId,
-    async complete(prompt) { return (await call(prompt, 1024)).content; },
-    async completeWithImages(content, options) { return call(content, options?.maxTokens ?? 1024); },
-    async analyzeDiff(options) { return call(buildDiffContent(options), options.maxTokens ?? 1024); },
+    async complete(prompt) {
+      return (await call(prompt, 1024)).content;
+    },
+    async completeWithImages(content, options) {
+      return call(content, options?.maxTokens ?? 1024);
+    },
+    async analyzeDiff(options) {
+      return call(buildDiffContent(options), options.maxTokens ?? 1024);
+    },
   };
 }
 
@@ -295,11 +312,7 @@ function buildDiffContent(options: {
 
 export type LLMProviderName = "gemini" | "anthropic" | "openrouter";
 
-const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set([
-  "gemini",
-  "anthropic",
-  "openrouter",
-]);
+const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set(["gemini", "anthropic", "openrouter"]);
 
 /**
  * The OpenAI model this project reaches for by default, and the one place its id is written.
@@ -366,10 +379,11 @@ const OPENAI_SHAPED_NAME = /^(openai|oai|gpt|chatgpt|codex|o\d)/i;
  * The documented default is unchanged: gemini is first in the preference order, so a
  * Gemini key present still means gemini.
  */
-function resolveProviderConfig(options?: LLMClientOptions):
+function resolveProviderConfig(
+  options?: LLMClientOptions,
+):
   | { ok: true; provider: LLMProviderName; key: string; model?: string }
-  | { ok: false; code: "INVALID_PROVIDER" | "MISSING_KEY"; message: string }
-{
+  | { ok: false; code: "INVALID_PROVIDER" | "MISSING_KEY"; message: string } {
   const keyMap: Record<LLMProviderName, string | undefined> = {
     gemini: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY,
     anthropic: process.env.ANTHROPIC_API_KEY,
@@ -395,8 +409,9 @@ function resolveProviderConfig(options?: LLMClientOptions):
       return {
         ok: false,
         code: "MISSING_KEY",
-        message: `No LLM API key found. Set one of: ${PREFERENCE.map((p) => envVarName[p]).join(", ")}`
-          + ` — or pick a provider explicitly with VLMKIT_LLM_PROVIDER.`,
+        message:
+          `No LLM API key found. Set one of: ${PREFERENCE.map((p) => envVarName[p]).join(", ")}` +
+          ` — or pick a provider explicitly with VLMKIT_LLM_PROVIDER.`,
       };
     }
     return { ok: true, provider, key: keyMap[provider]!, model };
@@ -407,9 +422,9 @@ function resolveProviderConfig(options?: LLMClientOptions):
     // valid providers is a complete answer only to someone who already knows OpenAI is served
     // through one of them; to everyone else it is a dead end, which is what it measured as.
     const route = OPENAI_SHAPED_NAME.test(String(requested))
-      ? ` OpenAI models are served through OpenRouter, not by a provider of their own:`
-        + ` VLMKIT_LLM_PROVIDER=openrouter VLMKIT_LLM_MODEL=${OPENAI_DEFAULT_MODEL}`
-        + ` (needs OPENROUTER_API_KEY).`
+      ? ` OpenAI models are served through OpenRouter, not by a provider of their own:` +
+        ` VLMKIT_LLM_PROVIDER=openrouter VLMKIT_LLM_MODEL=${OPENAI_DEFAULT_MODEL}` +
+        ` (needs OPENROUTER_API_KEY).`
       : "";
     return {
       ok: false,

@@ -58,7 +58,9 @@ const hist = (arr) => {
 };
 const coverage = (arr, topN) => {
   if (arr.length === 0) return 0;
-  const top = hist(arr).slice(0, topN).reduce((s, [, n]) => s + n, 0);
+  const top = hist(arr)
+    .slice(0, topN)
+    .reduce((s, [, n]) => s + n, 0);
   return +(top / arr.length).toFixed(3);
 };
 // "Best fit" is a trap: base 2 fits every even value, so it always wins and
@@ -77,7 +79,22 @@ const gridFit = (arr) => {
 
 const targets = process.argv.slice(2);
 const b = await chromium.launch();
-console.log(["page", "els", "spcVals", "spcTop6", "gridBase", "gridFit", "leftTop8", "fontVals", "fontTop5", "radiiVals", "btnSigs", "h2Sigs"].join("\t"));
+console.log(
+  [
+    "page",
+    "els",
+    "spcVals",
+    "spcTop6",
+    "gridBase",
+    "gridFit",
+    "leftTop8",
+    "fontVals",
+    "fontTop5",
+    "radiiVals",
+    "btnSigs",
+    "h2Sigs",
+  ].join("\t"),
+);
 for (const t of targets) {
   const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
   try {
@@ -89,12 +106,22 @@ for (const t of targets) {
       const list = d.byRole[role] ?? [];
       return list.length ? `${new Set(list).size}/${list.length}` : "-";
     };
-    console.log([
-      t.split("/").pop(), d.considered, new Set(d.spacing).size, coverage(d.spacing, 6),
-      g.base, g.fit, coverage(d.lefts, 8),
-      new Set(d.fontSizes).size, coverage(d.fontSizes, 5),
-      new Set(d.radii).size, sig("button"), sig("h2"),
-    ].join("\t"));
+    console.log(
+      [
+        t.split("/").pop(),
+        d.considered,
+        new Set(d.spacing).size,
+        coverage(d.spacing, 6),
+        g.base,
+        g.fit,
+        coverage(d.lefts, 8),
+        new Set(d.fontSizes).size,
+        coverage(d.fontSizes, 5),
+        new Set(d.radii).size,
+        sig("button"),
+        sig("h2"),
+      ].join("\t"),
+    );
   } catch (e) {
     console.log(`${t.split("/").pop()}\tERROR ${String(e.message).slice(0, 40)}`);
   }

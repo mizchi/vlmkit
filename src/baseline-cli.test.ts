@@ -12,11 +12,11 @@ import { archiveRouteBaselines } from "./baseline-cli.ts";
 const BASELINE_CLI = resolve(fileURLToPath(import.meta.url), "..", "baseline-cli.ts");
 
 function runBaseline(args: string[], cwd: string): { stdout: string; stderr: string; status: number } {
-  const r = spawnSync(
-    process.execPath,
-    ["--experimental-strip-types", BASELINE_CLI, ...args],
-    { encoding: "utf-8", cwd, env: { ...process.env, NO_COLOR: "1" } },
-  );
+  const r = spawnSync(process.execPath, ["--experimental-strip-types", BASELINE_CLI, ...args], {
+    encoding: "utf-8",
+    cwd,
+    env: { ...process.env, NO_COLOR: "1" },
+  });
   return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status ?? 1 };
 }
 
@@ -58,11 +58,16 @@ describe("vlmkit baseline approve", () => {
       const r = runBaseline(
         [
           "approve",
-          "--selector", ".hero__body",
-          "--reason", "sub-pixel AA",
-          "--max-px", "2",
-          "--expires", "2026-08-15",
-          "--acknowledged-by", "mizchi",
+          "--selector",
+          ".hero__body",
+          "--reason",
+          "sub-pixel AA",
+          "--max-px",
+          "2",
+          "--expires",
+          "2026-08-15",
+          "--acknowledged-by",
+          "mizchi",
         ],
         dir,
       );
@@ -82,10 +87,7 @@ describe("vlmkit baseline approve", () => {
   it("--dry-run prints the manifest without writing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-approve-"));
     try {
-      const r = runBaseline(
-        ["approve", "--selector", ".x", "--reason", "r", "--dry-run"],
-        dir,
-      );
+      const r = runBaseline(["approve", "--selector", ".x", "--reason", "r", "--dry-run"], dir);
       assert.equal(r.status, 0, r.stderr);
       assert.match(r.stdout, /dry-run/);
       assert.match(r.stdout, /"selector": "\.x"/);
@@ -116,17 +118,17 @@ describe("vlmkit baseline approve", () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-approve-"));
     try {
       const r = runBaseline(
-        [
-          "approve",
-          "--region", "x=120,y=80,w=200,h=40,viewport=mobile",
-          "--reason", "marquee; intentionally dynamic",
-        ],
+        ["approve", "--region", "x=120,y=80,w=200,h=40,viewport=mobile", "--reason", "marquee; intentionally dynamic"],
         dir,
       );
       assert.equal(r.status, 0, r.stderr);
       const manifest = JSON.parse(await readFile(join(dir, "approval.json"), "utf-8"));
       assert.deepEqual(manifest.rules[0].region, {
-        x: 120, y: 80, width: 200, height: 40, viewport: "mobile",
+        x: 120,
+        y: 80,
+        width: 200,
+        height: 40,
+        viewport: "mobile",
       });
       assert.equal(manifest.rules[0].selector, undefined);
     } finally {

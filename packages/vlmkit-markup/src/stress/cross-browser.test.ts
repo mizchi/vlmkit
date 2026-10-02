@@ -67,7 +67,11 @@ describe("parityShortfall", () => {
   it("still reports a shortfall for a single request, so the report cannot imply parity", () => {
     // Both branches must return something: "no comparison happened" is the one status a
     // reader must never mistake for "compared and fine".
-    for (const [requested, usable] of [[1, 1], [1, 0], [3, 1]] as const) {
+    for (const [requested, usable] of [
+      [1, 1],
+      [1, 0],
+      [3, 1],
+    ] as const) {
       assert.notEqual(parityShortfall(requested, usable), null, `${requested}/${usable}`);
     }
   });

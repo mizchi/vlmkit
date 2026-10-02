@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  explainShiftAccumulations,
-  findShiftOrigins,
-  parseBboxes,
-  type BboxElement,
-} from "./shift-origin.ts";
+import { explainShiftAccumulations, findShiftOrigins, parseBboxes, type BboxElement } from "./shift-origin.ts";
 
 function bbox(over: Partial<BboxElement> & { path: string }): BboxElement {
   const base: BboxElement = {
@@ -75,9 +70,9 @@ describe("findShiftOrigins", () => {
   it("emits multiple candidate origins ranked by best match to band shift", () => {
     // 3 elements at increasing top, all shifted by varying amounts.
     const baseline: BboxElement[] = [
-      bbox({ path: "p1", top: 0, height: 50 }),    // Δy = 30
-      bbox({ path: "p2", top: 100, height: 50 }),  // Δy = 50 (best match for band 50)
-      bbox({ path: "p3", top: 200, height: 50 }),  // Δy = 80
+      bbox({ path: "p1", top: 0, height: 50 }), // Δy = 30
+      bbox({ path: "p2", top: 100, height: 50 }), // Δy = 50 (best match for band 50)
+      bbox({ path: "p3", top: 200, height: 50 }), // Δy = 80
     ];
     const variant: BboxElement[] = [
       bbox({ path: "p1", top: 30 }),
@@ -126,11 +121,7 @@ describe("explainShiftAccumulations", () => {
       bbox({ path: "title[2]", classes: "luna-panel-title", top: 581, height: 22.5 }),
     ];
 
-    const [breakdown] = explainShiftAccumulations(
-      baseline,
-      variant,
-      [{ yStart: 650, yEnd: 900, shift: -40.5 }],
-    );
+    const [breakdown] = explainShiftAccumulations(baseline, variant, [{ yStart: 650, yEnd: 900, shift: -40.5 }]);
 
     assert.ok(breakdown);
     assert.equal(breakdown.accumulatedDeltaHeight, -40.5);
@@ -159,7 +150,9 @@ describe("parseBboxes", () => {
   });
 
   it("preserves optional element ids from the DOM bbox browser script", () => {
-    const json = JSON.stringify([{ path: "main[0]", tag: "main", id: "page", classes: "", top: 0, left: 0, width: 10, height: 10 }]);
+    const json = JSON.stringify([
+      { path: "main[0]", tag: "main", id: "page", classes: "", top: 0, left: 0, width: 10, height: 10 },
+    ]);
     const out = parseBboxes(json);
     assert.equal(out[0]?.id, "page");
   });

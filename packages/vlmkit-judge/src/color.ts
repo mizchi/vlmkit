@@ -35,7 +35,10 @@ export function parseColor(input: string | undefined | null): Rgba | null {
   if (s === "transparent") return [0, 0, 0, 0];
   const m = s.match(/rgba?\(([^)]+)\)/);
   if (m) {
-    const p = m[1]!.split(/[,/\s]+/).map(parseFloat).filter((n) => Number.isFinite(n));
+    const p = m[1]!
+      .split(/[,/\s]+/)
+      .map(parseFloat)
+      .filter((n) => Number.isFinite(n));
     if (p.length >= 3) return [p[0]!, p[1]!, p[2]!, p.length > 3 ? p[3]! : 1];
     return null;
   }
@@ -49,11 +52,7 @@ export function parseColor(input: string | undefined | null): Rgba | null {
 /** `over` painted on opaque `base`, source-over. */
 export function blendColor(base: Rgb, over: Rgba): [number, number, number] {
   const a = over[3];
-  return [
-    base[0] * (1 - a) + over[0] * a,
-    base[1] * (1 - a) + over[1] * a,
-    base[2] * (1 - a) + over[2] * a,
-  ];
+  return [base[0] * (1 - a) + over[0] * a, base[1] * (1 - a) + over[1] * a, base[2] * (1 - a) + over[2] * a];
 }
 
 /** WCAG 2.x relative luminance of an opaque sRGB colour. */
@@ -102,7 +101,17 @@ export function compositeBackground(innermostFirst: readonly Rgba[]): [number, n
  * dropped: callers composite first when they mean the painted colour.
  */
 export function toHex(c: readonly number[]): string {
-  return "#" + c.slice(0, 3).map((n) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, "0")).join("");
+  return (
+    "#" +
+    c
+      .slice(0, 3)
+      .map((n) =>
+        Math.round(Math.min(255, Math.max(0, n)))
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
 }
 
 /** `rgb(r, g, b)` with rounded channels — the form every contrast finding prints. */

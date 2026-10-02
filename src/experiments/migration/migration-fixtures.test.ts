@@ -15,12 +15,7 @@ describe("migration fixture inventory", () => {
       .map((entry) => entry.name)
       .sort((a, b) => a.localeCompare(b));
 
-    assert.deepEqual(directories, [
-      "region-diff-handoff",
-      "reset-css",
-      "shadcn-to-luna",
-      "tailwind-to-vanilla",
-    ]);
+    assert.deepEqual(directories, ["region-diff-handoff", "reset-css", "shadcn-to-luna", "tailwind-to-vanilla"]);
   });
 });
 

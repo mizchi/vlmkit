@@ -31,17 +31,11 @@ const MUTATIONS: Mutation[] = [
 ];
 
 const real = process.env.HEAL_REAL_LLM === "1";
-const defaultCodegenModels = [
-  "qwen/qwen3-coder-30b-a3b-instruct",
-  "google/gemini-2.5-flash",
-];
-const configuredCodegenModels = process.env.HEAL_CODEGEN_MODELS
-  ?.split(",")
+const defaultCodegenModels = ["qwen/qwen3-coder-30b-a3b-instruct", "google/gemini-2.5-flash"];
+const configuredCodegenModels = process.env.HEAL_CODEGEN_MODELS?.split(",")
   .map((model) => model.trim())
   .filter(Boolean);
-const codegenModels = configuredCodegenModels?.length
-  ? configuredCodegenModels
-  : defaultCodegenModels;
+const codegenModels = configuredCodegenModels?.length ? configuredCodegenModels : defaultCodegenModels;
 let codegenTiers: ModelTier[] = codegenModels.map((model) => ({
   provider: "openrouter",
   model,

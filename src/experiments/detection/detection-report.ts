@@ -12,7 +12,9 @@ import { getBenchGoalProgress, getBenchHistoryStats, readBenchHistory } from "..
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 
-function hr() { _hr(76); }
+function hr() {
+  _hr(76);
+}
 
 function fmtRate(n: number, total: number): string {
   if (total === 0) return `${DIM}n/a${RESET}`;
@@ -41,9 +43,7 @@ function pct(ratio: number): string {
  * is what makes 203 statements of report rendering testable against a fixture
  * instead of against whatever happens to be in the developer's `.vlmkit/`.
  */
-export async function runDetectionReport(
-  options: { dbPath?: string; historyPath?: string } = {},
-) {
+export async function runDetectionReport(options: { dbPath?: string; historyPath?: string } = {}) {
   const records = await readAllRecords(options.dbPath);
   const benchHistory = await readBenchHistory(options.historyPath);
 
@@ -76,7 +76,9 @@ export async function runDetectionReport(
     const scopedDetected = scoped.filter((r) => r.detected).length;
     if (scoped.length < records.length) {
       const outCount = records.length - scoped.length;
-      console.log(`    Scoped rate:      ${fmtRate(scopedDetected, scoped.length)} ${DIM}(excl. ${outCount} animation)${RESET}`);
+      console.log(
+        `    Scoped rate:      ${fmtRate(scopedDetected, scoped.length)} ${DIM}(excl. ${outCount} animation)${RESET}`,
+      );
     }
   }
   const fixtures = new Set(records.map((r) => (r as any).fixture ?? "page"));
@@ -93,8 +95,8 @@ export async function runDetectionReport(
     for (const [backend, summary] of [...benchStats.byBackend.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       console.log(
         `    ${backend.padEnd(20)} latest ${summary.latest.avgMsPerTrial.toFixed(1).padStart(7)} ms/trial` +
-        `  detect ${fmtRate(summary.latest.eitherDetected, summary.latest.trials)}` +
-        `  ${DIM}(runs=${summary.count}, best=${summary.bestAvgMsPerTrial.toFixed(1)} ms)${RESET}`,
+          `  detect ${fmtRate(summary.latest.eitherDetected, summary.latest.trials)}` +
+          `  ${DIM}(runs=${summary.count}, best=${summary.bestAvgMsPerTrial.toFixed(1)} ms)${RESET}`,
       );
     }
     if (benchStats.comparableSpeedups.length > 0) {
@@ -103,7 +105,7 @@ export async function runDetectionReport(
       for (const speedup of benchStats.comparableSpeedups.slice(0, 5)) {
         console.log(
           `    ${speedup.fixture.padEnd(20)} ${speedup.speedup.toFixed(2)}x` +
-          `  ${DIM}(prescanner ${speedup.prescannerAvgMsPerTrial.toFixed(1)} ms / chromium ${speedup.chromiumAvgMsPerTrial.toFixed(1)} ms, trials=${speedup.trials})${RESET}`,
+            `  ${DIM}(prescanner ${speedup.prescannerAvgMsPerTrial.toFixed(1)} ms / chromium ${speedup.chromiumAvgMsPerTrial.toFixed(1)} ms, trials=${speedup.trials})${RESET}`,
         );
       }
       console.log();
@@ -142,7 +144,7 @@ export async function runDetectionReport(
         const status = p.passed ? `${GREEN}pass${RESET}` : `${YELLOW}gap ${pct(p.gap)}${RESET}`;
         console.log(
           `    detection ${pct(p.latestRate)} latest / ${pct(p.bestRate)} best` +
-          `  target ${pct(p.targetRate)}  ${status}`,
+            `  target ${pct(p.targetRate)}  ${status}`,
         );
       }
       if (goalProgress.prescannerSpeedup) {
@@ -150,7 +152,7 @@ export async function runDetectionReport(
         const status = p.passed ? `${GREEN}pass${RESET}` : `${YELLOW}gap ${p.gap.toFixed(2)}x${RESET}`;
         console.log(
           `    speedup   ${p.latestSpeedup.toFixed(2)}x latest / ${p.bestSpeedup.toFixed(2)}x best` +
-          `  target ${p.targetSpeedup.toFixed(2)}x  ${status}`,
+            `  target ${p.targetSpeedup.toFixed(2)}x  ${status}`,
         );
       }
       console.log();
@@ -190,16 +192,24 @@ export async function runDetectionReport(
 
   console.log(`  ${BOLD}Detection by Property Category${RESET}`);
   console.log(`    ${"Category".padEnd(14)} ${"Total".padStart(5)}  ${"Rate".padStart(8)}  ${"Bar".padStart(22)}`);
-  for (const [cat, data] of [...stats.byCategory.entries()].sort((a, b) => (b[1].detected / b[1].total) - (a[1].detected / a[1].total))) {
-    console.log(`    ${cat.padEnd(14)} ${String(data.total).padStart(5)}  ${fmtRate(data.detected, data.total).padStart(22)}  ${bar(data.detected, data.total)}`);
+  for (const [cat, data] of [...stats.byCategory.entries()].sort(
+    (a, b) => b[1].detected / b[1].total - a[1].detected / a[1].total,
+  )) {
+    console.log(
+      `    ${cat.padEnd(14)} ${String(data.total).padStart(5)}  ${fmtRate(data.detected, data.total).padStart(22)}  ${bar(data.detected, data.total)}`,
+    );
   }
   console.log();
 
   // ---- By Selector Type ----
   console.log(`  ${BOLD}Detection by Selector Type${RESET}`);
   console.log(`    ${"Type".padEnd(16)} ${"Total".padStart(5)}  ${"Rate".padStart(8)}  ${"Bar".padStart(22)}`);
-  for (const [typ, data] of [...stats.bySelectorType.entries()].sort((a, b) => (b[1].detected / b[1].total) - (a[1].detected / a[1].total))) {
-    console.log(`    ${typ.padEnd(16)} ${String(data.total).padStart(5)}  ${fmtRate(data.detected, data.total).padStart(22)}  ${bar(data.detected, data.total)}`);
+  for (const [typ, data] of [...stats.bySelectorType.entries()].sort(
+    (a, b) => b[1].detected / b[1].total - a[1].detected / a[1].total,
+  )) {
+    console.log(
+      `    ${typ.padEnd(16)} ${String(data.total).padStart(5)}  ${fmtRate(data.detected, data.total).padStart(22)}  ${bar(data.detected, data.total)}`,
+    );
   }
   console.log();
 
@@ -222,14 +232,22 @@ export async function runDetectionReport(
     const desktopOnly = records.filter((r) => {
       const desktop = r.viewports.find((v) => v.width > 1000);
       const mobile = r.viewports.find((v) => v.width <= 500);
-      return desktop && (desktop.visualDiffDetected || desktop.a11yDiffDetected) &&
-        mobile && !(mobile.visualDiffDetected || mobile.a11yDiffDetected);
+      return (
+        desktop &&
+        (desktop.visualDiffDetected || desktop.a11yDiffDetected) &&
+        mobile &&
+        !(mobile.visualDiffDetected || mobile.a11yDiffDetected)
+      );
     }).length;
     const mobileOnly = records.filter((r) => {
       const desktop = r.viewports.find((v) => v.width > 1000);
       const mobile = r.viewports.find((v) => v.width <= 500);
-      return mobile && (mobile.visualDiffDetected || mobile.a11yDiffDetected) &&
-        desktop && !(desktop.visualDiffDetected || desktop.a11yDiffDetected);
+      return (
+        mobile &&
+        (mobile.visualDiffDetected || mobile.a11yDiffDetected) &&
+        desktop &&
+        !(desktop.visualDiffDetected || desktop.a11yDiffDetected)
+      );
     }).length;
     console.log(`    ${DIM}desktop-only: ${desktopOnly} | mobile-only: ${mobileOnly}${RESET}`);
     console.log();
@@ -288,7 +306,7 @@ export async function runDetectionReport(
   // Flaky (sometimes detected)
   const flaky = [...byProperty.entries()]
     .filter(([, d]) => d.total >= 3 && d.detected > 0 && d.detected < d.total)
-    .sort((a, b) => (a[1].detected / a[1].total) - (b[1].detected / b[1].total));
+    .sort((a, b) => a[1].detected / a[1].total - b[1].detected / b[1].total);
   if (flaky.length > 0) {
     console.log(`  ${BOLD}${YELLOW}Flaky Detection${RESET} ${DIM}(inconsistent, n>=3)${RESET}`);
     for (const [prop, d] of flaky.slice(0, 10)) {
@@ -305,5 +323,8 @@ export async function runDetectionReport(
 // test — or any tool reaching for a helper here — triggers a full run, which is
 // why this file had 0% coverage.
 if (isCliEntry(import.meta.url, "detection-report")) {
-  runDetectionReport().catch((e) => { console.error(e); process.exitCode = 1; });
+  runDetectionReport().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  });
 }

@@ -96,29 +96,29 @@ in vlmkit.gates.json is the durable way to do that.`,
       title: "window.mount rejected, or rendered nothing",
       severity: "suspect",
       docs:
-        "Nothing was measured — an unknown story id, a render throw, or a gallery that does not"
-        + " implement the contract. Never downgrade this to reach a green run: it would let a"
-        + " typo'd story id read as a passing component.",
+        "Nothing was measured — an unknown story id, a render throw, or a gallery that does not" +
+        " implement the contract. Never downgrade this to reach a green run: it would let a" +
+        " typo'd story id read as a passing component.",
     },
     {
       id: "sub-perceptual-drift",
       title: "Most of the component's pixels moved, by less than the comparator counts",
       severity: "warn",
       docs:
-        "The diff ratio is at or below the threshold, but most pixels differ by a small amount —"
-        + " the signature of a palette, gradient, opacity or filter change rather than of antialiasing."
-        + " Measured case: a hero's gradient went from a blue tint to a purple one, 96% of pixels"
-        + " differed by at most 8/255, and the ratio was 0.00%. `diff html` catches this from its"
-        + " computed-style diff; a story diff is pixels only, so this rule is the whole signal."
-        + " Promote it to suspect in vlmkit.gates.json if you want it to fail the run.",
+        "The diff ratio is at or below the threshold, but most pixels differ by a small amount —" +
+        " the signature of a palette, gradient, opacity or filter change rather than of antialiasing." +
+        " Measured case: a hero's gradient went from a blue tint to a purple one, 96% of pixels" +
+        " differed by at most 8/255, and the ratio was 0.00%. `diff html` catches this from its" +
+        " computed-style diff; a story diff is pixels only, so this rule is the whole signal." +
+        " Promote it to suspect in vlmkit.gates.json if you want it to fail the run.",
     },
     {
       id: "new-baseline",
       title: "No baseline existed, so one was written",
       severity: "warn",
       docs:
-        "Warn rather than info: in CI a missing baseline means the run compared nothing, which is"
-        + " worth surfacing. Set to off once you are confident baselines are committed.",
+        "Warn rather than info: in CI a missing baseline means the run compared nothing, which is" +
+        " worth surfacing. Set to off once you are confident baselines are committed.",
     },
   ],
   inputs: [
@@ -130,28 +130,69 @@ in vlmkit.gates.json is the durable way to do that.`,
       positional: 0,
       required: true,
     },
-    { name: "gallery", placeholder: "url", kind: "string", description: "Gallery URL (your Playwright baseURL)", required: true },
-    { name: "props", placeholder: "json", kind: "string", description: "Serializable props applied to every story listed" },
-    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport the story mounts in", defaultDescription: "800x600" },
-    { name: "threshold", placeholder: "ratio", kind: "number", description: "Diff ratio counted as unchanged", defaultDescription: String(DEFAULT_THRESHOLD) },
-    { name: "update-baseline", kind: "boolean", description: "Write the current render as the baseline instead of comparing" },
-    { name: "root", placeholder: "selector", kind: "string", description: "Element the gallery renders into", defaultDescription: "#root" },
-    { name: "settle", placeholder: "ms", kind: "number", description: "Wait after mount resolves, for entry transitions", defaultDescription: "0" },
-    { name: "out", placeholder: "dir", kind: "path", description: "Baseline / artifact directory", defaultDescription: ".vlmkit/stories" },
+    {
+      name: "gallery",
+      placeholder: "url",
+      kind: "string",
+      description: "Gallery URL (your Playwright baseURL)",
+      required: true,
+    },
+    {
+      name: "props",
+      placeholder: "json",
+      kind: "string",
+      description: "Serializable props applied to every story listed",
+    },
+    {
+      name: "viewport",
+      placeholder: "WxH",
+      kind: "string",
+      description: "Viewport the story mounts in",
+      defaultDescription: "800x600",
+    },
+    {
+      name: "threshold",
+      placeholder: "ratio",
+      kind: "number",
+      description: "Diff ratio counted as unchanged",
+      defaultDescription: String(DEFAULT_THRESHOLD),
+    },
+    {
+      name: "update-baseline",
+      kind: "boolean",
+      description: "Write the current render as the baseline instead of comparing",
+    },
+    {
+      name: "root",
+      placeholder: "selector",
+      kind: "string",
+      description: "Element the gallery renders into",
+      defaultDescription: "#root",
+    },
+    {
+      name: "settle",
+      placeholder: "ms",
+      kind: "number",
+      description: "Wait after mount resolves, for entry transitions",
+      defaultDescription: "0",
+    },
+    {
+      name: "out",
+      placeholder: "dir",
+      kind: "path",
+      description: "Baseline / artifact directory",
+      defaultDescription: ".vlmkit/stories",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const stories = readPositionals(argv, VALUE_FLAGS);
     if (stories.length === 0) {
-      throw new UsageError(
-        "missing required argument. Usage: vlmkit check story <story-id...> --gallery <url>",
-      );
+      throw new UsageError("missing required argument. Usage: vlmkit check story <story-id...> --gallery <url>");
     }
     const gallery = readFlag(argv, "gallery");
     if (!gallery) {
-      throw new UsageError(
-        "--gallery <url> is required — the gallery page your Playwright config sets as baseURL",
-      );
+      throw new UsageError("--gallery <url> is required — the gallery page your Playwright config sets as baseURL");
     }
     const rawProps = readFlag(argv, "props");
     let props: Record<string, unknown> | undefined;
@@ -164,8 +205,8 @@ in vlmkit.gates.json is the durable way to do that.`,
         props = parsed as Record<string, unknown>;
       } catch (e) {
         throw new UsageError(
-          `--props must be a JSON object (${e instanceof Error ? e.message : String(e)}).`
-          + ` The gallery contract requires plain serializable data.`,
+          `--props must be a JSON object (${e instanceof Error ? e.message : String(e)}).` +
+            ` The gallery contract requires plain serializable data.`,
         );
       }
     }
@@ -218,10 +259,10 @@ in vlmkit.gates.json is the durable way to do that.`,
           rule: "sub-perceptual-drift",
           severity: "warn",
           message:
-            `${result.story}: ${(m.changedFraction * 100).toFixed(0)}% of pixels differ`
-            + ` (max ${m.maxChannelDelta}/255, mean ${m.meanChannelDelta.toFixed(1)}/255)`
-            + ` but the diff ratio is ${(result.diffRatio! * 100).toFixed(2)}%`
-            + ` — below the comparator's perceptual threshold, so this did not fail`,
+            `${result.story}: ${(m.changedFraction * 100).toFixed(0)}% of pixels differ` +
+            ` (max ${m.maxChannelDelta}/255, mean ${m.meanChannelDelta.toFixed(1)}/255)` +
+            ` but the diff ratio is ${(result.diffRatio! * 100).toFixed(2)}%` +
+            ` — below the comparator's perceptual threshold, so this did not fail`,
           evidence: {
             story: result.story,
             changedFraction: m.changedFraction,
@@ -239,8 +280,8 @@ in vlmkit.gates.json is the durable way to do that.`,
         rule: "story-drift",
         severity: "suspect",
         message:
-          `${result.story}: ${(result.diffRatio! * 100).toFixed(2)}% of the component changed`
-          + ` (${result.diffPixels}/${result.totalPixels}px, threshold ${(report.threshold * 100).toFixed(2)}%)`,
+          `${result.story}: ${(result.diffRatio! * 100).toFixed(2)}% of the component changed` +
+          ` (${result.diffPixels}/${result.totalPixels}px, threshold ${(report.threshold * 100).toFixed(2)}%)`,
         // Region geometry is what turns a ratio into an edit. Kept structural so
         // an agent reading --json does not parse the prose to locate the change.
         evidence: {
@@ -268,9 +309,8 @@ in vlmkit.gates.json is the durable way to do that.`,
   headline: (report) => {
     const changed = report.results.filter((r) => r.outcome === "changed").length;
     const sizes = report.results.filter((r) => r.width !== undefined);
-    const dims = sizes.length === 1
-      ? `${sizes[0]!.width}x${sizes[0]!.height}`
-      : `${report.storyPixels.toLocaleString()}px total`;
+    const dims =
+      sizes.length === 1 ? `${sizes[0]!.width}x${sizes[0]!.height}` : `${report.storyPixels.toLocaleString()}px total`;
     return `${report.results.length} story/stories at ${dims}, ${changed} changed`;
   },
   ledger: (report, options) => ({

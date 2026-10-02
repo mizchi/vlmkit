@@ -1,10 +1,6 @@
 import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
-import {
-  buildPresenceMatrix,
-  formatPresenceMatrix,
-  type PresenceMatrixViewportInput,
-} from "./presence-matrix.ts";
+import { buildPresenceMatrix, formatPresenceMatrix, type PresenceMatrixViewportInput } from "./presence-matrix.ts";
 
 function vp(
   label: string,
@@ -28,11 +24,7 @@ describe("buildPresenceMatrix", () => {
 
   it("flags a viewport-exclusive region and hints the matching min-width media query", () => {
     const matrix = buildPresenceMatrix(
-      [
-        vp("1280", 1280, [{ x: 600, y: 3400, width: 200, height: 200 }]),
-        vp("768", 768, []),
-        vp("375", 375, []),
-      ],
+      [vp("1280", 1280, [{ x: 600, y: 3400, width: 200, height: 200 }]), vp("768", 768, []), vp("375", 375, [])],
       [
         { value: 1200, type: "min-width" },
         { value: 768, type: "max-width" },
@@ -53,10 +45,7 @@ describe("buildPresenceMatrix", () => {
 
   it("hints a max-width media query for a mobile-only region", () => {
     const matrix = buildPresenceMatrix(
-      [
-        vp("1280", 1280, []),
-        vp("375", 375, [{ x: 0, y: 80, width: 375, height: 40 }]),
-      ],
+      [vp("1280", 1280, []), vp("375", 375, [{ x: 0, y: 80, width: 375, height: 40 }])],
       [{ value: 768, type: "max-width" }],
     );
     const row = matrix.rows[0]!;
@@ -67,10 +56,7 @@ describe("buildPresenceMatrix", () => {
 
   it("emits no media hints when no breakpoint cleanly separates present from absent", () => {
     const matrix = buildPresenceMatrix(
-      [
-        vp("1280", 1280, [{ x: 0, y: 0, width: 100, height: 100 }]),
-        vp("768", 768, []),
-      ],
+      [vp("1280", 1280, [{ x: 0, y: 0, width: 100, height: 100 }]), vp("768", 768, [])],
       [{ value: 2000, type: "min-width" }],
     );
     assert.equal(matrix.rows[0]!.exclusive, true);
@@ -81,11 +67,7 @@ describe("buildPresenceMatrix", () => {
 describe("formatPresenceMatrix", () => {
   it("renders a region x viewport table with media hints", () => {
     const matrix = buildPresenceMatrix(
-      [
-        vp("1280", 1280, [{ x: 600, y: 3400, width: 200, height: 200 }]),
-        vp("768", 768, []),
-        vp("375", 375, []),
-      ],
+      [vp("1280", 1280, [{ x: 600, y: 3400, width: 200, height: 200 }]), vp("768", 768, []), vp("375", 375, [])],
       [{ value: 1200, type: "min-width" }],
     );
     const text = formatPresenceMatrix(matrix);

@@ -8,7 +8,11 @@ function mb(over: Partial<MatchedBbox>): MatchedBbox {
     rank: 0,
     baseline: { top: 0, left: 0, width: 100, height: 100, area: 10000, fillColor: "rgb(255,255,255)" },
     variant: { top: 0, left: 0, width: 100, height: 100, area: 10000, fillColor: "rgb(255,255,255)" },
-    deltaTop: 0, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 1,
+    deltaTop: 0,
+    deltaLeft: 0,
+    deltaWidth: 0,
+    deltaHeight: 0,
+    iou: 1,
     ...over,
   };
 }
@@ -18,17 +22,23 @@ describe("buildGeometryProfiles", () => {
     const perVp = [
       {
         viewport: "mobile",
-        matches: [mb({ rank: 0,
-          baseline: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
-          variant:  { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
-        })],
+        matches: [
+          mb({
+            rank: 0,
+            baseline: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
+          }),
+        ],
       },
       {
         viewport: "desktop",
-        matches: [mb({ rank: 0,
-          baseline: { top: 0, left: 0, width: 1180, height: 500, area: 0, fillColor: "" },
-          variant:  { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
-        })],
+        matches: [
+          mb({
+            rank: 0,
+            baseline: { top: 0, left: 0, width: 1180, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
+          }),
+        ],
       },
     ];
     const profiles = buildGeometryProfiles(perVp);
@@ -44,17 +54,21 @@ describe("buildGeometryProfiles", () => {
     const perVp = [
       {
         viewport: "mobile",
-        matches: [mb({
-          baseline: { top: 0, left: 0, width: 360, height: 500, area: 0, fillColor: "" },
-          variant:  { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
-        })],
+        matches: [
+          mb({
+            baseline: { top: 0, left: 0, width: 360, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
+          }),
+        ],
       },
       {
         viewport: "desktop",
-        matches: [mb({
-          baseline: { top: 0, left: 0, width: 360, height: 500, area: 0, fillColor: "" },
-          variant:  { top: 0, left: 0, width: 1100, height: 500, area: 0, fillColor: "" },
-        })],
+        matches: [
+          mb({
+            baseline: { top: 0, left: 0, width: 360, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 1100, height: 500, area: 0, fillColor: "" },
+          }),
+        ],
       },
     ];
     const profiles = buildGeometryProfiles(perVp);
@@ -66,17 +80,21 @@ describe("buildGeometryProfiles", () => {
     const perVp = [
       {
         viewport: "mobile",
-        matches: [mb({
-          baseline: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
-          variant:  { top: 0, left: 0, width: 340, height: 500, area: 0, fillColor: "" },
-        })],
+        matches: [
+          mb({
+            baseline: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 340, height: 500, area: 0, fillColor: "" },
+          }),
+        ],
       },
       {
         viewport: "desktop",
-        matches: [mb({
-          baseline: { top: 0, left: 0, width: 1180, height: 500, area: 0, fillColor: "" },
-          variant:  { top: 0, left: 0, width: 1175, height: 500, area: 0, fillColor: "" },
-        })],
+        matches: [
+          mb({
+            baseline: { top: 0, left: 0, width: 1180, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 1175, height: 500, area: 0, fillColor: "" },
+          }),
+        ],
       },
     ];
     const profiles = buildGeometryProfiles(perVp);
@@ -92,13 +110,15 @@ describe("buildGeometryProfiles", () => {
       {
         viewport: "mobile",
         matches: [
-          mb({ rank: 0,
+          mb({
+            rank: 0,
             baseline: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
-            variant:  { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
+            variant: { top: 0, left: 0, width: 343, height: 500, area: 0, fillColor: "" },
           }),
-          mb({ rank: 1,
+          mb({
+            rank: 1,
             baseline: { top: 600, left: 0, width: 200, height: 40, area: 0, fillColor: "" },
-            variant:  { top: 600, left: 0, width: 200, height: 40, area: 0, fillColor: "" },
+            variant: { top: 600, left: 0, width: 200, height: 40, area: 0, fillColor: "" },
           }),
         ],
       },

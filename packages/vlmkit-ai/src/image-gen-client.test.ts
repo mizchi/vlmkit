@@ -97,7 +97,9 @@ describe("parseGenerationResponse", () => {
   });
 
   it("skips entries without b64_json", () => {
-    const parsed = parseGenerationResponse({ data: [{ url: "https://example/png" }, { b64_json: Buffer.from("X").toString("base64") }] });
+    const parsed = parseGenerationResponse({
+      data: [{ url: "https://example/png" }, { b64_json: Buffer.from("X").toString("base64") }],
+    });
     assert.equal(parsed.images.length, 1);
     assert.equal(Buffer.from(parsed.images[0]).toString(), "X");
   });
@@ -146,12 +148,17 @@ describe("OpenRouter route", () => {
     const m = resolveImageGenModel("meta/muse-image");
     assert.deepEqual(buildOpenRouterBody(m, { prompt: "x" }), { model: "meta/muse-image", prompt: "x", n: 1 });
     assert.deepEqual(buildOpenRouterBody(m, { prompt: "x", aspectRatio: "16:9", quality: "high" }), {
-      model: "meta/muse-image", prompt: "x", n: 1, aspect_ratio: "16:9", quality: "high",
+      model: "meta/muse-image",
+      prompt: "x",
+      n: 1,
+      aspect_ratio: "16:9",
+      quality: "high",
     });
     assert.throws(() => buildOpenRouterBody(m, { prompt: " " }), /non-empty/);
-    assert.deepEqual(buildOpenRouterBody(m, { prompt: "x", inputReferences: ["data:image/png;base64,AA=="] }).input_references, [
-      { type: "image_url", image_url: { url: "data:image/png;base64,AA==" } },
-    ]);
+    assert.deepEqual(
+      buildOpenRouterBody(m, { prompt: "x", inputReferences: ["data:image/png;base64,AA=="] }).input_references,
+      [{ type: "image_url", image_url: { url: "data:image/png;base64,AA==" } }],
+    );
   });
 
   it("takes OpenRouter's billed cost and media type from the response", () => {
@@ -169,7 +176,10 @@ describe("OpenRouter route", () => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string, init: RequestInit) => {
       calls.push({ url, auth: new Headers(init.headers).get("authorization"), body: JSON.parse(String(init.body)) });
-      return new Response(JSON.stringify({ data: [{ b64_json: "AA==", media_type: "image/png" }], usage: { cost: 0.012 } }), { status: 200 });
+      return new Response(
+        JSON.stringify({ data: [{ b64_json: "AA==", media_type: "image/png" }], usage: { cost: 0.012 } }),
+        { status: 200 },
+      );
     }) as typeof fetch;
     try {
       const client = createImageGenClient(undefined, { apiKey: "k", baseUrl: "http://or.test" });

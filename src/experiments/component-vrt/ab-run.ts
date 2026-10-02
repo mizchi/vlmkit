@@ -56,11 +56,17 @@ const CLI = process.env.VLMKIT_AB_CLI ?? resolve(here, "../../cli/vlmkit.ts");
 
 /** Components in the fixture, in the order the page lays them out. */
 export const COMPONENTS = [
-  "Button", "Badge", "Avatar", "Card", "Alert", "Toolbar",
+  "Button",
+  "Badge",
+  "Avatar",
+  "Card",
+  "Alert",
+  "Toolbar",
   // Large on purpose. With only small components, "a component shot is far
   // smaller than a page shot" is true by construction rather than by finding —
   // these two exist so the thesis can fail.
-  "Hero", "DataTable",
+  "Hero",
+  "DataTable",
 ] as const;
 export type ComponentName = (typeof COMPONENTS)[number];
 
@@ -94,8 +100,9 @@ export const COMPOSES: Partial<Record<ComponentName, ComponentName[]>> = {
  * positive; anything inside it that a signal misses is a genuine miss.
  */
 export function expectedChanged(component: ComponentName): ComponentName[] {
-  const composites = (Object.keys(COMPOSES) as ComponentName[])
-    .filter((parent) => COMPOSES[parent]!.includes(component));
+  const composites = (Object.keys(COMPOSES) as ComponentName[]).filter((parent) =>
+    COMPOSES[parent]!.includes(component),
+  );
   return [component, ...composites];
 }
 
@@ -112,8 +119,7 @@ export function expectedChanged(component: ComponentName): ComponentName[] {
 export function declarationsIn(css: string, selector: string): { property: string; value: string }[] {
   // Match the rule block whose selector is exactly this one, at line start, so
   // `.c-card` does not also match `.c-card__title`.
-  const block = new RegExp(`^\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`, "m")
-    .exec(css);
+  const block = new RegExp(`^\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`, "m").exec(css);
   if (!block) return [];
   return block[1]!
     .split(";")
@@ -221,16 +227,17 @@ export function planSeed(css: string, request: SeedRequest): Seed {
   const declarations = declarationsIn(css, prefix);
   const wants = request.seedClass === "colour" ? COLOUR_PROPS : LAYOUT_PROPS;
   const candidates = declarations.filter(
-    (d) => wants.some((prop) => d.property === prop || d.property.startsWith(`${prop}-`))
+    (d) =>
+      wants.some((prop) => d.property === prop || d.property.startsWith(`${prop}-`)) &&
       // A colour hiding inside a shorthand (`border: 1px solid x`) is not a
       // colour-only mutation — changing it would also be a no-op or a reflow
       // depending on the shorthand, so the class would not mean what it says.
-      && (request.seedClass !== "colour" || /#|rgb|var\(|linear-gradient/.test(d.value)),
+      (request.seedClass !== "colour" || /#|rgb|var\(|linear-gradient/.test(d.value)),
   );
   if (candidates.length === 0) {
     throw new Error(
-      `no ${request.seedClass} candidate in ${prefix}`
-      + ` (has: ${declarations.map((d) => d.property).join(", ") || "nothing"})`,
+      `no ${request.seedClass} candidate in ${prefix}` +
+        ` (has: ${declarations.map((d) => d.property).join(", ") || "nothing"})`,
     );
   }
   const picked = candidates[Math.floor(rand() * candidates.length)]!;
@@ -364,11 +371,11 @@ function run(args: string[], cwd: string): { stdout: string; stderr: string; sta
 class ToolFailure extends Error {
   constructor(tool: string, detail: string) {
     super(
-      `${tool} produced no output — the environment is broken, so the run is void.\n`
-      + `  This is not a data point: a trial where the tool did not run is not a trial where the tool missed something.\n`
-      + `  Do not rebuild packages/vlmkit-markup (or any package the CLI loads) while this harness runs;\n`
-      + `  its dist is wiped by \`clean: true\` and every subprocess then fails to import the gate registry.\n`
-      + (detail ? `  tool stderr: ${detail.trim().split("\n").slice(-3).join(" / ")}` : ""),
+      `${tool} produced no output — the environment is broken, so the run is void.\n` +
+        `  This is not a data point: a trial where the tool did not run is not a trial where the tool missed something.\n` +
+        `  Do not rebuild packages/vlmkit-markup (or any package the CLI loads) while this harness runs;\n` +
+        `  its dist is wiped by \`clean: true\` and every subprocess then fails to import the gate registry.\n` +
+        (detail ? `  tool stderr: ${detail.trim().split("\n").slice(-3).join(" / ")}` : ""),
     );
     this.name = "ToolFailure";
   }
@@ -401,12 +408,10 @@ export interface SeedResult {
 function pageArm(workdir: string, plan: Seed): ArmResult {
   const out = join(workdir, "page-signal");
   const pageFile = `page-${plan.page}.html`;
-  const diffed = run([
-    "diff", "html",
-    join(workdir, "clean", pageFile),
-    join(workdir, "dirty", pageFile),
-    "--output-dir", out,
-  ], workdir);
+  const diffed = run(
+    ["diff", "html", join(workdir, "clean", pageFile), join(workdir, "dirty", pageFile), "--output-dir", out],
+    workdir,
+  );
 
   const reportPath = join(out, "diff-report.json");
   const notes: string[] = [];
@@ -446,19 +451,16 @@ function pageArm(workdir: string, plan: Seed): ArmResult {
 function storyArm(workdir: string, plan: Seed): ArmResult {
   const ids = COMPONENTS.map((name) => `components/${name}/Default`);
   const baselineDir = join(workdir, "story-baselines");
-  const galleryFor = (variant: "clean" | "dirty") =>
-    pathToFileURL(join(workdir, variant, "gallery.html")).href;
+  const galleryFor = (variant: "clean" | "dirty") => pathToFileURL(join(workdir, variant, "gallery.html")).href;
 
   // Baselines from clean. `--advisory` because the first run reports
   // new-baseline, which is a finding by design.
   run(["check", "story", ...ids, "--gallery", galleryFor("clean"), "--out", baselineDir, "--advisory"], workdir);
 
-  const compared = run([
-    "check", "story", ...ids,
-    "--gallery", galleryFor("dirty"),
-    "--out", baselineDir,
-    "--json", "--advisory",
-  ], workdir);
+  const compared = run(
+    ["check", "story", ...ids, "--gallery", galleryFor("dirty"), "--out", baselineDir, "--json", "--advisory"],
+    workdir,
+  );
 
   const notes: string[] = [];
   let parsed: {
@@ -520,8 +522,7 @@ export function runSeed(request: SeedRequest, root: string): SeedResult | null {
 
 const ratio = (a: number, b: number) => (b === 0 ? "—" : `${(a / b).toFixed(1)}x`);
 
-const sumBy = (rows: readonly SeedResult[], pick: (r: SeedResult) => number) =>
-  rows.reduce((n, r) => n + pick(r), 0);
+const sumBy = (rows: readonly SeedResult[], pick: (r: SeedResult) => number) => rows.reduce((n, r) => n + pick(r), 0);
 
 function falsePositives(arm: ArmResult, plan: Seed): number {
   const expected = expectedChanged(plan.component) as string[];
@@ -539,11 +540,13 @@ function sliceRow(label: string, rows: readonly SeedResult[]): string {
   const pageImg = sumBy(rows, (r) => r.page.imageTokens);
   const storyImg = sumBy(rows, (r) => r.story.imageTokens);
   const expected = rows.reduce((n, r) => n + expectedChanged(r.plan.component).length, 0);
-  return `| ${label} | ${rows.length} | ${ratio(pageBytes, storyBytes)} | **${ratio(pageImg, storyImg)}** |`
-    + ` ${sumBy(rows, (r) => missed(r.page, r.plan))}/${expected}`
-    + ` vs ${sumBy(rows, (r) => missed(r.story, r.plan))}/${expected} |`
-    + ` ${sumBy(rows, (r) => falsePositives(r.page, r.plan))}`
-    + ` vs ${sumBy(rows, (r) => falsePositives(r.story, r.plan))} |`;
+  return (
+    `| ${label} | ${rows.length} | ${ratio(pageBytes, storyBytes)} | **${ratio(pageImg, storyImg)}** |` +
+    ` ${sumBy(rows, (r) => missed(r.page, r.plan))}/${expected}` +
+    ` vs ${sumBy(rows, (r) => missed(r.story, r.plan))}/${expected} |` +
+    ` ${sumBy(rows, (r) => falsePositives(r.page, r.plan))}` +
+    ` vs ${sumBy(rows, (r) => falsePositives(r.story, r.plan))} |`
+  );
 }
 
 export function formatReport(results: readonly SeedResult[]): string {
@@ -551,34 +554,61 @@ export function formatReport(results: readonly SeedResult[]): string {
 
   lines.push("## By page composition");
   lines.push("");
-  lines.push("| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |");
+  lines.push(
+    "| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |",
+  );
   lines.push("|---|--:|--:|--:|--:|--:|");
-  for (const page of PAGES) lines.push(sliceRow(`page: \`${page}\``, results.filter((r) => r.plan.page === page)));
+  for (const page of PAGES)
+    lines.push(
+      sliceRow(
+        `page: \`${page}\``,
+        results.filter((r) => r.plan.page === page),
+      ),
+    );
   lines.push(sliceRow("**all**", results));
 
   lines.push("");
   lines.push("## By regression class");
   lines.push("");
-  lines.push("| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |");
+  lines.push(
+    "| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |",
+  );
   lines.push("|---|--:|--:|--:|--:|--:|");
   for (const cls of SEED_CLASSES) {
-    lines.push(sliceRow(`class: \`${cls}\``, results.filter((r) => r.plan.seedClass === cls)));
+    lines.push(
+      sliceRow(
+        `class: \`${cls}\``,
+        results.filter((r) => r.plan.seedClass === cls),
+      ),
+    );
   }
 
   lines.push("");
   lines.push("## By component size");
   lines.push("");
   lines.push(
-    "The adversarial cut. `Hero` and `DataTable` are large, so a component-scoped shot"
-    + " of them approaches a page-scoped shot. If the advantage survives here it is not"
-    + " an artefact of picking small components.",
+    "The adversarial cut. `Hero` and `DataTable` are large, so a component-scoped shot" +
+      " of them approaches a page-scoped shot. If the advantage survives here it is not" +
+      " an artefact of picking small components.",
   );
   lines.push("");
-  lines.push("| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |");
+  lines.push(
+    "| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |",
+  );
   lines.push("|---|--:|--:|--:|--:|--:|");
   const LARGE: readonly string[] = ["Hero", "DataTable"];
-  lines.push(sliceRow("small components", results.filter((r) => !LARGE.includes(r.plan.component))));
-  lines.push(sliceRow("**large components**", results.filter((r) => LARGE.includes(r.plan.component))));
+  lines.push(
+    sliceRow(
+      "small components",
+      results.filter((r) => !LARGE.includes(r.plan.component)),
+    ),
+  );
+  lines.push(
+    sliceRow(
+      "**large components**",
+      results.filter((r) => LARGE.includes(r.plan.component)),
+    ),
+  );
 
   lines.push("");
   lines.push("## Every trial");
@@ -586,22 +616,23 @@ export function formatReport(results: readonly SeedResult[]): string {
   lines.push("| page | class | component | mutation | page bytes | story bytes | page img tok | story img tok |");
   lines.push("|---|---|---|---|--:|--:|--:|--:|");
   for (const r of results) {
-    const mutation = r.plan.replacement === ""
-      ? `\`${r.plan.property}\` deleted`
-      : `\`${r.plan.property}\` → ${r.plan.replacement.slice(0, 22)}`;
+    const mutation =
+      r.plan.replacement === ""
+        ? `\`${r.plan.property}\` deleted`
+        : `\`${r.plan.property}\` → ${r.plan.replacement.slice(0, 22)}`;
     lines.push(
-      `| ${r.plan.page} | ${r.plan.seedClass} | \`${r.plan.component}\` | ${mutation} |`
-      + ` ${r.page.signalBytes.toLocaleString()} | ${r.story.signalBytes.toLocaleString()} |`
-      + ` ${r.page.imageTokens.toLocaleString()} | ${r.story.imageTokens.toLocaleString()} |`,
+      `| ${r.plan.page} | ${r.plan.seedClass} | \`${r.plan.component}\` | ${mutation} |` +
+        ` ${r.page.signalBytes.toLocaleString()} | ${r.story.signalBytes.toLocaleString()} |` +
+        ` ${r.page.imageTokens.toLocaleString()} | ${r.story.imageTokens.toLocaleString()} |`,
     );
   }
 
   lines.push("");
   lines.push(
-    "Image tokens use Anthropic's documented `w*h/750` approximation on the PNG"
-    + " dimensions actually emitted. Output tokens and retake counts are absent on"
-    + " purpose: both need a repair agent in the loop, and estimating them would be"
-    + " fabrication.",
+    "Image tokens use Anthropic's documented `w*h/750` approximation on the PNG" +
+      " dimensions actually emitted. Output tokens and retake counts are absent on" +
+      " purpose: both need a repair agent in the loop, and estimating them would be" +
+      " fabrication.",
   );
   return lines.join("\n");
 }
@@ -626,8 +657,7 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   // Labelled so a ToolFailure deep in the innermost loop can leave all three at
   // once. This block is module top level, not a function, so `return` is not
   // available here.
-  trials:
-  for (const page of pages) {
+  trials: for (const page of pages) {
     for (const seedClass of classes) {
       for (const component of components) {
         seed++;
@@ -672,18 +702,19 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
     // No report, no results.json. A partial corpus written to the same paths as
     // a complete one is how a void run gets quoted a week later.
     process.stderr.write(
-      `\n${results.length} trial(s) completed before the abort. Not written:`
-      + ` fix the environment and re-run from the start.\n`,
+      `\n${results.length} trial(s) completed before the abort. Not written:` +
+        ` fix the environment and re-run from the start.\n`,
     );
     process.exit(1);
   }
 
   let report = formatReport(results);
   if (skipped.length > 0) {
-    report += `\n\n## Skipped trials (${skipped.length})\n\n`
-      + skipped.map((s) => `- ${s}`).join("\n")
-      + "\n\nListed rather than dropped: a corpus that quietly shrinks is how a"
-      + " benchmark starts agreeing with whoever wrote it.\n";
+    report +=
+      `\n\n## Skipped trials (${skipped.length})\n\n` +
+      skipped.map((s) => `- ${s}`).join("\n") +
+      "\n\nListed rather than dropped: a corpus that quietly shrinks is how a" +
+      " benchmark starts agreeing with whoever wrote it.\n";
   }
   console.log(report);
   writeFileSync(join(root, "report.md"), `${report}\n`);

@@ -103,8 +103,7 @@ function staticImportsOf(source: string): string[] {
  * because importing a CLI-entry module runs its command.
  */
 function isCliEntryModule(source: string): boolean {
-  return source.includes("__VLMKIT_DISPATCHER_LEAF__ ===")
-    || /isCliEntry\(\s*import\.meta\.url/.test(source);
+  return source.includes("__VLMKIT_DISPATCHER_LEAF__ ===") || /isCliEntry\(\s*import\.meta\.url/.test(source);
 }
 
 /**
@@ -153,9 +152,9 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
       assert.deepEqual(
         offenders,
         [],
-        "A gate statically imports a module whose evaluation runs a CLI command. That "
-        + "kills the command silently — see this file's header. Move the shared code "
-        + `into a module with no CLI guard, or import it dynamically.\n\n${offenders.join("\n\n")}`,
+        "A gate statically imports a module whose evaluation runs a CLI command. That " +
+          "kills the command silently — see this file's header. Move the shared code " +
+          `into a module with no CLI guard, or import it dynamically.\n\n${offenders.join("\n\n")}`,
       );
     });
   }
@@ -170,7 +169,9 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
     // Fifteen modules carried it. `isCliEntry(import.meta.url, name)` resolves both
     // sides, so it is exact in both directions.
     const files = execSync("git ls-files '*.ts'", { cwd: REPO_ROOT, encoding: "utf8" })
-      .trim().split("\n").filter(Boolean);
+      .trim()
+      .split("\n")
+      .filter(Boolean);
     assert.ok(files.length > 200, `git ls-files returned ${files.length} — the listing is broken, not the code`);
     const offenders: string[] = [];
     for (const rel of files) {
@@ -186,15 +187,16 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
       //   `new URL(import.meta.url).pathname === argv[1]` — a URL pathname is
       //   percent-encoded and argv is not, so any path with a space fails.
       const suffixMatch = /process\.argv\[1\][^;]{0,200}?\.endsWith\(/s.test(source);
-      const urlPathname = /new URL\(import\.meta\.url\)\.pathname\s*===\s*process\.argv\[1\]/s.test(source)
-        || /process\.argv\[1\]\s*===\s*new URL\(import\.meta\.url\)\.pathname/s.test(source);
+      const urlPathname =
+        /new URL\(import\.meta\.url\)\.pathname\s*===\s*process\.argv\[1\]/s.test(source) ||
+        /process\.argv\[1\]\s*===\s*new URL\(import\.meta\.url\)\.pathname/s.test(source);
       if (suffixMatch || urlPathname) offenders.push(rel);
     }
     assert.deepEqual(
       offenders,
       [],
-      "hand-rolled entry guard — use `isCliEntry(import.meta.url, \"<dispatcher-name>\")` "
-      + "from @mizchi/vlmkit-core/plugin/cli-entry.ts",
+      'hand-rolled entry guard — use `isCliEntry(import.meta.url, "<dispatcher-name>")` ' +
+        "from @mizchi/vlmkit-core/plugin/cli-entry.ts",
     );
   });
 

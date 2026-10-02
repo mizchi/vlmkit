@@ -18,7 +18,9 @@ import { formatInteractReport, runInteract, runInteractCli, type Sequence } from
 const dir = mkdtempSync(join(tmpdir(), "vlmkit-interact-"));
 
 const fixture = join(dir, "page.html");
-writeFileSync(fixture, `<!doctype html><meta charset="utf-8"><title>interact</title>
+writeFileSync(
+  fixture,
+  `<!doctype html><meta charset="utf-8"><title>interact</title>
 <style>
   body { margin: 0; font: 16px sans-serif; background: #fff; color: #111; }
   .menu { display: none; height: 180px; background: #2d6cdf; color: #fff; padding: 16px; }
@@ -39,7 +41,8 @@ writeFileSync(fixture, `<!doctype html><meta charset="utf-8"><title>interact</ti
       document.getElementById("menu").classList.add("open");
     });
   </script>
-</body>`);
+</body>`,
+);
 
 function sequence(name: string, steps: Sequence["steps"], viewport?: Sequence["viewport"]): string {
   const file = join(dir, `${name}.json`);
@@ -64,22 +67,40 @@ describe("runInteract", () => {
       sequencePath: seq,
       outputDir: join(dir, "out-happy"),
     });
-    assert.deepEqual(report.snapshots.map((s) => s.name), ["default", "menu-open", "filled"]);
+    assert.deepEqual(
+      report.snapshots.map((s) => s.name),
+      ["default", "menu-open", "filled"],
+    );
     // Three snapshots, two transitions: a transition is a pair, not a step.
-    assert.deepEqual(report.transitions.map((t) => `${t.from}→${t.to}`), ["default→menu-open", "menu-open→filled"]);
+    assert.deepEqual(
+      report.transitions.map((t) => `${t.from}→${t.to}`),
+      ["default→menu-open", "menu-open→filled"],
+    );
     for (const s of report.snapshots) assert.match(s.screenshotPath, /\.png$/);
     assert.equal(new Set(report.snapshots.map((s) => s.screenshotPath)).size, 3);
     assert.deepEqual(report.stepFailures, [], "every step should have run");
 
     // Each transition carries the actions that produced it, which is the only way
     // to read a delta as evidence about a particular action.
-    assert.deepEqual(report.transitions[0]!.actions.map((a) => a.action), ["click"]);
-    assert.deepEqual(report.transitions[1]!.actions.map((a) => a.action), ["fill"]);
+    assert.deepEqual(
+      report.transitions[0]!.actions.map((a) => a.action),
+      ["click"],
+    );
+    assert.deepEqual(
+      report.transitions[1]!.actions.map((a) => a.action),
+      ["fill"],
+    );
 
     // Both actions are visible ones, so both deltas must be non-zero — a run where
     // the sequence never reached the page would report two zeroes and look tidy.
-    assert.ok(report.transitions[0]!.diffRatio > 0.01, `opening a 180px menu should paint: ${report.transitions[0]!.diffRatio}`);
-    assert.ok(report.transitions[1]!.diffRatio > 0, `filling an input should paint: ${report.transitions[1]!.diffRatio}`);
+    assert.ok(
+      report.transitions[0]!.diffRatio > 0.01,
+      `opening a 180px menu should paint: ${report.transitions[0]!.diffRatio}`,
+    );
+    assert.ok(
+      report.transitions[1]!.diffRatio > 0,
+      `filling an input should paint: ${report.transitions[1]!.diffRatio}`,
+    );
     assert.ok(report.transitions[0]!.totalPixels > 0);
   });
 
@@ -166,22 +187,26 @@ describe("runInteract", () => {
     // Every action shares one `executeStep` switch, and a missing case is a silent
     // no-op rather than a type error only because the union is exhaustive — worth
     // one pass over all of them.
-    const seq = sequence("vocab", [
-      { action: "snapshot", name: "start" },
-      { action: "hover", selector: ".btn-primary" },
-      { action: "focus", selector: "input[name=email]" },
-      { action: "type", selector: "input[name=email]", text: "hello" },
-      { action: "fill", selector: "input[name=email]", value: "replaced@example.com" },
-      { action: "press", selector: "input[name=email]", key: "Tab" },
-      { action: "select", selector: "select[name=plan]", value: "pro" },
-      { action: "blur", selector: "input[name=email]" },
-      { action: "waitForSelector", selector: ".btn-primary" },
-      { action: "wait", ms: 20 },
-      { action: "scroll", y: 300 },
-      { action: "press", key: "Escape" },
-      { action: "click", selector: ".dropdown-trigger" },
-      { action: "snapshot", name: "end" },
-    ], { width: 900, height: 600 });
+    const seq = sequence(
+      "vocab",
+      [
+        { action: "snapshot", name: "start" },
+        { action: "hover", selector: ".btn-primary" },
+        { action: "focus", selector: "input[name=email]" },
+        { action: "type", selector: "input[name=email]", text: "hello" },
+        { action: "fill", selector: "input[name=email]", value: "replaced@example.com" },
+        { action: "press", selector: "input[name=email]", key: "Tab" },
+        { action: "select", selector: "select[name=plan]", value: "pro" },
+        { action: "blur", selector: "input[name=email]" },
+        { action: "waitForSelector", selector: ".btn-primary" },
+        { action: "wait", ms: 20 },
+        { action: "scroll", y: 300 },
+        { action: "press", key: "Escape" },
+        { action: "click", selector: ".dropdown-trigger" },
+        { action: "snapshot", name: "end" },
+      ],
+      { width: 900, height: 600 },
+    );
     const report = await runInteract({
       source: fixture,
       sequencePath: seq,

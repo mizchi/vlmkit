@@ -20,11 +20,15 @@ const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("check crater", () => {
   const skipped = {
-    url: "http://127.0.0.1:9999", status: "skip", elapsedMs: 12,
+    url: "http://127.0.0.1:9999",
+    status: "skip",
+    elapsedMs: 12,
     checks: [{ name: "reachable", status: "skip", elapsedMs: 12, message: "connection refused" }],
   };
   const failed = {
-    url: "http://127.0.0.1:7000", status: "fail", elapsedMs: 240,
+    url: "http://127.0.0.1:7000",
+    status: "fail",
+    elapsedMs: 240,
     checks: [
       { name: "reachable", status: "pass", elapsedMs: 10, message: "ok" },
       { name: "render-css", status: "fail", elapsedMs: 230, message: "flex column ignored" },

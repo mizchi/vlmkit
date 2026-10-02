@@ -80,8 +80,7 @@ test("validateUiContract validates boundary policy through markup core", () => {
   screen.landmarks[1]!.parentId = "missing-parent";
 
   const issues = validateUiContract(contract);
-  const hasIssue = (fragment: string) =>
-    issues.some((issue) => issue.message.includes(fragment));
+  const hasIssue = (fragment: string) => issues.some((issue) => issue.message.includes(fragment));
   for (const fragment of [
     "unsupported UI contract version",
     "screen id",
@@ -111,7 +110,7 @@ test("validateUiContract requires fluid width constraints", () => {
 test("summarizeUiContractLandmark keeps layout and scroll decisions visible", () => {
   assert.equal(
     summarizeUiContractLandmark(valid.screens[0]!.landmarks[1]!),
-    "complementary \"Topics\": fixed 360px, scrollport max 720px, scroll-y, subgrid rows",
+    'complementary "Topics": fixed 360px, scrollport max 720px, scroll-y, subgrid rows',
   );
 });
 
@@ -119,7 +118,12 @@ test("summarizeUiContractLandmark shows unbounded fluid width explicitly", () =>
   const landmark = structuredClone(valid.screens[0]!.landmarks[0]!);
   landmark.layout.width = { kind: "fluid" };
   assert.match(summarizeUiContractLandmark(landmark), /fluid unbounded/);
-  assert.ok(validateUiContract({ version: 1, screens: [{ id: "x", viewports: [{ label: "desktop", width: 1, height: 1 }], landmarks: [landmark] }] }).length > 0);
+  assert.ok(
+    validateUiContract({
+      version: 1,
+      screens: [{ id: "x", viewports: [{ label: "desktop", width: 1, height: 1 }], landmarks: [landmark] }],
+    }).length > 0,
+  );
 });
 
 test("validateUiContract accepts enriched landing contracts", () => {
@@ -132,30 +136,18 @@ test("validateUiContract accepts enriched landing contracts", () => {
     { kind: "media-slot", selector: "[data-media-slot]", required: true },
     { kind: "next-section", selector: "[data-next-section]", required: true },
   ];
-  screen.states = [
-    { id: "cta-focus", kind: "focus-visible", selector: "[data-primary-cta]" },
-  ];
+  screen.states = [{ id: "cta-focus", kind: "focus-visible", selector: "[data-primary-cta]" }];
   screen.content = {
     kind: "static",
     text: { rowCount: 12, maxLength: 420 },
   };
   screen.decoration = {
-    typography: [
-      { role: "hero-title", family: "system-serif", size: 56, lineHeight: 1.08 },
-    ],
-    palette: [
-      { role: "surface", value: "#f8faf7", token: "surface" },
-    ],
-    media: [
-      { slot: "hero-preview", crop: "cover", aspectRatio: "16/10" },
-    ],
+    typography: [{ role: "hero-title", family: "system-serif", size: 56, lineHeight: 1.08 }],
+    palette: [{ role: "surface", value: "#f8faf7", token: "surface" }],
+    media: [{ slot: "hero-preview", crop: "cover", aspectRatio: "16/10" }],
   };
-  screen.assets = [
-    { id: "hero-preview", kind: "image", policy: "replaceable", slot: "hero" },
-  ];
-  screen.landmarks[0]!.slots = [
-    { id: "hero", kind: "media", marker: "media-slot", required: true },
-  ];
+  screen.assets = [{ id: "hero-preview", kind: "image", policy: "replaceable", slot: "hero" }];
+  screen.landmarks[0]!.slots = [{ id: "hero", kind: "media", marker: "media-slot", required: true }];
 
   assert.deepEqual(validateUiContract(contract), []);
   assert.match(summarizeUiContractScreen(screen), /landing/);
@@ -166,9 +158,7 @@ test("validateUiContract enforces pattern-specific evidence", () => {
   const landing = structuredClone(valid);
   landing.screens[0]!.pattern = "landing";
   landing.screens[0]!.goal = "landing";
-  landing.screens[0]!.markers = [
-    { kind: "primary-cta", selector: "[data-primary-cta]", required: true },
-  ];
+  landing.screens[0]!.markers = [{ kind: "primary-cta", selector: "[data-primary-cta]", required: true }];
   assert.ok(validateUiContract(landing).some((issue) => issue.message.includes("media-slot")));
 
   const appShell = structuredClone(valid);
@@ -192,10 +182,7 @@ test("validateUiContract enforces pattern-specific evidence", () => {
 
 test("validateUiContract validates marker policy through markup core", () => {
   const contract = structuredClone(valid);
-  contract.screens[0]!.markers = [
-    { kind: "primary-cta", required: true },
-    { kind: "badge" as never },
-  ];
+  contract.screens[0]!.markers = [{ kind: "primary-cta", required: true }, { kind: "badge" as never }];
 
   const issues = validateUiContract(contract);
   assert.ok(issues.some((issue) => issue.message.includes("required marker")));
@@ -209,22 +196,22 @@ test("validateUiContract accepts app-shell expected scrollports and required sta
   screen.goal = "app-shell";
   screen.sourceOfTruth = "viewport-shell";
   screen.markers = [
-    { kind: "scrollport", name: "channels", selector: "[data-scrollport=\"channels\"]", required: true },
-    { kind: "selected", selector: "[aria-current=\"page\"]", required: true },
+    { kind: "scrollport", name: "channels", selector: '[data-scrollport="channels"]', required: true },
+    { kind: "selected", selector: '[aria-current="page"]', required: true },
   ];
   screen.expectedScrollports = [
     {
       id: "channels",
       name: "channels",
-      selector: "[data-scrollport=\"channels\"]",
+      selector: '[data-scrollport="channels"]',
       axis: "y",
       required: true,
       minOverflow: 1,
     },
   ];
   screen.requiredStates = [
-    { id: "active-route", kind: "selected", selector: "[aria-current=\"page\"]", required: true },
-    { id: "channels-scrolled", kind: "scrolled", selector: "[data-scrollport=\"channels\"]", required: true },
+    { id: "active-route", kind: "selected", selector: '[aria-current="page"]', required: true },
+    { id: "channels-scrolled", kind: "scrolled", selector: '[data-scrollport="channels"]', required: true },
   ];
 
   assert.deepEqual(validateUiContract(contract), []);
@@ -278,9 +265,7 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
     palette: [{ role: "", value: "red" }],
     media: [{ slot: "" }],
   };
-  contract.screens[0]!.landmarks[1]!.assets = [
-    { id: "", kind: "image", policy: "replaceable" },
-  ];
+  contract.screens[0]!.landmarks[1]!.assets = [{ id: "", kind: "image", policy: "replaceable" }];
 
   const issues = validateUiContract(contract);
   assert.ok(issues.some((issue) => issue.message.includes("unknown parentId")));
@@ -308,15 +293,13 @@ test("validateUiContract accepts expressive menu composition contracts", () => {
   screen.pattern = "expressive-menu";
   screen.goal = "expressive-menu";
   screen.sourceOfTruth = "semantic-dom";
-  screen.markers = [
-    { kind: "selected", selector: "[data-selected=\"true\"]", required: true },
-  ];
+  screen.markers = [{ kind: "selected", selector: '[data-selected="true"]', required: true }];
   screen.states = [
-    { id: "selected-menu-item", kind: "selected", selector: "[data-selected=\"true\"]", required: true },
+    { id: "selected-menu-item", kind: "selected", selector: '[data-selected="true"]', required: true },
     { id: "menu-focus", kind: "focus-visible", selector: "button", required: true },
   ];
   screen.requiredStates = [
-    { id: "selected-menu-item", kind: "selected", selector: "[data-selected=\"true\"]", required: true },
+    { id: "selected-menu-item", kind: "selected", selector: '[data-selected="true"]', required: true },
     { id: "menu-hover", kind: "hover", selector: "button", required: true, minChangeRatio: 0.001 },
     { id: "menu-focus", kind: "focus-visible", selector: "button", required: true, minChangeRatio: 0.001 },
   ];
@@ -337,9 +320,7 @@ test("validateUiContract accepts expressive menu composition contracts", () => {
       { id: "slash-panel", kind: "slash-panel", role: "menu" },
       { id: "sticker", kind: "sticker", role: "selected item" },
     ],
-    motion: [
-      { id: "menu-hover", trigger: "hover", effect: "slam", durationMs: 140 },
-    ],
+    motion: [{ id: "menu-hover", trigger: "hover", effect: "slam", durationMs: 140 }],
   };
 
   assert.deepEqual(validateUiContract(contract), []);
@@ -359,7 +340,11 @@ test("validateUiContract requires expressive menu composition and state evidence
     style: "zigzag" as never,
     axes: ["sideways" as never],
     contrast: { mode: "extreme" as never, minRatio: 0, palette: ["red"] },
-    layers: [{ id: "", role: "backdrop" as never }, { id: "dup", role: "content" }, { id: "dup", role: "accent" }],
+    layers: [
+      { id: "", role: "backdrop" as never },
+      { id: "dup", role: "content" },
+      { id: "dup", role: "accent" },
+    ],
     shapes: [{ id: "", kind: "triangle" as never }],
     motion: [{ id: "", trigger: "tap" as never, effect: "wiggle" as never, durationMs: -1 }],
   };

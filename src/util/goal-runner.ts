@@ -1,7 +1,4 @@
-import type {
-  ChangeIntent,
-  PageExpectation,
-} from "@mizchi/vlmkit-core/types.ts";
+import type { ChangeIntent, PageExpectation } from "@mizchi/vlmkit-core/types.ts";
 import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { matchA11yExpectation } from "../vrt/snapshot/expectation.ts";
 import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vlmkit-ai/reasoning.ts";
@@ -47,9 +44,9 @@ export interface StepResult {
 }
 
 export interface GoalScore {
-  stepSuccessRate: number;     // 0-1
+  stepSuccessRate: number; // 0-1
   totalRetries: number;
-  averageStepScore: number;   // 0-100
+  averageStepScore: number; // 0-100
   goalRealized: boolean;
   summary: string;
 }
@@ -70,7 +67,7 @@ export async function runGoal(
   goal: Goal,
   baseline: A11yNode,
   loadSnapshot: (step: GoalStep, retryCount: number) => Promise<A11yNode>,
-  opts: { maxRetries?: number } = {}
+  opts: { maxRetries?: number } = {},
 ): Promise<GoalRunnerState> {
   const maxRetries = opts.maxRetries ?? 3;
   const state: GoalRunnerState = {
@@ -184,11 +181,9 @@ function computeGoalScore(state: GoalRunnerState): GoalScore {
 
   // Per-step score: passed = 100, retried = 60, failed = 0
   const stepScores = state.stepResults.map((r) =>
-    r.passed ? (r.retries === 0 ? 100 : Math.max(40, 100 - r.retries * 20)) : 0
+    r.passed ? (r.retries === 0 ? 100 : Math.max(40, 100 - r.retries * 20)) : 0,
   );
-  const averageStepScore = stepScores.length > 0
-    ? stepScores.reduce((a, b) => a + b, 0) / stepScores.length
-    : 0;
+  const averageStepScore = stepScores.length > 0 ? stepScores.reduce((a, b) => a + b, 0) / stepScores.length : 0;
 
   return {
     stepSuccessRate,
@@ -222,9 +217,19 @@ function quickIntrospect(tree: A11yNode) {
     description: "Page",
     landmarks,
     interactiveElements: interactive,
-    stats: { totalNodes, landmarkCount: landmarks.length, interactiveCount: interactive.length, unlabeledCount: interactive.filter((e) => !e.hasLabel).length, headingLevels: [] as number[] },
+    stats: {
+      totalNodes,
+      landmarkCount: landmarks.length,
+      interactiveCount: interactive.length,
+      unlabeledCount: interactive.filter((e) => !e.hasLabel).length,
+      headingLevels: [] as number[],
+    },
     suggestedInvariants: [
-      ...landmarks.map((l) => ({ description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`, check: "landmark-exists" as const, cost: "low" as const })),
+      ...landmarks.map((l) => ({
+        description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`,
+        check: "landmark-exists" as const,
+        cost: "low" as const,
+      })),
       { description: "All interactive elements have labels", check: "label-present" as const, cost: "low" as const },
     ],
   };

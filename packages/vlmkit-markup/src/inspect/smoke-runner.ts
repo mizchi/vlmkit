@@ -15,8 +15,12 @@ import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { type Page, type Browser } from "playwright";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type {
-  SmokeTestRequest, SmokeTestResponse, SmokeAction, SmokeError,
-  A11ySnapshot, A11yNodeCompact,
+  SmokeTestRequest,
+  SmokeTestResponse,
+  SmokeAction,
+  SmokeError,
+  A11ySnapshot,
+  A11yNodeCompact,
 } from "./smoke-types.ts";
 
 import { getArg, getIntArg, getRawArgs } from "@mizchi/vlmkit-core/cli-args.ts";
@@ -37,7 +41,10 @@ const VIEWPORT = { width: 1280, height: 900 };
 
 function seededRandom(seed: number): () => number {
   let s = seed;
-  return () => { s = (s * 1664525 + 1013904223) & 0x7fffffff; return s / 0x7fffffff; };
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
 }
 
 // ---- A11y tree → action candidates ----
@@ -84,15 +91,27 @@ function parseAriaYaml(yaml: string): any {
 }
 
 const SAMPLE_INPUTS = [
-  "hello", "test@example.com", "12345", "日本語テスト", "",
-  "a".repeat(100), "<script>alert(1)</script>", "   ", "null", "undefined",
+  "hello",
+  "test@example.com",
+  "12345",
+  "日本語テスト",
+  "",
+  "a".repeat(100),
+  "<script>alert(1)</script>",
+  "   ",
+  "null",
+  "undefined",
 ];
 
 async function discoverActions(page: Page): Promise<ActionCandidate[]> {
   const candidates: ActionCandidate[] = [];
 
   // Get a11y snapshot
-  const snapshot = await page.locator(":root").ariaSnapshot().then((yaml: string) => parseAriaYaml(yaml)).catch(() => null);
+  const snapshot = await page
+    .locator(":root")
+    .ariaSnapshot()
+    .then((yaml: string) => parseAriaYaml(yaml))
+    .catch(() => null);
   if (!snapshot) return candidates;
 
   function walk(node: any, path: string) {
@@ -105,19 +124,22 @@ async function discoverActions(page: Page): Promise<ActionCandidate[]> {
       if (role === "link" && name) {
         // We'll check origin at click time via page routing
         candidates.push({
-          role, name,
+          role,
+          name,
           selector: `[role="${role}"]`,
           action,
         });
       } else if (role === "textbox" || role === "searchbox") {
         candidates.push({
-          role, name,
+          role,
+          name,
           selector: name ? `[aria-label="${name}"]` : `${role}`,
           action: "type",
         });
       } else if (name) {
         candidates.push({
-          role, name,
+          role,
+          name,
           selector: `[role="${role}"]`,
           action,
         });
@@ -134,13 +156,25 @@ async function discoverActions(page: Page): Promise<ActionCandidate[]> {
 }
 
 function buildA11ySnapshot(page: Page, step: number): Promise<A11ySnapshot | null> {
-  return page.locator(":root").ariaSnapshot().then((yaml: string) => parseAriaYaml(yaml))
+  return page
+    .locator(":root")
+    .ariaSnapshot()
+    .then((yaml: string) => parseAriaYaml(yaml))
     .then((snap) => {
       if (!snap) return null;
       let interactiveCount = 0;
       let landmarkCount = 0;
       const INTERACTIVE = new Set(Object.keys(ROLE_ACTION_MAP));
-      const LANDMARKS = new Set(["banner", "main", "navigation", "contentinfo", "complementary", "form", "region", "search"]);
+      const LANDMARKS = new Set([
+        "banner",
+        "main",
+        "navigation",
+        "contentinfo",
+        "complementary",
+        "form",
+        "region",
+        "search",
+      ]);
 
       function walk(node: any): A11yNodeCompact {
         if (INTERACTIVE.has(node.role)) interactiveCount++;
@@ -163,10 +197,7 @@ function countA11yNodes(node: A11yNodeCompact | undefined): number {
   return 1 + (node.children ?? []).reduce((sum, child) => sum + countA11yNodes(child), 0);
 }
 
-function collectA11ySnapshotConsistencyIssues(
-  baseline: A11ySnapshot,
-  current: A11ySnapshot,
-): string[] {
+function collectA11ySnapshotConsistencyIssues(baseline: A11ySnapshot, current: A11ySnapshot): string[] {
   const issues: string[] = [];
   const baselineNodeCount = countA11yNodes(baseline.tree);
   const currentNodeCount = countA11yNodes(current.tree);
@@ -175,22 +206,16 @@ function collectA11ySnapshotConsistencyIssues(
     issues.push(`a11y tree became empty after step ${current.step}`);
   }
   if (baseline.interactiveCount > 0 && current.interactiveCount === 0) {
-    issues.push(
-      `interactive targets disappeared after step ${current.step} (${baseline.interactiveCount} -> 0)`,
-    );
+    issues.push(`interactive targets disappeared after step ${current.step} (${baseline.interactiveCount} -> 0)`);
   }
   if (baseline.landmarkCount > 0 && current.landmarkCount === 0) {
-    issues.push(
-      `landmarks disappeared after step ${current.step} (${baseline.landmarkCount} -> 0)`,
-    );
+    issues.push(`landmarks disappeared after step ${current.step} (${baseline.landmarkCount} -> 0)`);
   }
 
   return issues;
 }
 
-export function evaluateA11ySnapshotConsistency(
-  snapshots: readonly A11ySnapshot[],
-): SmokeError[] {
+export function evaluateA11ySnapshotConsistency(snapshots: readonly A11ySnapshot[]): SmokeError[] {
   if (snapshots.length < 2) return [];
   const baseline = snapshots[0];
   if (!baseline) return [];
@@ -208,9 +233,7 @@ export function evaluateA11ySnapshotConsistency(
   return errors;
 }
 
-export function annotateA11ySnapshotConsistency(
-  snapshots: A11ySnapshot[],
-): SmokeError[] {
+export function annotateA11ySnapshotConsistency(snapshots: A11ySnapshot[]): SmokeError[] {
   const errors = evaluateA11ySnapshotConsistency(snapshots);
   for (const error of errors) {
     const snapshot = snapshots.find((item) => item.step === error.step);
@@ -224,9 +247,7 @@ export function annotateA11ySnapshotConsistency(
 
 // ---- Runner ----
 
-export async function runSmokeTest(
-  request: SmokeTestRequest,
-): Promise<SmokeTestResponse> {
+export async function runSmokeTest(request: SmokeTestRequest): Promise<SmokeTestResponse> {
   const rand = seededRandom(request.seed ?? Date.now());
   const maxActions = request.maxActions ?? 30;
   const actions: SmokeAction[] = [];
@@ -271,9 +292,7 @@ export async function runSmokeTest(
 
   // Block external navigation
   if (request.blockExternalNavigation !== false) {
-    const origin = request.target.url
-      ? new URL(request.target.url).origin
-      : "null"; // data URL origin
+    const origin = request.target.url ? new URL(request.target.url).origin : "null"; // data URL origin
 
     await page.route("**/*", (route) => {
       const url = route.request().url();
@@ -283,7 +302,9 @@ export async function runSmokeTest(
           route.abort("blockedbyclient");
           return;
         }
-      } catch { /* allow */ }
+      } catch {
+        /* allow */
+      }
       route.continue();
     });
   }
@@ -323,8 +344,16 @@ export async function runSmokeTest(
     errors.push({ step: 0, type: "crash", message: `Failed to load: ${e}` });
     await browser.close();
     return {
-      status: "crash", actions, errors,
-      meta: { totalActions: 0, totalErrors: errors.length, elapsedMs: Date.now() - startTime, seed: request.seed, mode: request.mode },
+      status: "crash",
+      actions,
+      errors,
+      meta: {
+        totalActions: 0,
+        totalErrors: errors.length,
+        elapsedMs: Date.now() - startTime,
+        seed: request.seed,
+        mode: request.mode,
+      },
     };
   }
 
@@ -370,7 +399,9 @@ ACTION: click ROLE: button NAME: Submit`;
             });
           }
         }
-      } catch { /* fallback to random */ }
+      } catch {
+        /* fallback to random */
+      }
     }
   }
 
@@ -552,12 +583,18 @@ async function main() {
 
   // Print actions
   for (const action of result.actions) {
-    const icon = action.result === "ok" ? `${GREEN}✓${RESET}`
-      : action.result === "navigation" ? `${CYAN}→${RESET}`
-      : action.result === "timeout" ? `${YELLOW}⏱${RESET}`
-      : `${RED}✗${RESET}`;
+    const icon =
+      action.result === "ok"
+        ? `${GREEN}✓${RESET}`
+        : action.result === "navigation"
+          ? `${CYAN}→${RESET}`
+          : action.result === "timeout"
+            ? `${YELLOW}⏱${RESET}`
+            : `${RED}✗${RESET}`;
     const valueStr = action.value ? ` "${action.value}"` : "";
-    console.log(`  ${icon} [${String(action.step + 1).padStart(2)}] ${action.action} ${action.target.role}:${action.target.name}${valueStr} ${DIM}${action.elapsedMs}ms${RESET}`);
+    console.log(
+      `  ${icon} [${String(action.step + 1).padStart(2)}] ${action.action} ${action.target.role}:${action.target.name}${valueStr} ${DIM}${action.elapsedMs}ms${RESET}`,
+    );
   }
 
   // Print errors
@@ -572,7 +609,9 @@ async function main() {
   // Summary
   console.log();
   console.log(`  ${BOLD}Result: ${result.status === "pass" ? GREEN : RED}${result.status.toUpperCase()}${RESET}`);
-  console.log(`  ${DIM}Actions: ${result.meta.totalActions} | Errors: ${result.meta.totalErrors} | Time: ${result.meta.elapsedMs}ms${RESET}`);
+  console.log(
+    `  ${DIM}Actions: ${result.meta.totalActions} | Errors: ${result.meta.totalErrors} | Time: ${result.meta.elapsedMs}ms${RESET}`,
+  );
   if (result.meta.videoPath) {
     console.log(`  ${DIM}Video: ${GREEN}${result.meta.videoPath}${RESET}`);
   }
@@ -583,5 +622,8 @@ async function main() {
 
 // Run CLI only when executed directly
 if (isCliEntry(import.meta.url, "smoke-runner")) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
 }

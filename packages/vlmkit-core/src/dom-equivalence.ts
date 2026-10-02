@@ -24,11 +24,7 @@ export interface DomFingerprint {
 }
 
 export interface DomEquivalenceWarning {
-  code:
-    | "heading-mismatch"
-    | "button-mismatch"
-    | "input-mismatch"
-    | "element-count-mismatch";
+  code: "heading-mismatch" | "button-mismatch" | "input-mismatch" | "element-count-mismatch";
   message: string;
   baseline: string[];
   variant: string[];
@@ -83,10 +79,7 @@ const ELEMENT_COUNT_DRIFT_THRESHOLD = 0.05;
  * Verify structural DOM equivalence between two captured fingerprints.
  *
  */
-export function verifyDomEquivalence(
-  baseline: DomFingerprint,
-  variant: DomFingerprint,
-): DomEquivalenceResult {
+export function verifyDomEquivalence(baseline: DomFingerprint, variant: DomFingerprint): DomEquivalenceResult {
   const warnings: DomEquivalenceWarning[] = [];
 
   const headingDiff = diffSequence(baseline.headingTexts, variant.headingTexts);
@@ -119,13 +112,13 @@ export function verifyDomEquivalence(
     });
   }
 
-  const drift = baseline.elementCount === 0
-    ? 0
-    : Math.abs(baseline.elementCount - variant.elementCount) / baseline.elementCount;
+  const drift =
+    baseline.elementCount === 0 ? 0 : Math.abs(baseline.elementCount - variant.elementCount) / baseline.elementCount;
   if (drift > ELEMENT_COUNT_DRIFT_THRESHOLD) {
     warnings.push({
       code: "element-count-mismatch",
-      message: `total element count differs by ${(drift * 100).toFixed(1)}% ` +
+      message:
+        `total element count differs by ${(drift * 100).toFixed(1)}% ` +
         `(baseline: ${baseline.elementCount}, variant: ${variant.elementCount})`,
       baseline: [String(baseline.elementCount)],
       variant: [String(variant.elementCount)],

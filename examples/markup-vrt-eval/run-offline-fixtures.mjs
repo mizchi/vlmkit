@@ -2,28 +2,30 @@ export function buildOfflineStructuredPlan() {
   return {
     title: "Release Queue VRT Smoke",
     applicationOverview: "Release Queue coordinates service releases, blocked approvals, and release detail review.",
-    scenarios: [{
-      title: "Blocked filter and Invoice Export detail panel",
-      steps: [
-        "Open the Release Queue screen.",
-        "Verify the summary counts and candidate release table are visible.",
-        "Capture the initial VRT screenshot.",
-        "Apply the Blocked filter.",
-        "Open the Invoice Export detail panel.",
-        "Verify the selected service and detail summary.",
-        "Capture the detail-state VRT screenshot.",
-      ],
-      expectedResults: [
-        "The Release Queue heading is visible.",
-        "The blocked count remains 2.",
-        "The Invoice Export row remains visible after the Blocked filter is applied.",
-        "The detail panel shows Invoice Export and the compliance approval summary.",
-      ],
-      vlmkit: {
-        startState: "initial Release Queue view",
-        goalState: "Blocked filter with Invoice Export detail selected",
+    scenarios: [
+      {
+        title: "Blocked filter and Invoice Export detail panel",
+        steps: [
+          "Open the Release Queue screen.",
+          "Verify the summary counts and candidate release table are visible.",
+          "Capture the initial VRT screenshot.",
+          "Apply the Blocked filter.",
+          "Open the Invoice Export detail panel.",
+          "Verify the selected service and detail summary.",
+          "Capture the detail-state VRT screenshot.",
+        ],
+        expectedResults: [
+          "The Release Queue heading is visible.",
+          "The blocked count remains 2.",
+          "The Invoice Export row remains visible after the Blocked filter is applied.",
+          "The detail panel shows Invoice Export and the compliance approval summary.",
+        ],
+        vlmkit: {
+          startState: "initial Release Queue view",
+          goalState: "Blocked filter with Invoice Export detail selected",
+        },
       },
-    }],
+    ],
     generationNotes: [
       "Use gotoApp(page) from the configured helper import.",
       "Use only observed role and test id locators.",
@@ -106,16 +108,24 @@ VRT:
 ## Locator Inventory
 
 Roles:
-${buildOfflineLocatorInventory().roles.map((role) => `- ${role}`).join("\n")}
+${buildOfflineLocatorInventory()
+  .roles.map((role) => `- ${role}`)
+  .join("\n")}
 
 Labels:
-${buildOfflineLocatorInventory().labels.map((label) => `- ${label}`).join("\n")}
+${buildOfflineLocatorInventory()
+  .labels.map((label) => `- ${label}`)
+  .join("\n")}
 
 Test ids:
-${buildOfflineLocatorInventory().testIds.map((testId) => `- ${testId}`).join("\n")}
+${buildOfflineLocatorInventory()
+  .testIds.map((testId) => `- ${testId}`)
+  .join("\n")}
 
 Texts:
-${buildOfflineLocatorInventory().texts.map((text) => `- ${text}`).join("\n")}
+${buildOfflineLocatorInventory()
+  .texts.map((text) => `- ${text}`)
+  .join("\n")}
 `;
 }
 

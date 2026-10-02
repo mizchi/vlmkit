@@ -15,7 +15,13 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
-import { listModels, resolveModel, createVlmClient, type VlmModel, type VlmResponse } from "@mizchi/vlmkit-ai/vlm-client.ts";
+import {
+  listModels,
+  resolveModel,
+  createVlmClient,
+  type VlmModel,
+  type VlmResponse,
+} from "@mizchi/vlmkit-ai/vlm-client.ts";
 import { analyzeWithZoom } from "@mizchi/vlmkit-ai/zoom.ts";
 import { getArg, getFloatArg, getIntArg, hasFlag, getPositionalArgs } from "@mizchi/vlmkit-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -42,9 +48,13 @@ async function runList() {
   const models = await listModels({ maxCost, limit, includeGemini: true });
 
   console.log();
-  console.log(`${BOLD}${CYAN}Vision-capable models${RESET}  ${DIM}(${models.length} shown, OpenRouter + Gemini + Claude direct)${RESET}`);
+  console.log(
+    `${BOLD}${CYAN}Vision-capable models${RESET}  ${DIM}(${models.length} shown, OpenRouter + Gemini + Claude direct)${RESET}`,
+  );
   console.log();
-  console.log(`  ${"#".padStart(3)} ${"Model ID".padEnd(52)} ${"Prompt/1K".padStart(12)} ${"Compl/1K".padStart(12)} ${"Context".padStart(9)}`);
+  console.log(
+    `  ${"#".padStart(3)} ${"Model ID".padEnd(52)} ${"Prompt/1K".padStart(12)} ${"Compl/1K".padStart(12)} ${"Context".padStart(9)}`,
+  );
   console.log(`  ${"─".repeat(3)} ${"─".repeat(52)} ${"─".repeat(12)} ${"─".repeat(12)} ${"─".repeat(9)}`);
 
   for (let i = 0; i < models.length; i++) {
@@ -52,7 +62,9 @@ async function runList() {
     const p = formatCost(m.promptCostPer1k);
     const c = formatCost(m.completionCostPer1k);
     const color = m.promptCostPer1k === 0 ? GREEN : m.promptCostPer1k < 1e-6 ? YELLOW : DIM;
-    console.log(`  ${String(i).padStart(3)} ${color}${m.id.padEnd(52)}${RESET} ${p.padStart(12)} ${c.padStart(12)} ${String(m.contextLength).padStart(9)}`);
+    console.log(
+      `  ${String(i).padStart(3)} ${color}${m.id.padEnd(52)}${RESET} ${p.padStart(12)} ${c.padStart(12)} ${String(m.contextLength).padStart(9)}`,
+    );
   }
 
   console.log();
@@ -67,8 +79,15 @@ async function runBench(modelIds: string[]) {
   // Per-model key checks happen via createVlmClient({ throwIfMissing: false })
   // below — that lets a `claude:` / `gemini:` only run work without
   // OPENROUTER_API_KEY (and vice-versa).
-  if (!process.env.OPENROUTER_API_KEY && !process.env.GEMINI_API_KEY && !process.env.GOOGLE_AI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    console.log(`\n  ${YELLOW}No provider API key set (OPENROUTER_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY).${RESET}\n`);
+  if (
+    !process.env.OPENROUTER_API_KEY &&
+    !process.env.GEMINI_API_KEY &&
+    !process.env.GOOGLE_AI_API_KEY &&
+    !process.env.ANTHROPIC_API_KEY
+  ) {
+    console.log(
+      `\n  ${YELLOW}No provider API key set (OPENROUTER_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY).${RESET}\n`,
+    );
     process.exit(1);
   }
 
@@ -104,21 +123,32 @@ async function runBench(modelIds: string[]) {
     // Chromium behind for the rest of the bench run, which then sat next to every
     // model measurement it was supposed to be timing.
     await withBrowser(async (browser) => {
-    const before = await browser.newPage({ viewport: { width: 800, height: 600 } });
-    await before.setContent('<html><body style="font-family:sans-serif;padding:24px;background:#fff"><h1 style="color:#333">Dashboard</h1><p style="color:#666;margin:8px 0">Welcome back, Alice.</p><div style="display:flex;gap:16px;margin-top:16px"><div style="padding:16px;background:#f0f0f0;border-radius:8px;flex:1;border:1px solid #ddd"><strong>Users</strong><br>12,345</div><div style="padding:16px;background:#f0f0f0;border-radius:8px;flex:1;border:1px solid #ddd"><strong>Revenue</strong><br>$48,290</div></div><table style="width:100%;margin-top:24px;border-collapse:collapse"><tr style="background:#f9f9f9"><th style="text-align:left;padding:8px;border-bottom:1px solid #eee">Name</th><th style="text-align:left;padding:8px;border-bottom:1px solid #eee">Status</th></tr><tr><td style="padding:8px;border-bottom:1px solid #eee">Alice</td><td style="padding:8px;border-bottom:1px solid #eee"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:12px">Active</span></td></tr><tr><td style="padding:8px">Bob</td><td style="padding:8px"><span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:12px;font-size:12px">Pending</span></td></tr></table></body></html>');
-    await before.screenshot({ path: basePath });
-    await before.close();
+      const before = await browser.newPage({ viewport: { width: 800, height: 600 } });
+      await before.setContent(
+        '<html><body style="font-family:sans-serif;padding:24px;background:#fff"><h1 style="color:#333">Dashboard</h1><p style="color:#666;margin:8px 0">Welcome back, Alice.</p><div style="display:flex;gap:16px;margin-top:16px"><div style="padding:16px;background:#f0f0f0;border-radius:8px;flex:1;border:1px solid #ddd"><strong>Users</strong><br>12,345</div><div style="padding:16px;background:#f0f0f0;border-radius:8px;flex:1;border:1px solid #ddd"><strong>Revenue</strong><br>$48,290</div></div><table style="width:100%;margin-top:24px;border-collapse:collapse"><tr style="background:#f9f9f9"><th style="text-align:left;padding:8px;border-bottom:1px solid #eee">Name</th><th style="text-align:left;padding:8px;border-bottom:1px solid #eee">Status</th></tr><tr><td style="padding:8px;border-bottom:1px solid #eee">Alice</td><td style="padding:8px;border-bottom:1px solid #eee"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:12px">Active</span></td></tr><tr><td style="padding:8px">Bob</td><td style="padding:8px"><span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:12px;font-size:12px">Pending</span></td></tr></table></body></html>',
+      );
+      await before.screenshot({ path: basePath });
+      await before.close();
 
-    const after = await browser.newPage({ viewport: { width: 800, height: 600 } });
-    await after.setContent('<html><body style="font-family:sans-serif;padding:24px;background:#fff"><h1 style="color:#111;font-size:28px">Dashboard</h1><p style="color:#888;margin:12px 0">Welcome back, Alice.</p><div style="display:flex;gap:8px;margin-top:24px"><div style="padding:12px;background:#eff6ff;border-radius:12px;flex:1;border:1px solid #bfdbfe"><strong>Users</strong><br>12,345</div><div style="padding:12px;background:#fef2f2;border-radius:12px;flex:1;border:1px solid #fecaca"><strong>Revenue</strong><br>$48,290</div></div><table style="width:100%;margin-top:24px;border-collapse:collapse"><tr style="background:#f1f5f9"><th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;font-size:13px;text-transform:uppercase;color:#64748b">Name</th><th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;font-size:13px;text-transform:uppercase;color:#64748b">Status</th></tr><tr><td style="padding:10px;border-bottom:1px solid #f1f5f9">Alice</td><td style="padding:10px;border-bottom:1px solid #f1f5f9"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:12px">Active</span></td></tr><tr><td style="padding:10px">Bob</td><td style="padding:10px"><span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:12px;font-size:12px">Pending</span></td></tr></table></body></html>');
-    await after.screenshot({ path: curPath });
-    await after.close();
+      const after = await browser.newPage({ viewport: { width: 800, height: 600 } });
+      await after.setContent(
+        '<html><body style="font-family:sans-serif;padding:24px;background:#fff"><h1 style="color:#111;font-size:28px">Dashboard</h1><p style="color:#888;margin:12px 0">Welcome back, Alice.</p><div style="display:flex;gap:8px;margin-top:24px"><div style="padding:12px;background:#eff6ff;border-radius:12px;flex:1;border:1px solid #bfdbfe"><strong>Users</strong><br>12,345</div><div style="padding:12px;background:#fef2f2;border-radius:12px;flex:1;border:1px solid #fecaca"><strong>Revenue</strong><br>$48,290</div></div><table style="width:100%;margin-top:24px;border-collapse:collapse"><tr style="background:#f1f5f9"><th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;font-size:13px;text-transform:uppercase;color:#64748b">Name</th><th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;font-size:13px;text-transform:uppercase;color:#64748b">Status</th></tr><tr><td style="padding:10px;border-bottom:1px solid #f1f5f9">Alice</td><td style="padding:10px;border-bottom:1px solid #f1f5f9"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:12px">Active</span></td></tr><tr><td style="padding:10px">Bob</td><td style="padding:10px"><span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:12px;font-size:12px">Pending</span></td></tr></table></body></html>',
+      );
+      await after.screenshot({ path: curPath });
+      await after.close();
     });
 
-    const diff = await compareScreenshots({
-      testId: "vlm-test", testTitle: "vlm-test", projectName: "vlm",
-      screenshotPath: curPath, baselinePath: basePath, status: "changed",
-    }, { outputDir: TMP });
+    const diff = await compareScreenshots(
+      {
+        testId: "vlm-test",
+        testTitle: "vlm-test",
+        projectName: "vlm",
+        screenshotPath: curPath,
+        baselinePath: basePath,
+        status: "changed",
+      },
+      { outputDir: TMP },
+    );
 
     imageBase64 = diff?.heatmapPath
       ? (await readFile(diff.heatmapPath)).toString("base64")
@@ -146,12 +176,17 @@ Be specific. One change per line. Format: "- [element] property: old → new (se
   for (const model of models) {
     process.stdout.write(`  ${model.id.padEnd(50)} `);
     const client = await createVlmClient(model, { throwIfMissing: false });
-    if (!client) { console.log(`${RED}no key${RESET}`); continue; }
+    if (!client) {
+      console.log(`${RED}no key${RESET}`);
+      continue;
+    }
 
     try {
       const resp = await client.analyzeImage(imageBase64, prompt, { maxTokens: 512 });
       const costStr = resp.costUsd === 0 ? `${GREEN}FREE${RESET}` : `$${resp.costUsd.toFixed(6)}`;
-      console.log(`${GREEN}${String(resp.latencyMs).padStart(5)}ms${RESET} ${costStr.padStart(16)} ${DIM}${resp.totalTokens}tok ${resp.content.length}ch${RESET}`);
+      console.log(
+        `${GREEN}${String(resp.latencyMs).padStart(5)}ms${RESET} ${costStr.padStart(16)} ${DIM}${resp.totalTokens}tok ${resp.content.length}ch${RESET}`,
+      );
       results.push({ model: model.id, response: resp });
       await writeFile(join(TMP, `${model.id.replace(/\//g, "_")}.txt`), resp.content);
     } catch (e: any) {
@@ -169,7 +204,9 @@ Be specific. One change per line. Format: "- [element] property: old → new (se
           maxZooms: getIntArg("max-zooms", 6, { min: 0 }),
         });
         const costStr = resp.costUsd === 0 ? `${GREEN}FREE${RESET}` : `$${resp.costUsd.toFixed(6)}`;
-        console.log(`${GREEN}${String(resp.latencyMs).padStart(5)}ms${RESET} ${costStr.padStart(16)} ${DIM}${resp.totalTokens}tok ${resp.zoom.zooms.length} zoom(s) (${resp.zoom.protocol})${RESET}`);
+        console.log(
+          `${GREEN}${String(resp.latencyMs).padStart(5)}ms${RESET} ${costStr.padStart(16)} ${DIM}${resp.totalTokens}tok ${resp.zoom.zooms.length} zoom(s) (${resp.zoom.protocol})${RESET}`,
+        );
         results.push({ model: label, response: resp });
         await writeFile(join(TMP, `${model.id.replace(/\//g, "_")}.zoom.txt`), resp.content);
       } catch (e: any) {
@@ -184,7 +221,9 @@ Be specific. One change per line. Format: "- [element] property: old → new (se
   console.log();
   for (const r of results) {
     if (!r.response) continue;
-    console.log(`${BOLD}── ${r.model} ──${RESET} ${DIM}(${r.response.latencyMs}ms, $${r.response.costUsd.toFixed(6)})${RESET}`);
+    console.log(
+      `${BOLD}── ${r.model} ──${RESET} ${DIM}(${r.response.latencyMs}ms, $${r.response.costUsd.toFixed(6)})${RESET}`,
+    );
     // Truncate long responses
     const lines = r.response.content.split("\n").slice(0, 15);
     for (const line of lines) {
@@ -230,10 +269,19 @@ function generateMarkdownReport(data: { date: string; image: string; results: an
   lines.push(`| Model | Latency | Cost | Tokens | Response | Quality |`);
   lines.push(`|-------|---------|------|--------|----------|---------|`);
 
-  const successful = data.results.filter((r: any) => r.latencyMs > 0).sort((a: any, b: any) => a.latencyMs - b.latencyMs);
+  const successful = data.results
+    .filter((r: any) => r.latencyMs > 0)
+    .sort((a: any, b: any) => a.latencyMs - b.latencyMs);
   for (const r of successful) {
     const cost = r.costUsd === 0 ? "FREE" : `$${r.costUsd.toFixed(6)}`;
-    const quality = r.responseLength > 500 ? "⭐ detailed" : r.responseLength > 200 ? "○ adequate" : r.responseLength > 50 ? "△ brief" : "✗ minimal";
+    const quality =
+      r.responseLength > 500
+        ? "⭐ detailed"
+        : r.responseLength > 200
+          ? "○ adequate"
+          : r.responseLength > 50
+            ? "△ brief"
+            : "✗ minimal";
     lines.push(`| ${r.model} | ${r.latencyMs}ms | ${cost} | ${r.tokens} | ${r.responseLength}ch | ${quality} |`);
   }
 
@@ -297,5 +345,8 @@ ${BOLD}Environment:${RESET}
 // test — or any tool reaching for a helper here — triggers a full run, which is
 // why this file had 0% coverage.
 if (isCliEntry(import.meta.url)) {
-  runVlmBench().catch((e) => { console.error(e); process.exitCode = 1; });
+  runVlmBench().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  });
 }

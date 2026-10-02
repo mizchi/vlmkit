@@ -100,7 +100,7 @@ export interface VlmReasoningResult {
 // ---- Reasoning Pipeline API ----
 
 export interface ReasoningPipelineRequest {
-  /** heatmap PNG (base64) */  heatmapBase64?: string;
+  /** heatmap PNG (base64) */ heatmapBase64?: string;
   /** baseline screenshot (base64) */
   baselineBase64?: string;
   /** current screenshot (base64) */

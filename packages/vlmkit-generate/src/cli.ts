@@ -3,7 +3,13 @@ import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { generatePlaywrightTestWithRetry } from "./generate.ts";
-import { buildPlaywrightRuntimeGate, GeneratedTestGateError, GeneratedTestWriteError, type GateCommand, writeGeneratedTestFile } from "./write.ts";
+import {
+  buildPlaywrightRuntimeGate,
+  GeneratedTestGateError,
+  GeneratedTestWriteError,
+  type GateCommand,
+  writeGeneratedTestFile,
+} from "./write.ts";
 import type { GenerateDeps, GenerateInput, GeneratorModelOptions, LocatorInventory } from "./types.ts";
 
 export interface GenerateCliArgs {
@@ -93,7 +99,8 @@ export function parseGenerateCliArgs(argv: string[]): GenerateCliArgs {
 
   if (!args.plan) throw new Error(`--plan is required\n\n${GENERATE_USAGE}`);
   if (!args.out) throw new Error(`--out is required\n\n${GENERATE_USAGE}`);
-  if (args.runtimeGate) args.gateCommands!.push(buildPlaywrightRuntimeGate(args.playwrightConfig, args.runtimeGateRuns));
+  if (args.runtimeGate)
+    args.gateCommands!.push(buildPlaywrightRuntimeGate(args.playwrightConfig, args.runtimeGateRuns));
   return args as GenerateCliArgs;
 }
 
@@ -112,11 +119,16 @@ export async function runGenerateCli(argv: string[], deps?: Partial<GenerateDeps
   }
 
   const input = await buildGenerateInput(args);
-  const result = await generatePlaywrightTestWithRetry(input, {
-    provider: args.provider,
-    model: args.model,
-    maxTokens: args.maxTokens,
-  }, deps, { maxAttempts: args.maxAttempts });
+  const result = await generatePlaywrightTestWithRetry(
+    input,
+    {
+      provider: args.provider,
+      model: args.model,
+      maxTokens: args.maxTokens,
+    },
+    deps,
+    { maxAttempts: args.maxAttempts },
+  );
 
   if (result.diagnostics.length) {
     console.error(`Invalid generated test after ${result.attempts} attempt(s):`);
@@ -155,7 +167,9 @@ async function buildGenerateInput(args: GenerateCliArgs): Promise<GenerateInput>
     helperImportPath: args.helperImportPath,
     seedTestPath: args.seedTestPath,
     requireScreenshots: args.requireScreenshots,
-    locatorInventory: args.locatorInventory ? parseLocatorInventory(await readFile(args.locatorInventory, "utf8")) : undefined,
+    locatorInventory: args.locatorInventory
+      ? parseLocatorInventory(await readFile(args.locatorInventory, "utf8"))
+      : undefined,
   };
 }
 
@@ -195,12 +209,14 @@ Options:
   --gate-command <cmd>      Repeatable post-write gate; use {testFile} placeholder`;
 
 if (isDirectRun()) {
-  runGenerateCli(process.argv.slice(2)).then((code) => {
-    process.exitCode = code;
-  }).catch((error) => {
-    console.error(error instanceof Error ? error.stack : error);
-    process.exitCode = 1;
-  });
+  runGenerateCli(process.argv.slice(2))
+    .then((code) => {
+      process.exitCode = code;
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.stack : error);
+      process.exitCode = 1;
+    });
 }
 
 /**

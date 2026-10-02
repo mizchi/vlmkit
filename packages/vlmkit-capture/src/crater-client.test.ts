@@ -3,11 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  CraterClient,
-  DEFAULT_BIDI_URL,
-  resolveCraterBidiUrl,
-} from "./crater-client.ts";
+import { CraterClient, DEFAULT_BIDI_URL, resolveCraterBidiUrl } from "./crater-client.ts";
 
 describe("resolveCraterBidiUrl", () => {
   it("prefers explicit environment URLs", () => {
@@ -29,14 +25,8 @@ describe("resolveCraterBidiUrl", () => {
     const dir = await mkdtemp(join(tmpdir(), "crater-bidi-url-"));
     try {
       await writeFile(join(dir, ".bidi-ws-url"), "ws://127.0.0.1:9222/session/from-file\n");
-      assert.equal(
-        resolveCraterBidiUrl({ craterRoot: dir, env: {} }),
-        "ws://127.0.0.1:9222/session/from-file",
-      );
-      assert.equal(
-        resolveCraterBidiUrl({ env: { VLMKIT_CRATER_ROOT: dir } }),
-        "ws://127.0.0.1:9222/session/from-file",
-      );
+      assert.equal(resolveCraterBidiUrl({ craterRoot: dir, env: {} }), "ws://127.0.0.1:9222/session/from-file");
+      assert.equal(resolveCraterBidiUrl({ env: { VLMKIT_CRATER_ROOT: dir } }), "ws://127.0.0.1:9222/session/from-file");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -53,9 +43,11 @@ describe("CraterClient.captureComputedStyles", () => {
     const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
 
     (client as unknown as { contextId: string }).contextId = "session-1";
-    (client as unknown as {
-      sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
-    }).sendBidi = async (method, params) => {
+    (
+      client as unknown as {
+        sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).sendBidi = async (method, params) => {
       calls.push({ method, params });
       return {
         id: 1,
@@ -104,9 +96,10 @@ describe("CraterClient.captureComputedStyles", () => {
   it("drops crater snapshots when every property is empty", async () => {
     const client = new CraterClient("ws://unused");
 
-    (client as unknown as { evaluate: () => Promise<unknown> }).evaluate = async () => JSON.stringify({
-      ".card": { color: "", display: "" },
-    });
+    (client as unknown as { evaluate: () => Promise<unknown> }).evaluate = async () =>
+      JSON.stringify({
+        ".card": { color: "", display: "" },
+      });
 
     const snapshot = await client.captureComputedStyles(["color", "display"]);
 
@@ -120,9 +113,11 @@ describe("CraterClient.getComputedStylesWithState", () => {
     const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
 
     (client as unknown as { contextId: string }).contextId = "session-1";
-    (client as unknown as {
-      sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
-    }).sendBidi = async (method, params) => {
+    (
+      client as unknown as {
+        sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).sendBidi = async (method, params) => {
       calls.push({ method, params });
       return {
         id: 1,
@@ -162,9 +157,11 @@ describe("CraterClient.batchRender", () => {
     const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
 
     (client as unknown as { contextId: string }).contextId = "session-1";
-    (client as unknown as {
-      sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
-    }).sendBidi = async (method, params) => {
+    (
+      client as unknown as {
+        sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).sendBidi = async (method, params) => {
       calls.push({ method, params });
       return {
         id: 1,
@@ -183,10 +180,12 @@ describe("CraterClient.batchRender", () => {
     const result = await client.batchRender(
       "<!doctype html><style>.card{padding:16px}</style><div class='card'>A</div>",
       { width: 1280, height: 900 },
-      [{
-        id: "remove-card-padding",
-        mutations: [{ selector: ".card", property: "padding", action: "remove" }],
-      }],
+      [
+        {
+          id: "remove-card-padding",
+          mutations: [{ selector: ".card", property: "padding", action: "remove" }],
+        },
+      ],
     );
 
     assert.equal(result.results[0]?.paintTree?.w, 1280);
@@ -197,10 +196,12 @@ describe("CraterClient.batchRender", () => {
           context: "session-1",
           baseHtml: "<!doctype html><style>.card{padding:16px}</style><div class='card'>A</div>",
           viewport: { width: 1280, height: 900 },
-          variants: [{
-            id: "remove-card-padding",
-            mutations: [{ selector: ".card", property: "padding", action: "remove" }],
-          }],
+          variants: [
+            {
+              id: "remove-card-padding",
+              mutations: [{ selector: ".card", property: "padding", action: "remove" }],
+            },
+          ],
         },
       },
     ]);

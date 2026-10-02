@@ -38,5 +38,7 @@ export interface GenerateResult {
 
 export interface GenerateDeps {
   /** Only `content` is required — cost/provider/model metadata is best-effort (fakes and some providers omit it). */
-  complete: (prompt: string) => Promise<Pick<LLMResponse, "content"> & Partial<Pick<LLMResponse, "costUsd" | "provider" | "model">>>;
+  complete: (
+    prompt: string,
+  ) => Promise<Pick<LLMResponse, "content"> & Partial<Pick<LLMResponse, "costUsd" | "provider" | "model">>>;
 }

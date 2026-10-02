@@ -1,10 +1,7 @@
 import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import type { PaintNode } from "@mizchi/vlmkit-capture/crater-client.ts";
-import {
-  captureMigrationPaintTreeDiff,
-  summarizeMigrationPaintTreeChanges,
-} from "./migration-paint-tree.ts";
+import { captureMigrationPaintTreeDiff, summarizeMigrationPaintTreeChanges } from "./migration-paint-tree.ts";
 
 describe("captureMigrationPaintTreeDiff", () => {
   it("captures baseline/current paint trees and diffs them at a viewport", async () => {
@@ -51,7 +48,13 @@ describe("summarizeMigrationPaintTreeChanges", () => {
   it("aggregates change counts by paint tree change type", () => {
     const summary = summarizeMigrationPaintTreeChanges([
       { path: "root > div[0]", type: "geometry", property: "bounds", before: "0,0 10x10", after: "0,4 10x10" },
-      { path: "root > div[1]", type: "paint", property: "background", before: "[255,255,255,255]", after: "[0,0,0,255]" },
+      {
+        path: "root > div[1]",
+        type: "paint",
+        property: "background",
+        before: "[255,255,255,255]",
+        after: "[0,0,0,255]",
+      },
       { path: "root > div[2]", type: "paint", property: "color", before: "[0,0,0,255]", after: "[255,255,255,255]" },
       { path: "root > div[3]", type: "text", before: "A", after: "B" },
     ]);

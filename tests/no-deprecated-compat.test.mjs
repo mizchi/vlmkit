@@ -8,7 +8,9 @@ const ROOT = resolve(import.meta.dirname, "..");
 const sourceFiles = execFileSync("git", ["ls-files", "src/**/*.ts", "packages/*/src/**/*.ts"], {
   cwd: ROOT,
   encoding: "utf8",
-}).split("\n").filter(Boolean);
+})
+  .split("\n")
+  .filter(Boolean);
 
 test("runtime source contains no deprecated compatibility API", () => {
   const forbidden = [

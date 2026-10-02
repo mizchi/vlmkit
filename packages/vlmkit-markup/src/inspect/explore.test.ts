@@ -24,19 +24,24 @@ const dir = mkdtempSync(join(tmpdir(), "vlmkit-explore-"));
 
 function page(name: string, body: string): string {
   const file = join(dir, `${name}.html`);
-  writeFileSync(file, `<!doctype html><meta charset="utf-8"><title>${name}</title>
+  writeFileSync(
+    file,
+    `<!doctype html><meta charset="utf-8"><title>${name}</title>
 <style>
   body { margin: 0; font: 16px sans-serif; background: #fff; color: #111; }
   .panel { display: none; height: 200px; background: #2d6cdf; color: #fff; padding: 20px; }
   .panel.open { display: block; }
   button { font: inherit; padding: 8px 16px; margin: 12px; }
   .plain { display: inline-block; padding: 8px 16px; margin: 12px; }
-</style>${body}`);
+</style>${body}`,
+  );
   return file;
 }
 
 /** Both declaration mechanisms, and three outcomes across them. */
-const declared = page("declared", `
+const declared = page(
+  "declared",
+  `
 <body>
   <button data-vrt-action="open-panel" id="trigger">Open</button>
   <span class="plain" data-vrt-action="do-nothing">Inert</span>
@@ -52,7 +57,8 @@ const declared = page("declared", `
       { name: "js-throws", run: () => { throw new Error("deliberate"); } },
     ];
   </script>
-</body>`);
+</body>`,
+);
 
 /** Declares nothing — the "page has not opted in" path. */
 const bare = page("bare", `<body><button>Not declared</button><p>Nothing to explore.</p></body>`);
@@ -73,10 +79,14 @@ const plain = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, "");
 describe("runExplore", () => {
   it("discovers actions from both mechanisms, without double-counting", async () => {
     const report = await runExplore({ source: declared, outputDir: join(dir, "out-discover") });
-    assert.deepEqual(
-      report.actions.map((a) => a.name).sort(),
-      ["do-nothing", "inert-button", "js-offscreen", "js-paint", "js-throws", "open-panel"],
-    );
+    assert.deepEqual(report.actions.map((a) => a.name).sort(), [
+      "do-nothing",
+      "inert-button",
+      "js-offscreen",
+      "js-paint",
+      "js-throws",
+      "open-panel",
+    ]);
     // `window.__vrtActions` is read first and wins on a name collision, so origin
     // is not cosmetic — it says which declaration the runner actually invoked.
     const origins = new Map(report.actions.map((a) => [a.name, a.origin]));
@@ -140,7 +150,11 @@ describe("runExplore", () => {
     // region, the panel. A second region over the trigger button would be the
     // pointer leaving, not the handler.
     const painted = byName(report, "open-panel");
-    assert.equal(painted.heatmapRegions.length, 1, `expected only the panel, got ${JSON.stringify(painted.heatmapRegions.map((r) => [r.left, r.top, r.width, r.height]))}`);
+    assert.equal(
+      painted.heatmapRegions.length,
+      1,
+      `expected only the panel, got ${JSON.stringify(painted.heatmapRegions.map((r) => [r.left, r.top, r.width, r.height]))}`,
+    );
     assert.ok(painted.heatmapRegions[0]!.top >= 50, "the panel sits below the controls");
 
     // A focus ring is deliberately NOT suppressed — it is a real consequence of the
@@ -216,7 +230,10 @@ describe("runExplore", () => {
     // js-throws and after do-nothing in declaration order, so if state leaked, the
     // actions following it would show a body-sized delta.
     const painted = byName(report, "js-paint");
-    assert.ok(painted.diffRatio > 0.5, `a full-page background change should be most of the page, got ${painted.diffRatio}`);
+    assert.ok(
+      painted.diffRatio > 0.5,
+      `a full-page background change should be most of the page, got ${painted.diffRatio}`,
+    );
     assert.equal(byName(report, "js-offscreen").diffRatio, 0, "a leaked black body would show here");
   });
 

@@ -10,12 +10,7 @@ import { resolve } from "node:path";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
-import {
-  CraterClient,
-  DEFAULT_BIDI_URL,
-  isCraterAvailable,
-  resolveCraterBidiUrl,
-} from "./crater-client.ts";
+import { CraterClient, DEFAULT_BIDI_URL, isCraterAvailable, resolveCraterBidiUrl } from "./crater-client.ts";
 
 export interface CraterSmokeClient {
   connect(): Promise<void>;
@@ -36,11 +31,18 @@ export interface CraterSmokeClient {
     selector: string,
     forcedStates: string[],
     properties: string[],
-  ): Promise<{ normal: Record<string, string>; forced: Record<string, string>; diff: Array<{ property: string; normal: string; forced: string }> }>;
+  ): Promise<{
+    normal: Record<string, string>;
+    forced: Record<string, string>;
+    diff: Array<{ property: string; normal: string; forced: string }>;
+  }>;
   batchRender?(
     baseHtml: string,
     viewport: { width: number; height: number },
-    variants: Array<{ id: string; mutations: Array<{ selector: string; property: string; action?: "remove" | { override: string } }> }>,
+    variants: Array<{
+      id: string;
+      mutations: Array<{ selector: string; property: string; action?: "remove" | { override: string } }>;
+    }>,
   ): Promise<{ results: Array<{ id: string; paintTree?: unknown }> }>;
 }
 
@@ -96,12 +98,7 @@ function now(): number {
   return Date.now();
 }
 
-function makeCheck(
-  name: string,
-  status: CraterSmokeStatus,
-  start: number,
-  message: string,
-): CraterSmokeCheck {
+function makeCheck(name: string, status: CraterSmokeStatus, start: number, message: string): CraterSmokeCheck {
   return { name, status, elapsedMs: now() - start, message };
 }
 
@@ -117,21 +114,16 @@ function assertPaintTree(tree: unknown): void {
   }
 }
 
-export async function runCraterBidiSmoke(
-  options: CraterSmokeOptions = {},
-): Promise<CraterSmokeReport> {
+export async function runCraterBidiSmoke(options: CraterSmokeOptions = {}): Promise<CraterSmokeReport> {
   const url = options.url ?? DEFAULT_BIDI_URL;
   const requireAvailable = options.requireAvailable ?? false;
   const start = now();
   const checks: CraterSmokeCheck[] = [];
   const available = await (options.isAvailable ?? isCraterAvailable)(url);
   if (!available) {
-    checks.push(makeCheck(
-      "availability",
-      requireAvailable ? "fail" : "skip",
-      start,
-      `Crater BiDi is not available at ${url}`,
-    ));
+    checks.push(
+      makeCheck("availability", requireAvailable ? "fail" : "skip", start, `Crater BiDi is not available at ${url}`),
+    );
     return { status: reportStatus(checks), url, checks, elapsedMs: now() - start };
   }
 
@@ -157,97 +149,113 @@ export async function runCraterBidiSmoke(
     if (!connected) return { status: "fail", url, checks, elapsedMs: now() - start };
 
     const viewport = options.viewport ?? { width: 800, height: 480 };
-    if (!await runCheck("load", async () => {
-      await client.setViewport(viewport.width, viewport.height);
-      await client.setContent(options.html ?? DEFAULT_HTML);
-      return `loaded ${viewport.width}x${viewport.height}`;
-    })) {
+    if (
+      !(await runCheck("load", async () => {
+        await client.setViewport(viewport.width, viewport.height);
+        await client.setContent(options.html ?? DEFAULT_HTML);
+        return `loaded ${viewport.width}x${viewport.height}`;
+      }))
+    ) {
       return { status: "fail", url, checks, elapsedMs: now() - start };
     }
 
-    if (!await runCheck("capture-png", async () => {
-      const result = await client.capturePng();
-      if (result.width <= 0 || result.height <= 0 || result.png.length === 0) {
-        throw new Error("PNG capture returned empty data");
-      }
-      return `captured ${result.width}x${result.height}, ${result.png.length} bytes`;
-    })) {
+    if (
+      !(await runCheck("capture-png", async () => {
+        const result = await client.capturePng();
+        if (result.width <= 0 || result.height <= 0 || result.png.length === 0) {
+          throw new Error("PNG capture returned empty data");
+        }
+        return `captured ${result.width}x${result.height}, ${result.png.length} bytes`;
+      }))
+    ) {
       return { status: "fail", url, checks, elapsedMs: now() - start };
     }
 
-    if (!await runCheck("paint-tree", async () => {
-      assertPaintTree(await client.capturePaintTree());
-      return "paint tree captured";
-    })) {
+    if (
+      !(await runCheck("paint-tree", async () => {
+        assertPaintTree(await client.capturePaintTree());
+        return "paint tree captured";
+      }))
+    ) {
       return { status: "fail", url, checks, elapsedMs: now() - start };
     }
 
     if (client.captureComputedStyles) {
-      if (!await runCheck("computed-styles", async () => {
-        const styles = await client.captureComputedStyles!(["display", "color", "background-color"]);
-        return `computed styles captured (${styles.size} selector(s))`;
-      })) {
+      if (
+        !(await runCheck("computed-styles", async () => {
+          const styles = await client.captureComputedStyles!(["display", "color", "background-color"]);
+          return `computed styles captured (${styles.size} selector(s))`;
+        }))
+      ) {
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
 
     if (client.getResponsiveBreakpoints) {
-      if (!await runCheck("responsive-breakpoints", async () => {
-        const result = await client.getResponsiveBreakpoints!({
-          mode: "live-inline",
-          axis: "width",
-          includeDiagnostics: true,
-        });
-        return `breakpoint API returned ${result.breakpoints.length} breakpoint(s)`;
-      })) {
+      if (
+        !(await runCheck("responsive-breakpoints", async () => {
+          const result = await client.getResponsiveBreakpoints!({
+            mode: "live-inline",
+            axis: "width",
+            includeDiagnostics: true,
+          });
+          return `breakpoint API returned ${result.breakpoints.length} breakpoint(s)`;
+        }))
+      ) {
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
 
     if (client.getRequiredTestViewports) {
-      if (!await runCheck("required-test-viewports", async () => {
-        const result = await client.getRequiredTestViewports!();
-        return `viewport intelligence returned ${result.viewports.length} viewport(s)`;
-      })) {
+      if (
+        !(await runCheck("required-test-viewports", async () => {
+          const result = await client.getRequiredTestViewports!();
+          return `viewport intelligence returned ${result.viewports.length} viewport(s)`;
+        }))
+      ) {
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
 
     if (client.getCssRuleViewportMap) {
-      if (!await runCheck("css-rule-viewport-map", async () => {
-        const result = await client.getCssRuleViewportMap!();
-        return `rule/viewport map returned ${result.rules.length} rule(s)`;
-      })) {
+      if (
+        !(await runCheck("css-rule-viewport-map", async () => {
+          const result = await client.getCssRuleViewportMap!();
+          return `rule/viewport map returned ${result.rules.length} rule(s)`;
+        }))
+      ) {
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
 
     if (client.getComputedStylesWithState) {
-      if (!await runCheck("computed-styles-with-state", async () => {
-        const result = await client.getComputedStylesWithState!(
-          "button",
-          ["hover"],
-          ["background-color", "text-decoration"],
-        );
-        const diffCount = result.diff?.length ?? 0;
-        return `forced-state API returned ${diffCount} diff(s)`;
-      })) {
+      if (
+        !(await runCheck("computed-styles-with-state", async () => {
+          const result = await client.getComputedStylesWithState!(
+            "button",
+            ["hover"],
+            ["background-color", "text-decoration"],
+          );
+          const diffCount = result.diff?.length ?? 0;
+          return `forced-state API returned ${diffCount} diff(s)`;
+        }))
+      ) {
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
 
     if (options.deep && client.batchRender) {
-      if (!await runCheck("batch-render", async () => {
-        const result = await client.batchRender!(
-          options.html ?? DEFAULT_HTML,
-          options.viewport ?? viewport,
-          [{
-            id: "no-op",
-            mutations: [{ selector: "button", property: "color", action: { override: "white" } }],
-          }],
-        );
-        return `batch render returned ${result.results.length} variant(s)`;
-      })) {
+      if (
+        !(await runCheck("batch-render", async () => {
+          const result = await client.batchRender!(options.html ?? DEFAULT_HTML, options.viewport ?? viewport, [
+            {
+              id: "no-op",
+              mutations: [{ selector: "button", property: "color", action: { override: "white" } }],
+            },
+          ]);
+          return `batch render returned ${result.results.length} variant(s)`;
+        }))
+      ) {
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
@@ -275,20 +283,37 @@ export function formatCraterSmokeReport(report: CraterSmokeReport, rules?: RuleV
   const checkFailedOff = ruleTier(rules, "check-failed", "suspect") === "off";
   const unavailableOff = ruleTier(rules, "unavailable", "info") === "off";
   const failsShown = report.checks.some((c) => c.status === "fail") && !checkFailedOff;
-  const color = report.status === "pass" || (!failsShown && report.status === "fail") ? GREEN
-    : report.status === "skip" ? (unavailableOff ? DIM : YELLOW)
-    : RED;
+  const color =
+    report.status === "pass" || (!failsShown && report.status === "fail")
+      ? GREEN
+      : report.status === "skip"
+        ? unavailableOff
+          ? DIM
+          : YELLOW
+        : RED;
   lines.push(`${BOLD}${CYAN}vlmkit check crater${RESET}`);
   lines.push(`${DIM}url: ${report.url}${RESET}`);
   lines.push("");
-  lines.push(`status: ${color}${report.status}${RESET}`
-    + (report.status === "fail" && !failsShown ? ` ${DIM}(check-failed off — the failures below are measured, not reported)${RESET}` : ""));
+  lines.push(
+    `status: ${color}${report.status}${RESET}` +
+      (report.status === "fail" && !failsShown
+        ? ` ${DIM}(check-failed off — the failures below are measured, not reported)${RESET}`
+        : ""),
+  );
   for (const check of report.checks) {
-    const icon = check.status === "pass" ? `${GREEN}PASS${RESET}`
-      : check.status === "skip" ? (unavailableOff ? `${DIM}SKIP${RESET}` : `${YELLOW}SKIP${RESET}`)
-      : checkFailedOff ? `${DIM}FAIL${RESET}`
-      : `${RED}FAIL${RESET}`;
-    lines.push(`  ${icon} ${check.name.padEnd(22)} ${String(check.elapsedMs).padStart(5)}ms  ${DIM}${check.message}${RESET}`);
+    const icon =
+      check.status === "pass"
+        ? `${GREEN}PASS${RESET}`
+        : check.status === "skip"
+          ? unavailableOff
+            ? `${DIM}SKIP${RESET}`
+            : `${YELLOW}SKIP${RESET}`
+          : checkFailedOff
+            ? `${DIM}FAIL${RESET}`
+            : `${RED}FAIL${RESET}`;
+    lines.push(
+      `  ${icon} ${check.name.padEnd(22)} ${String(check.elapsedMs).padStart(5)}ms  ${DIM}${check.message}${RESET}`,
+    );
   }
   lines.push(`${DIM}elapsed: ${report.elapsedMs}ms${RESET}`);
   return lines.join("\n");

@@ -1,11 +1,6 @@
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
-import {
-  composePageDiff,
-  dominantPageColor,
-  matchPageComponents,
-  type PageComponent,
-} from "./page-compose-diff.ts";
+import { composePageDiff, dominantPageColor, matchPageComponents, type PageComponent } from "./page-compose-diff.ts";
 
 /** White canvas with solid-color rects. */
 function makePage(
@@ -76,9 +71,7 @@ test("a component absent from current is reported missing, not mispaired", () =>
 });
 
 test("an invented component is reported extra", () => {
-  const target = makePage(400, 400, [
-    { x: 20, y: 20, w: 360, h: 80, rgb: BLUE },
-  ]);
+  const target = makePage(400, 400, [{ x: 20, y: 20, w: 360, h: 80, rgb: BLUE }]);
   const current = makePage(400, 400, [
     { x: 20, y: 20, w: 360, h: 80, rgb: BLUE },
     { x: 20, y: 200, w: 200, h: 100, rgb: GRAY },
@@ -178,8 +171,9 @@ test("a current render whose background differs from the target still extracts r
   }
   const current = makePage(400, 400, [{ x: 20, y: 20, w: 360, h: 80, rgb: GRAY }]);
   const composition = composePageDiff(target, current);
-  const pageSized = [...composition.extra, ...composition.matches.map((m) => m.current)]
-    .filter((c) => c.width >= 390 && c.height >= 390);
+  const pageSized = [...composition.extra, ...composition.matches.map((m) => m.current)].filter(
+    (c) => c.width >= 390 && c.height >= 390,
+  );
   assert.equal(pageSized.length, 0, "current must not collapse into one page-sized component");
   assert.equal(composition.matches.length, 1);
   assert.equal(composition.matches[0]!.deltaTop, 0);
@@ -189,7 +183,14 @@ test("a current render whose background differs from the target still extracts r
 
 test("matchPageComponents pairs by position even when area ranks differ", () => {
   const mk = (index: number, left: number, top: number, w: number, h: number): PageComponent => ({
-    index, left, top, width: w, height: h, area: w * h, fillColor: "rgb(0, 0, 0)", hex: "#000000",
+    index,
+    left,
+    top,
+    width: w,
+    height: h,
+    area: w * h,
+    fillColor: "rgb(0, 0, 0)",
+    hex: "#000000",
   });
   // Target: big hero at top, small button below. Current is the same but the
   // hero shrank — by area rank the button could outrank it on one side.
@@ -205,7 +206,14 @@ test("matchPageComponents pairs by position even when area ranks differ", () => 
 
 test("near-identical thin lines do not cross-pair into a phantom ordering violation", () => {
   const mk = (index: number, left: number, top: number, w: number, h: number): PageComponent => ({
-    index, left, top, width: w, height: h, area: w * h, fillColor: "rgb(226, 232, 240)", hex: "#e2e8f0",
+    index,
+    left,
+    top,
+    width: w,
+    height: h,
+    area: w * h,
+    fillColor: "rgb(226, 232, 240)",
+    hex: "#e2e8f0",
   });
   // S5-r3 mobile: two 1px card borders 21px apart in the target; the current
   // render has the same pair shifted a few px. Greedy alone pairs t(628) with
@@ -226,12 +234,8 @@ test("a hairline never pairs with a blob, and far-apart fills never pair", () =>
   // S7 deadlock shape: target has a 1px divider; current has a text
   // fragment near the same center. Old matcher paired them, hiding one
   // real missing AND one real extra.
-  const target = makePage(1280, 300, [
-    { x: 456, y: 150, w: 368, h: 1, rgb: [226, 232, 240] },
-  ]);
-  const current = makePage(1280, 300, [
-    { x: 476, y: 145, w: 76, h: 11, rgb: [179, 182, 189] },
-  ]);
+  const target = makePage(1280, 300, [{ x: 456, y: 150, w: 368, h: 1, rgb: [226, 232, 240] }]);
+  const current = makePage(1280, 300, [{ x: 476, y: 145, w: 76, h: 11, rgb: [179, 182, 189] }]);
   const composition = composePageDiff(target, current);
   assert.equal(composition.matches.length, 0);
   assert.equal(composition.missing.length, 1);

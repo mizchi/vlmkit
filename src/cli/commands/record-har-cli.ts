@@ -73,15 +73,18 @@ export function parseArgs(argv: readonly string[]): RecordArgs {
     process.exit(0);
   }
   if (argv.length === 0) throw new UsageError(`a URL is required.\n\n${usage()}`);
-  const positional = argv.find((a) => !a.startsWith("-")
-    && !["--out", "--wait-until", "--timeout", "--settle"].includes(argv[argv.indexOf(a) - 1] ?? ""));
+  const positional = argv.find(
+    (a) =>
+      !a.startsWith("-") &&
+      !["--out", "--wait-until", "--timeout", "--settle"].includes(argv[argv.indexOf(a) - 1] ?? ""),
+  );
   if (!positional) throw new UsageError(`a URL is required.\n\n${usage()}`);
   if (!/^https?:\/\//.test(positional)) {
     // A file:// page has no network to pin, so recording one is always a mistake
     // rather than a no-op worth allowing.
     throw new UsageError(
-      `record-har needs an http(s) URL, got "${positional}".`
-      + ` A local file has no network to pin — pass the file straight to the gate instead.`,
+      `record-har needs an http(s) URL, got "${positional}".` +
+        ` A local file has no network to pin — pass the file straight to the gate instead.`,
     );
   }
   const waitUntil = (readFlag(argv, "wait-until") ?? "load") as PageLoadWaitUntil;
@@ -119,25 +122,35 @@ export async function recordHarCli(argv: readonly string[]): Promise<void> {
     await browser.close();
   }
 
-  const origins = [...new Set(requested.map((u) => {
-    try {
-      return new URL(u).origin;
-    } catch {
-      return null;
-    }
-  }).filter((o): o is string => o !== null))];
+  const origins = [
+    ...new Set(
+      requested
+        .map((u) => {
+          try {
+            return new URL(u).origin;
+          } catch {
+            return null;
+          }
+        })
+        .filter((o): o is string => o !== null),
+    ),
+  ];
 
   console.log("");
   console.log(`  ${BOLD}${CYAN}Recorded HAR${RESET}`);
-  console.log(`  ${DIM}${requested.length} request(s) across ${origins.length} origin(s): ${origins.join(", ")}${RESET}`);
-  console.log(`  ${DIM}wait-until ${args.waitUntil}, settle ${args.settleMs}ms, bodies ${args.content === "embed" ? "embedded" : "omitted"}${RESET}`);
+  console.log(
+    `  ${DIM}${requested.length} request(s) across ${origins.length} origin(s): ${origins.join(", ")}${RESET}`,
+  );
+  console.log(
+    `  ${DIM}wait-until ${args.waitUntil}, settle ${args.settleMs}ms, bodies ${args.content === "embed" ? "embedded" : "omitted"}${RESET}`,
+  );
   console.log(`  ${GREEN}${out}${RESET}`);
   // Said at record time, because both are silent at replay time until something is
   // already wrong: the recording is keyed on the full URL, and it ages.
   console.log(`  ${DIM}Replay: --har ${args.out}${RESET}`);
   console.log(
-    `  ${YELLOW}Keyed on the full URL${RESET}${DIM}, so it only replays for ${origins[0] ?? args.url}`
-    + ` — a different host or port stops matching. Re-record when the page starts calling a new endpoint.${RESET}`,
+    `  ${YELLOW}Keyed on the full URL${RESET}${DIM}, so it only replays for ${origins[0] ?? args.url}` +
+      ` — a different host or port stops matching. Re-record when the page starts calling a new endpoint.${RESET}`,
   );
 }
 

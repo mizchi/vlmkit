@@ -155,8 +155,7 @@ export function parseBenchGatesArgs(argv: readonly string[]): BenchGatesOptions 
   const rawCategory = readFlag(argv, "category");
   if (rawCategory !== undefined && !(rawCategory in GATE_CATEGORIES)) {
     throw new UsageError(
-      `--category: unknown category ${JSON.stringify(rawCategory)}.`
-      + ` Valid: ${GATE_CATEGORY_ORDER.join(", ")}`,
+      `--category: unknown category ${JSON.stringify(rawCategory)}.` + ` Valid: ${GATE_CATEGORY_ORDER.join(", ")}`,
     );
   }
   const outPath = readFlag(argv, "out");
@@ -210,8 +209,8 @@ export async function runBenchGates(options: BenchGatesOptions): Promise<BenchGa
       if (!resolved) {
         const suggestions = registry.suggest(tokens);
         throw new UsageError(
-          `--gate "${command}": unknown gate`
-          + (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
+          `--gate "${command}": unknown gate` +
+            (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
         );
       }
       const plugin = registry.list().find((e) => e.gate.id === resolved.gate.id)?.plugin ?? "?";
@@ -399,38 +398,40 @@ export function formatBenchGates(report: BenchGatesReport): string {
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit bench gates${RESET}`);
   lines.push(
-    `${DIM}${report.sources.length} source(s) x ${report.repeat} repeat(s) — `
-    + `${report.totals.benchedRuns} runs in ${(report.totals.wallMs / 1000).toFixed(1)}s${RESET}`,
+    `${DIM}${report.sources.length} source(s) x ${report.repeat} repeat(s) — ` +
+      `${report.totals.benchedRuns} runs in ${(report.totals.wallMs / 1000).toFixed(1)}s${RESET}`,
   );
   lines.push("");
 
   const w = { cmd: 21, ms: 9, share: 7, find: 8, rules: 11 };
   lines.push(
-    `${BOLD}${"gate".padEnd(w.cmd)}${"median".padStart(w.ms)}${"min".padStart(w.ms)}${"max".padStart(w.ms)}`
-    + `${"run%".padStart(w.share)}${"findings".padStart(w.find)}${"rules".padStart(w.rules)}${RESET}`,
+    `${BOLD}${"gate".padEnd(w.cmd)}${"median".padStart(w.ms)}${"min".padStart(w.ms)}${"max".padStart(w.ms)}` +
+      `${"run%".padStart(w.share)}${"findings".padStart(w.find)}${"rules".padStart(w.rules)}${RESET}`,
   );
   for (const gate of report.gates) {
     if (gate.error) {
-      lines.push(`${gate.command.padEnd(w.cmd)}${RED}${"error".padStart(w.ms)}${RESET}  ${DIM}${gate.error.slice(0, 60)}${RESET}`);
+      lines.push(
+        `${gate.command.padEnd(w.cmd)}${RED}${"error".padStart(w.ms)}${RESET}  ${DIM}${gate.error.slice(0, 60)}${RESET}`,
+      );
       continue;
     }
     const fired = `${gate.rulesFired}/${gate.rulesDeclared}`;
     lines.push(
-      gate.command.padEnd(w.cmd)
-      + `${gate.medianTotalMs.toFixed(0)}ms`.padStart(w.ms)
-      + `${gate.minTotalMs.toFixed(0)}ms`.padStart(w.ms)
-      + `${gate.maxTotalMs.toFixed(0)}ms`.padStart(w.ms)
-      + `${gate.runSharePct.toFixed(0)}%`.padStart(w.share)
-      + `${gate.medianFindings}`.padStart(w.find)
-      + fired.padStart(w.rules),
+      gate.command.padEnd(w.cmd) +
+        `${gate.medianTotalMs.toFixed(0)}ms`.padStart(w.ms) +
+        `${gate.minTotalMs.toFixed(0)}ms`.padStart(w.ms) +
+        `${gate.maxTotalMs.toFixed(0)}ms`.padStart(w.ms) +
+        `${gate.runSharePct.toFixed(0)}%`.padStart(w.share) +
+        `${gate.medianFindings}`.padStart(w.find) +
+        fired.padStart(w.rules),
     );
   }
 
   lines.push("");
   lines.push(
-    `${DIM}run% is the share of the gate's time spent in its measurement. The rest is`
-    + ` parse + projection + prose;\nthe projection across every gate above totals`
-    + ` ${report.totals.projectionMs.toFixed(2)}ms.${RESET}`,
+    `${DIM}run% is the share of the gate's time spent in its measurement. The rest is` +
+      ` parse + projection + prose;\nthe projection across every gate above totals` +
+      ` ${report.totals.projectionMs.toFixed(2)}ms.${RESET}`,
   );
 
   // Only the rules that cost something, plus the never-fired list, which is the
@@ -440,17 +441,17 @@ export function formatBenchGates(report: BenchGatesReport): string {
     lines.push("");
     lines.push(`${BOLD}attributed cost per rule${RESET} ${DIM}(top ${Math.min(12, fired.length)})${RESET}`);
     lines.push(
-      `${DIM}Each run's measurement time split across the rules that fired in it — an`
-      + ` allocation of a\nshared cost, not an isolated timing. Rules are not separately`
-      + ` executed.${RESET}`,
+      `${DIM}Each run's measurement time split across the rules that fired in it — an` +
+        ` allocation of a\nshared cost, not an isolated timing. Rules are not separately` +
+        ` executed.${RESET}`,
     );
     lines.push("");
     for (const rule of fired.slice(0, 12)) {
       lines.push(
-        `  ${`${rule.gateId}/${rule.rule}`.padEnd(46)}`
-        + `${rule.attributedMs.toFixed(0)}ms`.padStart(8)
-        + `${`${rule.firedRuns}/${rule.totalRuns} runs`.padStart(12)}`
-        + `${DIM} ${rule.declaredSeverity}${RESET}`,
+        `  ${`${rule.gateId}/${rule.rule}`.padEnd(46)}` +
+          `${rule.attributedMs.toFixed(0)}ms`.padStart(8) +
+          `${`${rule.firedRuns}/${rule.totalRuns} runs`.padStart(12)}` +
+          `${DIM} ${rule.declaredSeverity}${RESET}`,
       );
     }
   }
@@ -458,13 +459,11 @@ export function formatBenchGates(report: BenchGatesReport): string {
   const never = report.rules.filter((r) => r.firedRuns === 0);
   if (never.length > 0) {
     lines.push("");
+    lines.push(`${YELLOW}${never.length} of ${report.totals.rulesDeclared} rules never fired on this corpus.${RESET}`);
     lines.push(
-      `${YELLOW}${never.length} of ${report.totals.rulesDeclared} rules never fired on this corpus.${RESET}`,
-    );
-    lines.push(
-      `${DIM}Not dead weight by itself — a rule that never fires is a defect class you do not`
-      + `\nhave. It is only worth pruning if you also do not want the check. Widen the corpus`
-      + `\nbefore concluding a rule is untested.${RESET}`,
+      `${DIM}Not dead weight by itself — a rule that never fires is a defect class you do not` +
+        `\nhave. It is only worth pruning if you also do not want the check. Widen the corpus` +
+        `\nbefore concluding a rule is untested.${RESET}`,
     );
   }
 
@@ -475,10 +474,10 @@ export function formatBenchGates(report: BenchGatesReport): string {
     lines.push(`  all rules on   ${p.allRulesOnMs.toFixed(0)}ms`);
     lines.push(`  all rules off  ${p.allRulesOffMs.toFixed(0)}ms`);
     lines.push(
-      `  ${GREEN}delta ${p.deltaMs >= 0 ? "+" : ""}${p.deltaMs.toFixed(0)}ms (${p.deltaPct.toFixed(1)}%)${RESET}`
-      + ` ${DIM}— noise. Rule settings are applied to the findings AFTER the\n`
-      + `  measurement, so suppression costs nothing and saves nothing. To spend less,`
-      + ` drop a\n  gate or narrow its inputs.${RESET}`,
+      `  ${GREEN}delta ${p.deltaMs >= 0 ? "+" : ""}${p.deltaMs.toFixed(0)}ms (${p.deltaPct.toFixed(1)}%)${RESET}` +
+        ` ${DIM}— noise. Rule settings are applied to the findings AFTER the\n` +
+        `  measurement, so suppression costs nothing and saves nothing. To spend less,` +
+        ` drop a\n  gate or narrow its inputs.${RESET}`,
     );
   }
   lines.push("");
@@ -490,8 +489,8 @@ export function formatBenchGatesMarkdown(report: BenchGatesReport): string {
   lines.push("## Gate benchmark");
   lines.push("");
   lines.push(
-    `${report.sources.length} source(s) × ${report.repeat} repeat(s), `
-    + `${report.totals.benchedRuns} runs in ${(report.totals.wallMs / 1000).toFixed(1)}s.`,
+    `${report.sources.length} source(s) × ${report.repeat} repeat(s), ` +
+      `${report.totals.benchedRuns} runs in ${(report.totals.wallMs / 1000).toFixed(1)}s.`,
   );
   lines.push("");
   lines.push("| gate | category | median | min | max | run % | findings | rules fired | ms/finding |");
@@ -502,17 +501,17 @@ export function formatBenchGatesMarkdown(report: BenchGatesReport): string {
       continue;
     }
     lines.push(
-      `| \`${g.command}\` | ${g.category ?? "—"} | ${g.medianTotalMs.toFixed(0)}ms |`
-      + ` ${g.minTotalMs.toFixed(0)}ms | ${g.maxTotalMs.toFixed(0)}ms | ${g.runSharePct.toFixed(0)}% |`
-      + ` ${g.medianFindings} | ${g.rulesFired}/${g.rulesDeclared} |`
-      + ` ${g.msPerFinding === null ? "—" : `${g.msPerFinding.toFixed(0)}ms`} |`,
+      `| \`${g.command}\` | ${g.category ?? "—"} | ${g.medianTotalMs.toFixed(0)}ms |` +
+        ` ${g.minTotalMs.toFixed(0)}ms | ${g.maxTotalMs.toFixed(0)}ms | ${g.runSharePct.toFixed(0)}% |` +
+        ` ${g.medianFindings} | ${g.rulesFired}/${g.rulesDeclared} |` +
+        ` ${g.msPerFinding === null ? "—" : `${g.msPerFinding.toFixed(0)}ms`} |`,
     );
   }
   lines.push("");
   lines.push(
-    "`run %` is the share spent in the gate's measurement. Every rule the gate declares reads"
-    + " that one measurement, so the projection is the remainder — "
-    + `${report.totals.projectionMs.toFixed(2)}ms across every gate above.`,
+    "`run %` is the share spent in the gate's measurement. Every rule the gate declares reads" +
+      " that one measurement, so the projection is the remainder — " +
+      `${report.totals.projectionMs.toFixed(2)}ms across every gate above.`,
   );
 
   const fired = report.rules.filter((r) => r.firedRuns > 0);
@@ -521,17 +520,17 @@ export function formatBenchGatesMarkdown(report: BenchGatesReport): string {
     lines.push("### Attributed cost per rule");
     lines.push("");
     lines.push(
-      "Each run's measurement time split equally across the rules that fired in it. This is an"
-      + " allocation of a shared cost, not an isolated timing — rules are not separately executed.",
+      "Each run's measurement time split equally across the rules that fired in it. This is an" +
+        " allocation of a shared cost, not an isolated timing — rules are not separately executed.",
     );
     lines.push("");
     lines.push("| rule | declared | fired | findings/run | attributed/run | ms/finding |");
     lines.push("|---|---|--:|--:|--:|--:|");
     for (const r of fired.slice(0, 20)) {
       lines.push(
-        `| \`${r.gateId}/${r.rule}\` | ${r.declaredSeverity} | ${r.firedRuns}/${r.totalRuns} |`
-        + ` ${r.findings} | ${r.attributedMs.toFixed(0)}ms |`
-        + ` ${r.msPerFinding === null ? "—" : `${r.msPerFinding.toFixed(0)}ms`} |`,
+        `| \`${r.gateId}/${r.rule}\` | ${r.declaredSeverity} | ${r.firedRuns}/${r.totalRuns} |` +
+          ` ${r.findings} | ${r.attributedMs.toFixed(0)}ms |` +
+          ` ${r.msPerFinding === null ? "—" : `${r.msPerFinding.toFixed(0)}ms`} |`,
       );
     }
   }
@@ -542,8 +541,8 @@ export function formatBenchGatesMarkdown(report: BenchGatesReport): string {
     lines.push(`### Rules that never fired (${never.length} of ${report.totals.rulesDeclared})`);
     lines.push("");
     lines.push(
-      "A rule that never fires is a defect class this corpus does not contain — not dead weight"
-      + " by itself. Widen the corpus before concluding a rule is untested.",
+      "A rule that never fires is a defect class this corpus does not contain — not dead weight" +
+        " by itself. Widen the corpus before concluding a rule is untested.",
     );
     lines.push("");
     lines.push(never.map((r) => `\`${r.gateId}/${r.rule}\``).join(", "));
@@ -563,9 +562,9 @@ export function formatBenchGatesMarkdown(report: BenchGatesReport): string {
     lines.push(`| delta | ${p.deltaMs >= 0 ? "+" : ""}${p.deltaMs.toFixed(0)} (${p.deltaPct.toFixed(1)}%) |`);
     lines.push("");
     lines.push(
-      "Noise. Rule settings are applied to the findings **after** the measurement — by design, so"
-      + " a silenced finding can still be reported as silenced. Pruning rules buys clarity, not"
-      + " time; to spend less, drop a gate or narrow its inputs.",
+      "Noise. Rule settings are applied to the findings **after** the measurement — by design, so" +
+        " a silenced finding can still be reported as silenced. Pruning rules buys clarity, not" +
+        " time; to spend less, drop a gate or narrow its inputs.",
     );
   }
   return lines.join("\n");
@@ -606,11 +605,12 @@ Examples:
 export async function benchGatesCli(argv: readonly string[]): Promise<void> {
   const options = parseBenchGatesArgs(argv);
   const report = await runBenchGates(options);
-  const text = options.format === "json"
-    ? JSON.stringify(report, null, 2)
-    : options.format === "md"
-    ? formatBenchGatesMarkdown(report)
-    : formatBenchGates(report);
+  const text =
+    options.format === "json"
+      ? JSON.stringify(report, null, 2)
+      : options.format === "md"
+        ? formatBenchGatesMarkdown(report)
+        : formatBenchGates(report);
   console.log(text);
   if (options.outPath) {
     const path = resolve(options.outPath);

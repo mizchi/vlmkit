@@ -48,10 +48,7 @@ describe("urlToSnapshotLabel", () => {
 
 describe("resolveSnapshotLabels", () => {
   it("uses an explicit label for a single URL", () => {
-    assert.deepEqual(
-      resolveSnapshotLabels(["http://localhost:3000/"], ["home"]),
-      ["home"],
-    );
+    assert.deepEqual(resolveSnapshotLabels(["http://localhost:3000/"], ["home"]), ["home"]);
   });
 
   it("supports one explicit label per URL", () => {
@@ -66,10 +63,7 @@ describe("resolveSnapshotLabels", () => {
 
   it("rejects mismatched label counts", () => {
     assert.throws(
-      () => resolveSnapshotLabels(
-        ["http://localhost:3000/", "http://localhost:3000/issues"],
-        ["home"],
-      ),
+      () => resolveSnapshotLabels(["http://localhost:3000/", "http://localhost:3000/issues"], ["home"]),
       /--label must be provided either once for a single URL or once per URL/i,
     );
   });
@@ -87,20 +81,18 @@ describe("determineSnapshotExitCode", () => {
   });
 
   it("fails when diff is detected under --fail-on-diff", () => {
-    const result = determineSnapshotExitCode(
-      [{ label: "home", viewport: "desktop", isNew: false, diffRatio: 0.12 }],
-      { failOnDiff: true },
-    );
+    const result = determineSnapshotExitCode([{ label: "home", viewport: "desktop", isNew: false, diffRatio: 0.12 }], {
+      failOnDiff: true,
+    });
 
     assert.equal(result.exitCode, 1);
     assert.match(result.reasons[0] ?? "", /diff detected/i);
   });
 
   it("fails when a new baseline is created under --fail-on-new-baseline", () => {
-    const result = determineSnapshotExitCode(
-      [{ label: "home", viewport: "desktop", isNew: true }],
-      { failOnNewBaseline: true },
-    );
+    const result = determineSnapshotExitCode([{ label: "home", viewport: "desktop", isNew: true }], {
+      failOnNewBaseline: true,
+    });
 
     assert.equal(result.exitCode, 1);
     assert.match(result.reasons[0] ?? "", /new baseline/i);
@@ -120,10 +112,9 @@ describe("determineSnapshotExitCode", () => {
   });
 
   it("accepts ratios up to the configured threshold", () => {
-    const result = determineSnapshotExitCode(
-      [{ label: "home", viewport: "desktop", isNew: false, diffRatio: 0.01 }],
-      { maxDiffRatio: 0.01 },
-    );
+    const result = determineSnapshotExitCode([{ label: "home", viewport: "desktop", isNew: false, diffRatio: 0.01 }], {
+      maxDiffRatio: 0.01,
+    });
 
     assert.equal(result.exitCode, 0);
   });
@@ -150,10 +141,7 @@ describe("parseSnapshotConfig", () => {
     assert.equal(config.failOnDiff, true);
     assert.equal(config.maxDiffRatio, 0.01);
     assert.deepEqual(config.mask, [".hero", ".badge"]);
-    assert.deepEqual(config.routes, [
-      { path: "/" },
-      { path: "/issues?severity=critical", label: "critical-issues" },
-    ]);
+    assert.deepEqual(config.routes, [{ path: "/" }, { path: "/issues?severity=critical", label: "critical-issues" }]);
   });
 });
 
@@ -174,14 +162,8 @@ describe("parseSnapshotCliArgs", () => {
     });
 
     assert.equal(options.mode, "capture");
-    assert.deepEqual(options.urls, [
-      "http://localhost:3000/",
-      "http://localhost:3000/issues?severity=critical",
-    ]);
-    assert.deepEqual(options.labels, [
-      "localhost_3000_root",
-      "critical-issues",
-    ]);
+    assert.deepEqual(options.urls, ["http://localhost:3000/", "http://localhost:3000/issues?severity=critical"]);
+    assert.deepEqual(options.labels, ["localhost_3000_root", "critical-issues"]);
     assert.equal(options.outputDir, "artifacts/snapshots");
     assert.equal(options.threshold, 0.2);
     assert.equal(options.failOnDiff, true);
@@ -190,22 +172,29 @@ describe("parseSnapshotCliArgs", () => {
   });
 
   it("lets CLI URLs and flags override config defaults", () => {
-    const options = parseSnapshotCliArgs([
-      "http://localhost:4100/",
-      "--label", "home",
-      "--output", "tmp/out",
-      "--threshold", "0.3",
-      "--fail-on-new-baseline",
-      "--mask", ".runtime-mask",
-    ], {
-      baseUrl: "http://localhost:3000",
-      routes: [{ path: "/ignored", label: "ignored" }],
-      outputDir: "artifacts/snapshots",
-      threshold: 0.2,
-      failOnDiff: true,
-      failOnNewBaseline: false,
-      mask: [".config-mask"],
-    });
+    const options = parseSnapshotCliArgs(
+      [
+        "http://localhost:4100/",
+        "--label",
+        "home",
+        "--output",
+        "tmp/out",
+        "--threshold",
+        "0.3",
+        "--fail-on-new-baseline",
+        "--mask",
+        ".runtime-mask",
+      ],
+      {
+        baseUrl: "http://localhost:3000",
+        routes: [{ path: "/ignored", label: "ignored" }],
+        outputDir: "artifacts/snapshots",
+        threshold: 0.2,
+        failOnDiff: true,
+        failOnNewBaseline: false,
+        mask: [".config-mask"],
+      },
+    );
 
     assert.equal(options.mode, "capture");
     assert.deepEqual(options.urls, ["http://localhost:4100/"]);
@@ -236,18 +225,16 @@ describe("parseSnapshotCliArgs", () => {
     ]);
 
     assert.equal(options.mode, "stability-history");
-    assert.deepEqual(options.urls, [
-      "runs/one/stability-report.json",
-      "runs/two/stability-report.json",
-    ]);
+    assert.deepEqual(options.urls, ["runs/one/stability-report.json", "runs/two/stability-report.json"]);
     assert.equal(options.stabilityHistory?.outPath, "artifacts/stability-history.md");
   });
 
   it("rejects relative routes without baseUrl", () => {
     assert.throws(
-      () => parseSnapshotCliArgs([], {
-        routes: [{ path: "/issues", label: undefined }],
-      }),
+      () =>
+        parseSnapshotCliArgs([], {
+          routes: [{ path: "/issues", label: undefined }],
+        }),
       /baseUrl is required when snapshot routes are relative/i,
     );
   });

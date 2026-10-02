@@ -87,13 +87,16 @@ export function parseSharedFlags(argv: readonly string[]): SharedFlags {
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] !== "--rule") continue;
     const spec = argv[i + 1];
-    if (spec === undefined || spec.startsWith("--")) throw new UsageError("--rule needs <ruleRef>=<off|suspect|warn|info>");
+    if (spec === undefined || spec.startsWith("--"))
+      throw new UsageError("--rule needs <ruleRef>=<off|suspect|warn|info>");
     const eq = spec.lastIndexOf("=");
     if (eq <= 0) throw new UsageError(`--rule expects <ruleRef>=<setting>, got ${JSON.stringify(spec)}`);
     const ref = spec.slice(0, eq).trim();
     const setting = spec.slice(eq + 1).trim();
     if (!(RULE_SETTINGS as readonly string[]).includes(setting)) {
-      throw new UsageError(`--rule ${ref}: setting must be one of ${RULE_SETTINGS.join(", ")}, got ${JSON.stringify(setting)}`);
+      throw new UsageError(
+        `--rule ${ref}: setting must be one of ${RULE_SETTINGS.join(", ")}, got ${JSON.stringify(setting)}`,
+      );
     }
     ruleOverrides[ref] = setting as RuleSettings[string];
   }
@@ -147,8 +150,7 @@ function assertKnownRuleOverrides(gate: AnyGateDefinition, overrides: RuleSettin
     const ruleId = key.slice(prefix.length);
     if (ruleId === "*" || gate.rules.some((rule) => rule.id === ruleId)) continue;
     throw new UsageError(
-      `--rule ${key}: ${gate.id} has no rule "${ruleId}".`
-      + ` Known: ${gate.rules.map((rule) => rule.id).join(", ")}`,
+      `--rule ${key}: ${gate.id} has no rule "${ruleId}".` + ` Known: ${gate.rules.map((rule) => rule.id).join(", ")}`,
     );
   }
 }
@@ -286,9 +288,8 @@ export async function runGate<Report, Options>(
   // now", not re-derive the runner's decisions and risk disagreeing with them.
   const resolved = resolveRules(gate, settings);
   const ruleView: RuleView = {
-    effective: (ruleId: string) => resolved.decisions.get(ruleId)?.effective
-      ?? gate.rules.find((r) => r.id === ruleId)?.severity
-      ?? "warn",
+    effective: (ruleId: string) =>
+      resolved.decisions.get(ruleId)?.effective ?? gate.rules.find((r) => r.id === ruleId)?.severity ?? "warn",
     // `via` is what makes a decision explicit — `resolveRules` sets it only when a config key
     // or a `--rule` flag matched. Without it the decision is just the gate's own table, which
     // a formatter must NOT prefer over the severity its finding was emitted at.
@@ -297,26 +298,28 @@ export async function runGate<Report, Options>(
       return decision?.via ? decision.effective : undefined;
     },
   };
-  const prose = shared.json ? "" : [gate.format(report, ruleView), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
+  const prose = shared.json
+    ? ""
+    : [gate.format(report, ruleView), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
   timing.formatMs = round(performance.now() - tFormat);
   timing.totalMs = round(performance.now() - t0);
 
   const text = shared.json
     ? JSON.stringify(
-      {
-        gate: gate.id,
-        command: gateCommandString(gate),
-        verdict,
-        counts,
-        findings: rules.findings,
-        suppressed: rules.suppressed,
-        retuned: rules.retuned,
-        report,
-        ...(shared.timing ? { timing } : {}),
-      },
-      null,
-      2,
-    )
+        {
+          gate: gate.id,
+          command: gateCommandString(gate),
+          verdict,
+          counts,
+          findings: rules.findings,
+          suppressed: rules.suppressed,
+          retuned: rules.retuned,
+          report,
+          ...(shared.timing ? { timing } : {}),
+        },
+        null,
+        2,
+      )
     : prose;
 
   return {
@@ -373,31 +376,29 @@ export function formatRuleNotes(gate: AnyGateDefinition, applied: AppliedRules):
     for (const s of applied.suppressed) byRule.set(s.finding.rule, (byRule.get(s.finding.rule) ?? 0) + 1);
     lines.push("");
     lines.push(
-      `${YELLOW}${applied.suppressed.length} finding(s) suppressed by rule settings${RESET}`
-      + ` ${DIM}(${[...byRule].map(([rule, n]) => `${rule} x${n}`).join(", ")})${RESET}`,
+      `${YELLOW}${applied.suppressed.length} finding(s) suppressed by rule settings${RESET}` +
+        ` ${DIM}(${[...byRule].map(([rule, n]) => `${rule} x${n}`).join(", ")})${RESET}`,
     );
     if (gate.format.length < 2) {
       lines.push(
-        `${DIM}  The report above was rendered before those settings were applied, so it still`
-        + ` lists them and its own status line still counts them. The verdict and exit code do`
-        + ` not.${RESET}`,
+        `${DIM}  The report above was rendered before those settings were applied, so it still` +
+          ` lists them and its own status line still counts them. The verdict and exit code do` +
+          ` not.${RESET}`,
       );
     }
   }
   if (applied.retuned.length > 0) {
     const byRule = new Map<string, RetuneNote>();
     for (const r of applied.retuned) byRule.set(r.finding.rule, { from: r.from, to: r.to });
-    lines.push(
-      `${DIM}re-tuned: ${[...byRule].map(([rule, n]) => `${rule} ${n.from}->${n.to}`).join(", ")}${RESET}`,
-    );
+    lines.push(`${DIM}re-tuned: ${[...byRule].map(([rule, n]) => `${rule} ${n.from}->${n.to}`).join(", ")}${RESET}`);
   }
   if (applied.undeclared.length > 0) {
     // A gate bug, surfaced where the gate's author will see it: an
     // undeclared rule cannot be documented or configured.
     lines.push("");
     lines.push(
-      `${RED}${gate.id} emitted undeclared rule id(s): ${applied.undeclared.join(", ")}${RESET}`
-      + ` ${DIM}— add them to the gate's rules table.${RESET}`,
+      `${RED}${gate.id} emitted undeclared rule id(s): ${applied.undeclared.join(", ")}${RESET}` +
+        ` ${DIM}— add them to the gate's rules table.${RESET}`,
     );
   }
   return lines.join("\n");
@@ -419,7 +420,12 @@ export function formatRuleTable(gate: AnyGateDefinition): string {
   lines.push("");
   const width = Math.max(...gate.rules.map((r) => r.id.length));
   for (const rule of gate.rules) {
-    const severity = rule.severity === "suspect" ? `${RED}suspect${RESET}` : rule.severity === "warn" ? `${YELLOW}warn${RESET}` : `${DIM}info${RESET}`;
+    const severity =
+      rule.severity === "suspect"
+        ? `${RED}suspect${RESET}`
+        : rule.severity === "warn"
+          ? `${YELLOW}warn${RESET}`
+          : `${DIM}info${RESET}`;
     lines.push(`  ${rule.id.padEnd(width)}  ${severity.padEnd(16)} ${rule.title}`);
     if (rule.docs) lines.push(`  ${" ".repeat(width)}  ${DIM}${rule.docs}${RESET}`);
   }
@@ -481,10 +487,10 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   // can — a `"gates"` entry is a full command, tokenized quote-aware — which makes
   // this a documentation gap rather than a missing feature.
   lines.push("");
-  lines.push("Persisting: a `\"gates\"` entry in vlmkit.gates.json is the whole command, so any");
+  lines.push('Persisting: a `"gates"` entry in vlmkit.gates.json is the whole command, so any');
   lines.push("flag above belongs there and is committed with the page. Quoted values survive:");
   lines.push(`  "gates": ["${gateCommandString(gate)} --some-flag \\"a value with spaces\\""]`);
-  lines.push("Rule settings also have their own `\"rules\"` block.");
+  lines.push('Rule settings also have their own `"rules"` block.');
   return lines.join("\n");
 }
 
@@ -492,19 +498,20 @@ function flagLabel(input: NonNullable<AnyGateDefinition["inputs"]>[number]): str
   // `placeholder` wins for flags too: the documented usage says
   // `--manifest <file>` and `--frames <dir>`, which tell a reader more than
   // the generic `<path>` the kind would produce.
-  const value = input.kind === "boolean"
-    ? ""
-    : input.placeholder
-      ? ` <${input.placeholder}>`
-      : input.kind === "number"
-        ? " <n>"
-        : input.kind === "number-list" || input.kind === "string-list"
-          ? " <list>"
-          : input.kind === "path" || input.kind === "path-or-url"
-            ? " <path>"
-            : input.choices
-              ? ` <${input.choices.join("|")}>`
-              : " <value>";
+  const value =
+    input.kind === "boolean"
+      ? ""
+      : input.placeholder
+        ? ` <${input.placeholder}>`
+        : input.kind === "number"
+          ? " <n>"
+          : input.kind === "number-list" || input.kind === "string-list"
+            ? " <list>"
+            : input.kind === "path" || input.kind === "path-or-url"
+              ? " <path>"
+              : input.choices
+                ? ` <${input.choices.join("|")}>`
+                : " <value>";
   return `--${input.name}${value}${input.repeatable ? " (repeatable)" : ""}`;
 }
 
@@ -557,8 +564,10 @@ export function unpinnedLiveInput(gate: AnyGateDefinition, argv: readonly string
   if (!acceptsHar || argv.includes("--har")) return null;
   const url = argv.find((arg) => /^https?:\/\//.test(arg));
   if (!url) return null;
-  return `${DIM}  ${url} is live and not pinned — a re-run may measure different data.`
-    + ` Pin it: vlmkit snapshot record-har ${url} --out app.har, then --har app.har${RESET}`;
+  return (
+    `${DIM}  ${url} is live and not pinned — a re-run may measure different data.` +
+    ` Pin it: vlmkit snapshot record-har ${url} --out app.har, then --har app.har${RESET}`
+  );
 }
 
 /**
@@ -583,9 +592,7 @@ export function newOutputNotice(write: LedgerWrite | null, cwd: string): string 
   // A relocated ledger gets advice about ITSELF. Printing the canned pair after
   // `--ledger runs/x.jsonl` would name two directories the run did not write and
   // omit the one it did — advice that does not apply is worse than none.
-  const entries = rel === LEDGER_RELATIVE_PATH.split("\\").join("/")
-    ? [...VLMKIT_IGNORE_ENTRIES]
-    : [rel];
+  const entries = rel === LEDGER_RELATIVE_PATH.split("\\").join("/") ? [...VLMKIT_IGNORE_ENTRIES] : [rel];
   return [
     `${DIM}  created ${rel} — an append-only record of every gate run, one line each.${RESET}`,
     `${DIM}  It is not in .gitignore. Ignore it${entries.length > 1 ? " (`vlmkit gates init` writes these)" : ""}:${RESET}`,
@@ -632,11 +639,13 @@ export async function runGateCli<Report, Options>(
   // below the findings." The distance was the defect, not the absence.
   if (outcome.exitCode === 0 && outcome.counts.warn > 0 && !shared.json) {
     const ids = [...new Set(outcome.findings.filter((f) => f.severity === "warn").map((f) => f.rule))];
-    out(withExitIntent(
-      outcome.text,
-      `${DIM}  exits 0 — ${outcome.counts.warn} warn(s) did not fail this command.`
-      + ` To gate on one: --rule ${ids[0]}=suspect${ids.length > 1 ? ` (also: ${ids.slice(1).join(", ")})` : ""}${RESET}`,
-    ));
+    out(
+      withExitIntent(
+        outcome.text,
+        `${DIM}  exits 0 — ${outcome.counts.warn} warn(s) did not fail this command.` +
+          ` To gate on one: --rule ${ids[0]}=suspect${ids.length > 1 ? ` (also: ${ids.slice(1).join(", ")})` : ""}${RESET}`,
+      ),
+    );
   } else {
     out(outcome.text);
   }
@@ -671,8 +680,7 @@ export async function runGateCli<Report, Options>(
 export function formatGateTiming(outcome: GateOutcome): string {
   const t = outcome.timing;
   const share = t.totalMs > 0 ? (t.runMs / t.totalMs) * 100 : 0;
-  const row = (label: string, ms: number) =>
-    `  ${label.padEnd(10)} ${`${ms.toFixed(1)}ms`.padStart(9)}`;
+  const row = (label: string, ms: number) => `  ${label.padEnd(10)} ${`${ms.toFixed(1)}ms`.padStart(9)}`;
   return [
     "",
     `${BOLD}${CYAN}timing${RESET} ${DIM}${outcome.command}${RESET}`,
@@ -685,4 +693,3 @@ export function formatGateTiming(outcome: GateOutcome): string {
     `  ${BOLD}${"total".padEnd(10)}${`${t.totalMs.toFixed(1)}ms`.padStart(9)}${RESET}`,
   ].join("\n");
 }
-

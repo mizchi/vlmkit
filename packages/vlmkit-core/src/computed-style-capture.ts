@@ -3,12 +3,7 @@ export type ComputedStyleSnapshot = Record<string, Record<string, string>>;
 export type InteractionType = "hover" | "focus" | "active";
 
 /** Pseudo-class state names that CDP `CSS.forcePseudoState` accepts. */
-export type ForcedPseudoState =
-  | "hover"
-  | "focus"
-  | "focus-visible"
-  | "focus-within"
-  | "active";
+export type ForcedPseudoState = "hover" | "focus" | "focus-visible" | "focus-within" | "active";
 
 export interface InteractionTargetPlan {
   selector: string;
@@ -49,22 +44,67 @@ function classifyInteractionFromStates(states: ForcedPseudoState[]): Interaction
 }
 
 export const TRACKED_PROPERTIES = [
-  "display", "visibility", "opacity",
-  "width", "height", "max-width", "max-height", "min-width", "min-height",
-  "margin-top", "margin-right", "margin-bottom", "margin-left",
-  "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
-  "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
-  "border-top-style", "border-right-style", "border-bottom-style", "border-left-style",
+  "display",
+  "visibility",
+  "opacity",
+  "width",
+  "height",
+  "max-width",
+  "max-height",
+  "min-width",
+  "min-height",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "border-top-width",
+  "border-right-width",
+  "border-bottom-width",
+  "border-left-width",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "border-top-style",
+  "border-right-style",
+  "border-bottom-style",
+  "border-left-style",
   "border-radius",
-  "background-color", "background-image",
-  "color", "font-size", "font-weight", "font-family", "font-style",
-  "text-decoration", "text-align", "text-transform",
-  "line-height", "letter-spacing", "word-spacing", "white-space",
-  "flex-direction", "flex-wrap", "flex-grow", "flex-shrink",
-  "align-items", "justify-content", "gap",
-  "position", "top", "right", "bottom", "left",
-  "overflow", "overflow-x", "overflow-y", "box-shadow", "cursor",
+  "background-color",
+  "background-image",
+  "color",
+  "font-size",
+  "font-weight",
+  "font-family",
+  "font-style",
+  "text-decoration",
+  "text-align",
+  "text-transform",
+  "line-height",
+  "letter-spacing",
+  "word-spacing",
+  "white-space",
+  "flex-direction",
+  "flex-wrap",
+  "flex-grow",
+  "flex-shrink",
+  "align-items",
+  "justify-content",
+  "gap",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "overflow",
+  "overflow-x",
+  "overflow-y",
+  "box-shadow",
+  "cursor",
   // Note: grid-template-columns / rows etc. are NOT tracked here because
   // `getComputedStyle()` resolves `minmax(0, 1fr)` to `0px`, which looks
   // like an authored value but would break layout if written back as CSS.
@@ -85,9 +125,7 @@ export function normalizeInteractionSelector(selector: string): string {
     .trim();
 }
 
-export function buildInteractionTargetPlans(
-  selectors: string[],
-): InteractionTargetPlan[] {
+export function buildInteractionTargetPlans(selectors: string[]): InteractionTargetPlan[] {
   const plans: InteractionTargetPlan[] = [];
   const seen = new Set<string>();
 
@@ -135,9 +173,7 @@ export function selectInteractionFallbackPlans(
   return selected;
 }
 
-export function mergeComputedStyleSnapshots(
-  ...snapshots: ComputedStyleSnapshot[]
-): ComputedStyleSnapshot {
+export function mergeComputedStyleSnapshots(...snapshots: ComputedStyleSnapshot[]): ComputedStyleSnapshot {
   const merged: ComputedStyleSnapshot = {};
   for (const snapshot of snapshots) {
     for (const [selector, props] of Object.entries(snapshot)) {
@@ -150,16 +186,45 @@ export function mergeComputedStyleSnapshots(
 export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyleSnapshot {
   const results: ComputedStyleSnapshot = {};
   const semanticTags = new Set([
-    "main", "nav", "header", "footer", "aside", "article", "section",
-    "table", "thead", "tbody", "tr", "th", "td", "ul", "ol", "li",
-    "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "button", "input", "select", "textarea",
-    "pre", "code", "blockquote", "img", "span", "div", "form", "label",
+    "main",
+    "nav",
+    "header",
+    "footer",
+    "aside",
+    "article",
+    "section",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "p",
+    "a",
+    "button",
+    "input",
+    "select",
+    "textarea",
+    "pre",
+    "code",
+    "blockquote",
+    "img",
+    "span",
+    "div",
+    "form",
+    "label",
   ]);
 
-  function getClassNames(element: {
-    classList?: unknown;
-    className?: unknown;
-  }): string[] {
+  function getClassNames(element: { classList?: unknown; className?: unknown }): string[] {
     const classList = element.classList;
     if (classList && typeof classList === "object") {
       if (Symbol.iterator in classList) {
@@ -184,11 +249,12 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
     return [];
   }
 
-  const getStyle = typeof getComputedStyle === "function"
-    ? getComputedStyle
-    : typeof window !== "undefined" && typeof window.getComputedStyle === "function"
-      ? window.getComputedStyle.bind(window)
-      : null;
+  const getStyle =
+    typeof getComputedStyle === "function"
+      ? getComputedStyle
+      : typeof window !== "undefined" && typeof window.getComputedStyle === "function"
+        ? window.getComputedStyle.bind(window)
+        : null;
   if (!getStyle) {
     throw new Error("getComputedStyle is not available in this realm");
   }
@@ -200,10 +266,7 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
     return semanticTags.has(element.tagName.toLowerCase());
   }
 
-  function buildElementKey(
-    element: HTMLElement,
-    tagCounters: Record<string, number>,
-  ): string {
+  function buildElementKey(element: HTMLElement, tagCounters: Record<string, number>): string {
     if (element.id) return `#${element.id}`;
     const classNames = getClassNames(element);
     if (classNames.length > 0) return `.${classNames.join(".")}`;
@@ -212,7 +275,7 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
     const parentClass = element.parentElement ? getClassNames(element.parentElement)[0] : undefined;
     const ctx = parentClass ? `.${parentClass}` : "";
     const counterKey = `${ctx}>${tag}`;
-    const count = tagCounters[counterKey] = (tagCounters[counterKey] ?? 0) + 1;
+    const count = (tagCounters[counterKey] = (tagCounters[counterKey] ?? 0) + 1);
     return `${ctx}>${tag}[${count}]`;
   }
 
@@ -254,7 +317,9 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
         for (const rule of Array.from(rules)) {
           visitRule(rule as { selectorText?: unknown; cssRules?: unknown });
         }
-      } catch { /* cross-origin stylesheet */ }
+      } catch {
+        /* cross-origin stylesheet */
+      }
     }
     return aliases;
   }
@@ -309,16 +374,45 @@ export function captureComputedStyleSnapshotForTargetSelectorsInDom(input: {
   const { props, selectors } = input;
   const results: ComputedStyleSnapshot = {};
   const semanticTags = new Set([
-    "main", "nav", "header", "footer", "aside", "article", "section",
-    "table", "thead", "tbody", "tr", "th", "td", "ul", "ol", "li",
-    "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "button", "input", "select", "textarea",
-    "pre", "code", "blockquote", "img", "span", "div", "form", "label",
+    "main",
+    "nav",
+    "header",
+    "footer",
+    "aside",
+    "article",
+    "section",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "p",
+    "a",
+    "button",
+    "input",
+    "select",
+    "textarea",
+    "pre",
+    "code",
+    "blockquote",
+    "img",
+    "span",
+    "div",
+    "form",
+    "label",
   ]);
 
-  function getClassNames(element: {
-    classList?: unknown;
-    className?: unknown;
-  }): string[] {
+  function getClassNames(element: { classList?: unknown; className?: unknown }): string[] {
     const classList = element.classList;
     if (classList && typeof classList === "object") {
       if (Symbol.iterator in classList) {
@@ -343,11 +437,12 @@ export function captureComputedStyleSnapshotForTargetSelectorsInDom(input: {
     return [];
   }
 
-  const getStyle = typeof getComputedStyle === "function"
-    ? getComputedStyle
-    : typeof window !== "undefined" && typeof window.getComputedStyle === "function"
-      ? window.getComputedStyle.bind(window)
-      : null;
+  const getStyle =
+    typeof getComputedStyle === "function"
+      ? getComputedStyle
+      : typeof window !== "undefined" && typeof window.getComputedStyle === "function"
+        ? window.getComputedStyle.bind(window)
+        : null;
   if (!getStyle) {
     throw new Error("getComputedStyle is not available in this realm");
   }
@@ -358,10 +453,7 @@ export function captureComputedStyleSnapshotForTargetSelectorsInDom(input: {
     return semanticTags.has(element.tagName.toLowerCase());
   }
 
-  function buildElementKey(
-    element: HTMLElement,
-    tagCounters: Record<string, number>,
-  ): string {
+  function buildElementKey(element: HTMLElement, tagCounters: Record<string, number>): string {
     if (element.id) return `#${element.id}`;
     const classNames = getClassNames(element);
     if (classNames.length > 0) return `.${classNames.join(".")}`;
@@ -370,7 +462,7 @@ export function captureComputedStyleSnapshotForTargetSelectorsInDom(input: {
     const parentClass = element.parentElement ? getClassNames(element.parentElement)[0] : undefined;
     const ctx = parentClass ? `.${parentClass}` : "";
     const counterKey = `${ctx}>${tag}`;
-    const count = tagCounters[counterKey] = (tagCounters[counterKey] ?? 0) + 1;
+    const count = (tagCounters[counterKey] = (tagCounters[counterKey] ?? 0) + 1);
     return `${ctx}>${tag}[${count}]`;
   }
 
@@ -378,7 +470,9 @@ export function captureComputedStyleSnapshotForTargetSelectorsInDom(input: {
   for (const selector of selectors) {
     try {
       targets.push(...document.querySelectorAll(selector));
-    } catch { /* invalid selector */ }
+    } catch {
+      /* invalid selector */
+    }
   }
 
   const tagCounters: Record<string, number> = {};
@@ -417,15 +511,18 @@ export function collectInteractionTargetPlansInDom(): InteractionTargetPlan[] {
   for (const sheet of document.styleSheets) {
     try {
       for (const rule of sheet.cssRules) {
-        const isStyleRule = typeof CSSStyleRule === "undefined"
-          ? typeof (rule as { selectorText?: unknown }).selectorText === "string"
-          : rule instanceof CSSStyleRule;
+        const isStyleRule =
+          typeof CSSStyleRule === "undefined"
+            ? typeof (rule as { selectorText?: unknown }).selectorText === "string"
+            : rule instanceof CSSStyleRule;
         if (!isStyleRule) continue;
         const selectorText = (rule as CSSStyleRule).selectorText;
         if (!/:(focus-visible|focus-within|focus|hover|active)\b/.test(selectorText)) continue;
         selectorTexts.push(selectorText);
       }
-    } catch { /* cross-origin */ }
+    } catch {
+      /* cross-origin */
+    }
   }
 
   const plans: InteractionTargetPlan[] = [];
@@ -433,14 +530,14 @@ export function collectInteractionTargetPlansInDom(): InteractionTargetPlan[] {
   for (const selectorText of selectorTexts) {
     for (const rawSelector of selectorText.split(",")) {
       const selector = rawSelector.trim();
-        if (!selector || !/:(focus-visible|focus-within|focus|hover|active)\b/.test(selector)) continue;
-        const normalizedSelector = selector
-          .replace(/:(focus-visible|focus-within|focus|hover|active)\b/g, "")
-          .replace(/::[\w-]+/g, "")
-          .replace(/\s+/g, " ")
-          .replace(/\s*([>+~])\s*/g, " $1 ")
-          .trim();
-        if (!normalizedSelector) continue;
+      if (!selector || !/:(focus-visible|focus-within|focus|hover|active)\b/.test(selector)) continue;
+      const normalizedSelector = selector
+        .replace(/:(focus-visible|focus-within|focus|hover|active)\b/g, "")
+        .replace(/::[\w-]+/g, "")
+        .replace(/\s+/g, " ")
+        .replace(/\s*([>+~])\s*/g, " $1 ")
+        .trim();
+      if (!normalizedSelector) continue;
       const forcedStates: ForcedPseudoState[] = [];
       {
         const seenStates = new Set<string>();
@@ -472,35 +569,65 @@ export function collectInteractionTargetPlansInDom(): InteractionTargetPlan[] {
 export async function waitForInteractionStylesInDom(): Promise<void> {
   try {
     void (document.documentElement as HTMLElement | undefined)?.offsetHeight;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
-  const waitFrame = () => new Promise<void>((resolve) => {
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => resolve());
-      return;
-    }
-    setTimeout(resolve, 0);
-  });
+  const waitFrame = () =>
+    new Promise<void>((resolve) => {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      setTimeout(resolve, 0);
+    });
 
   await waitFrame();
   await waitFrame();
 }
 
-export async function captureEmulatedInteractionStyleSnapshotInDom(
-  props: string[],
-): Promise<ComputedStyleSnapshot> {
+export async function captureEmulatedInteractionStyleSnapshotInDom(props: string[]): Promise<ComputedStyleSnapshot> {
   const results: ComputedStyleSnapshot = {};
   const semanticTags = new Set([
-    "main", "nav", "header", "footer", "aside", "article", "section",
-    "table", "thead", "tbody", "tr", "th", "td", "ul", "ol", "li",
-    "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "button", "input", "select", "textarea",
-    "pre", "code", "blockquote", "img", "span", "div", "form", "label",
+    "main",
+    "nav",
+    "header",
+    "footer",
+    "aside",
+    "article",
+    "section",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "p",
+    "a",
+    "button",
+    "input",
+    "select",
+    "textarea",
+    "pre",
+    "code",
+    "blockquote",
+    "img",
+    "span",
+    "div",
+    "form",
+    "label",
   ]);
 
-  function getClassNames(element: {
-    classList?: unknown;
-    className?: unknown;
-  }): string[] {
+  function getClassNames(element: { classList?: unknown; className?: unknown }): string[] {
     const classList = element.classList;
     if (classList && typeof classList === "object") {
       if (Symbol.iterator in classList) {
@@ -525,11 +652,12 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
     return [];
   }
 
-  const getStyle = typeof getComputedStyle === "function"
-    ? getComputedStyle
-    : typeof window !== "undefined" && typeof window.getComputedStyle === "function"
-      ? window.getComputedStyle.bind(window)
-      : null;
+  const getStyle =
+    typeof getComputedStyle === "function"
+      ? getComputedStyle
+      : typeof window !== "undefined" && typeof window.getComputedStyle === "function"
+        ? window.getComputedStyle.bind(window)
+        : null;
   if (!getStyle) {
     throw new Error("getComputedStyle is not available in this realm");
   }
@@ -540,10 +668,7 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
     return semanticTags.has(element.tagName.toLowerCase());
   }
 
-  function buildElementKey(
-    element: HTMLElement,
-    tagCounters: Record<string, number>,
-  ): string {
+  function buildElementKey(element: HTMLElement, tagCounters: Record<string, number>): string {
     if (element.id) return `#${element.id}`;
     const classNames = getClassNames(element);
     if (classNames.length > 0) return `.${classNames.join(".")}`;
@@ -552,7 +677,7 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
     const parentClass = element.parentElement ? getClassNames(element.parentElement)[0] : undefined;
     const ctx = parentClass ? `.${parentClass}` : "";
     const counterKey = `${ctx}>${tag}`;
-    const count = tagCounters[counterKey] = (tagCounters[counterKey] ?? 0) + 1;
+    const count = (tagCounters[counterKey] = (tagCounters[counterKey] ?? 0) + 1);
     return `${ctx}>${tag}[${count}]`;
   }
 
@@ -562,9 +687,10 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
   for (const sheet of document.styleSheets) {
     try {
       for (const rule of sheet.cssRules) {
-        const isStyleRule = typeof CSSStyleRule === "undefined"
-          ? typeof (rule as { selectorText?: unknown }).selectorText === "string"
-          : rule instanceof CSSStyleRule;
+        const isStyleRule =
+          typeof CSSStyleRule === "undefined"
+            ? typeof (rule as { selectorText?: unknown }).selectorText === "string"
+            : rule instanceof CSSStyleRule;
         if (!isStyleRule) continue;
         const selectorText = (rule as CSSStyleRule).selectorText;
         if (!/:(focus-visible|focus-within|focus|hover|active)\b/.test(selectorText)) continue;
@@ -589,7 +715,9 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
           if (normalizedSelector) targetSelectors.add(normalizedSelector);
         }
       }
-    } catch { /* cross-origin */ }
+    } catch {
+      /* cross-origin */
+    }
   }
 
   if (emulatedRules.length === 0 || targetSelectors.size === 0) return {};
@@ -602,15 +730,18 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
   try {
     try {
       void (document.documentElement as HTMLElement | undefined)?.offsetHeight;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
-    const waitFrame = () => new Promise<void>((resolve) => {
-      if (typeof requestAnimationFrame === "function") {
-        requestAnimationFrame(() => resolve());
-        return;
-      }
-      setTimeout(resolve, 0);
-    });
+    const waitFrame = () =>
+      new Promise<void>((resolve) => {
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(() => resolve());
+          return;
+        }
+        setTimeout(resolve, 0);
+      });
 
     await waitFrame();
     await waitFrame();
@@ -656,9 +787,7 @@ export async function captureEmulatedInteractionStyleSnapshotInDom(
   }
 }
 
-export function computedStyleSnapshotToMap(
-  snapshot: ComputedStyleSnapshot,
-): Map<string, Record<string, string>> {
+export function computedStyleSnapshotToMap(snapshot: ComputedStyleSnapshot): Map<string, Record<string, string>> {
   const map = new Map<string, Record<string, string>>();
   for (const [selector, props] of Object.entries(snapshot)) {
     map.set(selector, props);
@@ -668,17 +797,14 @@ export function computedStyleSnapshotToMap(
 
 // esbuild injects __name(fn, "name") calls into Function.toString() output.
 // Polyfill it as a no-op for page.evaluate contexts.
-export const ESBUILD_NAME_POLYFILL = "var __name = typeof __name !== 'undefined' ? __name : function(fn) { return fn; };";
+export const ESBUILD_NAME_POLYFILL =
+  "var __name = typeof __name !== 'undefined' ? __name : function(fn) { return fn; };";
 
-export function buildComputedStyleCaptureExpression(
-  props: string[] = TRACKED_PROPERTIES,
-): string {
+export function buildComputedStyleCaptureExpression(props: string[] = TRACKED_PROPERTIES): string {
   return `(function(){ ${ESBUILD_NAME_POLYFILL} return (${captureComputedStyleSnapshotInDom.toString()})(${JSON.stringify(props)}); })()`;
 }
 
-export function buildComputedStyleCaptureJsonExpression(
-  props: string[] = TRACKED_PROPERTIES,
-): string {
+export function buildComputedStyleCaptureJsonExpression(props: string[] = TRACKED_PROPERTIES): string {
   return `JSON.stringify(${buildComputedStyleCaptureExpression(props)})`;
 }
 
@@ -699,9 +825,7 @@ export function parseComputedStyleSnapshot(value: unknown): ComputedStyleSnapsho
 }
 
 export function hasMeaningfulComputedStyleSnapshot(snapshot: ComputedStyleSnapshot): boolean {
-  return Object.values(snapshot).some((props) =>
-    Object.values(props).some((value) => value.trim().length > 0)
-  );
+  return Object.values(snapshot).some((props) => Object.values(props).some((value) => value.trim().length > 0));
 }
 
 function safeJsonParse(value: string): unknown {

@@ -11,11 +11,9 @@ let manifestPath: string;
 const CLI_PATH = new URL("./cli/vlmkit.ts", import.meta.url).pathname;
 
 function cli(...argv: string[]): { stdout: string; stderr: string; status: number } {
-  const result = spawnSync(
-    "node",
-    ["--experimental-strip-types", CLI_PATH, "manifest", ...argv],
-    { encoding: "utf-8" },
-  );
+  const result = spawnSync("node", ["--experimental-strip-types", CLI_PATH, "manifest", ...argv], {
+    encoding: "utf-8",
+  });
   return {
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
@@ -58,10 +56,19 @@ describe("vlmkit manifest CLI", () => {
 
   it("add: encodes tolerance flags into the rule.tolerance object", async () => {
     const r = cli(
-      "add", "--selector", ".hero__body",
-      "--max-px", "2", "--max-ratio", "0.01",
-      "--reason", "AA artifact", "--expires", farFuture,
-      "--path", manifestPath,
+      "add",
+      "--selector",
+      ".hero__body",
+      "--max-px",
+      "2",
+      "--max-ratio",
+      "0.01",
+      "--reason",
+      "AA artifact",
+      "--expires",
+      farFuture,
+      "--path",
+      manifestPath,
     );
     assert.equal(r.status, 0);
     const raw = JSON.parse(await readFile(manifestPath, "utf-8"));
@@ -125,9 +132,16 @@ describe("vlmkit manifest CLI", () => {
     // Seed an already-expired rule into a fresh manifest so we don't
     // depend on previous tests' state.
     const expiredPath = join(tmp, "expired.json");
-    await writeFile(expiredPath, JSON.stringify({
-      rules: [{ selector: ".legacy", reason: "stale", expires: "2020-01-01" }],
-    }, null, 2));
+    await writeFile(
+      expiredPath,
+      JSON.stringify(
+        {
+          rules: [{ selector: ".legacy", reason: "stale", expires: "2020-01-01" }],
+        },
+        null,
+        2,
+      ),
+    );
     const r = cli("check", "--path", expiredPath);
     assert.equal(r.status, 1);
     assert.match(r.stdout, /EXPIRED/);
@@ -173,8 +187,13 @@ const FAKE_REPORT = {
           deltaPx: 1,
           scope: "subset",
           candidates: [
-            { selector: ".hero__body", property: "padding-top",
-              baselineValue: "24px", variantValue: "25px", viewport: "mobile" },
+            {
+              selector: ".hero__body",
+              property: "padding-top",
+              baselineValue: "24px",
+              variantValue: "25px",
+              viewport: "mobile",
+            },
           ],
         },
         {
@@ -185,8 +204,13 @@ const FAKE_REPORT = {
           deltaPx: 24,
           scope: "subset",
           candidates: [
-            { selector: ".profile", property: "margin-top",
-              baselineValue: "0px", variantValue: "24px", viewport: "desktop" },
+            {
+              selector: ".profile",
+              property: "margin-top",
+              baselineValue: "0px",
+              variantValue: "24px",
+              viewport: "desktop",
+            },
           ],
         },
         {
@@ -218,8 +242,17 @@ describe("vlmkit manifest add --from-run", () => {
   });
 
   it("default filter (low ∧ |Δ|≤2) auto-acknowledges sub-pixel suggestions with candidates", async () => {
-    const r = cli("add", "--from-run", runDir, "--reason", "AA jitter",
-      "--expires", "2026-08-15", "--path", manifestPathFromRun);
+    const r = cli(
+      "add",
+      "--from-run",
+      runDir,
+      "--reason",
+      "AA jitter",
+      "--expires",
+      "2026-08-15",
+      "--path",
+      manifestPathFromRun,
+    );
     assert.equal(r.status, 0);
     const m = JSON.parse(await readFile(manifestPathFromRun, "utf-8"));
     // suggestion 1: low + 1px + has candidate → added
@@ -236,8 +269,7 @@ describe("vlmkit manifest add --from-run", () => {
 
   it("--top N broadens to the first N suggestions regardless of confidence", async () => {
     const fresh = join(runDir, "top.json");
-    const r = cli("add", "--from-run", runDir, "--top", "2",
-      "--reason", "acknowledged", "--path", fresh);
+    const r = cli("add", "--from-run", runDir, "--top", "2", "--reason", "acknowledged", "--path", fresh);
     assert.equal(r.status, 0);
     const m = JSON.parse(await readFile(fresh, "utf-8"));
     assert.equal(m.rules.length, 2);
@@ -246,16 +278,14 @@ describe("vlmkit manifest add --from-run", () => {
 
   it("--dry-run does not write the manifest", async () => {
     const fresh = join(runDir, "dry.json");
-    const r = cli("add", "--from-run", runDir, "--top", "1", "--dry-run",
-      "--reason", "noop", "--path", fresh);
+    const r = cli("add", "--from-run", runDir, "--top", "1", "--dry-run", "--reason", "noop", "--path", fresh);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /dry-run/);
     assert.throws(() => readFileSyncOrEmpty(fresh));
   });
 
   it("errors when diff-report.json is missing", () => {
-    const r = cli("add", "--from-run", "/nonexistent/path",
-      "--path", manifestPathFromRun);
+    const r = cli("add", "--from-run", "/nonexistent/path", "--path", manifestPathFromRun);
     assert.equal(r.status, 1);
     assert.match(r.stderr, /no diff-report\.json/);
   });

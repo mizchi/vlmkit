@@ -11,7 +11,7 @@
 import { existsSync } from "node:fs";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve, relative} from "node:path";
+import { dirname, resolve, relative } from "node:path";
 import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
 import {
   buildPreviousRunSummary,
@@ -22,8 +22,8 @@ import {
 } from "../../vrt/compare/diff-for-agent.ts";
 
 const defaultHistoryPath = (): string =>
-  relative(process.cwd(), resolveStatePath(process.cwd(), "last-diff-for-agent.json"))
-  || `${STATE_DIR}/last-diff-for-agent.json`;
+  relative(process.cwd(), resolveStatePath(process.cwd(), "last-diff-for-agent.json")) ||
+  `${STATE_DIR}/last-diff-for-agent.json`;
 
 function usage(): string {
   return [

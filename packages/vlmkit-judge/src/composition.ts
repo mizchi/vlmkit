@@ -236,7 +236,6 @@ export interface CompositionReport {
   verdict: "composed" | "unbalanced" | "not-judged";
 }
 
-
 /** What judging needs beyond the snapshot: the exemptions, nothing about how the page was loaded. */
 export interface CompositionJudgeOptions {
   /** `--allow "<selector>;<reason>"` for a deviation that is deliberate. */
@@ -344,10 +343,7 @@ interface StackSlot {
   index: number;
 }
 
-function stackSlots(
-  boxes: readonly CompositionBox[],
-  kids: Map<number, CompositionBox[]>,
-): Map<number, StackSlot> {
+function stackSlots(boxes: readonly CompositionBox[], kids: Map<number, CompositionBox[]>): Map<number, StackSlot> {
   const slots = new Map<number, StackSlot>();
   for (const [parent, list] of kids) {
     if (list.length < 2) continue;
@@ -434,11 +430,7 @@ interface GapAbove {
  * in markup a reader never sees.)
  */
 export const KICKER_SIZE_RATIO = 2;
-function isKicker(
-  prev: CompositionBox,
-  labelFontSize: number,
-  kids: Map<number, CompositionBox[]>,
-): boolean {
+function isKicker(prev: CompositionBox, labelFontSize: number, kids: Map<number, CompositionBox[]>): boolean {
   if (prev.textLen === 0) return false;
   const prevFont = maxFont(prev, kids);
   if (prevFont <= 0) return false;
@@ -485,7 +477,10 @@ function gapAbove(
     if (slot.index > 0) {
       const prev = slot.stack[slot.index - 1]!;
       // A kicker is part of the title block: keep looking above IT.
-      if (isKicker(prev, labelFontSize, kids)) { cur = prev; continue; }
+      if (isKicker(prev, labelFontSize, kids)) {
+        cur = prev;
+        continue;
+      }
       const gap = Math.round((cur.y - bottom(prev)) * 10) / 10;
       // Flush against the block above means the separation is done by PAINT (a
       // background or a rule), not by space, so there is no gap to compare and
@@ -535,8 +530,12 @@ export function measureProximity(boxes: readonly CompositionBox[]): {
         continue;
       }
       labels.push({
-        selector: c.selector, parent: boxes[parent]!.selector, level,
-        before: above.gap, after, boundary: above.via,
+        selector: c.selector,
+        parent: boxes[parent]!.selector,
+        level,
+        before: above.gap,
+        after,
+        boundary: above.via,
         inverted: after >= above.gap * PROXIMITY_RATIO && after - above.gap >= PROXIMITY_FLOOR_PX,
         firstChild: i === 0,
       });
@@ -598,10 +597,7 @@ function sharedParent(
  * still get wrong is the rail BETWEEN containers, which is where a stray margin
  * on one section shows up.
  */
-export function measureRails(
-  boxes: readonly CompositionBox[],
-  viewportWidth: number,
-): CompositionReport["rails"] {
+export function measureRails(boxes: readonly CompositionBox[], viewportWidth: number): CompositionReport["rails"] {
   const wide = boxes.filter((b) => inFlow(b) && b.w >= viewportWidth * RAIL_WIDTH_FRACTION);
   const tally = (pick: (b: CompositionBox) => number) => {
     const counts = new Map<number, CompositionBox[]>();
@@ -627,9 +623,14 @@ export function measureRails(
       const pair = sharedParent(entries[i - 1]![1], users, boxes);
       if (!pair) continue;
       out.push({
-        axis, a: entries[i - 1]![0], b: entries[i]![0], delta,
-        users: users.length, selector: pair.onB.selector,
-        via: pair.via.selector, siblingOnA: pair.onA.selector,
+        axis,
+        a: entries[i - 1]![0],
+        b: entries[i]![0],
+        delta,
+        users: users.length,
+        selector: pair.onB.selector,
+        via: pair.via.selector,
+        siblingOnA: pair.onA.selector,
       });
     }
     return out;
@@ -677,7 +678,8 @@ export function measureSeparation(boxes: readonly CompositionBox[]): Composition
   const a = median(intra);
   const b = median(inter);
   return {
-    intra: a, inter: b,
+    intra: a,
+    inter: b,
     ratio: a === 0 ? 0 : Math.round((b / a) * 100) / 100,
     samples: inter.length,
   };
@@ -710,7 +712,10 @@ export function measureHierarchy(boxes: readonly CompositionBox[]): CompositionR
   let bodyFontSize = 0;
   let bodyCount = 0;
   for (const [size, members] of sizeCounts) {
-    if (members.length > bodyCount) { bodyFontSize = size; bodyCount = members.length; }
+    if (members.length > bodyCount) {
+      bodyFontSize = size;
+      bodyCount = members.length;
+    }
   }
   const bodyMembers = sizeCounts.get(bodyFontSize) ?? [];
   const weightCounts = new Map<number, number>();
@@ -719,7 +724,12 @@ export function measureHierarchy(boxes: readonly CompositionBox[]): CompositionR
   const maxFontSize = leaves.length === 0 ? 0 : Math.max(...leaves.map((b) => b.fontSize));
   const boldest = leaves.length === 0 ? bodyWeight : Math.max(bodyWeight, ...leaves.map((b) => b.fontWeight));
   return {
-    levels: ordered.map(([level, b]) => ({ level, fontSize: b.fontSize, fontWeight: b.fontWeight, selector: b.selector })),
+    levels: ordered.map(([level, b]) => ({
+      level,
+      fontSize: b.fontSize,
+      fontWeight: b.fontWeight,
+      selector: b.selector,
+    })),
     flat,
     bodyFontSize,
     maxFontSize,
@@ -750,12 +760,19 @@ export function judgeComposition(
       severity: "warn",
       selector: l.selector,
       message:
-        `${l.selector} (h${l.level}) sits ${l.before}px below ${l.boundary}`
-        + ` but ${l.after}px above the content it labels, inside ${l.parent}`
-        + ` — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward.`
-        + ` Reduce the gap under it below ${Math.max(Math.round(l.before * PROXIMITY_RATIO) - 1, l.before + PROXIMITY_FLOOR_PX - 1)}px,`
-        + ` or widen the gap above it. This reports the ambiguity, not which gap is correct.`,
-      evidence: { before: l.before, after: l.after, level: l.level, parent: l.parent, boundary: l.boundary, firstChild: l.firstChild },
+        `${l.selector} (h${l.level}) sits ${l.before}px below ${l.boundary}` +
+        ` but ${l.after}px above the content it labels, inside ${l.parent}` +
+        ` — a label reads as belonging to whatever it is CLOSEST to, so this one groups upward.` +
+        ` Reduce the gap under it below ${Math.max(Math.round(l.before * PROXIMITY_RATIO) - 1, l.before + PROXIMITY_FLOOR_PX - 1)}px,` +
+        ` or widen the gap above it. This reports the ambiguity, not which gap is correct.`,
+      evidence: {
+        before: l.before,
+        after: l.after,
+        level: l.level,
+        parent: l.parent,
+        boundary: l.boundary,
+        firstChild: l.firstChild,
+      },
     });
   }
   if (inverted.length > 5) {
@@ -773,14 +790,19 @@ export function judgeComposition(
       severity: "info",
       selector: n.selector,
       message:
-        `Two children of ${n.via} sit on ${n.axis} rails ${n.delta}px apart`
-        + ` (${n.siblingOnA} at ${n.a}px, ${n.selector} at ${n.b}px; ${n.users} block(s) on the second).`
-        + ` Siblings share a containing block, so the same edge was available to both`
-        + ` — nobody designs a ${n.delta}px indent, so this is usually a stray margin. A ${n.delta}px`
-        + ` split is at the edge of what a reader can see, which is why this never carries the verdict.`,
+        `Two children of ${n.via} sit on ${n.axis} rails ${n.delta}px apart` +
+        ` (${n.siblingOnA} at ${n.a}px, ${n.selector} at ${n.b}px; ${n.users} block(s) on the second).` +
+        ` Siblings share a containing block, so the same edge was available to both` +
+        ` — nobody designs a ${n.delta}px indent, so this is usually a stray margin. A ${n.delta}px` +
+        ` split is at the edge of what a reader can see, which is why this never carries the verdict.`,
       evidence: {
-        axis: n.axis, a: n.a, b: n.b, delta: n.delta, users: n.users,
-        via: n.via, siblingOnA: n.siblingOnA,
+        axis: n.axis,
+        a: n.a,
+        b: n.b,
+        delta: n.delta,
+        users: n.users,
+        via: n.via,
+        siblingOnA: n.siblingOnA,
       },
     });
   }
@@ -791,36 +813,38 @@ export function judgeComposition(
       severity: "warn",
       selector: f.selector,
       message:
-        `${f.pair} both render at ${f.sizes.split("/")[1]}px (${f.sizes}) at the same weight`
-        + ` — the page DECLARES two heading levels and renders one, so the structure it asserts is invisible.`
-        + ` e.g. ${f.selector}. Either separate the sizes or carry the level with weight.`,
+        `${f.pair} both render at ${f.sizes.split("/")[1]}px (${f.sizes}) at the same weight` +
+        ` — the page DECLARES two heading levels and renders one, so the structure it asserts is invisible.` +
+        ` e.g. ${f.selector}. Either separate the sizes or carry the level with weight.`,
       evidence: { pair: f.pair, sizes: f.sizes },
     });
   }
 
   const textLeaves = boxes.filter((b) => b.leaf && b.textLen >= 2).length;
   if (
-    hierarchy.bodyFontSize > 0
-    && textLeaves >= CONTRAST_MIN_LEAVES
+    hierarchy.bodyFontSize > 0 &&
+    textLeaves >= CONTRAST_MIN_LEAVES &&
     // The page has to CLAIM a hierarchy before failing to render one. A page
     // with no heading at all is a list, and "nothing reads as the most
     // important" describes a list correctly rather than finding a defect in it:
     // danluu.com is a date-and-link index, every row 16px/400 by design, and it
     // was the one live-corpus page this rule fired on.
-    && hierarchy.levels.length > 0
-    && hierarchy.range < RANGE_FLOOR
-    && hierarchy.weightDelta < WEIGHT_STEP
+    hierarchy.levels.length > 0 &&
+    hierarchy.range < RANGE_FLOOR &&
+    hierarchy.weightDelta < WEIGHT_STEP
   ) {
     findings.push({
       kind: "no-type-contrast",
       severity: "warn",
       message:
-        `The largest text on the page is ${hierarchy.maxFontSize}px against ${hierarchy.bodyFontSize}px body`
-        + ` (${hierarchy.range}x) and nothing is more than ${hierarchy.weightDelta} weight units heavier`
-        + ` — nothing is emphasized by either size or weight, so no element reads as the most important.`,
+        `The largest text on the page is ${hierarchy.maxFontSize}px against ${hierarchy.bodyFontSize}px body` +
+        ` (${hierarchy.range}x) and nothing is more than ${hierarchy.weightDelta} weight units heavier` +
+        ` — nothing is emphasized by either size or weight, so no element reads as the most important.`,
       evidence: {
-        range: hierarchy.range, weightDelta: hierarchy.weightDelta,
-        maxFontSize: hierarchy.maxFontSize, bodyFontSize: hierarchy.bodyFontSize,
+        range: hierarchy.range,
+        weightDelta: hierarchy.weightDelta,
+        maxFontSize: hierarchy.maxFontSize,
+        bodyFontSize: hierarchy.bodyFontSize,
       },
     });
   }
@@ -835,17 +859,22 @@ export function judgeComposition(
       kind: "nothing-judged",
       severity: "info",
       message:
-        `No label, heading pair or page rail could be measured, so this verdict rests on no`
-        + ` composition evidence (${boxes.length} visible box(es);`
-        + ` ${unjudged.length} label(s) skipped as flush with their group edge).`
-        + ` Composition is measured on heading-led groups and on blocks spanning`
-        + ` >=${Math.round(RAIL_WIDTH_FRACTION * 100)}% of the viewport; a page built from neither has nothing to judge.`,
+        `No label, heading pair or page rail could be measured, so this verdict rests on no` +
+        ` composition evidence (${boxes.length} visible box(es);` +
+        ` ${unjudged.length} label(s) skipped as flush with their group edge).` +
+        ` Composition is measured on heading-led groups and on blocks spanning` +
+        ` >=${Math.round(RAIL_WIDTH_FRACTION * 100)}% of the viewport; a page built from neither has nothing to judge.`,
     });
   }
 
   const carries = findings.some((f) => f.severity === "warn" || f.severity === "suspect");
   return {
-    labels, labelsUnjudged: unjudged, rails, separation, hierarchy, findings,
+    labels,
+    labelsUnjudged: unjudged,
+    rails,
+    separation,
+    hierarchy,
+    findings,
     boxes: boxes.length,
     allowed: allow.allowed,
     unusedAllow: allow.unused(),

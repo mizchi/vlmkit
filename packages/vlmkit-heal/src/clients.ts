@@ -73,7 +73,8 @@ export function createRealObserveClient(): ObserveClient {
       const prompt =
         "A visual regression test failed. Decide if the change looks like an " +
         "INTENTIONAL UI change or a REGRESSION. Answer with exactly one word: " +
-        "intentional-change OR regression.\n\nReport:\n" + textReport;
+        "intentional-change OR regression.\n\nReport:\n" +
+        textReport;
       const res = await completeForTier(tier, prompt, true, screenshotPng);
       const word = res.content.toLowerCase();
       const verdict = word.includes("intentional")

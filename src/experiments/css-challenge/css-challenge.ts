@@ -13,9 +13,18 @@
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
-import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import {
+  diagnoseSandboxLaunchFailure,
+  formatPlaywrightLaunchError,
+  isPlaywrightSandboxRestrictionError,
+} from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
-import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeType, loadApprovalManifest } from "../../vrt/snapshot/approval.ts";
+import {
+  applyApprovalToVrtDiff,
+  collectApprovalWarnings,
+  inferApprovalChangeType,
+  loadApprovalManifest,
+} from "../../vrt/snapshot/approval.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 // `applyCssFix` from core rather than the byte-identical copy that lived here. Two
 // copies of a CSS mutator is one place for a fix to land and one to be forgotten —
@@ -55,7 +64,9 @@ const STRICT = hasFlag("strict");
 const VIEWPORT = { width: 1280, height: 900 };
 
 const BG_GREEN = "\x1b[42m";
-function banner(text: string) { console.log(`\n${BOLD}${CYAN}▸ ${text}${RESET}\n`); }
+function banner(text: string) {
+  console.log(`\n${BOLD}${CYAN}▸ ${text}${RESET}\n`);
+}
 
 // Kitty graphics
 function kittyShow(pngBuffer: Buffer, cols = 60) {
@@ -77,15 +88,25 @@ const SHOW_IMAGES = !process.env.NO_IMAGES;
 
 async function showPng(path: string, label: string) {
   console.log(`  ${DIM}${label}:${RESET}`);
-  if (!SHOW_IMAGES) { console.log(`  ${DIM}(image: ${path})${RESET}`); return; }
-  try { kittyShow(await readFile(path)); } catch { console.log("  (image not available)"); }
+  if (!SHOW_IMAGES) {
+    console.log(`  ${DIM}(image: ${path})${RESET}`);
+    return;
+  }
+  try {
+    kittyShow(await readFile(path));
+  } catch {
+    console.log("  (image not available)");
+  }
 }
 
 // ---- CSS manipulation ----
 
 // ---- Playwright capture ----
 
-async function capturePageState(html: string, screenshotPath: string): Promise<{ a11yTree: A11yNode; screenshotPath: string }> {
+async function capturePageState(
+  html: string,
+  screenshotPath: string,
+): Promise<{ a11yTree: A11yNode; screenshotPath: string }> {
   // `withBrowser`, not `launchBrowser`: this is one straight-line scope with no
   // handoff and no early exit, and it is called once per round of a benchmark
   // loop — so a throw before the close leaks a Chromium *inside a process that
@@ -97,34 +118,39 @@ async function capturePageState(html: string, screenshotPath: string): Promise<{
   // it: `diagnoseSandboxLaunchFailure` declines anything that is not the
   // Codex/macOS case, so core's missing-browser message still applies and an
   // unrecognized failure is rethrown untouched.
-  return withBrowser(async (browser) => {
-    const page = await browser.newPage({ viewport: VIEWPORT });
-    await page.setContent(html, { waitUntil: "networkidle" });
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+  return withBrowser(
+    async (browser) => {
+      const page = await browser.newPage({ viewport: VIEWPORT });
+      await page.setContent(html, { waitUntil: "networkidle" });
+      await page.screenshot({ path: screenshotPath, fullPage: true });
 
-    // Capture a11y tree via CDP
-    let a11yTree: A11yNode = { role: "document", name: "", children: [] };
-    try {
-      const client = await page.context().newCDPSession(page);
-      const result = await client.send("Accessibility.getFullAXTree");
-      a11yTree = cdpNodesToTree(result.nodes) as A11yNode;
-      await client.detach();
-    } catch {
-      // Fallback: minimal tree
-    }
+      // Capture a11y tree via CDP
+      let a11yTree: A11yNode = { role: "document", name: "", children: [] };
+      try {
+        const client = await page.context().newCDPSession(page);
+        const result = await client.send("Accessibility.getFullAXTree");
+        a11yTree = cdpNodesToTree(result.nodes) as A11yNode;
+        await client.detach();
+      } catch {
+        // Fallback: minimal tree
+      }
 
-    return { a11yTree, screenshotPath };
-  }, { diagnose: diagnoseSandboxLaunchFailure });
+      return { a11yTree, screenshotPath };
+    },
+    { diagnose: diagnoseSandboxLaunchFailure },
+  );
 }
 
-function cdpNodesToTree(nodes: Array<{
-  nodeId: string;
-  parentId?: string;
-  role?: { value?: string };
-  name?: { value?: string };
-  properties?: Array<{ name: string; value: { value?: unknown } }>;
-  childIds?: string[];
-}>): unknown {
+function cdpNodesToTree(
+  nodes: Array<{
+    nodeId: string;
+    parentId?: string;
+    role?: { value?: string };
+    name?: { value?: string };
+    properties?: Array<{ name: string; value: { value?: unknown } }>;
+    childIds?: string[];
+  }>,
+): unknown {
   if (!nodes || nodes.length === 0) return { role: "document", name: "", children: [] };
 
   const nodeMap = new Map<string, Record<string, unknown>>();
@@ -212,7 +238,10 @@ export async function runCssChallengeDemo() {
 
   // Extract CSS from <style id="target-css">
   const cssMatch = htmlRaw.match(/<style id="target-css">([\s\S]*?)<\/style>/);
-  if (!cssMatch) { console.error("Could not find <style id=\"target-css\">"); process.exit(1); }
+  if (!cssMatch) {
+    console.error('Could not find <style id="target-css">');
+    process.exit(1);
+  }
   const originalCss = cssMatch[1];
 
   // Parse declarations and pick one to remove
@@ -247,7 +276,10 @@ export async function runCssChallengeDemo() {
   console.log(`  ${DIM}A11y issues: ${baselineIssues.length}${RESET}`);
 
   let nodeCount = 0;
-  function countNodes(node: A11yNode) { nodeCount++; for (const c of node.children ?? []) countNodes(c); }
+  function countNodes(node: A11yNode) {
+    nodeCount++;
+    for (const c of node.children ?? []) countNodes(c);
+  }
   countNodes(baselineState.a11yTree);
   console.log(`  ${DIM}A11y tree: ${nodeCount} nodes${RESET}`);
   console.log(`  ${DIM}CSS declarations: ${declarations.length}${RESET}`);
@@ -274,23 +306,28 @@ export async function runCssChallengeDemo() {
 
   // Visual diff
   const vrtSnap: VrtSnapshot = {
-    testId: "page", testTitle: "page", projectName: "css-challenge",
-    screenshotPath: brokenPath, baselinePath: baselinePath, status: "changed",
+    testId: "page",
+    testTitle: "page",
+    projectName: "css-challenge",
+    screenshotPath: brokenPath,
+    baselinePath: baselinePath,
+    status: "changed",
   };
   const rawVrtDiff = await compareScreenshots(vrtSnap, { outputDir: TMP });
-  const vrtApproval = rawVrtDiff && approvalManifest
-    ? applyApprovalToVrtDiff(
-      rawVrtDiff,
-      approvalManifest,
-      {
-        selector: removed.selector,
-        property: removed.property,
-        category: categorizeProperty(removed.property),
-        changeType: inferApprovalChangeType(removed.property, categorizeProperty(removed.property)),
-      },
-      { strict: STRICT },
-    )
-    : null;
+  const vrtApproval =
+    rawVrtDiff && approvalManifest
+      ? applyApprovalToVrtDiff(
+          rawVrtDiff,
+          approvalManifest,
+          {
+            selector: removed.selector,
+            property: removed.property,
+            category: categorizeProperty(removed.property),
+            changeType: inferApprovalChangeType(removed.property, categorizeProperty(removed.property)),
+          },
+          { strict: STRICT },
+        )
+      : null;
   const vrtDiff = vrtApproval?.diff ?? rawVrtDiff;
 
   let visualReport = "";
@@ -301,9 +338,12 @@ export async function runCssChallengeDemo() {
     const sem = classifyVisualDiff(vrtDiff);
     console.log(`  ${BOLD}Visual:${RESET} ${sem.summary}`);
     for (const c of sem.changes) {
-      console.log(`    ${YELLOW}~${RESET} [${c.type}] ${c.description} (confidence: ${(c.confidence * 100).toFixed(0)}%)`);
+      console.log(
+        `    ${YELLOW}~${RESET} [${c.type}] ${c.description} (confidence: ${(c.confidence * 100).toFixed(0)}%)`,
+      );
     }
-    visualReport = `Visual diff: ${(vrtDiff.diffRatio * 100).toFixed(1)}% pixels changed\n` +
+    visualReport =
+      `Visual diff: ${(vrtDiff.diffRatio * 100).toFixed(1)}% pixels changed\n` +
       `Regions: ${vrtDiff.regions.map((r) => `(${r.x},${r.y} ${r.width}x${r.height})`).join(", ")}\n` +
       `Semantic: ${sem.summary}\n` +
       sem.changes.map((c) => `  - [${c.type}] ${c.description}`).join("\n");
@@ -330,7 +370,8 @@ export async function runCssChallengeDemo() {
       const icon = c.severity === "error" ? `${RED}✗${RESET}` : `${YELLOW}~${RESET}`;
       console.log(`    ${icon} [${c.type}] ${c.description}`);
     }
-    a11yReport = `A11y changes: ${a11yDiff.changes.length}\n` +
+    a11yReport =
+      `A11y changes: ${a11yDiff.changes.length}\n` +
       a11yDiff.changes.map((c) => `  - [${c.type}] ${c.description}`).join("\n");
   } else {
     console.log(`  ${DIM}A11y: no semantic changes${RESET}`);
@@ -341,8 +382,12 @@ export async function runCssChallengeDemo() {
   if (brokenIssues.length > baselineIssues.length) {
     const newIssues = brokenIssues.length - baselineIssues.length;
     console.log(`  ${RED}New a11y issues: ${newIssues}${RESET}`);
-    a11yReport += `\nNew a11y quality issues: ${newIssues}\n` +
-      brokenIssues.slice(baselineIssues.length).map((i) => `  - [${i.severity}] ${i.rule}: ${i.message}`).join("\n");
+    a11yReport +=
+      `\nNew a11y quality issues: ${newIssues}\n` +
+      brokenIssues
+        .slice(baselineIssues.length)
+        .map((i) => `  - [${i.severity}] ${i.rule}: ${i.message}`)
+        .join("\n");
   }
 
   const fullVrtReport = `${visualReport}\n\n${a11yReport}`;
@@ -377,11 +422,7 @@ export async function runCssChallengeDemo() {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     console.log(`  ${BOLD}Attempt ${attempt}/${MAX_ATTEMPTS}${RESET}`);
 
-    const prompt = buildFixPrompt(
-      { selector: "???", property: "???" },
-      fullVrtReport,
-      currentCss,
-    );
+    const prompt = buildFixPrompt({ selector: "???", property: "???" }, fullVrtReport, currentCss);
 
     const llmStart = Date.now();
     const response = await llm.complete(prompt);
@@ -398,7 +439,8 @@ export async function runCssChallengeDemo() {
     console.log(`  ${CYAN}Proposed fix:${RESET} ${fix.selector} { ${fix.property}: ${fix.value} }`);
 
     // Check exact match
-    const exactMatch = fix.selector === removed.selector &&
+    const exactMatch =
+      fix.selector === removed.selector &&
       fix.property === removed.property &&
       normalizeValue(fix.value) === normalizeValue(removed.value);
 
@@ -411,7 +453,9 @@ export async function runCssChallengeDemo() {
       console.log(`  Selector: ${selectorOk ? GREEN + "✓" : RED + "✗"} ${RESET}(expected: ${removed.selector})`);
       console.log(`  Property: ${propertyOk ? GREEN + "✓" : RED + "✗"} ${RESET}(expected: ${removed.property})`);
       if (propertyOk) {
-        console.log(`  Value:    ${normalizeValue(fix.value) === normalizeValue(removed.value) ? GREEN + "✓" : YELLOW + "~"} ${RESET}(expected: ${removed.value}, got: ${fix.value})`);
+        console.log(
+          `  Value:    ${normalizeValue(fix.value) === normalizeValue(removed.value) ? GREEN + "✓" : YELLOW + "~"} ${RESET}(expected: ${removed.value}, got: ${fix.value})`,
+        );
       }
     }
 
@@ -423,8 +467,12 @@ export async function runCssChallengeDemo() {
 
     // Compare fixed vs baseline
     const fixedSnap: VrtSnapshot = {
-      testId: "page", testTitle: "page", projectName: "css-challenge",
-      screenshotPath: fixedPath, baselinePath: baselinePath, status: "changed",
+      testId: "page",
+      testTitle: "page",
+      projectName: "css-challenge",
+      screenshotPath: fixedPath,
+      baselinePath: baselinePath,
+      status: "changed",
     };
     const fixedDiff = await compareScreenshots(fixedSnap, { outputDir: TMP });
     const fixedDiffRatio = fixedDiff?.diffRatio ?? 0;
@@ -467,7 +515,11 @@ export async function runCssChallengeDemo() {
 }
 
 async function cleanup() {
-  try { await rm(TMP, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    await rm(TMP, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 }
 
 if (isCliEntry(import.meta.url)) {

@@ -52,7 +52,9 @@ const DEFAULT_MAX_DISTANCE = 12;
 const DEFAULT_MIN_REPORT_SHARE = 0.005;
 
 function dist(a: PaletteColor, b: PaletteColor): number {
-  const dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
+  const dr = a.r - b.r,
+    dg = a.g - b.g,
+    db = a.b - b.b;
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 

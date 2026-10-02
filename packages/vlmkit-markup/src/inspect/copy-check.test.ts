@@ -10,18 +10,27 @@ test("normalizeWhitespace collapses runs and trims", () => {
 });
 
 test("parseCopyManifest strips list markers, skips heading comments and blank lines", () => {
-  const lines = parseCopyManifest([
-    "# Hero", // markdown heading = section comment, NOT a required line
-    "- Ship dashboards in minutes",
-    "* Start free",
-    "3. Third item",
-    "",
-    "## Footer",
+  const lines = parseCopyManifest(
+    [
+      "# Hero", // markdown heading = section comment, NOT a required line
+      "- Ship dashboards in minutes",
+      "* Start free",
+      "3. Third item",
+      "",
+      "## Footer",
+      "Plain line",
+      "- #10412", // hash glued to content is NOT a heading
+      "#general",
+    ].join("\n"),
+  );
+  assert.deepEqual(lines, [
+    "Ship dashboards in minutes",
+    "Start free",
+    "Third item",
     "Plain line",
-    "- #10412", // hash glued to content is NOT a heading
+    "#10412",
     "#general",
-  ].join("\n"));
-  assert.deepEqual(lines, ["Ship dashboards in minutes", "Start free", "Third item", "Plain line", "#10412", "#general"]);
+  ]);
 });
 
 test("placeholder text is a suspect even without a manifest", () => {
@@ -153,17 +162,20 @@ test("invisible-text gaming vectors are caught; text-transform and select stay l
     const page = join(dir, "page.html");
     const manifest = join(dir, "copy.md");
     await writeFile(page, html);
-    await writeFile(manifest, [
-      "# Section heading is a comment",
-      "- Plain visible line",
-      "- Packed hidden line",
-      "- Ghost opacity line",
-      "- Transparent ink line",
-      "- Screen reader only line",
-      "- SHOUTED LINE",
-      "- Germany",
-      "- Hidden select option",
-    ].join("\n"));
+    await writeFile(
+      manifest,
+      [
+        "# Section heading is a comment",
+        "- Plain visible line",
+        "- Packed hidden line",
+        "- Ghost opacity line",
+        "- Transparent ink line",
+        "- Screen reader only line",
+        "- SHOUTED LINE",
+        "- Germany",
+        "- Hidden select option",
+      ].join("\n"),
+    );
 
     const report = await runCopyCheck({ source: page, manifestPath: manifest });
     assert.equal(report.manifestLines, 8);
@@ -204,15 +216,24 @@ test("silencing battery: geometric hiding vectors are caught, reachable text sta
       [`<p style="clip-path:inset(100%)">VEC clip path inset</p>`, "VEC clip path inset"],
       [`<div style="width:0;height:0;overflow:hidden"><p>VEC zero box</p></div>`, "VEC zero box"],
       [`<div style="background:#fff"><p style="color:#fff">VEC camouflage</p></div>`, "VEC camouflage"],
-      [`<div style="overflow-x:hidden"><p style="position:relative;left:5000px;white-space:nowrap">VEC offscreen right</p></div>`, "VEC offscreen right"],
+      [
+        `<div style="overflow-x:hidden"><p style="position:relative;left:5000px;white-space:nowrap">VEC offscreen right</p></div>`,
+        "VEC offscreen right",
+      ],
       // The unclipped right-offscreen variant extends scrollWidth and is
       // scan scroll's catch (page-overflow-x), not this gate's — see report.
     ];
     const legit: [string, string][] = [
       [`<p>LEGIT plain</p>`, "LEGIT plain"],
       [`<p style="margin-top:3000px">LEGIT below fold</p>`, "LEGIT below fold"],
-      [`<div style="height:60px;overflow-y:auto"><p style="margin-top:200px">LEGIT inner scrollport</p></div>`, "LEGIT inner scrollport"],
-      [`<div style="width:200px;overflow-x:auto"><p style="width:900px;padding-left:600px;white-space:nowrap">LEGIT h scrollport</p></div>`, "LEGIT h scrollport"],
+      [
+        `<div style="height:60px;overflow-y:auto"><p style="margin-top:200px">LEGIT inner scrollport</p></div>`,
+        "LEGIT inner scrollport",
+      ],
+      [
+        `<div style="width:200px;overflow-x:auto"><p style="width:900px;padding-left:600px;white-space:nowrap">LEGIT h scrollport</p></div>`,
+        "LEGIT h scrollport",
+      ],
     ];
     const all = [...vectors, ...legit];
     const page = join(dir, "page.html");
@@ -221,10 +242,7 @@ test("silencing battery: geometric hiding vectors are caught, reachable text sta
     await writeFile(manifest, all.map(([, line]) => line).join("\n"));
 
     const report = await runCopyCheck({ source: page, manifestPath: manifest, exploreStates: false });
-    assert.deepEqual(
-      report.invisibleLines.map((i) => i.line).sort(),
-      vectors.map(([, line]) => line).sort(),
-    );
+    assert.deepEqual(report.invisibleLines.map((i) => i.line).sort(), vectors.map(([, line]) => line).sort());
     // Reason attribution: geometric vectors read unreachable; the classic
     // hiding techniques get their specific class.
     const reasonOf = Object.fromEntries(report.invisibleLines.map((i) => [i.line, i.reason]));
@@ -277,7 +295,10 @@ test("open shadow-root copy counts as visible; hidden shadow copy still caught (
     // Visible shadow text satisfies the gate...
     assert.deepEqual(report.missingLines, [], JSON.stringify(report.issues));
     // ...but hiding copy inside a shadow root is still not a way to pass.
-    assert.deepEqual(report.invisibleLines.map((l) => l.line), ["Fees may apply"]);
+    assert.deepEqual(
+      report.invisibleLines.map((l) => l.line),
+      ["Fees may apply"],
+    );
     assert.equal(report.invisibleLines[0]!.reason, "zero-size");
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -318,13 +339,16 @@ test("disclosure-state sweep reveals details / tab / aria-expanded copy (E2E)", 
     const page = join(dir, "page.html");
     const manifest = join(dir, "copy.md");
     await writeFile(page, html);
-    await writeFile(manifest, [
-      "- Pulse",
-      "- Refunds are processed within 5 days.",
-      "- Teams start at $12 per seat",
-      "- Available in 14 regions",
-      "- Not on this page at all",
-    ].join("\n"));
+    await writeFile(
+      manifest,
+      [
+        "- Pulse",
+        "- Refunds are processed within 5 days.",
+        "- Teams start at $12 per seat",
+        "- Available in 14 regions",
+        "- Not on this page at all",
+      ].join("\n"),
+    );
 
     const report = await runCopyCheck({ source: page, manifestPath: manifest });
     assert.equal(report.statesExplored, 3);
@@ -357,10 +381,9 @@ test("forbidden copy still on the page is a suspect; copy that is gone passes", 
     forbiddenLines: ["One writer per table, and payments holds the key.", "Beta pricing ends soon"],
   });
   assert.equal(report.forbidLines, 2);
-  assert.deepEqual(
-    report.forbiddenLines,
-    [{ line: "One writer per table, and payments holds the key.", where: "visible" }],
-  );
+  assert.deepEqual(report.forbiddenLines, [
+    { line: "One writer per table, and payments holds the key.", where: "visible" },
+  ]);
   const forbidden = report.issues.filter((i) => i.kind === "copy-forbidden");
   assert.equal(forbidden.length, 1);
   assert.equal(forbidden[0]!.severity, "suspect");
@@ -411,7 +434,10 @@ test("the forbid list shares the manifest's parser, so its headings are comments
     forbiddenLines: parseCopyManifest("# Stale claims\n\n- kept verbatim\n"),
   });
   assert.equal(report.forbidLines, 1);
-  assert.deepEqual(report.forbiddenLines.map((f) => f.line), ["kept verbatim"]);
+  assert.deepEqual(
+    report.forbiddenLines.map((f) => f.line),
+    ["kept verbatim"],
+  );
 });
 
 /**
@@ -435,7 +461,18 @@ test("inline runs join the way they read; blocks, <br> and cells still separate 
     const page = join(dir, "page.html");
     const manifest = join(dir, "copy.txt");
     await writeFile(page, html);
-    await writeFile(manifest, ["汐見窯 マグカップ", "¥4,180（税込）", "青磁釉のうつわ", "Free shipping over ¥5,000.", "foobar", "line oneline two", "cellmate"].join("\n"));
+    await writeFile(
+      manifest,
+      [
+        "汐見窯 マグカップ",
+        "¥4,180（税込）",
+        "青磁釉のうつわ",
+        "Free shipping over ¥5,000.",
+        "foobar",
+        "line oneline two",
+        "cellmate",
+      ].join("\n"),
+    );
 
     const report = await runCopyCheck({ source: page, manifestPath: manifest });
     assert.deepEqual(report.invisibleLines, [], "nothing that is on screen reads as invisible");

@@ -20,11 +20,20 @@ let lines: string[] = [];
 const realLog = console.log;
 const realError = console.error;
 beforeAll(() => {
-  console.log = (...a: unknown[]) => { lines.push(a.map(String).join(" ")); };
-  console.error = (...a: unknown[]) => { lines.push(a.map(String).join(" ")); };
+  console.log = (...a: unknown[]) => {
+    lines.push(a.map(String).join(" "));
+  };
+  console.error = (...a: unknown[]) => {
+    lines.push(a.map(String).join(" "));
+  };
 });
-afterAll(() => { console.log = realLog; console.error = realError; });
-beforeEach(() => { lines = []; });
+afterAll(() => {
+  console.log = realLog;
+  console.error = realError;
+});
+beforeEach(() => {
+  lines = [];
+});
 const output = () => lines.join("\n");
 
 /** A page with a main landmark, a heading and two labelled buttons. */
@@ -33,13 +42,17 @@ const healthyTree: A11yNode = {
   name: "Dashboard",
   children: [
     {
-      role: "banner", name: "", children: [
+      role: "banner",
+      name: "",
+      children: [
         { role: "heading", name: "Dashboard", level: 1 },
         { role: "link", name: "Home" },
       ],
     },
     {
-      role: "main", name: "", children: [
+      role: "main",
+      name: "",
+      children: [
         { role: "button", name: "Save" },
         { role: "button", name: "Cancel" },
         { role: "textbox", name: "Search" },
@@ -55,7 +68,9 @@ const unlabelledTree: A11yNode = {
   name: "Dashboard",
   children: [
     {
-      role: "main", name: "", children: [
+      role: "main",
+      name: "",
+      children: [
         { role: "button", name: "" },
         { role: "button", name: "" },
       ],
@@ -68,8 +83,9 @@ const blankTree: A11yNode = { role: "WebArea", name: "", children: [] } as A11yN
 
 /** 1x1 PNG, so `screenshotExists` is true where an invariant needs it. */
 const PNG = Buffer.from(
-  "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001"
-  + "0d0a2db40000000049454e44ae426082", "hex",
+  "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001" +
+    "0d0a2db40000000049454e44ae426082",
+  "hex",
 );
 
 /** A project root with the given trees written into `snapshots/` and/or `baselines/`. */
@@ -147,12 +163,11 @@ describe("runIntrospect", () => {
 });
 
 describe("runSpecVerify", () => {
-  const specFor = (paths: SpecPaths, spec: UiSpec) =>
-    writeFileSync(paths.specPath, JSON.stringify(spec));
+  const specFor = (paths: SpecPaths, spec: UiSpec) => writeFileSync(paths.specPath, JSON.stringify(spec));
 
   it("exits 0 when every invariant holds", async () => {
     const paths = project("verify-pass", { snapshots: { home: healthyTree } });
-    await runIntrospect(paths);   // generates the spec from this very tree
+    await runIntrospect(paths); // generates the spec from this very tree
     lines = [];
     assert.equal(await runSpecVerify(paths), 0);
     const text = output();
@@ -186,7 +201,13 @@ describe("runSpecVerify", () => {
     const paths = project("verify-missing", { snapshots: { home: healthyTree } });
     specFor(paths, {
       description: "spec naming a page that no longer exists",
-      pages: [{ testId: "checkout", purpose: "buy things", invariants: [{ description: "has a main landmark", check: "landmark-present", cost: "low" }] }],
+      pages: [
+        {
+          testId: "checkout",
+          purpose: "buy things",
+          invariants: [{ description: "has a main landmark", check: "landmark-present", cost: "low" }],
+        },
+      ],
       global: [],
     } as unknown as UiSpec);
     assert.equal(await runSpecVerify(paths), 0);
@@ -200,14 +221,16 @@ describe("runSpecVerify", () => {
     const paths = project("verify-cost", { snapshots: { home: healthyTree } });
     specFor(paths, {
       description: "one cheap, one expensive",
-      pages: [{
-        testId: "home",
-        purpose: "landing",
-        invariants: [
-          { description: "not blank", check: "no-whiteout", cost: "low" },
-          { description: "reads like a dashboard", check: "nl-assertion", cost: "high" },
-        ],
-      }],
+      pages: [
+        {
+          testId: "home",
+          purpose: "landing",
+          invariants: [
+            { description: "not blank", check: "no-whiteout", cost: "low" },
+            { description: "reads like a dashboard", check: "nl-assertion", cost: "high" },
+          ],
+        },
+      ],
       global: [],
     } as unknown as UiSpec);
     assert.equal(await runSpecVerify(paths), 0);
@@ -271,7 +294,10 @@ describe("runExpect", () => {
     });
     assert.equal(await runExpect(paths), 0);
     const exp = JSON.parse(readFileSync(paths.expectationPath, "utf-8"));
-    assert.deepEqual(exp.pages.map((p: { testId: string }) => p.testId), ["home"]);
+    assert.deepEqual(
+      exp.pages.map((p: { testId: string }) => p.testId),
+      ["home"],
+    );
   });
 
   it("exits 1 without baselines, and without snapshots", async () => {

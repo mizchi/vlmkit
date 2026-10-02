@@ -60,8 +60,7 @@ export const interactionsGate = defineGate<InteractionsGateReport, InteractionsG
   id: "check.interactions",
   command: ["check", "interactions"],
   title: "A11y-event state map",
-  summary:
-    "A11y-event state map: keyboard probes -> ARIA transitions; --reference makes it a behavioral contract",
+  summary: "A11y-event state map: keyboard probes -> ARIA transitions; --reference makes it a behavioral contract",
   category: "behavior",
   usage: `A11y-event state map: discovers interactive elements, probes their
 canonical keyboard events (Tab / Enter / Space / arrows / Escape), and
@@ -112,9 +111,26 @@ contract and every response mismatch is reported.`,
     ...HANDLER_SURFACE_RULES,
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to probe", positional: 0, required: true },
-    { name: "reference", placeholder: "html", kind: "path", description: "Reference page defining the interaction contract" },
-    { name: "max-elements", kind: "number", description: "Probe cap (the report says when capped)", defaultDescription: "30" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to probe",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "reference",
+      placeholder: "html",
+      kind: "path",
+      description: "Reference page defining the interaction contract",
+    },
+    {
+      name: "max-elements",
+      kind: "number",
+      description: "Probe cap (the report says when capped)",
+      defaultDescription: "30",
+    },
     {
       name: "handlers",
       kind: "boolean",
@@ -145,9 +161,8 @@ contract and every response mismatch is reported.`,
       report.comparison = compareInteractionMaps(refMap, map);
     }
     if (handlers) {
-      const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues } = await import(
-        "../inspect/handler-map.ts"
-      );
+      const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues } =
+        await import("../inspect/handler-map.ts");
       // Every family, unconditionally: this gate's whole job is to press things and see what
       // happens — it already fires keys at every control — so a family it will not exercise would
       // be the odd one out. `scan handlers` is the inventory and keeps them behind `--probe`.
@@ -230,15 +245,16 @@ contract and every response mismatch is reported.`,
     ...(options.reference ? { target: options.reference } : {}),
     headline: {
       elements: report.map.elements.length,
-      suspects: report.issues.filter((i) => i.severity === "suspect").length
-        + (report.comparison
-          ? report.comparison.missing.length
-            + report.comparison.mismatches.filter((m) => m.severity === "suspect").length
+      suspects:
+        report.issues.filter((i) => i.severity === "suspect").length +
+        (report.comparison
+          ? report.comparison.missing.length +
+            report.comparison.mismatches.filter((m) => m.severity === "suspect").length
           : 0),
-      warns: report.issues.filter((i) => i.severity === "warn").length
-        + (report.comparison
-          ? report.comparison.extra.length
-            + report.comparison.mismatches.filter((m) => m.severity === "warn").length
+      warns:
+        report.issues.filter((i) => i.severity === "warn").length +
+        (report.comparison
+          ? report.comparison.extra.length + report.comparison.mismatches.filter((m) => m.severity === "warn").length
           : 0),
     },
   }),

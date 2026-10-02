@@ -17,13 +17,7 @@
  */
 
 import { join } from "node:path";
-import {
-  readFile,
-  readdir,
-  mkdir,
-  cp,
-  rm,
-} from "node:fs/promises";
+import { readFile, readdir, mkdir, cp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { runVerifyPipeline, type VerifyPaths } from "./workflow/verify.ts";
 import { runGraph, runAffected } from "./workflow/graph.ts";
@@ -42,7 +36,6 @@ import { captureRoutes, type RouteCaptureResult } from "@mizchi/vlmkit-capture/r
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
 import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
-
 
 interface WorkflowCaptureOptions {
   configPath?: string;
@@ -126,8 +119,10 @@ function resolveCaptureTargets(options: WorkflowCaptureOptions): CaptureTargets 
     // An env var outranking a flag the user typed is the documented precedence, but it
     // must not be silent — that is an explicit request quietly not honoured.
     if (options.configPath || readEnv("CONFIG_PATH")) {
-      console.log(`  (VLMKIT_CAPTURE_ROUTES takes precedence — the config file's routes were NOT used;`
-        + ` unset it to use --config)`);
+      console.log(
+        `  (VLMKIT_CAPTURE_ROUTES takes precedence — the config file's routes were NOT used;` +
+          ` unset it to use --config)`,
+      );
     }
   } else if (routeSet.source === "config" && routeSet.configPath) {
     console.log(`  (using capture config: ${routeSet.configPath})`);
@@ -164,7 +159,12 @@ function reportCaptureFailure(result: RouteCaptureResult, baseUrl: string): void
   console.error("Capture produced no screenshots.");
   for (const failure of result.failures) {
     console.error(`  ${failure.name} (${failure.url}):`);
-    console.error(failure.error.split("\n").map((l) => `    ${l}`).join("\n"));
+    console.error(
+      failure.error
+        .split("\n")
+        .map((l) => `    ${l}`)
+        .join("\n"),
+    );
   }
   // Advice about ONE cause, offered as advice rather than as a diagnosis, naming the URL that
   // was actually resolved.
@@ -191,8 +191,9 @@ function reportCaptureOutcome(result: RouteCaptureResult): void {
     // Loud, because this is the one that quietly poisons a baseline: `page.goto` does not throw
     // on 4xx, so a mistyped route captures the error page and every later `verify` compares
     // against it.
-    console.log(`  ! ${entry.name}: HTTP ${entry.status} from ${entry.url}`
-      + ` — the capture is of the server's error page`);
+    console.log(
+      `  ! ${entry.name}: HTTP ${entry.status} from ${entry.url}` + ` — the capture is of the server's error page`,
+    );
   }
   for (const entry of result.blank) {
     // The spec asserted on this with `expect(bodyText.length).toBeGreaterThan(0)`, which failed
@@ -203,8 +204,10 @@ function reportCaptureOutcome(result: RouteCaptureResult): void {
   if (degraded.length > 0) {
     // Silently degrading mattered: an `ariaSnapshot` string and a real tree are not
     // interchangeable to the commands that diff them.
-    console.log(`  ! ${degraded.length} route(s) fell back from the CDP a11y tree`
-      + ` (${degraded.map((d) => `${d.name}:${d.a11ySource}`).join(", ")})`);
+    console.log(
+      `  ! ${degraded.length} route(s) fell back from the CDP a11y tree` +
+        ` (${degraded.map((d) => `${d.name}:${d.a11ySource}`).join(", ")})`,
+    );
   }
 }
 
@@ -250,8 +253,10 @@ async function runCapture(
     return 1;
   }
   const label = mode === "baseline" ? "Baselines created" : "Snapshots captured";
-  console.log(`\n${label}: ${result.captured.length} screenshot(s), `
-    + `${result.captured.length} a11y tree(s) at ${result.viewport.width}x${result.viewport.height}`);
+  console.log(
+    `\n${label}: ${result.captured.length} screenshot(s), ` +
+      `${result.captured.length} a11y tree(s) at ${result.viewport.width}x${result.viewport.height}`,
+  );
   console.log(`Stored in: ${outputDir}`);
   // A partial run is a failure of the routes that failed, not of the command: the usable
   // baselines are on disk and named. The exit code says something went wrong so CI notices.
@@ -474,7 +479,9 @@ export async function runWorkflowCli(argv = process.argv.slice(2)): Promise<numb
 // `node ./src/cli/workflow.ts` did not match and the command silently did nothing.
 if (isCliEntry(import.meta.url)) {
   runWorkflowCli()
-    .then((code) => { process.exitCode = code; })
+    .then((code) => {
+      process.exitCode = code;
+    })
     .catch((err) => {
       console.error(err);
       process.exitCode = 1;

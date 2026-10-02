@@ -60,10 +60,7 @@ describe("generateDiffReport", () => {
 
     // Compensated diff should be significantly less than raw diff
     const reduction = 1 - report.compensatedDiffCount / report.diffPixels;
-    assert.ok(
-      reduction > 0.2,
-      `shift compensation should reduce diff by >20%, got ${(reduction * 100).toFixed(0)}%`,
-    );
+    assert.ok(reduction > 0.2, `shift compensation should reduce diff by >20%, got ${(reduction * 100).toFixed(0)}%`);
 
     // Compact report should be present
     assert.ok(report.compact.includes("diff:"), "compact should include diff header");

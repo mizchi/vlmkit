@@ -144,10 +144,7 @@ const EMPTY: CsdResult = {
  * `Record<selector, Record<property, value>>`; produced by
  * `captureComputedStyleSnapshotInDom`.
  */
-export function diffComputedStyles(
-  baseline: ComputedStyleSnapshot,
-  variant: ComputedStyleSnapshot,
-): CsdResult {
+export function diffComputedStyles(baseline: ComputedStyleSnapshot, variant: ComputedStyleSnapshot): CsdResult {
   if (!baseline || !variant) return EMPTY;
 
   const entries: CsdEntry[] = [];

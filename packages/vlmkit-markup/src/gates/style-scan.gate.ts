@@ -46,7 +46,10 @@ function formatStyleScan(report: StyleScanReport, rules?: RuleView): string {
     `  design       ${report.counts.designSamples} role sample(s)${report.exclude.length ? `, --exclude ${report.exclude.join(" ")}` : ""}`,
     `  composition  ${report.counts.compositionBoxes} box(es)`,
     `  color        ${report.counts.colorControls} field(s), ${report.counts.colorLinks} link(s)`,
-    ...shown.map(({ row, tier }) => `\n${YELLOW}! [${row.kind}]${tier === row.severity ? "" : ` (re-tuned to ${tier})`} ${row.message}${RESET}`),
+    ...shown.map(
+      ({ row, tier }) =>
+        `\n${YELLOW}! [${row.kind}]${tier === row.severity ? "" : ` (re-tuned to ${tier})`} ${row.message}${RESET}`,
+    ),
     ...(note ? [`${DIM}${note}${RESET}`] : []),
     "",
     `${DIM}judge it without a browser:${RESET}`,
@@ -76,23 +79,50 @@ Then judge it with no browser:
 Each --from report equals what the live gate reports on the same page. The
 snapshot is one render: its --viewport applies to all three, and --exclude
 (design's vendor subtrees) is applied at capture time.`,
-  rules: [
-    { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
-  ],
+  rules: [{ id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" }],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to capture", positional: 0, required: true },
-    { name: "out", placeholder: "file", kind: "path", description: "Snapshot file to write", defaultDescription: DEFAULT_STYLE_SNAPSHOT },
-    { name: "viewport", kind: "number", description: "Viewport width, for all three gates", defaultDescription: "1280" },
     {
-      name: "exclude", placeholder: "selector", kind: "string", repeatable: true,
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to capture",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "out",
+      placeholder: "file",
+      kind: "path",
+      description: "Snapshot file to write",
+      defaultDescription: DEFAULT_STYLE_SNAPSHOT,
+    },
+    {
+      name: "viewport",
+      kind: "number",
+      description: "Viewport width, for all three gates",
+      defaultDescription: "1280",
+    },
+    {
+      name: "exclude",
+      placeholder: "selector",
+      kind: "string",
+      repeatable: true,
       description: "Vendor subtree left out of the design collection (check design --exclude)",
     },
-    { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    {
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
+      description: "Playwright storage state for pages behind a login",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit scan style <html-or-url> [--out snap.json]", [
-      "--out", "--viewport", "--exclude", "--storage-state",
+      "--out",
+      "--viewport",
+      "--exclude",
+      "--storage-state",
     ]);
     const viewport = readInt(argv, "viewport", { min: 200 });
     const exclude = readAll(argv, "exclude");
@@ -126,8 +156,8 @@ snapshot is one render: its --viewport applies to all three, and --exclude
     report.redirect ? [{ rule: "redirected", severity: "suspect", message: report.redirect }] : [],
   format: formatStyleScan,
   headline: (report) =>
-    `snapshot ${report.out}: ${report.counts.designSamples} design sample(s), ${report.counts.compositionBoxes} box(es),`
-    + ` ${report.counts.colorControls} field(s), ${report.counts.colorLinks} link(s)`,
+    `snapshot ${report.out}: ${report.counts.designSamples} design sample(s), ${report.counts.compositionBoxes} box(es),` +
+    ` ${report.counts.colorControls} field(s), ${report.counts.colorLinks} link(s)`,
   ledger: (report) => ({
     tool: "scan-style",
     source: report.source,

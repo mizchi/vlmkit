@@ -74,10 +74,7 @@ export type ScrollBehaviorIssueKind =
    * gate reported `status: ok` for the login page while naming the requested
    * URL as its source. Reported as a suspect issue so the pass cannot be silent.
    */
-  | "redirected"
-  | "fixed-drifts"
-  | "sticky-not-sticking"
-  | "snap-not-snapping";
+  "redirected" | "fixed-drifts" | "sticky-not-sticking" | "snap-not-snapping";
 
 export interface ScrollBehaviorIssue {
   kind: ScrollBehaviorIssueKind;
@@ -160,8 +157,9 @@ export function analyzeScrollBehavior(
       });
       continue;
     }
-    const aligned = snap.candidateOffsets.some((o) => Math.abs(o - snap.settledOffset) <= snapTolerance)
-      || Math.abs(snap.settledOffset - snap.maxOffset) <= snapTolerance;
+    const aligned =
+      snap.candidateOffsets.some((o) => Math.abs(o - snap.settledOffset) <= snapTolerance) ||
+      Math.abs(snap.settledOffset - snap.maxOffset) <= snapTolerance;
     if (!aligned) {
       issues.push({
         kind: "snap-not-snapping",
@@ -265,7 +263,6 @@ const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
   };
 })()`;
 
-
 export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise<ScrollBehaviorReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   return await withBrowser(async (browser) => {
@@ -280,8 +277,10 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
     const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
-    const collected = await page.evaluate(COLLECT_SCRIPT(options.maxElements ?? 20)) as
-      Omit<ScrollBehaviorInput, "source">;
+    const collected = (await page.evaluate(COLLECT_SCRIPT(options.maxElements ?? 20))) as Omit<
+      ScrollBehaviorInput,
+      "source"
+    >;
     await page.close();
     const report = analyzeScrollBehavior({ source: options.source, ...collected }, options);
     // Pushed as a suspect ISSUE, not just printed: the status line is derived
@@ -304,20 +303,26 @@ export function formatScrollBehaviorReport(report: ScrollBehaviorReport, rules?:
   lines.push("");
   lines.push(`status: ${status}`);
   lines.push(`page scrolled: ${report.pageScrolled}px`);
-  lines.push(`sticky/fixed elements: ${report.stickyFixed.length} (sticky engaged by the scroll: ${report.engagedSticky})`);
+  lines.push(
+    `sticky/fixed elements: ${report.stickyFixed.length} (sticky engaged by the scroll: ${report.engagedSticky})`,
+  );
   lines.push(`snap containers driven: ${report.snaps.length}`);
   if (report.stickyFixed.length > 0) {
     lines.push("");
     lines.push("Sticky / fixed:");
     for (const s of report.stickyFixed) {
-      lines.push(`  - ${s.selector}: ${s.position}${s.stickyTopPx !== null ? ` top=${s.stickyTopPx}px` : ""} viewport y ${s.before.y} -> ${s.after.y}`);
+      lines.push(
+        `  - ${s.selector}: ${s.position}${s.stickyTopPx !== null ? ` top=${s.stickyTopPx}px` : ""} viewport y ${s.before.y} -> ${s.after.y}`,
+      );
     }
   }
   if (report.snaps.length > 0) {
     lines.push("");
     lines.push("Snap containers:");
     for (const s of report.snaps) {
-      lines.push(`  - ${s.selector}: ${s.axis} ${s.strictness}, settled at ${s.settledOffset}px (${s.childCount} snap-aligned children)`);
+      lines.push(
+        `  - ${s.selector}: ${s.axis} ${s.strictness}, settled at ${s.settledOffset}px (${s.childCount} snap-aligned children)`,
+      );
     }
   }
   if (shown.length > 0) {

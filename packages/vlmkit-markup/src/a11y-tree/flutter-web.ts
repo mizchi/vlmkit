@@ -129,11 +129,30 @@ export const COLLECT_FLUTTER_SEMANTICS = `(() => {
 })()`;
 
 const ROLE_MAP: Record<string, string> = {
-  button: "button", link: "link", checkbox: "checkbox", radio: "radio", switch: "switch",
-  slider: "slider", tab: "tab", menuitem: "menuitem", combobox: "combobox", heading: "heading",
-  img: "image", image: "image", dialog: "dialog", alertdialog: "dialog", group: "group",
-  list: "list", listitem: "listitem", tablist: "group", radiogroup: "group", text: "text",
-  textbox: "textfield", searchbox: "textfield", scrollbar: "scrollview", region: "group",
+  button: "button",
+  link: "link",
+  checkbox: "checkbox",
+  radio: "radio",
+  switch: "switch",
+  slider: "slider",
+  tab: "tab",
+  menuitem: "menuitem",
+  combobox: "combobox",
+  heading: "heading",
+  img: "image",
+  image: "image",
+  dialog: "dialog",
+  alertdialog: "dialog",
+  group: "group",
+  list: "list",
+  listitem: "listitem",
+  tablist: "group",
+  radiogroup: "group",
+  text: "text",
+  textbox: "textfield",
+  searchbox: "textfield",
+  scrollbar: "scrollview",
+  region: "group",
 };
 
 /** Map raw semantics elements onto the contract. Pure: this is what the unit tests read. */

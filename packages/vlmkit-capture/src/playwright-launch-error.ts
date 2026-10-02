@@ -14,11 +14,11 @@ function normalizeErrorMessage(error: unknown): string {
 
 export function isPlaywrightSandboxRestrictionError(error: unknown): boolean {
   const message = normalizeErrorMessage(error);
-  return message.includes(FORMATTED_SANDBOX_MARKER)
-    || (
-      message.includes("browserType.launch:")
-      && RAW_SANDBOX_SIGNAL_PATTERNS.some((pattern) => message.includes(pattern))
-    );
+  return (
+    message.includes(FORMATTED_SANDBOX_MARKER) ||
+    (message.includes("browserType.launch:") &&
+      RAW_SANDBOX_SIGNAL_PATTERNS.some((pattern) => message.includes(pattern)))
+  );
 }
 
 /**
@@ -40,10 +40,7 @@ export function diagnoseSandboxLaunchFailure(error: unknown): string | null {
     : null;
 }
 
-export function formatPlaywrightLaunchError(
-  error: unknown,
-  options: { commandHint?: string } = {},
-): string {
+export function formatPlaywrightLaunchError(error: unknown, options: { commandHint?: string } = {}): string {
   const message = normalizeErrorMessage(error);
   if (!isPlaywrightSandboxRestrictionError(error)) return message;
   if (message.includes(FORMATTED_SANDBOX_MARKER)) return message;

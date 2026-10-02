@@ -19,11 +19,7 @@
 
 import { join } from "node:path";
 import type { HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
-import type {
-  MatchedTextRow,
-  RowGapDelta,
-  TypographyMismatch,
-} from "@mizchi/vlmkit-core/text-rows.ts";
+import type { MatchedTextRow, RowGapDelta, TypographyMismatch } from "@mizchi/vlmkit-core/text-rows.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
 import type { LandscapeDiffResult } from "../landscape-diff.ts";
 import type { DominantBackgrounds } from "../style/palette-extract.ts";
@@ -145,14 +141,17 @@ function expectedScrollportLabel(expected: UiExpectedScrollportContract, index: 
   // the type permits, `id` being required — produced a BLANK label and the report read
   // `1 expected missing` with nothing named. The positional fallback exists for exactly
   // that case and was unreachable.
-  const named = [expected.name, expected.id, scrollportNameFromSelector(expected.selector)]
-    .find((candidate) => candidate !== undefined && candidate.trim() !== "");
+  const named = [expected.name, expected.id, scrollportNameFromSelector(expected.selector)].find(
+    (candidate) => candidate !== undefined && candidate.trim() !== "",
+  );
   return named ?? `expected-${index + 1}`;
 }
 
 function scrollportNameFromSelector(selector: string | undefined): string | undefined {
   if (!selector) return undefined;
-  const match = selector.match(/\bdata-(?:vlmkit-scrollport|ui-scrollport|scroll-region|scrollport)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\]\s]+))/u);
+  const match = selector.match(
+    /\bdata-(?:vlmkit-scrollport|ui-scrollport|scroll-region|scrollport)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\]\s]+))/u,
+  );
   return match?.[1] ?? match?.[2] ?? match?.[3];
 }
 
@@ -167,11 +166,12 @@ export function formatLandingEvidence(evidence: ComponentLandingEvidence): strin
 }
 
 export function formatCanvasEvidence(evidence: ComponentCanvasEvidence): string {
-  const input = evidence.inputResponsive === true
-    ? "input ok"
-    : evidence.inputResponsive === false
-      ? "input missing"
-      : "input unknown";
+  const input =
+    evidence.inputResponsive === true
+      ? "input ok"
+      : evidence.inputResponsive === false
+        ? "input missing"
+        : "input unknown";
   const stateHook = evidence.stateHook
     ? evidence.stateHookPresent === false
       ? `state hook missing: ${evidence.stateHook}`
@@ -272,23 +272,30 @@ export function renderReportMarkdown(r: RenderInput): string {
   lines.push(`Target:  \`${r.targetImage}\` (${r.viewport.width}×${r.viewport.height})`);
   lines.push(`Current: \`${r.currentHtml}\``);
   if (r.dpr > 1) {
-    lines.push(`Capture: DPR ${r.dpr} (${Math.round(r.viewport.width / r.dpr)}×${Math.round(r.viewport.height / r.dpr)} CSS px)`);
+    lines.push(
+      `Capture: DPR ${r.dpr} (${Math.round(r.viewport.width / r.dpr)}×${Math.round(r.viewport.height / r.dpr)} CSS px)`,
+    );
   }
   if (r.dprSuggestion) {
-    lines.push(`DPR hint: ${r.dprSuggestion.reason}; try \`--dpr ${r.dprSuggestion.deviceScaleFactor}\` ` +
-      `to render at ${r.dprSuggestion.cssViewport.width}×${r.dprSuggestion.cssViewport.height} CSS px.`);
+    lines.push(
+      `DPR hint: ${r.dprSuggestion.reason}; try \`--dpr ${r.dprSuggestion.deviceScaleFactor}\` ` +
+        `to render at ${r.dprSuggestion.cssViewport.width}×${r.dprSuggestion.cssViewport.height} CSS px.`,
+    );
   }
   lines.push("");
   const pct = (r.diffRatio * 100).toFixed(2);
   lines.push(`**Pixel diff**: ${pct}% (${r.diffPixels} of ${r.totalPixels} pixels)`);
   lines.push("");
-  lines.push(`**Landscape diff**: ${(r.landscapeDiff.score * 100).toFixed(2)}% coarse ` +
-    `(${(r.landscapeDiff.similarity * 100).toFixed(2)}% similarity, ` +
-    `${r.landscapeDiff.changedCells}/${r.landscapeDiff.totalCells} changed cells, ` +
-    `${r.landscapeDiff.grid.cols}×${r.landscapeDiff.grid.rows} grid)`);
+  lines.push(
+    `**Landscape diff**: ${(r.landscapeDiff.score * 100).toFixed(2)}% coarse ` +
+      `(${(r.landscapeDiff.similarity * 100).toFixed(2)}% similarity, ` +
+      `${r.landscapeDiff.changedCells}/${r.landscapeDiff.totalCells} changed cells, ` +
+      `${r.landscapeDiff.grid.cols}×${r.landscapeDiff.grid.rows} grid)`,
+  );
   lines.push("");
-  lines.push(`**Goal**: \`${r.goalEvaluation.goal}\` (${r.goalEvaluation.label}) — ` +
-    `**${r.goalEvaluation.status}**`);
+  lines.push(
+    `**Goal**: \`${r.goalEvaluation.goal}\` (${r.goalEvaluation.label}) — ` + `**${r.goalEvaluation.status}**`,
+  );
   lines.push("");
   lines.push(r.goalEvaluation.summary);
   lines.push("");
@@ -302,16 +309,20 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.landscapeDiff.topCells.length > 0) {
     lines.push("## Landscape cell diff");
     lines.push("");
-    lines.push("Coarse grid comparison of average color + ink density. Use this " +
-      "before pixel-perfect work: it answers whether the large page regions " +
-      "land in roughly the same places.");
+    lines.push(
+      "Coarse grid comparison of average color + ink density. Use this " +
+        "before pixel-perfect work: it answers whether the large page regions " +
+        "land in roughly the same places.",
+    );
     lines.push("");
     lines.push("| Cell | Box | Score | Target | Current |");
     lines.push("|---|---|---:|---|---|");
     for (const c of r.landscapeDiff.topCells) {
-      lines.push(`| r${c.row} c${c.col} | ${c.x},${c.y} ${c.width}×${c.height} | ` +
-        `${(c.score * 100).toFixed(1)}% | \`${c.baseline.hex}\` ink ${c.baseline.ink.toFixed(2)} | ` +
-        `\`${c.current.hex}\` ink ${c.current.ink.toFixed(2)} |`);
+      lines.push(
+        `| r${c.row} c${c.col} | ${c.x},${c.y} ${c.width}×${c.height} | ` +
+          `${(c.score * 100).toFixed(1)}% | \`${c.baseline.hex}\` ink ${c.baseline.ink.toFixed(2)} | ` +
+          `\`${c.current.hex}\` ink ${c.current.ink.toFixed(2)} |`,
+      );
     }
     lines.push("");
   }
@@ -319,21 +330,26 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.semanticDrilldown.length > 0) {
     lines.push("## Landmark drilldown");
     lines.push("");
-    lines.push("Current DOM landmarks are used as semantic lenses over the visual " +
-      "diff. This follows ARIA landmark practice: concrete roles such as " +
-      "`banner`, `navigation`, `main`, `complementary`, `contentinfo`, " +
-      "`region`, `search`, and named `form` are used; `role=\"landmark\"` " +
-      "itself is ignored.");
+    lines.push(
+      "Current DOM landmarks are used as semantic lenses over the visual " +
+        "diff. This follows ARIA landmark practice: concrete roles such as " +
+        "`banner`, `navigation`, `main`, `complementary`, `contentinfo`, " +
+        '`region`, `search`, and named `form` are used; `role="landmark"` ' +
+        "itself is ignored.",
+    );
     lines.push("");
-    lines.push("The lanes are intentionally separate. Run the layout lane first " +
-      "until section placement is stable, then use the decoration lane for " +
-      "paint, media, and local text details.");
+    lines.push(
+      "The lanes are intentionally separate. Run the layout lane first " +
+        "until section placement is stable, then use the decoration lane for " +
+        "paint, media, and local text details.",
+    );
     lines.push("");
     const renderDrilldownRows = (rows: SemanticDrilldownEntry[], flow: "layout" | "decoration") => {
       const title = flow === "layout" ? "Layout lane" : "Decoration lane";
-      const next = flow === "layout"
-        ? "fix landmark geometry / spacing / section placement"
-        : "fix colors / media / text styling after layout stabilizes";
+      const next =
+        flow === "layout"
+          ? "fix landmark geometry / spacing / section placement"
+          : "fix colors / media / text styling after layout stabilizes";
       lines.push(`### ${title}`);
       lines.push("");
       if (rows.length === 0) {
@@ -341,21 +357,25 @@ export function renderReportMarkdown(r: RenderInput): string {
         lines.push("");
         return;
       }
-      lines.push("| Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |");
+      lines.push(
+        "| Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |",
+      );
       lines.push("|---:|---|---|---|---|---|---|---:|---:|---|---|");
       for (const row of rows.slice(0, 8)) {
         const lm = row.landmark;
         const name = lm.name ? ` "${lm.name}"` : "";
         const box = `${lm.bbox.left},${lm.bbox.top} ${lm.bbox.width}×${lm.bbox.height}`;
         const contract = lm.layout ? describeLandmarkLayoutContract(lm.layout) : undefined;
-        const evidence = `${row.landscapeCells.length} landscape cell(s), ` +
-          `${row.heatmapRegions.length} heatmap region(s)`;
-        lines.push(`| ${(row.priorityScore * 100).toFixed(1)} | ` +
-          `\`${lm.role}${name}\` | ${box} | ` +
-          `${contract?.width ?? "—"} | ${contract?.height ?? "—"} | ` +
-          `${contract?.scroll ?? "—"} | ${contract?.grid ?? "—"} | ` +
-          `${(row.layoutScore * 100).toFixed(1)}% | ` +
-          `${(row.decorationScore * 100).toFixed(1)}% | ${evidence} | ${next} |`);
+        const evidence =
+          `${row.landscapeCells.length} landscape cell(s), ` + `${row.heatmapRegions.length} heatmap region(s)`;
+        lines.push(
+          `| ${(row.priorityScore * 100).toFixed(1)} | ` +
+            `\`${lm.role}${name}\` | ${box} | ` +
+            `${contract?.width ?? "—"} | ${contract?.height ?? "—"} | ` +
+            `${contract?.scroll ?? "—"} | ${contract?.grid ?? "—"} | ` +
+            `${(row.layoutScore * 100).toFixed(1)}% | ` +
+            `${(row.decorationScore * 100).toFixed(1)}% | ${evidence} | ${next} |`,
+        );
       }
       lines.push("");
     };
@@ -366,19 +386,23 @@ export function renderReportMarkdown(r: RenderInput): string {
   } else if (r.landmarkRegions.length === 0) {
     lines.push("## Landmark drilldown");
     lines.push("");
-    lines.push("No current DOM landmarks were detected. Add semantic wrappers " +
-      "such as `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>`, " +
-      "or named `<section>` regions before relying on visual drilldown.");
+    lines.push(
+      "No current DOM landmarks were detected. Add semantic wrappers " +
+        "such as `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>`, " +
+        "or named `<section>` regions before relying on visual drilldown.",
+    );
     lines.push("");
   }
 
   if (r.scrollportRegions.length > 0) {
     lines.push("## Scrollport inspector");
     lines.push("");
-    lines.push("Explicit scrollport candidates from `data-scrollport`, " +
-      "`data-vlmkit-scrollport`, `data-ui-scrollport`, or " +
-      "`data-scroll-region`. This is separate from visual matching: an app " +
-      "shell can pass landscape diff while the actual scroll container is wrong.");
+    lines.push(
+      "Explicit scrollport candidates from `data-scrollport`, " +
+        "`data-vlmkit-scrollport`, `data-ui-scrollport`, or " +
+        "`data-scroll-region`. This is separate from visual matching: an app " +
+        "shell can pass landscape diff while the actual scroll container is wrong.",
+    );
     lines.push("");
     lines.push("| Status | Name | Box | Overflow | Client | Scroll | Reason |");
     lines.push("|---|---|---|---|---|---|---|");
@@ -388,8 +412,10 @@ export function renderReportMarkdown(r: RenderInput): string {
       const overflow = `${region.overflowX}/${region.overflowY}`;
       const client = `${region.clientWidth}×${region.clientHeight}`;
       const scroll = `${region.scrollWidth}×${region.scrollHeight}`;
-      lines.push(`| ${status.status} | \`${region.name}\` | ${box} | ` +
-        `${overflow} | ${client} | ${scroll} | ${status.reason} |`);
+      lines.push(
+        `| ${status.status} | \`${region.name}\` | ${box} | ` +
+          `${overflow} | ${client} | ${scroll} | ${status.reason} |`,
+      );
     }
     lines.push("");
   }
@@ -397,9 +423,11 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.landingEvidence) {
     lines.push("## Landing inspector");
     lines.push("");
-    lines.push("Current DOM evidence for landing-page first-viewport gates. Use " +
-      "`data-primary-cta`, `data-next-section`, and `data-media-slot` to make " +
-      "the intended regions explicit.");
+    lines.push(
+      "Current DOM evidence for landing-page first-viewport gates. Use " +
+        "`data-primary-cta`, `data-next-section`, and `data-media-slot` to make " +
+        "the intended regions explicit.",
+    );
     lines.push("");
     lines.push("| Gate | Status |");
     lines.push("|---|---|");
@@ -413,29 +441,33 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.canvasEvidence) {
     lines.push("## Canvas inspector");
     lines.push("");
-    lines.push("Current DOM canvas evidence for interactive/game-like surfaces. " +
-      "This checks the rendered canvas, a short frame delta, and optional " +
-      "`window.__gameState` response to `ArrowRight`.");
+    lines.push(
+      "Current DOM canvas evidence for interactive/game-like surfaces. " +
+        "This checks the rendered canvas, a short frame delta, and optional " +
+        "`window.__gameState` response to `ArrowRight`.",
+    );
     lines.push("");
     lines.push("| Gate | Status |");
     lines.push("|---|---|");
     lines.push(`| Canvas count | ${r.canvasEvidence.canvasCount} |`);
     lines.push(`| Nonblank canvas | ${r.canvasEvidence.nonblank ? "ok" : "blank"} |`);
     lines.push(`| Frame delta | ${r.canvasEvidence.frameDelta ? "ok" : "missing"} |`);
-    const input = r.canvasEvidence.inputResponsive === true
-      ? "ok"
-      : r.canvasEvidence.inputResponsive === false
-        ? "missing"
-        : "unknown";
+    const input =
+      r.canvasEvidence.inputResponsive === true
+        ? "ok"
+        : r.canvasEvidence.inputResponsive === false
+          ? "missing"
+          : "unknown";
     lines.push(`| Input response | ${input} |`);
     if (r.canvasEvidence.stateHook) {
       const hookStatus = r.canvasEvidence.stateHookPresent === false ? "missing" : "ok";
       lines.push(`| State hook | ${hookStatus}: \`${r.canvasEvidence.stateHook}\` |`);
     }
     if (r.canvasEvidence.requiredStateFields && r.canvasEvidence.requiredStateFields.length > 0) {
-      const fieldStatus = r.canvasEvidence.missingStateFields && r.canvasEvidence.missingStateFields.length > 0
-        ? `missing: ${mdCodeList(r.canvasEvidence.missingStateFields)}`
-        : `ok: ${mdCodeList(r.canvasEvidence.requiredStateFields)}`;
+      const fieldStatus =
+        r.canvasEvidence.missingStateFields && r.canvasEvidence.missingStateFields.length > 0
+          ? `missing: ${mdCodeList(r.canvasEvidence.missingStateFields)}`
+          : `ok: ${mdCodeList(r.canvasEvidence.requiredStateFields)}`;
       lines.push(`| Required state fields | ${fieldStatus} |`);
     } else if (r.canvasEvidence.observedStateFields && r.canvasEvidence.observedStateFields.length > 0) {
       lines.push(`| Observed state fields | ${mdCodeList(r.canvasEvidence.observedStateFields)} |`);
@@ -446,9 +478,11 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.expressiveMenuEvidence) {
     lines.push("## Expressive menu inspector");
     lines.push("");
-    lines.push("Current DOM evidence for poster-like menu surfaces. This checks " +
-      "semantic menu text and explicit composition metadata instead of asking " +
-      "pixel diff to reproduce every slash, sticker, and overlap exactly.");
+    lines.push(
+      "Current DOM evidence for poster-like menu surfaces. This checks " +
+        "semantic menu text and explicit composition metadata instead of asking " +
+        "pixel diff to reproduce every slash, sticker, and overlap exactly.",
+    );
     lines.push("");
     lines.push("| Gate | Status |");
     lines.push("|---|---|");
@@ -467,15 +501,20 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push("");
   }
 
-  const meaningfulBboxes = r.bboxMatches.filter((m) =>
-    Math.abs(m.deltaTop) > 1 || Math.abs(m.deltaLeft) > 1
-    || Math.abs(m.deltaWidth) > 1 || Math.abs(m.deltaHeight) > 1,
+  const meaningfulBboxes = r.bboxMatches.filter(
+    (m) =>
+      Math.abs(m.deltaTop) > 1 ||
+      Math.abs(m.deltaLeft) > 1 ||
+      Math.abs(m.deltaWidth) > 1 ||
+      Math.abs(m.deltaHeight) > 1,
   );
   if (meaningfulBboxes.length > 0) {
     lines.push("## Component bbox diff");
     lines.push("");
-    lines.push("Largest non-background regions, matched by area-rank between " +
-      "target and current. Δ shows position / size differences.");
+    lines.push(
+      "Largest non-background regions, matched by area-rank between " +
+        "target and current. Δ shows position / size differences.",
+    );
     lines.push("");
     lines.push("| Rank | Target bbox | Current bbox | Δ top / left / W / H | IoU |");
     lines.push("|---|---|---|---|---|");
@@ -483,7 +522,9 @@ export function renderReportMarkdown(r: RenderInput): string {
       const t = `${m.baseline.left},${m.baseline.top} ${m.baseline.width}×${m.baseline.height}`;
       const c = `${m.variant.left},${m.variant.top} ${m.variant.width}×${m.variant.height}`;
       const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
-      lines.push(`| #${m.rank} | ${t} | ${c} | ${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)} | ${m.iou} |`);
+      lines.push(
+        `| #${m.rank} | ${t} | ${c} | ${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)} | ${m.iou} |`,
+      );
     }
     lines.push("");
   }
@@ -491,15 +532,19 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.heatmapRegions.length > 0) {
     lines.push("## Heatmap region clusters");
     lines.push("");
-    lines.push("Each cluster is a contiguous run of differing pixels. `Fill` is " +
-      "the dominant color sampled from the target inside the region. `Kind` " +
-      "is a pixel-only content-type guess (text / filled-rect / icon / image).");
+    lines.push(
+      "Each cluster is a contiguous run of differing pixels. `Fill` is " +
+        "the dominant color sampled from the target inside the region. `Kind` " +
+        "is a pixel-only content-type guess (text / filled-rect / icon / image).",
+    );
     lines.push("");
     lines.push("| Top-Left | Size | Hot pixels | Fill | Kind |");
     lines.push("|---|---|---|---|---|");
     for (const reg of r.heatmapRegions.slice(0, 8)) {
       const fill = reg.dominantColor ? `\`${reg.dominantColor.hex}\`` : "—";
-      const kind = reg.kind ? `\`${reg.kind}\`${reg.kindConfidence !== undefined && reg.kindConfidence < 0.6 ? "?" : ""}` : "—";
+      const kind = reg.kind
+        ? `\`${reg.kind}\`${reg.kindConfidence !== undefined && reg.kindConfidence < 0.6 ? "?" : ""}`
+        : "—";
       lines.push(`| ${reg.left},${reg.top} | ${reg.width}×${reg.height} | ${reg.area} | ${fill} | ${kind} |`);
     }
     lines.push("");
@@ -511,8 +556,10 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push(`Target has ${r.baselineRowCount} text rows; current has ${r.variantRowCount}.`);
     if (r.baselineRowCount !== r.variantRowCount) {
       lines.push("");
-      lines.push("**Count mismatch** — current is missing rows of content " +
-        "(or has spurious extras). Add the missing elements before tweaking CSS.");
+      lines.push(
+        "**Count mismatch** — current is missing rows of content " +
+          "(or has spurious extras). Add the missing elements before tweaking CSS.",
+      );
     }
     if (r.textRowMatches.length > 0) {
       lines.push("");
@@ -525,10 +572,12 @@ export function renderReportMarkdown(r: RenderInput): string {
     }
     if (r.typographyMismatches.length > 0) {
       lines.push("");
-      lines.push("**Typography mismatches** — per-row font-size / weight " +
-        "estimated from band height and ink density. Estimates are " +
-        "heuristic (snapped to nearest UI bucket); large jumps " +
-        "(e.g. 16px → 24px, regular → bold) are reliable.");
+      lines.push(
+        "**Typography mismatches** — per-row font-size / weight " +
+          "estimated from band height and ink density. Estimates are " +
+          "heuristic (snapped to nearest UI bucket); large jumps " +
+          "(e.g. 16px → 24px, regular → bold) are reliable.",
+      );
       lines.push("");
       lines.push("| Rank | Target | Current | Kind |");
       lines.push("|---|---|---|---|");
@@ -540,18 +589,23 @@ export function renderReportMarkdown(r: RenderInput): string {
     }
     if (r.rowGapDeltas.length > 0) {
       lines.push("");
-      lines.push("**Spacing fixes** — per-gap delta between consecutive text rows. " +
-        "The fix is on the *preceding* element: if the gap above row #N is +6px, " +
-        "reduce that element's `margin-bottom` (or its container's `gap` value) by ~6px.");
+      lines.push(
+        "**Spacing fixes** — per-gap delta between consecutive text rows. " +
+          "The fix is on the *preceding* element: if the gap above row #N is +6px, " +
+          "reduce that element's `margin-bottom` (or its container's `gap` value) by ~6px.",
+      );
       lines.push("");
       lines.push("| Above → Below | Target gap | Current gap | Δgap | Suggested fix |");
       lines.push("|---|---|---|---|---|");
       for (const g of r.rowGapDeltas.slice(0, 12)) {
         const signed = g.delta > 0 ? `+${g.delta}` : `${g.delta}`;
-        const fix = g.delta > 0
-          ? `reduce preceding element's bottom space by ${g.delta}px`
-          : `add ${Math.abs(g.delta)}px to preceding element's bottom space`;
-        lines.push(`| #${g.aboveRank} → #${g.belowRank} | ${g.baselineGap}px | ${g.variantGap}px | ${signed}px | ${fix} |`);
+        const fix =
+          g.delta > 0
+            ? `reduce preceding element's bottom space by ${g.delta}px`
+            : `add ${Math.abs(g.delta)}px to preceding element's bottom space`;
+        lines.push(
+          `| #${g.aboveRank} → #${g.belowRank} | ${g.baselineGap}px | ${g.variantGap}px | ${signed}px | ${fix} |`,
+        );
       }
     }
     lines.push("");
@@ -560,9 +614,11 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.targetBg) {
     lines.push("## Backgrounds");
     lines.push("");
-    lines.push("Direct samples of the page bg (image perimeter) and inner bg " +
-      "(central rectangle) — start here when setting `body` and content " +
-      "container background colors.");
+    lines.push(
+      "Direct samples of the page bg (image perimeter) and inner bg " +
+        "(central rectangle) — start here when setting `body` and content " +
+        "container background colors.",
+    );
     lines.push("");
     lines.push("| Layer | Target | Current |");
     lines.push("|---|---|---|");
@@ -581,8 +637,10 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.paletteDiff.onlyInBaseline.length > 0 || r.paletteDiff.onlyInVariant.length > 0) {
     lines.push("## Palette diff");
     lines.push("");
-    lines.push("`Nearest` column: Euclidean RGB distance to the closest color on " +
-      "the other side. ≤ 30 = likely AA / quantization noise; > 60 = real palette gap.");
+    lines.push(
+      "`Nearest` column: Euclidean RGB distance to the closest color on " +
+        "the other side. ≤ 30 = likely AA / quantization noise; > 60 = real palette gap.",
+    );
     lines.push("");
     lines.push("| Side | Color | Share | Nearest |");
     lines.push("|---|---|---|---|");
@@ -605,58 +663,73 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.stateResults.length > 0) {
     lines.push("## State diff");
     lines.push("");
-    lines.push("Each row: current HTML rendered with the named state applied, " +
-      "diffed against the default render. Pseudo-classes are forced on " +
-      "interactive elements; `scrolled` scrolls contract-targeted scrollports.");
+    lines.push(
+      "Each row: current HTML rendered with the named state applied, " +
+        "diffed against the default render. Pseudo-classes are forced on " +
+        "interactive elements; `scrolled` scrolls contract-targeted scrollports.",
+    );
     lines.push("");
-    lines.push("- **Perceptual %**: pixelmatch at threshold 0.03 — what the eye " +
-      "would notice. Filters anti-aliasing and subpixel jitter.");
-    lines.push("- **Raw %**: any pixel where any RGB channel changed by ≥ 4. " +
-      "Catches subtle hover effects (Δ10/channel shifts) that the perceptual " +
-      "filter swallows.");
-    lines.push("- **Edge %**: of all diff pixels, fraction within 4px of any " +
-      "applied target bbox perimeter. High = outline-only change (likely UA default focus " +
-      "ring); low = interior fill/text changed (author CSS).");
-    lines.push("- **ΔLuma**: change in mean interior luminance of the applied " +
-      "elements (state minus default). Negative = elements got darker; positive = " +
-      "lighter. Typical `:hover` darkens (−5 to −30); a *large positive ΔLuma* on " +
-      "an already-light state is a wrong-direction-shift suspect.");
-    lines.push("- **Note**: `suspect` when both diff metrics are essentially zero. " +
-      "`ua-likely` when only the outline changed and the interior is untouched " +
-      "(catches missing author `:focus-visible` rules that the UA default hides). " +
-      "`direction?` when ΔLuma > +15 on a state that conventionally darkens.");
+    lines.push(
+      "- **Perceptual %**: pixelmatch at threshold 0.03 — what the eye " +
+        "would notice. Filters anti-aliasing and subpixel jitter.",
+    );
+    lines.push(
+      "- **Raw %**: any pixel where any RGB channel changed by ≥ 4. " +
+        "Catches subtle hover effects (Δ10/channel shifts) that the perceptual " +
+        "filter swallows.",
+    );
+    lines.push(
+      "- **Edge %**: of all diff pixels, fraction within 4px of any " +
+        "applied target bbox perimeter. High = outline-only change (likely UA default focus " +
+        "ring); low = interior fill/text changed (author CSS).",
+    );
+    lines.push(
+      "- **ΔLuma**: change in mean interior luminance of the applied " +
+        "elements (state minus default). Negative = elements got darker; positive = " +
+        "lighter. Typical `:hover` darkens (−5 to −30); a *large positive ΔLuma* on " +
+        "an already-light state is a wrong-direction-shift suspect.",
+    );
+    lines.push(
+      "- **Note**: `suspect` when both diff metrics are essentially zero. " +
+        "`ua-likely` when only the outline changed and the interior is untouched " +
+        "(catches missing author `:focus-visible` rules that the UA default hides). " +
+        "`direction?` when ΔLuma > +15 on a state that conventionally darkens.",
+    );
     lines.push("");
     lines.push("| State | Perceptual % | Raw % | Edge % | ΔLuma | Applied | Note |");
     lines.push("|---|---|---|---|---|---|---|");
     for (const s of r.stateResults) {
       const perceptZero = s.inducedDiffRatio < 0.0005;
       const rawZero = s.rawInducedDiffRatio < 0.0005;
-      const uaLikely = s.forcedCount > 0 && !rawZero
-        && s.edgeFraction > 0.85 && s.interiorPixels < 50;
+      const uaLikely = s.forcedCount > 0 && !rawZero && s.edgeFraction > 0.85 && s.interiorPixels < 50;
       // Wrong-direction heuristic: hover/active are conventionally
       // darkening states. If they lighten by > 15 luma units on a
       // styled state (rawZero false), flag for verification. focus
       // and focus-visible may legitimately lighten via outline, so
       // skip them.
-      const wrongDir = !rawZero
-        && !uaLikely
-        && (s.state === "hover" || s.state === "active")
-        && s.lumaDelta !== null && s.lumaDelta > 15
-        && s.lumaBefore !== null && s.lumaBefore > 160;
-      const note = s.forcedCount > 0 && perceptZero && rawZero
-        ? "**suspect** — state did not change rendering"
-        : s.forcedCount > 0 && perceptZero && !rawZero
-          ? "_subtle_ — only raw-pixel diff registers (check below the perceptual threshold)"
-          : uaLikely
-            ? "**ua-likely** — only the perimeter changed; author rule likely missing"
-            : wrongDir
-              ? `**direction?** — \`:${s.state}\` lightened by ${s.lumaDelta!.toFixed(0)} luma; verify this matches the intended hover direction`
-              : "";
+      const wrongDir =
+        !rawZero &&
+        !uaLikely &&
+        (s.state === "hover" || s.state === "active") &&
+        s.lumaDelta !== null &&
+        s.lumaDelta > 15 &&
+        s.lumaBefore !== null &&
+        s.lumaBefore > 160;
+      const note =
+        s.forcedCount > 0 && perceptZero && rawZero
+          ? "**suspect** — state did not change rendering"
+          : s.forcedCount > 0 && perceptZero && !rawZero
+            ? "_subtle_ — only raw-pixel diff registers (check below the perceptual threshold)"
+            : uaLikely
+              ? "**ua-likely** — only the perimeter changed; author rule likely missing"
+              : wrongDir
+                ? `**direction?** — \`:${s.state}\` lightened by ${s.lumaDelta!.toFixed(0)} luma; verify this matches the intended hover direction`
+                : "";
       const edgePct = s.edgeFraction > 0 ? (s.edgeFraction * 100).toFixed(0) + "%" : "—";
-      const luma = s.lumaDelta === null
-        ? "—"
-        : (s.lumaDelta > 0 ? `+${s.lumaDelta.toFixed(1)}` : s.lumaDelta.toFixed(1));
-      lines.push(`| \`${formatProbeState(s.state)}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${edgePct} | ${luma} | ${s.forcedCount} | ${note} |`);
+      const luma = s.lumaDelta === null ? "—" : s.lumaDelta > 0 ? `+${s.lumaDelta.toFixed(1)}` : s.lumaDelta.toFixed(1);
+      lines.push(
+        `| \`${formatProbeState(s.state)}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${edgePct} | ${luma} | ${s.forcedCount} | ${note} |`,
+      );
     }
     lines.push("");
   }
@@ -675,7 +748,9 @@ export function renderReportMarkdown(r: RenderInput): string {
   }
   if (r.baselineRowCount !== r.variantRowCount) {
     const diff = r.baselineRowCount - r.variantRowCount;
-    cssHints.push(`/* HTML: ${diff > 0 ? "add" : "remove"} ${Math.abs(diff)} row(s) of content — target has ${r.baselineRowCount}, current has ${r.variantRowCount} */`);
+    cssHints.push(
+      `/* HTML: ${diff > 0 ? "add" : "remove"} ${Math.abs(diff)} row(s) of content — target has ${r.baselineRowCount}, current has ${r.variantRowCount} */`,
+    );
   }
   for (const m of r.typographyMismatches.slice(0, 6)) {
     const props: string[] = [];
@@ -692,26 +767,36 @@ export function renderReportMarkdown(r: RenderInput): string {
   for (const g of r.rowGapDeltas.slice(0, 6)) {
     const dir = g.delta > 0 ? "reduce" : "add";
     const amt = Math.abs(g.delta);
-    cssHints.push(`/* row #${g.aboveRank}: ${dir} margin-bottom by ~${amt}px (target gap ${g.baselineGap}, current ${g.variantGap}) */`);
+    cssHints.push(
+      `/* row #${g.aboveRank}: ${dir} margin-bottom by ~${amt}px (target gap ${g.baselineGap}, current ${g.variantGap}) */`,
+    );
   }
   for (const reg of r.heatmapRegions.slice(0, 6)) {
     if (!reg.dominantColor || !reg.kind) continue;
     if (reg.kind === "filled-rect") {
-      cssHints.push(`/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: background: ${reg.dominantColor.hex} */`);
+      cssHints.push(
+        `/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: background: ${reg.dominantColor.hex} */`,
+      );
     } else if (reg.kind === "text") {
-      cssHints.push(`/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: color: ${reg.dominantColor.hex} (text) */`);
+      cssHints.push(
+        `/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: color: ${reg.dominantColor.hex} (text) */`,
+      );
     } else if (reg.kind === "icon") {
-      cssHints.push(`/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: icon — fill: ${reg.dominantColor.hex} */`);
+      cssHints.push(
+        `/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: icon — fill: ${reg.dominantColor.hex} */`,
+      );
     }
   }
   if (cssHints.length > 0) {
     lines.push("## Suggested CSS patch");
     lines.push("");
-    lines.push("Aggregated from every actionable signal above. Each line is " +
-      "either a paste-ready declaration or a `/* hint */` describing the " +
-      "delta. Selectors are intentionally omitted (the tool can't see your " +
-      "DOM); apply each declaration to whichever element matches the " +
-      "described region or row.");
+    lines.push(
+      "Aggregated from every actionable signal above. Each line is " +
+        "either a paste-ready declaration or a `/* hint */` describing the " +
+        "delta. Selectors are intentionally omitted (the tool can't see your " +
+        "DOM); apply each declaration to whichever element matches the " +
+        "described region or row.",
+    );
     lines.push("");
     lines.push("```css");
     for (const h of cssHints) lines.push(h);
@@ -725,28 +810,41 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (topDrilldown?.flow === "layout") {
     const lm = topDrilldown.landmark;
     const name = lm.name ? ` "${lm.name}"` : "";
-    lines.push(`1. Start with the \`${lm.role}${name}\` landmark. Its coarse ` +
-      "landscape cells changed, so fix section geometry, spacing, and " +
-      "placement before chasing local colors.");
+    lines.push(
+      `1. Start with the \`${lm.role}${name}\` landmark. Its coarse ` +
+        "landscape cells changed, so fix section geometry, spacing, and " +
+        "placement before chasing local colors.",
+    );
   } else if (topDrilldown?.flow === "decoration") {
     const lm = topDrilldown.landmark;
     const name = lm.name ? ` "${lm.name}"` : "";
-    lines.push(`1. Start with decoration inside the \`${lm.role}${name}\` ` +
-      "landmark. The coarse layout is relatively stable; fix local " +
-      "paint, media, and text details.");
+    lines.push(
+      `1. Start with decoration inside the \`${lm.role}${name}\` ` +
+        "landmark. The coarse layout is relatively stable; fix local " +
+        "paint, media, and text details.",
+    );
   } else if (r.baselineRowCount > r.variantRowCount) {
-    lines.push("1. The current rendering is missing text rows — add the missing " +
-      "HTML elements first. Bbox / palette tables tell you what styling they need.");
+    lines.push(
+      "1. The current rendering is missing text rows — add the missing " +
+        "HTML elements first. Bbox / palette tables tell you what styling they need.",
+    );
   } else {
-    lines.push("1. Open the target and current PNGs side-by-side. Use the heatmap " +
-      "region table to localize diff areas.");
+    lines.push(
+      "1. Open the target and current PNGs side-by-side. Use the heatmap " + "region table to localize diff areas.",
+    );
   }
-  lines.push("2. Cross-check the palette table — missing colors are the design tokens " +
-    "the current rendering doesn't have (paste the hex values into your CSS).");
-  lines.push("3. If bbox deltas are large, the current element's dimensions don't " +
-    "match the target — adjust `width` / `padding` / `font-size` until they converge.");
-  lines.push("4. Re-run `vlmkit build component` and check that diff %, bbox " +
-    "deltas, heatmap regions, palette deltas all shrink toward zero.");
+  lines.push(
+    "2. Cross-check the palette table — missing colors are the design tokens " +
+      "the current rendering doesn't have (paste the hex values into your CSS).",
+  );
+  lines.push(
+    "3. If bbox deltas are large, the current element's dimensions don't " +
+      "match the target — adjust `width` / `padding` / `font-size` until they converge.",
+  );
+  lines.push(
+    "4. Re-run `vlmkit build component` and check that diff %, bbox " +
+      "deltas, heatmap regions, palette deltas all shrink toward zero.",
+  );
   lines.push("");
   return lines.join("\n");
 }

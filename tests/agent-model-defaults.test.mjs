@@ -34,12 +34,7 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (path) => readFileSync(join(repoRoot, path), "utf8");
 
 /** Every document an agent may read for the answer, and none of them may disagree. */
-const INSTRUCTION_FILES = [
-  "AGENTS.md",
-  ".claude/CLAUDE.md",
-  "docs/configuration.md",
-  "docs/ja/README.md",
-];
+const INSTRUCTION_FILES = ["AGENTS.md", ".claude/CLAUDE.md", "docs/configuration.md", "docs/ja/README.md"];
 
 test("the code exports one OpenAI model id, in the OpenRouter catalogue's shape", () => {
   // The `openai/` prefix identifies the OpenRouter catalogue route used by the LLM client.

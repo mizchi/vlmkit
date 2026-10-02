@@ -76,7 +76,10 @@ describe("parsePageLoad", () => {
   });
 
   it("declares exactly the three inputs, with wait-until closed to real states", () => {
-    assert.deepEqual(PAGE_LOAD_INPUTS.map((i) => i.name), ["timeout", "wait-until", "har"]);
+    assert.deepEqual(
+      PAGE_LOAD_INPUTS.map((i) => i.name),
+      ["timeout", "wait-until", "har"],
+    );
     const waitUntil = PAGE_LOAD_INPUTS.find((i) => i.name === "wait-until")!;
     assert.deepEqual([...waitUntil.choices!], ["domcontentloaded", "load", "networkidle"]);
   });
@@ -101,10 +104,11 @@ describe("navigationOptions", () => {
 
 describe("pickPageLoad", () => {
   it("carries the three keys and drops everything else", () => {
-    assert.deepEqual(
-      pickPageLoad({ timeout: 5, waitUntil: "load", har: "a.har", ...{ outputDir: "x" } } as never),
-      { waitUntil: "load", timeout: 5, har: "a.har" },
-    );
+    assert.deepEqual(pickPageLoad({ timeout: 5, waitUntil: "load", har: "a.har", ...{ outputDir: "x" } } as never), {
+      waitUntil: "load",
+      timeout: 5,
+      har: "a.har",
+    });
   });
 });
 
@@ -112,10 +116,12 @@ describe("navigatePage reaches the browser call", () => {
   it("passes the caller's timeout and wait state to goto", async () => {
     const { page, recorded } = fakePage();
     await navigatePage(page, "http://localhost:5173/", { timeout: 90000, waitUntil: "domcontentloaded" });
-    assert.deepEqual(recorded.goto, [{
-      url: "http://localhost:5173/",
-      options: { waitUntil: "domcontentloaded", timeout: 90000 },
-    }]);
+    assert.deepEqual(recorded.goto, [
+      {
+        url: "http://localhost:5173/",
+        options: { waitUntil: "domcontentloaded", timeout: 90000 },
+      },
+    ]);
   });
 
   it("defaults to networkidle / 30s when the caller passed nothing", async () => {

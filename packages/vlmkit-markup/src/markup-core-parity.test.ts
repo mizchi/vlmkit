@@ -49,25 +49,13 @@ interface MarkupCoreParityFixture {
   semanticDrilldownPolicy: SemanticDrilldownPolicyFixture[];
 }
 
-const fixturePath = fileURLToPath(
-  new URL("../fixtures/markup-core/parity.json", import.meta.url),
-);
-const fixture = JSON.parse(
-  readFileSync(fixturePath, "utf8"),
-) as MarkupCoreParityFixture;
+const fixturePath = fileURLToPath(new URL("../fixtures/markup-core/parity.json", import.meta.url));
+const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as MarkupCoreParityFixture;
 
 test("markup-core component goal fixtures match TS bridge and CLI", () => {
   for (const entry of fixture.componentGoalStatus) {
-    assert.equal(
-      computeComponentGoalStatus(entry.input),
-      entry.expectedStatus,
-      `${entry.id} TS bridge`,
-    );
-    assert.equal(
-      runMarkupCore(componentGoalCliArgs(entry.input)),
-      entry.expectedStatus,
-      `${entry.id} CLI`,
-    );
+    assert.equal(computeComponentGoalStatus(entry.input), entry.expectedStatus, `${entry.id} TS bridge`);
+    assert.equal(runMarkupCore(componentGoalCliArgs(entry.input)), entry.expectedStatus, `${entry.id} CLI`);
   }
   assert.equal(getMarkupCoreRuntimeBackend(), "direct-js");
 });
@@ -89,17 +77,11 @@ test("markup-core semantic drilldown fixtures match TS bridge and CLI", () => {
     ]).split("|");
     assert.equal(flow, entry.expected.flow, `${entry.id} CLI flow`);
     assert.equal(reasonId, entry.expected.reasonId, `${entry.id} CLI reason`);
-    assert.equal(
-      Number(priorityScore),
-      entry.expected.priorityScore,
-      `${entry.id} CLI priority`,
-    );
+    assert.equal(Number(priorityScore), entry.expected.priorityScore, `${entry.id} CLI priority`);
   }
 });
 
-function componentGoalCliArgs(
-  input: ComponentGoalStatusFixture["input"],
-): string[] {
+function componentGoalCliArgs(input: ComponentGoalStatusFixture["input"]): string[] {
   return [
     "component-goal-status",
     input.goal,
@@ -125,11 +107,7 @@ function componentGoalCliArgs(
     boolArg(input.canvas?.nonblank),
     boolArg(input.canvas?.frameDelta),
     optionalBoolArg(input.canvas?.inputResponsive),
-    optionalBoolArg(
-      input.canvas?.stateHook
-        ? input.canvas.stateHookPresent !== false
-        : undefined,
-    ),
+    optionalBoolArg(input.canvas?.stateHook ? input.canvas.stateHookPresent !== false : undefined),
     intArg(input.canvas?.missingStateFields?.length),
     boolArg(Boolean(input.expressiveMenu)),
     intArg(input.expressiveMenu?.compositionLayers),
@@ -150,15 +128,11 @@ function doubleArg(value: number): string {
 }
 
 function optionalDoubleArg(value: number | undefined): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? String(value)
-    : "null";
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "null";
 }
 
 function intArg(value: number | undefined): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? String(Math.trunc(value))
-    : "0";
+  return typeof value === "number" && Number.isFinite(value) ? String(Math.trunc(value)) : "0";
 }
 
 function boolArg(value: boolean | undefined): string {

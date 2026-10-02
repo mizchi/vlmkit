@@ -16,7 +16,10 @@ function buildBandedImage(
   const data = new Uint8Array(width * height * 4);
   // Light gray background so we have non-flat variance.
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = 230; data[i + 1] = 230; data[i + 2] = 230; data[i + 3] = 255;
+    data[i] = 230;
+    data[i + 1] = 230;
+    data[i + 2] = 230;
+    data[i + 3] = 255;
   }
   for (const s of stripes) {
     if (s.y < 0 || s.y >= height) continue;
@@ -66,13 +69,17 @@ describe("detectBandShifts", () => {
     // second band shifts +15.
     const baselineStripes = [
       // band 0
-      { y: 30, gray: 0 }, { y: 80, gray: 0 }, { y: 130, gray: 0 }, { y: 180, gray: 0 },
+      { y: 30, gray: 0 },
+      { y: 80, gray: 0 },
+      { y: 130, gray: 0 },
+      { y: 180, gray: 0 },
       // band 1
-      { y: 230, gray: 0 }, { y: 280, gray: 0 }, { y: 330, gray: 0 }, { y: 380, gray: 0 },
+      { y: 230, gray: 0 },
+      { y: 280, gray: 0 },
+      { y: 330, gray: 0 },
+      { y: 380, gray: 0 },
     ];
-    const currentStripes = baselineStripes.map((s, i) =>
-      i < 4 ? { ...s, y: s.y + 5 } : { ...s, y: s.y + 15 },
-    );
+    const currentStripes = baselineStripes.map((s, i) => (i < 4 ? { ...s, y: s.y + 5 } : { ...s, y: s.y + 15 }));
     const baseline = buildBandedImage(200, 600, baselineStripes);
     const current = buildBandedImage(200, 600, currentStripes);
 
@@ -86,7 +93,10 @@ describe("detectBandShifts", () => {
   it("skips bands with no luminance variance (flat background)", () => {
     // First band has stripes, rest is flat gray.
     const baselineStripes = [
-      { y: 30, gray: 0 }, { y: 80, gray: 0 }, { y: 130, gray: 0 }, { y: 180, gray: 0 },
+      { y: 30, gray: 0 },
+      { y: 80, gray: 0 },
+      { y: 130, gray: 0 },
+      { y: 180, gray: 0 },
     ];
     const currentStripes = baselineStripes.map((s) => ({ ...s, y: s.y + 8 }));
     const baseline = buildBandedImage(200, 800, baselineStripes);

@@ -206,9 +206,7 @@ export function buildBenchDetectionSeries(
   });
   const sortedLatestFirst = [...filtered].sort((a, b) => b.runId.localeCompare(a.runId));
   const limit = Math.max(1, Math.min(options.limit ?? 100, 1000));
-  const selected = sortedLatestFirst
-    .slice(0, limit)
-    .sort((a, b) => a.runId.localeCompare(b.runId));
+  const selected = sortedLatestFirst.slice(0, limit).sort((a, b) => a.runId.localeCompare(b.runId));
 
   return {
     total: filtered.length,
@@ -236,9 +234,7 @@ export async function appendBenchHistory(
   await appendFile(historyPath, lines, "utf-8");
 }
 
-export async function readBenchHistory(
-  historyPath = getBenchHistoryPath(),
-): Promise<BenchHistoryRecord[]> {
+export async function readBenchHistory(historyPath = getBenchHistoryPath()): Promise<BenchHistoryRecord[]> {
   let content: string;
   try {
     content = await readFile(historyPath, "utf-8");
@@ -262,9 +258,7 @@ export async function readBenchHistory(
   return records;
 }
 
-export function getBenchHistoryStats(
-  records: BenchHistoryRecord[],
-): BenchHistoryStats {
+export function getBenchHistoryStats(records: BenchHistoryRecord[]): BenchHistoryStats {
   const byBackend = new Map<BenchHistoryBackend, BenchBackendStats>();
 
   for (const record of records) {
@@ -307,8 +301,9 @@ export function getBenchHistoryStats(
   }
 
   const comparableSpeedups: ComparableBenchSpeedup[] = [...comparable.values()]
-    .filter((entry): entry is { chromium: BenchHistoryRecord; prescanner: BenchHistoryRecord } =>
-      !!entry.chromium && !!entry.prescanner,
+    .filter(
+      (entry): entry is { chromium: BenchHistoryRecord; prescanner: BenchHistoryRecord } =>
+        !!entry.chromium && !!entry.prescanner,
     )
     .map((entry) => ({
       fixture: entry.chromium.fixture,
@@ -316,9 +311,7 @@ export function getBenchHistoryStats(
       startSeed: entry.chromium.startSeed,
       chromiumAvgMsPerTrial: entry.chromium.avgMsPerTrial,
       prescannerAvgMsPerTrial: entry.prescanner.avgMsPerTrial,
-      speedup: entry.prescanner.avgMsPerTrial === 0
-        ? 0
-        : entry.chromium.avgMsPerTrial / entry.prescanner.avgMsPerTrial,
+      speedup: entry.prescanner.avgMsPerTrial === 0 ? 0 : entry.chromium.avgMsPerTrial / entry.prescanner.avgMsPerTrial,
       chromiumRunId: entry.chromium.runId,
       prescannerRunId: entry.prescanner.runId,
     }))

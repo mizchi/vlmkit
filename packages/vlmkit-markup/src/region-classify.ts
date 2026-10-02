@@ -17,10 +17,7 @@
  *   2. Decision tree (MoonBit policy in `region_classify.mbt`) — turns
  *      the feature vector into a kind + confidence.
  */
-import {
-  regionClassifyKind,
-  type RegionKind,
-} from "./markup-core-region-classify.ts";
+import { regionClassifyKind, type RegionKind } from "./markup-core-region-classify.ts";
 
 export type { RegionKind } from "./markup-core-region-classify.ts";
 
@@ -84,7 +81,8 @@ export function classifyRegion(
   //   - per-row luma → stripe detection
   const histogram = new Set<number>();
   const rowMeanLuma = new Float32Array(H);
-  let totalSum = 0, totalSumSq = 0;
+  let totalSum = 0,
+    totalSumSq = 0;
   let n = 0;
   for (let yy = 0; yy < H; yy++) {
     const y = y0 + yy;
@@ -93,7 +91,9 @@ export function classifyRegion(
       const x = x0 + xx;
       const i = (y * imageWidth + x) * 4;
       if (data[i + 3]! === 0) continue;
-      const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+      const r = data[i]!,
+        g = data[i + 1]!,
+        b = data[i + 2]!;
       const key = ((r >> shift) << (2 * bits)) | ((g >> shift) << bits) | (b >> shift);
       histogram.add(key);
       const L = 0.299 * r + 0.587 * g + 0.114 * b;

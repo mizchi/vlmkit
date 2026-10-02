@@ -36,8 +36,7 @@ export const equivalenceGate = defineGate<RegionJudgeReport, EquivalenceGateOpti
   id: "check.equivalence",
   command: ["check", "equivalence"],
   title: "Visual equivalence judge",
-  summary:
-    "Visual equivalence judge for residual regions (measured delta + refutation-gated VLM or pair sheets)",
+  summary: "Visual equivalence judge for residual regions (measured delta + refutation-gated VLM or pair sheets)",
   category: "verdict",
   usage: `Visual equivalence judge for residual regions. Crops the region from
 both sides into a stacked pair image, measures the mean per-channel
@@ -72,11 +71,42 @@ written for a second reader.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "attempt.html|png", kind: "path", description: "Attempt page or screenshot", positional: 0, required: true },
-    { name: "target", placeholder: "png", kind: "path", description: "Target screenshot (defines the viewport for HTML sources)", required: true },
-    { name: "region", placeholder: "spec", kind: "string", description: 'Region "x,y,WxH" (kickback "(x,y) WxH" also accepted)', repeatable: true, required: true },
-    { name: "out", placeholder: "dir", kind: "path", description: "Pair-image output dir", defaultDescription: ".vlmkit-region-judge next to the source" },
-    { name: "vlm", placeholder: "model", kind: "string", description: "Judge with a VLM (optional model id); requires an API key" },
+    {
+      name: "source",
+      placeholder: "attempt.html|png",
+      kind: "path",
+      description: "Attempt page or screenshot",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "target",
+      placeholder: "png",
+      kind: "path",
+      description: "Target screenshot (defines the viewport for HTML sources)",
+      required: true,
+    },
+    {
+      name: "region",
+      placeholder: "spec",
+      kind: "string",
+      description: 'Region "x,y,WxH" (kickback "(x,y) WxH" also accepted)',
+      repeatable: true,
+      required: true,
+    },
+    {
+      name: "out",
+      placeholder: "dir",
+      kind: "path",
+      description: "Pair-image output dir",
+      defaultDescription: ".vlmkit-region-judge next to the source",
+    },
+    {
+      name: "vlm",
+      placeholder: "model",
+      kind: "string",
+      description: "Judge with a VLM (optional model id); requires an API key",
+    },
   ],
   parse: (argv) => {
     // Every value-taking flag has to be listed, or a caller who puts the flags
@@ -126,9 +156,9 @@ written for a second reader.`,
         rule: v.outcome,
         severity: v.outcome === "different" || v.outcome === "contradicted" ? "suspect" : "warn",
         message:
-          `region (${v.region.left},${v.region.top}) ${v.region.width}x${v.region.height}:`
-          + ` ${v.outcome} — measured mean channel delta ${v.measuredDelta.toFixed(2)}`
-          + ` (pair image ${v.pairImage})`,
+          `region (${v.region.left},${v.region.top}) ${v.region.width}x${v.region.height}:` +
+          ` ${v.outcome} — measured mean channel delta ${v.measuredDelta.toFixed(2)}` +
+          ` (pair image ${v.pairImage})`,
         evidence: { measuredDelta: v.measuredDelta, pairImage: v.pairImage },
       })),
   format: formatRegionJudgeReport,

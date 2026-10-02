@@ -76,12 +76,7 @@ export {
   type CssFix,
   type FixSuggestion,
 } from "./reasoning-pipeline.ts";
-export {
-  reasonAboutChanges,
-  type ReasoningChain,
-  type ActualChange,
-  type ExpectationMapping,
-} from "./reasoning.ts";
+export { reasonAboutChanges, type ReasoningChain, type ActualChange, type ExpectationMapping } from "./reasoning.ts";
 
 // ---- Intent / diff extraction ----
 export {

@@ -39,7 +39,7 @@ async function parseInBrowser(values: readonly string[]): Promise<(number[] | nu
   try {
     const page = await browser.newPage();
     await page.goto("about:blank");
-    return await page.evaluate(
+    return (await page.evaluate(
       `((values) => {
         ${CONTRAST_BACKGROUND_JS}
         return values.map((v) => {
@@ -47,7 +47,7 @@ async function parseInBrowser(values: readonly string[]): Promise<(number[] | nu
           return c === null ? null : c.map((n) => Math.round(n * 1000) / 1000);
         });
       })(${JSON.stringify(values)})`,
-    ) as (number[] | null)[];
+    )) as (number[] | null)[];
   } finally {
     await browser.close();
   }

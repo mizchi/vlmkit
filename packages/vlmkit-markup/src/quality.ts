@@ -20,7 +20,7 @@ export async function runQualityChecks(
   snapshots: VrtSnapshot[],
   diffs: VrtDiff[],
   graph?: DepGraph,
-  affected?: AffectedComponent[]
+  affected?: AffectedComponent[],
 ): Promise<QualityCheckResult[]> {
   const results: QualityCheckResult[] = [];
 
@@ -94,11 +94,10 @@ async function checkSnapshot(snapshot: VrtSnapshot): Promise<QualityCheckResult[
   return results;
 }
 
-function detectErrorIndicators(data: {
-  width: number;
-  height: number;
-  data: Uint8Array;
-}): { hasError: boolean; reason: string } {
+function detectErrorIndicators(data: { width: number; height: number; data: Uint8Array }): {
+  hasError: boolean;
+  reason: string;
+} {
   const { width, height, data: pixels } = data;
   const total = width * height;
   let redCount = 0;
@@ -147,9 +146,7 @@ function checkCoverage(snapshots: VrtSnapshot[], affected: AffectedComponent[]):
     };
   }
 
-  const snapshotNames = new Set(
-    snapshots.flatMap((s) => [s.testTitle.toLowerCase(), s.testId.toLowerCase()])
-  );
+  const snapshotNames = new Set(snapshots.flatMap((s) => [s.testTitle.toLowerCase(), s.testId.toLowerCase()]));
 
   const covered: string[] = [];
   const uncovered: string[] = [];
@@ -161,9 +158,7 @@ function checkCoverage(snapshots: VrtSnapshot[], affected: AffectedComponent[]):
       .pop()!
       .toLowerCase();
 
-    const isCovered = [...snapshotNames].some(
-      (sn) => sn.includes(name) || name.includes(sn)
-    );
+    const isCovered = [...snapshotNames].some((sn) => sn.includes(name) || name.includes(sn));
 
     if (isCovered) covered.push(comp.node.id);
     else uncovered.push(comp.node.id);

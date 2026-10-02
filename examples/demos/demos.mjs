@@ -26,12 +26,42 @@
 /** @typedef {{ viewport: [number, number], full?: boolean, mark?: string[], caption: string, clip?: { x: number, y: number, width: number, height: number } }} Shot */
 
 export const GROUPS = Object.freeze([
-  { id: "broken", icon: "page-check", title: "Is the page broken?", blurb: "Reference-free checks for the page you just wrote. No baseline, no design file, no API key." },
-  { id: "operable", icon: "keyboard", title: "Can it be operated?", blurb: "Keyboards, focus order, and agents that click on a screenshot." },
-  { id: "readable", icon: "contrast", title: "Can everyone read it?", blurb: "Contrast measured on rendered pixels, including apps with no DOM at all." },
-  { id: "design", icon: "layout-grid", title: "Does it look designed?", blurb: "Proximity, colour roles and a spacing scale. These report inconsistency, never taste." },
-  { id: "change", icon: "compare", title: "What changed?", blurb: "Two versions of a page, or one page under a longer language." },
-  { id: "vision", icon: "zoom", title: "Vision models", blurb: "Letting a VLM zoom into the original, from any provider." },
+  {
+    id: "broken",
+    icon: "page-check",
+    title: "Is the page broken?",
+    blurb: "Reference-free checks for the page you just wrote. No baseline, no design file, no API key.",
+  },
+  {
+    id: "operable",
+    icon: "keyboard",
+    title: "Can it be operated?",
+    blurb: "Keyboards, focus order, and agents that click on a screenshot.",
+  },
+  {
+    id: "readable",
+    icon: "contrast",
+    title: "Can everyone read it?",
+    blurb: "Contrast measured on rendered pixels, including apps with no DOM at all.",
+  },
+  {
+    id: "design",
+    icon: "layout-grid",
+    title: "Does it look designed?",
+    blurb: "Proximity, colour roles and a spacing scale. These report inconsistency, never taste.",
+  },
+  {
+    id: "change",
+    icon: "compare",
+    title: "What changed?",
+    blurb: "Two versions of a page, or one page under a longer language.",
+  },
+  {
+    id: "vision",
+    icon: "zoom",
+    title: "Vision models",
+    blurb: "Letting a VLM zoom into the original, from any provider.",
+  },
 ]);
 
 export const DEMOS = Object.freeze([
@@ -46,8 +76,16 @@ export const DEMOS = Object.freeze([
     look: "It sweeps 1280, 768 and 375px in one run. The overflow is reported with the element that sticks out and its right edge; the badge is found by sampling the price's glyphs and seeing 75% of them land on the badge instead.",
     fix: "Let `.plans` wrap (or stack below 768px), move the badge out of the price's box, and drop the fixed `height` on `.features`.",
     shots: [
-      { viewport: [1280, 360], mark: ["span.badge"], caption: "1280px: the badge covers the $49 price, and each list has lost its third item to the fixed height." },
-      { viewport: [768, 360], mark: ["div.plans > section:nth-of-type(3)"], caption: "768px: the third card runs 212px past the viewport." },
+      {
+        viewport: [1280, 360],
+        mark: ["span.badge"],
+        caption: "1280px: the badge covers the $49 price, and each list has lost its third item to the fixed height.",
+      },
+      {
+        viewport: [768, 360],
+        mark: ["div.plans > section:nth-of-type(3)"],
+        caption: "768px: the third card runs 212px past the viewport.",
+      },
     ],
   },
   {
@@ -60,8 +98,14 @@ export const DEMOS = Object.freeze([
     run: ["check", "copy", "examples/demos/copy/page.html", "--manifest", "examples/demos/copy/copy.txt"],
     lead: "The manifest (`copy.txt`, published here as `manifest.txt`) is the copy the page must show, verbatim. The page reworded the button, hid a pricing note in the page's own colour, and shipped a placeholder quote.",
     look: "The hidden note IS in the DOM, so a text search passes it. The gate reports it as `copy-invisible` with the reason class (`camouflage`) because a user cannot see it.",
-    fix: "Restore \"Start a free trial\", give `.note` a real colour, and write the testimonial.",
-    shots: [{ viewport: [1024, 640], caption: "What a visitor sees: \"Try it free\", an empty gap where the note is (white on white), and the placeholder quote." }],
+    fix: 'Restore "Start a free trial", give `.note` a real colour, and write the testimonial.',
+    shots: [
+      {
+        viewport: [1024, 640],
+        caption:
+          'What a visitor sees: "Try it free", an empty gap where the note is (white on white), and the placeholder quote.',
+      },
+    ],
   },
   {
     id: "responsive",
@@ -73,7 +117,13 @@ export const DEMOS = Object.freeze([
     lead: "Every viewport width is a generated test case; the page's own media queries partition them. One of the eleven mutants in the responsive pattern catalog forces four columns from 768px.",
     look: "The failure is shrunk before it is shown: to the exact interval 768-825px, to the declaration that causes it, and to a breakpoint move that was rewritten in the stylesheet and re-checked before the report calls it `verified`.",
     fix: "Move the breakpoint to `(min-width: 826px)`, or let the grid drop a column.",
-    shots: [{ viewport: [768, 900], mark: ["ol.phases > li:nth-of-type(1) > p:nth-of-type(1)"], caption: "768px, the first failing width: 69px-wide columns, eight lines of eight characters." }],
+    shots: [
+      {
+        viewport: [768, 900],
+        mark: ["ol.phases > li:nth-of-type(1) > p:nth-of-type(1)"],
+        caption: "768px, the first failing width: 69px-wide columns, eight lines of eight characters.",
+      },
+    ],
   },
   {
     id: "interactions",
@@ -85,7 +135,13 @@ export const DEMOS = Object.freeze([
     lead: "Every control is focused and pressed from the keyboard, and the page is watched for a response: an ARIA change, a layout change, a navigation.",
     look: "The dropdown answers Enter with a layout change. The Save button answers with nothing, so it is reported as an inert control.",
     fix: "Make Save a real submit (or handle `keydown`), so the keyboard gets what the mouse gets.",
-    shots: [{ viewport: [800, 260], mark: ["form>button.submit-btn"], caption: "Save looks like every other button, and does nothing on Enter." }],
+    shots: [
+      {
+        viewport: [800, 260],
+        mark: ["form>button.submit-btn"],
+        caption: "Save looks like every other button, and does nothing on Enter.",
+      },
+    ],
   },
   {
     id: "focus-order",
@@ -97,7 +153,13 @@ export const DEMOS = Object.freeze([
     lead: "Tab is pressed through the page and every focus step is placed on screen. `tabindex` values put Cut, Copy and Paste in reverse.",
     look: "Each finding names the two controls and their x positions, so the jump is visible in numbers rather than by pressing Tab.",
     fix: "Drop the positive `tabindex` values and let DOM order match visual order.",
-    shots: [{ viewport: [800, 360], mark: ["div.toolbar>button.btn-cut", "div.toolbar>button.btn-copy", "div.toolbar>button.btn-paste"], caption: "Visual order Paste · Copy · Cut left to right; focus goes Cut → Copy → Paste." }],
+    shots: [
+      {
+        viewport: [800, 360],
+        mark: ["div.toolbar>button.btn-cut", "div.toolbar>button.btn-copy", "div.toolbar>button.btn-paste"],
+        caption: "Visual order Paste · Copy · Cut left to right; focus goes Cut → Copy → Paste.",
+      },
+    ],
   },
   {
     id: "grounding",
@@ -105,12 +167,27 @@ export const DEMOS = Object.freeze([
     title: "A checkout button an agent would miss",
     command: "check grounding --mark",
     page: "fixtures/grounding/partly-covered.html",
-    run: ["check", "grounding", "fixtures/grounding/partly-covered.html", "--resolution", "1280x720", "--mark", "{out}/mark.png"],
+    run: [
+      "check",
+      "grounding",
+      "fixtures/grounding/partly-covered.html",
+      "--resolution",
+      "1280x720",
+      "--mark",
+      "{out}/mark.png",
+    ],
     lead: "For computer-use agents: an action map in screenshot pixels, and for each target whether a click there actually reaches it. `--mark` draws the numbered overlay an agent would be handed.",
     look: "A transparent veil covers the button's centre. The map moves t1's click point to a spot that does reach it, and still reports the defect, because anything aiming at the centre misses.",
     fix: "Remove the veil, or give it `pointer-events: none`.",
     shots: [],
-    evidence: [{ file: "mark.png", caption: "The numbered overlay, red where the coordinate carries a risk. `--resolution 1280x720` keeps the frame at full size for this page; by default the map is given in the downscaled frame a model is sent (640x360 here).", clip: { x: 0, y: 0, width: 520, height: 170 } }],
+    evidence: [
+      {
+        file: "mark.png",
+        caption:
+          "The numbered overlay, red where the coordinate carries a risk. `--resolution 1280x720` keeps the frame at full size for this page; by default the map is given in the downscaled frame a model is sent (640x360 here).",
+        clip: { x: 0, y: 0, width: 520, height: 170 },
+      },
+    ],
   },
   {
     id: "contrast",
@@ -122,7 +199,13 @@ export const DEMOS = Object.freeze([
     lead: "Every text-bearing element's colour against the background actually behind it, with the threshold its size earns (4.5:1, or 3:1 for large text).",
     look: "The large pale line passes at 3:1 only because it is large, and fails anyway at 2.54:1. Colours the browser serialises as `oklch()` or `lab()` are read back from a rasterised pixel, so none are skipped.",
     fix: "Darken the four inks to at least the ratio each needs.",
-    shots: [{ viewport: [800, 420], mark: ["p.small-pale", "p>a.light-link", "p.too-muted", "p.large-pale"], caption: "The four failures, outlined. The first line and the button pass." }],
+    shots: [
+      {
+        viewport: [800, 420],
+        mark: ["p.small-pale", "p>a.light-link", "p.too-muted", "p.large-pale"],
+        caption: "The four failures, outlined. The first line and the button pass.",
+      },
+    ],
   },
   {
     id: "a11y-tree",
@@ -148,7 +231,13 @@ export const DEMOS = Object.freeze([
     lead: "Proximity, alignment and contrast as measurements. This fixture is the intact composition page plus one rule that swaps the gaps around each heading.",
     look: "Each heading is 12px under the block above and 44px over the content it labels, so it reads as belonging upward. The gate reports the ambiguity and the gap that would remove it, never which gap is correct.",
     fix: "Put more space above each heading than below it.",
-    shots: [{ viewport: [1024, 900], mark: ["div.shell>section>h2", "section>div.subsection>h3"], caption: "Each outlined heading is closer to the block above it than to the text it introduces." }],
+    shots: [
+      {
+        viewport: [1024, 900],
+        mark: ["div.shell>section>h2", "section>div.subsection>h3"],
+        caption: "Each outlined heading is closer to the block above it than to the text it introduces.",
+      },
+    ],
   },
   {
     id: "color",
@@ -160,7 +249,9 @@ export const DEMOS = Object.freeze([
     lead: "The palette by role (surfaces, ink, marks, by painted area) and two WCAG rules. Here the links in the prose have no underline and are 2:1 against the text around them.",
     look: "`check a11y contrast` passes these links: they are readable against the background. This is the other criterion (WCAG 1.4.1), the link against the sentence it sits in.",
     fix: "Underline in-prose links, or reach 3:1 against the body ink.",
-    shots: [{ viewport: [1024, 640], mark: ["div.shell>p>a"], caption: "Blue links in dark-blue prose, no underline." }],
+    shots: [
+      { viewport: [1024, 640], mark: ["div.shell>p>a"], caption: "Blue links in dark-blue prose, no underline." },
+    ],
   },
   {
     id: "tokens",
@@ -182,12 +273,25 @@ export const DEMOS = Object.freeze([
     command: "diff html",
     page: "fixtures/shift-patterns/header-grow.html",
     extras: [{ from: "fixtures/shift-patterns/baseline.html", as: "baseline.html" }],
-    run: ["diff", "html", "fixtures/shift-patterns/baseline.html", "fixtures/shift-patterns/header-grow.html", "--output", "{out}"],
+    run: [
+      "diff",
+      "html",
+      "fixtures/shift-patterns/baseline.html",
+      "fixtures/shift-patterns/header-grow.html",
+      "--output",
+      "{out}",
+    ],
     lead: "Two versions of one page, compared per viewport: the pixel diff, the computed-style diff that explains it, and a triptych image.",
     look: "A raw pixel diff says 18.9% changed. The shift detector says one thing happened: everything below the header moved +48px, and after undoing the shift only 5.8% differs.",
     fix: "Restore the header's padding (the computed-style diff names `height`, `padding-top`, `padding-bottom`).",
     shots: [],
-    evidence: [{ file: "header-grow-mobile-triptych.png", caption: "Baseline, variant and heatmap at 375px, as `diff html` writes it.", clip: { x: 0, y: 0, width: 1129, height: 620 } }],
+    evidence: [
+      {
+        file: "header-grow-mobile-triptych.png",
+        caption: "Baseline, variant and heatmap at 375px, as `diff html` writes it.",
+        clip: { x: 0, y: 0, width: 1129, height: 620 },
+      },
+    ],
   },
   {
     id: "i18n",
@@ -199,8 +303,21 @@ export const DEMOS = Object.freeze([
     lead: "Every text run is lengthened 1.4x, roughly what translating English into German does, and the layout is measured again. No translations needed.",
     look: "A fixed-width button and heading overflow, and a paragraph doubles in height. Each finding carries the scroll width against the box.",
     fix: "Replace the fixed widths with `min-width` and let text wrap.",
-    shots: [{ viewport: [640, 360], mark: ["div.card>button.btn", "div.card>h2"], caption: "Before inflation, everything fits." }],
-    evidence: [{ file: "after.png", caption: "After 1.4x inflation (each word padded with X): the heading ends in an ellipsis, the button label runs past its edge, the line under it takes two.", clip: { x: 400, y: 20, width: 480, height: 240 } }],
+    shots: [
+      {
+        viewport: [640, 360],
+        mark: ["div.card>button.btn", "div.card>h2"],
+        caption: "Before inflation, everything fits.",
+      },
+    ],
+    evidence: [
+      {
+        file: "after.png",
+        caption:
+          "After 1.4x inflation (each word padded with X): the heading ends in an ellipsis, the button label runs past its edge, the line under it takes two.",
+        clip: { x: 400, y: 20, width: 480, height: 240 },
+      },
+    ],
   },
   {
     id: "zoom",
@@ -210,7 +327,7 @@ export const DEMOS = Object.freeze([
     page: "fixtures/css-challenge/dashboard.html",
     special: "zoom",
     lead: "A full-page 2x capture of a dashboard is shown to a model at a little under its CSS size, and one table header moved 2px. The zoom tool lets the model name a box and get it back cropped from the full-resolution original and magnified, from any provider's model.",
-    look: "In the view the model is sent, the shift is under two pixels. In the zoom it is plain: CUSTOMER starts level with \"Alice Johnson\" in the baseline and left of it in the current image. In the agent-mode accuracy bench, zoom scored 58/58 against 48/58 for one look, and the whole gain was exact values like this one.",
+    look: 'In the view the model is sent, the shift is under two pixels. In the zoom it is plain: CUSTOMER starts level with "Alice Johnson" in the baseline and left of it in the current image. In the agent-mode accuracy bench, zoom scored 58/58 against 48/58 for one look, and the whole gain was exact values like this one.',
     fix: "Turn zoom on when the answer is a measurement (a shift in pixels, a colour value), not just to notice a change.",
     shots: [],
   },

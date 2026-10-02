@@ -97,12 +97,18 @@ export function parseAfterActions(argv: readonly string[]): GroundingAction[] {
     const kind = m?.[1]?.toLowerCase();
     if (!m || (kind === "wheel") !== (m[4] !== undefined)) {
       throw new UsageError(
-        `--after ${JSON.stringify(raw)}: expected "click x,y", "move x,y" or "wheel x,y dy"`
-        + " — screenshot px, like the map's (e.g. --after \"wheel 85,150 89\").",
+        `--after ${JSON.stringify(raw)}: expected "click x,y", "move x,y" or "wheel x,y dy"` +
+          ' — screenshot px, like the map\'s (e.g. --after "wheel 85,150 89").',
       );
     }
     const at = { x: Number(m[2]), y: Number(m[3]) };
-    out.push(kind === "wheel" ? { kind: "wheel", at, dy: Number(m[4]) } : kind === "move" ? { kind: "move", at } : { kind: "click", at });
+    out.push(
+      kind === "wheel"
+        ? { kind: "wheel", at, dy: Number(m[4]) }
+        : kind === "move"
+          ? { kind: "move", at }
+          : { kind: "click", at },
+    );
   }
   return out;
 }
@@ -201,7 +207,14 @@ finding.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to scan",
+      positional: 0,
+      required: true,
+    },
     { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
     {
       name: "resolution",
@@ -211,15 +224,33 @@ finding.`,
       choices: [...Object.keys(RESOLUTION_PRESETS)],
       defaultDescription: "resolved from the viewport, as image-resize.ts does",
     },
-    { name: "precision-floor", placeholder: "px", kind: "number", description: "Min side in screenshot px below which a target is unresolvable", defaultDescription: "10" },
-    { name: "aim-margin", placeholder: "px", kind: "number", description: "Click-point-to-neighbour distance in screenshot px below which a miss hits the neighbour", defaultDescription: "6" },
+    {
+      name: "precision-floor",
+      placeholder: "px",
+      kind: "number",
+      description: "Min side in screenshot px below which a target is unresolvable",
+      defaultDescription: "10",
+    },
+    {
+      name: "aim-margin",
+      placeholder: "px",
+      kind: "number",
+      description: "Click-point-to-neighbour distance in screenshot px below which a miss hits the neighbour",
+      defaultDescription: "6",
+    },
     { name: "mark", placeholder: "png", kind: "path", description: "Write a numbered set-of-mark screenshot here" },
-    { name: "at", placeholder: "x,y", kind: "string", description: "Hit-test this screenshot-px point and report what a click there reaches", repeatable: true },
+    {
+      name: "at",
+      placeholder: "x,y",
+      kind: "string",
+      description: "Hit-test this screenshot-px point and report what a click there reaches",
+      repeatable: true,
+    },
     {
       name: "after",
       placeholder: "action",
       kind: "string",
-      description: "Replay \"click x,y\" / \"move x,y\" / \"wheel x,y dy\" (screenshot px) before measuring",
+      description: 'Replay "click x,y" / "move x,y" / "wheel x,y dy" (screenshot px) before measuring',
       repeatable: true,
     },
     ...PAGE_LOAD_INPUTS,
@@ -263,8 +294,10 @@ finding.`,
   format: formatGroundingReport,
   headline: (report) => {
     const actionable = report.targets.filter((t) => t.inFrame && !t.disabled);
-    return `${actionable.length} target(s) in frame at ${report.frame.width}x${report.frame.height}`
-      + ` (scale ${report.frame.scale.toFixed(2)})`;
+    return (
+      `${actionable.length} target(s) in frame at ${report.frame.width}x${report.frame.height}` +
+      ` (scale ${report.frame.scale.toFixed(2)})`
+    );
   },
   ledger: (report, options) => ({
     tool: "check-grounding",

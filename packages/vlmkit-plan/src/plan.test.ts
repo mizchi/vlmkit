@@ -24,13 +24,15 @@ describe("buildPlanPrompt", () => {
       request: "Plan guest checkout coverage.",
       seed: { path: "tests/seed.spec.ts", source: "test('seed', async () => {})" },
       prd: "Guest users can buy one item.",
-      observations: [{
-        url: "http://localhost:4173/checkout",
-        roles: ['button "Pay now"', 'textbox "Email"'],
-        labels: ["Email"],
-        testIds: ["cart-total"],
-        notes: ["Payment is mocked."],
-      }],
+      observations: [
+        {
+          url: "http://localhost:4173/checkout",
+          roles: ['button "Pay now"', 'textbox "Email"'],
+          labels: ["Email"],
+          testIds: ["cart-total"],
+          notes: ["Payment is mocked."],
+        },
+      ],
       constraints: ["Use two screenshots for VRT scenarios."],
     });
 
@@ -68,13 +70,15 @@ describe("structured plan contract", () => {
   const structured = {
     title: "Checkout",
     applicationOverview: "Guest checkout.",
-    scenarios: [{
-      title: "Checkout succeeds",
-      seed: "tests/seed.spec.ts",
-      steps: ["Open checkout.", "Pay."],
-      expectedResults: ["Confirmation is visible."],
-      vrt: { startState: "empty cart", goalState: "confirmation" },
-    }],
+    scenarios: [
+      {
+        title: "Checkout succeeds",
+        seed: "tests/seed.spec.ts",
+        steps: ["Open checkout.", "Pay."],
+        expectedResults: ["Confirmation is visible."],
+        vrt: { startState: "empty cart", goalState: "confirmation" },
+      },
+    ],
     generationNotes: ["Use role locators."],
     locatorInventory: {
       roles: ['button "Pay now"'],
@@ -96,10 +100,7 @@ describe("structured plan contract", () => {
   });
 
   it("parses fenced structured plan JSON", () => {
-    assert.deepEqual(
-      parseStructuredPlan(`\`\`\`json\n${JSON.stringify(structured)}\n\`\`\``, "Fallback"),
-      structured,
-    );
+    assert.deepEqual(parseStructuredPlan(`\`\`\`json\n${JSON.stringify(structured)}\n\`\`\``, "Fallback"), structured);
   });
 
   it("parses a structured plan JSON block with surrounding prose", () => {
@@ -118,12 +119,15 @@ describe("structured plan contract", () => {
   });
 
   it("validates seed and required scenario fields", () => {
-    const diagnostics = validateStructuredPlan({
-      title: "Checkout",
-      applicationOverview: "",
-      scenarios: [{ title: "x", steps: [], expectedResults: [] }],
-      generationNotes: [],
-    }, { seed: { path: "tests/seed.spec.ts" } });
+    const diagnostics = validateStructuredPlan(
+      {
+        title: "Checkout",
+        applicationOverview: "",
+        scenarios: [{ title: "x", steps: [], expectedResults: [] }],
+        generationNotes: [],
+      },
+      { seed: { path: "tests/seed.spec.ts" } },
+    );
 
     assert.ok(diagnostics.includes("missing Application Overview"));
     assert.ok(diagnostics.includes("scenario 1 missing steps"));
@@ -133,60 +137,73 @@ describe("structured plan contract", () => {
   });
 
   it("rejects too many scenarios for smoke scope", () => {
-    const diagnostics = validateStructuredPlan({
-      title: "Checkout",
-      applicationOverview: "Checkout.",
-      scenarios: [
-        { title: "first", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] },
-        { title: "second", steps: ["Open cart."], expectedResults: ["Cart is visible."] },
-      ],
-      generationNotes: ["Use observed locators."],
-    }, { scope: "smoke" });
+    const diagnostics = validateStructuredPlan(
+      {
+        title: "Checkout",
+        applicationOverview: "Checkout.",
+        scenarios: [
+          { title: "first", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] },
+          { title: "second", steps: ["Open cart."], expectedResults: ["Cart is visible."] },
+        ],
+        generationNotes: ["Use observed locators."],
+      },
+      { scope: "smoke" },
+    );
 
     assert.ok(diagnostics.includes("scope smoke allows at most 1 scenario"));
   });
 
   it("rejects locator inventory entries that were not observed", () => {
-    const diagnostics = validateStructuredPlan({
-      title: "Checkout",
-      applicationOverview: "Checkout.",
-      scenarios: [{ title: "x", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] }],
-      generationNotes: ["Use observed locators."],
-      locatorInventory: {
-        roles: ['button "Pay now"', 'button "Delete account"'],
-        labels: ["Email", "Coupon"],
-        testIds: ["cart-count", "admin-panel"],
-        texts: ["Order confirmed", "Admin"],
+    const diagnostics = validateStructuredPlan(
+      {
+        title: "Checkout",
+        applicationOverview: "Checkout.",
+        scenarios: [{ title: "x", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] }],
+        generationNotes: ["Use observed locators."],
+        locatorInventory: {
+          roles: ['button "Pay now"', 'button "Delete account"'],
+          labels: ["Email", "Coupon"],
+          testIds: ["cart-count", "admin-panel"],
+          texts: ["Order confirmed", "Admin"],
+        },
       },
-    }, {
-      observations: [{
-        roles: ['button "Pay now"'],
-        labels: ["Email"],
-        testIds: ["cart-count"],
-        texts: ["Order confirmed"],
-      }],
-    });
+      {
+        observations: [
+          {
+            roles: ['button "Pay now"'],
+            labels: ["Email"],
+            testIds: ["cart-count"],
+            texts: ["Order confirmed"],
+          },
+        ],
+      },
+    );
 
     assert.ok(diagnostics.includes('locatorInventory.roles contains unobserved locator: button "Delete account"'));
-    assert.ok(diagnostics.includes('locatorInventory.labels contains unobserved locator: Coupon'));
-    assert.ok(diagnostics.includes('locatorInventory.testIds contains unobserved locator: admin-panel'));
-    assert.ok(diagnostics.includes('locatorInventory.texts contains unobserved locator: Admin'));
+    assert.ok(diagnostics.includes("locatorInventory.labels contains unobserved locator: Coupon"));
+    assert.ok(diagnostics.includes("locatorInventory.testIds contains unobserved locator: admin-panel"));
+    assert.ok(diagnostics.includes("locatorInventory.texts contains unobserved locator: Admin"));
   });
 
   it("accepts equivalent role inventory quote styles", () => {
-    const diagnostics = validateStructuredPlan({
-      title: "Checkout",
-      applicationOverview: "Checkout.",
-      scenarios: [{ title: "x", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] }],
-      generationNotes: ["Use observed locators."],
-      locatorInventory: {
-        roles: ["button 'Pay now'", "heading 'Checkout'"],
+    const diagnostics = validateStructuredPlan(
+      {
+        title: "Checkout",
+        applicationOverview: "Checkout.",
+        scenarios: [{ title: "x", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] }],
+        generationNotes: ["Use observed locators."],
+        locatorInventory: {
+          roles: ["button 'Pay now'", "heading 'Checkout'"],
+        },
       },
-    }, {
-      observations: [{
-        roles: ['button "Pay now"', 'heading "Checkout"'],
-      }],
-    });
+      {
+        observations: [
+          {
+            roles: ['button "Pay now"', 'heading "Checkout"'],
+          },
+        ],
+      },
+    );
 
     assert.deepEqual(diagnostics, []);
   });
@@ -215,17 +232,22 @@ describe("structured plan contract", () => {
   });
 
   it("builds locator inventory directly from observations", () => {
-    assert.deepEqual(buildLocatorInventoryFromObservations([{
-      roles: ['button "Pay now"', 'button "Pay now"', "role=heading[name='Checkout']"],
-      labels: ["Email"],
-      testIds: ["cart-count"],
-      texts: ["Order confirmed"],
-    }]), {
-      roles: ['button "Pay now"', 'heading "Checkout"'],
-      labels: ["Email"],
-      testIds: ["cart-count"],
-      texts: ["Order confirmed"],
-    });
+    assert.deepEqual(
+      buildLocatorInventoryFromObservations([
+        {
+          roles: ['button "Pay now"', 'button "Pay now"', "role=heading[name='Checkout']"],
+          labels: ["Email"],
+          testIds: ["cart-count"],
+          texts: ["Order confirmed"],
+        },
+      ]),
+      {
+        roles: ['button "Pay now"', 'heading "Checkout"'],
+        labels: ["Email"],
+        testIds: ["cart-count"],
+        texts: ["Order confirmed"],
+      },
+    );
   });
 
   it("canonicalizes structured locator inventory before rendering and exporting", async () => {
@@ -233,10 +255,12 @@ describe("structured plan contract", () => {
       {
         title: "Checkout",
         request: "Plan checkout.",
-        observations: [{
-          roles: ['button "Pay now"', 'heading "Checkout"', 'textbox "Email"'],
-          labels: ["Email"],
-        }],
+        observations: [
+          {
+            roles: ['button "Pay now"', 'heading "Checkout"', 'textbox "Email"'],
+            labels: ["Email"],
+          },
+        ],
       },
       undefined,
       {
@@ -244,11 +268,13 @@ describe("structured plan contract", () => {
           content: JSON.stringify({
             title: "Checkout",
             applicationOverview: "Guest checkout.",
-            scenarios: [{
-              title: "Checkout succeeds",
-              steps: ["Open checkout."],
-              expectedResults: ["Checkout is visible."],
-            }],
+            scenarios: [
+              {
+                title: "Checkout succeeds",
+                steps: ["Open checkout."],
+                expectedResults: ["Checkout is visible."],
+              },
+            ],
             generationNotes: ["Use observed locators."],
             locatorInventory: {
               roles: ["button 'Pay now'", "role=heading[name='Checkout']", "textbox: Email", "button 'Pay now'"],
@@ -273,12 +299,14 @@ describe("structured plan contract", () => {
       {
         title: "Checkout",
         request: "Plan checkout.",
-        observations: [{
-          roles: ['button "Pay now"'],
-          labels: ["Email"],
-          testIds: ["cart-count"],
-          texts: ["Order confirmed"],
-        }],
+        observations: [
+          {
+            roles: ['button "Pay now"'],
+            labels: ["Email"],
+            testIds: ["cart-count"],
+            texts: ["Order confirmed"],
+          },
+        ],
       },
       undefined,
       {
@@ -286,11 +314,13 @@ describe("structured plan contract", () => {
           content: JSON.stringify({
             title: "Checkout",
             applicationOverview: "Guest checkout.",
-            scenarios: [{
-              title: "Checkout succeeds",
-              steps: ["Open checkout.", "Pay."],
-              expectedResults: ["Confirmation is visible."],
-            }],
+            scenarios: [
+              {
+                title: "Checkout succeeds",
+                steps: ["Open checkout.", "Pay."],
+                expectedResults: ["Confirmation is visible."],
+              },
+            ],
             generationNotes: ["Use observed locators."],
           }),
         }),
@@ -306,9 +336,11 @@ describe("structured plan contract", () => {
     });
     assert.match(result.markdown, /## Locator Inventory/);
     assert.deepEqual(
-      structuredPlanToLocatorInventory(result.plan!, [{
-        roles: ['button "Pay now"'],
-      }]),
+      structuredPlanToLocatorInventory(result.plan!, [
+        {
+          roles: ['button "Pay now"'],
+        },
+      ]),
       result.plan?.locatorInventory,
     );
   });
@@ -319,11 +351,13 @@ describe("structured plan contract", () => {
         title: "Checkout",
         request: "Plan checkout.",
         seed: { path: "tests/seed.spec.ts" },
-        observations: [{
-          roles: ['button "Pay now"'],
-          labels: ["Email"],
-          testIds: ["cart-count"],
-        }],
+        observations: [
+          {
+            roles: ['button "Pay now"'],
+            labels: ["Email"],
+            testIds: ["cart-count"],
+          },
+        ],
       },
       undefined,
       {
@@ -353,11 +387,13 @@ describe("structured plan contract", () => {
         title: "Checkout",
         request: "Plan checkout.",
         seed: { path: "tests/seed.spec.ts" },
-        observations: [{
-          roles: ['button "Pay now"'],
-          labels: ["Email"],
-          testIds: ["cart-count"],
-        }],
+        observations: [
+          {
+            roles: ['button "Pay now"'],
+            labels: ["Email"],
+            testIds: ["cart-count"],
+          },
+        ],
       },
       undefined,
       {
@@ -410,7 +446,8 @@ describe("normalizePlanMarkdown", () => {
 
 describe("validatePlanMarkdown", () => {
   it("accepts a complete planner artifact", () => {
-    const diagnostics = validatePlanMarkdown(`# Checkout
+    const diagnostics = validatePlanMarkdown(
+      `# Checkout
 
 ## Application Overview
 Guest checkout.
@@ -428,7 +465,9 @@ Guest checkout.
 
 ## Generation Notes
 Use role locators.
-`, { seed: { path: "tests/seed.spec.ts" } });
+`,
+      { seed: { path: "tests/seed.spec.ts" } },
+    );
 
     assert.deepEqual(diagnostics, []);
   });
@@ -446,7 +485,8 @@ Use role locators.
   });
 
   it("rejects markdown plans with too many scenarios for smoke scope", () => {
-    const diagnostics = validatePlanMarkdown(`# Checkout
+    const diagnostics = validatePlanMarkdown(
+      `# Checkout
 
 ## Application Overview
 Guest checkout.
@@ -459,7 +499,9 @@ Guest checkout.
 
 ## Generation Notes
 Use role locators.
-`, { scope: "smoke" });
+`,
+      { scope: "smoke" },
+    );
 
     assert.ok(diagnostics.includes("scope smoke allows at most 1 scenario"));
   });
@@ -486,16 +528,12 @@ Use role locators.
 describe("createPlan", () => {
   it("uses an injected model and normalizes the markdown", async () => {
     let sawPrompt = "";
-    const result = await createPlan(
-      { title: "Checkout", request: "Plan checkout." },
-      undefined,
-      {
-        complete: async (prompt) => {
-          sawPrompt = prompt;
-          return { content: "## Test Scenarios\n...", costUsd: 0.01, provider: "test", model: "planner" };
-        },
+    const result = await createPlan({ title: "Checkout", request: "Plan checkout." }, undefined, {
+      complete: async (prompt) => {
+        sawPrompt = prompt;
+        return { content: "## Test Scenarios\n...", costUsd: 0.01, provider: "test", model: "planner" };
       },
-    );
+    });
 
     assert.match(sawPrompt, /Plan checkout/);
     assert.equal(result.markdown, "# Checkout\n\n## Test Scenarios\n...\n");
@@ -563,35 +601,47 @@ Use role locators.
 
 describe("resolvePlannerModelOptions", () => {
   it("uses VLMKIT_LLM_PROVIDER before API-key based defaults", () => {
-    assert.deepEqual(resolvePlannerModelOptions(undefined, {
-      VLMKIT_LLM_PROVIDER: "openrouter",
-      ANTHROPIC_API_KEY: "anthropic-key",
-      OPENROUTER_API_KEY: "openrouter-key",
-    }), {
-      provider: "openrouter",
-      model: "openai/gpt-5-mini",
-      maxTokens: 2048,
-    });
+    assert.deepEqual(
+      resolvePlannerModelOptions(undefined, {
+        VLMKIT_LLM_PROVIDER: "openrouter",
+        ANTHROPIC_API_KEY: "anthropic-key",
+        OPENROUTER_API_KEY: "openrouter-key",
+      }),
+      {
+        provider: "openrouter",
+        model: "openai/gpt-5-mini",
+        maxTokens: 2048,
+      },
+    );
   });
 
   it("prefers Anthropic when no provider is explicit but an Anthropic key exists", () => {
-    assert.deepEqual(resolvePlannerModelOptions(undefined, {
-      ANTHROPIC_API_KEY: "anthropic-key",
-      OPENROUTER_API_KEY: "openrouter-key",
-    }), {
-      provider: "anthropic",
-      maxTokens: 2048,
-    });
+    assert.deepEqual(
+      resolvePlannerModelOptions(undefined, {
+        ANTHROPIC_API_KEY: "anthropic-key",
+        OPENROUTER_API_KEY: "openrouter-key",
+      }),
+      {
+        provider: "anthropic",
+        maxTokens: 2048,
+      },
+    );
   });
 
   it("preserves an explicit model for any provider", () => {
-    assert.deepEqual(resolvePlannerModelOptions({ provider: "anthropic", model: "claude-test", maxTokens: 1234 }, {
-      VLMKIT_LLM_PROVIDER: "openrouter",
-    }), {
-      provider: "anthropic",
-      model: "claude-test",
-      maxTokens: 1234,
-    });
+    assert.deepEqual(
+      resolvePlannerModelOptions(
+        { provider: "anthropic", model: "claude-test", maxTokens: 1234 },
+        {
+          VLMKIT_LLM_PROVIDER: "openrouter",
+        },
+      ),
+      {
+        provider: "anthropic",
+        model: "claude-test",
+        maxTokens: 1234,
+      },
+    );
   });
 
   it("falls back to OpenRouter when no environment gives a provider", () => {

@@ -10,9 +10,7 @@ import {
 } from "./migration-subagent.ts";
 import type { MigrationCompareReport } from "./migration-fix-loop-core.ts";
 
-function createCandidate(
-  overrides: Partial<MigrationFixCandidate> = {},
-): MigrationFixCandidate {
+function createCandidate(overrides: Partial<MigrationFixCandidate> = {}): MigrationFixCandidate {
   return {
     selector: ".card",
     property: "padding",
@@ -165,10 +163,7 @@ describe("buildMigrationSubagentTask", () => {
 
 describe("summarizeMigrationSubagentEvaluation", () => {
   it("reports resolved and improved success rates per variant", () => {
-    const summary = summarizeMigrationSubagentEvaluation(
-      createBeforeReport(),
-      createAfterReport(),
-    );
+    const summary = summarizeMigrationSubagentEvaluation(createBeforeReport(), createAfterReport());
 
     assert.equal(summary.variantCount, 2);
     assert.equal(summary.resolvedCount, 1);

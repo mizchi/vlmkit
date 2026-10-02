@@ -27,39 +27,43 @@ test("observe release queue UI", async ({ page }) => {
 
   await page.getByRole("button", { name: "Open Invoice Export details" }).click();
   await expect(page.getByTestId("selected-service")).toHaveText("Invoice Export");
-  await expect(page.getByTestId("detail-summary")).toHaveText("Ledger archive release is waiting for compliance approval.");
+  await expect(page.getByTestId("detail-summary")).toHaveText(
+    "Ledger archive release is waiting for compliance approval.",
+  );
 
-  const observations = [{
-    url: "http://127.0.0.1:4173/release-queue",
-    title: "Release Queue",
-    roles: [
-      "heading \"Release Queue\"",
-      "heading \"Candidate releases\"",
-      "heading \"Release detail\"",
-      "button \"All\"",
-      "button \"Blocked\"",
-      "button \"Ready\"",
-      "button \"Open Payments API details\"",
-      "button \"Open Invoice Export details\""
-    ],
-    labels: ["Search releases"],
-    testIds: [
-      "ready-count",
-      "blocked-count",
-      "release-row-payments-api",
-      "release-row-invoice-export",
-      "selected-service",
-      "detail-status",
-      "detail-summary"
-    ],
-    texts: [
-      "Payments API",
-      "Invoice Export",
-      "Blocked",
-      "Waiting on fraud review approval before checkout authorization rollout.",
-      "Ledger archive release is waiting for compliance approval."
-    ]
-  }];
+  const observations = [
+    {
+      url: "http://127.0.0.1:4173/release-queue",
+      title: "Release Queue",
+      roles: [
+        'heading "Release Queue"',
+        'heading "Candidate releases"',
+        'heading "Release detail"',
+        'button "All"',
+        'button "Blocked"',
+        'button "Ready"',
+        'button "Open Payments API details"',
+        'button "Open Invoice Export details"',
+      ],
+      labels: ["Search releases"],
+      testIds: [
+        "ready-count",
+        "blocked-count",
+        "release-row-payments-api",
+        "release-row-invoice-export",
+        "selected-service",
+        "detail-status",
+        "detail-summary",
+      ],
+      texts: [
+        "Payments API",
+        "Invoice Export",
+        "Blocked",
+        "Waiting on fraud review approval before checkout authorization rollout.",
+        "Ledger archive release is waiting for compliance approval.",
+      ],
+    },
+  ];
 
   await mkdir(".vlmkit/markup-vrt-eval/specs", { recursive: true });
   await writeFile(
@@ -68,19 +72,20 @@ test("observe release queue UI", async ({ page }) => {
   );
   await writeFile(
     ".vlmkit/markup-vrt-eval/specs/release-queue.visual-context.json",
-    JSON.stringify({
-      viewport: stableVisualContext.viewport,
-      elements: stableVisualContext.elements,
-      semantic: stableSemantic,
-      viewports: [
-        { label: "desktop", ...stableVisualContext, semantic: stableSemantic },
-        ...viewportContexts,
-      ],
-      variants: {
-        stable: { ...stableVisualContext, semantic: stableSemantic },
-        regression: { ...regressionVisualContext, semantic: regressionSemantic },
+    JSON.stringify(
+      {
+        viewport: stableVisualContext.viewport,
+        elements: stableVisualContext.elements,
+        semantic: stableSemantic,
+        viewports: [{ label: "desktop", ...stableVisualContext, semantic: stableSemantic }, ...viewportContexts],
+        variants: {
+          stable: { ...stableVisualContext, semantic: stableSemantic },
+          regression: { ...regressionVisualContext, semantic: regressionSemantic },
+        },
       },
-    }, null, 2) + "\n",
+      null,
+      2,
+    ) + "\n",
   );
 });
 
@@ -124,42 +129,50 @@ async function captureVisualContext(page) {
       "font-size",
       "line-height",
     ];
-    const elements = Array.from(document.querySelectorAll([
-      "main",
-      "section",
-      "article",
-      "aside",
-      "table",
-      "tr",
-      "td",
-      "th",
-      "button",
-      "[data-testid]",
-      ".metric",
-      ".pill",
-      ".queue",
-      ".detail-panel",
-      ".risk-bar",
-    ].join(",")));
+    const elements = Array.from(
+      document.querySelectorAll(
+        [
+          "main",
+          "section",
+          "article",
+          "aside",
+          "table",
+          "tr",
+          "td",
+          "th",
+          "button",
+          "[data-testid]",
+          ".metric",
+          ".pill",
+          ".queue",
+          ".detail-panel",
+          ".risk-bar",
+        ].join(","),
+      ),
+    );
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
-      elements: elements.map((element, index) => {
-        const rect = element.getBoundingClientRect();
-        const computed = window.getComputedStyle(element);
-        return {
-          key: elementKey(element, index),
-          path: elementPath(element, index),
-          selector: selectorHint(element),
-          tag: element.tagName.toLowerCase(),
-          id: element.id || undefined,
-          classes: typeof element.className === "string" ? element.className : "",
-          top: Math.round(rect.top),
-          left: Math.round(rect.left),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-          styles: Object.fromEntries(styleProperties.map((property) => [property, computed.getPropertyValue(property)])),
-        };
-      }).filter((entry) => entry.width > 0 && entry.height > 0),
+      elements: elements
+        .map((element, index) => {
+          const rect = element.getBoundingClientRect();
+          const computed = window.getComputedStyle(element);
+          return {
+            key: elementKey(element, index),
+            path: elementPath(element, index),
+            selector: selectorHint(element),
+            tag: element.tagName.toLowerCase(),
+            id: element.id || undefined,
+            classes: typeof element.className === "string" ? element.className : "",
+            top: Math.round(rect.top),
+            left: Math.round(rect.left),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+            styles: Object.fromEntries(
+              styleProperties.map((property) => [property, computed.getPropertyValue(property)]),
+            ),
+          };
+        })
+        .filter((entry) => entry.width > 0 && entry.height > 0),
     };
 
     function elementKey(element, index) {
@@ -176,9 +189,7 @@ async function captureVisualContext(page) {
       const testId = element.getAttribute("data-testid");
       if (testId) return `[data-testid="${testId}"]`;
       if (element.id) return `#${element.id}`;
-      const className = typeof element.className === "string"
-        ? element.className.split(/\s+/).filter(Boolean)[0]
-        : "";
+      const className = typeof element.className === "string" ? element.className.split(/\s+/).filter(Boolean)[0] : "";
       if (className) return `.${className}:nth(${index})`;
       return `${element.tagName.toLowerCase()}:nth(${index})`;
     }
@@ -187,9 +198,7 @@ async function captureVisualContext(page) {
       const testId = element.getAttribute("data-testid");
       if (testId) return `[data-testid="${testId}"]`;
       if (element.id) return `#${element.id}`;
-      const className = typeof element.className === "string"
-        ? element.className.split(/\s+/).filter(Boolean)[0]
-        : "";
+      const className = typeof element.className === "string" ? element.className.split(/\s+/).filter(Boolean)[0] : "";
       return className ? `.${className}` : element.tagName.toLowerCase();
     }
   });
@@ -200,18 +209,19 @@ async function captureSemanticSnapshot(page) {
     headings: Array.from(document.querySelectorAll("h1,h2,h3"))
       .map((element) => element.textContent?.trim() ?? "")
       .filter(Boolean),
-    buttons: Array.from(document.querySelectorAll("button"))
-      .map((element) => ({
-        text: element.textContent?.trim() ?? "",
-        ariaLabel: element.getAttribute("aria-label") ?? "",
-        pressed: element.getAttribute("aria-pressed") ?? "",
-      })),
-    testIds: Object.fromEntries(Array.from(document.querySelectorAll("[data-testid]"))
-      .map((element) => [
-        element.getAttribute("data-testid") ?? "",
-        element.textContent?.replace(/\s+/g, " ").trim() ?? "",
-      ])
-      .filter(([key]) => key)),
+    buttons: Array.from(document.querySelectorAll("button")).map((element) => ({
+      text: element.textContent?.trim() ?? "",
+      ariaLabel: element.getAttribute("aria-label") ?? "",
+      pressed: element.getAttribute("aria-pressed") ?? "",
+    })),
+    testIds: Object.fromEntries(
+      Array.from(document.querySelectorAll("[data-testid]"))
+        .map((element) => [
+          element.getAttribute("data-testid") ?? "",
+          element.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        ])
+        .filter(([key]) => key),
+    ),
   }));
 }
 

@@ -21,18 +21,14 @@
 import { watch as fsWatch } from "node:fs";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve, relative} from "node:path";
+import { dirname, resolve, relative } from "node:path";
 import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
-import { runMigrationCompare, parseMigrationCompareArgs, type MigrationCompareReport } from "./experiments/migration/migration-compare.ts";
 import {
-  BOLD,
-  CYAN,
-  DIM,
-  GREEN,
-  RED,
-  RESET,
-  YELLOW,
-} from "@mizchi/vlmkit-core/terminal-colors.ts";
+  runMigrationCompare,
+  parseMigrationCompareArgs,
+  type MigrationCompareReport,
+} from "./experiments/migration/migration-compare.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
 const DEBOUNCE_MS = 150;
@@ -179,9 +175,12 @@ export function summarizeReport(report: MigrationCompareReport): RoundSummary {
   return {
     timestamp: new Date().toISOString(),
     diffByViewport,
-    suggestions: (report as MigrationCompareReport & {
-      wireframeFixSuggestions?: Array<{ variantFile: string; suggestions: WireframeFixSuggestion[] }>;
-    }).wireframeFixSuggestions?.[0]?.suggestions ?? [],
+    suggestions:
+      (
+        report as MigrationCompareReport & {
+          wireframeFixSuggestions?: Array<{ variantFile: string; suggestions: WireframeFixSuggestion[] }>;
+        }
+      ).wireframeFixSuggestions?.[0]?.suggestions ?? [],
     reportPath: report.reportPath,
   };
 }
@@ -194,25 +193,33 @@ export function formatWatchDelta(delta: WatchRunDelta, isFirst: boolean): string
     const arrow = d.delta < -0.0005 ? `${GREEN}↓${RESET}` : d.delta > 0.0005 ? `${RED}↑${RESET}` : `${DIM}=${RESET}`;
     const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
     const deltaPct = (n: number) => `${n >= 0 ? "+" : ""}${(n * 100).toFixed(2)}pp`;
-    lines.push(`  ${vp.padEnd(8)} ${pct(d.curr).padStart(7)} ${arrow} ${DIM}${pct(d.prev)} (${deltaPct(d.delta)})${RESET}`);
+    lines.push(
+      `  ${vp.padEnd(8)} ${pct(d.curr).padStart(7)} ${arrow} ${DIM}${pct(d.prev)} (${deltaPct(d.delta)})${RESET}`,
+    );
   }
   if (delta.zeroCrossings.length > 0) {
     lines.push("");
-    lines.push(`  ${RED}${BOLD}zero-crossing${RESET} ${DIM}(your last edit overshot — damp before pushing further)${RESET}`);
+    lines.push(
+      `  ${RED}${BOLD}zero-crossing${RESET} ${DIM}(your last edit overshot — damp before pushing further)${RESET}`,
+    );
     for (const z of delta.zeroCrossings.slice(0, 3)) {
       lines.push(`    ${RED}~${RESET} ${z.message}`);
     }
   }
   if (delta.newlyIntroduced.length > 0) {
     lines.push("");
-    lines.push(`  ${RED}${BOLD}newly introduced${RESET} ${DIM}(your last edit produced these — likely regressed something)${RESET}`);
+    lines.push(
+      `  ${RED}${BOLD}newly introduced${RESET} ${DIM}(your last edit produced these — likely regressed something)${RESET}`,
+    );
     for (const s of delta.newlyIntroduced.slice(0, 5)) {
       lines.push(`    ${RED}+${RESET} [${s.confidence}] ${s.evidence}`);
     }
   }
   if (delta.resolved.length > 0) {
     lines.push("");
-    lines.push(`  ${GREEN}${BOLD}resolved${RESET} ${DIM}(${delta.resolved.length} suggestion(s) cleared by your last edit)${RESET}`);
+    lines.push(
+      `  ${GREEN}${BOLD}resolved${RESET} ${DIM}(${delta.resolved.length} suggestion(s) cleared by your last edit)${RESET}`,
+    );
     for (const s of delta.resolved.slice(0, 5)) {
       lines.push(`    ${GREEN}-${RESET} [${s.confidence}] ${s.evidence}`);
     }
@@ -260,7 +267,10 @@ async function runOnce(compareArgs: string[], outputDir: string): Promise<RoundS
   // Inject --output if the caller didn't pass one (or override theirs).
   const filtered: string[] = [];
   for (let i = 0; i < compareArgs.length; i++) {
-    if (compareArgs[i] === "--output" || compareArgs[i] === "--output-dir") { i++; continue; }
+    if (compareArgs[i] === "--output" || compareArgs[i] === "--output-dir") {
+      i++;
+      continue;
+    }
     filtered.push(compareArgs[i]);
   }
   const args = [...filtered, "--output-dir", runDir];
@@ -295,9 +305,7 @@ export async function runWatch(rawArgs: string[]): Promise<void> {
   // Pick what to watch. By default: the variant file + its parent dir
   // (so referenced stylesheets in the same dir are picked up). Caller
   // can override with --watch-path.
-  const watchPath = watchPathOverride
-    ? resolve(watchPathOverride)
-    : dirname(resolve(variant));
+  const watchPath = watchPathOverride ? resolve(watchPathOverride) : dirname(resolve(variant));
 
   console.log(`${BOLD}${CYAN}vlmkit watch${RESET}`);
   console.log(`  ${DIM}baseline${RESET} ${baseline}`);
@@ -313,7 +321,10 @@ export async function runWatch(rawArgs: string[]): Promise<void> {
   let debounce: NodeJS.Timeout | null = null;
 
   const trigger = async () => {
-    if (running) { queued = true; return; }
+    if (running) {
+      queued = true;
+      return;
+    }
     running = true;
     try {
       console.log(`${DIM}[${new Date().toISOString().slice(11, 19)}] running compare…${RESET}`);
@@ -327,7 +338,10 @@ export async function runWatch(rawArgs: string[]): Promise<void> {
       }
     } finally {
       running = false;
-      if (queued) { queued = false; setImmediate(trigger); }
+      if (queued) {
+        queued = false;
+        setImmediate(trigger);
+      }
     }
   };
 
@@ -356,7 +370,6 @@ function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
-
 
 if (isCliEntry(import.meta.url, "watch")) {
   runWatch(process.argv.slice(2)).catch((err) => {

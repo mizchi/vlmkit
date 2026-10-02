@@ -41,7 +41,12 @@ const matchAt = (w: number): string[] => [
 
 describe("widthCandidates", () => {
   it("lands a sample on both sides of px, em and range-syntax boundaries", () => {
-    const c = widthCandidates(["(max-width: 767.98px)", "(min-width: 48em)", "(width > 1024px)", "(orientation: portrait)"]);
+    const c = widthCandidates([
+      "(max-width: 767.98px)",
+      "(min-width: 48em)",
+      "(width > 1024px)",
+      "(orientation: portrait)",
+    ]);
     for (const w of [767, 768, 1024, 1025]) assert.ok(c.includes(w), `${w} in ${c}`);
     assert.ok(!c.some((w) => w < 700), "orientation contributes no numbers");
   });
@@ -60,10 +65,20 @@ describe("regimesFromSamples", () => {
       1440,
     );
     assert.deepEqual(unresolved, []);
-    assert.deepEqual(transitions.map((t) => t.width), [700, 1100]);
+    assert.deepEqual(
+      transitions.map((t) => t.width),
+      [700, 1100],
+    );
     assert.deepEqual(transitions[0]!.entering, ["(min-width: 700px)"]);
     assert.deepEqual(transitions[0]!.leaving, ["(max-width: 699px)"]);
-    assert.deepEqual(regimes.map((r) => [r.from, r.to]), [[320, 699], [700, 1099], [1100, 1440]]);
+    assert.deepEqual(
+      regimes.map((r) => [r.from, r.to]),
+      [
+        [320, 699],
+        [700, 1099],
+        [1100, 1440],
+      ],
+    );
   });
 
   it("reports a change between distant samples as unresolved instead of guessing", () => {
@@ -73,7 +88,10 @@ describe("regimesFromSamples", () => {
       1440,
     );
     assert.deepEqual(transitions, []);
-    assert.deepEqual(unresolved, [[500, 900], [900, 1440]]);
+    assert.deepEqual(unresolved, [
+      [500, 900],
+      [900, 1440],
+    ]);
   });
 });
 
@@ -98,7 +116,10 @@ describe("generation", () => {
   );
 
   it("starts from both sides of every transition and both ends", () => {
-    assert.deepEqual(edgeCases(space, transitions).map((c) => c.width), [320, 699, 700, 1099, 1100, 1440]);
+    assert.deepEqual(
+      edgeCases(space, transitions).map((c) => c.width),
+      [320, 699, 700, 1099, 1100, 1440],
+    );
     assert.ok(edgeCases(space, transitions).every((c) => c.height === 900 && c.textScale === 1));
   });
 
@@ -125,16 +146,34 @@ describe("generation", () => {
 
   it("shrinks every non-width dimension to the base case when the failure is width-only", async () => {
     const result = await shrinkRecord(
-      { width: 813, height: 655, textScale: 1.5, colorScheme: "dark" as const, reducedMotion: "no-preference" as const },
+      {
+        width: 813,
+        height: 655,
+        textScale: 1.5,
+        colorScheme: "dark" as const,
+        reducedMotion: "no-preference" as const,
+      },
       caseShrinkers(space),
       async (c) => c.width >= 700 && c.width <= 871,
     );
-    assert.deepEqual(result.value, { width: 813, height: 900, textScale: 1, colorScheme: "light", reducedMotion: "no-preference" });
+    assert.deepEqual(result.value, {
+      width: 813,
+      height: 900,
+      textScale: 1,
+      colorScheme: "light",
+      reducedMotion: "no-preference",
+    });
   });
 
   it("keeps the dimension a failure actually needs", async () => {
     const result = await shrinkRecord(
-      { width: 390, height: 655, textScale: 1.5, colorScheme: "light" as const, reducedMotion: "no-preference" as const },
+      {
+        width: 390,
+        height: 655,
+        textScale: 1.5,
+        colorScheme: "light" as const,
+        reducedMotion: "no-preference" as const,
+      },
       caseShrinkers(space),
       async (c) => c.textScale >= 1.25,
     );
@@ -217,14 +256,32 @@ describe("anchorInterval", () => {
 });
 
 describe("groupFailures", () => {
-  const f = (kind: ResponsiveFinding["kind"], selector: string, severity: "fail" | "warn" = "warn"): ResponsiveFinding => ({
-    kind, severity, selector, targets: [selector], message: `${kind} ${selector}`,
+  const f = (
+    kind: ResponsiveFinding["kind"],
+    selector: string,
+    severity: "fail" | "warn" = "warn",
+  ): ResponsiveFinding => ({
+    kind,
+    severity,
+    selector,
+    targets: [selector],
+    message: `${kind} ${selector}`,
   });
-  const c = (width: number) => ({ width, height: 900, textScale: 1, colorScheme: "light" as const, reducedMotion: "no-preference" as const });
+  const c = (width: number) => ({
+    width,
+    height: 900,
+    textScale: 1,
+    colorScheme: "light" as const,
+    reducedMotion: "no-preference" as const,
+  });
 
   it("merges findings that fail in exactly the same cases, and only those", () => {
     const outcomes: CaseOutcome[] = [
-      { index: 0, case: c(700), findings: [f("text-starved", "a.one"), f("text-starved", "a.two"), f("text-starved", "p.lede")] },
+      {
+        index: 0,
+        case: c(700),
+        findings: [f("text-starved", "a.one"), f("text-starved", "a.two"), f("text-starved", "p.lede")],
+      },
       { index: 1, case: c(800), findings: [f("text-starved", "a.one"), f("text-starved", "a.two")] },
       { index: 2, case: c(320), findings: [f("page-overflow-x", "div.row", "fail")] },
       { index: 3, case: c(330), findings: [f("page-overflow-x", "input.email", "fail")] },
@@ -239,8 +296,14 @@ describe("groupFailures", () => {
   });
 
   it("keys page overflow by the property alone", () => {
-    assert.equal(failureKey({ kind: "page-overflow-x", selector: "div.a" }), failureKey({ kind: "page-overflow-x", selector: "div.b" }));
-    assert.notEqual(failureKey({ kind: "text-starved", selector: "a" }), failureKey({ kind: "text-starved", selector: "b" }));
+    assert.equal(
+      failureKey({ kind: "page-overflow-x", selector: "div.a" }),
+      failureKey({ kind: "page-overflow-x", selector: "div.b" }),
+    );
+    assert.notEqual(
+      failureKey({ kind: "text-starved", selector: "a" }),
+      failureKey({ kind: "text-starved", selector: "b" }),
+    );
   });
 });
 
@@ -263,22 +326,39 @@ describe("judgeStarvedText", () => {
   });
 
   it("reports the docs phase cards: several lines under 6em", () => {
-    assert.equal(judgeStarvedText([s({ text: "Copies rows in ranges", chars: 60, lines: 6, contentWidth: 69, fontSize: 14 })]).length, 1);
+    assert.equal(
+      judgeStarvedText([s({ text: "Copies rows in ranges", chars: 60, lines: 6, contentWidth: 69, fontSize: 14 })])
+        .length,
+      1,
+    );
   });
 
   it("reports a short word broken across lines even in a wider box", () => {
-    const [finding] = judgeStarvedText([s({ text: "--config path", chars: 13, lines: 2, contentWidth: 120, fontSize: 14, brokenWord: "config" })]);
+    const [finding] = judgeStarvedText([
+      s({ text: "--config path", chars: 13, lines: 2, contentWidth: 120, fontSize: 14, brokenWord: "config" }),
+    ]);
     assert.match(finding!.message, /breaks "config"/);
   });
 
   it("leaves a long URL broken on purpose alone", () => {
     const word = "https://example.com/a/very/long/path/that/must/wrap";
-    assert.deepEqual(judgeStarvedText([s({ text: word, chars: word.length, lines: 2, contentWidth: 200, fontSize: 14, brokenWord: word })]), []);
+    assert.deepEqual(
+      judgeStarvedText([
+        s({ text: word, chars: word.length, lines: 2, contentWidth: 200, fontSize: 14, brokenWord: word }),
+      ]),
+      [],
+    );
   });
 
   it("leaves a display headline set in short lines alone, but not a crushed one", () => {
     // The magazine's 42px title at 1000px: four lines of five characters in 236px (5.6em).
-    const title = s({ text: "海辺の町の古本屋が、夜だけ店を開ける理由", chars: 20, lines: 4, contentWidth: 236, fontSize: 42 });
+    const title = s({
+      text: "海辺の町の古本屋が、夜だけ店を開ける理由",
+      chars: 20,
+      lines: 4,
+      contentWidth: 236,
+      fontSize: 42,
+    });
     assert.deepEqual(judgeStarvedText([title]), []);
     assert.equal(judgeStarvedText([{ ...title, contentWidth: 120 }]).length, 1, "under 4em is starved at any size");
   });

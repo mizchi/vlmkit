@@ -1,9 +1,4 @@
-import type {
-  A11yNode,
-  A11yChange,
-  A11yDiff,
-  A11ySnapshot,
-} from "./types.ts";
+import type { A11yNode, A11yChange, A11yDiff, A11ySnapshot } from "./types.ts";
 
 export const LANDMARK_ROLES = new Set([
   "banner",
@@ -41,10 +36,7 @@ export const INTERACTIVE_ROLES = new Set([
 /**
  * Compare two a11y tree snapshots and return the semantic diff.
  */
-export function diffA11yTrees(
-  baseline: A11ySnapshot,
-  current: A11ySnapshot
-): A11yDiff {
+export function diffA11yTrees(baseline: A11ySnapshot, current: A11ySnapshot): A11yDiff {
   const changes: A11yChange[] = [];
   diffNodes(baseline.tree, current.tree, "", changes);
 
@@ -59,11 +51,7 @@ export function diffA11yTrees(
     stats: {
       added: changes.filter((c) => c.type === "node-added").length,
       removed: changes.filter((c) => c.type === "node-removed").length,
-      modified: changes.filter(
-        (c) =>
-          c.type !== "node-added" &&
-          c.type !== "node-removed"
-      ).length,
+      modified: changes.filter((c) => c.type !== "node-added" && c.type !== "node-removed").length,
     },
   };
 }
@@ -72,11 +60,9 @@ function diffNodes(
   before: A11yNode | undefined,
   after: A11yNode | undefined,
   path: string,
-  changes: A11yChange[]
+  changes: A11yChange[],
 ): void {
-  const nodePath = path
-    ? `${path} > ${nodeLabel(after ?? before!)}`
-    : nodeLabel(after ?? before!);
+  const nodePath = path ? `${path} > ${nodeLabel(after ?? before!)}` : nodeLabel(after ?? before!);
 
   // Node added
   if (!before && after) {
@@ -173,7 +159,7 @@ function diffChildren(
   beforeChildren: A11yNode[],
   afterChildren: A11yNode[],
   parentPath: string,
-  changes: A11yChange[]
+  changes: A11yChange[],
 ): void {
   const matched = new Set<number>(); // matched indices in beforeChildren
   const afterMatched = new Set<number>();
@@ -218,10 +204,7 @@ function diffChildren(
       if (!stillUnmatchedAfter.has(j)) continue;
       const a = unmatchedAfter[j];
       // role or name match -> pair (diff as change)
-      if (
-        b.node.role === a.node.role ||
-        (b.node.name && b.node.name === a.node.name)
-      ) {
+      if (b.node.role === a.node.role || (b.node.name && b.node.name === a.node.name)) {
         stillUnmatchedAfter.delete(j);
         diffNodes(b.node, a.node, parentPath, changes);
         found = true;
@@ -342,7 +325,7 @@ function walkTree(node: A11yNode, path: string, issues: A11yIssue[]): void {
 export function parsePlaywrightA11ySnapshot(
   testId: string,
   testTitle: string,
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
 ): A11ySnapshot {
   return {
     testId,
@@ -369,10 +352,10 @@ function normalizeA11yNode(raw: Record<string, unknown>): A11yNode {
       pressed: raw.pressed as boolean | "mixed",
     }),
     ...(raw.selected !== undefined && { selected: raw.selected as boolean }),
-    ...(raw.children ? {
-      children: (raw.children as Record<string, unknown>[]).map(
-        normalizeA11yNode
-      ),
-    } : {}),
+    ...(raw.children
+      ? {
+          children: (raw.children as Record<string, unknown>[]).map(normalizeA11yNode),
+        }
+      : {}),
   };
 }

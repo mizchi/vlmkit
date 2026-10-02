@@ -50,11 +50,7 @@ function spec(name: string, loader: SpecLoader): Spec {
 }
 
 async function delegate(s: Spec, args: string[]): Promise<void> {
-  process.argv = [
-    process.argv[0],
-    "(vrt-dispatcher)",
-    ...args.map((a) => (a === HELP_SENTINEL ? "--help" : a)),
-  ];
+  process.argv = [process.argv[0], "(vrt-dispatcher)", ...args.map((a) => (a === HELP_SENTINEL ? "--help" : a))];
   const prev = process.env.__VLMKIT_DISPATCHER_LEAF__;
   process.env.__VLMKIT_DISPATCHER_LEAF__ = s.name;
   if (CLI_ENTRY) process.env.__VLMKIT_CLI_ENTRY__ = CLI_ENTRY;
@@ -93,7 +89,8 @@ async function runDiscover(args: string[]): Promise<void> {
     console.log();
   }
   console.log(`  \x1b[1mViewports (${result.viewports.length}):\x1b[0m`);
-  for (const vp of result.viewports) console.log(`    ${String(vp.width).padStart(5)}px  ${vp.label.padEnd(16)} \x1b[2m${vp.reason}\x1b[0m`);
+  for (const vp of result.viewports)
+    console.log(`    ${String(vp.width).padStart(5)}px  ${vp.label.padEnd(16)} \x1b[2m${vp.reason}\x1b[0m`);
   console.log();
   const { appendRunLedger } = await import("@mizchi/vlmkit-core/run-ledger.ts");
   appendRunLedger({
@@ -143,9 +140,15 @@ const SPECS: Record<string, Spec> = {
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
   batch: spec("batch", () => import("./commands/batch-cli.ts")),
   gates: spec("gates", () => import("./commands/gates-cli.ts")),
-  componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
+  componentFromImage: spec(
+    "component-from-image",
+    () => import("@mizchi/vlmkit-markup/component/component-from-image.ts"),
+  ),
   buildGallery: spec("build-gallery", () => import("@mizchi/vlmkit-markup/component/story-scaffold.ts")),
-  contractIntrospect: spec("contract-introspect", () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts")),
+  contractIntrospect: spec(
+    "contract-introspect",
+    () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts"),
+  ),
   contractValidate: spec("contract-validate", () => import("@mizchi/vlmkit-markup/contract/validate-contract.ts")),
   contractScaffold: spec("contract-scaffold", () => import("@mizchi/vlmkit-markup/contract/scaffold-contract.ts")),
   selectorHeal: spec("selector-heal-cli", () => import("@mizchi/vlmkit-markup/heal/selector-heal-cli.ts")),
@@ -187,13 +190,22 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   scan: {
     component: { spec: SPECS.componentExtract, desc: "Detect components in a screenshot; crop to standalone PNGs" },
-    breakpoints: { run: runDiscover, desc: "Discover responsive breakpoints from HTML/CSS (verify them with `check breakpoints`)" },
-    mock: { spec: SPECS.mockScan, desc: "Mock-image intake: infer @2x/@3x scale, write normalized @1x target, extraction sanity" },
+    breakpoints: {
+      run: runDiscover,
+      desc: "Discover responsive breakpoints from HTML/CSS (verify them with `check breakpoints`)",
+    },
+    mock: {
+      spec: SPECS.mockScan,
+      desc: "Mock-image intake: infer @2x/@3x scale, write normalized @1x target, extraction sanity",
+    },
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
     page: { spec: SPECS.pageCompose, desc: "Page-level multi-component composition diff" },
-    gallery: { spec: SPECS.buildGallery, desc: "Turn a converged page into a story gallery `check story` can maintain" },
+    gallery: {
+      spec: SPECS.buildGallery,
+      desc: "Turn a converged page into a story gallery `check story` can maintain",
+    },
   },
   contract: {
     introspect: { spec: SPECS.contractIntrospect, desc: "Infer UI Contract IR from existing HTML / URL" },
@@ -202,7 +214,10 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   heal: {
     selector: { spec: SPECS.selectorHeal, desc: "Suggest replacements for a selector that no longer matches" },
-    markup: { spec: SPECS.markupAutofix, desc: "Stage-2 auto-fix: LLM turns the verify-markup kickback into gated CSS overrides" },
+    markup: {
+      spec: SPECS.markupAutofix,
+      desc: "Stage-2 auto-fix: LLM turns the verify-markup kickback into gated CSS overrides",
+    },
   },
 };
 
@@ -253,8 +268,10 @@ export function legacyGroupLeaves(): [string, string][] {
 async function groupLeaves(groupName: string): Promise<{ name: string; desc: string }[]> {
   const legacy = Object.entries(GROUPS[groupName] ?? {}).map(([name, info]) => ({ name, desc: info.desc }));
   const registry = await loadGateRegistry();
-  const registered = (registry.groups().get(groupName) ?? [])
-    .map(({ gate }) => ({ name: gate.command.slice(1).join(" "), desc: gate.summary }));
+  const registered = (registry.groups().get(groupName) ?? []).map(({ gate }) => ({
+    name: gate.command.slice(1).join(" "),
+    desc: gate.summary,
+  }));
   return [...legacy, ...registered].sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -296,8 +313,8 @@ async function runRules(args: string[]): Promise<void> {
     if (!gate) {
       const suggestions = registry.suggest(wanted);
       console.error(
-        `Unknown gate: ${wanted.join(" ")}`
-        + (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
+        `Unknown gate: ${wanted.join(" ")}` +
+          (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
       );
       process.exitCode = 1;
       return;
@@ -328,14 +345,13 @@ async function runRules(args: string[]): Promise<void> {
   // and `check breakpoints` are spelled differently and answer the same thing.
   console.log(`\nvlmkit rules — every gate, by the kind of question it answers\n`);
   for (const [category, entries] of registry.categories()) {
-    const description = category === "other"
-      ? "Uncategorized (a plugin gate that declared no category)."
-      : GATE_CATEGORIES[category];
+    const description =
+      category === "other" ? "Uncategorized (a plugin gate that declared no category)." : GATE_CATEGORIES[category];
     console.log(`${BOLD}${category}${RESET}  ${DIM}${description}${RESET}`);
     for (const { gate, plugin } of entries) {
       console.log(
-        `  ${gate.command.join(" ").padEnd(21)}${String(gate.rules.length).padStart(2)} rule(s)`
-        + `  ${DIM}${gate.id}${RESET}${plugin.startsWith("@mizchi/") || plugin === "vlmkit-app" ? "" : `  ${CYAN}[${plugin}]${RESET}`}`,
+        `  ${gate.command.join(" ").padEnd(21)}${String(gate.rules.length).padStart(2)} rule(s)` +
+          `  ${DIM}${gate.id}${RESET}${plugin.startsWith("@mizchi/") || plugin === "vlmkit-app" ? "" : `  ${CYAN}[${plugin}]${RESET}`}`,
       );
     }
     console.log("");
@@ -388,11 +404,7 @@ Workflows:
 Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
 }
 
-async function runGroupLeaf(
-  groupName: string,
-  leafName: string,
-  rest: string[],
-): Promise<void> {
+async function runGroupLeaf(groupName: string, leafName: string, rest: string[]): Promise<void> {
   // `check a11y` / `check drift` used to be hand-written two-segment branches
   // here, each with its own sub-table and its own "unknown X" error. They are
   // three-token gates now (`["check","a11y","contrast"]`) and the registry
@@ -437,7 +449,8 @@ async function runGroupLeaf(
   // subcommand: a11y`. Two-word subcommands have no help routing; I had to guess
   // `check --help` to discover `a11y focus` exists." List what is under it instead.
   const prefix = `${groupName} ${leafName} `;
-  const underPrefix = registry.list()
+  const underPrefix = registry
+    .list()
     .map((entry) => ({ command: entry.gate.command.join(" "), gate: entry.gate }))
     .filter((entry) => entry.command.startsWith(prefix));
   if (underPrefix.length > 0) {
@@ -452,8 +465,8 @@ async function runGroupLeaf(
 
   const suggestions = registry.suggest([groupName, leafName]);
   console.error(
-    `Unknown ${groupName} subcommand: ${leafName}`
-    + (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"vlmkit ${s}"`).join(", ")}?` : ""),
+    `Unknown ${groupName} subcommand: ${leafName}` +
+      (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"vlmkit ${s}"`).join(", ")}?` : ""),
   );
   process.exit(1);
 }
@@ -461,8 +474,8 @@ async function runGroupLeaf(
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   // Answered before anything else so the compact index — the most common
   // invocation — never pays for loading the gate registry.
-  const isTopLevelHelp = argv.length === 0
-    || (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h" || argv[0] === "help"));
+  const isTopLevelHelp =
+    argv.length === 0 || (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h" || argv[0] === "help"));
   if (isTopLevelHelp) {
     printRootHelp();
     return;
@@ -490,17 +503,15 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
   // `vlmkit verify markup` as an unknown command.
   const registryGroups = [...(await loadGateRegistry()).groups().keys()];
   for (const groupName of [...new Set([...Object.keys(GROUPS), ...registryGroups])]) {
-    cli.command(`${groupName} [...args]`, `${groupName} group`)
+    cli
+      .command(`${groupName} [...args]`, `${groupName} group`)
       .allowUnknownOptions()
       .action(async () => {
         const groupArgs = passThrough(argv, [groupName]);
         // `vlmkit diff --help` (no leaf, just help) → group usage.
         // passThrough rewrites --help/-h to HELP_SENTINEL so cac
         // doesn't intercept; we restore the semantics here.
-        if (
-          groupArgs.length === 0 ||
-          (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)
-        ) {
+        if (groupArgs.length === 0 || (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)) {
           await printGroupHelp(groupName);
           return;
         }
@@ -512,7 +523,8 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
   // Snapshot / workflow / bench / api / report / skill (single-token).
   // `vlmkit snapshot flipbook ...` is special-cased to delegate directly
   // to the flipbook CLI (snapshot.ts doesn't have a `flipbook` mode).
-  cli.command("snapshot [...args]", "Multi-viewport snapshot baseline + diff")
+  cli
+    .command("snapshot [...args]", "Multi-viewport snapshot baseline + diff")
     .allowUnknownOptions()
     .action(async () => {
       const rest = passThrough(argv, ["snapshot"]);
@@ -538,7 +550,8 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
       await delegate(SPECS.snapshot, rest);
     });
 
-  cli.command("migration [...args]", "Migration VRT (compare / blind / subagent)")
+  cli
+    .command("migration [...args]", "Migration VRT (compare / blind / subagent)")
     .allowUnknownOptions()
     .action(async () => {
       const rest = passThrough(argv, ["migration"]);
@@ -557,11 +570,13 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
       }
     });
 
-  cli.command("workflow [...args]", "Stateful baseline/snapshot workflow")
+  cli
+    .command("workflow [...args]", "Stateful baseline/snapshot workflow")
     .allowUnknownOptions()
     .action(async () => runWorkflow(passThrough(argv, ["workflow"])));
 
-  cli.command("bench [...args]", "CSS challenge benchmark, or `bench gates` for gate/rule cost")
+  cli
+    .command("bench [...args]", "CSS challenge benchmark, or `bench gates` for gate/rule cost")
     .allowUnknownOptions()
     .action(async () => {
       const rest = passThrough(argv, ["bench"]);
@@ -582,7 +597,8 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
       await delegate(SPECS.cssBench, rest);
     });
 
-  cli.command("report [...args]", "Detection pattern report (CSS challenge)")
+  cli
+    .command("report [...args]", "Detection pattern report (CSS challenge)")
     .allowUnknownOptions()
     .action(async () => {
       const rest = passThrough(argv, ["report"]);
@@ -598,15 +614,18 @@ Options:
       await delegate(SPECS.detectionReport, rest);
     });
 
-  cli.command("skill [...args]", "Per-project skill playbooks")
+  cli
+    .command("skill [...args]", "Per-project skill playbooks")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.skill, passThrough(argv, ["skill"])));
 
-  cli.command("markup-loop [...args]", "Drop-in markup agent loop")
+  cli
+    .command("markup-loop [...args]", "Drop-in markup agent loop")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.markupLoop, passThrough(argv, ["markup-loop"])));
 
-  cli.command("api [...args]", "HTTP API server (serve / status)")
+  cli
+    .command("api [...args]", "HTTP API server (serve / status)")
     .allowUnknownOptions()
     .action(async () => {
       const rest = passThrough(argv, ["api"]);
@@ -623,7 +642,8 @@ Options:
       }
     });
 
-  cli.command("mcp [...args]", "MCP server exposing the deterministic verification gates (stdio)")
+  cli
+    .command("mcp [...args]", "MCP server exposing the deterministic verification gates (stdio)")
     .allowUnknownOptions()
     .action(async () => {
       const rest = passThrough(argv, ["mcp"]);
@@ -640,31 +660,38 @@ Options:
       await runStdioServer();
     });
 
-  cli.command("batch [...args]", "Run gates over many pages in parallel (glob, sharding, per-job timing)")
+  cli
+    .command("batch [...args]", "Run gates over many pages in parallel (glob, sharding, per-job timing)")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.batch, passThrough(argv, ["batch"])));
 
-  cli.command("gates [...args]", "One reviewed config for per-page gate sets + auditable suppressions")
+  cli
+    .command("gates [...args]", "One reviewed config for per-page gate sets + auditable suppressions")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.gates, passThrough(argv, ["gates"])));
 
-  cli.command("rules [...args]", "List registry-driven gates and the rules each one can tune")
+  cli
+    .command("rules [...args]", "List registry-driven gates and the rules each one can tune")
     .allowUnknownOptions()
     .action(async () => runRules(passThrough(argv, ["rules"])));
 
-  cli.command("manifest [...args]", "Author / edit approval.json manifests")
+  cli
+    .command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.manifest, passThrough(argv, ["manifest"])));
 
-  cli.command("watch [...args]", "File-watcher inner loop with round-vs-round delta")
+  cli
+    .command("watch [...args]", "File-watcher inner loop with round-vs-round delta")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.watch, passThrough(argv, ["watch"])));
 
-  cli.command("diff-pr [...args]", "PR CI gate: per-route thresholds + markdown summary")
+  cli
+    .command("diff-pr [...args]", "PR CI gate: per-route thresholds + markdown summary")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.diffPr, passThrough(argv, ["diff-pr"])));
 
-  cli.command("baseline [...args]", "Approve / inspect snapshot baselines")
+  cli
+    .command("baseline [...args]", "Approve / inspect snapshot baselines")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.baseline, passThrough(argv, ["baseline"])));
 

@@ -77,16 +77,14 @@ class Registry implements GateRegistry {
         const clashId = this.gates.find((g) => g.gate.id === gate.id);
         if (clashId) {
           problems.push(
-            `gate id "${gate.id}" is registered by both ${clashId.plugin} and ${plugin.name}`
-            + ` — ids address rule settings and ledger entries, so they must be unique`,
+            `gate id "${gate.id}" is registered by both ${clashId.plugin} and ${plugin.name}` +
+              ` — ids address rule settings and ledger entries, so they must be unique`,
           );
           continue;
         }
         const clashCommand = this.gates.find((g) => gateCommandString(g.gate) === command);
         if (clashCommand) {
-          problems.push(
-            `command "${command}" is registered by both ${clashCommand.plugin} and ${plugin.name}`,
-          );
+          problems.push(`command "${command}" is registered by both ${clashCommand.plugin} and ${plugin.name}`);
           continue;
         }
         this.gates.push({ gate, plugin: plugin.name });
@@ -153,17 +151,19 @@ class Registry implements GateRegistry {
       .filter((t) => Boolean(t) && !t.startsWith("-"))
       .join(" ");
     if (!query) return [];
-    return [...this.byCommandMap.keys()]
-      .map((candidate) => ({ candidate, distance: editDistance(query, candidate) }))
-      // Two edits, not a proportional budget. A budget scaled to command
-      // length made `check design` — a real gate that simply has not migrated
-      // to the registry yet — "did you mean check motion?", so `vlmkit gates`
-      // warned about a working config. A did-you-mean that fires on unrelated
-      // commands is worse than one that stays quiet.
-      .filter(({ distance }) => distance <= 2)
-      .sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate))
-      .slice(0, limit)
-      .map(({ candidate }) => candidate);
+    return (
+      [...this.byCommandMap.keys()]
+        .map((candidate) => ({ candidate, distance: editDistance(query, candidate) }))
+        // Two edits, not a proportional budget. A budget scaled to command
+        // length made `check design` — a real gate that simply has not migrated
+        // to the registry yet — "did you mean check motion?", so `vlmkit gates`
+        // warned about a working config. A did-you-mean that fires on unrelated
+        // commands is worse than one that stays quiet.
+        .filter(({ distance }) => distance <= 2)
+        .sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate))
+        .slice(0, limit)
+        .map(({ candidate }) => candidate)
+    );
   }
 }
 
@@ -178,11 +178,7 @@ export function editDistance(a: string, b: string): number {
   for (let i = 1; i <= a.length; i++) {
     const next = [i];
     for (let j = 1; j <= b.length; j++) {
-      next[j] = Math.min(
-        row[j]! + 1,
-        next[j - 1]! + 1,
-        row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
+      next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
     }
     row = next;
   }
@@ -199,10 +195,7 @@ export interface GateCommandProblem {
  * entry rather than throwing on the first, so a reviewer fixes the whole
  * config in one pass.
  */
-export function validateGateCommands(
-  registry: GateRegistry,
-  commands: readonly string[],
-): GateCommandProblem[] {
+export function validateGateCommands(registry: GateRegistry, commands: readonly string[]): GateCommandProblem[] {
   const problems: GateCommandProblem[] = [];
   for (const command of commands) {
     const tokens = command.trim().split(/\s+/).filter(Boolean);
@@ -214,8 +207,9 @@ export function validateGateCommands(
     const suggestions = registry.suggest(tokens);
     problems.push({
       command,
-      message: `unknown gate "${command}"`
-        + (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
+      message:
+        `unknown gate "${command}"` +
+        (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
     });
   }
   return problems;
@@ -237,8 +231,7 @@ export function validateRuleSettings(
       if (scope) {
         if (!scope.rules.some((r) => r.id === key)) {
           problems.push(
-            `"${key}" is not a rule of ${scope.id}`
-            + ` (known: ${scope.rules.map((r) => r.id).join(", ")})`,
+            `"${key}" is not a rule of ${scope.id}` + ` (known: ${scope.rules.map((r) => r.id).join(", ")})`,
           );
         }
         continue;
@@ -256,8 +249,7 @@ export function validateRuleSettings(
     if (ruleId === "*") continue;
     if (!gate.rules.some((r) => r.id === ruleId)) {
       problems.push(
-        `"${key}": ${gateId} has no rule "${ruleId}"`
-        + ` (known: ${gate.rules.map((r) => r.id).join(", ")})`,
+        `"${key}": ${gateId} has no rule "${ruleId}"` + ` (known: ${gate.rules.map((r) => r.id).join(", ")})`,
       );
     }
   }

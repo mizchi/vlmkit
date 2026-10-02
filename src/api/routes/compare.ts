@@ -1,10 +1,5 @@
 import type { Hono } from "hono";
-import type {
-  CompareRequest,
-  CompareResponse,
-  PixelDiffResult,
-  ViewportResult,
-} from "../api-types.ts";
+import type { CompareRequest, CompareResponse, PixelDiffResult, ViewportResult } from "../api-types.ts";
 import { resolveHtmlSource } from "./helpers.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
@@ -41,14 +36,16 @@ export function registerCompareRoute(app: Hono): void {
     const tmpDir = join(process.cwd(), "test-results", "api", crypto.randomUUID());
     await mkdir(tmpDir, { recursive: true });
 
-    const viewports = body.viewports ?? (() => {
-      const combined = baselineHtml + currentHtml;
-      const discovery = discoverViewports(combined, {
-        maxViewports: body.discover?.maxViewports ?? 7,
-        randomSamples: body.discover?.randomSamples ?? 1,
-      });
-      return discovery.viewports;
-    })();
+    const viewports =
+      body.viewports ??
+      (() => {
+        const combined = baselineHtml + currentHtml;
+        const discovery = discoverViewports(combined, {
+          maxViewports: body.discover?.maxViewports ?? 7,
+          randomSamples: body.discover?.randomSamples ?? 1,
+        });
+        return discovery.viewports;
+      })();
 
     const startTime = Date.now();
     const viewportResults: ViewportResult[] = [];
@@ -59,7 +56,8 @@ export function registerCompareRoute(app: Hono): void {
         const height = vp.height ?? 900;
         const label = vp.label ?? `${width}x${height}`;
 
-        const { capturePageState, diffComputedStyles } = await import("../../experiments/css-challenge/css-challenge-core.ts");
+        const { capturePageState, diffComputedStyles } =
+          await import("../../experiments/css-challenge/css-challenge-core.ts");
         const captureOpts = {
           captureHover: body.options?.hoverEmulation ?? false,
         };
@@ -79,14 +77,17 @@ export function registerCompareRoute(app: Hono): void {
           captureOpts,
         );
 
-        const diff = await compareScreenshots({
-          testId: label,
-          testTitle: label,
-          projectName: "api",
-          screenshotPath: curState.screenshotPath,
-          baselinePath: baseState.screenshotPath,
-          status: "changed",
-        }, { outputDir: tmpDir, threshold: body.options?.threshold ?? 0.1 });
+        const diff = await compareScreenshots(
+          {
+            testId: label,
+            testTitle: label,
+            projectName: "api",
+            screenshotPath: curState.screenshotPath,
+            baselinePath: baseState.screenshotPath,
+            status: "changed",
+          },
+          { outputDir: tmpDir, threshold: body.options?.threshold ?? 0.1 },
+        );
 
         const pixelDiff: PixelDiffResult = {
           diffPixels: diff?.diffPixels ?? 0,

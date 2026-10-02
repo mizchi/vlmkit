@@ -33,11 +33,13 @@ const strip = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 /** `--help` for a command, however it exits: groups without a leaf exit non-zero. */
 function help(args: string[]): string {
   try {
-    return strip(execFileSync(process.execPath, ["--experimental-strip-types", ENTRY, ...args], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, NO_COLOR: "1" },
-    }));
+    return strip(
+      execFileSync(process.execPath, ["--experimental-strip-types", ENTRY, ...args], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, NO_COLOR: "1" },
+      }),
+    );
   } catch (e) {
     const err = e as { stdout?: string; stderr?: string };
     return strip((err.stdout ?? "") + (err.stderr ?? ""));
@@ -100,9 +102,19 @@ describe("scripts/smoke-all-clis.sh", () => {
   it("uses no flat pre-0.6 command spelling", () => {
     // The specific rot: each of these routed before the group rename and none does now.
     const renamed = [
-      "a11y-contrast", "a11y-touch", "a11y-focus-order", "design-tokens", "theme-parity",
-      "i18n-stress", "media-variants", "cross-browser", "component-consistency",
-      "multi-page-consistency", "component-from-image", "component-extract", "png-diff",
+      "a11y-contrast",
+      "a11y-touch",
+      "a11y-focus-order",
+      "design-tokens",
+      "theme-parity",
+      "i18n-stress",
+      "media-variants",
+      "cross-browser",
+      "component-consistency",
+      "multi-page-consistency",
+      "component-from-image",
+      "component-extract",
+      "png-diff",
     ];
     const offenders = commands.filter((c) => renamed.includes(c));
     assert.deepEqual(offenders, [], `flat pre-0.6 spellings: ${offenders.join(", ")}`);
@@ -115,7 +127,7 @@ describe("Test.pkl", () => {
     // at spawn while `pkspec check` reported full Scenario coverage.
     const text = readFileSync(resolve(ROOT, "Test.pkl"), "utf8");
     const entry = /local vlmkit = "[^"]*?(src\/cli\/[\w.-]+)"/.exec(text)?.[1];
-    assert.ok(entry, "Test.pkl no longer declares a `local vlmkit = \"… src/cli/…\"` entry point");
+    assert.ok(entry, 'Test.pkl no longer declares a `local vlmkit = "… src/cli/…"` entry point');
     assert.equal(entry, "src/cli/vlmkit.ts");
   });
 

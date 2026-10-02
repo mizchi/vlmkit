@@ -15,10 +15,7 @@ import {
 function makeReport(): SnapshotReportDocument {
   return {
     timestamp: "2026-04-09T12:00:00.000Z",
-    urls: [
-      "http://localhost:4174/page.html",
-      "http://localhost:4174/dashboard.html",
-    ],
+    urls: ["http://localhost:4174/page.html", "http://localhost:4174/dashboard.html"],
     labels: ["page", "dashboard"],
     options: {
       threshold: 0.1,
@@ -75,10 +72,19 @@ describe("buildSnapshotStatusMatrix", () => {
     assert.deepEqual(matrix.components, ["page", "dashboard", "settings"]);
     assert.deepEqual(matrix.viewports, ["desktop", "mobile"]);
     assert.equal(matrix.rows[0]?.component, "page");
-    assert.deepEqual(matrix.rows[0]?.cells.map((cell) => cell.status), ["pass", "diff"]);
+    assert.deepEqual(
+      matrix.rows[0]?.cells.map((cell) => cell.status),
+      ["pass", "diff"],
+    );
     assert.equal(matrix.rows[1]?.worstStatus, "new-baseline");
-    assert.deepEqual(matrix.rows[1]?.cells.map((cell) => cell.status), ["shift-only", "new-baseline"]);
-    assert.deepEqual(matrix.rows[2]?.cells.map((cell) => cell.status), ["missing", "missing"]);
+    assert.deepEqual(
+      matrix.rows[1]?.cells.map((cell) => cell.status),
+      ["shift-only", "new-baseline"],
+    );
+    assert.deepEqual(
+      matrix.rows[2]?.cells.map((cell) => cell.status),
+      ["missing", "missing"],
+    );
     assert.equal(matrix.summary.totalCells, 6);
     assert.equal(matrix.summary.passCount, 1);
     assert.equal(matrix.summary.diffCount, 1);
@@ -103,30 +109,26 @@ describe("buildSnapshotStatusMatrix", () => {
 
 describe("determineSnapshotReportExitStatus", () => {
   it("passes when metrics stay within thresholds", () => {
-    const result = determineSnapshotReportExitStatus(
-      summarizeSnapshotReport(makeReport()),
-      { maxFalsePositiveRate: 0.7, maxDiffRatio: 0.02 },
-    );
+    const result = determineSnapshotReportExitStatus(summarizeSnapshotReport(makeReport()), {
+      maxFalsePositiveRate: 0.7,
+      maxDiffRatio: 0.02,
+    });
 
     assert.equal(result.exitCode, 0);
     assert.deepEqual(result.reasons, []);
   });
 
   it("fails when false positive rate exceeds the configured threshold", () => {
-    const result = determineSnapshotReportExitStatus(
-      summarizeSnapshotReport(makeReport()),
-      { maxFalsePositiveRate: 0.5 },
-    );
+    const result = determineSnapshotReportExitStatus(summarizeSnapshotReport(makeReport()), {
+      maxFalsePositiveRate: 0.5,
+    });
 
     assert.equal(result.exitCode, 1);
     assert.match(result.reasons[0] ?? "", /false positive rate/i);
   });
 
   it("fails when the worst diff ratio exceeds the configured threshold", () => {
-    const result = determineSnapshotReportExitStatus(
-      summarizeSnapshotReport(makeReport()),
-      { maxDiffRatio: 0.015 },
-    );
+    const result = determineSnapshotReportExitStatus(summarizeSnapshotReport(makeReport()), { maxDiffRatio: 0.015 });
 
     assert.equal(result.exitCode, 1);
     assert.match(result.reasons[0] ?? "", /max diff ratio/i);
@@ -176,10 +178,9 @@ describe("determineSnapshotReportEvaluationExitStatus", () => {
       results: before.results,
     };
 
-    const result = determineSnapshotReportEvaluationExitStatus(
-      summarizeSnapshotReportEvaluation(before, after),
-      { minSuccessRate: 0.1 },
-    );
+    const result = determineSnapshotReportEvaluationExitStatus(summarizeSnapshotReportEvaluation(before, after), {
+      minSuccessRate: 0.1,
+    });
 
     assert.equal(result.exitCode, 1);
     assert.match(result.reasons[0] ?? "", /success rate/i);
@@ -190,10 +191,14 @@ describe("parseSnapshotReportCliArgs", () => {
   it("parses report path and thresholds", () => {
     const parsed = parseSnapshotReportCliArgs([
       "test-results/snapshots/ci/snapshot-report.json",
-      "--max-false-positive-rate", "0",
-      "--max-diff-ratio", "0.001",
-      "--github-step-summary", "/tmp/summary.md",
-      "--format", "json",
+      "--max-false-positive-rate",
+      "0",
+      "--max-diff-ratio",
+      "0.001",
+      "--github-step-summary",
+      "/tmp/summary.md",
+      "--format",
+      "json",
     ]);
 
     assert.equal(parsed.mode, "summary");
@@ -207,12 +212,18 @@ describe("parseSnapshotReportCliArgs", () => {
   it("parses before/after evaluation reports and thresholds", () => {
     const parsed = parseSnapshotReportCliArgs([
       "evaluate",
-      "--before-report", "before/snapshot-report.json",
-      "--after-report", "after/snapshot-report.json",
-      "--min-success-rate", "0.5",
-      "--min-improvement-rate", "1",
-      "--output", "artifacts/snapshot-fix-eval.md",
-      "--format", "json",
+      "--before-report",
+      "before/snapshot-report.json",
+      "--after-report",
+      "after/snapshot-report.json",
+      "--min-success-rate",
+      "0.5",
+      "--min-improvement-rate",
+      "1",
+      "--output",
+      "artifacts/snapshot-fix-eval.md",
+      "--format",
+      "json",
     ]);
 
     assert.equal(parsed.mode, "evaluate");
@@ -227,10 +238,9 @@ describe("parseSnapshotReportCliArgs", () => {
 
 describe("formatSnapshotSummaryMarkdown", () => {
   it("renders a PR-friendly markdown summary", () => {
-    const markdown = formatSnapshotSummaryMarkdown(
-      summarizeSnapshotReport(makeReport()),
-      { reportPath: "test-results/snapshots/ci/snapshot-report.json" },
-    );
+    const markdown = formatSnapshotSummaryMarkdown(summarizeSnapshotReport(makeReport()), {
+      reportPath: "test-results/snapshots/ci/snapshot-report.json",
+    });
 
     assert.match(markdown, /False positive rate/);
     assert.match(markdown, /66\.7%/);
@@ -260,13 +270,10 @@ describe("formatSnapshotReportEvaluationMarkdown", () => {
       ],
     };
 
-    const markdown = formatSnapshotReportEvaluationMarkdown(
-      summarizeSnapshotReportEvaluation(before, after),
-      {
-        beforeReportPath: "before/snapshot-report.json",
-        afterReportPath: "after/snapshot-report.json",
-      },
-    );
+    const markdown = formatSnapshotReportEvaluationMarkdown(summarizeSnapshotReportEvaluation(before, after), {
+      beforeReportPath: "before/snapshot-report.json",
+      afterReportPath: "after/snapshot-report.json",
+    });
 
     assert.match(markdown, /VRT Snapshot Fix Evaluation/);
     assert.match(markdown, /Success rate: 50\.0%/);

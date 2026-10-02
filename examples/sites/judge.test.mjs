@@ -61,7 +61,18 @@ describe("nextOffset", () => {
 
 describe("parseShotArgs", () => {
   it("keeps the steps in the order they were given", () => {
-    const options = parseShotArgs(["index.html", "--click", "#menu", "--press", "Tab", "--fill", "#q", "cups", "--wait", "200"]);
+    const options = parseShotArgs([
+      "index.html",
+      "--click",
+      "#menu",
+      "--press",
+      "Tab",
+      "--fill",
+      "#q",
+      "cups",
+      "--wait",
+      "200",
+    ]);
     assert.deepEqual(
       options.steps.map((s) => [s.do, s.arg, s.value]),
       [
@@ -75,12 +86,22 @@ describe("parseShotArgs", () => {
 
   it("takes a viewport list, a preset or WxH", () => {
     const options = parseShotArgs(["index.html", "--viewport", "desktop,mobile,1024x700", "--full"]);
-    assert.deepEqual(options.viewports.map((v) => [v.width, v.height]), [[1280, 800], [375, 812], [1024, 700]]);
+    assert.deepEqual(
+      options.viewports.map((v) => [v.width, v.height]),
+      [
+        [1280, 800],
+        [375, 812],
+        [1024, 700],
+      ],
+    );
     assert.equal(options.full, true);
   });
 
   it("defaults to one desktop viewport", () => {
-    assert.deepEqual(parseShotArgs(["index.html"]).viewports.map((v) => v.name), ["desktop"]);
+    assert.deepEqual(
+      parseShotArgs(["index.html"]).viewports.map((v) => v.name),
+      ["desktop"],
+    );
   });
 
   it("refuses what cannot be one shot", () => {
@@ -102,7 +123,10 @@ describe("gateSummary", () => {
   it("prefers the gate's own verdict line, and falls back to the ledger headline without its local path", () => {
     assert.equal(gateSummary({ verdict: "verdict: CLEAN (0 fail)", headline: [] }), "verdict: CLEAN (0 fail)");
     assert.equal(
-      gateSummary({ verdict: null, headline: [{ tool: "check-a11y-touch", level: "AAA", failures: 1, report: "/x/report.md" }] }),
+      gateSummary({
+        verdict: null,
+        headline: [{ tool: "check-a11y-touch", level: "AAA", failures: 1, report: "/x/report.md" }],
+      }),
       "level AAA · failures 1",
     );
   });
@@ -160,7 +184,14 @@ describe("checkLog", () => {
     // A fix later found to be a misdiagnosis is closed by saying so after it, not by a verify.
     const misread = [...baseLog(), { kind: "defect", id: "D1", round: "R1", from: "G1", by: "gate", text: "x" }];
     misread.push({ kind: "fix", id: "F1", round: "R1", defect: "D1", text: "y" });
-    misread.push({ kind: "note", id: "N1", round: "R1", about: "D1", noteKind: "false-positive", text: "the gate was wrong" });
+    misread.push({
+      kind: "note",
+      id: "N1",
+      round: "R1",
+      about: "D1",
+      noteKind: "false-positive",
+      text: "the gate was wrong",
+    });
     assert.deepEqual(checkLog(misread), []);
     const decision = [...baseLog(), { kind: "defect", id: "D1", round: "R1", from: "G1", by: "gate", text: "x" }];
     decision.push({ kind: "note", id: "N1", round: "R1", about: "D1", noteKind: "decision", text: "thinking" });
@@ -186,7 +217,14 @@ describe("checkLog", () => {
     ]);
     const walked = { ...events.find((e) => e.id === "S2"), id: "S3", stoppedShort: undefined };
     delete walked.stoppedShort;
-    events.push(walked, { kind: "look", id: "L3", round: "R1", shot: "S3", tile: null, text: "x".repeat(MIN_LOOK_CHARS) });
+    events.push(walked, {
+      kind: "look",
+      id: "L3",
+      round: "R1",
+      shot: "S3",
+      tile: null,
+      text: "x".repeat(MIN_LOOK_CHARS),
+    });
     // Without the flag (a log from before it was recorded), the last screen says where the walk ended.
     assert.equal(stoppedShort(walked), true, "3 screens of 800px from 0 do not reach 4000px");
     walked.tiles = walked.tiles.map((t, i) => ({ ...t, scrollY: [0, 1600, 3200][i] }));
@@ -201,7 +239,14 @@ describe("checkLog", () => {
     assert.match(checkLog(events)[0], /^G2 is the last run of `vlmkit check color index.html` and it exited 1/);
     events.push({ kind: "gate", id: "G3", round: "R1", cmd: "vlmkit check color index.html", exit: 0, headline: [] });
     assert.deepEqual(checkLog(events), [], "a later green run of the same command closes it");
-    events.push({ kind: "gate", id: "G4", round: "R1", cmd: "vlmkit check a11y touch index.html", exit: 1, headline: [] });
+    events.push({
+      kind: "gate",
+      id: "G4",
+      round: "R1",
+      cmd: "vlmkit check a11y touch index.html",
+      exit: 1,
+      headline: [],
+    });
     events.push({ kind: "note", id: "N1", round: "R1", about: "G4", noteKind: "false-positive", text: "why" });
     assert.deepEqual(checkLog(events), []);
   });
@@ -219,7 +264,10 @@ describe("keptShots", () => {
       dark: false,
       viewport: { name: "x", width, height: 800 },
       pageHeight: 1600,
-      tiles: [{ file: `shots/${id}-1.webp`, w: width, h: 800, scrollY: 0 }, { file: `shots/${id}-2.webp`, w: width, h: 800, scrollY: 800 }],
+      tiles: [
+        { file: `shots/${id}-1.webp`, w: width, h: 800, scrollY: 0 },
+        { file: `shots/${id}-2.webp`, w: width, h: 800, scrollY: 800 },
+      ],
       steps: [],
       errors: [],
       ...extra,
@@ -230,7 +278,11 @@ describe("keptShots", () => {
       walk("S1", "R1", 1280),
       walk("S2", "R1", 375),
       walk("S3", "R1", 1280, { dark: true }),
-      walk("S4", "R1", 1280, { mode: "element", element: ".card", tiles: [{ file: "shots/S4-1.webp", w: 300, h: 200 }] }),
+      walk("S4", "R1", 1280, {
+        mode: "element",
+        element: ".card",
+        tiles: [{ file: "shots/S4-1.webp", w: 300, h: 200 }],
+      }),
       { kind: "round", id: "R2", actor: "builder", title: "fix pass" },
       walk("S5", "R2", 1280, { page: "index.html?theme=dark" }),
       walk("S6", "R2", 768),
@@ -267,7 +319,10 @@ describe("keptShots", () => {
   it("says on the page and in the Markdown which shots kept no pictures, and links the rest", () => {
     const events = closedLog();
     const html = renderHtml(events);
-    assert.match(html, /id="S4">(?:(?!<\/article>).)*1 screen\(s\), looked at when taken; not kept once the round was done/s);
+    assert.match(
+      html,
+      /id="S4">(?:(?!<\/article>).)*1 screen\(s\), looked at when taken; not kept once the round was done/s,
+    );
     assert.doesNotMatch(html, /src="shots\/S4-1\.webp"/, "no picture for a screen the log let go");
     assert.match(html, /src="shots\/S1-1\.webp"/);
     assert.match(html, /screens in 9 shots, 10 kept/);
@@ -301,7 +356,9 @@ describe("tileFile / publishedFiles / displayCommand", () => {
     // replacing only this checkout's root showed the recording machine's path there, and every
     // committed log page with a file:// command read as stale in CI.
     assert.equal(
-      displayCommand("vlmkit check animation 'file:///Users/someone/src/vlmkit/examples/sites/magazine/index.html#note-2'"),
+      displayCommand(
+        "vlmkit check animation 'file:///Users/someone/src/vlmkit/examples/sites/magazine/index.html#note-2'",
+      ),
       "vlmkit check animation 'file://$PWD/examples/sites/magazine/index.html#note-2'",
     );
     assert.equal(
@@ -388,20 +445,32 @@ describe("the CLI, end to end", () => {
     assert.equal(g1.exit, 0);
     assert.equal(g2.exit, 1);
     assert.equal(g1.verdict, "verdict: DRIFT (2 finding(s))");
-    assert.deepEqual(g1.headline, [{ tool: "check-stub", findings: 2 }], "the headline comes from the run's own ledger line");
+    assert.deepEqual(
+      g1.headline,
+      [{ tool: "check-stub", findings: 2 }],
+      "the headline comes from the run's own ledger line",
+    );
     const saved = readOutputs(site).get(g1.output);
     assert.ok(!saved.includes("\x1b["), "the kept output has no colour codes");
     assert.match(saved, /args: check stub index\.html/);
-    assert.ok(!existsSync(join(site, "judgment", "gates")), "an output lives in the database, not in a file of its own");
+    assert.ok(
+      !existsSync(join(site, "judgment", "gates")),
+      "an output lives in the database, not in a file of its own",
+    );
   });
 
   it("takes a full page as screens that step short of the pinned header and bar", () => {
     const run = judge("shot", "index.html", "--full", "--viewport", "desktop");
     assert.equal(run.status, 0, run.stderr);
-    const shot = readLog(site).filter((e) => e.kind === "shot").at(-1);
+    const shot = readLog(site)
+      .filter((e) => e.kind === "shot")
+      .at(-1);
     assert.equal(shot.pageHeight, 1900);
     // 800 tall, 100 pinned on top and 50 at the bottom: each step is 650 and the last is flush.
-    assert.deepEqual(shot.tiles.map((t) => t.scrollY), [0, 650, 1100]);
+    assert.deepEqual(
+      shot.tiles.map((t) => t.scrollY),
+      [0, 650, 1100],
+    );
     assert.deepEqual(shot.tiles[0].insets, { top: 100, bottom: 50 });
     for (const tile of shot.tiles) {
       // The log holds the screen; the file the builder Reads is its export, byte for byte.
@@ -416,7 +485,9 @@ describe("the CLI, end to end", () => {
   it("runs the steps before the shutter, and shoots one element", () => {
     const run = judge("shot", "index.html", "--click", "#menu", "--element", "header", "--label", "menu open");
     assert.equal(run.status, 0, run.stderr);
-    const shot = readLog(site).filter((e) => e.kind === "shot").at(-1);
+    const shot = readLog(site)
+      .filter((e) => e.kind === "shot")
+      .at(-1);
     assert.equal(shot.mode, "element");
     assert.equal(shot.label, "menu open");
     assert.deepEqual(shot.steps, [{ do: "click", arg: "#menu" }]);
@@ -429,11 +500,26 @@ describe("the CLI, end to end", () => {
     assert.match(judge("look", "S1", "fine").stderr, /at least \d+/);
     assert.match(judge("look", "S9", "x".repeat(100)).stderr, /no shot S9/);
     assert.match(judge("look", "S1:7", "x".repeat(100)).stderr, /has 3 tile\(s\)/);
-    const text = "Three screens: the navy header stays on top, the grey bar at the bottom, the two sections run past both.";
+    const text =
+      "Three screens: the navy header stays on top, the grey bar at the bottom, the two sections run past both.";
     assert.equal(judge("look", "S1", "-", { input: text }).status, 0, "a look can come from a heredoc");
-    assert.equal(judge("look", "S2", "The header with the menu open: one list item under the button, both in the header's navy band.").status, 0);
+    assert.equal(
+      judge(
+        "look",
+        "S2",
+        "The header with the menu open: one list item under the button, both in the header's navy band.",
+      ).status,
+      0,
+    );
     assert.match(judge("defect", "--from", "S1", "x").stderr, /needs --from <L#\|G#>/);
-    const defect = judge("defect", "--from", "L1", "--where", "nav", "The bottom bar has no top border and blends into the sections.");
+    const defect = judge(
+      "defect",
+      "--from",
+      "L1",
+      "--where",
+      "nav",
+      "The bottom bar has no top border and blends into the sections.",
+    );
     assert.equal(defect.status, 0);
     const recorded = readLog(site).find((e) => e.kind === "defect");
     assert.equal(recorded.by, "eye");
@@ -455,7 +541,11 @@ describe("the CLI, end to end", () => {
     judge("gate", "check", "stub", "index.html", "--fail");
     judge("note", "--about", "G3", "--kind", "accepted", "The stub fails on purpose.");
     judge("shot", "index.html", "--full", "--viewport", "mobile");
-    judge("look", "S3", "Phone width: the header and the bottom bar take a smaller share of the screen, sections are full width.");
+    judge(
+      "look",
+      "S3",
+      "Phone width: the header and the bottom bar take a smaller share of the screen, sections are full width.",
+    );
     judge("look", "S1:2", "Second desktop screen after the fix: the bottom bar now has a visible hairline above it.");
     assert.equal(judge("verify", "D1", "--by", "L4").status, 0);
     const done = judge("done", "Fixture log for the tests.");
@@ -471,9 +561,13 @@ describe("the CLI, end to end", () => {
     assert.ok(!stored.includes("shots/S2-1.webp"), "the close-up went");
     assert.ok(!existsSync(join(site, "judgment", "shots", "S2-1.webp")), "and so did its export");
     for (const id of ["S1", "S3"]) {
-      for (const tile of readLog(site).find((e) => e.id === id).tiles) assert.ok(stored.includes(tile.file), `${tile.file} kept`);
+      for (const tile of readLog(site).find((e) => e.id === id).tiles)
+        assert.ok(stored.includes(tile.file), `${tile.file} kept`);
     }
-    assert.ok(readLog(site).some((e) => e.kind === "look" && e.shot === "S2"), "what was seen in it stays");
+    assert.ok(
+      readLog(site).some((e) => e.kind === "look" && e.shot === "S2"),
+      "what was seen in it stays",
+    );
     assert.match(judge("look", "S2", "x".repeat(100)).stderr, /S2's screens went when its round was done/);
   });
 
@@ -488,22 +582,36 @@ describe("the CLI, end to end", () => {
   });
   it("does not count a closed drawer, pinned but off the side of the screen, as an inset", () => {
     const page = join(root, "site", "drawer.html");
-    writeFileSync(page, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>d</title><style>
+    writeFileSync(
+      page,
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>d</title><style>
       body{margin:0} header{position:sticky;top:0;height:60px;background:#123}
       nav{position:fixed;top:0;left:0;width:300px;height:100%;transform:translateX(-100%);background:#eee}
-      section{height:1600px}</style></head><body><header></header><nav>menu</nav><section>a</section></body></html>`);
+      section{height:1600px}</style></head><body><header></header><nav>menu</nav><section>a</section></body></html>`,
+    );
     const run = judge("shot", "drawer.html", "--full", "--viewport", "375x800");
     assert.equal(run.status, 0, run.stderr);
-    const shot = readLog(site).filter((e) => e.kind === "shot").at(-1);
+    const shot = readLog(site)
+      .filter((e) => e.kind === "shot")
+      .at(-1);
     assert.deepEqual(shot.tiles[0].insets, { top: 60, bottom: 0 }, "only the header is pinned on screen");
     assert.ok(shot.tiles[0].file.endsWith(".webp"), "screens are WebP");
-    judge("look", shot.id, "The sticky header is the only pinned band; the closed drawer never appears on screen here.");
+    judge(
+      "look",
+      shot.id,
+      "The sticky header is the only pinned band; the closed drawer never appears on screen here.",
+    );
   });
 
   it("takes text after -- as text, and answers --help on any command", () => {
     const fix = judge("note", "--kind", "decision", "--", "--measure 42rem -> 36rem, the brief's 70 characters");
     assert.equal(fix.status, 0, fix.stderr);
-    assert.equal(readLog(site).filter((e) => e.kind === "note").at(-1).text, "--measure 42rem -> 36rem, the brief's 70 characters");
+    assert.equal(
+      readLog(site)
+        .filter((e) => e.kind === "note")
+        .at(-1).text,
+      "--measure 42rem -> 36rem, the brief's 70 characters",
+    );
     assert.match(judge("note", "--measure", "x").stderr, /goes after --/);
     const help = judge("defect", "--help");
     assert.equal(help.status, 0);
@@ -514,12 +622,21 @@ describe("the CLI, end to end", () => {
     const run = judge("shot", "index.html", "--full", "--viewport", "desktop", "--max-tiles", "2");
     assert.equal(run.status, 0, run.stderr);
     assert.match(run.stdout, /^\[judge\] S\d+ .*2 screen\(s\) of 1900px, STOPPED SHORT of the end \(--max-tiles 2\)/m);
-    const shot = readLog(site).filter((e) => e.kind === "shot").at(-1);
+    const shot = readLog(site)
+      .filter((e) => e.kind === "shot")
+      .at(-1);
     assert.equal(shot.stoppedShort, true);
     assert.equal(stoppedShort(shot), true);
     const whole = judge("shot", "index.html", "--full", "--viewport", "desktop");
     assert.doesNotMatch(whole.stdout, /STOPPED SHORT/);
-    assert.equal("stoppedShort" in readLog(site).filter((e) => e.kind === "shot").at(-1), false, "a complete walk records nothing extra");
+    assert.equal(
+      "stoppedShort" in
+        readLog(site)
+          .filter((e) => e.kind === "shot")
+          .at(-1),
+      false,
+      "a complete walk records nothing extra",
+    );
   });
 
   it("keeps the whole log in one SQLite file that any SQLite reader can query", () => {
@@ -528,7 +645,10 @@ describe("the CLI, end to end", () => {
     const db = new DatabaseSync(logPaths(site).db, { readOnly: true });
     try {
       // The columns beside the JSON are what `sqlite3 judgment.sqlite "select … where kind = 'gate'"` reads.
-      const rows = db.prepare("SELECT kind, id, round FROM events ORDER BY seq").all().map((r) => ({ ...r }));
+      const rows = db
+        .prepare("SELECT kind, id, round FROM events ORDER BY seq")
+        .all()
+        .map((r) => ({ ...r }));
       assert.deepEqual(
         rows,
         events.map((e) => ({ kind: e.kind, id: e.id ?? null, round: e.kind === "round" ? e.id : (e.round ?? null) })),
@@ -540,10 +660,17 @@ describe("the CLI, end to end", () => {
     }
     // The published half is read out of the database: the page, and the screens the log keeps.
     const published = publishedJudgment(site);
-    assert.deepEqual(published.map((p) => p.path), publishedFiles(events));
+    assert.deepEqual(
+      published.map((p) => p.path),
+      publishedFiles(events),
+    );
     const screen = published.find((p) => p.path.endsWith(".webp"));
     assert.ok(screen.bytes().equals(readScreen(site, screen.path.slice("judgment/".length))));
     assert.equal(published[0].bytes().toString("utf8"), renderSite(site).html);
-    assert.doesNotMatch(judge("status").stderr, /ExperimentalWarning/, "node:sqlite's warning stays out of every command's output");
+    assert.doesNotMatch(
+      judge("status").stderr,
+      /ExperimentalWarning/,
+      "node:sqlite's warning stays out of every command's output",
+    );
   });
 });

@@ -224,10 +224,11 @@ export function correlateRuntimeEvents(
   const kept: RuntimeEvent[] = [];
   const suppressed: RuntimeEvent[] = [];
   for (const e of events) {
-    const echoesAFailedRequest = e.type === "console-error"
-      && e.sourceUrl !== undefined
-      && failedUrls.has(e.sourceUrl)
-      && /failed to load resource|net::ERR_|ERR_[A-Z_]+/i.test(e.text);
+    const echoesAFailedRequest =
+      e.type === "console-error" &&
+      e.sourceUrl !== undefined &&
+      failedUrls.has(e.sourceUrl) &&
+      /failed to load resource|net::ERR_|ERR_[A-Z_]+/i.test(e.text);
     (echoesAFailedRequest ? suppressed : kept).push(e);
   }
   return { events: kept, suppressed };
@@ -292,30 +293,35 @@ export function classifyRuntimeEvents(events: RuntimeEvent[], viewport: number):
 /** Fraction of pixels that differ from the corner-sampled background. */
 export function measureInkRatio(data: Uint8Array, width: number, height: number, tolerance = 12): number {
   if (width <= 0 || height <= 0) return 0;
-  const corners = [
-    0,
-    (width - 1) * 4,
-    (height - 1) * width * 4,
-    ((height - 1) * width + width - 1) * 4,
-  ];
+  const corners = [0, (width - 1) * 4, (height - 1) * width * 4, ((height - 1) * width + width - 1) * 4];
   const counts = new Map<string, { n: number; r: number; g: number; b: number }>();
   for (const i of corners) {
-    const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+    const r = data[i]!,
+      g = data[i + 1]!,
+      b = data[i + 2]!;
     const k = `${r >> 3},${g >> 3},${b >> 3}`;
     const c = counts.get(k) ?? { n: 0, r: 0, g: 0, b: 0 };
-    c.n++; c.r += r; c.g += g; c.b += b;
+    c.n++;
+    c.r += r;
+    c.g += g;
+    c.b += b;
     counts.set(k, c);
   }
   let bg = { n: -1, r: 255, g: 255, b: 255 };
   for (const c of counts.values()) if (c.n > bg.n) bg = c;
-  const bgR = Math.round(bg.r / bg.n), bgG = Math.round(bg.g / bg.n), bgB = Math.round(bg.b / bg.n);
+  const bgR = Math.round(bg.r / bg.n),
+    bgG = Math.round(bg.g / bg.n),
+    bgB = Math.round(bg.b / bg.n);
   let ink = 0;
   const total = width * height;
   for (let p = 0; p < total; p++) {
     const i = p * 4;
-    if (Math.abs(data[i]! - bgR) > tolerance
-      || Math.abs(data[i + 1]! - bgG) > tolerance
-      || Math.abs(data[i + 2]! - bgB) > tolerance) ink++;
+    if (
+      Math.abs(data[i]! - bgR) > tolerance ||
+      Math.abs(data[i + 1]! - bgG) > tolerance ||
+      Math.abs(data[i + 2]! - bgB) > tolerance
+    )
+      ink++;
   }
   return ink / total;
 }
@@ -428,10 +434,11 @@ export function judgeNetworkFailures(failures: NetworkFailure[], viewport: numbe
       kind: "stale-har-fixture",
       severity: "fail",
       viewport,
-      message: `${misses.length} request(s) were aborted because the \`--har\` recording has no entry for them`
-        + `: ${tails.join(", ")}${misses.length > 4 ? `, and ${misses.length - 4} more` : ""}.`
-        + ` The page was measured WITHOUT them, so every finding in this run is suspect.`
-        + ` Re-record the HAR over the same navigation — this is a stale fixture, not a broken page.`,
+      message:
+        `${misses.length} request(s) were aborted because the \`--har\` recording has no entry for them` +
+        `: ${tails.join(", ")}${misses.length > 4 ? `, and ${misses.length - 4} more` : ""}.` +
+        ` The page was measured WITHOUT them, so every finding in this run is suspect.` +
+        ` Re-record the HAR over the same navigation — this is a stale fixture, not a broken page.`,
       evidence: { urls: misses.map((f) => f.url) },
     });
   }
@@ -586,9 +593,12 @@ export function findTextCollisions(
   const painted = blocks.filter((b) => !b.clippedAway);
   const clippedAway = blocks.filter((b) => b.clippedAway);
   const boxesOverlap = (a: IntegrityTextBlock, b: IntegrityTextBlock) => {
-    const ab = a.unclipped ?? a, bb = b.unclipped ?? b;
-    return Math.min(ab.x + ab.width, bb.x + bb.width) - Math.max(ab.x, bb.x) >= minPx
-      && Math.min(ab.y + ab.height, bb.y + bb.height) - Math.max(ab.y, bb.y) >= minPx;
+    const ab = a.unclipped ?? a,
+      bb = b.unclipped ?? b;
+    return (
+      Math.min(ab.x + ab.width, bb.x + bb.width) - Math.max(ab.x, bb.x) >= minPx &&
+      Math.min(ab.y + ab.height, bb.y + bb.height) - Math.max(ab.y, bb.y) >= minPx
+    );
   };
   for (const gone of clippedAway) {
     if (!painted.some((other) => boxesOverlap(gone, other))) continue;
@@ -596,14 +606,16 @@ export function findTextCollisions(
       kind: "text-collision",
       viewport,
       selector: gone.selector,
-      reason: `clipped away by ${gone.clippedBy ?? "an ancestor"} (overflow is not visible) — `
-        + `its box still overlaps text below the clip, but no glyph is painted there`,
+      reason:
+        `clipped away by ${gone.clippedBy ?? "an ancestor"} (overflow is not visible) — ` +
+        `its box still overlaps text below the clip, but no glyph is painted there`,
     });
   }
 
   for (let i = 0; i < painted.length; i++) {
     for (let j = i + 1; j < painted.length; j++) {
-      const a = painted[i]!, b = painted[j]!;
+      const a = painted[i]!,
+        b = painted[j]!;
       // One block containing the other is nesting (a wrapper block whose
       // own text and a child block both bucketed), not a collision.
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
@@ -616,8 +628,10 @@ export function findTextCollisions(
       // the cry-wolf risk of lowering the floor itself.
       const aInk = a.inkInset ?? 0;
       const bInk = b.inkInset ?? 0;
-      const aTop = a.y + aInk, aBottom = a.y + a.height - aInk;
-      const bTop = b.y + bInk, bBottom = b.y + b.height - bInk;
+      const aTop = a.y + aInk,
+        aBottom = a.y + a.height - aInk;
+      const bTop = b.y + bInk,
+        bBottom = b.y + b.height - bInk;
       const oy = Math.min(aBottom, bBottom) - Math.max(aTop, bTop);
       if (ox < minPx || oy < minPx) continue;
       const contains = (o: IntegrityTextBlock, p: IntegrityTextBlock) =>
@@ -628,10 +642,7 @@ export function findTextCollisions(
       // against the shorter block's ink height. An area ratio cannot express
       // this: a real graze and a designed negative-leading stack land in the
       // same range by area, but are 1.000 vs 0.077-0.137 by ink fraction.
-      const minInkHeight = Math.min(
-        Math.max(1, a.height - 2 * aInk),
-        Math.max(1, b.height - 2 * bInk),
-      );
+      const minInkHeight = Math.min(Math.max(1, a.height - 2 * aInk), Math.max(1, b.height - 2 * bInk));
       if (oy < Math.max(2, minInkFraction * minInkHeight)) continue;
 
       const pair = { a, b, ox, oy: Math.round(oy * 10) / 10, area };
@@ -715,11 +726,21 @@ export function judgeClippedText(
   const exempted: IntegrityExemption[] = [];
   for (const c of candidates) {
     if (c.textOverflow === "ellipsis") {
-      exempted.push({ kind: "text-clipped", viewport, selector: c.selector, reason: "text-overflow: ellipsis — intentional truncation" });
+      exempted.push({
+        kind: "text-clipped",
+        viewport,
+        selector: c.selector,
+        reason: "text-overflow: ellipsis — intentional truncation",
+      });
       continue;
     }
     if (c.lineClamp !== "none" && c.lineClamp !== "") {
-      exempted.push({ kind: "text-clipped", viewport, selector: c.selector, reason: `-webkit-line-clamp: ${c.lineClamp} — intentional truncation` });
+      exempted.push({
+        kind: "text-clipped",
+        viewport,
+        selector: c.selector,
+        reason: `-webkit-line-clamp: ${c.lineClamp} — intentional truncation`,
+      });
       continue;
     }
     // Partial cut vs full hide (csszengarden dogfood, 2026-07-30): a
@@ -784,11 +805,21 @@ export function judgeCollapsedContainers(
   const exempted: IntegrityExemption[] = [];
   for (const c of candidates) {
     if (!c.anyInFlowChild) {
-      exempted.push({ kind: "collapsed-container", viewport, selector: c.selector, reason: "zero-height positioning anchor: all tall children are absolute/fixed" });
+      exempted.push({
+        kind: "collapsed-container",
+        viewport,
+        selector: c.selector,
+        reason: "zero-height positioning anchor: all tall children are absolute/fixed",
+      });
       continue;
     }
     if (c.overflowHidden) {
-      exempted.push({ kind: "collapsed-container", viewport, selector: c.selector, reason: "overflow:hidden collapse — reads as an intentional hide (accordion/animation pattern)" });
+      exempted.push({
+        kind: "collapsed-container",
+        viewport,
+        selector: c.selector,
+        reason: "overflow:hidden collapse — reads as an intentional hide (accordion/animation pattern)",
+      });
       continue;
     }
     findings.push({
@@ -862,11 +893,21 @@ export function judgeProtrusions(
   for (const c of candidates) {
     const sel = `${c.child} out of ${c.parent}`;
     if (c.positioned) {
-      exempted.push({ kind: "container-protrusion", viewport, selector: sel, reason: "positioned overlay (badge/notification pattern) — the protrusion is authored" });
+      exempted.push({
+        kind: "container-protrusion",
+        viewport,
+        selector: sel,
+        reason: "positioned overlay (badge/notification pattern) — the protrusion is authored",
+      });
       continue;
     }
     if (c.negBreakout && c.axis === "horizontal") {
-      exempted.push({ kind: "container-protrusion", viewport, selector: sel, reason: "negative horizontal margin — full-bleed/breakout pattern" });
+      exempted.push({
+        kind: "container-protrusion",
+        viewport,
+        selector: sel,
+        reason: "negative horizontal margin — full-bleed/breakout pattern",
+      });
       continue;
     }
     if (findings.length >= maxFindings) continue;
@@ -875,9 +916,10 @@ export function judgeProtrusions(
       severity: "fail",
       viewport,
       selector: sel,
-      message: c.child === "(text)"
-        ? `Text inside ${c.parent} sticks out ${c.amount}px past its painted box (overflow is visible) — a long word or fixed width; allow wrapping (overflow-wrap) or widen the box.`
-        : `${c.child} sticks out ${c.amount}px (${c.axis}) past its painted parent ${c.parent} — the child is wider/taller than the container allows; shrink it, let it wrap, or make the overflow an authored overlay (position + z-index).`,
+      message:
+        c.child === "(text)"
+          ? `Text inside ${c.parent} sticks out ${c.amount}px past its painted box (overflow is visible) — a long word or fixed width; allow wrapping (overflow-wrap) or widen the box.`
+          : `${c.child} sticks out ${c.amount}px (${c.axis}) past its painted parent ${c.parent} — the child is wider/taller than the container allows; shrink it, let it wrap, or make the overflow an authored overlay (position + z-index).`,
       evidence: { parent: c.parent, child: c.child, amount: c.amount, axis: c.axis },
     });
   }
@@ -936,14 +978,18 @@ export const TEXT_CONTRAST_MAX_CANDIDATES = 60;
  * counts refused samples only up to that point — the order and the cap the page's own loop
  * had when it did this arithmetic itself.
  */
-export function textContrastCandidates(
-  samples: readonly TextContrastSample[],
-): { candidates: ContrastCandidate[]; skippedComposite: number } {
+export function textContrastCandidates(samples: readonly TextContrastSample[]): {
+  candidates: ContrastCandidate[];
+  skippedComposite: number;
+} {
   const candidates: ContrastCandidate[] = [];
   let skippedComposite = 0;
   for (const sample of samples) {
     if (candidates.length >= TEXT_CONTRAST_MAX_CANDIDATES) break;
-    if (sample.composite) { skippedComposite++; continue; }
+    if (sample.composite) {
+      skippedComposite++;
+      continue;
+    }
     const m = measureTextContrast({
       color: sample.color ?? [0, 0, 0, 1],
       backgrounds: sample.backgrounds ?? [],
@@ -991,11 +1037,22 @@ export function judgeTextContrast(
   const lowContrast = new Map<string, ContrastCandidate[]>();
   for (const c of candidates) {
     if (c.disabled) {
-      exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "disabled control — reduced contrast is the platform convention" });
+      exempted.push({
+        kind: "low-contrast-text",
+        viewport,
+        selector: c.selector,
+        reason: "disabled control — reduced contrast is the platform convention",
+      });
       continue;
     }
     if (c.shadowed) {
-      exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)" });
+      exempted.push({
+        kind: "low-contrast-text",
+        viewport,
+        selector: c.selector,
+        reason:
+          "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)",
+      });
       continue;
     }
     if (c.ratio < 1.15) {
@@ -1018,9 +1075,13 @@ export function judgeTextContrast(
   for (const group of lowContrast.values()) {
     if (findings.length >= maxFindings) break;
     const first = group[0]!;
-    const where = group.length === 1
-      ? first.selector
-      : `${group.slice(0, 3).map((c) => c.selector).join(", ")}${group.length > 3 ? `, and ${group.length - 3} more` : ""}`;
+    const where =
+      group.length === 1
+        ? first.selector
+        : `${group
+            .slice(0, 3)
+            .map((c) => c.selector)
+            .join(", ")}${group.length > 3 ? `, and ${group.length - 3} more` : ""}`;
     findings.push({
       kind: "low-contrast-text",
       severity: "warn",
@@ -1031,11 +1092,12 @@ export function judgeTextContrast(
       // Name the floor that applied and why, rather than the old "below the 3:1
       // floor even for large text" — which was true, read as the contrast
       // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
-      message: `${first.fg} on ${first.bg} is contrast ${first.ratio.toFixed(2)}:1`
-        + ` — below the ${(first.floor ?? 3).toString()}:1 WCAG AA floor`
-        + (first.fontSizePx !== undefined ? ` for ${first.fontSizePx}px ${first.large ? "large" : "body"} text` : "")
-        + `. ${group.length} element(s): ${where}.`
-        + ` First is "${clip(first.text)}".`,
+      message:
+        `${first.fg} on ${first.bg} is contrast ${first.ratio.toFixed(2)}:1` +
+        ` — below the ${(first.floor ?? 3).toString()}:1 WCAG AA floor` +
+        (first.fontSizePx !== undefined ? ` for ${first.fontSizePx}px ${first.large ? "large" : "body"} text` : "") +
+        `. ${group.length} element(s): ${where}.` +
+        ` First is "${clip(first.text)}".`,
       evidence: {
         ratio: first.ratio,
         fg: first.fg,
@@ -1069,11 +1131,7 @@ export interface AlignmentGroup {
 
 const ALIGN_AXES = ["left", "centerX", "right", "top"] as const;
 
-export function judgeAlignment(
-  groups: AlignmentGroup[],
-  viewport: number,
-  maxFindings = 8,
-): IntegrityFinding[] {
+export function judgeAlignment(groups: AlignmentGroup[], viewport: number, maxFindings = 8): IntegrityFinding[] {
   const findings: IntegrityFinding[] = [];
   const flagged = new Set<string>();
   for (const group of groups) {
@@ -1168,7 +1226,6 @@ export interface OcclusionCandidate {
   pinnedEscapable: boolean;
 }
 
-
 export function findOccludedText(
   candidates: OcclusionCandidate[],
   viewport: number,
@@ -1205,4 +1262,3 @@ export function findOccludedText(
   }
   return { findings, exempted };
 }
-

@@ -33,7 +33,9 @@ export async function fetchOpenRouterPricing(apiKey: string): Promise<Map<string
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) throw new Error(`OpenRouter models error: ${res.status}`);
-  const data = (await res.json()) as { data: Array<{ id: string; pricing?: { prompt?: string; completion?: string } }> };
+  const data = (await res.json()) as {
+    data: Array<{ id: string; pricing?: { prompt?: string; completion?: string } }>;
+  };
   const map = new Map<string, Pricing>();
   for (const m of data.data) {
     map.set(m.id, {

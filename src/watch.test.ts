@@ -3,14 +3,18 @@ import { describe, it } from "vite-plus/test";
 import { detectZeroCrossings, diffWatchRuns, formatWatchDelta } from "./watch.ts";
 import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
-function sug(over: Partial<WireframeFixSuggestion> & { deltaPx: number; viewports: string[]; rank?: number; bboxDims?: string }): WireframeFixSuggestion {
+function sug(
+  over: Partial<WireframeFixSuggestion> & { deltaPx: number; viewports: string[]; rank?: number; bboxDims?: string },
+): WireframeFixSuggestion {
   // Real wireframe evidence strings put the magnitude AFTER a colon
   // (`rank=N (bbox WxH): Δtop +24px on …`). The watcher's suggestion
   // key only uses the pre-colon prefix to stay stable across small
   // numeric drift between rounds; mirror that shape here so the
   // tests exercise the same key derivation.
   return {
-    evidence: over.evidence ?? `component rank=${over.rank ?? 0} (bbox ${over.bboxDims ?? "200x100"}): Δtop ${over.deltaPx >= 0 ? "+" : ""}${over.deltaPx}px`,
+    evidence:
+      over.evidence ??
+      `component rank=${over.rank ?? 0} (bbox ${over.bboxDims ?? "200x100"}): Δtop ${over.deltaPx >= 0 ? "+" : ""}${over.deltaPx}px`,
     hypothesis: "...",
     suggestion: "...",
     viewports: over.viewports,
@@ -128,11 +132,13 @@ describe("detectZeroCrossings", () => {
 
   it("does NOT flag when magnitudes are below the significance floor (6px)", () => {
     const prev = {
-      timestamp: "t0", diffByViewport: {},
+      timestamp: "t0",
+      diffByViewport: {},
       suggestions: [sug({ rank: 0, deltaPx: 4, viewports: ["mobile"] })],
     };
     const curr = {
-      timestamp: "t1", diffByViewport: {},
+      timestamp: "t1",
+      diffByViewport: {},
       suggestions: [sug({ rank: 0, deltaPx: -4, viewports: ["mobile"] })],
     };
     assert.equal(detectZeroCrossings(prev, curr).length, 0);
@@ -140,11 +146,13 @@ describe("detectZeroCrossings", () => {
 
   it("does NOT flag same-sign rounds (no zero crossing)", () => {
     const prev = {
-      timestamp: "t0", diffByViewport: {},
+      timestamp: "t0",
+      diffByViewport: {},
       suggestions: [sug({ rank: 0, deltaPx: 24, viewports: ["mobile"] })],
     };
     const curr = {
-      timestamp: "t1", diffByViewport: {},
+      timestamp: "t1",
+      diffByViewport: {},
       suggestions: [sug({ rank: 0, deltaPx: 8, viewports: ["mobile"] })],
     };
     assert.equal(detectZeroCrossings(prev, curr).length, 0);
@@ -152,29 +160,37 @@ describe("detectZeroCrossings", () => {
 
   it("skips text-row suggestions (they lack stable component identity)", () => {
     const prev = {
-      timestamp: "t0", diffByViewport: {},
-      suggestions: [{
-        ...sug({ deltaPx: 16, viewports: ["mobile"] }),
-        evidence: '7 text-row(s) shifted Δy +16px on mobile (e.g. "Hello")',
-      }],
+      timestamp: "t0",
+      diffByViewport: {},
+      suggestions: [
+        {
+          ...sug({ deltaPx: 16, viewports: ["mobile"] }),
+          evidence: '7 text-row(s) shifted Δy +16px on mobile (e.g. "Hello")',
+        },
+      ],
     };
     const curr = {
-      timestamp: "t1", diffByViewport: {},
-      suggestions: [{
-        ...sug({ deltaPx: -8, viewports: ["mobile"] }),
-        evidence: '7 text-row(s) shifted Δy -8px on mobile (e.g. "Hello")',
-      }],
+      timestamp: "t1",
+      diffByViewport: {},
+      suggestions: [
+        {
+          ...sug({ deltaPx: -8, viewports: ["mobile"] }),
+          evidence: '7 text-row(s) shifted Δy -8px on mobile (e.g. "Hello")',
+        },
+      ],
     };
     assert.equal(detectZeroCrossings(prev, curr).length, 0);
   });
 
   it("diffWatchRuns now surfaces zeroCrossings on its result", () => {
     const prev = {
-      timestamp: "t0", diffByViewport: { mobile: 0.1 },
+      timestamp: "t0",
+      diffByViewport: { mobile: 0.1 },
       suggestions: [sug({ rank: 1, deltaPx: 24, viewports: ["mobile"] })],
     };
     const curr = {
-      timestamp: "t1", diffByViewport: { mobile: 0.05 },
+      timestamp: "t1",
+      diffByViewport: { mobile: 0.05 },
       suggestions: [sug({ rank: 1, deltaPx: -16, viewports: ["mobile"] })],
     };
     const delta = diffWatchRuns(prev, curr);
@@ -185,7 +201,13 @@ describe("detectZeroCrossings", () => {
 describe("formatWatchDelta", () => {
   it("first-run mode labels the output", () => {
     const out = formatWatchDelta(
-      { diffDelta: { mobile: { prev: 0.1, curr: 0.1, delta: 0 } }, resolved: [], persisted: [], newlyIntroduced: [], zeroCrossings: [] },
+      {
+        diffDelta: { mobile: { prev: 0.1, curr: 0.1, delta: 0 } },
+        resolved: [],
+        persisted: [],
+        newlyIntroduced: [],
+        zeroCrossings: [],
+      },
       true,
     );
     assert.match(out, /first run/);
@@ -225,14 +247,19 @@ describe("formatWatchDelta", () => {
     const out = formatWatchDelta(
       {
         diffDelta: {},
-        resolved: [], persisted: [], newlyIntroduced: [],
-        zeroCrossings: [{
-          componentPrefix: "component rank=0 (bbox 200x100)",
-          prev: { deltaPx: 24, viewports: ["mobile"] },
-          curr: { deltaPx: -16, viewports: ["mobile"] },
-          dampedTargetPx: -12,
-          message: "component rank=0 (bbox 200x100) flipped sign (+24px → -16px). Your last edit added too much; try damping ~50% (next edit ≈ -12px).",
-        }],
+        resolved: [],
+        persisted: [],
+        newlyIntroduced: [],
+        zeroCrossings: [
+          {
+            componentPrefix: "component rank=0 (bbox 200x100)",
+            prev: { deltaPx: 24, viewports: ["mobile"] },
+            curr: { deltaPx: -16, viewports: ["mobile"] },
+            dampedTargetPx: -12,
+            message:
+              "component rank=0 (bbox 200x100) flipped sign (+24px → -16px). Your last edit added too much; try damping ~50% (next edit ≈ -12px).",
+          },
+        ],
       },
       false,
     );

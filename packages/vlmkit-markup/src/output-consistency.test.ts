@@ -29,10 +29,7 @@ import { runA11yTouch } from "./a11y-touch.ts";
 import { runIntegrityCheck } from "./inspect/integrity-check.ts";
 import { parseAllowRules, ruleMatches } from "./inspect/integrity-exemption.ts";
 
-const FIXTURE = join(
-  fileURLToPath(new URL("../../../fixtures/external-assets", import.meta.url)),
-  "page.html",
-);
+const FIXTURE = join(fileURLToPath(new URL("../../../fixtures/external-assets", import.meta.url)), "page.html");
 const outDir = () => mkdtempSync(join(tmpdir(), "output-consistency-"));
 
 const VIEWPORTS = [
@@ -67,7 +64,10 @@ describe("viewport sweep order does not change the verdict", () => {
     // Previously both collapsed to a single width and read identically.
     const report = await runIntegrityCheck({ source: FIXTURE, viewports: VIEWPORTS });
     const widths = report.findings.map((f) => (f.viewports ?? [f.viewport]).length);
-    assert.ok(widths.some((n) => n > 1), "expected at least one finding present at several widths");
+    assert.ok(
+      widths.some((n) => n > 1),
+      "expected at least one finding present at several widths",
+    );
   });
 
   it("lets --allow match any width the finding appeared at", async () => {
@@ -85,12 +85,21 @@ describe("viewport sweep order does not change the verdict", () => {
 describe("console output does not hide rows", () => {
   const manyFindings = (): string => {
     const rows = Array.from({ length: 12 }, (_, i) => `<p class="low${i}">Low contrast line ${i}</p>`).join("");
-    const taps = Array.from({ length: 12 }, (_, i) => `<a class="tap${i}" href="#${i}" aria-label="tap ${i}"></a>`).join("");
-    const css = Array.from({ length: 12 }, (_, i) =>
-      `.low${i}{color:#bbbbbb}.tap${i}{display:inline-block;width:18px;height:18px;background:#333;margin:2px}`).join("");
+    const taps = Array.from(
+      { length: 12 },
+      (_, i) => `<a class="tap${i}" href="#${i}" aria-label="tap ${i}"></a>`,
+    ).join("");
+    const css = Array.from(
+      { length: 12 },
+      (_, i) =>
+        `.low${i}{color:#bbbbbb}.tap${i}{display:inline-block;width:18px;height:18px;background:#333;margin:2px}`,
+    ).join("");
     const dir = mkdtempSync(join(tmpdir(), "many-findings-"));
     const file = join(dir, "many.html");
-    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>body{background:#fff;font:16px sans-serif}${css}</style><body>${rows}${taps}</body>`);
+    writeFileSync(
+      file,
+      `<!doctype html><meta charset="utf-8"><style>body{background:#fff;font:16px sans-serif}${css}</style><body>${rows}${taps}</body>`,
+    );
     return file;
   };
   const MANY = manyFindings();

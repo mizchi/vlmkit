@@ -21,7 +21,7 @@ export interface ResponsiveSidecarSummary {
 
 export async function readContrastSidecars(
   snapshotDir: string,
-  entries: string[]
+  entries: string[],
 ): Promise<Map<string, ContrastSidecarSummary>> {
   const summaries = new Map<string, ContrastSidecarSummary>();
   for (const file of entries.filter((f) => f.endsWith(".contrast.json"))) {
@@ -58,7 +58,7 @@ function parseContrastSidecar(raw: unknown): ContrastSidecarSummary | undefined 
 
 export async function readResponsiveSidecars(
   snapshotDir: string,
-  entries: string[]
+  entries: string[],
 ): Promise<Map<string, ResponsiveSidecarSummary>> {
   const summaries = new Map<string, ResponsiveSidecarSummary>();
   for (const file of entries.filter((f) => f.endsWith(".responsive.json"))) {
@@ -79,8 +79,8 @@ function parseResponsiveSidecar(raw: unknown): ResponsiveSidecarSummary | undefi
   const detectedIssues = snapshots.flatMap(analyzeResponsiveSnapshot);
   return {
     snapshotCount: snapshots.length,
-    issueCount: findings.filter(isActionableResponsiveIssue).length
-      + detectedIssues.filter(isActionableResponsiveIssue).length,
+    issueCount:
+      findings.filter(isActionableResponsiveIssue).length + detectedIssues.filter(isActionableResponsiveIssue).length,
   };
 }
 
@@ -96,10 +96,11 @@ function normalizeResponsiveSnapshots(raw: unknown) {
 }
 
 function normalizeResponsiveFindings(raw: unknown) {
-  const values = isRecord(raw) && Array.isArray(raw.findings)
-    ? raw.findings
-    : isRecord(raw) && Array.isArray(raw.issues)
-      ? raw.issues
-      : [];
+  const values =
+    isRecord(raw) && Array.isArray(raw.findings)
+      ? raw.findings
+      : isRecord(raw) && Array.isArray(raw.issues)
+        ? raw.issues
+        : [];
   return values.filter(isResponsiveIssueLike);
 }

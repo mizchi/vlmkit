@@ -70,16 +70,18 @@ export function buildReport({
       screenshotName: repairContext.failure.screenshotName,
       diffRatio: repairContext.imageDiff?.diffRatio ?? null,
       bbox: repairContext.imageDiff?.bbox ?? null,
-      selectorMatches: repairContext.imageDiff?.selectorMatches?.map((match) => ({
-        selector: match.selector,
-        confidence: match.confidence,
-        score: match.evidence?.score ?? null,
-      })) ?? [],
-      edgeCandidates: repairContext.imageDiff?.edgeCandidates?.map((candidate) => ({
-        selector: candidate.selector,
-        reason: candidate.reason,
-        score: candidate.score,
-      })) ?? [],
+      selectorMatches:
+        repairContext.imageDiff?.selectorMatches?.map((match) => ({
+          selector: match.selector,
+          confidence: match.confidence,
+          score: match.evidence?.score ?? null,
+        })) ?? [],
+      edgeCandidates:
+        repairContext.imageDiff?.edgeCandidates?.map((candidate) => ({
+          selector: candidate.selector,
+          reason: candidate.reason,
+          score: candidate.score,
+        })) ?? [],
       cssAttribution: repairContext.styleAttribution.changedProperties.slice(0, 8),
       drift: repairContext.drift,
       semanticChanged: repairContext.semanticDiff.changed,
@@ -115,7 +117,8 @@ export function buildQualityFailures({
     !visualRegressionDetected && "regression variant should fail via VRT",
     !(repairContext.imageDiff?.changedPixels > 0) && "repair context should include measured image diff pixels",
     repairContext.repairHints.length === 0 && "repair context should include actionable repair hints",
-    repairContext.styleAttribution.changedProperties.length === 0 && "repair context should include computed-style attribution",
+    repairContext.styleAttribution.changedProperties.length === 0 &&
+      "repair context should include computed-style attribution",
     repairContext.drift.kind !== "visual-only" && "intentional regression should classify as visual-only",
     (visualContext.viewports?.length ?? 0) < 3 && "visual context should include desktop, mobile, and wide snapshots",
     stabilityRuns.some((run) => run.exitCode !== 0) && "stable generated VRT should pass twice after baseline update",
@@ -141,7 +144,7 @@ function evaluateExpectedChange(repairContext, expectedChange, visualRegressionD
     ...(repairContext.imageDiff?.edgeCandidates ?? []).map((candidate) => candidate.selector),
   ];
   const allowedSelectorFound = selectors.some((selector) =>
-    expectedChange.allowedSelectors.some((allowed) => selector === allowed || selector.startsWith(`${allowed}:`))
+    expectedChange.allowedSelectors.some((allowed) => selector === allowed || selector.startsWith(`${allowed}:`)),
   );
   if (!allowedSelectorFound) reasons.push("no changed selector matched expected-change allowlist");
   return {
@@ -197,23 +200,36 @@ function renderMarkdown(report) {
     `- Diff ratio: ${report.repair.diffRatio == null ? "n/a" : `${(report.repair.diffRatio * 100).toFixed(2)}%`}`,
     `- BBox: ${report.repair.bbox ? `left ${report.repair.bbox.left}, top ${report.repair.bbox.top}, width ${report.repair.bbox.width}, height ${report.repair.bbox.height}` : "n/a"}`,
     `- Selector matches: ${report.repair.selectorMatches.map((match) => `${match.selector} (${match.confidence})`).join(", ") || "none"}`,
-    `- Top-edge candidates: ${report.repair.edgeCandidates.slice(0, 4).map((candidate) => `${candidate.selector} (${candidate.reason})`).join(", ") || "none"}`,
+    `- Top-edge candidates: ${
+      report.repair.edgeCandidates
+        .slice(0, 4)
+        .map((candidate) => `${candidate.selector} (${candidate.reason})`)
+        .join(", ") || "none"
+    }`,
     `- Semantic changed: ${report.repair.semanticChanged ? "yes" : "no"}`,
     "",
     "### CSS Attribution",
     "",
-    ...report.repair.cssAttribution.map((row) => `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`),
-    ...(report.vlmRegionSummary.available ? [
-      "",
-      "### VLM Region Diff",
-      "",
-      `- Model: ${report.vlmRegionSummary.model ?? "unknown"}`,
-      `- Cost: ${report.vlmRegionSummary.cost == null ? "unknown" : `$${report.vlmRegionSummary.cost}`}`,
-      `- Summary: ${report.vlmRegionSummary.summary ?? "n/a"}`,
-      ...report.vlmRegionSummary.changes.slice(0, 6).map((row) =>
-        `- ${row.selector}: ${row.property} \`${row.from ?? "?"}\` -> \`${row.to ?? "?"}\` (${row.confidence})`
-      ),
-    ] : []),
+    ...report.repair.cssAttribution.map(
+      (row) =>
+        `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`,
+    ),
+    ...(report.vlmRegionSummary.available
+      ? [
+          "",
+          "### VLM Region Diff",
+          "",
+          `- Model: ${report.vlmRegionSummary.model ?? "unknown"}`,
+          `- Cost: ${report.vlmRegionSummary.cost == null ? "unknown" : `$${report.vlmRegionSummary.cost}`}`,
+          `- Summary: ${report.vlmRegionSummary.summary ?? "n/a"}`,
+          ...report.vlmRegionSummary.changes
+            .slice(0, 6)
+            .map(
+              (row) =>
+                `- ${row.selector}: ${row.property} \`${row.from ?? "?"}\` -> \`${row.to ?? "?"}\` (${row.confidence})`,
+            ),
+        ]
+      : []),
     "",
     "### Hints",
     "",
@@ -237,15 +253,22 @@ function renderMarkdown(report) {
 
 function renderHtmlReport(report) {
   const imageArtifacts = report.repair.artifacts ?? {};
-  const image = (label, path) => path
-    ? `<figure><figcaption>${escapeHtml(label)}</figcaption><img src="${escapeHtml(toHtmlArtifactPath(path))}" alt="${escapeHtml(label)}"></figure>`
-    : "";
-  const cssRows = report.repair.cssAttribution.map((row) =>
-    `<tr><td>${escapeHtml(row.selector)}</td><td>${escapeHtml(row.property)}</td><td><code>${escapeHtml(row.before)}</code></td><td><code>${escapeHtml(row.after)}</code></td><td>${escapeHtml(row.category)}</td><td>${row.score}</td></tr>`
-  ).join("");
-  const vlmRows = report.vlmRegionSummary.changes.map((row) =>
-    `<tr><td>${escapeHtml(row.selector)}</td><td>${escapeHtml(row.property)}</td><td><code>${escapeHtml(row.from ?? "")}</code></td><td><code>${escapeHtml(row.to ?? "")}</code></td><td>${escapeHtml(row.confidence)}</td><td>${escapeHtml(row.region)}</td></tr>`
-  ).join("");
+  const image = (label, path) =>
+    path
+      ? `<figure><figcaption>${escapeHtml(label)}</figcaption><img src="${escapeHtml(toHtmlArtifactPath(path))}" alt="${escapeHtml(label)}"></figure>`
+      : "";
+  const cssRows = report.repair.cssAttribution
+    .map(
+      (row) =>
+        `<tr><td>${escapeHtml(row.selector)}</td><td>${escapeHtml(row.property)}</td><td><code>${escapeHtml(row.before)}</code></td><td><code>${escapeHtml(row.after)}</code></td><td>${escapeHtml(row.category)}</td><td>${row.score}</td></tr>`,
+    )
+    .join("");
+  const vlmRows = report.vlmRegionSummary.changes
+    .map(
+      (row) =>
+        `<tr><td>${escapeHtml(row.selector)}</td><td>${escapeHtml(row.property)}</td><td><code>${escapeHtml(row.from ?? "")}</code></td><td><code>${escapeHtml(row.to ?? "")}</code></td><td>${escapeHtml(row.confidence)}</td><td>${escapeHtml(row.region)}</td></tr>`,
+    )
+    .join("");
   const hints = report.repair.hints.map((hint) => `<li>${escapeHtml(hint)}</li>`).join("");
   return `<!doctype html>
 <html lang="en">
@@ -318,7 +341,10 @@ function renderGithubStepSummary(report) {
     ["Expected change", report.metrics.expectedChangeApproved ? "approved" : "rejected"],
     ["Drift", `${report.metrics.driftKind} / ${report.metrics.driftPrimaryCause}`],
     ["Diff ratio", formatPercent(report.repair.diffRatio)],
-    ["Stability checks", `${report.metrics.stabilityChecksPassed ? "pass" : "fail"} (${report.metrics.stabilityCheckRuns})`],
+    [
+      "Stability checks",
+      `${report.metrics.stabilityChecksPassed ? "pass" : "fail"} (${report.metrics.stabilityCheckRuns})`,
+    ],
     ["CSS attribution rows", String(report.metrics.cssAttributionCount)],
     ["VLM region diff", `${report.metrics.vlmRegionDiffStatus} (${report.metrics.vlmRegionChangeCount} changes)`],
   ];
@@ -331,16 +357,17 @@ function renderGithubStepSummary(report) {
     "",
     "## Top Repair Hints",
     "",
-    ...(report.repair.hints.length
-      ? report.repair.hints.slice(0, 5).map((hint) => `- ${hint}`)
-      : ["- none"]),
+    ...(report.repair.hints.length ? report.repair.hints.slice(0, 5).map((hint) => `- ${hint}`) : ["- none"]),
     "",
     "## Top CSS Attribution",
     "",
     ...(report.repair.cssAttribution.length
-      ? report.repair.cssAttribution.slice(0, 5).map((row) =>
-        `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`
-      )
+      ? report.repair.cssAttribution
+          .slice(0, 5)
+          .map(
+            (row) =>
+              `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`,
+          )
       : ["- none"]),
     "",
     "## Artifacts",
@@ -353,12 +380,7 @@ function renderGithubStepSummary(report) {
 }
 
 function renderGuardrailContext({ report, guardrailSources }) {
-  const {
-    requestMarkdown,
-    planMarkdown,
-    locatorInventory,
-    generationRulesMarkdown,
-  } = guardrailSources;
+  const { requestMarkdown, planMarkdown, locatorInventory, generationRulesMarkdown } = guardrailSources;
   return [
     "# Markup VRT Heal Guardrail Context",
     "",
@@ -402,34 +424,40 @@ function renderGuardrailContext({ report, guardrailSources }) {
     "### CSS Attribution",
     "",
     ...(report.repair.cssAttribution.length
-      ? report.repair.cssAttribution.map((row) =>
-        `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`
-      )
+      ? report.repair.cssAttribution.map(
+          (row) =>
+            `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`,
+        )
       : ["- none"]),
     "",
     "### Selector Matches",
     "",
     ...(report.repair.selectorMatches.length
-      ? report.repair.selectorMatches.map((match) => `- ${match.selector} (${match.confidence}, score ${match.score ?? "n/a"})`)
+      ? report.repair.selectorMatches.map(
+          (match) => `- ${match.selector} (${match.confidence}, score ${match.score ?? "n/a"})`,
+        )
       : ["- none"]),
     "",
     "### Top-Edge Candidates",
     "",
     ...(report.repair.edgeCandidates.length
-      ? report.repair.edgeCandidates.map((candidate) => `- ${candidate.selector}: ${candidate.reason} (score ${candidate.score})`)
+      ? report.repair.edgeCandidates.map(
+          (candidate) => `- ${candidate.selector}: ${candidate.reason} (score ${candidate.score})`,
+        )
       : ["- none"]),
     "",
     "### VLM Region Diff",
     "",
     ...(report.vlmRegionSummary.available
       ? [
-        `- Model: ${report.vlmRegionSummary.model ?? "unknown"}`,
-        `- Cost: ${report.vlmRegionSummary.cost == null ? "unknown" : `$${report.vlmRegionSummary.cost}`}`,
-        `- Summary: ${report.vlmRegionSummary.summary ?? "n/a"}`,
-        ...report.vlmRegionSummary.changes.map((row) =>
-          `- ${row.selector}: ${row.property} \`${row.from ?? "?"}\` -> \`${row.to ?? "?"}\` (${row.confidence})`
-        ),
-      ]
+          `- Model: ${report.vlmRegionSummary.model ?? "unknown"}`,
+          `- Cost: ${report.vlmRegionSummary.cost == null ? "unknown" : `$${report.vlmRegionSummary.cost}`}`,
+          `- Summary: ${report.vlmRegionSummary.summary ?? "n/a"}`,
+          ...report.vlmRegionSummary.changes.map(
+            (row) =>
+              `- ${row.selector}: ${row.property} \`${row.from ?? "?"}\` -> \`${row.to ?? "?"}\` (${row.confidence})`,
+          ),
+        ]
       : [`- ${report.metrics.vlmRegionDiffStatus}`]),
     "",
     "### Repair Hints",
@@ -440,9 +468,7 @@ function renderGuardrailContext({ report, guardrailSources }) {
 }
 
 function toHtmlArtifactPath(path) {
-  return path.startsWith(".vlmkit/markup-vrt-eval/")
-    ? path.slice(".vlmkit/markup-vrt-eval/".length)
-    : path;
+  return path.startsWith(".vlmkit/markup-vrt-eval/") ? path.slice(".vlmkit/markup-vrt-eval/".length) : path;
 }
 
 function formatPercent(value) {

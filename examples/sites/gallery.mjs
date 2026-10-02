@@ -56,9 +56,13 @@ function pageLang(sourceDir) {
  */
 function finalStill(events) {
   const kept = keptShots(events);
-  const desktop = events.filter((e) => e.kind === "shot" && e.mode === "full" && e.viewport.width >= 1024 && kept.has(e.id));
+  const desktop = events.filter(
+    (e) => e.kind === "shot" && e.mode === "full" && e.viewport.width >= 1024 && kept.has(e.id),
+  );
   const shot = (desktop.some(landing) ? desktop.filter(landing) : desktop.filter((e) => !e.dark)).at(-1);
-  return shot ? { file: `judgment/${tileFile(events, shot.tiles[0].file)}`, w: shot.tiles[0].w, h: shot.tiles[0].h } : null;
+  return shot
+    ? { file: `judgment/${tileFile(events, shot.tiles[0].file)}`, w: shot.tiles[0].w, h: shot.tiles[0].h }
+    : null;
 }
 
 export function galleryEntries(sections = siteSections) {

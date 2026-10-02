@@ -33,11 +33,7 @@ import { type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "../style/palette-diff.ts";
-import {
-  extractComponentsFromFile,
-  matchComponents,
-  type MatchedBbox,
-} from "../component/component-bbox.ts";
+import { extractComponentsFromFile, matchComponents, type MatchedBbox } from "../component/component-bbox.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -161,7 +157,9 @@ export async function runMultiPageConsistency(
   });
 
   if (pages.length === 0 || !pages[0]!.matched) {
-    throw new UsageError(`Selector \`${options.selector}\` did not match on the reference page (${pages[0]?.label ?? "<none>"})`);
+    throw new UsageError(
+      `Selector \`${options.selector}\` did not match on the reference page (${pages[0]?.label ?? "<none>"})`,
+    );
   }
 
   const reference = pages[0]!;
@@ -273,21 +271,29 @@ export function formatMultiPageConsistencyReport(report: MultiPageConsistencyRep
     const tier = ruleTier(rules, ruled.rule, ruled.emitted);
     const reportable = Number.isNaN(d.diffRatio) || d.diffRatio > 0;
     if (tier === "off" && reportable) offRules.set(ruled.rule, (offRules.get(ruled.rule) ?? 0) + 1);
-    const icon = tier === "off" && reportable
-      ? `${DIM}-${RESET}`
-      : Number.isNaN(d.diffRatio)
-      ? `${YELLOW}!${RESET}`
-      : d.diffRatio === 0
-        ? `${GREEN}✓${RESET}`
-        : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : (tier === "suspect" ? `${RED}✗${RESET}` : `${YELLOW}~${RESET}`);
-    const retuned = tier !== "off" && reportable && tier !== ruled.emitted
-      ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
-      : "";
+    const icon =
+      tier === "off" && reportable
+        ? `${DIM}-${RESET}`
+        : Number.isNaN(d.diffRatio)
+          ? `${YELLOW}!${RESET}`
+          : d.diffRatio === 0
+            ? `${GREEN}✓${RESET}`
+            : d.diffRatio < 0.01
+              ? `${YELLOW}~${RESET}`
+              : tier === "suspect"
+                ? `${RED}✗${RESET}`
+                : `${YELLOW}~${RESET}`;
+    const retuned =
+      tier !== "off" && reportable && tier !== ruled.emitted
+        ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
+        : "";
     lines.push(`  ${icon} ${d.candidate.padEnd(40)} ${pct}${retuned}`);
   }
   if (offRules.size > 0) {
     const detail = [...offRules].map(([rule, n]) => `${rule} x${n}`).join(", ");
-    lines.push(`  ${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} page(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
+    lines.push(
+      `  ${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} page(s) measured and NOT reported — rule turned off (${detail})${RESET}`,
+    );
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
@@ -298,12 +304,16 @@ function renderReport(selector: string, reference: PageEntry, pages: PageEntry[]
   lines.push("# Multi-page consistency report");
   lines.push("");
   lines.push(`Selector: \`${selector}\``);
-  lines.push(`Reference: \`${reference.label}\`  (bbox ${reference.bbox.width}×${reference.bbox.height} at ${reference.bbox.x},${reference.bbox.y})`);
+  lines.push(
+    `Reference: \`${reference.label}\`  (bbox ${reference.bbox.width}×${reference.bbox.height} at ${reference.bbox.x},${reference.bbox.y})`,
+  );
   lines.push("");
-  lines.push("Each candidate page's element is compared to the reference's. " +
-    "When the same selector renders differently on different pages, the " +
-    "design system is drifting — usually a per-page CSS override or a " +
-    "scoped style that escaped its boundary.");
+  lines.push(
+    "Each candidate page's element is compared to the reference's. " +
+      "When the same selector renders differently on different pages, the " +
+      "design system is drifting — usually a per-page CSS override or a " +
+      "scoped style that escaped its boundary.",
+  );
   lines.push("");
   lines.push("## Drift summary");
   lines.push("");
@@ -312,7 +322,9 @@ function renderReport(selector: string, reference: PageEntry, pages: PageEntry[]
   for (const d of deltas) {
     const pct = Number.isNaN(d.diffRatio) ? "_(selector missing)_" : (d.diffRatio * 100).toFixed(2) + "%";
     const wh = `${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
-    lines.push(`| \`${d.candidate}\` | ${pct} | ${wh} | ${d.paletteOnlyInRef} | ${d.paletteOnlyInCand} | ${d.heatmapRegions} |`);
+    lines.push(
+      `| \`${d.candidate}\` | ${pct} | ${wh} | ${d.paletteOnlyInRef} | ${d.paletteOnlyInCand} | ${d.heatmapRegions} |`,
+    );
   }
   lines.push("");
   lines.push("## Captured screenshots");
@@ -326,13 +338,19 @@ function renderReport(selector: string, reference: PageEntry, pages: PageEntry[]
   lines.push("");
   lines.push("## Suggested next step");
   lines.push("");
-  lines.push("1. For each candidate with non-zero diff, open its screenshot next to " +
-    "the reference and identify the visible delta (color, spacing, sizing).");
-  lines.push("2. Check whether the candidate page has a CSS override scoped to it " +
-    "(e.g., `body.pricing .footer { … }`) that the other pages don't share.");
-  lines.push("3. Move shared component styles up to a global stylesheet, or " +
-    "promote the component to a shared partial / framework component so all " +
-    "pages render identically.");
+  lines.push(
+    "1. For each candidate with non-zero diff, open its screenshot next to " +
+      "the reference and identify the visible delta (color, spacing, sizing).",
+  );
+  lines.push(
+    "2. Check whether the candidate page has a CSS override scoped to it " +
+      "(e.g., `body.pricing .footer { … }`) that the other pages don't share.",
+  );
+  lines.push(
+    "3. Move shared component styles up to a global stylesheet, or " +
+      "promote the component to a shared partial / framework component so all " +
+      "pages render identically.",
+  );
   lines.push("");
   return lines.join("\n");
 }

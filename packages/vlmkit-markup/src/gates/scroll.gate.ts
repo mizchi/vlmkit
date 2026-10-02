@@ -18,8 +18,7 @@ export const scrollGate = defineGate<ScrollBehaviorReport, ScrollBehaviorOptions
   id: "check.scroll",
   command: ["check", "scroll"],
   title: "Scroll behavior verification",
-  summary:
-    "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge",
+  summary: "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge",
   category: "behavior",
   usage: `Scroll behavior verification: fixed elements must hold their viewport
 position, engaged sticky elements must stick at their top offset, and
@@ -42,7 +41,14 @@ inventory is \`vlmkit scan scroll\`.)`,
     { id: "snap-not-snapping", title: "Mandatory snap container settled off every child edge", severity: "warn" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
     { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
     ...PAGE_LOAD_INPUTS,
   ],

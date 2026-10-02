@@ -10,10 +10,7 @@ export { collectGitContext } from "./git-context.ts";
 export { applyPatch, commitPatch } from "./patch.ts";
 export { estimateCost, billedCost, fetchOpenRouterPricing, withPricing } from "./cost.ts";
 export type { TokenUsage, Pricing } from "./cost.ts";
-export type {
-  ObserveClient,
-  CodegenClient,
-} from "./clients.ts";
+export type { ObserveClient, CodegenClient } from "./clients.ts";
 export { createRealObserveClient, createRealCodegenClient } from "./clients.ts";
 export { heal } from "./heal.ts";
 export type { HealDeps } from "./heal.ts";

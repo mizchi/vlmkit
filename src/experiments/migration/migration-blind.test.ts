@@ -296,12 +296,14 @@ describe("formatMigrationBlindSuccessMarkdown", () => {
     const scenario = selectMigrationBlindScenario(manifest, "shadcn-to-luna");
     assert.ok(scenario);
 
-    const markdown = formatMigrationBlindSuccessMarkdown(evaluateMigrationBlindSuccess({
-      scenario,
-      beforeReport: createReport([0.05, 0.03]),
-      afterReport: createReport([0.008, 0.004]),
-      roundsUsed: 2,
-    }));
+    const markdown = formatMigrationBlindSuccessMarkdown(
+      evaluateMigrationBlindSuccess({
+        scenario,
+        beforeReport: createReport([0.05, 0.03]),
+        afterReport: createReport([0.008, 0.004]),
+        roundsUsed: 2,
+      }),
+    );
 
     assert.match(markdown, /Blind Scenario Evaluation/);
     assert.match(markdown, /shadcn\/ui -> luna/);

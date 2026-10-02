@@ -133,9 +133,7 @@ export function summarizeMigrationBlindScenarios(manifest: MigrationBlindManifes
   }));
 }
 
-export function formatMigrationBlindScenarioMarkdown(
-  scenario: MigrationBlindScenario,
-): string {
+export function formatMigrationBlindScenarioMarkdown(scenario: MigrationBlindScenario): string {
   return [
     `## Blind Scenario: ${scenario.title}`,
     "",
@@ -148,17 +146,14 @@ export function formatMigrationBlindScenarioMarkdown(
   ].join("\n");
 }
 
-export function synthesizeMigrationBlindReferenceFix(
-  blindHtml: string,
-  referenceHtml: string,
-): string {
+export function synthesizeMigrationBlindReferenceFix(blindHtml: string, referenceHtml: string): string {
   const blindCss = extractCss(blindHtml);
   const referenceCss = extractCss(referenceHtml);
   if (!blindCss) {
-    throw new Error("Blind target HTML is missing <style id=\"target-css\">");
+    throw new Error('Blind target HTML is missing <style id="target-css">');
   }
   if (!referenceCss) {
-    throw new Error("Reference HTML is missing <style id=\"target-css\">");
+    throw new Error('Reference HTML is missing <style id="target-css">');
   }
   return replaceCss(blindHtml, blindCss, referenceCss);
 }
@@ -236,7 +231,7 @@ export function evaluateMigrationBlindSoloResult(
   if (finalWorstDiffRatio > targetDiffRatio) {
     reasons.push(
       `Final worst diff ${(finalWorstDiffRatio * 100).toFixed(2)}% ` +
-      `is above ${(targetDiffRatio * 100).toFixed(1)}%`,
+        `is above ${(targetDiffRatio * 100).toFixed(1)}%`,
     );
   }
   return {
@@ -247,9 +242,7 @@ export function evaluateMigrationBlindSoloResult(
   };
 }
 
-export function formatMigrationBlindPreparationMarkdown(
-  preparation: MigrationBlindPreparation,
-): string {
+export function formatMigrationBlindPreparationMarkdown(preparation: MigrationBlindPreparation): string {
   const lines = [
     `## Blind Scenario Preparation: ${preparation.scenario.title}`,
     "",
@@ -351,8 +344,14 @@ function parseSuccessCriteria(value: unknown, index: number): MigrationBlindScen
     throw new Error(`Blind scenario at index ${index} must define successCriteria`);
   }
   const record = value as Record<string, unknown>;
-  const maxDiffRatio = parseRatio(record.maxDiffRatio, `Blind scenario at index ${index} has an invalid successCriteria.maxDiffRatio`);
-  const maxRounds = parsePositiveInteger(record.maxRounds, `Blind scenario at index ${index} has an invalid successCriteria.maxRounds`);
+  const maxDiffRatio = parseRatio(
+    record.maxDiffRatio,
+    `Blind scenario at index ${index} has an invalid successCriteria.maxDiffRatio`,
+  );
+  const maxRounds = parsePositiveInteger(
+    record.maxRounds,
+    `Blind scenario at index ${index} has an invalid successCriteria.maxRounds`,
+  );
   return { maxDiffRatio, maxRounds };
 }
 
@@ -380,12 +379,12 @@ function parsePositiveInteger(value: unknown, message: string): number {
 async function main() {
   const [manifestPath, command = "list", scenarioId, ...rest] = process.argv.slice(2);
   if (
-    !manifestPath
-    || manifestPath === "--help"
-    || manifestPath === "-h"
-    || command === "--help"
-    || command === "-h"
-    || command === "help"
+    !manifestPath ||
+    manifestPath === "--help" ||
+    manifestPath === "-h" ||
+    command === "--help" ||
+    command === "-h" ||
+    command === "help"
   ) {
     console.log(formatUsage());
     return;
@@ -458,9 +457,8 @@ async function runPrepare(scenario: MigrationBlindScenario, args: string[]) {
   const { runMigrationCompare } = await import("./migration-compare.ts");
   const report = await runMigrationCompare(compareOptions);
   const preparation = await buildPreparationFromReport(scenario, compareOptions, report);
-  const output = format === "json"
-    ? JSON.stringify(preparation, null, 2)
-    : formatMigrationBlindPreparationMarkdown(preparation);
+  const output =
+    format === "json" ? JSON.stringify(preparation, null, 2) : formatMigrationBlindPreparationMarkdown(preparation);
 
   if (packetPath) {
     const resolvedOutput = resolve(packetPath);
@@ -485,9 +483,10 @@ async function runEvaluate(scenario: MigrationBlindScenario, args: string[]) {
     afterReport,
     roundsUsed,
   });
-  const output = format === "json"
-    ? JSON.stringify({ summary }, null, 2)
-    : formatMigrationBlindSuccessMarkdown(summary, { beforeReportPath, afterReportPath });
+  const output =
+    format === "json"
+      ? JSON.stringify({ summary }, null, 2)
+      : formatMigrationBlindSuccessMarkdown(summary, { beforeReportPath, afterReportPath });
 
   if (outputPath) {
     const resolvedOutput = resolve(outputPath);
@@ -503,10 +502,14 @@ async function runEvaluate(scenario: MigrationBlindScenario, args: string[]) {
 }
 
 async function runSolo(scenario: MigrationBlindScenario, args: string[]) {
-  const outputPath = resolve(optionalValue(args, "--output")
-    ?? resolve("test-results", "migration", "blind", scenario.id, "solo", basename(scenario.blindTarget)));
-  const reportOutputDir = resolve(optionalValue(args, "--report-output-dir")
-    ?? resolve("test-results", "migration", "blind", scenario.id, "solo-report"));
+  const outputPath = resolve(
+    optionalValue(args, "--output") ??
+      resolve("test-results", "migration", "blind", scenario.id, "solo", basename(scenario.blindTarget)),
+  );
+  const reportOutputDir = resolve(
+    optionalValue(args, "--report-output-dir") ??
+      resolve("test-results", "migration", "blind", scenario.id, "solo-report"),
+  );
   const format = parseFormat(optionalValue(args, "--format"));
   const enablePaintTree = hasFlag(args, "--paint-tree");
   const check = hasFlag(args, "--check");
@@ -542,9 +545,7 @@ async function runSolo(scenario: MigrationBlindScenario, args: string[]) {
     reportPath: report.reportPath,
     ...evaluation,
   };
-  const output = format === "json"
-    ? JSON.stringify(result, null, 2)
-    : formatMigrationBlindSoloMarkdown(result);
+  const output = format === "json" ? JSON.stringify(result, null, 2) : formatMigrationBlindSoloMarkdown(result);
 
   console.log(output);
   if (check && !result.passed) {
@@ -586,12 +587,14 @@ async function buildPreparationFromReport(
     const variantHtml = await readFile(variantPath, "utf-8");
     const currentCss = extractCss(variantHtml);
     if (!currentCss) continue;
-    tasks.push(buildMigrationSubagentTask({
-      baselineFile,
-      variantFile: basename(variantPath),
-      currentCss,
-      target,
-    }));
+    tasks.push(
+      buildMigrationSubagentTask({
+        baselineFile,
+        variantFile: basename(variantPath),
+        currentCss,
+        target,
+      }),
+    );
   }
 
   return {
@@ -603,10 +606,7 @@ async function buildPreparationFromReport(
   };
 }
 
-function requireScenario(
-  manifest: MigrationBlindManifest,
-  scenarioId: string,
-): MigrationBlindScenario {
+function requireScenario(manifest: MigrationBlindManifest, scenarioId: string): MigrationBlindScenario {
   const scenario = selectMigrationBlindScenario(manifest, scenarioId);
   if (!scenario) {
     throw new Error(`Unknown scenario: ${scenarioId}`);

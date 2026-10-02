@@ -79,10 +79,7 @@ export interface DerivedThreshold {
  * Rounded to two significant figures: an unrounded 0.00009353741 in a config
  * file reads as a measurement when it is a budget divided by an area.
  */
-export function deriveStoryThreshold(
-  area: number,
-  options: { noisePixels?: number } = {},
-): DerivedThreshold {
+export function deriveStoryThreshold(area: number, options: { noisePixels?: number } = {}): DerivedThreshold {
   const noisePixels = options.noisePixels ?? DEFAULT_NOISE_PIXELS;
   if (area <= 0) {
     return { threshold: THRESHOLD_CEILING, reason: "zero-area story — fell back to the gate default" };
@@ -91,15 +88,17 @@ export function deriveStoryThreshold(
   if (raw >= THRESHOLD_CEILING) {
     return {
       threshold: THRESHOLD_CEILING,
-      reason: `${noisePixels}px of ${area.toLocaleString()}px is ${(raw * 100).toFixed(2)}%,`
-        + ` at or above the gate default — kept the default ${THRESHOLD_CEILING}`,
+      reason:
+        `${noisePixels}px of ${area.toLocaleString()}px is ${(raw * 100).toFixed(2)}%,` +
+        ` at or above the gate default — kept the default ${THRESHOLD_CEILING}`,
     };
   }
   if (raw <= THRESHOLD_FLOOR) {
     return {
       threshold: THRESHOLD_FLOOR,
-      reason: `${noisePixels}px of ${area.toLocaleString()}px is ${(raw * 100).toFixed(4)}%,`
-        + ` below the renderer-noise floor — clamped to ${THRESHOLD_FLOOR}`,
+      reason:
+        `${noisePixels}px of ${area.toLocaleString()}px is ${(raw * 100).toFixed(4)}%,` +
+        ` below the renderer-noise floor — clamped to ${THRESHOLD_FLOOR}`,
     };
   }
   return {
@@ -199,10 +198,7 @@ function variantFromClass(className: string): string | undefined {
  * named state" part of the handoff can come from the page rather than from
  * someone remembering.
  */
-export function discoverStoryCandidates(
-  elements: readonly RawElement[],
-  options: DiscoverOptions,
-): StoryCandidate[] {
+export function discoverStoryCandidates(elements: readonly RawElement[], options: DiscoverOptions): StoryCandidate[] {
   const wanted = options.selectors?.map((selector) => selector.replace(/^\./, ""));
   const prefix = options.prefix ?? "components";
   const maxAreaRatio = options.maxAreaRatio ?? 0.5;
@@ -292,20 +288,21 @@ export function discoverStoryCandidates(
     // a second baseline to maintain and reports the child's changes as its own.
     // Checked before the area test because a wrapper around a large component is
     // large, and "page furniture" is the wrong explanation for it.
-    const wrapped = candidate.contains.length === 1
-      ? candidates.find((other) => other.component === candidate.contains[0])
-      : undefined;
+    const wrapped =
+      candidate.contains.length === 1
+        ? candidates.find((other) => other.component === candidate.contains[0])
+        : undefined;
     if (wrapped && wrapped.width === candidate.width && wrapped.height === candidate.height) {
       candidate.recommended = false;
       candidate.notes.push(
-        `same box as ${wrapped.component} which it wraps — a duplicate baseline;`
-        + ` story ${wrapped.id} already covers these pixels`,
+        `same box as ${wrapped.component} which it wraps — a duplicate baseline;` +
+          ` story ${wrapped.id} already covers these pixels`,
       );
     } else if (areaRatio > maxAreaRatio) {
       candidate.recommended = false;
       candidate.notes.push(
-        `${(areaRatio * 100).toFixed(0)}% of the viewport — page furniture rather than a component;`
-        + ` split it or pass --selector to keep it`,
+        `${(areaRatio * 100).toFixed(0)}% of the viewport — page furniture rather than a component;` +
+          ` split it or pass --selector to keep it`,
       );
     } else if (candidate.contains.length >= 3) {
       // Not a hard reject: a Toolbar legitimately contains three things. But a
@@ -336,13 +333,15 @@ function titleCase(value: string): string {
  * ends the script element, and captured markup is exactly where one shows up.
  */
 function scriptSafeJson(value: unknown): string {
-  return JSON.stringify(value)
-    .replace(/</g, "\\u003c")
-    // U+2028 / U+2029 are literal line terminators in a script body but legal
-    // inside a JSON string, so a paragraph separator in captured copy would be a
-    // syntax error in the generated gallery rather than a stray character.
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
+  return (
+    JSON.stringify(value)
+      .replace(/</g, "\\u003c")
+      // U+2028 / U+2029 are literal line terminators in a script body but legal
+      // inside a JSON string, so a paragraph separator in captured copy would be a
+      // syntax error in the generated gallery rather than a stray character.
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029")
+  );
 }
 
 export interface GalleryHtmlOptions {
@@ -451,11 +450,7 @@ window.unmount = async () => {
 }
 
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**
@@ -546,7 +541,11 @@ function collectInPage(): { elements: RawElement[]; css: string; unreadable: str
   const unreadable: string[] = [];
   for (const sheet of Array.from(document.styleSheets)) {
     try {
-      sheets.push(Array.from(sheet.cssRules).map((rule) => rule.cssText).join("\n"));
+      sheets.push(
+        Array.from(sheet.cssRules)
+          .map((rule) => rule.cssText)
+          .join("\n"),
+      );
     } catch {
       // Opaque stylesheet — `cssRules` throws for anything the page did not
       // load same-origin, and Chromium counts every `file://` stylesheet as
@@ -602,9 +601,7 @@ async function refetchStylesheets(
 export async function scaffoldStoryGallery(options: StoryScaffoldOptions): Promise<StoryScaffoldResult> {
   return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport: options.viewport });
-    const url = options.source.includes("://")
-      ? options.source
-      : `file://${resolve(options.source)}`;
+    const url = options.source.includes("://") ? options.source : `file://${resolve(options.source)}`;
     await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
     const collected = await page.evaluate(collectInPage);
     const refetched = await refetchStylesheets(page, collected.unreadable);
@@ -619,9 +616,7 @@ export async function scaffoldStoryGallery(options: StoryScaffoldOptions): Promi
     });
     // An explicit --selector list is an instruction, not a suggestion: if you
     // named it, it becomes a story even if the heuristics dislike it.
-    const keep = options.includeAll || options.selectors
-      ? all
-      : all.filter((candidate) => candidate.recommended);
+    const keep = options.includeAll || options.selectors ? all : all.filter((candidate) => candidate.recommended);
     const skipped = all.filter((candidate) => !keep.includes(candidate));
 
     const outDir = resolve(options.outDir);
@@ -671,21 +666,24 @@ export function formatStoryScaffoldResult(result: StoryScaffoldResult): string {
   const galleryUrl = `file://${result.galleryPath}`;
   const lines = [
     `${BOLD}${CYAN}vlmkit build gallery${RESET}`,
-    `${DIM}source: ${result.source}  viewport: ${result.viewport.width}x${result.viewport.height}`
-    + `  css: ${result.cssBytes.toLocaleString()} bytes${RESET}`,
+    `${DIM}source: ${result.source}  viewport: ${result.viewport.width}x${result.viewport.height}` +
+      `  css: ${result.cssBytes.toLocaleString()} bytes${RESET}`,
     "",
     `${BOLD}${result.stories.length} story/stories${RESET}`,
   ];
   for (const story of result.stories) {
     lines.push(
-      `  ${GREEN}+${RESET} ${story.id.padEnd(40)} ${`${story.width}x${story.height}`.padStart(10)}`
-      + `  ${DIM}${story.selector}${RESET}`,
+      `  ${GREEN}+${RESET} ${story.id.padEnd(40)} ${`${story.width}x${story.height}`.padStart(10)}` +
+        `  ${DIM}${story.selector}${RESET}`,
     );
     for (const note of story.notes) lines.push(`      ${DIM}${note}${RESET}`);
   }
   if (result.skipped.length > 0) {
-    lines.push("", `${YELLOW}${result.skipped.length} candidate(s) not written${RESET}`
-      + ` ${DIM}(--include-all keeps them, --selector overrides)${RESET}`);
+    lines.push(
+      "",
+      `${YELLOW}${result.skipped.length} candidate(s) not written${RESET}` +
+        ` ${DIM}(--include-all keeps them, --selector overrides)${RESET}`,
+    );
     for (const story of result.skipped) {
       lines.push(`  ${DIM}- ${story.id} — ${story.notes.join("; ")}${RESET}`);
     }
@@ -701,11 +699,13 @@ export function formatStoryScaffoldResult(result: StoryScaffoldResult): string {
     // Loud, because the failure mode is a baseline that looks fine and is wrong.
     lines.push(
       "",
-      `${YELLOW}warning:${RESET} ${result.unreadableStylesheets.length} stylesheet(s) could not be read`
-      + ` and could not be re-fetched, so the gallery may render differently from the page:`,
+      `${YELLOW}warning:${RESET} ${result.unreadableStylesheets.length} stylesheet(s) could not be read` +
+        ` and could not be re-fetched, so the gallery may render differently from the page:`,
     );
     for (const href of result.unreadableStylesheets) lines.push(`  - ${href}`);
-    lines.push(`  ${DIM}Inline the CSS into the page, or serve it somewhere this can GET it, before trusting baselines.${RESET}`);
+    lines.push(
+      `  ${DIM}Inline the CSS into the page, or serve it somewhere this can GET it, before trusting baselines.${RESET}`,
+    );
   }
   lines.push(
     "",
@@ -718,7 +718,8 @@ export function formatStoryScaffoldResult(result: StoryScaffoldResult): string {
       `     ${DIM}vlmkit check story ${story.id} --gallery "${galleryUrl}" --threshold ${story.threshold}${RESET}`,
     );
   }
-  if (result.stories.length > 3) lines.push(`     ${DIM}… ${result.stories.length - 3} more in ${result.storiesPath}${RESET}`);
+  if (result.stories.length > 3)
+    lines.push(`     ${DIM}… ${result.stories.length - 3} more in ${result.storiesPath}${RESET}`);
   lines.push(
     `  3. Record the set so CI runs it and the ids stop drifting:`,
     `     ${DIM}merge the "pages" array below into vlmkit.gates.json${RESET}`,
@@ -793,15 +794,16 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log(formatStoryScaffoldResult(result));
   if (result.stories.length === 0) {
     console.error(
-      "\nNo stories written. Pass --selector <.class> to name components explicitly,"
-      + " or --include-all to see what discovery rejected.",
+      "\nNo stories written. Pass --selector <.class> to name components explicitly," +
+        " or --include-all to see what discovery rejected.",
     );
     process.exitCode = 1;
   }
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "build-gallery"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "build-gallery" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

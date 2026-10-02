@@ -235,11 +235,11 @@ async function main(): Promise<void> {
     // flipbook's HTML cannot go — a PR comment.
     if (imageFormatForPath(parsed.out) === "webp") {
       throw new UsageError(
-        "--animated writes APNG, so the output cannot be .webp.\n"
-        + "  Animated WebP needs libwebp's animation encoder, which `@jsquash/webp` does not\n"
-        + "  expose and `sharp` would cost 29 MB for (see packages/vlmkit-core/src/webp.ts).\n"
-        + "  Use a .png name — APNG plays in browsers and in GitHub comments, and a viewer\n"
-        + "  without APNG support shows frame 0.",
+        "--animated writes APNG, so the output cannot be .webp.\n" +
+          "  Animated WebP needs libwebp's animation encoder, which `@jsquash/webp` does not\n" +
+          "  expose and `sharp` would cost 29 MB for (see packages/vlmkit-core/src/webp.ts).\n" +
+          "  Use a .png name — APNG plays in browsers and in GitHub comments, and a viewer\n" +
+          "  without APNG support shows frame 0.",
       );
     }
     const sizes = new Set(frames.map((f) => `${f.width}x${f.height}`));
@@ -247,8 +247,8 @@ async function main(): Promise<void> {
       // A still sheet tolerates this by sizing the cell to the largest frame. An animation cannot:
       // the canvas is one size, so a mixed sequence is a wrong glob rather than a layout choice.
       throw new UsageError(
-        `--animated needs every frame the same size, got ${[...sizes].join(", ")}.\n`
-        + "  Drop --animated for a still sheet, which places mixed sizes top-left in a uniform cell.",
+        `--animated needs every frame the same size, got ${[...sizes].join(", ")}.\n` +
+          "  Drop --animated for a still sheet, which places mixed sizes top-left in a uniform cell.",
       );
     }
     const bytes = encodeApng(frames, {
@@ -260,9 +260,13 @@ async function main(): Promise<void> {
     const delay = parsed.delayMs ?? 200;
     console.log();
     console.log(`${BOLD}${CYAN}Animated strip${RESET}`);
-    console.log(`  ${DIM}Frames: ${frames.length} at ${delay}ms each (${(frames.length * delay / 1000).toFixed(1)}s per loop)${RESET}`);
+    console.log(
+      `  ${DIM}Frames: ${frames.length} at ${delay}ms each (${((frames.length * delay) / 1000).toFixed(1)}s per loop)${RESET}`,
+    );
     console.log(`  ${DIM}Canvas: ${frames[0]!.width}x${frames[0]!.height} apng${RESET}`);
-    console.log(`  ${DIM}Loops:  ${parsed.loops === undefined || parsed.loops === 0 ? "forever" : parsed.loops}${RESET}`);
+    console.log(
+      `  ${DIM}Loops:  ${parsed.loops === undefined || parsed.loops === 0 ? "forever" : parsed.loops}${RESET}`,
+    );
     console.log(`  ${GREEN}Wrote ${parsed.out}${RESET} ${DIM}(${(bytes.length / 1024).toFixed(1)} KB)${RESET}`);
     console.log(`  ${DIM}Plays in a browser and in a GitHub comment; other viewers show frame 0.${RESET}`);
     return;
@@ -285,7 +289,10 @@ async function main(): Promise<void> {
   // The extension picks the format, so `--out strip.webp` needs no second flag.
   const format = imageFormatForPath(parsed.out);
   if (format === "webp") {
-    await writeFile(resolve(parsed.out), await encodeWebp(sheet, parsed.quality === undefined ? {} : { quality: parsed.quality }));
+    await writeFile(
+      resolve(parsed.out),
+      await encodeWebp(sheet, parsed.quality === undefined ? {} : { quality: parsed.quality }),
+    );
   } else {
     await encodePng(resolve(parsed.out), sheet);
   }
@@ -293,7 +300,9 @@ async function main(): Promise<void> {
   const sizes = new Set(frames.map((f) => `${f.width}x${f.height}`));
   console.log();
   console.log(`${BOLD}${CYAN}Strip${RESET}`);
-  console.log(`  ${DIM}Frames: ${frames.length} (${sheet.layout.rows} row(s) x ${sheet.layout.columns} column(s))${RESET}`);
+  console.log(
+    `  ${DIM}Frames: ${frames.length} (${sheet.layout.rows} row(s) x ${sheet.layout.columns} column(s))${RESET}`,
+  );
   console.log(`  ${DIM}Sheet:  ${sheet.width}x${sheet.height} ${format}${RESET}`);
   if (sheet.layout.scale !== 1) {
     console.log(`  ${DIM}Scale:  1/${sheet.layout.scale} to fit ${cap}px${RESET}`);

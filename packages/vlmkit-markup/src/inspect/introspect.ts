@@ -9,11 +9,7 @@ import type {
   PageSpec,
 } from "@mizchi/vlmkit-core/types.ts";
 import { LANDMARK_ROLES, INTERACTIVE_ROLES } from "@mizchi/vlmkit-core/a11y-semantic.ts";
-import {
-  checkSpecInvariant,
-  countNodeAriaRelationshipRefs,
-  type SpecPageData,
-} from "./spec-checks.ts";
+import { checkSpecInvariant, countNodeAriaRelationshipRefs, type SpecPageData } from "./spec-checks.ts";
 import {
   readContrastSidecars,
   readResponsiveSidecars,
@@ -47,12 +43,7 @@ export async function introspect(snapshotDir: string): Promise<IntrospectResult>
     const raw = JSON.parse(await readFile(join(snapshotDir, file), "utf-8"));
     if (!raw) continue;
 
-    pages.push(introspectPage(
-      testId,
-      raw as A11yNode,
-      contrastSummaries.get(testId),
-      responsiveSummaries.get(testId)
-    ));
+    pages.push(introspectPage(testId, raw as A11yNode, contrastSummaries.get(testId), responsiveSummaries.get(testId)));
   }
 
   return { generatedAt: new Date().toISOString(), pages };
@@ -62,7 +53,7 @@ function introspectPage(
   testId: string,
   tree: A11yNode,
   contrastSummary?: ContrastSidecarSummary,
-  responsiveSummary?: ResponsiveSidecarSummary
+  responsiveSummary?: ResponsiveSidecarSummary,
 ): PageIntrospection {
   const landmarks: { role: string; name: string }[] = [];
   const interactiveElements: { role: string; name: string; hasLabel: boolean }[] = [];
@@ -109,7 +100,7 @@ function introspectPage(
     ariaRelationshipCount,
     !!contrastSummary,
     !!responsiveSummary,
-    unlabeledCount
+    unlabeledCount,
   );
 
   // Auto-generate page description
@@ -146,7 +137,7 @@ function introspectPage(
 function generateDescription(
   testId: string,
   landmarks: { role: string; name: string }[],
-  interactive: { role: string; name: string; hasLabel: boolean }[]
+  interactive: { role: string; name: string; hasLabel: boolean }[],
 ): string {
   const parts = [`Page "${testId}"`];
   if (landmarks.length > 0) {
@@ -169,7 +160,7 @@ function generateInvariants(
   ariaRelationshipCount: number,
   hasContrastData: boolean,
   hasResponsiveData: boolean,
-  unlabeledCount: number
+  unlabeledCount: number,
 ): SpecInvariant[] {
   const invariants: SpecInvariant[] = [];
 
@@ -274,7 +265,7 @@ export function verifySpec(
   spec: UiSpec,
   pageData: Map<string, SpecPageData>,
   changedFiles?: string[],
-  depEdges?: Map<string, string[]>
+  depEdges?: Map<string, string[]>,
 ): SpecVerifyResult {
   const results: SpecPageResult[] = [];
 
@@ -328,19 +319,12 @@ export function verifySpec(
   return { results };
 }
 
-function checkInvariant(
-  inv: SpecInvariant,
-  data: SpecPageData
-): CheckedInvariant {
+function checkInvariant(inv: SpecInvariant, data: SpecPageData): CheckedInvariant {
   const result = checkSpecInvariant(inv, data);
   return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
 }
 
-function isAffectedByChanges(
-  dependsOn: string[],
-  changedFiles: string[],
-  depEdges: Map<string, string[]>
-): boolean {
+function isAffectedByChanges(dependsOn: string[], changedFiles: string[], depEdges: Map<string, string[]>): boolean {
   // Direct match
   for (const dep of dependsOn) {
     if (changedFiles.some((f) => f.includes(dep))) return true;

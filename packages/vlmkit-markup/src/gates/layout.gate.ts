@@ -86,7 +86,14 @@ machine-checkable contract (DOM math, no VLM).`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
     {
       name: "contract",
       placeholder: "file",
@@ -117,7 +124,9 @@ machine-checkable contract (DOM math, no VLM).`,
       // ENOENT keeps its own handling — `handleCliError` renders it as
       // "file not found: <path>", which is better than anything said here.
       if ((e as { code?: string }).code === "ENOENT") throw e;
-      throw new UsageError(`--contract ${contractPath} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+      throw new UsageError(
+        `--contract ${contractPath} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
     if (!Array.isArray(contract?.rules) || contract.rules.length === 0) {
       throw new UsageError(`--contract ${contractPath}: "rules" must be a non-empty array`);
@@ -158,8 +167,7 @@ machine-checkable contract (DOM math, no VLM).`,
     return findings;
   },
   format: formatLayoutReport,
-  headline: (report) =>
-    `${report.done ? "SATISFIED" : "VIOLATED"} (${report.passed}/${report.total} rules)`,
+  headline: (report) => `${report.done ? "SATISFIED" : "VIOLATED"} (${report.passed}/${report.total} rules)`,
   // See the module docstring: runLayoutVerify already appends its own entry.
   ledger: () => null,
 });

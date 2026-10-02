@@ -31,49 +31,77 @@ import { newEvaluation, problems, renderMarkdown, type Evaluation, type Run } fr
 /** The evaluation a bare run re-runs, and the one `score.test.ts` holds to the briefs. */
 export const SAVED_EVALUATION = "docs/reports/data/2026-09-30-image-gen/evaluation.json";
 
-const EXT: Record<string, string> = { "image/svg+xml": "svg", "image/jpeg": "jpg", "image/webp": "webp", "image/png": "png" };
+const EXT: Record<string, string> = {
+  "image/svg+xml": "svg",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/png": "png",
+};
 
 async function runOne(model: string, brief: Brief, outDir: string): Promise<Run> {
   const started = Date.now();
   try {
     const client = createImageGenClient(model);
     const res = await client.generate({ prompt: brief.prompt, aspectRatio: brief.aspectRatio });
-    if (!res.images[0]) return { model, brief: brief.id, costUsd: res.costUsd, latencyMs: res.latencyMs, error: "no image in the response" };
+    if (!res.images[0])
+      return {
+        model,
+        brief: brief.id,
+        costUsd: res.costUsd,
+        latencyMs: res.latencyMs,
+        error: "no image in the response",
+      };
     const file = `${brief.id}--${model.replace(/[/:]/g, "__")}.${EXT[res.mediaTypes[0] ?? "image/png"] ?? "png"}`;
     await writeFile(join(outDir, file), res.images[0]);
     return { model, brief: brief.id, costUsd: res.costUsd, latencyMs: res.latencyMs, file };
   } catch (e) {
-    return { model, brief: brief.id, costUsd: null, latencyMs: Date.now() - started, error: (e as Error).message.slice(0, 300) };
+    return {
+      model,
+      brief: brief.id,
+      costUsd: null,
+      latencyMs: Date.now() - started,
+      error: (e as Error).message.slice(0, 300),
+    };
   }
 }
 
 /** One sheet per brief, every model's image labelled with its id, so a scorer compares like with like. */
 async function contactSheets(ev: Evaluation, outDir: string, executablePath?: string): Promise<string[]> {
   const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
-  const media = (f: string) => ({ svg: "image/svg+xml", jpg: "image/jpeg", webp: "image/webp" })[f.split(".").pop()!] ?? "image/png";
-  return withBrowser(async (browser) => {
-    const page = await browser.newPage({ viewport: { width: 1600, height: 600 } });
-    const written: string[] = [];
-    for (const brief of Object.keys(ev.briefs)) {
-      const runs = ev.runs.filter((r) => r.brief === brief && r.file).sort((a, b) => a.model.localeCompare(b.model));
-      if (!runs.length) continue;
-      const tiles = await Promise.all(runs.map(async (r) => {
-        const src = `data:${media(r.file!)};base64,${(await readFile(join(outDir, r.file!))).toString("base64")}`;
-        return `<div style="background:#fff"><div style="padding:3px;background:#222;color:#ff0">${r.model}</div><img src="${src}" style="width:100%;display:block"></div>`;
-      }));
-      await page.setContent(`<body style="margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:#999;font:bold 14px sans-serif">${tiles.join("")}</body>`);
-      await page.waitForLoadState("networkidle");
-      const path = join(outDir, `sheet-${brief}.jpg`);
-      await page.screenshot({ path, fullPage: true, type: "jpeg", quality: 72 });
-      written.push(path);
-    }
-    return written;
-  }, executablePath ? { launch: { executablePath } } : {});
+  const media = (f: string) =>
+    ({ svg: "image/svg+xml", jpg: "image/jpeg", webp: "image/webp" })[f.split(".").pop()!] ?? "image/png";
+  return withBrowser(
+    async (browser) => {
+      const page = await browser.newPage({ viewport: { width: 1600, height: 600 } });
+      const written: string[] = [];
+      for (const brief of Object.keys(ev.briefs)) {
+        const runs = ev.runs.filter((r) => r.brief === brief && r.file).sort((a, b) => a.model.localeCompare(b.model));
+        if (!runs.length) continue;
+        const tiles = await Promise.all(
+          runs.map(async (r) => {
+            const src = `data:${media(r.file!)};base64,${(await readFile(join(outDir, r.file!))).toString("base64")}`;
+            return `<div style="background:#fff"><div style="padding:3px;background:#222;color:#ff0">${r.model}</div><img src="${src}" style="width:100%;display:block"></div>`;
+          }),
+        );
+        await page.setContent(
+          `<body style="margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:#999;font:bold 14px sans-serif">${tiles.join("")}</body>`,
+        );
+        await page.waitForLoadState("networkidle");
+        const path = join(outDir, `sheet-${brief}.jpg`);
+        await page.screenshot({ path, fullPage: true, type: "jpeg", quality: 72 });
+        written.push(path);
+      }
+      return written;
+    },
+    executablePath ? { launch: { executablePath } } : {},
+  );
 }
 
 async function list(): Promise<void> {
   const key = process.env.OPENROUTER_API_KEY;
-  const res = await fetch("https://openrouter.ai/api/v1/images/models", { headers: key ? { Authorization: `Bearer ${key}` } : {} });
+  const res = await fetch("https://openrouter.ai/api/v1/images/models", {
+    headers: key ? { Authorization: `Bearer ${key}` } : {},
+  });
   if (!res.ok) throw new Error(`images/models: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const { data } = (await res.json()) as { data: { id: string; supported_parameters?: Record<string, unknown> }[] };
   for (const m of data) console.log(`${m.id}  ${DIM}${Object.keys(m.supported_parameters ?? {}).join(",")}${RESET}`);
@@ -107,7 +135,8 @@ async function main(): Promise<void> {
   const wanted = getArg("briefs", "");
   const briefs = wanted ? BRIEFS.filter((b) => wanted.split(",").includes(b.id)) : BRIEFS;
   if (!briefs.length) throw new Error(`--briefs matched none of ${BRIEFS.map((b) => b.id).join(", ")}`);
-  if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is required for a run (--report needs none)");
+  if (!process.env.OPENROUTER_API_KEY)
+    throw new Error("OPENROUTER_API_KEY is required for a run (--report needs none)");
 
   const date = new Date().toISOString().slice(0, 10);
   const outDir = resolve(getArg("out", `test-results/image-gen/${date}`));
@@ -115,15 +144,21 @@ async function main(): Promise<void> {
   const jobs = models.flatMap((m) => briefs.map((b) => [m, b] as const));
   const runs: Run[] = [];
   let next = 0;
-  await Promise.all(Array.from({ length: getIntArg("concurrency", 8, { min: 1, max: 32 }) }, async () => {
-    while (next < jobs.length) {
-      const [model, brief] = jobs[next++];
-      const run = await runOne(model, brief, outDir);
-      runs.push(run);
-      const cost = run.costUsd === null ? "?" : `$${run.costUsd.toFixed(3)}`;
-      console.log(run.error ? `  ${RED}✗${RESET} ${model} ${brief.id}: ${run.error}` : `  ${GREEN}✓${RESET} ${model} ${brief.id}  ${cost}  ${(run.latencyMs / 1000).toFixed(1)}s`);
-    }
-  }));
+  await Promise.all(
+    Array.from({ length: getIntArg("concurrency", 8, { min: 1, max: 32 }) }, async () => {
+      while (next < jobs.length) {
+        const [model, brief] = jobs[next++];
+        const run = await runOne(model, brief, outDir);
+        runs.push(run);
+        const cost = run.costUsd === null ? "?" : `$${run.costUsd.toFixed(3)}`;
+        console.log(
+          run.error
+            ? `  ${RED}✗${RESET} ${model} ${brief.id}: ${run.error}`
+            : `  ${GREEN}✓${RESET} ${model} ${brief.id}  ${cost}  ${(run.latencyMs / 1000).toFixed(1)}s`,
+        );
+      }
+    }),
+  );
   runs.sort((a, b) => a.model.localeCompare(b.model) || a.brief.localeCompare(b.brief));
   const ev = newEvaluation(date, runs, briefs);
   await writeFile(join(outDir, "evaluation.json"), `${JSON.stringify(ev, null, 1)}\n`);
@@ -134,7 +169,9 @@ async function main(): Promise<void> {
     try {
       sheets = await contactSheets(ev, outDir, getArg("chromium", "") || undefined);
     } catch (e) {
-      console.error(`  ${YELLOW}contact sheets skipped: ${(e as Error).message.split("\n")[0]} (try --chromium <path>)${RESET}`);
+      console.error(
+        `  ${YELLOW}contact sheets skipped: ${(e as Error).message.split("\n")[0]} (try --chromium <path>)${RESET}`,
+      );
     }
   }
   const spent = runs.reduce((a, r) => a + (r.costUsd ?? 0), 0);

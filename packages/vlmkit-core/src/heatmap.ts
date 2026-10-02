@@ -1,4 +1,17 @@
-import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor, DiffRegionColorSample, DiffRegionColorPair, DiffIgnoreRegion, DiffIgnoredRegionReport, DiffMaskSummary } from "./types.ts";
+import type {
+  VrtDiff,
+  VrtSnapshot,
+  DiffRegion,
+  DiffRegionType,
+  DiffReport,
+  ShiftRegion,
+  DiffRegionColor,
+  DiffRegionColorSample,
+  DiffRegionColorPair,
+  DiffIgnoreRegion,
+  DiffIgnoredRegionReport,
+  DiffMaskSummary,
+} from "./types.ts";
 import { type PngData, cropImage, decodePng, encodePng } from "./png-utils.ts";
 import { estimateRegionShift } from "./region-shift.ts";
 
@@ -30,15 +43,11 @@ const IGNORED_HEATMAP_RGB: readonly [number, number, number] = [170, 200, 255];
 export function parseIgnoreRegionSpec(value: string): DiffIgnoreRegion {
   const match = /^\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*[xX*]\s*(\d+)\s*$/.exec(value);
   if (!match) {
-    throw new Error(
-      `invalid ignore region "${value}" — expected "<x>,<y>,<w>x<h>", e.g. "0,300,640x60"`,
-    );
+    throw new Error(`invalid ignore region "${value}" — expected "<x>,<y>,<w>x<h>", e.g. "0,300,640x60"`);
   }
   const [x, y, width, height] = match.slice(1, 5).map(Number) as [number, number, number, number];
   if (width <= 0 || height <= 0) {
-    throw new Error(
-      `invalid ignore region "${value}" — width and height must be positive, got ${width}x${height}`,
-    );
+    throw new Error(`invalid ignore region "${value}" — width and height must be positive, got ${width}x${height}`);
   }
   return { x, y, width, height };
 }
@@ -145,8 +154,7 @@ async function runPixelDiff(
     const commonW = Math.min(baseline.width, current.width);
     const commonH = Math.min(baseline.height, current.height);
     overflowPixels =
-      Math.max(baseline.width, current.width) * Math.max(baseline.height, current.height)
-      - commonW * commonH;
+      Math.max(baseline.width, current.width) * Math.max(baseline.height, current.height) - commonW * commonH;
     resizedBaseline = cropImage(baseline, commonW, commonH);
     resizedCurrent = cropImage(current, commonW, commonH);
   }
@@ -156,9 +164,7 @@ async function runPixelDiff(
   const diffOutput = new Uint8Array(width * height * 4);
   const threshold = opts.threshold ?? 0.1;
 
-  const rawDiffPixels = pixelmatch(
-    resizedBaseline.data, resizedCurrent.data, diffOutput, width, height, { threshold },
-  );
+  const rawDiffPixels = pixelmatch(resizedBaseline.data, resizedCurrent.data, diffOutput, width, height, { threshold });
 
   // Masks are applied to the *compared* area only. Overflow from a size mismatch
   // is counted whole into both numerator and denominator and is not maskable —
@@ -166,9 +172,10 @@ async function runPixelDiff(
   // that no rect inside the common 640x360 box can reach. Say so rather than
   // pretend, because "I ignored the bottom strip and the ratio didn't move" has
   // exactly this cause.
-  const mask = opts.ignoreRegions && opts.ignoreRegions.length > 0
-    ? applyIgnoreRegions(diffOutput, width, height, opts.ignoreRegions)
-    : undefined;
+  const mask =
+    opts.ignoreRegions && opts.ignoreRegions.length > 0
+      ? applyIgnoreRegions(diffOutput, width, height, opts.ignoreRegions)
+      : undefined;
 
   const ignoredPixels = mask?.ignoredPixels ?? 0;
   const totalPixels = width * height - ignoredPixels + overflowPixels;
@@ -184,8 +191,15 @@ async function runPixelDiff(
   }
 
   return {
-    diffOutput, width, height, diffPixels, totalPixels, threshold,
-    resizedBaseline, resizedCurrent, heatmapPath,
+    diffOutput,
+    width,
+    height,
+    diffPixels,
+    totalPixels,
+    threshold,
+    resizedBaseline,
+    resizedCurrent,
+    heatmapPath,
     ...(mask ? { mask } : {}),
   };
 }
@@ -224,7 +238,7 @@ export async function compareScreenshots(
      * `DiffMaskSummary` for the effect on `diffRatio`.
      */
     ignoreRegions?: DiffIgnoreRegion[];
-  } = {}
+  } = {},
 ): Promise<VrtDiff | null> {
   if (!snapshot.baselinePath) return null;
 
@@ -279,7 +293,7 @@ function detectDiffRegions(
   diffData: Uint8Array,
   width: number,
   height: number,
-  cellSize: number = adaptiveRegionCellSize(width, height)
+  cellSize: number = adaptiveRegionCellSize(width, height),
 ): DiffRegion[] {
   const cols = Math.ceil(width / cellSize);
   const rows = Math.ceil(height / cellSize);
@@ -361,22 +375,14 @@ function detectDiffRegions(
   return regions;
 }
 
-function attachRegionColorSamples(
-  regions: DiffRegion[],
-  baseline: PngData,
-  current: PngData,
-): void {
+function attachRegionColorSamples(regions: DiffRegion[], baseline: PngData, current: PngData): void {
   for (const region of regions) {
     const sample = sampleRegionColorSample(baseline, current, region);
     if (sample) region.colorSample = sample;
   }
 }
 
-function attachRegionShiftEstimates(
-  regions: DiffRegion[],
-  baseline: PngData,
-  current: PngData,
-): void {
+function attachRegionShiftEstimates(regions: DiffRegion[], baseline: PngData, current: PngData): void {
   for (const region of regions) {
     if (region.regionType === "edge") continue;
     const shift = estimateRegionShift(baseline, current, region);
@@ -461,14 +467,22 @@ export function sampleRegionColorSample(
       const cr = current.data[ci]!;
       const cg = current.data[ci + 1]!;
       const cb = current.data[ci + 2]!;
-      all.br += br; all.bg += bg; all.bb += bb;
-      all.cr += cr; all.cg += cg; all.cb += cb;
+      all.br += br;
+      all.bg += bg;
+      all.bb += bb;
+      all.cr += cr;
+      all.cg += cg;
+      all.cb += cb;
       all.n++;
 
       const delta = (Math.abs(br - cr) + Math.abs(bg - cg) + Math.abs(bb - cb)) / 3;
       if (delta > CHANGED_PIXEL_DELTA) {
-        changed.br += br; changed.bg += bg; changed.bb += bb;
-        changed.cr += cr; changed.cg += cg; changed.cb += cb;
+        changed.br += br;
+        changed.bg += bg;
+        changed.bb += bb;
+        changed.cr += cr;
+        changed.cg += cg;
+        changed.cb += cb;
         changed.n++;
         if (delta > peakDelta) {
           peakDelta = delta;
@@ -487,11 +501,11 @@ export function sampleRegionColorSample(
   // The peak only adds signal when the mean is unreliable — i.e. the change
   // is sparse and the peak names a different color than the averaged-out mean.
   if (
-    changed.n > 0
-    && peakBaseline
-    && peakCurrent
-    && changed.n < all.n * SPARSE_CHANGE_RATIO
-    && (peakBaseline.hex !== sample.baseline.hex || peakCurrent.hex !== sample.current.hex)
+    changed.n > 0 &&
+    peakBaseline &&
+    peakCurrent &&
+    changed.n < all.n * SPARSE_CHANGE_RATIO &&
+    (peakBaseline.hex !== sample.baseline.hex || peakCurrent.hex !== sample.current.hex)
   ) {
     sample.peak = {
       baseline: peakBaseline,
@@ -614,20 +628,20 @@ export function detectBandShifts(
     // Variance check — flat bands have no signal.
     let mean = 0;
     for (let y = yStart; y < yEnd; y++) mean += profile1[y]!;
-    mean /= (yEnd - yStart);
+    mean /= yEnd - yStart;
     let variance = 0;
     for (let y = yStart; y < yEnd; y++) {
       const d = profile1[y]! - mean;
       variance += d * d;
     }
-    variance /= (yEnd - yStart);
+    variance /= yEnd - yStart;
     if (variance < 5) continue; // empirically: flat background
 
     // Mean-subtract both profiles so the cross-correlation magnitude scales
     // with actual structure rather than background brightness.
     let mean2 = 0;
     for (let y = yStart; y < yEnd; y++) mean2 += profile2[y]!;
-    mean2 /= (yEnd - yStart);
+    mean2 /= yEnd - yStart;
 
     let bestOffset = 0;
     let bestCorr = -Infinity;
@@ -656,9 +670,8 @@ export function detectBandShifts(
 
     // Confidence = peak sharpness relative to the second-best alignment.
     // A clean shift has best ≫ second-best; noise has best ≈ second-best.
-    const confidence = bestCorr > 0 && secondBestCorr > 0
-      ? Math.min(1, Math.max(0, (bestCorr - secondBestCorr) / bestCorr))
-      : 0;
+    const confidence =
+      bestCorr > 0 && secondBestCorr > 0 ? Math.min(1, Math.max(0, (bestCorr - secondBestCorr) / bestCorr)) : 0;
 
     if (bestOffset !== 0 && bestCorr > zeroOffsetCorr && confidence >= minConfidence) {
       regions.push({ yStart, yEnd, shift: bestOffset, confidence: Number(confidence.toFixed(3)) });
@@ -777,15 +790,17 @@ export async function generateDiffReport(
     globalShift = detectGlobalShift(r.resizedBaseline, r.resizedCurrent);
     if (globalShift !== 0) {
       compensated = compensatedDiffCount(
-        r.resizedBaseline.data, r.resizedCurrent.data,
-        r.width, r.height, globalShift, r.threshold,
+        r.resizedBaseline.data,
+        r.resizedCurrent.data,
+        r.width,
+        r.height,
+        globalShift,
+        r.threshold,
       );
       // Prefer per-band shifts when they reveal locally-varying offsets.
       // Falls back to the global single-band region if no band locks on.
       const bands = detectBandShifts(r.resizedBaseline, r.resizedCurrent);
-      shiftRegions = bands.length > 0
-        ? bands
-        : [{ yStart: 0, yEnd: r.height, shift: globalShift }];
+      shiftRegions = bands.length > 0 ? bands : [{ yStart: 0, yEnd: r.height, shift: globalShift }];
     }
   }
 
@@ -813,7 +828,7 @@ export async function generateDiffReport(
  */
 export function detectWhiteout(
   data: PngData,
-  opts: { threshold?: number } = {}
+  opts: { threshold?: number } = {},
 ): { isWhiteout: boolean; whiteRatio: number } {
   const threshold = opts.threshold ?? 0.95;
   const { width, height, data: pixels } = data;
@@ -840,7 +855,7 @@ export function detectWhiteout(
  */
 export function detectEmptyContent(
   data: PngData,
-  opts: { threshold?: number } = {}
+  opts: { threshold?: number } = {},
 ): { isEmpty: boolean; uniqueColors: number } {
   const threshold = opts.threshold ?? 8;
   const colorSet = new Set<number>();
@@ -851,8 +866,7 @@ export function detectEmptyContent(
   const stride = Math.max(1, Math.floor(total / 10000));
   for (let i = 0; i < total; i += stride) {
     const offset = i * 4;
-    const color =
-      (pixels[offset] << 16) | (pixels[offset + 1] << 8) | pixels[offset + 2];
+    const color = (pixels[offset] << 16) | (pixels[offset + 1] << 8) | pixels[offset + 2];
     colorSet.add(color);
   }
 

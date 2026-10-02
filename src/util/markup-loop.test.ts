@@ -75,7 +75,10 @@ describe("markup-loop drop-in config", () => {
     assert.match(commands.generate.display, /--helper-import \.\/support\/goto-app/);
     assert.match(commands.generate.display, /--max-tokens 4096/);
     assert.match(commands.generate.display, /--runtime-gate-runs 2/);
-    assert.match(commands.generate.display, /--gate-command "pnpm exec playwright test --config playwright\.config\.ts tests\/vlmkit\/settings\.spec\.ts --update-snapshots"/);
+    assert.match(
+      commands.generate.display,
+      /--gate-command "pnpm exec playwright test --config playwright\.config\.ts tests\/vlmkit\/settings\.spec\.ts --update-snapshots"/,
+    );
   });
 
   it("checks the generated helper because missing glue breaks generated tests", async () => {
@@ -299,10 +302,7 @@ describe("runMarkupLoopCli", () => {
     const configPath = join(cwd, "markup-loop.json");
     assert.equal(await runMarkupLoopCli(["init", "--config", configPath]), 0);
     const config = await loadMarkupLoopConfig(configPath);
-    assert.equal(
-      resolve(markupLoopRoot(configPath), config.observationsFile),
-      join(cwd, config.observationsFile),
-    );
+    assert.equal(resolve(markupLoopRoot(configPath), config.observationsFile), join(cwd, config.observationsFile));
     await rm(cwd, { recursive: true, force: true });
   });
 

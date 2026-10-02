@@ -7,16 +7,18 @@ test("summarizeVlmRegionDiff keeps concise paint change handoff rows", () => {
     model: "anthropic/example",
     usage: { cost: 0.01 },
     summary: "Blocked badges changed color.",
-    changes: [{
-      selector: ".pill",
-      selectorHint: "Release detail badge",
-      property: "background-color",
-      from: "#fee",
-      to: "#eff",
-      confidence: "high",
-      region: "detail badge",
-      description: "Badge changed from red to teal.",
-    }],
+    changes: [
+      {
+        selector: ".pill",
+        selectorHint: "Release detail badge",
+        property: "background-color",
+        from: "#fee",
+        to: "#eff",
+        confidence: "high",
+        region: "detail badge",
+        description: "Badge changed from red to teal.",
+      },
+    ],
   });
 
   assert.equal(summary.available, true);

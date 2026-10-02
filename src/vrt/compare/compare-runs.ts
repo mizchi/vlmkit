@@ -67,7 +67,10 @@ export function compareRuns(a: CrReport, b: CrReport): CrCompareResult {
   const byVariant = new Map<string, CrViewportDelta[]>();
   const onlyInA: string[] = [];
   const onlyInB: string[] = [];
-  let improved = 0, regressed = 0, unchanged = 0, netDelta = 0;
+  let improved = 0,
+    regressed = 0,
+    unchanged = 0,
+    netDelta = 0;
 
   const allKeys = new Set<string>([...mapA.keys(), ...mapB.keys()]);
   for (const k of allKeys) {
@@ -156,11 +159,16 @@ function formatPct(ratio: number, signed = false): string {
 
 function labelStatus(status: CrViewportDelta["status"]): string {
   switch (status) {
-    case "improved": return "IMPROVED";
-    case "regressed": return "REGRESSED";
-    case "unchanged": return "UNCHANGED";
-    case "added": return "ADDED";
-    case "removed": return "REMOVED";
+    case "improved":
+      return "IMPROVED";
+    case "regressed":
+      return "REGRESSED";
+    case "unchanged":
+      return "UNCHANGED";
+    case "added":
+      return "ADDED";
+    case "removed":
+      return "REMOVED";
   }
 }
 
@@ -170,11 +178,7 @@ export interface CrFormatOptions {
   labelB?: string;
 }
 
-export function formatCompareRunsMarkdown(
-  a: CrReport,
-  b: CrReport,
-  options: CrFormatOptions = {},
-): string {
+export function formatCompareRunsMarkdown(a: CrReport, b: CrReport, options: CrFormatOptions = {}): string {
   const cr = compareRuns(a, b);
   const labelA = options.labelA ?? "A";
   const labelB = options.labelB ?? "B";
@@ -192,12 +196,11 @@ export function formatCompareRunsMarkdown(
     lines.push(`| Viewport | ${labelA} | ${labelB} | Δ | Status | Category change |`);
     lines.push("|---|---|---|---|---|---|");
     for (const row of rows) {
-      const catChange = row.categoryBefore || row.categoryAfter
-        ? `${row.categoryBefore ?? "-"} → ${row.categoryAfter ?? "-"}`
-        : "-";
+      const catChange =
+        row.categoryBefore || row.categoryAfter ? `${row.categoryBefore ?? "-"} → ${row.categoryAfter ?? "-"}` : "-";
       lines.push(
         `| \`${row.viewport}\` | ${formatPct(row.beforeRatio)} | ${formatPct(row.afterRatio)} ` +
-        `| ${formatPct(row.delta, true)} | ${labelStatus(row.status)} | ${catChange} |`,
+          `| ${formatPct(row.delta, true)} | ${labelStatus(row.status)} | ${catChange} |`,
       );
     }
     lines.push("");

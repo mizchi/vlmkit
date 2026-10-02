@@ -92,10 +92,16 @@ describe("@mizchi/vlmkit-markup/rules — the deterministic layer", () => {
     // does not excuse them. A single isolated one would be exempt, which is correct and
     // would make this assertion about the exception rather than about the floor.
     assert.equal(rules.requiredTouchSide("AA"), 24);
-    assert.equal(rules.analyzeA11yTouchSamples([
-      { path: ".x", tag: "button", text: "x", bbox: { x: 0, y: 0, width: 20, height: 20 } },
-      { path: ".y", tag: "button", text: "y", bbox: { x: 20, y: 0, width: 20, height: 20 } },
-    ], "AA").length, 2);
+    assert.equal(
+      rules.analyzeA11yTouchSamples(
+        [
+          { path: ".x", tag: "button", text: "x", bbox: { x: 0, y: 0, width: 20, height: 20 } },
+          { path: ".y", tag: "button", text: "y", bbox: { x: 20, y: 0, width: 20, height: 20 } },
+        ],
+        "AA",
+      ).length,
+      2,
+    );
   });
 });
 

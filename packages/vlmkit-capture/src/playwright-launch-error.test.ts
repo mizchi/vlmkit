@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  formatPlaywrightLaunchError,
-  isPlaywrightSandboxRestrictionError,
-} from "./playwright-launch-error.ts";
+import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "./playwright-launch-error.ts";
 
 const SANDBOX_ERROR = `browserType.launch: Target page, context or browser has been closed
 Browser logs:
@@ -12,26 +9,19 @@ Browser logs:
 
 describe("isPlaywrightSandboxRestrictionError", () => {
   it("detects known macOS sandbox launch failures", () => {
-    assert.equal(
-      isPlaywrightSandboxRestrictionError(new Error(SANDBOX_ERROR)),
-      true,
-    );
+    assert.equal(isPlaywrightSandboxRestrictionError(new Error(SANDBOX_ERROR)), true);
   });
 
   it("does not classify unrelated Playwright errors as sandbox restrictions", () => {
-    assert.equal(
-      isPlaywrightSandboxRestrictionError(new Error("browserType.launch: Executable doesn't exist")),
-      false,
-    );
+    assert.equal(isPlaywrightSandboxRestrictionError(new Error("browserType.launch: Executable doesn't exist")), false);
   });
 });
 
 describe("formatPlaywrightLaunchError", () => {
   it("formats a user-facing sandbox explanation", () => {
-    const message = formatPlaywrightLaunchError(
-      new Error(SANDBOX_ERROR),
-      { commandHint: "rerun outside the Codex sandbox or in CI" },
-    );
+    const message = formatPlaywrightLaunchError(new Error(SANDBOX_ERROR), {
+      commandHint: "rerun outside the Codex sandbox or in CI",
+    });
 
     assert.match(message, /Codex\/macOS sandbox restriction/i);
     assert.match(message, /Chromium itself is likely fine/i);
@@ -47,14 +37,10 @@ describe("formatPlaywrightLaunchError", () => {
   });
 
   it("does not wrap an already formatted sandbox explanation again", () => {
-    const formatted = formatPlaywrightLaunchError(
-      new Error(SANDBOX_ERROR),
-      { commandHint: "in your local terminal or in CI" },
-    );
+    const formatted = formatPlaywrightLaunchError(new Error(SANDBOX_ERROR), {
+      commandHint: "in your local terminal or in CI",
+    });
 
-    assert.equal(
-      formatPlaywrightLaunchError(new Error(formatted)),
-      formatted,
-    );
+    assert.equal(formatPlaywrightLaunchError(new Error(formatted)), formatted);
   });
 });

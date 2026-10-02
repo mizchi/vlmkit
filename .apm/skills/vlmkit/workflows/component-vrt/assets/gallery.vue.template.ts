@@ -10,16 +10,11 @@
 import { createApp, h, type App, type Component } from "vue";
 
 /** Adjust to your layout. `.vue` single-file stories are one story each. */
-const modules = import.meta.glob<Record<string, unknown>>(
-  "../../components/**/*.story.{ts,js,vue}",
-  { eager: true },
-);
+const modules = import.meta.glob<Record<string, unknown>>("../../components/**/*.story.{ts,js,vue}", { eager: true });
 
 const stories = new Map<string, Component>();
 for (const [path, mod] of Object.entries(modules)) {
-  const id = path
-    .replace(/^.*?\/components\//, "components/")
-    .replace(/\.story\.(?:[jt]s|vue)$/, "");
+  const id = path.replace(/^.*?\/components\//, "components/").replace(/\.story\.(?:[jt]s|vue)$/, "");
   if (path.endsWith(".vue")) {
     // "A single-file-component story is one story, addressed by its path alone
     // (its default export)" — the spec's grammar.

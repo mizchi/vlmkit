@@ -20,11 +20,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
-import {
-  VLMKIT_IGNORE_ENTRIES,
-  isGitIgnored,
-  isGitRepo,
-} from "@mizchi/vlmkit-core/run-ledger.ts";
+import { VLMKIT_IGNORE_ENTRIES, isGitIgnored, isGitRepo } from "@mizchi/vlmkit-core/run-ledger.ts";
 import {
   GATE_CONFIG_FILENAMES,
   type GateConfig,
@@ -37,14 +33,7 @@ import {
 import type { RuleSettings } from "@mizchi/vlmkit-core/plugin/rules.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { formatWebServerPlan, withWebServer } from "./web-server.ts";
-import {
-  type BatchSummary,
-  formatBatchSummary,
-  parseShard,
-  resolvePages,
-  runJobs,
-  shardPages,
-} from "./batch-cli.ts";
+import { type BatchSummary, formatBatchSummary, parseShard, resolvePages, runJobs, shardPages } from "./batch-cli.ts";
 
 export function findGateConfig(cwd = process.cwd()): string | null {
   for (const name of GATE_CONFIG_FILENAMES) {
@@ -58,8 +47,8 @@ async function loadConfig(explicit?: string): Promise<{ path: string; config: Ga
   const path = explicit ? resolve(explicit) : findGateConfig();
   if (!path) {
     throw new UsageError(
-      `No gate config found (looked for ${GATE_CONFIG_FILENAMES.join(", ")}).`
-      + ` Create one with: vlmkit gates init --pages "routes/**/*.html"`,
+      `No gate config found (looked for ${GATE_CONFIG_FILENAMES.join(", ")}).` +
+        ` Create one with: vlmkit gates init --pages "routes/**/*.html"`,
     );
   }
   if (!existsSync(path)) throw new UsageError(`Gate config not found: ${path}`);
@@ -89,8 +78,8 @@ export async function expandPlanSources(plan: GatePlan, baseDir?: string): Promi
     const files = expansions.get(job.source)!;
     if (files.length === 0) {
       throw new UsageError(
-        `Page "${job.pageId}": source matched no files: ${job.source}`
-        + ` — fix the pattern or remove the entry rather than letting the gate run on nothing.`,
+        `Page "${job.pageId}": source matched no files: ${job.source}` +
+          ` — fix the pattern or remove the entry rather than letting the gate run on nothing.`,
       );
     }
     for (const file of files) {
@@ -126,14 +115,15 @@ export function formatPlan(plan: GatePlan, configPath: string): string {
       current = job.pageId;
       lines.push(`${BOLD}${current}${RESET}${job.source === current ? "" : ` ${DIM}${job.source}${RESET}`}`);
     }
-    const suffix = job.appliedSuppressions.length > 0
-      ? ` ${YELLOW}[+${job.appliedSuppressions.length} suppression]${RESET}`
-      : "";
+    const suffix =
+      job.appliedSuppressions.length > 0 ? ` ${YELLOW}[+${job.appliedSuppressions.length} suppression]${RESET}` : "";
     lines.push(`  vlmkit ${job.gate} ${job.source}${suffix}`);
   }
   if (plan.expired.length > 0) {
     lines.push("");
-    lines.push(`${RED}${plan.expired.length} expired suppression(s) NOT applied${RESET} ${DIM}(see: vlmkit gates suppressions)${RESET}`);
+    lines.push(
+      `${RED}${plan.expired.length} expired suppression(s) NOT applied${RESET} ${DIM}(see: vlmkit gates suppressions)${RESET}`,
+    );
   }
   return lines.join("\n");
 }
@@ -149,20 +139,21 @@ export function formatSuppressions(suppressions: ResolvedSuppression[], soonDays
     return lines.join("\n");
   }
   lines.push(
-    `${summary.rows.length} total: ${summary.active} active, ${summary.permanent} permanent (no expiry),`
-    + ` ${summary.expired > 0 ? `${RED}${summary.expired} expired${RESET}` : "0 expired"}`
-    + `${summary.expiringSoon > 0 ? `, ${YELLOW}${summary.expiringSoon} expiring within ${soonDays}d${RESET}` : ""}`
-    + `${summary.unowned > 0 ? `, ${YELLOW}${summary.unowned} unowned${RESET}` : ""}`,
+    `${summary.rows.length} total: ${summary.active} active, ${summary.permanent} permanent (no expiry),` +
+      ` ${summary.expired > 0 ? `${RED}${summary.expired} expired${RESET}` : "0 expired"}` +
+      `${summary.expiringSoon > 0 ? `, ${YELLOW}${summary.expiringSoon} expiring within ${soonDays}d${RESET}` : ""}` +
+      `${summary.unowned > 0 ? `, ${YELLOW}${summary.unowned} unowned${RESET}` : ""}`,
   );
   lines.push("");
   for (const s of summary.rows) {
-    const state = s.status === "expired"
-      ? `${RED}EXPIRED ${-s.daysLeft!}d ago${RESET}`
-      : s.status === "permanent"
-        ? `${DIM}permanent${RESET}`
-        : (s.daysLeft ?? Infinity) <= soonDays
-          ? `${YELLOW}${s.daysLeft}d left${RESET}`
-          : `${GREEN}${s.daysLeft}d left${RESET}`;
+    const state =
+      s.status === "expired"
+        ? `${RED}EXPIRED ${-s.daysLeft!}d ago${RESET}`
+        : s.status === "permanent"
+          ? `${DIM}permanent${RESET}`
+          : (s.daysLeft ?? Infinity) <= soonDays
+            ? `${YELLOW}${s.daysLeft}d left${RESET}`
+            : `${GREEN}${s.daysLeft}d left${RESET}`;
     // `rule` entries come from the `rules` block and `suppression` entries from
     // `suppressions`; both are silencing something, and a reviewer deciding whether
     // an entry still earns its place needs to know which file section to edit.
@@ -172,9 +163,7 @@ export function formatSuppressions(suppressions: ResolvedSuppression[], soonDays
   }
   if (summary.expired > 0) {
     lines.push("");
-    lines.push(
-      `${RED}Expired suppressions are not applied${RESET} — the gate they silenced runs unmuted.`,
-    );
+    lines.push(`${RED}Expired suppressions are not applied${RESET} — the gate they silenced runs unmuted.`);
     lines.push(`${DIM}Fix the page, or renew the entry with a new expiry and a re-stated reason.${RESET}`);
   }
   return lines.join("\n");
@@ -189,14 +178,14 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
   if (expired.length === 0) return "";
   const rules = expired.filter((s) => s.kind === "rule").length;
   const lines = [
-    `${RED}${expired.length} suppression(s) expired${rules > 0 ? ` (${rules} rule setting(s))` : ""}`
-    + ` — the gate(s) below run unmuted:${RESET}`,
+    `${RED}${expired.length} suppression(s) expired${rules > 0 ? ` (${rules} rule setting(s))` : ""}` +
+      ` — the gate(s) below run unmuted:${RESET}`,
   ];
   for (const s of expired) {
     lines.push(
-      `  ${RED}x${RESET} ${s.kind === "rule" ? `${DIM}[rule]${RESET} ` : ""}`
-      + `${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`
-      + ` ${DIM}(expired ${-s.daysLeft!}d ago: ${s.reason})${RESET}`,
+      `  ${RED}x${RESET} ${s.kind === "rule" ? `${DIM}[rule]${RESET} ` : ""}` +
+        `${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}` +
+        ` ${DIM}(expired ${-s.daysLeft!}d ago: ${s.reason})${RESET}`,
     );
   }
   lines.push(`${DIM}A failure below may be this, not a new regression. See: vlmkit gates suppressions${RESET}`);
@@ -240,9 +229,9 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
  * dropping it here would turn that error into a setting that quietly does nothing
  * — the exact failure rule settings exist to remove.
  */
-export function rulesForGateFactory(
-  registry: { resolve: (argv: readonly string[]) => { gate: { id: string; rules: readonly { id: string }[] } } | null | undefined },
-): (baseGate: string, rules: RuleSettings) => RuleSettings {
+export function rulesForGateFactory(registry: {
+  resolve: (argv: readonly string[]) => { gate: { id: string; rules: readonly { id: string }[] } } | null | undefined;
+}): (baseGate: string, rules: RuleSettings) => RuleSettings {
   return (baseGate, rules) => {
     const gate = registry.resolve(baseGate.split(/\s+/).filter(Boolean))?.gate;
     if (!gate) return rules;
@@ -265,7 +254,7 @@ export function rulesForGateFactory(
 async function validateAgainstRegistry(
   plan: GatePlan,
   configPath: string,
-  registry: Awaited<ReturnType<typeof import("../gate-registry.ts")["loadGateRegistry"]>>,
+  registry: Awaited<ReturnType<(typeof import("../gate-registry.ts"))["loadGateRegistry"]>>,
 ): Promise<void> {
   const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
 
@@ -281,7 +270,9 @@ async function validateAgainstRegistry(
   const ruleProblems: string[] = [];
   const allRules: Record<string, RuleSettings[string]> = {};
   for (const job of plan.jobs) Object.assign(allRules, job.rules);
-  const qualified = Object.fromEntries(Object.entries(allRules).filter(([key]) => key.includes("/") || key.includes(".")));
+  const qualified = Object.fromEntries(
+    Object.entries(allRules).filter(([key]) => key.includes("/") || key.includes(".")),
+  );
   const bare = Object.entries(allRules).filter(([key]) => !key.includes("/") && !key.includes("."));
   ruleProblems.push(...validateRuleSettings(registry, qualified));
   for (const job of plan.jobs) {
@@ -289,8 +280,9 @@ async function validateAgainstRegistry(
     if (mine.length === 0) continue;
     const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
     ruleProblems.push(
-      ...validateRuleSettings(registry, Object.fromEntries(mine), gate)
-        .map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
+      ...validateRuleSettings(registry, Object.fromEntries(mine), gate).map(
+        (p) => `${job.pageId} / ${job.baseGate}: ${p}`,
+      ),
     );
   }
   if (ruleProblems.length > 0) {
@@ -316,28 +308,29 @@ async function validateAgainstRegistry(
       if (input.positional !== undefined || input.required !== true) continue;
       if (tokens.has(`--${input.name}`)) continue;
       missingFlags.push(
-        `${job.pageId} / ${job.baseGate}: --${input.name} is required`
-        + `${input.placeholder ? ` <${input.placeholder}>` : ""} — ${input.description}`,
+        `${job.pageId} / ${job.baseGate}: --${input.name} is required` +
+          `${input.placeholder ? ` <${input.placeholder}>` : ""} — ${input.description}`,
       );
     }
   }
   if (missingFlags.length > 0) {
     throw new UsageError(
-      `${configPath}: ${missingFlags.length} gate(s) cannot run as configured:\n`
-      + [...new Set(missingFlags)].map((p) => `  - ${p}`).join("\n")
-      + `\nA plan that lists a job it cannot start is worse than a config error —`
-      + ` the failure would otherwise arrive after the browser work, as "did not run".`,
+      `${configPath}: ${missingFlags.length} gate(s) cannot run as configured:\n` +
+        [...new Set(missingFlags)].map((p) => `  - ${p}`).join("\n") +
+        `\nA plan that lists a job it cannot start is worse than a config error —` +
+        ` the failure would otherwise arrive after the browser work, as "did not run".`,
     );
   }
 
   const gateGroups = registry.groups();
-  const unresolved = validateGateCommands(registry, [...new Set(plan.jobs.map((j) => j.baseGate))])
-    .filter(({ command }) => gateGroups.has(command.trim().split(/\s+/)[0] ?? ""));
+  const unresolved = validateGateCommands(registry, [...new Set(plan.jobs.map((j) => j.baseGate))]).filter(
+    ({ command }) => gateGroups.has(command.trim().split(/\s+/)[0] ?? ""),
+  );
   if (unresolved.length > 0) {
     throw new UsageError(
-      `${configPath}: ${unresolved.length} unknown gate command(s):\n`
-      + unresolved.map((p) => `  - ${p.message}`).join("\n")
-      + `\n\nRun \`vlmkit rules\` for the full list.`,
+      `${configPath}: ${unresolved.length} unknown gate command(s):\n` +
+        unresolved.map((p) => `  - ${p.message}`).join("\n") +
+        `\n\nRun \`vlmkit rules\` for the full list.`,
     );
   }
 }
@@ -377,23 +370,23 @@ export function scaffoldConfig(
   // The command is left as a placeholder rather than guessed. `npm run dev` is the
   // common case but a wrong command that LOOKS configured is worse than an obvious
   // blank: the run would start something unrelated and gate whatever answered.
-  const localSources = urlSources.filter((source) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(source));
+  const localSources = urlSources.filter((source) =>
+    /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(source),
+  );
   const declared = gates.length > 0 ? [...gates] : [STARTER_GATE];
   return {
     config: {
       ...(localSources[0]
         ? {
-          webServer: {
-            command: "npm run dev",
-            url: localSources[0],
-            timeout: 60000,
-          },
-        }
+            webServer: {
+              command: "npm run dev",
+              url: localSources[0],
+              timeout: 60000,
+            },
+          }
         : {}),
       defaults: {
-        gates: urlSources.length > 0
-          ? declared.map((gate) => `${gate} ${URL_SCAFFOLD_FLAGS}`)
-          : declared,
+        gates: urlSources.length > 0 ? declared.map((gate) => `${gate} ${URL_SCAFFOLD_FLAGS}`) : declared,
       },
       pages: sources.map((source) => ({ source })),
     },
@@ -419,9 +412,7 @@ export async function ensureIgnoreEntries(cwd: string): Promise<string[]> {
   const path = join(cwd, ".gitignore");
   // Absolute, because `isGitIgnored` measures the target against `cwd` — a bare
   // `.vlmkit` would resolve against `process.cwd()` and read as outside the tree.
-  const missing = VLMKIT_IGNORE_ENTRIES.filter(
-    (entry) => !isGitIgnored(cwd, join(cwd, entry.replace(/\/+$/, ""))),
-  );
+  const missing = VLMKIT_IGNORE_ENTRIES.filter((entry) => !isGitIgnored(cwd, join(cwd, entry.replace(/\/+$/, ""))));
   if (missing.length === 0) return [];
   let existing = "";
   try {
@@ -450,15 +441,15 @@ async function initConfig(args: string[]): Promise<void> {
   console.log(`  ${config.pages.length} page entr(ies), gates: ${config.defaults!.gates!.join(", ")}`);
   if (urlSources.length > 0) {
     console.log(
-      `\n  Added --wait-until load --timeout 15000 because the source is a URL:`
-      + ` the default \`networkidle\` milestone never fires on a page that holds a`
-      + ` connection open (a stream, a poll), and every gate would time out having`
-      + ` reported nothing. Drop them if this page does reach network idle.`,
+      `\n  Added --wait-until load --timeout 15000 because the source is a URL:` +
+        ` the default \`networkidle\` milestone never fires on a page that holds a` +
+        ` connection open (a stream, a poll), and every gate would time out having` +
+        ` reported nothing. Drop them if this page does reach network idle.`,
     );
     console.log(
-      `  For reproducible numbers, pin the network too:`
-      + ` vlmkit snapshot record-har ${urlSources[0]} --out app.har`
-      + `, then add --har app.har.`,
+      `  For reproducible numbers, pin the network too:` +
+        ` vlmkit snapshot record-har ${urlSources[0]} --out app.har` +
+        `, then add --har app.har.`,
     );
   }
   const ignored = await ensureIgnoreEntries(dirname(path));
@@ -468,13 +459,13 @@ async function initConfig(args: string[]): Promise<void> {
   }
   if (localSources.length > 0) {
     console.log(
-      `\n  Added a webServer block because ${localSources[0]} is local: a config that says`
-      + ` which URLs to gate but not how to bring them up needs a wrapper script to run at all.`,
+      `\n  Added a webServer block because ${localSources[0]} is local: a config that says` +
+        ` which URLs to gate but not how to bring them up needs a wrapper script to run at all.`,
     );
     console.log(
-      `  ${YELLOW}Replace its \`command\`${RESET} — the scaffold says \`npm run dev\` because guessing`
-      + ` wrong is worse than an obvious blank: the run would start something unrelated and`
-      + ` gate whatever answered. Delete the block if the server is already up in CI.`,
+      `  ${YELLOW}Replace its \`command\`${RESET} — the scaffold says \`npm run dev\` because guessing` +
+        ` wrong is worse than an obvious blank: the run would start something unrelated and` +
+        ` gate whatever answered. Delete the block if the server is already up in CI.`,
     );
   }
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
@@ -571,9 +562,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     else console.log(formatSuppressions(plan.suppressions, soon));
     const requireExpiry = hasFlag(args, "require-expiry");
     const requireOwner = hasFlag(args, "require-owner");
-    const problems = summary.expired
-      + (requireExpiry ? summary.permanent : 0)
-      + (requireOwner ? summary.unowned : 0);
+    const problems = summary.expired + (requireExpiry ? summary.permanent : 0) + (requireOwner ? summary.unowned : 0);
     if (problems > 0 && !hasFlag(args, "advisory")) process.exitCode = 1;
     return;
   }
@@ -593,9 +582,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const sharded = shardPlan(plan, shard);
   if (sharded.jobs.length === 0) {
     throw new UsageError(
-      `No gate runs selected`
-      + (only.length > 0 ? ` by --only ${only.join(", ")}` : "")
-      + (shard ? ` in shard ${shard.index}/${shard.total}` : ""),
+      `No gate runs selected` +
+        (only.length > 0 ? ` by --only ${only.join(", ")}` : "") +
+        (shard ? ` in shard ${shard.index}/${shard.total}` : ""),
     );
   }
   // Print stale config BEFORE the run: a gate failing because its suppression
@@ -617,7 +606,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
         quiet: hasFlag(args, "quiet") || json,
         ...(json ? { json: true } : {}),
       },
-    ));
+    ),
+  );
   const stale = sharded.expired.length;
   if (json) {
     // Structured findings, not the child's terminal text. v7's agent-l: "findings
@@ -625,29 +615,39 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     // carries the gate's own envelope, and `output` is dropped from the JSON —
     // keeping both would leave a consumer guessing which one is authoritative, and
     // the prose copy is the one that is only readable by a human.
-    console.log(JSON.stringify({
-      config: path,
-      expiredSuppressions: stale,
-      ...summary,
-      jobs: summary.jobs.map(({ output, envelope, ...rest }) => ({
-        ...rest,
-        ...(envelope ? { gateReport: envelope } : { unparsedOutput: output }),
-      })),
-    }, null, 2));
-  }
-  else {
-    console.log(formatBatchSummary(summary, {
-      showOutput: hasFlag(args, "show-output"),
-      ...(output ? { outputDir: output } : {}),
-    }));
+    console.log(
+      JSON.stringify(
+        {
+          config: path,
+          expiredSuppressions: stale,
+          ...summary,
+          jobs: summary.jobs.map(({ output, envelope, ...rest }) => ({
+            ...rest,
+            ...(envelope ? { gateReport: envelope } : { unparsedOutput: output }),
+          })),
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    console.log(
+      formatBatchSummary(summary, {
+        showOutput: hasFlag(args, "show-output"),
+        ...(output ? { outputDir: output } : {}),
+      }),
+    );
     if (stale > 0) {
       console.log("");
-      console.log(`${RED}${stale} suppression(s) expired${RESET} — stale config fails the run even when the gates pass.`);
+      console.log(
+        `${RED}${stale} suppression(s) expired${RESET} — stale config fails the run even when the gates pass.`,
+      );
     }
   }
   if ((summary.failed > 0 || stale > 0) && !hasFlag(args, "advisory")) process.exitCode = 1;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "gates" ||
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "gates" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) main().catch(handleCliError);

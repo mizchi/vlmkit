@@ -105,12 +105,15 @@ describe("--wait-until / --timeout reach the browser on a never-idle page", () =
       isNavigationTimeout,
       "the fixture no longer hangs, so this case proves nothing",
     );
-    const report = await runGate(breakpointsGate, [
+    const report = (await runGate(breakpointsGate, [
       url,
-      "--timeout", "1500",
-      "--wait-until", "domcontentloaded",
-      "--breakpoints", "700",
-    ]) as { checkedValues: number[] };
+      "--timeout",
+      "1500",
+      "--wait-until",
+      "domcontentloaded",
+      "--breakpoints",
+      "700",
+    ])) as { checkedValues: number[] };
     assert.deepEqual(report.checkedValues, [700]);
   });
 
@@ -119,55 +122,71 @@ describe("--wait-until / --timeout reach the browser on a never-idle page", () =
       () => runGate(a11yTouchGate, [url, "--timeout", "1500", "--output-dir", join(outDir, "touch-a")]),
       isNavigationTimeout,
     );
-    const report = await runGate(a11yTouchGate, [
+    const report = (await runGate(a11yTouchGate, [
       url,
-      "--timeout", "1500",
-      "--wait-until", "domcontentloaded",
-      "--output-dir", join(outDir, "touch-b"),
-    ]) as { inspectedCount: number };
+      "--timeout",
+      "1500",
+      "--wait-until",
+      "domcontentloaded",
+      "--output-dir",
+      join(outDir, "touch-b"),
+    ])) as { inspectedCount: number };
     // The button only exists after RENDER_DELAY_MS. Zero here would mean the
     // flag was honoured but the settle was skipped — a pass that measured the
     // placeholder, which is worse than the timeout it replaced.
     assert.ok(report.inspectedCount >= 1, `inspected ${report.inspectedCount} targets`);
   });
 
-  it("scan handlers: the load-default gates keep their milestone and still take the flags", { timeout: 120_000 }, async () => {
-    // This gate navigates at `load` and settles afterwards, so it survives the
-    // never-idle page WITHOUT any flag — that is why the default must not have
-    // been levelled to networkidle. It still honours a lowered milestone.
-    type Report = { surface: { totalRegistrations: number } };
-    const dflt = await runGate(handlersGate, [url]) as Report;
-    assert.ok(dflt.surface.totalRegistrations >= 1, "the load-default path regressed");
+  it(
+    "scan handlers: the load-default gates keep their milestone and still take the flags",
+    { timeout: 120_000 },
+    async () => {
+      // This gate navigates at `load` and settles afterwards, so it survives the
+      // never-idle page WITHOUT any flag — that is why the default must not have
+      // been levelled to networkidle. It still honours a lowered milestone.
+      type Report = { surface: { totalRegistrations: number } };
+      const dflt = (await runGate(handlersGate, [url])) as Report;
+      assert.ok(dflt.surface.totalRegistrations >= 1, "the load-default path regressed");
 
-    const lowered = await runGate(handlersGate, [
-      url,
-      "--timeout", "1500",
-      "--wait-until", "domcontentloaded",
-    ]) as Report;
-    assert.ok(
-      lowered.surface.totalRegistrations >= 1,
-      "the click handler is registered after the delayed render, so 0 means the settle was skipped",
-    );
-  });
+      const lowered = (await runGate(handlersGate, [
+        url,
+        "--timeout",
+        "1500",
+        "--wait-until",
+        "domcontentloaded",
+      ])) as Report;
+      assert.ok(
+        lowered.surface.totalRegistrations >= 1,
+        "the click handler is registered after the delayed render, so 0 means the settle was skipped",
+      );
+    },
+  );
 
-  it("check layout: a gate whose run() re-assembles its options around a config file", { timeout: 120_000 }, async () => {
-    const contract = join(outDir, "contract.json");
-    writeFileSync(contract, JSON.stringify({ rules: [{ selector: ".card", at: 1280, count: 2 }] }));
-    await assert.rejects(
-      () => runGate(layoutGate, [url, "--contract", contract, "--timeout", "1500"]),
-      isNavigationTimeout,
-    );
-    const report = await runGate(layoutGate, [
-      url,
-      "--contract", contract,
-      "--timeout", "1500",
-      "--wait-until", "domcontentloaded",
-    ]) as { done: boolean; results: { checks: { measured: string }[] }[] };
-    // `count .card == 2` is the assertion `verify flow` used to fail on a
-    // client-rendered page for want of a settle (see settle-consistency.test.ts).
-    assert.equal(report.results[0]?.checks[0]?.measured, "2");
-    assert.equal(report.done, true);
-  });
+  it(
+    "check layout: a gate whose run() re-assembles its options around a config file",
+    { timeout: 120_000 },
+    async () => {
+      const contract = join(outDir, "contract.json");
+      writeFileSync(contract, JSON.stringify({ rules: [{ selector: ".card", at: 1280, count: 2 }] }));
+      await assert.rejects(
+        () => runGate(layoutGate, [url, "--contract", contract, "--timeout", "1500"]),
+        isNavigationTimeout,
+      );
+      const report = (await runGate(layoutGate, [
+        url,
+        "--contract",
+        contract,
+        "--timeout",
+        "1500",
+        "--wait-until",
+        "domcontentloaded",
+      ])) as { done: boolean; results: { checks: { measured: string }[] }[] };
+      // `count .card == 2` is the assertion `verify flow` used to fail on a
+      // client-rendered page for want of a settle (see settle-consistency.test.ts).
+      assert.equal(report.results[0]?.checks[0]?.measured, "2");
+      assert.equal(report.done, true);
+    },
+  );
 });
 
 describe("--har replays a recording after the server is gone", () => {
@@ -193,13 +212,17 @@ describe("--har replays a recording after the server is gone", () => {
     // Without the HAR this is ERR_CONNECTION_REFUSED: the port is closed.
     await assert.rejects(() => runGate(breakpointsGate, [url, "--timeout", "3000", "--breakpoints", "700"]));
 
-    const report = await runGate(breakpointsGate, [
+    const report = (await runGate(breakpointsGate, [
       url,
-      "--har", har,
-      "--wait-until", "load",
-      "--timeout", "5000",
-      "--breakpoints", "700",
-    ]) as { checkedValues: number[]; source: string };
+      "--har",
+      har,
+      "--wait-until",
+      "load",
+      "--timeout",
+      "5000",
+      "--breakpoints",
+      "700",
+    ])) as { checkedValues: number[]; source: string };
     assert.deepEqual(report.checkedValues, [700]);
     assert.equal(report.source, url);
   });

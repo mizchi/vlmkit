@@ -25,11 +25,11 @@ const BASELINE_CLI = resolve(fileURLToPath(import.meta.url), "..", "baseline-cli
 const ANSI = /\x1B\[[0-9;]*m/g;
 
 function runBaseline(args: string[], cwd: string): { stdout: string; stderr: string; status: number } {
-  const r = spawnSync(
-    process.execPath,
-    ["--experimental-strip-types", BASELINE_CLI, ...args],
-    { encoding: "utf-8", cwd, env: { ...process.env, NO_COLOR: "1" } },
-  );
+  const r = spawnSync(process.execPath, ["--experimental-strip-types", BASELINE_CLI, ...args], {
+    encoding: "utf-8",
+    cwd,
+    env: { ...process.env, NO_COLOR: "1" },
+  });
   return {
     stdout: (r.stdout ?? "").replace(ANSI, ""),
     stderr: (r.stderr ?? "").replace(ANSI, ""),
@@ -78,7 +78,10 @@ async function makeProject(opts: ProjectOptions = {}): Promise<string> {
     baselineDir: "baselines",
     viewports: opts.viewports ?? ["desktop"],
     thresholds: opts.thresholds ?? { desktop: 0.01, mobile: 0.01, wide: 0.01 },
-    routes: opts.routes ?? [{ name: "hud", path: "/hud" }, { name: "menu", path: "/menu" }],
+    routes: opts.routes ?? [
+      { name: "hud", path: "/hud" },
+      { name: "menu", path: "/menu" },
+    ],
   };
   if (opts.a11y) config.a11y = opts.a11y;
   await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify(config, null, 2));
@@ -86,11 +89,17 @@ async function makeProject(opts: ProjectOptions = {}): Promise<string> {
 }
 
 describe("resolvePngSources", () => {
-  const config = parseDiffPrConfig(JSON.stringify({
-    baseUrl: "http://localhost:9/",
-    viewports: ["desktop"],
-    routes: [{ name: "hud", path: "/hud" }, { name: "form-app", path: "/form" }],
-  }), "/proj/vlmkit.config.json");
+  const config = parseDiffPrConfig(
+    JSON.stringify({
+      baseUrl: "http://localhost:9/",
+      viewports: ["desktop"],
+      routes: [
+        { name: "hud", path: "/hud" },
+        { name: "form-app", path: "/form" },
+      ],
+    }),
+    "/proj/vlmkit.config.json",
+  );
 
   it("maps the nested <route>/<viewport>.png layout — the pinned layout round-trips", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-map-"));
@@ -104,10 +113,10 @@ describe("resolvePngSources", () => {
         cwd: dir,
         requireFullCoverage: true,
       });
-      assert.deepEqual(
-        sources.map((s) => `${s.route.name}/${s.viewport}:${s.matchedAs}`).sort(),
-        ["form-app/desktop:nested", "hud/desktop:nested"],
-      );
+      assert.deepEqual(sources.map((s) => `${s.route.name}/${s.viewport}:${s.matchedAs}`).sort(), [
+        "form-app/desktop:nested",
+        "hud/desktop:nested",
+      ]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -127,10 +136,10 @@ describe("resolvePngSources", () => {
         cwd: dir,
         requireFullCoverage: true,
       });
-      assert.deepEqual(
-        sources.map((s) => `${s.route.name}/${s.viewport}:${s.matchedAs}`).sort(),
-        ["form-app/mobile:flat", "hud/mobile:flat"],
-      );
+      assert.deepEqual(sources.map((s) => `${s.route.name}/${s.viewport}:${s.matchedAs}`).sort(), [
+        "form-app/mobile:flat",
+        "hud/mobile:flat",
+      ]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -151,13 +160,14 @@ describe("resolvePngSources", () => {
       assert.equal(single[0].matchedAs, "bare");
 
       await assert.rejects(
-        () => resolvePngSources({
-          routes: [config.routes[0]],
-          viewports: ["desktop", "mobile"],
-          fromDir: dir,
-          cwd: dir,
-          requireFullCoverage: true,
-        }),
+        () =>
+          resolvePngSources({
+            routes: [config.routes[0]],
+            viewports: ["desktop", "mobile"],
+            fromDir: dir,
+            cwd: dir,
+            requireFullCoverage: true,
+          }),
         /1 file\(s\) in .* map to no declared route\/viewport pair:\n {2}hud\.png/,
       );
     } finally {
@@ -171,13 +181,14 @@ describe("resolvePngSources", () => {
       await writePng(join(dir, "hud-desktop.png"));
       await writePng(join(dir, "hud", "desktop.png"));
       await assert.rejects(
-        () => resolvePngSources({
-          routes: [config.routes[0]],
-          viewports: ["desktop"],
-          fromDir: dir,
-          cwd: dir,
-          requireFullCoverage: true,
-        }),
+        () =>
+          resolvePngSources({
+            routes: [config.routes[0]],
+            viewports: ["desktop"],
+            fromDir: dir,
+            cwd: dir,
+            requireFullCoverage: true,
+          }),
         /two files both map to route `hud` viewport `desktop`/,
       );
     } finally {
@@ -210,24 +221,41 @@ describe("resolvePngSources", () => {
       const file = join(dir, "frame_0001.png");
       await writePng(file);
       await assert.rejects(
-        () => resolvePngSources({
-          routes: config.routes, viewports: ["desktop"], fromPng: file, cwd: dir,
-          requireFullCoverage: false,
-        }),
+        () =>
+          resolvePngSources({
+            routes: config.routes,
+            viewports: ["desktop"],
+            fromPng: file,
+            cwd: dir,
+            requireFullCoverage: false,
+          }),
         /maps to no declared route\/viewport pair/,
       );
       await assert.rejects(
-        () => resolvePngSources({
-          routes: config.routes, viewports: ["desktop"], fromPng: file, cwd: dir,
-          routeOverride: "hud", requireFullCoverage: false,
-        }),
+        () =>
+          resolvePngSources({
+            routes: config.routes,
+            viewports: ["desktop"],
+            fromPng: file,
+            cwd: dir,
+            routeOverride: "hud",
+            requireFullCoverage: false,
+          }),
         /--route and --viewport must be given together/,
       );
       const ok = await resolvePngSources({
-        routes: config.routes, viewports: ["desktop"], fromPng: file, cwd: dir,
-        routeOverride: "hud", viewportOverride: "desktop", requireFullCoverage: false,
+        routes: config.routes,
+        viewports: ["desktop"],
+        fromPng: file,
+        cwd: dir,
+        routeOverride: "hud",
+        viewportOverride: "desktop",
+        requireFullCoverage: false,
       });
-      assert.deepEqual(ok.map((s) => [s.route.name, s.viewport, s.matchedAs]), [["hud", "desktop", "explicit"]]);
+      assert.deepEqual(
+        ok.map((s) => [s.route.name, s.viewport, s.matchedAs]),
+        [["hud", "desktop", "explicit"]],
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -238,10 +266,14 @@ describe("resolvePngSources", () => {
     try {
       await writeFile(join(dir, "hud.png"), "this is a JPEG really");
       await assert.rejects(
-        () => resolvePngSources({
-          routes: [config.routes[0]], viewports: ["desktop"], fromDir: dir, cwd: dir,
-          requireFullCoverage: true,
-        }),
+        () =>
+          resolvePngSources({
+            routes: [config.routes[0]],
+            viewports: ["desktop"],
+            fromDir: dir,
+            cwd: dir,
+            requireFullCoverage: true,
+          }),
         /is not a PNG \(bad signature\)/,
       );
     } finally {
@@ -308,7 +340,10 @@ describe("baseline pin --from-dir / --from-png", () => {
   it("errors when --from-png points at a missing file", async () => {
     const proj = await makeProject();
     try {
-      const r = runBaseline(["pin", "--from-png", "captures/nope.png", "--route", "hud", "--viewport", "desktop"], proj);
+      const r = runBaseline(
+        ["pin", "--from-png", "captures/nope.png", "--route", "hud", "--viewport", "desktop"],
+        proj,
+      );
       assert.equal(r.status, 1);
       assert.match(r.stderr, /--from-png file not found:.*nope\.png/);
     } finally {
@@ -476,7 +511,17 @@ describe("baseline verify --from-dir", () => {
       assert.equal(runBaseline(["pin", "--from-dir", "captures"], proj).status, 0);
       await writePng(join(proj, "frames", "frame_0001.png"), { blockSize: 20 });
       const r = runBaseline(
-        ["verify", "--from-png", "frames/frame_0001.png", "--route", "menu", "--viewport", "desktop", "--output", "run"],
+        [
+          "verify",
+          "--from-png",
+          "frames/frame_0001.png",
+          "--route",
+          "menu",
+          "--viewport",
+          "desktop",
+          "--output",
+          "run",
+        ],
         proj,
       );
       assert.equal(r.status, 1, r.stdout + r.stderr);

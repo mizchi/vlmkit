@@ -85,8 +85,9 @@ function installFakeDom(
       },
     }),
   };
-  (globalThis as Record<string, unknown>).getComputedStyle =
-    ((globalThis as Record<string, unknown>).window as { getComputedStyle: unknown }).getComputedStyle;
+  (globalThis as Record<string, unknown>).getComputedStyle = (
+    (globalThis as Record<string, unknown>).window as { getComputedStyle: unknown }
+  ).getComputedStyle;
 }
 
 function styleKey(element: FakeElement): string {
@@ -94,8 +95,8 @@ function styleKey(element: FakeElement): string {
   const classNames = element.classList ?? element.className?.split(/\s+/).filter(Boolean) ?? [];
   if (classNames.length > 0) return `.${classNames.join(".")}`;
   const tag = element.tagName.toLowerCase();
-  const parentClass = element.parentElement?.classList?.[0]
-    ?? element.parentElement?.className?.split(/\s+/).filter(Boolean)[0];
+  const parentClass =
+    element.parentElement?.classList?.[0] ?? element.parentElement?.className?.split(/\s+/).filter(Boolean)[0];
   return parentClass ? `.${parentClass}>${tag}` : tag;
 }
 
@@ -130,12 +131,7 @@ describe("captureComputedStyleSnapshotInDom", () => {
     const button1: FakeElement = { classList: [], tagName: "BUTTON", parentElement: wrapper };
     const button2: FakeElement = { classList: [], tagName: "BUTTON", parentElement: wrapper };
 
-    installFakeDom(
-      [button1, button2],
-      new Map([
-        [".wrapper>button", { display: "inline-block" }],
-      ]),
-    );
+    installFakeDom([button1, button2], new Map([[".wrapper>button", { display: "inline-block" }]]));
 
     const snapshot = captureComputedStyleSnapshotInDom(["display"]);
 
@@ -152,12 +148,7 @@ describe("captureComputedStyleSnapshotInDom", () => {
       parentElement: null,
     };
 
-    installFakeDom(
-      [card],
-      new Map([
-        [".readme-header", { display: "flex" }],
-      ]),
-    );
+    installFakeDom([card], new Map([[".readme-header", { display: "flex" }]]));
 
     const snapshot = captureComputedStyleSnapshotInDom(["display"]);
 
@@ -173,12 +164,7 @@ describe("captureComputedStyleSnapshotInDom", () => {
       parentElement: null,
     };
 
-    installFakeDom(
-      [card],
-      new Map([
-        [".readme-header", { display: "flex" }],
-      ]),
-    );
+    installFakeDom([card], new Map([[".readme-header", { display: "flex" }]]));
     (globalThis as Record<string, unknown>).window = {};
 
     const snapshot = captureComputedStyleSnapshotInDom(["display"]);
@@ -192,13 +178,8 @@ describe("captureComputedStyleSnapshotInDom", () => {
     const selectors: string[] = [];
     const wrapper: FakeElement = { classList: ["wrapper"], tagName: "DIV", parentElement: null };
 
-    installFakeDom(
-      [wrapper],
-      new Map([
-        [".wrapper", { display: "block" }],
-      ]),
-      new Map(),
-      (selector) => selectors.push(selector),
+    installFakeDom([wrapper], new Map([[".wrapper", { display: "block" }]]), new Map(), (selector) =>
+      selectors.push(selector),
     );
 
     captureComputedStyleSnapshotInDom(["display"]);
@@ -214,12 +195,7 @@ describe("captureComputedStyleSnapshotInDom", () => {
       parentElement: null,
     };
 
-    installFakeDom(
-      [badge],
-      new Map([
-        [".luna-pill.is-active", { color: "rgb(255, 0, 0)" }],
-      ]),
-    );
+    installFakeDom([badge], new Map([[".luna-pill.is-active", { color: "rgb(255, 0, 0)" }]]));
 
     const documentRecord = (globalThis as Record<string, unknown>).document as Record<string, unknown>;
     documentRecord.querySelectorAll = (selector: string) => {
@@ -229,9 +205,7 @@ describe("captureComputedStyleSnapshotInDom", () => {
     };
     documentRecord.styleSheets = [
       {
-        cssRules: [
-          { selectorText: ".luna-pill" },
-        ],
+        cssRules: [{ selectorText: ".luna-pill" }],
       },
     ];
 
@@ -257,7 +231,9 @@ describe("captureComputedStyleSnapshotForTargetSelectorsInDom", () => {
         [".field", { background: "rgb(255, 255, 255)" }],
       ]),
     );
-    ((globalThis as Record<string, unknown>).document as Record<string, unknown>).querySelectorAll = (selector: string) => {
+    ((globalThis as Record<string, unknown>).document as Record<string, unknown>).querySelectorAll = (
+      selector: string,
+    ) => {
       if (selector === ".field") return [field];
       return [];
     };
@@ -284,10 +260,25 @@ describe("buildInteractionTargetPlans", () => {
 
     assert.deepEqual(plans, [
       { selector: ".btn:hover", normalizedSelector: ".btn", interaction: "hover", forcedStates: ["hover"] },
-      { selector: "input:focus-visible", normalizedSelector: "input", interaction: "focus", forcedStates: ["focus-visible"] },
-      { selector: ".tooltip:hover::after", normalizedSelector: ".tooltip", interaction: "hover", forcedStates: ["hover"] },
+      {
+        selector: "input:focus-visible",
+        normalizedSelector: "input",
+        interaction: "focus",
+        forcedStates: ["focus-visible"],
+      },
+      {
+        selector: ".tooltip:hover::after",
+        normalizedSelector: ".tooltip",
+        interaction: "hover",
+        forcedStates: ["hover"],
+      },
       { selector: ".cta:active", normalizedSelector: ".cta", interaction: "active", forcedStates: ["active"] },
-      { selector: ".pressed:hover:active", normalizedSelector: ".pressed", interaction: "active", forcedStates: ["hover", "active"] },
+      {
+        selector: ".pressed:hover:active",
+        normalizedSelector: ".pressed",
+        interaction: "active",
+        forcedStates: ["hover", "active"],
+      },
     ]);
   });
 });
@@ -295,9 +286,24 @@ describe("buildInteractionTargetPlans", () => {
 describe("selectInteractionFallbackPlans", () => {
   it("keeps focus and active plans, plus hover plans when emulation is empty", () => {
     const plans = [
-      { selector: ".btn:hover", normalizedSelector: ".btn", interaction: "hover" as const, forcedStates: ["hover" as const] },
-      { selector: "input:focus", normalizedSelector: "input", interaction: "focus" as const, forcedStates: ["focus" as const] },
-      { selector: ".cta:active", normalizedSelector: ".cta", interaction: "active" as const, forcedStates: ["active" as const] },
+      {
+        selector: ".btn:hover",
+        normalizedSelector: ".btn",
+        interaction: "hover" as const,
+        forcedStates: ["hover" as const],
+      },
+      {
+        selector: "input:focus",
+        normalizedSelector: "input",
+        interaction: "focus" as const,
+        forcedStates: ["focus" as const],
+      },
+      {
+        selector: ".cta:active",
+        normalizedSelector: ".cta",
+        interaction: "active" as const,
+        forcedStates: ["active" as const],
+      },
     ];
 
     assert.deepEqual(selectInteractionFallbackPlans(plans, true), [
@@ -393,10 +399,12 @@ describe("computedStyleSnapshotToMap", () => {
 
 describe("parseComputedStyleSnapshot", () => {
   it("accepts JSON-serialized snapshots", () => {
-    const snapshot = parseComputedStyleSnapshot(JSON.stringify({
-      ".card": { color: "red" },
-      ".card::before": { content: '"badge"' },
-    }));
+    const snapshot = parseComputedStyleSnapshot(
+      JSON.stringify({
+        ".card": { color: "red" },
+        ".card::before": { content: '"badge"' },
+      }),
+    );
 
     assert.deepEqual(snapshot, {
       ".card": { color: "red" },
@@ -407,15 +415,21 @@ describe("parseComputedStyleSnapshot", () => {
 
 describe("hasMeaningfulComputedStyleSnapshot", () => {
   it("returns false when all captured values are empty", () => {
-    assert.equal(hasMeaningfulComputedStyleSnapshot({
-      ".card": { display: "", color: "" },
-    }), false);
+    assert.equal(
+      hasMeaningfulComputedStyleSnapshot({
+        ".card": { display: "", color: "" },
+      }),
+      false,
+    );
   });
 
   it("returns true when at least one property has a value", () => {
-    assert.equal(hasMeaningfulComputedStyleSnapshot({
-      ".card": { display: "flex", color: "" },
-    }), true);
+    assert.equal(
+      hasMeaningfulComputedStyleSnapshot({
+        ".card": { display: "flex", color: "" },
+      }),
+      true,
+    );
   });
 });
 
@@ -468,13 +482,13 @@ describe("buildComputedStyleCaptureExpression", () => {
       },
     };
 
-    const serialized = vm.runInNewContext(
-      buildComputedStyleCaptureJsonExpression(["display"]),
-      context,
-    );
+    const serialized = vm.runInNewContext(buildComputedStyleCaptureJsonExpression(["display"]), context);
 
-    assert.equal(serialized, JSON.stringify({
-      ".readme-header": { display: "flex" },
-    }));
+    assert.equal(
+      serialized,
+      JSON.stringify({
+        ".readme-header": { display: "flex" },
+      }),
+    );
   });
 });

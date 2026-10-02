@@ -26,9 +26,7 @@ const real = process.env.HEAL_REAL_LLM === "1";
 const original = readFileSync(pageFile, "utf8");
 
 // Intentional UI change: badge text + color.
-const mutated = original
-  .replace(">Active<", ">Archived<")
-  .replace("#2563eb", "#dc2626");
+const mutated = original.replace(">Active<", ">Archived<").replace("#2563eb", "#dc2626");
 writeFileSync(pageFile, mutated);
 
 // observe = a cheap *reasoning* VLM for the intentional-vs-regression judgment.

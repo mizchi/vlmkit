@@ -12,11 +12,22 @@ import {
 /** A HUD panel with one label; `label` overrides the label's paint. */
 function hud(panel: Partial<SceneNode>, label: Partial<SceneNode>): SceneNode {
   return {
-    name: "hud", x: 0, y: 0, width: 800, height: 600,
-    children: [{
-      name: "panel", x: 20, y: 20, width: 300, height: 80, ...panel,
-      children: [{ name: "label", x: 10, y: 10, width: 200, height: 24, text: "Health 42", ...label }],
-    }],
+    name: "hud",
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+    children: [
+      {
+        name: "panel",
+        x: 20,
+        y: 20,
+        width: 300,
+        height: 80,
+        ...panel,
+        children: [{ name: "label", x: 10, y: 10, width: 200, height: 24, text: "Health 42", ...label }],
+      },
+    ],
   };
 }
 
@@ -42,14 +53,21 @@ describe("judgeSceneIntegrity: contrast from resolved paint", () => {
   it("applies the large-text floor from the scene's font size", () => {
     // #949494 on white is 3.03:1 — a failure for body text, a pass for 24px text.
     const body = judgeSceneIntegrity(sceneFromTree(hud({ background: "#ffffff" }, { color: "#949494" })));
-    const large = judgeSceneIntegrity(sceneFromTree(hud({ background: "#ffffff" }, { color: "#949494", fontSize: 24 })));
+    const large = judgeSceneIntegrity(
+      sceneFromTree(hud({ background: "#ffffff" }, { color: "#949494", fontSize: 24 })),
+    );
     assert.ok(body.findings.some((f) => f.kind === "low-contrast-text"));
     assert.ok(!large.findings.some((f) => f.kind === "low-contrast-text"));
   });
 
   it("multiplies opacity down the recorded ancestor chain", () => {
-    const report = judgeSceneIntegrity(sceneFromTree(hud({ background: "#ffffff", opacity: 0.3 }, { color: "#000000" })));
-    assert.ok(report.findings.some((f) => f.kind === "low-contrast-text"), JSON.stringify(report.findings));
+    const report = judgeSceneIntegrity(
+      sceneFromTree(hud({ background: "#ffffff", opacity: 0.3 }, { color: "#000000" })),
+    );
+    assert.ok(
+      report.findings.some((f) => f.kind === "low-contrast-text"),
+      JSON.stringify(report.findings),
+    );
   });
 
   it("composites a translucent panel over the opaque layer beneath it", () => {
@@ -64,16 +82,24 @@ describe("judgeSceneIntegrity: contrast from resolved paint", () => {
     const report = judgeSceneIntegrity(sceneFromTree(hud({}, { color: "#777777" })));
     assert.equal(report.findings.length, 0);
     assert.ok(report.exempted.some((e) => e.kind === "low-contrast-text" && /no opaque `background`/.test(e.reason)));
-    assert.ok(report.inertRules.some((r) => r.rule === "low-contrast-text"), JSON.stringify(report.inertRules));
+    assert.ok(
+      report.inertRules.some((r) => r.rule === "low-contrast-text"),
+      JSON.stringify(report.inertRules),
+    );
   });
 
   it("counts text over an image as refused, the way the page counts a gradient", () => {
     const report = judgeSceneIntegrity(sceneFromTree(hud({ backgroundImage: true }, { color: "#777777" })));
-    assert.ok(report.exempted.some((e) => /1 text block\(s\) skipped/.test(e.reason)), JSON.stringify(report.exempted));
+    assert.ok(
+      report.exempted.some((e) => /1 text block\(s\) skipped/.test(e.reason)),
+      JSON.stringify(report.exempted),
+    );
   });
 
   it("exempts disabled and shadowed text like the DOM path", () => {
-    const report = judgeSceneIntegrity(sceneFromTree(hud({ background: "#555555" }, { color: "#777777", disabled: true })));
+    const report = judgeSceneIntegrity(
+      sceneFromTree(hud({ background: "#555555" }, { color: "#777777", disabled: true })),
+    );
     assert.equal(report.findings.length, 0);
     assert.ok(report.exempted.some((e) => /disabled control/.test(e.reason)));
   });
@@ -87,10 +113,23 @@ describe("judgeSceneIntegrity: contrast from resolved paint", () => {
 
 describe("parseSceneElements", () => {
   it("reads the paint and type fields in either case convention", () => {
-    const [element] = parseSceneElements(JSON.stringify([{
-      path: "a", tag: "div", top: 0, left: 0, width: 10, height: 10,
-      color: "#000", background_image: true, font_size: 12, fontWeight: 700, text_shadow: true,
-    }]));
+    const [element] = parseSceneElements(
+      JSON.stringify([
+        {
+          path: "a",
+          tag: "div",
+          top: 0,
+          left: 0,
+          width: 10,
+          height: 10,
+          color: "#000",
+          background_image: true,
+          font_size: 12,
+          fontWeight: 700,
+          text_shadow: true,
+        },
+      ]),
+    );
     assert.equal(element!.color, "#000");
     assert.equal(element!.backgroundImage, true);
     assert.equal(element!.fontSize, 12);
@@ -100,7 +139,10 @@ describe("parseSceneElements", () => {
 
   it("rejects a colour only a renderer could resolve, naming the field", () => {
     assert.throws(
-      () => parseSceneElements([{ path: "a", tag: "div", top: 0, left: 0, width: 1, height: 1, color: "oklch(0.5 0.1 200)" }]),
+      () =>
+        parseSceneElements([
+          { path: "a", tag: "div", top: 0, left: 0, width: 1, height: 1, color: "oklch(0.5 0.1 200)" },
+        ]),
       /elements\[0\]\.color .*resolved colour/,
     );
   });

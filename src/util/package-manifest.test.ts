@@ -53,7 +53,11 @@ describe("package manifest for publishable CLI", () => {
 
     assert.ok(scripts, "package.json should define scripts");
     for (const [name, command] of Object.entries(scripts)) {
-      assert.doesNotMatch(command, /--experimental-strip-types/, `script ${name} should not need experimental strip flags`);
+      assert.doesNotMatch(
+        command,
+        /--experimental-strip-types/,
+        `script ${name} should not need experimental strip flags`,
+      );
     }
   });
 
@@ -204,11 +208,7 @@ describe("package manifest for publishable CLI", () => {
       if (files && !files.includes("LICENSE")) continue;
 
       const license = await readFile(resolve(dir, "LICENSE"), "utf-8");
-      assert.equal(
-        license,
-        rootLicense,
-        `${pkg.name as string} should ship the canonical root MIT license text`,
-      );
+      assert.equal(license, rootLicense, `${pkg.name as string} should ship the canonical root MIT license text`);
     }
   });
 
@@ -230,7 +230,10 @@ describe("package manifest for publishable CLI", () => {
       assert.equal(scripts?.prepack, "pnpm build", `${name} should build before packing`);
       assert.deepEqual(engines, { node: ">=24" }, `${name} should declare its Node runtime`);
       assert.deepEqual(publishConfig, { access: "public" }, `${name} should publish publicly`);
-      assert.ok(files?.some((file) => file === "dist" || file.startsWith("dist/")), `${name} should publish dist`);
+      assert.ok(
+        files?.some((file) => file === "dist" || file.startsWith("dist/")),
+        `${name} should publish dist`,
+      );
       assert.ok(!files?.some((file) => file.startsWith("src/")), `${name} should not publish raw TypeScript sources`);
       assert.ok(exports, `${name} should declare exports`);
 

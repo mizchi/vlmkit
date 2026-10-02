@@ -34,12 +34,7 @@ import {
   readPositionals,
   tokenizeCommand,
 } from "@mizchi/vlmkit-core/arg-reader.ts";
-import {
-  VLMKIT_IGNORE_ENTRIES,
-  appendRunLedger,
-  isGitIgnored,
-  isGitRepo,
-} from "@mizchi/vlmkit-core/run-ledger.ts";
+import { VLMKIT_IGNORE_ENTRIES, appendRunLedger, isGitIgnored, isGitRepo } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface BatchJob {
@@ -89,7 +84,7 @@ export function parseGateEnvelope(stdout: string): GateEnvelope | null {
   if (!text.startsWith("{")) return null;
   try {
     const parsed = JSON.parse(text) as unknown;
-    return typeof parsed === "object" && parsed !== null ? parsed as GateEnvelope : null;
+    return typeof parsed === "object" && parsed !== null ? (parsed as GateEnvelope) : null;
   } catch {
     return null;
   }
@@ -264,8 +259,13 @@ function runJob(job: BatchJob, cliEntry: string, json = false): Promise<BatchJob
     // the webServer's greeting corrupted `--json` before this.
     let output = "";
     let stdout = "";
-    child.stdout.on("data", (d) => { output += d; stdout += d; });
-    child.stderr.on("data", (d) => { output += d; });
+    child.stdout.on("data", (d) => {
+      output += d;
+      stdout += d;
+    });
+    child.stderr.on("data", (d) => {
+      output += d;
+    });
     child.on("error", (err) => {
       resolveJob({ ...job, exitCode: 127, durationMs: Date.now() - started, output: `${output}${err.message}\n` });
     });
@@ -281,7 +281,11 @@ function runJob(job: BatchJob, cliEntry: string, json = false): Promise<BatchJob
   });
 }
 
-const slug = (s: string) => s.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+const slug = (s: string) =>
+  s
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 
 /**
  * Per-job log filename. Uses the whole source path, not its basename: with
@@ -324,15 +328,20 @@ export async function runJobs(
   );
   const started = Date.now();
   let done = 0;
-  const results = await runPool(jobs, concurrency, (job) => runJob(job, cliEntry, options.json === true), (result) => {
-    done++;
-    if (options.quiet) return;
-    const status = result.exitCode === 0 ? `${GREEN}pass${RESET}` : `${RED}fail${RESET}`;
-    process.stderr.write(
-      `${DIM}[${String(done).padStart(String(jobs.length).length)}/${jobs.length}]${RESET} `
-      + `${status} ${DIM}${(result.durationMs / 1000).toFixed(1)}s${RESET} ${result.gate} ${result.page}\n`,
-    );
-  });
+  const results = await runPool(
+    jobs,
+    concurrency,
+    (job) => runJob(job, cliEntry, options.json === true),
+    (result) => {
+      done++;
+      if (options.quiet) return;
+      const status = result.exitCode === 0 ? `${GREEN}pass${RESET}` : `${RED}fail${RESET}`;
+      process.stderr.write(
+        `${DIM}[${String(done).padStart(String(jobs.length).length)}/${jobs.length}]${RESET} ` +
+          `${status} ${DIM}${(result.durationMs / 1000).toFixed(1)}s${RESET} ${result.gate} ${result.page}\n`,
+      );
+    },
+  );
   const summary: BatchSummary = {
     jobs: results,
     passed: results.filter((r) => r.exitCode === 0).length,
@@ -342,8 +351,7 @@ export async function runJobs(
     concurrency,
     ...(options.shard ? { shard: options.shard } : {}),
     ...(() => {
-      const created = VLMKIT_IGNORE_ENTRIES
-        .filter((entry) => !preexisting.has(entry))
+      const created = VLMKIT_IGNORE_ENTRIES.filter((entry) => !preexisting.has(entry))
         .filter((entry) => existsSync(join(artifactCwd, entry.replace(/\/+$/, ""))))
         .filter((entry) => !isGitIgnored(artifactCwd, join(artifactCwd, entry.replace(/\/+$/, ""))));
       return created.length > 0 && isGitRepo(artifactCwd) ? { createdArtifacts: created } : {};
@@ -365,17 +373,20 @@ export async function runJobs(
   // there, while this append used `process.cwd()`. One `gates run --config
   // ../proj/...` from a sibling directory therefore produced TWO ledgers, in two
   // places, each holding half the run.
-  appendRunLedger({
-    tool: "batch",
-    source: [...new Set(jobs.map((j) => j.page))].join(" ").slice(0, 200),
-    headline: {
-      gates: new Set(jobs.map((j) => j.gate)).size,
-      pages: new Set(jobs.map((j) => j.page)).size,
-      failed: summary.failed,
-      wallMs: summary.wallMs,
-      concurrency,
+  appendRunLedger(
+    {
+      tool: "batch",
+      source: [...new Set(jobs.map((j) => j.page))].join(" ").slice(0, 200),
+      headline: {
+        gates: new Set(jobs.map((j) => j.gate)).size,
+        pages: new Set(jobs.map((j) => j.page)).size,
+        failed: summary.failed,
+        wallMs: summary.wallMs,
+        concurrency,
+      },
     },
-  }, { cwd: artifactCwd });
+    { cwd: artifactCwd },
+  );
   return summary;
 }
 
@@ -383,8 +394,8 @@ export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
   const pages = shardPages(await resolvePages(options.patterns), options.shard);
   if (pages.length === 0) {
     throw new Error(
-      `No pages matched: ${options.patterns.join(", ")}`
-      + (options.shard ? ` (after --shard ${options.shard.index}/${options.shard.total})` : ""),
+      `No pages matched: ${options.patterns.join(", ")}` +
+        (options.shard ? ` (after --shard ${options.shard.index}/${options.shard.total})` : ""),
     );
   }
   return runJobs(buildJobs(options.gates, pages), options);
@@ -476,7 +487,10 @@ function stripAnsi(text: string): string {
 
 /** The one line worth putting in the summary for a job that never ran. */
 export function gateFailureReason(output: string): string {
-  const lines = stripAnsi(output).split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
+  const lines = stripAnsi(output)
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim());
   // `error: …` is what `handleCliError` prints; fall back to the first line, which
   // for an unhandled throw is the exception message.
   return (lines.find((l) => /^error:/i.test(l)) ?? lines[0] ?? "no output").slice(0, 300);
@@ -494,14 +508,15 @@ export function formatBatchSummary(
   // A product only when it is one: per-page `extraGates` give pages different gate lists, and
   // "4 page(s) x 5 gate(s) = 8 job(s)" (four pages, one shared gate, four one-page contrast runs)
   // read as arithmetic that does not add up.
-  const plan = pages.size * gates.length === summary.jobs.length
-    ? `${pages.size} page(s) x ${gates.length} gate(s) = ${summary.jobs.length} job(s)`
-    : `${summary.jobs.length} job(s) over ${pages.size} page(s), ${gates.length} distinct gate command(s)`;
+  const plan =
+    pages.size * gates.length === summary.jobs.length
+      ? `${pages.size} page(s) x ${gates.length} gate(s) = ${summary.jobs.length} job(s)`
+      : `${summary.jobs.length} job(s) over ${pages.size} page(s), ${gates.length} distinct gate command(s)`;
   lines.push(
-    `${DIM}${plan},`
-    + ` concurrency ${summary.concurrency}`
-    + (summary.shard ? `, shard ${summary.shard.index}/${summary.shard.total}` : "")
-    + `${RESET}`,
+    `${DIM}${plan},` +
+      ` concurrency ${summary.concurrency}` +
+      (summary.shard ? `, shard ${summary.shard.index}/${summary.shard.total}` : "") +
+      `${RESET}`,
   );
   lines.push("");
   // Split the failure count, because "the page is broken" and "the run is broken"
@@ -512,8 +527,8 @@ export function formatBatchSummary(
       ? `verdict: ${GREEN}ALL PASS${RESET} (${summary.passed}/${summary.jobs.length})`
       : neverRan.length === 0
         ? `verdict: ${RED}${summary.failed} FAILED${RESET} (${summary.passed} passed)`
-        : `verdict: ${RED}${summary.failed - neverRan.length} FAILED${RESET},`
-          + ` ${YELLOW}${neverRan.length} DID NOT RUN${RESET} (${summary.passed} passed)`,
+        : `verdict: ${RED}${summary.failed - neverRan.length} FAILED${RESET},` +
+          ` ${YELLOW}${neverRan.length} DID NOT RUN${RESET} (${summary.passed} passed)`,
   );
   const wall = summary.wallMs / 1000;
   const busy = summary.serialMs / 1000;
@@ -523,9 +538,9 @@ export function formatBatchSummary(
   // concurrency 8), so busy/wall would have claimed 5.9x where the real gain
   // over a serial run was 3.2x. Reporting occupancy keeps the number honest.
   lines.push(
-    `${DIM}  wall ${wall.toFixed(1)}s, job time ${busy.toFixed(1)}s total`
-    + ` (avg ${(busy / Math.max(wall, 0.001)).toFixed(1)} jobs in flight),`
-    + ` slowest job ${((slowest?.durationMs ?? 0) / 1000).toFixed(1)}s${RESET}`,
+    `${DIM}  wall ${wall.toFixed(1)}s, job time ${busy.toFixed(1)}s total` +
+      ` (avg ${(busy / Math.max(wall, 0.001)).toFixed(1)} jobs in flight),` +
+      ` slowest job ${((slowest?.durationMs ?? 0) / 1000).toFixed(1)}s${RESET}`,
   );
   // Warns a passing job found, said on the summary. Without this the adoption path
   // reported `ALL PASS (6/6)` and showed none of ten findings — the one number an
@@ -540,13 +555,13 @@ export function formatBatchSummary(
     if (total > 0) {
       lines.push("");
       lines.push(
-        `${YELLOW}${total} warn(s)${RESET} in ${warned.length} passing gate(s) — not shown above,`
-        + ` and they did not fail the run:`,
+        `${YELLOW}${total} warn(s)${RESET} in ${warned.length} passing gate(s) — not shown above,` +
+          ` and they did not fail the run:`,
       );
       for (const j of warned) lines.push(`${DIM}    ${String(j.warns).padStart(3)}  ${j.gate}  ${j.job.page}${RESET}`);
       lines.push(
-        `${DIM}See them: --show-output, or --output <dir> to keep every log.`
-        + ` Gate on one: --rule <id>=suspect.${RESET}`,
+        `${DIM}See them: --show-output, or --output <dir> to keep every log.` +
+          ` Gate on one: --rule <id>=suspect.${RESET}`,
       );
     }
   }
@@ -566,14 +581,15 @@ export function formatBatchSummary(
       // Described per entry, because they are different things and only one of
       // them is announced anywhere else: a gate prints `report: <path>` for what
       // it writes under test-results/, while the ledger prints nothing here.
-      const what = entry === ".vlmkit/"
-        ? "an append-only record of every gate run, one line each"
-        : "the gates' own reports and screenshots";
+      const what =
+        entry === ".vlmkit/"
+          ? "an append-only record of every gate run, one line each"
+          : "the gates' own reports and screenshots";
       lines.push(`${DIM}    ${entry.padEnd(15)} ${what}${RESET}`);
     }
     lines.push(
-      `${DIM}${summary.createdArtifacts.length === 1 ? "It is not" : "Neither is"} in .gitignore.`
-      + ` \`vlmkit gates init\` writes ${summary.createdArtifacts.length === 1 ? "that entry" : "those entries"} for you.${RESET}`,
+      `${DIM}${summary.createdArtifacts.length === 1 ? "It is not" : "Neither is"} in .gitignore.` +
+        ` \`vlmkit gates init\` writes ${summary.createdArtifacts.length === 1 ? "that entry" : "those entries"} for you.${RESET}`,
     );
   }
   lines.push("");
@@ -583,7 +599,9 @@ export function formatBatchSummary(
     for (const f of failures) {
       const ran = gateReported(f.output);
       const mark = ran ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${mark} ${f.gate} ${f.page} ${DIM}(exit ${f.exitCode}, ${(f.durationMs / 1000).toFixed(1)}s)${RESET}`);
+      lines.push(
+        `  ${mark} ${f.gate} ${f.page} ${DIM}(exit ${f.exitCode}, ${(f.durationMs / 1000).toFixed(1)}s)${RESET}`,
+      );
       // The reason goes inline for a job that never ran. Re-running to find out why
       // the harness broke is a whole extra cycle, and in CI there may not be one.
       if (!ran) lines.push(`      ${YELLOW}did not run:${RESET} ${gateFailureReason(f.output)}`);
@@ -666,7 +684,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const output = readFlag(argv, "output");
   const json = hasFlag(argv, "json");
   if (gates.length === 0 || gates.some((g) => !g.trim())) {
-    console.error("At least one --gate is required, e.g. --gate \"check integrity\"\n");
+    console.error('At least one --gate is required, e.g. --gate "check integrity"\n');
     printUsage(1);
   }
   if (patterns.length === 0) printUsage(1);
@@ -679,13 +697,17 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     quiet: hasFlag(argv, "quiet"),
   });
   if (json) console.log(JSON.stringify(summary, null, 2));
-  else console.log(formatBatchSummary(summary, {
-      showOutput: hasFlag(argv, "show-output"),
-      ...(output ? { outputDir: output } : {}),
-    }));
+  else
+    console.log(
+      formatBatchSummary(summary, {
+        showOutput: hasFlag(argv, "show-output"),
+        ...(output ? { outputDir: output } : {}),
+      }),
+    );
   if (summary.failed > 0 && !hasFlag(argv, "advisory")) process.exitCode = 1;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "batch" ||
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "batch" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) main().catch(handleCliError);

@@ -31,9 +31,7 @@ function image(
 }
 
 test("compareLandscapeFromRgba returns perfect similarity for identical images", () => {
-  const a = image(320, 200, [
-    { x: 32, y: 32, w: 180, h: 80, r: 30, g: 80, b: 70 },
-  ]);
+  const a = image(320, 200, [{ x: 32, y: 32, w: 180, h: 80, r: 30, g: 80, b: 70 }]);
   const r = compareLandscapeFromRgba(a, a, { cols: 8, rows: 5 });
   assert.equal(r.score, 0);
   assert.equal(r.similarity, 1);
@@ -41,12 +39,8 @@ test("compareLandscapeFromRgba returns perfect similarity for identical images",
 });
 
 test("compareLandscapeFromRgba detects large layout moves", () => {
-  const baseline = image(320, 200, [
-    { x: 32, y: 40, w: 180, h: 72, r: 30, g: 80, b: 70 },
-  ]);
-  const current = image(320, 200, [
-    { x: 112, y: 108, w: 180, h: 72, r: 30, g: 80, b: 70 },
-  ]);
+  const baseline = image(320, 200, [{ x: 32, y: 40, w: 180, h: 72, r: 30, g: 80, b: 70 }]);
+  const current = image(320, 200, [{ x: 112, y: 108, w: 180, h: 72, r: 30, g: 80, b: 70 }]);
   const r = compareLandscapeFromRgba(baseline, current, { cols: 8, rows: 5 });
   assert.ok(r.score > 0.05, `score=${r.score}`);
   assert.ok(r.changedCells > 0);
@@ -54,12 +48,8 @@ test("compareLandscapeFromRgba detects large layout moves", () => {
 });
 
 test("compareLandscapeFromRgba is less sensitive to tiny text-like pixel changes", () => {
-  const baseline = image(400, 240, [
-    { x: 40, y: 80, w: 260, h: 4, r: 20, g: 20, b: 20 },
-  ]);
-  const current = image(400, 240, [
-    { x: 40, y: 80, w: 220, h: 4, r: 20, g: 20, b: 20 },
-  ]);
+  const baseline = image(400, 240, [{ x: 40, y: 80, w: 260, h: 4, r: 20, g: 20, b: 20 }]);
+  const current = image(400, 240, [{ x: 40, y: 80, w: 220, h: 4, r: 20, g: 20, b: 20 }]);
   const r = compareLandscapeFromRgba(baseline, current, { cols: 10, rows: 6 });
   assert.ok(r.score < 0.01, `score=${r.score}`);
   assert.equal(r.changedCells, 0);

@@ -80,11 +80,35 @@ describe("summarizeMigrationFixCandidates", () => {
   it("aggregates repeated candidates across viewports", () => {
     const summary = summarizeMigrationFixCandidates([
       [
-        { selector: ".grid", property: "gap", value: "16px", category: "spacing", mediaCondition: null, score: 6, reasoning: "spacing mismatch" },
-        { selector: ".badge", property: "background-color", value: "#dcfce7", category: "visual", mediaCondition: null, score: 4, reasoning: "paint tree background" },
+        {
+          selector: ".grid",
+          property: "gap",
+          value: "16px",
+          category: "spacing",
+          mediaCondition: null,
+          score: 6,
+          reasoning: "spacing mismatch",
+        },
+        {
+          selector: ".badge",
+          property: "background-color",
+          value: "#dcfce7",
+          category: "visual",
+          mediaCondition: null,
+          score: 4,
+          reasoning: "paint tree background",
+        },
       ],
       [
-        { selector: ".grid", property: "gap", value: "16px", category: "spacing", mediaCondition: null, score: 7, reasoning: "spacing mismatch" },
+        {
+          selector: ".grid",
+          property: "gap",
+          value: "16px",
+          category: "spacing",
+          mediaCondition: null,
+          score: 7,
+          reasoning: "spacing mismatch",
+        },
       ],
     ]);
 

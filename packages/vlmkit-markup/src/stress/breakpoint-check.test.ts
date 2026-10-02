@@ -208,7 +208,10 @@ test("collapseSweepOverflow merges contiguous overflowing widths into ranges", (
 
 test("deriveSweepIssues turns ranges into warn issues with the width span", () => {
   const issues = deriveSweepIssues({
-    min: 320, max: 1280, step: 25, sampledWidths: 39,
+    min: 320,
+    max: 1280,
+    step: 25,
+    sampledWidths: 39,
     overflowRanges: [{ from: 830, to: 870, maxOverflow: 99 }],
   });
   assert.equal(issues.length, 1);

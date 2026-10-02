@@ -78,14 +78,16 @@ function startServer(): Promise<{ server: Server; url: string }> {
  *  are on content that arrives later. That split is what exposes a missing
  *  settle — the action's auto-wait cannot cover for it. */
 const LATE_FLOW = {
-  steps: [{
-    label: "panel shows two cards",
-    do: { action: "click", selector: "#toggle" },
-    expect: [
-      { assert: "count", selector: ".card", equals: 2 },
-      { assert: "visible", selector: "#apply" },
-    ],
-  }],
+  steps: [
+    {
+      label: "panel shows two cards",
+      do: { action: "click", selector: "#toggle" },
+      expect: [
+        { assert: "count", selector: ".card", equals: 2 },
+        { assert: "visible", selector: "#apply" },
+      ],
+    },
+  ],
 } as const;
 
 describe("gates settle before reading a client-rendered page", () => {
@@ -113,7 +115,8 @@ describe("gates settle before reading a client-rendered page", () => {
 
     assert.equal(layout.results?.[0]?.checks?.[0]?.measured, "2");
     assert.equal(flow.done, true, JSON.stringify(flow.steps, null, 1));
-    for (const a of flow.steps[0]!.assertions) assert.equal(a.passed, true, `${JSON.stringify(a.assert)} -> ${a.actual}`);
+    for (const a of flow.steps[0]!.assertions)
+      assert.equal(a.passed, true, `${JSON.stringify(a.assert)} -> ${a.actual}`);
   });
 
   it("verify flow needs no hand-written wait step to see late content", async () => {
@@ -123,7 +126,12 @@ describe("gates settle before reading a client-rendered page", () => {
     const withoutWait = await runFlowVerify({ source: file, flow: structuredClone(LATE_FLOW) as never });
     const withWait = await runFlowVerify({
       source: file,
-      flow: { steps: [{ label: "wait", do: { action: "wait", ms: RENDER_DELAY_MS + 200 } }, ...structuredClone(LATE_FLOW).steps] } as never,
+      flow: {
+        steps: [
+          { label: "wait", do: { action: "wait", ms: RENDER_DELAY_MS + 200 } },
+          ...structuredClone(LATE_FLOW).steps,
+        ],
+      } as never,
     });
     assert.equal(withoutWait.done, withWait.done);
     assert.equal(withoutWait.done, true);
@@ -161,12 +169,15 @@ describe("gates settle before reading a client-rendered page", () => {
     // returned ZERO landmarks on a page that renders after load — the input
     // every downstream contract command reads.
     const spa = join(mkdtempSync(join(tmpdir(), "settle-spa-")), "dist-index.html");
-    writeFileSync(spa, `<!doctype html><meta charset="utf-8"><title>App</title>
+    writeFileSync(
+      spa,
+      `<!doctype html><meta charset="utf-8"><title>App</title>
 <style>body{margin:0;font:16px system-ui,sans-serif}main{padding:24px}</style>
 <body><div id="root">Loading…</div>
 <script>setTimeout(() => { document.getElementById("root").outerHTML =
   '<header><nav>Nav</nav></header><main><h1>Dashboard</h1><p>Body</p></main><footer>F</footer>';
-}, ${RENDER_DELAY_MS});</script>`);
+}, ${RENDER_DELAY_MS});</script>`,
+    );
     const contract = await introspectUiContractFromHtml({
       input: spa,
       viewports: [{ label: "desktop", width: 1280, height: 800 }],
@@ -188,7 +199,10 @@ describe("gates settle before reading a client-rendered page", () => {
 describe("a malformed flow is a usage error, not a page defect", () => {
   it("rejects an unknown assert name and lists the valid ones", () => {
     assert.throws(
-      () => validateFlow({ steps: [{ do: { action: "wait", ms: 1 }, expect: [{ assert: "visble", selector: "#a" } as never] }] }),
+      () =>
+        validateFlow({
+          steps: [{ do: { action: "wait", ms: 1 }, expect: [{ assert: "visble", selector: "#a" } as never] }],
+        }),
       (e: Error) => {
         // Previously: FAIL with actual "unknown assert" — read as a page defect.
         assert.match(e.message, /unknown assert "visble"/);
@@ -209,12 +223,17 @@ describe("a malformed flow is a usage error, not a page defect", () => {
 
   it("names the offending step, so a long flow is debuggable", () => {
     assert.throws(
-      () => validateFlow({
-        steps: [
-          { do: { action: "wait", ms: 1 } },
-          { label: "open menu", do: { action: "hover", selector: "#m" }, expect: [{ assert: "shown", selector: "#p" } as never] },
-        ],
-      }),
+      () =>
+        validateFlow({
+          steps: [
+            { do: { action: "wait", ms: 1 } },
+            {
+              label: "open menu",
+              do: { action: "hover", selector: "#m" },
+              expect: [{ assert: "shown", selector: "#p" } as never],
+            },
+          ],
+        }),
       /step 1 \("open menu"\), expect\[0\]/,
     );
   });
@@ -227,10 +246,7 @@ describe("a malformed flow is a usage error, not a page defect", () => {
     // The validator's lists are string literals, so a name added to FlowAction
     // or FlowAssert without a list entry would start rejecting a *valid* flow.
     // Loud rather than silent, but still wrong — pin it.
-    const source = readFileSync(
-      fileURLToPath(new URL("./inspect/flow-verify.ts", import.meta.url)),
-      "utf8",
-    );
+    const source = readFileSync(fileURLToPath(new URL("./inspect/flow-verify.ts", import.meta.url)), "utf8");
     const union = (kind: "action" | "assert") =>
       [...new Set([...source.matchAll(new RegExp(`\\{ ${kind}: "(\\w+)"`, "g"))].map((m) => m[1]!))].sort();
     assert.deepEqual([...FLOW_ACTIONS].sort(), union("action"));
@@ -242,7 +258,10 @@ describe("a malformed flow is a usage error, not a page defect", () => {
     // FlowAction/FlowAssert but not to the list would start being rejected.
     validateFlow({
       steps: [
-        { do: { action: "click", selector: "#a" }, expect: [{ assert: "attr", selector: "#a", name: "aria-expanded", equals: "true" }] },
+        {
+          do: { action: "click", selector: "#a" },
+          expect: [{ assert: "attr", selector: "#a", name: "aria-expanded", equals: "true" }],
+        },
         { do: { action: "press", key: "Enter" }, expect: [{ assert: "visible", selector: "#a" }] },
         { do: { action: "fill", selector: "#a", value: "x" }, expect: [{ assert: "hidden", selector: "#a" }] },
         { do: { action: "type", selector: "#a", text: "x" }, expect: [{ assert: "focused", selector: "#a" }] },

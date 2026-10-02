@@ -173,10 +173,7 @@ export function validateApprovalManifest(value: unknown): ApprovalManifest {
   };
 }
 
-export function collectApprovalWarnings(
-  manifest: ApprovalManifest,
-  opts: { now?: Date } = {},
-): ApprovalWarning[] {
+export function collectApprovalWarnings(manifest: ApprovalManifest, opts: { now?: Date } = {}): ApprovalWarning[] {
   const now = opts.now ?? new Date();
   return manifest.rules
     .filter((rule) => isApprovalRuleExpired(rule, now))
@@ -202,10 +199,9 @@ export function applyApprovalToVrtDiff(
     return { diff, approved: false, matchedRules: [], warnings };
   }
 
-  const matchedRules = manifest.rules.filter((rule) =>
-    !isApprovalRuleExpired(rule, opts.now) &&
-    matchesApprovalRule(rule, context) &&
-    approvesVrtDiff(rule, diff)
+  const matchedRules = manifest.rules.filter(
+    (rule) =>
+      !isApprovalRuleExpired(rule, opts.now) && matchesApprovalRule(rule, context) && approvesVrtDiff(rule, diff),
   );
 
   if (matchedRules.length === 0) {
@@ -257,8 +253,7 @@ export function filterApprovedVrtRegions(
       // A region-bbox rule approves any diff inside its zone — no DOM context
       // needed. An optional tolerance still bounds the scoped diff.
       if (rule.region) {
-        return matchesApprovalRegion(rule.region, region, opts.viewport) &&
-          approvesVrtDiff(rule, regionDiff);
+        return matchesApprovalRegion(rule.region, region, opts.viewport) && approvesVrtDiff(rule, regionDiff);
       }
       return matchesApprovalRule(rule, context) && approvesVrtDiff(rule, regionDiff);
     });
@@ -306,15 +301,16 @@ export function filterApprovedPaintTreeChanges(
   const matches: PaintTreeApprovalMatch[] = [];
 
   for (const change of changes) {
-    const rules = manifest.rules.filter((rule) =>
-      !isApprovalRuleExpired(rule, opts.now) &&
-      matchesApprovalRule(rule, {
-        selector: context.selector,
-        property: context.property ?? change.property,
-        category: context.category,
-        changeType: change.type,
-      }) &&
-      approvesPaintTreeChange(rule, change)
+    const rules = manifest.rules.filter(
+      (rule) =>
+        !isApprovalRuleExpired(rule, opts.now) &&
+        matchesApprovalRule(rule, {
+          selector: context.selector,
+          property: context.property ?? change.property,
+          category: context.category,
+          changeType: change.type,
+        }) &&
+        approvesPaintTreeChange(rule, change),
     );
 
     if (rules.length === 0) {
@@ -339,10 +335,7 @@ export function matchesApprovalRule(rule: ApprovalRule, context: ApprovalContext
   return true;
 }
 
-export function inferApprovalChangeType(
-  property: string,
-  category: PropertyCategory | undefined,
-): ApprovalChangeType {
+export function inferApprovalChangeType(property: string, category: PropertyCategory | undefined): ApprovalChangeType {
   if (category === "layout" || category === "spacing" || category === "sizing") {
     return "geometry";
   }
@@ -386,10 +379,7 @@ export function suggestApprovalRule(input: ApprovalSuggestionInput): ApprovalRul
   };
 }
 
-export function mergeApprovalManifest(
-  manifest: ApprovalManifest,
-  rules: ApprovalRule[],
-): ApprovalManifest {
+export function mergeApprovalManifest(manifest: ApprovalManifest, rules: ApprovalRule[]): ApprovalManifest {
   const merged = [...manifest.rules];
   for (const rule of rules) {
     const index = merged.findIndex((existing) => isSameApprovalIdentity(existing, rule));
@@ -425,8 +415,13 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   const createdAt = asOptionalString(rule.createdAt, `approval.rules[${index}].createdAt`);
   const kindRaw = asOptionalString(rule.kind, `approval.rules[${index}].kind`);
   const VALID_KINDS = new Set([
-    "visual", "a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic",
-    "media-variant", "cross-browser",
+    "visual",
+    "a11y-contrast",
+    "a11y-touch",
+    "a11y-focus-order",
+    "a11y-semantic",
+    "media-variant",
+    "cross-browser",
   ]);
   if (kindRaw !== undefined && !VALID_KINDS.has(kindRaw)) {
     throw new Error(`approval.rules[${index}].kind must be one of: ${[...VALID_KINDS].join(", ")}`);
@@ -538,9 +533,7 @@ export function filterA11yFindings<T extends { path: string }>(
 ): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
   if (!manifest) return { kept: findings, suppressed: [] };
   const now = new Date();
-  const rules = manifest.rules.filter((r) =>
-    r.kind === kind && !!r.selector && !isApprovalRuleExpired(r, now),
-  );
+  const rules = manifest.rules.filter((r) => r.kind === kind && !!r.selector && !isApprovalRuleExpired(r, now));
   if (rules.length === 0) return { kept: findings, suppressed: [] };
   const kept: T[] = [];
   const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
@@ -558,19 +551,21 @@ export function filterA11yFindings<T extends { path: string }>(
  * findings on that engine by setting `deltaRatio = 0` and tagging
  * the engine's error / note. The audit trail is preserved.
  */
-export function filterCrossBrowserFindings<T extends {
-  engine: string;
-  status: "ok" | "skipped" | "failed";
-  deltaRatio: number;
-  error?: string;
-}>(
+export function filterCrossBrowserFindings<
+  T extends {
+    engine: string;
+    status: "ok" | "skipped" | "failed";
+    deltaRatio: number;
+    error?: string;
+  },
+>(
   findings: T[],
   manifest: ApprovalManifest | null | undefined,
 ): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
   if (!manifest) return { kept: findings, suppressed: [] };
   const now = new Date();
-  const rules = manifest.rules.filter((r) =>
-    r.kind === "cross-browser" && !!r.selector && !isApprovalRuleExpired(r, now),
+  const rules = manifest.rules.filter(
+    (r) => r.kind === "cross-browser" && !!r.selector && !isApprovalRuleExpired(r, now),
   );
   if (rules.length === 0) return { kept: findings, suppressed: [] };
   const kept: T[] = [];
@@ -598,14 +593,16 @@ export function filterCrossBrowserFindings<T extends {
  * (audit trail preserved in the kept list; the gate counts what's
  * left).
  */
-export function filterMediaVariantFindings<T extends { variant: string; verdict: "ok" | "suspect" | "warn" | "skip"; note: string }>(
+export function filterMediaVariantFindings<
+  T extends { variant: string; verdict: "ok" | "suspect" | "warn" | "skip"; note: string },
+>(
   findings: T[],
   manifest: ApprovalManifest | null | undefined,
 ): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
   if (!manifest) return { kept: findings, suppressed: [] };
   const now = new Date();
-  const rules = manifest.rules.filter((r) =>
-    r.kind === "media-variant" && !!r.selector && !isApprovalRuleExpired(r, now),
+  const rules = manifest.rules.filter(
+    (r) => r.kind === "media-variant" && !!r.selector && !isApprovalRuleExpired(r, now),
   );
   if (rules.length === 0) return { kept: findings, suppressed: [] };
   const kept: T[] = [];
@@ -625,7 +622,6 @@ export function filterMediaVariantFindings<T extends { variant: string; verdict:
   }
   return { kept, suppressed };
 }
-
 
 function validateTolerance(value: unknown, index: number): ApprovalTolerance | undefined {
   if (value === undefined) return undefined;
@@ -737,9 +733,7 @@ function getMaxColorDelta(changes: PaintTreeChange[]): number | null {
 
 function parseExpiry(expires: string): Date {
   const dateOnly = expires.match(/^\d{4}-\d{2}-\d{2}$/);
-  const parsed = dateOnly
-    ? new Date(`${expires}T23:59:59.999`)
-    : new Date(expires);
+  const parsed = dateOnly ? new Date(`${expires}T23:59:59.999`) : new Date(expires);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error(`Invalid approval expiry date: ${expires}`);
   }
@@ -784,12 +778,14 @@ function isSameApprovalIdentity(a: ApprovalRule, b: ApprovalRule): boolean {
   // a selector with a pre-existing visual rule.
   const ka = a.kind ?? "visual";
   const kb = b.kind ?? "visual";
-  return ka === kb &&
+  return (
+    ka === kb &&
     a.selector === b.selector &&
     a.property === b.property &&
     a.category === b.category &&
     a.changeType === b.changeType &&
-    JSON.stringify(a.region) === JSON.stringify(b.region);
+    JSON.stringify(a.region) === JSON.stringify(b.region)
+  );
 }
 
 const TEXTUAL_PROPERTIES = new Set([

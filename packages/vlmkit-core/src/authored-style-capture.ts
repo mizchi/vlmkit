@@ -81,12 +81,8 @@ export function captureAuthoredStyleSnapshotInDom(props: string[]): AuthoredStyl
     };
 
     // @media / @supports / @container — descend with the media condition extended.
-    const conditionFromMedia = typeof ruleObj.media?.mediaText === "string"
-      ? ruleObj.media!.mediaText
-      : "";
-    const conditionFromAt = typeof ruleObj.conditionText === "string"
-      ? ruleObj.conditionText
-      : "";
+    const conditionFromMedia = typeof ruleObj.media?.mediaText === "string" ? ruleObj.media!.mediaText : "";
+    const conditionFromAt = typeof ruleObj.conditionText === "string" ? ruleObj.conditionText : "";
     const additionalCondition = conditionFromMedia || conditionFromAt;
     const nestedMedia = additionalCondition
       ? mediaCondition
@@ -128,25 +124,22 @@ export function captureAuthoredStyleSnapshotInDom(props: string[]): AuthoredStyl
       for (const rule of Array.from(rules)) {
         visit(rule, "");
       }
-    } catch { /* cross-origin stylesheet */ }
+    } catch {
+      /* cross-origin stylesheet */
+    }
   }
 
   return results;
 }
 
 // esbuild injects __name(fn, "name") calls into Function.toString() output.
-const ESBUILD_NAME_POLYFILL =
-  "var __name = typeof __name !== 'undefined' ? __name : function(fn) { return fn; };";
+const ESBUILD_NAME_POLYFILL = "var __name = typeof __name !== 'undefined' ? __name : function(fn) { return fn; };";
 
-export function buildAuthoredStyleCaptureExpression(
-  props: string[] = AUTHORED_PROPERTIES,
-): string {
+export function buildAuthoredStyleCaptureExpression(props: string[] = AUTHORED_PROPERTIES): string {
   return `(function(){ ${ESBUILD_NAME_POLYFILL} return (${captureAuthoredStyleSnapshotInDom.toString()})(${JSON.stringify(props)}); })()`;
 }
 
-export function buildAuthoredStyleCaptureJsonExpression(
-  props: string[] = AUTHORED_PROPERTIES,
-): string {
+export function buildAuthoredStyleCaptureJsonExpression(props: string[] = AUTHORED_PROPERTIES): string {
   return `JSON.stringify(${buildAuthoredStyleCaptureExpression(props)})`;
 }
 
@@ -167,9 +160,7 @@ export function parseAuthoredStyleSnapshot(value: unknown): AuthoredStyleSnapsho
 }
 
 export function hasMeaningfulAuthoredStyleSnapshot(snapshot: AuthoredStyleSnapshot): boolean {
-  return Object.values(snapshot).some((props) =>
-    Object.values(props).some((value) => value.trim().length > 0)
-  );
+  return Object.values(snapshot).some((props) => Object.values(props).some((value) => value.trim().length > 0));
 }
 
 function safeJsonParse(value: string): unknown {

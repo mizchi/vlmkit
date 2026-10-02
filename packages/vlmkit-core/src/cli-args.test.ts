@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "vite-plus/test";
-import {
-  getArg,
-  getArgValues,
-  getFloatArg,
-  getIntArg,
-  getPositionalArgs,
-  getRawArgs,
-  hasFlag,
-} from "./cli-args.ts";
+import { getArg, getArgValues, getFloatArg, getIntArg, getPositionalArgs, getRawArgs, hasFlag } from "./cli-args.ts";
 
 const REAL_ARGV = process.argv;
 const withArgv = <T>(tail: string[], body: () => T): T => {
@@ -22,13 +14,25 @@ afterEach(() => {
 
 describe("getArg", () => {
   it("reads a value and falls back when absent", () => {
-    assert.equal(withArgv(["--fixture", "page"], () => getArg("fixture", "default")), "page");
-    assert.equal(withArgv(["--json"], () => getArg("fixture", "default")), "default");
-    assert.equal(withArgv([], () => getArg("fixture")), undefined);
+    assert.equal(
+      withArgv(["--fixture", "page"], () => getArg("fixture", "default")),
+      "page",
+    );
+    assert.equal(
+      withArgv(["--json"], () => getArg("fixture", "default")),
+      "default",
+    );
+    assert.equal(
+      withArgv([], () => getArg("fixture")),
+      undefined,
+    );
   });
 
   it("treats an empty value as absent, as callers were written against", () => {
-    assert.equal(withArgv(["--image", ""], () => getArg("image", "fallback.png")), "fallback.png");
+    assert.equal(
+      withArgv(["--image", ""], () => getArg("image", "fallback.png")),
+      "fallback.png",
+    );
   });
 
   it("refuses to return the next flag as the value", () => {
@@ -43,16 +47,31 @@ describe("getArg", () => {
   it("reads argv per call, so a dispatcher-loaded leaf sees its own arguments", () => {
     // The previous module captured process.argv at import time; a leaf loaded
     // after the dispatcher rewrote argv saw the wrong list.
-    assert.equal(withArgv(["--fixture", "a"], () => getArg("fixture", "?")), "a");
-    assert.equal(withArgv(["--fixture", "b"], () => getArg("fixture", "?")), "b");
+    assert.equal(
+      withArgv(["--fixture", "a"], () => getArg("fixture", "?")),
+      "a",
+    );
+    assert.equal(
+      withArgv(["--fixture", "b"], () => getArg("fixture", "?")),
+      "b",
+    );
   });
 });
 
 describe("getIntArg / getFloatArg", () => {
   it("parses, falls back, and range-checks", () => {
-    assert.equal(withArgv(["--max-rounds", "5"], () => getIntArg("max-rounds", 3)), 5);
-    assert.equal(withArgv([], () => getIntArg("max-rounds", 3)), 3);
-    assert.equal(withArgv(["--max-cost", "0.001"], () => getFloatArg("max-cost", 999)), 0.001);
+    assert.equal(
+      withArgv(["--max-rounds", "5"], () => getIntArg("max-rounds", 3)),
+      5,
+    );
+    assert.equal(
+      withArgv([], () => getIntArg("max-rounds", 3)),
+      3,
+    );
+    assert.equal(
+      withArgv(["--max-cost", "0.001"], () => getFloatArg("max-cost", 999)),
+      0.001,
+    );
   });
 
   it("rejects a non-number where the old code produced NaN", () => {
@@ -84,9 +103,21 @@ describe("getPositionalArgs", () => {
 
 describe("hasFlag / getArgValues / getRawArgs", () => {
   it("still work as before", () => {
-    assert.equal(withArgv(["--no-db"], () => hasFlag("no-db")), true);
-    assert.equal(withArgv([], () => hasFlag("no-db")), false);
-    assert.deepEqual(withArgv(["--gate", "a", "--gate", "b"], () => getArgValues("gate")), ["a", "b"]);
-    assert.deepEqual(withArgv(["--fixture", "page"], () => getRawArgs()), ["--fixture", "page"]);
+    assert.equal(
+      withArgv(["--no-db"], () => hasFlag("no-db")),
+      true,
+    );
+    assert.equal(
+      withArgv([], () => hasFlag("no-db")),
+      false,
+    );
+    assert.deepEqual(
+      withArgv(["--gate", "a", "--gate", "b"], () => getArgValues("gate")),
+      ["a", "b"],
+    );
+    assert.deepEqual(
+      withArgv(["--fixture", "page"], () => getRawArgs()),
+      ["--fixture", "page"],
+    );
   });
 });

@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  createCraterWasmLayoutBackend,
-  loadCraterWasmModule,
-  normalizeCraterLayoutJson,
-} from "./crater-wasm.ts";
+import { createCraterWasmLayoutBackend, loadCraterWasmModule, normalizeCraterLayoutJson } from "./crater-wasm.ts";
 
 const SAMPLE_LAYOUT_JSON = JSON.stringify({
   id: "root",
@@ -15,17 +11,19 @@ const SAMPLE_LAYOUT_JSON = JSON.stringify({
   margin: { top: 0, right: 0, bottom: 0, left: 0 },
   padding: { top: 8, right: 8, bottom: 8, left: 8 },
   border: { top: 1, right: 1, bottom: 1, left: 1 },
-  children: [{
-    id: "title",
-    x: 8,
-    y: 8,
-    width: 120,
-    height: 32,
-    margin: { top: 0, right: 0, bottom: 0, left: 0 },
-    padding: { top: 0, right: 0, bottom: 0, left: 0 },
-    border: { top: 0, right: 0, bottom: 0, left: 0 },
-    children: [],
-  }],
+  children: [
+    {
+      id: "title",
+      x: 8,
+      y: 8,
+      width: 120,
+      height: 32,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      border: { top: 0, right: 0, bottom: 0, left: 0 },
+      children: [],
+    },
+  ],
 });
 
 describe("Crater WASM layout backend", () => {
@@ -44,11 +42,13 @@ describe("Crater WASM layout backend", () => {
     });
 
     assert.equal(result.backend, "crater-wasm");
-    assert.deepEqual(calls, [{
-      html: "<main><h1>Hello</h1></main>",
-      width: 320,
-      height: 180,
-    }]);
+    assert.deepEqual(calls, [
+      {
+        html: "<main><h1>Hello</h1></main>",
+        width: 320,
+        height: 180,
+      },
+    ]);
     assert.equal(result.viewport.label, "small");
     assert.equal(result.layout.id, "root");
     assert.equal(result.layout.children[0]?.id, "title");
@@ -61,10 +61,7 @@ describe("Crater WASM layout backend", () => {
     const layout = normalizeCraterLayoutJson(SAMPLE_LAYOUT_JSON);
     assert.equal(layout.padding.left, 8);
 
-    assert.throws(
-      () => normalizeCraterLayoutJson(JSON.stringify({ id: "bad", children: [] })),
-      /missing numeric x/,
-    );
+    assert.throws(() => normalizeCraterLayoutJson(JSON.stringify({ id: "bad", children: [] })), /missing numeric x/);
   });
 
   it("loads a dynamically imported Crater WPT module", async () => {
@@ -98,9 +95,10 @@ describe("Crater WASM layout backend", () => {
 
   it("fails fast when the loaded module does not expose the WPT layout renderer", async () => {
     await assert.rejects(
-      () => loadCraterWasmModule({
-        modulePath: "data:text/javascript,export const nope = true;",
-      }),
+      () =>
+        loadCraterWasmModule({
+          modulePath: "data:text/javascript,export const nope = true;",
+        }),
       /renderHtmlToJsonForWpt/,
     );
   });

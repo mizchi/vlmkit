@@ -14,12 +14,7 @@ function blankPng(width: number, height: number, fill: [number, number, number])
   return { width, height, data };
 }
 
-function paintRows(
-  png: PngData,
-  y0: number,
-  y1: number,
-  color: [number, number, number],
-): void {
+function paintRows(png: PngData, y0: number, y1: number, color: [number, number, number]): void {
   for (let y = y0; y < y1; y++) {
     for (let x = 0; x < png.width; x++) {
       const i = (y * png.width + x) * 4;

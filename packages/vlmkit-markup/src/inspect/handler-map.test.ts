@@ -162,13 +162,21 @@ test("E2E: widgets fixture surface is clean and fully attributed", { timeout: 12
   assert.ok(listbox.ix !== null); // cross-referenced with the interaction map
   const cell = s.elements.find((e) => e.text === "W1")!;
   assert.equal(cell.insideInteractive, true); // grid interior, exempt
-  assert.deepEqual(deriveHandlerIssues(s).filter((i) => i.severity === "suspect"), []);
+  assert.deepEqual(
+    deriveHandlerIssues(s).filter((i) => i.severity === "suspect"),
+    [],
+  );
 });
 
-test("E2E: a pointer-only div is caught; a delegation wrapper and inline onclick are handled", { timeout: 120_000 }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), "handlers-"));
-  const file = join(dir, "page.html");
-  writeFileSync(file, `<!doctype html><html><head><title>t</title></head><body>
+test(
+  "E2E: a pointer-only div is caught; a delegation wrapper and inline onclick are handled",
+  { timeout: 120_000 },
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), "handlers-"));
+    const file = join(dir, "page.html");
+    writeFileSync(
+      file,
+      `<!doctype html><html><head><title>t</title></head><body>
     <div id="wrap">
       <button id="real">Real button</button>
     </div>
@@ -178,17 +186,19 @@ test("E2E: a pointer-only div is caught; a delegation wrapper and inline onclick
       document.getElementById("wrap").addEventListener("click", () => {});
       document.getElementById("ghost").addEventListener("click", () => { location.hash = "cart"; });
     </script>
-  </body></html>`);
-  const s = await buildHandlerSurface({ source: file });
-  const issues = deriveHandlerIssues(s);
-  const pointerOnly = issues.filter((i) => i.kind === "pointer-only-control");
-  // ghost (addEventListener) and inline (onclick attribute) both flagged;
-  // wrap is a delegation container around a real button — exempt.
-  assert.equal(pointerOnly.length, 2);
-  assert.ok(pointerOnly.some((i) => i.element.includes("#ghost")));
-  assert.ok(pointerOnly.some((i) => i.element.includes("#inline")));
-  assert.ok(!pointerOnly.some((i) => i.element.includes("#wrap")));
-});
+  </body></html>`,
+    );
+    const s = await buildHandlerSurface({ source: file });
+    const issues = deriveHandlerIssues(s);
+    const pointerOnly = issues.filter((i) => i.kind === "pointer-only-control");
+    // ghost (addEventListener) and inline (onclick attribute) both flagged;
+    // wrap is a delegation container around a real button — exempt.
+    assert.equal(pointerOnly.length, 2);
+    assert.ok(pointerOnly.some((i) => i.element.includes("#ghost")));
+    assert.ok(pointerOnly.some((i) => i.element.includes("#inline")));
+    assert.ok(!pointerOnly.some((i) => i.element.includes("#wrap")));
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Surface contract compare
@@ -252,9 +262,9 @@ test("surface contract: container delegation across structure covers per-cell re
 // `dragover` (on the target), and both are covered here.
 
 test("a dragstart handler on a non-draggable element is a handler that cannot fire", () => {
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#item", text: "row", types: { dragstart: 1 }, draggable: false }),
-  ));
+  const issues = deriveHandlerIssues(
+    surface(entry({ path: "div#item", text: "row", types: { dragstart: 1 }, draggable: false })),
+  );
   const found = issues.find((i) => i.kind === "drag-source-not-draggable")!;
   assert.ok(found, "dragstart without draggable must report");
   assert.equal(found.severity, "suspect");
@@ -265,25 +275,21 @@ test("a dragstart handler on a non-draggable element is a handler that cannot fi
 test("a draggable source is not reported, however it became draggable", () => {
   // `el.draggable` is the effective value, so an <a href> or <img> reads true with no
   // attribute. Deriving it from the attribute alone would have flagged both.
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#item", types: { dragstart: 1, dragend: 1 }, draggable: true }),
-  ));
+  const issues = deriveHandlerIssues(
+    surface(entry({ path: "div#item", types: { dragstart: 1, dragend: 1 }, draggable: true })),
+  );
   assert.equal(issues.filter((i) => i.kind === "drag-source-not-draggable").length, 0);
 });
 
 test("draggability that was never collected does not invent a finding", () => {
   // A surface from an older build has no `draggable` field. Reading `undefined` as "not
   // draggable" would report every drag source on data this gate did not measure.
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#item", types: { dragstart: 1 } }),
-  ));
+  const issues = deriveHandlerIssues(surface(entry({ path: "div#item", types: { dragstart: 1 } })));
   assert.equal(issues.filter((i) => i.kind === "drag-source-not-draggable").length, 0);
 });
 
 test("a drop handler with no dragover anywhere above it can never fire", () => {
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#zone", text: "drop here", types: { drop: 1 } }),
-  ));
+  const issues = deriveHandlerIssues(surface(entry({ path: "div#zone", text: "drop here", types: { drop: 1 } })));
   const found = issues.find((i) => i.kind === "drop-without-dragover")!;
   assert.ok(found, "drop with no dragover must report");
   assert.equal(found.severity, "suspect");
@@ -293,11 +299,10 @@ test("a drop handler with no dragover anywhere above it can never fire", () => {
 
 test("dragover or dragenter on the element itself clears the drop finding", () => {
   for (const partner of ["dragover", "dragenter"] as const) {
-    const issues = deriveHandlerIssues(surface(
-      entry({ path: "div#zone", types: { drop: 1, [partner]: 1 } }),
-    ));
+    const issues = deriveHandlerIssues(surface(entry({ path: "div#zone", types: { drop: 1, [partner]: 1 } })));
     assert.equal(
-      issues.filter((i) => i.kind === "drop-without-dragover").length, 0,
+      issues.filter((i) => i.kind === "drop-without-dragover").length,
+      0,
       `${partner} on the element is enough`,
     );
   }
@@ -306,9 +311,9 @@ test("dragover or dragenter on the element itself clears the drop finding", () =
 test("dragover on an ancestor clears it too, because the event bubbles", () => {
   // A delegated drop target registers dragover once on the container. Flagging the child
   // would be a false positive on the normal way to write this.
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "ul>li", types: { drop: 1 }, ancestorTypes: ["dragover"] }),
-  ));
+  const issues = deriveHandlerIssues(
+    surface(entry({ path: "ul>li", types: { drop: 1 }, ancestorTypes: ["dragover"] })),
+  );
   assert.equal(issues.filter((i) => i.kind === "drop-without-dragover").length, 0);
 });
 
@@ -317,9 +322,7 @@ test("drag with no keyboard path is a warn, not a suspect, and does not advise t
   // but the alternative route is often elsewhere on the page, which this element-local
   // view cannot see. And the fix is NOT the `pointer-only-control` remedy: tabindex and a
   // key handler cannot start a drag, which is why drag is kept out of POINTER_TYPES.
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#item", types: { dragstart: 1 }, draggable: true }),
-  ));
+  const issues = deriveHandlerIssues(surface(entry({ path: "div#item", types: { dragstart: 1 }, draggable: true })));
   const found = issues.find((i) => i.kind === "drag-without-keyboard-alternative")!;
   assert.ok(found);
   assert.equal(found.severity, "warn");
@@ -340,80 +343,90 @@ test("a keyboard handler on the element or an ancestor answers the drag a11y fin
   ];
   for (const shape of shapes) {
     const issues = deriveHandlerIssues(surface(entry({ path: "div#item", draggable: true, ...shape })));
-    assert.equal(
-      issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0,
-      JSON.stringify(shape),
-    );
+    assert.equal(issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0, JSON.stringify(shape));
   }
 });
 
 test("an invisible drag source is not an a11y finding", () => {
   // Same guard the pointer-only check uses: a hidden element operates nothing.
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#item", types: { dragstart: 1 }, draggable: true, visible: false }),
-  ));
+  const issues = deriveHandlerIssues(
+    surface(entry({ path: "div#item", types: { dragstart: 1 }, draggable: true, visible: false })),
+  );
   assert.equal(issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0);
 });
 
 test("a correct drag pair produces no drag findings at all", () => {
   // The control. A source that is draggable with a keyboard alternative, and a target with
   // both halves of the drop contract, must be silent — otherwise the rules are noise.
-  const issues = deriveHandlerIssues(surface(
-    entry({ path: "div#item", types: { dragstart: 1, dragend: 1, keydown: 1 }, draggable: true }),
-    entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }),
-  ));
-  assert.deepEqual(issues.filter((i) => i.kind.startsWith("drag") || i.kind.startsWith("drop")), []);
+  const issues = deriveHandlerIssues(
+    surface(
+      entry({ path: "div#item", types: { dragstart: 1, dragend: 1, keydown: 1 }, draggable: true }),
+      entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }),
+    ),
+  );
+  assert.deepEqual(
+    issues.filter((i) => i.kind.startsWith("drag") || i.kind.startsWith("drop")),
+    [],
+  );
 });
 
-test("E2E: drag handlers are collected through both routes, and only the broken pairs report",
-  { timeout: 120_000 }, async () => {
-  // Driven from the committed fixture rather than an inline string, so the HTML a reader
-  // opens to learn what this gate checks is the same HTML the assertions below pin. The
-  // fixture's own comment states the expectation per element.
-  //
-  // The `on*` sweep is the half that was missing: `COMMON_ON_PROPS` had no drag entries, so
-  // `el.ondragover = fn` and `<div ondragstart="...">` were invisible. Measured before the
-  // fix on the same shape — the element assigning `ondragover` as a property did not appear
-  // in the surface at all.
-  const s = await buildHandlerSurface({ source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html") });
-  // `describe()` joins ancestors with `>`, so match on the id segment rather than the whole
-  // path — and anchored, because `div#ok` is a substring of nothing here but `div#zone` is a
-  // prefix of `div#zone-no-dragover`.
-  const byId = (id: string) => s.elements.find((e) => e.path.endsWith(`#${id}`));
+test(
+  "E2E: drag handlers are collected through both routes, and only the broken pairs report",
+  { timeout: 120_000 },
+  async () => {
+    // Driven from the committed fixture rather than an inline string, so the HTML a reader
+    // opens to learn what this gate checks is the same HTML the assertions below pin. The
+    // fixture's own comment states the expectation per element.
+    //
+    // The `on*` sweep is the half that was missing: `COMMON_ON_PROPS` had no drag entries, so
+    // `el.ondragover = fn` and `<div ondragstart="...">` were invisible. Measured before the
+    // fix on the same shape — the element assigning `ondragover` as a property did not appear
+    // in the surface at all.
+    const s = await buildHandlerSurface({ source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html") });
+    // `describe()` joins ancestors with `>`, so match on the id segment rather than the whole
+    // path — and anchored, because `div#ok` is a substring of nothing here but `div#zone` is a
+    // prefix of `div#zone-no-dragover`.
+    const byId = (id: string) => s.elements.find((e) => e.path.endsWith(`#${id}`));
 
-  // Route 2, the DOM sweep, both spellings.
-  assert.ok(byId("prop-target")?.types.dragover, "ondragover assigned as a property must be collected");
-  assert.ok(byId("attr-source")?.types.dragstart, "an ondragstart attribute must be collected");
-  // Route 1 keeps working, including the continuous `drag` event.
-  assert.ok(byId("ok")?.types.drag, "`drag` is the continuous source event — there is no dragmove");
+    // Route 2, the DOM sweep, both spellings.
+    assert.ok(byId("prop-target")?.types.dragover, "ondragover assigned as a property must be collected");
+    assert.ok(byId("attr-source")?.types.dragstart, "an ondragstart attribute must be collected");
+    // Route 1 keeps working, including the continuous `drag` event.
+    assert.ok(byId("ok")?.types.drag, "`drag` is the continuous source event — there is no dragmove");
 
-  // Effective draggability, read off the DOM property so defaults come out right.
-  assert.equal(byId("ok")?.draggable, true);
-  assert.equal(byId("not-draggable")?.draggable, false);
-  assert.equal(byId("native-source")?.draggable, true, "an <a href> is draggable with no attribute");
+    // Effective draggability, read off the DOM property so defaults come out right.
+    assert.equal(byId("ok")?.draggable, true);
+    assert.equal(byId("not-draggable")?.draggable, false);
+    assert.equal(byId("native-source")?.draggable, true, "an <a href> is draggable with no attribute");
 
-  const issues = deriveHandlerIssues(s);
-  const kindsFor = (id: string) =>
-    issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+    const issues = deriveHandlerIssues(s);
+    const kindsFor = (id: string) =>
+      issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
 
-  // The two handlers that cannot fire.
-  assert.deepEqual(kindsFor("not-draggable").filter((k) => k === "drag-source-not-draggable"),
-    ["drag-source-not-draggable"]);
-  assert.deepEqual(kindsFor("zone-no-dragover").filter((k) => k === "drop-without-dragover"),
-    ["drop-without-dragover"]);
-
-  // And everything correct stays silent, which is what makes those two readable.
-  for (const id of ["ok", "zone", "native-source", "attr-source", "prop-target", "delegated-item"]) {
+    // The two handlers that cannot fire.
     assert.deepEqual(
-      kindsFor(id).filter((k) => k === "drag-source-not-draggable" || k === "drop-without-dragover"),
-      [], `${id} should have no unfireable-handler finding`,
+      kindsFor("not-draggable").filter((k) => k === "drag-source-not-draggable"),
+      ["drag-source-not-draggable"],
     );
-  }
-  // The a11y half: #ok and #attr-source carry keyboard handlers, the other two sources do not.
-  assert.equal(kindsFor("ok").includes("drag-without-keyboard-alternative"), false);
-  assert.equal(kindsFor("attr-source").includes("drag-without-keyboard-alternative"), false);
-  assert.ok(kindsFor("not-draggable").includes("drag-without-keyboard-alternative"));
-});
+    assert.deepEqual(
+      kindsFor("zone-no-dragover").filter((k) => k === "drop-without-dragover"),
+      ["drop-without-dragover"],
+    );
+
+    // And everything correct stays silent, which is what makes those two readable.
+    for (const id of ["ok", "zone", "native-source", "attr-source", "prop-target", "delegated-item"]) {
+      assert.deepEqual(
+        kindsFor(id).filter((k) => k === "drag-source-not-draggable" || k === "drop-without-dragover"),
+        [],
+        `${id} should have no unfireable-handler finding`,
+      );
+    }
+    // The a11y half: #ok and #attr-source carry keyboard handlers, the other two sources do not.
+    assert.equal(kindsFor("ok").includes("drag-without-keyboard-alternative"), false);
+    assert.equal(kindsFor("attr-source").includes("drag-without-keyboard-alternative"), false);
+    assert.ok(kindsFor("not-draggable").includes("drag-without-keyboard-alternative"));
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Probed drag behaviour
@@ -532,8 +545,7 @@ test("E2E: the probe catches what the static read cannot", { timeout: 120_000 },
   );
 
   const issues = deriveHandlerIssues(s);
-  const kindsFor = (id: string) =>
-    issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+  const kindsFor = (id: string) => issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
 
   assert.ok(kindsFor("zone-forgot-prevent").includes("dragover-not-prevented"));
   // The two targets that do cancel stay silent.
@@ -574,10 +586,15 @@ test("down + move on one element is a pointer drag; either alone is not", () => 
 });
 
 test("a pointer-drag surface gets the drag finding, with drag advice, not the click advice", () => {
-  const issues = deriveHandlerIssues(surface(entry({
-    path: "div#canvas", text: "canvas",
-    types: { pointerdown: 1, pointermove: 1, pointerup: 1 },
-  })));
+  const issues = deriveHandlerIssues(
+    surface(
+      entry({
+        path: "div#canvas",
+        text: "canvas",
+        types: { pointerdown: 1, pointermove: 1, pointerup: 1 },
+      }),
+    ),
+  );
   const drag = issues.find((i) => i.kind === "drag-without-keyboard-alternative")!;
   assert.ok(drag, "a pointer drag with no keyboard path must report");
   assert.match(drag.message, /pointer drag/);
@@ -591,18 +608,32 @@ test("a pointer-drag surface gets the drag finding, with drag advice, not the cl
 test("a click-only role-less div is still a pointer-only control", () => {
   // The control for the change above: the two accordion headers on that same editor
   // ("Canvas Settings", "Elements (11)") are click-only and correctly kept their finding.
-  const issues = deriveHandlerIssues(surface(entry({
-    path: "div#acc", text: "Canvas Settings", types: { click: 1 },
-  })));
+  const issues = deriveHandlerIssues(
+    surface(
+      entry({
+        path: "div#acc",
+        text: "Canvas Settings",
+        types: { click: 1 },
+      }),
+    ),
+  );
   assert.equal(issues.filter((i) => i.kind === "pointer-only-control").length, 1);
   assert.equal(issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0);
 });
 
 test("a pointer drag with a keyboard path reports nothing", () => {
-  const issues = deriveHandlerIssues(surface(entry({
-    path: "div#canvas", types: { pointerdown: 1, pointermove: 1, keydown: 1 },
-  })));
-  assert.deepEqual(issues.filter((i) => i.kind.startsWith("drag") || i.kind === "pointer-only-control"), []);
+  const issues = deriveHandlerIssues(
+    surface(
+      entry({
+        path: "div#canvas",
+        types: { pointerdown: 1, pointermove: 1, keydown: 1 },
+      }),
+    ),
+  );
+  assert.deepEqual(
+    issues.filter((i) => i.kind.startsWith("drag") || i.kind === "pointer-only-control"),
+    [],
+  );
 });
 
 test("E2E: the accessible name identifies an icon-only control", { timeout: 120_000 }, async () => {
@@ -612,7 +643,9 @@ test("E2E: the accessible name identifies an icon-only control", { timeout: 120_
   // which element it is about. The buttons' aria-labels say "Zoom Out", "Zoom In", …
   const dir = mkdtempSync(join(tmpdir(), "handlers-name-"));
   const file = join(dir, "icons.html");
-  writeFileSync(file, `<!doctype html><html><head><title>t</title></head><body>
+  writeFileSync(
+    file,
+    `<!doctype html><html><head><title>t</title></head><body>
     <button aria-label="Zoom Out" style="width:30px;height:30px"><svg width="10" height="10"></svg></button>
     <button title="Fit to Canvas" style="width:30px;height:30px"><svg width="10" height="10"></svg></button>
     <button style="width:30px;height:30px"><img src="data:," alt="Import SVG"></button>
@@ -620,71 +653,78 @@ test("E2E: the accessible name identifies an icon-only control", { timeout: 120_
     <script>
       for (const b of document.querySelectorAll("button")) b.addEventListener("click", () => {});
     </script>
-  </body></html>`);
+  </body></html>`,
+  );
   const s = await buildHandlerSurface({ source: file });
-  const names = s.elements.filter((e) => e.path.endsWith("button")).map((e) => e.text).sort();
+  const names = s.elements
+    .filter((e) => e.path.endsWith("button"))
+    .map((e) => e.text)
+    .sort();
   assert.deepEqual(names, ["Fit to Canvas", "Import SVG", "Text wins", "Zoom Out"]);
 });
 
-test("E2E: the pointer-drag gesture separates a working drag from a dead one, canvas included",
-  { timeout: 180_000 }, async () => {
-  // A real gesture — mouse.down / move / up — not a synthetic event: unlike HTML5 drag, this
-  // one IS drivable, so the probe measures the same input a user produces.
-  //
-  // Pixels rather than the DOM, and `#canvas-works` is the reason: its DOM never changes at
-  // all while it draws, so a DOM comparison would call every canvas editor dead.
-  const s = await buildHandlerSurface({
-    source: join(REPO_ROOT, "fixtures/handlers/pointer-drag.html"),
-    probeDrag: true,
-  });
-  assert.ok(s.pointerDragProbe, "probeDrag must produce pointer-drag rows on this page");
-  const row = (id: string) => s.pointerDragProbe!.find((r) => r.path.endsWith(`#${id}`));
+test(
+  "E2E: the pointer-drag gesture separates a working drag from a dead one, canvas included",
+  { timeout: 180_000 },
+  async () => {
+    // A real gesture — mouse.down / move / up — not a synthetic event: unlike HTML5 drag, this
+    // one IS drivable, so the probe measures the same input a user produces.
+    //
+    // Pixels rather than the DOM, and `#canvas-works` is the reason: its DOM never changes at
+    // all while it draws, so a DOM comparison would call every canvas editor dead.
+    const s = await buildHandlerSurface({
+      source: join(REPO_ROOT, "fixtures/handlers/pointer-drag.html"),
+      probeDrag: true,
+    });
+    assert.ok(s.pointerDragProbe, "probeDrag must produce pointer-drag rows on this page");
+    const row = (id: string) => s.pointerDragProbe!.find((r) => r.path.endsWith(`#${id}`));
 
-  for (const id of ["works", "feedback-only", "dead", "canvas-works"]) {
-    assert.ok(row(id), `${id} should have been driven`);
-    assert.equal(row(id)!.error, undefined, `${id}: ${row(id)!.error}`);
-  }
-  // A drag that moves something, while held and after release.
-  assert.ok(row("works")!.feedbackRatio > 0.005, `works feedback ${row("works")!.feedbackRatio}`);
-  assert.ok(row("works")!.committedRatio > 0.005, `works committed ${row("works")!.committedRatio}`);
-  // Engages, then reverts: feedback without a commit is a distinguishable state.
-  assert.ok(row("feedback-only")!.feedbackRatio > 0.005);
-  assert.equal(row("feedback-only")!.committedRatio, 0, "it put the dot back");
-  // Wired and inert.
-  assert.equal(row("dead")!.feedbackRatio, 0);
-  assert.equal(row("dead")!.committedRatio, 0);
-  /*
-   * The canvas: pixels move, the DOM does not.
-   *
-   * The numbers are in the message, and they are what found the cause. This assertion failed in full
-   * parallel runs while passing every time in isolation, and printing them said why:
-   * `feedback=0.250% committed=0.500% handlerCalls=11` — the page had received the whole gesture and
-   * drawn a ninth of the stroke, which is a screenshot racing the compositor rather than a drag that
-   * did not happen. `probePointerDrags` awaits a painted frame now. `handlerCalls` is what made it
-   * legible: 0 would have meant the gesture never arrived, which is a different defect entirely.
-   */
-  const canvas = row("canvas-works")!;
-  assert.ok(
-    canvas.feedbackRatio > 0.005,
-    `a canvas drag must register as feedback: feedback=${(canvas.feedbackRatio * 100).toFixed(3)}% `
-    + `committed=${(canvas.committedRatio * 100).toFixed(3)}% handlerCalls=${canvas.handlerCalls}`,
-  );
-
-  // Evidence, not a verdict: the inert pad gets NO finding, because 0% is ambiguous on a real
-  // page — dead handlers, a bad start point and offscreen feedback all look like this.
-  const issues = deriveHandlerIssues(s);
-  const kinds = new Set(issues.map((i) => i.kind));
-  assert.equal(kinds.has("pointer-drag-no-feedback" as never), false, "no such rule, on purpose");
-
-  // What the probe DOES settle: those types were exercised, so the gate stops calling them
-  // uncovered.
-  const unprobed = issues.find((i) => i.kind === "unprobed-handler-types");
-  if (unprobed) {
-    for (const t of ["pointerdown", "pointermove", "pointerup"]) {
-      assert.doesNotMatch(unprobed.message, new RegExp(`\\b${t}\\b`), `${t} was probed this run`);
+    for (const id of ["works", "feedback-only", "dead", "canvas-works"]) {
+      assert.ok(row(id), `${id} should have been driven`);
+      assert.equal(row(id)!.error, undefined, `${id}: ${row(id)!.error}`);
     }
-  }
-});
+    // A drag that moves something, while held and after release.
+    assert.ok(row("works")!.feedbackRatio > 0.005, `works feedback ${row("works")!.feedbackRatio}`);
+    assert.ok(row("works")!.committedRatio > 0.005, `works committed ${row("works")!.committedRatio}`);
+    // Engages, then reverts: feedback without a commit is a distinguishable state.
+    assert.ok(row("feedback-only")!.feedbackRatio > 0.005);
+    assert.equal(row("feedback-only")!.committedRatio, 0, "it put the dot back");
+    // Wired and inert.
+    assert.equal(row("dead")!.feedbackRatio, 0);
+    assert.equal(row("dead")!.committedRatio, 0);
+    /*
+     * The canvas: pixels move, the DOM does not.
+     *
+     * The numbers are in the message, and they are what found the cause. This assertion failed in full
+     * parallel runs while passing every time in isolation, and printing them said why:
+     * `feedback=0.250% committed=0.500% handlerCalls=11` — the page had received the whole gesture and
+     * drawn a ninth of the stroke, which is a screenshot racing the compositor rather than a drag that
+     * did not happen. `probePointerDrags` awaits a painted frame now. `handlerCalls` is what made it
+     * legible: 0 would have meant the gesture never arrived, which is a different defect entirely.
+     */
+    const canvas = row("canvas-works")!;
+    assert.ok(
+      canvas.feedbackRatio > 0.005,
+      `a canvas drag must register as feedback: feedback=${(canvas.feedbackRatio * 100).toFixed(3)}% ` +
+        `committed=${(canvas.committedRatio * 100).toFixed(3)}% handlerCalls=${canvas.handlerCalls}`,
+    );
+
+    // Evidence, not a verdict: the inert pad gets NO finding, because 0% is ambiguous on a real
+    // page — dead handlers, a bad start point and offscreen feedback all look like this.
+    const issues = deriveHandlerIssues(s);
+    const kinds = new Set(issues.map((i) => i.kind));
+    assert.equal(kinds.has("pointer-drag-no-feedback" as never), false, "no such rule, on purpose");
+
+    // What the probe DOES settle: those types were exercised, so the gate stops calling them
+    // uncovered.
+    const unprobed = issues.find((i) => i.kind === "unprobed-handler-types");
+    if (unprobed) {
+      for (const t of ["pointerdown", "pointermove", "pointerup"]) {
+        assert.doesNotMatch(unprobed.message, new RegExp(`\\b${t}\\b`), `${t} was probed this run`);
+      }
+    }
+  },
+);
 
 test("without the probe, the pointer types are still reported as uncovered", () => {
   // The other half of the contract above: the warn is correct when nothing drove them, and
@@ -716,12 +756,17 @@ test("E2E: a gesture that invokes nothing is the one graded outcome", { timeout:
   assert.equal(row("swallowed").feedbackRatio, 0);
   assert.equal(row("dead").feedbackRatio, 0);
 
-  const kindsFor = (id: string) => deriveHandlerIssues(s)
-    .filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+  const kindsFor = (id: string) =>
+    deriveHandlerIssues(s)
+      .filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`))
+      .map((i) => i.kind);
   assert.ok(kindsFor("swallowed").includes("pointer-drag-intercepted"));
   for (const id of ["dead", "works", "feedback-only", "canvas-works"]) {
-    assert.equal(kindsFor(id).includes("pointer-drag-intercepted"), false,
-      `${id} is reachable and must not be reported as intercepted`);
+    assert.equal(
+      kindsFor(id).includes("pointer-drag-intercepted"),
+      false,
+      `${id} is reachable and must not be reported as intercepted`,
+    );
   }
 });
 
@@ -731,13 +776,16 @@ test("no invocation count means no intercepted finding", () => {
   const s = surface(entry({ path: "div#c", types: { pointerdown: 1, pointermove: 1 } }));
   s.pointerDragProbe = [{ path: "div#c", feedbackRatio: 0, committedRatio: 0 }];
   assert.equal(
-    deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length, 0,
+    deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length,
+    0,
     "undefined handlerCalls is not zero",
   );
   s.pointerDragProbe = [{ path: "div#c", feedbackRatio: 0, committedRatio: 0, handlerCalls: 0 }];
   assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length, 1);
   // And a gesture that could not be performed says nothing either way.
-  s.pointerDragProbe = [{ path: "div#c", feedbackRatio: 0, committedRatio: 0, handlerCalls: 0, error: "no usable box" }];
+  s.pointerDragProbe = [
+    { path: "div#c", feedbackRatio: 0, committedRatio: 0, handlerCalls: 0, error: "no usable box" },
+  ];
   assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length, 0);
 });
 
@@ -748,7 +796,9 @@ test("E2E: counting invocations does not change how the page's listeners behave"
   // diff the page's own log.
   const dir = mkdtempSync(join(tmpdir(), "handlers-fidelity-"));
   const file = join(dir, "fidelity.html");
-  writeFileSync(file, `<!doctype html><html><head><title>t</title></head><body>
+  writeFileSync(
+    file,
+    `<!doctype html><html><head><title>t</title></head><body>
     <div id="t" style="width:60px;height:20px">t</div>
     <script>
       window.log = [];
@@ -766,7 +816,8 @@ test("E2E: counting invocations does not change how the page's listeners behave"
       el.addEventListener('click', () => { throw new Error('boom'); });
       el.addEventListener('click', () => window.log.push('after-throw'));
     </script>
-  </body></html>`);
+  </body></html>`,
+  );
 
   const logs: string[][] = [];
   for (const probeDrag of [false, true]) {
@@ -784,7 +835,8 @@ test("E2E: counting invocations does not change how the page's listeners behave"
       logs.push(await page.evaluate(() => (window as unknown as { log: string[] }).log));
       if (probeDrag) {
         const samples = await page.evaluate(() =>
-          (window as unknown as { __vlmkitHandlers: { src: string }[] }).__vlmkitHandlers.map((h) => h.src));
+          (window as unknown as { __vlmkitHandlers: { src: string }[] }).__vlmkitHandlers.map((h) => h.src),
+        );
         assert.ok(
           samples.some((src) => src.includes("window.log.push")),
           `the recorder captured wrappers instead of the page's listeners: ${JSON.stringify(samples.slice(0, 3))}`,
@@ -855,12 +907,14 @@ test("the types a gesture exercised come from what the recorder saw, not from th
   // A gesture that entered a target and dropped there need never have LEFT it, so `dragleave`
   // stays unprobed even though the drop landed. Inferring the list from the outcome — the
   // first version of this — claimed coverage the run did not have.
-  s.realDragProbe = [realRow({
-    path: "div#src",
-    dragstartFired: true,
-    droppedOn: "div#zone",
-    observedTypes: ["dragstart", "dragend"],
-  })];
+  s.realDragProbe = [
+    realRow({
+      path: "div#src",
+      dragstartFired: true,
+      droppedOn: "div#zone",
+      observedTypes: ["dragstart", "dragend"],
+    }),
+  ];
   const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types");
   assert.ok(unprobed, "dragleave was never driven, so it must still be disclosed");
   assert.match(unprobed.message, /dragleave/);
@@ -882,8 +936,7 @@ test("E2E: driving the drag separates three kinds of source", { timeout: 180_000
   assert.ok(s.realDragProbe && s.realDragProbe.length > 0, "probeDrag must drive the sources");
   const row = (id: string) => s.realDragProbe!.find((r) => r.path.endsWith(`#${id}`));
   const issues = deriveHandlerIssues(s);
-  const kindsFor = (id: string) =>
-    issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+  const kindsFor = (id: string) => issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
 
   // 1. Sources the browser picks up: the drag starts and the drop lands on the correct target.
   for (const id of ["ok", "native-source", "attr-source"]) {
@@ -899,7 +952,8 @@ test("E2E: driving the drag separates three kinds of source", { timeout: 180_000
     assert.ok(row(id)!.gestures > 0, "and it must have been driven, or the finding is unearned");
     assert.ok(kindsFor(id).includes("drag-source-inert"), `${id} must report drag-source-inert`);
     assert.equal(
-      s.elements.find((e) => e.path.endsWith(`#${id}`))?.draggable, true,
+      s.elements.find((e) => e.path.endsWith(`#${id}`))?.draggable,
+      true,
       "the DOM says draggable — that is what makes this invisible statically",
     );
   }
@@ -910,10 +964,15 @@ test("E2E: driving the drag separates three kinds of source", { timeout: 180_000
 
   // The gesture drove the whole vocabulary, so the "not covered by the interaction probes"
   // warn has nothing left to disclose about drag on this page.
-  assert.deepEqual(
-    (row("ok")?.observedTypes ?? []).slice().sort(),
-    ["drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop"],
-  );
+  assert.deepEqual((row("ok")?.observedTypes ?? []).slice().sort(), [
+    "drag",
+    "dragend",
+    "dragenter",
+    "dragleave",
+    "dragover",
+    "dragstart",
+    "drop",
+  ]);
   // Every drag type was driven, so none of them is disclosed as unexercised. `keydown` still is
   // — #ok carries one as its keyboard alternative and this gate presses nothing — which is the
   // honest report for a run of `scan handlers --probe-drag`.
@@ -924,7 +983,10 @@ test("E2E: driving the drag separates three kinds of source", { timeout: 180_000
   // Without the flag there is no row at all — absent means not measured.
   const noProbe = await buildHandlerSurface({ source });
   assert.equal(noProbe.realDragProbe, undefined);
-  assert.equal(deriveHandlerIssues(noProbe).some((i) => i.kind === "drag-source-inert"), false);
+  assert.equal(
+    deriveHandlerIssues(noProbe).some((i) => i.kind === "drag-source-inert"),
+    false,
+  );
 });
 
 test("E2E: an inert source is retried, and the source after it is still measured", { timeout: 180_000 }, async () => {
@@ -940,7 +1002,9 @@ test("E2E: an inert source is retried, and the source after it is still measured
   // the debris from probing a broken source lands on whatever is probed next.
   const dir = mkdtempSync(join(tmpdir(), "handlers-selection-"));
   const file = join(dir, "selection.html");
-  writeFileSync(file, `<!doctype html><html><head><title>t</title>
+  writeFileSync(
+    file,
+    `<!doctype html><html><head><title>t</title>
     <style>.nodrag { -webkit-user-drag: none; } div { width: 220px; }</style></head><body>
     <div class="nodrag" id="dead-src" draggable="true">a source the browser will not pick up</div>
     <div id="good-src" draggable="true">a source it will</div>
@@ -954,7 +1018,8 @@ test("E2E: an inert source is retried, and the source after it is still measured
       document.getElementById('zone').addEventListener('dragover', (e) => e.preventDefault());
       document.getElementById('zone').addEventListener('drop', (e) => e.preventDefault());
     </script>
-  </body></html>`);
+  </body></html>`,
+  );
 
   const s = await buildHandlerSurface({ source: file, probeDrag: true });
   const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`));
@@ -963,7 +1028,9 @@ test("E2E: an inert source is retried, and the source after it is still measured
   // The assertion the reset exists for: probed second, after two gestures' worth of debris.
   assert.equal(row("good-src")?.dragstartFired, true, "the next source must still drag");
   assert.ok(row("good-src")?.droppedOn?.endsWith("#zone"), "and still land its drop");
-  const kinds = deriveHandlerIssues(s).filter((i) => i.kind === "drag-source-inert").map((i) => i.element);
+  const kinds = deriveHandlerIssues(s)
+    .filter((i) => i.kind === "drag-source-inert")
+    .map((i) => i.element);
   assert.equal(kinds.length, 1, `only the inert one reports: ${kinds.join(", ")}`);
   assert.match(kinds[0]!, /#dead-src/);
 });
@@ -1052,52 +1119,57 @@ test("E2E: a delegated drag board is pressed on its cards, not on its container"
  * Graded against a page that gets it right as well as one that does not, because a rule that fires
  * on the broken half proves nothing on its own. `#tight` and `#loose` differ by one declaration.
  */
-test("E2E: a gesture that selects text where it should not is reported, and user-select silences it", { timeout: 180_000 }, async () => {
-  const source = join(REPO_ROOT, "fixtures/handlers/selection-on-drag.html");
-  const s = await buildHandlerSurface({ source, probeDrag: true, probes: ["drag", "dblclick"] });
-  const kinds = (id: string) => deriveHandlerIssues(s)
-    .filter((i) => i.element.startsWith(`div#${id} `))
-    .map((i) => i.kind);
+test(
+  "E2E: a gesture that selects text where it should not is reported, and user-select silences it",
+  { timeout: 180_000 },
+  async () => {
+    const source = join(REPO_ROOT, "fixtures/handlers/selection-on-drag.html");
+    const s = await buildHandlerSurface({ source, probeDrag: true, probes: ["drag", "dblclick"] });
+    const kinds = (id: string) =>
+      deriveHandlerIssues(s)
+        .filter((i) => i.element.startsWith(`div#${id} `))
+        .map((i) => i.kind);
 
-  // The stray press: a drag that starts on the surface's own prose rather than on an item. Every
-  // other gesture presses a draggable item, which is `user-select: none` on any real board — so
-  // without this one the rule cannot see the gesture a player actually makes.
-  const dragRow = s.realDragProbe?.find((r) => r.path === "div#loose");
-  assert.ok(dragRow?.selectedText, "the stray press must be measured");
-  // The prose it landed on, as far as the 120-character cap carries it.
-  assert.match(dragRow.selectedText.text, /Drag an item onto a pile/, "it selects the prose it landed on");
-  assert.equal(dragRow.selectedText.anchor, "p.prose", "named where the user-select belongs");
-  assert.ok(kinds("loose").includes("drag-selects-text"));
+    // The stray press: a drag that starts on the surface's own prose rather than on an item. Every
+    // other gesture presses a draggable item, which is `user-select: none` on any real board — so
+    // without this one the rule cannot see the gesture a player actually makes.
+    const dragRow = s.realDragProbe?.find((r) => r.path === "div#loose");
+    assert.ok(dragRow?.selectedText, "the stray press must be measured");
+    // The prose it landed on, as far as the 120-character cap carries it.
+    assert.match(dragRow.selectedText.text, /Drag an item onto a pile/, "it selects the prose it landed on");
+    assert.equal(dragRow.selectedText.anchor, "p.prose", "named where the user-select belongs");
+    assert.ok(kinds("loose").includes("drag-selects-text"));
 
-  // The miss: double-click is a gesture with a meaning here, and a double-click that lands where
-  // the handler does not apply selects a word instead. This is the shape solitaire hit.
-  const dblRow = s.doubleClickProbe?.find((r) => r.path === "div#loose-dblclick");
-  assert.ok(dblRow, "a dblclick handler must be probed");
-  assert.ok(dblRow.pointsTried > 0, "and a miss point must have been found");
-  assert.ok(dblRow.selected, `the miss must select something: ${JSON.stringify(dblRow)}`);
-  assert.ok(kinds("loose-dblclick").includes("dblclick-selects-text"));
+    // The miss: double-click is a gesture with a meaning here, and a double-click that lands where
+    // the handler does not apply selects a word instead. This is the shape solitaire hit.
+    const dblRow = s.doubleClickProbe?.find((r) => r.path === "div#loose-dblclick");
+    assert.ok(dblRow, "a dblclick handler must be probed");
+    assert.ok(dblRow.pointsTried > 0, "and a miss point must have been found");
+    assert.ok(dblRow.selected, `the miss must select something: ${JSON.stringify(dblRow)}`);
+    assert.ok(kinds("loose-dblclick").includes("dblclick-selects-text"));
 
-  // The other direction. One declaration apart from the halves above.
-  for (const id of ["tight", "tight-dblclick"]) {
-    assert.deepEqual(
-      kinds(id).filter((k) => k.endsWith("selects-text")),
-      [],
-      `${id} declines selection, so neither rule may fire on it`,
+    // The other direction. One declaration apart from the halves above.
+    for (const id of ["tight", "tight-dblclick"]) {
+      assert.deepEqual(
+        kinds(id).filter((k) => k.endsWith("selects-text")),
+        [],
+        `${id} declines selection, so neither rule may fire on it`,
+      );
+    }
+    assert.equal(s.realDragProbe?.find((r) => r.path === "div#tight")?.selectedText, undefined);
+    assert.equal(s.doubleClickProbe?.find((r) => r.path === "div#tight")?.selected, undefined);
+    // And the guarded halves were actually driven, or the silence is unearned.
+    assert.ok((s.doubleClickProbe?.find((r) => r.path === "div#tight")?.pointsTried ?? 0) > 0);
+
+    // Absent without the family, because absent has to mean "not measured".
+    const noProbe = await buildHandlerSurface({ source, probeDrag: true, probes: ["drag"] });
+    assert.equal(noProbe.doubleClickProbe, undefined);
+    assert.equal(
+      deriveHandlerIssues(noProbe).some((i) => i.kind === "dblclick-selects-text"),
+      false,
     );
-  }
-  assert.equal(s.realDragProbe?.find((r) => r.path === "div#tight")?.selectedText, undefined);
-  assert.equal(s.doubleClickProbe?.find((r) => r.path === "div#tight")?.selected, undefined);
-  // And the guarded halves were actually driven, or the silence is unearned.
-  assert.ok((s.doubleClickProbe?.find((r) => r.path === "div#tight")?.pointsTried ?? 0) > 0);
-
-  // Absent without the family, because absent has to mean "not measured".
-  const noProbe = await buildHandlerSurface({ source, probeDrag: true, probes: ["drag"] });
-  assert.equal(noProbe.doubleClickProbe, undefined);
-  assert.equal(
-    deriveHandlerIssues(noProbe).some((i) => i.kind === "dblclick-selects-text"),
-    false,
-  );
-});
+  },
+);
 
 /**
  * What the drag does to the readability of the thing being dragged.
@@ -1112,7 +1184,9 @@ test("mid-drag legibility is graded on the fall AND the floor, never on either a
   const fired = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-ghost-illegible").length;
 
   // Through the floor, and the drag is what took it there.
-  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 7.6, dragging: 4.2, opacity: 0.55 } })];
+  s.realDragProbe = [
+    realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 7.6, dragging: 4.2, opacity: 0.55 } }),
+  ];
   assert.equal(fired(), 1);
   assert.match(
     deriveHandlerIssues(s).find((i) => i.kind === "drag-ghost-illegible")!.message,
@@ -1121,22 +1195,31 @@ test("mid-drag legibility is graded on the fall AND the floor, never on either a
 
   // A big proportional fall that lands somewhere still readable. Measured and not graded — this is
   // solitaire's own case at 7.59:1 → 5.01:1, which a human called a defect and a rule may not.
-  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 7.6, dragging: 5.0, opacity: 0.55 } })];
+  s.realDragProbe = [
+    realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 7.6, dragging: 5.0, opacity: 0.55 } }),
+  ];
   assert.equal(fired(), 0, "above the floor is reported in the reportline, not graded");
 
   // Low contrast the drag had nothing to do with belongs to `check a11y contrast`.
-  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 4.2, dragging: 4.2, opacity: 1 } })];
+  s.realDragProbe = [
+    realRow({ path: "div#src", dragstartFired: true, dragLegibility: { rest: 4.2, dragging: 4.2, opacity: 1 } }),
+  ];
   assert.equal(fired(), 0);
 });
 
-test("E2E: a translucent ghost over a coloured surface is measured, and an opaque one is not", { timeout: 180_000 }, async () => {
-  // Two real pages rather than a hand-built row, because the number this grades on comes out of
-  // screenshots: what the composite of `opacity` over a background actually looks like is exactly
-  // what a synthetic row cannot tell you.
-  const dir = mkdtempSync(join(tmpdir(), "handlers-ghost-"));
-  const page = (opacity: string) => {
-    const file = join(dir, `ghost-${opacity.replace(".", "")}.html`);
-    writeFileSync(file, `<!doctype html><html><head><title>t</title><style>
+test(
+  "E2E: a translucent ghost over a coloured surface is measured, and an opaque one is not",
+  { timeout: 180_000 },
+  async () => {
+    // Two real pages rather than a hand-built row, because the number this grades on comes out of
+    // screenshots: what the composite of `opacity` over a background actually looks like is exactly
+    // what a synthetic row cannot tell you.
+    const dir = mkdtempSync(join(tmpdir(), "handlers-ghost-"));
+    const page = (opacity: string) => {
+      const file = join(dir, `ghost-${opacity.replace(".", "")}.html`);
+      writeFileSync(
+        file,
+        `<!doctype html><html><head><title>t</title><style>
       body { margin: 0; background: #0b6623; }
       #zone { position: absolute; left: 200px; top: 0; width: 120px; height: 160px; background: #0e7a2a; }
       /* A card: white face, near-black glyph, on a green table. The pair the rule is about. */
@@ -1152,29 +1235,31 @@ test("E2E: a translucent ghost over a coloured surface is measured, and an opaqu
         zone.addEventListener("dragover", (e) => e.preventDefault());
         zone.addEventListener("drop", (e) => e.preventDefault());
         src.addEventListener("keydown", () => {});
-      </script></body></html>`);
-    return file;
-  };
+      </script></body></html>`,
+      );
+      return file;
+    };
 
-  const translucent = await buildHandlerSurface({ source: page("0.35"), probeDrag: true });
-  const ghost = translucent.realDragProbe?.[0]?.dragLegibility;
-  assert.ok(ghost, "the pair must be measured");
-  assert.ok(ghost.rest > ghost.dragging, `the drag must dim it: ${JSON.stringify(ghost)}`);
-  assert.equal(ghost.opacity, 0.35, "and the opacity is read, not inferred");
-  assert.ok(
-    deriveHandlerIssues(translucent).some((i) => i.kind === "drag-ghost-illegible"),
-    `0.35 over green must report: ${JSON.stringify(ghost)}`,
-  );
+    const translucent = await buildHandlerSurface({ source: page("0.35"), probeDrag: true });
+    const ghost = translucent.realDragProbe?.[0]?.dragLegibility;
+    assert.ok(ghost, "the pair must be measured");
+    assert.ok(ghost.rest > ghost.dragging, `the drag must dim it: ${JSON.stringify(ghost)}`);
+    assert.equal(ghost.opacity, 0.35, "and the opacity is read, not inferred");
+    assert.ok(
+      deriveHandlerIssues(translucent).some((i) => i.kind === "drag-ghost-illegible"),
+      `0.35 over green must report: ${JSON.stringify(ghost)}`,
+    );
 
-  const opaque = await buildHandlerSurface({ source: page("1"), probeDrag: true });
-  const same = opaque.realDragProbe?.[0]?.dragLegibility;
-  assert.ok(same, "an opaque ghost is still measured — absent would mean unmeasured");
-  assert.equal(
-    deriveHandlerIssues(opaque).some((i) => i.kind === "drag-ghost-illegible"),
-    false,
-    `nothing changed, so nothing to report: ${JSON.stringify(same)}`,
-  );
-});
+    const opaque = await buildHandlerSurface({ source: page("1"), probeDrag: true });
+    const same = opaque.realDragProbe?.[0]?.dragLegibility;
+    assert.ok(same, "an opaque ghost is still measured — absent would mean unmeasured");
+    assert.equal(
+      deriveHandlerIssues(opaque).some((i) => i.kind === "drag-ghost-illegible"),
+      false,
+      `nothing changed, so nothing to report: ${JSON.stringify(same)}`,
+    );
+  },
+);
 
 test("the report obeys rule settings instead of contradicting the verdict", async () => {
   const { formatHandlerSurface } = await import("./handler-map.ts");
@@ -1212,18 +1297,21 @@ test("the report obeys rule settings instead of contradicting the verdict", asyn
 
 test("the printed route drops `drag`, merges repeats, and says which state it could not read", async () => {
   const { formatDragTimeline } = await import("./handler-map.ts");
-  const lines = formatDragTimeline([
-    { type: "dragstart", path: "div#card", count: 1 },
-    { type: "drag", path: "div#card", count: 1 },
-    { type: "dragover", path: "div#bin", count: 1, prevented: false },
-    // `drag` fires on the SOURCE between every `dragover` on the target, so without dropping it
-    // the two never coalesce and one gesture printed seven lines of alternating noise.
-    { type: "drag", path: "div#card", count: 1 },
-    { type: "dragover", path: "div#bin", count: 3, prevented: false },
-    { type: "dragover", path: "div#quiet", count: 1, prevented: null },
-    { type: "drop", path: "div#zone", count: 1, prevented: true, received: [{ type: "text/plain", value: "ok" }] },
-    { type: "dragend", path: "div#card", count: 1 },
-  ], 8);
+  const lines = formatDragTimeline(
+    [
+      { type: "dragstart", path: "div#card", count: 1 },
+      { type: "drag", path: "div#card", count: 1 },
+      { type: "dragover", path: "div#bin", count: 1, prevented: false },
+      // `drag` fires on the SOURCE between every `dragover` on the target, so without dropping it
+      // the two never coalesce and one gesture printed seven lines of alternating noise.
+      { type: "drag", path: "div#card", count: 1 },
+      { type: "dragover", path: "div#bin", count: 3, prevented: false },
+      { type: "dragover", path: "div#quiet", count: 1, prevented: null },
+      { type: "drop", path: "div#zone", count: 1, prevented: true, received: [{ type: "text/plain", value: "ok" }] },
+      { type: "dragend", path: "div#card", count: 1 },
+    ],
+    8,
+  );
   const route = lines.join(" ");
   assert.doesNotMatch(route, /drag@/, "`drag` carries no routing information");
   assert.match(route, /dragover@div#bin x4/, "1 + 3 merged across the interleaved `drag`");
@@ -1246,21 +1334,25 @@ test("a payload the target really received refutes `dragstart-transfers-nothing`
   const warns = () => deriveHandlerIssues(s).filter((i) => i.kind === "dragstart-transfers-nothing").length;
   assert.equal(warns(), 1, "with no real drag there is no evidence, so the warn stands");
 
-  s.realDragProbe = [realRow({
-    path: "a#link",
-    dragstartFired: true,
-    droppedOn: "div#zone",
-    timeline: [{ type: "drop", path: "div#zone", count: 1, received: [{ type: "text/plain", value: "file:///x" }] }],
-  })];
+  s.realDragProbe = [
+    realRow({
+      path: "a#link",
+      dragstartFired: true,
+      droppedOn: "div#zone",
+      timeline: [{ type: "drop", path: "div#zone", count: 1, received: [{ type: "text/plain", value: "file:///x" }] }],
+    }),
+  ];
   assert.equal(warns(), 0, "a payload observed at a drop refutes it");
 
   // An empty payload at the drop is the case the warn was written for, and it survives.
-  s.realDragProbe = [realRow({
-    path: "a#link",
-    dragstartFired: true,
-    droppedOn: "div#zone",
-    timeline: [{ type: "drop", path: "div#zone", count: 1, received: [] }],
-  })];
+  s.realDragProbe = [
+    realRow({
+      path: "a#link",
+      dragstartFired: true,
+      droppedOn: "div#zone",
+      timeline: [{ type: "drop", path: "div#zone", count: 1, received: [] }],
+    }),
+  ];
   assert.equal(warns(), 1);
 });
 
@@ -1269,7 +1361,9 @@ test("E2E: the route explains a drop that never happened", { timeout: 180_000 },
   // The aggregate says "no target accepted it"; the route says where it went and why.
   const dir = mkdtempSync(join(tmpdir(), "handlers-route-"));
   const file = join(dir, "forgot.html");
-  writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><title>t</title>
+  writeFileSync(
+    file,
+    `<!doctype html><html><head><meta charset="utf-8"><title>t</title>
     <style>.item{width:150px;padding:8px;background:#1a6ed8;color:#fff}
            .zone{width:170px;height:70px;background:#eee;margin-top:10px}</style></head><body>
     <div class="item" id="card" draggable="true">card</div>
@@ -1281,23 +1375,36 @@ test("E2E: the route explains a drop that never happened", { timeout: 180_000 },
       document.getElementById("bin").addEventListener("dragover", () => {});
       document.getElementById("bin").addEventListener("drop", () => {});
     </script>
-  </body></html>`);
+  </body></html>`,
+  );
   const s = await buildHandlerSurface({ source: file, probeDrag: true });
   const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"));
   assert.ok(row?.dragstartFired, "the drag itself starts");
   assert.equal(row.droppedOn, undefined, "and nothing accepts it");
   const over = row.timeline?.filter((step) => step.type === "dragover" && step.path.endsWith("#bin")) ?? [];
   assert.ok(over.length > 0, "the drag must have crossed the target");
-  assert.ok(over.every((step) => step.prevented === false), "measured on the real gesture, after the page's handler ran");
-  assert.equal(row.timeline?.some((step) => step.type === "drop"), false, "an uncancelled dragover produces no drop AT ALL");
+  assert.ok(
+    over.every((step) => step.prevented === false),
+    "measured on the real gesture, after the page's handler ran",
+  );
+  assert.equal(
+    row.timeline?.some((step) => step.type === "drop"),
+    false,
+    "an uncancelled dragover produces no drop AT ALL",
+  );
 });
 
-test("E2E: a target that stops propagation is reported as unreadable, not as refusing", { timeout: 180_000 }, async () => {
-  // Nested drop zones do this routinely. The bubble-phase listener that reads `defaultPrevented`
-  // never sees the event, and the drop still lands — so `false` there would be a false accusation.
-  const dir = mkdtempSync(join(tmpdir(), "handlers-quiet-"));
-  const file = join(dir, "quiet.html");
-  writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><title>t</title>
+test(
+  "E2E: a target that stops propagation is reported as unreadable, not as refusing",
+  { timeout: 180_000 },
+  async () => {
+    // Nested drop zones do this routinely. The bubble-phase listener that reads `defaultPrevented`
+    // never sees the event, and the drop still lands — so `false` there would be a false accusation.
+    const dir = mkdtempSync(join(tmpdir(), "handlers-quiet-"));
+    const file = join(dir, "quiet.html");
+    writeFileSync(
+      file,
+      `<!doctype html><html><head><meta charset="utf-8"><title>t</title>
     <style>.item{width:150px;padding:8px;background:#1a6ed8;color:#fff}
            .zone{width:170px;height:70px;background:#eee;margin-top:10px}</style></head><body>
     <div class="item" id="card" draggable="true">card</div>
@@ -1310,61 +1417,78 @@ test("E2E: a target that stops propagation is reported as unreadable, not as ref
       z.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); });
       z.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); });
     </script>
-  </body></html>`);
-  const s = await buildHandlerSurface({ source: file, probeDrag: true });
-  const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"))!;
-  assert.ok(row.droppedOn?.endsWith("#quiet"), "the drop lands — preventDefault was called");
-  const over = row.timeline!.filter((step) => step.type === "dragover" && step.path.endsWith("#quiet"));
-  assert.ok(over.length > 0);
-  assert.ok(over.every((step) => step.prevented === null), "unknown, because the event never bubbled");
-  // And the payload is readable at the drop even though propagation stopped after it: the
-  // capture-phase read happens first.
-  const drop = row.timeline!.find((step) => step.type === "drop");
-  assert.deepEqual(drop?.received, [{ type: "text/plain", value: "c" }]);
-});
+  </body></html>`,
+    );
+    const s = await buildHandlerSurface({ source: file, probeDrag: true });
+    const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"))!;
+    assert.ok(row.droppedOn?.endsWith("#quiet"), "the drop lands — preventDefault was called");
+    const over = row.timeline!.filter((step) => step.type === "dragover" && step.path.endsWith("#quiet"));
+    assert.ok(over.length > 0);
+    assert.ok(
+      over.every((step) => step.prevented === null),
+      "unknown, because the event never bubbled",
+    );
+    // And the payload is readable at the drop even though propagation stopped after it: the
+    // capture-phase read happens first.
+    const drop = row.timeline!.find((step) => step.type === "drop");
+    assert.deepEqual(drop?.received, [{ type: "text/plain", value: "c" }]);
+  },
+);
 
-test("E2E: the drop payload is read at the drop, where it is the only place readable",
-  { timeout: 180_000 }, async () => {
-  // Protected mode: `getData()` returns "" during dragstart/dragenter/dragover and the real
-  // value during drop — measured. So the fixture's three working sources show three different
-  // answers, and each is a different story about the same wire.
-  const s = await buildHandlerSurface({
-    source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html"),
-    probeDrag: true,
-  });
-  const received = (id: string) => s.realDragProbe
-    ?.find((r) => r.path.endsWith(`#${id}`))
-    ?.timeline?.find((step) => step.type === "drop")?.received;
+test(
+  "E2E: the drop payload is read at the drop, where it is the only place readable",
+  { timeout: 180_000 },
+  async () => {
+    // Protected mode: `getData()` returns "" during dragstart/dragenter/dragover and the real
+    // value during drop — measured. So the fixture's three working sources show three different
+    // answers, and each is a different story about the same wire.
+    const s = await buildHandlerSurface({
+      source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html"),
+      probeDrag: true,
+    });
+    const received = (id: string) =>
+      s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`))?.timeline?.find((step) => step.type === "drop")?.received;
 
-  // The page set it.
-  assert.deepEqual(received("ok"), [{ type: "text/plain", value: "ok" }]);
-  // The page set nothing and the BROWSER filled in three types for the link — which is the
-  // evidence that the payload is not the page's: an `<a href>` contributes `text/plain` and
-  // `text/uri-list` (both the URL) plus `text/html` (the serialized element).
-  const native = received("native-source") ?? [];
-  assert.deepEqual(native.map((r) => r.type), ["text/plain", "text/uri-list", "text/html"]);
-  /*
-   * A PREFIX of the resolved href, not the whole thing: the recorder truncates every received
-   * value at 80 characters (a target may be handed a whole serialized model), and
-   * `file://` + this repo's absolute path + `#x` is 84 in this checkout. Anchoring on `$` made the
-   * test pass or fail on how deep the clone happens to sit, which is not what it is about.
-   */
-  const href = `file://${join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html")}#x`;
-  assert.ok(
-    href.startsWith(native[0]!.value) && native[0]!.value.length >= 40,
-    `text/plain must be the resolved href (got ${JSON.stringify(native[0]!.value)}, want a prefix of ${href})`,
-  );
-  assert.match(native[2]!.value, /^<a /);
-  // Nobody set anything: `ondragstart="void 0"` on a plain div.
-  assert.deepEqual(received("attr-source"), []);
+    // The page set it.
+    assert.deepEqual(received("ok"), [{ type: "text/plain", value: "ok" }]);
+    // The page set nothing and the BROWSER filled in three types for the link — which is the
+    // evidence that the payload is not the page's: an `<a href>` contributes `text/plain` and
+    // `text/uri-list` (both the URL) plus `text/html` (the serialized element).
+    const native = received("native-source") ?? [];
+    assert.deepEqual(
+      native.map((r) => r.type),
+      ["text/plain", "text/uri-list", "text/html"],
+    );
+    /*
+     * A PREFIX of the resolved href, not the whole thing: the recorder truncates every received
+     * value at 80 characters (a target may be handed a whole serialized model), and
+     * `file://` + this repo's absolute path + `#x` is 84 in this checkout. Anchoring on `$` made the
+     * test pass or fail on how deep the clone happens to sit, which is not what it is about.
+     */
+    const href = `file://${join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html")}#x`;
+    assert.ok(
+      href.startsWith(native[0]!.value) && native[0]!.value.length >= 40,
+      `text/plain must be the resolved href (got ${JSON.stringify(native[0]!.value)}, want a prefix of ${href})`,
+    );
+    assert.match(native[2]!.value, /^<a /);
+    // Nobody set anything: `ondragstart="void 0"` on a plain div.
+    assert.deepEqual(received("attr-source"), []);
 
-  // Which is why only the last of the three keeps the warn.
-  const transfersNothing = deriveHandlerIssues(s)
-    .filter((i) => i.kind === "dragstart-transfers-nothing").map((i) => i.element);
-  assert.equal(transfersNothing.some((el) => el.includes("#attr-source")), true);
-  assert.equal(transfersNothing.some((el) => el.includes("#native-source")), false,
-    "refuted by what the target actually received");
-});
+    // Which is why only the last of the three keeps the warn.
+    const transfersNothing = deriveHandlerIssues(s)
+      .filter((i) => i.kind === "dragstart-transfers-nothing")
+      .map((i) => i.element);
+    assert.equal(
+      transfersNothing.some((el) => el.includes("#attr-source")),
+      true,
+    );
+    assert.equal(
+      transfersNothing.some((el) => el.includes("#native-source")),
+      false,
+      "refuted by what the target actually received",
+    );
+  },
+);
 
 // ---------------------------------------------------------------------------
 // The drop-target half: a correct target the drag cannot reach
@@ -1386,28 +1510,33 @@ test("a drop target nothing can land on is a finding, and it names what is on to
   assert.deepEqual(kinds(), []);
 });
 
-test("E2E: a covered drop target reports, and the identical uncovered one takes the drop",
-  { timeout: 180_000 }, async () => {
-  // Both zones carry the same correct contract — `dragover` calling preventDefault and a wired
-  // `drop` — so a static read cannot separate them and a synthetic dispatch at either runs its
-  // handlers as written.
-  const s = await buildHandlerSurface({
-    source: join(REPO_ROOT, "fixtures/handlers/drop-target-covered.html"),
-    probeDrag: true,
-  });
-  assert.deepEqual(
-    s.unreachableTargets?.map((u) => [u.path.endsWith("#covered"), u.interceptedBy.endsWith("#veil")]),
-    [[true, true]],
-  );
-  const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"))!;
-  assert.ok(row.dragstartFired);
-  assert.ok(row.droppedOn?.endsWith("#open"), `the reachable one takes the drop, got ${row.droppedOn}`);
+test(
+  "E2E: a covered drop target reports, and the identical uncovered one takes the drop",
+  { timeout: 180_000 },
+  async () => {
+    // Both zones carry the same correct contract — `dragover` calling preventDefault and a wired
+    // `drop` — so a static read cannot separate them and a synthetic dispatch at either runs its
+    // handlers as written.
+    const s = await buildHandlerSurface({
+      source: join(REPO_ROOT, "fixtures/handlers/drop-target-covered.html"),
+      probeDrag: true,
+    });
+    assert.deepEqual(
+      s.unreachableTargets?.map((u) => [u.path.endsWith("#covered"), u.interceptedBy.endsWith("#veil")]),
+      [[true, true]],
+    );
+    const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"))!;
+    assert.ok(row.dragstartFired);
+    assert.ok(row.droppedOn?.endsWith("#open"), `the reachable one takes the drop, got ${row.droppedOn}`);
 
-  const kindsFor = (id: string) => deriveHandlerIssues(s)
-    .filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
-  assert.deepEqual(kindsFor("covered"), ["drop-target-unreachable"]);
-  assert.deepEqual(kindsFor("open"), [], "the control: same contract, nothing on top, nothing to report");
-});
+    const kindsFor = (id: string) =>
+      deriveHandlerIssues(s)
+        .filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`))
+        .map((i) => i.kind);
+    assert.deepEqual(kindsFor("covered"), ["drop-target-unreachable"]);
+    assert.deepEqual(kindsFor("open"), [], "the control: same contract, nothing on top, nothing to report");
+  },
+);
 
 test("E2E: a hit test needs no gesture, so the inventory reports it too", { timeout: 180_000 }, async () => {
   // `elementFromPoint` dispatches nothing, so this is a fact about the page's geometry rather
@@ -1442,7 +1571,11 @@ test("E2E: the two ways a reachable target looks unreachable", { timeout: 180_00
   const flagged = deriveHandlerIssues(s).filter((i) => i.kind === "drop-target-unreachable");
   assert.equal(flagged.length, 1);
   for (const id of ["filled-list", "badged", "open"]) {
-    assert.equal(flagged.some((i) => i.element.includes(`#${id}`)), false, `${id} must stay silent`);
+    assert.equal(
+      flagged.some((i) => i.element.includes(`#${id}`)),
+      false,
+      `${id} must stay silent`,
+    );
   }
   // And the drag fixture's delegated list, whose child does NOT fill it, is silent too.
   const other = await buildHandlerSurface({ source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html") });
@@ -1456,17 +1589,26 @@ test("a cancelled drag that left something behind is a finding; the other three 
   const s = surface(entry({ path: "div#card", types: { dragstart: 1 }, draggable: true }));
   const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-cancel-not-reverted").length;
 
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true, ratio: 0.99 } })];
+  s.realDragProbe = [
+    realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true, ratio: 0.99 } }),
+  ];
   assert.equal(kinds(), 1);
-  assert.match(deriveHandlerIssues(s).find((i) => i.kind === "drag-cancel-not-reverted")!.message, /undo it in `?dragend/);
+  assert.match(
+    deriveHandlerIssues(s).find((i) => i.kind === "drag-cancel-not-reverted")!.message,
+    /undo it in `?dragend/,
+  );
 
   // Escape did not cancel it, so whatever changed may be the drop legitimately doing its job.
   // Not coverable end to end — Escape cancelled every driven drag measured — so it is pinned here.
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: false, ratio: 0.99 } })];
+  s.realDragProbe = [
+    realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: false, ratio: 0.99 } }),
+  ];
   assert.equal(kinds(), 0, "a change after a drag that completed is not this defect");
 
   // Cancelled and clean.
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true, ratio: 0 } })];
+  s.realDragProbe = [
+    realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true, ratio: 0 } }),
+  ];
   assert.equal(kinds(), 0);
 
   // Cancelled, revert not measured — the screenshots failed. Absent is not zero and not one.
@@ -1479,60 +1621,75 @@ test("a cancelled drag that left something behind is a finding; the other three 
 
   // The cancel gesture found nothing to pick up, because the source removed itself during the
   // earlier ones. The box it used to occupy differs, and that is not this defect.
-  s.realDragProbe = [realRow({
-    path: "div#card",
-    dragstartFired: true,
-    cancel: { started: false, cancelled: false, ratio: 0.99 },
-  })];
+  s.realDragProbe = [
+    realRow({
+      path: "div#card",
+      dragstartFired: true,
+      cancel: { started: false, cancelled: false, ratio: 0.99 },
+    }),
+  ];
   assert.equal(kinds(), 0, "no drag was started, so nothing was cancelled");
 });
 
-test("E2E: Escape strands the optimistic update wired to `drop` instead of `dragend`",
-  { timeout: 180_000 }, async () => {
-  // Both cards hide themselves on `dragstart` — the "it is leaving the list" every sortable does.
-  // One undoes it in `dragend`, which fires whether the drag succeeded or not; the other undoes it
-  // in `drop`, which a cancelled drag never reaches.
-  const s = await buildHandlerSurface({
-    source: join(REPO_ROOT, "fixtures/handlers/drag-cancel.html"),
-    probeDrag: true,
-  });
-  const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+test(
+  "E2E: Escape strands the optimistic update wired to `drop` instead of `dragend`",
+  { timeout: 180_000 },
+  async () => {
+    // Both cards hide themselves on `dragstart` — the "it is leaving the list" every sortable does.
+    // One undoes it in `dragend`, which fires whether the drag succeeded or not; the other undoes it
+    // in `drop`, which a cancelled drag never reaches.
+    const s = await buildHandlerSurface({
+      source: join(REPO_ROOT, "fixtures/handlers/drag-cancel.html"),
+      probeDrag: true,
+    });
+    const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`))!;
 
-  // The browser's own verdict, on both: the drag was cancelled and no drop ran.
-  for (const id of ["restores", "strands"]) {
-    assert.equal(row(id).cancel?.cancelled, true, `${id}: Escape must cancel the drag`);
-  }
-  // And the pixels, which is where they differ.
-  assert.ok(row("restores").cancel!.ratio! < 0.02, `restores left ${row("restores").cancel!.ratio}`);
-  assert.ok(row("strands").cancel!.ratio! > 0.5, `strands left ${row("strands").cancel!.ratio}`);
+    // The browser's own verdict, on both: the drag was cancelled and no drop ran.
+    for (const id of ["restores", "strands"]) {
+      assert.equal(row(id).cancel?.cancelled, true, `${id}: Escape must cancel the drag`);
+    }
+    // And the pixels, which is where they differ.
+    assert.ok(row("restores").cancel!.ratio! < 0.02, `restores left ${row("restores").cancel!.ratio}`);
+    assert.ok(row("strands").cancel!.ratio! > 0.5, `strands left ${row("strands").cancel!.ratio}`);
 
-  const flagged = deriveHandlerIssues(s)
-    .filter((i) => i.kind === "drag-cancel-not-reverted").map((i) => i.element);
-  assert.equal(flagged.length, 1, flagged.join(", "));
-  assert.match(flagged[0]!, /#strands/);
-});
+    const flagged = deriveHandlerIssues(s)
+      .filter((i) => i.kind === "drag-cancel-not-reverted")
+      .map((i) => i.element);
+    assert.equal(flagged.length, 1, flagged.join(", "));
+    assert.match(flagged[0]!, /#strands/);
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Mid-flight: the drag ends up fine and something during it was wrong
 
 test("a drag with no dragend is a finding; a drag that never started is not", () => {
   const s = surface(entry({ path: "div#card", types: { dragstart: 1 }, draggable: true }));
-  const kinds = () => deriveHandlerIssues(s)
-    .filter((i) => i.kind === "drag-source-detached-mid-drag").length;
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-source-detached-mid-drag").length;
 
-  s.realDragProbe = [realRow({
-    path: "div#card",
-    dragstartFired: true,
-    timeline: [{ type: "dragstart", path: "div#card", count: 1 }, { type: "drop", path: "div#zone", count: 1 }],
-  })];
+  s.realDragProbe = [
+    realRow({
+      path: "div#card",
+      dragstartFired: true,
+      timeline: [
+        { type: "dragstart", path: "div#card", count: 1 },
+        { type: "drop", path: "div#zone", count: 1 },
+      ],
+    }),
+  ];
   assert.equal(kinds(), 1, "the drop landed and dragend never came");
 
   // With a dragend, nothing to report — the normal case.
-  s.realDragProbe = [realRow({
-    path: "div#card",
-    dragstartFired: true,
-    timeline: [{ type: "dragstart", path: "div#card", count: 1 }, { type: "dragend", path: "div#card", count: 1 }],
-  })];
+  s.realDragProbe = [
+    realRow({
+      path: "div#card",
+      dragstartFired: true,
+      timeline: [
+        { type: "dragstart", path: "div#card", count: 1 },
+        { type: "dragend", path: "div#card", count: 1 },
+      ],
+    }),
+  ];
   assert.equal(kinds(), 0);
 
   // A source the browser refused to pick up has no dragend either, and `drag-source-inert` is
@@ -1569,15 +1726,21 @@ test("E2E: the two mid-flight defects, each with its control", { timeout: 180_00
     probeDrag: true,
   });
   const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`))!;
-  const has = (id: string, kind: string) => deriveHandlerIssues(s)
-    .some((i) => i.kind === kind && i.element.includes(`#${id}`));
+  const has = (id: string, kind: string) =>
+    deriveHandlerIssues(s).some((i) => i.kind === kind && i.element.includes(`#${id}`));
 
   // A detached source gets no dragend. Its drop still landed, which is what makes it invisible.
   assert.ok(row("vanishes").droppedOn, "the drag itself succeeded");
-  assert.equal(row("vanishes").timeline?.some((step) => step.type === "dragend"), false);
+  assert.equal(
+    row("vanishes").timeline?.some((step) => step.type === "dragend"),
+    false,
+  );
   assert.ok(has("vanishes", "drag-source-detached-mid-drag"));
   // The control: same drag, node stays in the document.
-  assert.equal(row("plain").timeline?.some((step) => step.type === "dragend"), true);
+  assert.equal(
+    row("plain").timeline?.some((step) => step.type === "dragend"),
+    true,
+  );
   assert.equal(has("plain", "drag-source-detached-mid-drag"), false);
 
   // The handler duration, and the control that caught the first version of this measurement.
@@ -1633,41 +1796,48 @@ test("a passive listener's preventDefault is a finding; the same call that works
   assert.deepEqual(kinds(), []);
 });
 
-test("E2E: the wheel family separates a consumed wheel from a cancel that did nothing",
-  { timeout: 180_000 }, async () => {
-  const s = await buildHandlerSurface({
-    source: join(REPO_ROOT, "fixtures/handlers/wheel-and-passive.html"),
-    probes: ["wheel"],
-  });
-  const scrolled = (id: string) => s.wheelProbe?.find((r) => r.path.endsWith(`#${id}`))?.scrolledPx;
+test(
+  "E2E: the wheel family separates a consumed wheel from a cancel that did nothing",
+  { timeout: 180_000 },
+  async () => {
+    const s = await buildHandlerSurface({
+      source: join(REPO_ROOT, "fixtures/handlers/wheel-and-passive.html"),
+      probes: ["wheel"],
+    });
+    const scrolled = (id: string) => s.wheelProbe?.find((r) => r.path.endsWith(`#${id}`))?.scrolledPx;
 
-  // A 200px wheel is 200px of scroll, not 400: the element's own scrollTop was being counted twice,
-  // once on its own and once by the ancestor walk that starts at it.
-  assert.equal(scrolled("listens"), 200, "a handler that only reads lets the browser scroll");
-  assert.equal(scrolled("jacked"), 0, "preventDefault on a non-passive listener stops it");
-  assert.equal(scrolled("implicit"), 0, "a wheel listener with no option is not passive");
-  // The defect, and it is visible in the pixels as well as in the record: the panel scrolled
-  // although its handler said not to.
-  assert.equal(scrolled("cancels"), 200);
+    // A 200px wheel is 200px of scroll, not 400: the element's own scrollTop was being counted twice,
+    // once on its own and once by the ancestor walk that starts at it.
+    assert.equal(scrolled("listens"), 200, "a handler that only reads lets the browser scroll");
+    assert.equal(scrolled("jacked"), 0, "preventDefault on a non-passive listener stops it");
+    assert.equal(scrolled("implicit"), 0, "a wheel listener with no option is not passive");
+    // The defect, and it is visible in the pixels as well as in the record: the panel scrolled
+    // although its handler said not to.
+    assert.equal(scrolled("cancels"), 200);
 
-  const flagged = deriveHandlerIssues(s)
-    .filter((i) => i.kind === "passive-listener-cannot-cancel").map((i) => i.element);
-  assert.equal(flagged.length, 2, flagged.join(", "));
-  assert.match(flagged.join(" "), /#cancels/);
-  // The second explanation, from the same rule: `scroll` is not cancelable. A `scroll` handler is
-  // also a wheel-family target, because rolling the wheel over a scrollable panel is how one runs.
-  assert.match(flagged.join(" "), /#uncancelable/);
+    const flagged = deriveHandlerIssues(s)
+      .filter((i) => i.kind === "passive-listener-cannot-cancel")
+      .map((i) => i.element);
+    assert.equal(flagged.length, 2, flagged.join(", "));
+    assert.match(flagged.join(" "), /#cancels/);
+    // The second explanation, from the same rule: `scroll` is not cancelable. A `scroll` handler is
+    // also a wheel-family target, because rolling the wheel over a scrollable panel is how one runs.
+    assert.match(flagged.join(" "), /#uncancelable/);
 
-  // Consuming the wheel is what a map does. It is reported and must never be graded.
-  const { formatHandlerSurface } = await import("./handler-map.ts");
-  const text = formatHandlerSurface(s, deriveHandlerIssues(s)).replace(/\u001b\[[0-9;]*m/g, "");
-  assert.match(text, /div#jacked: a 200px wheel moved 0px \(nothing scrolled/);
-  assert.equal(deriveHandlerIssues(s).some((i) => i.element.includes("#jacked")), false);
+    // Consuming the wheel is what a map does. It is reported and must never be graded.
+    const { formatHandlerSurface } = await import("./handler-map.ts");
+    const text = formatHandlerSurface(s, deriveHandlerIssues(s)).replace(/\u001b\[[0-9;]*m/g, "");
+    assert.match(text, /div#jacked: a 200px wheel moved 0px \(nothing scrolled/);
+    assert.equal(
+      deriveHandlerIssues(s).some((i) => i.element.includes("#jacked")),
+      false,
+    );
 
-  // And the types stop being listed as never exercised.
-  const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types");
-  assert.equal(unprobed?.types?.includes("wheel") ?? false, false, "the wheel was driven");
-});
+    // And the types stop being listed as never exercised.
+    const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types");
+    assert.equal(unprobed?.types?.includes("wheel") ?? false, false, "the wheel was driven");
+  },
+);
 
 test("--probe rejects a family it does not have", async () => {
   const { parseProbeFamilies } = await import("../gates/handlers.gate.ts");
@@ -1730,8 +1900,7 @@ test("a hover finding needs no entry in the handler surface", () => {
   assert.match(found[0]!.element, /span#css "CSS only"/);
 });
 
-test("E2E: hover triggers come from the stylesheets as well as from the listeners",
-  { timeout: 180_000 }, async () => {
+test("E2E: hover triggers come from the stylesheets as well as from the listeners", { timeout: 180_000 }, async () => {
   const s = await buildHandlerSurface({
     source: join(REPO_ROOT, "fixtures/handlers/hover-vs-focus.html"),
     probes: ["hover"],
@@ -1743,25 +1912,42 @@ test("E2E: hover triggers come from the stylesheets as well as from the listener
   for (const id of ["jsHoverOnly", "jsBoth", "cssHoverOnly", "cssBoth", "noTabindex", "nothing"]) {
     assert.ok(row(id), `${id} must be probed`);
   }
-  assert.deepEqual(row("cssHoverOnly")!.revealedOnHover.map((l) => l.split("|")[0]), ["#t1"]);
+  assert.deepEqual(
+    row("cssHoverOnly")!.revealedOnHover.map((l) => l.split("|")[0]),
+    ["#t1"],
+  );
   assert.deepEqual(row("cssHoverOnly")!.revealedOnFocus, []);
-  assert.deepEqual(row("cssBoth")!.revealedOnFocus.map((l) => l.split("|")[0]), ["#t2"]);
+  assert.deepEqual(
+    row("cssBoth")!.revealedOnFocus.map((l) => l.split("|")[0]),
+    ["#t2"],
+  );
   assert.equal(row("noTabindex")!.focusable, false);
   assert.deepEqual(row("nothing")!.revealedOnHover, [], "the null control reveals nothing");
 
   const flagged = deriveHandlerIssues(s)
-    .filter((i) => i.kind === "hover-only-reveal").map((i) => i.element);
+    .filter((i) => i.kind === "hover-only-reveal")
+    .map((i) => i.element);
   assert.equal(flagged.length, 3, flagged.join(", "));
   for (const id of ["cssHoverOnly", "jsHoverOnly", "noTabindex"]) {
-    assert.ok(flagged.some((el) => el.includes(`#${id}`)), `${id} must report`);
+    assert.ok(
+      flagged.some((el) => el.includes(`#${id}`)),
+      `${id} must report`,
+    );
   }
   for (const id of ["cssBoth", "jsBoth", "nothing", "asymDelay"]) {
-    assert.equal(flagged.some((el) => el.includes(`#${id}`)), false, `${id} must stay silent`);
+    assert.equal(
+      flagged.some((el) => el.includes(`#${id}`)),
+      false,
+      `${id} must stay silent`,
+    );
   }
   // An ordinary tooltip: instant on hover, 400ms on focus. With one 80ms look this read as
   // hover-only — a false positive on a delay that exists so the tip does not flash as the pointer
   // crosses. The probe takes a second look before concluding a phase revealed nothing.
-  assert.deepEqual(row("asymDelay")!.revealedOnFocus.map((l) => l.split("|")[0]), ["#t6"]);
+  assert.deepEqual(
+    row("asymDelay")!.revealedOnFocus.map((l) => l.split("|")[0]),
+    ["#t6"],
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1773,7 +1959,10 @@ function menuRow(over: Partial<import("./handler-map.ts").MenuProbe> & { path: s
 
 test("the three right-click outcomes, and the two that are defects", () => {
   const s = surface(entry({ path: "div#box", types: { contextmenu: 1 } }));
-  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind.startsWith("contextmenu-")).map((i) => i.kind);
+  const kinds = () =>
+    deriveHandlerIssues(s)
+      .filter((i) => i.kind.startsWith("contextmenu-"))
+      .map((i) => i.kind);
 
   // The contract: cancelled, and something appeared.
   s.menuProbe = [menuRow({ path: "div#box" })];
@@ -1831,7 +2020,10 @@ test("E2E: right-click and touch on the fixture", { timeout: 240_000 }, async ()
     assert.ok(menu(id).handlerCalls > 0, `${id}: the right-click must reach the handler`);
   }
   assert.equal(menu("ctxOk").prevented, true);
-  assert.deepEqual(menu("ctxOk").revealed.map((l) => l.split("|")[0]), ["#menu"]);
+  assert.deepEqual(
+    menu("ctxOk").revealed.map((l) => l.split("|")[0]),
+    ["#menu"],
+  );
   assert.equal(menu("ctxNoPrevent").prevented, false);
   assert.equal(menu("ctxNothing").prevented, true);
   assert.deepEqual(menu("ctxNothing").revealed, []);
@@ -1854,7 +2046,11 @@ test("E2E: right-click and touch on the fixture", { timeout: 240_000 }, async ()
   // The controls stay silent under all three.
   for (const id of ["ctxOk", "tapOnly", "swipe"]) {
     assert.equal(
-      kinds.some((i) => i.element.includes(`#${id}`) && (i.kind.startsWith("contextmenu-") || i.kind === "touch-handlers-not-invoked")),
+      kinds.some(
+        (i) =>
+          i.element.includes(`#${id}`) &&
+          (i.kind.startsWith("contextmenu-") || i.kind === "touch-handlers-not-invoked"),
+      ),
       false,
       `${id} must stay silent`,
     );
@@ -1915,57 +2111,61 @@ test("the input family's coverage claim is what the recorder saw", () => {
   assert.deepEqual(unprobed.types, ["keydown"]);
 });
 
-test("E2E: three drives per field, and the control that makes the finding attributable",
-  { timeout: 240_000 }, async () => {
-  const s = await buildHandlerSurface({
-    source: join(REPO_ROOT, "fixtures/handlers/text-input.html"),
-    probes: ["input"],
-  });
-  const row = (id: string) => s.textInputProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+test(
+  "E2E: three drives per field, and the control that makes the finding attributable",
+  { timeout: 240_000 },
+  async () => {
+    const s = await buildHandlerSurface({
+      source: join(REPO_ROOT, "fixtures/handlers/text-input.html"),
+      probes: ["input"],
+    });
+    const row = (id: string) => s.textInputProbe?.find((r) => r.path.endsWith(`#${id}`))!;
 
-  // Half of these fields have no handler at all, so the targets cannot come from the handler
-  // surface. Before they were enumerated in the page, three of the six were unprobed.
-  for (const id of ["plain", "stripsNonAscii", "digitsOnly", "maxlen", "area", "changeCounter"]) {
-    assert.ok(row(id), `${id} must be probed`);
-  }
-  assert.equal(row("plain").plainCjk, "日本語");
-  assert.equal(row("stripsNonAscii").plainAscii, "vlmkit7");
-  assert.equal(row("stripsNonAscii").plainCjk, "", "the filter eats it");
-  assert.equal(row("digitsOnly").plainAscii, "7", "and it eats most of the ASCII too");
-  assert.equal(row("maxlen").plainAscii, "vlmk");
-  assert.equal(row("maxlen").plainCjk, "日本語", "a length rule is not a script rule");
+    // Half of these fields have no handler at all, so the targets cannot come from the handler
+    // surface. Before they were enumerated in the page, three of the six were unprobed.
+    for (const id of ["plain", "stripsNonAscii", "digitsOnly", "maxlen", "area", "changeCounter"]) {
+      assert.ok(row(id), `${id} must be probed`);
+    }
+    assert.equal(row("plain").plainCjk, "日本語");
+    assert.equal(row("stripsNonAscii").plainAscii, "vlmkit7");
+    assert.equal(row("stripsNonAscii").plainCjk, "", "the filter eats it");
+    assert.equal(row("digitsOnly").plainAscii, "7", "and it eats most of the ASCII too");
+    assert.equal(row("maxlen").plainAscii, "vlmk");
+    assert.equal(row("maxlen").plainCjk, "日本語", "a length rule is not a script rule");
 
-  // A field that cannot take focus reports `not driven` rather than a value it never received.
-  // Found on a real page: a textarea inside a closed <details> reported `"vlmkit7" became ""` for a
-  // drive that never happened, and only the ASCII control kept that from being a false positive.
-  const closed = row("insideClosedDetails");
-  assert.ok(closed, "the field inside the closed <details> must appear");
-  assert.match(closed.error ?? "", /could not focus/);
-  assert.equal(closed.plainAscii, "", "and it must not claim a measurement");
-  assert.equal(
-    deriveHandlerIssues(s).some((i) => i.element.includes("#insideClosedDetails")),
-    false,
-    "an undriven field cannot produce a finding",
-  );
+    // A field that cannot take focus reports `not driven` rather than a value it never received.
+    // Found on a real page: a textarea inside a closed <details> reported `"vlmkit7" became ""` for a
+    // drive that never happened, and only the ASCII control kept that from being a false positive.
+    const closed = row("insideClosedDetails");
+    assert.ok(closed, "the field inside the closed <details> must appear");
+    assert.match(closed.error ?? "", /could not focus/);
+    assert.equal(closed.plainAscii, "", "and it must not claim a measurement");
+    assert.equal(
+      deriveHandlerIssues(s).some((i) => i.element.includes("#insideClosedDetails")),
+      false,
+      "an undriven field cannot produce a finding",
+    );
 
-  // The composition really ran: its types are in the observed list, which is what the coverage
-  // claim reads. Nothing is graded from the composed value.
-  assert.ok(row("plain").observedTypes.includes("compositionstart"), row("plain").observedTypes.join(","));
-  assert.ok(row("plain").observedTypes.includes("compositionend"));
-  assert.equal(row("plain").composed, "日本語");
-  assert.equal(row("stripsNonAscii").composed, "", "same result composed or not — not IME-specific");
+    // The composition really ran: its types are in the observed list, which is what the coverage
+    // claim reads. Nothing is graded from the composed value.
+    assert.ok(row("plain").observedTypes.includes("compositionstart"), row("plain").observedTypes.join(","));
+    assert.ok(row("plain").observedTypes.includes("compositionend"));
+    assert.equal(row("plain").composed, "日本語");
+    assert.equal(row("stripsNonAscii").composed, "", "same result composed or not — not IME-specific");
 
-  // Transformed is not dropped. A furigana field that transliterates kana to romaji is ordinary on
-  // Japanese sites, and a "does the value still contain it" check reported `lost "日本語" — typing it
-  // left "NIHONGO"`, contradicting itself. A drop returns LESS than went in.
-  assert.equal(row("translit").plainCjk, "NIHONGO");
-  assert.ok(row("translit").plainCjk.length > "日本語".length);
+    // Transformed is not dropped. A furigana field that transliterates kana to romaji is ordinary on
+    // Japanese sites, and a "does the value still contain it" check reported `lost "日本語" — typing it
+    // left "NIHONGO"`, contradicting itself. A drop returns LESS than went in.
+    assert.equal(row("translit").plainCjk, "NIHONGO");
+    assert.ok(row("translit").plainCjk.length > "日本語".length);
 
-  const flagged = deriveHandlerIssues(s)
-    .filter((i) => i.kind === "text-input-rejects-non-ascii").map((i) => i.element);
-  assert.equal(flagged.length, 1, flagged.join(", "));
-  assert.match(flagged[0]!, /#stripsNonAscii/);
-});
+    const flagged = deriveHandlerIssues(s)
+      .filter((i) => i.kind === "text-input-rejects-non-ascii")
+      .map((i) => i.element);
+    assert.equal(flagged.length, 1, flagged.join(", "));
+    assert.match(flagged[0]!, /#stripsNonAscii/);
+  },
+);
 
 test("a field that rewrites text is not a field that drops it", () => {
   const s = surface(entry({ path: "input#f", types: { input: 1 } }));
@@ -2001,10 +2201,7 @@ test("check interactions --handlers can emit every rule it declares", async () =
   }
   // The source is the only place the family list appears for this gate, so read it there: a gate
   // that declares the rules and drives one family is the state this test exists to reject.
-  const source = await readFile(
-    fileURLToPath(new URL("../gates/interactions.gate.ts", import.meta.url)),
-    "utf8",
-  );
+  const source = await readFile(fileURLToPath(new URL("../gates/interactions.gate.ts", import.meta.url)), "utf8");
   assert.match(source, /probes: \[\.\.\.PROBE_FAMILIES\]/);
   assert.doesNotMatch(source, /buildHandlerSurface\(\{ source, probeDrag: true/);
 });
@@ -2019,13 +2216,15 @@ test("a hover finding says when many elements share the probed path", () => {
     globals: {},
     totalRegistrations: 17,
   };
-  s.hoverProbe = [{
-    path: "div>button",
-    text: "1",
-    revealedOnHover: ["#tooltip-1|Rectangle"],
-    revealedOnFocus: [],
-    focusable: true,
-  }];
+  s.hoverProbe = [
+    {
+      path: "div>button",
+      text: "1",
+      revealedOnHover: ["#tooltip-1|Rectangle"],
+      revealedOnFocus: [],
+      focusable: true,
+    },
+  ];
   const found = deriveHandlerIssues(s).find((i) => i.kind === "hover-only-reveal")!;
   assert.match(found.message, /17 elements on this page derive the same path/);
   assert.match(found.message, /the pattern rather than one control/);
@@ -2069,54 +2268,69 @@ test("drag-source-not-draggable still fires when the surface predates draggableD
   // The compatibility direction, and the one that matters: reading a missing count as 0 keeps
   // the rule working on a recorded surface, where treating "not collected" as "delegates" would
   // silently switch the rule off. Same policy as `draggable` itself.
-  const issues = deriveHandlerIssues(surface(entry({
-    path: "div#old",
-    text: "source",
-    types: { dragstart: 1 },
-    draggable: false,
-  })));
+  const issues = deriveHandlerIssues(
+    surface(
+      entry({
+        path: "div#old",
+        text: "source",
+        types: { dragstart: 1 },
+        draggable: false,
+      }),
+    ),
+  );
   assert.equal(issues.filter((i) => i.kind === "drag-source-not-draggable").length, 1);
 });
 
-test("E2E: the drag probe is quiet on a delegated board and still catches a real refusal", { timeout: 180_000 }, async () => {
-  // Both directions in one test, because either alone is worthless: a probe that reports nothing
-  // is quiet on the good page too, and a probe that reports everything catches the bad one.
-  //
-  // The delegated board is `examples/solitaire/`, which is in the repo for exactly this. It
-  // attaches every drag handler once to `main#table`, addresses 52 rebuilt children through
-  // `closest(...)`, and cancels `dragover` only for a legal move. All three drag rules fired on
-  // it, and all three were wrong:
-  //
-  //   drag-source-not-draggable    read `draggable` on the container, which never is
-  //   dragstart-transfers-nothing  dispatched at the container, where the guard returns early
-  //   dragover-not-prevented       tried ONE pair, a red Queen with no legal destination
-  const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
-  const solitaire = join(repoRoot, "examples", "solitaire", "index.html");
+test(
+  "E2E: the drag probe is quiet on a delegated board and still catches a real refusal",
+  { timeout: 180_000 },
+  async () => {
+    // Both directions in one test, because either alone is worthless: a probe that reports nothing
+    // is quiet on the good page too, and a probe that reports everything catches the bad one.
+    //
+    // The delegated board is `examples/solitaire/`, which is in the repo for exactly this. It
+    // attaches every drag handler once to `main#table`, addresses 52 rebuilt children through
+    // `closest(...)`, and cancels `dragover` only for a legal move. All three drag rules fired on
+    // it, and all three were wrong:
+    //
+    //   drag-source-not-draggable    read `draggable` on the container, which never is
+    //   dragstart-transfers-nothing  dispatched at the container, where the guard returns early
+    //   dragover-not-prevented       tried ONE pair, a red Queen with no legal destination
+    const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
+    const solitaire = join(repoRoot, "examples", "solitaire", "index.html");
 
-  const board = await buildHandlerSurface({
-    source: `${pathToFileURL(solitaire).href}?seed=1&animate=0`,
-    probeDrag: true,
-  });
-  const boardIssues = deriveHandlerIssues(board).map((i) => i.kind);
-  for (const kind of ["drag-source-not-draggable", "dragstart-transfers-nothing", "dragover-not-prevented"] as const) {
-    assert.ok(!boardIssues.includes(kind), `${kind} must not fire on a working delegated board`);
-  }
-  // The container really is the delegating shape this exempts, rather than the test passing
-  // because the surface came back empty.
-  const container = board.elements.find((e) => e.path.includes("main#table"));
-  assert.ok(container, "the delegation container is in the surface");
-  assert.equal(container.draggable, false);
-  assert.ok((container.draggableDescendants ?? 0) >= 7, "and it serves the cards");
+    const board = await buildHandlerSurface({
+      source: `${pathToFileURL(solitaire).href}?seed=1&animate=0`,
+      probeDrag: true,
+    });
+    const boardIssues = deriveHandlerIssues(board).map((i) => i.kind);
+    for (const kind of [
+      "drag-source-not-draggable",
+      "dragstart-transfers-nothing",
+      "dragover-not-prevented",
+    ] as const) {
+      assert.ok(!boardIssues.includes(kind), `${kind} must not fire on a working delegated board`);
+    }
+    // The container really is the delegating shape this exempts, rather than the test passing
+    // because the surface came back empty.
+    const container = board.elements.find((e) => e.path.includes("main#table"));
+    assert.ok(container, "the delegation container is in the surface");
+    assert.equal(container.draggable, false);
+    assert.ok((container.draggableDescendants ?? 0) >= 7, "and it serves the cards");
 
-  // The fixture whose zone genuinely never cancels must still report. An earlier version of this
-  // fix widened the probe's targets to the element's SIBLINGS, and a sibling that does cancel
-  // made this finding disappear — reporting another element's preventDefault as this one's.
-  const fixture = join(repoRoot, "fixtures", "handlers", "drag-and-drop.html");
-  const bad = await buildHandlerSurface({ source: fixture, probeDrag: true });
-  const badIssues = deriveHandlerIssues(bad);
-  const refusal = badIssues.filter((i) => i.kind === "dragover-not-prevented");
-  assert.equal(refusal.length, 1, "the fixture's one refusing zone still reports");
-  assert.match(refusal[0]!.element, /zone-forgot-prevent/);
-  assert.equal(badIssues.filter((i) => i.kind === "drag-source-not-draggable").length, 1,
-    "and the source that really cannot be dragged still reports");
-});
+    // The fixture whose zone genuinely never cancels must still report. An earlier version of this
+    // fix widened the probe's targets to the element's SIBLINGS, and a sibling that does cancel
+    // made this finding disappear — reporting another element's preventDefault as this one's.
+    const fixture = join(repoRoot, "fixtures", "handlers", "drag-and-drop.html");
+    const bad = await buildHandlerSurface({ source: fixture, probeDrag: true });
+    const badIssues = deriveHandlerIssues(bad);
+    const refusal = badIssues.filter((i) => i.kind === "dragover-not-prevented");
+    assert.equal(refusal.length, 1, "the fixture's one refusing zone still reports");
+    assert.match(refusal[0]!.element, /zone-forgot-prevent/);
+    assert.equal(
+      badIssues.filter((i) => i.kind === "drag-source-not-draggable").length,
+      1,
+      "and the source that really cannot be dragged still reports",
+    );
+  },
+);

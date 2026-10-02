@@ -15,14 +15,8 @@ import type {
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, "..");
 const repoRoot = resolve(packageRoot, "../..");
-const cliPath = join(
-  packageRoot,
-  "_build/js/debug/build/markup-core-cli/markup-core-cli.js",
-);
-const apiPath = join(
-  packageRoot,
-  "_build/js/debug/build/markup-core-api/markup-core-api.js",
-);
+const cliPath = join(packageRoot, "_build/js/debug/build/markup-core-cli/markup-core-cli.js");
+const apiPath = join(packageRoot, "_build/js/debug/build/markup-core-api/markup-core-api.js");
 
 let built = false;
 const runMarkupCoreCache = new Map<string, string>();
@@ -103,9 +97,7 @@ export function computeComponentGoalStatus(input: {
       // Presence of the hook, not its value: the positional form sent "null" when
       // the contract declared no hook and "false" when it declared one that was
       // missing, and those mean different things to the rule.
-      state_hook_present: input.canvas.stateHook
-        ? input.canvas.stateHookPresent !== false
-        : undefined,
+      state_hook_present: input.canvas.stateHook ? input.canvas.stateHookPresent !== false : undefined,
       missing_state_fields: intOr(input.canvas.missingStateFields?.length),
     },
     expressive_menu: input.expressiveMenu && {
@@ -191,8 +183,8 @@ export function callMarkupCoreJson<TOut>(command: string, input: unknown): TOut 
     return JSON.parse(output) as TOut;
   } catch (e) {
     throw new Error(
-      `markup-core ${command} returned output that is not JSON: ${JSON.stringify(output.slice(0, 200))}`
-      + ` (${e instanceof Error ? e.message : String(e)})`,
+      `markup-core ${command} returned output that is not JSON: ${JSON.stringify(output.slice(0, 200))}` +
+        ` (${e instanceof Error ? e.message : String(e)})`,
     );
   }
 }
@@ -294,10 +286,10 @@ function runMarkupCoreJsonRaw(command: string, payload: string): string {
   // actually wrong instead.
   if (directModuleSource === "injected") {
     throw new Error(
-      `markup-core JSON command "${command}" is unavailable: the injected markup-core API `
-      + "has no run_markup_core_json. The bundled entrypoint (scripts/vlmkit-bundled.mjs) "
-      + "must hand over the whole generated bridge, and the bridge must be rebuilt after "
-      + "adding a JSON entry point. This is a build/packaging fault, not a bad payload.",
+      `markup-core JSON command "${command}" is unavailable: the injected markup-core API ` +
+        "has no run_markup_core_json. The bundled entrypoint (scripts/vlmkit-bundled.mjs) " +
+        "must hand over the whole generated bridge, and the bridge must be rebuilt after " +
+        "adding a JSON entry point. This is a build/packaging fault, not a bad payload.",
     );
   }
   ensureMarkupCoreCli();
@@ -355,9 +347,7 @@ function encodeDirectArgs(args: string[]): string | undefined {
 function pickDirectApi(source: Partial<DirectMarkupCoreModule>): DirectMarkupCoreModule {
   return {
     run_markup_core: source.run_markup_core!,
-    ...(typeof source.run_markup_core_json === "function"
-      ? { run_markup_core_json: source.run_markup_core_json }
-      : {}),
+    ...(typeof source.run_markup_core_json === "function" ? { run_markup_core_json: source.run_markup_core_json } : {}),
     ...(typeof source.markup_core_json_commands === "function"
       ? { markup_core_json_commands: source.markup_core_json_commands }
       : {}),
@@ -400,22 +390,13 @@ function unwrapMoonBitResult(value: unknown): string {
     // `String(value._0)` was `[object Object]` for every error MoonBit's stdlib
     // raises, which meant the JSON boundary's whole selling point — a decode error
     // that names the field — was invisible on the default backend.
-    throw new Error(
-      `markup-core direct call failed: ${describeMoonBitError(value._0) ?? String(value._0)}`,
-    );
+    throw new Error(`markup-core direct call failed: ${describeMoonBitError(value._0) ?? String(value._0)}`);
   }
   return String(value);
 }
 
-function isMoonBitResult(
-  value: unknown,
-): value is { $tag: 0 | 1; _0: unknown } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "$tag" in value &&
-    "_0" in value
-  );
+function isMoonBitResult(value: unknown): value is { $tag: 0 | 1; _0: unknown } {
+  return typeof value === "object" && value !== null && "$tag" in value && "_0" in value;
 }
 
 export function isMarkupCoreComponentProbeState(value: string): boolean {
@@ -430,17 +411,8 @@ export function computeComponentProbeStates(requiredStateKinds: string[]): strin
   return splitList(runMarkupCore(["component-probe-states", joinList(requiredStateKinds)]));
 }
 
-export function mergeMarkupCoreComponentProbeStates(
-  explicit: string[] | undefined,
-  injected: string[],
-): string[] {
-  return splitList(
-    runMarkupCore([
-      "merge-component-probe-states",
-      joinList(explicit ?? []),
-      joinList(injected),
-    ]),
-  );
+export function mergeMarkupCoreComponentProbeStates(explicit: string[] | undefined, injected: string[]): string[] {
+  return splitList(runMarkupCore(["merge-component-probe-states", joinList(explicit ?? []), joinList(injected)]));
 }
 
 export type MarkupCoreScrollTargetSource = "state-targets" | "expected-scrollports" | "none";
@@ -454,20 +426,13 @@ export function computeComponentScrollTargetSource(
     joinList(requiredStateKinds),
     intArg(explicitScrolledTargetCount),
   ]);
-  if (
-    output === "state-targets" ||
-    output === "expected-scrollports" ||
-    output === "none"
-  ) {
+  if (output === "state-targets" || output === "expected-scrollports" || output === "none") {
     return output;
   }
   throw new Error(`unexpected markup-core scroll target source: ${output}`);
 }
 
-export type MarkupCoreSemanticDrilldownReasonId =
-  | "coarse-landscape"
-  | "local-kinds"
-  | "local-pixel";
+export type MarkupCoreSemanticDrilldownReasonId = "coarse-landscape" | "local-kinds" | "local-pixel";
 
 export interface MarkupCoreSemanticDrilldownPolicy {
   flow: "layout" | "decoration";
@@ -490,11 +455,7 @@ export function computeSemanticDrilldownPolicy(
   if (flow !== "layout" && flow !== "decoration") {
     throw new Error(`unexpected markup-core semantic flow: ${output}`);
   }
-  if (
-    reasonId !== "coarse-landscape" &&
-    reasonId !== "local-kinds" &&
-    reasonId !== "local-pixel"
-  ) {
+  if (reasonId !== "coarse-landscape" && reasonId !== "local-kinds" && reasonId !== "local-pixel") {
     throw new Error(`unexpected markup-core semantic reason: ${output}`);
   }
   const parsedPriority = Number(priorityScore);
@@ -550,8 +511,7 @@ export type MarkupCoreUiContractPatternEvidenceIssueId =
   | "expressive-menu-required-hover"
   | "expressive-menu-required-focus-visible";
 
-export type MarkupCoreUiContractVersionIssueId =
-  "contract-version-unsupported";
+export type MarkupCoreUiContractVersionIssueId = "contract-version-unsupported";
 
 export type MarkupCoreUiContractScreenIssueId =
   | "screen-id-required"
@@ -571,12 +531,9 @@ export type MarkupCoreUiContractLandmarkIssueId =
   | "landmark-name-required"
   | "landmark-parent-unknown";
 
-export type MarkupCoreUiContractResponsiveRuleIssueId =
-  "responsive-rule-viewport-unknown";
+export type MarkupCoreUiContractResponsiveRuleIssueId = "responsive-rule-viewport-unknown";
 
-export type MarkupCoreUiContractMarkerIssueId =
-  | "marker-kind-unknown"
-  | "marker-target-required";
+export type MarkupCoreUiContractMarkerIssueId = "marker-kind-unknown" | "marker-target-required";
 
 export type MarkupCoreUiContractRangeIssueId =
   | "range-min-non-negative"
@@ -589,16 +546,13 @@ export type MarkupCoreUiContractAssetIssueId = "asset-id-required";
 
 export type MarkupCoreUiContractCanvasIssueId = "canvas-state-hook-required";
 
-export type MarkupCoreUiContractCanvasInputIssueId =
-  "canvas-input-action-required";
+export type MarkupCoreUiContractCanvasInputIssueId = "canvas-input-action-required";
 
 export type MarkupCoreUiContractCanvasHudIssueId = "canvas-hud-id-required";
 
-export type MarkupCoreUiContractCompositionIssueId =
-  "composition-style-unknown";
+export type MarkupCoreUiContractCompositionIssueId = "composition-style-unknown";
 
-export type MarkupCoreUiContractCompositionAxisIssueId =
-  "composition-axis-unknown";
+export type MarkupCoreUiContractCompositionAxisIssueId = "composition-axis-unknown";
 
 export type MarkupCoreUiContractCompositionLayerIssueId =
   | "composition-layer-id-required"
@@ -618,30 +572,22 @@ export type MarkupCoreUiContractCompositionMotionIssueId =
   | "motion-effect-unknown"
   | "motion-duration-non-negative";
 
-export type MarkupCoreUiContractCompositionContrastIssueId =
-  | "contrast-mode-unknown"
-  | "contrast-min-ratio-positive";
+export type MarkupCoreUiContractCompositionContrastIssueId = "contrast-mode-unknown" | "contrast-min-ratio-positive";
 
-export type MarkupCoreUiContractCompositionContrastPaletteIssueId =
-  "contrast-palette-value-hex";
+export type MarkupCoreUiContractCompositionContrastPaletteIssueId = "contrast-palette-value-hex";
 
 export type MarkupCoreUiContractDecorationTypographyIssueId =
   | "typography-role-required"
   | "typography-size-positive"
   | "typography-line-height-positive";
 
-export type MarkupCoreUiContractDecorationPaletteIssueId =
-  | "palette-role-required"
-  | "palette-value-hex";
+export type MarkupCoreUiContractDecorationPaletteIssueId = "palette-role-required" | "palette-value-hex";
 
-export type MarkupCoreUiContractDecorationMediaIssueId =
-  "media-slot-required";
+export type MarkupCoreUiContractDecorationMediaIssueId = "media-slot-required";
 
-export type MarkupCoreUiContractContentItemsIssueId =
-  "content-items-exact-non-negative";
+export type MarkupCoreUiContractContentItemsIssueId = "content-items-exact-non-negative";
 
-export type MarkupCoreUiContractContentTextIssueId =
-  "content-text-row-count-non-negative";
+export type MarkupCoreUiContractContentTextIssueId = "content-text-row-count-non-negative";
 
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
@@ -651,10 +597,7 @@ export type MarkupCoreUiContractLayoutIssueId =
   | "layout-grid-columns"
   | "layout-grid-rows";
 
-export type MarkupCoreUiContractStateIssueId =
-  | "state-id-required"
-  | "state-kind-unknown"
-  | "state-target-required";
+export type MarkupCoreUiContractStateIssueId = "state-id-required" | "state-kind-unknown" | "state-target-required";
 
 export type MarkupCoreUiContractRequiredStateIssueId =
   | MarkupCoreUiContractStateIssueId
@@ -668,20 +611,13 @@ export type MarkupCoreUiContractExpectedScrollportIssueId =
   | "expected-scrollport-target-required"
   | "expected-scrollport-min-overflow";
 
-export function computeUiContractVersionIssueIds(input: {
-  version: number;
-}): MarkupCoreUiContractVersionIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-version-issue-ids",
-    intArg(input.version),
-  ]);
+export function computeUiContractVersionIssueIds(input: { version: number }): MarkupCoreUiContractVersionIssueId[] {
+  const output = runMarkupCore(["ui-contract-version-issue-ids", intArg(input.version)]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractVersionIssueId(issueId)) {
       return issueId;
     }
-    throw new Error(
-      `unexpected markup-core UI contract version issue id: ${issueId}`,
-    );
+    throw new Error(`unexpected markup-core UI contract version issue id: ${issueId}`);
   });
 }
 
@@ -701,9 +637,7 @@ export function computeUiContractScreenIssueIds(input: {
     if (isMarkupCoreUiContractScreenIssueId(issueId)) {
       return issueId;
     }
-    throw new Error(
-      `unexpected markup-core UI contract screen issue id: ${issueId}`,
-    );
+    throw new Error(`unexpected markup-core UI contract screen issue id: ${issueId}`);
   });
 }
 
@@ -727,9 +661,7 @@ export function computeUiContractViewportIssueIds(input: {
     if (isMarkupCoreUiContractViewportIssueId(issueId)) {
       return issueId;
     }
-    throw new Error(
-      `unexpected markup-core UI contract viewport issue id: ${issueId}`,
-    );
+    throw new Error(`unexpected markup-core UI contract viewport issue id: ${issueId}`);
   });
 }
 
@@ -751,26 +683,19 @@ export function computeUiContractLandmarkIssueIds(input: {
     if (isMarkupCoreUiContractLandmarkIssueId(issueId)) {
       return issueId;
     }
-    throw new Error(
-      `unexpected markup-core UI contract landmark issue id: ${issueId}`,
-    );
+    throw new Error(`unexpected markup-core UI contract landmark issue id: ${issueId}`);
   });
 }
 
 export function computeUiContractResponsiveRuleIssueIds(input: {
   viewportKnown: boolean;
 }): MarkupCoreUiContractResponsiveRuleIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-responsive-rule-issue-ids",
-    boolArg(input.viewportKnown),
-  ]);
+  const output = runMarkupCore(["ui-contract-responsive-rule-issue-ids", boolArg(input.viewportKnown)]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractResponsiveRuleIssueId(issueId)) {
       return issueId;
     }
-    throw new Error(
-      `unexpected markup-core UI contract responsive rule issue id: ${issueId}`,
-    );
+    throw new Error(`unexpected markup-core UI contract responsive rule issue id: ${issueId}`);
   });
 }
 
@@ -844,9 +769,7 @@ export function computeUiContractOptionalRangeIssueIds(input: {
   });
 }
 
-export function computeUiContractSlotIssueIds(input: {
-  id: string;
-}): MarkupCoreUiContractSlotIssueId[] {
+export function computeUiContractSlotIssueIds(input: { id: string }): MarkupCoreUiContractSlotIssueId[] {
   const output = runMarkupCore(["ui-contract-slot-issue-ids", input.id]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractSlotIssueId(issueId)) {
@@ -856,9 +779,7 @@ export function computeUiContractSlotIssueIds(input: {
   });
 }
 
-export function computeUiContractAssetIssueIds(input: {
-  id: string;
-}): MarkupCoreUiContractAssetIssueId[] {
+export function computeUiContractAssetIssueIds(input: { id: string }): MarkupCoreUiContractAssetIssueId[] {
   const output = runMarkupCore(["ui-contract-asset-issue-ids", input.id]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractAssetIssueId(issueId)) {
@@ -888,10 +809,7 @@ export function computeUiContractCanvasIssueIds(input: {
 export function computeUiContractCanvasInputIssueIds(input: {
   action: string;
 }): MarkupCoreUiContractCanvasInputIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-canvas-input-issue-ids",
-    input.action,
-  ]);
+  const output = runMarkupCore(["ui-contract-canvas-input-issue-ids", input.action]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractCanvasInputIssueId(issueId)) {
       return issueId;
@@ -900,9 +818,7 @@ export function computeUiContractCanvasInputIssueIds(input: {
   });
 }
 
-export function computeUiContractCanvasHudIssueIds(input: {
-  id: string;
-}): MarkupCoreUiContractCanvasHudIssueId[] {
+export function computeUiContractCanvasHudIssueIds(input: { id: string }): MarkupCoreUiContractCanvasHudIssueId[] {
   const output = runMarkupCore(["ui-contract-canvas-hud-issue-ids", input.id]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractCanvasHudIssueId(issueId)) {
@@ -915,10 +831,7 @@ export function computeUiContractCanvasHudIssueIds(input: {
 export function computeUiContractCompositionIssueIds(input: {
   style: string;
 }): MarkupCoreUiContractCompositionIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-issue-ids",
-    input.style,
-  ]);
+  const output = runMarkupCore(["ui-contract-composition-issue-ids", input.style]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractCompositionIssueId(issueId)) {
       return issueId;
@@ -930,10 +843,7 @@ export function computeUiContractCompositionIssueIds(input: {
 export function computeUiContractCompositionAxisIssueIds(input: {
   axis: string;
 }): MarkupCoreUiContractCompositionAxisIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-axis-issue-ids",
-    input.axis,
-  ]);
+  const output = runMarkupCore(["ui-contract-composition-axis-issue-ids", input.axis]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractCompositionAxisIssueId(issueId)) {
       return issueId;
@@ -1027,10 +937,7 @@ export function computeUiContractCompositionContrastIssueIds(input: {
 export function computeUiContractCompositionContrastPaletteIssueIds(input: {
   value: string;
 }): MarkupCoreUiContractCompositionContrastPaletteIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-contrast-palette-issue-ids",
-    input.value,
-  ]);
+  const output = runMarkupCore(["ui-contract-composition-contrast-palette-issue-ids", input.value]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractCompositionContrastPaletteIssueId(issueId)) {
       return issueId;
@@ -1079,10 +986,7 @@ export function computeUiContractDecorationPaletteIssueIds(input: {
 export function computeUiContractDecorationMediaIssueIds(input: {
   slot: string;
 }): MarkupCoreUiContractDecorationMediaIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-decoration-media-issue-ids",
-    input.slot,
-  ]);
+  const output = runMarkupCore(["ui-contract-decoration-media-issue-ids", input.slot]);
   return splitList(output).map((issueId) => {
     if (isMarkupCoreUiContractDecorationMediaIssueId(issueId)) {
       return issueId;
@@ -1263,15 +1167,11 @@ function isMarkupCoreUiContractPatternEvidenceIssueId(
   );
 }
 
-function isMarkupCoreUiContractVersionIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractVersionIssueId {
+function isMarkupCoreUiContractVersionIssueId(issueId: string): issueId is MarkupCoreUiContractVersionIssueId {
   return issueId === "contract-version-unsupported";
 }
 
-function isMarkupCoreUiContractScreenIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractScreenIssueId {
+function isMarkupCoreUiContractScreenIssueId(issueId: string): issueId is MarkupCoreUiContractScreenIssueId {
   return (
     issueId === "screen-id-required" ||
     issueId === "screen-pattern-unknown" ||
@@ -1280,9 +1180,7 @@ function isMarkupCoreUiContractScreenIssueId(
   );
 }
 
-function isMarkupCoreUiContractViewportIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractViewportIssueId {
+function isMarkupCoreUiContractViewportIssueId(issueId: string): issueId is MarkupCoreUiContractViewportIssueId {
   return (
     issueId === "viewport-label-required" ||
     issueId === "viewport-label-unique" ||
@@ -1291,9 +1189,7 @@ function isMarkupCoreUiContractViewportIssueId(
   );
 }
 
-function isMarkupCoreUiContractLandmarkIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractLandmarkIssueId {
+function isMarkupCoreUiContractLandmarkIssueId(issueId: string): issueId is MarkupCoreUiContractLandmarkIssueId {
   return (
     issueId === "landmark-abstract-role" ||
     issueId === "landmark-id-required" ||
@@ -1308,9 +1204,7 @@ function isMarkupCoreUiContractResponsiveRuleIssueId(
   return issueId === "responsive-rule-viewport-unknown";
 }
 
-function isMarkupCoreUiContractLayoutIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractLayoutIssueId {
+function isMarkupCoreUiContractLayoutIssueId(issueId: string): issueId is MarkupCoreUiContractLayoutIssueId {
   return (
     issueId === "layout-width-fluid-bounds" ||
     issueId === "layout-width-fixed-positive" ||
@@ -1321,58 +1215,37 @@ function isMarkupCoreUiContractLayoutIssueId(
   );
 }
 
-function isMarkupCoreUiContractMarkerIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractMarkerIssueId {
+function isMarkupCoreUiContractMarkerIssueId(issueId: string): issueId is MarkupCoreUiContractMarkerIssueId {
+  return issueId === "marker-kind-unknown" || issueId === "marker-target-required";
+}
+
+function isMarkupCoreUiContractRangeIssueId(issueId: string): issueId is MarkupCoreUiContractRangeIssueId {
   return (
-    issueId === "marker-kind-unknown" ||
-    issueId === "marker-target-required"
+    issueId === "range-min-non-negative" || issueId === "range-max-non-negative" || issueId === "range-min-lte-max"
   );
 }
 
-function isMarkupCoreUiContractRangeIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractRangeIssueId {
-  return (
-    issueId === "range-min-non-negative" ||
-    issueId === "range-max-non-negative" ||
-    issueId === "range-min-lte-max"
-  );
-}
-
-function isMarkupCoreUiContractSlotIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractSlotIssueId {
+function isMarkupCoreUiContractSlotIssueId(issueId: string): issueId is MarkupCoreUiContractSlotIssueId {
   return issueId === "slot-id-required";
 }
 
-function isMarkupCoreUiContractAssetIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractAssetIssueId {
+function isMarkupCoreUiContractAssetIssueId(issueId: string): issueId is MarkupCoreUiContractAssetIssueId {
   return issueId === "asset-id-required";
 }
 
-function isMarkupCoreUiContractCanvasIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractCanvasIssueId {
+function isMarkupCoreUiContractCanvasIssueId(issueId: string): issueId is MarkupCoreUiContractCanvasIssueId {
   return issueId === "canvas-state-hook-required";
 }
 
-function isMarkupCoreUiContractCanvasInputIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractCanvasInputIssueId {
+function isMarkupCoreUiContractCanvasInputIssueId(issueId: string): issueId is MarkupCoreUiContractCanvasInputIssueId {
   return issueId === "canvas-input-action-required";
 }
 
-function isMarkupCoreUiContractCanvasHudIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractCanvasHudIssueId {
+function isMarkupCoreUiContractCanvasHudIssueId(issueId: string): issueId is MarkupCoreUiContractCanvasHudIssueId {
   return issueId === "canvas-hud-id-required";
 }
 
-function isMarkupCoreUiContractCompositionIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractCompositionIssueId {
+function isMarkupCoreUiContractCompositionIssueId(issueId: string): issueId is MarkupCoreUiContractCompositionIssueId {
   return issueId === "composition-style-unknown";
 }
 
@@ -1418,10 +1291,7 @@ function isMarkupCoreUiContractCompositionMotionIssueId(
 function isMarkupCoreUiContractCompositionContrastIssueId(
   issueId: string,
 ): issueId is MarkupCoreUiContractCompositionContrastIssueId {
-  return (
-    issueId === "contrast-mode-unknown" ||
-    issueId === "contrast-min-ratio-positive"
-  );
+  return issueId === "contrast-mode-unknown" || issueId === "contrast-min-ratio-positive";
 }
 
 function isMarkupCoreUiContractCompositionContrastPaletteIssueId(
@@ -1443,10 +1313,7 @@ function isMarkupCoreUiContractDecorationTypographyIssueId(
 function isMarkupCoreUiContractDecorationPaletteIssueId(
   issueId: string,
 ): issueId is MarkupCoreUiContractDecorationPaletteIssueId {
-  return (
-    issueId === "palette-role-required" ||
-    issueId === "palette-value-hex"
-  );
+  return issueId === "palette-role-required" || issueId === "palette-value-hex";
 }
 
 function isMarkupCoreUiContractDecorationMediaIssueId(
@@ -1461,20 +1328,12 @@ function isMarkupCoreUiContractContentItemsIssueId(
   return issueId === "content-items-exact-non-negative";
 }
 
-function isMarkupCoreUiContractContentTextIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractContentTextIssueId {
+function isMarkupCoreUiContractContentTextIssueId(issueId: string): issueId is MarkupCoreUiContractContentTextIssueId {
   return issueId === "content-text-row-count-non-negative";
 }
 
-function isMarkupCoreUiContractStateIssueId(
-  issueId: string,
-): issueId is MarkupCoreUiContractStateIssueId {
-  return (
-    issueId === "state-id-required" ||
-    issueId === "state-kind-unknown" ||
-    issueId === "state-target-required"
-  );
+function isMarkupCoreUiContractStateIssueId(issueId: string): issueId is MarkupCoreUiContractStateIssueId {
+  return issueId === "state-id-required" || issueId === "state-kind-unknown" || issueId === "state-target-required";
 }
 
 function isMarkupCoreUiContractRequiredStateIssueId(
@@ -1501,16 +1360,7 @@ function isMarkupCoreUiContractExpectedScrollportIssueId(
 
 export function ensureMarkupCoreCli(): void {
   if (built) return;
-  run("moon", [
-    "-C",
-    packageRoot,
-    "build",
-    "markup-core",
-    "markup-core-api",
-    "markup-core-cli",
-    "--target",
-    "js",
-  ]);
+  run("moon", ["-C", packageRoot, "build", "markup-core", "markup-core-api", "markup-core-cli", "--target", "js"]);
   built = true;
   directModuleUnavailable = false;
 }
@@ -1520,9 +1370,7 @@ function doubleArg(value: number): string {
 }
 
 function intArg(value: number | undefined): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? String(Math.trunc(value))
-    : "0";
+  return typeof value === "number" && Number.isFinite(value) ? String(Math.trunc(value)) : "0";
 }
 
 function boolArg(value: boolean | undefined): string {
@@ -1544,18 +1392,15 @@ function run(command: string, args: string[]): string {
   });
   if (result.error) {
     const enoent = (result.error as NodeJS.ErrnoException).code === "ENOENT";
-    const hint = enoent && command === "moon"
-      ? "\nThe MoonBit `moon` CLI is not on PATH. If installed, add ~/.moon/bin to PATH; otherwise install it: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash"
-      : "";
-    throw new Error(
-      `${command} ${args.join(" ")} failed: ${result.error.message}${hint}`,
-    );
+    const hint =
+      enoent && command === "moon"
+        ? "\nThe MoonBit `moon` CLI is not on PATH. If installed, add ~/.moon/bin to PATH; otherwise install it: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash"
+        : "";
+    throw new Error(`${command} ${args.join(" ")} failed: ${result.error.message}${hint}`);
   }
   if (result.status !== 0) {
     const detail = [result.stdout, result.stderr].filter(Boolean).join("\n");
-    throw new Error(
-      `${command} ${args.join(" ")} failed with ${result.status}\n${detail}`,
-    );
+    throw new Error(`${command} ${args.join(" ")} failed with ${result.status}\n${detail}`);
   }
   return result.stdout.trim();
 }

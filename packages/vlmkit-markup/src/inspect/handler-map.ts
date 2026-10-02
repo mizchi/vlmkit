@@ -186,7 +186,6 @@ export const HANDLER_PATCH_SCRIPT = `
 })()
 `;
 
-
 /**
  * Count invocations of the page's OWN listeners, without changing how they behave.
  *
@@ -329,9 +328,23 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
 `;
 
 const COMMON_ON_PROPS = [
-  "onclick", "ondblclick", "onmousedown", "onmouseup", "onpointerdown", "onpointerup",
-  "onkeydown", "onkeyup", "onkeypress", "oninput", "onchange", "onsubmit",
-  "onfocus", "onblur", "onmouseover", "onmouseenter", "ontouchstart",
+  "onclick",
+  "ondblclick",
+  "onmousedown",
+  "onmouseup",
+  "onpointerdown",
+  "onpointerup",
+  "onkeydown",
+  "onkeyup",
+  "onkeypress",
+  "oninput",
+  "onchange",
+  "onsubmit",
+  "onfocus",
+  "onblur",
+  "onmouseover",
+  "onmouseenter",
+  "ontouchstart",
   // The HTML5 drag-and-drop family. The `addEventListener` route already recorded these
   // — it is type-agnostic — but this DOM sweep did not, so `el.ondragover = fn` and
   // `<div ondrop="...">` were invisible. Measured on a fixture assigning `ondragover` as a
@@ -339,7 +352,13 @@ const COMMON_ON_PROPS = [
   //
   // These seven are the whole DOM vocabulary. There is no `dragmove` event: the
   // continuous ones are `drag`, fired on the source, and `dragover`, fired on the target.
-  "ondragstart", "ondrag", "ondragenter", "ondragover", "ondragleave", "ondrop", "ondragend",
+  "ondragstart",
+  "ondrag",
+  "ondragenter",
+  "ondragover",
+  "ondragleave",
+  "ondrop",
+  "ondragend",
 ];
 
 /**
@@ -351,8 +370,8 @@ const COMMON_ON_PROPS = [
  * `href`, `input[type=text]`, `<select>` (Space opens the dropdown) and `<textarea>` do not.
  */
 const NATIVE_CLICK_ON_ACTIVATION =
-  "button, a[href], input[type=submit], input[type=button], input[type=reset],"
-  + " input[type=checkbox], input[type=radio], summary";
+  "button, a[href], input[type=submit], input[type=button], input[type=reset]," +
+  " input[type=checkbox], input[type=radio], summary";
 
 /**
  * `describe(el)` — the element → path derivation, as one definition for the three places
@@ -518,7 +537,6 @@ export const COLLECT_SURFACE_SCRIPT = `
   return { elements: out, globals, total, controls };
 })()
 `;
-
 
 /**
  * Per-element outcome of firing the drag sequence, when `probeDrag` is on.
@@ -766,7 +784,6 @@ export const PROBE_DRAG_SCRIPT = `
 })()
 `;
 
-
 /**
  * What a real pointer-drag gesture did to a drag surface.
  *
@@ -808,7 +825,6 @@ export interface PointerDragProbe {
   /** Set when the gesture could not be performed (no box, offscreen, detached). */
   error?: string;
 }
-
 
 /**
  * Perform the gesture on each pointer-drag surface and measure the pixels either side.
@@ -855,15 +871,12 @@ async function handleForPath(page: Page, path: string): Promise<JSHandle> {
  * the frame is composited, the second after it.
  */
 async function nextPaintedFrame(page: Page): Promise<void> {
-  await page.evaluate(
-    "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
-  ).catch(() => {});
+  await page
+    .evaluate("new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+    .catch(() => {});
 }
 
-async function probePointerDrags(
-  page: Page,
-  elements: readonly HandlerSurfaceEntry[],
-): Promise<PointerDragProbe[]> {
+async function probePointerDrags(page: Page, elements: readonly HandlerSurfaceEntry[]): Promise<PointerDragProbe[]> {
   const surfaces = elements.filter((e) => e.visible && isPointerDragSurface(Object.keys(e.types)));
   const out: PointerDragProbe[] = [];
   for (const entry of surfaces) {
@@ -872,17 +885,29 @@ async function probePointerDrags(
       // Located by re-deriving the surface's own path, so the probe cannot drag a different
       // element than the one it reports on.
       const el = (await handleForPath(page, entry.path)).asElement();
-      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      if (!el) {
+        row.error = "element not found for its own path";
+        out.push(row);
+        continue;
+      }
       const box = await el.boundingBox();
       if (!box || box.width < 4 || box.height < 4) {
-        row.error = "no usable box"; out.push(row); continue;
+        row.error = "no usable box";
+        out.push(row);
+        continue;
       }
       const before = await el.screenshot();
       // Reset immediately before the gesture, so the count is this gesture's and not the
       // page's own start-up chatter.
-      await page.evaluate((node) => (window as unknown as {
-        __vlmkitResetCalls?: (n: Element) => void;
-      }).__vlmkitResetCalls?.(node as Element), el);
+      await page.evaluate(
+        (node) =>
+          (
+            window as unknown as {
+              __vlmkitResetCalls?: (n: Element) => void;
+            }
+          ).__vlmkitResetCalls?.(node as Element),
+        el,
+      );
       const at = (fx: number, fy: number) => [box.x + box.width * fx, box.y + box.height * fy] as const;
       await page.mouse.move(...at(0.3, 0.3));
       await page.mouse.down();
@@ -899,9 +924,15 @@ async function probePointerDrags(
       const after = await el.screenshot();
       row.feedbackRatio = pixelDelta(before, during);
       row.committedRatio = pixelDelta(before, after);
-      const calls = await page.evaluate((node) => (window as unknown as {
-        __vlmkitCallCount?: (n: Element) => number;
-      }).__vlmkitCallCount?.(node as Element), el);
+      const calls = await page.evaluate(
+        (node) =>
+          (
+            window as unknown as {
+              __vlmkitCallCount?: (n: Element) => number;
+            }
+          ).__vlmkitCallCount?.(node as Element),
+        el,
+      );
       if (typeof calls === "number") row.handlerCalls = calls;
     } catch (err) {
       row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
@@ -1526,10 +1557,7 @@ async function readDragPlan(page: Page): Promise<{ delegated: boolean; presses: 
  * A page with no declared drop target still gets one gesture, to a point 60px away, because
  * `dragstartFired` is worth measuring on its own.
  */
-async function probeRealDrags(
-  page: Page,
-  elements: readonly HandlerSurfaceEntry[],
-): Promise<RealDragProbe[]> {
+async function probeRealDrags(page: Page, elements: readonly HandlerSurfaceEntry[]): Promise<RealDragProbe[]> {
   const sources = elements.filter((e) => e.visible && e.types.dragstart);
   if (sources.length === 0) return [];
   const targets = elements.filter((e) => e.visible && (e.types.dragover || e.types.drop));
@@ -1573,7 +1601,9 @@ async function probeRealDrags(
     // Selected text is draggable, so a leftover selection starts a text drag instead of this
     // one — measured, and it made the same two gestures disagree between runs. What the gesture
     // itself selects is read at the END, before the next clear: see `READ_SELECTION`.
-    await page.evaluate("(() => { window.__vlmkitDragLog = []; const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
+    await page.evaluate(
+      "(() => { window.__vlmkitDragLog = []; const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()",
+    );
     await page.mouse.move(from.x, from.y);
     await page.mouse.down();
     // A short move first: the browser needs a threshold crossed before it promotes the
@@ -1581,9 +1611,9 @@ async function probeRealDrags(
     await page.mouse.move(from.x + 8, from.y + 6, { steps: 2 });
     let before: Buffer | null = null;
     if (target) {
-      const started = await page.evaluate(
+      const started = (await page.evaluate(
         "(window.__vlmkitDragLog || []).some((r) => r.type === 'dragstart')",
-      ) as boolean;
+      )) as boolean;
       if (started) before = await target.screenshot().catch(() => null);
     }
     await page.mouse.move(to.x, to.y, { steps: 5 });
@@ -1600,10 +1630,9 @@ async function probeRealDrags(
     let sourceDuring: Buffer | null = null;
     let sourceOpacity: number | undefined;
     if (source) {
-      sourceOpacity = await page.evaluate(
-        (node) => Number(getComputedStyle(node as Element).opacity),
-        source,
-      ).catch(() => undefined) as number | undefined;
+      sourceOpacity = (await page
+        .evaluate((node) => Number(getComputedStyle(node as Element).opacity), source)
+        .catch(() => undefined)) as number | undefined;
       sourceDuring = await source.screenshot().catch(() => null);
     }
     // Escape before the release, which is the order a user produces and the order measured to
@@ -1616,10 +1645,10 @@ async function probeRealDrags(
     // read with it. Driven against a `dragover` handler that busy-waits 300ms, `dragend` was
     // already in the log on the first read and the second changed nothing. Removing the guard also
     // left every test green, which is how it came up for checking.
-    const log = await page.evaluate("window.__vlmkitDragLog") as LogRow[];
+    const log = (await page.evaluate("window.__vlmkitDragLog")) as LogRow[];
     // What the gesture left selected. Read here rather than at the next gesture's reset, so the
     // range is attributable to the drag that produced it instead of to the one after it.
-    const selected = await page.evaluate(READ_SELECTION) as { text: string; anchor: string | null };
+    const selected = (await page.evaluate(READ_SELECTION)) as { text: string; anchor: string | null };
     return {
       log,
       hoverRatio: before && during ? pixelDelta(before, during) : undefined,
@@ -1633,7 +1662,11 @@ async function probeRealDrags(
     const row: RealDragProbe = { path: src.path, dragstartFired: false, targetsTried: [], gestures: 0 };
     try {
       const entryHandle = (await handleForPath(page, src.path)).asElement();
-      if (!entryHandle) { row.error = "element not found for its own path"; out.push(row); continue; }
+      if (!entryHandle) {
+        row.error = "element not found for its own path";
+        out.push(row);
+        continue;
+      }
       /*
        * The element under measurement, published to the page for the rest of this iteration.
        * `DRAG_PLAN_SCRIPT` reads it to resolve the press candidates, and `DRAG_RECORDER_SCRIPT`
@@ -1651,7 +1684,11 @@ async function probeRealDrags(
         const box = await press.handle.boundingBox();
         if (box && box.width >= 4 && box.height >= 4) presses.push({ ...press, box });
       }
-      if (presses.length === 0) { row.error = "no usable box"; out.push(row); continue; }
+      if (presses.length === 0) {
+        row.error = "no usable box";
+        out.push(row);
+        continue;
+      }
 
       const startedOn = new Set<string>();
       const timeline: DragTimelineStep[] = [];
@@ -1670,15 +1707,16 @@ async function probeRealDrags(
        * the card it just picked up. Otherwise the page's declared targets, resolved one at a time
        * so a page with a dozen zones does not pay for boxes the gesture never reaches.
        */
-      const aimsFrom = (press: DragPressPlan) => plan.delegated
-        ? press.aims.map((aim) => ({
-          path: aim.path,
-          resolve: async () => {
-            const b = await aim.handle.boundingBox();
-            return b ? { at: centreOf(b), handle: aim.handle } : null;
-          },
-        }))
-        : targets.map((t) => ({ path: t.path, resolve: () => aimAt(t) }));
+      const aimsFrom = (press: DragPressPlan) =>
+        plan.delegated
+          ? press.aims.map((aim) => ({
+              path: aim.path,
+              resolve: async () => {
+                const b = await aim.handle.boundingBox();
+                return b ? { at: centreOf(b), handle: aim.handle } : null;
+              },
+            }))
+          : targets.map((t) => ({ path: t.path, resolve: () => aimAt(t) }));
 
       const run = async (
         from: { x: number; y: number },
@@ -1733,7 +1771,11 @@ async function probeRealDrags(
 
       const hoverFeedback: { target: string; ratio: number }[] = [];
 
-      if (budget <= 0) { row.capped = true; out.push(row); continue; }
+      if (budget <= 0) {
+        row.capped = true;
+        out.push(row);
+        continue;
+      }
 
       // ---- Which press starts a drag, and does its first destination accept it? --------------
       let chosen: (DragPressPlan & { box: Box }) | null = null;
@@ -1762,9 +1804,15 @@ async function probeRealDrags(
         const aims = aimsFrom(press);
         // `[null]` = no declared destination: one gesture to a point 60px away, because whether the
         // browser picks the element up is worth measuring on its own.
-        for (const aim of (aims.length > 0 ? aims : [null])) {
-          if (budget <= 0) { row.capped = true; break candidates; }
-          if (row.droppedOn && visitsAfterDrop++ >= EXTRA_TARGET_VISITS) { row.capped = true; break candidates; }
+        for (const aim of aims.length > 0 ? aims : [null]) {
+          if (budget <= 0) {
+            row.capped = true;
+            break candidates;
+          }
+          if (row.droppedOn && visitsAfterDrop++ >= EXTRA_TARGET_VISITS) {
+            row.capped = true;
+            break candidates;
+          }
           // Re-read, because a previous gesture may have MOVED the source: a board's drop handler
           // appends the card to another pile, and a point captured before that is over the hole the
           // card left. Gone entirely means stop measuring rather than press where it used to be.
@@ -1836,7 +1884,7 @@ async function probeRealDrags(
           await page.evaluate((node) => {
             (window as unknown as { __vlmkitMissTarget?: Element }).__vlmkitMissTarget = node;
           }, entryHandle);
-          const points = await page.evaluate(MISS_POINTS_SCRIPT) as { x: number; y: number; over: string }[];
+          const points = (await page.evaluate(MISS_POINTS_SCRIPT)) as { x: number; y: number; over: string }[];
           const stray = points.find((p) => p.over !== "the surface itself") ?? points[0];
           if (stray) {
             budget--;
@@ -1878,7 +1926,12 @@ async function probeRealDrags(
           height: Math.max(1, Math.ceil(box.height)),
         };
         const before = await page.screenshot({ clip }).catch(() => null);
-        const { log: cancelLog, selected: cancelSelected } = await gesture(centre, chosenAim?.at ?? { x: centre.x + 60, y: centre.y + 60 }, null, true);
+        const { log: cancelLog, selected: cancelSelected } = await gesture(
+          centre,
+          chosenAim?.at ?? { x: centre.x + 60, y: centre.y + 60 },
+          null,
+          true,
+        );
         // This is a gesture like any other, so it can be the one that selects — and on a surface
         // whose earlier gestures all landed on a card, it is the only one that presses anywhere else.
         if (cancelSelected && !row.selectedText) row.selectedText = cancelSelected;
@@ -1948,13 +2001,19 @@ async function probeTouches(
   options: HandlerSurfaceOptions,
   elements: readonly HandlerSurfaceEntry[],
 ): Promise<TouchProbe[]> {
-  const targets = elements.filter((e) =>
-    e.visible && (e.types["touchstart"] || e.types["touchend"] || e.types["touchmove"]));
+  const targets = elements.filter(
+    (e) => e.visible && (e.types["touchstart"] || e.types["touchend"] || e.types["touchmove"]),
+  );
   if (targets.length === 0) return [];
-  const page = await browser.newPage(withAuthState({
-    viewport: { width: 1280, height: 800 },
-    hasTouch: true,
-  }, options.storageState));
+  const page = await browser.newPage(
+    withAuthState(
+      {
+        viewport: { width: 1280, height: 800 },
+        hasTouch: true,
+      },
+      options.storageState,
+    ),
+  );
   const out: TouchProbe[] = [];
   try {
     await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
@@ -1970,17 +2029,37 @@ async function probeTouches(
       const row: TouchProbe = { path: entry.path, text: entry.text, tapCalls: 0 };
       try {
         const el = (await handleForPath(page, entry.path)).asElement();
-        if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+        if (!el) {
+          row.error = "element not found for its own path";
+          out.push(row);
+          continue;
+        }
         const box = await el.boundingBox();
-        if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
-        await page.evaluate((node) => (window as unknown as {
-          __vlmkitResetCalls?: (n: Element) => void;
-        }).__vlmkitResetCalls?.(node as Element), el);
+        if (!box || box.width < 4 || box.height < 4) {
+          row.error = "no usable box";
+          out.push(row);
+          continue;
+        }
+        await page.evaluate(
+          (node) =>
+            (
+              window as unknown as {
+                __vlmkitResetCalls?: (n: Element) => void;
+              }
+            ).__vlmkitResetCalls?.(node as Element),
+          el,
+        );
         await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
         await page.waitForTimeout(80);
-        const calls = await page.evaluate((node) => (window as unknown as {
-          __vlmkitCallCount?: (n: Element) => number;
-        }).__vlmkitCallCount?.(node as Element), el);
+        const calls = await page.evaluate(
+          (node) =>
+            (
+              window as unknown as {
+                __vlmkitCallCount?: (n: Element) => number;
+              }
+            ).__vlmkitCallCount?.(node as Element),
+          el,
+        );
         if (typeof calls === "number") row.tapCalls = calls;
 
         if (entry.types["touchmove"]) {
@@ -1993,10 +2072,7 @@ async function probeTouches(
           for (let i = 1; i <= 5; i++) {
             await cdp.send("Input.dispatchTouchEvent", {
               type: "touchMove",
-              touchPoints: touchPoint(
-                box.x + box.width * (0.25 + 0.1 * i),
-                box.y + box.height * (0.25 + 0.08 * i),
-              ),
+              touchPoints: touchPoint(box.x + box.width * (0.25 + 0.1 * i), box.y + box.height * (0.25 + 0.08 * i)),
             });
           }
           await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
@@ -2085,7 +2161,7 @@ const INPUT_RECORDER_SCRIPT = String.raw`
  * fields, and the cap is reported.
  */
 async function probeTextInputs(page: Page): Promise<{ rows: TextInputProbe[]; capped: number }> {
-  const candidates = await page.evaluate(TEXT_FIELD_SCRIPT) as { path: string; text: string }[];
+  const candidates = (await page.evaluate(TEXT_FIELD_SCRIPT)) as { path: string; text: string }[];
   const targets = candidates.slice(0, MAX_TEXT_FIELDS);
   if (targets.length === 0) return { rows: [], capped: 0 };
   await page.evaluate(INPUT_RECORDER_SCRIPT);
@@ -2104,13 +2180,21 @@ async function probeTextInputs(page: Page): Promise<{ rows: TextInputProbe[]; ca
     };
     try {
       const el = (await handleForPath(page, entry.path)).asElement();
-      if (!el) { row.error = "element not found for its own path"; rows.push(row); continue; }
+      if (!el) {
+        row.error = "element not found for its own path";
+        rows.push(row);
+        continue;
+      }
       const seen = new Set<string>();
       const drive = async (text: string, compose: boolean) => {
         // Cleared through the DOM, which fires the page's own input handler the same way a user
         // selecting-all and deleting would.
         await el.evaluate((node: Element) => {
-          const field = node as unknown as { value?: string; textContent: string | null; dispatchEvent: (e: Event) => boolean };
+          const field = node as unknown as {
+            value?: string;
+            textContent: string | null;
+            dispatchEvent: (e: Event) => boolean;
+          };
           if (typeof field.value === "string") field.value = "";
           else field.textContent = "";
           field.dispatchEvent(new Event("input", { bubbles: true }));
@@ -2138,7 +2222,7 @@ async function probeTextInputs(page: Page): Promise<{ rows: TextInputProbe[]; ca
         // Blur, because `change` fires there and not on every keystroke.
         await el.evaluate((node: Element) => (node as HTMLElement).blur());
         await page.waitForTimeout(40);
-        for (const t of await page.evaluate("window.__vlmkitInputLog") as string[]) seen.add(t);
+        for (const t of (await page.evaluate("window.__vlmkitInputLog")) as string[]) seen.add(t);
         return await el.evaluate((node: Element) => {
           const field = node as unknown as { value?: string; textContent: string | null };
           return typeof field.value === "string" ? field.value : String(field.textContent ?? "");
@@ -2266,10 +2350,7 @@ const MISS_POINTS_SCRIPT = String.raw`(() => {
  * Only elements that HAVE a `dblclick` handler, because the premise is a page for which
  * double-click is a gesture with a meaning. A page that binds none has nothing to miss.
  */
-async function probeDoubleClicks(
-  page: Page,
-  elements: readonly HandlerSurfaceEntry[],
-): Promise<DoubleClickProbe[]> {
+async function probeDoubleClicks(page: Page, elements: readonly HandlerSurfaceEntry[]): Promise<DoubleClickProbe[]> {
   const targets = elements.filter((e) => e.visible && e.types["dblclick"]);
   if (targets.length === 0) return [];
   const out: DoubleClickProbe[] = [];
@@ -2277,33 +2358,53 @@ async function probeDoubleClicks(
     const row: DoubleClickProbe = { path: entry.path, text: entry.text, pointsTried: 0, handlerCalls: 0 };
     try {
       const el = (await handleForPath(page, entry.path)).asElement();
-      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      if (!el) {
+        row.error = "element not found for its own path";
+        out.push(row);
+        continue;
+      }
       await page.evaluate((node) => {
         (window as unknown as { __vlmkitMissTarget?: Element }).__vlmkitMissTarget = node;
       }, el);
-      const points = await page.evaluate(MISS_POINTS_SCRIPT) as { x: number; y: number; over: string }[];
+      const points = (await page.evaluate(MISS_POINTS_SCRIPT)) as { x: number; y: number; over: string }[];
       for (const point of points) {
         row.pointsTried++;
         // Clear first, so what is read afterwards is this gesture's and not the page's own
         // start-up selection or a previous probe's leftovers.
-        await page.evaluate("(() => { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
-        await page.evaluate((node) => (window as unknown as {
-          __vlmkitResetCalls?: (n: Element) => void;
-        }).__vlmkitResetCalls?.(node as Element), el);
+        await page.evaluate(
+          "(() => { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()",
+        );
+        await page.evaluate(
+          (node) =>
+            (
+              window as unknown as {
+                __vlmkitResetCalls?: (n: Element) => void;
+              }
+            ).__vlmkitResetCalls?.(node as Element),
+          el,
+        );
         await page.mouse.dblclick(point.x, point.y);
         await page.waitForTimeout(60);
-        const calls = await page.evaluate((node) => (window as unknown as {
-          __vlmkitCallCount?: (n: Element) => number;
-        }).__vlmkitCallCount?.(node as Element) ?? 0, el) as number;
+        const calls = (await page.evaluate(
+          (node) =>
+            (
+              window as unknown as {
+                __vlmkitCallCount?: (n: Element) => number;
+              }
+            ).__vlmkitCallCount?.(node as Element) ?? 0,
+          el,
+        )) as number;
         row.handlerCalls = Math.max(row.handlerCalls, calls);
-        const selected = await page.evaluate(READ_SELECTION) as { text: string; anchor: string | null };
+        const selected = (await page.evaluate(READ_SELECTION)) as { text: string; anchor: string | null };
         if (selected.text) {
           row.selected = selected;
           break;
         }
       }
       // Leave nothing behind for the probes that run after this one.
-      await page.evaluate("(() => { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
+      await page.evaluate(
+        "(() => { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()",
+      );
     } catch (err) {
       row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
     }
@@ -2327,22 +2428,27 @@ const MENU_RECORDER_SCRIPT = String.raw`
 })()
 `;
 
-async function probeMenus(
-  page: Page,
-  elements: readonly HandlerSurfaceEntry[],
-): Promise<MenuProbe[]> {
+async function probeMenus(page: Page, elements: readonly HandlerSurfaceEntry[]): Promise<MenuProbe[]> {
   const targets = elements.filter((e) => e.visible && e.types["contextmenu"]);
   if (targets.length === 0) return [];
   await page.evaluate(MENU_RECORDER_SCRIPT);
   const out: MenuProbe[] = [];
-  const snapshot = async () => new Set(await page.evaluate(VISIBLE_SNAPSHOT_SCRIPT) as string[]);
+  const snapshot = async () => new Set((await page.evaluate(VISIBLE_SNAPSHOT_SCRIPT)) as string[]);
   for (const entry of targets) {
     const row: MenuProbe = { path: entry.path, text: entry.text, handlerCalls: 0, prevented: false, revealed: [] };
     try {
       const el = (await handleForPath(page, entry.path)).asElement();
-      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      if (!el) {
+        row.error = "element not found for its own path";
+        out.push(row);
+        continue;
+      }
       const box = await el.boundingBox();
-      if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
+      if (!box || box.width < 4 || box.height < 4) {
+        row.error = "no usable box";
+        out.push(row);
+        continue;
+      }
       // Escape first: a menu left open by the previous target would still be visible and would
       // read as this one's reveal.
       await page.keyboard.press("Escape");
@@ -2350,17 +2456,29 @@ async function probeMenus(
       await page.waitForTimeout(60);
       const base = await snapshot();
       await page.evaluate("(() => { window.__vlmkitMenuLog = []; return true; })()");
-      await page.evaluate((node) => (window as unknown as {
-        __vlmkitResetCalls?: (n: Element) => void;
-      }).__vlmkitResetCalls?.(node as Element), el);
+      await page.evaluate(
+        (node) =>
+          (
+            window as unknown as {
+              __vlmkitResetCalls?: (n: Element) => void;
+            }
+          ).__vlmkitResetCalls?.(node as Element),
+        el,
+      );
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: "right" });
       await page.waitForTimeout(100);
-      row.revealed = [...await snapshot()].filter((label) => !base.has(label));
-      const log = await page.evaluate("window.__vlmkitMenuLog") as { prevented: boolean }[];
+      row.revealed = [...(await snapshot())].filter((label) => !base.has(label));
+      const log = (await page.evaluate("window.__vlmkitMenuLog")) as { prevented: boolean }[];
       row.prevented = log.some((r) => r.prevented);
-      const calls = await page.evaluate((node) => (window as unknown as {
-        __vlmkitCallCount?: (n: Element) => number;
-      }).__vlmkitCallCount?.(node as Element), el);
+      const calls = await page.evaluate(
+        (node) =>
+          (
+            window as unknown as {
+              __vlmkitCallCount?: (n: Element) => number;
+            }
+          ).__vlmkitCallCount?.(node as Element),
+        el,
+      );
       if (typeof calls === "number") row.handlerCalls = calls;
     } catch (err) {
       row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
@@ -2530,18 +2648,26 @@ async function probeHovers(
   const fromHandlers = elements
     .filter((e) => e.visible && (e.types["mouseenter"] || e.types["mouseover"]))
     .map((e) => e.path);
-  const css = await page.evaluate(HOVER_SELECTOR_SCRIPT) as { paths: string[]; unreadable: number };
+  const css = (await page.evaluate(HOVER_SELECTOR_SCRIPT)) as { paths: string[]; unreadable: number };
   const all = [...new Set([...fromHandlers, ...css.paths])];
   const targets = all.slice(0, MAX_HOVER_TARGETS);
   const rows: HoverProbe[] = [];
-  const snapshot = async () => new Set(await page.evaluate(VISIBLE_SNAPSHOT_SCRIPT) as string[]);
+  const snapshot = async () => new Set((await page.evaluate(VISIBLE_SNAPSHOT_SCRIPT)) as string[]);
   for (const path of targets) {
     const row: HoverProbe = { path, text: "", revealedOnHover: [], revealedOnFocus: [], focusable: false };
     try {
       const el = (await handleForPath(page, path)).asElement();
-      if (!el) { row.error = "element not found for its own path"; rows.push(row); continue; }
+      if (!el) {
+        row.error = "element not found for its own path";
+        rows.push(row);
+        continue;
+      }
       const box = await el.boundingBox();
-      if (!box || box.width < 1 || box.height < 1) { row.error = "no usable box"; rows.push(row); continue; }
+      if (!box || box.width < 1 || box.height < 1) {
+        row.error = "no usable box";
+        rows.push(row);
+        continue;
+      }
       row.text = (await el.evaluate((node: Element) => (node.textContent ?? "").trim().slice(0, 40))) ?? "";
       // Neither hovered nor focused. The mouse goes to the corner rather than merely elsewhere,
       // because "elsewhere" can be another trigger.
@@ -2556,10 +2682,10 @@ async function probeHovers(
       // The second look costs 450ms and is paid only on the path that would otherwise report.
       const revealedAfter = async (first: number) => {
         await page.waitForTimeout(first);
-        let found = [...await snapshot()].filter((label) => !base.has(label));
+        let found = [...(await snapshot())].filter((label) => !base.has(label));
         if (found.length === 0) {
           await page.waitForTimeout(HOVER_DELAYED_WAIT_MS);
-          found = [...await snapshot()].filter((label) => !base.has(label));
+          found = [...(await snapshot())].filter((label) => !base.has(label));
         }
         return found;
       };
@@ -2617,31 +2743,39 @@ async function probeWheels(page: Page, elements: readonly HandlerSurfaceEntry[])
   // `scroll` handlers count as targets too: rolling the wheel over a scrollable panel is how a
   // `scroll` handler runs, and without them nothing on the page exercises that type. It is also
   // what surfaces a `preventDefault()` on `scroll`, which is not cancelable at all.
-  const targets = elements.filter((e) =>
-    e.visible && (e.types["wheel"] || e.types["mousewheel"] || e.types["scroll"]));
+  const targets = elements.filter((e) => e.visible && (e.types["wheel"] || e.types["mousewheel"] || e.types["scroll"]));
   const out: WheelProbe[] = [];
   for (const entry of targets) {
     const row: WheelProbe = { path: entry.path, scrolledPx: 0, scrollable: false };
     try {
       const el = (await handleForPath(page, entry.path)).asElement();
-      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      if (!el) {
+        row.error = "element not found for its own path";
+        out.push(row);
+        continue;
+      }
       const box = await el.boundingBox();
-      if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
-      const read = async () => await el.evaluate((node: Element) => {
-        // Starts at the element itself and walks up ONCE. Adding node.scrollTop separately and
-        // then walking from the node double-counted it, and a 200px wheel reported 400px.
-        let cur: Element | null = node;
-        let scrollable = false;
-        let sum = 0;
-        while (cur) {
-          if (cur.scrollHeight > cur.clientHeight + 1) scrollable = true;
-          sum += cur.scrollTop;
-          cur = cur.parentElement;
-        }
-        const root = document.scrollingElement;
-        if (root && root.scrollHeight > root.clientHeight + 1) scrollable = true;
-        return { sum: sum + window.scrollY, scrollable };
-      });
+      if (!box || box.width < 4 || box.height < 4) {
+        row.error = "no usable box";
+        out.push(row);
+        continue;
+      }
+      const read = async () =>
+        await el.evaluate((node: Element) => {
+          // Starts at the element itself and walks up ONCE. Adding node.scrollTop separately and
+          // then walking from the node double-counted it, and a 200px wheel reported 400px.
+          let cur: Element | null = node;
+          let scrollable = false;
+          let sum = 0;
+          while (cur) {
+            if (cur.scrollHeight > cur.clientHeight + 1) scrollable = true;
+            sum += cur.scrollTop;
+            cur = cur.parentElement;
+          }
+          const root = document.scrollingElement;
+          if (root && root.scrollHeight > root.clientHeight + 1) scrollable = true;
+          return { sum: sum + window.scrollY, scrollable };
+        });
       const before = await read();
       row.scrollable = before.scrollable;
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -2672,9 +2806,10 @@ function pixelDelta(a: Buffer, b: Buffer): number {
   if (A.width !== B.width || A.height !== B.height) return 1;
   let changed = 0;
   for (let i = 0; i < A.data.length; i += 4) {
-    const d = Math.abs(A.data[i]! - B.data[i]!)
-      + Math.abs(A.data[i + 1]! - B.data[i + 1]!)
-      + Math.abs(A.data[i + 2]! - B.data[i + 2]!);
+    const d =
+      Math.abs(A.data[i]! - B.data[i]!) +
+      Math.abs(A.data[i + 1]! - B.data[i + 1]!) +
+      Math.abs(A.data[i + 2]! - B.data[i + 2]!);
     if (d > 12) changed++;
   }
   return A.width * A.height === 0 ? 0 : changed / (A.width * A.height);
@@ -2688,7 +2823,7 @@ function pixelDelta(a: Buffer, b: Buffer): number {
  * handler POSTs will POST, so the default stays an inventory that presses nothing.
  */
 export const PROBE_FAMILIES = ["drag", "wheel", "hover", "menu", "touch", "input", "dblclick"] as const;
-export type ProbeFamily = typeof PROBE_FAMILIES[number];
+export type ProbeFamily = (typeof PROBE_FAMILIES)[number];
 
 export interface HandlerSurfaceOptions extends PageLoadOptions {
   source: string;
@@ -2728,7 +2863,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     // this the scan inventories the pre-render DOM (see settlePage).
     await settlePage(page);
     await page.evaluate(DISCOVER_SCRIPT); // stamp interactive elements for cross-referencing
-    const raw = await page.evaluate(COLLECT_SURFACE_SCRIPT) as {
+    const raw = (await page.evaluate(COLLECT_SURFACE_SCRIPT)) as {
       elements: HandlerSurfaceEntry[];
       globals: Record<string, number>;
       total: number;
@@ -2736,49 +2871,38 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     };
     // A hit test over the declared drop targets. No events, no flag: it asks where a pointer
     // would land, which is a fact about the page as inventoried.
-    const unreachableTargets = await page.evaluate(TARGET_REACH_SCRIPT) as
-      { path: string; interceptedBy: string }[];
+    const unreachableTargets = (await page.evaluate(TARGET_REACH_SCRIPT)) as { path: string; interceptedBy: string }[];
     // Real mouse input first among the probes, on the least-perturbed page: it is the one
     // that answers whether the BROWSER starts a drag here, and a synthetic dispatch that has
     // already run the page's drop handlers can have moved the source out from under it.
-    const realDragProbe = probes.has("drag")
-      ? await probeRealDrags(page, raw.elements)
-      : undefined;
+    const realDragProbe = probes.has("drag") ? await probeRealDrags(page, raw.elements) : undefined;
     // After the surface, so a probe that mutates the page cannot change what was
     // inventoried. Dispatching runs the page's own handlers, and a drop handler is exactly
     // the kind that rewrites the DOM.
-    const dragProbe = probes.has("drag")
-      ? await page.evaluate(PROBE_DRAG_SCRIPT) as DragProbe[]
-      : undefined;
+    const dragProbe = probes.has("drag") ? ((await page.evaluate(PROBE_DRAG_SCRIPT)) as DragProbe[]) : undefined;
     // Real mouse input, so this needs the Page rather than an evaluate. Only for the
     // elements already classified as pointer-drag surfaces — one on the editor this came
     // from, so the screenshot cost is bounded by how many drag surfaces a page has.
-    const pointerDragProbe = probes.has("drag")
-      ? await probePointerDrags(page, raw.elements)
-      : undefined;
+    const pointerDragProbe = probes.has("drag") ? await probePointerDrags(page, raw.elements) : undefined;
     const wheelProbe = probes.has("wheel") ? await probeWheels(page, raw.elements) : undefined;
     const hover = probes.has("hover") ? await probeHovers(page, raw.elements) : undefined;
     const menuProbe = probes.has("menu") ? await probeMenus(page, raw.elements) : undefined;
     const textInput = probes.has("input") ? await probeTextInputs(page) : undefined;
     // After the drag family on purpose: it double-clicks the page, and a page whose double-click
     // means "send this home" would otherwise change the board the drag probe is about to measure.
-    const doubleClickProbe = probes.has("dblclick")
-      ? await probeDoubleClicks(page, raw.elements)
-      : undefined;
+    const doubleClickProbe = probes.has("dblclick") ? await probeDoubleClicks(page, raw.elements) : undefined;
     // A separate page, because touch emulation changes what the page sees: `navigator
     // .maxTouchPoints` goes 0 -> 1 and `"ontouchstart" in window` false -> true, both of which real
     // apps branch on. Measured, and the reason this does not just add `hasTouch` to the page every
     // other family uses.
-    const touchProbe = probes.has("touch")
-      ? await probeTouches(browser, options, raw.elements)
-      : undefined;
+    const touchProbe = probes.has("touch") ? await probeTouches(browser, options, raw.elements) : undefined;
     // Every element whose handler called preventDefault during this run, with whether the call had
     // an effect. Asked per element because a WeakMap cannot be enumerated; only for elements that
     // have handlers at all, which is every entry in the surface.
     const cancelAttempts: { path: string; type: string; passive: boolean; effective: boolean }[] = [];
     if (anyProbe) {
       for (const entry of raw.elements) {
-        const info = await page.evaluate(`(() => {
+        const info = (await page.evaluate(`(() => {
           ${DESCRIBE_PATH_FN}
           const want = ${JSON.stringify(entry.path)};
           for (const el of document.querySelectorAll("*")) {
@@ -2786,7 +2910,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
             return window.__vlmkitCancelInfo ? window.__vlmkitCancelInfo(el) : null;
           }
           return null;
-        })()`) as { type: string; passive: boolean; effective: boolean }[] | null;
+        })()`)) as { type: string; passive: boolean; effective: boolean }[] | null;
         for (const rec of info ?? []) cancelAttempts.push({ path: entry.path, ...rec });
       }
     }
@@ -2796,7 +2920,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     if (probes.has("drag")) {
       for (const entry of raw.elements) {
         if (!entry.types["dragover"]) continue;
-        const took = await page.evaluate(`(() => {
+        const took = (await page.evaluate(`(() => {
           ${DESCRIBE_PATH_FN}
           const want = ${JSON.stringify(entry.path)};
           for (const el of document.querySelectorAll("*")) {
@@ -2804,7 +2928,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
             return window.__vlmkitSlowestCall ? window.__vlmkitSlowestCall(el, "dragover") : null;
           }
           return null;
-        })()`) as number | null;
+        })()`)) as number | null;
         if (typeof took === "number") entry.dragoverMs = took;
       }
     }
@@ -2949,8 +3073,6 @@ export interface InteractionProbeEvidence {
   activatedIx: number[];
 }
 
-
-
 /**
  * Did THIS run exercise this element's handler of this type?
  *
@@ -2958,11 +3080,7 @@ export interface InteractionProbeEvidence {
  * The old answer was a page-global set membership test, which claimed coverage for every
  * element on every run — including runs where nothing was pressed at all.
  */
-function probedForElement(
-  type: string,
-  e: HandlerSurfaceEntry,
-  probe: InteractionProbeEvidence | undefined,
-): boolean {
+function probedForElement(type: string, e: HandlerSurfaceEntry, probe: InteractionProbeEvidence | undefined): boolean {
   // No probe ran. `scan handlers` is an inventory: it opens the page, reads registrations and
   // closes it. Nothing was exercised, so nothing is covered.
   if (!probe || e.ix === null) return false;
@@ -2978,14 +3096,31 @@ function probedForElement(
 }
 
 export interface HandlerIssue {
-  kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
-    | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
-    | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
-    | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
-    | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel"
-    | "hover-only-reveal" | "contextmenu-not-prevented" | "contextmenu-replaces-nothing"
-    | "touch-handlers-not-invoked" | "text-input-rejects-non-ascii"
-    | "drag-selects-text" | "dblclick-selects-text" | "drag-ghost-illegible";
+  kind:
+    | "pointer-only-control"
+    | "unprobed-handler-types"
+    | "delegated-handlers-opaque"
+    | "no-handlers-found"
+    | "drag-source-not-draggable"
+    | "drop-without-dragover"
+    | "drag-without-keyboard-alternative"
+    | "dragover-not-prevented"
+    | "dragstart-transfers-nothing"
+    | "pointer-drag-intercepted"
+    | "drag-source-inert"
+    | "drop-target-unreachable"
+    | "drag-cancel-not-reverted"
+    | "drag-source-detached-mid-drag"
+    | "dragover-handler-slow"
+    | "passive-listener-cannot-cancel"
+    | "hover-only-reveal"
+    | "contextmenu-not-prevented"
+    | "contextmenu-replaces-nothing"
+    | "touch-handlers-not-invoked"
+    | "text-input-rejects-non-ascii"
+    | "drag-selects-text"
+    | "dblclick-selects-text"
+    | "drag-ghost-illegible";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -3015,258 +3150,258 @@ export interface HandlerIssue {
  * deriver cannot reach only one of its two consumers.
  */
 export const HANDLER_SURFACE_RULES = [
-    {
-      id: "pointer-only-control",
-      title: "Click handler on a role-less element with no keyboard path",
-      severity: "suspect",
-      docs: "Operable by mouse but not by keyboard or assistive tech. The headline detection of this gate.",
-    },
-    {
-      id: "delegated-handlers-opaque",
-      title: "Root delegation hides per-element handlers",
-      severity: "warn",
-      docs: "Expected on React-style apps: the surface is measurable, just not per element.",
-    },
-    {
-      id: "drag-source-not-draggable",
-      title: "dragstart handler on an element that is not draggable",
-      severity: "suspect",
-      docs:
-        "The handler can never fire: the browser starts no drag on an element whose"
-        + " `draggable` is false. Add `draggable=\"true\"`, or move the handler to an element"
-        + " draggable by default (<a href>, <img>).",
-    },
-    {
-      id: "drop-without-dragover",
-      title: "drop handler with no dragover/dragenter to preventDefault on",
-      severity: "suspect",
-      docs:
-        "Also unfireable. dragover's default action rejects the drop, so a target must"
-        + " register dragover (or dragenter) and call preventDefault(). Checked on the element"
-        + " and every ancestor it would bubble through, so delegated targets are not flagged.",
-    },
-    {
-      id: "dragover-not-prevented",
-      title: "dragover handler that never calls preventDefault",
-      severity: "suspect",
-      docs:
-        "Probed, not read: the static check cannot see this, because a dragover handler DOES"
-        + " exist — it just does not cancel, so the browser rejects the drop and the wired"
-        + " drop handler never runs. Requires --probe-drag (or `check interactions --handlers`)."
-        + " Reported only when the pair search ran to completion: a selective handler cancels for"
-        + " SOME source/target pairs, so a search that hit its cap has not established that none"
-        + " of them cancels.",
-    },
-    {
-      id: "pointer-drag-intercepted",
-      title: "Drag handlers that a real gesture never invoked",
-      severity: "suspect",
-      docs:
-        "Registered, the gesture was delivered over the element, and none of its own listeners"
-        + " ran — an overlay, `pointer-events` on an ancestor, or a listener on a detached node."
-        + " The one unambiguous outcome of the pointer-drag probe: the pixel numbers beside it"
-        + " are reported rather than graded, because 0% pixels has several explanations and"
-        + " 0 invocations has one. Requires --probe-drag.",
-    },
-    {
-      id: "drag-selects-text",
-      title: "A drag gesture over this surface selected text",
-      severity: "suspect",
-      docs:
-        "Driven: a real press-and-drag over the surface left a range selection behind. Selected"
-        + " text is itself draggable, so the next press may drag the SELECTION rather than the"
-        + " thing under the cursor; the highlight sits over the surface; and the gesture that"
-        + " produced it was aimed at the surface, not at the text. `user-select: none` belongs on"
-        + " the element the range anchors in, which the finding names — usually not the surface"
-        + " itself but a hint line or a status readout inside it. Requires --probe-drag.",
-    },
-    {
-      id: "drag-ghost-illegible",
-      title: "The dragged element becomes unreadable while it is in the air",
-      severity: "suspect",
-      docs:
-        "Driven: the element was shot at rest and again mid-flight, and the WCAG ratio between its"
-        + " darkest 2% and lightest 10% of pixels fell below 4.5:1 with the drag responsible for at"
-        + " least a quarter of the fall. The usual cause is the `opacity` every sortable applies to"
-        + " its source, composited over whatever the surface behind it happens to be — the finding"
-        + " reports the computed opacity alongside the two ratios. A proxy, not a text-contrast"
-        + " measurement: it does not know which pixels are glyphs. Requires --probe-drag.",
-    },
-    {
-      id: "dblclick-selects-text",
-      title: "A double-click that missed selected a word",
-      severity: "suspect",
-      docs:
-        "Driven: the page binds `dblclick` as a gesture with a meaning, and a double-click at a"
-        + " point where its handler does not apply selected a word instead. The handler is silent"
-        + " — it addresses a child and returns early — but the browser is not, so the user is left"
-        + " holding a selection they did not ask for. The fix is `user-select: none` on the"
-        + " surface, not a change to the handler. Requires --probe dblclick.",
-    },
-    {
-      id: "drag-source-inert",
-      title: "A real drag gesture on this source started no drag",
-      severity: "suspect",
-      docs:
-        "Driven, not read: a real mouse gesture over the element produced no `dragstart` at"
-        + " all, twice, from two different points. The browser refuses to start a drag here —"
-        + " `-webkit-user-drag: none` on it or an ancestor, an overlay taking the press, or"
-        + " `draggable` on a different node than the handler. Distinct from"
-        + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
-        + " one case that IS statically visible; this covers the ones that are not, and which"
-        + " the synthetic dispatch reports as working. Requires --probe-drag.",
-    },
-    {
-      id: "contextmenu-not-prevented",
-      title: "A contextmenu handler that lets the browser menu open too",
-      severity: "suspect",
-      docs:
-        "Driven: a real right-click ran the handler and nothing cancelled the event, so the browser's"
-        + " own menu opens as well as whatever the page wanted to show. Read after the page's"
-        + " handlers have run — before them `defaultPrevented` is always false and says nothing."
-        + " Requires --probe menu.",
-    },
-    {
-      id: "contextmenu-replaces-nothing",
-      title: "A contextmenu handler that cancels the browser menu and shows nothing",
-      severity: "warn",
-      docs:
-        "The right-click was cancelled and nothing became visible, so the user right-clicks and gets"
-        + " nothing at all — worse off than with the browser's menu. Warn rather than suspect: the"
-        + " replacement may be drawn somewhere this cannot see (a canvas, a portal positioned"
-        + " offscreen until placed), and suppressing the menu deliberately is a choice a page is"
-        + " allowed to make. Requires --probe menu.",
-    },
-    {
-      id: "text-input-rejects-non-ascii",
-      title: "A text field that keeps ASCII and drops non-ASCII text",
-      severity: "warn",
-      docs:
-        "Typed into, three ways: an ASCII sample, the same sample in Japanese, and the Japanese one"
-        + " through an IME composition. The field kept the ASCII and lost the Japanese, so a name,"
-        + " address or comment typed in a non-Latin script disappears. The ASCII drive is the"
-        + " control, and it is what makes the finding attributable: a field that mangles ASCII too"
-        + " is filtering by its own rules (a phone number, a numeric amount) and is not reported."
-        + " Warn rather than suspect, because a field may legitimately accept only Latin text — and"
-        + " if so it should say so rather than swallowing what was typed. Requires --probe input.",
-    },
-    {
-      id: "touch-handlers-not-invoked",
-      title: "Touch handlers a real tap never invoked",
-      severity: "suspect",
-      docs:
-        "Registered, the tap landed on the element's own box, and none of its listeners ran — the"
-        + " same unambiguous outcome `pointer-drag-intercepted` grades, for touch. Something is"
-        + " between the finger and the listener: an overlay, `pointer-events` on an ancestor, a"
-        + " listener on a detached node. Driven in a page with touch emulation on, which is a"
-        + " different environment from the rest of the run and reported as such. Requires"
-        + " --probe touch.",
-    },
-    {
-      id: "hover-only-reveal",
-      title: "Content that appears on hover and not on focus",
-      severity: "suspect",
-      docs:
-        "WCAG 1.4.13 and 2.1.1: hovering the trigger made something visible and focusing the same"
-        + " trigger made nothing visible, so a keyboard user never sees it. Measured as a diff of"
-        + " what is visible on the PAGE rather than of the trigger's own pixels — a tooltip or menu"
-        + " appears outside the trigger's box. Triggers come from the hover handlers AND from every"
-        + " selector containing `:hover`, because the CSS-only trigger is the common form and has no"
-        + " listener to find. Requires --probe hover.",
-    },
-    {
-      id: "passive-listener-cannot-cancel",
-      title: "A handler calls preventDefault() on a listener that cannot cancel",
-      severity: "suspect",
-      docs:
-        "The listener was registered `{ passive: true }` and its handler calls preventDefault(),"
-        + " which is a silent no-op — Chromium logs \"Unable to preventDefault inside passive event"
-        + " listener invocation\" and carries on. So code written to stop a scroll, a zoom or a"
-        + " browser gesture does not stop it, and the page shows nothing for it. Measured per"
-        + " element: the same wheel listener records the call as ineffective under"
-        + " `{ passive: true }` and effective under `{ passive: false }` and with no option at all."
-        + " Needs a probe family that makes the event fire.",
-    },
-    {
-      id: "drag-source-detached-mid-drag",
-      title: "dragstart fired and dragend never did",
-      severity: "suspect",
-      docs:
-        "The source left the document while it was being dragged, so `dragend` — the only place a"
-        + " drag is guaranteed to end up, success or not — never ran on it. Measured on a source"
-        + " that removes itself in `dragstart`: the drop still lands, the drag looks like it"
-        + " worked, and every cleanup wired to `dragend` is silently skipped. Read from a capture"
-        + " listener on `document`, which `stopPropagation` cannot hide from. One read is enough:"
-        + " the evaluate that reads the log is queued behind the page's own main-thread work, so"
-        + " nothing able to delay `dragend` can arrive after it — checked against a `dragover`"
-        + " handler busy-waiting 300ms. Requires --probe-drag.",
-    },
-    {
-      id: "dragover-handler-slow",
-      title: "A dragover handler slow enough to stutter the drag",
-      severity: "warn",
-      docs:
-        "Timed inside the listener wrapper, so the number is the handler's own run and not the"
-        + " interval between events: the interval version reported 68ms for a handler that returns"
-        + " immediately, because dragover keeps firing while the probe takes its hover screenshot."
-        + " Warn rather than suspect: it is a smoothness defect. Only sees listeners added with"
-        + " addEventListener, so an `ondragover=` property reads as unmeasured. Requires"
-        + " --probe-drag.",
-    },
-    {
-      id: "drag-cancel-not-reverted",
-      title: "Escape cancelled the drag and the page kept the change",
-      severity: "suspect",
-      docs:
-        "Driven: the probe presses Escape mid-drag, the browser reports the drag as cancelled"
-        + " (dragend with dropEffect \"none\", no drop), and the source's own box still differs"
-        + " from before the gesture. The shape this catches is the optimistic update every"
-        + " sortable makes — hide the item on dragstart because it is 'leaving' — with no restore"
-        + " on a cancelled drag. Measured separation on a fixture: the source that restores reads"
-        + " 0.00%, the one that forgets reads 99.03%. Requires --probe-drag.",
-    },
-    {
-      id: "drop-target-unreachable",
-      title: "A real drag never reached this drop target",
-      severity: "suspect",
-      docs:
-        "A hit test, so it needs no probe flag: three points inside the target (centre, 25%, 75%)"
-        + " are passed to elementFromPoint, and none of them lands on it or inside it. A"
-        + " descendant counts as reaching it, because the event bubbles — deriving this from the"
-        + " gesture log instead reported the fixture's delegated <ul> as unreachable, since the"
-        + " aim lands on its <li>. Measured on a target with a correct contract (dragover calling"
-        + " preventDefault, a wired drop) under a transparent sibling: the whole run reported"
-        + " nothing about it, because the static check sees both handlers and the synthetic"
-        + " dispatch runs them directly at the element.",
-    },
-    {
-      id: "dragstart-transfers-nothing",
-      title: "dragstart leaves the DataTransfer empty",
-      severity: "warn",
-      docs:
-        "A target calling getData() reads \"\". Chromium still starts the drag, Firefox and"
-        + " Safari do not, so this is a cross-browser defect rather than a local one — and a"
-        + " page may deliberately keep its payload in its own state, which is why it warns.",
-    },
-    {
-      id: "drag-without-keyboard-alternative",
-      title: "Drag-operated element with no keyboard path",
-      severity: "warn",
-      docs:
-        "HTML5 drag has no keyboard equivalent in any browser, so the action is mouse-only"
-        + " (WCAG 2.1.1, 2.5.7). Warn rather than suspect because the alternative path is"
-        + " often elsewhere on the page, which this element-local view cannot see. The fix is"
-        + " another route to the same result, not tabindex + Enter — that cannot start a drag.",
-    },
-    { id: "unprobed-handler-types", title: "Event types this gate does not probe", severity: "warn" },
-    {
-      id: "no-handlers-found",
-      title: "The page presents controls and registers no handlers at all",
-      severity: "warn",
-      docs:
-        "Warn, not suspect: a page of links and a form that posts legitimately needs none."
-        + " Raise to suspect on an app where every control is expected to be wired.",
-    },
+  {
+    id: "pointer-only-control",
+    title: "Click handler on a role-less element with no keyboard path",
+    severity: "suspect",
+    docs: "Operable by mouse but not by keyboard or assistive tech. The headline detection of this gate.",
+  },
+  {
+    id: "delegated-handlers-opaque",
+    title: "Root delegation hides per-element handlers",
+    severity: "warn",
+    docs: "Expected on React-style apps: the surface is measurable, just not per element.",
+  },
+  {
+    id: "drag-source-not-draggable",
+    title: "dragstart handler on an element that is not draggable",
+    severity: "suspect",
+    docs:
+      "The handler can never fire: the browser starts no drag on an element whose" +
+      ' `draggable` is false. Add `draggable="true"`, or move the handler to an element' +
+      " draggable by default (<a href>, <img>).",
+  },
+  {
+    id: "drop-without-dragover",
+    title: "drop handler with no dragover/dragenter to preventDefault on",
+    severity: "suspect",
+    docs:
+      "Also unfireable. dragover's default action rejects the drop, so a target must" +
+      " register dragover (or dragenter) and call preventDefault(). Checked on the element" +
+      " and every ancestor it would bubble through, so delegated targets are not flagged.",
+  },
+  {
+    id: "dragover-not-prevented",
+    title: "dragover handler that never calls preventDefault",
+    severity: "suspect",
+    docs:
+      "Probed, not read: the static check cannot see this, because a dragover handler DOES" +
+      " exist — it just does not cancel, so the browser rejects the drop and the wired" +
+      " drop handler never runs. Requires --probe-drag (or `check interactions --handlers`)." +
+      " Reported only when the pair search ran to completion: a selective handler cancels for" +
+      " SOME source/target pairs, so a search that hit its cap has not established that none" +
+      " of them cancels.",
+  },
+  {
+    id: "pointer-drag-intercepted",
+    title: "Drag handlers that a real gesture never invoked",
+    severity: "suspect",
+    docs:
+      "Registered, the gesture was delivered over the element, and none of its own listeners" +
+      " ran — an overlay, `pointer-events` on an ancestor, or a listener on a detached node." +
+      " The one unambiguous outcome of the pointer-drag probe: the pixel numbers beside it" +
+      " are reported rather than graded, because 0% pixels has several explanations and" +
+      " 0 invocations has one. Requires --probe-drag.",
+  },
+  {
+    id: "drag-selects-text",
+    title: "A drag gesture over this surface selected text",
+    severity: "suspect",
+    docs:
+      "Driven: a real press-and-drag over the surface left a range selection behind. Selected" +
+      " text is itself draggable, so the next press may drag the SELECTION rather than the" +
+      " thing under the cursor; the highlight sits over the surface; and the gesture that" +
+      " produced it was aimed at the surface, not at the text. `user-select: none` belongs on" +
+      " the element the range anchors in, which the finding names — usually not the surface" +
+      " itself but a hint line or a status readout inside it. Requires --probe-drag.",
+  },
+  {
+    id: "drag-ghost-illegible",
+    title: "The dragged element becomes unreadable while it is in the air",
+    severity: "suspect",
+    docs:
+      "Driven: the element was shot at rest and again mid-flight, and the WCAG ratio between its" +
+      " darkest 2% and lightest 10% of pixels fell below 4.5:1 with the drag responsible for at" +
+      " least a quarter of the fall. The usual cause is the `opacity` every sortable applies to" +
+      " its source, composited over whatever the surface behind it happens to be — the finding" +
+      " reports the computed opacity alongside the two ratios. A proxy, not a text-contrast" +
+      " measurement: it does not know which pixels are glyphs. Requires --probe-drag.",
+  },
+  {
+    id: "dblclick-selects-text",
+    title: "A double-click that missed selected a word",
+    severity: "suspect",
+    docs:
+      "Driven: the page binds `dblclick` as a gesture with a meaning, and a double-click at a" +
+      " point where its handler does not apply selected a word instead. The handler is silent" +
+      " — it addresses a child and returns early — but the browser is not, so the user is left" +
+      " holding a selection they did not ask for. The fix is `user-select: none` on the" +
+      " surface, not a change to the handler. Requires --probe dblclick.",
+  },
+  {
+    id: "drag-source-inert",
+    title: "A real drag gesture on this source started no drag",
+    severity: "suspect",
+    docs:
+      "Driven, not read: a real mouse gesture over the element produced no `dragstart` at" +
+      " all, twice, from two different points. The browser refuses to start a drag here —" +
+      " `-webkit-user-drag: none` on it or an ancestor, an overlay taking the press, or" +
+      " `draggable` on a different node than the handler. Distinct from" +
+      " `drag-source-not-draggable`, which reads the `draggable` property and reports the" +
+      " one case that IS statically visible; this covers the ones that are not, and which" +
+      " the synthetic dispatch reports as working. Requires --probe-drag.",
+  },
+  {
+    id: "contextmenu-not-prevented",
+    title: "A contextmenu handler that lets the browser menu open too",
+    severity: "suspect",
+    docs:
+      "Driven: a real right-click ran the handler and nothing cancelled the event, so the browser's" +
+      " own menu opens as well as whatever the page wanted to show. Read after the page's" +
+      " handlers have run — before them `defaultPrevented` is always false and says nothing." +
+      " Requires --probe menu.",
+  },
+  {
+    id: "contextmenu-replaces-nothing",
+    title: "A contextmenu handler that cancels the browser menu and shows nothing",
+    severity: "warn",
+    docs:
+      "The right-click was cancelled and nothing became visible, so the user right-clicks and gets" +
+      " nothing at all — worse off than with the browser's menu. Warn rather than suspect: the" +
+      " replacement may be drawn somewhere this cannot see (a canvas, a portal positioned" +
+      " offscreen until placed), and suppressing the menu deliberately is a choice a page is" +
+      " allowed to make. Requires --probe menu.",
+  },
+  {
+    id: "text-input-rejects-non-ascii",
+    title: "A text field that keeps ASCII and drops non-ASCII text",
+    severity: "warn",
+    docs:
+      "Typed into, three ways: an ASCII sample, the same sample in Japanese, and the Japanese one" +
+      " through an IME composition. The field kept the ASCII and lost the Japanese, so a name," +
+      " address or comment typed in a non-Latin script disappears. The ASCII drive is the" +
+      " control, and it is what makes the finding attributable: a field that mangles ASCII too" +
+      " is filtering by its own rules (a phone number, a numeric amount) and is not reported." +
+      " Warn rather than suspect, because a field may legitimately accept only Latin text — and" +
+      " if so it should say so rather than swallowing what was typed. Requires --probe input.",
+  },
+  {
+    id: "touch-handlers-not-invoked",
+    title: "Touch handlers a real tap never invoked",
+    severity: "suspect",
+    docs:
+      "Registered, the tap landed on the element's own box, and none of its listeners ran — the" +
+      " same unambiguous outcome `pointer-drag-intercepted` grades, for touch. Something is" +
+      " between the finger and the listener: an overlay, `pointer-events` on an ancestor, a" +
+      " listener on a detached node. Driven in a page with touch emulation on, which is a" +
+      " different environment from the rest of the run and reported as such. Requires" +
+      " --probe touch.",
+  },
+  {
+    id: "hover-only-reveal",
+    title: "Content that appears on hover and not on focus",
+    severity: "suspect",
+    docs:
+      "WCAG 1.4.13 and 2.1.1: hovering the trigger made something visible and focusing the same" +
+      " trigger made nothing visible, so a keyboard user never sees it. Measured as a diff of" +
+      " what is visible on the PAGE rather than of the trigger's own pixels — a tooltip or menu" +
+      " appears outside the trigger's box. Triggers come from the hover handlers AND from every" +
+      " selector containing `:hover`, because the CSS-only trigger is the common form and has no" +
+      " listener to find. Requires --probe hover.",
+  },
+  {
+    id: "passive-listener-cannot-cancel",
+    title: "A handler calls preventDefault() on a listener that cannot cancel",
+    severity: "suspect",
+    docs:
+      "The listener was registered `{ passive: true }` and its handler calls preventDefault()," +
+      ' which is a silent no-op — Chromium logs "Unable to preventDefault inside passive event' +
+      ' listener invocation" and carries on. So code written to stop a scroll, a zoom or a' +
+      " browser gesture does not stop it, and the page shows nothing for it. Measured per" +
+      " element: the same wheel listener records the call as ineffective under" +
+      " `{ passive: true }` and effective under `{ passive: false }` and with no option at all." +
+      " Needs a probe family that makes the event fire.",
+  },
+  {
+    id: "drag-source-detached-mid-drag",
+    title: "dragstart fired and dragend never did",
+    severity: "suspect",
+    docs:
+      "The source left the document while it was being dragged, so `dragend` — the only place a" +
+      " drag is guaranteed to end up, success or not — never ran on it. Measured on a source" +
+      " that removes itself in `dragstart`: the drop still lands, the drag looks like it" +
+      " worked, and every cleanup wired to `dragend` is silently skipped. Read from a capture" +
+      " listener on `document`, which `stopPropagation` cannot hide from. One read is enough:" +
+      " the evaluate that reads the log is queued behind the page's own main-thread work, so" +
+      " nothing able to delay `dragend` can arrive after it — checked against a `dragover`" +
+      " handler busy-waiting 300ms. Requires --probe-drag.",
+  },
+  {
+    id: "dragover-handler-slow",
+    title: "A dragover handler slow enough to stutter the drag",
+    severity: "warn",
+    docs:
+      "Timed inside the listener wrapper, so the number is the handler's own run and not the" +
+      " interval between events: the interval version reported 68ms for a handler that returns" +
+      " immediately, because dragover keeps firing while the probe takes its hover screenshot." +
+      " Warn rather than suspect: it is a smoothness defect. Only sees listeners added with" +
+      " addEventListener, so an `ondragover=` property reads as unmeasured. Requires" +
+      " --probe-drag.",
+  },
+  {
+    id: "drag-cancel-not-reverted",
+    title: "Escape cancelled the drag and the page kept the change",
+    severity: "suspect",
+    docs:
+      "Driven: the probe presses Escape mid-drag, the browser reports the drag as cancelled" +
+      ' (dragend with dropEffect "none", no drop), and the source\'s own box still differs' +
+      " from before the gesture. The shape this catches is the optimistic update every" +
+      " sortable makes — hide the item on dragstart because it is 'leaving' — with no restore" +
+      " on a cancelled drag. Measured separation on a fixture: the source that restores reads" +
+      " 0.00%, the one that forgets reads 99.03%. Requires --probe-drag.",
+  },
+  {
+    id: "drop-target-unreachable",
+    title: "A real drag never reached this drop target",
+    severity: "suspect",
+    docs:
+      "A hit test, so it needs no probe flag: three points inside the target (centre, 25%, 75%)" +
+      " are passed to elementFromPoint, and none of them lands on it or inside it. A" +
+      " descendant counts as reaching it, because the event bubbles — deriving this from the" +
+      " gesture log instead reported the fixture's delegated <ul> as unreachable, since the" +
+      " aim lands on its <li>. Measured on a target with a correct contract (dragover calling" +
+      " preventDefault, a wired drop) under a transparent sibling: the whole run reported" +
+      " nothing about it, because the static check sees both handlers and the synthetic" +
+      " dispatch runs them directly at the element.",
+  },
+  {
+    id: "dragstart-transfers-nothing",
+    title: "dragstart leaves the DataTransfer empty",
+    severity: "warn",
+    docs:
+      'A target calling getData() reads "". Chromium still starts the drag, Firefox and' +
+      " Safari do not, so this is a cross-browser defect rather than a local one — and a" +
+      " page may deliberately keep its payload in its own state, which is why it warns.",
+  },
+  {
+    id: "drag-without-keyboard-alternative",
+    title: "Drag-operated element with no keyboard path",
+    severity: "warn",
+    docs:
+      "HTML5 drag has no keyboard equivalent in any browser, so the action is mouse-only" +
+      " (WCAG 2.1.1, 2.5.7). Warn rather than suspect because the alternative path is" +
+      " often elsewhere on the page, which this element-local view cannot see. The fix is" +
+      " another route to the same result, not tabindex + Enter — that cannot start a drag.",
+  },
+  { id: "unprobed-handler-types", title: "Event types this gate does not probe", severity: "warn" },
+  {
+    id: "no-handlers-found",
+    title: "The page presents controls and registers no handlers at all",
+    severity: "warn",
+    docs:
+      "Warn, not suspect: a page of links and a form that posts legitimately needs none." +
+      " Raise to suspect on an app where every control is expected to be wired.",
+  },
 ] as const;
 
 /**
@@ -3380,15 +3515,17 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // whose refusing zone highlights 99% of its own box on `dragenter`, so the affordance is
     // unmistakable. Folded into the message rather than raised as a second finding, because one
     // root cause reported twice is what `drag-source-inert` deliberately avoids.
-    const hovered = surface.realDragProbe
-      ?.flatMap((r) => r.hoverFeedback ?? [])
-      .filter((h) => h.target === e.path)
-      .reduce((max, h) => Math.max(max, h.ratio), 0) ?? 0;
-    const highlight = hovered >= 0.02
-      ? ` A real drag over it changed ${(hovered * 100).toFixed(0)}% of its own pixels, so it`
-        + ` advertises itself as a drop zone and then rejects the drop — the user is told it will`
-        + ` work.`
-      : "";
+    const hovered =
+      surface.realDragProbe
+        ?.flatMap((r) => r.hoverFeedback ?? [])
+        .filter((h) => h.target === e.path)
+        .reduce((max, h) => Math.max(max, h.ratio), 0) ?? 0;
+    const highlight =
+      hovered >= 0.02
+        ? ` A real drag over it changed ${(hovered * 100).toFixed(0)}% of its own pixels, so it` +
+          ` advertises itself as a drop zone and then rejects the drop — the user is told it will` +
+          ` work.`
+        : "";
     /*
      * Not when the pair search was TRUNCATED. "No listener cancelled it" is a claim about every
      * pair, and a capped search tried 40 of them — on a board with seven sources and a dozen
@@ -3410,10 +3547,11 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "dragover-not-prevented",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a dragover handler that does not call `
-          + `preventDefault(), so the browser rejects the drop and the drop handler never `
-          + `runs. Measured by dispatching a dragover: no listener cancelled it.${highlight} Call `
-          + `e.preventDefault() in the dragover handler (and in dragenter, if you rely on it).`,
+        message:
+          `${e.path} "${e.text}" has a dragover handler that does not call ` +
+          `preventDefault(), so the browser rejects the drop and the drop handler never ` +
+          `runs. Measured by dispatching a dragover: no listener cancelled it.${highlight} Call ` +
+          `e.preventDefault() in the dragover handler (and in dragenter, if you rely on it).`,
       });
     }
     // A real drag can refute this one, and on the fixture it did. The synthetic probe dispatches
@@ -3435,10 +3573,11 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "dragstart-transfers-nothing",
         severity: "warn",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" ran its dragstart handler and left the DataTransfer `
-          + `empty, so a target calling getData() reads "". Chromium still starts the drag; `
-          + `Firefox and Safari do not. Call e.dataTransfer.setData(<type>, <value>) unless `
-          + `the payload deliberately lives in the page's own state.`,
+        message:
+          `${e.path} "${e.text}" ran its dragstart handler and left the DataTransfer ` +
+          `empty, so a target calling getData() reads "". Chromium still starts the drag; ` +
+          `Firefox and Safari do not. Call e.dataTransfer.setData(<type>, <value>) unless ` +
+          `the payload deliberately lives in the page's own state.`,
       });
     }
 
@@ -3459,13 +3598,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "pointer-drag-intercepted",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has drag handlers that never ran: a real `
-          + `pointerdown/pointermove/pointerup gesture was delivered over its box and none of `
-          + `its own listeners was invoked. Something between the pointer and the element is `
-          + `taking the events — an overlay or backdrop on top of it, \`pointer-events\` on an `
-          + `ancestor, or a listener attached to a node that is no longer in the document. `
-          + `Measured at 30%-70% across the element, so a surface that is only covered `
-          + `elsewhere would not report this.`,
+        message:
+          `${e.path} "${e.text}" has drag handlers that never ran: a real ` +
+          `pointerdown/pointermove/pointerup gesture was delivered over its box and none of ` +
+          `its own listeners was invoked. Something between the pointer and the element is ` +
+          `taking the events — an overlay or backdrop on top of it, \`pointer-events\` on an ` +
+          `ancestor, or a listener attached to a node that is no longer in the document. ` +
+          `Measured at 30%-70% across the element, so a surface that is only covered ` +
+          `elsewhere would not report this.`,
       });
     }
 
@@ -3487,13 +3627,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "drag-source-inert",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a dragstart handler and a real mouse drag over it `
-          + `started no drag: the gesture was performed twice, from the centre and from 25% in, `
-          + `and the browser fired no dragstart. Something stops the drag from beginning — `
-          + `\`-webkit-user-drag: none\` on it or an ancestor, an element on top of it taking the `
-          + `press, or \`draggable\` set on a different node than the handler. Note the element `
-          + `IS draggable as far as the DOM is concerned, which is why the static check passes `
-          + `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
+        message:
+          `${e.path} "${e.text}" has a dragstart handler and a real mouse drag over it ` +
+          `started no drag: the gesture was performed twice, from the centre and from 25% in, ` +
+          `and the browser fired no dragstart. Something stops the drag from beginning — ` +
+          `\`-webkit-user-drag: none\` on it or an ancestor, an element on top of it taking the ` +
+          `press, or \`draggable\` set on a different node than the handler. Note the element ` +
+          `IS draggable as far as the DOM is concerned, which is why the static check passes ` +
+          `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
       });
     }
 
@@ -3514,13 +3655,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "drag-selects-text",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `A real drag over ${e.path} left text selected: `
-          + `${JSON.stringify(realProbe.selectedText.text)}`
-          + `${anchor ? `, anchored in ${anchor}` : ""}. Selected text is itself draggable, so the `
-          + `next press can drag the selection instead of the element under it, and the highlight `
-          + `sits over the surface. Set \`user-select: none\` on `
-          + `${anchor ?? "the selectable content inside this surface"} — a drag surface that `
-          + `contains prose needs it on the prose, not only on the items.`,
+        message:
+          `A real drag over ${e.path} left text selected: ` +
+          `${JSON.stringify(realProbe.selectedText.text)}` +
+          `${anchor ? `, anchored in ${anchor}` : ""}. Selected text is itself draggable, so the ` +
+          `next press can drag the selection instead of the element under it, and the highlight ` +
+          `sits over the surface. Set \`user-select: none\` on ` +
+          `${anchor ?? "the selectable content inside this surface"} — a drag surface that ` +
+          `contains prose needs it on the prose, not only on the items.`,
       });
     }
 
@@ -3534,24 +3676,26 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
      */
     const legibility = realProbe?.dragLegibility;
     if (
-      legibility && !realProbe?.error
-      && legibility.dragging < DRAG_LEGIBILITY_FLOOR
-      && legibility.dragging < legibility.rest * (1 - DRAG_LEGIBILITY_DROP)
+      legibility &&
+      !realProbe?.error &&
+      legibility.dragging < DRAG_LEGIBILITY_FLOOR &&
+      legibility.dragging < legibility.rest * (1 - DRAG_LEGIBILITY_DROP)
     ) {
       const drop = Math.round((1 - legibility.dragging / legibility.rest) * 100);
       issues.push({
         kind: "drag-ghost-illegible",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `The element being dragged from ${e.path} loses ${drop}% of its own contrast while `
-          + `the drag is in the air: ${legibility.rest.toFixed(2)}:1 at rest, `
-          + `${legibility.dragging.toFixed(2)}:1 mid-flight`
-          + `${legibility.opacity !== undefined ? ` at \`opacity: ${legibility.opacity}\`` : ""}, `
-          + `below the 4.5:1 the rest of this project gates text on. Whatever is behind the surface `
-          + `is now showing through the thing being carried. Ghost the SOURCE'S POSITION rather than `
-          + `the source — a dashed outline, a gap, a placeholder — or raise the opacity until the `
-          + `face survives the composite. Measured from the element's own pixels (darkest 2% against `
-          + `lightest 10%), so it is a legibility proxy and not a text-contrast reading.`,
+        message:
+          `The element being dragged from ${e.path} loses ${drop}% of its own contrast while ` +
+          `the drag is in the air: ${legibility.rest.toFixed(2)}:1 at rest, ` +
+          `${legibility.dragging.toFixed(2)}:1 mid-flight` +
+          `${legibility.opacity !== undefined ? ` at \`opacity: ${legibility.opacity}\`` : ""}, ` +
+          `below the 4.5:1 the rest of this project gates text on. Whatever is behind the surface ` +
+          `is now showing through the thing being carried. Ghost the SOURCE'S POSITION rather than ` +
+          `the source — a dashed outline, a gap, a placeholder — or raise the opacity until the ` +
+          `face survives the composite. Measured from the element's own pixels (darkest 2% against ` +
+          `lightest 10%), so it is a legibility proxy and not a text-contrast reading.`,
       });
     }
 
@@ -3565,12 +3709,13 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "drag-source-detached-mid-drag",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" started a drag and never received a dragend: the element `
-          + `left the document while the drag was in flight. Every cleanup wired to dragend — `
-          + `restoring the placeholder, clearing the drag class, releasing the dragged model — is `
-          + `skipped, and the drop still lands, so the drag looks like it worked. Move the item `
-          + `with CSS or a placeholder instead of removing the node, or attach the cleanup to the `
-          + `container rather than to the node being dragged.`,
+        message:
+          `${e.path} "${e.text}" started a drag and never received a dragend: the element ` +
+          `left the document while the drag was in flight. Every cleanup wired to dragend — ` +
+          `restoring the placeholder, clearing the drag class, releasing the dragged model — is ` +
+          `skipped, and the drop still lands, so the drag looks like it worked. Move the item ` +
+          `with CSS or a placeholder instead of removing the node, or attach the cleanup to the ` +
+          `container rather than to the node being dragged.`,
       });
     }
 
@@ -3582,11 +3727,12 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "dragover-handler-slow",
         severity: "warn",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a dragover handler that took ${e.dragoverMs.toFixed(0)}ms `
-          + `in a single call. dragover fires every frame while the pointer is over the target, so `
-          + `the drag stutters for as long as it stays here. Do the work once on dragenter, cache `
-          + `anything read from layout, and keep the dragover handler to preventDefault() plus a `
-          + `cheap decision.`,
+        message:
+          `${e.path} "${e.text}" has a dragover handler that took ${e.dragoverMs.toFixed(0)}ms ` +
+          `in a single call. dragover fires every frame while the pointer is over the target, so ` +
+          `the drag stutters for as long as it stays here. Do the work once on dragenter, cache ` +
+          `anything read from layout, and keep the dragover handler to preventDefault() plus a ` +
+          `cheap decision.`,
       });
     }
 
@@ -3599,20 +3745,21 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       // fact applies.
       if (rec.path !== e.path || rec.effective) continue;
       const why = rec.passive
-        ? `the listener is registered { passive: true }, and a passive listener cannot cancel its `
-          + `event — Chromium logs "Unable to preventDefault inside passive event listener `
-          + `invocation" and carries on. Register it with { passive: false } if the cancel is `
-          + `intended, or drop the call if it is not.`
-        : `the event was not cancelable, so preventDefault() had nothing to cancel. Either the `
-          + `default action is already gone by the time this runs, or the wrong event is being `
-          + `listened for.`;
+        ? `the listener is registered { passive: true }, and a passive listener cannot cancel its ` +
+          `event — Chromium logs "Unable to preventDefault inside passive event listener ` +
+          `invocation" and carries on. Register it with { passive: false } if the cancel is ` +
+          `intended, or drop the call if it is not.`
+        : `the event was not cancelable, so preventDefault() had nothing to cancel. Either the ` +
+          `default action is already gone by the time this runs, or the wrong event is being ` +
+          `listened for.`;
       issues.push({
         kind: "passive-listener-cannot-cancel",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a ${rec.type} handler that calls preventDefault(), and `
-          + `the call did nothing: ${why} Whatever it was meant to stop — a scroll, a zoom, a `
-          + `browser gesture — still happens.`,
+        message:
+          `${e.path} "${e.text}" has a ${rec.type} handler that calls preventDefault(), and ` +
+          `the call did nothing: ${why} Whatever it was meant to stop — a scroll, a zoom, a ` +
+          `browser gesture — still happens.`,
       });
     }
 
@@ -3625,13 +3772,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "drag-cancel-not-reverted",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" was dragged, Escape was pressed, and the browser cancelled `
-          + `the drag — dragend reported dropEffect "none" and no drop ran — but `
-          + `${(cancel.ratio * 100).toFixed(0)}% of the element's own box still differs from before `
-          + `the gesture. A cancelled drag has to leave the page as it was. The usual cause is an `
-          + `optimistic change made in dragstart (hiding or moving the item because it is `
-          + `"leaving") that is only undone in drop, so pressing Escape strands it: undo it in `
-          + `dragend instead, which fires whether the drag succeeded or not.`,
+        message:
+          `${e.path} "${e.text}" was dragged, Escape was pressed, and the browser cancelled ` +
+          `the drag — dragend reported dropEffect "none" and no drop ran — but ` +
+          `${(cancel.ratio * 100).toFixed(0)}% of the element's own box still differs from before ` +
+          `the gesture. A cancelled drag has to leave the page as it was. The usual cause is an ` +
+          `optimistic change made in dragstart (hiding or moving the item because it is ` +
+          `"leaving") that is only undone in drop, so pressing Escape strands it: undo it in ` +
+          `dragend instead, which fires whether the drag succeeded or not.`,
       });
     }
 
@@ -3644,11 +3792,12 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "drop-target-unreachable",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" is wired as a drop target and nothing can drop on it: `
-          + `every sample point inside it — centre, 25%, 75% — hits ${covered.interceptedBy} `
-          + `instead, so the pointer never reaches it. Its own handlers are fine, which is why `
-          + `nothing else reports this: look for what is on top of it — an overlay or backdrop, a `
-          + `sibling with \`position: absolute; inset: 0\`, or an ancestor's \`pointer-events\`.`,
+        message:
+          `${e.path} "${e.text}" is wired as a drop target and nothing can drop on it: ` +
+          `every sample point inside it — centre, 25%, 75% — hits ${covered.interceptedBy} ` +
+          `instead, so the pointer never reaches it. Its own handlers are fine, which is why ` +
+          `nothing else reports this: look for what is on top of it — an overlay or backdrop, a ` +
+          `sibling with \`position: absolute; inset: 0\`, or an ancestor's \`pointer-events\`.`,
       });
     }
 
@@ -3678,10 +3827,11 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "drag-source-not-draggable",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a dragstart handler but is not draggable, so the `
-          + `handler can never fire — the browser starts no drag on an element whose `
-          + `\`draggable\` is false. Add \`draggable="true"\` (or move the handler to an `
-          + `element that is draggable by default, like an <a href> or <img>).`,
+        message:
+          `${e.path} "${e.text}" has a dragstart handler but is not draggable, so the ` +
+          `handler can never fire — the browser starts no drag on an element whose ` +
+          `\`draggable\` is false. Add \`draggable="true"\` (or move the handler to an ` +
+          `element that is draggable by default, like an <a href> or <img>).`,
       });
     }
 
@@ -3692,18 +3842,21 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // dragover/dragenter handler at all, on the element or an ancestor it would bubble
     // through, is decisive on its own.
     if (
-      dragTargetTypes.includes("drop")
-      && !types.includes("dragover") && !types.includes("dragenter")
-      && !e.ancestorTypes.includes("dragover") && !e.ancestorTypes.includes("dragenter")
+      dragTargetTypes.includes("drop") &&
+      !types.includes("dragover") &&
+      !types.includes("dragenter") &&
+      !e.ancestorTypes.includes("dragover") &&
+      !e.ancestorTypes.includes("dragenter")
     ) {
       issues.push({
         kind: "drop-without-dragover",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a drop handler but no dragover or dragenter `
-          + `handler on it or any ancestor, so the drop can never fire. The default action `
-          + `for dragover is "reject the drop"; a target must register dragover and call `
-          + `preventDefault() on it.`,
+        message:
+          `${e.path} "${e.text}" has a drop handler but no dragover or dragenter ` +
+          `handler on it or any ancestor, so the drop can never fire. The default action ` +
+          `for dragover is "reject the drop"; a target must register dragover and call ` +
+          `preventDefault() on it.`,
       });
     }
 
@@ -3713,50 +3866,59 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // Warn rather than suspect: the alternative path is often elsewhere on the page (a
     // "move to" menu), which this element-local view cannot see.
     if (
-      (dragSourceTypes.length > 0 || pointerDrag) && !hasKeyboard
-      && !e.ancestorTypes.some((t) => KEYBOARD_TYPES.has(t))
-      && e.visible
+      (dragSourceTypes.length > 0 || pointerDrag) &&
+      !hasKeyboard &&
+      !e.ancestorTypes.some((t) => KEYBOARD_TYPES.has(t)) &&
+      e.visible
     ) {
       // Both drags, one finding: the remedy is identical and it is NOT the
       // `pointer-only-control` remedy. `tabindex` plus a key handler cannot start an HTML5
       // drag, and it cannot drag a canvas either.
       const how = dragSourceTypes.length > 0 ? dragSourceTypes.join("/") : "pointer drag";
-      const why = dragSourceTypes.length > 0
-        ? "HTML5 drag has no keyboard equivalent in any browser"
-        : "a pointer-driven drag gesture has no keyboard equivalent";
-      const fix = dragSourceTypes.length > 0
-        ? 'move up/down controls, a "move to" menu, or cut/paste'
-        : "arrow-key nudging, numeric position/size fields, or a menu action for the same edit";
+      const why =
+        dragSourceTypes.length > 0
+          ? "HTML5 drag has no keyboard equivalent in any browser"
+          : "a pointer-driven drag gesture has no keyboard equivalent";
+      const fix =
+        dragSourceTypes.length > 0
+          ? 'move up/down controls, a "move to" menu, or cut/paste'
+          : "arrow-key nudging, numeric position/size fields, or a menu action for the same edit";
       issues.push({
         kind: "drag-without-keyboard-alternative",
         severity: "warn",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" is operated by dragging (${how}) `
-          + `with no keyboard handler on it or an ancestor. ${why}, so this action is `
-          + `mouse-only (WCAG 2.1.1, and 2.5.7 Dragging Movements). Provide a non-drag path `
-          + `to the same result — ${fix} — rather than tabindex and a key handler, which `
-          + `cannot perform a drag.`,
+        message:
+          `${e.path} "${e.text}" is operated by dragging (${how}) ` +
+          `with no keyboard handler on it or an ancestor. ${why}, so this action is ` +
+          `mouse-only (WCAG 2.1.1, and 2.5.7 Dragging Movements). Provide a non-drag path ` +
+          `to the same result — ${fix} — rather than tabindex and a key handler, which ` +
+          `cannot perform a drag.`,
       });
     }
 
     if (
-      hasPointer && !hasKeyboard
-      && e.ix === null
-      && e.visible
-      && !e.containsInteractive
-      && !e.insideInteractive
+      hasPointer &&
+      !hasKeyboard &&
+      e.ix === null &&
+      e.visible &&
+      !e.containsInteractive &&
+      !e.insideInteractive &&
       // A drag surface is reported by `drag-without-keyboard-alternative` instead. Both
       // findings are true of it, but their advice contradicts: this one says to add a role,
       // tabindex and key handling, and that does not make a canvas draggable. Measured on a
       // real SVG editor, whose canvas got exactly that advice for its
       // pointerdown/pointermove/pointerup trio.
-      && !pointerDrag
+      !pointerDrag
     ) {
       issues.push({
         kind: "pointer-only-control",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" has a ${Object.keys(e.types).filter((t) => POINTER_TYPES.has(t)).join("/")} handler but no role, no keyboard handler, and no interactive descendant — mouse users can operate it, keyboard and assistive-tech users cannot. Give it a role + tabindex + key handling, or move the handler onto a real control.`,
+        message: `${e.path} "${e.text}" has a ${Object.keys(e.types)
+          .filter((t) => POINTER_TYPES.has(t))
+          .join(
+            "/",
+          )} handler but no role, no keyboard handler, and no interactive descendant — mouse users can operate it, keyboard and assistive-tech users cannot. Give it a role + tabindex + key handling, or move the handler onto a real control.`,
       });
     }
   }
@@ -3776,13 +3938,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       kind: "text-input-rejects-non-ascii",
       severity: "warn",
       element: `${row.path} "${row.text}"`,
-      message: `${row.path} "${row.text}" kept ${JSON.stringify(TEXT_PROBE_ASCII)} and lost `
-        + `${JSON.stringify(TEXT_PROBE_CJK)} — typing it left ${JSON.stringify(row.plainCjk)} in the `
-        + `field. A name, address or comment in a non-Latin script disappears here. The ASCII sample `
-        + `going in unchanged is what points at the script rather than at a length or format rule: `
-        + `look for a filter on the input handler, or a pattern that assumes Latin characters. If the `
-        + `field really only accepts Latin text, say so and reject the entry rather than swallowing `
-        + `it.`,
+      message:
+        `${row.path} "${row.text}" kept ${JSON.stringify(TEXT_PROBE_ASCII)} and lost ` +
+        `${JSON.stringify(TEXT_PROBE_CJK)} — typing it left ${JSON.stringify(row.plainCjk)} in the ` +
+        `field. A name, address or comment in a non-Latin script disappears here. The ASCII sample ` +
+        `going in unchanged is what points at the script rather than at a length or format rule: ` +
+        `look for a filter on the input handler, or a pattern that assumes Latin characters. If the ` +
+        `field really only accepts Latin text, say so and reject the entry rather than swallowing ` +
+        `it.`,
     });
   }
   for (const row of surface.menuProbe ?? []) {
@@ -3792,19 +3955,21 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         kind: "contextmenu-not-prevented",
         severity: "suspect",
         element: `${row.path} "${row.text}"`,
-        message: `${row.path} "${row.text}" ran its contextmenu handler on a real right-click and `
-          + `nothing cancelled the event, so the browser's own menu opens too — the page's menu is at `
-          + `best beside it. Call e.preventDefault() in the handler.`,
+        message:
+          `${row.path} "${row.text}" ran its contextmenu handler on a real right-click and ` +
+          `nothing cancelled the event, so the browser's own menu opens too — the page's menu is at ` +
+          `best beside it. Call e.preventDefault() in the handler.`,
       });
     } else if (row.revealed.length === 0) {
       issues.push({
         kind: "contextmenu-replaces-nothing",
         severity: "warn",
         element: `${row.path} "${row.text}"`,
-        message: `${row.path} "${row.text}" cancelled the right-click and nothing became visible, so `
-          + `a user right-clicking here gets nothing at all — the browser's menu is gone and the `
-          + `page put nothing in its place. If the replacement is drawn on a canvas or positioned `
-          + `offscreen until placed, this cannot see it; if there is no replacement, do not cancel.`,
+        message:
+          `${row.path} "${row.text}" cancelled the right-click and nothing became visible, so ` +
+          `a user right-clicking here gets nothing at all — the browser's menu is gone and the ` +
+          `page put nothing in its place. If the replacement is drawn on a canvas or positioned ` +
+          `offscreen until placed, this cannot see it; if there is no replacement, do not cancel.`,
       });
     }
   }
@@ -3827,12 +3992,13 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       kind: "dblclick-selects-text",
       severity: "suspect",
       element: `${row.path} "${row.text}"`,
-      message: `A double-click on ${row.path} at a point its own handler does not apply to selected `
-        + `${JSON.stringify(row.selected.text)}${anchor ? ` from ${anchor}` : ""}. Double-click is a `
-        + `gesture with a meaning on this page, so the miss is ordinary play — and the handler is `
-        + `silent about it while the browser leaves a range selection behind. Set `
-        + `\`user-select: none\` on ${anchor ?? "the selectable content in this surface"}; the `
-        + `handler is not the thing to change.`,
+      message:
+        `A double-click on ${row.path} at a point its own handler does not apply to selected ` +
+        `${JSON.stringify(row.selected.text)}${anchor ? ` from ${anchor}` : ""}. Double-click is a ` +
+        `gesture with a meaning on this page, so the miss is ordinary play — and the handler is ` +
+        `silent about it while the browser leaves a range selection behind. Set ` +
+        `\`user-select: none\` on ${anchor ?? "the selectable content in this surface"}; the ` +
+        `handler is not the thing to change.`,
     });
   }
   for (const row of surface.touchProbe ?? []) {
@@ -3841,10 +4007,11 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       kind: "touch-handlers-not-invoked",
       severity: "suspect",
       element: `${row.path} "${row.text}"`,
-      message: `${row.path} "${row.text}" has touch handlers that a real tap never invoked: the tap `
-        + `landed on the middle of its own box and none of its listeners ran. Something is between `
-        + `the finger and the listener — an overlay or backdrop on top of it, \`pointer-events\` on an `
-        + `ancestor, or a listener attached to a node no longer in the document.`,
+      message:
+        `${row.path} "${row.text}" has touch handlers that a real tap never invoked: the tap ` +
+        `landed on the middle of its own box and none of its listeners ran. Something is between ` +
+        `the finger and the listener — an overlay or backdrop on top of it, \`pointer-events\` on an ` +
+        `ancestor, or a listener attached to a node no longer in the document.`,
     });
   }
   // Hover triggers are NOT iterated with the handler surface, and that is the point: the common
@@ -3854,29 +4021,35 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
   // correctly all along.
   for (const row of surface.hoverProbe ?? []) {
     if (row.error || row.revealedOnHover.length === 0 || row.revealedOnFocus.length > 0) continue;
-    const what = row.revealedOnHover.slice(0, 3).map((label) => label.split("|")[0]).join(", ");
+    const what = row.revealedOnHover
+      .slice(0, 3)
+      .map((label) => label.split("|")[0])
+      .join(", ");
     // How many elements derive this same path. A toolbar of icon-only buttons with no id or class
     // collapses to ONE path, so the probe visits the first of them and the finding would read as
     // though it were about that one button. Measured on a real editor: 17 tooltip triggers, one
     // path, one finding. Naming the count is the difference between "this button" and "this
     // pattern" for the reader.
     const sharing = surface.elements.filter((e) => e.path === row.path).length;
-    const alsoOn = sharing > 1
-      ? ` ${sharing} elements on this page derive the same path, so this is the pattern rather than `
-        + `one control — the probe drove the first of them.`
-      : "";
+    const alsoOn =
+      sharing > 1
+        ? ` ${sharing} elements on this page derive the same path, so this is the pattern rather than ` +
+          `one control — the probe drove the first of them.`
+        : "";
     issues.push({
       kind: "hover-only-reveal",
       severity: "suspect",
       element: `${row.path} "${row.text}"`,
-      message: `${row.path} "${row.text}" reveals ${what} on hover and nothing on focus, so a `
-        + `keyboard or assistive-tech user never sees it (WCAG 1.4.13 Content on Hover or Focus, `
-        + `2.1.1). `
-        + (row.focusable
-          ? `The trigger is focusable, so add the same reveal to :focus / :focus-visible, or a focus `
-            + `handler beside the hover one.`
-          : `The trigger cannot even be focused — give it tabindex="0" (or make it a button), then `
-            + `reveal on focus as well as on hover.`) + alsoOn,
+      message:
+        `${row.path} "${row.text}" reveals ${what} on hover and nothing on focus, so a ` +
+        `keyboard or assistive-tech user never sees it (WCAG 1.4.13 Content on Hover or Focus, ` +
+        `2.1.1). ` +
+        (row.focusable
+          ? `The trigger is focusable, so add the same reveal to :focus / :focus-visible, or a focus ` +
+            `handler beside the hover one.`
+          : `The trigger cannot even be focused — give it tabindex="0" (or make it a button), then ` +
+            `reveal on focus as well as on hover.`) +
+        alsoOn,
     });
   }
   // Disclose the blind spot instead of printing a clean bill of health.
@@ -3889,11 +4062,11 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
   // React 18/19 attach to the ROOT CONTAINER element, not to document, so
   // the signature is one element carrying a large, generic slab of event
   // types while containing the real controls — not a `globals` entry.
-  const isDelegationRoot = (e: HandlerSurfaceEntry) =>
-    Object.keys(e.types).length >= 10 && e.containsInteractive;
+  const isDelegationRoot = (e: HandlerSurfaceEntry) => Object.keys(e.types).length >= 10 && e.containsInteractive;
   const roots = surface.elements.filter(isDelegationRoot);
-  const ownPointerHandlers = surface.elements
-    .filter((e) => !isDelegationRoot(e) && Object.keys(e.types).some((t) => POINTER_TYPES.has(t))).length;
+  const ownPointerHandlers = surface.elements.filter(
+    (e) => !isDelegationRoot(e) && Object.keys(e.types).some((t) => POINTER_TYPES.has(t)),
+  ).length;
   const delegatedPointerTypes = [
     ...new Set([
       ...Object.keys(surface.globals).filter((t) => POINTER_TYPES.has(t)),
@@ -3915,15 +4088,15 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // for the second case and printed in both, which made a run that exercised nothing read as
     // a run with a few gaps.
     const message = surface.interactionProbe
-      ? `Handler types registered but NOT exercised by this run's probes: ${[...unprobedTypes].sort().join(", ")}`
-        + ` — the probe focuses a control and presses the key its role activates with, so a`
-        + ` \`click\` handler on anything but a native control, and any type outside`
-        + ` focus/blur/keyboard, is untested here. Verify those paths with a 'verify flow' script.`
-      : `${unprobedTypes.size} handler type(s) registered and NONE exercised:`
-        + ` ${[...unprobedTypes].sort().join(", ")} — this gate is an inventory and presses`
-        + ` nothing. A clean result here says the wiring exists, not that it works. Run`
-        + ` 'check interactions --handlers' to focus and activate the controls, add`
-        + ` '--probe-drag' for the drag surfaces, or drive the rest with a 'verify flow' script.`;
+      ? `Handler types registered but NOT exercised by this run's probes: ${[...unprobedTypes].sort().join(", ")}` +
+        ` — the probe focuses a control and presses the key its role activates with, so a` +
+        ` \`click\` handler on anything but a native control, and any type outside` +
+        ` focus/blur/keyboard, is untested here. Verify those paths with a 'verify flow' script.`
+      : `${unprobedTypes.size} handler type(s) registered and NONE exercised:` +
+        ` ${[...unprobedTypes].sort().join(", ")} — this gate is an inventory and presses` +
+        ` nothing. A clean result here says the wiring exists, not that it works. Run` +
+        ` 'check interactions --handlers' to focus and activate the controls, add` +
+        ` '--probe-drag' for the drag surfaces, or drive the rest with a 'verify flow' script.`;
     issues.push({
       kind: "unprobed-handler-types",
       severity: "warn",
@@ -3952,12 +4125,12 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       severity: "warn",
       element: "(page)",
       message:
-        `${controls} visible interactive control(s) and ZERO handler registrations —`
-        + ` no listeners, no on* attributes, no on* properties, nothing on window/document.`
-        + ` Either the controls are inert (check interactions reports that as inert-control),`
-        + ` or they are wired somewhere this gate cannot see, or the page genuinely needs none`
-        + ` (links, a form that posts). This gate cannot tell which; it can only tell you that`
-        + ` a clean result here is not evidence of anything.`,
+        `${controls} visible interactive control(s) and ZERO handler registrations —` +
+        ` no listeners, no on* attributes, no on* properties, nothing on window/document.` +
+        ` Either the controls are inert (check interactions reports that as inert-control),` +
+        ` or they are wired somewhere this gate cannot see, or the page genuinely needs none` +
+        ` (links, a form that posts). This gate cannot tell which; it can only tell you that` +
+        ` a clean result here is not evidence of anything.`,
     });
   }
   return issues;
@@ -4032,8 +4205,12 @@ export function compareHandlerSurfaces(reference: HandlerSurface, attempt: Handl
       });
     }
   }
-  const refGlobalCats = new Set([...Object.keys(reference.globals)].map((k) => categorizeHandlerType(k.split(":")[1] ?? k)));
-  const attGlobalCats = new Set([...Object.keys(attempt.globals)].map((k) => categorizeHandlerType(k.split(":")[1] ?? k)));
+  const refGlobalCats = new Set(
+    [...Object.keys(reference.globals)].map((k) => categorizeHandlerType(k.split(":")[1] ?? k)),
+  );
+  const attGlobalCats = new Set(
+    [...Object.keys(attempt.globals)].map((k) => categorizeHandlerType(k.split(":")[1] ?? k)),
+  );
   const lostGlobal = [...refGlobalCats].filter((c) => !attGlobalCats.has(c));
   if (lostGlobal.length > 0) {
     mismatches.push({
@@ -4066,8 +4243,14 @@ export function formatDragTimeline(timeline: readonly DragTimelineStep[], perLin
   for (const step of timeline) {
     if (step.type === "drag") continue;
     const last = merged[merged.length - 1];
-    if (last && last.type === step.type && last.path === step.path && last.prevented === step.prevented
-      && !last.received && !step.received) {
+    if (
+      last &&
+      last.type === step.type &&
+      last.path === step.path &&
+      last.prevented === step.prevented &&
+      !last.received &&
+      !step.received
+    ) {
       merged[merged.length - 1] = { ...last, count: last.count + step.count };
       continue;
     }
@@ -4075,13 +4258,14 @@ export function formatDragTimeline(timeline: readonly DragTimelineStep[], perLin
   }
   const steps = merged.map((s) => {
     const repeat = s.count > 1 ? ` x${s.count}` : "";
-    const note = s.prevented === true
-      ? " (prevented)"
-      : s.prevented === false
-        ? " (NOT prevented — the drop is refused here)"
-        : s.prevented === null
-          ? " (propagation stopped — cannot tell)"
-          : "";
+    const note =
+      s.prevented === true
+        ? " (prevented)"
+        : s.prevented === false
+          ? " (NOT prevented — the drop is refused here)"
+          : s.prevented === null
+            ? " (propagation stopped — cannot tell)"
+            : "";
     const got = s.received?.length
       ? ` [got ${s.received.map((r) => `${r.type}=${JSON.stringify(r.value)}`).join(", ")}]`
       : s.received
@@ -4106,11 +4290,7 @@ export function formatDragTimeline(timeline: readonly DragTimelineStep[], perLin
  * severity the project chose, so `=info` moves a line out of the suspect count rather than
  * leaving it red.
  */
-export function formatHandlerSurface(
-  surface: HandlerSurface,
-  issues: HandlerIssue[],
-  rules?: RuleView,
-): string {
+export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIssue[], rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit scan handlers${RESET}`);
   lines.push(`${DIM}source: ${surface.source}${RESET}`);
@@ -4138,18 +4318,31 @@ export function formatHandlerSurface(
   // The control count is the denominator. `registrations: 0 across 0 element(s)`
   // read the same for a static document and for a page whose buttons are all dead.
   lines.push(
-    `registrations: ${surface.totalRegistrations} across ${surface.elements.length} element(s)`
-    + `${Object.keys(surface.globals).length > 0 ? ` + globals` : ""}`
-    + `${surface.visibleControls !== undefined ? `, on a page presenting ${surface.visibleControls} control(s)` : ""}`,
+    `registrations: ${surface.totalRegistrations} across ${surface.elements.length} element(s)` +
+      `${Object.keys(surface.globals).length > 0 ? ` + globals` : ""}` +
+      `${surface.visibleControls !== undefined ? `, on a page presenting ${surface.visibleControls} control(s)` : ""}`,
   );
   lines.push("");
   for (const e of surface.elements) {
-    const types = Object.entries(e.types).map(([t, n]) => (n > 1 ? `${t}×${n}` : t)).join(", ");
-    const badge = e.ix !== null ? "" : e.containsInteractive ? ` ${DIM}(delegation container)${RESET}` : e.insideInteractive ? ` ${DIM}(inside a control)${RESET}` : ` ${YELLOW}(no role)${RESET}`;
+    const types = Object.entries(e.types)
+      .map(([t, n]) => (n > 1 ? `${t}×${n}` : t))
+      .join(", ");
+    const badge =
+      e.ix !== null
+        ? ""
+        : e.containsInteractive
+          ? ` ${DIM}(delegation container)${RESET}`
+          : e.insideInteractive
+            ? ` ${DIM}(inside a control)${RESET}`
+            : ` ${YELLOW}(no role)${RESET}`;
     lines.push(`  - ${e.path} "${e.text}": ${types}${badge}`);
   }
   if (Object.keys(surface.globals).length > 0) {
-    lines.push(`  - globals: ${Object.entries(surface.globals).map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(", ")}`);
+    lines.push(
+      `  - globals: ${Object.entries(surface.globals)
+        .map(([k, n]) => (n > 1 ? `${k}×${n}` : k))
+        .join(", ")}`,
+    );
   }
   // Evidence, not a verdict. A 0% row is ambiguous — dead handlers, a gesture that started
   // somewhere ungrabbable, or feedback painted outside this element's box are
@@ -4167,11 +4360,9 @@ export function formatHandlerSurface(
       const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
       const flat = row.feedbackRatio === 0 && row.committedRatio === 0;
       lines.push(
-        `  - ${row.path}: feedback while held ${pct(row.feedbackRatio)}`
-        + `, changed after release ${pct(row.committedRatio)}`
-        + (flat
-          ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
-          : ""),
+        `  - ${row.path}: feedback while held ${pct(row.feedbackRatio)}` +
+          `, changed after release ${pct(row.committedRatio)}` +
+          (flat ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}` : ""),
       );
     }
   }
@@ -4183,12 +4374,13 @@ export function formatHandlerSurface(
         lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
         continue;
       }
-      const kept = (typed: string, got: string) => got.includes(typed)
-        ? `kept ${JSON.stringify(typed)}`
-        : `${YELLOW}${JSON.stringify(typed)} became ${JSON.stringify(got)}${RESET}`;
+      const kept = (typed: string, got: string) =>
+        got.includes(typed)
+          ? `kept ${JSON.stringify(typed)}`
+          : `${YELLOW}${JSON.stringify(typed)} became ${JSON.stringify(got)}${RESET}`;
       lines.push(
-        `  - ${row.path}: ${kept(TEXT_PROBE_ASCII, row.plainAscii)}, ${kept(TEXT_PROBE_CJK, row.plainCjk)}`
-        + `, composed ${JSON.stringify(row.composed)}`,
+        `  - ${row.path}: ${kept(TEXT_PROBE_ASCII, row.plainAscii)}, ${kept(TEXT_PROBE_CJK, row.plainCjk)}` +
+          `, composed ${JSON.stringify(row.composed)}`,
       );
     }
     if (surface.textInputCapped) {
@@ -4203,28 +4395,34 @@ export function formatHandlerSurface(
         lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
         continue;
       }
-      const shown = row.revealed.length > 0
-        ? `revealed ${row.revealed.slice(0, 3).map((l) => l.split("|")[0]).join(", ")}`
-        : "revealed nothing";
+      const shown =
+        row.revealed.length > 0
+          ? `revealed ${row.revealed
+              .slice(0, 3)
+              .map((l) => l.split("|")[0])
+              .join(", ")}`
+          : "revealed nothing";
       lines.push(
-        `  - ${row.path}: ${row.handlerCalls} handler call(s), `
-        + `${row.prevented ? "browser menu cancelled" : `${YELLOW}browser menu NOT cancelled${RESET}`}, ${shown}`,
+        `  - ${row.path}: ${row.handlerCalls} handler call(s), ` +
+          `${row.prevented ? "browser menu cancelled" : `${YELLOW}browser menu NOT cancelled${RESET}`}, ${shown}`,
       );
     }
   }
   if (surface.touchProbe && surface.touchProbe.length > 0) {
     lines.push("");
     lines.push(`${BOLD}Touch (tap and swipe, touch emulation on):${RESET}`);
-    lines.push(`  ${DIM}driven in a second page: touch emulation sets maxTouchPoints to 1 and`
-      + ` "ontouchstart" in window to true, which a page may branch on${RESET}`);
+    lines.push(
+      `  ${DIM}driven in a second page: touch emulation sets maxTouchPoints to 1 and` +
+        ` "ontouchstart" in window to true, which a page may branch on${RESET}`,
+    );
     for (const row of surface.touchProbe) {
       if (row.error) {
         lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
         continue;
       }
       lines.push(
-        `  - ${row.path}: tap invoked ${row.tapCalls} listener(s)`
-        + (row.swipeRatio === undefined ? "" : `, a swipe changed ${(row.swipeRatio * 100).toFixed(2)}% of it`),
+        `  - ${row.path}: tap invoked ${row.tapCalls} listener(s)` +
+          (row.swipeRatio === undefined ? "" : `, a swipe changed ${(row.swipeRatio * 100).toFixed(2)}% of it`),
       );
     }
   }
@@ -4236,18 +4434,24 @@ export function formatHandlerSurface(
         lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
         continue;
       }
-      const label = (list: string[]) => list.length === 0
-        ? "nothing"
-        : list.slice(0, 3).map((l) => l.split("|")[0]).join(", ") + (list.length > 3 ? ` +${list.length - 3}` : "");
+      const label = (list: string[]) =>
+        list.length === 0
+          ? "nothing"
+          : list
+              .slice(0, 3)
+              .map((l) => l.split("|")[0])
+              .join(", ") + (list.length > 3 ? ` +${list.length - 3}` : "");
       lines.push(
-        `  - ${row.path}: hover reveals ${label(row.revealedOnHover)}, focus reveals ${label(row.revealedOnFocus)}`
-        + (row.focusable ? "" : ` ${DIM}(not focusable)${RESET}`),
+        `  - ${row.path}: hover reveals ${label(row.revealedOnHover)}, focus reveals ${label(row.revealedOnFocus)}` +
+          (row.focusable ? "" : ` ${DIM}(not focusable)${RESET}`),
       );
     }
     if (surface.hoverProbeLimits) {
       const { unreadableSheets, capped } = surface.hoverProbeLimits;
       const notes = [
-        unreadableSheets > 0 ? `${unreadableSheets} stylesheet(s) unreadable (another origin) — their :hover triggers were not found` : "",
+        unreadableSheets > 0
+          ? `${unreadableSheets} stylesheet(s) unreadable (another origin) — their :hover triggers were not found`
+          : "",
         capped > 0 ? `${capped} more trigger(s) not visited (cap ${MAX_HOVER_TARGETS})` : "",
       ].filter(Boolean);
       if (notes.length > 0) lines.push(`  ${DIM}${notes.join("; ")}${RESET}`);
@@ -4263,10 +4467,12 @@ export function formatHandlerSurface(
       }
       // Evidence only. Consuming the wheel is what a map or a carousel is supposed to do.
       lines.push(
-        `  - ${row.path}: a 200px wheel moved ${row.scrolledPx}px`
-        + (row.scrolledPx === 0 && row.scrollable
-          ? ` ${YELLOW}(nothing scrolled, though something here could — the handler consumed it)${RESET}`
-          : row.scrollable ? "" : ` ${DIM}(nothing here scrolls anyway)${RESET}`),
+        `  - ${row.path}: a 200px wheel moved ${row.scrolledPx}px` +
+          (row.scrolledPx === 0 && row.scrollable
+            ? ` ${YELLOW}(nothing scrolled, though something here could — the handler consumed it)${RESET}`
+            : row.scrollable
+              ? ""
+              : ` ${DIM}(nothing here scrolls anyway)${RESET}`),
       );
     }
   }
@@ -4287,9 +4493,10 @@ export function formatHandlerSurface(
         lines.push(`  - ${row.path}: ${DIM}not driven — gesture budget spent on earlier sources${RESET}`);
         continue;
       }
-      const tried = row.targetsTried.length > 0
-        ? `, tried ${row.targetsTried.length} target(s)`
-        : ", no drop target declared on the page";
+      const tried =
+        row.targetsTried.length > 0
+          ? `, tried ${row.targetsTried.length} target(s)`
+          : ", no drop target declared on the page";
       // What the target actually received, on the one line where it fits. The source side of
       // this is `dragstart-transfers-nothing`; this is the other end of the same wire, and
       // `getData()` is only readable during `drop` — measured, it returns "" everywhere else.
@@ -4303,11 +4510,12 @@ export function formatHandlerSurface(
       // may be painted outside the zone's own box — a placeholder opening in a sibling list is
       // the common shape — which an element-local screenshot cannot see.
       const hover = row.hoverFeedback?.find((h) => h.target === row.droppedOn);
-      const silent = hover && hover.ratio < 0.02
-        ? ` ${DIM}(no visible change while hovering)${RESET}`
-        : hover
-          ? ` ${DIM}(highlighted ${(hover.ratio * 100).toFixed(0)}% while hovering)${RESET}`
-          : "";
+      const silent =
+        hover && hover.ratio < 0.02
+          ? ` ${DIM}(no visible change while hovering)${RESET}`
+          : hover
+            ? ` ${DIM}(highlighted ${(hover.ratio * 100).toFixed(0)}% while hovering)${RESET}`
+            : "";
       const landed = row.droppedOn
         ? `${GREEN}dropped on ${row.droppedOn}${RESET}${payload}${silent}`
         : row.dragstartFired
@@ -4320,12 +4528,12 @@ export function formatHandlerSurface(
         : !row.cancel.started
           ? ` ${DIM}(no second drag to cancel — the source was gone by then)${RESET}`
           : !row.cancel.cancelled
-          ? ` ${DIM}(Escape did not cancel it)${RESET}`
-          : row.cancel.ratio === undefined
-            ? ` ${DIM}(cancelled; revert not measured)${RESET}`
-            : row.cancel.ratio >= 0.02
-              ? ` ${RED}(Escape cancelled it and ${(row.cancel.ratio * 100).toFixed(0)}% of it stayed changed)${RESET}`
-              : ` ${DIM}(Escape reverted it cleanly)${RESET}`;
+            ? ` ${DIM}(Escape did not cancel it)${RESET}`
+            : row.cancel.ratio === undefined
+              ? ` ${DIM}(cancelled; revert not measured)${RESET}`
+              : row.cancel.ratio >= 0.02
+                ? ` ${RED}(Escape cancelled it and ${(row.cancel.ratio * 100).toFixed(0)}% of it stayed changed)${RESET}`
+                : ` ${DIM}(Escape reverted it cleanly)${RESET}`;
       // Which element the press landed on, when it is not the one holding the handler. A reader
       // seeing `main#table: dragstart fired` for a board wants to know WHICH card moved, and the
       // route below is only printed when the drag failed.
@@ -4338,14 +4546,15 @@ export function formatHandlerSurface(
        * reported by looking at it and a rule should not claim to have proved.
        */
       const legibility = row.dragLegibility;
-      const dimmed = legibility && legibility.dragging < legibility.rest * (1 - DRAG_LEGIBILITY_DROP)
-        ? ` ${legibility.dragging < DRAG_LEGIBILITY_FLOOR ? RED : DIM}(mid-drag contrast `
-          + `${legibility.rest.toFixed(1)}:1 → ${legibility.dragging.toFixed(1)}:1`
-          + `${legibility.opacity !== undefined ? ` at opacity ${legibility.opacity}` : ""})${RESET}`
-        : "";
+      const dimmed =
+        legibility && legibility.dragging < legibility.rest * (1 - DRAG_LEGIBILITY_DROP)
+          ? ` ${legibility.dragging < DRAG_LEGIBILITY_FLOOR ? RED : DIM}(mid-drag contrast ` +
+            `${legibility.rest.toFixed(1)}:1 → ${legibility.dragging.toFixed(1)}:1` +
+            `${legibility.opacity !== undefined ? ` at opacity ${legibility.opacity}` : ""})${RESET}`
+          : "";
       lines.push(
-        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${pressed}${tried} — ${landed}${cancelNote}${dimmed}`
-        + (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
+        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${pressed}${tried} — ${landed}${cancelNote}${dimmed}` +
+          (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
       );
       // The route, printed only when the drag did not complete. That is when the question is
       // "where did it go instead", and printing it for a working source would bury the one

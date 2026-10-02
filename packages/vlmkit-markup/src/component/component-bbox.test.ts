@@ -16,13 +16,19 @@ function synth(
 ): Uint8Array {
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = bg[0]; data[i + 1] = bg[1]; data[i + 2] = bg[2]; data[i + 3] = 255;
+    data[i] = bg[0];
+    data[i + 1] = bg[1];
+    data[i + 2] = bg[2];
+    data[i + 3] = 255;
   }
   for (const r of rects) {
     for (let y = r.top; y < r.top + r.h; y++) {
       for (let x = r.left; x < r.left + r.w; x++) {
         const i = (y * width + x) * 4;
-        data[i] = r.color[0]; data[i + 1] = r.color[1]; data[i + 2] = r.color[2]; data[i + 3] = 255;
+        data[i] = r.color[0];
+        data[i + 1] = r.color[1];
+        data[i + 2] = r.color[2];
+        data[i + 3] = 255;
       }
     }
   }
@@ -31,9 +37,7 @@ function synth(
 
 describe("extractComponentsFromRgba", () => {
   it("finds a single rectangle on a flat background", () => {
-    const data = synth(200, 200, [240, 240, 240], [
-      { left: 50, top: 60, w: 80, h: 40, color: [0, 0, 0] },
-    ]);
+    const data = synth(200, 200, [240, 240, 240], [{ left: 50, top: 60, w: 80, h: 40, color: [0, 0, 0] }]);
     const comps = extractComponentsFromRgba(data, 200, 200);
     assert.equal(comps.length, 1);
     assert.equal(comps[0]!.left, 50);
@@ -44,11 +48,16 @@ describe("extractComponentsFromRgba", () => {
   });
 
   it("sorts multiple components by area (largest first)", () => {
-    const data = synth(300, 300, [255, 255, 255], [
-      { left: 10, top: 10, w: 50, h: 50, color: [50, 50, 50] },        // small (2500)
-      { left: 100, top: 100, w: 150, h: 100, color: [200, 0, 0] },     // big (15000)
-      { left: 80, top: 240, w: 30, h: 30, color: [0, 200, 0] },        // tiny (900)
-    ]);
+    const data = synth(
+      300,
+      300,
+      [255, 255, 255],
+      [
+        { left: 10, top: 10, w: 50, h: 50, color: [50, 50, 50] }, // small (2500)
+        { left: 100, top: 100, w: 150, h: 100, color: [200, 0, 0] }, // big (15000)
+        { left: 80, top: 240, w: 30, h: 30, color: [0, 200, 0] }, // tiny (900)
+      ],
+    );
     const comps = extractComponentsFromRgba(data, 300, 300, { minArea: 500 });
     assert.equal(comps.length, 3);
     assert.equal(comps[0]!.width, 150); // biggest first
@@ -57,20 +66,30 @@ describe("extractComponentsFromRgba", () => {
   });
 
   it("filters components below minArea", () => {
-    const data = synth(100, 100, [255, 255, 255], [
-      { left: 10, top: 10, w: 20, h: 20, color: [0, 0, 0] },           // 400
-      { left: 40, top: 40, w: 5, h: 5, color: [0, 0, 0] },             // 25
-    ]);
+    const data = synth(
+      100,
+      100,
+      [255, 255, 255],
+      [
+        { left: 10, top: 10, w: 20, h: 20, color: [0, 0, 0] }, // 400
+        { left: 40, top: 40, w: 5, h: 5, color: [0, 0, 0] }, // 25
+      ],
+    );
     const comps = extractComponentsFromRgba(data, 100, 100, { minArea: 100 });
     assert.equal(comps.length, 1);
     assert.equal(comps[0]!.area, 400);
   });
 
   it("merges adjacent pixels (4-connectivity)", () => {
-    const data = synth(50, 50, [255, 255, 255], [
-      { left: 5, top: 5, w: 10, h: 10, color: [0, 0, 0] },
-      { left: 15, top: 5, w: 10, h: 10, color: [0, 0, 0] }, // touches the first
-    ]);
+    const data = synth(
+      50,
+      50,
+      [255, 255, 255],
+      [
+        { left: 5, top: 5, w: 10, h: 10, color: [0, 0, 0] },
+        { left: 15, top: 5, w: 10, h: 10, color: [0, 0, 0] }, // touches the first
+      ],
+    );
     const comps = extractComponentsFromRgba(data, 50, 50, { minArea: 50 });
     assert.equal(comps.length, 1);
     assert.equal(comps[0]!.width, 20);
@@ -78,9 +97,7 @@ describe("extractComponentsFromRgba", () => {
 
   it("detects backgrounds from a non-white image", () => {
     // Dark slate background; one bright rectangle.
-    const data = synth(100, 100, [15, 23, 42], [
-      { left: 20, top: 20, w: 60, h: 40, color: [255, 255, 255] },
-    ]);
+    const data = synth(100, 100, [15, 23, 42], [{ left: 20, top: 20, w: 60, h: 40, color: [255, 255, 255] }]);
     const comps = extractComponentsFromRgba(data, 100, 100);
     assert.equal(comps.length, 1);
     assert.equal(comps[0]!.width, 60);
@@ -91,9 +108,7 @@ describe("extractComponentsFromRgba", () => {
   });
 
   it("sampled fillColor approximates the rectangle's color", () => {
-    const data = synth(80, 80, [240, 240, 240], [
-      { left: 10, top: 10, w: 60, h: 60, color: [200, 80, 80] },
-    ]);
+    const data = synth(80, 80, [240, 240, 240], [{ left: 10, top: 10, w: 60, h: 60, color: [200, 80, 80] }]);
     const comps = extractComponentsFromRgba(data, 80, 80, { minArea: 100 });
     assert.match(comps[0]!.fillColor, /^rgb\(/);
     assert.match(comps[0]!.fillColor, /200/);
@@ -141,7 +156,10 @@ describe("adaptive background tolerance", () => {
   const fill = (w: number, h: number, rgb: [number, number, number]) => {
     const data = new Uint8Array(w * h * 4);
     for (let i = 0; i < w * h; i++) {
-      data[i * 4] = rgb[0]; data[i * 4 + 1] = rgb[1]; data[i * 4 + 2] = rgb[2]; data[i * 4 + 3] = 255;
+      data[i * 4] = rgb[0];
+      data[i * 4 + 1] = rgb[1];
+      data[i * 4 + 2] = rgb[2];
+      data[i * 4 + 3] = 255;
     }
     return data;
   };
@@ -155,18 +173,23 @@ describe("adaptive background tolerance", () => {
     for (let i = 0; i < 80 * 80; i++) {
       const d = (i % 5) - 2 + ((i % 3) - 1); // small, varied deviations
       const v = 255 - Math.abs(d) * 2;
-      noisy[i * 4] = v; noisy[i * 4 + 1] = v; noisy[i * 4 + 2] = v;
+      noisy[i * 4] = v;
+      noisy[i * 4 + 1] = v;
+      noisy[i * 4 + 2] = v;
     }
     assert.ok(adaptiveBgTolerance(noisy, 80, 80, [255, 255, 255]) > 4);
   });
 
   it("extracts a pale #f4f4f4 card on white that the fixed tolerance of 12 missed", () => {
-    const w = 120, h = 120;
+    const w = 120,
+      h = 120;
     const data = fill(w, h, [255, 255, 255]);
     for (let y = 10; y < 60; y++) {
       for (let x = 10; x < 90; x++) {
         const i = (y * w + x) * 4;
-        data[i] = 244; data[i + 1] = 244; data[i + 2] = 244;
+        data[i] = 244;
+        data[i + 1] = 244;
+        data[i + 2] = 244;
       }
     }
     const found = extractComponentsFromRgba(data, w, h);

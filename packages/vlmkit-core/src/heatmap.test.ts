@@ -2,11 +2,7 @@ import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { detectWhiteout, detectEmptyContent, parseIgnoreRegionSpec } from "./heatmap.ts";
 
-function makePngData(
-  width: number,
-  height: number,
-  fill: [number, number, number, number]
-) {
+function makePngData(width: number, height: number, fill: [number, number, number, number]) {
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     data[i * 4] = fill[0];

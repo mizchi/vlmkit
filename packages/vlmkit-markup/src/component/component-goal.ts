@@ -1,8 +1,17 @@
 import { computeComponentGoalStatus } from "../markup-core-runtime.ts";
 
-export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas", "expressive-menu"] as const;
+export const COMPONENT_GOALS = [
+  "app",
+  "layout",
+  "pixel",
+  "draft",
+  "app-shell",
+  "landing",
+  "canvas",
+  "expressive-menu",
+] as const;
 
-export type ComponentGoal = typeof COMPONENT_GOALS[number];
+export type ComponentGoal = (typeof COMPONENT_GOALS)[number];
 export type ComponentGoalStatus = "pass" | "review" | "fail";
 export type ComponentGoalMetric = "landscape" | "pixel";
 
@@ -132,8 +141,8 @@ const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
     label: "Landing page",
     primaryMetric: "landscape",
     description: "Landing-page convergence with first-viewport hero, CTA, next-section, and media-slot gates.",
-    pass: { landscape: 0.03, pixel: 0.30 },
-    review: { landscape: 0.05, pixel: 0.40 },
+    pass: { landscape: 0.03, pixel: 0.3 },
+    review: { landscape: 0.05, pixel: 0.4 },
   },
   canvas: {
     goal: "canvas",
@@ -147,7 +156,8 @@ const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
     goal: "expressive-menu",
     label: "Expressive menu",
     primaryMetric: "landscape",
-    description: "Poster-like menu convergence with semantic menu text, selected state, composition markers, and contrast gates.",
+    description:
+      "Poster-like menu convergence with semantic menu text, selected state, composition markers, and contrast gates.",
     pass: { landscape: 0.05 },
     review: { landscape: 0.08 },
   },
@@ -158,7 +168,7 @@ export function listComponentGoals(): ComponentGoal[] {
 }
 
 export function normalizeComponentGoal(goal: string | undefined): ComponentGoal {
-  return COMPONENT_GOALS.includes(goal as ComponentGoal) ? goal as ComponentGoal : "app";
+  return COMPONENT_GOALS.includes(goal as ComponentGoal) ? (goal as ComponentGoal) : "app";
 }
 
 export function getComponentGoalProfile(goal: string | undefined): ComponentGoalProfile {
@@ -271,23 +281,21 @@ function summarizeLanding(landing: ComponentLandingEvidence | undefined): string
 
 function summarizeCanvas(canvas: ComponentCanvasEvidence | undefined): string {
   if (!canvas || canvas.canvasCount === 0) return "no canvas evidence";
-  const input = canvas.inputResponsive === true
-    ? "input ok"
-    : canvas.inputResponsive === false
-      ? "input missing"
-      : "input unknown";
+  const input =
+    canvas.inputResponsive === true ? "input ok" : canvas.inputResponsive === false ? "input missing" : "input unknown";
   const stateHook = canvas.stateHook
     ? canvas.stateHookPresent === false
       ? `state hook missing: ${canvas.stateHook}`
       : `state hook ok: ${canvas.stateHook}`
     : undefined;
-  const stateFields = canvas.missingStateFields && canvas.missingStateFields.length > 0
-    ? `state fields missing: ${canvas.missingStateFields.join("/")}`
-    : canvas.requiredStateFields && canvas.requiredStateFields.length > 0
-      ? `state fields ok: ${canvas.requiredStateFields.join("/")}`
-      : canvas.observedStateFields && canvas.observedStateFields.length > 0
-        ? `state fields observed: ${canvas.observedStateFields.join("/")}`
-        : undefined;
+  const stateFields =
+    canvas.missingStateFields && canvas.missingStateFields.length > 0
+      ? `state fields missing: ${canvas.missingStateFields.join("/")}`
+      : canvas.requiredStateFields && canvas.requiredStateFields.length > 0
+        ? `state fields ok: ${canvas.requiredStateFields.join("/")}`
+        : canvas.observedStateFields && canvas.observedStateFields.length > 0
+          ? `state fields observed: ${canvas.observedStateFields.join("/")}`
+          : undefined;
   const parts = [
     canvas.nonblank ? "nonblank ok" : "blank",
     canvas.frameDelta ? "frame delta ok" : "frame delta missing",
@@ -314,15 +322,14 @@ function summarizeExpressiveMenu(expressiveMenu: ComponentExpressiveMenuEvidence
 }
 
 function contrastSummary(expressiveMenu: ComponentExpressiveMenuEvidence): string {
-  const min = expressiveMenu.minMenuContrastRatio === null
-    ? "contrast min unknown"
-    : `contrast min ${expressiveMenu.minMenuContrastRatio.toFixed(2)}`;
-  const low = expressiveMenu.lowContrastItemCount > 0
-    ? `${expressiveMenu.lowContrastItemCount} low contrast`
-    : "0 low contrast";
-  const status = expressiveMenu.highContrast && expressiveMenu.lowContrastItemCount === 0
-    ? "contrast ok"
-    : "contrast missing";
+  const min =
+    expressiveMenu.minMenuContrastRatio === null
+      ? "contrast min unknown"
+      : `contrast min ${expressiveMenu.minMenuContrastRatio.toFixed(2)}`;
+  const low =
+    expressiveMenu.lowContrastItemCount > 0 ? `${expressiveMenu.lowContrastItemCount} low contrast` : "0 low contrast";
+  const status =
+    expressiveMenu.highContrast && expressiveMenu.lowContrastItemCount === 0 ? "contrast ok" : "contrast missing";
   return `${status}, ${min}, ${low}`;
 }
 

@@ -30,15 +30,27 @@ export async function loadExpectation(path: string): Promise<VrtExpectation> {
  */
 export function matchA11yExpectation(
   pageExp: PageExpectation,
-  a11yDiff: A11yDiff | undefined
-): { matched: boolean; reasoning: string; matchedChanges: string[]; unmatchedExpected: string[]; unexpectedChanges: string[] } {
+  a11yDiff: A11yDiff | undefined,
+): {
+  matched: boolean;
+  reasoning: string;
+  matchedChanges: string[];
+  unmatchedExpected: string[];
+  unexpectedChanges: string[];
+} {
   // Infer a11y field from NL expect (when structured fields are omitted)
   const a11yMode = pageExp.a11y ?? inferA11yMode(pageExp.expect);
 
   // Expecting no-change
   if (a11yMode === "no-change") {
     if (!a11yDiff || a11yDiff.changes.length === 0) {
-      return { matched: true, reasoning: "No a11y changes as expected", matchedChanges: [], unmatchedExpected: [], unexpectedChanges: [] };
+      return {
+        matched: true,
+        reasoning: "No a11y changes as expected",
+        matchedChanges: [],
+        unmatchedExpected: [],
+        unexpectedChanges: [],
+      };
     }
     return {
       matched: false,
@@ -51,7 +63,13 @@ export function matchA11yExpectation(
 
   // any = don't care
   if (a11yMode === "any") {
-    return { matched: true, reasoning: "A11y changes accepted (any)", matchedChanges: [], unmatchedExpected: [], unexpectedChanges: [] };
+    return {
+      matched: true,
+      reasoning: "A11y changes accepted (any)",
+      matchedChanges: [],
+      unmatchedExpected: [],
+      unexpectedChanges: [],
+    };
   }
 
   // changed or regression-expected
@@ -91,13 +109,9 @@ export function matchA11yExpectation(
     }
   }
 
-  const unmatchedExpDescs = expected
-    .filter((_, i) => !matchedExpIdx.has(i))
-    .map((e) => e.description);
+  const unmatchedExpDescs = expected.filter((_, i) => !matchedExpIdx.has(i)).map((e) => e.description);
 
-  const unexpectedChanges = actual
-    .filter((_, i) => !matchedActualIdx.has(i))
-    .map(describe);
+  const unexpectedChanges = actual.filter((_, i) => !matchedActualIdx.has(i)).map(describe);
 
   const allExpectedMatched = matchedChanges.length === expected.length;
   const noUnexpected = unexpectedChanges.length === 0;
@@ -125,9 +139,10 @@ export function matchA11yExpectation(
   // changed: OK if all changes match expected and no unexpected changes
   return {
     matched: allExpectedMatched && noUnexpected,
-    reasoning: allExpectedMatched && noUnexpected
-      ? `All ${matchedChanges.length} a11y change(s) match expectations`
-      : `${matchedChanges.length}/${expected.length} expected matched, ${unexpectedChanges.length} unexpected`,
+    reasoning:
+      allExpectedMatched && noUnexpected
+        ? `All ${matchedChanges.length} a11y change(s) match expectations`
+        : `${matchedChanges.length}/${expected.length} expected matched, ${unexpectedChanges.length} unexpected`,
     matchedChanges,
     unmatchedExpected: unmatchedExpDescs,
     unexpectedChanges,
@@ -214,7 +229,7 @@ export function crossValidateWithExpectation(
   pageExp: PageExpectation | undefined,
   visualDiff: VisualSemanticDiff | undefined,
   a11yDiff: A11yDiff | undefined,
-  _intent: ChangeIntent
+  _intent: ChangeIntent,
 ): CrossValidationResult {
   if (!pageExp) {
     // No expectation defined -- fall back to normal cross-validation
@@ -252,9 +267,7 @@ export function crossValidateWithExpectation(
   const reasoning = [
     a11yResult.reasoning,
     visualReasoning,
-    ...(a11yResult.unexpectedChanges.length > 0
-      ? [`Unexpected a11y: ${a11yResult.unexpectedChanges.join("; ")}`]
-      : []),
+    ...(a11yResult.unexpectedChanges.length > 0 ? [`Unexpected a11y: ${a11yResult.unexpectedChanges.join("; ")}`] : []),
   ].join(". ");
 
   return {
@@ -281,7 +294,7 @@ export function scoreLoop(
     tokenUsage: number;
     startTime: number;
     endTime: number;
-  }
+  },
 ): LoopScore {
   const details: ScoreDetail[] = [];
 
@@ -325,13 +338,27 @@ function scoreUsability(ctx: UnifiedAgentContext, details: ScoreDetail[]): numbe
   const cvRatio = cvWithReasoning.length / Math.max(ctx.crossValidations.length, 1);
   score = Math.round(score * (0.5 + cvRatio * 0.5));
 
-  details.push({ category: "usability", score, maxScore: 100, reasoning: `${escalated.length} escalated, ${cvRatio.toFixed(0)}% with detailed reasoning` });
+  details.push({
+    category: "usability",
+    score,
+    maxScore: 100,
+    reasoning: `${escalated.length} escalated, ${cvRatio.toFixed(0)}% with detailed reasoning`,
+  });
   return Math.max(0, Math.min(100, score));
 }
 
-function scorePracticality(ctx: UnifiedAgentContext, expectations: VrtExpectation | undefined, details: ScoreDetail[]): number {
+function scorePracticality(
+  ctx: UnifiedAgentContext,
+  expectations: VrtExpectation | undefined,
+  details: ScoreDetail[],
+): number {
   if (!expectations) {
-    details.push({ category: "practicality", score: 50, maxScore: 100, reasoning: "No expectations defined — baseline scoring" });
+    details.push({
+      category: "practicality",
+      score: 50,
+      maxScore: 100,
+      reasoning: "No expectations defined — baseline scoring",
+    });
     return 50;
   }
 
@@ -349,7 +376,12 @@ function scorePracticality(ctx: UnifiedAgentContext, expectations: VrtExpectatio
   }
 
   const score = total > 0 ? Math.round((matched / total) * 100) : 50;
-  details.push({ category: "practicality", score, maxScore: 100, reasoning: `${matched}/${total} page expectations matched` });
+  details.push({
+    category: "practicality",
+    score,
+    maxScore: 100,
+    reasoning: `${matched}/${total} page expectations matched`,
+  });
   return score;
 }
 

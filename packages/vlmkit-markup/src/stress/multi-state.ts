@@ -103,9 +103,10 @@ export async function applyForcedPseudoState(
         const el = capped[i] as HTMLElement;
         el.setAttribute("data-vlmkit-state-marker", String(i));
         const tag = el.tagName.toLowerCase();
-        const cls = el.className && typeof el.className === "string"
-          ? `.${el.className.trim().split(/\s+/).slice(0, 3).join(".")}`
-          : "";
+        const cls =
+          el.className && typeof el.className === "string"
+            ? `.${el.className.trim().split(/\s+/).slice(0, 3).join(".")}`
+            : "";
         fingerprints.push(`${tag}${cls}`);
         const r = el.getBoundingClientRect();
         bboxes.push({ x: r.x, y: r.y, width: r.width, height: r.height });
@@ -171,7 +172,8 @@ export async function applyForcedPseudoState(
  */
 export async function clearStateMarkers(page: Page): Promise<void> {
   await page.evaluate(() => {
-    document.querySelectorAll("[data-vlmkit-state-marker]")
+    document
+      .querySelectorAll("[data-vlmkit-state-marker]")
       .forEach((el) => el.removeAttribute("data-vlmkit-state-marker"));
   });
 }

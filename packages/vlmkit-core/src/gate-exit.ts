@@ -43,8 +43,7 @@ export function gateExitCode(hasSuspect: boolean, flags: GateExitFlags): 0 | 1 {
 }
 
 /** Shared help text so every gate documents the contract identically. */
-export const GATE_EXIT_HELP =
-  "  --advisory              Print findings but exit 0 (default: a suspect exits 1)";
+export const GATE_EXIT_HELP = "  --advisory              Print findings but exit 0 (default: a suspect exits 1)";
 
 /**
  * Apply the contract. Sets `process.exitCode` rather than calling

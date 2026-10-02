@@ -100,10 +100,7 @@ export type ScrollScanIssueKind =
    * gate reported `status: ok` for the login page while naming the requested
    * URL as its source. Reported as a suspect issue so the pass cannot be silent.
    */
-  | "redirected"
-  | "page-overflow-x"
-  | "clipped-content"
-  | "nested-scroll";
+  "redirected" | "page-overflow-x" | "clipped-content" | "nested-scroll";
 
 export interface ScrollScanIssue {
   kind: ScrollScanIssueKind;
@@ -157,7 +154,6 @@ export interface ScrollScanOptions extends PageLoadOptions {
   maxFindings?: number;
 }
 
-
 function scrollable(overflow: string): boolean {
   return overflow === "auto" || overflow === "scroll";
 }
@@ -167,7 +163,10 @@ function clipping(overflow: string): boolean {
 }
 
 function slug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export function analyzeScrollSamples(
@@ -200,8 +199,11 @@ export function analyzeScrollSamples(
       });
       continue;
     }
-    if ((scrollable(el.overflowX) || scrollable(el.overflowY))
-      && el.overflowAmountX < minOverflow && el.overflowAmountY < minOverflow) {
+    if (
+      (scrollable(el.overflowX) || scrollable(el.overflowY)) &&
+      el.overflowAmountX < minOverflow &&
+      el.overflowAmountY < minOverflow
+    ) {
       // A <textarea> is overflow: auto by the UA stylesheet — nobody declared a scrollport there.
       if (el.tagName.toLowerCase() !== "textarea") {
         deadScrollports.push({ selector: el.selector, overflowX: el.overflowX, overflowY: el.overflowY });
@@ -235,17 +237,24 @@ export function analyzeScrollSamples(
       .slice(0, 3)
       .map((o) => `${o.selector} (right edge ${o.right}px)`)
       .join(", ");
-    const detail = causes.length > 0
-      // Where the element ENDS, and both terms that put it there. The message used to
-      // read "(130px wide; constraining it removes 46px of the overflow)", which is
-      // arithmetically true and diagnostically wrong: a dogfood agent noted "The cause
-      // was `left: 660px`, not the width. Shrinking the button as instructed would have
-      // 'fixed' integrity and left the tab order broken." Naming only the width
-      // prescribes the one change that is usually not the fix.
-      ? ` — caused by: ${causes.map((o) =>
-        `${o.selector} (extends to x=${o.right}px: starts at ${Math.round(o.right - o.width)}px, ${o.width}px wide;`
-        + ` shrinking or moving it removes ${o.relieves}px of the overflow)`).join(", ")}`
-      : (widest ? ` — sticking out: ${widest}` : "");
+    const detail =
+      causes.length > 0
+        ? // Where the element ENDS, and both terms that put it there. The message used to
+          // read "(130px wide; constraining it removes 46px of the overflow)", which is
+          // arithmetically true and diagnostically wrong: a dogfood agent noted "The cause
+          // was `left: 660px`, not the width. Shrinking the button as instructed would have
+          // 'fixed' integrity and left the tab order broken." Naming only the width
+          // prescribes the one change that is usually not the fix.
+          ` — caused by: ${causes
+            .map(
+              (o) =>
+                `${o.selector} (extends to x=${o.right}px: starts at ${Math.round(o.right - o.width)}px, ${o.width}px wide;` +
+                ` shrinking or moving it removes ${o.relieves}px of the overflow)`,
+            )
+            .join(", ")}`
+        : widest
+          ? ` — sticking out: ${widest}`
+          : "";
     // Say how many other candidates were probed and cleared. The measurement already
     // neutralizes up to 40 elements past the edge, but the report named only the
     // survivors, so a reader could not tell an exhaustive probe from a first-match
@@ -254,29 +263,31 @@ export function analyzeScrollSamples(
     // whether integrity had *analysed and cleared* the cards row or simply attributed
     // all overflow to the single worst offender and stopped. I had to reason about
     // flex-shrink myself to trust the fix."
-    const cleared = input.page.overflowOffenders.filter((o) =>
-      o.relieves !== undefined && !causes.some((c) => c.selector === o.selector));
+    const cleared = input.page.overflowOffenders.filter(
+      (o) => o.relieves !== undefined && !causes.some((c) => c.selector === o.selector),
+    );
     // The best single fix, not the sum: `relieves` is measured by neutralizing one
     // element at a time, so two elements can each report the same overflow and adding
     // them up would claim more than exists.
     const accounted = Math.max(0, ...causes.map((o) => o.relieves ?? 0));
     const unaccounted = horizontalOverflow - accounted;
-    const clearedNote = causes.length === 0
-      ? ""
-      // A shortfall is the more useful half of the answer, and this is how it showed
-      // up: on the scenario at 375px the gate reports 439px of overflow and the named
-      // cause relieves 77px. The other elements past the edge are rigid siblings in one
-      // row, and since each is probed alone, neutralizing either leaves the other
-      // overflowing — so both measure 0 and no single element can be blamed. Stating
-      // the remainder is what stops the named cause reading as the whole story.
-      : (unaccounted >= minOverflow
-        ? `; fixing that leaves ${unaccounted}px, which no single element relieves`
-          + ` — look for siblings that are each rigid (a fixed-width row, a min-width grid track).`
-          + ` ${cleared.length} other element(s) past the edge were probed individually`
-        : cleared.length > 0
-          ? `; ${cleared.length} other element(s) past the edge were probed and each accounts for`
-            + ` ${Math.max(0, ...cleared.map((o) => o.relieves ?? 0))}px or less`
-          : "");
+    const clearedNote =
+      causes.length === 0
+        ? ""
+        : // A shortfall is the more useful half of the answer, and this is how it showed
+          // up: on the scenario at 375px the gate reports 439px of overflow and the named
+          // cause relieves 77px. The other elements past the edge are rigid siblings in one
+          // row, and since each is probed alone, neutralizing either leaves the other
+          // overflowing — so both measure 0 and no single element can be blamed. Stating
+          // the remainder is what stops the named cause reading as the whole story.
+          unaccounted >= minOverflow
+          ? `; fixing that leaves ${unaccounted}px, which no single element relieves` +
+            ` — look for siblings that are each rigid (a fixed-width row, a min-width grid track).` +
+            ` ${cleared.length} other element(s) past the edge were probed individually`
+          : cleared.length > 0
+            ? `; ${cleared.length} other element(s) past the edge were probed and each accounts for` +
+              ` ${Math.max(0, ...cleared.map((o) => o.relieves ?? 0))}px or less`
+            : "";
     issues.push({
       kind: "page-overflow-x",
       severity: "suspect",
@@ -298,8 +309,11 @@ export function analyzeScrollSamples(
       // overflow (rigid siblings in one row), there is nothing honest to put here and
       // the `unaccounted` note already says so.
       ...(causes[0]?.selector ? { selector: causes[0].selector } : {}),
-      message: `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
-        detail + clearedNote + ".",
+      message:
+        `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
+        detail +
+        clearedNote +
+        ".",
     });
   }
   for (const clip of clipped.slice(0, maxFindings)) {
@@ -327,9 +341,12 @@ export function analyzeScrollSamples(
     const n = (idCounts.get(base) ?? 0) + 1;
     idCounts.set(base, n);
     const id = n === 1 ? base : `${base}-${n}`;
-    const minOverflowPx = c.axis === "x"
-      ? c.overflowAmountX
-      : c.axis === "both" ? Math.max(c.overflowAmountX, c.overflowAmountY) : c.overflowAmountY;
+    const minOverflowPx =
+      c.axis === "x"
+        ? c.overflowAmountX
+        : c.axis === "both"
+          ? Math.max(c.overflowAmountX, c.overflowAmountY)
+          : c.overflowAmountY;
     return {
       id,
       selector: c.selector,
@@ -478,16 +495,13 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
     const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
-    const collected = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
+    const collected = (await page.evaluate(COLLECT_SCROLL_SCRIPT)) as Omit<ScrollScanInput, "source">;
     await page.close();
-    const report = analyzeScrollSamples(
-      { source: options.source, ...collected },
-      options,
-    );
+    const report = analyzeScrollSamples({ source: options.source, ...collected }, options);
     // Pushed as a suspect ISSUE, not just printed: the status line is derived
     // from the issue list, so a note alone would have left `status: ok`.
     if (redirectNote) {
-      report.issues.unshift({ kind: "redirected", severity: "suspect",  message: redirectNote });
+      report.issues.unshift({ kind: "redirected", severity: "suspect", message: redirectNote });
     }
     return report;
   });
@@ -500,19 +514,32 @@ export function formatScrollScanReport(report: ScrollScanReport, rules?: RuleVie
   lines.push(`${DIM}source: ${report.source} (${report.page.viewportWidth}x${report.page.viewportHeight})${RESET}`);
   lines.push("");
   lines.push(`status: ${status}`);
-  lines.push(`page: ${report.page.scrollWidth}x${report.page.scrollHeight} — horizontal overflow ${report.page.horizontalOverflow}px, vertical scroll ${report.page.verticalScroll}px`);
-  lines.push(`scroll containers: ${report.containers.length} (dead scrollports ${report.deadScrollports.length}, clipped ${report.clipped.length})`);
+  lines.push(
+    `page: ${report.page.scrollWidth}x${report.page.scrollHeight} — horizontal overflow ${report.page.horizontalOverflow}px, vertical scroll ${report.page.verticalScroll}px`,
+  );
+  lines.push(
+    `scroll containers: ${report.containers.length} (dead scrollports ${report.deadScrollports.length}, clipped ${report.clipped.length})`,
+  );
   if (report.visuallyHidden > 0) {
-    lines.push(`${DIM}  ${report.visuallyHidden} visually-hidden (sr-only) box(es) not reported as clipped — 2px or less on both axes, the shape check integrity exempts${RESET}`);
+    lines.push(
+      `${DIM}  ${report.visuallyHidden} visually-hidden (sr-only) box(es) not reported as clipped — 2px or less on both axes, the shape check integrity exempts${RESET}`,
+    );
   }
   if (report.containers.length > 0) {
     lines.push("");
     lines.push("Scroll containers:");
     for (const c of report.containers) {
-      const amount = c.axis === "x" ? `${c.overflowAmountX}px` : c.axis === "y" ? `${c.overflowAmountY}px` : `${c.overflowAmountX}px/${c.overflowAmountY}px`;
+      const amount =
+        c.axis === "x"
+          ? `${c.overflowAmountX}px`
+          : c.axis === "y"
+            ? `${c.overflowAmountY}px`
+            : `${c.overflowAmountX}px/${c.overflowAmountY}px`;
       const attr = c.scrollportAttr !== undefined ? ` [data-scrollport="${c.scrollportAttr}"]` : "";
       const nested = c.nestedIn ? ` (nested in ${c.nestedIn})` : "";
-      lines.push(`  - ${c.selector}: axis=${c.axis} overflow=${amount} box=(${c.bbox.x},${c.bbox.y}) ${c.bbox.width}x${c.bbox.height}${attr}${nested}`);
+      lines.push(
+        `  - ${c.selector}: axis=${c.axis} overflow=${amount} box=(${c.bbox.x},${c.bbox.y}) ${c.bbox.width}x${c.bbox.height}${attr}${nested}`,
+      );
     }
   }
   if (report.deadScrollports.length > 0) {
@@ -543,7 +570,9 @@ export function formatScrollScanReport(report: ScrollScanReport, rules?: RuleVie
   }
   if (report.expectedScrollports.length > 0) {
     lines.push("");
-    lines.push(`Contract hint: --json emits ${report.expectedScrollports.length} expectedScrollports entr${report.expectedScrollports.length === 1 ? "y" : "ies"} ready for a UI Contract.`);
+    lines.push(
+      `Contract hint: --json emits ${report.expectedScrollports.length} expectedScrollports entr${report.expectedScrollports.length === 1 ? "y" : "ies"} ready for a UI Contract.`,
+    );
   }
   return lines.join("\n");
 }

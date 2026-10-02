@@ -102,9 +102,7 @@ export interface CompositionOptions extends CompositionJudgeOptions {
 export async function runCompositionCheck(options: CompositionOptions): Promise<CompositionReport> {
   return await withBrowser(async (browser) => {
     const width = options.viewport ?? 1280;
-    const page = await browser.newPage(
-      withAuthState({ viewport: { width, height: 900 } }, options.storageState),
-    );
+    const page = await browser.newPage(withAuthState({ viewport: { width, height: 900 } }, options.storageState));
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
@@ -118,7 +116,7 @@ export async function runCompositionCheck(options: CompositionOptions): Promise<
     // metrics as the composition.
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
-    const input = await page.evaluate(COLLECT_COMPOSITION) as CompositionInput;
+    const input = (await page.evaluate(COLLECT_COMPOSITION)) as CompositionInput;
     return judgeCollectedComposition(input, redirect, options);
   });
 }
@@ -195,14 +193,14 @@ export function formatCompositionReport(report: CompositionReport, rules?: RuleV
   // Coverage on the verdict line, the way `check design` prints it: a quiet
   // verdict drawn from two labels is worth knowing about before it is trusted.
   lines.push(
-    `${DIM}  measured: ${report.labels.length} label(s), ${report.hierarchy.levels.length} heading level(s),`
-    + ` ${report.rails.blocks} wide block(s) on ${report.rails.lefts} left / ${report.rails.rights} right rail(s)`
-    + ` — from ${report.boxes} visible box(es)${RESET}`,
+    `${DIM}  measured: ${report.labels.length} label(s), ${report.hierarchy.levels.length} heading level(s),` +
+      ` ${report.rails.blocks} wide block(s) on ${report.rails.lefts} left / ${report.rails.rights} right rail(s)` +
+      ` — from ${report.boxes} visible box(es)${RESET}`,
   );
   if (report.labelsUnjudged.length > 0) {
     lines.push(
-      `${DIM}  ${report.labelsUnjudged.length} label(s) not judged: they open a box that paints its own`
-      + ` group edge, so nothing above them could be mis-grouped with${RESET}`,
+      `${DIM}  ${report.labelsUnjudged.length} label(s) not judged: they open a box that paints its own` +
+        ` group edge, so nothing above them could be mis-grouped with${RESET}`,
     );
   }
   lines.push("");
@@ -213,8 +211,8 @@ export function formatCompositionReport(report: CompositionReport, rules?: RuleV
       lines.push(`  h${l.level}  ${String(l.fontSize).padStart(5)}px / ${l.fontWeight}   ${DIM}${l.selector}${RESET}`);
     }
     lines.push(
-      `${DIM}  body ${report.hierarchy.bodyFontSize}px, largest ${report.hierarchy.maxFontSize}px`
-      + ` (${report.hierarchy.range}x), heaviest +${report.hierarchy.weightDelta} weight${RESET}`,
+      `${DIM}  body ${report.hierarchy.bodyFontSize}px, largest ${report.hierarchy.maxFontSize}px` +
+        ` (${report.hierarchy.range}x), heaviest +${report.hierarchy.weightDelta} weight${RESET}`,
     );
     lines.push("");
   }
@@ -222,9 +220,9 @@ export function formatCompositionReport(report: CompositionReport, rules?: RuleV
     // Measurement, not a verdict — and labelled as such, because the number
     // looks gateable and the study showed it is not.
     lines.push(
-      `${DIM}Group gaps: ${report.separation.inter}px between heading-led groups vs`
-      + ` ${report.separation.intra}px inside them (${report.separation.ratio}x, ${report.separation.samples} sample(s)).`
-      + ` Context only — intact pages measure 0.86-3.00x, so this cannot carry a verdict.${RESET}`,
+      `${DIM}Group gaps: ${report.separation.inter}px between heading-led groups vs` +
+        ` ${report.separation.intra}px inside them (${report.separation.ratio}x, ${report.separation.samples} sample(s)).` +
+        ` Context only — intact pages measure 0.86-3.00x, so this cannot carry a verdict.${RESET}`,
     );
     lines.push("");
   }
@@ -234,15 +232,19 @@ export function formatCompositionReport(report: CompositionReport, rules?: RuleV
     }
   }
   if (report.unusedAllow.length > 0) {
-    lines.push(`${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`);
+    lines.push(
+      `${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`,
+    );
     lines.push(`${DIM}Delete them: an exemption kept past what it covered only widens the blind spot.${RESET}`);
   }
   if (report.allowed.length > 0 || report.unusedAllow.length > 0) lines.push("");
 
   if (shown.length === 0) {
-    lines.push(tiers.hiddenByRule.size > 0
-      ? `${DIM}No composition finding reported — every finding's rule is off.${RESET}`
-      : `${GREEN}Proximity, alignment and type hierarchy all read consistently.${RESET}`);
+    lines.push(
+      tiers.hiddenByRule.size > 0
+        ? `${DIM}No composition finding reported — every finding's rule is off.${RESET}`
+        : `${GREEN}Proximity, alignment and type hierarchy all read consistently.${RESET}`,
+    );
     return lines.join("\n");
   }
   const mark = (tier: CompositionFinding["severity"]) =>

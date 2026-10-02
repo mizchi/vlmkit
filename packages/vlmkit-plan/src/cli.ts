@@ -4,7 +4,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlanWithRetry, createStructuredPlanWithRetry, structuredPlanToLocatorInventory } from "./plan.ts";
-import type { PlanDeps, PlanInput, PlanResult, PlanScope, PlannerModelOptions, StructuredPlanResult, UiObservation } from "./types.ts";
+import type {
+  PlanDeps,
+  PlanInput,
+  PlanResult,
+  PlanScope,
+  PlannerModelOptions,
+  StructuredPlanResult,
+  UiObservation,
+} from "./types.ts";
 
 export interface PlanCliArgs {
   title: string;
@@ -135,7 +143,7 @@ export async function runPlanCli(argv: string[], deps?: Partial<PlanDeps>): Prom
     if (args.locatorInventoryOut) {
       await writeJsonFile(
         args.locatorInventoryOut,
-        result.plan ? structuredPlanToLocatorInventory(result.plan, input.observations) ?? {} : {},
+        result.plan ? (structuredPlanToLocatorInventory(result.plan, input.observations) ?? {}) : {},
       );
     }
   }
@@ -143,7 +151,7 @@ export async function runPlanCli(argv: string[], deps?: Partial<PlanDeps>): Prom
 }
 
 async function buildPlanInput(args: PlanCliArgs): Promise<PlanInput> {
-  const request = args.request ?? await readFile(required(args.requestFile), "utf8");
+  const request = args.request ?? (await readFile(required(args.requestFile), "utf8"));
   const prd = args.prd ? await readFile(args.prd, "utf8") : undefined;
   const observations = args.observations ? parseObservations(await readFile(args.observations, "utf8")) : undefined;
   const seed = args.seed
@@ -221,12 +229,14 @@ Options:
   --scope <name>            smoke | focused | full (default: smoke)`;
 
 if (isDirectRun()) {
-  runPlanCli(process.argv.slice(2)).then((code) => {
-    process.exitCode = code;
-  }).catch((error) => {
-    console.error(error instanceof Error ? error.stack : error);
-    process.exitCode = 1;
-  });
+  runPlanCli(process.argv.slice(2))
+    .then((code) => {
+      process.exitCode = code;
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.stack : error);
+      process.exitCode = 1;
+    });
 }
 
 /**

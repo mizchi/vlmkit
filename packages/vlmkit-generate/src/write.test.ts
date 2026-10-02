@@ -49,20 +49,23 @@ describe("writeGeneratedTestFile", () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-write-"));
     try {
       const filePath = join(dir, "generated.spec.ts");
-      const result = await writeGeneratedTestFile({
-        filePath,
-        source: "new\n",
-        gates: [{ name: "stub", command: "check {testFile}" }],
-      }, {
-        runCommand: async (gate) => ({
-          name: gate.name ?? gate.command,
-          command: gate.command,
-          ok: true,
-          exitCode: 0,
-          stdout: "",
-          stderr: "",
-        }),
-      });
+      const result = await writeGeneratedTestFile(
+        {
+          filePath,
+          source: "new\n",
+          gates: [{ name: "stub", command: "check {testFile}" }],
+        },
+        {
+          runCommand: async (gate) => ({
+            name: gate.name ?? gate.command,
+            command: gate.command,
+            ok: true,
+            exitCode: 0,
+            stdout: "",
+            stderr: "",
+          }),
+        },
+      );
 
       assert.equal(result.gates.length, 1);
       assert.equal(await readFile(filePath, "utf8"), "new\n");
@@ -76,23 +79,26 @@ describe("writeGeneratedTestFile", () => {
     try {
       const filePath = join(dir, "generated.spec.ts");
       const commands: string[] = [];
-      const result = await writeGeneratedTestFile({
-        filePath,
-        source: "new\n",
-        gates: [{ name: "runtime", command: "playwright test {testFile}", runs: 3 }],
-      }, {
-        runCommand: async (gate) => {
-          commands.push(gate.command);
-          return {
-            name: gate.name ?? gate.command,
-            command: gate.command,
-            ok: true,
-            exitCode: 0,
-            stdout: "",
-            stderr: "",
-          };
+      const result = await writeGeneratedTestFile(
+        {
+          filePath,
+          source: "new\n",
+          gates: [{ name: "runtime", command: "playwright test {testFile}", runs: 3 }],
         },
-      });
+        {
+          runCommand: async (gate) => {
+            commands.push(gate.command);
+            return {
+              name: gate.name ?? gate.command,
+              command: gate.command,
+              ok: true,
+              exitCode: 0,
+              stdout: "",
+              stderr: "",
+            };
+          },
+        },
+      );
 
       assert.equal(commands.length, 3);
       assert.equal(result.gates.length, 3);
@@ -109,21 +115,25 @@ describe("writeGeneratedTestFile", () => {
       await writeGeneratedTestFile({ filePath, source: "old\n" });
 
       await assert.rejects(
-        () => writeGeneratedTestFile({
-          filePath,
-          source: "new\n",
-          overwrite: true,
-          gates: [{ name: "typecheck", command: "tsc --noEmit" }],
-        }, {
-          runCommand: async (gate) => ({
-            name: gate.name ?? gate.command,
-            command: gate.command,
-            ok: false,
-            exitCode: 2,
-            stdout: "",
-            stderr: "type error",
-          }),
-        }),
+        () =>
+          writeGeneratedTestFile(
+            {
+              filePath,
+              source: "new\n",
+              overwrite: true,
+              gates: [{ name: "typecheck", command: "tsc --noEmit" }],
+            },
+            {
+              runCommand: async (gate) => ({
+                name: gate.name ?? gate.command,
+                command: gate.command,
+                ok: false,
+                exitCode: 2,
+                stdout: "",
+                stderr: "type error",
+              }),
+            },
+          ),
         (error) => error instanceof GeneratedTestGateError && error.result.stderr === "type error",
       );
       assert.equal(await readFile(filePath, "utf8"), "old\n");
@@ -137,20 +147,24 @@ describe("writeGeneratedTestFile", () => {
     try {
       const filePath = join(dir, "generated.spec.ts");
       await assert.rejects(
-        () => writeGeneratedTestFile({
-          filePath,
-          source: "new\n",
-          gates: [{ name: "list", command: "playwright test --list {testFile}" }],
-        }, {
-          runCommand: async (gate) => ({
-            name: gate.name ?? gate.command,
-            command: gate.command,
-            ok: false,
-            exitCode: 1,
-            stdout: "",
-            stderr: "bad test",
-          }),
-        }),
+        () =>
+          writeGeneratedTestFile(
+            {
+              filePath,
+              source: "new\n",
+              gates: [{ name: "list", command: "playwright test --list {testFile}" }],
+            },
+            {
+              runCommand: async (gate) => ({
+                name: gate.name ?? gate.command,
+                command: gate.command,
+                ok: false,
+                exitCode: 1,
+                stdout: "",
+                stderr: "bad test",
+              }),
+            },
+          ),
         GeneratedTestGateError,
       );
       await assert.rejects(() => stat(filePath));

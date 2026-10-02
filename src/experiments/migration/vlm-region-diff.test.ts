@@ -38,7 +38,10 @@ describe("isTruncatedRegionDiffResponse", () => {
 describe("computeRegionImageScale", () => {
   it("returns 1 when every dimension fits within the max edge", () => {
     const scale = computeRegionImageScale(
-      [{ width: 1280, height: 800 }, { width: 375, height: 7000 }],
+      [
+        { width: 1280, height: 800 },
+        { width: 375, height: 7000 },
+      ],
       7500,
     );
     assert.equal(scale, 1);
@@ -46,7 +49,10 @@ describe("computeRegionImageScale", () => {
 
   it("scales down to fit the tallest dimension", () => {
     const scale = computeRegionImageScale(
-      [{ width: 375, height: 9541 }, { width: 375, height: 9377 }],
+      [
+        { width: 375, height: 9541 },
+        { width: 375, height: 9377 },
+      ],
       7500,
     );
     assert.equal(scale, 7500 / 9541);
@@ -55,23 +61,27 @@ describe("computeRegionImageScale", () => {
 
 describe("scaleRegionBboxesToOriginal", () => {
   it("returns the result unchanged when scale is 1", () => {
-    const result = parseVlmResponse(JSON.stringify({
-      verdict: "diff",
-      regions: [{ region: "a", bbox: { left: 10, top: 20, width: 30, height: 40 }, description: "" }],
-      summary: "",
-    }));
+    const result = parseVlmResponse(
+      JSON.stringify({
+        verdict: "diff",
+        regions: [{ region: "a", bbox: { left: 10, top: 20, width: 30, height: 40 }, description: "" }],
+        summary: "",
+      }),
+    );
     assert.deepEqual(scaleRegionBboxesToOriginal(result, 1), result);
   });
 
   it("maps bboxes from downscaled coordinates back to original pixels", () => {
-    const result = parseVlmResponse(JSON.stringify({
-      verdict: "diff",
-      regions: [
-        { region: "a", bbox: { left: 10, top: 20, width: 30, height: 40 }, description: "" },
-        { region: "b", bbox: null, description: "" },
-      ],
-      summary: "",
-    }));
+    const result = parseVlmResponse(
+      JSON.stringify({
+        verdict: "diff",
+        regions: [
+          { region: "a", bbox: { left: 10, top: 20, width: 30, height: 40 }, description: "" },
+          { region: "b", bbox: null, description: "" },
+        ],
+        summary: "",
+      }),
+    );
     const scaled = scaleRegionBboxesToOriginal(result, 0.5);
     assert.deepEqual(scaled.regions[0]?.bbox, { left: 20, top: 40, width: 60, height: 80 });
     assert.equal(scaled.regions[1]?.bbox, null);
@@ -114,7 +124,8 @@ describe("parseVlmResponse", () => {
   });
 
   it("strips markdown fences around the JSON block", () => {
-    const raw = "Sure! Here's the analysis:\n\n```json\n" +
+    const raw =
+      "Sure! Here's the analysis:\n\n```json\n" +
       JSON.stringify({ verdict: "no-diff", regions: [], summary: "looks the same" }) +
       "\n```\n";
     const result = parseVlmResponse(raw);
@@ -422,21 +433,23 @@ describe("buildStructuredRegionChanges", () => {
   });
 
   it("uses explicit VLM selector/property hints when present", () => {
-    const result = parseVlmResponse(JSON.stringify({
-      verdict: "diff",
-      regions: [
-        {
-          region: "primary action",
-          selectorHint: ".cta",
-          propertyHint: "background",
-          bbox: [1, 2, 3, 4],
-          baselineColor: "#123456",
-          variantColor: "#654321",
-          description: "The CTA gradient differs.",
-        },
-      ],
-      summary: "CTA differs",
-    }));
+    const result = parseVlmResponse(
+      JSON.stringify({
+        verdict: "diff",
+        regions: [
+          {
+            region: "primary action",
+            selectorHint: ".cta",
+            propertyHint: "background",
+            bbox: [1, 2, 3, 4],
+            baselineColor: "#123456",
+            variantColor: "#654321",
+            description: "The CTA gradient differs.",
+          },
+        ],
+        summary: "CTA differs",
+      }),
+    );
 
     const changes = buildStructuredRegionChanges(result);
     assert.equal(changes[0]?.selectorHint, ".cta");
@@ -566,7 +579,9 @@ describe("buildStructuredRegionChanges", () => {
 
     assert.equal(
       buildStructuredRegionChanges(result, {
-        elements: [{ path: "main[0]", tag: "main", id: "page", classes: "shell", top: 0, left: 0, width: 10, height: 10 }],
+        elements: [
+          { path: "main[0]", tag: "main", id: "page", classes: "shell", top: 0, left: 0, width: 10, height: 10 },
+        ],
       })[0]?.selector,
       ".shell",
     );
@@ -612,19 +627,21 @@ describe("buildStructuredRegionChanges", () => {
 
 describe("parseRegionElementsJson", () => {
   it("parses a raw element array and filters malformed rows", () => {
-    const elements = parseRegionElementsJson(JSON.stringify([
-      {
-        path: "body[0]>main[0]",
-        tag: "main",
-        id: "page",
-        classes: "shell",
-        top: 0,
-        left: 0,
-        width: 100,
-        height: 200,
-      },
-      { path: "bad", tag: "div", top: 0, left: 0, width: 100 },
-    ]));
+    const elements = parseRegionElementsJson(
+      JSON.stringify([
+        {
+          path: "body[0]>main[0]",
+          tag: "main",
+          id: "page",
+          classes: "shell",
+          top: 0,
+          left: 0,
+          width: 100,
+          height: 200,
+        },
+        { path: "bad", tag: "div", top: 0, left: 0, width: 100 },
+      ]),
+    );
 
     assert.deepEqual(elements, [
       {
@@ -641,11 +658,11 @@ describe("parseRegionElementsJson", () => {
   });
 
   it("parses an object with an elements array", () => {
-    const elements = parseRegionElementsJson(JSON.stringify({
-      elements: [
-        { path: "button[0]", tag: "button", classes: "cta", top: 1, left: 2, width: 3, height: 4 },
-      ],
-    }));
+    const elements = parseRegionElementsJson(
+      JSON.stringify({
+        elements: [{ path: "button[0]", tag: "button", classes: "cta", top: 1, left: 2, width: 3, height: 4 }],
+      }),
+    );
 
     assert.equal(elements.length, 1);
     assert.equal(elements[0]?.path, "button[0]");
@@ -718,7 +735,10 @@ describe("formatRegionDiffMarkdown", () => {
     assert.match(markdown, /# VLM region diff/);
     assert.match(markdown, /Model: `anthropic\/claude-haiku-4-5`/);
     assert.match(markdown, /\| Selector \| Property \| From \| To \| Delta \| Bbox \| Confidence \| Evidence \|/);
-    assert.match(markdown, /\| `\.cta` \| `background-color` \| `#112233` \| `#445566` \| 51 \| `10,20 30x40` \| high \/ high \| `button` `body\[0\]>button\[0\]` /);
+    assert.match(
+      markdown,
+      /\| `\.cta` \| `background-color` \| `#112233` \| `#445566` \| 51 \| `10,20 30x40` \| high \/ high \| `button` `body\[0\]>button\[0\]` /,
+    );
     assert.match(markdown, /The CTA background is lighter\./);
   });
 

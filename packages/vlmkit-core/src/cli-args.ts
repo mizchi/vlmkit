@@ -13,13 +13,7 @@
  * reached through the CLI dispatcher — which rewrites `process.argv` before
  * loading the leaf — sees the arguments it was actually given.
  */
-import {
-  hasFlag as hasFlagIn,
-  readAll,
-  readFlag,
-  readNumber,
-  readPositionals,
-} from "./arg-reader.ts";
+import { hasFlag as hasFlagIn, readAll, readFlag, readNumber, readPositionals } from "./arg-reader.ts";
 
 const argv = (): string[] => process.argv.slice(2);
 

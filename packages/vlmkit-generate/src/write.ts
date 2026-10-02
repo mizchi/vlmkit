@@ -41,10 +41,7 @@ export interface WriteGeneratedTestDeps {
 export class GeneratedTestWriteError extends Error {
   readonly code: "EEXIST";
 
-  constructor(
-    code: "EEXIST",
-    message: string,
-  ) {
+  constructor(code: "EEXIST", message: string) {
     super(message);
     this.name = "GeneratedTestWriteError";
     this.code = code;
@@ -157,21 +154,28 @@ function shellQuote(value: string): string {
 
 function runShellGate(gate: GateCommand): Promise<GateResult> {
   return new Promise((resolveResult) => {
-    exec(gate.command, {
-      cwd: gate.cwd,
-      env: { ...process.env, ...gate.env },
-    }, (error, stdout, stderr) => {
-      const exitCode = typeof (error as { code?: unknown } | null)?.code === "number"
-        ? (error as { code: number }).code
-        : error ? 1 : 0;
-      resolveResult({
-        name: gate.name ?? gate.command,
-        command: gate.command,
-        ok: !error,
-        exitCode,
-        stdout,
-        stderr,
-      });
-    });
+    exec(
+      gate.command,
+      {
+        cwd: gate.cwd,
+        env: { ...process.env, ...gate.env },
+      },
+      (error, stdout, stderr) => {
+        const exitCode =
+          typeof (error as { code?: unknown } | null)?.code === "number"
+            ? (error as { code: number }).code
+            : error
+              ? 1
+              : 0;
+        resolveResult({
+          name: gate.name ?? gate.command,
+          command: gate.command,
+          ok: !error,
+          exitCode,
+          stdout,
+          stderr,
+        });
+      },
+    );
   });
 }

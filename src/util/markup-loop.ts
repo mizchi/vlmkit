@@ -226,7 +226,9 @@ export function createDefaultMarkupLoopConfig(options: InitMarkupLoopOptions = {
   };
 }
 
-export async function initMarkupLoop(options: InitMarkupLoopOptions = {}): Promise<{ config: MarkupLoopConfig; created: string[] }> {
+export async function initMarkupLoop(
+  options: InitMarkupLoopOptions = {},
+): Promise<{ config: MarkupLoopConfig; created: string[] }> {
   const configPath = options.configPath ?? DEFAULT_CONFIG_PATH;
   /**
    * An ABSOLUTE `--config` names the project to scaffold, so the harness lands beside it.
@@ -304,31 +306,48 @@ export function buildMarkupLoopCommands(config: MarkupLoopConfig, root = process
    */
   const p = (value: string): string => (root === process.cwd() ? value : resolve(root, value));
   const planArgs = [
-    "--title", config.title,
-    "--request-file", p(config.requestFile),
-    "--observations", p(config.observationsFile),
-    "--out", p(config.planFile),
-    "--structured-out", p(config.structuredPlanFile),
-    "--locator-inventory-out", p(config.locatorInventoryFile),
-    "--scope", config.scope,
-    "--max-attempts", String(config.maxAttempts),
+    "--title",
+    config.title,
+    "--request-file",
+    p(config.requestFile),
+    "--observations",
+    p(config.observationsFile),
+    "--out",
+    p(config.planFile),
+    "--structured-out",
+    p(config.structuredPlanFile),
+    "--locator-inventory-out",
+    p(config.locatorInventoryFile),
+    "--scope",
+    config.scope,
+    "--max-attempts",
+    String(config.maxAttempts),
   ];
   if (config.provider) planArgs.push("--provider", config.provider);
   if (config.model) planArgs.push("--model", config.model);
   if (config.maxTokens) planArgs.push("--max-tokens", String(config.maxTokens));
 
   const generateArgs = [
-    "--plan", p(config.planFile),
-    "--rules", p(config.rulesFile),
-    "--locator-inventory", p(config.locatorInventoryFile),
-    "--helper-import", config.helperImport,
-    "--out", p(config.generatedTestFile),
-    "--max-attempts", String(config.maxAttempts),
+    "--plan",
+    p(config.planFile),
+    "--rules",
+    p(config.rulesFile),
+    "--locator-inventory",
+    p(config.locatorInventoryFile),
+    "--helper-import",
+    config.helperImport,
+    "--out",
+    p(config.generatedTestFile),
+    "--max-attempts",
+    String(config.maxAttempts),
     "--overwrite",
-    "--gate-command", config.updateSnapshotsCommand,
+    "--gate-command",
+    config.updateSnapshotsCommand,
     "--runtime-gate",
-    "--playwright-config", p(config.playwrightConfig),
-    "--runtime-gate-runs", String(config.runtimeGateRuns),
+    "--playwright-config",
+    p(config.playwrightConfig),
+    "--runtime-gate-runs",
+    String(config.runtimeGateRuns),
   ];
   if (config.provider) generateArgs.push("--provider", config.provider);
   if (config.model) generateArgs.push("--model", config.model);
@@ -358,7 +377,10 @@ export function checkMarkupLoopReadiness(config: MarkupLoopConfig, cwd = process
   };
 }
 
-export async function runMarkupLoop(configPath = DEFAULT_CONFIG_PATH, options: { dryRun?: boolean } = {}): Promise<number> {
+export async function runMarkupLoop(
+  configPath = DEFAULT_CONFIG_PATH,
+  options: { dryRun?: boolean } = {},
+): Promise<number> {
   const config = await loadMarkupLoopConfig(configPath);
   const readiness = checkMarkupLoopReadiness(config, markupLoopRoot(configPath));
   const commands = readiness.commands;
@@ -394,28 +416,34 @@ export async function observeMarkupLoop(
   // `outputPath` is printed and asserted on, and absolutizing the default case would turn
   // `.vlmkit/markup-loop/observations.json` into a machine-specific line for no gain.
   const root = markupLoopRoot(configPath);
-  const outputPath = options.outputPath
-    ?? (root === process.cwd() ? config.observationsFile : resolve(root, config.observationsFile));
+  const outputPath =
+    options.outputPath ?? (root === process.cwd() ? config.observationsFile : resolve(root, config.observationsFile));
   const observations = [observation];
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(observations, null, 2)}\n`, "utf8");
   return { observations, outputPath };
 }
 
-export async function captureMarkupObservation(url: string, options: ObserveMarkupLoopOptions = {}): Promise<MarkupLoopObservation> {
+export async function captureMarkupObservation(
+  url: string,
+  options: ObserveMarkupLoopOptions = {},
+): Promise<MarkupLoopObservation> {
   const timeout = options.timeoutMs ?? 15_000;
-  return await withBrowser(async (browser) => {
-    const page = await browser.newPage();
-    page.setDefaultTimeout(timeout);
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout });
-    if (options.waitFor) await page.waitForSelector(options.waitFor, { timeout });
-    try {
-      await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 3_000) });
-    } catch {
-      // SPAs often keep connections open; DOM observations are still useful after domcontentloaded.
-    }
-    return await page.evaluate(OBSERVE_SCRIPT) as MarkupLoopObservation;
-  }, { launch: { headless: options.headless ?? true } });
+  return await withBrowser(
+    async (browser) => {
+      const page = await browser.newPage();
+      page.setDefaultTimeout(timeout);
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout });
+      if (options.waitFor) await page.waitForSelector(options.waitFor, { timeout });
+      try {
+        await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 3_000) });
+      } catch {
+        // SPAs often keep connections open; DOM observations are still useful after domcontentloaded.
+      }
+      return (await page.evaluate(OBSERVE_SCRIPT)) as MarkupLoopObservation;
+    },
+    { launch: { headless: options.headless ?? true } },
+  );
 }
 
 async function doctor(configPath = DEFAULT_CONFIG_PATH): Promise<number> {
@@ -463,19 +491,20 @@ Include:
 }
 
 function renderObservationsTemplate(config: MarkupLoopConfig): string {
-  return `${JSON.stringify([{
-    url: config.baseUrl,
-    title: "Replace with the observed page title",
-    roles: [
-      "heading \"Replace with real heading\"",
-      "button \"Replace with real button\"",
+  return `${JSON.stringify(
+    [
+      {
+        url: config.baseUrl,
+        title: "Replace with the observed page title",
+        roles: ['heading "Replace with real heading"', 'button "Replace with real button"'],
+        labels: [],
+        testIds: [],
+        texts: ["Replace with exact visible text that should anchor the scenario"],
+      },
     ],
-    labels: [],
-    testIds: [],
-    texts: [
-      "Replace with exact visible text that should anchor the scenario",
-    ],
-  }], null, 2)}\n`;
+    null,
+    2,
+  )}\n`;
 }
 
 function renderGenerationRules(): string {
@@ -684,8 +713,9 @@ function parsePositiveInt(value: string, flag: string): number {
   return parsed;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-loop"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-loop" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 
 if (isCliEntry) {
   runMarkupLoopCli()

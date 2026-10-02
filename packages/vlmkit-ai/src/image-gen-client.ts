@@ -139,7 +139,13 @@ export function resolveImageGenModel(id: string): ImageGenModel {
   // A catalogue id is not listed here: OpenRouter's image catalogue changes weekly, and the price
   // comes back with every response, so a copy of either would only go stale.
   if (OPENROUTER_ID.test(id)) {
-    return { id, provider: "openrouter", costPer1MInputTextTokens: 0, costPer1MInputImageTokens: 0, costPer1MOutputImageTokens: 0 };
+    return {
+      id,
+      provider: "openrouter",
+      costPer1MInputTextTokens: 0,
+      costPer1MInputImageTokens: 0,
+      costPer1MOutputImageTokens: 0,
+    };
   }
   throw new VrtConfigError(
     "INVALID_MODEL",
@@ -255,9 +261,11 @@ export function parseGenerationResponse(json: RawGenerationResponse): ParsedGene
 
 export function estimateImageGenCost(model: ImageGenModel, usage: ImageGenUsage | null): number {
   if (!usage) return 0;
-  const cost = (usage.inputTextTokens * model.costPer1MInputTextTokens
-    + usage.inputImageTokens * model.costPer1MInputImageTokens
-    + usage.outputTokens * model.costPer1MOutputImageTokens) / 1_000_000;
+  const cost =
+    (usage.inputTextTokens * model.costPer1MInputTextTokens +
+      usage.inputImageTokens * model.costPer1MInputImageTokens +
+      usage.outputTokens * model.costPer1MOutputImageTokens) /
+    1_000_000;
   return Math.round(cost * 1_000_000) / 1_000_000;
 }
 

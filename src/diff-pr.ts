@@ -49,9 +49,20 @@ import {
 import { clearRouteBaselinePngs, pinPngSources, resolvePngSources, type PngSource } from "./baseline-from-png.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
-import { runMediaVariants, type VariantResult, type MediaVariant } from "@mizchi/vlmkit-markup/stress/media-variants.ts";
+import {
+  runMediaVariants,
+  type VariantResult,
+  type MediaVariant,
+} from "@mizchi/vlmkit-markup/stress/media-variants.ts";
 import { runCrossBrowser, type EngineName, type EngineResult } from "@mizchi/vlmkit-markup/stress/cross-browser.ts";
-import { filterA11yFindings, filterApprovedVrtRegions, filterCrossBrowserFindings, filterMediaVariantFindings, loadApprovalManifest, type ApprovalManifest } from "./vrt/snapshot/approval.ts";
+import {
+  filterA11yFindings,
+  filterApprovedVrtRegions,
+  filterCrossBrowserFindings,
+  filterMediaVariantFindings,
+  loadApprovalManifest,
+  type ApprovalManifest,
+} from "./vrt/snapshot/approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import type { ContrastFinding } from "@mizchi/vlmkit-markup/a11y-contrast.ts";
@@ -243,8 +254,8 @@ function positionalRouteNames(args: string[]): string[] {
  */
 function fileModeViewportSpecs(config: DiffPrConfig): Array<{ label: string; width: number; height: number }> {
   if (!config.viewports || config.viewports.length === 0) return viewportSpecsFor(config);
-  return config.viewports.map((label) =>
-    DEFAULT_VIEWPORTS.find((v) => v.label === label) ?? { label, width: 0, height: 0 }
+  return config.viewports.map(
+    (label) => DEFAULT_VIEWPORTS.find((v) => v.label === label) ?? { label, width: 0, height: 0 },
   );
 }
 
@@ -313,10 +324,10 @@ async function renderViewport(
         await page.locator(waitFor).first().waitFor({ state: "visible", timeout: 10000 });
       } catch {
         throw new Error(
-          `waitFor selector never became visible within 10s: ${waitFor}. `
-          + `The page loaded, so this is a selector that does not match (a typo, or an `
-          + `element that is present but not visible) or a view that failed to render. `
-          + `Fix the selector, or drop \`waitFor\` if the page needs no readiness gate.`,
+          `waitFor selector never became visible within 10s: ${waitFor}. ` +
+            `The page loaded, so this is a selector that does not match (a typo, or an ` +
+            `element that is present but not visible) or a view that failed to render. ` +
+            `Fix the selector, or drop \`waitFor\` if the page needs no readiness gate.`,
         );
       }
     }
@@ -376,10 +387,14 @@ async function pinFromFiles(
   });
   for (let i = 0; i < sources.length; i++) {
     const s = sources[i];
-    console.log(`  ${s.route.name.padEnd(20)} ${s.viewport.padEnd(10)} ${GREEN}ok${RESET} ${DIM}${s.file} → ${written[i]} (${s.matchedAs})${RESET}`);
+    console.log(
+      `  ${s.route.name.padEnd(20)} ${s.viewport.padEnd(10)} ${GREEN}ok${RESET} ${DIM}${s.file} → ${written[i]} (${s.matchedAs})${RESET}`,
+    );
   }
   console.log();
-  console.log(`${DIM}Pinned ${written.length} PNG(s). Run \`vlmkit baseline verify --from-dir <dir>\` to gate against them.${RESET}`);
+  console.log(
+    `${DIM}Pinned ${written.length} PNG(s). Run \`vlmkit baseline verify --from-dir <dir>\` to gate against them.${RESET}`,
+  );
   return 0;
 }
 
@@ -413,9 +428,10 @@ async function cmdPin(args: string[]): Promise<number> {
   }
 
   console.log(`${BOLD}${CYAN}vlmkit diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
-  const scopeNote = routesToPin.length === config.routes.length
-    ? `pinning ${routesToPin.length} route(s)`
-    : `pinning ${routesToPin.length} of ${config.routes.length} route(s) (${routesToPin.map((r) => r.name).join(", ")}); other baselines untouched`;
+  const scopeNote =
+    routesToPin.length === config.routes.length
+      ? `pinning ${routesToPin.length} route(s)`
+      : `pinning ${routesToPin.length} of ${config.routes.length} route(s) (${routesToPin.map((r) => r.name).join(", ")}); other baselines untouched`;
   console.log(`${DIM}  ${scopeNote} into ${config.baselineDir}/${RESET}`);
   console.log();
 
@@ -448,9 +464,12 @@ async function cmdPin(args: string[]): Promise<number> {
       // `app ok (0/1 viewport(s))` — measured with an unreachable URL, followed by
       // "Baselines pinned." and exit 0 with zero PNGs on disk. The count was right there
       // and the color contradicted it.
-      const tag = success === viewports.length
-        ? `${GREEN}ok${RESET}`
-        : success === 0 ? `${RED}nothing pinned${RESET}` : `${YELLOW}partial${RESET}`;
+      const tag =
+        success === viewports.length
+          ? `${GREEN}ok${RESET}`
+          : success === 0
+            ? `${RED}nothing pinned${RESET}`
+            : `${YELLOW}partial${RESET}`;
       console.log(` ${tag} ${DIM}(${success}/${viewports.length} viewport(s))${RESET}`);
     }
   });
@@ -459,10 +478,13 @@ async function cmdPin(args: string[]): Promise<number> {
     // Exit non-zero, because the whole point of `pin` is to leave baselines behind and
     // the next `diff-pr` run is what discovers it did not. A green pin step followed by a
     // red gate run sends the reader to the gate, which is not where the problem is.
-    console.error(`${RED}${BOLD}FAIL${RESET} — ${unwritten.length} baseline(s) were not written: `
-      + `${unwritten.join(", ")}.`);
-    console.error(`${DIM}Nothing was pinned for these, so \`vlmkit diff-pr\` will report them as `
-      + `not compared. Fix the errors above and re-run.${RESET}`);
+    console.error(
+      `${RED}${BOLD}FAIL${RESET} — ${unwritten.length} baseline(s) were not written: ` + `${unwritten.join(", ")}.`,
+    );
+    console.error(
+      `${DIM}Nothing was pinned for these, so \`vlmkit diff-pr\` will report them as ` +
+        `not compared. Fix the errors above and re-run.${RESET}`,
+    );
     return 1;
   }
   console.log(`${DIM}Baselines pinned. Run \`vlmkit diff-pr\` in CI to gate against them.${RESET}`);
@@ -487,7 +509,9 @@ async function cmdRun(args: string[]): Promise<number> {
   if (config.approvalPath) {
     const manifestPath = resolve(configBaseDir(config), config.approvalPath);
     if (existsSync(manifestPath)) {
-      try { manifest = await loadApprovalManifest(manifestPath); } catch (err) {
+      try {
+        manifest = await loadApprovalManifest(manifestPath);
+      } catch (err) {
         console.log(`${YELLOW}warn: approval manifest at ${manifestPath} failed to load: ${String(err)}${RESET}`);
       }
     }
@@ -529,16 +553,19 @@ async function cmdRun(args: string[]): Promise<number> {
     ? config.routes.filter((r) => viewports.some((vp) => fileSources!.has(`${r.name}/${vp.label}`)))
     : config.routes;
   const outOfScope = config.routes.filter((r) => !routesToRun.includes(r)).map((r) => r.name);
-  const scopeNote = outOfScope.length > 0
-    ? `${routesToRun.length} of ${config.routes.length} declared route(s) checked ` +
-      `(no PNG supplied for: ${outOfScope.join(", ")})`
-    : undefined;
+  const scopeNote =
+    outOfScope.length > 0
+      ? `${routesToRun.length} of ${config.routes.length} declared route(s) checked ` +
+        `(no PNG supplied for: ${outOfScope.join(", ")})`
+      : undefined;
 
   console.log(`${BOLD}${CYAN}vlmkit diff-pr${RESET}  ${DIM}${configPath}${RESET}`);
   console.log(`${DIM}  ${config.routes.length} route(s); thresholds ${JSON.stringify(config.thresholds)}${RESET}`);
   if (manifest) console.log(`${DIM}  approval manifest: ${manifest.rules.length} rule(s)${RESET}`);
   if (fileSources) {
-    console.log(`${DIM}  current side from ${files.fromDir ?? files.fromPng} (no browser): ${fileSources.size} PNG(s)${RESET}`);
+    console.log(
+      `${DIM}  current side from ${files.fromDir ?? files.fromPng} (no browser): ${fileSources.size} PNG(s)${RESET}`,
+    );
     if (skippedGates.length > 0) {
       // Loud, because these gates are declared in config and a PASS here does
       // not cover them. They need a live page; a PNG cannot supply a DOM,
@@ -562,7 +589,9 @@ async function cmdRun(args: string[]): Promise<number> {
     for (const route of routesToRun) {
       const baselineDir = baselineDirForRoute(config, route);
       if (!existsSync(baselineDir)) {
-        console.log(`  ${route.name.padEnd(20)} ${RED}no baseline${RESET} ${DIM}(${baselineDir} — run \`vlmkit diff-pr pin\` first)${RESET}`);
+        console.log(
+          `  ${route.name.padEnd(20)} ${RED}no baseline${RESET} ${DIM}(${baselineDir} — run \`vlmkit diff-pr pin\` first)${RESET}`,
+        );
         results.push({ route, viewports: [], failed: true, error: `no baseline at ${baselineDir}` });
         continue;
       }
@@ -606,8 +635,13 @@ async function cmdRun(args: string[]): Promise<number> {
             renderRes = { contrastFailures: [], touchFailures: [], focusOrderFailures: [], semanticFailures: [] };
           } else {
             renderRes = await renderViewport(
-              browser!, route.url, vp.width, vp.height,
-              variantPath, route.waitFor, a11yPolicy,
+              browser!,
+              route.url,
+              vp.width,
+              vp.height,
+              variantPath,
+              route.waitFor,
+              a11yPolicy,
             );
           }
         } catch (err) {
@@ -637,9 +671,8 @@ async function cmdRun(args: string[]): Promise<number> {
         // here, selector rules can't bind, but region-bbox rules (the zone
         // matcher) do — that's the CI consumer of `vlmkit baseline approve
         // --region` (A/B epic 01).
-        const diff = rawDiff && manifest
-          ? filterApprovedVrtRegions(rawDiff, manifest, [], { viewport: vp.label }).diff
-          : rawDiff;
+        const diff =
+          rawDiff && manifest ? filterApprovedVrtRegions(rawDiff, manifest, [], { viewport: vp.label }).diff : rawDiff;
         const diffRatio = diff?.diffRatio ?? 0;
         const diffPixels = diff?.diffPixels ?? 0;
         const totalPixels = diff?.totalPixels ?? rawDiff?.totalPixels ?? 0;
@@ -762,9 +795,7 @@ async function cmdRun(args: string[]): Promise<number> {
           // Manifest can suppress per-engine failures
           // (kind: "cross-browser", selector: "firefox").
           const filtered = filterCrossBrowserFindings(xb.engines, manifest);
-          const overCount = filtered.kept.filter(
-            (e) => e.status === "ok" && e.deltaRatio > threshold,
-          ).length;
+          const overCount = filtered.kept.filter((e) => e.status === "ok" && e.deltaRatio > threshold).length;
           const skippedCount = filtered.kept.filter((e) => e.status === "skipped").length;
           const skipFails = !allowSkipped && skippedCount > 0;
           crossBrowserResult = {
@@ -788,19 +819,20 @@ async function cmdRun(args: string[]): Promise<number> {
       // viewport reports pass. An unpinned viewport is not "within threshold"; it was
       // never measured. Neither is a policy that threw — `mvFailed`/`xbFailed` are
       // false for an absent result, and an absent result is exactly what a crash left.
-      const failed = visualFailed || mvFailed || xbFailed
-        || unpinned.length > 0 || policyErrors.length > 0;
+      const failed = visualFailed || mvFailed || xbFailed || unpinned.length > 0 || policyErrors.length > 0;
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
-      const breakdown = perVp.map((v) => {
-        // Same reason as the markdown row: `100.00%` for zero compared pixels reads as a
-        // total visual regression rather than as "this viewport never rendered".
-        if (v.error) return `${RED}${v.viewport}=error${RESET}`;
-        const tag = v.pass ? GREEN : RED;
-        const a11ySuffix = v.a11y
-          ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}/f=${v.a11y.focusOrderFailures.length}/s=${v.a11y.semanticFailures.length}]${RESET}`
-          : "";
-        return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}${a11ySuffix}`;
-      }).join(" ");
+      const breakdown = perVp
+        .map((v) => {
+          // Same reason as the markdown row: `100.00%` for zero compared pixels reads as a
+          // total visual regression rather than as "this viewport never rendered".
+          if (v.error) return `${RED}${v.viewport}=error${RESET}`;
+          const tag = v.pass ? GREEN : RED;
+          const a11ySuffix = v.a11y
+            ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}/f=${v.a11y.focusOrderFailures.length}/s=${v.a11y.semanticFailures.length}]${RESET}`
+            : "";
+          return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}${a11ySuffix}`;
+        })
+        .join(" ");
       const mvSuffix = mediaVariantsResult
         ? ` ${DIM}[mv suspect=${mediaVariantsResult.suspectCount}/${mediaVariantsResult.maxSuspects} warn=${mediaVariantsResult.warnCount}/${mediaVariantsResult.maxWarns}]${RESET}`
         : "";
@@ -809,17 +841,23 @@ async function cmdRun(args: string[]): Promise<number> {
         : "";
       // Ahead of the deltas, because a reader who sees `a=0.00%` and nothing else has
       // no way to know a second viewport was declared.
-      const unpinnedSuffix = unpinned.length > 0
-        ? ` ${RED}not compared: ${unpinned.join(", ")} (no baseline — \`vlmkit diff-pr pin\`)${RESET}`
-        : "";
+      const unpinnedSuffix =
+        unpinned.length > 0
+          ? ` ${RED}not compared: ${unpinned.join(", ")} (no baseline — \`vlmkit diff-pr pin\`)${RESET}`
+          : "";
       // Same reasoning as `unpinnedSuffix`: a suffix that says nothing leaves the reader
       // to infer from a missing `[mv …]` tag that a declared policy crashed.
-      const erroredSuffix = policyErrors.length > 0
-        ? ` ${RED}not evaluated: ${policyErrors.map((e) => e.policy).join(", ")} (errored)${RESET}`
-        : "";
-      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${unpinnedSuffix}${erroredSuffix}${mvSuffix}${xbSuffix}`);
+      const erroredSuffix =
+        policyErrors.length > 0
+          ? ` ${RED}not evaluated: ${policyErrors.map((e) => e.policy).join(", ")} (errored)${RESET}`
+          : "";
+      console.log(
+        `  ${route.name.padEnd(20)} ${status}  ${breakdown}${unpinnedSuffix}${erroredSuffix}${mvSuffix}${xbSuffix}`,
+      );
       results.push({
-        route, viewports: perVp, failed,
+        route,
+        viewports: perVp,
+        failed,
         ...(unpinned.length > 0 ? { unpinned } : {}),
         ...(policyErrors.length > 0 ? { policyErrors } : {}),
         mediaVariants: mediaVariantsResult,
@@ -844,9 +882,11 @@ async function cmdRun(args: string[]): Promise<number> {
   if (anyFail) {
     const unpinnedCount = results.reduce((n, r) => n + (r.unpinned?.length ?? 0), 0);
     const erroredCount = results.reduce((n, r) => n + (r.policyErrors?.length ?? 0), 0);
-    console.log(`${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.`
-      + (unpinnedCount > 0 ? ` ${unpinnedCount} declared viewport(s) had no baseline and were not compared.` : "")
-      + (erroredCount > 0 ? ` ${erroredCount} declared policy run(s) errored and produced no verdict.` : ""));
+    console.log(
+      `${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.` +
+        (unpinnedCount > 0 ? ` ${unpinnedCount} declared viewport(s) had no baseline and were not compared.` : "") +
+        (erroredCount > 0 ? ` ${erroredCount} declared policy run(s) errored and produced no verdict.` : ""),
+    );
     return 1;
   }
   console.log(`${GREEN}${BOLD}PASS${RESET} — all routes within threshold.`);
@@ -918,9 +958,13 @@ export function buildMarkdownSummary(
         const a11yCell = vp.a11y
           ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch} · ${vp.a11y.focusOrderFailures.length}/${vp.a11y.maxFocusOrder} · ${vp.a11y.semanticFailures.length}/${vp.a11y.maxSemantic}`
           : "—";
-        lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${a11yCell} | ${icon} |`);
+        lines.push(
+          `| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${a11yCell} | ${icon} |`,
+        );
       } else {
-        lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${icon} |`);
+        lines.push(
+          `| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${icon} |`,
+        );
       }
     }
   }
@@ -933,15 +977,19 @@ export function buildMarkdownSummary(
     lines.push("");
     lines.push("## Not compared — no baseline");
     lines.push("");
-    lines.push("These viewports are declared in config but have no pinned PNG, so nothing "
-      + "was measured for them. That is why the run failed; it is not a pixel breach.");
+    lines.push(
+      "These viewports are declared in config but have no pinned PNG, so nothing " +
+        "was measured for them. That is why the run failed; it is not a pixel breach.",
+    );
     lines.push("");
     for (const r of unpinnedRoutes) {
       lines.push(`- \`${r.route.name}\`: ${r.unpinned!.join(", ")}`);
     }
     lines.push("");
-    lines.push("Pin them with `vlmkit diff-pr pin` (or `pin <route>` for one), or drop the "
-      + "viewport from `viewports` if it is no longer wanted.");
+    lines.push(
+      "Pin them with `vlmkit diff-pr pin` (or `pin <route>` for one), or drop the " +
+        "viewport from `viewports` if it is no longer wanted.",
+    );
   }
 
   const erroredRoutes = results.filter((r) => (r.policyErrors ?? []).length > 0);
@@ -951,9 +999,11 @@ export function buildMarkdownSummary(
     lines.push("");
     lines.push("## Not evaluated — the policy errored");
     lines.push("");
-    lines.push("These policies are declared in config and their run threw, so they "
-      + "produced no verdict. That is why the run failed; it is not a pixel breach, and "
-      + "it is not a clean result either.");
+    lines.push(
+      "These policies are declared in config and their run threw, so they " +
+        "produced no verdict. That is why the run failed; it is not a pixel breach, and " +
+        "it is not a clean result either.",
+    );
     lines.push("");
     for (const r of erroredRoutes) {
       for (const e of r.policyErrors!) {
@@ -964,12 +1014,14 @@ export function buildMarkdownSummary(
 
   // Surface the worst visual offenders for quick eyeballing.
   const overThreshold = results
-    .flatMap((r) => r.viewports
-      // `!v.error`: a viewport that never rendered is not an offender, and it used to top
-      // this list at "99.00pp over threshold" with zero pixels compared.
-      .filter((v) => !v.error && v.diffRatio > v.threshold)
-      .map((v) => ({ route: r.route.name, vp: v })))
-    .sort((a, b) => (b.vp.diffRatio - b.vp.threshold) - (a.vp.diffRatio - a.vp.threshold))
+    .flatMap((r) =>
+      r.viewports
+        // `!v.error`: a viewport that never rendered is not an offender, and it used to top
+        // this list at "99.00pp over threshold" with zero pixels compared.
+        .filter((v) => !v.error && v.diffRatio > v.threshold)
+        .map((v) => ({ route: r.route.name, vp: v })),
+    )
+    .sort((a, b) => b.vp.diffRatio - b.vp.threshold - (a.vp.diffRatio - a.vp.threshold))
     .slice(0, 5);
   if (overThreshold.length > 0) {
     lines.push("");
@@ -977,8 +1029,10 @@ export function buildMarkdownSummary(
     lines.push("");
     for (const o of overThreshold) {
       const over = (o.vp.diffRatio - o.vp.threshold) * 100;
-      lines.push(`- \`${o.route}\` / ${o.vp.viewport}: ${pctStr(o.vp.diffRatio)} ` +
-        `(${over.toFixed(2)}pp over threshold ${pctStr(o.vp.threshold)})`);
+      lines.push(
+        `- \`${o.route}\` / ${o.vp.viewport}: ${pctStr(o.vp.diffRatio)} ` +
+          `(${over.toFixed(2)}pp over threshold ${pctStr(o.vp.threshold)})`,
+      );
     }
   }
 
@@ -997,28 +1051,40 @@ export function buildMarkdownSummary(
     lines.push("");
     for (const { route, vp } of a11yFailRows.slice(0, 5)) {
       if (vp.a11y && !vp.a11y.contrastPass) {
-        const top = vp.a11y.contrastFailures.slice(0, 3)
+        const top = vp.a11y.contrastFailures
+          .slice(0, 3)
           .map((f) => `\`${f.path}\` ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA})`)
           .join("; ");
-        lines.push(`- \`${route}\` / ${vp.viewport} — **contrast** ${vp.a11y.contrastFailures.length} > ${vp.a11y.maxContrast}: ${top}`);
+        lines.push(
+          `- \`${route}\` / ${vp.viewport} — **contrast** ${vp.a11y.contrastFailures.length} > ${vp.a11y.maxContrast}: ${top}`,
+        );
       }
       if (vp.a11y && !vp.a11y.touchPass) {
-        const top = vp.a11y.touchFailures.slice(0, 3)
+        const top = vp.a11y.touchFailures
+          .slice(0, 3)
           .map((f) => `\`${f.path}\` ${f.minSide}px < ${f.required}px`)
           .join("; ");
-        lines.push(`- \`${route}\` / ${vp.viewport} — **touch** ${vp.a11y.touchFailures.length} > ${vp.a11y.maxTouch}: ${top}`);
+        lines.push(
+          `- \`${route}\` / ${vp.viewport} — **touch** ${vp.a11y.touchFailures.length} > ${vp.a11y.maxTouch}: ${top}`,
+        );
       }
       if (vp.a11y && !vp.a11y.focusOrderPass) {
-        const top = vp.a11y.focusOrderFailures.slice(0, 3)
+        const top = vp.a11y.focusOrderFailures
+          .slice(0, 3)
           .map((f) => `${f.kind} (step ${f.fromIndex}→${f.toIndex})`)
           .join("; ");
-        lines.push(`- \`${route}\` / ${vp.viewport} — **focus-order** ${vp.a11y.focusOrderFailures.length} > ${vp.a11y.maxFocusOrder}: ${top}`);
+        lines.push(
+          `- \`${route}\` / ${vp.viewport} — **focus-order** ${vp.a11y.focusOrderFailures.length} > ${vp.a11y.maxFocusOrder}: ${top}`,
+        );
       }
       if (vp.a11y && !vp.a11y.semanticPass) {
-        const top = vp.a11y.semanticFailures.slice(0, 3)
+        const top = vp.a11y.semanticFailures
+          .slice(0, 3)
           .map((f) => `[${f.kind}] \`${f.path}\``)
           .join("; ");
-        lines.push(`- \`${route}\` / ${vp.viewport} — **semantic** ${vp.a11y.semanticFailures.length} > ${vp.a11y.maxSemantic}: ${top}`);
+        lines.push(
+          `- \`${route}\` / ${vp.viewport} — **semantic** ${vp.a11y.semanticFailures.length} > ${vp.a11y.maxSemantic}: ${top}`,
+        );
       }
     }
   }
@@ -1051,7 +1117,9 @@ export function buildMarkdownSummary(
     for (const r of mvFailRows) {
       const mv = r.mediaVariants!;
       const offenders = mv.variants.filter((v) => v.verdict === "suspect" || v.verdict === "warn");
-      lines.push(`- \`${r.route.name}\` — suspect ${mv.suspectCount}/${mv.maxSuspects}, warn ${mv.warnCount}/${mv.maxWarns}`);
+      lines.push(
+        `- \`${r.route.name}\` — suspect ${mv.suspectCount}/${mv.maxSuspects}, warn ${mv.warnCount}/${mv.maxWarns}`,
+      );
       for (const v of offenders.slice(0, 5)) {
         lines.push(`  - **${v.variant}** (${v.verdict}): ${v.note}`);
       }
@@ -1125,20 +1193,20 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
     if (inCi) {
       // A green step here would tell the reviewer the summary reached the PR. It did not.
       console.error();
-      console.error(`${RED}not posted${RESET} — no comment was added to ${opts.prRef}, and `
-        + `CI is set, so nothing here will be read by a human.`);
-      console.error(`Install the gh CLI in this job (\`gh\` must be on PATH and `
-        + `authenticated — GH_TOKEN / GITHUB_TOKEN), or drop the \`post\` step.`);
+      console.error(
+        `${RED}not posted${RESET} — no comment was added to ${opts.prRef}, and ` +
+          `CI is set, so nothing here will be read by a human.`,
+      );
+      console.error(
+        `Install the gh CLI in this job (\`gh\` must be on PATH and ` +
+          `authenticated — GH_TOKEN / GITHUB_TOKEN), or drop the \`post\` step.`,
+      );
       return 1;
     }
     return 0;
   }
 
-  const result = spawnSync(
-    "gh",
-    ["pr", "comment", opts.prRef, "--body-file", decoratedPath],
-    { stdio: "inherit" },
-  );
+  const result = spawnSync("gh", ["pr", "comment", opts.prRef, "--body-file", decoratedPath], { stdio: "inherit" });
   if (result.status !== 0) {
     console.error(`${RED}gh pr comment failed (exit ${result.status}).${RESET}`);
     console.error(`Body left at ${decoratedPath} for manual retry.`);
@@ -1156,9 +1224,7 @@ async function cmdPost(args: string[]): Promise<number> {
   }
   const cwd = process.cwd();
   const summaryFlag = readFlag(args, "summary");
-  const summaryPath = summaryFlag
-    ? resolve(cwd, summaryFlag)
-    : resolve(cwd, ".vlmkit/runs/diff-pr/summary.md");
+  const summaryPath = summaryFlag ? resolve(cwd, summaryFlag) : resolve(cwd, ".vlmkit/runs/diff-pr/summary.md");
   const marker = readFlag(args, "marker") ?? "vrt-diff-pr-summary";
   return postPrComment({ prRef, summaryPath, marker });
 }
@@ -1235,7 +1301,6 @@ async function main(argv = process.argv.slice(2)) {
   const code = await cmdRun(argv);
   if (code !== 0) process.exit(code);
 }
-
 
 if (isCliEntry(import.meta.url, "diff-pr")) {
   // `handleCliError`, not `console.error(err)`: `readFlag` throws `UsageError` for a

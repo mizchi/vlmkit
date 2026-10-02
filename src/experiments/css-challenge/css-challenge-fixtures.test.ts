@@ -36,24 +36,18 @@ describe("normalizeCssChallengeFixtureSelection", () => {
   ];
 
   it("expands all to the full fixture set", () => {
-    assert.deepEqual(
-      normalizeCssChallengeFixtureSelection(["all"], available),
-      available,
-    );
+    assert.deepEqual(normalizeCssChallengeFixtureSelection(["all"], available), available);
   });
 
   it("deduplicates explicit fixtures while preserving order", () => {
-    assert.deepEqual(
-      normalizeCssChallengeFixtureSelection(["dashboard", "page", "dashboard"], available),
-      ["dashboard", "page"],
-    );
+    assert.deepEqual(normalizeCssChallengeFixtureSelection(["dashboard", "page", "dashboard"], available), [
+      "dashboard",
+      "page",
+    ]);
   });
 
   it("falls back to page when no fixture is provided", () => {
-    assert.deepEqual(
-      normalizeCssChallengeFixtureSelection([], available),
-      ["page"],
-    );
+    assert.deepEqual(normalizeCssChallengeFixtureSelection([], available), ["page"]);
   });
 
   it("rejects unknown fixture names with the available set", () => {

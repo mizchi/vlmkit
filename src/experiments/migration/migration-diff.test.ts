@@ -28,34 +28,26 @@ function makeDiff(regions: DiffRegion[], totalPixels = 1_000_000): VrtDiff {
 
 describe("classifyMigrationVisualChange", () => {
   it("maps text-like changes to typography", () => {
-    const diff = makeDiff([
-      { x: 40, y: 120, width: 420, height: 20, diffPixelCount: 2200 },
-    ]);
+    const diff = makeDiff([{ x: 40, y: 120, width: 420, height: 20, diffPixelCount: 2200 }]);
     const change = classifyVisualDiff(diff).changes[0];
     assert.equal(classifyMigrationVisualChange(change, diff), "typography");
   });
 
   it("maps dense color-only changes to color-change", () => {
-    const diff = makeDiff([
-      { x: 0, y: 0, width: 200, height: 100, diffPixelCount: 18000 },
-    ]);
+    const diff = makeDiff([{ x: 0, y: 0, width: 200, height: 100, diffPixelCount: 18000 }]);
     const change = classifyVisualDiff(diff).changes[0];
     assert.equal(classifyMigrationVisualChange(change, diff), "color-change");
   });
 
   it("maps compact layout shifts to spacing", () => {
-    const diff = makeDiff([
-      { x: 80, y: 240, width: 120, height: 60, diffPixelCount: 3000 },
-    ], 50_000);
+    const diff = makeDiff([{ x: 80, y: 240, width: 120, height: 60, diffPixelCount: 3000 }], 50_000);
     const change = classifyVisualDiff(diff).changes[0];
     assert.equal(change.type, "layout-shift");
     assert.equal(classifyMigrationVisualChange(change, diff), "spacing");
   });
 
   it("keeps large structural changes as layout-shift", () => {
-    const diff = makeDiff([
-      { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },
-    ]);
+    const diff = makeDiff([{ x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 }]);
     const change = classifyVisualDiff(diff).changes[0];
     assert.equal(classifyMigrationVisualChange(change, diff), "layout-shift");
   });
@@ -63,11 +55,14 @@ describe("classifyMigrationVisualChange", () => {
 
 describe("classifyMigrationDiff", () => {
   it("aggregates category counts and dominant category", () => {
-    const diff = makeDiff([
-      { x: 10, y: 10, width: 32, height: 32, diffPixelCount: 800 },
-      { x: 40, y: 120, width: 420, height: 20, diffPixelCount: 2200 },
-      { x: 80, y: 240, width: 120, height: 60, diffPixelCount: 3000 },
-    ], 50_000);
+    const diff = makeDiff(
+      [
+        { x: 10, y: 10, width: 32, height: 32, diffPixelCount: 800 },
+        { x: 40, y: 120, width: 420, height: 20, diffPixelCount: 2200 },
+        { x: 80, y: 240, width: 120, height: 60, diffPixelCount: 3000 },
+      ],
+      50_000,
+    );
 
     const result = classifyMigrationDiff(diff);
     assert.equal(result.dominantCategory, "spacing");
@@ -87,11 +82,14 @@ describe("classifyMigrationDiff", () => {
 
 describe("buildMigrationRegionApprovalContexts", () => {
   it("maps each diff region to approval-friendly category and change type", () => {
-    const diff = makeDiff([
-      { x: 80, y: 240, width: 120, height: 60, diffPixelCount: 3000 },
-      { x: 40, y: 120, width: 420, height: 20, diffPixelCount: 2200 },
-      { x: 0, y: 0, width: 160, height: 80, diffPixelCount: 10000 },
-    ], 50_000);
+    const diff = makeDiff(
+      [
+        { x: 80, y: 240, width: 120, height: 60, diffPixelCount: 3000 },
+        { x: 40, y: 120, width: 420, height: 20, diffPixelCount: 2200 },
+        { x: 0, y: 0, width: 160, height: 80, diffPixelCount: 10000 },
+      ],
+      50_000,
+    );
 
     const contexts = buildMigrationRegionApprovalContexts(diff);
 

@@ -79,10 +79,7 @@ const SCORE_TIE_MARGIN = 0.02;
  */
 const TIE_AREA_RATIO = 0.5;
 
-export function matchRegionBboxToElement(
-  region: RectBox,
-  elements: RegionElementRect[],
-): RegionSelectorMatch | null {
+export function matchRegionBboxToElement(region: RectBox, elements: RegionElementRect[]): RegionSelectorMatch | null {
   return matchRegionBboxToElements(region, elements, 1)[0] ?? null;
 }
 
@@ -148,12 +145,14 @@ export function matchRegionBboxToElements(
     ranked.push(match);
   }
   ranked.sort(compareSelectorMatches);
-  return ranked
-    // Same floor as before: a candidate covering under 15% of the region is not an
-    // explanation for it, and was never returned.
-    .filter((match) => match.evidence.regionCoverage >= 0.15)
-    .slice(0, limit)
-    .map(({ sortTop: _sortTop, sortLeft: _sortLeft, ...out }) => out);
+  return (
+    ranked
+      // Same floor as before: a candidate covering under 15% of the region is not an
+      // explanation for it, and was never returned.
+      .filter((match) => match.evidence.regionCoverage >= 0.15)
+      .slice(0, limit)
+      .map(({ sortTop: _sortTop, sortLeft: _sortLeft, ...out }) => out)
+  );
 }
 
 function compareSelectorMatches(
@@ -199,10 +198,7 @@ function cssIdentifier(value: string): string | null {
   return /^-?[A-Za-z_][A-Za-z0-9_-]*$/.test(trimmed) ? trimmed : null;
 }
 
-function selectorConfidenceFromScore(
-  score: number,
-  regionCoverage: number,
-): RegionSelectorMatch["confidence"] {
+function selectorConfidenceFromScore(score: number, regionCoverage: number): RegionSelectorMatch["confidence"] {
   if (regionCoverage >= 0.85 && score >= 0.75) return "high";
   if (regionCoverage >= 0.35 && score >= 0.35) return "medium";
   return "low";
@@ -230,9 +226,7 @@ export function parseRegionElementsJson(content: string): RegionElementRect[] {
     : parsed && typeof parsed === "object" && Array.isArray((parsed as { elements?: unknown }).elements)
       ? (parsed as { elements: unknown[] }).elements
       : [];
-  return rows
-    .map((row) => parseRegionElementRect(row))
-    .filter((row): row is RegionElementRect => row !== null);
+  return rows.map((row) => parseRegionElementRect(row)).filter((row): row is RegionElementRect => row !== null);
 }
 
 function parseRegionElementRect(value: unknown): RegionElementRect | null {
@@ -259,11 +253,7 @@ function parseRegionElementRect(value: unknown): RegionElementRect | null {
 }
 
 function numberFromUnknown(value: unknown): number | null {
-  const n = typeof value === "number"
-    ? value
-    : typeof value === "string"
-      ? Number.parseFloat(value)
-      : Number.NaN;
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
   return Number.isFinite(n) ? n : null;
 }
 

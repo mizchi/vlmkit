@@ -71,7 +71,9 @@ const demoSite = (name, files) => section(`sites-${name}`, `examples/sites/${nam
 const demoAssets = () => [
   "demos.css",
   "index.html",
-  ...DEMOS.flatMap((demo) => demoFiles(demo, readResult(demo.id, join(repoRoot, "examples/demos"))).map((f) => `${demo.id}/${f}`)),
+  ...DEMOS.flatMap((demo) =>
+    demoFiles(demo, readResult(demo.id, join(repoRoot, "examples/demos"))).map((f) => `${demo.id}/${f}`),
+  ),
 ];
 
 /**
@@ -123,7 +125,12 @@ export const siteSections = Object.freeze([
   section("demos", "examples/demos", "demos", demoAssets()),
   // The generated icon set (`scripts/readme-art.mjs`), which the demo gallery links as `../icons/`.
   // The README reaches the same files through the repository, so they live once, in docs/assets.
-  section("icons", ICON_DIR, "icons", ICONS.map((i) => iconFile(i.id).slice(ICON_DIR.length + 1))),
+  section(
+    "icons",
+    ICON_DIR,
+    "icons",
+    ICONS.map((i) => iconFile(i.id).slice(ICON_DIR.length + 1)),
+  ),
 ]);
 
 /**
@@ -177,15 +184,15 @@ export async function buildSite({
   const built = [];
   for (const section of sections) {
     const sectionSource = resolve(resolvedSourceRoot, section.sourceDir);
-    const sectionOutput = section.basePath
-      ? join(resolvedOutputDir, section.basePath)
-      : resolvedOutputDir;
+    const sectionOutput = section.basePath ? join(resolvedOutputDir, section.basePath) : resolvedOutputDir;
     await mkdir(sectionOutput, { recursive: true });
     // Most sections are flat; the demos keep one directory per demo.
-    await Promise.all(section.assets.map(async (asset) => {
-      await mkdir(dirname(join(sectionOutput, asset)), { recursive: true });
-      await copyFile(join(sectionSource, asset), join(sectionOutput, asset));
-    }));
+    await Promise.all(
+      section.assets.map(async (asset) => {
+        await mkdir(dirname(join(sectionOutput, asset)), { recursive: true });
+        await copyFile(join(sectionSource, asset), join(sectionOutput, asset));
+      }),
+    );
     const judgment = section.judgment ?? [];
     for (const { path, bytes } of judgment) {
       // A log's screens live two levels down (`judgment/shots/`); runtime files are flat.

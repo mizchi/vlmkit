@@ -22,14 +22,11 @@ describe("mutationsForPropertyRemoval", () => {
 
 describe("mutationsForSelectorBlockRemoval", () => {
   it("emits one remove mutation per property in the block", () => {
-    assert.deepEqual(
-      mutationsForSelectorBlockRemoval(".card", ["padding", "border-radius", "background"]),
-      [
-        { selector: ".card", property: "padding", action: "remove" },
-        { selector: ".card", property: "border-radius", action: "remove" },
-        { selector: ".card", property: "background", action: "remove" },
-      ],
-    );
+    assert.deepEqual(mutationsForSelectorBlockRemoval(".card", ["padding", "border-radius", "background"]), [
+      { selector: ".card", property: "padding", action: "remove" },
+      { selector: ".card", property: "border-radius", action: "remove" },
+      { selector: ".card", property: "background", action: "remove" },
+    ]);
   });
 });
 
@@ -45,7 +42,11 @@ describe("runBatchPrescan", () => {
     }> = [];
 
     const client = {
-      async batchRender(baseHtml: string, viewport: { width: number; height: number }, variants: Array<{ id: string; mutations: CraterCssMutation[] }>) {
+      async batchRender(
+        baseHtml: string,
+        viewport: { width: number; height: number },
+        variants: Array<{ id: string; mutations: CraterCssMutation[] }>,
+      ) {
         callerArgs.push({ baseHtml, viewport, variants });
         return {
           results: [
@@ -70,7 +71,10 @@ describe("runBatchPrescan", () => {
     assert.equal(results.length, 2);
     assert.equal(results[0]?.id, "trial-a");
     assert.equal(results[0]?.missing, false);
-    assert.ok((results[0]?.changes ?? []).some((c) => c.type === "geometry"), "padding removal should change geometry");
+    assert.ok(
+      (results[0]?.changes ?? []).some((c) => c.type === "geometry"),
+      "padding removal should change geometry",
+    );
     assert.equal(results[1]?.id, "trial-b");
     assert.equal(results[1]?.changes.length, 0, "identical tree → no changes");
     assert.deepEqual(callerArgs[0]?.variants, [
@@ -116,15 +120,20 @@ describe("runBatchPrescan", () => {
 
 describe("hasAnyBatchPrescanSignal", () => {
   it("returns true when at least one variant emitted changes", () => {
-    assert.equal(hasAnyBatchPrescanSignal([
-      { id: "a", changes: [], missing: false },
-      { id: "b", changes: [{ path: "root", type: "geometry", property: "bounds", before: "", after: "" }], missing: false },
-    ]), true);
+    assert.equal(
+      hasAnyBatchPrescanSignal([
+        { id: "a", changes: [], missing: false },
+        {
+          id: "b",
+          changes: [{ path: "root", type: "geometry", property: "bounds", before: "", after: "" }],
+          missing: false,
+        },
+      ]),
+      true,
+    );
   });
 
   it("does not count missing variants as a signal", () => {
-    assert.equal(hasAnyBatchPrescanSignal([
-      { id: "a", changes: [], missing: true },
-    ]), false);
+    assert.equal(hasAnyBatchPrescanSignal([{ id: "a", changes: [], missing: true }]), false);
   });
 });

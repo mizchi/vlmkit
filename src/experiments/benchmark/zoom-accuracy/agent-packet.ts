@@ -125,14 +125,25 @@ export async function exportPacket(
       const src = prepareZoomSource(await readFile(path), options.budget);
       await writeFile(join(dir, `image${i}.png`), src.viewPng);
       // The loop tells the model the size it sees; so does the packet.
-      await writeFile(join(dir, `image${i}.txt`), `Image ${i} (${src.view.width}x${src.view.height} pixels) — ${i === 0 ? "Baseline" : "Current"}\n`);
+      await writeFile(
+        join(dir, `image${i}.txt`),
+        `Image ${i} (${src.view.width}x${src.view.height} pixels) — ${i === 0 ? "Baseline" : "Current"}\n`,
+      );
     }
-    const coordNote = options.coordinates === "pixels"
-      ? "Coordinates are absolute pixels of the image as shown, origin top-left."
-      : "Coordinates are 0-1000 of each image's width and height, origin top-left.";
+    const coordNote =
+      options.coordinates === "pixels"
+        ? "Coordinates are absolute pixels of the image as shown, origin top-left."
+        : "Coordinates are 0-1000 of each image's width and height, origin top-left.";
     await writeFile(join(dir, "prompt.txt"), `${buildPrompt(c)}\n\n${coordNote}\n`);
   }
-  const meta: PacketMeta = { arm, budget: options.budget, coordinates: options.coordinates, maxZooms: arm === "zoom" ? options.maxZooms : 0, tasks: Object.keys(tasks), benchDir };
+  const meta: PacketMeta = {
+    arm,
+    budget: options.budget,
+    coordinates: options.coordinates,
+    maxZooms: arm === "zoom" ? options.maxZooms : 0,
+    tasks: Object.keys(tasks),
+    benchDir,
+  };
   await writeFile(join(packetDir, "packet.json"), JSON.stringify(meta, null, 2));
   await writeFile(join(packetDir, "BRIEF.md"), agentBrief(meta, arm, helper));
   const map: PacketMap = { packetDir, tasks };
@@ -144,7 +155,12 @@ export async function exportPacket(
  * The zoom helper: one `runZoomLoop` zoom, by hand. Refuses past the packet's budget and
  * logs every call to `zooms.jsonl` in the task's directory, which the import counts.
  */
-export async function agentZoom(packetDir: string, task: string, imageIndex: number, box: [number, number, number, number]): Promise<{ text: string; png?: string }> {
+export async function agentZoom(
+  packetDir: string,
+  task: string,
+  imageIndex: number,
+  box: [number, number, number, number],
+): Promise<{ text: string; png?: string }> {
   const meta = JSON.parse(await readFile(join(packetDir, "packet.json"), "utf8")) as PacketMeta;
   if (!meta.tasks.includes(task)) return { text: `Error: no task "${task}"` };
   if (imageIndex !== 0 && imageIndex !== 1) return { text: "Error: image must be 0 or 1" };
@@ -162,7 +178,12 @@ export async function agentZoom(packetDir: string, task: string, imageIndex: num
   if (!outcome.ok) return { text: outcome.text };
   const png = join(dir, `zoom-${done + 1}.png`);
   await writeFile(png, outcome.png);
-  await writeFile(log, (existsSync(log) ? await readFile(log, "utf8") : "") + JSON.stringify({ imageIndex, box, originalBox: outcome.originalBox }) + "\n");
+  await writeFile(
+    log,
+    (existsSync(log) ? await readFile(log, "utf8") : "") +
+      JSON.stringify({ imageIndex, box, originalBox: outcome.originalBox }) +
+      "\n",
+  );
   return { text: `${outcome.text} (${done + 1}/${meta.maxZooms})`, png };
 }
 
@@ -171,7 +192,12 @@ export async function agentZoom(packetDir: string, task: string, imageIndex: num
  * A task with no answer is written as an empty reply, so it scores as wrong rather than
  * silently shrinking the arm.
  */
-export async function importAnswers(benchDir: string, answersPath: string, arm: Arm, model: string): Promise<{ imported: number; missing: string[] }> {
+export async function importAnswers(
+  benchDir: string,
+  answersPath: string,
+  arm: Arm,
+  model: string,
+): Promise<{ imported: number; missing: string[] }> {
   const map = JSON.parse(await readFile(join(benchDir, mapFile(arm)), "utf8")) as PacketMap;
   const raw = JSON.parse(await readFile(answersPath, "utf8")) as Record<string, unknown>;
   const dir = join(benchDir, "answers", model.replace(/[^a-z0-9._-]+/gi, "_"), arm);
@@ -184,11 +210,19 @@ export async function importAnswers(benchDir: string, answersPath: string, arm: 
     const log = join(map.packetDir, "tasks", task, "zooms.jsonl");
     const zooms = existsSync(log) ? (await readFile(log, "utf8")).split("\n").filter(Boolean).length : 0;
     const saved: SavedAnswer = {
-      model, arm, caseId, answer, promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: 0, zooms, turns: zooms + 1,
+      model,
+      arm,
+      caseId,
+      answer,
+      promptTokens: 0,
+      completionTokens: 0,
+      costUsd: 0,
+      latencyMs: 0,
+      zooms,
+      turns: zooms + 1,
       ...(value === undefined ? { error: "no answer in answers.json" } : {}),
     };
     await writeFile(join(dir, `${caseId}.json`), JSON.stringify(saved, null, 2));
   }
   return { imported: Object.keys(map.tasks).length - missing.length, missing };
 }
-

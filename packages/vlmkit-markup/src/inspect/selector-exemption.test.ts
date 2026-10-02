@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  applySelectorAllowRules,
-  parseSelectorAllowRules,
-  selectorAllowFilter,
-} from "./selector-exemption.ts";
+import { applySelectorAllowRules, parseSelectorAllowRules, selectorAllowFilter } from "./selector-exemption.ts";
 
 const rules = parseSelectorAllowRules([
   "button#export;the export button is the one primary action",
@@ -42,6 +38,9 @@ describe("selectorAllowFilter", () => {
     const kept = paths.filter((p) => allow.keep(p));
     const applied = applySelectorAllowRules(paths, rules, (p) => p);
     assert.deepEqual(kept, applied.kept);
-    assert.deepEqual(allow.unused(), applied.unused.map((r) => r.raw));
+    assert.deepEqual(
+      allow.unused(),
+      applied.unused.map((r) => r.raw),
+    );
   });
 });

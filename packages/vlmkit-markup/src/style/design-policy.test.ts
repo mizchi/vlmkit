@@ -134,10 +134,9 @@ describe("judgeDesignPolicy — a role too small to judge", () => {
   ];
 
   it("marks a role under --min-instances as not judged rather than leaving it to read as ok", () => {
-    const report = judgeDesignPolicy(
-      input({ samples: withDeliberatePrimary() }),
-      { allow: ["button#export;primary is deliberate"] },
-    );
+    const report = judgeDesignPolicy(input({ samples: withDeliberatePrimary() }), {
+      allow: ["button#export;primary is deliberate"],
+    });
     const role = report.roles.find((r) => r.role === "button")!;
     assert.equal(role.notJudged, true);
     assert.equal(role.unjudgedByAllow, true, "--allow is what took it under the floor");
@@ -147,10 +146,9 @@ describe("judgeDesignPolicy — a role too small to judge", () => {
   it("reports a real drift among the remaining instances instead of swallowing it", () => {
     // The false negative in full: allow one, break another, and the old build said
     // COHERENT while the row printed `reuse 1x, 2 one-off` beside it.
-    const report = judgeDesignPolicy(
-      input({ samples: withDeliberatePrimaryAndRealDrift() }),
-      { allow: ["button#export;primary is deliberate"] },
-    );
+    const report = judgeDesignPolicy(input({ samples: withDeliberatePrimaryAndRealDrift() }), {
+      allow: ["button#export;primary is deliberate"],
+    });
     assert.equal(report.verdict, "not-judged");
     const nothing = report.findings.find((f) => f.kind === "nothing-judged")!;
     assert.ok(nothing, "the run must say the check measured nothing");
@@ -172,9 +170,11 @@ describe("judgeDesignPolicy — a role too small to judge", () => {
   });
 
   it("does not blame --allow for a role that was too small anyway", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#only" })],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#only" })],
+      }),
+    );
     const role = report.roles.find((r) => r.role === "button")!;
     assert.equal(role.notJudged, true);
     assert.equal(role.unjudgedByAllow, undefined);
@@ -187,13 +187,15 @@ describe("judgeDesignPolicy — component drift", () => {
     // next sentence ("Dominant style, used 2x") and named a count no style had. v5's
     // repair agent: "No style is used 1.5 times. […] I could not tune the gate into
     // agreement with itself, and had to reverse-engineer the formula."
-    const report = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
-        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#snooze" }),
-        styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#snooze" }),
+          styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
+        ],
+      }),
+    );
     const message = report.findings.find((f) => f.kind === "component-drift")!.message;
     assert.match(message, /used 2x, 1x/);
     assert.match(message, /this role averages 1\.5x/);
@@ -203,13 +205,15 @@ describe("judgeDesignPolicy — component drift", () => {
   it("names the property that actually differs, not just both fingerprints", () => {
     // "Both styles print `border 1`; the actual delta is `background` […] I opened the
     // stylesheet to learn whether the deviation was one property or two."
-    const report = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "10|18|10|18|8|1|rgb(255, 255, 255)", "16|400", { selector: "#save" }),
-        styled("button", "10|18|10|18|8|1|rgb(255, 255, 255)", "16|400", { selector: "#snooze" }),
-        styled("button", "10|18|10|18|8|1|rgb(34, 85, 204)", "16|400", { selector: "#acknowledge" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "10|18|10|18|8|1|rgb(255, 255, 255)", "16|400", { selector: "#save" }),
+          styled("button", "10|18|10|18|8|1|rgb(255, 255, 255)", "16|400", { selector: "#snooze" }),
+          styled("button", "10|18|10|18|8|1|rgb(34, 85, 204)", "16|400", { selector: "#acknowledge" }),
+        ],
+      }),
+    );
     const message = report.findings.find((f) => f.kind === "component-drift")!.message;
     assert.match(message, /differs in background-color rgb\(255, 255, 255\) → rgb\(34, 85, 204\)/);
     // One property, and the message says so — that was the whole question.
@@ -217,13 +221,15 @@ describe("judgeDesignPolicy — component drift", () => {
   });
 
   it("caps the differing-property list, since a style that differs in everything answers by count", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "0|0|0|0|0|0|transparent", "16|400", { selector: "#a" }),
-        styled("button", "0|0|0|0|0|0|transparent", "16|400", { selector: "#b" }),
-        styled("button", "10|18|10|18|8|1|white", "20|700", { selector: "#c" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "0|0|0|0|0|0|transparent", "16|400", { selector: "#a" }),
+          styled("button", "0|0|0|0|0|0|transparent", "16|400", { selector: "#b" }),
+          styled("button", "10|18|10|18|8|1|white", "20|700", { selector: "#c" }),
+        ],
+      }),
+    );
     const message = report.findings.find((f) => f.kind === "component-drift")!.message;
     assert.match(message, /and \d+ more/);
   });
@@ -232,15 +238,17 @@ describe("judgeDesignPolicy — component drift", () => {
     // #112 item 4: three icon-only zoom buttons outvoted the app's own three, so the
     // app's buttons were reported as the deviants. Two agents found `--exclude` only
     // by opening `--help`; the gate has the evidence to mention it here.
-    const report = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-zoom-in" }),
-        styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-zoom-out" }),
-        styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-reset" }),
-        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
-        styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-zoom-in" }),
+          styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-zoom-out" }),
+          styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-reset" }),
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
+          styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
+        ],
+      }),
+    );
     const message = report.findings.find((f) => f.kind === "component-drift")!.message;
     assert.match(message, /--exclude/);
     assert.match(message, /third-party widget/);
@@ -248,26 +256,33 @@ describe("judgeDesignPolicy — component drift", () => {
 
   it("does not offer --exclude when the dominant style is the page's own component", () => {
     // A false positive here costs a sentence, but it must not appear on every page.
-    const report = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
-        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#snooze" }),
-        styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#snooze" }),
+          styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
+        ],
+      }),
+    );
     const message = report.findings.find((f) => f.kind === "component-drift")!.message;
     assert.doesNotMatch(message, /--exclude/);
   });
 
   it("reports a role whose styles are barely reused", () => {
     // Agent fixture shape: 6 buttons, 3 styles, reuse 2.0.
-    const report = judgeDesignPolicy(input({
-      samples: [
-        sample("button", "a"), sample("button", "a"),
-        sample("button", "b"), sample("button", "b"),
-        sample("button", "c"), sample("button", "c"),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          sample("button", "a"),
+          sample("button", "a"),
+          sample("button", "b"),
+          sample("button", "b"),
+          sample("button", "c"),
+          sample("button", "c"),
+        ],
+      }),
+    );
     assert.equal(report.verdict, "drift");
     const drift = report.findings.filter((f) => f.kind === "component-drift");
     assert.equal(drift.length, 1);
@@ -280,9 +295,11 @@ describe("judgeDesignPolicy — component drift", () => {
 
   it("stays quiet when one style carries the role", () => {
     // MDN shape: 8 buttons, 1 style, reuse 8.0.
-    const report = judgeDesignPolicy(input({
-      samples: Array.from({ length: 8 }, () => sample("button", "a")),
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: Array.from({ length: 8 }, () => sample("button", "a")),
+      }),
+    );
     assert.deepEqual(report.findings, []);
     assert.equal(report.verdict, "coherent");
     assert.equal(report.roles[0]!.reuse, 8);
@@ -294,10 +311,15 @@ describe("judgeDesignPolicy — component drift", () => {
     // refusal stands; what changed in v7 is that it is no longer silent —
     // it used to leave `findings` empty and a `coherent` verdict, which reads
     // as "measured and fine" for a role nothing was measured on.
-    const report = judgeDesignPolicy(input({
-      samples: [sample("button", "a"), sample("button", "b")],
-    }));
-    assert.deepEqual(report.findings.map((f) => f.kind), ["nothing-judged"]);
+    const report = judgeDesignPolicy(
+      input({
+        samples: [sample("button", "a"), sample("button", "b")],
+      }),
+    );
+    assert.deepEqual(
+      report.findings.map((f) => f.kind),
+      ["nothing-judged"],
+    );
     assert.equal(report.findings[0]!.severity, "info", "a small page is not a defect");
     assert.equal(report.verdict, "not-judged");
     assert.equal(report.roles[0]!.instances, 2);
@@ -305,15 +327,17 @@ describe("judgeDesignPolicy — component drift", () => {
   });
 
   it("names the dominant style and the deviations, never a correct value", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [
-        ...Array.from({ length: 4 }, () => sample("button", "dom")),
-        sample("button", "x", ".btn-ghost"),
-        sample("button", "y", ".btn-link"),
-        sample("button", "z", ".btn-icon"),
-        sample("button", "w", ".btn-tiny"),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          ...Array.from({ length: 4 }, () => sample("button", "dom")),
+          sample("button", "x", ".btn-ghost"),
+          sample("button", "y", ".btn-link"),
+          sample("button", "z", ".btn-icon"),
+          sample("button", "w", ".btn-tiny"),
+        ],
+      }),
+    );
     const message = report.findings.find((f) => f.kind === "component-drift")!.message;
     assert.match(message, /Dominant style, used 4x/);
     assert.match(message, /\.btn-ghost/);
@@ -322,12 +346,16 @@ describe("judgeDesignPolicy — component drift", () => {
   });
 
   it("keeps roles independent", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [
-        ...Array.from({ length: 5 }, () => sample("h2", "h")),
-        sample("button", "a"), sample("button", "b"), sample("button", "c"),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          ...Array.from({ length: 5 }, () => sample("h2", "h")),
+          sample("button", "a"),
+          sample("button", "b"),
+          sample("button", "c"),
+        ],
+      }),
+    );
     const roles = report.findings.filter((f) => f.kind === "component-drift").map((f) => f.role);
     assert.deepEqual(roles, ["button"]);
   });
@@ -365,17 +393,21 @@ describe("judgeDesignPolicy — scale outliers", () => {
   it("ignores sub-pixel neighbours produced by rem arithmetic", () => {
     // web.dev tripped the first implementation with "21.4px, nearest common
     // 21.3px" — two rem-derived values, zero design content.
-    const report = judgeDesignPolicy(input({
-      spacing: [...spacing(21.3, 9), ...spacing(16, 12), ...spacing(32, 7), ...spacing(21.4, 2)],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        spacing: [...spacing(21.3, 9), ...spacing(16, 12), ...spacing(32, 7), ...spacing(21.4, 2)],
+      }),
+    );
     assert.equal(report.findings.filter((f) => f.kind === "scale-outlier").length, 0);
   });
 
   it("ignores values below the spacing-scale floor", () => {
     // MDN's only outlier rows were 2/2.5/5/6px paddings on inline <code>.
-    const report = judgeDesignPolicy(input({
-      spacing: [...spacing(4, 20), ...spacing(8, 12), ...spacing(16, 9), ...spacing(5, 2), ...spacing(6, 2)],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        spacing: [...spacing(4, 20), ...spacing(8, 12), ...spacing(16, 9), ...spacing(5, 2), ...spacing(6, 2)],
+      }),
+    );
     assert.equal(report.findings.filter((f) => f.kind === "scale-outlier").length, 0);
   });
 
@@ -388,17 +420,21 @@ describe("judgeDesignPolicy — scale outliers", () => {
   });
 
   it("scales the window with the value so large steps stay reportable", () => {
-    const report = judgeDesignPolicy(input({
-      spacing: [...spacing(64, 10), ...spacing(16, 9), ...spacing(24, 8), ...spacing(60, 1)],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        spacing: [...spacing(64, 10), ...spacing(16, 9), ...spacing(24, 8), ...spacing(60, 1)],
+      }),
+    );
     assert.match(report.findings.find((f) => f.kind === "scale-outlier")!.message, /60px \(1x\) next to 64px/);
   });
 
   it("requires the reference to be genuinely established", () => {
     // 2 uses vs 3 uses is not a majority worth snapping to.
-    const report = judgeDesignPolicy(input({
-      spacing: [...spacing(16, 3), ...spacing(24, 3), ...spacing(32, 3), ...spacing(23, 2)],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        spacing: [...spacing(16, 3), ...spacing(24, 3), ...spacing(32, 3), ...spacing(23, 2)],
+      }),
+    );
     assert.equal(report.findings.filter((f) => f.kind === "scale-outlier").length, 0);
   });
 
@@ -415,18 +451,24 @@ describe("judgeDesignPolicy — text-free elements", () => {
   // because those buttons paint no text and inherit 12px/400 where the app's
   // buttons are 14px/600. No styling change converges them.
   const twoAppStyles = [
-    styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"),
-    styled("button", "boxB", "14|400"), styled("button", "boxB", "14|400"), styled("button", "boxB", "14|400"),
+    styled("button", "boxA", "14|600"),
+    styled("button", "boxA", "14|600"),
+    styled("button", "boxA", "14|600"),
+    styled("button", "boxB", "14|400"),
+    styled("button", "boxB", "14|400"),
+    styled("button", "boxB", "14|400"),
   ];
 
   it("folds an icon-only element into the established style its box matches", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [
-        ...twoAppStyles,
-        styled("button", "boxA", "12|400", { textFree: true, selector: ".vendor .zoom-in" }),
-        styled("button", "boxA", "12|400", { textFree: true, selector: ".vendor .zoom-out" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          ...twoAppStyles,
+          styled("button", "boxA", "12|400", { textFree: true, selector: ".vendor .zoom-in" }),
+          styled("button", "boxA", "12|400", { textFree: true, selector: ".vendor .zoom-out" }),
+        ],
+      }),
+    );
     const role = report.roles.find((r) => r.role === "button")!;
     assert.equal(role.instances, 8);
     assert.equal(role.signatures, 2, "the icon buttons must not add a third style");
@@ -438,13 +480,15 @@ describe("judgeDesignPolicy — text-free elements", () => {
   it("still counts an icon-only element whose box matches nothing", () => {
     // The fold forgives an unobservable font, never an unobservable box: a
     // 2px-padding vendor control against the app's 8/16 IS visible drift.
-    const report = judgeDesignPolicy(input({
-      samples: [
-        ...twoAppStyles,
-        styled("button", "boxVendor", "12|400", { textFree: true }),
-        styled("button", "boxVendor", "12|400", { textFree: true }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          ...twoAppStyles,
+          styled("button", "boxVendor", "12|400", { textFree: true }),
+          styled("button", "boxVendor", "12|400", { textFree: true }),
+        ],
+      }),
+    );
     assert.equal(report.roles.find((r) => r.role === "button")!.signatures, 3);
     assert.equal(report.textFreeFolded, 0);
     assert.equal(report.textFreeSamples, 2);
@@ -454,25 +498,26 @@ describe("judgeDesignPolicy — text-free elements", () => {
   it("keeps font comparison for elements that DO paint text", () => {
     // The over-reach guard: same boxes, deviant fonts, text present. Folding
     // these would delete the signal the metric exists for.
-    const report = judgeDesignPolicy(input({
-      samples: [
-        ...twoAppStyles,
-        styled("button", "boxA", "10|300"), styled("button", "boxA", "9|200"),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [...twoAppStyles, styled("button", "boxA", "10|300"), styled("button", "boxA", "9|200")],
+      }),
+    );
     assert.equal(report.roles.find((r) => r.role === "button")!.signatures, 4);
     assert.equal(report.textFreeFolded, 0);
     assert.equal(report.verdict, "drift");
   });
 
   it("groups icon-only elements with each other by box when no text style hosts them", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "boxIcon", "12|400", { textFree: true, selector: ".a" }),
-        styled("button", "boxIcon", "16|700", { textFree: true, selector: ".b" }),
-        styled("button", "boxIcon", "20|100", { textFree: true, selector: ".c" }),
-      ],
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "boxIcon", "12|400", { textFree: true, selector: ".a" }),
+          styled("button", "boxIcon", "16|700", { textFree: true, selector: ".b" }),
+          styled("button", "boxIcon", "20|100", { textFree: true, selector: ".c" }),
+        ],
+      }),
+    );
     assert.equal(report.roles.find((r) => r.role === "button")!.signatures, 1);
     assert.equal(report.verdict, "coherent");
   });
@@ -488,10 +533,12 @@ describe("judgeDesignPolicy — coverage reporting", () => {
   it("tallies the skipped elements by tag, most first", () => {
     // The bare count could not distinguish "this page is divs" from "the
     // measurement broke", which is the question a reader actually has.
-    const report = judgeDesignPolicy(input({
-      skipped: 28,
-      skippedTags: { span: 1, div: 24, p: 3 },
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        skipped: 28,
+        skippedTags: { span: 1, div: 24, p: 3 },
+      }),
+    );
     assert.deepEqual(report.skippedTags, [
       { tag: "div", count: 24 },
       { tag: "p", count: 3 },
@@ -500,11 +547,13 @@ describe("judgeDesignPolicy — coverage reporting", () => {
   });
 
   it("reports what the verdict rests on, not only what it skipped", () => {
-    const report = judgeDesignPolicy(input({
-      samples: [sample("button", "a"), sample("button", "a")],
-      skipped: 28,
-      skippedTags: { div: 28 },
-    }));
+    const report = judgeDesignPolicy(
+      input({
+        samples: [sample("button", "a"), sample("button", "a")],
+        skipped: 28,
+        skippedTags: { div: 28 },
+      }),
+    );
     assert.equal(report.judgedElements, 2);
   });
 });
@@ -520,10 +569,12 @@ describe("design sample collector", () => {
 
 describe("formatDesignReport", () => {
   it("separates verdict-carrying findings from informational ones", () => {
-    const judged = judgeDesignPolicy(input({
-      samples: [sample("button", "a"), sample("button", "b"), sample("button", "c")],
-      spacing: [...spacing(16, 12), ...spacing(24, 9), ...spacing(32, 7), ...spacing(23, 1)],
-    }));
+    const judged = judgeDesignPolicy(
+      input({
+        samples: [sample("button", "a"), sample("button", "b"), sample("button", "c")],
+        spacing: [...spacing(16, 12), ...spacing(24, 9), ...spacing(32, 7), ...spacing(23, 1)],
+      }),
+    );
     const text = formatDesignReport({ source: "fixture.html", ...judged });
     assert.match(text, /DRIFT/);
     assert.match(text, /Findings/);
@@ -535,11 +586,13 @@ describe("formatDesignReport", () => {
   it("makes a thin coverage figure interpretable instead of printing a bare skip count", () => {
     // v6's adopting agent on the old line: "28 of 30 elements skipped means the
     // verdict rests on almost nothing, and nothing says whether that is normal."
-    const judged = judgeDesignPolicy(input({
-      samples: [sample("button", "a"), sample("button", "a")],
-      skipped: 28,
-      skippedTags: { div: 24, p: 3, span: 1 },
-    }));
+    const judged = judgeDesignPolicy(
+      input({
+        samples: [sample("button", "a"), sample("button", "a")],
+        skipped: 28,
+        skippedTags: { div: 24, p: 3, span: 1 },
+      }),
+    );
     const text = plain(formatDesignReport({ source: "fixture.html", ...judged }));
     assert.match(text, /coverage: 2 of 30 visible element\(s\) carried an inferable role/);
     assert.match(text, /no role: div x24, p x3, span x1/);
@@ -564,9 +617,11 @@ describe("formatDesignReport", () => {
   });
 
   it("keeps stale subtree exclusions visible", () => {
-    const judged = judgeDesignPolicy(input({
-      exclusions: [{ selector: ".removed-widget", matches: 0, elements: 0 }],
-    }));
+    const judged = judgeDesignPolicy(
+      input({
+        exclusions: [{ selector: ".removed-widget", matches: 0, elements: 0 }],
+      }),
+    );
     assert.deepEqual(judged.unusedExcludes, [".removed-widget"]);
     const text = formatDesignReport({ source: "fixture.html", ...judged });
     assert.match(text, /\.removed-widget: 0 root match/);
@@ -576,14 +631,16 @@ describe("formatDesignReport", () => {
   });
 
   it("reports how many elements each --exclude removed, next to the verdict", () => {
-    const judged = judgeDesignPolicy(input({
-      samples: Array.from({ length: 5 }, () => sample("button", "a")),
-      exclusions: [
-        { selector: ".maplibregl-ctrl", matches: 2, elements: 11 },
-        { selector: ".chartjs-tooltip", matches: 1, elements: 3 },
-      ],
-      excludedElements: 14,
-    }));
+    const judged = judgeDesignPolicy(
+      input({
+        samples: Array.from({ length: 5 }, () => sample("button", "a")),
+        exclusions: [
+          { selector: ".maplibregl-ctrl", matches: 2, elements: 11 },
+          { selector: ".chartjs-tooltip", matches: 1, elements: 3 },
+        ],
+        excludedElements: 14,
+      }),
+    );
     assert.deepEqual(judged.unusedExcludes, []);
     const text = formatDesignReport({ source: "fixture.html", ...judged });
     // Mirrors `check integrity`'s `(2 fail, 1 warn, 5 exempted)`: the size of
@@ -594,12 +651,16 @@ describe("formatDesignReport", () => {
   });
 
   it("says a text-free element was judged on its box alone", () => {
-    const judged = judgeDesignPolicy(input({
-      samples: [
-        styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"),
-        styled("button", "boxA", "12|400", { textFree: true }),
-      ],
-    }));
+    const judged = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "boxA", "14|600"),
+          styled("button", "boxA", "14|600"),
+          styled("button", "boxA", "14|600"),
+          styled("button", "boxA", "12|400", { textFree: true }),
+        ],
+      }),
+    );
     const text = formatDesignReport({ source: "fixture.html", ...judged });
     assert.match(text, /text-free: 1 \(1 judged on box alone/);
     assert.match(text, /not observable without painted text/);
@@ -610,11 +671,14 @@ const DIR = mkdtempSync(join(tmpdir(), "design-policy-"));
 
 const page = (name: string, body: string, css = ""): string => {
   const file = join(DIR, `${name}.html`);
-  writeFileSync(file, `<!doctype html><meta charset="utf-8"><title>${name}</title>
+  writeFileSync(
+    file,
+    `<!doctype html><meta charset="utf-8"><title>${name}</title>
 <style>body { margin: 0; font: 16px/1.5 sans-serif; }
 button { padding: 12px 20px; border-radius: 8px; font-size: 14px; border: 1px solid #333; background: #fff; }
 ${css}</style>
-${body}`);
+${body}`,
+  );
   return file;
 };
 

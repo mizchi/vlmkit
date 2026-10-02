@@ -66,10 +66,10 @@ describe("CLI entry points dispatch identically", () => {
     assert.equal(
       dispatchExpression(BUNDLED),
       dispatchExpression(WORKSPACE),
-      "scripts/vlmkit-bundled.mjs (the published `bin`) and src/cli/vlmkit.ts must invoke and "
-      + "guard runCli the same way. A difference here is invisible in the workspace and total "
-      + "in the shipped CLI — it has happened three times. If the bundled entry genuinely needs "
-      + "to differ, change both and say why in a comment.",
+      "scripts/vlmkit-bundled.mjs (the published `bin`) and src/cli/vlmkit.ts must invoke and " +
+        "guard runCli the same way. A difference here is invisible in the workspace and total " +
+        "in the shipped CLI — it has happened three times. If the bundled entry genuinely needs " +
+        "to differ, change both and say why in a comment.",
     );
   });
 
@@ -83,11 +83,7 @@ describe("CLI entry points dispatch identically", () => {
         /\.catch\(handleCliError\)/,
         `${file} must end in .catch(handleCliError) — a bare console.error ships raw stacks`,
       );
-      assert.match(
-        readFileSync(file, "utf8"),
-        /import .*handleCliError.* from/,
-        `${file} must import handleCliError`,
-      );
+      assert.match(readFileSync(file, "utf8"), /import .*handleCliError.* from/, `${file} must import handleCliError`);
     }
   });
 

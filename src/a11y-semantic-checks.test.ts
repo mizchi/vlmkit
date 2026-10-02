@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  analyzeA11ySemanticSamples,
-  type A11ySemanticRawSample,
-} from "./a11y-semantic-checks.ts";
+import { analyzeA11ySemanticSamples, type A11ySemanticRawSample } from "./a11y-semantic-checks.ts";
 
 function blank(): A11ySemanticRawSample {
   return { headings: [], formControls: [], images: [] };
@@ -68,16 +65,18 @@ describe("analyzeA11ySemanticSamples", () => {
     it("flags an input with only a placeholder", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        formControls: [{
-          path: "form>input",
-          tag: "input",
-          type: "text",
-          hasAssociatedLabel: false,
-          hasAriaLabel: false,
-          hasAriaLabelledby: false,
-          ariaLabelledbyTargetText: "",
-          placeholder: "Email",
-        }],
+        formControls: [
+          {
+            path: "form>input",
+            tag: "input",
+            type: "text",
+            hasAssociatedLabel: false,
+            hasAriaLabel: false,
+            hasAriaLabelledby: false,
+            ariaLabelledbyTargetText: "",
+            placeholder: "Email",
+          },
+        ],
       });
       const f = out.filter((x) => x.kind === "form-label");
       assert.equal(f.length, 1);
@@ -88,12 +87,18 @@ describe("analyzeA11ySemanticSamples", () => {
     it("accepts an aria-label", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        formControls: [{
-          path: "input", tag: "input", type: "text",
-          hasAssociatedLabel: false, hasAriaLabel: true,
-          hasAriaLabelledby: false, ariaLabelledbyTargetText: "",
-          placeholder: "",
-        }],
+        formControls: [
+          {
+            path: "input",
+            tag: "input",
+            type: "text",
+            hasAssociatedLabel: false,
+            hasAriaLabel: true,
+            hasAriaLabelledby: false,
+            ariaLabelledbyTargetText: "",
+            placeholder: "",
+          },
+        ],
       });
       assert.equal(out.filter((x) => x.kind === "form-label").length, 0);
     });
@@ -101,12 +106,18 @@ describe("analyzeA11ySemanticSamples", () => {
     it("accepts aria-labelledby pointing at non-empty text", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        formControls: [{
-          path: "input", tag: "input", type: "text",
-          hasAssociatedLabel: false, hasAriaLabel: false,
-          hasAriaLabelledby: true, ariaLabelledbyTargetText: "Phone number",
-          placeholder: "",
-        }],
+        formControls: [
+          {
+            path: "input",
+            tag: "input",
+            type: "text",
+            hasAssociatedLabel: false,
+            hasAriaLabel: false,
+            hasAriaLabelledby: true,
+            ariaLabelledbyTargetText: "Phone number",
+            placeholder: "",
+          },
+        ],
       });
       assert.equal(out.filter((x) => x.kind === "form-label").length, 0);
     });
@@ -114,12 +125,18 @@ describe("analyzeA11ySemanticSamples", () => {
     it("rejects aria-labelledby pointing at empty text", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        formControls: [{
-          path: "input", tag: "input", type: "text",
-          hasAssociatedLabel: false, hasAriaLabel: false,
-          hasAriaLabelledby: true, ariaLabelledbyTargetText: "",
-          placeholder: "",
-        }],
+        formControls: [
+          {
+            path: "input",
+            tag: "input",
+            type: "text",
+            hasAssociatedLabel: false,
+            hasAriaLabel: false,
+            hasAriaLabelledby: true,
+            ariaLabelledbyTargetText: "",
+            placeholder: "",
+          },
+        ],
       });
       assert.equal(out.filter((x) => x.kind === "form-label").length, 1);
     });
@@ -128,9 +145,13 @@ describe("analyzeA11ySemanticSamples", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
         formControls: ["submit", "reset", "button"].map((t) => ({
-          path: `input[type=${t}]`, tag: "input", type: t,
-          hasAssociatedLabel: false, hasAriaLabel: false,
-          hasAriaLabelledby: false, ariaLabelledbyTargetText: "",
+          path: `input[type=${t}]`,
+          tag: "input",
+          type: t,
+          hasAssociatedLabel: false,
+          hasAriaLabel: false,
+          hasAriaLabelledby: false,
+          ariaLabelledbyTargetText: "",
           placeholder: "",
         })),
       });
@@ -142,10 +163,16 @@ describe("analyzeA11ySemanticSamples", () => {
     it("flags an img without alt", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        images: [{
-          path: "img", src: "/logo.png",
-          hasAlt: false, hasEmptyAlt: false, ariaHidden: false, role: "",
-        }],
+        images: [
+          {
+            path: "img",
+            src: "/logo.png",
+            hasAlt: false,
+            hasEmptyAlt: false,
+            ariaHidden: false,
+            role: "",
+          },
+        ],
       });
       const f = out.filter((x) => x.kind === "image-alt");
       assert.equal(f.length, 1);
@@ -155,10 +182,16 @@ describe("analyzeA11ySemanticSamples", () => {
     it("accepts img with empty alt (decorative)", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        images: [{
-          path: "img", src: "/bg.png",
-          hasAlt: true, hasEmptyAlt: true, ariaHidden: false, role: "",
-        }],
+        images: [
+          {
+            path: "img",
+            src: "/bg.png",
+            hasAlt: true,
+            hasEmptyAlt: true,
+            ariaHidden: false,
+            role: "",
+          },
+        ],
       });
       assert.equal(out.filter((x) => x.kind === "image-alt").length, 0);
     });
@@ -166,10 +199,16 @@ describe("analyzeA11ySemanticSamples", () => {
     it("accepts img with aria-hidden", () => {
       const out = analyzeA11ySemanticSamples({
         ...blank(),
-        images: [{
-          path: "img", src: "/x.svg",
-          hasAlt: false, hasEmptyAlt: false, ariaHidden: true, role: "",
-        }],
+        images: [
+          {
+            path: "img",
+            src: "/x.svg",
+            hasAlt: false,
+            hasEmptyAlt: false,
+            ariaHidden: true,
+            role: "",
+          },
+        ],
       });
       assert.equal(out.filter((x) => x.kind === "image-alt").length, 0);
     });
@@ -178,10 +217,16 @@ describe("analyzeA11ySemanticSamples", () => {
       for (const role of ["presentation", "none"]) {
         const out = analyzeA11ySemanticSamples({
           ...blank(),
-          images: [{
-            path: "img", src: "/x.svg",
-            hasAlt: false, hasEmptyAlt: false, ariaHidden: false, role,
-          }],
+          images: [
+            {
+              path: "img",
+              src: "/x.svg",
+              hasAlt: false,
+              hasEmptyAlt: false,
+              ariaHidden: false,
+              role,
+            },
+          ],
         });
         assert.equal(out.filter((x) => x.kind === "image-alt").length, 0, `role=${role}`);
       }

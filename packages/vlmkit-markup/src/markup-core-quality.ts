@@ -5,10 +5,7 @@ import { callMarkupCoreJson, finiteOr, intOr, runMarkupCore } from "./markup-cor
 
 export type QualityErrorStateKind = "error" | "warning" | "none";
 
-export function computeQualityErrorStateKind(
-  redRatio: number,
-  yellowRatio: number,
-): QualityErrorStateKind {
+export function computeQualityErrorStateKind(redRatio: number, yellowRatio: number): QualityErrorStateKind {
   const out = callMarkupCoreJson<string>("quality-error-state-kind", {
     red_ratio: finiteOr(redRatio),
     yellow_ratio: finiteOr(yellowRatio),
@@ -27,10 +24,7 @@ export function computeQualityCoveragePassed(covered: number, total: number): bo
 export type QualityDiffSeverity = "large" | "small";
 
 export function computeQualityDiffSeverity(diffRatio: number): QualityDiffSeverity {
-  const out = runMarkupCore([
-    "quality-diff-severity",
-    doubleArg(diffRatio),
-  ]);
+  const out = runMarkupCore(["quality-diff-severity", doubleArg(diffRatio)]);
   if (out === "large" || out === "small") return out;
   throw new Error(`markup-core quality-diff-severity unexpected: ${out}`);
 }
@@ -38,4 +32,3 @@ export function computeQualityDiffSeverity(diffRatio: number): QualityDiffSeveri
 function doubleArg(value: number): string {
   return String(Number.isFinite(value) ? value : 0);
 }
-

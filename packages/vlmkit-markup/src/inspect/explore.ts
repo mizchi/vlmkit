@@ -129,7 +129,9 @@ export interface ExploreReport {
   failedActions: number;
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
+function isUrl(s: string): boolean {
+  return /^https?:\/\//.test(s);
+}
 
 function parseArgs(argv: string[]) {
   let outputDir = "";
@@ -224,7 +226,9 @@ async function settleHover(page: Page, action: DiscoveredAction): Promise<void> 
 async function invokeAction(page: Page, action: DiscoveredAction): Promise<void> {
   if (action.origin === "window.__vrtActions") {
     await page.evaluate(async (name) => {
-      const list = (window as unknown as { __vrtActions?: Array<{ name: string; run: () => unknown | Promise<unknown> }> }).__vrtActions;
+      const list = (
+        window as unknown as { __vrtActions?: Array<{ name: string; run: () => unknown | Promise<unknown> }> }
+      ).__vrtActions;
       const found = list?.find((a) => a.name === name);
       if (!found) throw new Error(`window.__vrtActions["${name}"] not found at invocation time`);
       await found.run();
@@ -270,7 +274,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
 
-    actions = await page.evaluate(DISCOVER_SCRIPT) as DiscoveredAction[];
+    actions = (await page.evaluate(DISCOVER_SCRIPT)) as DiscoveredAction[];
 
     // Capture a baseline used as the "before" reference for EACH
     // action. We reset state between actions by reloading the page.
@@ -309,7 +313,10 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
             w.__vrtMutationCount = (w.__vrtMutationCount ?? 0) + muts.length;
           });
           obs.observe(document.documentElement, {
-            childList: true, attributes: true, characterData: true, subtree: true,
+            childList: true,
+            attributes: true,
+            characterData: true,
+            subtree: true,
           });
           w.__vrtMutationObs = obs;
         });
@@ -347,7 +354,8 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       }
       await page.screenshot({ path: afterShot, fullPage: false });
 
-      let diffRatio = 0, diffPixels = 0;
+      let diffRatio = 0,
+        diffPixels = 0;
       let heatmapRegions: HeatmapRegion[] = [];
       let heatmapPath: string | undefined;
       if (executed) {
@@ -367,7 +375,9 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
           heatmapRegions = await findHeatmapRegionsFromFile(heatmapMaybe, {}, afterShot);
           await annotateHeatmapRegionKinds(heatmapRegions, afterShot);
           if (diffPixels > 0) heatmapPath = heatmapMaybe;
-        } catch { /* no heatmap */ }
+        } catch {
+          /* no heatmap */
+        }
       }
 
       findings.push({
@@ -388,14 +398,23 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
-    source: options.source, viewport, actions, findings,
-    silentFloor, strictTiming: !!options.strictTiming,
+    source: options.source,
+    viewport,
+    actions,
+    findings,
+    silentFloor,
+    strictTiming: !!options.strictTiming,
   });
   await writeFile(reportPath, md);
 
   return {
-    source: options.source, viewport, actions, findings, reportPath,
-    silentFloor, strictTiming: !!options.strictTiming,
+    source: options.source,
+    viewport,
+    actions,
+    findings,
+    reportPath,
+    silentFloor,
+    strictTiming: !!options.strictTiming,
     deadActions: findings.filter((f) => f.executed && f.diffRatio < silentFloor).length,
     silentHandlers: findings.filter((f) => isSilentHandler(f, silentFloor)).length,
     failedActions: findings.filter((f) => !f.executed).length,
@@ -424,22 +443,29 @@ export function formatExploreReport(report: ExploreReport): string {
   lines.push(`  ${BOLD}${CYAN}vlmkit inspect explore${RESET}`);
   lines.push(`  ${DIM}source: ${report.source}${RESET}`);
   if (report.actions.length === 0) {
-    lines.push(`  ${YELLOW}!${RESET} no declared actions found — page exposes neither \`window.__vrtActions\` nor \`data-vrt-action\` attributes`);
+    lines.push(
+      `  ${YELLOW}!${RESET} no declared actions found — page exposes neither \`window.__vrtActions\` nor \`data-vrt-action\` attributes`,
+    );
     lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
     return lines.join("\n");
   }
   lines.push(`  ${DIM}discovered ${report.actions.length} action(s)${RESET}`);
   for (const f of report.findings) {
     const isSilent = isSilentHandler(f, report.silentFloor);
-    const icon = !f.executed ? `${RED}✗${RESET}`
-      : isSilent ? `${RED}!${RESET}`
-      : f.diffRatio < report.silentFloor ? `${YELLOW}~${RESET}`
-      : `${GREEN}✓${RESET}`;
+    const icon = !f.executed
+      ? `${RED}✗${RESET}`
+      : isSilent
+        ? `${RED}!${RESET}`
+        : f.diffRatio < report.silentFloor
+          ? `${YELLOW}~${RESET}`
+          : `${GREEN}✓${RESET}`;
     const pct = (f.diffRatio * 100).toFixed(2);
     const mut = f.mutationCount !== undefined ? `, ${f.mutationCount} mut` : "";
-    const detail = !f.executed ? `failed: ${f.error}`
-      : isSilent ? `Δ ${pct}% — silent handler (0 DOM mutations)`
-      : `Δ ${pct}%${mut}`;
+    const detail = !f.executed
+      ? `failed: ${f.error}`
+      : isSilent
+        ? `Δ ${pct}% — silent handler (0 DOM mutations)`
+        : `Δ ${pct}%${mut}`;
     lines.push(`  ${icon} ${f.action.name.padEnd(24)} ${DIM}${detail}${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
@@ -462,9 +488,11 @@ function renderReport(r: RenderInput): string {
   if (r.actions.length === 0) {
     lines.push("## No declared actions found");
     lines.push("");
-    lines.push("The page exposes neither `window.__vrtActions` (JS hook) nor " +
-      "`data-vrt-action` attributes. To enable auto-exploration, declare " +
-      "actions in one of two ways:");
+    lines.push(
+      "The page exposes neither `window.__vrtActions` (JS hook) nor " +
+        "`data-vrt-action` attributes. To enable auto-exploration, declare " +
+        "actions in one of two ways:",
+    );
     lines.push("");
     lines.push("```html");
     lines.push("<!-- attribute-driven (clicks the element) -->");
@@ -489,11 +517,13 @@ function renderReport(r: RenderInput): string {
   lines.push("");
   lines.push("## Findings");
   lines.push("");
-  lines.push("Each row: action invoked from a freshly-loaded page, baseline " +
-    "captured before invocation, after captured post-invocation + " +
-    "post-wait, pixel-diffed. A `dead` action (Δ near 0%) typically means " +
-    "the declared selector / function had no visible side effect — verify " +
-    "the declaration matches a real interaction.");
+  lines.push(
+    "Each row: action invoked from a freshly-loaded page, baseline " +
+      "captured before invocation, after captured post-invocation + " +
+      "post-wait, pixel-diffed. A `dead` action (Δ near 0%) typically means " +
+      "the declared selector / function had no visible side effect — verify " +
+      "the declaration matches a real interaction.",
+  );
   lines.push("");
   // Add a Mut. column only when --strict-timing was on; otherwise the
   // column would be all em-dashes and just clutter the report.
@@ -503,8 +533,9 @@ function renderReport(r: RenderInput): string {
     // the pixelmatch noise floor used for the diff itself, while this
     // 0.001 cutoff is "did anything happen at all". Spelled out in the
     // preamble so the value is auditable without reading source.
-    lines.push(`Silent / dead cutoff: Δ < ${(r.silentFloor * 100).toFixed(2)}% ` +
-      `(constant; independent of \`--threshold\`).`);
+    lines.push(
+      `Silent / dead cutoff: Δ < ${(r.silentFloor * 100).toFixed(2)}% ` + `(constant; independent of \`--threshold\`).`,
+    );
     lines.push("");
   }
   const header = showMut
@@ -589,10 +620,7 @@ function printUsage(): void {
  * @param cwd resolved against for the default output directory. An argument
  *   rather than a `process.chdir`, which is process-wide.
  */
-export async function runExploreCli(
-  cliArgs: readonly string[],
-  options: { cwd?: string } = {},
-): Promise<number> {
+export async function runExploreCli(cliArgs: readonly string[], options: { cwd?: string } = {}): Promise<number> {
   const argv = [...cliArgs];
   if (argv.includes("--help") || argv.includes("-h")) {
     printUsage();
@@ -623,6 +651,8 @@ export async function runExploreCli(
 
 if (isCliEntry(import.meta.url, "explore")) {
   runExploreCli(process.argv.slice(2))
-    .then((code) => { process.exitCode = code; })
+    .then((code) => {
+      process.exitCode = code;
+    })
     .catch(handleCliError);
 }

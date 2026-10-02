@@ -19,10 +19,7 @@ import { createRoot, type Root } from "react-dom/client";
  *
  * Adjust this glob to your layout. It is the one line that is not portable.
  */
-const modules = import.meta.glob<Record<string, unknown>>(
-  "../../components/**/*.story.{tsx,jsx}",
-  { eager: true },
-);
+const modules = import.meta.glob<Record<string, unknown>>("../../components/**/*.story.{tsx,jsx}", { eager: true });
 
 type StoryFn = (props: Record<string, unknown>) => React.ReactNode;
 
@@ -32,9 +29,7 @@ type StoryFn = (props: Record<string, unknown>) => React.ReactNode;
  */
 const stories = new Map<string, StoryFn>();
 for (const [path, mod] of Object.entries(modules)) {
-  const id = path
-    .replace(/^.*?\/components\//, "components/")
-    .replace(/\.story\.[jt]sx?$/, "");
+  const id = path.replace(/^.*?\/components\//, "components/").replace(/\.story\.[jt]sx?$/, "");
   for (const [name, value] of Object.entries(mod)) {
     if (typeof value === "function") stories.set(`${id}/${name}`, value as StoryFn);
   }

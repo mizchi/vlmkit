@@ -10,12 +10,7 @@
  * capture flow — `batchRender` only returns paint trees. Use this driver
  * alongside the existing capture loop, not as a wholesale replacement.
  */
-import type {
-  CraterClient,
-  CraterCssMutation,
-  PaintNode,
-  PaintTreeChange,
-} from "./crater-client.ts";
+import type { CraterClient, CraterCssMutation, PaintNode, PaintTreeChange } from "./crater-client.ts";
 import { diffPaintTrees } from "./crater-client.ts";
 
 export interface BatchPrescanRequest {
@@ -57,9 +52,7 @@ export async function runBatchPrescan(
   options: BatchPrescanOptions = {},
 ): Promise<BatchPrescanResult[]> {
   const skipEmpty = options.skipEmptyMutations ?? true;
-  const callable = skipEmpty
-    ? requests.filter((req) => req.mutations.length > 0)
-    : requests;
+  const callable = skipEmpty ? requests.filter((req) => req.mutations.length > 0) : requests;
 
   if (callable.length === 0) return [];
 
@@ -88,10 +81,7 @@ export async function runBatchPrescan(
  * Build a Crater `mutations` payload for "remove a single CSS declaration"
  * — the css-challenge property-mode trial shape.
  */
-export function mutationsForPropertyRemoval(
-  selector: string,
-  property: string,
-): CraterCssMutation[] {
+export function mutationsForPropertyRemoval(selector: string, property: string): CraterCssMutation[] {
   return [{ selector, property, action: "remove" }];
 }
 
@@ -99,10 +89,7 @@ export function mutationsForPropertyRemoval(
  * Build a Crater `mutations` payload for "remove every declaration in a
  * selector block" — the css-challenge selector-mode trial shape.
  */
-export function mutationsForSelectorBlockRemoval(
-  selector: string,
-  properties: string[],
-): CraterCssMutation[] {
+export function mutationsForSelectorBlockRemoval(selector: string, properties: string[]): CraterCssMutation[] {
   return properties.map((property) => ({ selector, property, action: "remove" }));
 }
 

@@ -74,12 +74,8 @@ export function extractSnapshotFixTasks(
   options: ExtractFixTasksOptions = {},
 ): SnapshotFixTask[] {
   const minDiffRatio = options.minDiffRatio ?? 0;
-  const labelFilter = options.labels && options.labels.length > 0
-    ? new Set(options.labels)
-    : undefined;
-  const outputDir = options.outputDir
-    ? resolve(options.outputDir)
-    : undefined;
+  const labelFilter = options.labels && options.labels.length > 0 ? new Set(options.labels) : undefined;
+  const outputDir = options.outputDir ? resolve(options.outputDir) : undefined;
 
   const tasks: SnapshotFixTask[] = [];
   for (const entry of report.results) {
@@ -133,10 +129,7 @@ function formatPct(ratio: number): string {
   return `${(ratio * 100).toFixed(2)}%`;
 }
 
-export function formatSnapshotFixPromptMarkdown(
-  tasks: SnapshotFixTask[],
-  options: FormatPromptOptions = {},
-): string {
+export function formatSnapshotFixPromptMarkdown(tasks: SnapshotFixTask[], options: FormatPromptOptions = {}): string {
   const base = options.relativeTo ? resolve(options.relativeTo) : process.cwd();
   const limit = options.limit ?? tasks.length;
   const selected = tasks.slice(0, limit);
@@ -147,10 +140,10 @@ export function formatSnapshotFixPromptMarkdown(
   lines.push(
     options.intro ??
       "The following routes regressed against their VRT baselines. " +
-      "For each task, inspect the baseline / current / heatmap images, " +
-      "identify the visual cause in the linked HTML, and propose a code " +
-      "fix that closes the diff. Report the fix as a unified diff against " +
-      "the source files responsible for the affected route.",
+        "For each task, inspect the baseline / current / heatmap images, " +
+        "identify the visual cause in the linked HTML, and propose a code " +
+        "fix that closes the diff. Report the fix as a unified diff against " +
+        "the source files responsible for the affected route.",
   );
   lines.push("");
 
@@ -160,19 +153,25 @@ export function formatSnapshotFixPromptMarkdown(
     return lines.join("\n");
   }
 
-  lines.push(`Total regressed snapshots: ${tasks.length}` +
-    (limit < tasks.length ? ` (showing top ${limit} by diff ratio)` : ""));
+  lines.push(
+    `Total regressed snapshots: ${tasks.length}` +
+      (limit < tasks.length ? ` (showing top ${limit} by diff ratio)` : ""),
+  );
   lines.push("");
 
   for (const [index, task] of selected.entries()) {
     lines.push(`## ${index + 1}. ${task.label} — ${task.viewport} (${formatPct(task.diffRatio)})`);
     lines.push("");
     lines.push(`- URL: ${task.url}`);
-    lines.push(`- Diff ratio: ${formatPct(task.diffRatio)} ` +
-      `(${task.compensatedDiffRatio !== undefined ? `${formatPct(task.compensatedDiffRatio)} after shift compensation` : "no shift compensation"})`);
+    lines.push(
+      `- Diff ratio: ${formatPct(task.diffRatio)} ` +
+        `(${task.compensatedDiffRatio !== undefined ? `${formatPct(task.compensatedDiffRatio)} after shift compensation` : "no shift compensation"})`,
+    );
     if (task.globalShift !== undefined && task.globalShift !== 0) {
-      lines.push(`- Global shift: ${task.globalShift > 0 ? "+" : ""}${task.globalShift}px` +
-        (task.shiftOnly ? " (shift-only — likely layout reflow above the fold)" : ""));
+      lines.push(
+        `- Global shift: ${task.globalShift > 0 ? "+" : ""}${task.globalShift}px` +
+          (task.shiftOnly ? " (shift-only — likely layout reflow above the fold)" : ""),
+      );
     }
     lines.push(`- Baseline: \`${relPath(task.paths.baseline, base)}\``);
     lines.push(`- Current: \`${relPath(task.paths.current, base)}\``);
@@ -191,7 +190,9 @@ export function formatSnapshotFixPromptMarkdown(
   lines.push("2. If a heatmap is present, use it to localize the diff region.");
   lines.push("3. Map the affected DOM (from the captured HTML) back to source files.");
   lines.push("4. Propose a minimal CSS or markup change and re-run `vlmkit snapshot` to verify.");
-  lines.push("5. Once green, run `vlmkit snapshot approve --label <label>` to promote the new baseline if the visual change is intentional.");
+  lines.push(
+    "5. Once green, run `vlmkit snapshot approve --label <label>` to promote the new baseline if the visual change is intentional.",
+  );
   lines.push("");
 
   return lines.join("\n");

@@ -46,12 +46,7 @@ export interface RenderSanityResult {
   failedRequests: FailedRequest[];
 }
 
-const BROWSER_DEFAULT_FONTS = new Set([
-  "times new roman",
-  "times",
-  '"times new roman"',
-  "serif",
-]);
+const BROWSER_DEFAULT_FONTS = new Set(["times new roman", "times", '"times new roman"', "serif"]);
 
 function looksLikeBrowserDefault(fontFamily: string): boolean {
   const normalized = fontFamily.trim().toLowerCase();
@@ -134,8 +129,9 @@ export function probeSourceHtml(html: string): {
 } {
   return {
     declaredExternalScripts: /<script[^>]+\bsrc\s*=/i.test(html),
-    declaredExternalStylesheets: /<link[^>]+\brel\s*=\s*["']?stylesheet["']?[^>]+\bhref\s*=/i.test(html)
-      || /<link[^>]+\bhref\s*=[^>]+\brel\s*=\s*["']?stylesheet/i.test(html),
+    declaredExternalStylesheets:
+      /<link[^>]+\brel\s*=\s*["']?stylesheet["']?[^>]+\bhref\s*=/i.test(html) ||
+      /<link[^>]+\bhref\s*=[^>]+\brel\s*=\s*["']?stylesheet/i.test(html),
   };
 }
 

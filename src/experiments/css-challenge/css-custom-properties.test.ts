@@ -9,12 +9,7 @@ import {
 import type { CssDeclaration } from "./css-challenge-core.ts";
 import type { ComputedStyleDiff } from "./css-challenge-core.ts";
 
-function decl(
-  index: number,
-  selector: string,
-  property: string,
-  value: string,
-): CssDeclaration {
+function decl(index: number, selector: string, property: string, value: string): CssDeclaration {
   return {
     index,
     text: `${selector} { ${property}: ${value}; }`,
@@ -27,10 +22,10 @@ function decl(
 
 describe("extractCustomPropertyReferences", () => {
   it("should extract direct and fallback var() references", () => {
-    assert.deepEqual(
-      extractCustomPropertyReferences("linear-gradient(var(--accent), var(--bg, white))"),
-      ["--accent", "--bg"],
-    );
+    assert.deepEqual(extractCustomPropertyReferences("linear-gradient(var(--accent), var(--bg, white))"), [
+      "--accent",
+      "--bg",
+    ]);
   });
 });
 
@@ -43,10 +38,7 @@ describe("collectComputedStyleTrackingProperties", () => {
       decl(3, ".card", "--card-fg", "var(--accent)"),
     ];
 
-    assert.deepEqual(
-      collectComputedStyleTrackingProperties(declarations),
-      ["border-color", "color"],
-    );
+    assert.deepEqual(collectComputedStyleTrackingProperties(declarations), ["border-color", "color"]);
   });
 });
 
@@ -83,9 +75,7 @@ describe("buildCustomPropertyUsageIndex", () => {
   });
 
   it("should return empty targets for unknown custom properties", () => {
-    const index = buildCustomPropertyUsageIndex([
-      decl(0, ".button", "color", "var(--accent)"),
-    ]);
+    const index = buildCustomPropertyUsageIndex([decl(0, ".button", "color", "var(--accent)")]);
 
     assert.deepEqual(index.findImpactedTargets("--missing"), []);
   });

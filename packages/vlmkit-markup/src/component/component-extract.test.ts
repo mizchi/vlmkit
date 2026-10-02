@@ -54,19 +54,25 @@ function buildHud(W: number, H: number, s: number): { png: PNG; elements: HudEle
       for (let xx = x; xx < x + w; xx++) {
         if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
         const i = (yy * W + xx) * 4;
-        png.data[i] = c[0]; png.data[i + 1] = c[1]; png.data[i + 2] = c[2]; png.data[i + 3] = 255;
+        png.data[i] = c[0];
+        png.data[i + 1] = c[1];
+        png.data[i + 2] = c[2];
+        png.data[i + 3] = 255;
       }
     }
   };
   const frame = (x: number, y: number, w: number, h: number, c: [number, number, number], t: number) => {
-    rect(x, y, w, t, c); rect(x, y + h - t, w, t, c);
-    rect(x, y, t, h, c); rect(x + w - t, y, t, h, c);
+    rect(x, y, w, t, c);
+    rect(x, y + h - t, w, t, c);
+    rect(x, y, t, h, c);
+    rect(x + w - t, y, t, h, c);
   };
   const elements: HudElement[] = [];
   const add = (name: string, left: number, top: number, width: number, height: number) =>
     elements.push({ name, left, top, width, height });
 
-  const L = S(8), T = S(8);
+  const L = S(8),
+    T = S(8);
   rect(L, T, S(120), S(10), [60, 20, 24]);
   rect(L, T, S(84), S(10), [220, 60, 60]);
   add("hp-bar", L, T, S(120), S(10));
@@ -80,12 +86,17 @@ function buildHud(W: number, H: number, s: number): { png: PNG; elements: HudEle
   add("xp-bar", L, xpY, S(120), S(4));
 
   const stY = xpY + S(24);
-  ([[200, 90, 200], [90, 200, 120], [200, 180, 80]] as Array<[number, number, number]>)
-    .forEach((c, i) => {
-      const x = L + i * S(18);
-      rect(x, stY, S(12), S(12), c);
-      add(`status-${i + 1}`, x, stY, S(12), S(12));
-    });
+  (
+    [
+      [200, 90, 200],
+      [90, 200, 120],
+      [200, 180, 80],
+    ] as Array<[number, number, number]>
+  ).forEach((c, i) => {
+    const x = L + i * S(18);
+    rect(x, stY, S(12), S(12), c);
+    add(`status-${i + 1}`, x, stY, S(12), S(12));
+  });
 
   const pX = L + S(128);
   frame(pX, T - S(2), S(28), S(28), [230, 220, 180], Math.max(1, S(2)));
@@ -95,27 +106,40 @@ function buildHud(W: number, H: number, s: number): { png: PNG; elements: HudEle
   const cX = pX + S(40);
   rect(cX, T + S(2), S(10), S(10), [240, 200, 60]);
   add("coin-icon", cX, T + S(2), S(10), S(10));
-  const lX = cX + S(16), glyphW = Math.max(1, S(5)), glyphAdv = Math.max(2, S(7));
+  const lX = cX + S(16),
+    glyphW = Math.max(1, S(5)),
+    glyphAdv = Math.max(2, S(7));
   for (let g = 0; g < 4; g++) rect(lX + g * glyphAdv, T + S(3), glyphW, Math.max(1, S(7)), [240, 240, 230]);
   add("coin-label", lX, T + S(3), 3 * glyphAdv + glyphW, Math.max(1, S(7)));
 
-  const mm = S(60), mmX = W - S(8) - mm;
+  const mm = S(60),
+    mmX = W - S(8) - mm;
   frame(mmX, T, mm, mm, [120, 200, 200], Math.max(1, S(2)));
   let seed = 12345;
-  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
   for (let d = 0; d < 40; d++) {
-    rect(mmX + S(2) + Math.floor(rnd() * (mm - S(6))), T + S(2) + Math.floor(rnd() * (mm - S(6))),
-      Math.max(1, S(2)), Math.max(1, S(2)), [90, 160, 160]);
+    rect(
+      mmX + S(2) + Math.floor(rnd() * (mm - S(6))),
+      T + S(2) + Math.floor(rnd() * (mm - S(6))),
+      Math.max(1, S(2)),
+      Math.max(1, S(2)),
+      [90, 160, 160],
+    );
   }
   add("minimap", mmX, T, mm, mm);
 
-  const chW = S(12), chT = Math.max(1, S(2));
-  const chX = Math.round(W / 2 - chW / 2), chY = Math.round(H / 2 - chW / 2);
+  const chW = S(12),
+    chT = Math.max(1, S(2));
+  const chX = Math.round(W / 2 - chW / 2),
+    chY = Math.round(H / 2 - chW / 2);
   rect(chX, chY + Math.round((chW - chT) / 2), chW, chT, [240, 240, 240]);
   rect(chX + Math.round((chW - chT) / 2), chY, chT, chW, [240, 240, 240]);
   add("crosshair", chX, chY, chW, chW);
 
-  const dW = S(200), dH = S(40), dX = S(16), dY = H - S(60) - dH;
+  const dW = S(200),
+    dH = S(40),
+    dX = S(16),
+    dY = H - S(60) - dH;
   frame(dX, dY, dW, dH, [220, 220, 210], Math.max(1, S(2)));
   rect(dX + S(8), dY + S(10), S(150), Math.max(1, S(4)), [200, 200, 190]);
   rect(dX + S(8), dY + S(20), S(120), Math.max(1, S(4)), [200, 200, 190]);
@@ -132,7 +156,9 @@ function buildHud(W: number, H: number, s: number): { png: PNG; elements: HudEle
   const wX = W - S(104);
   rect(wX, bY - S(4), S(24), S(16), [150, 150, 160]);
   add("weapon-icon", wX, bY - S(4), S(24), S(16));
-  const aX = wX + S(34), agW = Math.max(1, S(6)), agAdv = Math.max(2, S(10));
+  const aX = wX + S(34),
+    agW = Math.max(1, S(6)),
+    agAdv = Math.max(2, S(10));
   for (let g = 0; g < 3; g++) rect(aX + g * agAdv, bY, agW, Math.max(1, S(8)), [240, 240, 230]);
   add("ammo-label", aX, bY, 2 * agAdv + agW, Math.max(1, S(8)));
 
@@ -140,7 +166,8 @@ function buildHud(W: number, H: number, s: number): { png: PNG; elements: HudEle
 }
 
 function iou(a: { left: number; top: number; width: number; height: number }, b: HudElement): number {
-  const ix = Math.max(a.left, b.left), iy = Math.max(a.top, b.top);
+  const ix = Math.max(a.left, b.left),
+    iy = Math.max(a.top, b.top);
   const ax = Math.min(a.left + a.width, b.left + b.width);
   const ay = Math.min(a.top + a.height, b.top + b.height);
   const inter = Math.max(0, ax - ix) * Math.max(0, ay - iy);
@@ -262,7 +289,10 @@ describe("runComponentExtract option resolution", () => {
 
   it("lets an explicit flag widen the preset it was combined with", async () => {
     const r = await runComponentExtract({
-      source: hudPath, outputDir: dir, preset: "game-ui", topN: 40,
+      source: hudPath,
+      outputDir: dir,
+      preset: "game-ui",
+      topN: 40,
     });
     assert.deepEqual(r.settings, { minArea: 24, topN: 40, preset: "game-ui" });
   });

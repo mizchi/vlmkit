@@ -27,12 +27,14 @@ import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { readFromSnapshotFlag, readStyleSnapshot } from "../style/style-snapshot.ts";
 
-export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions & { elementsPath?: string; fromPath?: string }>({
+export const designGate = defineGate<
+  DesignPolicyReport,
+  DesignPolicyOptions & { elementsPath?: string; fromPath?: string }
+>({
   id: "check.design",
   command: ["check", "design"],
   title: "Design-system coherence",
-  summary:
-    "Coherence of the design system the page itself implies (component/spacing consistency)",
+  summary: "Coherence of the design system the page itself implies (component/spacing consistency)",
   category: "design-system",
   usage: `Conformance to the design system the page itself implies: are components
 styled consistently, and does spacing stay on the page's own scale? Reports
@@ -59,26 +61,40 @@ docs/design/design-policy-metrics.md`,
       title: "No role had enough instances to judge, so the reuse check ran on nothing",
       severity: "info",
       docs:
-        "Info by default — a genuinely small page is not a defect. Raise to suspect to"
-        + " enforce that this gate must actually measure something, which is what stops a"
-        + " --min-instances / --allow combination from reporting green forever in silence.",
+        "Info by default — a genuinely small page is not a defect. Raise to suspect to" +
+        " enforce that this gate must actually measure something, which is what stops a" +
+        " --min-instances / --allow combination from reporting green forever in silence.",
     },
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check (omit when using --elements)", positional: 0 },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check (omit when using --elements)",
+      positional: 0,
+    },
     {
       name: "elements",
       placeholder: "scene.json",
       kind: "path",
-      description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Groups by `role`; padding/radius/border/background/font form the signature",
+      description:
+        "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Groups by `role`; padding/radius/border/background/font form the signature",
     },
     {
-      name: "from", placeholder: "snapshot.json", kind: "path",
+      name: "from",
+      placeholder: "snapshot.json",
+      kind: "path",
       description: "A `scan style` snapshot instead of a page: judged with no browser, same report as the live run",
     },
     { name: "min-reuse", kind: "number", description: "Times each style must be reused", defaultDescription: "3" },
-    { name: "min-instances", kind: "number", description: "Instances before a role is judged", defaultDescription: "3" },
+    {
+      name: "min-instances",
+      kind: "number",
+      description: "Instances before a role is judged",
+      defaultDescription: "3",
+    },
     {
       name: "exclude",
       placeholder: "selector",
@@ -98,7 +114,12 @@ docs/design/design-policy-metrics.md`,
       repeatable: true,
       description: DESIGN_ALLOW_HELP,
     },
-    { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    {
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
+      description: "Playwright storage state for pages behind a login",
+    },
     // Spread, not re-declared — see the note in `integrity.gate.ts`.
     ...PAGE_LOAD_INPUTS,
   ],
@@ -125,7 +146,9 @@ docs/design/design-policy-metrics.md`,
         throw new UsageError("check design takes either a page source or --elements, not both.");
       }
       if (readAll(argv, "exclude").length > 0) {
-        throw new UsageError("--exclude scopes a page's DOM; a scene is already the elements you chose to write, so leave the vendor subtree out of it.");
+        throw new UsageError(
+          "--exclude scopes a page's DOM; a scene is already the elements you chose to write, so leave the vendor subtree out of it.",
+        );
       }
       const minReuse = readNumber(argv, "min-reuse", { min: 0 });
       const minInstances = readInt(argv, "min-instances", { min: 1 });

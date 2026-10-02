@@ -32,13 +32,38 @@ export const A11Y_TREE_FORMAT = "vlmkit-a11y/1";
  * stays as its own string and is judged only by what its `actions` say it does.
  */
 export type A11yRole =
-  | "button" | "link" | "textfield" | "checkbox" | "radio" | "switch" | "slider" | "tab"
-  | "menuitem" | "combobox" | "heading" | "text" | "image" | "group" | "list" | "listitem"
-  | "dialog" | "scrollview" | "window";
+  | "button"
+  | "link"
+  | "textfield"
+  | "checkbox"
+  | "radio"
+  | "switch"
+  | "slider"
+  | "tab"
+  | "menuitem"
+  | "combobox"
+  | "heading"
+  | "text"
+  | "image"
+  | "group"
+  | "list"
+  | "listitem"
+  | "dialog"
+  | "scrollview"
+  | "window";
 
 /** Roles a user operates. A node with one of these and no name is announced as nothing. */
 export const INTERACTIVE_ROLES: ReadonlySet<string> = new Set([
-  "button", "link", "textfield", "checkbox", "radio", "switch", "slider", "tab", "menuitem", "combobox",
+  "button",
+  "link",
+  "textfield",
+  "checkbox",
+  "radio",
+  "switch",
+  "slider",
+  "tab",
+  "menuitem",
+  "combobox",
 ]);
 
 export interface A11yRect {
@@ -113,11 +138,17 @@ export function parseA11yTree(source: string | unknown): A11yTree {
   const tree = raw as Partial<A11yTree> | null;
   if (!tree || tree.format !== A11Y_TREE_FORMAT) {
     throw new UsageError(
-      `not an accessibility tree (format ${JSON.stringify(tree?.format ?? null)}; expected "${A11Y_TREE_FORMAT}").`
-      + " Write one with: vlmkit scan a11y <page-or-dump.xml> --out a11y.json",
+      `not an accessibility tree (format ${JSON.stringify(tree?.format ?? null)}; expected "${A11Y_TREE_FORMAT}").` +
+        " Write one with: vlmkit scan a11y <page-or-dump.xml> --out a11y.json",
     );
   }
-  if (!tree.viewport || !num(tree.viewport.width) || !num(tree.viewport.height) || tree.viewport.width <= 0 || tree.viewport.height <= 0) {
+  if (
+    !tree.viewport ||
+    !num(tree.viewport.width) ||
+    !num(tree.viewport.height) ||
+    tree.viewport.width <= 0 ||
+    tree.viewport.height <= 0
+  ) {
     throw new UsageError("accessibility tree: `viewport` needs a positive width and height (viewport units).");
   }
   if (!Array.isArray(tree.nodes)) throw new UsageError("accessibility tree: `nodes` must be an array.");
@@ -161,12 +192,13 @@ const named = (node: A11yNode): string => (node.name ?? "").trim();
 
 /** Operable: an interactive role, or a platform role the tree says can be tapped or typed into. */
 export function isInteractive(node: A11yNode): boolean {
-  return INTERACTIVE_ROLES.has(node.role)
-    || (node.actions ?? []).some((a) => a === "tap" || a === "setText" || a === "longPress");
+  return (
+    INTERACTIVE_ROLES.has(node.role) ||
+    (node.actions ?? []).some((a) => a === "tap" || a === "setText" || a === "longPress")
+  );
 }
 
-const scrolls = (node: A11yNode): boolean =>
-  node.role === "scrollview" || (node.actions ?? []).includes("scroll");
+const scrolls = (node: A11yNode): boolean => node.role === "scrollview" || (node.actions ?? []).includes("scroll");
 
 const indexBy = (tree: A11yTree): Map<string, A11yNode> => new Map(tree.nodes.map((n) => [n.path, n]));
 
@@ -456,7 +488,11 @@ export function measurePixelContrast(tree: A11yTree, frame: RgbaFrame): PixelCon
     }
     let bg = 0;
     let bgCount = -1;
-    for (const [key, count] of counts) if (count > bgCount) { bg = key; bgCount = count; }
+    for (const [key, count] of counts)
+      if (count > bgCount) {
+        bg = key;
+        bgCount = count;
+      }
     const glyphs = glyphPixels(keys, w, h, scale, (key) => ratioOf(key, bg) >= INK_MASK_RATIO);
     const inkCounts = new Map<number, number>();
     for (const i of glyphs) inkCounts.set(keys[i]!, (inkCounts.get(keys[i]!) ?? 0) + 1);
@@ -465,7 +501,10 @@ export function measurePixelContrast(tree: A11yTree, frame: RgbaFrame): PixelCon
     for (const [key, count] of inkCounts) {
       if (count < MIN_INK_PIXELS) continue;
       const r = ratioOf(key, bg);
-      if (r > best) { best = r; ink = key; }
+      if (r > best) {
+        best = r;
+        ink = key;
+      }
     }
     if (ink === bg) {
       skipped.push({ path: node.path, name, reason: "no-ink" });

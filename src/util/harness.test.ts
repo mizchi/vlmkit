@@ -46,18 +46,36 @@ const scenarios: ScenarioDef[] = [
   {
     name: "style-only (no a11y change)",
     snapshot: "snapshot-style-only.a11y.json",
-    intent: { summary: "style: change button color", changeType: "style", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: [] },
+    intent: {
+      summary: "style: change button color",
+      changeType: "style",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: [],
+    },
     correctExpectation: { testId: "home", expect: "No a11y changes, visual only", a11y: "no-change" },
-    wrongExpectation: { testId: "home", expect: "Navigation removed", a11y: "regression-expected", expectedA11yChanges: [{ description: "Nav removed" }] },
+    wrongExpectation: {
+      testId: "home",
+      expect: "Navigation removed",
+      a11y: "regression-expected",
+      expectedA11yChanges: [{ description: "Nav removed" }],
+    },
     expectVerdict: "not-realized", // no changes → expectation for "no change" matches but reasoning says not-realized (nothing to realize)
     specShouldFail: false,
   },
   {
     name: "nav removed (intentional)",
     snapshot: "snapshot-nav-removed.a11y.json",
-    intent: { summary: "style: hide nav on home", changeType: "style", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "style: hide nav on home",
+      changeType: "style",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
     correctExpectation: {
-      testId: "home", expect: "Navigation removed from header",
+      testId: "home",
+      expect: "Navigation removed from header",
       expectedA11yChanges: [{ description: "Navigation landmark removed" }],
     },
     wrongExpectation: { testId: "home", expect: "No changes at all", a11y: "no-change" },
@@ -67,9 +85,16 @@ const scenarios: ScenarioDef[] = [
   {
     name: "search form added",
     snapshot: "snapshot-search-added.a11y.json",
-    intent: { summary: "feat: add search", changeType: "feature", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "feat: add search",
+      changeType: "feature",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
     correctExpectation: {
-      testId: "home", expect: "Search landmark added to header",
+      testId: "home",
+      expect: "Search landmark added to header",
       expectedA11yChanges: [{ description: "Search landmark added" }],
     },
     wrongExpectation: { testId: "home", expect: "No changes", a11y: "no-change" },
@@ -79,19 +104,36 @@ const scenarios: ScenarioDef[] = [
   {
     name: "button renamed",
     snapshot: "snapshot-button-renamed.a11y.json",
-    intent: { summary: "style: rename send to submit", changeType: "style", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "style: rename send to submit",
+      changeType: "style",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
     correctExpectation: {
-      testId: "home", expect: "Send button renamed to Submit",
+      testId: "home",
+      expect: "Send button renamed to Submit",
       expectedA11yChanges: [{ description: "Button name changed from Send to Submit", name: "Send" }],
     },
-    wrongExpectation: { testId: "home", expect: "Form removed", expectedA11yChanges: [{ description: "Form landmark removed" }] },
+    wrongExpectation: {
+      testId: "home",
+      expect: "Form removed",
+      expectedA11yChanges: [{ description: "Form landmark removed" }],
+    },
     expectVerdict: "realized",
     specShouldFail: false,
   },
   {
     name: "labels broken (regression)",
     snapshot: "snapshot-label-broken.a11y.json",
-    intent: { summary: "refactor: extract utils", changeType: "refactor", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: [] },
+    intent: {
+      summary: "refactor: extract utils",
+      changeType: "refactor",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: [],
+    },
     correctExpectation: { testId: "home", expect: "No changes expected during refactor", a11y: "no-change" },
     wrongExpectation: { testId: "home", expect: "Labels added", a11y: "changed" },
     expectVerdict: "not-realized",
@@ -100,9 +142,16 @@ const scenarios: ScenarioDef[] = [
   {
     name: "a11y fixed (improvement)",
     snapshot: "snapshot-a11y-fixed.a11y.json",
-    intent: { summary: "a11y: fix form labels", changeType: "a11y", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "a11y: fix form labels",
+      changeType: "a11y",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
     correctExpectation: {
-      testId: "home", expect: "Form elements get accessible labels",
+      testId: "home",
+      expect: "Form elements get accessible labels",
       expectedA11yChanges: [
         { description: "Form gets name" },
         { description: "Email textbox gets label", role: "textbox" },
@@ -117,21 +166,42 @@ const scenarios: ScenarioDef[] = [
   {
     name: "section added (feature)",
     snapshot: "snapshot-section-added.a11y.json",
-    intent: { summary: "feat: add activity section", changeType: "feature", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "feat: add activity section",
+      changeType: "feature",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
     correctExpectation: {
-      testId: "home", expect: "Activity section added with region landmark",
+      testId: "home",
+      expect: "Activity section added with region landmark",
       expectedA11yChanges: [{ description: "Region landmark added for recent activity" }],
     },
-    wrongExpectation: { testId: "home", expect: "Navigation removed", expectedA11yChanges: [{ description: "Nav removed" }] },
+    wrongExpectation: {
+      testId: "home",
+      expect: "Navigation removed",
+      expectedA11yChanges: [{ description: "Nav removed" }],
+    },
     expectVerdict: "realized",
     specShouldFail: false,
   },
   {
     name: "form removed (destructive)",
     snapshot: "snapshot-form-removed.a11y.json",
-    intent: { summary: "refactor: simplify home", changeType: "refactor", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: [] },
+    intent: {
+      summary: "refactor: simplify home",
+      changeType: "refactor",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: [],
+    },
     correctExpectation: { testId: "home", expect: "No a11y regression expected in refactor", a11y: "no-change" },
-    wrongExpectation: { testId: "home", expect: "Search added", expectedA11yChanges: [{ description: "Search added" }] },
+    wrongExpectation: {
+      testId: "home",
+      expect: "Search added",
+      expectedA11yChanges: [{ description: "Search added" }],
+    },
     expectVerdict: "not-realized",
     // form ランドマーク + element-count invariant で検出可能
     specShouldFail: true,
@@ -139,9 +209,16 @@ const scenarios: ScenarioDef[] = [
   {
     name: "heading restructured",
     snapshot: "snapshot-heading-restructured.a11y.json",
-    intent: { summary: "feat: restructure page layout", changeType: "feature", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "feat: restructure page layout",
+      changeType: "feature",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
     correctExpectation: {
-      testId: "home", expect: "Heading structure changed: Welcome → Dashboard, new Overview and Contact Us headings",
+      testId: "home",
+      expect: "Heading structure changed: Welcome → Dashboard, new Overview and Contact Us headings",
       expectedA11yChanges: [
         { description: "Heading name changed from Welcome to Dashboard" },
         { description: "New heading Overview added" },
@@ -155,9 +232,20 @@ const scenarios: ScenarioDef[] = [
   {
     name: "role changed (link → button)",
     snapshot: "snapshot-role-changed.a11y.json",
-    intent: { summary: "refactor: convert nav to buttons", changeType: "refactor", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: [] },
+    intent: {
+      summary: "refactor: convert nav to buttons",
+      changeType: "refactor",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: [],
+    },
     correctExpectation: { testId: "home", expect: "No a11y changes expected in refactor", a11y: "no-change" },
-    wrongExpectation: { testId: "home", expect: "Search form added to header", a11y: "changed", expectedA11yChanges: [{ description: "Search landmark added" }] },
+    wrongExpectation: {
+      testId: "home",
+      expect: "Search form added to header",
+      a11y: "changed",
+      expectedA11yChanges: [{ description: "Search landmark added" }],
+    },
     expectVerdict: "not-realized",
     // element-count invariant で link→button の数の変化を検出可能
     specShouldFail: true,
@@ -173,7 +261,11 @@ describe("Harness: full pipeline quality", () => {
         const d = diff(baseline, snapshot);
 
         const cv = crossValidateWithExpectation(
-          "home", sc.correctExpectation, undefined, d.changes.length > 0 ? d : undefined, sc.intent
+          "home",
+          sc.correctExpectation,
+          undefined,
+          d.changes.length > 0 ? d : undefined,
+          sc.intent,
         );
 
         // style-only と regression cases: correct exp は no-change なので approve
@@ -195,7 +287,11 @@ describe("Harness: full pipeline quality", () => {
         const d = diff(baseline, snapshot);
 
         const cv = crossValidateWithExpectation(
-          "home", sc.wrongExpectation, undefined, d.changes.length > 0 ? d : undefined, sc.intent
+          "home",
+          sc.wrongExpectation,
+          undefined,
+          d.changes.length > 0 ? d : undefined,
+          sc.intent,
         );
 
         assert.notEqual(cv.recommendation, "approve", `${sc.name} wrong exp should not approve: ${cv.reasoning}`);
@@ -206,7 +302,12 @@ describe("Harness: full pipeline quality", () => {
         const snapshot = await loadTree(sc.snapshot);
         const d = diff(baseline, snapshot);
 
-        const chain = reasonAboutChanges("home", sc.correctExpectation, d.changes.length > 0 ? d : undefined, sc.intent);
+        const chain = reasonAboutChanges(
+          "home",
+          sc.correctExpectation,
+          d.changes.length > 0 ? d : undefined,
+          sc.intent,
+        );
 
         if (sc.expectVerdict === "not-realized" && d.changes.length === 0) {
           // No diff at all → no changes to realize
@@ -271,9 +372,19 @@ function buildIntrospection(tree: A11yNode) {
     description: "Home page",
     landmarks,
     interactiveElements: interactive,
-    stats: { totalNodes: 0, landmarkCount: landmarks.length, interactiveCount: interactive.length, unlabeledCount: interactive.filter((e) => !e.hasLabel).length, headingLevels: [] },
+    stats: {
+      totalNodes: 0,
+      landmarkCount: landmarks.length,
+      interactiveCount: interactive.length,
+      unlabeledCount: interactive.filter((e) => !e.hasLabel).length,
+      headingLevels: [],
+    },
     suggestedInvariants: [
-      ...landmarks.map((l) => ({ description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`, check: "landmark-exists" as const, cost: "low" as const })),
+      ...landmarks.map((l) => ({
+        description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`,
+        check: "landmark-exists" as const,
+        cost: "low" as const,
+      })),
       ...(() => {
         const roleCounts = new Map<string, number>();
         for (const el of interactive) roleCounts.set(el.role, (roleCounts.get(el.role) ?? 0) + 1);

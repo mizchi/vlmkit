@@ -40,18 +40,29 @@ function skillFile(name: string, skill: Partial<Skill>): void {
 }
 
 const fixture = join(dir, "page.html");
-writeFileSync(fixture, `<!doctype html><meta charset="utf-8"><title>card</title>
+writeFileSync(
+  fixture,
+  `<!doctype html><meta charset="utf-8"><title>card</title>
 <style>
   body { margin: 0; font: 16px sans-serif; background: #fff; }
   .card { padding: 13px; background: #eeeeee; color: #bbbbbb; }
 </style>
-<body><div class="card">Low contrast card</div></body>`);
+<body><div class="card">Low contrast card</div></body>`,
+);
 
 let lines: string[] = [];
 const realLog = console.log;
-beforeAll(() => { console.log = (...a: unknown[]) => { lines.push(a.map(String).join(" ")); }; });
-afterAll(() => { console.log = realLog; });
-beforeEach(() => { lines = []; });
+beforeAll(() => {
+  console.log = (...a: unknown[]) => {
+    lines.push(a.map(String).join(" "));
+  };
+});
+afterAll(() => {
+  console.log = realLog;
+});
+beforeEach(() => {
+  lines = [];
+});
 const output = () => lines.join("\n").replace(/\[[0-9;]*m/g, "");
 
 describe("toolCommand", () => {
@@ -106,9 +117,20 @@ describe("toolCommand", () => {
     // Drive every alias through `toolCommand`, since that is what a skill file's
     // `tool` field goes through.
     const aliases = [
-      "a11y-contrast", "a11y-touch", "a11y-focus-order", "design-tokens", "theme-parity",
-      "i18n-stress", "media-variants", "cross-browser", "component-consistency",
-      "multi-page-consistency", "interact", "explore", "perf", "component-from-image",
+      "a11y-contrast",
+      "a11y-touch",
+      "a11y-focus-order",
+      "design-tokens",
+      "theme-parity",
+      "i18n-stress",
+      "media-variants",
+      "cross-browser",
+      "component-consistency",
+      "multi-page-consistency",
+      "interact",
+      "explore",
+      "perf",
+      "component-from-image",
     ];
     const dangling = aliases
       .map((a) => [a, toolCommand(a).join(" ")] as const)
@@ -116,19 +138,23 @@ describe("toolCommand", () => {
     assert.deepEqual(
       dangling.map(([a, t]) => `${a} → ${t}`),
       [],
-      "a legacy alias points at a command that no longer exists; update the map, "
-      + "and prefer the CLI's own tables over the module's file path — `cross-browser` "
-      + "lives in `stress/` but its command is `diff browsers`",
+      "a legacy alias points at a command that no longer exists; update the map, " +
+        "and prefer the CLI's own tables over the module's file path — `cross-browser` " +
+        "lives in `stress/` but its command is `diff browsers`",
     );
   });
 });
 
 describe("checkArgv", () => {
   it("puts the target as the first positional and the output dir last", () => {
-    assert.deepEqual(
-      checkArgv("check tokens", "page.html", ["--strict"], "/out/tokens"),
-      ["check", "tokens", "page.html", "--strict", "--output-dir", "/out/tokens"],
-    );
+    assert.deepEqual(checkArgv("check tokens", "page.html", ["--strict"], "/out/tokens"), [
+      "check",
+      "tokens",
+      "page.html",
+      "--strict",
+      "--output-dir",
+      "/out/tokens",
+    ]);
   });
 
   it("gives `check drift pages` no positional, under either spelling of its name", () => {
@@ -148,14 +174,16 @@ describe("checkToFlags", () => {
     // the shared page-load set, `--pixel-tolerance` on the drift gates. A made-up
     // flag would still exercise the transformation but would read as documenting a
     // capability that does not exist.
-    assert.deepEqual(
-      checkToFlags({ tool: "check a11y touch", level: "AA", waitUntil: "domcontentloaded" }, {}),
-      ["--level", "AA", "--wait-until", "domcontentloaded"],
-    );
-    assert.deepEqual(
-      checkToFlags({ tool: "check drift component", pixelTolerance: 0.05 }, {}),
-      ["--pixel-tolerance", "0.05"],
-    );
+    assert.deepEqual(checkToFlags({ tool: "check a11y touch", level: "AA", waitUntil: "domcontentloaded" }, {}), [
+      "--level",
+      "AA",
+      "--wait-until",
+      "domcontentloaded",
+    ]);
+    assert.deepEqual(checkToFlags({ tool: "check drift component", pixelTolerance: 0.05 }, {}), [
+      "--pixel-tolerance",
+      "0.05",
+    ]);
   });
 
   it("renders booleans as bare flags, and omits a false one entirely", () => {
@@ -165,10 +193,10 @@ describe("checkToFlags", () => {
   });
 
   it("joins an array with commas, as the gates' own parsers expect", () => {
-    assert.deepEqual(
-      checkToFlags({ tool: "stress media", variants: ["forced-colors", "rtl"] }, {}),
-      ["--variants", "forced-colors,rtl"],
-    );
+    assert.deepEqual(checkToFlags({ tool: "stress media", variants: ["forced-colors", "rtl"] }, {}), [
+      "--variants",
+      "forced-colors,rtl",
+    ]);
   });
 
   it("skips null and undefined rather than passing the string 'null'", () => {
@@ -179,10 +207,10 @@ describe("checkToFlags", () => {
     const withSelector = checkToFlags({ tool: "multi-page-consistency" }, { selector: ".card" });
     assert.deepEqual(withSelector, ["--selector", ".card"]);
     // A check that named its own selector keeps it.
-    assert.deepEqual(
-      checkToFlags({ tool: "multi-page-consistency", selector: ".footer" }, { selector: ".card" }),
-      ["--selector", ".footer"],
-    );
+    assert.deepEqual(checkToFlags({ tool: "multi-page-consistency", selector: ".footer" }, { selector: ".card" }), [
+      "--selector",
+      ".footer",
+    ]);
     // And a tool that takes no selector is not handed one.
     assert.deepEqual(checkToFlags({ tool: "check tokens" }, { selector: ".card" }), []);
   });
@@ -205,16 +233,16 @@ describe("diagnoseLaunchFailure", () => {
   it("names a broken CLI entry as a vlmkit bug, not a finding", () => {
     // This is the exact output the old code produced for every check, and rendered
     // as a failing check.
-    const why = diagnoseLaunchFailure("check tokens", "Error: Cannot find module '/x/src/vrt.ts'\n  code: 'MODULE_NOT_FOUND'");
+    const why = diagnoseLaunchFailure(
+      "check tokens",
+      "Error: Cannot find module '/x/src/vrt.ts'\n  code: 'MODULE_NOT_FOUND'",
+    );
     assert.ok(why);
     assert.match(why, /vlmkit bug, not a finding/);
   });
 
   it("says nothing about a check that ran and reported findings", () => {
-    assert.equal(
-      diagnoseLaunchFailure("check tokens", "  vlmkit check tokens\n  ✗ 3 off-scale value(s)\n"),
-      undefined,
-    );
+    assert.equal(diagnoseLaunchFailure("check tokens", "  vlmkit check tokens\n  ✗ 3 off-scale value(s)\n"), undefined);
   });
 });
 
@@ -259,11 +287,7 @@ describe("renderSkillReport", () => {
   });
 
   it("names the command it actually spawned, not just the alias written in the file", () => {
-    const md = renderSkillReport(
-      { name: "card", checks: [] },
-      "page.html",
-      [result({ tool: "design-tokens" })],
-    );
+    const md = renderSkillReport({ name: "card", checks: [] }, "page.html", [result({ tool: "design-tokens" })]);
     assert.match(md, /`design-tokens`/, "the file's spelling, so the reader can find it");
     assert.match(md, /`vlmkit check tokens`/, "and what ran, so they can reproduce it");
   });
@@ -271,11 +295,9 @@ describe("renderSkillReport", () => {
   it("does not mark a non-zero check as a warning", () => {
     // The row read `⚠ 2` before, because exit 2 was special-cased as "warned". It was a
     // malformed `--ignore-region` value in the skill file. Measured end to end.
-    const md = renderSkillReport(
-      { name: "card", checks: [] },
-      "x.png",
-      [result({ tool: "diff png", command: ["diff", "png"], exitCode: 2 })],
-    );
+    const md = renderSkillReport({ name: "card", checks: [] }, "x.png", [
+      result({ tool: "diff png", command: ["diff", "png"], exitCode: 2 }),
+    ]);
     assert.match(md, /✗ 2/, "a non-zero exit is a failed check");
     assert.doesNotMatch(md, /⚠/, "nothing here warned");
   });
@@ -284,29 +306,23 @@ describe("renderSkillReport", () => {
     // The column printed `vlmkit diff browsers` for a check declared as
     // `diff browsers --engines chromium`, so the one line a reader would copy to reproduce
     // the run was not the run.
-    const md = renderSkillReport(
-      { name: "card", checks: [] },
-      "a.html",
-      [result({
+    const md = renderSkillReport({ name: "card", checks: [] }, "a.html", [
+      result({
         tool: "diff browsers",
         command: ["diff", "browsers"],
         args: ["--engines", "chromium"],
-      })],
-    );
+      }),
+    ]);
     assert.match(md, /`vlmkit diff browsers --engines chromium`/);
   });
 
   it("segregates checks that never ran and gives them no exit code", () => {
     // The whole point: a runner that could not launch anything must not render as
     // failing checks. The old table gave a MODULE_NOT_FOUND an `✗ 1`.
-    const md = renderSkillReport(
-      { name: "stale", checks: [] },
-      "page.html",
-      [
-        result({ tool: "a11y-kontrast", exitCode: 1, launchFailure: "`a11y-kontrast` is not a vlmkit command" }),
-        result({ tool: "check tokens", exitCode: 1, stdoutTail: "✗ 3 off-scale value(s)" }),
-      ],
-    );
+    const md = renderSkillReport({ name: "stale", checks: [] }, "page.html", [
+      result({ tool: "a11y-kontrast", exitCode: 1, launchFailure: "`a11y-kontrast` is not a vlmkit command" }),
+      result({ tool: "check tokens", exitCode: 1, stdoutTail: "✗ 3 off-scale value(s)" }),
+    ]);
     assert.match(md, /Checks: \*\*1\*\* of 2 ran/);
     assert.match(md, /## 1 check\(s\) did not run/);
     assert.match(md, /not a finding about the target/);
@@ -317,11 +333,9 @@ describe("renderSkillReport", () => {
   });
 
   it("says so plainly when nothing ran at all", () => {
-    const md = renderSkillReport(
-      { name: "all-stale", checks: [] },
-      "page.html",
-      [result({ tool: "x", exitCode: 1, launchFailure: "`x` is not a vlmkit command" })],
-    );
+    const md = renderSkillReport({ name: "all-stale", checks: [] }, "page.html", [
+      result({ tool: "x", exitCode: 1, launchFailure: "`x` is not a vlmkit command" }),
+    ]);
     assert.match(md, /Checks: \*\*0\*\* of 1 ran/);
     assert.match(md, /_\(none ran\)_/);
   });
@@ -338,17 +352,22 @@ describe("runSkill", () => {
     // The one test here that launches processes, because it is the one thing the
     // pure tests cannot prove: that the entry it resolves is a CLI that runs.
     // `check a11y contrast` on a 1.65:1 card is a deterministic non-zero finding.
-    skillFile("live", { description: "Card checks", selector: ".card", checks: [
-      { tool: "a11y-contrast" },
-      { tool: "a11y-kontrast" },
-    ] });
+    skillFile("live", {
+      description: "Card checks",
+      selector: ".card",
+      checks: [{ tool: "a11y-contrast" }, { tool: "a11y-kontrast" }],
+    });
     process.env.__VLMKIT_CLI_ENTRY__ = resolve(import.meta.dirname, "..", "cli", "vlmkit.ts");
     try {
       const result = await runSkill("live", fixture, join(dir, "out-live"), { cwd: dir });
       assert.equal(result.results.length, 2);
 
       const [contrast, typo] = result.results;
-      assert.equal(contrast!.launchFailure, undefined, `the legacy alias should have resolved: ${contrast!.stdoutTail}`);
+      assert.equal(
+        contrast!.launchFailure,
+        undefined,
+        `the legacy alias should have resolved: ${contrast!.stdoutTail}`,
+      );
       assert.deepEqual(contrast!.command, ["check", "a11y", "contrast"]);
       assert.equal(contrast!.exitCode, 1, "a 1.65:1 contrast ratio is a failure");
       assert.match(contrast!.stdoutTail, /1\.65:1/, "the finding is about the page, not about module resolution");
@@ -398,7 +417,10 @@ describe("checkStatus", () => {
     // is stale never ran, and reporting it as a failure of the page is a report lying
     // about what it measured.
     assert.equal(checkStatus({ exitCode: 1, launchFailure: "unknown command" }), "did-not-run");
-    assert.equal(checkStatus({ exitCode: 0, launchFailure: "unknown command" }), "did-not-run",
-      "a launch failure outranks a zero exit");
+    assert.equal(
+      checkStatus({ exitCode: 0, launchFailure: "unknown command" }),
+      "did-not-run",
+      "a launch failure outranks a zero exit",
+    );
   });
 });

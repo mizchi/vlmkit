@@ -23,7 +23,10 @@ describe("textContrastCandidates", () => {
       grey(2, { color: [0, 0, 0, 1] }),
       grey(3, { fontSizePx: 24, color: [118, 118, 118, 1] }),
     ]);
-    assert.deepEqual(candidates.map((c) => c.selector), ["p:nth-of-type(1)"]);
+    assert.deepEqual(
+      candidates.map((c) => c.selector),
+      ["p:nth-of-type(1)"],
+    );
     assert.equal(candidates[0]!.fg, "rgb(150, 150, 150)");
     assert.equal(candidates[0]!.floor, 4.5);
   });

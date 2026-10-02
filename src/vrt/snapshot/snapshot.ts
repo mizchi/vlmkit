@@ -15,7 +15,12 @@ import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-c
 import { applyMask, formatMaskProblems, MaskTally } from "@mizchi/vlmkit-core/mask.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { approveSnapshotsFromReport } from "./approve.ts";
-import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
+import {
+  determineSnapshotExitCode,
+  parseSnapshotCliArgs,
+  parseSnapshotConfig,
+  type SnapshotConfig,
+} from "../../cli/commands/snapshot.ts";
 import {
   extractSnapshotFixTasks,
   formatSnapshotFixPromptJson,
@@ -79,7 +84,10 @@ function findSnapshotConfigPath(cliArgs: string[], cwd: string): string | undefi
   return existsSync(defaultPath) ? defaultPath : undefined;
 }
 
-async function loadSnapshotConfigForCli(cliArgs: string[], cwd: string): Promise<{
+async function loadSnapshotConfigForCli(
+  cliArgs: string[],
+  cwd: string,
+): Promise<{
   config: SnapshotConfig;
   configPath?: string;
 }> {
@@ -96,11 +104,7 @@ async function loadSnapshotConfigForCli(cliArgs: string[], cwd: string): Promise
   return { config, configPath };
 }
 
-async function approve(options: {
-  outputDir: string;
-  labels: string[];
-  configPath?: string;
-}) {
+async function approve(options: { outputDir: string; labels: string[]; configPath?: string }) {
   const reportPath = join(options.outputDir, "snapshot-report.json");
   let result: Awaited<ReturnType<typeof approveSnapshotsFromReport>>;
   try {
@@ -155,12 +159,13 @@ async function runFixPrompt(options: {
     outputDir: options.outputDir,
   });
 
-  const output = options.fixPrompt.format === "json"
-    ? formatSnapshotFixPromptJson(tasks)
-    : formatSnapshotFixPromptMarkdown(tasks, {
-        relativeTo: options.outputDir,
-        limit: options.fixPrompt.limit,
-      });
+  const output =
+    options.fixPrompt.format === "json"
+      ? formatSnapshotFixPromptJson(tasks)
+      : formatSnapshotFixPromptMarkdown(tasks, {
+          relativeTo: options.outputDir,
+          limit: options.fixPrompt.limit,
+        });
 
   if (options.fixPrompt.outPath) {
     const outPath = resolve(options.fixPrompt.outPath);
@@ -195,14 +200,18 @@ async function runStability(options: {
   flipbookDelayMs?: number;
 }) {
   if (options.urls.length === 0) {
-    throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vlmkit.config.json.");
+    throw new Error(
+      "No URLs provided for stability run. Pass URLs directly or configure routes in vlmkit.config.json.",
+    );
   }
 
   await mkdir(options.outputDir, { recursive: true });
 
   console.log();
   console.log(`${BOLD}${CYAN}Snapshot Stability${RESET}`);
-  console.log(`  ${DIM}URLs: ${options.urls.length} | Iterations: ${options.iterations} | Output: ${options.outputDir}${RESET}`);
+  console.log(
+    `  ${DIM}URLs: ${options.urls.length} | Iterations: ${options.iterations} | Output: ${options.outputDir}${RESET}`,
+  );
   console.log(`  ${DIM}Threshold: ${options.threshold} | Backend: ${options.backend.label}${RESET}`);
   if (options.configPath) {
     console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
@@ -233,9 +242,10 @@ async function runStability(options: {
             console.log(`  ${YELLOW}warn: --mask ${bad} is not valid CSS — it masks nothing.${RESET}`);
           }
 
-          const currentPath = iter === 0
-            ? join(options.outputDir, `${label}-${vp.label}-baseline.png`)
-            : join(options.outputDir, `${label}-${vp.label}-iter${iter}.png`);
+          const currentPath =
+            iter === 0
+              ? join(options.outputDir, `${label}-${vp.label}-baseline.png`)
+              : join(options.outputDir, `${label}-${vp.label}-iter${iter}.png`);
           await page.screenshot({ path: currentPath, fullPage: true });
           await page.close();
 
@@ -261,18 +271,23 @@ async function runStability(options: {
           };
           const diff = await compareScreenshots(snap, { outputDir: options.outputDir, threshold: options.threshold });
           const diffRatio = diff?.diffRatio ?? 0;
-          const report = diffRatio > 0
-            ? await generateDiffReport(snap, { outputDir: options.outputDir, detectShift: true, threshold: options.threshold })
-            : null;
+          const report =
+            diffRatio > 0
+              ? await generateDiffReport(snap, {
+                  outputDir: options.outputDir,
+                  detectShift: true,
+                  threshold: options.threshold,
+                })
+              : null;
           const globalShift = report?.globalShift ?? 0;
-          const compensatedDiffRatio = report
-            ? report.compensatedDiffCount / report.totalPixels
-            : diffRatio;
+          const compensatedDiffRatio = report ? report.compensatedDiffCount / report.totalPixels : diffRatio;
 
           const color = diffRatio === 0 ? GREEN : diffRatio < 0.01 ? YELLOW : RED;
           const pct = (diffRatio * 100).toFixed(2);
-          console.log(`    ${label}/${vp.label}: ${color}${pct}%${RESET}` +
-            (globalShift !== 0 ? ` ${DIM}(shift ${globalShift > 0 ? "+" : ""}${globalShift}px)${RESET}` : ""));
+          console.log(
+            `    ${label}/${vp.label}: ${color}${pct}%${RESET}` +
+              (globalShift !== 0 ? ` ${DIM}(shift ${globalShift > 0 ? "+" : ""}${globalShift}px)${RESET}` : ""),
+          );
 
           iterations.push({
             iteration: iter,
@@ -322,19 +337,21 @@ async function runStability(options: {
     const groups = new Map<string, FlipbookFrame[]>();
     for (const r of iterations) {
       const key = `${r.label}::${r.viewport}`;
-      const frame: FlipbookFrame = r.iteration === 0
-        ? {
-            path: join(options.outputDir, `${r.label}-${r.viewport}-baseline.png`),
-            label: "iter 0",
-            sublabel: "baseline",
-          }
-        : {
-            path: join(options.outputDir, `${r.label}-${r.viewport}-iter${r.iteration}.png`),
-            label: `iter ${r.iteration}`,
-            sublabel: `${(r.diffRatio * 100).toFixed(2)}% diff`,
-          };
+      const frame: FlipbookFrame =
+        r.iteration === 0
+          ? {
+              path: join(options.outputDir, `${r.label}-${r.viewport}-baseline.png`),
+              label: "iter 0",
+              sublabel: "baseline",
+            }
+          : {
+              path: join(options.outputDir, `${r.label}-${r.viewport}-iter${r.iteration}.png`),
+              label: `iter ${r.iteration}`,
+              sublabel: `${(r.diffRatio * 100).toFixed(2)}% diff`,
+            };
       const list = groups.get(key);
-      if (list) list.push(frame); else groups.set(key, [frame]);
+      if (list) list.push(frame);
+      else groups.set(key, [frame]);
     }
     for (const [key, frames] of groups) {
       const [label, viewport] = key.split("::") as [string, string];
@@ -355,17 +372,16 @@ async function runStability(options: {
   // Returned, not assigned: a helper that reaches for `process.exitCode` fails the
   // whole process, including a test runner that called it to check this very branch.
   if (options.failAboveRate !== undefined && report.overallFalsePositiveRate > options.failAboveRate) {
-    console.log(`  ${RED}FP rate ${(report.overallFalsePositiveRate * 100).toFixed(2)}% exceeds --fail-above-rate ${(options.failAboveRate * 100).toFixed(2)}%${RESET}`);
+    console.log(
+      `  ${RED}FP rate ${(report.overallFalsePositiveRate * 100).toFixed(2)}% exceeds --fail-above-rate ${(options.failAboveRate * 100).toFixed(2)}%${RESET}`,
+    );
     console.log();
     return 1;
   }
   return 0;
 }
 
-async function runStabilityHistory(options: {
-  reportPaths: string[];
-  outPath?: string;
-}) {
+async function runStabilityHistory(options: { reportPaths: string[]; outPath?: string }) {
   const inputs = [];
   for (const reportPath of options.reportPaths) {
     const raw = await readFile(reportPath, "utf-8");
@@ -411,10 +427,16 @@ async function runDiffFlipbook(options: {
     throw error;
   }
 
-  const report = JSON.parse(raw) as { results: Array<{
-    label: string; viewport: string; screenshotPath: string;
-    baselinePath?: string; diffRatio?: number; isNew?: boolean;
-  }> };
+  const report = JSON.parse(raw) as {
+    results: Array<{
+      label: string;
+      viewport: string;
+      screenshotPath: string;
+      baselinePath?: string;
+      diffRatio?: number;
+      isNew?: boolean;
+    }>;
+  };
 
   const filter = options.labels.length > 0 ? new Set(options.labels) : undefined;
   const baseOut = resolve(options.flipbookOutDir ?? join(options.outputDir, "flipbooks"));
@@ -479,10 +501,7 @@ async function runDiffFlipbook(options: {
  *      runs files in shared workers. A test needing a temp directory cannot use it
  *      without corrupting whatever runs alongside.
  */
-export async function runSnapshotCli(
-  cliArgs: readonly string[],
-  options: { cwd?: string } = {},
-): Promise<number> {
+export async function runSnapshotCli(cliArgs: readonly string[], options: { cwd?: string } = {}): Promise<number> {
   if (cliArgs.length === 0 || cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
     console.log(formatSnapshotUsage());
     return cliArgs.length === 0 ? 1 : 0;
@@ -567,8 +586,12 @@ export async function runSnapshotCli(
   console.log(`${BOLD}${CYAN}╔════════════════════════════════════════════════════════════════════════╗${RESET}`);
   console.log(`${BOLD}${CYAN}║  VRT Snapshot                                                        ║${RESET}`);
   console.log(`${BOLD}${CYAN}╚════════════════════════════════════════════════════════════════════════╝${RESET}`);
-  console.log(`  ${DIM}URLs: ${urls.length} | Viewports: ${VIEWPORTS.map((v) => v.label).join(", ")} | Output: ${outputDir}${RESET}`);
-  console.log(`  ${DIM}Threshold: ${parsed.threshold} | Backend: ${captureBackend.label}${backendSource === "default" ? "" : ` (${backendSource})`}${RESET}`);
+  console.log(
+    `  ${DIM}URLs: ${urls.length} | Viewports: ${VIEWPORTS.map((v) => v.label).join(", ")} | Output: ${outputDir}${RESET}`,
+  );
+  console.log(
+    `  ${DIM}Threshold: ${parsed.threshold} | Backend: ${captureBackend.label}${backendSource === "default" ? "" : ` (${backendSource})`}${RESET}`,
+  );
   if (configPath) {
     console.log(`  ${DIM}Config: ${configPath}${RESET}`);
   }
@@ -611,7 +634,9 @@ export async function runSnapshotCli(
         try {
           await access(baselinePath);
           hasBaseline = true;
-        } catch { /* no baseline */ }
+        } catch {
+          /* no baseline */
+        }
 
         if (hasBaseline) {
           const snap: VrtSnapshot = {
@@ -626,9 +651,10 @@ export async function runSnapshotCli(
           const diffRatio = diff?.diffRatio ?? 0;
 
           // Shift detection for enhanced analysis
-          const report = diffRatio > 0
-            ? await generateDiffReport(snap, { outputDir, detectShift: true, threshold: parsed.threshold })
-            : null;
+          const report =
+            diffRatio > 0
+              ? await generateDiffReport(snap, { outputDir, detectShift: true, threshold: parsed.threshold })
+              : null;
           const globalShift = report?.globalShift ?? 0;
           const compensatedDiffRatio = report ? report.compensatedDiffCount / report.totalPixels : diffRatio;
           const shiftOnly = report?.shiftOnly ?? false;
@@ -647,8 +673,16 @@ export async function runSnapshotCli(
 
           console.log(`    ${vp.label.padEnd(10)} ${diffStr}`);
           results.push({
-            url, label, viewport: vp.label, screenshotPath: currentPath, baselinePath,
-            diffRatio, isNew: false, globalShift, compensatedDiffRatio, shiftOnly,
+            url,
+            label,
+            viewport: vp.label,
+            screenshotPath: currentPath,
+            baselinePath,
+            diffRatio,
+            isNew: false,
+            globalShift,
+            compensatedDiffRatio,
+            shiftOnly,
           });
         } else {
           // First run: promote current to baseline
@@ -683,7 +717,7 @@ export async function runSnapshotCli(
     console.log(`  ${DIM}New baselines: ${newBaselines.length}${RESET}`);
   }
   if (compared.length > 0) {
-    const fpRate = (falsePositives.length / compared.length * 100).toFixed(1);
+    const fpRate = ((falsePositives.length / compared.length) * 100).toFixed(1);
     console.log(`  Compared: ${compared.length} | Diff > 0: ${falsePositives.length} (${fpRate}%)`);
     if (falsePositives.length > 0) {
       for (const fp of falsePositives) {
@@ -721,20 +755,24 @@ export async function runSnapshotCli(
   // Write JSON summary
   await writeFile(
     join(outputDir, "snapshot-report.json"),
-    JSON.stringify({
-      timestamp: new Date().toISOString(),
-      urls,
-      labels,
-      options: {
-        threshold: parsed.threshold,
-        failOnDiff: parsed.failOnDiff,
-        failOnNewBaseline: parsed.failOnNewBaseline,
-        maxDiffRatio: parsed.maxDiffRatio ?? null,
-        configPath: configPath ?? null,
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        urls,
+        labels,
+        options: {
+          threshold: parsed.threshold,
+          failOnDiff: parsed.failOnDiff,
+          failOnNewBaseline: parsed.failOnNewBaseline,
+          maxDiffRatio: parsed.maxDiffRatio ?? null,
+          configPath: configPath ?? null,
+        },
+        results,
+        exitStatus,
       },
-      results,
-      exitStatus,
-    }, null, 2),
+      null,
+      2,
+    ),
   );
 
   console.log();
@@ -757,6 +795,11 @@ if (isCliEntry(import.meta.url, "snapshot")) {
   // should be. Assigning rather than `process.exit` so buffered stdout still
   // flushes — the defect `applyGateExit` exists for.
   runSnapshotCli(process.argv.slice(2))
-    .then((code) => { process.exitCode = code; })
-    .catch((e) => { console.error(e); process.exitCode = 1; });
+    .then((code) => {
+      process.exitCode = code;
+    })
+    .catch((e) => {
+      console.error(e);
+      process.exitCode = 1;
+    });
 }

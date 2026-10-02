@@ -9,7 +9,13 @@ const at = (atMs: number, ...keys: string[]): PersistenceSample<string> => ({
 
 test("one instant is a glimpse; two consecutive instants a state apart are a state", () => {
   const rows = tierByPersistence([at(0), at(100, "a", "b"), at(300, "b"), at(400)]);
-  assert.deepEqual(rows.map((r) => [r.key, r.tier]), [["a", "transient"], ["b", "held"]]);
+  assert.deepEqual(
+    rows.map((r) => [r.key, r.tier]),
+    [
+      ["a", "transient"],
+      ["b", "held"],
+    ],
+  );
   const b = rows.find((r) => r.key === "b")!;
   assert.deepEqual(b.run, { fromMs: 100, toMs: 300, samples: 2 });
   assert.equal(b.finding, "b@100", "the finding as first seen");
@@ -34,7 +40,10 @@ test("the longest run is the one reported", () => {
 
 test("a defect the settled page already has is left to the settled run", () => {
   const rows = tierByPersistence([at(0, "rest", "moving"), at(100, "rest", "moving")], new Set(["rest"]));
-  assert.deepEqual(rows.map((r) => r.key), ["moving"]);
+  assert.deepEqual(
+    rows.map((r) => r.key),
+    ["moving"],
+  );
 });
 
 test("minHeldSamples raises the bar", () => {
@@ -44,7 +53,15 @@ test("minHeldSamples raises the bar", () => {
 });
 
 test("a key repeated within one instant counts once", () => {
-  const rows = tierByPersistence([{ atMs: 0, findings: [{ key: "a", finding: "x" }, { key: "a", finding: "y" }] }]);
+  const rows = tierByPersistence([
+    {
+      atMs: 0,
+      findings: [
+        { key: "a", finding: "x" },
+        { key: "a", finding: "y" },
+      ],
+    },
+  ]);
   assert.equal(rows.length, 1);
   assert.equal(rows[0]!.run.samples, 1);
 });
@@ -56,7 +73,10 @@ test("timelineInstants: each finite animation's start, middle and end, plus 0", 
 test("timelineInstants: an infinite animation contributes one iteration; the cap and the count hold", () => {
   assert.deepEqual(timelineInstants([{ startMs: 0, durationMs: 1000, iterations: null }]), [0, 500, 999]);
   assert.deepEqual(timelineInstants([{ startMs: 6000, durationMs: 400, iterations: 1 }]), [0], "past the cap");
-  const many = timelineInstants(Array.from({ length: 20 }, (_, i) => ({ startMs: i * 100, durationMs: 50, iterations: 1 })), { maxInstants: 6 });
+  const many = timelineInstants(
+    Array.from({ length: 20 }, (_, i) => ({ startMs: i * 100, durationMs: 50, iterations: 1 })),
+    { maxInstants: 6 },
+  );
   assert.ok(many.length <= 6);
   assert.equal(many[0], 0);
   assert.equal(many[many.length - 1], 1949, "both ends kept");

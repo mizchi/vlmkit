@@ -1,7 +1,11 @@
 import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { A11Y_CONTRAST_SAMPLE_SCRIPT, analyzeA11yContrastSamples, type A11yContrastRawSample } from "./a11y-contrast.ts";
+import {
+  A11Y_CONTRAST_SAMPLE_SCRIPT,
+  analyzeA11yContrastSamples,
+  type A11yContrastRawSample,
+} from "./a11y-contrast.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 
 function sample(overrides: Partial<A11yContrastRawSample> = {}): A11yContrastRawSample {
@@ -126,7 +130,10 @@ describe("analyzeA11yContrastSamples", () => {
       sample({ path: ".mixed", foreground: { r: 0x9c, g: 0xa3, b: 0xaf }, fontSize: 28, fontWeight: 700 }),
     ]);
     assert.ok(findings.length >= 1);
-    assert.ok(findings.every((f) => f.elements === 1), "neither collapses into the other");
+    assert.ok(
+      findings.every((f) => f.elements === 1),
+      "neither collapses into the other",
+    );
   });
 
   it("sorts findings by ratio ascending (worst first)", () => {
@@ -139,9 +146,7 @@ describe("analyzeA11yContrastSamples", () => {
   });
 
   it("annotates with hex colors and required AA threshold", () => {
-    const findings = analyzeA11yContrastSamples([
-      sample({ foreground: { r: 0x9c, g: 0xa3, b: 0xaf } }),
-    ]);
+    const findings = analyzeA11yContrastSamples([sample({ foreground: { r: 0x9c, g: 0xa3, b: 0xaf } })]);
     const f = findings[0]!;
     assert.equal(f.foreground.hex, "#9ca3af");
     assert.equal(f.background.hex, "#ffffff");

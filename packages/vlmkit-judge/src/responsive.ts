@@ -112,8 +112,7 @@ export interface RegimePartition {
   unresolved: [number, number][];
 }
 
-const sameSet = (a: readonly string[], b: readonly string[]) =>
-  a.length === b.length && a.every((x) => b.includes(x));
+const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 /**
  * Partition [min, max] by where the matching condition set changes. Samples need not be
@@ -240,9 +239,8 @@ export function generateCase(
   index: number,
   heightEdges: readonly number[] = [],
 ): ResponsiveCase {
-  const regime = regimes.length > 0
-    ? regimes[index % regimes.length]!
-    : { from: space.minWidth, to: space.maxWidth, matches: [] };
+  const regime =
+    regimes.length > 0 ? regimes[index % regimes.length]! : { from: space.minWidth, to: space.maxWidth, matches: [] };
   const width = rng.chance(0.25)
     ? rng.pick([regime.from, Math.min(regime.to, regime.from + 1), Math.max(regime.from, regime.to - 1), regime.to])
     : rng.int(regime.from, regime.to);
@@ -251,11 +249,14 @@ export function generateCase(
     const edges = heightEdges.filter((h) => h >= space.minHeight && h <= space.maxHeight);
     height = edges.length > 0 && rng.chance(0.3) ? rng.pick(edges) : rng.int(space.minHeight, space.maxHeight);
   }
-  const textScale = space.textScales.length > 1 && rng.chance(0.5) ? rng.pick(space.textScales.slice(1)) : space.textScales[0] ?? 1;
-  const colorScheme = space.colorSchemes.length > 1 && rng.chance(0.5) ? space.colorSchemes[1]! : space.colorSchemes[0] ?? "light";
-  const reducedMotion = space.reducedMotions.length > 1 && rng.chance(0.5)
-    ? space.reducedMotions[1]!
-    : space.reducedMotions[0] ?? "no-preference";
+  const textScale =
+    space.textScales.length > 1 && rng.chance(0.5) ? rng.pick(space.textScales.slice(1)) : (space.textScales[0] ?? 1);
+  const colorScheme =
+    space.colorSchemes.length > 1 && rng.chance(0.5) ? space.colorSchemes[1]! : (space.colorSchemes[0] ?? "light");
+  const reducedMotion =
+    space.reducedMotions.length > 1 && rng.chance(0.5)
+      ? space.reducedMotions[1]!
+      : (space.reducedMotions[0] ?? "no-preference");
   return { width, height, textScale, colorScheme, reducedMotion };
 }
 
@@ -365,10 +366,12 @@ export function groupFailures(outcomes: readonly CaseOutcome[]): FailureGroup[] 
       });
     }
   }
-  return [...groups.values()].sort((a, b) =>
-    (a.severity === b.severity ? 0 : a.severity === "fail" ? -1 : 1)
-    || b.cases.length - a.cases.length
-    || b.keys.length - a.keys.length);
+  return [...groups.values()].sort(
+    (a, b) =>
+      (a.severity === b.severity ? 0 : a.severity === "fail" ? -1 : 1) ||
+      b.cases.length - a.cases.length ||
+      b.keys.length - a.keys.length,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -500,11 +503,12 @@ export function anchorInterval(
   }
   return {
     kind: "inside-regime",
-    diagnosis: lo === min
-      ? `fails at every width from ${min}px up to ${hi}px and no breakpoint bounds it — something keeps a size the viewport cannot give it`
-      : hi === max
-        ? `fails from ${lo}px to the widest width tested and no breakpoint bounds it`
-        : `fails at ${range}, inside one regime — no breakpoint begins or ends it, so the cause is a size that does not follow the viewport (a fixed width, nowrap, a min-content floor)`,
+    diagnosis:
+      lo === min
+        ? `fails at every width from ${min}px up to ${hi}px and no breakpoint bounds it — something keeps a size the viewport cannot give it`
+        : hi === max
+          ? `fails from ${lo}px to the widest width tested and no breakpoint bounds it`
+          : `fails at ${range}, inside one regime — no breakpoint begins or ends it, so the cause is a size that does not follow the viewport (a fixed width, nowrap, a min-content floor)`,
   };
 }
 
@@ -613,12 +617,18 @@ export function qualifyAnchor(
  * `min-width: 700px` pair move together, or the fix would open a gap). Empty when the
  * anchor suggests no move.
  */
-export function breakpointMoves(anchor: FailureAnchor, lo: number, hi: number, min: number): { from: string; to: string }[] {
-  const plan = anchor.kind === "starts-at-breakpoint" && anchor.startsAt
-    ? { t: anchor.startsAt, from: lo, to: hi + 1 }
-    : anchor.kind === "ends-at-breakpoint" && anchor.clearedAt && lo > min
-      ? { t: anchor.clearedAt, from: hi + 1, to: lo }
-      : null;
+export function breakpointMoves(
+  anchor: FailureAnchor,
+  lo: number,
+  hi: number,
+  min: number,
+): { from: string; to: string }[] {
+  const plan =
+    anchor.kind === "starts-at-breakpoint" && anchor.startsAt
+      ? { t: anchor.startsAt, from: lo, to: hi + 1 }
+      : anchor.kind === "ends-at-breakpoint" && anchor.clearedAt && lo > min
+        ? { t: anchor.clearedAt, from: hi + 1, to: lo }
+        : null;
   if (!plan) return [];
   const out: { from: string; to: string }[] = [];
   for (const cond of [...plan.t.entering, ...plan.t.leaving]) {
@@ -642,10 +652,30 @@ export interface CauseCandidate {
 }
 
 const STRUCTURAL = new Set([
-  "grid-template-columns", "flex-wrap", "white-space", "text-wrap", "text-wrap-mode",
-  "min-width", "min-inline-size", "width", "inline-size", "flex-basis", "flex", "flex-shrink",
-  "max-width", "max-inline-size", "height", "block-size", "max-height", "max-block-size",
-  "transform", "translate", "left", "right", "inset-inline-start", "inset-inline-end",
+  "grid-template-columns",
+  "flex-wrap",
+  "white-space",
+  "text-wrap",
+  "text-wrap-mode",
+  "min-width",
+  "min-inline-size",
+  "width",
+  "inline-size",
+  "flex-basis",
+  "flex",
+  "flex-shrink",
+  "max-width",
+  "max-inline-size",
+  "height",
+  "block-size",
+  "max-height",
+  "max-block-size",
+  "transform",
+  "translate",
+  "left",
+  "right",
+  "inset-inline-start",
+  "inset-inline-end",
 ]);
 
 /** A rough px reading of the size a declaration forces, for ordering only. */
@@ -669,7 +699,10 @@ function forcedPx(value: string): number {
  * sizing and wrapping before spacing — `padding: 0` clears nearly any squeeze and names
  * nothing; then the larger forced size; then the element itself before its relatives.
  */
-export function rankCauseCandidates<T extends CauseCandidate>(candidates: readonly T[], anchor: FailureAnchor | undefined): T[] {
+export function rankCauseCandidates<T extends CauseCandidate>(
+  candidates: readonly T[],
+  anchor: FailureAnchor | undefined,
+): T[] {
   const anchorConditions = new Set([
     ...(anchor?.startsAt ? [...anchor.startsAt.entering, ...anchor.startsAt.leaving] : []),
     ...(anchor?.clearedAt ? [...anchor.clearedAt.entering, ...anchor.clearedAt.leaving] : []),
@@ -680,27 +713,55 @@ export function rankCauseCandidates<T extends CauseCandidate>(candidates: readon
     if (anchorConditions.size === 0 && c.media.some((m) => m.startsWith("@container"))) return 0;
     return STRUCTURAL.has(c.property) ? 1 : 2;
   };
-  return [...candidates].sort((a, b) =>
-    tier(a) - tier(b)
-    || (STRUCTURAL.has(a.property) ? 0 : 1) - (STRUCTURAL.has(b.property) ? 0 : 1)
-    || forcedPx(b.value) - forcedPx(a.value)
-    || roleOrder[a.role] - roleOrder[b.role]);
+  return [...candidates].sort(
+    (a, b) =>
+      tier(a) - tier(b) ||
+      (STRUCTURAL.has(a.property) ? 0 : 1) - (STRUCTURAL.has(b.property) ? 0 : 1) ||
+      forcedPx(b.value) - forcedPx(a.value) ||
+      roleOrder[a.role] - roleOrder[b.role],
+  );
 }
 
 const NEUTRAL_OVERRIDES: Readonly<Record<string, string>> = {
-  "width": "auto", "inline-size": "auto", "min-width": "auto", "min-inline-size": "auto",
-  "max-width": "none", "max-inline-size": "none",
-  "height": "auto", "block-size": "auto", "max-height": "none", "max-block-size": "none",
-  "flex": "0 1 auto", "flex-basis": "auto", "flex-shrink": "1", "flex-wrap": "wrap",
-  "white-space": "normal", "text-wrap": "wrap", "text-wrap-mode": "wrap",
+  width: "auto",
+  "inline-size": "auto",
+  "min-width": "auto",
+  "min-inline-size": "auto",
+  "max-width": "none",
+  "max-inline-size": "none",
+  height: "auto",
+  "block-size": "auto",
+  "max-height": "none",
+  "max-block-size": "none",
+  flex: "0 1 auto",
+  "flex-basis": "auto",
+  "flex-shrink": "1",
+  "flex-wrap": "wrap",
+  "white-space": "normal",
+  "text-wrap": "wrap",
+  "text-wrap-mode": "wrap",
   "grid-template-columns": "none",
-  "gap": "0", "column-gap": "0",
-  "padding": "0", "padding-left": "0", "padding-right": "0", "padding-inline": "0",
-  "padding-inline-start": "0", "padding-inline-end": "0",
-  "margin-left": "0", "margin-right": "0", "margin-inline": "0", "margin-inline-start": "0", "margin-inline-end": "0",
-  "left": "auto", "right": "auto", "inset-inline-start": "auto", "inset-inline-end": "auto",
-  "transform": "none", "translate": "none",
-  "letter-spacing": "normal", "word-spacing": "normal",
+  gap: "0",
+  "column-gap": "0",
+  padding: "0",
+  "padding-left": "0",
+  "padding-right": "0",
+  "padding-inline": "0",
+  "padding-inline-start": "0",
+  "padding-inline-end": "0",
+  "margin-left": "0",
+  "margin-right": "0",
+  "margin-inline": "0",
+  "margin-inline-start": "0",
+  "margin-inline-end": "0",
+  left: "auto",
+  right: "auto",
+  "inset-inline-start": "auto",
+  "inset-inline-end": "auto",
+  transform: "none",
+  translate: "none",
+  "letter-spacing": "normal",
+  "word-spacing": "normal",
 };
 
 /**
@@ -712,7 +773,10 @@ const NEUTRAL_OVERRIDES: Readonly<Record<string, string>> = {
 export function neutralOverride(property: string, value: string): string | null {
   const override = NEUTRAL_OVERRIDES[property];
   if (override === undefined) return null;
-  const v = value.trim().toLowerCase().replace(/\s*!important$/, "");
+  const v = value
+    .trim()
+    .toLowerCase()
+    .replace(/\s*!important$/, "");
   if (/^(auto|initial|unset|revert|revert-layer|inherit|normal|none|0|0px|0%)$/.test(v)) return null;
   if (property === "flex-shrink" && v === "1") return null;
   if (property === "flex-wrap" && v !== "nowrap") return null;

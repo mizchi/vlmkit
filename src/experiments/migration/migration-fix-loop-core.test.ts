@@ -24,9 +24,7 @@ import {
   type MigrationCompareReport,
 } from "./migration-fix-loop-core.ts";
 
-function createCandidate(
-  overrides: Partial<MigrationFixCandidate> = {},
-): MigrationFixCandidate {
+function createCandidate(overrides: Partial<MigrationFixCandidate> = {}): MigrationFixCandidate {
   return {
     selector: ".card",
     property: "padding",
@@ -166,50 +164,58 @@ describe("buildMigrationFixLoopPrompt", () => {
 
     const report: MigrationCompareReport = {
       ...createReport(),
-      authoredStyleDiff: [{
-        variantFile: "after.html",
-        result: {
-          entries: [
-            { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
-          ],
+      authoredStyleDiff: [
+        {
+          variantFile: "after.html",
+          result: {
+            entries: [{ selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" }],
+          },
         },
-      }],
-      domPositionDiffPerViewport: [{
-        variantFile: "after.html",
-        result: {
-          entries: [
+      ],
+      domPositionDiffPerViewport: [
+        {
+          variantFile: "after.html",
+          result: {
+            entries: [
+              {
+                path: "body[0]>a[0]",
+                baselineClasses: "cta",
+                variantClasses: "cta",
+                property: "background-color",
+                baseline: "rgb(45, 105, 236)",
+                variant: "rgb(240, 75, 75)",
+                viewport: "desktop",
+              },
+            ],
+          },
+        },
+      ],
+      regionDiffs: [
+        {
+          variantFile: "after.html",
+          perViewport: [
             {
-              path: "body[0]>a[0]",
-              baselineClasses: "cta",
-              variantClasses: "cta",
-              property: "background-color",
-              baseline: "rgb(45, 105, 236)",
-              variant: "rgb(240, 75, 75)",
               viewport: "desktop",
+              verdict: "diff",
+              summary: "CTA button background color changed.",
+              changeCount: 1,
+              changes: [
+                {
+                  selector: ".cta",
+                  selectorHint: ".cta",
+                  selectorConfidence: "high",
+                  property: "background-color",
+                  from: "#366fed",
+                  to: "#f15353",
+                  averageChannelDelta: 124.2,
+                  bbox: { left: 80, top: 220, width: 160, height: 44 },
+                  confidence: "high",
+                },
+              ],
             },
           ],
         },
-      }],
-      regionDiffs: [{
-        variantFile: "after.html",
-        perViewport: [{
-          viewport: "desktop",
-          verdict: "diff",
-          summary: "CTA button background color changed.",
-          changeCount: 1,
-          changes: [{
-            selector: ".cta",
-            selectorHint: ".cta",
-            selectorConfidence: "high",
-            property: "background-color",
-            from: "#366fed",
-            to: "#f15353",
-            averageChannelDelta: 124.2,
-            bbox: { left: 80, top: 220, width: 160, height: 44 },
-            confidence: "high",
-          }],
-        }],
-      }],
+      ],
     };
     const prompt = buildMigrationFixLoopPrompt({
       baselineFile: "before.html",
@@ -221,7 +227,10 @@ describe("buildMigrationFixLoopPrompt", () => {
     });
 
     assert.match(prompt, /VLM region-diff candidates/);
-    assert.match(prompt, /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/);
+    assert.match(
+      prompt,
+      /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/,
+    );
     assert.match(prompt, /sampled=#366fed -> #f15353/);
     assert.match(prompt, /viewport=desktop/);
   });
@@ -246,46 +255,54 @@ describe("migration-fix-loop CLI", () => {
         baseline: "before.html",
         variants: ["after.html"],
         viewports: [{ width: 375, height: 812, label: "mobile", reason: "dogfood" }],
-        results: [{
-          variant: "after",
-          variantFile: "after.html",
-          viewport: "mobile",
-          diffRatio: 0.045,
-          diffPixels: 13789,
-          dominantCategory: "color-change",
-          categorySummary: "1 color-change",
-          paintTreeSummary: "1 paint",
-          paintTreeChangeCount: 1,
-          fixCandidates: [],
-        }],
-        authoredStyleDiff: [{
-          variantFile: "after.html",
-          result: {
-            entries: [
-              { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
+        results: [
+          {
+            variant: "after",
+            variantFile: "after.html",
+            viewport: "mobile",
+            diffRatio: 0.045,
+            diffPixels: 13789,
+            dominantCategory: "color-change",
+            categorySummary: "1 color-change",
+            paintTreeSummary: "1 paint",
+            paintTreeChangeCount: 1,
+            fixCandidates: [],
+          },
+        ],
+        authoredStyleDiff: [
+          {
+            variantFile: "after.html",
+            result: {
+              entries: [{ selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" }],
+            },
+          },
+        ],
+        regionDiffs: [
+          {
+            variantFile: "after.html",
+            perViewport: [
+              {
+                viewport: "mobile",
+                verdict: "diff",
+                summary: "Primary CTA background changed from blue to red.",
+                changeCount: 1,
+                changes: [
+                  {
+                    selector: ".cta",
+                    selectorHint: "primary CTA",
+                    selectorConfidence: "high",
+                    property: "background-color",
+                    from: "#366fed",
+                    to: "#f15353",
+                    averageChannelDelta: 128.67,
+                    bbox: { left: 170, top: 338, width: 156, height: 50 },
+                    confidence: "high",
+                  },
+                ],
+              },
             ],
           },
-        }],
-        regionDiffs: [{
-          variantFile: "after.html",
-          perViewport: [{
-            viewport: "mobile",
-            verdict: "diff",
-            summary: "Primary CTA background changed from blue to red.",
-            changeCount: 1,
-            changes: [{
-              selector: ".cta",
-              selectorHint: "primary CTA",
-              selectorConfidence: "high",
-              property: "background-color",
-              from: "#366fed",
-              to: "#f15353",
-              averageChannelDelta: 128.67,
-              bbox: { left: 170, top: 338, width: 156, height: 50 },
-              confidence: "high",
-            }],
-          }],
-        }],
+        ],
       };
       const reportPath = join(dir, "diff-report.json");
       const responsePath = join(dir, "response.txt");
@@ -294,24 +311,35 @@ describe("migration-fix-loop CLI", () => {
       await writeFile(join(dir, "before.html"), beforeHtml);
       await writeFile(join(dir, "after.html"), afterHtml);
       await writeFile(reportPath, JSON.stringify(report, null, 2));
-      await writeFile(responsePath, `SELECTOR: .cta
+      await writeFile(
+        responsePath,
+        `SELECTOR: .cta
 PROPERTY: background-color
 VALUE: #366fed
 MEDIA: none
-`);
+`,
+      );
 
-      const result = spawnSync(process.execPath, [
-        join(import.meta.dirname!, "migration-fix-loop.ts"),
-        "--report", reportPath,
-        "--response-file", responsePath,
-        "--output", outputPath,
-        "--prompt-out", promptPath,
-        "--no-rerun",
-      ], {
-        cwd: join(import.meta.dirname!, "..", "..", ".."),
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(import.meta.dirname!, "migration-fix-loop.ts"),
+          "--report",
+          reportPath,
+          "--response-file",
+          responsePath,
+          "--output",
+          outputPath,
+          "--prompt-out",
+          promptPath,
+          "--no-rerun",
+        ],
+        {
+          cwd: join(import.meta.dirname!, "..", "..", ".."),
+          encoding: "utf-8",
+          timeout: 10000,
+        },
+      );
 
       assert.equal(result.status, 0, result.stderr || result.stdout);
       const prompt = await readFile(promptPath, "utf-8");
@@ -446,7 +474,8 @@ describe("parseMigrationFixMultiResponse", () => {
   });
 
   it("strips prose / markdown fences around the JSON block", () => {
-    const wrapped = "Sure! Here are the fixes:\n\n```json\n" +
+    const wrapped =
+      "Sure! Here are the fixes:\n\n```json\n" +
       JSON.stringify({ fixes: [{ selector: ".a", property: "color", value: "red", mediaCondition: null }] }) +
       "\n```\n";
     assert.equal(parseMigrationFixMultiResponse(wrapped).length, 1);
@@ -593,10 +622,12 @@ describe("applyMigrationFixToCss appendIfMissing", () => {
 
   it("returns unchanged CSS when appendIfMissing is false and no rule matches", () => {
     const css = ".existing { color: red; }";
-    const next = applyMigrationFixToCss(
-      css,
-      { selector: ".missing", property: "padding", value: "12px", mediaCondition: null },
-    );
+    const next = applyMigrationFixToCss(css, {
+      selector: ".missing",
+      property: "padding",
+      value: "12px",
+      mediaCondition: null,
+    });
     assert.equal(next, css);
   });
 });
@@ -634,34 +665,40 @@ describe("buildMigrationFixLoopMultiPrompt", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      authoredStyleDiff: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
+      authoredStyleDiff: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [{ selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" }],
+          },
+        },
+      ],
+      regionDiffs: [
+        {
+          variantFile: "current.html",
+          perViewport: [
+            {
+              viewport: "mobile",
+              verdict: "diff",
+              summary: "CTA background differs.",
+              changeCount: 1,
+              changes: [
+                {
+                  selector: ".cta",
+                  selectorHint: ".cta",
+                  selectorConfidence: "high",
+                  property: "background-color",
+                  from: "#366fed",
+                  to: "#f15353",
+                  averageChannelDelta: 118.9,
+                  bbox: { left: 24, top: 300, width: 144, height: 42 },
+                  confidence: "high",
+                },
+              ],
+            },
           ],
         },
-      }],
-      regionDiffs: [{
-        variantFile: "current.html",
-        perViewport: [{
-          viewport: "mobile",
-          verdict: "diff",
-          summary: "CTA background differs.",
-          changeCount: 1,
-          changes: [{
-            selector: ".cta",
-            selectorHint: ".cta",
-            selectorConfidence: "high",
-            property: "background-color",
-            from: "#366fed",
-            to: "#f15353",
-            averageChannelDelta: 118.9,
-            bbox: { left: 24, top: 300, width: 144, height: 42 },
-            confidence: "high",
-          }],
-        }],
-      }],
+      ],
     };
     const prompt = buildMigrationFixLoopMultiPrompt({
       baselineFile: "target.html",
@@ -689,7 +726,10 @@ describe("buildMigrationFixLoopMultiPrompt", () => {
     assert.ok(vlmIndex >= 0);
     assert.ok(baselineTableIndex >= 0);
     assert.ok(vlmIndex < baselineTableIndex, "VLM handoff should appear before generic baseline rows");
-    assert.match(prompt, /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/);
+    assert.match(
+      prompt,
+      /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/,
+    );
   });
 });
 
@@ -699,23 +739,40 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
     variants: ["current.html"],
     viewports: [],
     results: [],
-    computedStyleDiff: [{
-      variantFile: "current.html",
-      result: {
-        entries: [
-          { selector: ".btn", property: "background-color", baseline: "rgb(29, 78, 216)", variant: "rgb(37, 99, 235)" },
-          { selector: ".hero", property: "padding", baseline: "24px", variant: "16px" },
-        ],
+    computedStyleDiff: [
+      {
+        variantFile: "current.html",
+        result: {
+          entries: [
+            {
+              selector: ".btn",
+              property: "background-color",
+              baseline: "rgb(29, 78, 216)",
+              variant: "rgb(37, 99, 235)",
+            },
+            { selector: ".hero", property: "padding", baseline: "24px", variant: "16px" },
+          ],
+        },
       },
-    }],
-    domPositionDiffPerViewport: [{
-      variantFile: "current.html",
-      result: {
-        entries: [
-          { path: "body[0]>div[0]", baselineClasses: "actions", variantClasses: "actions", property: "margin-top", baseline: "34px", variant: "32px", viewport: "mobile" },
-        ],
+    ],
+    domPositionDiffPerViewport: [
+      {
+        variantFile: "current.html",
+        result: {
+          entries: [
+            {
+              path: "body[0]>div[0]",
+              baselineClasses: "actions",
+              variantClasses: "actions",
+              property: "margin-top",
+              baseline: "34px",
+              variant: "32px",
+              viewport: "mobile",
+            },
+          ],
+        },
       },
-    }],
+    ],
   };
 
   it("indexes baseline values by selector+property", () => {
@@ -791,17 +848,51 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      domPositionDiffPerViewport: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "34px", variant: "20px", viewport: "wide" },
-            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "20px", variant: "20px", viewport: "mobile" },
-            { path: "body[0]", baselineClasses: "card", variantClasses: "card", property: "color", baseline: "red", variant: "blue", viewport: "wide" },
-            { path: "body[0]", baselineClasses: "card", variantClasses: "card", property: "color", baseline: "red", variant: "blue", viewport: "mobile" },
-          ],
+      domPositionDiffPerViewport: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [
+              {
+                path: "body[0]",
+                baselineClasses: "stage",
+                variantClasses: "stage",
+                property: "padding",
+                baseline: "34px",
+                variant: "20px",
+                viewport: "wide",
+              },
+              {
+                path: "body[0]",
+                baselineClasses: "stage",
+                variantClasses: "stage",
+                property: "padding",
+                baseline: "20px",
+                variant: "20px",
+                viewport: "mobile",
+              },
+              {
+                path: "body[0]",
+                baselineClasses: "card",
+                variantClasses: "card",
+                property: "color",
+                baseline: "red",
+                variant: "blue",
+                viewport: "wide",
+              },
+              {
+                path: "body[0]",
+                baselineClasses: "card",
+                variantClasses: "card",
+                property: "color",
+                baseline: "red",
+                variant: "blue",
+                viewport: "mobile",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const idx = buildBaselineValueIndex(multiViewportReport, "current.html");
     assert.ok(idx.viewportVariant.has(".stage padding"), "two distinct baselines for .stage padding → variant");
@@ -816,15 +907,33 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      domPositionDiffPerViewport: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "34px", variant: "20px", viewport: "wide" },
-            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "20px", variant: "20px", viewport: "mobile" },
-          ],
+      domPositionDiffPerViewport: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [
+              {
+                path: "body[0]",
+                baselineClasses: "stage",
+                variantClasses: "stage",
+                property: "padding",
+                baseline: "34px",
+                variant: "20px",
+                viewport: "wide",
+              },
+              {
+                path: "body[0]",
+                baselineClasses: "stage",
+                variantClasses: "stage",
+                property: "padding",
+                baseline: "20px",
+                variant: "20px",
+                viewport: "mobile",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const idx = buildBaselineValueIndex(multiViewportReport, "current.html");
     const result = correctMigrationFixesWithReport(
@@ -863,29 +972,25 @@ describe("buildBaselineValueIndex + authored-style channel", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      authoredStyleDiff: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            {
-              selector: ".shell",
-              property: "grid-template-columns",
-              baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
-              variant: "minmax(0, 1fr) minmax(0, 1fr)",
-            },
-          ],
+      authoredStyleDiff: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [
+              {
+                selector: ".shell",
+                property: "grid-template-columns",
+                baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
+                variant: "minmax(0, 1fr) minmax(0, 1fr)",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const idx = buildBaselineValueIndex(report, "current.html");
-    assert.equal(
-      idx.global.get(".shell grid-template-columns"),
-      "minmax(0, 1fr) 4px minmax(0, 1fr)",
-    );
-    assert.equal(
-      idx.variantValues.get(".shell grid-template-columns"),
-      "minmax(0, 1fr) minmax(0, 1fr)",
-    );
+    assert.equal(idx.global.get(".shell grid-template-columns"), "minmax(0, 1fr) 4px minmax(0, 1fr)");
+    assert.equal(idx.variantValues.get(".shell grid-template-columns"), "minmax(0, 1fr) minmax(0, 1fr)");
     assert.equal(idx.authoredMediaScoped.length, 0);
   });
 
@@ -895,19 +1000,21 @@ describe("buildBaselineValueIndex + authored-style channel", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      authoredStyleDiff: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            {
-              selector: "@media (min-width: 768px) :: .shell",
-              property: "grid-template-columns",
-              baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
-              variant: "minmax(0, 1fr) minmax(0, 1fr)",
-            },
-          ],
+      authoredStyleDiff: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [
+              {
+                selector: "@media (min-width: 768px) :: .shell",
+                property: "grid-template-columns",
+                baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
+                variant: "minmax(0, 1fr) minmax(0, 1fr)",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const idx = buildBaselineValueIndex(report, "current.html");
     assert.equal(idx.authoredMediaScoped.length, 1);
@@ -927,25 +1034,27 @@ describe("buildBaselineValueIndex + authored-style channel", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      authoredStyleDiff: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            {
-              selector: "@media (min-width: 768px) :: .shell",
-              property: "transform",
-              baseline: "translateY(4px)",
-              variant: "translateY(0)",
-            },
-            {
-              selector: "@media (min-width: 768px) :: .shell",
-              property: "transform",
-              baseline: "translateY(4px)",
-              variant: "translateY(0)",
-            },
-          ],
+      authoredStyleDiff: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [
+              {
+                selector: "@media (min-width: 768px) :: .shell",
+                property: "transform",
+                baseline: "translateY(4px)",
+                variant: "translateY(0)",
+              },
+              {
+                selector: "@media (min-width: 768px) :: .shell",
+                property: "transform",
+                baseline: "translateY(4px)",
+                variant: "translateY(0)",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const idx = buildBaselineValueIndex(report, "current.html");
     assert.equal(idx.authoredMediaScoped.length, 1);
@@ -957,19 +1066,21 @@ describe("buildBaselineValueIndex + authored-style channel", () => {
       variants: ["current.html"],
       viewports: [],
       results: [],
-      authoredStyleDiff: [{
-        variantFile: "current.html",
-        result: {
-          entries: [
-            {
-              selector: "@media (min-width: 768px) :: .shell",
-              property: "grid-template-columns",
-              baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
-              variant: "minmax(0, 1fr) minmax(0, 1fr)",
-            },
-          ],
+      authoredStyleDiff: [
+        {
+          variantFile: "current.html",
+          result: {
+            entries: [
+              {
+                selector: "@media (min-width: 768px) :: .shell",
+                property: "grid-template-columns",
+                baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
+                variant: "minmax(0, 1fr) minmax(0, 1fr)",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const idx = buildBaselineValueIndex(report, "current.html");
     const prompt = buildMigrationFixLoopMultiPrompt({
@@ -993,7 +1104,10 @@ describe("buildBaselineValueIndex + authored-style channel", () => {
       baselineValueIndex: idx,
     });
     assert.match(prompt, /Media-scoped authored CSS deltas/);
-    assert.match(prompt, /@media \(min-width: 768px\) \{ \.shell \{ grid-template-columns: minmax\(0, 1fr\) 4px minmax\(0, 1fr\); \} \}/);
+    assert.match(
+      prompt,
+      /@media \(min-width: 768px\) \{ \.shell \{ grid-template-columns: minmax\(0, 1fr\) 4px minmax\(0, 1fr\); \} \}/,
+    );
     assert.match(prompt, /mediaCondition: "\(min-width: 768px\)"/);
   });
 });
@@ -1115,15 +1229,14 @@ describe("inlineExternalStylesheets", () => {
 describe("shouldIgnoreMigrationRerunError", () => {
   it("should ignore known Playwright sandbox launch failures", () => {
     assert.equal(
-      shouldIgnoreMigrationRerunError(new Error("browserType.launch: ... Operation not permitted ... MachPortRendezvousServer")),
+      shouldIgnoreMigrationRerunError(
+        new Error("browserType.launch: ... Operation not permitted ... MachPortRendezvousServer"),
+      ),
       true,
     );
   });
 
   it("should preserve unrelated rerun errors", () => {
-    assert.equal(
-      shouldIgnoreMigrationRerunError(new Error("migration compare failed: diff output missing")),
-      false,
-    );
+    assert.equal(shouldIgnoreMigrationRerunError(new Error("migration compare failed: diff output missing")), false);
   });
 });

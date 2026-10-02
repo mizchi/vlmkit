@@ -21,7 +21,10 @@ const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "benchm
 function createTestImage(width: number, height: number, seed: number): Uint8Array {
   const data = new Uint8Array(width * height * 4);
   let s = seed;
-  const rand = () => { s = (s * 1664525 + 1013904223) & 0x7fffffff; return s / 0x7fffffff; };
+  const rand = () => {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
   for (let i = 0; i < data.length; i += 4) {
     data[i] = Math.floor(rand() * 256);
     data[i + 1] = Math.floor(rand() * 256);
@@ -34,7 +37,10 @@ function createTestImage(width: number, height: number, seed: number): Uint8Arra
 function createSimilarImage(base: Uint8Array, diffRatio: number, seed: number): Uint8Array {
   const data = new Uint8Array(base);
   let s = seed;
-  const rand = () => { s = (s * 1664525 + 1013904223) & 0x7fffffff; return s / 0x7fffffff; };
+  const rand = () => {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
   const pixelCount = data.length / 4;
   const diffPixels = Math.floor(pixelCount * diffRatio);
   for (let i = 0; i < diffPixels; i++) {
@@ -100,9 +106,13 @@ export async function runBenchmark() {
       const img1 = createTestImage(w, h, 1);
       const img2 = createSimilarImage(img1, 0.05, 2);
       const output = new Uint8Array(w * h * 4);
-      const r = await bench(`pixelmatch ${label}`, () => {
-        pixelmatch(img1, img2, output, w, h, { threshold: 0.1 });
-      }, label === "1920x1080" ? 20 : 50);
+      const r = await bench(
+        `pixelmatch ${label}`,
+        () => {
+          pixelmatch(img1, img2, output, w, h, { threshold: 0.1 });
+        },
+        label === "1920x1080" ? 20 : 50,
+      );
       results.push(r);
     }
   }
@@ -130,7 +140,10 @@ export async function runBenchmark() {
   // ---- CSS parser ----
   {
     const { parseCssDeclarations, extractCss } = await import("../css-challenge/css-challenge-core.ts");
-    const html = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"), "utf-8");
+    const html = await readFile(
+      join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"),
+      "utf-8",
+    );
     const css = extractCss(html)!;
 
     const r = await bench("parseCssDeclarations (276 decls)", () => {
@@ -173,7 +186,15 @@ export async function runBenchmark() {
           children.push({ ...makeTree(depth - 1, width), y: i * 20 });
         }
       }
-      return { tag: "div", x: 0, y: 0, w: 100, h: 20, p: { op: 1, c: [0, 0, 0, 1], bg: [255, 255, 255, 1], fs: 16 }, ch: children };
+      return {
+        tag: "div",
+        x: 0,
+        y: 0,
+        w: 100,
+        h: 20,
+        p: { op: 1, c: [0, 0, 0, 1], bg: [255, 255, 255, 1], fs: 16 },
+        ch: children,
+      };
     }
 
     const tree1 = makeTree(3, 5); // 5^3 = 125 nodes
@@ -214,7 +235,12 @@ export async function runBenchmark() {
   // ---- A11y tree diff ----
   {
     const { diffA11yTrees, verifyA11yTree } = await import("@mizchi/vlmkit-core/a11y-semantic.ts");
-    const tree = JSON.parse(await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "github-repo", "baseline-desktop.a11y.json"), "utf-8"));
+    const tree = JSON.parse(
+      await readFile(
+        join(import.meta.dirname!, "..", "..", "..", "fixtures", "github-repo", "baseline-desktop.a11y.json"),
+        "utf-8",
+      ),
+    );
     const snap = (t: any) => ({ testId: "test", testTitle: "test", tree: t });
 
     const r1 = await bench("diffA11yTrees (github page)", () => {
@@ -233,8 +259,23 @@ export async function runBenchmark() {
     const { categorizeProperty } = await import("../css-challenge/css-challenge-core.ts");
 
     const r = await bench("categorizeProperty x100", () => {
-      for (const p of ["display", "padding", "width", "color", "font-size", "animation", "transform",
-        "margin", "background", "border-radius", "flex", "gap", "opacity", "cursor", "line-height"]) {
+      for (const p of [
+        "display",
+        "padding",
+        "width",
+        "color",
+        "font-size",
+        "animation",
+        "transform",
+        "margin",
+        "background",
+        "border-radius",
+        "flex",
+        "gap",
+        "opacity",
+        "cursor",
+        "line-height",
+      ]) {
         categorizeProperty(p);
       }
     }, 500);
@@ -243,8 +284,12 @@ export async function runBenchmark() {
 
   // ---- groupBySelector + removeSelectorBlock ----
   {
-    const { parseCssDeclarations, groupBySelector, removeSelectorBlock, extractCss } = await import("../css-challenge/css-challenge-core.ts");
-    const html = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"), "utf-8");
+    const { parseCssDeclarations, groupBySelector, removeSelectorBlock, extractCss } =
+      await import("../css-challenge/css-challenge-core.ts");
+    const html = await readFile(
+      join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"),
+      "utf-8",
+    );
     const css = extractCss(html)!;
     const decls = parseCssDeclarations(css);
 
@@ -263,7 +308,10 @@ export async function runBenchmark() {
   // ---- Viewport discovery from real HTML ----
   {
     const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
-    const html = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "grid-complex.html"), "utf-8");
+    const html = await readFile(
+      join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "grid-complex.html"),
+      "utf-8",
+    );
 
     const r = await bench("discoverViewports (grid-complex)", () => {
       discoverViewports(html, { maxViewports: 10, randomSamples: 1 });
@@ -281,10 +329,19 @@ export async function runBenchmark() {
     const records: DetectionRecord[] = [];
     for (let i = 0; i < 100; i++) {
       records.push({
-        runId: "bench", fixture: "test", backend: "chromium",
-        selector: `.el-${i}`, property: "color", value: "red",
-        category: "visual", selectorType: "class", isInteractive: false,
-        mediaCondition: null, viewports: [], detected: true, undetectedReason: null,
+        runId: "bench",
+        fixture: "test",
+        backend: "chromium",
+        selector: `.el-${i}`,
+        property: "color",
+        value: "red",
+        category: "visual",
+        selectorType: "class",
+        isInteractive: false,
+        mediaCondition: null,
+        viewports: [],
+        detected: true,
+        undetectedReason: null,
       } as any);
     }
 
@@ -316,18 +373,32 @@ export async function runBenchmark() {
     await savePng(p2, img2, 1280, 920);
 
     const r = await bench("compareScreenshots (mismatch+heatmap)", async () => {
-      await compareScreenshots({
-        testId: "crop", testTitle: "crop", projectName: "bench",
-        screenshotPath: p2, baselinePath: p1, status: "changed",
-      }, { outputDir: TMP });
+      await compareScreenshots(
+        {
+          testId: "crop",
+          testTitle: "crop",
+          projectName: "bench",
+          screenshotPath: p2,
+          baselinePath: p1,
+          status: "changed",
+        },
+        { outputDir: TMP },
+      );
     }, 10);
     results.push(r);
 
     const r2 = await bench("compareScreenshots (mismatch, no heatmap)", async () => {
-      await compareScreenshots({
-        testId: "crop2", testTitle: "crop2", projectName: "bench",
-        screenshotPath: p2, baselinePath: p1, status: "changed",
-      }, { outputDir: TMP, skipHeatmap: true });
+      await compareScreenshots(
+        {
+          testId: "crop2",
+          testTitle: "crop2",
+          projectName: "bench",
+          screenshotPath: p2,
+          baselinePath: p1,
+          status: "changed",
+        },
+        { outputDir: TMP, skipHeatmap: true },
+      );
     }, 10);
     results.push(r2);
   }
@@ -336,8 +407,14 @@ export async function runBenchmark() {
   {
     const { extractBreakpoints } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
     const { parseCssDeclarations, extractCss } = await import("../css-challenge/css-challenge-core.ts");
-    const html1 = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "page.html"), "utf-8");
-    const html2 = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"), "utf-8");
+    const html1 = await readFile(
+      join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "page.html"),
+      "utf-8",
+    );
+    const html2 = await readFile(
+      join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"),
+      "utf-8",
+    );
 
     const r = await bench("CSS analysis pipeline (parse+bp+diff)", () => {
       const css1 = extractCss(html1)!;
@@ -360,11 +437,15 @@ export async function runBenchmark() {
   }
 
   // ---- Report ----
-  console.log(`  ${"Name".padEnd(40)} ${"avg".padStart(10)} ${"ops/s".padStart(10)} ${"total".padStart(10)} ${DIM}n${RESET}`);
+  console.log(
+    `  ${"Name".padEnd(40)} ${"avg".padStart(10)} ${"ops/s".padStart(10)} ${"total".padStart(10)} ${DIM}n${RESET}`,
+  );
   console.log(`  ${"─".repeat(40)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(10)} ${DIM}─${RESET}`);
   for (const r of results) {
     const avgStr = r.avgMs < 1 ? `${(r.avgMs * 1000).toFixed(0)}µs` : `${r.avgMs.toFixed(1)}ms`;
-    console.log(`  ${r.name.padEnd(40)} ${avgStr.padStart(10)} ${String(r.opsPerSec).padStart(10)} ${`${r.totalMs.toFixed(0)}ms`.padStart(10)} ${DIM}${r.iterations}${RESET}`);
+    console.log(
+      `  ${r.name.padEnd(40)} ${avgStr.padStart(10)} ${String(r.opsPerSec).padStart(10)} ${`${r.totalMs.toFixed(0)}ms`.padStart(10)} ${DIM}${r.iterations}${RESET}`,
+    );
   }
   console.log();
 
@@ -379,5 +460,8 @@ export async function runBenchmark() {
 // test — or any tool reaching for a helper here — triggers a full run, which is
 // why this file had 0% coverage.
 if (isCliEntry(import.meta.url)) {
-  runBenchmark().catch((e) => { console.error(e); process.exitCode = 1; });
+  runBenchmark().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  });
 }

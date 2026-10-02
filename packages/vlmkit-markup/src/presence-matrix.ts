@@ -48,12 +48,7 @@ interface TaggedRegion {
 }
 
 function intersects(a: DiffRegion, b: DiffRegion): boolean {
-  return (
-    a.x < b.x + b.width &&
-    b.x < a.x + a.width &&
-    a.y < b.y + b.height &&
-    b.y < a.y + a.height
-  );
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
 export function buildPresenceMatrix(
@@ -119,18 +114,14 @@ export function buildPresenceMatrix(
     const r = widest.region;
 
     const presentWidths = members.map((m) => m.width);
-    const absentWidths = inputs
-      .filter((v) => !presentIdx.has(inputs.indexOf(v)))
-      .map((v) => v.width);
+    const absentWidths = inputs.filter((v) => !presentIdx.has(inputs.indexOf(v))).map((v) => v.width);
 
     rows.push({
       bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
       present,
       absent,
       exclusive,
-      mediaHints: exclusive
-        ? discriminatingBreakpoints(presentWidths, absentWidths, breakpoints)
-        : [],
+      mediaHints: exclusive ? discriminatingBreakpoints(presentWidths, absentWidths, breakpoints) : [],
     });
   }
 
@@ -192,8 +183,8 @@ export function formatPresenceMatrix(matrix: PresenceMatrix): string {
     lines.push("");
     for (const row of exclusiveWithHints) {
       lines.push(
-        `- region \`${row.bbox.x},${row.bbox.y} ${row.bbox.width}x${row.bbox.height}\` present at `
-          + `${row.present.join(", ")} only → check ${row.mediaHints.join(" / ")} blocks`,
+        `- region \`${row.bbox.x},${row.bbox.y} ${row.bbox.width}x${row.bbox.height}\` present at ` +
+          `${row.present.join(", ")} only → check ${row.mediaHints.join(" / ")} blocks`,
       );
     }
   }

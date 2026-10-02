@@ -17,7 +17,10 @@ describe("markup gate plugin", () => {
   it("registers without conflicts", () => {
     const registry = createGateRegistry([markupGatesPlugin]);
     assert.deepEqual(
-      registry.list().map(({ gate }) => gate.command.join(" ")).sort(),
+      registry
+        .list()
+        .map(({ gate }) => gate.command.join(" "))
+        .sort(),
       [
         "check a11y contrast",
         "check a11y focus",
@@ -115,8 +118,7 @@ function escapeRegExp(value: string): string {
 
 describe("gate argument parsing", () => {
   const ctx = { cwd: process.cwd(), argv: [] as string[], json: false };
-  const gateFor = (command: string) =>
-    markupGatesPlugin.gates.find((g) => g.command.join(" ") === command)!;
+  const gateFor = (command: string) => markupGatesPlugin.gates.find((g) => g.command.join(" ") === command)!;
 
   it("check breakpoints reads its numeric flags", () => {
     const parsed = gateFor("check breakpoints").parse(
@@ -138,13 +140,22 @@ describe("gate argument parsing", () => {
   });
 
   it("check scroll parses a viewport and rejects a malformed one", () => {
-    const parsed = gateFor("check scroll").parse(["page.html", "--viewport", "375x812"], ctx) as Record<string, unknown>;
+    const parsed = gateFor("check scroll").parse(["page.html", "--viewport", "375x812"], ctx) as Record<
+      string,
+      unknown
+    >;
     assert.deepEqual(parsed.viewport, { width: 375, height: 812 });
-    assert.throws(() => gateFor("check scroll").parse(["page.html", "--viewport", "375"], ctx), /expects <width>x<height>/);
+    assert.throws(
+      () => gateFor("check scroll").parse(["page.html", "--viewport", "375"], ctx),
+      /expects <width>x<height>/,
+    );
   });
 
   it("check integrity maps sweep widths to their documented heights", () => {
-    const parsed = gateFor("check integrity").parse(["page.html", "--viewports", "1280,768,375"], ctx) as Record<string, unknown>;
+    const parsed = gateFor("check integrity").parse(["page.html", "--viewports", "1280,768,375"], ctx) as Record<
+      string,
+      unknown
+    >;
     assert.deepEqual(parsed.viewports, [
       { width: 1280, height: 800 },
       { width: 768, height: 900 },
@@ -160,7 +171,10 @@ describe("gate argument parsing", () => {
     assert.equal(Array.isArray(parsed.allow), true);
     // The exemption DSL keeps its own rules — an exemption with no stated
     // reason is unreviewable, and that check still fires during parse.
-    assert.throws(() => gateFor("check integrity").parse(["page.html", "--allow", "text-clipped@1280"], ctx), /needs a reason/);
+    assert.throws(
+      () => gateFor("check integrity").parse(["page.html", "--allow", "text-clipped@1280"], ctx),
+      /needs a reason/,
+    );
     assert.throws(() => gateFor("check integrity").parse(["page.html", "--allow", "no-such-kind;why"], ctx));
   });
 
@@ -199,7 +213,11 @@ describe("gate argument parsing", () => {
   });
 
   it("check copy refuses browser-only flags in --elements mode", () => {
-    for (const [flag, value] of [["--target", "t.png"], ["--out", "sheets"], ["--storage-state", "s.json"]]) {
+    for (const [flag, value] of [
+      ["--target", "t.png"],
+      ["--out", "sheets"],
+      ["--storage-state", "s.json"],
+    ]) {
       assert.throws(
         () => gateFor("check copy").parse(["--elements", "e.json", flag!, value!], ctx),
         new RegExp(`\\${flag} does not apply with --elements`),
@@ -212,10 +230,9 @@ describe("gate argument parsing", () => {
   });
 
   it("check copy validates --allow-invisible in element-rect mode too", () => {
-    const parsed = gateFor("check copy").parse(
-      ["--elements", "e.json", "--allow-invisible", "unpainted"],
-      ctx,
-    ) as { imageMode: { allowInvisible: string[] } };
+    const parsed = gateFor("check copy").parse(["--elements", "e.json", "--allow-invisible", "unpainted"], ctx) as {
+      imageMode: { allowInvisible: string[] };
+    };
     assert.deepEqual(parsed.imageMode.allowInvisible, ["unpainted"]);
     assert.throws(
       () => gateFor("check copy").parse(["--elements", "e.json", "--allow-invisible", "nope"], ctx),
@@ -233,67 +250,96 @@ describe("gate argument parsing", () => {
 describe("finding projection", () => {
   it("normalizes check integrity's fail severity to suspect", () => {
     const gate = markupGatesPlugin.gates.find((g) => g.id === "check.integrity")!;
-    const findings = gate.findings({
-      source: "page.html",
-      verdict: "defects",
-      findings: [
-        { kind: "text-collision", severity: "fail", viewport: 1280, message: "overlap", selector: ".a" },
-        { kind: "broken-font", severity: "warn", viewport: 768, message: "font" },
+    const findings = gate.findings(
+      {
+        source: "page.html",
+        verdict: "defects",
+        findings: [
+          { kind: "text-collision", severity: "fail", viewport: 1280, message: "overlap", selector: ".a" },
+          { kind: "broken-font", severity: "warn", viewport: 768, message: "font" },
+        ],
+        exempted: [],
+        viewports: [],
+        kickback: [],
+      },
+      { source: "page.html" },
+    );
+    assert.deepEqual(
+      findings.map((f) => [f.rule, f.severity]),
+      [
+        ["text-collision", "suspect"],
+        ["broken-font", "warn"],
       ],
-      exempted: [],
-      viewports: [],
-      kickback: [],
-    }, { source: "page.html" });
-    assert.deepEqual(findings.map((f) => [f.rule, f.severity]), [
-      ["text-collision", "suspect"],
-      ["broken-font", "warn"],
-    ]);
+    );
     assert.equal(findings[0]!.selector, ".a");
     assert.equal(findings[0]!.viewport, 1280);
   });
 
   it("turns each failed layout check into a rule-attributed finding", () => {
     const gate = markupGatesPlugin.gates.find((g) => g.id === "check.layout")!;
-    const findings = gate.findings({
-      source: "page.html",
-      passed: 0,
-      total: 1,
-      done: false,
-      results: [
-        {
-          rule: { selector: ".sidebar", at: 1280, width: 260 },
-          viewport: 1280,
-          passed: false,
-          checks: [
-            { name: "width", expected: "260±1px", measured: "300px", passed: false },
-            { name: "perRow", expected: "3", measured: "2", passed: false },
-            { name: "visible", expected: "true", measured: "true", passed: true },
-          ],
-        },
-      ],
-    }, { source: "page.html", contractPath: "c.json" });
-    assert.deepEqual(findings.map((f) => f.rule), ["width", "per-row"]);
+    const findings = gate.findings(
+      {
+        source: "page.html",
+        passed: 0,
+        total: 1,
+        done: false,
+        results: [
+          {
+            rule: { selector: ".sidebar", at: 1280, width: 260 },
+            viewport: 1280,
+            passed: false,
+            checks: [
+              { name: "width", expected: "260±1px", measured: "300px", passed: false },
+              { name: "perRow", expected: "3", measured: "2", passed: false },
+              { name: "visible", expected: "true", measured: "true", passed: true },
+            ],
+          },
+        ],
+      },
+      { source: "page.html", contractPath: "c.json" },
+    );
+    assert.deepEqual(
+      findings.map((f) => f.rule),
+      ["width", "per-row"],
+    );
     assert.equal(findings[0]!.selector, ".sidebar");
     assert.equal(findings[0]!.viewport, 1280);
   });
 
   it("reports a layout redirect as its own rule, ahead of the assertions", () => {
     const gate = markupGatesPlugin.gates.find((g) => g.id === "check.layout")!;
-    const findings = gate.findings({
-      source: "https://app.example.com/dash",
-      passed: 0,
-      total: 0,
-      done: false,
-      results: [],
-      redirected: "requested /dash, landed on /login",
-    }, { source: "https://app.example.com/dash", contractPath: "c.json" });
-    assert.deepEqual(findings.map((f) => f.rule), ["redirected"]);
+    const findings = gate.findings(
+      {
+        source: "https://app.example.com/dash",
+        passed: 0,
+        total: 0,
+        done: false,
+        results: [],
+        redirected: "requested /dash, landed on /login",
+      },
+      { source: "https://app.example.com/dash", contractPath: "c.json" },
+    );
+    assert.deepEqual(
+      findings.map((f) => f.rule),
+      ["redirected"],
+    );
   });
 
   it("declares every rule the layout check-name map can produce", () => {
     const gate = markupGatesPlugin.gates.find((g) => g.id === "check.layout")!;
     const declared = new Set(gate.rules.map((r) => r.id));
-    for (const id of ["visible", "count", "width", "min-width", "max-width", "min-height", "full-width", "per-row", "above", "no-assertion"]) {
+    for (const id of [
+      "visible",
+      "count",
+      "width",
+      "min-width",
+      "max-width",
+      "min-height",
+      "full-width",
+      "per-row",
+      "above",
+      "no-assertion",
+    ]) {
       assert.ok(declared.has(id), `check.layout is missing rule "${id}"`);
     }
   });
@@ -331,10 +377,10 @@ describe("value-taking flags before the positional", () => {
   });
 
   it("check copy: --vlm after the source still resolves both", () => {
-    const options = gate("check.copy").parse(
-      ["page.html", "--target", "t.png", "--vlm", "some/model"],
-      ctx,
-    ) as { source: string; vlm: string | true };
+    const options = gate("check.copy").parse(["page.html", "--target", "t.png", "--vlm", "some/model"], ctx) as {
+      source: string;
+      vlm: string | true;
+    };
     assert.equal(options.source, "page.html");
     assert.equal(options.vlm, "some/model");
   });
@@ -382,7 +428,7 @@ describe("run-ledger ownership", () => {
      * and returns null, while a real implementation reads report fields and
      * throws on an empty object. The throw is the signal, not a failure.
      */
-    const ownsLedger = (gate: typeof markupGatesPlugin.gates[number]) => {
+    const ownsLedger = (gate: (typeof markupGatesPlugin.gates)[number]) => {
       if (!gate.ledger) return false;
       try {
         return gate.ledger({} as never, {} as never) !== null;
@@ -421,8 +467,8 @@ describe("run-ledger ownership", () => {
     assert.deepEqual(
       offenders,
       [],
-      "each of these records twice per run — remove the module's append, or give"
-      + ` the gate \`ledger: () => null\`: ${offenders.join("; ")}`,
+      "each of these records twice per run — remove the module's append, or give" +
+        ` the gate \`ledger: () => null\`: ${offenders.join("; ")}`,
     );
   });
 });
@@ -448,10 +494,7 @@ describe("check story argument parsing", () => {
   });
 
   it("requires a gallery, and says what a gallery is", () => {
-    assert.throws(
-      () => gate.parse(["components/Button/Primary"], ctx),
-      /--gallery <url> is required.*baseURL/s,
-    );
+    assert.throws(() => gate.parse(["components/Button/Primary"], ctx), /--gallery <url> is required.*baseURL/s);
   });
 
   it("does not read a flag value as a story id", () => {
@@ -499,10 +542,10 @@ describe("check story argument parsing", () => {
 
 describe("check grounding --at", () => {
   it("reads every repeat as a screenshot-px point", () => {
-    assert.deepEqual(
-      parseAtPoints(["page.html", "--at", "473,96", "--at", "0, 12"]),
-      [{ x: 473, y: 96 }, { x: 0, y: 12 }],
-    );
+    assert.deepEqual(parseAtPoints(["page.html", "--at", "473,96", "--at", "0, 12"]), [
+      { x: 473, y: 96 },
+      { x: 0, y: 12 },
+    ]);
     assert.deepEqual(parseAtPoints(["page.html"]), []);
   });
 
@@ -518,7 +561,15 @@ describe("check grounding --at", () => {
 describe("check grounding --after", () => {
   it("reads actions in order, spelled the way a harness logs them", () => {
     assert.deepEqual(
-      parseAfterActions(["page.html", "--after", "wheel 85,150 89", "--after", "click 85,123", "--after", "move:10,20"]),
+      parseAfterActions([
+        "page.html",
+        "--after",
+        "wheel 85,150 89",
+        "--after",
+        "click 85,123",
+        "--after",
+        "move:10,20",
+      ]),
       [
         { kind: "wheel", at: { x: 85, y: 150 }, dy: 89 },
         { kind: "click", at: { x: 85, y: 123 } },

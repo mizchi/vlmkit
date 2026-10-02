@@ -35,11 +35,7 @@ export interface FlipbookOptions {
 const DEFAULTS = { delayMs: 700, autoplay: true, loop: true } as const;
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**
@@ -51,11 +47,13 @@ export function renderFlipbookHtml(
   options: FlipbookOptions,
 ): string {
   const cfg = { ...DEFAULTS, ...options };
-  const framesJson = JSON.stringify(encodedFrames.map((f) => ({
-    src: f.dataUrl,
-    label: f.label,
-    sublabel: f.sublabel ?? "",
-  })));
+  const framesJson = JSON.stringify(
+    encodedFrames.map((f) => ({
+      src: f.dataUrl,
+      label: f.label,
+      sublabel: f.sublabel ?? "",
+    })),
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -161,11 +159,13 @@ export async function writeFlipbook(
   if (frames.length === 0) {
     throw new Error("Cannot write flipbook with zero frames");
   }
-  const encoded = await Promise.all(frames.map(async (f) => {
-    const buf = await readFile(f.path);
-    const dataUrl = `data:image/png;base64,${buf.toString("base64")}`;
-    return { dataUrl, label: f.label, sublabel: f.sublabel };
-  }));
+  const encoded = await Promise.all(
+    frames.map(async (f) => {
+      const buf = await readFile(f.path);
+      const dataUrl = `data:image/png;base64,${buf.toString("base64")}`;
+      return { dataUrl, label: f.label, sublabel: f.sublabel };
+    }),
+  );
   const html = renderFlipbookHtml(encoded, options);
   await mkdir(dirname(resolve(outPath)), { recursive: true });
   await writeFile(outPath, html);

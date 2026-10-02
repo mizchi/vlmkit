@@ -40,9 +40,11 @@ function startWall(): Promise<{ server: Server; base: string }> {
     }
     const login = (req.url ?? "").startsWith("/login");
     res.writeHead(200, { "content-type": "text/html" });
-    res.end(login
-      ? `<!doctype html><meta charset="utf-8"><title>Sign in</title><body style="font:16px sans-serif;padding:40px"><h1>Sign in</h1><form><input type="password"><button>Sign in</button></form></body>`
-      : `<!doctype html><meta charset="utf-8"><title>Dashboard</title><body style="margin:0"><main><div class="card" style="width:1000px">Revenue</div><div class="card" style="width:1000px">Costs</div></main></body>`);
+    res.end(
+      login
+        ? `<!doctype html><meta charset="utf-8"><title>Sign in</title><body style="font:16px sans-serif;padding:40px"><h1>Sign in</h1><form><input type="password"><button>Sign in</button></form></body>`
+        : `<!doctype html><meta charset="utf-8"><title>Dashboard</title><body style="margin:0"><main><div class="card" style="width:1000px">Revenue</div><div class="card" style="width:1000px">Costs</div></main></body>`,
+    );
   });
   return new Promise((resolve) => {
     server.listen(0, () => {

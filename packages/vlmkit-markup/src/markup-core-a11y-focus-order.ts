@@ -47,4 +47,3 @@ function isFocusOrderTransition(value: string): value is FocusOrderTransition {
     value === "ok"
   );
 }
-

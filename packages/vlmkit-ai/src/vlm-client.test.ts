@@ -23,8 +23,10 @@ import { afterEach, beforeEach, describe, it, vi } from "vite-plus/test";
  * assertion is what the client SENT.
  */
 const geminiCalls: Record<string, unknown>[] = [];
-let geminiReply: { text: string; usage?: { promptTokenCount: number; candidatesTokenCount: number } } =
-  { text: "gemini says ok", usage: { promptTokenCount: 900, candidatesTokenCount: 40 } };
+let geminiReply: { text: string; usage?: { promptTokenCount: number; candidatesTokenCount: number } } = {
+  text: "gemini says ok",
+  usage: { promptTokenCount: 900, candidatesTokenCount: 40 },
+};
 
 vi.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: class {
@@ -75,7 +77,7 @@ let realFetch: typeof globalThis.fetch;
 function stubFetch(responder: (url: string) => { status?: number; json?: unknown; text?: string }) {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+    const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
     captured.push({ url, ...(init ? { init } : {}), body });
     const r = responder(url);
     const status = r.status ?? 200;
@@ -142,8 +144,14 @@ describe("model catalogues", () => {
     // Returned by value: a caller that sorts the list must not reorder the module's own.
     const first = listClaudeModels();
     first.sort((a, b) => b.promptCostPer1k - a.promptCostPer1k);
-    assert.deepEqual(listClaudeModels().map((m) => m.id), listClaudeModels().map((m) => m.id));
-    assert.notDeepEqual(first.map((m) => m.id), listClaudeModels().map((m) => m.id));
+    assert.deepEqual(
+      listClaudeModels().map((m) => m.id),
+      listClaudeModels().map((m) => m.id),
+    );
+    assert.notDeepEqual(
+      first.map((m) => m.id),
+      listClaudeModels().map((m) => m.id),
+    );
   });
 
   it("resolves a direct model with or without its prefix", () => {
@@ -159,13 +167,20 @@ describe("model catalogues", () => {
     const models = await listModels({ includeGemini: false, includeClaude: false });
     assert.ok(!models.some((m) => m.id === "vendor/text-only"), "text-only model must be filtered out");
     const costs = models.map((m) => m.promptCostPer1k);
-    assert.deepEqual(costs, [...costs].sort((a, b) => a - b), "sorted by prompt cost");
+    assert.deepEqual(
+      costs,
+      [...costs].sort((a, b) => a - b),
+      "sorted by prompt cost",
+    );
   });
 
   it("filters by max cost and truncates to the limit", async () => {
     stubFetch(() => ({ json: OPENROUTER_MODELS }));
     const cheap = await listModels({ maxCost: 1e-6, includeGemini: false, includeClaude: false });
-    assert.deepEqual(cheap.map((m) => m.id), ["vendor/cheap-vision"]);
+    assert.deepEqual(
+      cheap.map((m) => m.id),
+      ["vendor/cheap-vision"],
+    );
     const limited = await listModels({ limit: 1, includeGemini: false, includeClaude: false });
     assert.equal(limited.length, 1);
   });
@@ -193,7 +208,10 @@ describe("model catalogues", () => {
   it("mixes the direct providers into the list by default", async () => {
     stubFetch(() => ({ json: OPENROUTER_MODELS }));
     const all = await listModels();
-    assert.ok(all.some((m) => m.id.startsWith("gemini:")), "gemini included unless excluded");
+    assert.ok(
+      all.some((m) => m.id.startsWith("gemini:")),
+      "gemini included unless excluded",
+    );
     assert.ok(all.some((m) => m.id.startsWith("claude:")));
     assert.ok(all.some((m) => m.id === "vendor/cheap-vision"));
   });
@@ -203,7 +221,9 @@ describe("resolveModel", () => {
   it("prefers the direct providers over an API lookup", async () => {
     // No fetch stub on purpose: resolving a direct id must not touch the network at all, and a
     // real `fetch` here would try to reach openrouter.ai from a sandbox.
-    stubFetch(() => { throw new Error("resolveModel must not fetch for a direct id"); });
+    stubFetch(() => {
+      throw new Error("resolveModel must not fetch for a direct id");
+    });
     assert.equal((await resolveModel("gemini:gemini-2.0-flash")).id, "gemini:gemini-2.0-flash");
     assert.equal((await resolveModel("claude:claude-sonnet-4-6")).id, "claude:claude-sonnet-4-6");
     assert.equal(captured.length, 0);
@@ -245,7 +265,11 @@ describe("resolveModel", () => {
       json: {
         data: [
           { id: "qwen/qwen3-vl", architecture: { input_modalities: ["image"] }, pricing: { prompt: "0.000001" } },
-          { id: "qwen/qwen3-vl-30b-a3b-instruct", architecture: { input_modalities: ["image"] }, pricing: { prompt: "0.000002" } },
+          {
+            id: "qwen/qwen3-vl-30b-a3b-instruct",
+            architecture: { input_modalities: ["image"] },
+            pricing: { prompt: "0.000002" },
+          },
         ],
       },
     }));
@@ -276,8 +300,12 @@ describe("createVlmClient — missing keys", () => {
   const gemini = listGeminiModels()[0]!;
   const claude = listClaudeModels()[0]!;
   const openRouter: VlmModel = {
-    id: "vendor/cheap-vision", name: "Cheap", promptCostPer1k: 1e-7,
-    completionCostPer1k: 4e-7, contextLength: 1000, modality: "text+image->text",
+    id: "vendor/cheap-vision",
+    name: "Cheap",
+    promptCostPer1k: 1e-7,
+    completionCostPer1k: 4e-7,
+    contextLength: 1000,
+    modality: "text+image->text",
   };
 
   it("names the exact variable each provider needs", async () => {
@@ -289,7 +317,7 @@ describe("createVlmClient — missing keys", () => {
       [openRouter, /OPENROUTER_API_KEY/],
     ] as const) {
       await assert.rejects(
-        () => createVlmClient(model, { apiKey: undefined, ...({}) }),
+        () => createVlmClient(model, { apiKey: undefined, ...{} }),
         (err: unknown) => {
           assert.ok(err instanceof VrtConfigError, `${model.id} threw ${err}`);
           assert.equal(err.code, "MISSING_KEY");
@@ -309,7 +337,10 @@ describe("createVlmClient — missing keys", () => {
 describe("Anthropic requests", () => {
   const claude = listClaudeModels()[0]!;
   const reply = {
-    content: [{ type: "text", text: "CHANGE: color #fff -> #000" }, { type: "thinking", text: "ignored" }],
+    content: [
+      { type: "text", text: "CHANGE: color #fff -> #000" },
+      { type: "thinking", text: "ignored" },
+    ],
     usage: { input_tokens: 1200, output_tokens: 80 },
   };
 
@@ -334,7 +365,10 @@ describe("Anthropic requests", () => {
     assert.equal(res.completionTokens, 80);
     assert.equal(res.totalTokens, 1280);
     // The cost expression this repo's benches are quoted in: per-1k times tokens/1000.
-    assert.ok(Math.abs(res.costUsd - ((1200 / 1000) * claude.promptCostPer1k + (80 / 1000) * claude.completionCostPer1k)) < 1e-12);
+    assert.ok(
+      Math.abs(res.costUsd - ((1200 / 1000) * claude.promptCostPer1k + (80 / 1000) * claude.completionCostPer1k)) <
+        1e-12,
+    );
     assert.ok(res.latencyMs >= 0);
   });
 
@@ -345,7 +379,10 @@ describe("Anthropic requests", () => {
     const client = await createVlmClient(claude, { apiKey: "k" });
     await client!.analyzeDiff("BASE", "CUR", "describe the delta", { maxTokens: 256 });
     const content = (captured[0]!.body.messages as { content: Record<string, unknown>[] }[])[0]!.content;
-    assert.deepEqual(content.map((c) => c.type), ["text", "image", "text", "image", "text"]);
+    assert.deepEqual(
+      content.map((c) => c.type),
+      ["text", "image", "text", "image", "text"],
+    );
     assert.match(String(content[0]!.text), /Baseline/i);
     assert.match(String(content[2]!.text), /Current/i);
     assert.equal((content[1]!.source as { data: string }).data, "BASE");
@@ -360,13 +397,16 @@ describe("Anthropic requests", () => {
     const client = await createVlmClient(claude, { apiKey: "k" });
     await client!.analyzeImageFile(file, "prompt");
     const content = (captured[0]!.body.messages as { content: Record<string, unknown>[] }[])[0]!.content;
-    assert.equal((content[0]!.source as { data: string }).data, Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64"));
+    assert.equal(
+      (content[0]!.source as { data: string }).data,
+      Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64"),
+    );
   });
 
   it("surfaces the provider's own error body", async () => {
     // A 401 with an empty message is the single most common real failure, and it must not arrive
     // as `undefined is not a function` three frames later.
-    stubFetch(() => ({ status: 401, text: "{\"error\":{\"message\":\"invalid x-api-key\"}}" }));
+    stubFetch(() => ({ status: 401, text: '{"error":{"message":"invalid x-api-key"}}' }));
     const client = await createVlmClient(claude, { apiKey: "bad" });
     await assert.rejects(() => client!.analyzeImage("IMG", "p"), /Anthropic API error: 401.*invalid x-api-key/s);
   });
@@ -374,8 +414,12 @@ describe("Anthropic requests", () => {
 
 describe("OpenRouter requests", () => {
   const model: VlmModel = {
-    id: "vendor/cheap-vision", name: "Cheap", promptCostPer1k: 1e-7,
-    completionCostPer1k: 4e-7, contextLength: 1000, modality: "text+image->text",
+    id: "vendor/cheap-vision",
+    name: "Cheap",
+    promptCostPer1k: 1e-7,
+    completionCostPer1k: 4e-7,
+    contextLength: 1000,
+    modality: "text+image->text",
   };
   const reply = {
     choices: [{ message: { content: "ok" } }],
@@ -467,7 +511,10 @@ describe("Gemini requests", () => {
     assert.equal(res.promptTokens, 900);
     assert.equal(res.completionTokens, 40);
     assert.equal(res.totalTokens, 940);
-    assert.ok(Math.abs(res.costUsd - ((900 / 1000) * gemini.promptCostPer1k + (40 / 1000) * gemini.completionCostPer1k)) < 1e-15);
+    assert.ok(
+      Math.abs(res.costUsd - ((900 / 1000) * gemini.promptCostPer1k + (40 / 1000) * gemini.completionCostPer1k)) <
+        1e-15,
+    );
     assert.equal(res.model, gemini.id, "the reported id keeps the prefix, so a report says which provider ran");
   });
 

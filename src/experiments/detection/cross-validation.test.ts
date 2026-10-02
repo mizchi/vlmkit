@@ -6,9 +6,7 @@ import type { VisualSemanticDiff, A11yDiff, ChangeIntent } from "@mizchi/vlmkit-
 const styleIntent: ChangeIntent = {
   summary: "style: change button color",
   changeType: "style",
-  expectedVisualChanges: [
-    { component: "Button", description: "color change", confidence: 0.8 },
-  ],
+  expectedVisualChanges: [{ component: "Button", description: "color change", confidence: 0.8 }],
   expectedA11yChanges: [],
   affectedComponents: ["src/Button.tsx"],
 };

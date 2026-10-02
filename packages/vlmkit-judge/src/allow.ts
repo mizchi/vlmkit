@@ -47,9 +47,9 @@ export function parseSelectorAllowRules(
     const cut = spec.indexOf(";");
     if (cut < 0) {
       throw new UsageError(
-        `--allow needs a reason: <selector>;<reason> (got "${spec}").`
-        + (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "")
-        + ` An exemption without a stated reason cannot be reviewed.`,
+        `--allow needs a reason: <selector>;<reason> (got "${spec}").` +
+          (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "") +
+          ` An exemption without a stated reason cannot be reviewed.`,
       );
     }
     const selector = spec.slice(0, cut).trim();
@@ -58,8 +58,8 @@ export function parseSelectorAllowRules(
     if (!reason) throw new UsageError(`--allow reason is empty in "${spec}". Say why this is intentional.`);
     if (selector === "*") {
       throw new UsageError(
-        `--allow "*" would exempt everything, which is ${offSuggestion}.`
-        + ` Name what is deliberately different, or turn the rule off explicitly.`,
+        `--allow "*" would exempt everything, which is ${offSuggestion}.` +
+          ` Name what is deliberately different, or turn the rule off explicitly.`,
       );
     }
     rules.push({ selector, reason, raw: spec });
@@ -109,10 +109,7 @@ export function applySelectorAllowRules<T>(
 }
 
 /** The one matching rule, for both helpers here: the first rule whose selector the path contains. */
-function matchSelectorAllowRule(
-  rules: readonly SelectorAllowRule[],
-  selector: string,
-): SelectorAllowRule | undefined {
+function matchSelectorAllowRule(rules: readonly SelectorAllowRule[], selector: string): SelectorAllowRule | undefined {
   return rules.find((r) => selector.includes(r.selector));
 }
 

@@ -69,7 +69,9 @@ export async function runMigrationFixLoop() {
   variantHtml = await inlineExternalStylesheets(variantHtml, dirname(variantPath));
   const currentCss = extractCss(variantHtml);
   if (!currentCss) {
-    console.error(`Could not find any <style> block in ${variantPath} (extractCss expects either <style id="target-css"> or a generic <style>...).`);
+    console.error(
+      `Could not find any <style> block in ${variantPath} (extractCss expects either <style id="target-css"> or a generic <style>...).`,
+    );
     process.exit(1);
   }
 
@@ -144,14 +146,18 @@ export async function runMigrationFixLoop() {
     }
     const fixes = correction.fixes;
     if (PROPOSE_ONLY) {
-      const payload = JSON.stringify({
-        report: REPORT_PATH,
-        variant: target.variantFile,
-        viewport: target.viewport,
-        viewportWidth: target.viewportWidth,
-        diffRatio: target.diffRatio,
-        proposals: fixes,
-      }, null, 2);
+      const payload = JSON.stringify(
+        {
+          report: REPORT_PATH,
+          variant: target.variantFile,
+          viewport: target.viewport,
+          viewportWidth: target.viewportWidth,
+          diffRatio: target.diffRatio,
+          proposals: fixes,
+        },
+        null,
+        2,
+      );
       if (PROPOSALS_OUT) {
         const out = resolve(PROPOSALS_OUT);
         await mkdir(dirname(out), { recursive: true });
@@ -187,9 +193,13 @@ export async function runMigrationFixLoop() {
     }
 
     console.log();
-    console.log(`Multi-fix: ${applied.length}/${fixes.length} applied${skipped.length > 0 ? ` (${skipped.length} skipped — selector not in writable CSS)` : ""}`);
+    console.log(
+      `Multi-fix: ${applied.length}/${fixes.length} applied${skipped.length > 0 ? ` (${skipped.length} skipped — selector not in writable CSS)` : ""}`,
+    );
     for (const fix of applied) {
-      console.log(`  + ${fix.selector} { ${fix.property}: ${fix.value}; }${fix.mediaCondition ? ` @media ${fix.mediaCondition}` : ""}`);
+      console.log(
+        `  + ${fix.selector} { ${fix.property}: ${fix.value}; }${fix.mediaCondition ? ` @media ${fix.mediaCondition}` : ""}`,
+      );
     }
 
     if (DRY_RUN || applied.length === 0) {
@@ -211,9 +221,7 @@ export async function runMigrationFixLoop() {
     await writeFile(outputPath, workingHtml);
     console.log(`Wrote: ${outputPath}`);
 
-    const afterByViewport = NO_RERUN
-      ? null
-      : await rerunCompare(report, baselinePath, outputPath);
+    const afterByViewport = NO_RERUN ? null : await rerunCompare(report, baselinePath, outputPath);
 
     await writeSummary({
       target,
@@ -270,7 +278,9 @@ export async function runMigrationFixLoop() {
   const fix = correction.fixes[0]!;
 
   console.log();
-  console.log(`Fix: ${fix.selector} { ${fix.property}: ${fix.value}; }${fix.mediaCondition ? ` @media ${fix.mediaCondition}` : ""}`);
+  console.log(
+    `Fix: ${fix.selector} { ${fix.property}: ${fix.value}; }${fix.mediaCondition ? ` @media ${fix.mediaCondition}` : ""}`,
+  );
 
   if (DRY_RUN) {
     console.log("Dry run: fix was not written.");
@@ -360,7 +370,9 @@ async function rerunCompare(
       const b = before.get(after.viewport) ?? 0;
       const delta = after.diffRatio - b;
       const arrow = delta < -0.003 ? "↓" : delta > 0.003 ? "↑" : "≈";
-      console.log(`  ${after.viewport.padEnd(12)} ${(b * 100).toFixed(2)}% → ${(after.diffRatio * 100).toFixed(2)}%  ${arrow}`);
+      console.log(
+        `  ${after.viewport.padEnd(12)} ${(b * 100).toFixed(2)}% → ${(after.diffRatio * 100).toFixed(2)}%  ${arrow}`,
+      );
     }
     return perViewport;
   } catch (error) {
@@ -376,12 +388,14 @@ async function resolveMultiFixes(input: {
   target: SelectedMigrationFixTarget;
 }): Promise<MigrationFix[]> {
   if (MANUAL_SELECTOR && MANUAL_PROPERTY && MANUAL_VALUE) {
-    return [{
-      selector: MANUAL_SELECTOR,
-      property: MANUAL_PROPERTY,
-      value: MANUAL_VALUE,
-      mediaCondition: MANUAL_MEDIA === "none" ? null : MANUAL_MEDIA,
-    }];
+    return [
+      {
+        selector: MANUAL_SELECTOR,
+        property: MANUAL_PROPERTY,
+        value: MANUAL_VALUE,
+        mediaCondition: MANUAL_MEDIA === "none" ? null : MANUAL_MEDIA,
+      },
+    ];
   }
   if (RESPONSE_FILE) {
     const raw = await readFile(resolve(RESPONSE_FILE), "utf-8");

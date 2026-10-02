@@ -5,14 +5,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
-const VLMKIT_TS = resolve(
-  fileURLToPath(import.meta.url),
-  "..",
-  "vlmkit.ts",
-);
-const PACKAGE_VERSION = JSON.parse(
-  readFileSync(resolve(import.meta.dirname!, "..", "..", "package.json"), "utf8"),
-).version as string;
+const VLMKIT_TS = resolve(fileURLToPath(import.meta.url), "..", "vlmkit.ts");
+const PACKAGE_VERSION = JSON.parse(readFileSync(resolve(import.meta.dirname!, "..", "..", "package.json"), "utf8"))
+  .version as string;
 
 function runVrt(args: string[]): { stdout: string; stderr: string; status: number } {
   const r = spawnSync(

@@ -745,16 +745,7 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         rules: arrayOf(ref("ApprovalRule")),
         warnings: arrayOf(ref("ApprovalWarning")),
       },
-      required: [
-        "path",
-        "action",
-        "dryRun",
-        "beforeCount",
-        "afterCount",
-        "total",
-        "rules",
-        "warnings",
-      ],
+      required: ["path", "action", "dryRun", "beforeCount", "afterCount", "total", "rules", "warnings"],
     },
     CloudflareViewport: {
       type: "object",

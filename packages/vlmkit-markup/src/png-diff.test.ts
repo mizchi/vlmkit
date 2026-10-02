@@ -93,9 +93,12 @@ async function writeNoisyFramePair(dir: string): Promise<{ baselinePath: string;
 describe("png-diff --ignore-region", () => {
   it("parses repeated --ignore-region into rects", () => {
     const options = parsePngDiffArgs([
-      "a.png", "b.png",
-      "--ignore-region", "0,300,640x60",
-      "--ignore-region", " 12 , 4 , 8x8 ",
+      "a.png",
+      "b.png",
+      "--ignore-region",
+      "0,300,640x60",
+      "--ignore-region",
+      " 12 , 4 , 8x8 ",
     ]);
     assert.deepEqual(options.ignoreRegions, [
       { x: 0, y: 300, width: 640, height: 60 },
@@ -129,10 +132,7 @@ describe("png-diff --ignore-region", () => {
       assert.equal(unmasked.diff.totalPixels, FRAME_PIXELS);
       assert.equal(unmasked.diff.mask, undefined, "no mask key without --ignore-region");
       assert.equal(unmasked.diff.regions.length, 1);
-      assert.deepEqual(
-        { x: unmasked.diff.regions[0]!.x, y: unmasked.diff.regions[0]!.y },
-        { x: NOISY.x, y: NOISY.y },
-      );
+      assert.deepEqual({ x: unmasked.diff.regions[0]!.x, y: unmasked.diff.regions[0]!.y }, { x: NOISY.x, y: NOISY.y });
 
       const masked = await runPngDiff({
         ...base,
@@ -162,7 +162,12 @@ describe("png-diff --ignore-region", () => {
     try {
       const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
       const result = await runPngDiff({
-        baselinePath, currentPath, outputDir: TMP, threshold: 0.1, skipHeatmap: true, json: false,
+        baselinePath,
+        currentPath,
+        outputDir: TMP,
+        threshold: 0.1,
+        skipHeatmap: true,
+        json: false,
         ignoreRegions: [{ x: 0, y: 0, width: 32, height: 32 }],
       });
 
@@ -188,7 +193,12 @@ describe("png-diff --ignore-region", () => {
     try {
       const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
       const result = await runPngDiff({
-        baselinePath, currentPath, outputDir: TMP, threshold: 0.1, skipHeatmap: true, json: false,
+        baselinePath,
+        currentPath,
+        outputDir: TMP,
+        threshold: 0.1,
+        skipHeatmap: true,
+        json: false,
         ignoreRegions: [
           { x: NOISY.x, y: NOISY.y, width: NOISY.w, height: NOISY.h },
           { x: NOISY.x + 16, y: NOISY.y, width: NOISY.w, height: NOISY.h }, // half overlaps the first
@@ -219,12 +229,17 @@ describe("png-diff --ignore-region", () => {
     await mkdir(TMP, { recursive: true });
     const lines: string[] = [];
     const original = console.log;
-    console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+    console.log = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
     try {
       const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
       await runPngDiffCli([
-        baselinePath, currentPath, "--no-heatmap",
-        "--ignore-region", `${NOISY.x},${NOISY.y},${NOISY.w}x${NOISY.h}`,
+        baselinePath,
+        currentPath,
+        "--no-heatmap",
+        "--ignore-region",
+        `${NOISY.x},${NOISY.y},${NOISY.w}x${NOISY.h}`,
       ]);
       const text = lines.join("\n");
       assert.match(text, /diff:\s+0\.00% \(0 \/ 24576 px measured\)/);
@@ -260,12 +275,7 @@ describe("png-diff", () => {
   });
 
   it("parses --crop-regions into an output directory", () => {
-    const options = parsePngDiffArgs([
-      "before.png",
-      "after.png",
-      "--crop-regions",
-      "tmp/crops",
-    ]);
+    const options = parsePngDiffArgs(["before.png", "after.png", "--crop-regions", "tmp/crops"]);
     assert.equal(options.cropRegions, "tmp/crops");
   });
 
@@ -371,10 +381,21 @@ describe("png-diff", () => {
       await encodePng(baselinePath, createPalettePng(120, 120, colors));
       await encodePng(currentPath, createPalettePng(120, 120, changed));
       const { writeFile } = await import("node:fs/promises");
-      await writeFile(elementsPath, JSON.stringify([
-        { path: "div.portfolio-caption", tag: "div", classes: "portfolio-caption", left: 80, top: 80, width: 40, height: 40 },
-        { path: "header.masthead", tag: "header", classes: "masthead", left: 0, top: 0, width: 120, height: 40 },
-      ]));
+      await writeFile(
+        elementsPath,
+        JSON.stringify([
+          {
+            path: "div.portfolio-caption",
+            tag: "div",
+            classes: "portfolio-caption",
+            left: 80,
+            top: 80,
+            width: 40,
+            height: 40,
+          },
+          { path: "header.masthead", tag: "header", classes: "masthead", left: 0, top: 0, width: 120, height: 40 },
+        ]),
+      );
 
       const result = await runPngDiff({
         baselinePath,

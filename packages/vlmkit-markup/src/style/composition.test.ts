@@ -28,19 +28,23 @@ const box = (over: Partial<CompositionBox> = {}): CompositionBox => ({
   selector: `div.b${nextIndex}`,
   tag: "div",
   heading: 0,
-  x: 0, y: 0, w: 600, h: 20,
+  x: 0,
+  y: 0,
+  w: 600,
+  h: 20,
   position: "static",
-  fontSize: 16, fontWeight: 400,
+  fontSize: 16,
+  fontWeight: 400,
   bg: "rgba(0, 0, 0, 0)",
-  border: 0, radius: 0,
+  border: 0,
+  radius: 0,
   textLen: 10,
   leaf: true,
   ...over,
 });
 
 /** Re-index a hand-written tree so `i` matches array position, as the collector guarantees. */
-const tree = (boxes: CompositionBox[]): CompositionBox[] =>
-  boxes.map((b, i) => ({ ...b, i }));
+const tree = (boxes: CompositionBox[]): CompositionBox[] => boxes.map((b, i) => ({ ...b, i }));
 
 const input = (boxes: CompositionBox[], width = 1280): CompositionInput => ({
   boxes: tree(boxes),
@@ -53,19 +57,31 @@ const input = (boxes: CompositionBox[], width = 1280): CompositionInput => ({
  */
 function sections(opts: { gapAbove: number; gapBelow: number; count?: number }): CompositionBox[] {
   const { gapAbove, gapBelow, count = 2 } = opts;
-  const boxes: CompositionBox[] = [box({ parent: -1, selector: "div.shell", tag: "div", y: 0, h: 2000, textLen: 500, leaf: false })];
+  const boxes: CompositionBox[] = [
+    box({ parent: -1, selector: "div.shell", tag: "div", y: 0, h: 2000, textLen: 500, leaf: false }),
+  ];
   let y = 0;
   for (let s = 0; s < count; s++) {
     y += gapAbove;
     const sectionIndex = boxes.length;
     const sectionTop = y;
-    boxes.push(box({ parent: 0, selector: `section.s${s}`, tag: "section", y: sectionTop, h: 0, textLen: 200, leaf: false }));
+    boxes.push(
+      box({ parent: 0, selector: `section.s${s}`, tag: "section", y: sectionTop, h: 0, textLen: 200, leaf: false }),
+    );
     // Heading flush with its section, so the boundary above comes from the
     // section's previous sibling — the margin-collapse shape.
-    boxes.push(box({
-      parent: sectionIndex, selector: `section.s${s}>h2`, tag: "h2", heading: 2,
-      y: sectionTop, h: 30, fontSize: 26, textLen: 12,
-    }));
+    boxes.push(
+      box({
+        parent: sectionIndex,
+        selector: `section.s${s}>h2`,
+        tag: "h2",
+        heading: 2,
+        y: sectionTop,
+        h: 30,
+        fontSize: 26,
+        textLen: 12,
+      }),
+    );
     y = sectionTop + 30 + gapBelow;
     boxes.push(box({ parent: sectionIndex, selector: `section.s${s}>p.a`, tag: "p", y, h: 40, textLen: 80 }));
     y += 40 + 10;
@@ -91,12 +107,13 @@ function sections(opts: { gapAbove: number; gapBelow: number; count?: number }):
  * it as their parent.
  */
 function railSplit(at: number): CompositionBox[] {
-  const wide = (x: number, selector: string, y: number) =>
-    box({ parent: at, selector, x, w: 800, y, h: 50 });
+  const wide = (x: number, selector: string, y: number) => box({ parent: at, selector, x, w: 800, y, h: 50 });
   return [
     box({ parent: -1, selector: "div.rails", x: 0, w: 1280, y: 3000, h: 400, leaf: false }),
-    wide(232, "section.p", 3000), wide(232, "section.q", 3100),
-    wide(237, "section.r", 3200), wide(237, "section.s", 3300),
+    wide(232, "section.p", 3000),
+    wide(232, "section.q", 3100),
+    wide(237, "section.r", 3200),
+    wide(237, "section.s", 3300),
   ];
 }
 
@@ -175,7 +192,10 @@ describe("measureProximity", () => {
     const near = measureProximity(tree(sections({ gapAbove: 16, gapBelow: 23 })));
     assert.equal(near.labels.filter((l) => l.inverted).length, 0, "23 vs 16 is under the 8px floor");
     const far = measureProximity(tree(sections({ gapAbove: 16, gapBelow: 44 })));
-    assert.ok(far.labels.some((l) => l.inverted), "44 vs 16 clears both tests");
+    assert.ok(
+      far.labels.some((l) => l.inverted),
+      "44 vs 16 clears both tests",
+    );
   });
 
   it("does not treat a whole card as a label", () => {
@@ -270,17 +290,21 @@ describe("measureRails", () => {
    * this suite's shape before the live-corpus round and it tested a case the
    * gate never sees.
    */
-  const wide = (x: number, w: number, selector: string, parent = 0) =>
-    box({ parent, selector, x, w, y: 0, h: 50 });
+  const wide = (x: number, w: number, selector: string, parent = 0) => box({ parent, selector, x, w, y: 0, h: 50 });
   /** `div.shell` at index 0, so children can name it as their parent. */
   const shell = (...kids: CompositionBox[]) =>
     tree([box({ parent: -1, selector: "div.shell", x: 0, w: 1280, h: 2000, leaf: false }), ...kids]);
 
   it("reports two rails a few pixels apart", () => {
-    const rails = measureRails(shell(
-      wide(232, 800, "section.a"), wide(232, 800, "section.b"),
-      wide(237, 800, "section.c"), wide(237, 800, "section.d"),
-    ), 1280);
+    const rails = measureRails(
+      shell(
+        wide(232, 800, "section.a"),
+        wide(232, 800, "section.b"),
+        wide(237, 800, "section.c"),
+        wide(237, 800, "section.d"),
+      ),
+      1280,
+    );
     const left = rails.near.filter((n) => n.axis === "left");
     assert.equal(left.length, 1);
     assert.equal(left[0]!.delta, 5);
@@ -294,33 +318,59 @@ describe("measureRails", () => {
   it("ignores a 1px split, which is rounding of fractional layout", () => {
     // landing-product renders rails at 78 and 79, and at 1201 and 1202. A12
     // excludes sub-2px for the same reason.
-    assert.equal(measureRails(shell(
-      wide(78, 800, "section.a"), wide(78, 800, "section.b"),
-      wide(79, 800, "section.c"), wide(79, 800, "section.d"),
-    ), 1280).near.length, 0);
+    assert.equal(
+      measureRails(
+        shell(
+          wide(78, 800, "section.a"),
+          wide(78, 800, "section.b"),
+          wide(79, 800, "section.c"),
+          wide(79, 800, "section.d"),
+        ),
+        1280,
+      ).near.length,
+      0,
+    );
   });
 
   it("ignores a clearly deliberate indent", () => {
-    assert.equal(measureRails(shell(
-      wide(100, 800, "section.a"), wide(100, 800, "section.b"),
-      wide(140, 700, "section.c"), wide(140, 700, "section.d"),
-    ), 1280).near.filter((n) => n.axis === "left").length, 0);
+    assert.equal(
+      measureRails(
+        shell(
+          wide(100, 800, "section.a"),
+          wide(100, 800, "section.b"),
+          wide(140, 700, "section.c"),
+          wide(140, 700, "section.d"),
+        ),
+        1280,
+      ).near.filter((n) => n.axis === "left").length,
+      0,
+    );
   });
 
   it("needs two blocks on a rail before calling it one", () => {
     // One stray block must not invent a phantom rail to compare against.
-    assert.equal(measureRails(shell(
-      wide(232, 800, "section.a"), wide(232, 800, "section.b"),
-      wide(237, 800, "section.stray"),
-    ), 1280).near.length, 0);
+    assert.equal(
+      measureRails(
+        shell(wide(232, 800, "section.a"), wide(232, 800, "section.b"), wide(237, 800, "section.stray")),
+        1280,
+      ).near.length,
+      0,
+    );
   });
 
   it("ignores boxes too narrow to carry the page's rail", () => {
-    assert.equal(measureRails(shell(
-      wide(232, 800, "section.a"), wide(232, 800, "section.b"),
-      box({ parent: 0, selector: "span.badge", x: 237, w: 40, y: 0, h: 20 }),
-      box({ parent: 0, selector: "span.badge2", x: 237, w: 40, y: 0, h: 20 }),
-    ), 1280).near.length, 0);
+    assert.equal(
+      measureRails(
+        shell(
+          wide(232, 800, "section.a"),
+          wide(232, 800, "section.b"),
+          box({ parent: 0, selector: "span.badge", x: 237, w: 40, y: 0, h: 20 }),
+          box({ parent: 0, selector: "span.badge2", x: 237, w: 40, y: 0, h: 20 }),
+        ),
+        1280,
+      ).near.length,
+      0,
+    );
   });
 
   // The four classes the live corpus turned up. Every current firing on 14
@@ -400,7 +450,9 @@ describe("measureHierarchy", () => {
   const heading = (level: number, fontSize: number, fontWeight = 700) =>
     box({ parent: -1, selector: `h${level}`, tag: `h${level}`, heading: level, fontSize, fontWeight, textLen: 10 });
   const body = (fontSize = 15, fontWeight = 400, n = 5) =>
-    Array.from({ length: n }, (_, i) => box({ parent: -1, selector: `p.${i}`, tag: "p", fontSize, fontWeight, textLen: 80 }));
+    Array.from({ length: n }, (_, i) =>
+      box({ parent: -1, selector: `p.${i}`, tag: "p", fontSize, fontWeight, textLen: 80 }),
+    );
 
   it("passes a real step at every declared level", () => {
     const h = measureHierarchy(tree([heading(1, 40), heading(2, 26), heading(3, 18), ...body()]));
@@ -463,20 +515,26 @@ describe("judgeComposition", () => {
   });
 
   it("reports no-type-contrast only when neither size nor weight emphasizes anything", () => {
-    const flat = judgeComposition(input([
-      box({ parent: -1, selector: "h1", tag: "h1", heading: 1, fontSize: 15, fontWeight: 400, textLen: 10 }),
-      ...Array.from({ length: 5 }, (_, i) =>
-        box({ parent: -1, selector: `p.${i}`, tag: "p", fontSize: 15, fontWeight: 400, textLen: 80 })),
-    ]));
+    const flat = judgeComposition(
+      input([
+        box({ parent: -1, selector: "h1", tag: "h1", heading: 1, fontSize: 15, fontWeight: 400, textLen: 10 }),
+        ...Array.from({ length: 5 }, (_, i) =>
+          box({ parent: -1, selector: `p.${i}`, tag: "p", fontSize: 15, fontWeight: 400, textLen: 80 }),
+        ),
+      ]),
+    );
     assert.ok(flat.findings.some((f) => f.kind === "no-type-contrast"));
 
     // form-app's shape: 18px/700 titles over 14px/400 body is a 1.29x size
     // ratio, under the floor, on a page whose hierarchy is perfectly legible.
-    const boldOnly = judgeComposition(input([
-      box({ parent: -1, selector: "h2", tag: "h2", heading: 2, fontSize: 18, fontWeight: 700, textLen: 10 }),
-      ...Array.from({ length: 5 }, (_, i) =>
-        box({ parent: -1, selector: `p.${i}`, tag: "p", fontSize: 14, fontWeight: 400, textLen: 80 })),
-    ]));
+    const boldOnly = judgeComposition(
+      input([
+        box({ parent: -1, selector: "h2", tag: "h2", heading: 2, fontSize: 18, fontWeight: 700, textLen: 10 }),
+        ...Array.from({ length: 5 }, (_, i) =>
+          box({ parent: -1, selector: `p.${i}`, tag: "p", fontSize: 14, fontWeight: 400, textLen: 80 }),
+        ),
+      ]),
+    );
     assert.equal(boldOnly.findings.filter((f) => f.kind === "no-type-contrast").length, 0);
   });
 
@@ -486,23 +544,24 @@ describe("judgeComposition", () => {
     // most important" describes a list correctly rather than finding a defect
     // in it; the page has to CLAIM a hierarchy before failing to render one.
     const rows = Array.from({ length: 8 }, (_, i) =>
-      box({ parent: -1, selector: `a.row${i}`, tag: "a", fontSize: 16, fontWeight: 400, textLen: 40 }));
+      box({ parent: -1, selector: `a.row${i}`, tag: "a", fontSize: 16, fontWeight: 400, textLen: 40 }),
+    );
     const report = judgeComposition(input(rows));
     assert.equal(report.hierarchy.levels.length, 0);
     assert.equal(report.findings.filter((f) => f.kind === "no-type-contrast").length, 0);
 
     // …and still fires once a heading is declared and rendered at body scale.
-    const withHeading = judgeComposition(input([
-      box({ parent: -1, selector: "h1", tag: "h1", heading: 1, fontSize: 16, fontWeight: 400, textLen: 20 }),
-      ...rows,
-    ]));
+    const withHeading = judgeComposition(
+      input([
+        box({ parent: -1, selector: "h1", tag: "h1", heading: 1, fontSize: 16, fontWeight: 400, textLen: 20 }),
+        ...rows,
+      ]),
+    );
     assert.equal(withHeading.findings.filter((f) => f.kind === "no-type-contrast").length, 1);
   });
 
   it("says so rather than passing when nothing could be measured", () => {
-    const report = judgeComposition(input([
-      box({ parent: -1, selector: "span.only", w: 40, h: 20, textLen: 3 }),
-    ]));
+    const report = judgeComposition(input([box({ parent: -1, selector: "span.only", w: 40, h: 20, textLen: 3 })]));
     assert.equal(report.verdict, "not-judged");
     assert.ok(report.findings.some((f) => f.kind === "nothing-judged"));
     // And it must not ALSO claim the page has no type contrast: one span
@@ -519,7 +578,9 @@ describe("judgeComposition", () => {
 
   it("takes an allowed row out of the verdict and still lists it", () => {
     const boxes = sections({ gapAbove: 12, gapBelow: 44 });
-    const report = judgeComposition(input(boxes), { allow: ["section.s1>h2;the lede heading is deliberately isolated"] });
+    const report = judgeComposition(input(boxes), {
+      allow: ["section.s1>h2;the lede heading is deliberately isolated"],
+    });
     assert.ok(report.allowed.length >= 1);
     assert.equal(report.allowed[0]!.reason, "the lede heading is deliberately isolated");
     assert.ok(!report.findings.some((f) => f.selector === "section.s1>h2"));

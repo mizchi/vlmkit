@@ -44,10 +44,7 @@ export function normalizeVrtDiffRegionPixels(diff: VrtDiff): number[] {
   return normalized;
 }
 
-export function createScopedVrtDiff(
-  diff: VrtDiff,
-  region: DiffRegion,
-): VrtDiff {
+export function createScopedVrtDiff(diff: VrtDiff, region: DiffRegion): VrtDiff {
   return {
     ...diff,
     diffPixels: region.diffPixelCount,

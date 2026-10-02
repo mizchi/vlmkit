@@ -75,10 +75,7 @@ describe("verifyDomEquivalence", () => {
   });
 
   it("flags input values changing", () => {
-    const r = verifyDomEquivalence(
-      fp(),
-      fp({ inputValues: ["Different input value", "EU daytime shift"] }),
-    );
+    const r = verifyDomEquivalence(fp(), fp({ inputValues: ["Different input value", "EU daytime shift"] }));
     const w = r.warnings.find((w) => w.code === "input-mismatch");
     assert.ok(w);
   });

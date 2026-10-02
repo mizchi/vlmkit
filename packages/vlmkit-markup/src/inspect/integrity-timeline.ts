@@ -81,23 +81,34 @@ export async function judgeIntegrityInstant(
   maxFindings = 12,
 ): Promise<IntegrityFinding[]> {
   const out: IntegrityFinding[] = [];
-  out.push(...findTextCollisions(await page.evaluate(collectors.text) as IntegrityTextBlock[], width, { maxFindings }).findings);
-  const clipped = judgeClippedText(await page.evaluate(collectors.clip) as ClipCandidate[], width, maxFindings);
+  out.push(
+    ...findTextCollisions((await page.evaluate(collectors.text)) as IntegrityTextBlock[], width, { maxFindings })
+      .findings,
+  );
+  const clipped = judgeClippedText((await page.evaluate(collectors.clip)) as ClipCandidate[], width, maxFindings);
   out.push(...clipped.findings);
-  out.push(...judgeCollapsedContainers(await page.evaluate(collectors.collapse) as CollapseCandidate[], width).findings);
-  out.push(...judgeProtrusions(await page.evaluate(collectors.protrusions) as ProtrusionCandidate[], width, maxFindings).findings);
+  out.push(
+    ...judgeCollapsedContainers((await page.evaluate(collectors.collapse)) as CollapseCandidate[], width).findings,
+  );
+  out.push(
+    ...judgeProtrusions((await page.evaluate(collectors.protrusions)) as ProtrusionCandidate[], width, maxFindings)
+      .findings,
+  );
   // Contrast only for text at full opacity. Mid-motion, text below that is mid-FADE — a
   // fade-in at 40% is the animation, not a defect, and judging it was the one false-positive
   // class on the repo's animated pages (six of eight dogfood pages flipped to `defects` on
   // entrance fades alone). Contrast that is low because the colours are, or because what is
   // behind the text moved, is still judged. The settled run judges every opacity.
-  const { samples: all } = await page.evaluate(collectors.contrast) as { samples: TextContrastSample[] };
+  const { samples: all } = (await page.evaluate(collectors.contrast)) as { samples: TextContrastSample[] };
   const samples = all.filter((s) => (s.opacity ?? 1) >= 0.999 && (s.color?.[3] ?? 1) >= 0.999);
   const measured = textContrastCandidates(samples);
   out.push(...judgeTextContrast(measured.candidates, measured.skippedComposite, width, maxFindings).findings);
-  out.push(...findOccludedText(await page.evaluate(collectors.occlusions) as OcclusionCandidate[], width).findings);
-  const scroll = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
-  const clippedSelectors = new Set([...clipped.findings.map((f) => f.selector), ...clipped.exempted.map((e) => e.selector)]);
+  out.push(...findOccludedText((await page.evaluate(collectors.occlusions)) as OcclusionCandidate[], width).findings);
+  const scroll = (await page.evaluate(COLLECT_SCROLL_SCRIPT)) as Omit<ScrollScanInput, "source">;
+  const clippedSelectors = new Set([
+    ...clipped.findings.map((f) => f.selector),
+    ...clipped.exempted.map((e) => e.selector),
+  ]);
   for (const issue of analyzeScrollSamples({ source: "", ...scroll }).issues) {
     if (issue.kind !== "page-overflow-x" && issue.kind !== "clipped-content") continue;
     if (issue.kind === "clipped-content" && issue.selector && clippedSelectors.has(issue.selector)) continue;
@@ -139,28 +150,51 @@ export async function sampleIntegrityTimeline(
     // Network idle and fonts only: the settle's animation and trailing waits run on the page's
     // own timers, which the held clock never fires.
     await settlePage(page, 0, 0);
-    const advance = (t: number) => page.evaluate(
-      (ms) => (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(ms),
-      t,
-    );
+    const advance = (t: number) =>
+      page.evaluate(
+        (ms) =>
+          (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(
+            ms,
+          ),
+        t,
+      );
     await advance(0);
     const held = await page.evaluate(() =>
-      (window as unknown as { __vlmkitTimelineAnimations(): { startMs: number; durationMs: number; iterations: number | null }[] })
-        .__vlmkitTimelineAnimations());
-    const instants = options.at && options.at.length > 0
-      ? [...new Set(options.at)].sort((a, b) => a - b)
-      : [...new Set([...timelineInstants(held), ...COARSE_GRID_MS])].sort((a, b) => a - b);
+      (
+        window as unknown as {
+          __vlmkitTimelineAnimations(): { startMs: number; durationMs: number; iterations: number | null }[];
+        }
+      ).__vlmkitTimelineAnimations(),
+    );
+    const instants =
+      options.at && options.at.length > 0
+        ? [...new Set(options.at)].sort((a, b) => a - b)
+        : [...new Set([...timelineInstants(held), ...COARSE_GRID_MS])].sort((a, b) => a - b);
     const samples: TimelineSample[] = [];
     for (const atMs of instants) {
       await advance(atMs);
-      await page.evaluate((t) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(t), atMs);
-      samples.push({ atMs, findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12) });
+      await page.evaluate(
+        (t) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(t),
+        atMs,
+      );
+      samples.push({
+        atMs,
+        findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12),
+      });
     }
-    const finiteEnds = held.filter((a) => a.iterations !== null).map((a) => a.startMs + a.durationMs * (a.iterations ?? 1));
+    const finiteEnds = held
+      .filter((a) => a.iterations !== null)
+      .map((a) => a.startMs + a.durationMs * (a.iterations ?? 1));
     const restMs = Math.max(2000, ...instants, ...finiteEnds) + 1;
     await advance(restMs);
-    await page.evaluate((t) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(t), restMs);
-    const rest = { atMs: restMs, findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12) };
+    await page.evaluate(
+      (t) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(t),
+      restMs,
+    );
+    const rest = {
+      atMs: restMs,
+      findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12),
+    };
     return { samples, rest };
   } finally {
     await page.close();

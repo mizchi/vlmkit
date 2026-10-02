@@ -58,11 +58,7 @@ import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, rename, rm, readdir, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import {
-  findConfigPath,
-  loadDiffPrConfig,
-  type DiffPrConfig,
-} from "./diff-pr-config.ts";
+import { findConfigPath, loadDiffPrConfig, type DiffPrConfig } from "./diff-pr-config.ts";
 import {
   buildApprovalRuleFromInput,
   mergeApprovalManifest,
@@ -162,10 +158,7 @@ async function cmdRm(args: string[]): Promise<number> {
  * re-pin (`vlmkit baseline update`) is reversible. Returns the number of files
  * archived. Pure file IO — no Playwright — so it is unit-testable.
  */
-export async function archiveRouteBaselines(
-  routeDir: string,
-  timestamp: string,
-): Promise<number> {
+export async function archiveRouteBaselines(routeDir: string, timestamp: string): Promise<number> {
   if (!existsSync(routeDir)) return 0;
   const pngs = (await readdir(routeDir)).filter((f) => f.endsWith(".png"));
   if (pngs.length === 0) return 0;
@@ -198,9 +191,7 @@ async function cmdUpdate(args: string[]): Promise<number> {
     }
   }
   const targets = positional.filter((p) => !flaggedValues.has(p));
-  const routes = targets.length > 0
-    ? config.routes.filter((r) => targets.includes(r.name))
-    : config.routes;
+  const routes = targets.length > 0 ? config.routes.filter((r) => targets.includes(r.name)) : config.routes;
   if (targets.length > 0) {
     const unknown = targets.filter((t) => !config.routes.some((r) => r.name === t));
     if (unknown.length > 0) {
@@ -280,7 +271,9 @@ async function cmdApprove(args: string[]): Promise<number> {
   const reason = readFlag(args, "reason");
   if ((!selector && !regionRaw) || !reason) {
     console.error(`${RED}error:${RESET} a --selector or --region, plus --reason, are required`);
-    console.error(`\n  vlmkit baseline approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]") --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
+    console.error(
+      `\n  vlmkit baseline approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]") --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`,
+    );
     return 1;
   }
   const maxPxRaw = readFlag(args, "max-px");
@@ -311,7 +304,9 @@ async function cmdApprove(args: string[]): Promise<number> {
     try {
       existing = parseApprovalManifest(await readFile(manifestPath, "utf-8"));
     } catch (error) {
-      console.error(`${RED}error:${RESET} could not read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `${RED}error:${RESET} could not read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return 1;
     }
   }
@@ -326,7 +321,9 @@ async function cmdApprove(args: string[]): Promise<number> {
 
   await writeFile(manifestPath, json);
   const label = selector ?? `region ${regionRaw}`;
-  console.log(`  ${GREEN}✓${RESET} approved ${CYAN}${label}${RESET} in ${manifestPath} (${merged.rules.length} rule(s) total)`);
+  console.log(
+    `  ${GREEN}✓${RESET} approved ${CYAN}${label}${RESET} in ${manifestPath} (${merged.rules.length} rule(s) total)`,
+  );
   return 0;
 }
 
@@ -418,7 +415,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       process.exit(1);
   }
 }
-
 
 if (isCliEntry(import.meta.url, "baseline-cli")) {
   // `handleCliError`, not `console.error(err)`: `readFlag` throws `UsageError` for a

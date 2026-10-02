@@ -72,28 +72,41 @@ A "poor" verdict fails the command; "needs-improvement" is a warn. (Before
     { id: "fcp-needs-improvement", title: `FCP above ${THRESHOLDS.fcp.good}ms`, severity: "warn" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to measure", positional: 0, required: true },
-    { name: "observe", placeholder: "ms", kind: "number", description: "Observation window after the navigation milestone", defaultDescription: "3000" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to measure",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "observe",
+      placeholder: "ms",
+      kind: "number",
+      description: "Observation window after the navigation milestone",
+      defaultDescription: "3000",
+    },
     { name: "strict", kind: "boolean", description: "Accepted no-op (a poor verdict already exits 1)" },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/perf" },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Output directory",
+      defaultDescription: "./test-results/perf",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     // `--har` is deliberately absent — see the comment on `PerfOptions`.
     ...PAGE_LOAD_INPUTS.filter((input) => input.name !== "har"),
   ],
   parse: (argv) => {
-    const source = readPositionals(argv, [
-      "--observe",
-      "--output-dir",
-      "--report",
-      "--timeout",
-      "--wait-until",
-    ])[0];
+    const source = readPositionals(argv, ["--observe", "--output-dir", "--report", "--timeout", "--wait-until"])[0];
     if (!source) throw new UsageError("missing required argument. Usage: vlmkit check perf <html-or-url>");
     if (argv.includes("--har")) {
       throw new UsageError(
-        "check perf does not accept --har: replaying responses from a recording serves them "
-        + "off local disk, so TTFB / LCP / FCP would measure disk reads rather than the page. "
-        + "Use --timeout / --wait-until to survive a slow or never-idle page instead.",
+        "check perf does not accept --har: replaying responses from a recording serves them " +
+          "off local disk, so TTFB / LCP / FCP would measure disk reads rather than the page. " +
+          "Use --timeout / --wait-until to survive a slow or never-idle page instead.",
       );
     }
     const observeMs = readInt(argv, "observe", { min: 0 });
@@ -120,9 +133,9 @@ A "poor" verdict fails the command; "needs-improvement" is a warn. (Before
         rule: `${metric}-${poor ? "poor" : "needs-improvement"}`,
         severity: poor ? "suspect" : "warn",
         message:
-          `${metric.toUpperCase()} ${measured[metric]}${unit[metric]} is ${verdict}`
-          + ` (good <= ${THRESHOLDS[metric].good}${unit[metric]},`
-          + ` poor > ${THRESHOLDS[metric].poor}${unit[metric]})`,
+          `${metric.toUpperCase()} ${measured[metric]}${unit[metric]} is ${verdict}` +
+          ` (good <= ${THRESHOLDS[metric].good}${unit[metric]},` +
+          ` poor > ${THRESHOLDS[metric].poor}${unit[metric]})`,
         evidence: { metric, value: measured[metric], verdict },
       });
     }

@@ -84,9 +84,7 @@ const CASES: BenchCase[] = [
     input: "design-runs/patterns-20260520/game/current.html",
     pattern: "canvas",
     goal: "canvas",
-    viewports: [
-      { label: "desktop", width: 1280, height: 720 },
-    ],
+    viewports: [{ label: "desktop", width: 1280, height: 720 }],
   },
 ];
 
@@ -153,18 +151,27 @@ function printSummary(records: BenchRecord[]): void {
   console.log();
   console.log(`${BOLD}${CYAN}vlmkit introspect benchmark${RESET}`);
   console.log();
-  console.log(`  ${"Case".padEnd(18)} ${"avg".padStart(8)} ${"p95".padStart(8)} ${"launch".padStart(8)} ${"viewports".padStart(10)} ${"goto".padStart(8)} ${"landmark".padStart(9)}`);
-  console.log(`  ${"-".repeat(18)} ${"-".repeat(8)} ${"-".repeat(8)} ${"-".repeat(8)} ${"-".repeat(10)} ${"-".repeat(8)} ${"-".repeat(9)}`);
+  console.log(
+    `  ${"Case".padEnd(18)} ${"avg".padStart(8)} ${"p95".padStart(8)} ${"launch".padStart(8)} ${"viewports".padStart(10)} ${"goto".padStart(8)} ${"landmark".padStart(9)}`,
+  );
+  console.log(
+    `  ${"-".repeat(18)} ${"-".repeat(8)} ${"-".repeat(8)} ${"-".repeat(8)} ${"-".repeat(10)} ${"-".repeat(8)} ${"-".repeat(9)}`,
+  );
   for (const benchCase of CASES) {
     const rows = byCase(records, benchCase.name);
     console.log(
-      `  ${benchCase.name.padEnd(18)}`
-      + ` ${formatMs(mean(rows.map((row) => row.totalMs))).padStart(8)}`
-      + ` ${formatMs(percentile(rows.map((row) => row.totalMs), 95)).padStart(8)}`
-      + ` ${formatMs(mean(rows.map((row) => row.browserLaunchMs))).padStart(8)}`
-      + ` ${formatMs(mean(rows.map((row) => row.viewportTotalMs))).padStart(10)}`
-      + ` ${formatMs(mean(rows.map((row) => row.navigateMs))).padStart(8)}`
-      + ` ${formatMs(mean(rows.map((row) => row.landmarkMs))).padStart(9)}`,
+      `  ${benchCase.name.padEnd(18)}` +
+        ` ${formatMs(mean(rows.map((row) => row.totalMs))).padStart(8)}` +
+        ` ${formatMs(
+          percentile(
+            rows.map((row) => row.totalMs),
+            95,
+          ),
+        ).padStart(8)}` +
+        ` ${formatMs(mean(rows.map((row) => row.browserLaunchMs))).padStart(8)}` +
+        ` ${formatMs(mean(rows.map((row) => row.viewportTotalMs))).padStart(10)}` +
+        ` ${formatMs(mean(rows.map((row) => row.navigateMs))).padStart(8)}` +
+        ` ${formatMs(mean(rows.map((row) => row.landmarkMs))).padStart(9)}`,
     );
   }
   console.log();
@@ -191,7 +198,10 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       });
       const issues = validateUiContract(contract);
       if (issues.length > 0) {
-        const detail = issues.slice(0, 5).map((issue) => `${issue.path}: ${issue.message}`).join("; ");
+        const detail = issues
+          .slice(0, 5)
+          .map((issue) => `${issue.path}: ${issue.message}`)
+          .join("; ");
         throw new Error(`${benchCase.name} produced invalid contract: ${detail}`);
       }
       if (!profile) throw new Error(`${benchCase.name} did not report profile`);

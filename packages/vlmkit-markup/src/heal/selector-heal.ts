@@ -43,11 +43,15 @@ export async function healSelector(
   return await page.evaluate(
     ({ parsed, maxCandidates, exclude }) => {
       function tokenize(s: string): string[] {
-        return s.toLowerCase().split(/[^a-z0-9]+/i).filter((t) => t.length > 1);
+        return s
+          .toLowerCase()
+          .split(/[^a-z0-9]+/i)
+          .filter((t) => t.length > 1);
       }
       function jaccard(a: string[], b: string[]): number {
         if (a.length === 0 && b.length === 0) return 0;
-        const sa = new Set(a), sb = new Set(b);
+        const sa = new Set(a),
+          sb = new Set(b);
         let inter = 0;
         for (const t of sa) if (sb.has(t)) inter++;
         const union = sa.size + sb.size - inter;
@@ -70,7 +74,8 @@ export async function healSelector(
 
       // Candidate population: only visible elements that are
       // interactive-ish OR that match the target tag.
-      const interactiveSelectors = "button, a[href], input, select, textarea, summary, [role='button'], [role='link'], [tabindex]";
+      const interactiveSelectors =
+        "button, a[href], input, select, textarea, summary, [role='button'], [role='link'], [tabindex]";
       const seen = new Set<Element>();
       const candidates: HealCandidate[] = [];
       const elements = new Set<Element>();
@@ -85,7 +90,9 @@ export async function healSelector(
       if (exclude) {
         try {
           for (const el of document.querySelectorAll(exclude)) excluded.add(el);
-        } catch { /* invalid selector — ignore */ }
+        } catch {
+          /* invalid selector — ignore */
+        }
       }
 
       for (const el of elements) {
@@ -98,10 +105,12 @@ export async function healSelector(
         if (r.width === 0 || r.height === 0) continue;
 
         const tag = el.tagName.toLowerCase();
-        const classNames = (el.className && typeof el.className === "string"
-          ? el.className.trim().split(/\s+/)
-          : []) as string[];
-        const text = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("placeholder") || "").trim().slice(0, 60);
+        const classNames = (
+          el.className && typeof el.className === "string" ? el.className.trim().split(/\s+/) : []
+        ) as string[];
+        const text = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("placeholder") || "")
+          .trim()
+          .slice(0, 60);
         const reasons: string[] = [];
         let score = 0;
 
@@ -135,7 +144,8 @@ export async function healSelector(
         if (score <= 0.05) continue;
         candidates.push({
           selector: shortSelector(el),
-          tag, text,
+          tag,
+          text,
           confidence: Math.min(1, score),
           reasons,
         });

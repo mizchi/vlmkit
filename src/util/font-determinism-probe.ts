@@ -101,13 +101,13 @@ export function pairMargins(blocks: IntegrityTextBlock[], reported: Set<string>)
   const out: PairMargin[] = [];
   for (let i = 0; i < blocks.length; i++) {
     for (let j = i + 1; j < blocks.length; j++) {
-      const a = blocks[i]!, b = blocks[j]!;
+      const a = blocks[i]!,
+        b = blocks[j]!;
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
       if (ox < MIN_OVERLAP_PX) continue;
       const aInk = a.inkInset ?? 0;
       const bInk = b.inkInset ?? 0;
-      const oy = Math.min(a.y + a.height - aInk, b.y + b.height - bInk)
-        - Math.max(a.y + aInk, b.y + bInk);
+      const oy = Math.min(a.y + a.height - aInk, b.y + b.height - bInk) - Math.max(a.y + aInk, b.y + bInk);
       // Keep near-misses, not just overlaps. A pair whose ink bands clear each
       // other by 3px is precisely what a font-metric shift could push into
       // reporting range, so excluding it would measure only the pairs that
@@ -117,10 +117,7 @@ export function pairMargins(blocks: IntegrityTextBlock[], reported: Set<string>)
       const contains = (o: IntegrityTextBlock, p: IntegrityTextBlock) =>
         o.x <= p.x && o.y <= p.y && o.x + o.width >= p.x + p.width && o.y + o.height >= p.y + p.height;
       if (contains(a, b) || contains(b, a)) continue;
-      const minInkHeight = Math.min(
-        Math.max(1, a.height - 2 * aInk),
-        Math.max(1, b.height - 2 * bInk),
-      );
+      const minInkHeight = Math.min(Math.max(1, a.height - 2 * aInk), Math.max(1, b.height - 2 * bInk));
       const threshold = Math.max(MIN_OVERLAP_PX, Math.max(2, MIN_INK_FRACTION * minInkHeight));
       const key = `${a.selector} x ${b.selector}`;
       out.push({
@@ -167,67 +164,70 @@ export async function measure(options: MeasureOptions): Promise<ProbeFingerprint
   // One of only 4 sites repo-wide that pass `args`, and the whole point of this
   // probe is what those flags do to glyph rasterization — `launch` forwards the
   // object to `browserType.launch()` untouched so the rendering is unchanged.
-  return await withBrowser(async (browser) => {
-    const files: string[] = [];
-    for (const pattern of options.patterns) {
-      if (/[*?[\]{}]/.test(pattern)) {
-        for await (const hit of glob(pattern)) files.push(hit);
-      } else {
-        files.push(pattern);
+  return await withBrowser(
+    async (browser) => {
+      const files: string[] = [];
+      for (const pattern of options.patterns) {
+        if (/[*?[\]{}]/.test(pattern)) {
+          for await (const hit of glob(pattern)) files.push(hit);
+        } else {
+          files.push(pattern);
+        }
       }
-    }
-    files.sort();
-    for (const file of files) {
-      const page = await browser.newPage({
-        viewport: { width, height: 900 },
-        deviceScaleFactor: dpr,
-      });
-      await page.goto(pathToFileURL(resolvePath(file)).href, { waitUntil: "load", timeout: 30000 });
-      if (options.fontStack) {
-        await page.addStyleTag({
-          content: (options.fontFace
-            ? `@font-face { font-family: ProbeFont; src: url("${options.fontFace}"); font-display: block; }\n`
-            : "")
-            // Deliberately blunt: every element, not just body. Cross-OS drift
-            // substitutes one face for another under the SAME declared stack;
-            // this replaces the stack outright, which moves metrics further.
-            + `body, body * { font-family: ${options.fontStack} !important; }`,
+      files.sort();
+      for (const file of files) {
+        const page = await browser.newPage({
+          viewport: { width, height: 900 },
+          deviceScaleFactor: dpr,
         });
+        await page.goto(pathToFileURL(resolvePath(file)).href, { waitUntil: "load", timeout: 30000 });
+        if (options.fontStack) {
+          await page.addStyleTag({
+            content:
+              (options.fontFace
+                ? `@font-face { font-family: ProbeFont; src: url("${options.fontFace}"); font-display: block; }\n`
+                : "") +
+              // Deliberately blunt: every element, not just body. Cross-OS drift
+              // substitutes one face for another under the SAME declared stack;
+              // this replaces the stack outright, which moves metrics further.
+              `body, body * { font-family: ${options.fontStack} !important; }`,
+          });
+        }
+        // After the style injection, so the substituted stack's faces are the ones waited for.
+        // `settlePage` also waits for idle, which matters here: an injected `@font-face` with a
+        // real `src` starts a request, and this probe's whole subject is font metrics.
+        await settlePage(page, 150);
+        const blocks = (await page.evaluate(COLLECT_INTEGRITY_TEXT)) as IntegrityTextBlock[];
+        const gate = findTextCollisions(blocks, width);
+        const reportedPairs = gate.findings.map((f) => f.selector ?? "").filter(Boolean);
+        fixtures.push({
+          fixture: file,
+          blocks: blocks.map((b) => ({ selector: b.selector, height: b.height, inkInset: round(b.inkInset ?? 0) })),
+          pairs: pairMargins(blocks, new Set(reportedPairs)),
+          findings: gate.findings.length,
+          reportedPairs: [...reportedPairs].sort(),
+        });
+        await page.close();
       }
-      // After the style injection, so the substituted stack's faces are the ones waited for.
-      // `settlePage` also waits for idle, which matters here: an injected `@font-face` with a
-      // real `src` starts a request, and this probe's whole subject is font metrics.
-      await settlePage(page, 150);
-      const blocks = await page.evaluate(COLLECT_INTEGRITY_TEXT) as IntegrityTextBlock[];
-      const gate = findTextCollisions(blocks, width);
-      const reportedPairs = gate.findings
-        .map((f) => f.selector ?? "")
-        .filter(Boolean);
-      fixtures.push({
-        fixture: file,
-        blocks: blocks.map((b) => ({ selector: b.selector, height: b.height, inkInset: round(b.inkInset ?? 0) })),
-        pairs: pairMargins(blocks, new Set(reportedPairs)),
-        findings: gate.findings.length,
-        reportedPairs: [...reportedPairs].sort(),
-      });
-      await page.close();
-    }
-    return {
-      label: options.label,
-      platform: `${process.platform}-${process.arch}`,
-      browserVersion: browser.version(),
-      dpr,
-      fontStack: options.fontStack ?? null,
-      hinting,
-      fixtures,
-    };
-  }, {
-    launch: {
-      args: hinting === "none"
-        ? ["--font-render-hinting=none", "--disable-font-subpixel-positioning", "--disable-lcd-text"]
-        : [],
+      return {
+        label: options.label,
+        platform: `${process.platform}-${process.arch}`,
+        browserVersion: browser.version(),
+        dpr,
+        fontStack: options.fontStack ?? null,
+        hinting,
+        fixtures,
+      };
     },
-  });
+    {
+      launch: {
+        args:
+          hinting === "none"
+            ? ["--font-render-hinting=none", "--disable-font-subpixel-positioning", "--disable-lcd-text"]
+            : [],
+      },
+    },
+  );
 }
 
 export interface ComparisonRow {
@@ -331,31 +331,33 @@ export function formatComparison(c: Comparison): string {
   lines.push("fixture                                   dInk   dMargin  +/-pairs  thr  geom");
   for (const r of c.rows) {
     lines.push(
-      `${r.fixture.slice(-40).padEnd(40)}  ${r.maxInkInsetDelta.toFixed(2).padStart(5)}`
-      + `  ${r.maxMarginDelta.toFixed(2).padStart(8)}`
-      + `  ${`+${r.onlyInB}/-${r.onlyInA}`.padStart(8)}`
-      + `  ${String(r.thresholdFlips.length).padStart(3)}`
-      + `  ${String(r.geometryFlips.length).padStart(4)}`,
+      `${r.fixture.slice(-40).padEnd(40)}  ${r.maxInkInsetDelta.toFixed(2).padStart(5)}` +
+        `  ${r.maxMarginDelta.toFixed(2).padStart(8)}` +
+        `  ${`+${r.onlyInB}/-${r.onlyInA}`.padStart(8)}` +
+        `  ${String(r.thresholdFlips.length).padStart(3)}` +
+        `  ${String(r.geometryFlips.length).padStart(4)}`,
     );
   }
   lines.push("");
-  lines.push(c.totalThresholdFlips === 0
-    ? `FLOOR STABLE: no pair present in both runs changed report status.`
-    : `FLOOR FRAGILE: ${c.totalThresholdFlips} pair(s) judged differently at the same overlap.`);
+  lines.push(
+    c.totalThresholdFlips === 0
+      ? `FLOOR STABLE: no pair present in both runs changed report status.`
+      : `FLOOR FRAGILE: ${c.totalThresholdFlips} pair(s) judged differently at the same overlap.`,
+  );
   for (const r of c.rows) for (const f of r.thresholdFlips) lines.push(`  ! ${r.fixture}: ${f}`);
   if (c.totalGeometryFlips > 0) {
     lines.push("");
     lines.push(
-      `${c.totalGeometryFlips} report(s) differ because the overlap itself changed`
-      + ` (the page renders differently, not the gate judging differently):`,
+      `${c.totalGeometryFlips} report(s) differ because the overlap itself changed` +
+        ` (the page renders differently, not the gate judging differently):`,
     );
     for (const r of c.rows) for (const f of r.geometryFlips) lines.push(`  - ${r.fixture}: ${f}`);
   }
   if (c.tightestMargin) {
     lines.push("");
     lines.push(
-      `tightest margin anywhere: ${c.tightestMargin.margin}px (${c.tightestMargin.label},`
-      + ` ${c.tightestMargin.fixture}, ${c.tightestMargin.pair})`,
+      `tightest margin anywhere: ${c.tightestMargin.margin}px (${c.tightestMargin.label},` +
+        ` ${c.tightestMargin.fixture}, ${c.tightestMargin.pair})`,
     );
     lines.push(`  a pair this close to its floor is what a metric shift would flip first.`);
   }
@@ -430,8 +432,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     const pairs = fingerprint.fixtures.reduce((s, f) => s + f.pairs.length, 0);
     const findings = fingerprint.fixtures.reduce((s, f) => s + f.findings, 0);
     console.log(
-      `${fingerprint.label}: ${fingerprint.fixtures.length} fixture(s), ${pairs} candidate pair(s),`
-      + ` ${findings} reported -> ${out}`,
+      `${fingerprint.label}: ${fingerprint.fixtures.length} fixture(s), ${pairs} candidate pair(s),` +
+        ` ${findings} reported -> ${out}`,
     );
   } else {
     console.log(json);

@@ -186,7 +186,10 @@ test("renderReportMarkdown includes canvas diagnostics", () => {
   assert.match(markdown, /\| Nonblank canvas \| ok \|/);
   assert.match(markdown, /\| Input response \| ok \|/);
   assert.match(markdown, /\| State hook \| ok: `window\.__gameState` \|/);
-  assert.match(markdown, /\| Required state fields \| ok: `mode`, `frame`, `playerX`, `playerY`, `score`, `assetsReady` \|/);
+  assert.match(
+    markdown,
+    /\| Required state fields \| ok: `mode`, `frame`, `playerX`, `playerY`, `score`, `assetsReady` \|/,
+  );
 });
 
 test("renderReportMarkdown includes expressive menu diagnostics", () => {
@@ -306,31 +309,33 @@ test("renderReportMarkdown avoids wrong-direction hover warning for dark control
   assert.doesNotMatch(markdown, /\*\*direction\?\*\*/);
 });
 
-
 test("summarizeScrollportEvidence checks expected scroll axis", () => {
-  const evidence = summarizeScrollportEvidence([
-    {
-      name: "messages",
-      path: "[data-scrollport][0]",
-      bbox: { left: 0, top: 0, width: 320, height: 240 },
-      order: 0,
-      explicit: true,
-      overflowX: "auto",
-      overflowY: "visible",
-      clientWidth: 320,
-      clientHeight: 240,
-      scrollWidth: 640,
-      scrollHeight: 240,
-    },
-  ], [
-    {
-      id: "messages",
-      name: "messages",
-      selector: "[data-scrollport=\"messages\"]",
-      axis: "y",
-      required: true,
-    },
-  ]);
+  const evidence = summarizeScrollportEvidence(
+    [
+      {
+        name: "messages",
+        path: "[data-scrollport][0]",
+        bbox: { left: 0, top: 0, width: 320, height: 240 },
+        order: 0,
+        explicit: true,
+        overflowX: "auto",
+        overflowY: "visible",
+        clientWidth: 320,
+        clientHeight: 240,
+        scrollWidth: 640,
+        scrollHeight: 240,
+      },
+    ],
+    [
+      {
+        id: "messages",
+        name: "messages",
+        selector: '[data-scrollport="messages"]',
+        axis: "y",
+        required: true,
+      },
+    ],
+  );
 
   assert.equal(evidence.ok, 1);
   assert.equal(evidence.expected?.ok, 0);
@@ -406,10 +411,7 @@ describe("summarizeScrollportEvidence", () => {
     const evidence = summarizeScrollportEvidence([], [{ id: "", selector: ".no-data-attribute" }]);
     assert.deepEqual(evidence.expected?.missingNames, ["expected-1"]);
     // Whitespace is not a name either.
-    assert.deepEqual(
-      summarizeScrollportEvidence([], [{ id: "  " }]).expected?.missingNames,
-      ["expected-1"],
-    );
+    assert.deepEqual(summarizeScrollportEvidence([], [{ id: "  " }]).expected?.missingNames, ["expected-1"]);
   });
 
   it("holds an expectation to its axis — scrolling the wrong way is broken, not ok", () => {
@@ -443,7 +445,16 @@ describe("formatScrollportEvidence", () => {
       ok: 2,
       broken: 0,
       empty: 0,
-      expected: { total: 3, ok: 2, broken: 0, empty: 0, missing: 1, missingNames: ["carousel"], brokenNames: [], emptyNames: [] },
+      expected: {
+        total: 3,
+        ok: 2,
+        broken: 0,
+        empty: 0,
+        missing: 1,
+        missingNames: ["carousel"],
+        brokenNames: [],
+        emptyNames: [],
+      },
     });
     assert.match(text, /expected 2\/3 ok/);
     assert.match(text, /1 expected missing/);
@@ -520,17 +531,25 @@ const BASE: RenderInput = {
   totalPixels: 480_000,
   diffRatio: 0.01,
   landscapeDiff: {
-    width: 800, height: 600,
-    score: 0.02, similarity: 0.98, changedCells: 1, totalCells: 16,
+    width: 800,
+    height: 600,
+    score: 0.02,
+    similarity: 0.98,
+    changedCells: 1,
+    totalCells: 16,
     grid: { cols: 4, rows: 4 },
     topCells: [],
   },
   goalEvaluation: {
-    goal: "app", label: "Application", status: "review",
-    summary: "Application review", primaryMetric: "landscape",
+    goal: "app",
+    label: "Application",
+    status: "review",
+    summary: "Application review",
+    primaryMetric: "landscape",
     // The thresholds the verdict was reached against. The `as any` fixtures above
     // omit these four and the compiler never got a chance to say so.
-    pixelDiffRatio: 0.01, landscapeDiffRatio: 0.02,
+    pixelDiffRatio: 0.01,
+    landscapeDiffRatio: 0.02,
     pass: { landscape: 0.03, pixel: 0.25 },
     review: { landscape: 0.05, pixel: 0.35 },
   },
@@ -546,23 +565,41 @@ const BASE: RenderInput = {
   baselineRowCount: 0,
   variantRowCount: 0,
   paletteDiff: {
-    matched: [], onlyInBaseline: [], onlyInVariant: [],
-    baselineMatchedShare: 1, variantMatchedShare: 1,
+    matched: [],
+    onlyInBaseline: [],
+    onlyInVariant: [],
+    baselineMatchedShare: 1,
+    variantMatchedShare: 1,
   },
   stateResults: [],
   dpr: 1,
 };
 
 const cellStats = (hex: string, ink: number) => ({
-  r: 0x22, g: 0x44, b: 0x88, luma: 90, ink, hex,
+  r: 0x22,
+  g: 0x44,
+  b: 0x88,
+  luma: 90,
+  ink,
+  hex,
 });
 
 const bbox = (over: Partial<ComponentBbox> = {}): ComponentBbox => ({
-  top: 10, left: 20, width: 200, height: 60, area: 9_000, fillColor: "rgb(34, 68, 136)", ...over,
+  top: 10,
+  left: 20,
+  width: 200,
+  height: 60,
+  area: 9_000,
+  fillColor: "rgb(34, 68, 136)",
+  ...over,
 });
 
 const textRow = (yCenter: number): TextRow => ({
-  yCenter, yStart: yCenter - 8, yEnd: yCenter + 8, meanLuma: 60, height: 16,
+  yCenter,
+  yStart: yCenter - 8,
+  yEnd: yCenter + 8,
+  meanLuma: 60,
+  height: 16,
 });
 
 describe("renderReportMarkdown — the header", () => {
@@ -613,10 +650,19 @@ describe("renderReportMarkdown — the landscape cell table", () => {
       ...BASE,
       landscapeDiff: {
         ...BASE.landscapeDiff,
-        topCells: [{
-          row: 1, col: 2, x: 400, y: 150, width: 200, height: 150, score: 0.42,
-          baseline: cellStats("#224488", 0.31), current: cellStats("#ffffff", 0.02),
-        }],
+        topCells: [
+          {
+            row: 1,
+            col: 2,
+            x: 400,
+            y: 150,
+            width: 200,
+            height: 150,
+            score: 0.42,
+            baseline: cellStats("#224488", 0.31),
+            current: cellStats("#ffffff", 0.02),
+          },
+        ],
       },
     });
     assert.match(md, /## Landscape cell diff/);
@@ -630,10 +676,18 @@ describe("renderReportMarkdown — the bbox table", () => {
     // bury the real shifts in rows nobody should act on.
     const md = renderReportMarkdown({
       ...BASE,
-      bboxMatches: [{
-        rank: 0, baseline: bbox(), variant: bbox({ top: 11, left: 21 }),
-        deltaTop: 1, deltaLeft: 1, deltaWidth: 0, deltaHeight: 0, iou: 0.99,
-      }],
+      bboxMatches: [
+        {
+          rank: 0,
+          baseline: bbox(),
+          variant: bbox({ top: 11, left: 21 }),
+          deltaTop: 1,
+          deltaLeft: 1,
+          deltaWidth: 0,
+          deltaHeight: 0,
+          iou: 0.99,
+        },
+      ],
     });
     assert.doesNotMatch(md, /## Component bbox diff/);
   });
@@ -641,12 +695,18 @@ describe("renderReportMarkdown — the bbox table", () => {
   it("lists a real shift with signed deltas", () => {
     const md = renderReportMarkdown({
       ...BASE,
-      bboxMatches: [{
-        rank: 0,
-        baseline: bbox(),
-        variant: bbox({ top: 34, left: 20, width: 180 }),
-        deltaTop: 24, deltaLeft: 0, deltaWidth: -20, deltaHeight: 0, iou: 0.71,
-      }],
+      bboxMatches: [
+        {
+          rank: 0,
+          baseline: bbox(),
+          variant: bbox({ top: 34, left: 20, width: 180 }),
+          deltaTop: 24,
+          deltaLeft: 0,
+          deltaWidth: -20,
+          deltaHeight: 0,
+          iou: 0.71,
+        },
+      ],
     });
     assert.match(md, /## Component bbox diff/);
     // Signed, because "24" and "-20" mean opposite corrections and an unsigned
@@ -656,8 +716,14 @@ describe("renderReportMarkdown — the bbox table", () => {
 
   it("caps the table at eight rows", () => {
     const many = Array.from({ length: 20 }, (_, i) => ({
-      rank: i, baseline: bbox(), variant: bbox({ top: 100 }),
-      deltaTop: 90, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 0.2,
+      rank: i,
+      baseline: bbox(),
+      variant: bbox({ top: 100 }),
+      deltaTop: 90,
+      deltaLeft: 0,
+      deltaWidth: 0,
+      deltaHeight: 0,
+      iou: 0.2,
     }));
     const md = renderReportMarkdown({ ...BASE, bboxMatches: many });
     const rows = md.split("\n").filter((l) => /^\| #\d+ \|/.test(l));
@@ -672,7 +738,16 @@ describe("renderReportMarkdown — the heatmap cluster table", () => {
     const md = renderReportMarkdown({
       ...BASE,
       heatmapRegions: [
-        { top: 0, left: 0, width: 100, height: 40, area: 2_000, dominantColor: { r: 34, g: 68, b: 136, hex: "#224488" }, kind: "text", kindConfidence: 0.9 },
+        {
+          top: 0,
+          left: 0,
+          width: 100,
+          height: 40,
+          area: 2_000,
+          dominantColor: { r: 34, g: 68, b: 136, hex: "#224488" },
+          kind: "text",
+          kindConfidence: 0.9,
+        },
         { top: 50, left: 0, width: 100, height: 40, area: 1_800, kind: "icon", kindConfidence: 0.4 },
         { top: 100, left: 0, width: 100, height: 40, area: 900 },
       ],
@@ -697,16 +772,14 @@ describe("renderReportMarkdown — the text-row section", () => {
   });
 
   it("says nothing when the counts agree and nothing was matched", () => {
-    assert.doesNotMatch(
-      renderReportMarkdown({ ...BASE, baselineRowCount: 5, variantRowCount: 5 }),
-      /## Text-row Δy/,
-    );
+    assert.doesNotMatch(renderReportMarkdown({ ...BASE, baselineRowCount: 5, variantRowCount: 5 }), /## Text-row Δy/);
   });
 
   it("lists signed Δy per matched row, without claiming a count mismatch", () => {
     const md = renderReportMarkdown({
       ...BASE,
-      baselineRowCount: 2, variantRowCount: 2,
+      baselineRowCount: 2,
+      variantRowCount: 2,
       textRowMatches: [
         { rank: 0, baseline: textRow(100), variant: textRow(112), deltaY: 12 },
         { rank: 1, baseline: textRow(200), variant: textRow(194), deltaY: -6 },
@@ -721,10 +794,18 @@ describe("renderReportMarkdown — the text-row section", () => {
   it("names a typography mismatch by what actually differs", () => {
     const md = renderReportMarkdown({
       ...BASE,
-      baselineRowCount: 1, variantRowCount: 1,
+      baselineRowCount: 1,
+      variantRowCount: 1,
       textRowMatches: [{ rank: 0, baseline: textRow(100), variant: textRow(100), deltaY: 0 }],
       typographyMismatches: [
-        { rank: 0, kind: "both", baselineFontSize: 24, variantFontSize: 16, baselineWeight: "bold", variantWeight: "regular" },
+        {
+          rank: 0,
+          kind: "both",
+          baselineFontSize: 24,
+          variantFontSize: 16,
+          baselineWeight: "bold",
+          variantWeight: "regular",
+        },
       ],
     });
     assert.match(md, /\*\*Typography mismatches\*\*/);
@@ -740,8 +821,16 @@ describe("renderReportMarkdown — palette and backgrounds", () => {
   it("reports both backgrounds, and whether the page is one flat colour", () => {
     const md = renderReportMarkdown({
       ...BASE,
-      targetBg: { outer: { r: 255, g: 255, b: 255, hex: "#ffffff" }, inner: { r: 244, g: 244, b: 244, hex: "#f4f4f4" }, same: false },
-      currentBg: { outer: { r: 255, g: 255, b: 255, hex: "#ffffff" }, inner: { r: 255, g: 255, b: 255, hex: "#ffffff" }, same: true },
+      targetBg: {
+        outer: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+        inner: { r: 244, g: 244, b: 244, hex: "#f4f4f4" },
+        same: false,
+      },
+      currentBg: {
+        outer: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+        inner: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+        same: true,
+      },
     });
     assert.match(md, /## Backgrounds/);
     // Both layers, side by side: the finding is that the target's content background
@@ -756,11 +845,17 @@ describe("renderReportMarkdown — palette and backgrounds", () => {
     const md = renderReportMarkdown({
       ...BASE,
       paletteDiff: {
-        matched: [], baselineMatchedShare: 0.8, variantMatchedShare: 0.8,
+        matched: [],
+        baselineMatchedShare: 0.8,
+        variantMatchedShare: 0.8,
         // `nearestNeighborDistance`, not `nearest` — my first guess at the field name,
         // which `as any` would have accepted and then rendered as `undefined`.
-        onlyInBaseline: [{ r: 244, g: 244, b: 244, hex: "#f4f4f4", share: 0.12, count: 5_760, nearestNeighborDistance: 6 }],
-        onlyInVariant: [{ r: 17, g: 17, b: 17, hex: "#111111", share: 0.04, count: 1_920, nearestNeighborDistance: 92 }],
+        onlyInBaseline: [
+          { r: 244, g: 244, b: 244, hex: "#f4f4f4", share: 0.12, count: 5_760, nearestNeighborDistance: 6 },
+        ],
+        onlyInVariant: [
+          { r: 17, g: 17, b: 17, hex: "#111111", share: 0.04, count: 1_920, nearestNeighborDistance: 92 },
+        ],
       },
     });
     assert.match(md, /## Palette diff/);
@@ -777,8 +872,28 @@ describe("renderReportMarkdown — the state table", () => {
     const md = renderReportMarkdown({
       ...BASE,
       stateResults: [
-        { state: "focus-visible", forcedCount: 1, inducedDiffRatio: 0.004, rawInducedDiffRatio: 0.005, edgeFraction: 0.96, interiorPixels: 12, lumaDelta: -2, lumaBefore: 240, lumaAfter: 238 },
-        { state: "hover", forcedCount: 1, inducedDiffRatio: 0.02, rawInducedDiffRatio: 0.02, edgeFraction: 0.1, interiorPixels: 4_200, lumaDelta: -30, lumaBefore: 240, lumaAfter: 210 },
+        {
+          state: "focus-visible",
+          forcedCount: 1,
+          inducedDiffRatio: 0.004,
+          rawInducedDiffRatio: 0.005,
+          edgeFraction: 0.96,
+          interiorPixels: 12,
+          lumaDelta: -2,
+          lumaBefore: 240,
+          lumaAfter: 238,
+        },
+        {
+          state: "hover",
+          forcedCount: 1,
+          inducedDiffRatio: 0.02,
+          rawInducedDiffRatio: 0.02,
+          edgeFraction: 0.1,
+          interiorPixels: 4_200,
+          lumaDelta: -30,
+          lumaBefore: 240,
+          lumaAfter: 210,
+        },
       ],
     });
     assert.match(md, /## State diff/);
@@ -792,7 +907,17 @@ describe("renderReportMarkdown — the state table", () => {
     const md = renderReportMarkdown({
       ...BASE,
       stateResults: [
-        { state: "hover", forcedCount: 0, inducedDiffRatio: 0, rawInducedDiffRatio: 0, edgeFraction: 0, interiorPixels: 0, lumaDelta: null, lumaBefore: null, lumaAfter: null },
+        {
+          state: "hover",
+          forcedCount: 0,
+          inducedDiffRatio: 0,
+          rawInducedDiffRatio: 0,
+          edgeFraction: 0,
+          interiorPixels: 0,
+          lumaDelta: null,
+          lumaBefore: null,
+          lumaAfter: null,
+        },
       ],
     });
     assert.match(md, /## State diff/);

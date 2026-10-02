@@ -390,12 +390,12 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
   const now = options.now ?? new Date();
   const only = options.only?.filter((s) => s.trim()) ?? [];
   const defaultGates = config.defaults?.gates ?? [];
-  const defaultSuppressions = (config.defaults?.suppressions ?? [])
-    .map((s) => resolveSuppression(s, "defaults", now));
+  const defaultSuppressions = (config.defaults?.suppressions ?? []).map((s) => resolveSuppression(s, "defaults", now));
   // Resolved once, like `defaultSuppressions` — resolving inside the page loop
   // would list every default entry once per page in the inventory.
-  const defaultRuleSettings = Object.entries(config.defaults?.ruleAnnotations ?? {})
-    .map(([ref, entry]) => resolveRuleSetting(ref, entry, "defaults", now));
+  const defaultRuleSettings = Object.entries(config.defaults?.ruleAnnotations ?? {}).map(([ref, entry]) =>
+    resolveRuleSetting(ref, entry, "defaults", now),
+  );
 
   const jobs: GateJob[] = [];
   const suppressions: ResolvedSuppression[] = [...defaultSuppressions, ...defaultRuleSettings];
@@ -404,15 +404,16 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
     const pageId = page.id ?? page.source;
     const pageSuppressions = (page.suppressions ?? []).map((s) => resolveSuppression(s, pageId, now));
     suppressions.push(...pageSuppressions);
-    const pageRuleSettings = Object.entries(page.ruleAnnotations ?? {})
-      .map(([ref, entry]) => resolveRuleSetting(ref, entry, pageId, now));
+    const pageRuleSettings = Object.entries(page.ruleAnnotations ?? {}).map(([ref, entry]) =>
+      resolveRuleSetting(ref, entry, pageId, now),
+    );
     suppressions.push(...pageRuleSettings);
     if (only.length > 0 && !only.some((o) => pageId.includes(o) || page.source.includes(o))) continue;
     const gates = [...(page.gates ?? defaultGates), ...(page.extraGates ?? [])];
     if (gates.length === 0) {
       throw new UsageError(
-        `Page "${pageId}" resolved to zero gates — set its \`gates\` or \`defaults.gates\`.`
-        + ` A page that silently runs nothing is worse than a config error.`,
+        `Page "${pageId}" resolved to zero gates — set its \`gates\` or \`defaults.gates\`.` +
+          ` A page that silently runs nothing is worse than a config error.`,
       );
     }
     const candidates = [...defaultSuppressions, ...pageSuppressions];
@@ -484,10 +485,7 @@ export interface SuppressionSummary {
   expiringSoon: number;
 }
 
-export function summarizeSuppressions(
-  suppressions: ResolvedSuppression[],
-  soonDays = 30,
-): SuppressionSummary {
+export function summarizeSuppressions(suppressions: ResolvedSuppression[], soonDays = 30): SuppressionSummary {
   const rows = [...suppressions].sort((a, b) => {
     const rank = (s: ResolvedSuppression) => (s.status === "expired" ? 0 : s.status === "active" ? 1 : 2);
     return rank(a) - rank(b) || (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity);

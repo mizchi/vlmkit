@@ -1,10 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname, resolve as resolvePath } from "node:path";
-import {
-  extractCss,
-  parseCssDeclarations,
-  replaceCss,
-} from "../css-challenge/css-challenge-core.ts";
+import { extractCss, parseCssDeclarations, replaceCss } from "../css-challenge/css-challenge-core.ts";
 import type { MigrationDiffCategory } from "./migration-diff.ts";
 import type { MigrationFixCandidate } from "./migration-fix-candidates.ts";
 import { isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
@@ -82,7 +78,17 @@ export interface MigrationCompareReport {
   /** Per-viewport, per-element computed-style diff via DOM-position match. */
   domPositionDiffPerViewport?: Array<{
     variantFile: string;
-    result?: { entries?: Array<{ path: string; baselineClasses?: string; variantClasses?: string; property: string; baseline: string; variant: string; viewport: string }> };
+    result?: {
+      entries?: Array<{
+        path: string;
+        baselineClasses?: string;
+        variantClasses?: string;
+        property: string;
+        baseline: string;
+        variant: string;
+        viewport: string;
+      }>;
+    };
   }>;
   /** VLM region-diff handoff rows: selector/property hints derived from changed screenshot regions. */
   regionDiffs?: Array<{
@@ -130,7 +136,9 @@ export function selectMigrationFixTarget(
 ): SelectedMigrationFixTarget | null {
   const filtered = report.results
     .filter((result) => result.diffPixels > 0)
-    .filter((result) => !options.variant || result.variant === options.variant || result.variantFile === options.variant)
+    .filter(
+      (result) => !options.variant || result.variant === options.variant || result.variantFile === options.variant,
+    )
     .sort((left, right) => {
       if (right.diffPixels !== left.diffPixels) return right.diffPixels - left.diffPixels;
       if (right.paintTreeChangeCount !== left.paintTreeChangeCount) {
@@ -151,14 +159,13 @@ export function selectMigrationFixTarget(
   };
 }
 
-export function summarizeMigrationReportConvergence(
-  report: MigrationCompareReport,
-): MigrationReportConvergence {
-  const variants = [...new Set(report.results.map((result) => result.variant))]
-    .map((variant) => summarizeMigrationVariantConvergence(
+export function summarizeMigrationReportConvergence(report: MigrationCompareReport): MigrationReportConvergence {
+  const variants = [...new Set(report.results.map((result) => result.variant))].map((variant) =>
+    summarizeMigrationVariantConvergence(
       variant,
       report.results.filter((result) => result.variant === variant),
-    ));
+    ),
+  );
 
   const cleanResults = variants.reduce((sum, variant) => sum + variant.cleanResults, 0);
   const approvedResults = variants.reduce((sum, variant) => sum + variant.approvedResults, 0);
@@ -185,23 +192,71 @@ function isPromptAuthoredCssSelector(selector: string): boolean {
 }
 
 const PROMPT_AUTHORED_PROPERTIES = new Set([
-  "color", "background-color", "border-color",
-  "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
-  "background", "border", "outline-color", "fill",
-  "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-  "gap", "row-gap", "column-gap",
-  "font-size", "font-weight", "font-family", "line-height", "letter-spacing",
-  "text-align", "text-transform", "text-decoration",
-  "border-radius", "border-width", "border-style",
-  "opacity", "visibility", "display", "flex-direction", "justify-content", "align-items",
+  "color",
+  "background-color",
+  "border-color",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "background",
+  "border",
+  "outline-color",
+  "fill",
+  "padding",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "margin",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "gap",
+  "row-gap",
+  "column-gap",
+  "font-size",
+  "font-weight",
+  "font-family",
+  "line-height",
+  "letter-spacing",
+  "text-align",
+  "text-transform",
+  "text-decoration",
+  "border-radius",
+  "border-width",
+  "border-style",
+  "opacity",
+  "visibility",
+  "display",
+  "flex-direction",
+  "justify-content",
+  "align-items",
   "box-shadow",
-  "grid-template-columns", "grid-template-rows", "grid-template-areas",
-  "grid-auto-columns", "grid-auto-rows", "grid-auto-flow",
-  "grid-column", "grid-row", "grid-column-start", "grid-row-start",
-  "flex", "flex-basis", "flex-grow", "flex-shrink", "flex-wrap",
-  "aspect-ratio", "place-items", "place-content", "place-self",
-  "align-content", "align-self", "justify-self", "justify-items",
+  "grid-template-columns",
+  "grid-template-rows",
+  "grid-template-areas",
+  "grid-auto-columns",
+  "grid-auto-rows",
+  "grid-auto-flow",
+  "grid-column",
+  "grid-row",
+  "grid-column-start",
+  "grid-row-start",
+  "flex",
+  "flex-basis",
+  "flex-grow",
+  "flex-shrink",
+  "flex-wrap",
+  "aspect-ratio",
+  "place-items",
+  "place-content",
+  "place-self",
+  "align-content",
+  "align-self",
+  "justify-self",
+  "justify-items",
 ]);
 
 function isPromptAuthoredProperty(property: string): boolean {
@@ -240,7 +295,9 @@ function resolveRegionDiffPromptValues(
   const viewportKey = `${key} ${viewport}`;
   const authored = index?.authoredKeys.has(key) ?? false;
   const indexedTarget = index
-    ? (authored ? (index.global.get(key) ?? null) : (index.byViewport.get(viewportKey) ?? index.global.get(key) ?? null))
+    ? authored
+      ? (index.global.get(key) ?? null)
+      : (index.byViewport.get(viewportKey) ?? index.global.get(key) ?? null)
     : null;
   const indexedCurrent = index?.variantValues.get(key) ?? null;
   return {
@@ -259,9 +316,8 @@ function buildRegionDiffPromptLines(input: {
 }): string[] {
   const summary = (input.regionDiffs ?? []).find((entry) => entry.variantFile === input.target.variantFile);
   if (!summary) return [];
-  const rows = summary.perViewport.flatMap((entry) =>
-    entry.changes.map((change) => ({ viewport: entry.viewport, change }))
-  )
+  const rows = summary.perViewport
+    .flatMap((entry) => entry.changes.map((change) => ({ viewport: entry.viewport, change })))
     .map((row) => ({
       ...row,
       selector: row.change.selector ?? row.change.selectorHint,
@@ -291,17 +347,18 @@ function buildRegionDiffPromptLines(input: {
       row.change,
       input.baselineValueIndex,
     );
-    const sampled = (row.change.from || row.change.to)
-      ? `; sampled=${row.change.from ?? "unknown"} -> ${row.change.to ?? "unknown"}`
-      : "";
-    const delta = row.change.averageChannelDelta !== null
-      ? `; delta=${row.change.averageChannelDelta.toFixed(1)}`
-      : "";
+    const sampled =
+      row.change.from || row.change.to
+        ? `; sampled=${row.change.from ?? "unknown"} -> ${row.change.to ?? "unknown"}`
+        : "";
+    const delta = row.change.averageChannelDelta !== null ? `; delta=${row.change.averageChannelDelta.toFixed(1)}` : "";
     lines.push(
       `  ${index + 1}. ${row.selector} { ${row.change.property} } -> target=${formatBacktickedValue(values.target)} (${values.targetSource}), current=${formatBacktickedValue(values.current)} (${values.currentSource})${sampled}; viewport=${row.viewport}; confidence=${row.change.confidence}/${row.change.selectorConfidence ?? "unknown"}${delta}; bbox=${formatRegionDiffBbox(row.change.bbox)}`,
     );
   }
-  lines.push("Rules: treat these as the highest-priority concrete fixes. Prefer the `target` value, especially when it is marked `(authored)`, because sampled PNG colors can drift from authored CSS literals.");
+  lines.push(
+    "Rules: treat these as the highest-priority concrete fixes. Prefer the `target` value, especially when it is marked `(authored)`, because sampled PNG colors can drift from authored CSS literals.",
+  );
   return lines;
 }
 
@@ -314,12 +371,13 @@ export function buildMigrationFixLoopPrompt(input: {
   /** Authoritative baseline values from the diff report, used to ground VLM handoff values. */
   baselineValueIndex?: BaselineValueIndex;
 }): string {
-  const candidateLines = input.target.fixCandidates.length === 0
-    ? ["(no heuristic candidates)"]
-    : input.target.fixCandidates.slice(0, 5).map((candidate, index) => {
-      const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
-      return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
-    });
+  const candidateLines =
+    input.target.fixCandidates.length === 0
+      ? ["(no heuristic candidates)"]
+      : input.target.fixCandidates.slice(0, 5).map((candidate, index) => {
+          const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
+          return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
+        });
   const regionDiffLines = buildRegionDiffPromptLines({
     target: input.target,
     regionDiffs: input.regionDiffs,
@@ -390,12 +448,13 @@ export function buildMigrationFixLoopMultiPrompt(input: {
   baselineValueIndex?: BaselineValueIndex;
   regionDiffs?: MigrationCompareReport["regionDiffs"];
 }): string {
-  const candidateLines = input.target.fixCandidates.length === 0
-    ? ["(no heuristic candidates)"]
-    : input.target.fixCandidates.slice(0, 12).map((candidate, index) => {
-      const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
-      return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
-    });
+  const candidateLines =
+    input.target.fixCandidates.length === 0
+      ? ["(no heuristic candidates)"]
+      : input.target.fixCandidates.slice(0, 12).map((candidate, index) => {
+          const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
+          return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
+        });
   const regionDiffLines = buildRegionDiffPromptLines({
     target: input.target,
     regionDiffs: input.regionDiffs,
@@ -424,25 +483,73 @@ export function buildMigrationFixLoopMultiPrompt(input: {
   // values like `.page { height: 1334.41px }` come from the layout pass,
   // not the stylesheet — hard-coding them overconstrains the page.
   const AUTHORED_PROPERTIES = new Set([
-    "color", "background-color", "border-color",
-    "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
-    "background", "border", "outline-color", "fill",
-    "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-    "gap", "row-gap", "column-gap",
-    "font-size", "font-weight", "font-family", "line-height", "letter-spacing",
-    "text-align", "text-transform", "text-decoration",
-    "border-radius", "border-width", "border-style",
-    "opacity", "visibility", "display", "flex-direction", "justify-content", "align-items",
+    "color",
+    "background-color",
+    "border-color",
+    "border-top-color",
+    "border-right-color",
+    "border-bottom-color",
+    "border-left-color",
+    "background",
+    "border",
+    "outline-color",
+    "fill",
+    "padding",
+    "padding-top",
+    "padding-right",
+    "padding-bottom",
+    "padding-left",
+    "margin",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+    "gap",
+    "row-gap",
+    "column-gap",
+    "font-size",
+    "font-weight",
+    "font-family",
+    "line-height",
+    "letter-spacing",
+    "text-align",
+    "text-transform",
+    "text-decoration",
+    "border-radius",
+    "border-width",
+    "border-style",
+    "opacity",
+    "visibility",
+    "display",
+    "flex-direction",
+    "justify-content",
+    "align-items",
     "box-shadow",
     // Grid / layout structural properties — pixel-explicit but typically
     // hand-authored (e.g. `grid-template-columns: 72px 268px minmax(0, 1fr)`).
-    "grid-template-columns", "grid-template-rows", "grid-template-areas",
-    "grid-auto-columns", "grid-auto-rows", "grid-auto-flow",
-    "grid-column", "grid-row", "grid-column-start", "grid-row-start",
-    "flex", "flex-basis", "flex-grow", "flex-shrink", "flex-wrap",
-    "aspect-ratio", "place-items", "place-content", "place-self",
-    "align-content", "align-self", "justify-self", "justify-items",
+    "grid-template-columns",
+    "grid-template-rows",
+    "grid-template-areas",
+    "grid-auto-columns",
+    "grid-auto-rows",
+    "grid-auto-flow",
+    "grid-column",
+    "grid-row",
+    "grid-column-start",
+    "grid-row-start",
+    "flex",
+    "flex-basis",
+    "flex-grow",
+    "flex-shrink",
+    "flex-wrap",
+    "aspect-ratio",
+    "place-items",
+    "place-content",
+    "place-self",
+    "align-content",
+    "align-self",
+    "justify-self",
+    "justify-items",
   ]);
   const isAuthoredProperty = (property: string): boolean => AUTHORED_PROPERTIES.has(property);
 
@@ -482,21 +589,31 @@ export function buildMigrationFixLoopMultiPrompt(input: {
     const top = rows.slice(0, 24);
     if (top.length > 0) {
       reportTableLines.push("");
-      reportTableLines.push(`Report-authoritative baseline values (${top.length} of ${rows.length} authored-property pairs):`);
+      reportTableLines.push(
+        `Report-authoritative baseline values (${top.length} of ${rows.length} authored-property pairs):`,
+      );
       for (const r of top) {
         const variantSuffix = r.variant !== null ? ` (variant=\`${r.variant}\`)` : "";
         reportTableLines.push(`  ${r.selector} { ${r.property} } → baseline=\`${r.baseline}\`${variantSuffix}`);
       }
-      reportTableLines.push("Rules: (a) copy the baseline value VERBATIM when proposing a fix; (b) only use real CSS selectors (no `.parent>tag[1]` path syntax); (c) only target authored properties — never computed layout dimensions like \`height: 1334.41px\`; (d) if `variant` already equals `baseline`, skip — that pair is already in sync.");
+      reportTableLines.push(
+        "Rules: (a) copy the baseline value VERBATIM when proposing a fix; (b) only use real CSS selectors (no `.parent>tag[1]` path syntax); (c) only target authored properties — never computed layout dimensions like \`height: 1334.41px\`; (d) if `variant` already equals `baseline`, skip — that pair is already in sync.",
+      );
     }
     if (variantRows.length > 0) {
       const topVariant = variantRows.slice(0, 12);
       reportTableLines.push("");
-      reportTableLines.push(`Viewport-variant pairs (${topVariant.length} of ${variantRows.length} — same selector/property has DIFFERENT baselines per viewport):`);
+      reportTableLines.push(
+        `Viewport-variant pairs (${topVariant.length} of ${variantRows.length} — same selector/property has DIFFERENT baselines per viewport):`,
+      );
       for (const v of topVariant) {
-        reportTableLines.push(`  ${v.selector} { ${v.property} } → values=${v.values.map((x) => `\`${x}\``).join(" | ")}`);
+        reportTableLines.push(
+          `  ${v.selector} { ${v.property} } → values=${v.values.map((x) => `\`${x}\``).join(" | ")}`,
+        );
       }
-      reportTableLines.push("These MUST be media-gated. Setting `mediaCondition: null` for a viewport-variant pair will be REJECTED by the apply step — fix one viewport at a time with the matching media condition.");
+      reportTableLines.push(
+        "These MUST be media-gated. Setting `mediaCondition: null` for a viewport-variant pair will be REJECTED by the apply step — fix one viewport at a time with the matching media condition.",
+      );
     }
 
     // Media-scoped authored entries. Already carry their `@media (...)`
@@ -511,11 +628,19 @@ export function buildMigrationFixLoopMultiPrompt(input: {
     if (authoredScoped.length > 0) {
       const top = authoredScoped.slice(0, 16);
       reportTableLines.push("");
-      reportTableLines.push(`Media-scoped authored CSS deltas (${top.length} of ${authoredScoped.length} — captured from CSSOM, value is the AUTHORED string):`);
+      reportTableLines.push(
+        `Media-scoped authored CSS deltas (${top.length} of ${authoredScoped.length} — captured from CSSOM, value is the AUTHORED string):`,
+      );
       for (const r of top) {
-        reportTableLines.push(`  @media ${r.mediaCondition} { ${r.selector} { ${r.property}: ${r.baseline}; } } → variant=\`${r.variant}\``);
+        reportTableLines.push(
+          `  @media ${r.mediaCondition} { ${r.selector} { ${r.property}: ${r.baseline}; } } → variant=\`${r.variant}\``,
+        );
       }
-      reportTableLines.push("Apply these with `mediaCondition: \"" + (authoredScoped[0]!.mediaCondition) + "\"` (or whatever matches each row). Authored values may include `minmax(0, 1fr)` / `auto` / `var(--...)` — copy verbatim, do not resolve to px.");
+      reportTableLines.push(
+        'Apply these with `mediaCondition: "' +
+          authoredScoped[0]!.mediaCondition +
+          '"` (or whatever matches each row). Authored values may include `minmax(0, 1fr)` / `auto` / `var(--...)` — copy verbatim, do not resolve to px.',
+      );
     }
   }
 
@@ -605,9 +730,7 @@ export interface BaselineValueIndex {
 const AUTHORED_MEDIA_SEPARATOR = " :: ";
 const AUTHORED_MEDIA_PREFIX = "@media ";
 
-function splitAuthoredScopedSelector(
-  scoped: string,
-): { selector: string; mediaCondition: string } {
+function splitAuthoredScopedSelector(scoped: string): { selector: string; mediaCondition: string } {
   if (!scoped.startsWith(AUTHORED_MEDIA_PREFIX)) {
     return { selector: scoped, mediaCondition: "" };
   }
@@ -630,10 +753,7 @@ function classListToSelectors(classList: string | undefined): string[] {
   return selectors;
 }
 
-export function buildBaselineValueIndex(
-  report: MigrationCompareReport,
-  variantFile?: string,
-): BaselineValueIndex {
+export function buildBaselineValueIndex(report: MigrationCompareReport, variantFile?: string): BaselineValueIndex {
   // First pass: collect every observed (selector, property, viewport)
   // tuple and aggregate distinct values per (selector, property).
   const byViewport = new Map<string, string>();
@@ -697,10 +817,7 @@ export function buildBaselineValueIndex(
   for (const block of dpv) {
     if (variantFile && block.variantFile !== variantFile) continue;
     for (const e of block.result?.entries ?? []) {
-      const selectors = [
-        ...classListToSelectors(e.baselineClasses),
-        ...classListToSelectors(e.variantClasses),
-      ];
+      const selectors = [...classListToSelectors(e.baselineClasses), ...classListToSelectors(e.variantClasses)];
       for (const sel of selectors) {
         const key = `${sel} ${e.property}`;
         observeValue(key, e.baseline);
@@ -750,8 +867,16 @@ function isAuthoredCssSelectorForFix(selector: string): boolean {
 }
 
 const COMPUTED_LAYOUT_PROPERTIES = new Set([
-  "width", "height", "min-width", "min-height", "max-width", "max-height",
-  "top", "right", "bottom", "left",
+  "width",
+  "height",
+  "min-width",
+  "min-height",
+  "max-width",
+  "max-height",
+  "top",
+  "right",
+  "bottom",
+  "left",
 ]);
 
 function isAuthoredCssPropertyForFix(property: string): boolean {
@@ -799,11 +924,19 @@ export function correctMigrationFixesWithReport(
       continue;
     }
     if (!isAuthoredCssSelectorForFix(fix.selector)) {
-      dropped.push({ selector: fix.selector, property: fix.property, reason: "path-style selector (not writable CSS)" });
+      dropped.push({
+        selector: fix.selector,
+        property: fix.property,
+        reason: "path-style selector (not writable CSS)",
+      });
       continue;
     }
     if (!isAuthoredCssPropertyForFix(fix.property)) {
-      dropped.push({ selector: fix.selector, property: fix.property, reason: "computed-layout property (e.g. height/width) is not a stable authored value" });
+      dropped.push({
+        selector: fix.selector,
+        property: fix.property,
+        reason: "computed-layout property (e.g. height/width) is not a stable authored value",
+      });
       continue;
     }
     const globalKey = `${fix.selector} ${fix.property}`;
@@ -867,7 +1000,7 @@ export function parseMigrationFixMultiResponse(response: string): MigrationFix[]
     const rawMedia = item.mediaCondition;
     if (typeof rawMedia === "string") {
       const trimmed = rawMedia.trim();
-      mediaCondition = (trimmed === "" || trimmed.toLowerCase() === "none") ? null : trimmed;
+      mediaCondition = trimmed === "" || trimmed.toLowerCase() === "none" ? null : trimmed;
     }
     fixes.push({ selector, property, value, mediaCondition });
   }
@@ -909,10 +1042,7 @@ export function extractCustomProperties(css: string): Map<string, string> {
  * the mismatch because the report's computed-style diff doesn't surface
  * CSS variables (the resolved RGB values appear instead).
  */
-export function extractCustomPropertyDiffs(
-  baselineHtml: string,
-  variantHtml: string,
-): MigrationFix[] {
+export function extractCustomPropertyDiffs(baselineHtml: string, variantHtml: string): MigrationFix[] {
   const baselineCss = extractCss(baselineHtml);
   const variantCss = extractCss(variantHtml);
   if (!baselineCss || !variantCss) return [];
@@ -941,9 +1071,9 @@ function readLinkTagAttr(tag: string, name: string): string | undefined {
 
 function isLocalStylesheetHref(href: string): boolean {
   if (!href) return false;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(href)) return false;     // absolute URL (http://, etc.)
-  if (href.startsWith("//")) return false;                       // protocol-relative
-  if (href.startsWith("data:")) return false;                    // data URL
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(href)) return false; // absolute URL (http://, etc.)
+  if (href.startsWith("//")) return false; // protocol-relative
+  if (href.startsWith("data:")) return false; // data URL
   return true;
 }
 
@@ -960,10 +1090,7 @@ function isLocalStylesheetHref(href: string): boolean {
  * The fixed HTML written back to disk carries the inlined form — a
  * one-way conversion that's acceptable for derived `fixed.html` files.
  */
-export async function inlineExternalStylesheets(
-  html: string,
-  baseDir: string,
-): Promise<string> {
+export async function inlineExternalStylesheets(html: string, baseDir: string): Promise<string> {
   // Extract `<link>` tags first so we can resolve hrefs in one pass.
   const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
   let result = html;
@@ -996,10 +1123,11 @@ export function resolveMigrationFixFromBaselineHtml(
 ): MigrationFix | null {
   const css = extractCss(baselineHtml);
   if (!css) return null;
-  const declaration = parseCssDeclarations(css).find((entry) =>
-    entry.selector === candidate.selector
-    && entry.property === candidate.property
-    && entry.mediaCondition === candidate.mediaCondition
+  const declaration = parseCssDeclarations(css).find(
+    (entry) =>
+      entry.selector === candidate.selector &&
+      entry.property === candidate.property &&
+      entry.mediaCondition === candidate.mediaCondition,
   );
   if (!declaration) return null;
   return {
@@ -1129,9 +1257,7 @@ function scanCssBlocks(css: string): CssBlock[] {
       }
       const bodyEnd = j - 1;
       const blockEnd = j;
-      const mediaCondition = mediaStack.length > 0
-        ? mediaStack[mediaStack.length - 1]!.condition
-        : null;
+      const mediaCondition = mediaStack.length > 0 ? mediaStack[mediaStack.length - 1]!.condition : null;
       blocks.push({
         selector: head,
         bodyStart,
@@ -1158,11 +1284,7 @@ function scanCssBlocks(css: string): CssBlock[] {
   return blocks;
 }
 
-export function applyMigrationFixToCss(
-  css: string,
-  fix: MigrationFix,
-  options: ApplyMigrationFixOptions = {},
-): string {
+export function applyMigrationFixToCss(css: string, fix: MigrationFix, options: ApplyMigrationFixOptions = {}): string {
   const targetSelector = normalizeSelectorWhitespace(fix.selector);
   const blocks = scanCssBlocks(css);
 
@@ -1205,7 +1327,10 @@ function upsertDeclarationMultiline(body: string, property: string, value: strin
     let valueEnd = body.length;
     for (let k = propEnd; k < body.length; k++) {
       const ch = body[k];
-      if (ch === ";") { valueEnd = k; break; }
+      if (ch === ";") {
+        valueEnd = k;
+        break;
+      }
     }
     // The value slice from `:` to `;`.
     const colonIdx = body.indexOf(":", propEnd);
@@ -1225,9 +1350,8 @@ function upsertDeclarationMultiline(body: string, property: string, value: strin
   const lines = core.split("\n");
   if (lines.length >= 2) {
     // Multi-line body: append a new indented declaration.
-    const indent = lines[lines.length - 1].match(/^\s*/)?.[0]
-      ?? lines.find((l) => l.trim())?.match(/^\s*/)?.[0]
-      ?? "  ";
+    const indent =
+      lines[lines.length - 1].match(/^\s*/)?.[0] ?? lines.find((l) => l.trim())?.match(/^\s*/)?.[0] ?? "  ";
     const needsSemicolon = !core.trimEnd().endsWith(";") && core.trim().length > 0;
     const prefix = needsSemicolon ? ";" : "";
     return `${core}${prefix}\n${indent}${property}: ${value};${trailing}`;
@@ -1270,10 +1394,7 @@ function summarizeConvergenceStatus(
   return cleanResults > 0 ? "clean" : "remaining";
 }
 
-function resolveVariantFile(
-  report: MigrationCompareReport,
-  result: MigrationCompareReportResult,
-): string {
+function resolveVariantFile(report: MigrationCompareReport, result: MigrationCompareReportResult): string {
   if (result.variantFile) return result.variantFile;
   return report.variants.find((variantFile) => basename(variantFile, ".html") === result.variant) ?? result.variant;
 }

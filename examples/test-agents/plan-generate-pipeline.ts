@@ -10,8 +10,8 @@ import { writeGeneratedTestFile, type GateCommand } from "@mizchi/vlmkit-generat
 
 async function main() {
   const title = process.env.TITLE ?? "Generated Playwright Test";
-  const request = process.env.REQUEST
-    ?? (process.env.REQUEST_FILE ? await readFile(process.env.REQUEST_FILE, "utf8") : "");
+  const request =
+    process.env.REQUEST ?? (process.env.REQUEST_FILE ? await readFile(process.env.REQUEST_FILE, "utf8") : "");
   if (!request.trim()) {
     console.error("Set REQUEST or REQUEST_FILE.");
     process.exit(2);
@@ -24,22 +24,25 @@ async function main() {
   const observations = process.env.OBSERVATIONS_FILE
     ? parseObservations(await readFile(process.env.OBSERVATIONS_FILE, "utf8"))
     : undefined;
-  const rulesMarkdown = process.env.RULES_FILE
-    ? await readFile(process.env.RULES_FILE, "utf8")
-    : undefined;
+  const rulesMarkdown = process.env.RULES_FILE ? await readFile(process.env.RULES_FILE, "utf8") : undefined;
 
-  const plan = await createStructuredPlanWithRetry({
-    title,
-    request,
-    prd: process.env.PRD_FILE ? await readFile(process.env.PRD_FILE, "utf8") : undefined,
-    observations,
-    seed: process.env.SEED_TEST
-      ? {
-        path: process.env.SEED_TEST,
-        source: process.env.SEED_SOURCE ? await readFile(process.env.SEED_SOURCE, "utf8") : undefined,
-      }
-      : undefined,
-  }, { provider }, undefined, { maxAttempts });
+  const plan = await createStructuredPlanWithRetry(
+    {
+      title,
+      request,
+      prd: process.env.PRD_FILE ? await readFile(process.env.PRD_FILE, "utf8") : undefined,
+      observations,
+      seed: process.env.SEED_TEST
+        ? {
+            path: process.env.SEED_TEST,
+            source: process.env.SEED_SOURCE ? await readFile(process.env.SEED_SOURCE, "utf8") : undefined,
+          }
+        : undefined,
+    },
+    { provider },
+    undefined,
+    { maxAttempts },
+  );
 
   if (plan.diagnostics.length) {
     console.error(`Planner diagnostics after ${plan.attempts} attempt(s):`);
@@ -50,15 +53,20 @@ async function main() {
   await mkdir(dirname(planPath), { recursive: true });
   await writeFile(planPath, plan.markdown, "utf8");
 
-  const generated = await generatePlaywrightTestWithRetry({
-    planMarkdown: plan.markdown,
-    rulesMarkdown,
-    testFilePath: testPath,
-    helperImportPath: process.env.HELPER_IMPORT ?? "../support/goto-app",
-    seedTestPath: process.env.SEED_TEST,
-    requireScreenshots: process.env.NO_SCREENSHOTS !== "1",
-    locatorInventory: plan.plan ? structuredPlanToLocatorInventory(plan.plan) : undefined,
-  }, { provider }, undefined, { maxAttempts });
+  const generated = await generatePlaywrightTestWithRetry(
+    {
+      planMarkdown: plan.markdown,
+      rulesMarkdown,
+      testFilePath: testPath,
+      helperImportPath: process.env.HELPER_IMPORT ?? "../support/goto-app",
+      seedTestPath: process.env.SEED_TEST,
+      requireScreenshots: process.env.NO_SCREENSHOTS !== "1",
+      locatorInventory: plan.plan ? structuredPlanToLocatorInventory(plan.plan) : undefined,
+    },
+    { provider },
+    undefined,
+    { maxAttempts },
+  );
 
   if (generated.diagnostics.length) {
     console.error(`Generator diagnostics after ${generated.attempts} attempt(s):`);
@@ -66,9 +74,7 @@ async function main() {
     process.exit(2);
   }
 
-  const gates: GateCommand[] = process.env.GATE_COMMAND
-    ? [{ name: "custom", command: process.env.GATE_COMMAND }]
-    : [];
+  const gates: GateCommand[] = process.env.GATE_COMMAND ? [{ name: "custom", command: process.env.GATE_COMMAND }] : [];
   await writeGeneratedTestFile({
     filePath: testPath,
     source: generated.source,

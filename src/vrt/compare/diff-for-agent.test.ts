@@ -21,8 +21,12 @@ function sampleReport(over: Partial<DfaReport> = {}): DfaReport {
     reportPath: "/work/fix/out/diff-report.json",
     results: [
       {
-        variant: "working", variantFile: "working.html",
-        viewport: "mobile", diffRatio: 0.4113, diffPixels: 100, totalPixels: 244,
+        variant: "working",
+        variantFile: "working.html",
+        viewport: "mobile",
+        diffRatio: 0.4113,
+        diffPixels: 100,
+        totalPixels: 244,
         dominantCategory: "layout-shift",
         categorySummary: "3 layout-shift, 1 color-change",
         categoryCounts: { "layout-shift": 3, "color-change": 1 },
@@ -33,8 +37,12 @@ function sampleReport(over: Partial<DfaReport> = {}): DfaReport {
         ],
       },
       {
-        variant: "working", variantFile: "working.html",
-        viewport: "desktop", diffRatio: 0.2398, diffPixels: 30, totalPixels: 125,
+        variant: "working",
+        variantFile: "working.html",
+        viewport: "desktop",
+        diffRatio: 0.2398,
+        diffPixels: 30,
+        totalPixels: 125,
         dominantCategory: "layout-shift",
         categorySummary: "2 layout-shift",
         categoryCounts: { "layout-shift": 2 },
@@ -76,78 +84,94 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("annotates display deltas that may be flex item coercion", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      domPositionDiff: [{
-        variantFile: "working.html",
-        result: {
-          totalDiffs: 1,
-          pathsOnlyInBaseline: [],
-          pathsOnlyInVariant: [],
-          byProperty: [{ property: "display", count: 1 }],
-          byPath: [{
-            path: "main[0]>span[0]",
-            baselineClasses: "pill",
-            variantClasses: "luna-pill",
-            count: 1,
-          }],
-          entries: [{
-            path: "main[0]>span[0]",
-            tag: "span",
-            baselineClasses: "pill",
-            variantClasses: "luna-pill",
-            property: "display",
-            baseline: "inline-flex",
-            variant: "flex",
-            parentDisplayContext: {
-              baselineParent: "flex",
-              variantParent: "flex",
-              isFlexOrGridItem: true,
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        domPositionDiff: [
+          {
+            variantFile: "working.html",
+            result: {
+              totalDiffs: 1,
+              pathsOnlyInBaseline: [],
+              pathsOnlyInVariant: [],
+              byProperty: [{ property: "display", count: 1 }],
+              byPath: [
+                {
+                  path: "main[0]>span[0]",
+                  baselineClasses: "pill",
+                  variantClasses: "luna-pill",
+                  count: 1,
+                },
+              ],
+              entries: [
+                {
+                  path: "main[0]>span[0]",
+                  tag: "span",
+                  baselineClasses: "pill",
+                  variantClasses: "luna-pill",
+                  property: "display",
+                  baseline: "inline-flex",
+                  variant: "flex",
+                  parentDisplayContext: {
+                    baselineParent: "flex",
+                    variantParent: "flex",
+                    isFlexOrGridItem: true,
+                  },
+                },
+              ],
             },
-          }],
-        },
-      }],
-    }));
+          },
+        ],
+      }),
+    );
 
     assert.match(md, /flex\/grid item/);
     assert.match(md, /parent is flex/);
   });
 
   it("surfaces missing CSS rule hints across class-renamed selectors", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      computedStyleDiff: [{
-        variantFile: "working.html",
-        result: {
-          totalDiffs: 0,
-          byProperty: [],
-          bySelector: [],
-          entries: [],
-          selectorsOnlyInBaseline: [".eyebrow"],
-          selectorsOnlyInVariant: [".luna-pill"],
-        },
-      }],
-      domPositionDiffPerViewport: [{
-        variantFile: "working.html",
-        result: {
-          totalDiffs: 2,
-          verifiedPairs: [".luna-pill::text-transform"],
-          byViewport: [
-            { viewport: "mobile", count: 1 },
-            { viewport: "desktop", count: 1 },
-          ],
-          byPathProperty: [{
-            path: "main[0]>section[0]>span[0]",
-            property: "text-transform",
-            baselineClasses: "eyebrow",
-            variantClasses: "luna-pill",
-            viewports: ["mobile", "desktop"],
-            samples: [
-              { viewport: "mobile", baseline: "uppercase", variant: "none" },
-              { viewport: "desktop", baseline: "uppercase", variant: "none" },
-            ],
-          }],
-        },
-      }],
-    }));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        computedStyleDiff: [
+          {
+            variantFile: "working.html",
+            result: {
+              totalDiffs: 0,
+              byProperty: [],
+              bySelector: [],
+              entries: [],
+              selectorsOnlyInBaseline: [".eyebrow"],
+              selectorsOnlyInVariant: [".luna-pill"],
+            },
+          },
+        ],
+        domPositionDiffPerViewport: [
+          {
+            variantFile: "working.html",
+            result: {
+              totalDiffs: 2,
+              verifiedPairs: [".luna-pill::text-transform"],
+              byViewport: [
+                { viewport: "mobile", count: 1 },
+                { viewport: "desktop", count: 1 },
+              ],
+              byPathProperty: [
+                {
+                  path: "main[0]>section[0]>span[0]",
+                  property: "text-transform",
+                  baselineClasses: "eyebrow",
+                  variantClasses: "luna-pill",
+                  viewports: ["mobile", "desktop"],
+                  samples: [
+                    { viewport: "mobile", baseline: "uppercase", variant: "none" },
+                    { viewport: "desktop", baseline: "uppercase", variant: "none" },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
 
     assert.match(md, /Missing CSS rule hints/);
     assert.match(md, /`\.eyebrow`/);
@@ -157,28 +181,34 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("surfaces color-change sampled color pairs", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      results: [{
-        variant: "working",
-        variantFile: "working.html",
-        viewport: "mobile",
-        diffRatio: 0.1,
-        diffPixels: 10,
-        totalPixels: 100,
-        dominantCategory: "color-change",
-        categorySummary: "1 color-change",
-        categoryCounts: { "color-change": 1 },
-        colorSamples: [{
-          x: 80,
-          y: 1040,
-          width: 64,
-          height: 32,
-          baseline: "#6b7280",
-          variant: "#8c9099",
-          distance: 54,
-        }],
-      }],
-    }));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        results: [
+          {
+            variant: "working",
+            variantFile: "working.html",
+            viewport: "mobile",
+            diffRatio: 0.1,
+            diffPixels: 10,
+            totalPixels: 100,
+            dominantCategory: "color-change",
+            categorySummary: "1 color-change",
+            categoryCounts: { "color-change": 1 },
+            colorSamples: [
+              {
+                x: 80,
+                y: 1040,
+                width: 64,
+                height: 32,
+                baseline: "#6b7280",
+                variant: "#8c9099",
+                distance: 54,
+              },
+            ],
+          },
+        ],
+      }),
+    );
 
     assert.match(md, /Color-change samples/);
     assert.match(md, /#6b7280/);
@@ -186,52 +216,63 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("surfaces VLM region-diff handoff summaries with artifact paths", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      authoredStyleDiff: [{
-        variantFile: "working.html",
-        result: {
-          totalDiffs: 1,
-          byProperty: [{ property: "background-color", count: 1 }],
-          bySelector: [{ selector: ".cta", count: 1 }],
-          entries: [
-            { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
-          ],
-        },
-      }],
-      regionDiffs: [{
-        variantFile: "working.html",
-        maxViewports: 1,
-        skippedViewports: [
-          { viewport: "desktop", diffRatio: 0.2398, diffPixels: 30, reason: "region-diff-max-viewports" },
-          { viewport: "wide", diffRatio: 0.0312, diffPixels: 12, reason: "region-diff-max-viewports" },
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        authoredStyleDiff: [
+          {
+            variantFile: "working.html",
+            result: {
+              totalDiffs: 1,
+              byProperty: [{ property: "background-color", count: 1 }],
+              bySelector: [{ selector: ".cta", count: 1 }],
+              entries: [{ selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" }],
+            },
+          },
         ],
-        perViewport: [{
-          viewport: "mobile",
-          jsonPath: "/work/fix/out/working-mobile-region-diff.json",
-          markdownPath: "/work/fix/out/working-mobile-region-diff.md",
-          verdict: "diff",
-          summary: "Primary CTA background changed from blue to red.",
-          changeCount: 1,
-          changes: [{
-            selector: ".cta",
-            selectorHint: "primary CTA",
-            selectorConfidence: "high",
-            property: "background-color",
-            from: "#366fed",
-            to: "#f15353",
-            averageChannelDelta: 128.67,
-            bbox: { left: 170, top: 338, width: 156, height: 50 },
-            confidence: "high",
-          }],
-        }],
-      }],
-    }));
+        regionDiffs: [
+          {
+            variantFile: "working.html",
+            maxViewports: 1,
+            skippedViewports: [
+              { viewport: "desktop", diffRatio: 0.2398, diffPixels: 30, reason: "region-diff-max-viewports" },
+              { viewport: "wide", diffRatio: 0.0312, diffPixels: 12, reason: "region-diff-max-viewports" },
+            ],
+            perViewport: [
+              {
+                viewport: "mobile",
+                jsonPath: "/work/fix/out/working-mobile-region-diff.json",
+                markdownPath: "/work/fix/out/working-mobile-region-diff.md",
+                verdict: "diff",
+                summary: "Primary CTA background changed from blue to red.",
+                changeCount: 1,
+                changes: [
+                  {
+                    selector: ".cta",
+                    selectorHint: "primary CTA",
+                    selectorConfidence: "high",
+                    property: "background-color",
+                    from: "#366fed",
+                    to: "#f15353",
+                    averageChannelDelta: 128.67,
+                    bbox: { left: 170, top: 338, width: 156, height: 50 },
+                    confidence: "high",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
 
     assert.match(md, /VLM region diff/);
     assert.doesNotMatch(md, /Optional VLM handoff generated/);
     assert.doesNotMatch(md, /\| Viewport \| Selector \| Property \| Baseline → Variant \| Δ \| Bbox \| Confidence \|/);
     assert.match(md, /\| Viewport \| Selector \| Property \| Target \| Current \| Evidence \| Artifacts \|/);
-    assert.match(md, /`mobile` \| `\.cta` \| `background-color` \| `#2d69ec` _\(authored CSSOM\)_ \| `#f04b4b` \| sampled `#366fed` → `#f15353`; bbox `170,338 156x50`; conf high\/high \| json: `\/work\/fix\/out\/working-mobile-region-diff\.json`; md: `\/work\/fix\/out\/working-mobile-region-diff\.md`/);
+    assert.match(
+      md,
+      /`mobile` \| `\.cta` \| `background-color` \| `#2d69ec` _\(authored CSSOM\)_ \| `#f04b4b` \| sampled `#366fed` → `#f15353`; bbox `170,338 156x50`; conf high\/high \| json: `\/work\/fix\/out\/working-mobile-region-diff\.json`; md: `\/work\/fix\/out\/working-mobile-region-diff\.md`/,
+    );
     assert.match(md, /Notes: `mobile`: Primary CTA background changed/);
     assert.match(md, /`\.cta`/);
     assert.match(md, /`background-color`/);
@@ -262,14 +303,20 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("emits PASS message when every diff is zero", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      results: [
-        {
-          variant: "working", variantFile: "working.html",
-          viewport: "mobile", diffRatio: 0, diffPixels: 0, totalPixels: 100,
-        },
-      ],
-    }));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        results: [
+          {
+            variant: "working",
+            variantFile: "working.html",
+            viewport: "mobile",
+            diffRatio: 0,
+            diffPixels: 0,
+            totalPixels: 100,
+          },
+        ],
+      }),
+    );
     assert.match(md, /\*\*PASS\*\*/);
     assert.match(md, /Nothing to fix/);
   });
@@ -292,37 +339,55 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("renders per-section diffRatio when bbox + heatmap data are present", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      componentBboxDiffs: [{
-        variantFile: "working.html",
-        perViewport: [{
-          viewport: "mobile",
-          matches: [
-            // Large hero section: 200×100 = 20000 area, fully covered by region → 100%.
-            {
-              rank: 1,
-              baseline: { top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "#fff" },
-              variant: { top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "#fff" },
-              deltaTop: 0, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 1,
-            },
-            // Smaller card: 50×50 = 2500 area, no heatmap intersection → 0%.
-            {
-              rank: 2,
-              baseline: { top: 200, left: 0, width: 50, height: 50, area: 2500, fillColor: "#fff" },
-              variant: { top: 200, left: 0, width: 50, height: 50, area: 2500, fillColor: "#fff" },
-              deltaTop: 0, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 1,
-            },
-          ],
-        }],
-      }],
-      heatmapRegions: [{
-        variantFile: "working.html",
-        perViewport: [{
-          viewport: "mobile",
-          regions: [{ top: 0, left: 0, width: 200, height: 100, area: 20000 }],
-        }],
-      }],
-    }));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        componentBboxDiffs: [
+          {
+            variantFile: "working.html",
+            perViewport: [
+              {
+                viewport: "mobile",
+                matches: [
+                  // Large hero section: 200×100 = 20000 area, fully covered by region → 100%.
+                  {
+                    rank: 1,
+                    baseline: { top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "#fff" },
+                    variant: { top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "#fff" },
+                    deltaTop: 0,
+                    deltaLeft: 0,
+                    deltaWidth: 0,
+                    deltaHeight: 0,
+                    iou: 1,
+                  },
+                  // Smaller card: 50×50 = 2500 area, no heatmap intersection → 0%.
+                  {
+                    rank: 2,
+                    baseline: { top: 200, left: 0, width: 50, height: 50, area: 2500, fillColor: "#fff" },
+                    variant: { top: 200, left: 0, width: 50, height: 50, area: 2500, fillColor: "#fff" },
+                    deltaTop: 0,
+                    deltaLeft: 0,
+                    deltaWidth: 0,
+                    deltaHeight: 0,
+                    iou: 1,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        heatmapRegions: [
+          {
+            variantFile: "working.html",
+            perViewport: [
+              {
+                viewport: "mobile",
+                regions: [{ top: 0, left: 0, width: 200, height: 100, area: 20000 }],
+              },
+            ],
+          },
+        ],
+      }),
+    );
     assert.match(md, /Per-section diffRatio/);
     // Hero is fully covered (200×100 region intersects 200×100 section).
     assert.match(md, /\| 100\.00% \|/);
@@ -333,24 +398,32 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("labels component bbox diffs with likely CSS axis candidates", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      componentBboxDiffs: [{
-        variantFile: "working.html",
-        perViewport: [{
-          viewport: "mobile",
-          matches: [{
-            rank: 1,
-            baseline: { top: 100, left: 20, width: 320, height: 120, area: 38400, fillColor: "#fff" },
-            variant: { top: 100, left: 20, width: 320, height: 170, area: 54400, fillColor: "#fff" },
-            deltaTop: 0,
-            deltaLeft: 0,
-            deltaWidth: 0,
-            deltaHeight: 50,
-            iou: 0.71,
-          }],
-        }],
-      }],
-    }));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        componentBboxDiffs: [
+          {
+            variantFile: "working.html",
+            perViewport: [
+              {
+                viewport: "mobile",
+                matches: [
+                  {
+                    rank: 1,
+                    baseline: { top: 100, left: 20, width: 320, height: 120, area: 38400, fillColor: "#fff" },
+                    variant: { top: 100, left: 20, width: 320, height: 170, area: 54400, fillColor: "#fff" },
+                    deltaTop: 0,
+                    deltaLeft: 0,
+                    deltaWidth: 0,
+                    deltaHeight: 50,
+                    iou: 0.71,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
 
     assert.match(md, /Component bbox diff/);
     assert.match(md, /height \(\+50px\)/);
@@ -360,40 +433,48 @@ describe("formatMigrationReportForAgent", () => {
   });
 
   it("renders vertical accumulation breakdowns for shift bands", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      shiftAccumulations: [{
-        variantFile: "working.html",
-        perViewport: [{
-          viewport: "desktop",
-          breakdowns: [{
-            bandStart: 720,
-            bandEnd: 1047,
-            bandShift: 99,
-            accumulatedDeltaHeight: 94.5,
-            contributions: [
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        shiftAccumulations: [
+          {
+            variantFile: "working.html",
+            perViewport: [
               {
-                tag: "article",
-                baselineClasses: "metric",
-                variantClasses: "luna-metric",
-                count: 4,
-                averageDeltaHeight: -9,
-                totalDeltaHeight: -36,
-                samplePaths: ["metric[0]", "metric[1]"],
-              },
-              {
-                tag: "h3",
-                baselineClasses: "panel-title",
-                variantClasses: "luna-panel-title",
-                count: 3,
-                averageDeltaHeight: -1.5,
-                totalDeltaHeight: -4.5,
-                samplePaths: ["title[0]"],
+                viewport: "desktop",
+                breakdowns: [
+                  {
+                    bandStart: 720,
+                    bandEnd: 1047,
+                    bandShift: 99,
+                    accumulatedDeltaHeight: 94.5,
+                    contributions: [
+                      {
+                        tag: "article",
+                        baselineClasses: "metric",
+                        variantClasses: "luna-metric",
+                        count: 4,
+                        averageDeltaHeight: -9,
+                        totalDeltaHeight: -36,
+                        samplePaths: ["metric[0]", "metric[1]"],
+                      },
+                      {
+                        tag: "h3",
+                        baselineClasses: "panel-title",
+                        variantClasses: "luna-panel-title",
+                        count: 3,
+                        averageDeltaHeight: -1.5,
+                        totalDeltaHeight: -4.5,
+                        samplePaths: ["title[0]"],
+                      },
+                    ],
+                  },
+                ],
               },
             ],
-          }],
-        }],
-      }],
-    }));
+          },
+        ],
+      }),
+    );
 
     assert.match(md, /Vertical accumulation breakdown/);
     assert.match(md, /`metric` → `luna-metric`/);
@@ -413,7 +494,7 @@ describe("formatMigrationReportForAgent", () => {
         ],
       } as any,
       [
-        { top: 0, left: 0, width: 50, height: 50 },  // 2500px inside rank 1's bbox (10000px) → 25%
+        { top: 0, left: 0, width: 50, height: 50 }, // 2500px inside rank 1's bbox (10000px) → 25%
         { top: 200, left: 0, width: 10, height: 10 }, // 100px inside rank 2's bbox (10000px) → 1%
       ],
       "mobile",
@@ -443,7 +524,7 @@ describe("formatMigrationReportForAgent", () => {
 
   it("suppresses the regression banner when only a single viewport got worse (noise floor)", () => {
     const previous: PreviousRunSummary = {
-      byVariant: { "working.html": { mobile: 0.2, desktop: 0.30 } },
+      byVariant: { "working.html": { mobile: 0.2, desktop: 0.3 } },
     };
     // Only mobile got worse (desktop went from 0.30 → 0.24, an
     // improvement). With totalViewports=2 the default threshold is 2,
@@ -481,11 +562,11 @@ describe("detectRegression", () => {
   it("threshold default is max(2, ceil(n/2)); 3 of 5 worsened fires the alarm", () => {
     const finding = detectRegression(
       [
-        { viewport: "vp1", diffRatio: 0.15 },  // +0.05  worse
-        { viewport: "vp2", diffRatio: 0.25 },  // +0.05  worse
-        { viewport: "vp3", diffRatio: 0.35 },  // +0.05  worse
-        { viewport: "vp4", diffRatio: 0.40 },  // ±0     unchanged
-        { viewport: "vp5", diffRatio: 0.50 },  // ±0     unchanged
+        { viewport: "vp1", diffRatio: 0.15 }, // +0.05  worse
+        { viewport: "vp2", diffRatio: 0.25 }, // +0.05  worse
+        { viewport: "vp3", diffRatio: 0.35 }, // +0.05  worse
+        { viewport: "vp4", diffRatio: 0.4 }, // ±0     unchanged
+        { viewport: "vp5", diffRatio: 0.5 }, // ±0     unchanged
       ],
       previous,
       "v.html",
@@ -501,9 +582,9 @@ describe("detectRegression", () => {
       [
         { viewport: "vp1", diffRatio: 0.15 },
         { viewport: "vp2", diffRatio: 0.25 },
-        { viewport: "vp3", diffRatio: 0.30 },
-        { viewport: "vp4", diffRatio: 0.40 },
-        { viewport: "vp5", diffRatio: 0.50 },
+        { viewport: "vp3", diffRatio: 0.3 },
+        { viewport: "vp4", diffRatio: 0.4 },
+        { viewport: "vp5", diffRatio: 0.5 },
       ],
       previous,
       "v.html",
@@ -516,11 +597,7 @@ describe("detectRegression", () => {
     const prevOne: PreviousRunSummary = {
       byVariant: { "v.html": { only: 0.1 } },
     };
-    const finding = detectRegression(
-      [{ viewport: "only", diffRatio: 0.99 }],
-      prevOne,
-      "v.html",
-    );
+    const finding = detectRegression([{ viewport: "only", diffRatio: 0.99 }], prevOne, "v.html");
     assert.ok(finding);
     assert.equal(finding!.regressed, false);
     assert.equal(finding!.threshold, 2);
@@ -536,37 +613,41 @@ describe("detectRegression", () => {
 
 describe("formatMigrationReportForAgent — per-viewport CSD", () => {
   it("emits universal and breakpoint-gated tables with sample values per viewport", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      computedStyleDiffPerViewport: [{
-        variantFile: "working.html",
-        result: {
-          totalDiffs: 3,
-          byViewport: [
-            { viewport: "mobile", count: 1 },
-            { viewport: "desktop", count: 2 },
-          ],
-          universalPairs: [".btn|padding"],
-          breakpointGatedPairs: [".card|gap"],
-          bySelectorProperty: [
-            {
-              selector: ".btn", property: "padding",
-              viewports: ["mobile", "desktop"],
-              samples: [
-                { viewport: "mobile", baseline: "10px", variant: "6px" },
-                { viewport: "desktop", baseline: "10px", variant: "6px" },
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        computedStyleDiffPerViewport: [
+          {
+            variantFile: "working.html",
+            result: {
+              totalDiffs: 3,
+              byViewport: [
+                { viewport: "mobile", count: 1 },
+                { viewport: "desktop", count: 2 },
+              ],
+              universalPairs: [".btn|padding"],
+              breakpointGatedPairs: [".card|gap"],
+              bySelectorProperty: [
+                {
+                  selector: ".btn",
+                  property: "padding",
+                  viewports: ["mobile", "desktop"],
+                  samples: [
+                    { viewport: "mobile", baseline: "10px", variant: "6px" },
+                    { viewport: "desktop", baseline: "10px", variant: "6px" },
+                  ],
+                },
+                {
+                  selector: ".card",
+                  property: "gap",
+                  viewports: ["desktop"],
+                  samples: [{ viewport: "desktop", baseline: "12px", variant: "0px" }],
+                },
               ],
             },
-            {
-              selector: ".card", property: "gap",
-              viewports: ["desktop"],
-              samples: [
-                { viewport: "desktop", baseline: "12px", variant: "0px" },
-              ],
-            },
-          ],
-        },
-      }],
-    }));
+          },
+        ],
+      }),
+    );
     assert.match(md, /Verified deltas \(computed-style\) × viewport/);
     assert.match(md, /Universal pairs/);
     assert.match(md, /Breakpoint-gated pairs/);
@@ -577,18 +658,22 @@ describe("formatMigrationReportForAgent — per-viewport CSD", () => {
   });
 
   it("skips the per-viewport CSD section entirely when totalDiffs is 0", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      computedStyleDiffPerViewport: [{
-        variantFile: "working.html",
-        result: {
-          totalDiffs: 0,
-          byViewport: [],
-          universalPairs: [],
-          breakpointGatedPairs: [],
-          bySelectorProperty: [],
-        },
-      }],
-    }));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        computedStyleDiffPerViewport: [
+          {
+            variantFile: "working.html",
+            result: {
+              totalDiffs: 0,
+              byViewport: [],
+              universalPairs: [],
+              breakpointGatedPairs: [],
+              bySelectorProperty: [],
+            },
+          },
+        ],
+      }),
+    );
     assert.doesNotMatch(md, /Verified deltas \(computed-style\) × viewport/);
   });
 });
@@ -608,19 +693,29 @@ describe("formatMigrationReportForAgent — optional signal sections", () => {
   const hoverOnly = sampleReport({
     results: [
       {
-        variant: "working", variantFile: "working.html",
-        viewport: "desktop", diffRatio: 0, diffPixels: 0, totalPixels: 1000,
+        variant: "working",
+        variantFile: "working.html",
+        viewport: "desktop",
+        diffRatio: 0,
+        diffPixels: 0,
+        totalPixels: 1000,
       },
     ],
-    stateDiffs: [{
-      variantFile: "working.html",
-      perState: [{
-        state: "hover",
-        forcedCount: 4,
-        affectedElements: ["button.primary", "a.nav-link"],
-        perViewport: [{ viewport: "desktop", defaultDiffRatio: 0, stateDiffRatio: 0.031, hoverInducedDelta: 0.031 }],
-      }],
-    }],
+    stateDiffs: [
+      {
+        variantFile: "working.html",
+        perState: [
+          {
+            state: "hover",
+            forcedCount: 4,
+            affectedElements: ["button.primary", "a.nav-link"],
+            perViewport: [
+              { viewport: "desktop", defaultDiffRatio: 0, stateDiffRatio: 0.031, hoverInducedDelta: 0.031 },
+            ],
+          },
+        ],
+      },
+    ],
   });
 
   it("does not declare PASS when the default diff is 0 but a forced state diverges", () => {
@@ -638,75 +733,126 @@ describe("formatMigrationReportForAgent — optional signal sections", () => {
     assert.match(md, /\| `:hover` \| `desktop` \| 0\.00% \| 3\.10% \| \+3\.10% \| 4 \|/);
     // The sign is the reading: a negative induced delta means the forced state is CLOSER to the
     // baseline than the default one, which is a different bug from a missing hover rule.
-    const negative = formatMigrationReportForAgent(sampleReport({
-      results: [{ variant: "w", variantFile: "working.html", viewport: "desktop", diffRatio: 0.05, diffPixels: 5, totalPixels: 100 }],
-      stateDiffs: [{
-        variantFile: "working.html",
-        perState: [{
-          state: "focus", forcedCount: 1, affectedElements: [],
-          perViewport: [{ viewport: "desktop", defaultDiffRatio: 0.05, stateDiffRatio: 0.01, hoverInducedDelta: -0.04 }],
-        }],
-      }],
-    }));
+    const negative = formatMigrationReportForAgent(
+      sampleReport({
+        results: [
+          {
+            variant: "w",
+            variantFile: "working.html",
+            viewport: "desktop",
+            diffRatio: 0.05,
+            diffPixels: 5,
+            totalPixels: 100,
+          },
+        ],
+        stateDiffs: [
+          {
+            variantFile: "working.html",
+            perState: [
+              {
+                state: "focus",
+                forcedCount: 1,
+                affectedElements: [],
+                perViewport: [
+                  { viewport: "desktop", defaultDiffRatio: 0.05, stateDiffRatio: 0.01, hoverInducedDelta: -0.04 },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
     assert.match(negative, /\| `:focus` \| `desktop` \| 5\.00% \| 1\.00% \| -4\.00% \| 1 \|/);
   });
 
   it("samples the forced elements, and says nothing when there are none", () => {
-    assert.match(formatMigrationReportForAgent(hoverOnly), /Sample of forced elements: `button\.primary`, `a\.nav-link`\./);
-    const noSample = formatMigrationReportForAgent(sampleReport({
-      stateDiffs: [{
-        variantFile: "working.html",
-        perState: [{
-          state: "hover", forcedCount: 0, affectedElements: [],
-          perViewport: [{ viewport: "desktop", defaultDiffRatio: 0.1, stateDiffRatio: 0.1, hoverInducedDelta: 0 }],
-        }],
-      }],
-    }));
+    assert.match(
+      formatMigrationReportForAgent(hoverOnly),
+      /Sample of forced elements: `button\.primary`, `a\.nav-link`\./,
+    );
+    const noSample = formatMigrationReportForAgent(
+      sampleReport({
+        stateDiffs: [
+          {
+            variantFile: "working.html",
+            perState: [
+              {
+                state: "hover",
+                forcedCount: 0,
+                affectedElements: [],
+                perViewport: [
+                  { viewport: "desktop", defaultDiffRatio: 0.1, stateDiffRatio: 0.1, hoverInducedDelta: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
     assert.doesNotMatch(noSample, /Sample of forced elements/);
   });
 
   it("splits palette findings into missing and extra, with the near-neighbour distance", () => {
     // Which side a colour is on decides the fix: `missing` is a token the variant forgot,
     // `extra` is a hard-coded literal it invented. Swapping them inverts the instruction.
-    const md = formatMigrationReportForAgent(sampleReport({
-      paletteDiffs: [{
-        variantFile: "working.html",
-        perViewport: [{
-          viewport: "desktop",
-          baseline: [{ hex: "#1a73e8", share: 0.2, r: 26, g: 115, b: 232 }],
-          variant: [{ hex: "#4285f4", share: 0.18, r: 66, g: 133, b: 244 }],
-          diff: {
-            matched: [],
-            onlyInBaseline: [{ hex: "#1a73e8", share: 0.2, nearestNeighborDistance: 46 }],
-            onlyInVariant: [{ hex: "#4285f4", share: 0.18, nearestNeighborDistance: 8 }],
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        paletteDiffs: [
+          {
+            variantFile: "working.html",
+            perViewport: [
+              {
+                viewport: "desktop",
+                baseline: [{ hex: "#1a73e8", share: 0.2, r: 26, g: 115, b: 232 }],
+                variant: [{ hex: "#4285f4", share: 0.18, r: 66, g: 133, b: 244 }],
+                diff: {
+                  matched: [],
+                  onlyInBaseline: [{ hex: "#1a73e8", share: 0.2, nearestNeighborDistance: 46 }],
+                  onlyInVariant: [{ hex: "#4285f4", share: 0.18, nearestNeighborDistance: 8 }],
+                },
+              },
+            ],
           },
-        }],
-      }],
-    }));
+        ],
+      }),
+    );
     assert.match(md, /### Palette diff/);
     assert.match(md, /\| `desktop` \| missing \| `#1a73e8` \| 20\.0% \|/);
     assert.match(md, /\| `desktop` \| extra \| `#4285f4` \| 18\.0% \|/);
   });
 
   it("reports shift origins, and says so when a viewport produced none", () => {
-    const withOrigins = formatMigrationReportForAgent(sampleReport({
-      shiftOrigins: [{
-        variantFile: "working.html",
-        perViewport: [{
-          viewport: "desktop",
-          origins: [{
-            band: { yStart: 100, yEnd: 200, deltaY: 12 },
-            baselineClass: "hero", variantClass: "hero", originTop: { baseline: 104, variant: 116 },
-            position: 3, suspect: "margin-top",
-          }],
-        }],
-      }],
-    } as never));
+    const withOrigins = formatMigrationReportForAgent(
+      sampleReport({
+        shiftOrigins: [
+          {
+            variantFile: "working.html",
+            perViewport: [
+              {
+                viewport: "desktop",
+                origins: [
+                  {
+                    band: { yStart: 100, yEnd: 200, deltaY: 12 },
+                    baselineClass: "hero",
+                    variantClass: "hero",
+                    originTop: { baseline: 104, variant: 116 },
+                    position: 3,
+                    suspect: "margin-top",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      } as never),
+    );
     assert.match(withOrigins, /### Shift-origin diagnostics/);
 
-    const noOrigins = formatMigrationReportForAgent(sampleReport({
-      shiftOrigins: [{ variantFile: "working.html", perViewport: [{ viewport: "desktop", origins: [] }] }],
-    } as never));
+    const noOrigins = formatMigrationReportForAgent(
+      sampleReport({
+        shiftOrigins: [{ variantFile: "working.html", perViewport: [{ viewport: "desktop", origins: [] }] }],
+      } as never),
+    );
     // Present-but-empty must not print an empty table: the section header with no rows reads as
     // "no shifts", which is the opposite of "the probe found no origin for the shifts there are".
     assert.doesNotMatch(noOrigins, /\| Viewport \| Band \(y\) \|/);
@@ -715,25 +861,35 @@ describe("formatMigrationReportForAgent — optional signal sections", () => {
   it("keeps the region-diff cap visible when viewports were skipped", () => {
     // A cap that silently analyses 1 of 4 changed viewports reads as "only one viewport
     // changed". The deprecated `diff region` path still ships and still runs on `--region-diff`.
-    const md = formatMigrationReportForAgent(sampleReport({
-      regionDiffs: [{
-        variantFile: "working.html",
-        maxViewports: 1,
-        skippedViewports: [
-          { viewport: "mobile", diffRatio: 0.31, diffPixels: 900 },
-          { viewport: "tablet", diffRatio: 0.12, diffPixels: 400 },
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        regionDiffs: [
+          {
+            variantFile: "working.html",
+            maxViewports: 1,
+            skippedViewports: [
+              { viewport: "mobile", diffRatio: 0.31, diffPixels: 900 },
+              { viewport: "tablet", diffRatio: 0.12, diffPixels: 400 },
+            ],
+            perViewport: [
+              {
+                viewport: "desktop",
+                changes: [
+                  {
+                    selector: ".card",
+                    property: "background-color",
+                    baselineValue: "#ffffff",
+                    variantValue: "#f5f5f5",
+                    confidence: "high",
+                    bbox: { top: 10, left: 20, width: 100, height: 40 },
+                  },
+                ],
+              },
+            ],
+          },
         ],
-        perViewport: [{
-          viewport: "desktop",
-          changes: [{
-            selector: ".card", property: "background-color",
-            baselineValue: "#ffffff", variantValue: "#f5f5f5",
-            confidence: "high",
-            bbox: { top: 10, left: 20, width: 100, height: 40 },
-          }],
-        }],
-      }],
-    } as never));
+      } as never),
+    );
     assert.match(md, /### VLM region diff/);
     assert.match(md, /analyzed 1\/3 changed viewport\(s\)/);
     assert.match(md, /--region-diff-max-viewports=1/);
@@ -742,12 +898,16 @@ describe("formatMigrationReportForAgent — optional signal sections", () => {
   });
 
   it("puts a region-diff error in its own table rather than losing it", () => {
-    const md = formatMigrationReportForAgent(sampleReport({
-      regionDiffs: [{
-        variantFile: "working.html",
-        perViewport: [{ viewport: "desktop", changes: [], error: "VLM returned no JSON" }],
-      }],
-    } as never));
+    const md = formatMigrationReportForAgent(
+      sampleReport({
+        regionDiffs: [
+          {
+            variantFile: "working.html",
+            perViewport: [{ viewport: "desktop", changes: [], error: "VLM returned no JSON" }],
+          },
+        ],
+      } as never),
+    );
     assert.match(md, /\| Viewport \| Error \|/);
     assert.match(md, /\| `desktop` \| VLM returned no JSON \|/);
   });
@@ -758,7 +918,10 @@ describe("formatMigrationReportForAgent — optional signal sections", () => {
     // measurement that found nothing.
     const bare = formatMigrationReportForAgent(sampleReport());
     for (const heading of [
-      /### Forced-state diff/, /### Palette diff/, /### Shift-origin diagnostics/, /### VLM region diff/,
+      /### Forced-state diff/,
+      /### Palette diff/,
+      /### Shift-origin diagnostics/,
+      /### VLM region diff/,
     ]) {
       assert.doesNotMatch(bare, heading);
     }
@@ -768,7 +931,14 @@ describe("formatMigrationReportForAgent — optional signal sections", () => {
     const two = sampleReport({
       results: [
         ...sampleReport().results,
-        { variant: "other", variantFile: "other.html", viewport: "desktop", diffRatio: 0.1, diffPixels: 10, totalPixels: 100 },
+        {
+          variant: "other",
+          variantFile: "other.html",
+          viewport: "desktop",
+          diffRatio: 0.1,
+          diffPixels: 10,
+          totalPixels: 100,
+        },
       ],
     });
     const only = formatMigrationReportForAgent(two, { variant: "other.html" });

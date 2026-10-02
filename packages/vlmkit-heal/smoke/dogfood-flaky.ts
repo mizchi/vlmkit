@@ -30,8 +30,16 @@ try {
     },
     {
       // assert these are never invoked on the flaky path
-      observe: { observe: async () => { throw new Error("observe must not run for flaky"); } },
-      codegen: { propose: async () => { throw new Error("codegen must not run for flaky"); } },
+      observe: {
+        observe: async () => {
+          throw new Error("observe must not run for flaky");
+        },
+      },
+      codegen: {
+        propose: async () => {
+          throw new Error("codegen must not run for flaky");
+        },
+      },
     },
   );
   console.log("\n=== Flaky 疎通 result ===");

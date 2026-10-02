@@ -19,7 +19,14 @@ const sampleGate = defineGate<{ ok: boolean }, Record<string, unknown>>({
   summary: "A gate that exists to be adapted",
   rules: [{ id: "bad-thing", title: "A bad thing", severity: "suspect" }],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page",
+      positional: 0,
+      required: true,
+    },
     { name: "target", placeholder: "png", kind: "path", description: "Target", repeatable: true },
     { name: "classes", kind: "string-list", description: "Comma-joined list" },
     { name: "depth", kind: "number", description: "How deep" },
@@ -37,10 +44,7 @@ const sampleGate = defineGate<{ ok: boolean }, Record<string, unknown>>({
 describe("gateToolName", () => {
   it("turns a dotted gate id into the MCP naming convention", () => {
     assert.equal(gateToolName(sampleGate), "check_sample");
-    assert.equal(
-      gateToolName({ ...sampleGate, id: "check.a11y.contrast" }),
-      "check_a11y_contrast",
-    );
+    assert.equal(gateToolName({ ...sampleGate, id: "check.a11y.contrast" }), "check_a11y_contrast");
   });
 });
 
@@ -79,24 +83,25 @@ describe("derived input schema", () => {
 
 describe("gateToolArgv", () => {
   it("puts positionals first, then flags", () => {
-    assert.deepEqual(
-      gateToolArgv(sampleGate, { source: "page.html", depth: 3 }),
-      ["page.html", "--depth", "3"],
-    );
+    assert.deepEqual(gateToolArgv(sampleGate, { source: "page.html", depth: 3 }), ["page.html", "--depth", "3"]);
   });
 
   it("repeats a repeatable flag and comma-joins a list flag", () => {
     // Getting this backwards is exactly the mismatch a hand-written tool hid:
     // `--target a,b` is one nonexistent file, and `--classes a --classes b`
     // drops the first value.
-    assert.deepEqual(
-      gateToolArgv(sampleGate, { source: "p.html", target: ["a.png", "b.png"] }),
-      ["p.html", "--target", "a.png", "--target", "b.png"],
-    );
-    assert.deepEqual(
-      gateToolArgv(sampleGate, { source: "p.html", classes: ["one", "two"] }),
-      ["p.html", "--classes", "one,two"],
-    );
+    assert.deepEqual(gateToolArgv(sampleGate, { source: "p.html", target: ["a.png", "b.png"] }), [
+      "p.html",
+      "--target",
+      "a.png",
+      "--target",
+      "b.png",
+    ]);
+    assert.deepEqual(gateToolArgv(sampleGate, { source: "p.html", classes: ["one", "two"] }), [
+      "p.html",
+      "--classes",
+      "one,two",
+    ]);
   });
 
   it("passes a boolean flag only when true", () => {
@@ -106,14 +111,21 @@ describe("gateToolArgv", () => {
 
   it("sends --no-x only when the positive argument is explicitly false", () => {
     const options = { description: "", invert: { "no-context": "context" } };
-    assert.deepEqual(gateToolArgv(sampleGate, { source: "p.html", context: false }, options), ["p.html", "--no-context"]);
+    assert.deepEqual(gateToolArgv(sampleGate, { source: "p.html", context: false }, options), [
+      "p.html",
+      "--no-context",
+    ]);
     assert.deepEqual(gateToolArgv(sampleGate, { source: "p.html", context: true }, options), ["p.html"]);
     assert.deepEqual(gateToolArgv(sampleGate, { source: "p.html" }, options), ["p.html"]);
   });
 
   it("reads an aliased argument under its published name", () => {
     assert.deepEqual(
-      gateToolArgv(sampleGate, { source: "p.html", targets: ["a.png"] }, { description: "", aliases: { target: "targets" } }),
+      gateToolArgv(
+        sampleGate,
+        { source: "p.html", targets: ["a.png"] },
+        { description: "", aliases: { target: "targets" } },
+      ),
       ["p.html", "--target", "a.png"],
     );
   });
@@ -148,7 +160,10 @@ describe("the published tool surface", () => {
     // The three verdict-shaped tools publish a word, not a count; clients and
     // this package's own tests match on it.
     for (const name of ["verify_markup", "verify_flow", "check_integrity", "check_layout"]) {
-      assert.ok(TOOLS.some((t) => t.name === name), `${name} missing from TOOLS`);
+      assert.ok(
+        TOOLS.some((t) => t.name === name),
+        `${name} missing from TOOLS`,
+      );
     }
   });
 
@@ -192,9 +207,15 @@ describe("required-ness follows `required`, not `positional`", () => {
     // went optional.
     assert.deepEqual(
       notRequired.sort(),
-      ["check color :: source", "check composition :: source", "check copy :: source", "check design :: source", "check integrity :: source"],
-      "a positional-0 input without `required: true` is now OPTIONAL in the MCP schema — "
-      + "add `required: true` unless it is genuinely optional",
+      [
+        "check color :: source",
+        "check composition :: source",
+        "check copy :: source",
+        "check design :: source",
+        "check integrity :: source",
+      ],
+      "a positional-0 input without `required: true` is now OPTIONAL in the MCP schema — " +
+        "add `required: true` unless it is genuinely optional",
     );
   });
 
@@ -205,10 +226,12 @@ describe("required-ness follows `required`, not `positional`", () => {
     assert.equal(tool.inputSchema.elements!.isOptional(), true);
     assert.equal(tool.inputSchema.image!.isOptional(), true);
     // And the argv it builds for image mode must carry neither a positional nor a page.
-    assert.deepEqual(
-      gateToolArgv(integrityGate, { elements: "e.json", image: "f.png" }, { description: "" }),
-      ["--elements", "e.json", "--image", "f.png"],
-    );
+    assert.deepEqual(gateToolArgv(integrityGate, { elements: "e.json", image: "f.png" }, { description: "" }), [
+      "--elements",
+      "e.json",
+      "--image",
+      "f.png",
+    ]);
   });
 
   it("leaves check copy's source optional so element-rect mode is callable", async () => {
@@ -220,11 +243,7 @@ describe("required-ness follows `required`, not `positional`", () => {
     assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
     assert.equal(tool.inputSchema.elements!.isOptional(), true);
     assert.deepEqual(
-      gateToolArgv(
-        copyGate,
-        { elements: "e.json", image: "f.png", manifest: "copy.txt" },
-        { description: "" },
-      ),
+      gateToolArgv(copyGate, { elements: "e.json", image: "f.png", manifest: "copy.txt" }, { description: "" }),
       ["--elements", "e.json", "--image", "f.png", "--manifest", "copy.txt"],
     );
   });
@@ -236,7 +255,10 @@ describe("required-ness follows `required`, not `positional`", () => {
     const tool = gateTool(colorGate, { description: "x" });
     assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
     assert.equal(tool.inputSchema.elements!.isOptional(), true);
-    assert.deepEqual(gateToolArgv(colorGate, { elements: "scene.json" }, { description: "" }), ["--elements", "scene.json"]);
+    assert.deepEqual(gateToolArgv(colorGate, { elements: "scene.json" }, { description: "" }), [
+      "--elements",
+      "scene.json",
+    ]);
   });
 
   it("leaves check design's source optional so scene mode is callable", async () => {
@@ -244,7 +266,10 @@ describe("required-ness follows `required`, not `positional`", () => {
     const tool = gateTool(designGate, { description: "x" });
     assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
     assert.equal(tool.inputSchema.elements!.isOptional(), true);
-    assert.deepEqual(gateToolArgv(designGate, { elements: "scene.json" }, { description: "" }), ["--elements", "scene.json"]);
+    assert.deepEqual(gateToolArgv(designGate, { elements: "scene.json" }, { description: "" }), [
+      "--elements",
+      "scene.json",
+    ]);
   });
 
   it("leaves check composition's source optional so scene mode is callable", async () => {
@@ -252,6 +277,9 @@ describe("required-ness follows `required`, not `positional`", () => {
     const tool = gateTool(compositionGate, { description: "x" });
     assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
     assert.equal(tool.inputSchema.elements!.isOptional(), true);
-    assert.deepEqual(gateToolArgv(compositionGate, { elements: "scene.json" }, { description: "" }), ["--elements", "scene.json"]);
+    assert.deepEqual(gateToolArgv(compositionGate, { elements: "scene.json" }, { description: "" }), [
+      "--elements",
+      "scene.json",
+    ]);
   });
 });

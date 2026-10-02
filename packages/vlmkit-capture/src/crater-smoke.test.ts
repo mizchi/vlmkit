@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  parseCraterSmokeArgs,
-  runCraterBidiSmoke,
-  type CraterSmokeClient,
-} from "./crater-smoke.ts";
+import { parseCraterSmokeArgs, runCraterBidiSmoke, type CraterSmokeClient } from "./crater-smoke.ts";
 
 class FakeCraterClient implements CraterSmokeClient {
   closed = false;
@@ -54,14 +50,28 @@ class FakeCraterClient implements CraterSmokeClient {
 
   async getCssRuleViewportMap(): Promise<{ rules: unknown[] }> {
     this.calls.push("getCssRuleViewportMap");
-    return { rules: [{ selector: "main", properties: ["max-width"], mediaCondition: "(min-width: 700px)", activeAtWidths: [800], inactiveAtWidths: [320] }] };
+    return {
+      rules: [
+        {
+          selector: "main",
+          properties: ["max-width"],
+          mediaCondition: "(min-width: 700px)",
+          activeAtWidths: [800],
+          inactiveAtWidths: [320],
+        },
+      ],
+    };
   }
 
   async getComputedStylesWithState(
     selector: string,
     forcedStates: string[],
     _properties: string[],
-  ): Promise<{ normal: Record<string, string>; forced: Record<string, string>; diff: Array<{ property: string; normal: string; forced: string }> }> {
+  ): Promise<{
+    normal: Record<string, string>;
+    forced: Record<string, string>;
+    diff: Array<{ property: string; normal: string; forced: string }>;
+  }> {
     this.calls.push(`getComputedStylesWithState:${selector}:${forcedStates.join("+")}`);
     return {
       normal: { "background-color": "rgb(37, 99, 235)" },
@@ -89,10 +99,7 @@ describe("parseCraterSmokeArgs", () => {
       "ws://127.0.0.1:9222/session/from-env",
     );
     assert.equal(
-      parseCraterSmokeArgs([
-        "--url",
-        "ws://127.0.0.1:9333/session/explicit",
-      ], {
+      parseCraterSmokeArgs(["--url", "ws://127.0.0.1:9333/session/explicit"], {
         VLMKIT_CRATER_BIDI_URL: "ws://127.0.0.1:9222/session/from-env",
       }).url,
       "ws://127.0.0.1:9333/session/explicit",

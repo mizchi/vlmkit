@@ -125,18 +125,28 @@ export function layoutContractToUiLayout(layout: LandmarkLayoutContract): UiLayo
   const minWidth = parsePx(layout.minWidth);
   const maxWidth = parsePx(layout.maxWidth);
   const measuredWidth = Math.round(layout.clientWidth);
-  const width: UiWidthPolicy = maxWidth !== undefined || minWidth !== undefined
-    ? { kind: "fluid", ...(minWidth !== undefined ? { min: minWidth } : {}), ...(maxWidth !== undefined ? { max: maxWidth } : {}) }
-    : measuredWidth > 0
-      ? { kind: "fluid", max: measuredWidth }
-    : { kind: "fluid" };
+  const width: UiWidthPolicy =
+    maxWidth !== undefined || minWidth !== undefined
+      ? {
+          kind: "fluid",
+          ...(minWidth !== undefined ? { min: minWidth } : {}),
+          ...(maxWidth !== undefined ? { max: maxWidth } : {}),
+        }
+      : measuredWidth > 0
+        ? { kind: "fluid", max: measuredWidth }
+        : { kind: "fluid" };
 
   const maxHeight = parsePx(layout.maxHeight);
   const minHeight = parsePx(layout.minHeight);
   const scroll = scrollPolicy(layout);
-  const height: UiHeightPolicy = scroll.y && maxHeight !== undefined
-    ? { kind: "scrollport", ...(minHeight !== undefined ? { min: minHeight } : {}), max: maxHeight }
-    : { kind: "content", ...(minHeight !== undefined ? { min: minHeight } : {}), ...(maxHeight !== undefined ? { max: maxHeight } : {}) };
+  const height: UiHeightPolicy =
+    scroll.y && maxHeight !== undefined
+      ? { kind: "scrollport", ...(minHeight !== undefined ? { min: minHeight } : {}), max: maxHeight }
+      : {
+          kind: "content",
+          ...(minHeight !== undefined ? { min: minHeight } : {}),
+          ...(maxHeight !== undefined ? { max: maxHeight } : {}),
+        };
 
   return {
     width,
@@ -147,10 +157,10 @@ export function layoutContractToUiLayout(layout: LandmarkLayoutContract): UiLayo
 }
 
 function scrollPolicy(layout: LandmarkLayoutContract): UiScrollPolicy {
-  const scrollableX = (layout.overflowX === "auto" || layout.overflowX === "scroll")
-    && layout.scrollWidth > layout.clientWidth + 1;
-  const scrollableY = (layout.overflowY === "auto" || layout.overflowY === "scroll")
-    && layout.scrollHeight > layout.clientHeight + 1;
+  const scrollableX =
+    (layout.overflowX === "auto" || layout.overflowX === "scroll") && layout.scrollWidth > layout.clientWidth + 1;
+  const scrollableY =
+    (layout.overflowY === "auto" || layout.overflowY === "scroll") && layout.scrollHeight > layout.clientHeight + 1;
   return { x: scrollableX, y: scrollableY };
 }
 
@@ -178,9 +188,7 @@ function displayPolicy(layout: LandmarkLayoutContract): UiDisplayPolicy {
   return { kind: "block" };
 }
 
-export function landmarkRegionsToUiContract(
-  input: LandmarkRegionsToUiContractInput,
-): UiContract {
+export function landmarkRegionsToUiContract(input: LandmarkRegionsToUiContractInput): UiContract {
   const baseCapture = input.captures[0];
   const baseLandmarks = baseCapture?.landmarks ?? [];
   const landmarks = baseLandmarks.map((landmark): UiContractLandmark => {
@@ -192,30 +200,30 @@ export function landmarkRegionsToUiContract(
       ...(landmark.slots?.length ? { slots: landmark.slots.map(mapLandmarkSlot) } : {}),
       ...(landmark.repeat ? { repeat: mapLandmarkRepeat(landmark.repeat) } : {}),
       ...(landmark.content ? { content: mapLandmarkContent(landmark.content) } : {}),
-      layout: landmark.layout
-        ? layoutContractToUiLayout(landmark.layout)
-        : defaultUiLayout(),
+      layout: landmark.layout ? layoutContractToUiLayout(landmark.layout) : defaultUiLayout(),
       ...(responsive.length > 0 ? { responsive } : {}),
     };
   });
 
   return {
     version: 1,
-    screens: [{
-      id: input.screenId,
-      ...(input.pattern ? { pattern: input.pattern } : {}),
-      ...(input.goal ? { goal: input.goal } : {}),
-      sourceOfTruth: "semantic-dom",
-      viewports: input.viewports,
-      ...(input.hints?.markers?.length ? { markers: input.hints.markers } : {}),
-      ...(input.hints?.states?.length ? { states: input.hints.states } : {}),
-      ...(input.hints?.requiredStates?.length ? { requiredStates: input.hints.requiredStates } : {}),
-      ...(input.hints?.expectedScrollports?.length ? { expectedScrollports: input.hints.expectedScrollports } : {}),
-      ...(input.hints?.composition ? { composition: input.hints.composition } : {}),
-      ...(input.hints?.assets?.length ? { assets: input.hints.assets } : {}),
-      ...(input.hints?.canvas ? { canvas: input.hints.canvas } : {}),
-      landmarks,
-    }],
+    screens: [
+      {
+        id: input.screenId,
+        ...(input.pattern ? { pattern: input.pattern } : {}),
+        ...(input.goal ? { goal: input.goal } : {}),
+        sourceOfTruth: "semantic-dom",
+        viewports: input.viewports,
+        ...(input.hints?.markers?.length ? { markers: input.hints.markers } : {}),
+        ...(input.hints?.states?.length ? { states: input.hints.states } : {}),
+        ...(input.hints?.requiredStates?.length ? { requiredStates: input.hints.requiredStates } : {}),
+        ...(input.hints?.expectedScrollports?.length ? { expectedScrollports: input.hints.expectedScrollports } : {}),
+        ...(input.hints?.composition ? { composition: input.hints.composition } : {}),
+        ...(input.hints?.assets?.length ? { assets: input.hints.assets } : {}),
+        ...(input.hints?.canvas ? { canvas: input.hints.canvas } : {}),
+        landmarks,
+      },
+    ],
   };
 }
 
@@ -302,16 +310,14 @@ function matchResponsiveLandmark(
 ): LandmarkRegion | undefined {
   const byName = base.name
     ? nthMatch(
-      base,
-      baseLandmarks.filter((candidate) => candidate.role === base.role && candidate.name === base.name),
-      candidates.filter((candidate) => candidate.role === base.role && candidate.name === base.name),
-    )
+        base,
+        baseLandmarks.filter((candidate) => candidate.role === base.role && candidate.name === base.name),
+        candidates.filter((candidate) => candidate.role === base.role && candidate.name === base.name),
+      )
     : undefined;
   if (byName) return byName;
 
-  const byPath = candidates.find((candidate) =>
-    candidate.role === base.role && candidate.path === base.path,
-  );
+  const byPath = candidates.find((candidate) => candidate.role === base.role && candidate.path === base.path);
   if (byPath) return byPath;
 
   return nthMatch(
@@ -336,9 +342,7 @@ function samePolicy(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export async function introspectUiContractFromHtml(
-  options: IntrospectUiContractOptions,
-): Promise<UiContract> {
+export async function introspectUiContractFromHtml(options: IntrospectUiContractOptions): Promise<UiContract> {
   const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
   const input = options.input;
   const screenId = options.screenId ?? (basename(input).replace(/\.[^.]+$/, "") || "screen");
@@ -433,9 +437,7 @@ export async function introspectUiContractFromHtml(
 }
 
 function introspectionTarget(input: string): string {
-  return isHttpUrl(input) || isFileUrl(input)
-    ? input
-    : pathToFileURL(resolve(input)).toString();
+  return isHttpUrl(input) || isFileUrl(input) ? input : pathToFileURL(resolve(input)).toString();
 }
 
 export function waitUntilForIntrospectionInput(input: string): "load" | "networkidle" {
@@ -462,7 +464,9 @@ export function formatIntrospectionProfile(profile: UiContractIntrospectionProfi
         `goto ${formatMs(viewport.navigateMs)}`,
         `landmarks ${viewport.landmarks} in ${formatMs(viewport.landmarkMs)}`,
         viewport.hintMs > 0 ? `hints ${formatMs(viewport.hintMs)}` : "",
-      ].filter(Boolean).join(", "),
+      ]
+        .filter(Boolean)
+        .join(", "),
     );
   }
   return lines.join("\n");
@@ -491,10 +495,20 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
     const markers: UiMarkerContract[] = [];
     const expectedScrollports: UiExpectedScrollportContract[] = [];
     if (has("[data-primary-cta]")) {
-      markers.push({ kind: "primary-cta", selector: "[data-primary-cta]", attribute: "data-primary-cta", required: true });
+      markers.push({
+        kind: "primary-cta",
+        selector: "[data-primary-cta]",
+        attribute: "data-primary-cta",
+        required: true,
+      });
     }
     if (has("[data-next-section]")) {
-      markers.push({ kind: "next-section", selector: "[data-next-section]", attribute: "data-next-section", required: true });
+      markers.push({
+        kind: "next-section",
+        selector: "[data-next-section]",
+        attribute: "data-next-section",
+        required: true,
+      });
     }
     if (has("[data-media-slot]")) {
       markers.push({ kind: "media-slot", selector: "[data-media-slot]", attribute: "data-media-slot", required: true });
@@ -504,12 +518,17 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
     }
 
     const scrollportIdCounts = new Map<string, number>();
-    for (const el of Array.from(document.querySelectorAll("[data-scrollport], [data-vlmkit-scrollport], [data-ui-scrollport], [data-scroll-region]"))) {
-      const value = el.getAttribute("data-scrollport")
-        || el.getAttribute("data-vlmkit-scrollport")
-        || el.getAttribute("data-ui-scrollport")
-        || el.getAttribute("data-scroll-region")
-        || "";
+    for (const el of Array.from(
+      document.querySelectorAll(
+        "[data-scrollport], [data-vlmkit-scrollport], [data-ui-scrollport], [data-scroll-region]",
+      ),
+    )) {
+      const value =
+        el.getAttribute("data-scrollport") ||
+        el.getAttribute("data-vlmkit-scrollport") ||
+        el.getAttribute("data-ui-scrollport") ||
+        el.getAttribute("data-scroll-region") ||
+        "";
       const attribute = el.hasAttribute("data-scrollport")
         ? "data-scrollport"
         : el.hasAttribute("data-vlmkit-scrollport")
@@ -534,16 +553,16 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
       const overflowX = hasOverflowX || (!hasOverflowY && scrollableX);
       const overflowY = hasOverflowY || (!hasOverflowX && scrollableY);
       const axis = overflowX && overflowY ? "both" : overflowX ? "x" : "y";
-      const minOverflow = axis === "x"
-        ? Math.max(0, Math.round(el.scrollWidth - el.clientWidth))
-        : axis === "both"
-          ? Math.max(
-            0,
-            Math.round(el.scrollWidth - el.clientWidth),
-            Math.round(el.scrollHeight - el.clientHeight),
-          )
-          : Math.max(0, Math.round(el.scrollHeight - el.clientHeight));
-      const id = uniqueId(slug(value || `scrollport-${expectedScrollports.length}`) || `scrollport-${expectedScrollports.length}`, scrollportIdCounts);
+      const minOverflow =
+        axis === "x"
+          ? Math.max(0, Math.round(el.scrollWidth - el.clientWidth))
+          : axis === "both"
+            ? Math.max(0, Math.round(el.scrollWidth - el.clientWidth), Math.round(el.scrollHeight - el.clientHeight))
+            : Math.max(0, Math.round(el.scrollHeight - el.clientHeight));
+      const id = uniqueId(
+        slug(value || `scrollport-${expectedScrollports.length}`) || `scrollport-${expectedScrollports.length}`,
+        scrollportIdCounts,
+      );
       expectedScrollports.push({
         id,
         ...(value ? { name: value } : {}),
@@ -554,11 +573,11 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
       });
     }
 
-    if (has("[aria-current=\"page\"], [data-selected=\"true\"]")) {
-      markers.push({ kind: "selected", selector: "[aria-current=\"page\"], [data-selected=\"true\"]", required: true });
+    if (has('[aria-current="page"], [data-selected="true"]')) {
+      markers.push({ kind: "selected", selector: '[aria-current="page"], [data-selected="true"]', required: true });
     }
-    if (has("[data-unread], [data-unread=\"true\"]")) {
-      markers.push({ kind: "unread", selector: "[data-unread], [data-unread=\"true\"]" });
+    if (has('[data-unread], [data-unread="true"]')) {
+      markers.push({ kind: "unread", selector: '[data-unread], [data-unread="true"]' });
     }
 
     const states: UiStateContract[] = [];
@@ -571,18 +590,24 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
         required: true,
       });
     }
-    if (has("[aria-current=\"page\"], [data-selected=\"true\"]")) {
-      const selector = "[aria-current=\"page\"], [data-selected=\"true\"]";
+    if (has('[aria-current="page"], [data-selected="true"]')) {
+      const selector = '[aria-current="page"], [data-selected="true"]';
       states.push({ id: "selected", kind: "selected", selector });
       requiredStates.push({ id: "selected", kind: "selected", selector, required: true });
     }
 
     const composition = captureComposition();
-    if (composition && has("button, a[href], [role=\"menuitem\"], [data-menu-item]")) {
-      const selector = "button, a[href], [role=\"menuitem\"], [data-menu-item]";
+    if (composition && has('button, a[href], [role="menuitem"], [data-menu-item]')) {
+      const selector = 'button, a[href], [role="menuitem"], [data-menu-item]';
       states.push({ id: "focus-visible", kind: "focus-visible", selector, required: true });
       requiredStates.push({ id: "hover", kind: "hover", selector, required: true, minChangeRatio: 0.001 });
-      requiredStates.push({ id: "focus-visible", kind: "focus-visible", selector, required: true, minChangeRatio: 0.001 });
+      requiredStates.push({
+        id: "focus-visible",
+        kind: "focus-visible",
+        selector,
+        required: true,
+        minChangeRatio: 0.001,
+      });
     }
 
     const assets: UiAssetContract[] = [];
@@ -604,12 +629,15 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
     }
 
     const gameState = (window as unknown as { __gameState?: unknown }).__gameState;
-    const canvas: UiCanvasContract | undefined = canvasElements.length > 0
-      ? {
-          ...(gameState !== undefined ? { stateHook: "window.__gameState" } : {}),
-          ...(gameState && typeof gameState === "object" ? { requiredStateFields: Object.keys(gameState as Record<string, unknown>) } : {}),
-        }
-      : undefined;
+    const canvas: UiCanvasContract | undefined =
+      canvasElements.length > 0
+        ? {
+            ...(gameState !== undefined ? { stateHook: "window.__gameState" } : {}),
+            ...(gameState && typeof gameState === "object"
+              ? { requiredStateFields: Object.keys(gameState as Record<string, unknown>) }
+              : {}),
+          }
+        : undefined;
     if (gameState !== undefined) {
       markers.push({ kind: "game-state", target: "window.__gameState", required: true });
     }
@@ -672,7 +700,7 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
       const values = new Set<string>();
       const candidates = [
         document.body,
-        document.querySelector("[data-selected=\"true\"], [aria-current=\"page\"]"),
+        document.querySelector('[data-selected="true"], [aria-current="page"]'),
         document.querySelector("[data-accent]"),
       ].filter((el): el is Element => !!el);
       for (const el of candidates) {
@@ -696,11 +724,14 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
     }
 
     function selectorFor(attribute: string, value: string): string {
-      return value ? `[${attribute}="${value.replace(/"/g, "\\\"")}"]` : `[${attribute}]`;
+      return value ? `[${attribute}="${value.replace(/"/g, '\\"')}"]` : `[${attribute}]`;
     }
 
     function slug(value: string): string {
-      return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
     }
 
     function uniqueId(base: string, counts: Map<string, number>): string {
@@ -720,7 +751,9 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
 
     function shapeKind(raw: string): "slash-panel" | "sticker" | "burst" | "cutout" | "mask" | "frame" | "ribbon" {
       const allowed = new Set(["slash-panel", "sticker", "burst", "cutout", "mask", "frame", "ribbon"]);
-      return allowed.has(raw) ? raw as "slash-panel" | "sticker" | "burst" | "cutout" | "mask" | "frame" | "ribbon" : "cutout";
+      return allowed.has(raw)
+        ? (raw as "slash-panel" | "sticker" | "burst" | "cutout" | "mask" | "frame" | "ribbon")
+        : "cutout";
     }
   });
 }
@@ -766,8 +799,12 @@ function printHelp(): void {
   console.log("Options:");
   console.log("  --out, -o <path>                 Write UI Contract JSON");
   console.log("  --screen-id <id>                 Screen id (default: input basename)");
-  console.log("  --pattern <name>                 Optional pattern: editorial|landing|app-shell|dashboard|canvas|expressive-menu|mixed");
-  console.log("  --goal <name>                    Optional validation goal: app|layout|pixel|draft|app-shell|landing|canvas|expressive-menu");
+  console.log(
+    "  --pattern <name>                 Optional pattern: editorial|landing|app-shell|dashboard|canvas|expressive-menu|mixed",
+  );
+  console.log(
+    "  --goal <name>                    Optional validation goal: app|layout|pixel|draft|app-shell|landing|canvas|expressive-menu",
+  );
   console.log("  --viewport <label:WxH[@DPR]>     Capture viewport; repeatable");
   console.log("  --profile                        Print timing breakdown to stderr");
   console.log("  --profile-json <path>            Write timing breakdown JSON");
@@ -784,14 +821,15 @@ async function main(argv = process.argv.slice(2)) {
   const contract = await introspectUiContractFromHtml({
     input: args.input,
     screenId: args.screenId || undefined,
-    pattern: args.pattern ? args.pattern as UiContractPattern : undefined,
-    goal: args.goal ? args.goal as UiContractGoal : undefined,
+    pattern: args.pattern ? (args.pattern as UiContractPattern) : undefined,
+    goal: args.goal ? (args.goal as UiContractGoal) : undefined,
     viewports: args.viewports.length > 0 ? args.viewports : undefined,
-    onProfile: args.profile || args.profileJson
-      ? (next) => {
-        profile = next;
-      }
-      : undefined,
+    onProfile:
+      args.profile || args.profileJson
+        ? (next) => {
+            profile = next;
+          }
+        : undefined,
   });
   const issues = validateUiContract(contract);
   const json = JSON.stringify(contract, null, 2);
@@ -819,8 +857,9 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "contract-introspect"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "contract-introspect" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

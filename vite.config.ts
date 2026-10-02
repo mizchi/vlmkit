@@ -221,19 +221,52 @@ export default defineConfig({
   ],
 
   /**
-   * Settings for `vp lint` and `vp fmt`. NEITHER RUNS YET: no script, hook or CI job calls them,
-   * and the repository has never been formatted by a tool, so a first `vp fmt` rewrites most
-   * files. That rewrite belongs in its own commit. These values only match what the code
-   * already does, so it stays small: double quotes, semicolons, and 120 columns (p99 line
-   * length is 126).
+   * `vp lint` settings. Nothing runs lint yet: no script, hook or CI job calls it.
    */
   lint: {
     ignorePatterns: ["**/dist/**", "**/fixtures/**", "**/node_modules/**", "test-results/**", ".pages/**"],
   },
+
+  /**
+   * `vp fmt`: `pnpm fmt` writes, `pnpm fmt:check` is what CI runs (format.yml).
+   *
+   * The values match what the code already did before the first format: double quotes,
+   * semicolons, 120 columns (p99 line length was 126).
+   *
+   * The ignore list is the half that matters. Oxfmt has no switch to format only some file
+   * types, so the scope is set here, and every entry is a file whose bytes something depends on:
+   * - Markdown, JSON, HTML, CSS and YAML. These are prose, generated output or pages under test.
+   *   Tests compare JUDGMENT.md, the demo pages and the README's demo table with a fresh render.
+   *   Each demo's page.html must equal its fixture byte for byte. Scripts write the result.json
+   *   files and art.lock.json. The landing page and the demo sites are judged pages, where any
+   *   change is a new judgment round.
+   * - The JavaScript those judged pages load in the browser: each demo site's own directory,
+   *   the landing page's scripts, and solitaire's game.js.
+   * - `design-runs/`: dated research snapshots, kept as they were run.
+   */
   fmt: {
     printWidth: 120,
     semi: true,
     singleQuote: false,
-    ignorePatterns: ["**/dist/**", "**/fixtures/**", "**/node_modules/**", "test-results/**", ".pages/**"],
+    ignorePatterns: [
+      "**/dist/**",
+      "**/fixtures/**",
+      "**/node_modules/**",
+      "test-results/**",
+      ".pages/**",
+      "**/*.md",
+      "**/*.json",
+      "**/*.html",
+      "**/*.css",
+      "**/*.yml",
+      "**/*.yaml",
+      "examples/sites/*/**",
+      "examples/vlmkit-intro-page/app.js",
+      "examples/vlmkit-intro-page/content.js",
+      "examples/vlmkit-intro-page/preferences.js",
+      "examples/vlmkit-intro-page/scenarios.js",
+      "examples/solitaire/game.js",
+      "design-runs/**",
+    ],
   },
 });

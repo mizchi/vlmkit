@@ -9,9 +9,7 @@ const bundledWorkflows = join(skillsPackage, "workflows");
 const apmPackage = join(repoRoot, ".apm/skills/vlmkit");
 
 export async function syncSkillPackage() {
-  const workflowNames = (
-    await readdir(sourceWorkflows, { withFileTypes: true })
-  )
+  const workflowNames = (await readdir(sourceWorkflows, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();

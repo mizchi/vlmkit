@@ -69,19 +69,10 @@ export interface DpEntry {
 }
 
 /** Properties for which em-normalization is informative. */
-const EM_RELATIVE = new Set([
-  "letter-spacing",
-  "word-spacing",
-  "line-height",
-]);
+const EM_RELATIVE = new Set(["letter-spacing", "word-spacing", "line-height"]);
 
 /** Parent `display` values that coerce inline children to block-ish layouts. */
-const FLEX_OR_GRID_DISPLAYS = new Set([
-  "flex",
-  "inline-flex",
-  "grid",
-  "inline-grid",
-]);
+const FLEX_OR_GRID_DISPLAYS = new Set(["flex", "inline-flex", "grid", "inline-grid"]);
 
 function emEquivalent(value: string, fontSizePx: number): number | undefined {
   if (!value || value === "normal" || value === "auto" || fontSizePx <= 0) return undefined;
@@ -119,10 +110,7 @@ const EMPTY: DpResult = {
   byPath: [],
 };
 
-export function diffDomPositionStyles(
-  baseline: PositionedElement[],
-  variant: PositionedElement[],
-): DpResult {
+export function diffDomPositionStyles(baseline: PositionedElement[], variant: PositionedElement[]): DpResult {
   if (!baseline?.length || !variant?.length) return EMPTY;
 
   const baselineMap = new Map<string, PositionedElement>();
@@ -193,7 +181,12 @@ export function diffDomPositionStyles(
     .sort((a, b) => b.count - a.count || a.property.localeCompare(b.property));
 
   const sortedByPath = [...byPath.entries()]
-    .map(([path, v]) => ({ path, baselineClasses: v.baselineClasses, variantClasses: v.variantClasses, count: v.count }))
+    .map(([path, v]) => ({
+      path,
+      baselineClasses: v.baselineClasses,
+      variantClasses: v.variantClasses,
+      count: v.count,
+    }))
     .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
 
   return {
@@ -261,7 +254,7 @@ export function parseDomPositionStyles(value: unknown): PositionedElement[] {
   if (typeof value !== "string") return [];
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed as PositionedElement[] : [];
+    return Array.isArray(parsed) ? (parsed as PositionedElement[]) : [];
   } catch {
     return [];
   }
@@ -372,15 +365,18 @@ export function diffPositionStylesAcrossViewports(
   // typically one source rule; differing-viewport deltas are media-query
   // gated.
   const ppKey = (path: string, property: string) => `${path} ${property}`;
-  const aggregated = new Map<string, {
-    path: string;
-    property: string;
-    baselineClasses: string;
-    variantClasses: string;
-    viewports: string[];
-    samples: DpSample[];
-    parentDisplayContext?: { baselineParent: string; variantParent: string; isFlexOrGridItem: boolean };
-  }>();
+  const aggregated = new Map<
+    string,
+    {
+      path: string;
+      property: string;
+      baselineClasses: string;
+      variantClasses: string;
+      viewports: string[];
+      samples: DpSample[];
+      parentDisplayContext?: { baselineParent: string; variantParent: string; isFlexOrGridItem: boolean };
+    }
+  >();
   for (const e of entries) {
     const k = ppKey(e.path, e.property);
     const sample: DpSample = {
@@ -397,9 +393,7 @@ export function diffPositionStylesAcrossViewports(
       // across affected viewports (e.g. `height: 48px → 33px` everywhere it
       // applies). Keep at most one sample per unique value-pair so the
       // report stays compact when shipped as JSON.
-      const alreadySeen = existing.samples.some(
-        (s) => s.baseline === e.baseline && s.variant === e.variant,
-      );
+      const alreadySeen = existing.samples.some((s) => s.baseline === e.baseline && s.variant === e.variant);
       if (!alreadySeen) {
         existing.samples.push(sample);
       }
@@ -415,17 +409,20 @@ export function diffPositionStylesAcrossViewports(
       });
     }
   }
-  const byPathProperty = [...aggregated.values()].sort((a, b) =>
-    b.viewports.length - a.viewports.length
-    || a.path.localeCompare(b.path)
-    || a.property.localeCompare(b.property),
+  const byPathProperty = [...aggregated.values()].sort(
+    (a, b) =>
+      b.viewports.length - a.viewports.length || a.path.localeCompare(b.path) || a.property.localeCompare(b.property),
   );
 
   const byProperty = new Map<string, number>();
   for (const e of entries) byProperty.set(e.property, (byProperty.get(e.property) ?? 0) + 1);
   const byPath = new Map<string, { baselineClasses: string; variantClasses: string; count: number }>();
   for (const e of entries) {
-    const cur = byPath.get(e.path) ?? { baselineClasses: e.baselineClasses, variantClasses: e.variantClasses, count: 0 };
+    const cur = byPath.get(e.path) ?? {
+      baselineClasses: e.baselineClasses,
+      variantClasses: e.variantClasses,
+      count: 0,
+    };
     cur.count += 1;
     byPath.set(e.path, cur);
   }
@@ -447,11 +444,19 @@ export function diffPositionStylesAcrossViewports(
     totalDiffs: entries.length,
     verifiedPairs,
     byPathProperty,
-    byViewport: [...byViewport.entries()].map(([viewport, count]) => ({ viewport, count }))
+    byViewport: [...byViewport.entries()]
+      .map(([viewport, count]) => ({ viewport, count }))
       .sort((a, b) => b.count - a.count || a.viewport.localeCompare(b.viewport)),
-    byProperty: [...byProperty.entries()].map(([property, count]) => ({ property, count }))
+    byProperty: [...byProperty.entries()]
+      .map(([property, count]) => ({ property, count }))
       .sort((a, b) => b.count - a.count || a.property.localeCompare(b.property)),
-    byPath: [...byPath.entries()].map(([path, v]) => ({ path, baselineClasses: v.baselineClasses, variantClasses: v.variantClasses, count: v.count }))
+    byPath: [...byPath.entries()]
+      .map(([path, v]) => ({
+        path,
+        baselineClasses: v.baselineClasses,
+        variantClasses: v.variantClasses,
+        count: v.count,
+      }))
       .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path)),
   };
 }

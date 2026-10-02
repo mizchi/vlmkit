@@ -98,13 +98,7 @@ export function cropImage(img: PngData, w: number, h: number): PngData {
  * clamped to the image bounds, so the returned crop may be smaller than
  * requested when the region overruns an edge (or off the top-left).
  */
-export function cropRegion(
-  img: PngData,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): PngData {
+export function cropRegion(img: PngData, x: number, y: number, w: number, h: number): PngData {
   const x0 = Math.max(0, Math.min(Math.floor(x), img.width));
   const y0 = Math.max(0, Math.min(Math.floor(y), img.height));
   const x1 = Math.max(x0, Math.min(Math.floor(x + w), img.width));
@@ -137,10 +131,7 @@ export async function decodePng(path: string): Promise<PngData> {
 /**
  * Write RGBA pixel data to a PNG file.
  */
-export async function encodePng(
-  path: string,
-  data: PngData
-): Promise<void> {
+export async function encodePng(path: string, data: PngData): Promise<void> {
   const { PNG } = await import("pngjs");
   const png = new PNG({ width: data.width, height: data.height });
   Buffer.from(data.data.buffer, data.data.byteOffset, data.data.byteLength).copy(png.data);

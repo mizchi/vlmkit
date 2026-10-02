@@ -48,11 +48,7 @@ export {
 export { findHeatmapRegionsFromFile, findHeatmapRegionsFromRgba } from "./heatmap-regions.ts";
 export { composeFilmstrip, filmstripLayout, type FilmstripLayout, type FilmstripOptions } from "./filmstrip.ts";
 export { encodeWebp, imageFormatForPath, webpEncoderAvailable, type WebpEncodeOptions } from "./webp.ts";
-export {
-  createScopedVrtDiff,
-  normalizeVrtDiffRegions,
-  normalizeVrtDiffRegionPixels,
-} from "./diff-regions.ts";
+export { createScopedVrtDiff, normalizeVrtDiffRegions, normalizeVrtDiffRegionPixels } from "./diff-regions.ts";
 
 // ---- Layout / typography ----
 export {
@@ -64,30 +60,14 @@ export {
 } from "./text-rows.ts";
 
 // ---- PNG IO ----
-export {
-  cropImage,
-  decodePng,
-  encodePng,
-} from "./png-utils.ts";
-export {
-  resizePngBuffer,
-  resolveResolutionForViewport,
-  getImageDimensions,
-} from "./image-resize.ts";
+export { cropImage, decodePng, encodePng } from "./png-utils.ts";
+export { resizePngBuffer, resolveResolutionForViewport, getImageDimensions } from "./image-resize.ts";
 
 // ---- DOM diff ----
-export {
-  verifyDomEquivalence,
-} from "./dom-equivalence.ts";
-export {
-  diffDomPositionStyles,
-  diffPositionStylesAcrossViewports,
-} from "./dom-position-styles.ts";
+export { verifyDomEquivalence } from "./dom-equivalence.ts";
+export { diffDomPositionStyles, diffPositionStylesAcrossViewports } from "./dom-position-styles.ts";
 export { diffComputedStyles } from "./computed-style-diff.ts";
-export {
-  diffAuthoredStyles,
-  aggregateAuthoredStyleByViewport,
-} from "./authored-style-diff.ts";
+export { diffAuthoredStyles, aggregateAuthoredStyleByViewport } from "./authored-style-diff.ts";
 
 // ---- A11y diff ----
 export {

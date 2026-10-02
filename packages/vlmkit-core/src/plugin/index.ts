@@ -174,4 +174,11 @@ export { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW, hr } from "../terminal-colo
  * once (a budget, a house palette) rather than repeat on every invocation, or
  * that needs somewhere under `.vlmkit/` to keep state.
  */
-export { CONFIG_CANDIDATES, CONFIG_FILE, STATE_DIR, debugEnabled, readEnv, resolveStatePath } from "../project-config.ts";
+export {
+  CONFIG_CANDIDATES,
+  CONFIG_FILE,
+  STATE_DIR,
+  debugEnabled,
+  readEnv,
+  resolveStatePath,
+} from "../project-config.ts";

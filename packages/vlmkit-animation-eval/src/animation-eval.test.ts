@@ -131,46 +131,34 @@ test("computeSettleMs returns null when any animation is infinite", () => {
 });
 
 test("restTimeForAnimation: running finite → past end, running infinite → 0, page-paused → author time", () => {
-  assert.equal(
-    restTimeForAnimation(timing({ durationMs: 500, delayMs: 100, iterations: 2 })),
-    1100,
-  );
+  assert.equal(restTimeForAnimation(timing({ durationMs: 500, delayMs: 100, iterations: 2 })), 1100);
   assert.equal(restTimeForAnimation(timing({ iterations: null })), 0);
-  assert.equal(
-    restTimeForAnimation(timing({ playState: "paused", currentTimeMs: 340, iterations: null })),
-    340,
-  );
-  assert.equal(
-    restTimeForAnimation(timing({ playState: "finished", currentTimeMs: 800 })),
-    800,
-  );
+  assert.equal(restTimeForAnimation(timing({ playState: "paused", currentTimeMs: 340, iterations: null })), 340);
+  assert.equal(restTimeForAnimation(timing({ playState: "finished", currentTimeMs: 800 })), 800);
 });
 
 test("computeOscillation: alternate spends one iteration per leg", () => {
-  assert.deepEqual(
-    computeOscillation(timing({ durationMs: 1200, direction: "alternate" })),
-    { oscillating: true, legMs: 1200 },
-  );
-  assert.deepEqual(
-    computeOscillation(timing({ durationMs: 1200, direction: "alternate-reverse" })),
-    { oscillating: true, legMs: 1200 },
-  );
+  assert.deepEqual(computeOscillation(timing({ durationMs: 1200, direction: "alternate" })), {
+    oscillating: true,
+    legMs: 1200,
+  });
+  assert.deepEqual(computeOscillation(timing({ durationMs: 1200, direction: "alternate-reverse" })), {
+    oscillating: true,
+    legMs: 1200,
+  });
 });
 
 test("computeOscillation: palindromic keyframes sweep out and back within one iteration", () => {
   // The S5 blind spot: same 1200ms x∞ as the alternate implementation,
   // but each leg is half the duration — a 2x frequency difference.
-  assert.deepEqual(
-    computeOscillation(timing({ durationMs: 1200, direction: "normal", palindromic: true })),
-    { oscillating: true, legMs: 600 },
-  );
+  assert.deepEqual(computeOscillation(timing({ durationMs: 1200, direction: "normal", palindromic: true })), {
+    oscillating: true,
+    legMs: 600,
+  });
 });
 
 test("computeOscillation: normal non-palindromic animations do not oscillate", () => {
-  assert.deepEqual(
-    computeOscillation(timing({ durationMs: 800 })),
-    { oscillating: false, legMs: 800 },
-  );
+  assert.deepEqual(computeOscillation(timing({ durationMs: 800 })), { oscillating: false, legMs: 800 });
 });
 
 test("formatAnimationEvalReport annotates oscillating animations with the leg time", () => {
@@ -205,17 +193,23 @@ test("a visually dead animation raises no-visible-effect", () => {
 
 test("an animation whose seek did not take raises seek-ineffective instead of a visibility verdict", () => {
   const issues = deriveAnimationIssues({
-    evaluated: [evaluated({
-      visible: false,
-      motionBbox: null,
-      totalChangedPixels: 0,
-      maxFrameRatio: 0,
-      seekIneffective: { reason: "readback", detail: "was no longer on the page" },
-    })],
+    evaluated: [
+      evaluated({
+        visible: false,
+        motionBbox: null,
+        totalChangedPixels: 0,
+        maxFrameRatio: 0,
+        seekIneffective: { reason: "readback", detail: "was no longer on the page" },
+      }),
+    ],
     settleMs: 800,
     infinite: [],
   });
-  assert.deepEqual(issues.map((i) => i.kind), ["seek-ineffective"], "no-visible-effect must not also fire: the frames say nothing about visibility");
+  assert.deepEqual(
+    issues.map((i) => i.kind),
+    ["seek-ineffective"],
+    "no-visible-effect must not also fire: the frames say nothing about visibility",
+  );
   assert.equal(issues[0]!.severity, "suspect");
   assert.match(issues[0]!.message, /cancelled or replaced/);
 });
@@ -361,12 +355,15 @@ test("formatAnimationEvalReport surfaces uncontrolled motion", () => {
 async function animPage(css: string, body = '<div id="a"></div>'): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-anim-"));
   const path = join(dir, "page.html");
-  await writeFile(path, `<!doctype html><html><head><meta charset="utf-8"><style>
+  await writeFile(
+    path,
+    `<!doctype html><html><head><meta charset="utf-8"><style>
     body { margin: 0; padding: 20px; background: #fff; }
     @keyframes slide { from { transform: translateX(0); } to { transform: translateX(300px); } }
     #a { width: 120px; height: 60px; background: #2255cc; }
     ${css}
-  </style></head><body>${body}</body></html>`);
+  </style></head><body>${body}</body></html>`,
+  );
   return path;
 }
 
@@ -374,14 +371,18 @@ async function evaluate(css: string, body?: string) {
   return runAnimationEval({ source: await animPage(css, body) });
 }
 
-test("runAnimationEval: settleMs is the declared duration, not zero for a finished animation", { timeout: 120_000 }, async () => {
-  // Reported 0 before the fix, for the same page, because a 200ms animation has
-  // finished by the ~765ms the collector runs. `computeSettleMs` computes
-  // `delay + duration x iterations` — a from-load number — so filtering its input
-  // by "still moving right now" mixed two clocks.
-  const report = await evaluate("#a { animation: slide 200ms linear 1 forwards; }");
-  assert.equal(report.settleMs, 200);
-});
+test(
+  "runAnimationEval: settleMs is the declared duration, not zero for a finished animation",
+  { timeout: 120_000 },
+  async () => {
+    // Reported 0 before the fix, for the same page, because a 200ms animation has
+    // finished by the ~765ms the collector runs. `computeSettleMs` computes
+    // `delay + duration x iterations` — a from-load number — so filtering its input
+    // by "still moving right now" mixed two clocks.
+    const report = await evaluate("#a { animation: slide 200ms linear 1 forwards; }");
+    assert.equal(report.settleMs, 200);
+  },
+);
 
 test("runAnimationEval: settleMs takes the delay and iteration count from the CSS", { timeout: 120_000 }, async () => {
   // 300ms delay + 400ms x 2 iterations = 1100.
@@ -392,31 +393,42 @@ test("runAnimationEval: settleMs takes the delay and iteration count from the CS
 test("runAnimationEval: an infinite animation makes settleMs null and is listed", { timeout: 120_000 }, async () => {
   const report = await evaluate("#a { animation: slide 500ms linear infinite; }");
   assert.equal(report.settleMs, null);
-  assert.deepEqual(report.infinite.map((i) => i.name), ["slide"]);
-});
-
-test("runAnimationEval: a page-paused animation counts as neither motion nor never-settling", { timeout: 120_000 }, async () => {
-  // The one exclusion that is about the page's own choice rather than about when
-  // we looked: `animation-play-state: paused` is visually static by construction.
-  const report = await evaluate("#a { animation: slide 500ms linear infinite; animation-play-state: paused; }");
-  assert.equal(report.settleMs, 0, "a paused animation must not contribute to settle");
-  assert.deepEqual(report.infinite, [], "a paused infinite animation never runs, so it is not a never-settles");
-  assert.equal(report.animationCount, 1, "it is still reported as an animation on the page");
-});
-
-test("runAnimationEval: a short animation with no reduced-motion rule is still reported", { timeout: 120_000 }, async () => {
-  // The severe one. Before the fix this page — which honours the preference
-  // nowhere — came back "No animation issues detected" with exit 0 at 150ms,
-  // 200ms and 400ms, and only started reporting at 800ms. The cutoff was not a
-  // threshold anyone chose; it was the instant the collector ran.
-  const report = await evaluate("#a { animation: slide 200ms linear 1 forwards; }");
-  assert.equal(report.reducedMotion?.remainingCount, 1);
-  assert.equal(report.reducedMotion?.remaining[0]?.durationMs, 200);
-  assert.ok(
-    report.issues.some((i) => i.kind === "reduced-motion-ignored"),
-    `expected reduced-motion-ignored, got ${JSON.stringify(report.issues.map((i) => i.kind))}`,
+  assert.deepEqual(
+    report.infinite.map((i) => i.name),
+    ["slide"],
   );
 });
+
+test(
+  "runAnimationEval: a page-paused animation counts as neither motion nor never-settling",
+  { timeout: 120_000 },
+  async () => {
+    // The one exclusion that is about the page's own choice rather than about when
+    // we looked: `animation-play-state: paused` is visually static by construction.
+    const report = await evaluate("#a { animation: slide 500ms linear infinite; animation-play-state: paused; }");
+    assert.equal(report.settleMs, 0, "a paused animation must not contribute to settle");
+    assert.deepEqual(report.infinite, [], "a paused infinite animation never runs, so it is not a never-settles");
+    assert.equal(report.animationCount, 1, "it is still reported as an animation on the page");
+  },
+);
+
+test(
+  "runAnimationEval: a short animation with no reduced-motion rule is still reported",
+  { timeout: 120_000 },
+  async () => {
+    // The severe one. Before the fix this page — which honours the preference
+    // nowhere — came back "No animation issues detected" with exit 0 at 150ms,
+    // 200ms and 400ms, and only started reporting at 800ms. The cutoff was not a
+    // threshold anyone chose; it was the instant the collector ran.
+    const report = await evaluate("#a { animation: slide 200ms linear 1 forwards; }");
+    assert.equal(report.reducedMotion?.remainingCount, 1);
+    assert.equal(report.reducedMotion?.remaining[0]?.durationMs, 200);
+    assert.ok(
+      report.issues.some((i) => i.kind === "reduced-motion-ignored"),
+      `expected reduced-motion-ignored, got ${JSON.stringify(report.issues.map((i) => i.kind))}`,
+    );
+  },
+);
 
 test("runAnimationEval: honouring reduced-motion keeps the gate silent", { timeout: 120_000 }, async () => {
   // The inverse, without which the fix above would just be a stuck alarm. Both
@@ -452,18 +464,25 @@ test("runAnimationEval: honouring reduced-motion keeps the gate silent", { timeo
  * it, with the author's own play state read before the pause — which is what keeps
  * the `page-paused` case above working.
  */
-test("runAnimationEval: frame-samples short fill:none animations, not just the survivors", { timeout: 120_000 }, async () => {
-  // No `forwards`: the animation is removed from `getAnimations()` the moment it
-  // finishes, which is well before the ~765ms the evaluator reads at.
-  const report = await evaluate(
-    `#a { animation: slide 200ms linear 1; }
+test(
+  "runAnimationEval: frame-samples short fill:none animations, not just the survivors",
+  { timeout: 120_000 },
+  async () => {
+    // No `forwards`: the animation is removed from `getAnimations()` the moment it
+    // finishes, which is well before the ~765ms the evaluator reads at.
+    const report = await evaluate(
+      `#a { animation: slide 200ms linear 1; }
      #b { width: 60px; height: 30px; background: #c52; animation: slide 220ms linear 1; }`,
-    '<div id="a"></div><div id="b"></div>',
-  );
-  assert.equal(report.animationCount, 2);
-  assert.equal(report.evaluated.length, 2, "both must be sampled, not only a survivor");
-  assert.ok(report.evaluated.every((a) => a.visible), "both move 300px; both must read as visible");
-});
+      '<div id="a"></div><div id="b"></div>',
+    );
+    assert.equal(report.animationCount, 2);
+    assert.equal(report.evaluated.length, 2, "both must be sampled, not only a survivor");
+    assert.ok(
+      report.evaluated.every((a) => a.visible),
+      "both move 300px; both must read as visible",
+    );
+  },
+);
 
 test("runAnimationEval: the sampled set is the same on two consecutive runs", { timeout: 180_000 }, async () => {
   const css = "#a { animation: slide 200ms linear 1; }";
@@ -475,30 +494,34 @@ test("runAnimationEval: the sampled set is the same on two consecutive runs", { 
   );
 });
 
-test("runAnimationEval: the strip leaves out animations that moved nothing, and says how many", { timeout: 120_000 }, async () => {
-  // An animation with no motion bbox used to get a row cropped to the whole
-  // viewport, which then sized the uniform cell for every other row: one dead
-  // keyframe turned a tight sheet into 1592x768 of mostly grey.
-  const { mkdtemp } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const source = await animPage(
-    `@keyframes dead { from { z-index: 1; } to { z-index: 9; } }
+test(
+  "runAnimationEval: the strip leaves out animations that moved nothing, and says how many",
+  { timeout: 120_000 },
+  async () => {
+    // An animation with no motion bbox used to get a row cropped to the whole
+    // viewport, which then sized the uniform cell for every other row: one dead
+    // keyframe turned a tight sheet into 1592x768 of mostly grey.
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const source = await animPage(
+      `@keyframes dead { from { z-index: 1; } to { z-index: 9; } }
      #a { animation: slide 300ms linear 1 forwards; }
      #b { animation: dead 300ms linear 1 forwards; }`,
-    '<div id="a"></div><div id="b">b</div>',
-  );
-  const dir = await mkdtemp(join(tmpdir(), "vlmkit-strip-"));
-  const stripPath = join(dir, "strip.png");
-  const report = await runAnimationEval({ source, stripPath });
+      '<div id="a"></div><div id="b">b</div>',
+    );
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-strip-"));
+    const stripPath = join(dir, "strip.png");
+    const report = await runAnimationEval({ source, stripPath });
 
-  assert.equal(report.evaluated.length, 2, "both are still evaluated and reported");
-  assert.ok(report.strip, "a strip was requested");
-  assert.equal(report.strip.omitted, 1, "the dead one contributes no row");
-  assert.equal(report.strip.rows, 1);
-  const formatted = formatAnimationEvalReport(report);
-  assert.match(formatted, /1 omitted as no-visible-effect/, "the omission must be named, never silent");
-});
+    assert.equal(report.evaluated.length, 2, "both are still evaluated and reported");
+    assert.ok(report.strip, "a strip was requested");
+    assert.equal(report.strip.omitted, 1, "the dead one contributes no row");
+    assert.equal(report.strip.rows, 1);
+    const formatted = formatAnimationEvalReport(report);
+    assert.match(formatted, /1 omitted as no-visible-effect/, "the omission must be named, never silent");
+  },
+);
 
 /**
  * The strip is sampled on ONE shared clock, so a stagger is visible.
@@ -536,66 +559,74 @@ test("runAnimationEval: strip columns are shared instants on the page timeline",
   assert.match(formatted, /rows top to bottom are #a, #b/);
 });
 
-test("runAnimationEval: the strip window defaults to one iteration of the slowest animation", { timeout: 120_000 }, async () => {
-  const { mkdtemp } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const source = await animPage(
-    `#a { animation: slide 200ms linear 1 forwards; }
+test(
+  "runAnimationEval: the strip window defaults to one iteration of the slowest animation",
+  { timeout: 120_000 },
+  async () => {
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const source = await animPage(
+      `#a { animation: slide 200ms linear 1 forwards; }
      #b { width: 120px; height: 60px; background: #2255cc; animation: slide 500ms linear 300ms 1 forwards; }`,
-    '<div id="a"></div><div id="b"></div>',
-  );
-  const report = await runAnimationEval({
-    source,
-    samples: 2,
-    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-shared-")), "strip.png"),
-  });
-  // 300ms delay + 500ms duration is the last thing to finish.
-  assert.equal(report.strip?.windowMs, 800);
-  assert.deepEqual(report.strip?.times, [400, 800]);
-});
+      '<div id="a"></div><div id="b"></div>',
+    );
+    const report = await runAnimationEval({
+      source,
+      samples: 2,
+      stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-shared-")), "strip.png"),
+    });
+    // 300ms delay + 500ms duration is the last thing to finish.
+    assert.equal(report.strip?.windowMs, 800);
+    assert.deepEqual(report.strip?.times, [400, 800]);
+  },
+);
 
-test("runAnimationEval: a delayed animation has not started at an instant inside its delay", { timeout: 120_000 }, async () => {
-  // The behavioural half. At t=100ms the undelayed element is mid-fade and the one
-  // with a 200ms delay has not moved at all — which is the difference the sheet has
-  // to be able to show, and could not when each row ran on its own clock.
-  const { mkdtemp, readFile } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const { cropRegion, measureChangeMagnitude } = await import("@mizchi/vlmkit-core/png-utils.ts");
-  const { PNG } = await import("pngjs");
+test(
+  "runAnimationEval: a delayed animation has not started at an instant inside its delay",
+  { timeout: 120_000 },
+  async () => {
+    // The behavioural half. At t=100ms the undelayed element is mid-fade and the one
+    // with a 200ms delay has not moved at all — which is the difference the sheet has
+    // to be able to show, and could not when each row ran on its own clock.
+    const { mkdtemp, readFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { cropRegion, measureChangeMagnitude } = await import("@mizchi/vlmkit-core/png-utils.ts");
+    const { PNG } = await import("pngjs");
 
-  const source = await animPage(
-    `#a { animation: slide 200ms linear 1 forwards; }
+    const source = await animPage(
+      `#a { animation: slide 200ms linear 1 forwards; }
      #b { width: 120px; height: 60px; background: #2255cc; animation: slide 200ms linear 200ms 1 forwards; }`,
-    '<div id="a"></div><div id="b"></div>',
-  );
-  const dir = await mkdtemp(join(tmpdir(), "vlmkit-stagger-"));
-  const report = await runAnimationEval({
-    source,
-    samples: 4,
-    stripWindowMs: 400,
-    stripPath: join(dir, "strip.png"),
-    framesDir: dir,
-  });
+      '<div id="a"></div><div id="b"></div>',
+    );
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-stagger-"));
+    const report = await runAnimationEval({
+      source,
+      samples: 4,
+      stripWindowMs: 400,
+      stripPath: join(dir, "strip.png"),
+      framesDir: dir,
+    });
 
-  const decode = async (name: string) => {
-    const png = PNG.sync.read(await readFile(join(dir, name)));
-    return { width: png.width, height: png.height, data: new Uint8Array(png.data) };
-  };
-  const early = await decode("t-100ms.png");
-  const late = await decode("t-400ms.png");
-  const delayed = report.evaluated.find((a) => a.selector === "#b");
-  assert.ok(delayed?.motionBbox, "the delayed animation must still be evaluated");
-  const box = delayed.motionBbox;
-  const region = (frame: Awaited<ReturnType<typeof decode>>) =>
-    cropRegion(frame, box.x, box.y, box.width, box.height);
-  const moved = measureChangeMagnitude(region(early), region(late));
-  assert.ok(
-    moved.changedFraction > 0.05,
-    `the delayed element must look different at 100ms and 400ms, got ${moved.changedFraction}`,
-  );
-});
+    const decode = async (name: string) => {
+      const png = PNG.sync.read(await readFile(join(dir, name)));
+      return { width: png.width, height: png.height, data: new Uint8Array(png.data) };
+    };
+    const early = await decode("t-100ms.png");
+    const late = await decode("t-400ms.png");
+    const delayed = report.evaluated.find((a) => a.selector === "#b");
+    assert.ok(delayed?.motionBbox, "the delayed animation must still be evaluated");
+    const box = delayed.motionBbox;
+    const region = (frame: Awaited<ReturnType<typeof decode>>) =>
+      cropRegion(frame, box.x, box.y, box.width, box.height);
+    const moved = measureChangeMagnitude(region(early), region(late));
+    assert.ok(
+      moved.changedFraction > 0.05,
+      `the delayed element must look different at 100ms and 400ms, got ${moved.changedFraction}`,
+    );
+  },
+);
 
 /**
  * The strip's default window follows the finite animations, and its rows can be
@@ -625,22 +656,26 @@ test("runAnimationEval: an infinite animation does not set the strip's timebase"
   assert.deepEqual(report.strip?.times, [50, 100, 150, 200]);
 });
 
-test("runAnimationEval: with everything infinite, one iteration of the longest is the window", { timeout: 120_000 }, async () => {
-  const { mkdtemp } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const source = await animPage(
-    `#a { animation: slide 500ms linear infinite; }
+test(
+  "runAnimationEval: with everything infinite, one iteration of the longest is the window",
+  { timeout: 120_000 },
+  async () => {
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const source = await animPage(
+      `#a { animation: slide 500ms linear infinite; }
      #b { width: 40px; height: 40px; background: #333; animation: slide 800ms linear infinite; }`,
-    '<div id="a"></div><div id="b"></div>',
-  );
-  const report = await runAnimationEval({
-    source,
-    samples: 2,
-    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-win-")), "strip.png"),
-  });
-  assert.equal(report.strip?.windowMs, 800, "nothing finite to go on, so the longest period");
-});
+      '<div id="a"></div><div id="b"></div>',
+    );
+    const report = await runAnimationEval({
+      source,
+      samples: 2,
+      stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-win-")), "strip.png"),
+    });
+    assert.equal(report.strip?.windowMs, 800, "nothing finite to go on, so the longest period");
+  },
+);
 
 test("runAnimationEval: --strip-selector scopes the rows and the counts say why", { timeout: 120_000 }, async () => {
   // "No flag to scope the strip to one animation or selector. I expected
@@ -671,22 +706,26 @@ test("runAnimationEval: --strip-selector scopes the rows and the counts say why"
   assert.match(formatAnimationEvalReport(report), /2 outside --strip-selector/);
 });
 
-test("runAnimationEval: a --strip-selector matching nothing animated says what is animated", { timeout: 120_000 }, async () => {
-  const { mkdtemp } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const source = await animPage("#a { animation: slide 200ms linear 1 forwards; }");
-  const stripPath = join(await mkdtemp(join(tmpdir(), "vlmkit-scope-")), "strip.png");
-  await assert.rejects(
-    () => runAnimationEval({ source, stripSelector: ".nope", stripPath }),
-    (error: Error) => {
-      assert.match(error.message, /--strip-selector `\.nope` matched no animated element/);
-      // The way out is in the message, not in a second command.
-      assert.match(error.message, /Animated elements on this page: #a/);
-      return true;
-    },
-  );
-});
+test(
+  "runAnimationEval: a --strip-selector matching nothing animated says what is animated",
+  { timeout: 120_000 },
+  async () => {
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const source = await animPage("#a { animation: slide 200ms linear 1 forwards; }");
+    const stripPath = join(await mkdtemp(join(tmpdir(), "vlmkit-scope-")), "strip.png");
+    await assert.rejects(
+      () => runAnimationEval({ source, stripSelector: ".nope", stripPath }),
+      (error: Error) => {
+        assert.match(error.message, /--strip-selector `\.nope` matched no animated element/);
+        // The way out is in the message, not in a second command.
+        assert.match(error.message, /Animated elements on this page: #a/);
+        return true;
+      },
+    );
+  },
+);
 
 test("runAnimationEval: a dead animation does not set the strip's window either", { timeout: 120_000 }, async () => {
   // v2 stopped an infinite animation from setting the timebase; v3 found the same
@@ -717,23 +756,27 @@ test("runAnimationEval: a dead animation does not set the strip's window either"
   assert.equal(report.strip?.windowMs, 200, "and it does not set the window either");
 });
 
-test("runAnimationEval: --strip-selector also narrows the window to the selected rows", { timeout: 120_000 }, async () => {
-  const { mkdtemp } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const source = await animPage(
-    `.pick { width: 60px; height: 30px; background: #248; animation: slide 200ms linear 1 forwards; }
+test(
+  "runAnimationEval: --strip-selector also narrows the window to the selected rows",
+  { timeout: 120_000 },
+  async () => {
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const source = await animPage(
+      `.pick { width: 60px; height: 30px; background: #248; animation: slide 200ms linear 1 forwards; }
      #other { width: 60px; height: 30px; background: #a22; animation: slide 900ms linear 1 forwards; }`,
-    '<div class="pick"></div><div id="other"></div>',
-  );
-  const report = await runAnimationEval({
-    source,
-    samples: 2,
-    stripSelector: ".pick",
-    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-scopewin-")), "strip.png"),
-  });
-  assert.equal(report.strip?.windowMs, 200, "the 900ms animation is out of scope, so out of the window");
-});
+      '<div class="pick"></div><div id="other"></div>',
+    );
+    const report = await runAnimationEval({
+      source,
+      samples: 2,
+      stripSelector: ".pick",
+      stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-scopewin-")), "strip.png"),
+    });
+    assert.equal(report.strip?.windowMs, 200, "the 900ms animation is out of scope, so out of the window");
+  },
+);
 
 /**
  * `--strip-animated`: the same sampling, written as one playing file.
@@ -746,10 +789,7 @@ test("runAnimationEval: --strip-selector also narrows the window to the selected
 test("--strip-animated writes an APNG of the whole page over the same timeline", { timeout: 120_000 }, async () => {
   const { readApngChunks } = await import("@mizchi/vlmkit-core/apng.ts");
   const { readFile } = await import("node:fs/promises");
-  const source = await animPage(
-    `#a { animation: slide 300ms linear 1 forwards; }`,
-    '<div id="a"></div>',
-  );
+  const source = await animPage(`#a { animation: slide 300ms linear 1 forwards; }`, '<div id="a"></div>');
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-strip-anim-"));
   const stripPath = join(dir, "anim.png");
   const report = await runAnimationEval({ source, stripPath, stripAnimated: true });
@@ -763,14 +803,14 @@ test("--strip-animated writes an APNG of the whole page over the same timeline",
 
   const bytes = new Uint8Array(await readFile(stripPath));
   const chunks = readApngChunks(bytes);
-  assert.equal(
-    chunks.filter((c) => c.type === "fcTL").length,
-    report.strip.times.length,
-    "an fcTL per frame",
-  );
+  assert.equal(chunks.filter((c) => c.type === "fcTL").length, report.strip.times.length, "an fcTL per frame");
   // Sequence numbers are shared between fcTL and fdAT; a viewer rejects the file when they are not.
   const sequences = chunks.filter((c) => c.sequence !== undefined).map((c) => c.sequence!);
-  assert.deepEqual(sequences, [...sequences].sort((a, b) => a - b), "monotonic");
+  assert.deepEqual(
+    sequences,
+    [...sequences].sort((a, b) => a - b),
+    "monotonic",
+  );
   assert.equal(new Set(sequences).size, sequences.length, "and unique");
 
   // The canvas is the page, not a cropped cell — that is the whole point.
@@ -796,32 +836,44 @@ test("--strip-animated refuses a .webp path, naming why", { timeout: 120_000 }, 
  * is what changed them. Both pages below were reported `visible` before the rule existed — the
  * pixels the gate credited to its seeks were the page's own re-render and its own ticker.
  */
-test("runAnimationEval: an animation the page re-creates is seek-ineffective, not visible", { timeout: 120_000 }, async () => {
-  const report = await evaluate(
-    ".box { width: 120px; height: 60px; background: #2255cc; animation: slide 2000ms linear 1 forwards; }",
-    `<div id="root"><div class="box"></div></div>
+test(
+  "runAnimationEval: an animation the page re-creates is seek-ineffective, not visible",
+  { timeout: 120_000 },
+  async () => {
+    const report = await evaluate(
+      ".box { width: 120px; height: 60px; background: #2255cc; animation: slide 2000ms linear 1 forwards; }",
+      `<div id="root"><div class="box"></div></div>
      <script>setInterval(() => { document.getElementById("root").innerHTML = '<div class="box"></div>'; }, 100);</script>`,
-  );
-  const box = report.evaluated.find((a) => a.selector.includes("box"));
-  assert.equal(box?.seekIneffective?.reason, "readback");
-  assert.ok(report.issues.some((i) => i.kind === "seek-ineffective"));
-  assert.ok(!report.issues.some((i) => i.kind === "no-visible-effect"));
-});
+    );
+    const box = report.evaluated.find((a) => a.selector.includes("box"));
+    assert.equal(box?.seekIneffective?.reason, "readback");
+    assert.ok(report.issues.some((i) => i.kind === "seek-ineffective"));
+    assert.ok(!report.issues.some((i) => i.kind === "no-visible-effect"));
+  },
+);
 
-test("runAnimationEval: a ticker repainting the animated element makes the replay disagree", { timeout: 120_000 }, async () => {
-  const report = await evaluate(
-    "#a { animation: slide 2000ms linear 1 forwards; }",
-    `<div id="a"></div><script>
+test(
+  "runAnimationEval: a ticker repainting the animated element makes the replay disagree",
+  { timeout: 120_000 },
+  async () => {
+    const report = await evaluate(
+      "#a { animation: slide 2000ms linear 1 forwards; }",
+      `<div id="a"></div><script>
       const a = document.getElementById("a"); let h = 0;
       (function loop() { h = (h + 7) % 360; a.style.background = "hsl(" + h + ",70%,45%)"; requestAnimationFrame(loop); })();
     </script>`,
-  );
-  assert.equal(report.evaluated[0]?.seekIneffective?.reason, "replay");
-});
+    );
+    assert.equal(report.evaluated[0]?.seekIneffective?.reason, "replay");
+  },
+);
 
-test("runAnimationEval: an ordinary animation's seeks take and its replay reproduces", { timeout: 120_000 }, async () => {
-  const report = await evaluate("#a { animation: slide 400ms linear 1 forwards; }");
-  assert.equal(report.evaluated[0]?.visible, true);
-  assert.equal(report.evaluated[0]?.seekIneffective, undefined);
-  assert.ok(!report.issues.some((i) => i.kind === "seek-ineffective"));
-});
+test(
+  "runAnimationEval: an ordinary animation's seeks take and its replay reproduces",
+  { timeout: 120_000 },
+  async () => {
+    const report = await evaluate("#a { animation: slide 400ms linear 1 forwards; }");
+    assert.equal(report.evaluated[0]?.visible, true);
+    assert.equal(report.evaluated[0]?.seekIneffective, undefined);
+    assert.ok(!report.issues.some((i) => i.kind === "seek-ineffective"));
+  },
+);

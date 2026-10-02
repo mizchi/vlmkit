@@ -12,11 +12,7 @@
  * `page-compose.ts` remains the CLI entry point and re-exports these, so existing
  * imports and `vlmkit build page` are unaffected.
  */
-import {
-  extractComponentsFromRgba,
-  type ComponentBbox,
-  type ExtractComponentsOptions,
-} from "./component-bbox.ts";
+import { extractComponentsFromRgba, type ComponentBbox, type ExtractComponentsOptions } from "./component-bbox.ts";
 import { classifyRegion, kindsCanPair, type ComponentKindInfo } from "./component-classify.ts";
 import { iou } from "@mizchi/vlmkit-core/rect-overlap.ts";
 
@@ -156,12 +152,17 @@ export function matchPageComponents(
     const centerDist = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / diag;
     if (centerDist > maxCenter) return null;
     const sizePenalty =
-      (Math.abs(t.width - c.width) / Math.max(t.width, c.width, 1)
-        + Math.abs(t.height - c.height) / Math.max(t.height, c.height, 1)) / 2;
+      (Math.abs(t.width - c.width) / Math.max(t.width, c.width, 1) +
+        Math.abs(t.height - c.height) / Math.max(t.height, c.height, 1)) /
+      2;
     return centerDist + sizePenalty * 0.5;
   };
 
-  interface Scored { t: PageComponent; c: PageComponent; score: number }
+  interface Scored {
+    t: PageComponent;
+    c: PageComponent;
+    score: number;
+  }
   const scored: Scored[] = [];
   for (const t of target) {
     for (const c of current) {
@@ -285,10 +286,15 @@ export function dominantPageColor(
   const total = img.width * img.height;
   for (let p = 0; p < total; p += stride) {
     const i = p * 4;
-    const r = img.data[i]!, g = img.data[i + 1]!, b = img.data[i + 2]!;
+    const r = img.data[i]!,
+      g = img.data[i + 1]!,
+      b = img.data[i + 2]!;
     const key = `${r >> 3},${g >> 3},${b >> 3}`;
     const bucket = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
-    bucket.n++; bucket.r += r; bucket.g += g; bucket.b += b;
+    bucket.n++;
+    bucket.r += r;
+    bucket.g += g;
+    bucket.b += b;
     counts.set(key, bucket);
   }
   let best: { n: number; r: number; g: number; b: number } | undefined;
@@ -318,15 +324,12 @@ export function composePageDiff(
   if (!options.background) {
     const detected = dominantPageColor(current);
     const agrees =
-      Math.abs(detected[0] - targetBackground[0]) <= tolerance
-      && Math.abs(detected[1] - targetBackground[1]) <= tolerance
-      && Math.abs(detected[2] - targetBackground[2]) <= tolerance;
+      Math.abs(detected[0] - targetBackground[0]) <= tolerance &&
+      Math.abs(detected[1] - targetBackground[1]) <= tolerance &&
+      Math.abs(detected[2] - targetBackground[2]) <= tolerance;
     if (!agrees) currentBackground = detected;
   }
-  const attachKinds = (
-    components: PageComponent[],
-    image: { data: Uint8Array; width: number },
-  ): PageComponent[] =>
+  const attachKinds = (components: PageComponent[], image: { data: Uint8Array; width: number }): PageComponent[] =>
     components.map((c) => ({ ...c, kind: classifyRegion(image.data, image.width, c) }));
   // Ranking-boundary stabilization (S13, third segmentation-fitting
   // occurrence): the Nth area-ranked slot is a seat both sides fight
@@ -342,13 +345,21 @@ export function composePageDiff(
   const poolMargin = 6;
   const targetComponents = attachKinds(
     toPageComponents(
-      extractComponentsFromRgba(target.data, target.width, target.height, { ...options, topN: topN + poolMargin, background: targetBackground }),
+      extractComponentsFromRgba(target.data, target.width, target.height, {
+        ...options,
+        topN: topN + poolMargin,
+        background: targetBackground,
+      }),
     ),
     target,
   );
   const currentComponents = attachKinds(
     toPageComponents(
-      extractComponentsFromRgba(current.data, current.width, current.height, { ...options, topN: topN + poolMargin, background: currentBackground }),
+      extractComponentsFromRgba(current.data, current.width, current.height, {
+        ...options,
+        topN: topN + poolMargin,
+        background: currentBackground,
+      }),
     ),
     current,
   );
@@ -398,9 +409,10 @@ export function renderPageCompositionMarkdown(
     lines.push(`| Target | Current | dPos | dSize | IoU | Fill target -> current |`);
     lines.push(`|---|---|---|---|---|---|`);
     for (const m of composition.matches) {
-      const fill = m.fillDistance > 30
-        ? `\`${m.target.hex}\` -> \`${m.current.hex}\` (d${m.fillDistance})`
-        : `\`${m.target.hex}\` ok`;
+      const fill =
+        m.fillDistance > 30
+          ? `\`${m.target.hex}\` -> \`${m.current.hex}\` (d${m.fillDistance})`
+          : `\`${m.target.hex}\` ok`;
       lines.push(
         `| ${bboxLabel(m.target)} | ${bboxLabel(m.current)} | (${m.deltaLeft.toFixed(0)},${m.deltaTop.toFixed(0)}) | (${m.deltaWidth.toFixed(0)},${m.deltaHeight.toFixed(0)}) | ${m.iou.toFixed(2)} | ${fill} |`,
       );
@@ -416,7 +428,9 @@ export function renderPageCompositionMarkdown(
     lines.push(`| Target component | Fill | Suggested action |`);
     lines.push(`|---|---|---|`);
     for (const c of composition.missing) {
-      lines.push(`| ${bboxLabel(c)} | \`${c.hex}\` | add a ~${c.width}x${c.height} block near (${c.left},${c.top}); drill in via \`build component\` on its crop |`);
+      lines.push(
+        `| ${bboxLabel(c)} | \`${c.hex}\` | add a ~${c.width}x${c.height} block near (${c.left},${c.top}); drill in via \`build component\` on its crop |`,
+      );
     }
   }
   lines.push("");
@@ -452,7 +466,9 @@ export function renderPageCompositionMarkdown(
     lines.push(`|---|---|---|---|`);
     for (const g of composition.gapDeltas) {
       const hint = g.delta > 0 ? "reduce" : "add";
-      lines.push(`| #${g.above} -> #${g.below} | ${g.targetGap}px | ${g.currentGap}px | ${g.delta > 0 ? "+" : ""}${g.delta}px (${hint} ${Math.abs(g.delta)}px) |`);
+      lines.push(
+        `| #${g.above} -> #${g.below} | ${g.targetGap}px | ${g.currentGap}px | ${g.delta > 0 ? "+" : ""}${g.delta}px (${hint} ${Math.abs(g.delta)}px) |`,
+      );
     }
     lines.push("");
   }
@@ -462,15 +478,21 @@ export function renderPageCompositionMarkdown(
   if (composition.missing.length > 0) {
     const biggest = composition.missing.reduce((a, b) => (a.area >= b.area ? a : b));
     lines.push(`1. Build the largest missing component first: ${bboxLabel(biggest)} fill \`${biggest.hex}\`.`);
-    lines.push(`2. Re-run \`build page\` after each component lands; drill into a single component with \`build component <crop> <html>\`.`);
+    lines.push(
+      `2. Re-run \`build page\` after each component lands; drill into a single component with \`build component <crop> <html>\`.`,
+    );
   } else if (composition.orderViolations.length > 0) {
     lines.push(`1. Fix section order first — the swapped sections above dominate every other delta.`);
   } else {
     const worst = [...composition.matches].sort((a, b) => a.iou - b.iou)[0];
     if (worst && worst.iou < 0.9) {
-      lines.push(`1. Composition is complete; tighten the worst-aligned component ${bboxLabel(worst.target)} (IoU ${worst.iou.toFixed(2)}) using the dPos/dSize columns.`);
+      lines.push(
+        `1. Composition is complete; tighten the worst-aligned component ${bboxLabel(worst.target)} (IoU ${worst.iou.toFixed(2)}) using the dPos/dSize columns.`,
+      );
     } else {
-      lines.push(`1. Composition matches. Move to the decoration pass (\`check palette\`, \`check tokens\`, \`build component\` per part).`);
+      lines.push(
+        `1. Composition matches. Move to the decoration pass (\`check palette\`, \`check tokens\`, \`build component\` per part).`,
+      );
     }
     if (composition.gapDeltas.length > 0) {
       lines.push(`2. Then normalize the stacking gaps listed above.`);

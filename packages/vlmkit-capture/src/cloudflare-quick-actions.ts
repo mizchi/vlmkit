@@ -80,13 +80,7 @@ export interface CloudflareCrawlStartResult {
   jobId: string;
 }
 
-export type CloudflareCrawlRecordStatus =
-  | "queued"
-  | "errored"
-  | "completed"
-  | "disallowed"
-  | "skipped"
-  | "cancelled";
+export type CloudflareCrawlRecordStatus = "queued" | "errored" | "completed" | "disallowed" | "skipped" | "cancelled";
 
 export interface CloudflareCrawlRecord {
   url: string;
@@ -154,15 +148,18 @@ export function createCloudflareQuickActionsClient(config: CloudflareQuickAction
   };
 
   async function post(action: CloudflareQuickAction, body: unknown): Promise<Response> {
-    const response = await fetchImpl(buildCloudflareQuickActionEndpoint({
-      accountId: config.accountId,
-      action,
-      apiBase: config.apiBase,
-    }), {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    const response = await fetchImpl(
+      buildCloudflareQuickActionEndpoint({
+        accountId: config.accountId,
+        action,
+        apiBase: config.apiBase,
+      }),
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      },
+    );
     if (!response.ok) {
       throw new Error(`Cloudflare ${action} failed: ${response.status} ${await response.text()}`);
     }
@@ -185,26 +182,29 @@ export function createCloudflareQuickActionsClient(config: CloudflareQuickAction
 
     async startCrawl(input: CloudflareCrawlRequest): Promise<CloudflareCrawlStartResult> {
       const response = await post("crawl", input);
-      const parsed = await response.json() as unknown;
+      const parsed = (await response.json()) as unknown;
       return {
         jobId: normalizeCrawlJobId(parsed),
       };
     },
 
     async getCrawlResult(jobId: string): Promise<CloudflareCrawlResult> {
-      const response = await fetchImpl(buildCloudflareQuickActionEndpoint({
-        accountId: config.accountId,
-        action: "crawl",
-        jobId,
-        apiBase: config.apiBase,
-      }), {
-        method: "GET",
-        headers: { Authorization: `Bearer ${config.apiToken}` },
-      });
+      const response = await fetchImpl(
+        buildCloudflareQuickActionEndpoint({
+          accountId: config.accountId,
+          action: "crawl",
+          jobId,
+          apiBase: config.apiBase,
+        }),
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${config.apiToken}` },
+        },
+      );
       if (!response.ok) {
         throw new Error(`Cloudflare crawl result failed: ${response.status} ${await response.text()}`);
       }
-      const parsed = await response.json() as unknown;
+      const parsed = (await response.json()) as unknown;
       return normalizeCrawlResult(parsed);
     },
   };
@@ -261,9 +261,7 @@ function normalizeCrawlResult(parsed: unknown): CloudflareCrawlResult {
     browserSecondsUsed: readNumber(value, "browserSecondsUsed"),
     total: readNumber(value, "total"),
     finished: readNumber(value, "finished"),
-    records: Array.isArray(value.records)
-      ? value.records.filter(isRecord).map(normalizeCrawlRecord)
-      : [],
+    records: Array.isArray(value.records) ? value.records.filter(isRecord).map(normalizeCrawlRecord) : [],
   };
 }
 
@@ -273,10 +271,10 @@ function normalizeCrawlRecord(value: Record<string, unknown>): CloudflareCrawlRe
     status: readString(value, "status") as CloudflareCrawlRecordStatus,
     metadata: isRecord(value.metadata)
       ? {
-        status: readNumber(value.metadata, "status"),
-        url: readOptionalString(value.metadata, "url"),
-        title: readOptionalString(value.metadata, "title"),
-      }
+          status: readNumber(value.metadata, "status"),
+          url: readOptionalString(value.metadata, "url"),
+          title: readOptionalString(value.metadata, "title"),
+        }
       : undefined,
     html: readOptionalString(value, "html"),
     markdown: readOptionalString(value, "markdown"),

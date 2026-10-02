@@ -31,14 +31,12 @@ function deriveBaselinePath(currentPath: string): string {
   return currentPath.replace(/-current\.png$/u, "-baseline.png");
 }
 
-function resolveApproveEntries(
-  report: SnapshotReportFile,
-  labelFilters: string[],
-): SnapshotApproveEntry[] {
+function resolveApproveEntries(report: SnapshotReportFile, labelFilters: string[]): SnapshotApproveEntry[] {
   const normalizedFilters = [...new Set(labelFilters)];
-  const results = normalizedFilters.length === 0
-    ? report.results
-    : report.results.filter((entry) => normalizedFilters.includes(entry.label));
+  const results =
+    normalizedFilters.length === 0
+      ? report.results
+      : report.results.filter((entry) => normalizedFilters.includes(entry.label));
 
   if (normalizedFilters.length > 0 && results.length === 0) {
     throw new Error(`No snapshot results matched --label filters: ${normalizedFilters.join(", ")}`);

@@ -86,10 +86,9 @@ interface LagResult {
 }
 
 function acceptAxis(result: LagResult): boolean {
-  return !result.flat
-    && result.lag !== 0
-    && result.peak >= MIN_PEAK
-    && result.peak - result.zeroLag >= MIN_PEAK_ADVANTAGE;
+  return (
+    !result.flat && result.lag !== 0 && result.peak >= MIN_PEAK && result.peak - result.zeroLag >= MIN_PEAK_ADVANTAGE
+  );
 }
 
 /**

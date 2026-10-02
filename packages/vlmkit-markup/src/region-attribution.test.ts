@@ -31,8 +31,26 @@ import {
 const HUD: RegionElementRect[] = [
   { path: "hud[0]", tag: "hud", id: "hud", classes: "hud-root", top: 0, left: 0, width: 640, height: 360 },
   { path: "hud[0]>bar[0]", tag: "bar", id: "hp_bar", classes: "hp-bar", top: 16, left: 16, width: 200, height: 20 },
-  { path: "hud[0]>panel[1]", tag: "panel", id: "score_panel", classes: "score-panel", top: 16, left: 500, width: 124, height: 20 },
-  { path: "hud[0]>button[2]", tag: "button", id: "pause_button", classes: "pause-button", top: 320, left: 270, width: 100, height: 28 },
+  {
+    path: "hud[0]>panel[1]",
+    tag: "panel",
+    id: "score_panel",
+    classes: "score-panel",
+    top: 16,
+    left: 500,
+    width: 124,
+    height: 20,
+  },
+  {
+    path: "hud[0]>button[2]",
+    tag: "button",
+    id: "pause_button",
+    classes: "pause-button",
+    top: 320,
+    left: 270,
+    width: 100,
+    height: 28,
+  },
 ];
 
 describe("adaptiveRegionCellSize", () => {

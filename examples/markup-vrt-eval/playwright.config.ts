@@ -8,10 +8,7 @@ const outRoot = resolve(repoRoot, ".vlmkit/markup-vrt-eval");
 
 export default defineConfig({
   testDir: repoRoot,
-  testMatch: [
-    "examples/markup-vrt-eval/tests/**/*.spec.ts",
-    ".vlmkit/markup-vrt-eval/generated/**/*.spec.ts",
-  ],
+  testMatch: ["examples/markup-vrt-eval/tests/**/*.spec.ts", ".vlmkit/markup-vrt-eval/generated/**/*.spec.ts"],
   timeout: 45_000,
   fullyParallel: false,
   reporter: [["list"], ["json", { outputFile: resolve(outRoot, "playwright-report.json") }]],
@@ -40,7 +37,5 @@ export default defineConfig({
     timeout: 30_000,
     reuseExistingServer: true,
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

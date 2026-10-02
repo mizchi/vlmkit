@@ -27,7 +27,13 @@ import { zoomCallFromArgs } from "./zoom-loop.ts";
 
 type Fetch = typeof fetch;
 
-async function postJson(fetcher: Fetch, url: string, headers: Record<string, string>, body: unknown, provider: string): Promise<any> {
+async function postJson(
+  fetcher: Fetch,
+  url: string,
+  headers: Record<string, string>,
+  body: unknown,
+  provider: string,
+): Promise<any> {
   const res = await fetcher(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
@@ -41,7 +47,10 @@ async function postJson(fetcher: Fetch, url: string, headers: Record<string, str
 }
 
 /** A call the provider made whose arguments did not parse still needs an answer; this one says why. */
-function callsFrom(parsed: (ZoomCall | { id: string; error: string })[]): { calls: ZoomCall[]; broken: { id: string; error: string }[] } {
+function callsFrom(parsed: (ZoomCall | { id: string; error: string })[]): {
+  calls: ZoomCall[];
+  broken: { id: string; error: string }[];
+} {
   const calls: ZoomCall[] = [];
   const broken: { id: string; error: string }[] = [];
   for (const p of parsed) ("error" in p ? broken : calls).push(p as never);
@@ -82,9 +91,12 @@ export function openAiCompatibleDriver(options: OpenAiCompatibleDriverOptions): 
     ...(options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {}),
     ...options.headers,
   };
-  const content = (parts: ZoomPart[]) => parts.map((p) => p.type === "text"
-    ? { type: "text", text: p.text }
-    : { type: "image_url", image_url: { url: `data:image/png;base64,${b64(p.png)}` } });
+  const content = (parts: ZoomPart[]) =>
+    parts.map((p) =>
+      p.type === "text"
+        ? { type: "text", text: p.text }
+        : { type: "image_url", image_url: { url: `data:image/png;base64,${b64(p.png)}` } },
+    );
 
   type Msg = { role: string; content?: unknown; tool_calls?: unknown; tool_call_id?: string };
   const render = (transcript: readonly ZoomTurn[]): Msg[] => {
@@ -92,9 +104,7 @@ export function openAiCompatibleDriver(options: OpenAiCompatibleDriverOptions): 
     for (const t of transcript) {
       if (t.role === "user") out.push({ role: "user", content: content(t.parts) });
       else if (t.role === "assistant") {
-        out.push(t.raw !== undefined
-          ? t.raw as Msg
-          : { role: "assistant", content: t.text });
+        out.push(t.raw !== undefined ? (t.raw as Msg) : { role: "assistant", content: t.text });
       } else if (t.native) {
         // Native results: text in the tool message, the image in a user message after them.
         const images: ZoomPart[] = [];
@@ -115,25 +125,49 @@ export function openAiCompatibleDriver(options: OpenAiCompatibleDriverOptions): 
     model: options.model,
     nativeTools: options.nativeTools ?? true,
     async turn(transcript, { tool, maxTokens }) {
-      const data = await postJson(fetcher, url, headers, {
-        model: options.model,
-        max_tokens: maxTokens,
-        messages: render(transcript),
-        ...(tool ? { tools: [{ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }] } : {}),
-      }, "OpenAI-compatible");
+      const data = await postJson(
+        fetcher,
+        url,
+        headers,
+        {
+          model: options.model,
+          max_tokens: maxTokens,
+          messages: render(transcript),
+          ...(tool
+            ? {
+                tools: [
+                  {
+                    type: "function",
+                    function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+                  },
+                ],
+              }
+            : {}),
+        },
+        "OpenAI-compatible",
+      );
       const choice = data.choices?.[0];
       const message = choice?.message ?? {};
       const toolCalls: { id: string; function?: { name?: string; arguments?: unknown } }[] = message.tool_calls ?? [];
-      const { calls, broken } = callsFrom(toolCalls
-        .filter((c) => c.function?.name === "zoom")
-        .map((c) => zoomCallFromArgs(c.id, c.function?.arguments)));
-      return withBroken({
-        text: typeof message.content === "string" ? message.content : "",
-        calls,
-        raw: { role: "assistant", content: message.content ?? null, ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}) },
-        usage: { promptTokens: data.usage?.prompt_tokens ?? 0, completionTokens: data.usage?.completion_tokens ?? 0 },
-        ...(choice?.finish_reason && !["stop", "tool_calls"].includes(choice.finish_reason) ? { stop: choice.finish_reason } : {}),
-      }, broken);
+      const { calls, broken } = callsFrom(
+        toolCalls.filter((c) => c.function?.name === "zoom").map((c) => zoomCallFromArgs(c.id, c.function?.arguments)),
+      );
+      return withBroken(
+        {
+          text: typeof message.content === "string" ? message.content : "",
+          calls,
+          raw: {
+            role: "assistant",
+            content: message.content ?? null,
+            ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+          },
+          usage: { promptTokens: data.usage?.prompt_tokens ?? 0, completionTokens: data.usage?.completion_tokens ?? 0 },
+          ...(choice?.finish_reason && !["stop", "tool_calls"].includes(choice.finish_reason)
+            ? { stop: choice.finish_reason }
+            : {}),
+        },
+        broken,
+      );
     },
   };
 }
@@ -152,9 +186,12 @@ export interface AnthropicDriverOptions {
 export function anthropicDriver(options: AnthropicDriverOptions): VisionChatDriver {
   const url = `${(options.baseUrl ?? "https://api.anthropic.com").replace(/\/$/, "")}/v1/messages`;
   const fetcher = options.fetch ?? fetch;
-  const blocks = (parts: ZoomPart[]) => parts.map((p) => p.type === "text"
-    ? { type: "text", text: p.text }
-    : { type: "image", source: { type: "base64", media_type: "image/png", data: b64(p.png) } });
+  const blocks = (parts: ZoomPart[]) =>
+    parts.map((p) =>
+      p.type === "text"
+        ? { type: "text", text: p.text }
+        : { type: "image", source: { type: "base64", media_type: "image/png", data: b64(p.png) } },
+    );
 
   type Msg = { role: "user" | "assistant"; content: unknown[] };
   const render = (transcript: readonly ZoomTurn[]): Msg[] => {
@@ -164,17 +201,30 @@ export function anthropicDriver(options: AnthropicDriverOptions): VisionChatDriv
       else if (t.role === "assistant") {
         out.push({
           role: "assistant",
-          content: t.raw !== undefined
-            ? t.raw as unknown[]
-            : [
-              ...(t.text ? [{ type: "text", text: t.text }] : []),
-              ...t.calls.filter((c) => !c.id.startsWith("text-")).map((c) => ({ type: "tool_use", id: c.id, name: "zoom", input: { image_index: c.imageIndex, ...c.box } })),
-            ],
+          content:
+            t.raw !== undefined
+              ? (t.raw as unknown[])
+              : [
+                  ...(t.text ? [{ type: "text", text: t.text }] : []),
+                  ...t.calls
+                    .filter((c) => !c.id.startsWith("text-"))
+                    .map((c) => ({
+                      type: "tool_use",
+                      id: c.id,
+                      name: "zoom",
+                      input: { image_index: c.imageIndex, ...c.box },
+                    })),
+                ],
         });
       } else if (t.native) {
         out.push({
           role: "user",
-          content: t.results.map((r) => ({ type: "tool_result", tool_use_id: r.callId, content: blocks(r.parts), ...(r.isError ? { is_error: true } : {}) })),
+          content: t.results.map((r) => ({
+            type: "tool_result",
+            tool_use_id: r.callId,
+            content: blocks(r.parts),
+            ...(r.isError ? { is_error: true } : {}),
+          })),
         });
       } else {
         out.push({ role: "user", content: blocks(t.results.flatMap((r) => r.parts)) });
@@ -187,23 +237,40 @@ export function anthropicDriver(options: AnthropicDriverOptions): VisionChatDriv
     model: options.model,
     nativeTools: true,
     async turn(transcript, { tool, maxTokens }) {
-      const data = await postJson(fetcher, url, { "x-api-key": options.apiKey, "anthropic-version": "2023-06-01" }, {
-        model: options.model,
-        max_tokens: maxTokens,
-        messages: render(transcript),
-        ...(tool ? { tools: [{ name: tool.name, description: tool.description, input_schema: tool.parameters }] } : {}),
-      }, "Anthropic");
-      const content: { type: string; text?: string; id?: string; name?: string; input?: unknown }[] = data.content ?? [];
-      const { calls, broken } = callsFrom(content
-        .filter((b) => b.type === "tool_use" && b.name === "zoom")
-        .map((b) => zoomCallFromArgs(b.id!, b.input)));
-      return withBroken({
-        text: content.filter((b) => b.type === "text").map((b) => b.text ?? "").join(""),
-        calls,
-        raw: content,
-        usage: { promptTokens: data.usage?.input_tokens ?? 0, completionTokens: data.usage?.output_tokens ?? 0 },
-        ...(data.stop_reason && !["end_turn", "tool_use", "stop_sequence"].includes(data.stop_reason) ? { stop: data.stop_reason } : {}),
-      }, broken);
+      const data = await postJson(
+        fetcher,
+        url,
+        { "x-api-key": options.apiKey, "anthropic-version": "2023-06-01" },
+        {
+          model: options.model,
+          max_tokens: maxTokens,
+          messages: render(transcript),
+          ...(tool
+            ? { tools: [{ name: tool.name, description: tool.description, input_schema: tool.parameters }] }
+            : {}),
+        },
+        "Anthropic",
+      );
+      const content: { type: string; text?: string; id?: string; name?: string; input?: unknown }[] =
+        data.content ?? [];
+      const { calls, broken } = callsFrom(
+        content.filter((b) => b.type === "tool_use" && b.name === "zoom").map((b) => zoomCallFromArgs(b.id!, b.input)),
+      );
+      return withBroken(
+        {
+          text: content
+            .filter((b) => b.type === "text")
+            .map((b) => b.text ?? "")
+            .join(""),
+          calls,
+          raw: content,
+          usage: { promptTokens: data.usage?.input_tokens ?? 0, completionTokens: data.usage?.output_tokens ?? 0 },
+          ...(data.stop_reason && !["end_turn", "tool_use", "stop_sequence"].includes(data.stop_reason)
+            ? { stop: data.stop_reason }
+            : {}),
+        },
+        broken,
+      );
     },
   };
 }
@@ -229,9 +296,8 @@ export function geminiDriver(options: GeminiDriverOptions): VisionChatDriver {
   const base = (options.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
   const url = `${base}/models/${encodeURIComponent(options.model)}:generateContent`;
   const fetcher = options.fetch ?? fetch;
-  const parts = (ps: ZoomPart[]) => ps.map((p) => p.type === "text"
-    ? { text: p.text }
-    : { inlineData: { mimeType: "image/png", data: b64(p.png) } });
+  const parts = (ps: ZoomPart[]) =>
+    ps.map((p) => (p.type === "text" ? { text: p.text } : { inlineData: { mimeType: "image/png", data: b64(p.png) } }));
 
   type Msg = { role: "user" | "model"; parts: unknown[] };
   const render = (transcript: readonly ZoomTurn[]): Msg[] => {
@@ -241,18 +307,26 @@ export function geminiDriver(options: GeminiDriverOptions): VisionChatDriver {
       else if (t.role === "assistant") {
         out.push({
           role: "model",
-          parts: t.raw !== undefined
-            ? t.raw as unknown[]
-            : [
-              ...(t.text ? [{ text: t.text }] : []),
-              ...t.calls.filter((c) => !c.id.startsWith("text-")).map((c) => ({ functionCall: { name: "zoom", args: { image_index: c.imageIndex, ...c.box } } })),
-            ],
+          parts:
+            t.raw !== undefined
+              ? (t.raw as unknown[])
+              : [
+                  ...(t.text ? [{ text: t.text }] : []),
+                  ...t.calls
+                    .filter((c) => !c.id.startsWith("text-"))
+                    .map((c) => ({ functionCall: { name: "zoom", args: { image_index: c.imageIndex, ...c.box } } })),
+                ],
         });
       } else if (t.native) {
         out.push({
           role: "user",
           parts: t.results.flatMap((r) => [
-            { functionResponse: { name: "zoom", response: { result: textOf(r), ...(r.isError ? { error: true } : {}) } } },
+            {
+              functionResponse: {
+                name: "zoom",
+                response: { result: textOf(r), ...(r.isError ? { error: true } : {}) },
+              },
+            },
             ...parts(r.parts.filter((p) => p.type === "image")),
           ]),
         });
@@ -267,24 +341,48 @@ export function geminiDriver(options: GeminiDriverOptions): VisionChatDriver {
     model: options.model,
     nativeTools: true,
     async turn(transcript, { tool, maxTokens }) {
-      const data = await postJson(fetcher, url, { "x-goog-api-key": options.apiKey }, {
-        contents: render(transcript),
-        generationConfig: { maxOutputTokens: maxTokens },
-        ...(tool ? { tools: [{ functionDeclarations: [{ name: tool.name, description: tool.description, parameters: geminiSchema(tool.parameters) }] }] } : {}),
-      }, "Gemini");
+      const data = await postJson(
+        fetcher,
+        url,
+        { "x-goog-api-key": options.apiKey },
+        {
+          contents: render(transcript),
+          generationConfig: { maxOutputTokens: maxTokens },
+          ...(tool
+            ? {
+                tools: [
+                  {
+                    functionDeclarations: [
+                      { name: tool.name, description: tool.description, parameters: geminiSchema(tool.parameters) },
+                    ],
+                  },
+                ],
+              }
+            : {}),
+        },
+        "Gemini",
+      );
       const candidate = data.candidates?.[0];
       const ps: { text?: string; functionCall?: { name?: string; args?: unknown } }[] = candidate?.content?.parts ?? [];
       // Gemini function calls carry no id; the call's position in the turn is one.
-      const { calls, broken } = callsFrom(ps
-        .filter((p) => p.functionCall?.name === "zoom")
-        .map((p, i) => zoomCallFromArgs(`gemini-${i}`, p.functionCall!.args)));
-      return withBroken({
-        text: ps.map((p) => p.text ?? "").join(""),
-        calls,
-        raw: ps,
-        usage: { promptTokens: data.usageMetadata?.promptTokenCount ?? 0, completionTokens: data.usageMetadata?.candidatesTokenCount ?? 0 },
-        ...(candidate?.finishReason && candidate.finishReason !== "STOP" ? { stop: candidate.finishReason } : {}),
-      }, broken);
+      const { calls, broken } = callsFrom(
+        ps
+          .filter((p) => p.functionCall?.name === "zoom")
+          .map((p, i) => zoomCallFromArgs(`gemini-${i}`, p.functionCall!.args)),
+      );
+      return withBroken(
+        {
+          text: ps.map((p) => p.text ?? "").join(""),
+          calls,
+          raw: ps,
+          usage: {
+            promptTokens: data.usageMetadata?.promptTokenCount ?? 0,
+            completionTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+          },
+          ...(candidate?.finishReason && candidate.finishReason !== "STOP" ? { stop: candidate.finishReason } : {}),
+        },
+        broken,
+      );
     },
   };
 }
@@ -292,7 +390,10 @@ export function geminiDriver(options: GeminiDriverOptions): VisionChatDriver {
 // ---------------------------------------------------------------------------
 
 function textOf(r: ZoomResult): string {
-  return r.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("\n");
+  return r.parts
+    .filter((p) => p.type === "text")
+    .map((p) => (p as { text: string }).text)
+    .join("\n");
 }
 
 /**
@@ -302,7 +403,13 @@ function textOf(r: ZoomResult): string {
  */
 function withBroken(turn: DriverTurn, broken: { id: string; error: string }[]): DriverTurn {
   if (broken.length === 0) return turn;
-  return { ...turn, calls: [...turn.calls, ...broken.map((b) => ({ id: b.id, imageIndex: 0, box: { x1: 0, y1: 0, x2: 0, y2: 0 }, error: b.error }))] };
+  return {
+    ...turn,
+    calls: [
+      ...turn.calls,
+      ...broken.map((b) => ({ id: b.id, imageIndex: 0, box: { x1: 0, y1: 0, x2: 0, y2: 0 }, error: b.error })),
+    ],
+  };
 }
 
 export type { ZoomToolSpec };

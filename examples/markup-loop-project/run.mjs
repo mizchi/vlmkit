@@ -34,16 +34,23 @@ try {
   await runVlmkit([
     "markup-loop",
     "init",
-    "--topic", "operations-dashboard",
-    "--title", "Operations Dashboard Smoke",
-    "--base-url", baseUrl,
-    "--provider", "openrouter",
-    "--playwright-config", "playwright.config.ts",
+    "--topic",
+    "operations-dashboard",
+    "--title",
+    "Operations Dashboard Smoke",
+    "--base-url",
+    baseUrl,
+    "--provider",
+    "openrouter",
+    "--playwright-config",
+    "playwright.config.ts",
     "--force",
   ]);
 
   await mkdir(dirname(requestPath), { recursive: true });
-  await writeFile(requestPath, `# Operations Dashboard Smoke
+  await writeFile(
+    requestPath,
+    `# Operations Dashboard Smoke
 
 Verify that an operator can review the dashboard, see the incident summary,
 filter services, and keep the approve-deployment action visible.
@@ -54,7 +61,9 @@ Stable anchors:
 - button "Approve deployment"
 - test id "service-health"
 - text "2 incidents need review"
-`, "utf8");
+`,
+    "utf8",
+  );
 
   await runVlmkit(["markup-loop", "observe", "--wait-for", "[data-testid='service-health']"]);
   await runVlmkit(["markup-loop", "doctor"]);

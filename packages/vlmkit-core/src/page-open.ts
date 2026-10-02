@@ -147,8 +147,7 @@ export function sourceToUrl(source: string): string {
  */
 export async function settlePage(page: Page, settleMs = 250, animationCapMs = 2000): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
-  await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined))
-    .catch(() => {});
+  await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined)).catch(() => {});
   if (animationCapMs > 0) await waitForAnimations(page, animationCapMs);
   if (settleMs > 0) await page.waitForTimeout(settleMs);
 }
@@ -164,27 +163,28 @@ export async function settlePage(page: Page, settleMs = 250, animationCapMs = 20
  * real error in the same `catch` as the timeout.
  */
 async function waitForAnimations(page: Page, capMs: number): Promise<void> {
-  await page.evaluate(async (cap) => {
-    if (typeof document.getAnimations !== "function") return;
-    const finite = document.getAnimations().filter((animation) => {
-      // An infinite animation never resolves `finished`. Read the effect's timing rather than
-      // the style, because `iterations` is where the Web Animations API states it.
-      const timing = animation.effect && "getComputedTiming" in animation.effect
-        ? animation.effect.getComputedTiming()
-        : null;
-      const iterations = timing ? timing.iterations : undefined;
-      return iterations !== Infinity && iterations !== null;
+  await page
+    .evaluate(async (cap) => {
+      if (typeof document.getAnimations !== "function") return;
+      const finite = document.getAnimations().filter((animation) => {
+        // An infinite animation never resolves `finished`. Read the effect's timing rather than
+        // the style, because `iterations` is where the Web Animations API states it.
+        const timing =
+          animation.effect && "getComputedTiming" in animation.effect ? animation.effect.getComputedTiming() : null;
+        const iterations = timing ? timing.iterations : undefined;
+        return iterations !== Infinity && iterations !== null;
+      });
+      if (finite.length === 0) return;
+      await Promise.race([
+        // `catch` per animation: a cancelled animation rejects `finished`, and one card removed
+        // mid-flight must not reject the whole wait.
+        Promise.all(finite.map((animation) => animation.finished.catch(() => undefined))),
+        new Promise((resolve) => setTimeout(resolve, cap)),
+      ]);
+    }, capMs)
+    .catch(() => {
+      // A navigation or a closed page during the wait is not this function's business to report.
     });
-    if (finite.length === 0) return;
-    await Promise.race([
-      // `catch` per animation: a cancelled animation rejects `finished`, and one card removed
-      // mid-flight must not reject the whole wait.
-      Promise.all(finite.map((animation) => animation.finished.catch(() => undefined))),
-      new Promise((resolve) => setTimeout(resolve, cap)),
-    ]);
-  }, capMs).catch(() => {
-    // A navigation or a closed page during the wait is not this function's business to report.
-  });
 }
 
 /**
@@ -308,11 +308,11 @@ function trackHarMisses(page: Page, path: string): HarReplay {
       const target = originOfUrl(url);
       if (!/ERR_FAILED/.test(message) || !target || origins.length === 0 || origins.includes(target)) throw error;
       const explained = new Error(
-        `the --har recording holds nothing for ${target}, so even the page itself was aborted.\n`
-        + `  ${path}\n`
-        + `  it recorded: ${origins.join(", ")}\n`
-        + `  A HAR is keyed on the full URL, so a different host or port stops matching entirely.`
-        + ` Re-record against ${target}, or serve the page on the recorded origin.`,
+        `the --har recording holds nothing for ${target}, so even the page itself was aborted.\n` +
+          `  ${path}\n` +
+          `  it recorded: ${origins.join(", ")}\n` +
+          `  A HAR is keyed on the full URL, so a different host or port stops matching entirely.` +
+          ` Re-record against ${target}, or serve the page on the recorded origin.`,
       );
       explained.cause = error;
       throw explained;
@@ -382,21 +382,20 @@ export interface OpenedPage {
 }
 
 function pageOptions(options: OpenPageOptions) {
-  return withAuthState({
-    ...(options.viewport ? { viewport: options.viewport } : {}),
-    ...(options.deviceScaleFactor !== undefined ? { deviceScaleFactor: options.deviceScaleFactor } : {}),
-    ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
-  }, options.storageState);
+  return withAuthState(
+    {
+      ...(options.viewport ? { viewport: options.viewport } : {}),
+      ...(options.deviceScaleFactor !== undefined ? { deviceScaleFactor: options.deviceScaleFactor } : {}),
+      ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
+    },
+    options.storageState,
+  );
 }
 
 /**
  * Open a file or URL by navigation, so relative assets resolve.
  */
-export async function openSource(
-  browser: Browser,
-  source: string,
-  options: OpenPageOptions = {},
-): Promise<OpenedPage> {
+export async function openSource(browser: Browser, source: string, options: OpenPageOptions = {}): Promise<OpenedPage> {
   const page = await browser.newPage(pageOptions(options));
   await applyHar(page, options.har);
   await page.goto(sourceToUrl(source), {
@@ -439,11 +438,7 @@ export interface OpenHtmlOptions extends OpenPageOptions {
  * the document a real base URL, and `setContent` replaces the markup without
  * discarding it.
  */
-export async function openHtml(
-  browser: Browser,
-  html: string,
-  options: OpenHtmlOptions = {},
-): Promise<Page> {
+export async function openHtml(browser: Browser, html: string, options: OpenHtmlOptions = {}): Promise<Page> {
   const page = await browser.newPage(pageOptions(options));
   await applyHar(page, options.har);
   if (options.baseSource) {

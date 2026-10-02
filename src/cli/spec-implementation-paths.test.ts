@@ -32,7 +32,9 @@ const read = (rel: string): string => readFileSync(resolve(ROOT, rel), "utf8");
  * been checked, pointing it at an existing file with no such symbol would still have passed.
  */
 function resolveDeclared(at: string): string | undefined {
-  const [path, symbol] = at.includes(":") ? [at.slice(0, at.indexOf(":")), at.slice(at.indexOf(":") + 1)] : [at, undefined];
+  const [path, symbol] = at.includes(":")
+    ? [at.slice(0, at.indexOf(":")), at.slice(at.indexOf(":") + 1)]
+    : [at, undefined];
   if (!existsSync(resolve(ROOT, path))) return `${at} — no such file`;
   if (symbol !== undefined && symbol !== "" && !read(path).includes(symbol)) {
     return `${at} — file exists but does not contain \`${symbol}\``;
@@ -85,8 +87,7 @@ describe("docs/SPEC.md", () => {
    * while it was there all along — a false positive that would have been "fixed" by adding a
    * duplicate line.
    */
-  const declaredInDoc = (): string[] =>
-    [...doc.matchAll(/^\s*- (?:code|doc): `([^`]+)`/gm)].map((m) => m[1]!);
+  const declaredInDoc = (): string[] => [...doc.matchAll(/^\s*- (?:code|doc): `([^`]+)`/gm)].map((m) => m[1]!);
 
   it("declares no link to a file that does not exist", () => {
     const declared = declaredInDoc();
@@ -107,8 +108,8 @@ describe("docs/SPEC.md", () => {
     assert.deepEqual(
       { stale, missing },
       { stale: [], missing: [] },
-      "docs/SPEC.md's implementation links disagree with Spec.pkl. Regenerate with "
-      + "`pkf run spec-render` (pkspec), or update both together.",
+      "docs/SPEC.md's implementation links disagree with Spec.pkl. Regenerate with " +
+        "`pkf run spec-render` (pkspec), or update both together.",
     );
   });
 
@@ -123,8 +124,8 @@ describe("docs/SPEC.md", () => {
     assert.deepEqual(
       stale,
       [],
-      "docs/SPEC.md is behind Spec.pkl. Regenerate with `pkf run spec-render` "
-      + `(pkspec), or update it in lockstep:\n  ${stale.map((d) => d.slice(0, 100)).join("\n  ")}`,
+      "docs/SPEC.md is behind Spec.pkl. Regenerate with `pkf run spec-render` " +
+        `(pkspec), or update it in lockstep:\n  ${stale.map((d) => d.slice(0, 100)).join("\n  ")}`,
     );
   });
 });

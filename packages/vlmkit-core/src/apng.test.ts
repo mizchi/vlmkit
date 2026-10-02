@@ -65,8 +65,11 @@ describe("encodeApng", () => {
     const decoded = PNG.sync.read(Buffer.from(encodeApng([RED, GREEN, BLUE])));
     assert.equal(decoded.width, 8);
     assert.equal(decoded.height, 6);
-    assert.deepEqual([decoded.data[0], decoded.data[1], decoded.data[2], decoded.data[3]], [220, 40, 40, 255],
-      "frame 0's pixels, not a later frame's");
+    assert.deepEqual(
+      [decoded.data[0], decoded.data[1], decoded.data[2], decoded.data[3]],
+      [220, 40, 40, 255],
+      "frame 0's pixels, not a later frame's",
+    );
   });
 
   it("round-trips a single frame as an ordinary PNG", async () => {

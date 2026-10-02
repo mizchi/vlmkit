@@ -72,10 +72,7 @@ describe("extractTypescriptSource", () => {
   });
 
   it("unwraps nested TypeScript code fences returned by chat models", () => {
-    assert.equal(
-      extractTypescriptSource(`\`\`\`typescript\n\`\`\`ts\n${validSource}\`\`\`\n\`\`\``),
-      validSource,
-    );
+    assert.equal(extractTypescriptSource(`\`\`\`typescript\n\`\`\`ts\n${validSource}\`\`\`\n\`\`\``), validSource);
   });
 });
 
@@ -107,7 +104,8 @@ test("x", async ({ page }) => {
   });
 
   it("requires expect to be imported and used for assertions", () => {
-    const diagnostics = validateGeneratedTestSource(`import { test } from "@playwright/test";
+    const diagnostics = validateGeneratedTestSource(
+      `import { test } from "@playwright/test";
 import { gotoApp } from "./_helpers";
 
 test("x", async ({ page }) => {
@@ -115,7 +113,9 @@ test("x", async ({ page }) => {
   await page.getByRole("button").click();
   await page.screenshot();
 });
-`, { requireScreenshots: false });
+`,
+      { requireScreenshots: false },
+    );
 
     assert.ok(diagnostics.includes("missing expect import from @playwright/test"));
     assert.ok(diagnostics.includes("missing expect assertions"));
@@ -188,7 +188,8 @@ test("x", async ({ page }) => {
   });
 
   it("reports locators that are not in the observed inventory", () => {
-    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+    const diagnostics = validateGeneratedTestSource(
+      `import { test, expect } from "@playwright/test";
 import { gotoApp } from "./_helpers";
 
 test("checkout", async ({ page }) => {
@@ -201,13 +202,15 @@ test("checkout", async ({ page }) => {
   await expect(page.getByTestId("admin-panel")).toBeHidden();
   await expect(page).toHaveScreenshot("checkout.png");
 });
-`, {
-      locatorInventory: {
-        labels: ["Email"],
-        roles: ['button "Pay now"'],
-        testIds: ["cart-count"],
+`,
+      {
+        locatorInventory: {
+          labels: ["Email"],
+          roles: ['button "Pay now"'],
+          testIds: ["cart-count"],
+        },
       },
-    });
+    );
 
     assert.ok(diagnostics.includes('unknown label locator: "Coupon"'));
     assert.ok(diagnostics.includes('unknown role locator: button "Delete account"'));
@@ -215,7 +218,8 @@ test("checkout", async ({ page }) => {
   });
 
   it("rejects name filters on status role locators", () => {
-    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+    const diagnostics = validateGeneratedTestSource(
+      `import { test, expect } from "@playwright/test";
 import { gotoApp } from "./_helpers";
 
 test("profile", async ({ page }) => {
@@ -223,17 +227,20 @@ test("profile", async ({ page }) => {
   await expect(page.getByRole("status", { name: "Profile saved" })).toBeVisible();
   await expect(page).toHaveScreenshot("profile.png");
 });
-`, {
-      locatorInventory: {
-        roles: ['status "Profile saved"'],
+`,
+      {
+        locatorInventory: {
+          roles: ['status "Profile saved"'],
+        },
       },
-    });
+    );
 
     assert.ok(diagnostics.includes('role "status" should not use a name filter; assert text separately'));
   });
 
   it("allows nameless status role locators when a status role was observed", () => {
-    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+    const diagnostics = validateGeneratedTestSource(
+      `import { test, expect } from "@playwright/test";
 import { gotoApp } from "./_helpers";
 
 test("profile", async ({ page }) => {
@@ -241,12 +248,14 @@ test("profile", async ({ page }) => {
   await expect(page.getByRole("status")).toContainText("Profile saved");
   await expect(page).toHaveScreenshot("profile.png");
 });
-`, {
-      locatorInventory: {
-        roles: ['status "Profile saved"'],
-        texts: ["Profile saved"],
+`,
+      {
+        locatorInventory: {
+          roles: ['status "Profile saved"'],
+          texts: ["Profile saved"],
+        },
       },
-    });
+    );
 
     assert.deepEqual(diagnostics, []);
   });
@@ -258,7 +267,12 @@ describe("generatePlaywrightTest", () => {
       { planMarkdown: "# Checkout", testFilePath: "tests/checkout.spec.ts" },
       undefined,
       {
-        complete: async () => ({ content: `\`\`\`ts\n${validSource}\`\`\``, costUsd: 0.02, provider: "test", model: "generator" }),
+        complete: async () => ({
+          content: `\`\`\`ts\n${validSource}\`\`\``,
+          costUsd: 0.02,
+          provider: "test",
+          model: "generator",
+        }),
       },
     );
 
@@ -313,35 +327,47 @@ test("bad", async ({ page }) => { await page.goto("/"); });
 
 describe("resolveGeneratorModelOptions", () => {
   it("uses VLMKIT_LLM_PROVIDER before API-key based defaults", () => {
-    assert.deepEqual(resolveGeneratorModelOptions(undefined, {
-      VLMKIT_LLM_PROVIDER: "openrouter",
-      ANTHROPIC_API_KEY: "anthropic-key",
-      OPENROUTER_API_KEY: "openrouter-key",
-    }), {
-      provider: "openrouter",
-      model: "openai/gpt-5-codex",
-      maxTokens: 4096,
-    });
+    assert.deepEqual(
+      resolveGeneratorModelOptions(undefined, {
+        VLMKIT_LLM_PROVIDER: "openrouter",
+        ANTHROPIC_API_KEY: "anthropic-key",
+        OPENROUTER_API_KEY: "openrouter-key",
+      }),
+      {
+        provider: "openrouter",
+        model: "openai/gpt-5-codex",
+        maxTokens: 4096,
+      },
+    );
   });
 
   it("prefers Anthropic when no provider is explicit but an Anthropic key exists", () => {
-    assert.deepEqual(resolveGeneratorModelOptions(undefined, {
-      ANTHROPIC_API_KEY: "anthropic-key",
-      OPENROUTER_API_KEY: "openrouter-key",
-    }), {
-      provider: "anthropic",
-      maxTokens: 4096,
-    });
+    assert.deepEqual(
+      resolveGeneratorModelOptions(undefined, {
+        ANTHROPIC_API_KEY: "anthropic-key",
+        OPENROUTER_API_KEY: "openrouter-key",
+      }),
+      {
+        provider: "anthropic",
+        maxTokens: 4096,
+      },
+    );
   });
 
   it("preserves an explicit model for any provider", () => {
-    assert.deepEqual(resolveGeneratorModelOptions({ provider: "anthropic", model: "claude-test", maxTokens: 1234 }, {
-      VLMKIT_LLM_PROVIDER: "openrouter",
-    }), {
-      provider: "anthropic",
-      model: "claude-test",
-      maxTokens: 1234,
-    });
+    assert.deepEqual(
+      resolveGeneratorModelOptions(
+        { provider: "anthropic", model: "claude-test", maxTokens: 1234 },
+        {
+          VLMKIT_LLM_PROVIDER: "openrouter",
+        },
+      ),
+      {
+        provider: "anthropic",
+        model: "claude-test",
+        maxTokens: 1234,
+      },
+    );
   });
 
   it("falls back to OpenRouter when no environment gives a provider", () => {

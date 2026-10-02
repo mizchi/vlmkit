@@ -42,10 +42,7 @@ async function exists(path: string): Promise<boolean> {
  * `undefined` when the heatmap is missing (zero-diff viewport — a
  * triptych would offer no extra information over the variant alone).
  */
-export async function composeTriptych(
-  browser: Browser,
-  opts: ComposeTriptychOptions,
-): Promise<string | undefined> {
+export async function composeTriptych(browser: Browser, opts: ComposeTriptychOptions): Promise<string | undefined> {
   if (!opts.heatmapPath || !(await exists(opts.heatmapPath))) return undefined;
   if (!(await exists(opts.baselinePath)) || !(await exists(opts.variantPath))) return undefined;
 

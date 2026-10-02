@@ -48,14 +48,17 @@ export async function applyMask(page: Page, selectors: string[]): Promise<MaskRe
   const result: MaskResult = { applied: [], invalid: [], unmatched: [] };
   if (selectors.length === 0) return result;
 
-  const counts = await page.evaluate((list: string[]) =>
-    list.map((s) => {
-      try {
-        return document.querySelectorAll(s).length;
-      } catch {
-        return -1; // not valid CSS
-      }
-    }), selectors);
+  const counts = await page.evaluate(
+    (list: string[]) =>
+      list.map((s) => {
+        try {
+          return document.querySelectorAll(s).length;
+        } catch {
+          return -1; // not valid CSS
+        }
+      }),
+    selectors,
+  );
 
   for (let i = 0; i < selectors.length; i++) {
     const selector = selectors[i]!;

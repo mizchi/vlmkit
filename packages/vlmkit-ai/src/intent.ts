@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 export async function extractDiffSemantics(
   repoDir: string,
   base: string = "HEAD~1",
-  head: string = "HEAD"
+  head: string = "HEAD",
 ): Promise<DiffSemantics> {
   const [diffResult, logResult] = await Promise.all([
     execFileAsync("git", ["diff", "--unified=3", `${base}...${head}`], {
@@ -58,9 +58,7 @@ export function parseDiff(diffText: string): FileChange[] {
     let lineNum = 0;
 
     for (const line of lines) {
-      const hunkMatch = line.match(
-        /^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@(.*)$/
-      );
+      const hunkMatch = line.match(/^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@(.*)$/);
       if (hunkMatch) {
         if (currentHunk) hunks.push(currentHunk);
         lineNum = parseInt(hunkMatch[2], 10);
@@ -98,20 +96,11 @@ export function parseDiff(diffText: string): FileChange[] {
  * Infer change intent from files and commit message.
  * Lightweight version without LLM. See buildIntentWithLLM for LLM version.
  */
-export function buildIntent(
-  files: FileChange[],
-  commitMessage: string
-): ChangeIntent {
+export function buildIntent(files: FileChange[], commitMessage: string): ChangeIntent {
   const changeType = inferChangeType(commitMessage);
-  const affectedComponents = files
-    .filter((f) => isComponentFile(f.path))
-    .map((f) => f.path);
+  const affectedComponents = files.filter((f) => isComponentFile(f.path)).map((f) => f.path);
 
-  const expectedVisualChanges = inferVisualExpectations(
-    files,
-    commitMessage,
-    changeType
-  );
+  const expectedVisualChanges = inferVisualExpectations(files, commitMessage, changeType);
 
   return {
     summary: commitMessage.split("\n")[0],
@@ -122,9 +111,7 @@ export function buildIntent(
   };
 }
 
-function inferChangeType(
-  message: string
-): ChangeIntent["changeType"] {
+function inferChangeType(message: string): ChangeIntent["changeType"] {
   const lower = message.toLowerCase();
   if (/^fix[:(]|bug\s*fix|hotfix|patch/.test(lower)) return "bugfix";
   if (/^feat[:(]|feature|add\s/.test(lower)) return "feature";
@@ -145,7 +132,7 @@ function isComponentFile(path: string): boolean {
 function inferVisualExpectations(
   files: FileChange[],
   _commitMessage: string,
-  changeType: ChangeIntent["changeType"]
+  changeType: ChangeIntent["changeType"],
 ): VisualExpectation[] {
   const expectations: VisualExpectation[] = [];
 
@@ -167,11 +154,8 @@ function inferVisualExpectations(
     if (!isComponentFile(file.path)) continue;
 
     // Detect CSS/style changes
-    const styleChanges = file.hunks.some(
-      (h) =>
-        /(?:style|css|className|color|font|margin|padding|border|background)/i.test(
-          h.content
-        )
+    const styleChanges = file.hunks.some((h) =>
+      /(?:style|css|className|color|font|margin|padding|border|background)/i.test(h.content),
     );
 
     if (styleChanges) {
@@ -183,9 +167,8 @@ function inferVisualExpectations(
     }
 
     // Detect layout changes
-    const layoutChanges = file.hunks.some(
-      (h) =>
-        /(?:flex|grid|display|position|width|height|overflow)/i.test(h.content)
+    const layoutChanges = file.hunks.some((h) =>
+      /(?:flex|grid|display|position|width|height|overflow)/i.test(h.content),
     );
 
     if (layoutChanges) {
@@ -197,11 +180,8 @@ function inferVisualExpectations(
     }
 
     // Detect text/content changes
-    const contentChanges = file.hunks.some(
-      (h) =>
-        /(?:text|label|title|heading|<h[1-6]|<p|<span|innerText)/i.test(
-          h.content
-        )
+    const contentChanges = file.hunks.some((h) =>
+      /(?:text|label|title|heading|<h[1-6]|<p|<span|innerText)/i.test(h.content),
     );
 
     if (contentChanges) {
@@ -228,16 +208,12 @@ export interface LLMProvider {
 export async function buildIntentWithLLM(
   files: FileChange[],
   commitMessage: string,
-  llm: LLMProvider
+  llm: LLMProvider,
 ): Promise<ChangeIntent> {
-  const diffSummary = files
-    .map((f) => `${f.path} (+${f.additions}/-${f.deletions})`)
-    .join("\n");
+  const diffSummary = files.map((f) => `${f.path} (+${f.additions}/-${f.deletions})`).join("\n");
 
   const hunkSamples = files
-    .flatMap((f) =>
-      f.hunks.slice(0, 3).map((h) => `--- ${f.path}\n${h.content.slice(0, 500)}`)
-    )
+    .flatMap((f) => f.hunks.slice(0, 3).map((h) => `--- ${f.path}\n${h.content.slice(0, 500)}`))
     .join("\n\n");
 
   const prompt = `Analyze this code change and predict its visual impact.
@@ -281,14 +257,9 @@ Respond in JSON:
 /**
  * Build a reasoning prompt that validates VRT diff against Intent.
  */
-export function buildReasoningPrompt(
-  diff: VrtDiff,
-  intent: ChangeIntent
-): string {
+export function buildReasoningPrompt(diff: VrtDiff, intent: ChangeIntent): string {
   const matchingExpectations = intent.expectedVisualChanges.filter(
-    (e) =>
-      diff.snapshot.testTitle.includes(e.component) ||
-      e.component.includes(diff.snapshot.testTitle)
+    (e) => diff.snapshot.testTitle.includes(e.component) || e.component.includes(diff.snapshot.testTitle),
   );
 
   return `You are a visual regression test reviewer.

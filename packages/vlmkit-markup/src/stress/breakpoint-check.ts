@@ -93,11 +93,7 @@ export type BreakpointCheckIssueKind =
    * gate reported `status: ok` for the login page while naming the requested
    * URL as its source. Reported as a suspect issue so the pass cannot be silent.
    */
-  | "redirected"
-  | "boundary-spike"
-  | "boundary-gap"
-  | "overflow-at-boundary"
-  | "sweep-overflow";
+  "redirected" | "boundary-spike" | "boundary-gap" | "overflow-at-boundary" | "sweep-overflow";
 
 export interface BreakpointCheckIssue {
   kind: BreakpointCheckIssueKind;
@@ -195,7 +191,6 @@ export interface BreakpointCheckOptions extends PageLoadOptions {
   sweepMax?: number;
 }
 
-
 /**
  * Extract width breakpoints written in media-query range syntax —
  * `(width >= 768px)`, `(48rem < width)`, `(400px <= width <= 700px)` —
@@ -235,15 +230,7 @@ export function extractRangeSyntaxBreakpoints(css: string): { value: number; raw
   return [...found.entries()].map(([value, raw]) => ({ value, raw })).sort((a, b) => a.value - b.value);
 }
 
-const DISCRETE_PROPS = [
-  "display",
-  "position",
-  "float",
-  "flexDirection",
-  "flexWrap",
-  "order",
-  "textAlign",
-] as const;
+const DISCRETE_PROPS = ["display", "position", "float", "flexDirection", "flexWrap", "order", "textAlign"] as const;
 
 /**
  * Boundary invariant on three same-page renders at B−1 / B / B+1: every
@@ -315,9 +302,10 @@ export function deriveBreakpointIssues(results: BreakpointResult[]): BreakpointC
         severity: "suspect",
         selector: gap.selector,
         breakpoint: result.value,
-        message: gap.kind === "hidden-only-at"
-          ? `${gap.selector} disappears at exactly ${result.value}px but is visible at ${result.value - 1}px and ${result.value + 1}px — both hide rules apply (or neither show rule does) on the boundary itself.`
-          : `${gap.selector} is visible only at exactly ${result.value}px — the boundary width falls outside both adjacent regimes' hide rules.`,
+        message:
+          gap.kind === "hidden-only-at"
+            ? `${gap.selector} disappears at exactly ${result.value}px but is visible at ${result.value - 1}px and ${result.value + 1}px — both hide rules apply (or neither show rule does) on the boundary itself.`
+            : `${gap.selector} is visible only at exactly ${result.value}px — the boundary width falls outside both adjacent regimes' hide rules.`,
       });
     }
     for (const sample of result.samples) {
@@ -400,7 +388,6 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       await navigatePage(page, url, options);
     }
 
-
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
@@ -413,7 +400,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       values = [...options.breakpoints];
     } else {
       // Collect CSS in-page so external local stylesheets count too.
-      const collected = await page.evaluate(COLLECT_CSS_SCRIPT) as { cssText: string; crossOriginHrefs: string[] };
+      const collected = (await page.evaluate(COLLECT_CSS_SCRIPT)) as { cssText: string; crossOriginHrefs: string[] };
       let cssText = collected.cssText;
       // CSSOM refuses cross-origin rules; fetch those sheets out-of-band so
       // CDN-hosted responsive CSS still yields breakpoints. Chromium also
@@ -425,11 +412,11 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
         try {
           if (href.startsWith("file:")) {
             const { readFile } = await import("node:fs/promises");
-            cssText += "\n" + await readFile(fileURLToPath(href), "utf-8");
+            cssText += "\n" + (await readFile(fileURLToPath(href), "utf-8"));
           } else {
             const res = await fetch(href);
             if (!res.ok) continue;
-            cssText += "\n" + await res.text();
+            cssText += "\n" + (await res.text());
           }
           fetched++;
         } catch {
@@ -467,7 +454,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       // Media queries re-evaluate synchronously on resize; a settled rAF
       // keeps transition-mid states out of the sample.
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-      const collected = await page.evaluate(collectStylesScript(maxElements)) as Omit<WidthSample, "width">;
+      const collected = (await page.evaluate(collectStylesScript(maxElements))) as Omit<WidthSample, "width">;
       samples.set(width, { width, ...collected });
     }
 
@@ -483,9 +470,9 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       for (let width = min; width <= max; width += step) {
         await page.setViewportSize({ width, height });
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-        const overflow = await page.evaluate(
+        const overflow = (await page.evaluate(
           "Math.max(0, document.documentElement.scrollWidth - window.innerWidth)",
-        ) as number;
+        )) as number;
         sweepSamples.push({ width, horizontalOverflow: overflow });
       }
       sweep = {
@@ -545,9 +532,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       issues: [
         // First, and suspect: the status line is derived from the issue list, so
         // a printed note alone would have left `status: ok` on a login page.
-        ...(redirectNote
-          ? [{ kind: "redirected" as const, severity: "suspect" as const, message: redirectNote }]
-          : []),
+        ...(redirectNote ? [{ kind: "redirected" as const, severity: "suspect" as const, message: redirectNote }] : []),
         ...deriveBreakpointIssues(results),
         ...(sweep ? deriveSweepIssues(sweep) : []),
       ],
@@ -572,13 +557,16 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport, rules
     lines.push(`${icon} ${entry.row.message}${retuneNote(entry)}${RESET}`);
   }
   if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
-    lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`);
+    lines.push(
+      `${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`,
+    );
   }
   if (report.sweep) {
     const s = report.sweep;
-    const verdict = s.overflowRanges.length === 0
-      ? `${GREEN}clean${RESET}`
-      : `${YELLOW}${s.overflowRanges.length} overflow range(s)${RESET}`;
+    const verdict =
+      s.overflowRanges.length === 0
+        ? `${GREEN}clean${RESET}`
+        : `${YELLOW}${s.overflowRanges.length} overflow range(s)${RESET}`;
     lines.push(`width sweep: ${s.min}-${s.max}px step ${s.step} (${s.sampledWidths} widths) — ${verdict}`);
   }
   if (report.checkedValues.length === 0) {
@@ -600,10 +588,12 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport, rules
     const overflowNote = bp.samples.some((s) => s.horizontalOverflow > 1)
       ? ` overflow:${bp.samples.map((s) => `${s.horizontalOverflow}`).join("/")}px`
       : "";
-    const verdict = bp.spikes.length === 0 && bp.gaps.length === 0 && !overflowNote
-      ? `${GREEN}clean${RESET}`
-      : `${bp.spikes.length} spike(s), ${bp.gaps.length} gap(s)${overflowNote}`;
-    const raw = bp.raw.length > 0 ? ` ${DIM}${bp.raw[0]}${bp.raw.length > 1 ? ` +${bp.raw.length - 1}` : ""}${RESET}` : "";
+    const verdict =
+      bp.spikes.length === 0 && bp.gaps.length === 0 && !overflowNote
+        ? `${GREEN}clean${RESET}`
+        : `${bp.spikes.length} spike(s), ${bp.gaps.length} gap(s)${overflowNote}`;
+    const raw =
+      bp.raw.length > 0 ? ` ${DIM}${bp.raw[0]}${bp.raw.length > 1 ? ` +${bp.raw.length - 1}` : ""}${RESET}` : "";
     lines.push(`  ${bp.value}px: ${verdict}${raw}`);
   }
   if (shown.length > 0) {

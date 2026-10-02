@@ -66,10 +66,7 @@ async function writeCrops(
   await mkdir(dir, { recursive: true });
   const written: string[] = [];
   const save = async (name: string, img: { data: Uint8Array; width: number; height: number }, c: ComponentBbox) => {
-    const crop = cropRegion(
-      { width: img.width, height: img.height, data: img.data },
-      c.left, c.top, c.width, c.height,
-    );
+    const crop = cropRegion({ width: img.width, height: img.height, data: img.data }, c.left, c.top, c.width, c.height);
     if (crop.width === 0 || crop.height === 0) return;
     const png = new PNG({ width: crop.width, height: crop.height });
     png.data = Buffer.from(crop.data.buffer, crop.data.byteOffset, crop.data.byteLength);
@@ -168,8 +165,9 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "page-compose"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "page-compose" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

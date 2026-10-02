@@ -89,15 +89,21 @@ async function captureElementScreenshot(
     const bbox = await locator.boundingBox();
     if (!bbox) return { found: false };
     await locator.screenshot({ path: outputPath });
-    return { found: true, bbox: { x: Math.round(bbox.x), y: Math.round(bbox.y), width: Math.round(bbox.width), height: Math.round(bbox.height) } };
+    return {
+      found: true,
+      bbox: {
+        x: Math.round(bbox.x),
+        y: Math.round(bbox.y),
+        width: Math.round(bbox.width),
+        height: Math.round(bbox.height),
+      },
+    };
   } catch {
     return { found: false };
   }
 }
 
-export async function runElementCompare(
-  options: ElementCompareOptions,
-): Promise<ElementCompareReport> {
+export async function runElementCompare(options: ElementCompareOptions): Promise<ElementCompareReport> {
   const {
     selectors,
     viewport = { width: 1280, height: 900 },
@@ -234,13 +240,18 @@ function parseArgs(args: string[]): ElementCompareOptions {
   if (!selectorsRaw) {
     throw new UsageError("--selectors is required (comma-separated CSS selectors)");
   }
-  const selectors = selectorsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const selectors = selectorsRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const baselineUrl = getArg("url") || undefined;
   const currentUrl = getArg("current-url") || undefined;
 
   // Positional args for file mode
-  const positional = args.filter((a) => !a.startsWith("--") && !args.some((b, i) => b.startsWith("--") && args[i + 1] === a));
+  const positional = args.filter(
+    (a) => !a.startsWith("--") && !args.some((b, i) => b.startsWith("--") && args[i + 1] === a),
+  );
   const baselineFile = !baselineUrl ? positional[0] : undefined;
   const currentFile = !currentUrl ? positional[1] : undefined;
 
@@ -263,8 +274,8 @@ function parseArgs(args: string[]): ElementCompareOptions {
 function formatUsage(): string {
   return [
     "Usage:",
-    "  vlmkit diff component --url <baseline> --current-url <current> --selectors \"header,main,footer\"",
-    "  vlmkit diff component before.html after.html --selectors \"header,.content\"",
+    '  vlmkit diff component --url <baseline> --current-url <current> --selectors "header,main,footer"',
+    '  vlmkit diff component before.html after.html --selectors "header,.content"',
     "",
     "Aliases:",
     "  vlmkit diff elements",
@@ -333,9 +344,15 @@ async function main() {
   }
   const elColor = summary.elementDiffRatio === 0 ? GREEN : summary.elementDiffRatio < 0.01 ? YELLOW : RED;
   console.log(`  Element diff:      ${elColor}${(summary.elementDiffRatio * 100).toFixed(2)}%${RESET}`);
-  console.log(`  ${DIM}Elements: ${summary.total} total, ${summary.matched} matched, ${summary.changed} changed, ${summary.missing} missing${RESET}`);
+  console.log(
+    `  ${DIM}Elements: ${summary.total} total, ${summary.matched} matched, ${summary.changed} changed, ${summary.missing} missing${RESET}`,
+  );
 
-  if (summary.fullPageDiffRatio !== undefined && summary.fullPageDiffRatio > 0 && summary.elementDiffRatio < summary.fullPageDiffRatio) {
+  if (
+    summary.fullPageDiffRatio !== undefined &&
+    summary.fullPageDiffRatio > 0 &&
+    summary.elementDiffRatio < summary.fullPageDiffRatio
+  ) {
     const reduction = ((1 - summary.elementDiffRatio / summary.fullPageDiffRatio) * 100).toFixed(0);
     console.log(`  ${GREEN}Element-level reduces noise by ${reduction}%${RESET}`);
   }

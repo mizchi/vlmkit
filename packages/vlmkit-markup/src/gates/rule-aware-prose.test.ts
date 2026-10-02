@@ -29,8 +29,13 @@ const plain = (s: string) => s.replace(/\[[0-9;]*m/g, "");
 
 describe("check a11y touch", () => {
   const report = {
-    source: "p.html", level: "AAA", required: 44, viewport: { width: 1280, height: 720 },
-    screenshot: "s.png", inspectedCount: 3, reportPath: "r.md",
+    source: "p.html",
+    level: "AAA",
+    required: 44,
+    viewport: { width: 1280, height: 720 },
+    screenshot: "s.png",
+    inspectedCount: 3,
+    reportPath: "r.md",
     failures: [
       { path: "a.one", bbox: { width: 30, height: 14 }, minSide: 14, required: 44, text: "Terms" },
       { path: "a.two", bbox: { width: 20, height: 14 }, minSide: 14, required: 44, text: "Docs" },
@@ -60,8 +65,20 @@ describe("check a11y touch", () => {
 
 describe("check a11y contrast", () => {
   const report = {
-    html: "p.html", totalText: 9, screenshot: "s.png", reportPath: "r.md",
-    failures: [{ path: "p.hint", ratio: 2.8, requiredAA: 4.5, foreground: { hex: "#999" }, background: { hex: "#fff" }, text: "Hi" }],
+    html: "p.html",
+    totalText: 9,
+    screenshot: "s.png",
+    reportPath: "r.md",
+    failures: [
+      {
+        path: "p.hint",
+        ratio: 2.8,
+        requiredAA: 4.5,
+        foreground: { hex: "#999" },
+        background: { hex: "#fff" },
+        text: "Hi",
+      },
+    ],
   };
 
   it("off reports the measurement and no failure", () => {
@@ -73,7 +90,10 @@ describe("check a11y contrast", () => {
 
 describe("check a11y focus", () => {
   const report = {
-    source: "p.html", viewport: { width: 1280, height: 720 }, screenshot: "s.png", reportPath: "r.md",
+    source: "p.html",
+    viewport: { width: 1280, height: 720 },
+    screenshot: "s.png",
+    reportPath: "r.md",
     steps: [{}, {}, {}],
     findings: [
       { kind: "reverse", fromIndex: 1, toIndex: 2, message: "moved up" },
@@ -97,7 +117,11 @@ describe("check a11y focus", () => {
 
 describe("check tokens", () => {
   const base = {
-    source: "p.html", viewport: { width: 1280, height: 720 }, config: {}, inspectedCount: 12, reportPath: "r.md",
+    source: "p.html",
+    viewport: { width: 1280, height: 720 },
+    config: {},
+    inspectedCount: 12,
+    reportPath: "r.md",
     violations: [
       { property: "padding", path: "div.a", tag: "div", value: 7, nearest: 8 },
       { property: "padding", path: "div.b", tag: "div", value: 9, nearest: 8 },
@@ -128,9 +152,22 @@ describe("check tokens", () => {
 
 describe("check theme", () => {
   const report = {
-    html: "p.html", viewport: { width: 1280, height: 900 }, lightScreenshot: "l.png", darkScreenshot: "d.png",
-    themePixelDelta: 0.001, totalMatched: 4, reportPath: "r.md",
-    unthemed: [{ rank: 1, bbox: { left: 0, top: 0, width: 10, height: 10 }, lightFill: { hex: "#fff" }, darkFill: { hex: "#fff" }, fillDelta: 0 }],
+    html: "p.html",
+    viewport: { width: 1280, height: 900 },
+    lightScreenshot: "l.png",
+    darkScreenshot: "d.png",
+    themePixelDelta: 0.001,
+    totalMatched: 4,
+    reportPath: "r.md",
+    unthemed: [
+      {
+        rank: 1,
+        bbox: { left: 0, top: 0, width: 10, height: 10 },
+        lightFill: { hex: "#fff" },
+        darkFill: { hex: "#fff" },
+        fillDelta: 0,
+      },
+    ],
   };
 
   it("each of its two rules can be silenced without touching the other", () => {
@@ -147,8 +184,23 @@ describe("check theme", () => {
 });
 
 describe("stress i18n", () => {
-  const wrap = { path: "div.a", tag: "div", text: "x", kind: "vertical-wrap", before: { width: 10, height: 10, clientWidth: 10, scrollWidth: 10 }, after: { width: 10, height: 20, clientWidth: 10, scrollWidth: 10 } };
-  const report = { html: "p.html", inflateFactor: 1.4, beforeScreenshot: "b.png", afterScreenshot: "a.png", totalInspected: 20, reportPath: "r.md", overflowing: [wrap, { ...wrap, path: "div.b" }] };
+  const wrap = {
+    path: "div.a",
+    tag: "div",
+    text: "x",
+    kind: "vertical-wrap",
+    before: { width: 10, height: 10, clientWidth: 10, scrollWidth: 10 },
+    after: { width: 10, height: 20, clientWidth: 10, scrollWidth: 10 },
+  };
+  const report = {
+    html: "p.html",
+    inflateFactor: 1.4,
+    beforeScreenshot: "b.png",
+    afterScreenshot: "a.png",
+    totalInspected: 20,
+    reportPath: "r.md",
+    overflowing: [wrap, { ...wrap, path: "div.b" }],
+  };
 
   it("the rule people actually turn off empties the list and says why", () => {
     const off = plain(formatI18nStressReport(report as never, ruleViewFrom({ "vertical-wrap": "off" })));
@@ -164,10 +216,29 @@ describe("stress i18n", () => {
 
 describe("stress media", () => {
   const report = {
-    source: "p.html", viewport: { width: 1280, height: 720 }, defaultScreenshot: "d.png", reportPath: "r.md",
+    source: "p.html",
+    viewport: { width: 1280, height: 720 },
+    defaultScreenshot: "d.png",
+    reportPath: "r.md",
     variants: [
-      { variant: "print", screenshotPath: "p.png", deltaRatio: 0, deltaPixels: 0, totalPixels: 1, verdict: "warn", note: "no print rule" },
-      { variant: "rtl", screenshotPath: "r.png", deltaRatio: 0.07, deltaPixels: 1, totalPixels: 1, verdict: "suspect", note: "physical props" },
+      {
+        variant: "print",
+        screenshotPath: "p.png",
+        deltaRatio: 0,
+        deltaPixels: 0,
+        totalPixels: 1,
+        verdict: "warn",
+        note: "no print rule",
+      },
+      {
+        variant: "rtl",
+        screenshotPath: "r.png",
+        deltaRatio: 0.07,
+        deltaPixels: 1,
+        totalPixels: 1,
+        verdict: "suspect",
+        note: "physical props",
+      },
     ],
   };
 
@@ -182,9 +253,20 @@ describe("stress media", () => {
 
 describe("check design", () => {
   const report = {
-    source: "p.html", verdict: "drift", findings: [{ kind: "component-drift", severity: "warn", role: "button", message: "2 styles" }],
-    roles: [], spacingValues: 3, excludedElements: 0, exclusions: [], judgedElements: 4, skipped: 1, statefulSkipped: 0,
-    skippedTags: [], textFreeSamples: 0, textFreeFolded: 0, thresholds: { minReuse: 3, minInstances: 3 },
+    source: "p.html",
+    verdict: "drift",
+    findings: [{ kind: "component-drift", severity: "warn", role: "button", message: "2 styles" }],
+    roles: [],
+    spacingValues: 3,
+    excludedElements: 0,
+    exclusions: [],
+    judgedElements: 4,
+    skipped: 1,
+    statefulSkipped: 0,
+    skippedTags: [],
+    textFreeSamples: 0,
+    textFreeFolded: 0,
+    thresholds: { minReuse: 3, minInstances: 3 },
   };
 
   it("does not claim 'no design drift detected' for drift it was told not to report", () => {
@@ -228,8 +310,15 @@ import { formatRegionJudgeReport } from "../inspect/region-judge.ts";
 
 describe("check copy", () => {
   const report = {
-    source: "p.html", textLength: 120, statesExplored: 0, droppedStates: 0, manifestLines: 2,
-    missingLines: ["Sign up"], invisibleLines: [], allowedInvisibleLines: [], revealedLines: [],
+    source: "p.html",
+    textLength: 120,
+    statesExplored: 0,
+    droppedStates: 0,
+    manifestLines: 2,
+    missingLines: ["Sign up"],
+    invisibleLines: [],
+    allowedInvisibleLines: [],
+    revealedLines: [],
     issues: [
       { kind: "copy-missing", severity: "suspect", message: `"Sign up" is not on the page` },
       { kind: "placeholder-text", severity: "suspect", message: "Lorem ipsum at p.intro" },
@@ -244,10 +333,9 @@ describe("check copy", () => {
   });
 
   it("all rules off says so instead of 'No copy issues detected'", () => {
-    const off = plain(formatCopyCheckReport(
-      report as never,
-      ruleViewFrom({ "placeholder-text": "off", "copy-missing": "off" }),
-    ));
+    const off = plain(
+      formatCopyCheckReport(report as never, ruleViewFrom({ "placeholder-text": "off", "copy-missing": "off" })),
+    );
     assert.match(off, /status: ok/);
     assert.doesNotMatch(off, /No copy issues detected/, "two issues were measured — that line would be false");
     assert.match(off, /2 finding\(s\) not shown/);
@@ -256,7 +344,9 @@ describe("check copy", () => {
 
 describe("check breakpoints", () => {
   const report = {
-    source: "p.html", checkedValues: [768], breakpoints: [{ value: 768, samples: [], spikes: [{}], gaps: [], raw: [] }],
+    source: "p.html",
+    checkedValues: [768],
+    breakpoints: [{ value: 768, samples: [], spikes: [{}], gaps: [], raw: [] }],
     issues: [
       { kind: "boundary-spike", severity: "suspect", message: "height jumps 40px at 768", selector: ".grid" },
       { kind: "sweep-overflow", severity: "warn", message: "overflow 12px at 812" },
@@ -271,10 +361,9 @@ describe("check breakpoints", () => {
   });
 
   it("with every rule off it does not claim all boundaries consistent", () => {
-    const off = plain(formatBreakpointCheckReport(
-      report as never,
-      ruleViewFrom({ "boundary-spike": "off", "sweep-overflow": "off" }),
-    ));
+    const off = plain(
+      formatBreakpointCheckReport(report as never, ruleViewFrom({ "boundary-spike": "off", "sweep-overflow": "off" })),
+    );
     assert.doesNotMatch(off, /All boundaries consistent/);
     assert.match(off, /2 finding\(s\) not shown/);
   });
@@ -282,7 +371,11 @@ describe("check breakpoints", () => {
 
 describe("check scroll", () => {
   const report = {
-    source: "p.html", pageScrolled: 500, stickyFixed: [], engagedSticky: 0, snaps: [],
+    source: "p.html",
+    pageScrolled: 500,
+    stickyFixed: [],
+    engagedSticky: 0,
+    snaps: [],
     issues: [{ kind: "sticky-not-sticking", severity: "suspect", message: "moved with the page", selector: "header" }],
   };
 
@@ -295,9 +388,23 @@ describe("check scroll", () => {
 
 describe("scan scroll", () => {
   const report = {
-    source: "p.html", page: { viewportWidth: 1280, viewportHeight: 720, scrollWidth: 1400, scrollHeight: 2000, horizontalOverflow: 120, verticalScroll: 1280 },
-    containers: [], deadScrollports: [], clipped: [], visuallyHidden: 0, expectedScrollports: [],
-    issues: [{ kind: "page-overflow-x", severity: "suspect", message: "page scrolls 120px sideways", selector: ".hero" }],
+    source: "p.html",
+    page: {
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      scrollWidth: 1400,
+      scrollHeight: 2000,
+      horizontalOverflow: 120,
+      verticalScroll: 1280,
+    },
+    containers: [],
+    deadScrollports: [],
+    clipped: [],
+    visuallyHidden: 0,
+    expectedScrollports: [],
+    issues: [
+      { kind: "page-overflow-x", severity: "suspect", message: "page scrolls 120px sideways", selector: ".hero" },
+    ],
   };
 
   it("off keeps the measured overflow number in the page line", () => {
@@ -311,8 +418,14 @@ describe("scan scroll", () => {
 
 describe("check motion", () => {
   const report = {
-    source: "p.html", sampleCount: 3, activeAnimationCount: 4, activeTransitionCount: 1,
-    runningAnimationCount: 4, pausedAnimationCount: 0, hasReducedMotionRule: false, samples: [],
+    source: "p.html",
+    sampleCount: 3,
+    activeAnimationCount: 4,
+    activeTransitionCount: 1,
+    runningAnimationCount: 4,
+    pausedAnimationCount: 0,
+    hasReducedMotionRule: false,
+    samples: [],
     issues: [
       { kind: "missing-reduced-motion", severity: "suspect", message: "no reduce rule" },
       { kind: "running-animation", severity: "warn", message: "fadeIn is running", selector: ".card" },
@@ -330,8 +443,13 @@ describe("check motion", () => {
 
 describe("check animation", () => {
   const report = {
-    source: "p.html", viewport: { width: 1280, height: 720 }, animationCount: 4, evaluated: [], infinite: [],
-    settleMs: 4500, reducedMotion: { remainingCount: 2 },
+    source: "p.html",
+    viewport: { width: 1280, height: 720 },
+    animationCount: 4,
+    evaluated: [],
+    infinite: [],
+    settleMs: 4500,
+    reducedMotion: { remainingCount: 2 },
     issues: [
       { kind: "long-settle", severity: "warn", message: "4500ms to settle" },
       { kind: "reduced-motion-ignored", severity: "suspect", message: "2 still running", selector: ".card" },
@@ -345,7 +463,11 @@ describe("check animation", () => {
     const off = plain(formatAnimationEvalReport(report as never, ruleViewFrom({ "long-settle": "off" })));
     assert.match(off, /settle: 4500ms/, "the settle time is a measurement");
     assert.doesNotMatch(off, /\[long-settle\]/, "but nothing claims a live rule carries it");
-    assert.match(off, /reduced-motion: 2 animation\(s\) still running \[reduced-motion-ignored\]/, "the other tag stays");
+    assert.match(
+      off,
+      /reduced-motion: 2 animation\(s\) still running \[reduced-motion-ignored\]/,
+      "the other tag stays",
+    );
   });
 
   it("unset is unchanged from before the migration", () => {
@@ -357,8 +479,13 @@ describe("check animation", () => {
 
 describe("check asset", () => {
   const report = {
-    source: "hero.png", width: 1200, height: 630, aspect: 1.905, backgroundKind: "opaque",
-    occupancy: 0.42, issues: [{ kind: "opaque-background", severity: "suspect", message: "no alpha channel" }],
+    source: "hero.png",
+    width: 1200,
+    height: 630,
+    aspect: 1.905,
+    backgroundKind: "opaque",
+    occupancy: 0.42,
+    issues: [{ kind: "opaque-background", severity: "suspect", message: "no alpha channel" }],
   };
 
   it("off keeps the measured background kind", () => {
@@ -371,10 +498,23 @@ describe("check asset", () => {
 
 describe("check layout", () => {
   const report = {
-    source: "p.html", done: false, passed: 1, total: 2,
+    source: "p.html",
+    done: false,
+    passed: 1,
+    total: 2,
     results: [
-      { rule: { selector: ".card" }, viewport: 1280, passed: false, checks: [{ name: "perRow", expected: "3", measured: "2", passed: false }] },
-      { rule: { selector: ".hero" }, viewport: 1280, passed: true, checks: [{ name: "visible", expected: "true", passed: true }] },
+      {
+        rule: { selector: ".card" },
+        viewport: 1280,
+        passed: false,
+        checks: [{ name: "perRow", expected: "3", measured: "2", passed: false }],
+      },
+      {
+        rule: { selector: ".hero" },
+        viewport: 1280,
+        passed: true,
+        checks: [{ name: "visible", expected: "true", passed: true }],
+      },
     ],
   };
 
@@ -383,7 +523,11 @@ describe("check layout", () => {
     // `exits 0` is the contradiction this migration exists to remove.
     const off = plain(formatLayoutReport(report as never, ruleViewFrom({ "per-row": "off" })));
     assert.match(off, /verdict: SATISFIED \(1\/2 rules\)/, "passed/total stay as measured");
-    assert.match(off, /- perRow: expected 3, measured 2 — NOT reported \(per-row off\)/, "the row keeps its measurement");
+    assert.match(
+      off,
+      /- perRow: expected 3, measured 2 — NOT reported \(per-row off\)/,
+      "the row keeps its measurement",
+    );
     assert.match(off, /1 failing check\(s\) not reported — rule turned off \(per-row x1\)/);
   });
 
@@ -396,9 +540,21 @@ describe("check layout", () => {
 
 describe("check story", () => {
   const report = {
-    gallery: "g.html", viewport: { width: 800, height: 600 }, threshold: 0.01, storyPixels: 0, pagePixels: 0,
+    gallery: "g.html",
+    viewport: { width: 800, height: 600 },
+    threshold: 0.01,
+    storyPixels: 0,
+    pagePixels: 0,
     results: [
-      { story: "Button/Primary", outcome: "changed", width: 88, height: 36, diffRatio: 0.04, diffPixels: 120, totalPixels: 3168 },
+      {
+        story: "Button/Primary",
+        outcome: "changed",
+        width: 88,
+        height: 36,
+        diffRatio: 0.04,
+        diffPixels: 120,
+        totalPixels: 3168,
+      },
       { story: "Card/Default", outcome: "new-baseline", width: 274, height: 88, baselinePath: "b.png" },
     ],
   };
@@ -422,11 +578,32 @@ describe("check story", () => {
 
 describe("check drift component", () => {
   const report = {
-    html: "p.html", selector: ".card", instanceCount: 3, referenceIndex: 0, allowRuleCount: 0, instances: [],
+    html: "p.html",
+    selector: ".card",
+    instanceCount: 3,
+    referenceIndex: 0,
+    allowRuleCount: 0,
+    instances: [],
     reportPath: "r.md",
     deltas: [
-      { candidateIndex: 1, diffRatio: 0.047, bboxDeltas: { width: 0, height: 0 }, styleDeltas: [{ property: "padding-top", reference: "20px", candidate: "12px" }], exemptedStyleDeltas: [], paletteOnlyInCand: 0, paletteOnlyInRef: 0 },
-      { candidateIndex: 2, diffRatio: 0.002, bboxDeltas: { width: 0, height: 0 }, styleDeltas: [], exemptedStyleDeltas: [], paletteOnlyInCand: 0, paletteOnlyInRef: 0 },
+      {
+        candidateIndex: 1,
+        diffRatio: 0.047,
+        bboxDeltas: { width: 0, height: 0 },
+        styleDeltas: [{ property: "padding-top", reference: "20px", candidate: "12px" }],
+        exemptedStyleDeltas: [],
+        paletteOnlyInCand: 0,
+        paletteOnlyInRef: 0,
+      },
+      {
+        candidateIndex: 2,
+        diffRatio: 0.002,
+        bboxDeltas: { width: 0, height: 0 },
+        styleDeltas: [],
+        exemptedStyleDeltas: [],
+        paletteOnlyInCand: 0,
+        paletteOnlyInRef: 0,
+      },
     ],
   };
 
@@ -441,10 +618,26 @@ describe("check drift component", () => {
 
 describe("check drift pages", () => {
   const report = {
-    selector: "header", reference: "index.html", reportPath: "r.md",
+    selector: "header",
+    reference: "index.html",
+    reportPath: "r.md",
     deltas: [
-      { candidate: "about.html", diffRatio: 0.08, bboxDeltas: { width: 0, height: 0 }, paletteOnlyInCand: 0, paletteOnlyInRef: 0, heatmapRegions: 1 },
-      { candidate: "blog.html", diffRatio: Number.NaN, bboxDeltas: { width: 0, height: 0 }, paletteOnlyInCand: 0, paletteOnlyInRef: 0, heatmapRegions: 0 },
+      {
+        candidate: "about.html",
+        diffRatio: 0.08,
+        bboxDeltas: { width: 0, height: 0 },
+        paletteOnlyInCand: 0,
+        paletteOnlyInRef: 0,
+        heatmapRegions: 1,
+      },
+      {
+        candidate: "blog.html",
+        diffRatio: Number.NaN,
+        bboxDeltas: { width: 0, height: 0 },
+        paletteOnlyInCand: 0,
+        paletteOnlyInRef: 0,
+        heatmapRegions: 0,
+      },
     ],
   };
 
@@ -458,16 +651,34 @@ describe("check drift pages", () => {
 
 describe("verify markup", () => {
   const report = {
-    attempt: 2, done: false, kickback: ["fix the gap"], trend: undefined,
-    targets: [{ target: "t.png", width: 1280, height: 800, pass: false, matched: 4, missing: 1, missingBlocking: 1, extra: 0, extraBlocking: 0, orderViolations: 0, gapDeltas: 0, pixelDiffRatio: 0.03, renderedHeight: 900 }],
+    attempt: 2,
+    done: false,
+    kickback: ["fix the gap"],
+    trend: undefined,
+    targets: [
+      {
+        target: "t.png",
+        width: 1280,
+        height: 800,
+        pass: false,
+        matched: 4,
+        missing: 1,
+        missingBlocking: 1,
+        extra: 0,
+        extraBlocking: 0,
+        orderViolations: 0,
+        gapDeltas: 0,
+        pixelDiffRatio: 0.03,
+        renderedHeight: 900,
+      },
+    ],
     gates: [{ gate: "check integrity", gateId: "check.integrity", suspects: 2, warns: 0, summary: "2 defects" }],
   };
 
   it("does not print NOT DONE when every rule behind the residuals is off", () => {
-    const off = plain(formatMarkupVerifyReport(
-      report as never,
-      ruleViewFrom({ "target-failed": "off", "gate-suspect": "off" }),
-    ));
+    const off = plain(
+      formatMarkupVerifyReport(report as never, ruleViewFrom({ "target-failed": "off", "gate-suspect": "off" })),
+    );
     assert.match(off, /verdict: DONE \(residuals remain, but every rule covering them is off\)/);
     assert.match(off, /fail — NOT reported/, "the target row still says it failed the measurement");
     assert.match(off, /suspect x2 — NOT reported/);
@@ -483,10 +694,18 @@ describe("verify markup", () => {
 
 describe("verify flow", () => {
   const report = {
-    source: "p.html", done: false, passed: 1, total: 2,
+    source: "p.html",
+    done: false,
+    passed: 1,
+    total: 2,
     steps: [
       { index: 0, label: "open", passed: true, assertions: [] },
-      { index: 1, label: "submit", passed: false, assertions: [{ passed: false, assert: { assert: "text", selector: ".toast", contains: "Saved" }, actual: "" }] },
+      {
+        index: 1,
+        label: "submit",
+        passed: false,
+        assertions: [{ passed: false, assert: { assert: "text", selector: ".toast", contains: "Saved" }, actual: "" }],
+      },
     ],
   };
 
@@ -503,10 +722,21 @@ describe("verify flow", () => {
 
 describe("check equivalence", () => {
   const report = {
-    source: "a.html", target: "b.png",
+    source: "a.html",
+    target: "b.png",
     verdicts: [
-      { outcome: "different", region: { left: 0, top: 0, width: 100, height: 50 }, measuredDelta: 12.4, pairImage: "p1.png" },
-      { outcome: "pending-review", region: { left: 0, top: 60, width: 100, height: 50 }, measuredDelta: 4.1, pairImage: "p2.png" },
+      {
+        outcome: "different",
+        region: { left: 0, top: 0, width: 100, height: 50 },
+        measuredDelta: 12.4,
+        pairImage: "p1.png",
+      },
+      {
+        outcome: "pending-review",
+        region: { left: 0, top: 60, width: 100, height: 50 },
+        measuredDelta: 4.1,
+        pairImage: "p2.png",
+      },
     ],
   };
 

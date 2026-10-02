@@ -21,7 +21,7 @@ describe("createApiApp", () => {
 
     const statusResponse = await app.request("http://vrt.local/api/status");
     assert.equal(statusResponse.status, 200);
-    const status = await statusResponse.json() as {
+    const status = (await statusResponse.json()) as {
       capabilities: string[];
       backends: Array<{ name: string; available: boolean }>;
       storage?: { r2: boolean; kv: boolean; d1: boolean; available: boolean };
@@ -35,7 +35,7 @@ describe("createApiApp", () => {
 
     const openApiResponse = await app.request("http://vrt.local/api/openapi.json");
     assert.equal(openApiResponse.status, 200);
-    const spec = await openApiResponse.json() as {
+    const spec = (await openApiResponse.json()) as {
       servers: Array<{ url: string }>;
       paths: Record<string, unknown>;
     };
@@ -49,21 +49,23 @@ describe("createApiApp", () => {
       resolveCraterAvailable: async () => false,
       listExecutionResults: async (query) => ({
         total: 1,
-        results: [{
-          runId: query.q === "daily" ? "daily-1" : "other",
-          runType: "snapshot",
-          latestCreatedAt: "2026-05-22T00:00:00.000Z",
-          artifactCount: 1,
-          artifactKinds: ["snapshot"],
-          artifacts: [],
-        }],
+        results: [
+          {
+            runId: query.q === "daily" ? "daily-1" : "other",
+            runType: "snapshot",
+            latestCreatedAt: "2026-05-22T00:00:00.000Z",
+            artifactCount: 1,
+            artifactKinds: ["snapshot"],
+            artifacts: [],
+          },
+        ],
       }),
     });
 
     const response = await app.request("http://vrt.local/api/execution-results?q=daily&limit=5");
 
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       total: number;
       results: Array<{ runId: string }>;
     };
@@ -86,15 +88,17 @@ describe("createApiApp", () => {
                 },
                 async all() {
                   return {
-                    results: [{
-                      run_id: "worker-run",
-                      run_type: "snapshot",
-                      artifact_kind: "snapshot",
-                      artifact_path: "snapshot-report.json",
-                      r2_key: "runs/worker-run/snapshot/snapshot-report.json",
-                      content_type: "application/json",
-                      created_at: "2026-05-22T00:00:00.000Z",
-                    }],
+                    results: [
+                      {
+                        run_id: "worker-run",
+                        run_type: "snapshot",
+                        artifact_kind: "snapshot",
+                        artifact_path: "snapshot-report.json",
+                        r2_key: "runs/worker-run/snapshot/snapshot-report.json",
+                        content_type: "application/json",
+                        created_at: "2026-05-22T00:00:00.000Z",
+                      },
+                    ],
                   };
                 },
               };
@@ -111,7 +115,7 @@ describe("createApiApp", () => {
     );
 
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       results: Array<{ runId: string }>;
     };
     assert.equal(body.results[0]?.runId, "worker-run");
@@ -122,21 +126,23 @@ describe("createApiApp", () => {
       resolveCraterAvailable: async () => false,
       listVisualDiffDisplays: async () => ({
         total: 1,
-        results: [{
-          runId: "run-1",
-          runType: "snapshot",
-          displayKey: "home-desktop",
-          latestCreatedAt: "2026-05-22T00:00:00.000Z",
-          availableModes: ["side-by-side", "heatmap", "overlay"],
-          assets: {},
-        }],
+        results: [
+          {
+            runId: "run-1",
+            runType: "snapshot",
+            displayKey: "home-desktop",
+            latestCreatedAt: "2026-05-22T00:00:00.000Z",
+            availableModes: ["side-by-side", "heatmap", "overlay"],
+            assets: {},
+          },
+        ],
       }),
     });
 
     const response = await app.request("http://vrt.local/api/visual-diffs?q=home");
 
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       total: number;
       results: Array<{ displayKey: string }>;
     };
@@ -149,24 +155,26 @@ describe("createApiApp", () => {
       resolveCraterAvailable: async () => false,
       listDetectionSeries: async (query) => ({
         total: 2,
-        points: [{
-          runId: `${query.backend ?? "all"}:${query.fixture ?? "all"}`,
-          createdAt: "2026-05-22T00:00:00.000Z",
-          fixture: query.fixture ?? "page",
-          backend: query.backend ?? "prescanner",
-          trials: 10,
-          detected: 8,
-          detectionRate: 0.8,
-          avgMsPerTrial: 380,
-          metadataOnly: 3,
-        }],
+        points: [
+          {
+            runId: `${query.backend ?? "all"}:${query.fixture ?? "all"}`,
+            createdAt: "2026-05-22T00:00:00.000Z",
+            fixture: query.fixture ?? "page",
+            backend: query.backend ?? "prescanner",
+            trials: 10,
+            detected: 8,
+            detectionRate: 0.8,
+            avgMsPerTrial: 380,
+            metadataOnly: 3,
+          },
+        ],
       }),
     });
 
     const response = await app.request("http://vrt.local/api/detection-series?backend=prescanner&fixture=page&limit=5");
 
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       total: number;
       points: Array<{ runId: string; detectionRate: number }>;
     };
@@ -182,19 +190,23 @@ describe("createApiApp", () => {
         timestamp: "2026-05-22T00:00:00.000Z",
         components: [query.label ?? "card"],
         viewports: [query.viewport ?? "desktop"],
-        rows: [{
-          component: query.label ?? "card",
-          worstStatus: "diff",
-          maxDiffRatio: 0.02,
-          cells: [{
+        rows: [
+          {
             component: query.label ?? "card",
-            viewport: query.viewport ?? "desktop",
-            status: "diff",
-            isNew: false,
-            diffRatio: 0.02,
-            shiftOnly: false,
-          }],
-        }],
+            worstStatus: "diff",
+            maxDiffRatio: 0.02,
+            cells: [
+              {
+                component: query.label ?? "card",
+                viewport: query.viewport ?? "desktop",
+                status: "diff",
+                isNew: false,
+                diffRatio: 0.02,
+                shiftOnly: false,
+              },
+            ],
+          },
+        ],
         summary: {
           totalCells: 1,
           passCount: 0,
@@ -210,7 +222,7 @@ describe("createApiApp", () => {
     const response = await app.request("http://vrt.local/api/component-status-matrix?label=hero&viewport=mobile");
 
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       components: string[];
       viewports: string[];
       rows: Array<{ component: string; worstStatus: string }>;
@@ -244,7 +256,7 @@ describe("createApiApp", () => {
 
     const listResponse = await app.request("http://vrt.local/api/approvals?path=approval.json");
     assert.equal(listResponse.status, 200);
-    const list = await listResponse.json() as { total: number; rules: Array<{ selector?: string }> };
+    const list = (await listResponse.json()) as { total: number; rules: Array<{ selector?: string }> };
     assert.equal(list.total, 1);
     assert.equal(list.rules[0]?.selector, ".hero");
 
@@ -258,7 +270,7 @@ describe("createApiApp", () => {
       }),
     });
     assert.equal(operationResponse.status, 200);
-    const operation = await operationResponse.json() as { action: string; added?: { selector?: string } };
+    const operation = (await operationResponse.json()) as { action: string; added?: { selector?: string } };
     assert.equal(operation.action, "add");
     assert.equal(operation.added?.selector, ".card");
   });
@@ -283,11 +295,13 @@ describe("createApiApp", () => {
             status: "completed",
             total: 1,
             finished: 1,
-            records: [{
-              url: "https://example.com/docs",
-              status: "completed",
-              metadata: { status: 200, url: "https://example.com/docs", title: "Docs" },
-            }],
+            records: [
+              {
+                url: "https://example.com/docs",
+                status: "completed",
+                metadata: { status: 200, url: "https://example.com/docs", title: "Docs" },
+              },
+            ],
           };
         },
       },
@@ -309,11 +323,13 @@ describe("createApiApp", () => {
       body: JSON.stringify({ url: "https://example.com/docs", render: false }),
     });
     assert.equal(crawlResponse.status, 200);
-    assert.equal((await crawlResponse.json() as { jobId: string }).jobId, "crawl-1");
+    assert.equal(((await crawlResponse.json()) as { jobId: string }).jobId, "crawl-1");
 
-    const routesResponse = await app.request("http://vrt.local/api/cloudflare/crawl/crawl-1/routes?baseUrl=https://example.com");
+    const routesResponse = await app.request(
+      "http://vrt.local/api/cloudflare/crawl/crawl-1/routes?baseUrl=https://example.com",
+    );
     assert.equal(routesResponse.status, 200);
-    const routes = await routesResponse.json() as { routes: Array<{ path: string; title?: string }> };
+    const routes = (await routesResponse.json()) as { routes: Array<{ path: string; title?: string }> };
     assert.deepEqual(routes.routes, [{ url: "https://example.com/docs", path: "/docs", title: "Docs" }]);
   });
 
@@ -349,7 +365,7 @@ describe("createApiApp", () => {
     });
 
     const statusResponse = await app.request("http://vrt.local/api/status");
-    const status = await statusResponse.json() as {
+    const status = (await statusResponse.json()) as {
       capabilities: string[];
       backends: Array<{ name: string; available: boolean }>;
     };
@@ -366,7 +382,7 @@ describe("createApiApp", () => {
     });
 
     assert.equal(layoutResponse.status, 200);
-    const layout = await layoutResponse.json() as {
+    const layout = (await layoutResponse.json()) as {
       backend: string;
       viewport: { width: number; height: number; label?: string };
       layout: { id: string; width: number; height: number };

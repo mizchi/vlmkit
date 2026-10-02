@@ -127,7 +127,10 @@ async function callOpenAICompat(
     body: JSON.stringify({ model: tier.model, max_tokens: 512, messages: [{ role: "user", content }] }),
   });
   if (!res.ok) throw new Error(`${tier.baseURL} error: ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  const j = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
   return {
     content: j.choices?.[0]?.message?.content ?? "",
     promptTokens: j.usage?.prompt_tokens ?? 0,

@@ -42,9 +42,8 @@ import { dominantPageColor } from "../component/page-compose.ts";
  * certainly a 2x export.
  */
 export const COMMON_CSS_WIDTHS = [
-  320, 360, 375, 390, 393, 412, 414, 428, 440,
-  768, 800, 810, 834, 900,
-  1024, 1080, 1152, 1280, 1366, 1440, 1512, 1536, 1680, 1728, 1920,
+  320, 360, 375, 390, 393, 412, 414, 428, 440, 768, 800, 810, 834, 900, 1024, 1080, 1152, 1280, 1366, 1440, 1512, 1536,
+  1680, 1728, 1920,
 ];
 
 export interface ScaleCandidate {
@@ -72,14 +71,19 @@ export function inferScaleCandidates(imageWidth: number): ScaleCandidate[] {
       candidates.push({
         scale,
         cssWidth,
-        reason: scale === 1
-          ? `${cssWidth}px is a common CSS viewport width`
-          : `${imageWidth} / ${scale} = ${cssWidth}px, a common CSS viewport width`,
+        reason:
+          scale === 1
+            ? `${cssWidth}px is a common CSS viewport width`
+            : `${imageWidth} / ${scale} = ${cssWidth}px, a common CSS viewport width`,
       });
     }
   }
   if (candidates.length === 0) {
-    candidates.push({ scale: 1, cssWidth: imageWidth, reason: "no common-width match; assuming @1x (override with --scale or --width)" });
+    candidates.push({
+      scale: 1,
+      cssWidth: imageWidth,
+      reason: "no common-width match; assuming @1x (override with --scale or --width)",
+    });
   }
   return candidates;
 }
@@ -102,7 +106,10 @@ export function boxDownscale(
   const n = scale * scale;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      let r = 0, g = 0, b = 0, a = 0;
+      let r = 0,
+        g = 0,
+        b = 0,
+        a = 0;
       for (let dy = 0; dy < scale; dy++) {
         for (let dx = 0; dx < scale; dx++) {
           const si = ((y * scale + dy) * src.width + (x * scale + dx)) * 4;
@@ -259,12 +266,19 @@ export async function runMockScan(options: MockScanOptions): Promise<MockScanRep
   };
   if (options.out) {
     // Sidecar lets `verify markup` pick up capture facts without flags.
-    await writeFile(`${options.out}.meta.json`, JSON.stringify({
-      scale: chosen.scale,
-      cssWidth: chosen.cssWidth,
-      bgNoise,
-      degraded,
-    }, null, 2));
+    await writeFile(
+      `${options.out}.meta.json`,
+      JSON.stringify(
+        {
+          scale: chosen.scale,
+          cssWidth: chosen.cssWidth,
+          bgNoise,
+          degraded,
+        },
+        null,
+        2,
+      ),
+    );
   }
   appendRunLedger({
     tool: "scan-mock",
@@ -290,7 +304,9 @@ export function formatMockScanReport(report: MockScanReport): string {
   if (report.candidates.length > 1) {
     lines.push(`${DIM}candidates: ${report.candidates.map((c) => `@${c.scale}x->${c.cssWidth}px`).join(", ")}${RESET}`);
   }
-  lines.push(`normalized: ${report.normalized.width}x${report.normalized.height}px (CSS px)${report.normalized.out ? ` -> ${report.normalized.out}` : ""}`);
+  lines.push(
+    `normalized: ${report.normalized.width}x${report.normalized.height}px (CSS px)${report.normalized.out ? ` -> ${report.normalized.out}` : ""}`,
+  );
   lines.push(
     `extraction: ${report.extraction.componentCount} component(s), background ${report.extraction.dominantBackground} — ${report.extraction.friendly ? `${GREEN}extraction-friendly${RESET}` : `${YELLOW}noisy${RESET}`}`,
   );
@@ -352,7 +368,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   else console.log(formatMockScanReport(report));
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "mock-scan" ||
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "mock-scan" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

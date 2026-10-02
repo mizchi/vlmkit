@@ -15,7 +15,7 @@ const ENV_KEYS = [
 ] as const;
 
 function withCleanEnv(
-  overrides: Partial<Record<typeof ENV_KEYS[number], string>>,
+  overrides: Partial<Record<(typeof ENV_KEYS)[number], string>>,
   fn: () => void | Promise<void>,
 ): void | Promise<void> {
   const saved: Record<string, string | undefined> = {};
@@ -150,8 +150,10 @@ describe("createUnifiedLLMClient", () => {
       assert.throws(
         () => createUnifiedLLMClient(),
         (err: Error) =>
-          err instanceof VrtConfigError && err.code === "MISSING_KEY"
-          && /GEMINI_API_KEY/.test(err.message) && /provider "gemini"/.test(err.message),
+          err instanceof VrtConfigError &&
+          err.code === "MISSING_KEY" &&
+          /GEMINI_API_KEY/.test(err.message) &&
+          /provider "gemini"/.test(err.message),
       );
     });
     withCleanEnv({ ANTHROPIC_API_KEY: "k" }, () => {
@@ -169,10 +171,11 @@ describe("createUnifiedLLMClient", () => {
       assert.throws(
         () => createUnifiedLLMClient(),
         (err: Error) =>
-          err instanceof VrtConfigError && err.code === "MISSING_KEY"
-          && /GEMINI_API_KEY/.test(err.message)
-          && /ANTHROPIC_API_KEY/.test(err.message)
-          && /OPENROUTER_API_KEY/.test(err.message),
+          err instanceof VrtConfigError &&
+          err.code === "MISSING_KEY" &&
+          /GEMINI_API_KEY/.test(err.message) &&
+          /ANTHROPIC_API_KEY/.test(err.message) &&
+          /OPENROUTER_API_KEY/.test(err.message),
       );
     });
   });
@@ -190,8 +193,7 @@ describe("createLLMProvider", () => {
     withCleanEnv({}, () => {
       assert.throws(
         () => createLLMProvider(),
-        (err: Error) =>
-          err instanceof VrtConfigError && err.code === "NO_PROVIDER_AVAILABLE",
+        (err: Error) => err instanceof VrtConfigError && err.code === "NO_PROVIDER_AVAILABLE",
       );
     });
   });
@@ -217,8 +219,7 @@ describe("createReasoningPipeline", () => {
     withCleanEnv({}, () => {
       assert.throws(
         () => createReasoningPipeline(),
-        (err: Error) =>
-          err instanceof VrtConfigError && err.code === "NO_PROVIDER_AVAILABLE",
+        (err: Error) => err instanceof VrtConfigError && err.code === "NO_PROVIDER_AVAILABLE",
       );
     });
   });

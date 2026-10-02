@@ -17,13 +17,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  collectGitContext,
-  fetchOpenRouterPricing,
-  heal,
-  withPricing,
-  type ModelTier,
-} from "@mizchi/vlmkit-heal";
+import { collectGitContext, fetchOpenRouterPricing, heal, withPricing, type ModelTier } from "@mizchi/vlmkit-heal";
 
 const testFileArg = process.argv[2] ?? process.env.TEST_FILE;
 if (!testFileArg) {
@@ -39,15 +33,21 @@ if (!openRouterKey) {
 
 const pricing = await fetchOpenRouterPricing(openRouterKey);
 
-const observeTiers: ModelTier[] = withPricing([
-  { provider: "openrouter", model: "openai/gpt-5-mini", vision: true },
-  { provider: "openrouter", model: "anthropic/claude-sonnet-4.6", vision: true },
-], pricing);
+const observeTiers: ModelTier[] = withPricing(
+  [
+    { provider: "openrouter", model: "openai/gpt-5-mini", vision: true },
+    { provider: "openrouter", model: "anthropic/claude-sonnet-4.6", vision: true },
+  ],
+  pricing,
+);
 
-const codegenTiers: ModelTier[] = withPricing([
-  { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false },
-  { provider: "openrouter", model: "openai/gpt-5-codex", vision: false },
-], pricing);
+const codegenTiers: ModelTier[] = withPricing(
+  [
+    { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false },
+    { provider: "openrouter", model: "openai/gpt-5-codex", vision: false },
+  ],
+  pricing,
+);
 
 const testCommand = process.env.TEST_COMMAND ?? `pnpm exec playwright test ${testFileArg}`;
 const guardrailContextFile = process.env.GUARDRAIL_CONTEXT_FILE;
@@ -66,20 +66,27 @@ const result = await heal({
   outputDir: process.env.OUTPUT_DIR,
   expectedChange: process.env.EXPECTED_CHANGE,
   guardrailContext,
-  gitContext: process.env.NO_GIT_CONTEXT === "1"
-    ? undefined
-    : collectGitContext(process.cwd(), { base: process.env.GIT_BASE ?? "origin/main" }),
+  gitContext:
+    process.env.NO_GIT_CONTEXT === "1"
+      ? undefined
+      : collectGitContext(process.cwd(), { base: process.env.GIT_BASE ?? "origin/main" }),
 });
 
-console.log(JSON.stringify({
-  verdict: result.verdict,
-  totalCostUsd: result.totalCostUsd,
-  attempts: result.attempts.map((a) => ({
-    phase: a.phase,
-    errorKind: a.errorKind,
-    model: a.tier.model,
-    costUsd: a.costUsd,
-  })),
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      verdict: result.verdict,
+      totalCostUsd: result.totalCostUsd,
+      attempts: result.attempts.map((a) => ({
+        phase: a.phase,
+        errorKind: a.errorKind,
+        model: a.tier.model,
+        costUsd: a.costUsd,
+      })),
+    },
+    null,
+    2,
+  ),
+);
 
 process.exitCode = result.verdict === "fixed" ? 0 : 1;

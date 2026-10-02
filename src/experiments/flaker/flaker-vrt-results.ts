@@ -29,17 +29,17 @@ export function buildFlakerVariantMetadata(
   backend: FlakerVrtBackend,
   viewport: Pick<FlakerVrtViewport, "label" | "width" | "height">,
 ): Record<string, string> {
-  return normalizeVariant({
-    backend,
-    viewport: viewport.label,
-    width: String(viewport.width),
-    height: String(viewport.height),
-  }) ?? {};
+  return (
+    normalizeVariant({
+      backend,
+      viewport: viewport.label,
+      width: String(viewport.width),
+      height: String(viewport.height),
+    }) ?? {}
+  );
 }
 
-export function inferFlakerScenarioIdFromReport(
-  report: Pick<MigrationCompareReport, "dir">,
-): string {
+export function inferFlakerScenarioIdFromReport(report: Pick<MigrationCompareReport, "dir">): string {
   if (!report.dir) {
     return "migration/unknown";
   }
@@ -60,9 +60,10 @@ export function convertMigrationReportToFlakerResults(input: {
   backend: FlakerVrtBackend;
   durationMs?: number;
 }): FlakerTestCaseResult[] {
-  const perTestDuration = input.report.results.length > 0
-    ? Math.max(1, Math.round((input.durationMs ?? 0) / input.report.results.length))
-    : 0;
+  const perTestDuration =
+    input.report.results.length > 0
+      ? Math.max(1, Math.round((input.durationMs ?? 0) / input.report.results.length))
+      : 0;
 
   return input.report.results.map((result) =>
     convertMigrationResultToFlakerResult({
@@ -72,7 +73,7 @@ export function convertMigrationReportToFlakerResults(input: {
       scenarioId: input.scenarioId,
       backend: input.backend,
       durationMs: perTestDuration,
-    })
+    }),
   );
 }
 
@@ -90,23 +91,16 @@ export function mapMigrationReportToRequestedFlakerResults(input: {
     backend: input.scenario.backend,
     durationMs: input.durationMs,
   });
-  const resultMap = new Map(
-    converted.map((entry) => [`${entry.suite}\0${entry.testName}`, entry] as const),
-  );
+  const resultMap = new Map(converted.map((entry) => [`${entry.suite}\0${entry.testName}`, entry] as const));
 
-  return input.requestedTests.map((test) =>
-    resultMap.get(`${normalizePath(test.suite)}\0${test.testName}`)
-      ?? createFlakyResult(
-        test,
-        `Missing migration result for ${test.suite} @ ${test.testName}`,
-      )
+  return input.requestedTests.map(
+    (test) =>
+      resultMap.get(`${normalizePath(test.suite)}\0${test.testName}`) ??
+      createFlakyResult(test, `Missing migration result for ${test.suite} @ ${test.testName}`),
   );
 }
 
-export function createFlakyResult(
-  test: FlakerTestId,
-  message: string,
-): FlakerTestCaseResult {
+export function createFlakyResult(test: FlakerTestId, message: string): FlakerTestCaseResult {
   return {
     ...test,
     status: "flaky",
@@ -116,11 +110,7 @@ export function createFlakyResult(
   };
 }
 
-export function resolveScenarioSuite(
-  cwd: string,
-  dir: string,
-  variantFile: string,
-): string {
+export function resolveScenarioSuite(cwd: string, dir: string, variantFile: string): string {
   const resolved = resolve(cwd, dir, variantFile);
   const rel = relative(cwd, resolved);
   return normalizePath(rel);
@@ -159,9 +149,7 @@ export function normalizePath(path: string): string {
   return path.replaceAll("\\", "/");
 }
 
-function normalizeVariant(
-  variant?: Record<string, string> | null,
-): Record<string, string> | null {
+function normalizeVariant(variant?: Record<string, string> | null): Record<string, string> | null {
   if (!variant) return null;
   const entries = Object.entries(variant)
     .filter(([, value]) => value != null)
@@ -184,22 +172,16 @@ function convertMigrationResultToFlakerResult(input: {
   }
 
   const variantFile = resolveResultVariantFile(input.report, input.result);
-  const suite = resolveReportSuite(
-    input.cwd,
-    input.report.dir,
-    input.scenarioId,
-    variantFile,
-  );
+  const suite = resolveReportSuite(input.cwd, input.report.dir, input.scenarioId, variantFile);
   const testName = `viewport:${input.result.viewport}`;
   const variant = buildFlakerVariantMetadata(input.backend, viewport);
-  const status = input.result.approved || input.result.diffPixels === 0
-    ? "passed"
-    : "failed";
-  const errorMessage = status === "failed"
-    ? buildFailureMessage(input.result)
-    : input.result.approved
-      ? input.result.approvalReasons.join("; ") || "approved"
-      : undefined;
+  const status = input.result.approved || input.result.diffPixels === 0 ? "passed" : "failed";
+  const errorMessage =
+    status === "failed"
+      ? buildFailureMessage(input.result)
+      : input.result.approved
+        ? input.result.approvalReasons.join("; ") || "approved"
+        : undefined;
 
   return {
     suite,
@@ -242,16 +224,13 @@ function resolveReportSuite(
   return normalizePath(variantFile);
 }
 
-function resolveResultVariantFile(
-  report: MigrationCompareReport,
-  result: MigrationCompareResult,
-): string {
+function resolveResultVariantFile(report: MigrationCompareReport, result: MigrationCompareResult): string {
   if (result.variantFile) {
     return result.variantFile;
   }
 
-  const exactMatch = report.variants.find((variantFile) =>
-    variantFile === result.variant || basenameWithoutHtml(variantFile) === result.variant
+  const exactMatch = report.variants.find(
+    (variantFile) => variantFile === result.variant || basenameWithoutHtml(variantFile) === result.variant,
   );
   if (exactMatch) {
     return exactMatch;
@@ -262,9 +241,7 @@ function resolveResultVariantFile(
 
 function basenameWithoutHtml(path: string): string {
   const normalized = path.split(/[\\/]/).at(-1) ?? path;
-  return normalized.endsWith(".html")
-    ? normalized.slice(0, -".html".length)
-    : normalized;
+  return normalized.endsWith(".html") ? normalized.slice(0, -".html".length) : normalized;
 }
 
 function buildFailureMessage(result: MigrationCompareResult): string {

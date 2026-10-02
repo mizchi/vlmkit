@@ -170,11 +170,7 @@ export function navigationOptions(
  * `navigationOptions(options, "load")` + their own `settlePage` instead, so the
  * settle is not done twice.
  */
-export async function navigatePage(
-  page: Page,
-  url: string,
-  options: PageLoadOptions = {},
-): Promise<void> {
+export async function navigatePage(page: Page, url: string, options: PageLoadOptions = {}): Promise<void> {
   await applyHar(page, options.har);
   await page.goto(url, navigationOptions(options));
   if (options.waitUntil && options.waitUntil !== DEFAULT_PAGE_LOAD_WAIT_UNTIL) {

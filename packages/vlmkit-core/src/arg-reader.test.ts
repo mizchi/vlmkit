@@ -134,14 +134,18 @@ describe("tokenizeCommand", () => {
   it("keeps quoted values together", () => {
     // A path with a space, or a selector list, would otherwise arrive at the
     // gate as several arguments and fail as if the gate were broken.
-    assert.deepEqual(
-      tokenizeCommand('check copy --manifest "copy/press kit.txt"'),
-      ["check", "copy", "--manifest", "copy/press kit.txt"],
-    );
-    assert.deepEqual(
-      tokenizeCommand(`check breakpoints --mask '.hero, .promo'`),
-      ["check", "breakpoints", "--mask", ".hero, .promo"],
-    );
+    assert.deepEqual(tokenizeCommand('check copy --manifest "copy/press kit.txt"'), [
+      "check",
+      "copy",
+      "--manifest",
+      "copy/press kit.txt",
+    ]);
+    assert.deepEqual(tokenizeCommand(`check breakpoints --mask '.hero, .promo'`), [
+      "check",
+      "breakpoints",
+      "--mask",
+      ".hero, .promo",
+    ]);
   });
 
   it("keeps an empty quoted argument", () => {

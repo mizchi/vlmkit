@@ -21,9 +21,7 @@ test("markup-loop project example reproduces the drop-in observe loop", async ()
   assert.match(result.stdout, /vlmkit-generate --plan \.vlmkit\/markup-loop\/plan\.md/);
   assert.match(result.stdout, /Markup loop project example passed/);
 
-  const observations = JSON.parse(
-    await readFile(join(exampleDir, ".vlmkit/markup-loop/observations.json"), "utf8"),
-  );
+  const observations = JSON.parse(await readFile(join(exampleDir, ".vlmkit/markup-loop/observations.json"), "utf8"));
   assert.equal(observations[0]?.title, "Operations Dashboard");
   assert.ok(observations[0]?.roles.includes('heading "Operations Dashboard"'));
   assert.ok(observations[0]?.roles.includes('button "Approve deployment"'));

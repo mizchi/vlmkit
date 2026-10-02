@@ -15,7 +15,9 @@ const ROOT = resolve(import.meta.dirname, "../../../..");
 const PATTERNS = join(ROOT, "fixtures/responsive-patterns/patterns");
 
 describe("fixtures/responsive-patterns: intact patterns", () => {
-  const files = readdirSync(PATTERNS).filter((f) => f.endsWith(".html")).sort();
+  const files = readdirSync(PATTERNS)
+    .filter((f) => f.endsWith(".html"))
+    .sort();
 
   it("has the eleven patterns the catalog lists", () => {
     assert.equal(files.length, 11, files.join(", "));
@@ -34,7 +36,10 @@ describe("fixtures/responsive-patterns: intact patterns", () => {
         report.failures.map((f) => `${f.kind} ${f.selectors[0]} @${f.firstCase.width}: ${f.message}`),
         [],
       );
-      assert.ok(report.regimes.every((r) => r.cases > 0), "every regime was visited");
+      assert.ok(
+        report.regimes.every((r) => r.cases > 0),
+        "every regime was visited",
+      );
     });
   }
 });

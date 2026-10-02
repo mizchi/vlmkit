@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
 import type { IntegrityFinding } from "./integrity-check.ts";
-import {
-  applyAllowRules,
-  parseAllowRule,
-  parseAllowRules,
-  ruleMatches,
-} from "./integrity-exemption.ts";
+import { applyAllowRules, parseAllowRule, parseAllowRules, ruleMatches } from "./integrity-exemption.ts";
 
 const finding = (over: Partial<IntegrityFinding> = {}): IntegrityFinding => ({
   kind: "near-misalignment",
@@ -49,10 +44,7 @@ describe("parseAllowRule", () => {
 
   it("requires a reason, and points at the right delimiter", () => {
     assert.throws(() => parseAllowRule("text-collision@.kicker"), /needs a reason/);
-    assert.throws(
-      () => parseAllowRule("text-collision@#refund#because"),
-      /separated by ";", not "#"/,
-    );
+    assert.throws(() => parseAllowRule("text-collision@#refund#because"), /separated by ";", not "#"/);
     assert.throws(() => parseAllowRule("text-collision;   "), /reason is empty/);
   });
 
@@ -123,7 +115,10 @@ describe("applyAllowRules", () => {
     const rules = parseAllowRules(["text-collision@.gone;covered a defect that is now fixed"]);
     const result = applyAllowRules([finding()], rules);
     assert.equal(result.findings.length, 1);
-    assert.deepEqual(result.unusedRules.map((r) => r.raw), ["text-collision@.gone;covered a defect that is now fixed"]);
+    assert.deepEqual(
+      result.unusedRules.map((r) => r.raw),
+      ["text-collision@.gone;covered a defect that is now fixed"],
+    );
   });
 
   it("counts a rule as used once, however many findings it covers", () => {

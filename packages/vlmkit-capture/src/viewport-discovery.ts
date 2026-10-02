@@ -8,9 +8,9 @@
 // ---- Types ----
 
 export interface Breakpoint {
-  value: number;          // px
+  value: number; // px
   type: "min-width" | "max-width";
-  raw: string;            // e.g. "(min-width: 768px)"
+  raw: string; // e.g. "(min-width: 768px)"
 }
 
 export interface ResponsiveBreakpoint {
@@ -24,18 +24,13 @@ export interface ResponsiveBreakpoint {
 }
 
 /** Where a viewport candidate originated. */
-export type ViewportSource =
-  | "standard"
-  | "regex-boundary"
-  | "regex-sample"
-  | "crater-required"
-  | "crater-rule-map";
+export type ViewportSource = "standard" | "regex-boundary" | "regex-sample" | "crater-required" | "crater-rule-map";
 
 export interface ViewportSpec {
   width: number;
   height: number;
   label: string;
-  reason: string;         // why this viewport was chosen
+  reason: string; // why this viewport was chosen
   /**
    * Optional provenance for downstream reports — present when discovery
    * went through `generateViewports` / the Crater discovery path. Older
@@ -121,25 +116,15 @@ export function extractStylesheetHrefsFromHtml(html: string): string[] {
     .filter((href): href is string => !!href);
 }
 
-export function extractBreakpointsFromHtmlWithStylesheets(
-  html: string,
-  stylesheetTexts: string[],
-): Breakpoint[] {
-  return extractBreakpoints([
-    extractInlineStyleCss(html),
-    ...stylesheetTexts,
-  ].join("\n"));
+export function extractBreakpointsFromHtmlWithStylesheets(html: string, stylesheetTexts: string[]): Breakpoint[] {
+  return extractBreakpoints([extractInlineStyleCss(html), ...stylesheetTexts].join("\n"));
 }
 
-function isResponsiveBreakpoint(
-  breakpoint: ViewportBreakpoint,
-): breakpoint is ResponsiveBreakpoint {
+function isResponsiveBreakpoint(breakpoint: ViewportBreakpoint): breakpoint is ResponsiveBreakpoint {
   return "axis" in breakpoint;
 }
 
-function normalizeResponsiveBreakpoint(
-  breakpoint: ViewportBreakpoint,
-): ResponsiveBreakpoint {
+function normalizeResponsiveBreakpoint(breakpoint: ViewportBreakpoint): ResponsiveBreakpoint {
   if (isResponsiveBreakpoint(breakpoint)) {
     const guards = [...new Set(breakpoint.guards)].sort((a, b) => a.localeCompare(b));
     return {
@@ -166,29 +151,19 @@ function normalizeResponsiveBreakpoint(
   };
 }
 
-function compareResponsiveBreakpoint(
-  left: ResponsiveBreakpoint,
-  right: ResponsiveBreakpoint,
-): number {
+function compareResponsiveBreakpoint(left: ResponsiveBreakpoint, right: ResponsiveBreakpoint): number {
   if (left.valuePx !== right.valuePx) return left.valuePx - right.valuePx;
   const order = { lt: 0, le: 1, ge: 2, gt: 3 } as const;
   if (order[left.op] !== order[right.op]) return order[left.op] - order[right.op];
   return left.guards.join("|").localeCompare(right.guards.join("|"));
 }
 
-export function toResponsiveBreakpoints(
-  breakpoints: ViewportBreakpoint[],
-): ResponsiveBreakpoint[] {
+export function toResponsiveBreakpoints(breakpoints: ViewportBreakpoint[]): ResponsiveBreakpoint[] {
   const merged = new Map<string, ResponsiveBreakpoint>();
 
   for (const breakpoint of breakpoints) {
     const normalized = normalizeResponsiveBreakpoint(breakpoint);
-    const key = [
-      normalized.axis,
-      normalized.op,
-      normalized.valuePx,
-      normalized.guards.join("&"),
-    ].join(":");
+    const key = [normalized.axis, normalized.op, normalized.valuePx, normalized.guards.join("&")].join(":");
     const existing = merged.get(key);
     if (existing) {
       existing.ruleCount += normalized.ruleCount;
@@ -200,15 +175,11 @@ export function toResponsiveBreakpoints(
   return [...merged.values()].sort(compareResponsiveBreakpoint);
 }
 
-export function mergeResponsiveBreakpoints(
-  ...collections: ViewportBreakpoint[][]
-): ResponsiveBreakpoint[] {
+export function mergeResponsiveBreakpoints(...collections: ViewportBreakpoint[][]): ResponsiveBreakpoint[] {
   return toResponsiveBreakpoints(collections.flat());
 }
 
-export function extractResponsiveBreakpointsFromHtml(
-  html: string,
-): ResponsiveBreakpoint[] {
+export function extractResponsiveBreakpointsFromHtml(html: string): ResponsiveBreakpoint[] {
   return toResponsiveBreakpoints(extractBreakpointsFromHtml(html));
 }
 
@@ -216,19 +187,17 @@ export function extractResponsiveBreakpointsFromHtmlWithStylesheets(
   html: string,
   stylesheetTexts: string[],
 ): ResponsiveBreakpoint[] {
-  return toResponsiveBreakpoints(
-    extractBreakpointsFromHtmlWithStylesheets(html, stylesheetTexts),
-  );
+  return toResponsiveBreakpoints(extractBreakpointsFromHtmlWithStylesheets(html, stylesheetTexts));
 }
 
 // ---- Viewport generation ----
 
 export interface ViewportOptions {
-  height?: number;              // default: 900
-  maxViewports?: number;        // upper limit (cost control)
-  randomSamples?: number;       // random samples within range (default: 0)
-  seed?: number;                // random seed
-  includeStandard?: boolean;    // include standard viewports (375, 1280, 1440) (default: true)
+  height?: number; // default: 900
+  maxViewports?: number; // upper limit (cost control)
+  randomSamples?: number; // random samples within range (default: 0)
+  seed?: number; // random seed
+  includeStandard?: boolean; // include standard viewports (375, 1280, 1440) (default: true)
 }
 
 const STANDARD_VIEWPORTS: Array<{ width: number; label: string }> = [
@@ -245,10 +214,7 @@ const STANDARD_VIEWPORTS: Array<{ width: number; label: string }> = [
  * - boundary -1px: just before breakpoint activates
  * - (optional) random samples within range
  */
-export function generateViewports(
-  breakpoints: ViewportBreakpoint[],
-  options: ViewportOptions = {},
-): ViewportSpec[] {
+export function generateViewports(breakpoints: ViewportBreakpoint[], options: ViewportOptions = {}): ViewportSpec[] {
   const responsiveBreakpoints = toResponsiveBreakpoints(breakpoints);
   const height = options.height ?? 900;
   const maxViewports = options.maxViewports ?? 20;
@@ -302,7 +268,10 @@ export function generateViewports(
     ranges.push([allWidths[allWidths.length - 1], 1920]);
 
     let s = seed;
-    const rand = () => { s = (s * 1664525 + 1013904223) & 0x7fffffff; return s / 0x7fffffff; };
+    const rand = () => {
+      s = (s * 1664525 + 1013904223) & 0x7fffffff;
+      return s / 0x7fffffff;
+    };
 
     for (const [lo, hi] of ranges) {
       if (hi - lo < 2) continue;
@@ -321,10 +290,7 @@ export function generateViewports(
 /**
  * Discover breakpoints from HTML and generate boundary-check viewports.
  */
-export function discoverViewports(
-  html: string,
-  options: ViewportOptions = {},
-): DiscoveryResult {
+export function discoverViewports(html: string, options: ViewportOptions = {}): DiscoveryResult {
   const breakpoints = extractBreakpointsFromHtml(html);
   const responsiveBreakpoints = toResponsiveBreakpoints(breakpoints);
   const viewports = generateViewports(responsiveBreakpoints, options);

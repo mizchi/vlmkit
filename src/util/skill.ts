@@ -177,8 +177,14 @@ export function checkToFlags(check: SkillCheck, defaults: { selector?: string })
   for (const [key, value] of Object.entries(check)) {
     if (key === "tool") continue;
     if (value === undefined || value === null) continue;
-    if (key === "strict" && value === true) { args.push("--strict"); continue; }
-    if (key === "allowSkipped" && value === true) { args.push("--allow-skipped"); continue; }
+    if (key === "strict" && value === true) {
+      args.push("--strict");
+      continue;
+    }
+    if (key === "allowSkipped" && value === true) {
+      args.push("--allow-skipped");
+      continue;
+    }
     // Camel-case → kebab-case for the flag name.
     const flag = "--" + key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
     if (Array.isArray(value)) {
@@ -191,17 +197,18 @@ export function checkToFlags(check: SkillCheck, defaults: { selector?: string })
   }
   // Inherit default selector when the tool needs one and the check
   // didn't override it.
-  if (defaults.selector && !args.includes("--selector")
-    && (check.tool === "component-consistency" || check.tool === "multi-page-consistency")) {
+  if (
+    defaults.selector &&
+    !args.includes("--selector") &&
+    (check.tool === "component-consistency" || check.tool === "multi-page-consistency")
+  ) {
     args.push("--selector", defaults.selector);
   }
   return args;
 }
 
 /** The argv `vlmkit` would be invoked with for one check. Pure, so it is assertable. */
-export function checkArgv(
-  tool: string, target: string, args: string[], outputDir: string,
-): string[] {
+export function checkArgv(tool: string, target: string, args: string[], outputDir: string): string[] {
   const command = toolCommand(tool);
   // `check drift pages` takes its pages through repeatable --urls / --files, not a
   // positional, so handing it the target as one would look like a stray argument.
@@ -251,9 +258,7 @@ interface CheckOutcome {
  * failing checks. That is a report lying about what it measured, which is worse
  * than no report.
  */
-async function runOneCheck(
-  tool: string, target: string, args: string[], outputDir: string,
-): Promise<CheckOutcome> {
+async function runOneCheck(tool: string, target: string, args: string[], outputDir: string): Promise<CheckOutcome> {
   const start = Date.now();
   const entry = resolveCliEntry();
   const finalArgs = [
@@ -265,18 +270,26 @@ async function runOneCheck(
   return await new Promise((res) => {
     const proc = spawn(process.execPath, finalArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
-    proc.stdout.on("data", (d) => { stdout += d.toString(); });
-    proc.stderr.on("data", (d) => { stdout += d.toString(); });
+    proc.stdout.on("data", (d) => {
+      stdout += d.toString();
+    });
+    proc.stderr.on("data", (d) => {
+      stdout += d.toString();
+    });
     proc.on("error", (e) => {
       res({
-        exitCode: 1, durationMs: Date.now() - start, stdoutTail: String(e.message),
+        exitCode: 1,
+        durationMs: Date.now() - start,
+        stdoutTail: String(e.message),
         launchFailure: `could not spawn ${process.execPath}: ${e.message}`,
       });
     });
     proc.on("close", (code) => {
       const tail = stdout.split("\n").slice(-8).join("\n");
       const outcome: CheckOutcome = {
-        exitCode: code ?? 0, durationMs: Date.now() - start, stdoutTail: tail,
+        exitCode: code ?? 0,
+        durationMs: Date.now() - start,
+        stdoutTail: tail,
       };
       const launchFailure = diagnoseLaunchFailure(tool, stdout);
       if (launchFailure) outcome.launchFailure = launchFailure;
@@ -292,9 +305,11 @@ async function runOneCheck(
 export function diagnoseLaunchFailure(tool: string, stdout: string): string | undefined {
   if (/Unknown command:/.test(stdout)) {
     const canonical = LEGACY_TOOL_NAMES[tool];
-    return `\`${tool}\` is not a vlmkit command`
-      + (canonical ? ` (did you mean \`${canonical}\`?)` : "")
-      + " — run `vlmkit --help` for the command list";
+    return (
+      `\`${tool}\` is not a vlmkit command` +
+      (canonical ? ` (did you mean \`${canonical}\`?)` : "") +
+      " — run `vlmkit --help` for the command list"
+    );
   }
   if (/MODULE_NOT_FOUND|Cannot find module/.test(stdout)) {
     return "the vlmkit CLI entry could not be loaded — this is a vlmkit bug, not a finding about the target";
@@ -304,7 +319,10 @@ export function diagnoseLaunchFailure(tool: string, stdout: string): string | un
 
 /** @param cwd where `.vrt-skills/` is looked for. An argument, not a `process.chdir`. */
 export async function runSkill(
-  name: string, target: string, outputBase: string, options: { cwd?: string } = {},
+  name: string,
+  target: string,
+  outputBase: string,
+  options: { cwd?: string } = {},
 ): Promise<SkillRunResult> {
   const skill = await loadSkill(name, options.cwd);
   const outputDir = resolve(outputBase, `skill-${skill.name}`);
@@ -323,9 +341,8 @@ export async function runSkill(
     const r = await runOneCheck(check.tool, target, args, subdir);
     results.push({ tool: check.tool, command: toolCommand(check.tool), args, ...r, outputDir: subdir });
     const status = checkStatus(r);
-    const icon = status === "did-not-run" ? `${YELLOW}?${RESET}`
-      : status === "pass" ? `${GREEN}✓${RESET}`
-      : `${RED}✗${RESET}`;
+    const icon =
+      status === "did-not-run" ? `${YELLOW}?${RESET}` : status === "pass" ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
     const detail = r.launchFailure
       ? `did not run — ${r.launchFailure}`
       : `exit ${r.exitCode}  ${(r.durationMs / 1000).toFixed(1)}s`;
@@ -347,9 +364,9 @@ export function renderSkillReport(skill: Skill, target: string, results: SkillRu
   if (skill.description) lines.push(skill.description, "");
   lines.push(`Target: \`${target}\``);
   const ranCount = results.filter((r) => !r.launchFailure).length;
-  lines.push(ranCount === results.length
-    ? `Checks: **${results.length}**`
-    : `Checks: **${ranCount}** of ${results.length} ran`);
+  lines.push(
+    ranCount === results.length ? `Checks: **${results.length}**` : `Checks: **${ranCount}** of ${results.length} ran`,
+  );
   lines.push("");
   // Checks that never started come first and are never given an exit code, because
   // an exit code here reads as a verdict about the target. The old table rendered a
@@ -376,7 +393,9 @@ export function renderSkillReport(skill: Skill, target: string, results: SkillRu
     // check declared as `diff browsers --engines chromium`, so the one line a reader would
     // copy to reproduce the run was not the run.
     const invocation = ["vlmkit", ...r.command, ...r.args].join(" ");
-    lines.push(`| \`${r.tool}\` | \`${invocation}\` | ${icon} ${r.exitCode} | ${dur} | \`${join(r.outputDir, "report.md")}\` |`);
+    lines.push(
+      `| \`${r.tool}\` | \`${invocation}\` | ${icon} ${r.exitCode} | ${dur} | \`${join(r.outputDir, "report.md")}\` |`,
+    );
   }
   if (ran.length === 0) {
     lines.push("| _(none ran)_ | | | | |");
@@ -424,17 +443,15 @@ async function commandInit(name: string) {
     await stat(path);
     console.error(`error: ${path} already exists`);
     process.exit(1);
-  } catch { /* not exists; proceed */ }
+  } catch {
+    /* not exists; proceed */
+  }
   const template: Skill = {
     name,
     description: `Checks for ${name}`,
     selector: `.${name}`,
     viewport: { width: 1280, height: 720 },
-    checks: [
-      { tool: "a11y-contrast" },
-      { tool: "a11y-touch", level: "AAA" },
-      { tool: "theme-parity" },
-    ],
+    checks: [{ tool: "a11y-contrast" }, { tool: "a11y-touch", level: "AAA" }, { tool: "theme-parity" }],
   };
   await writeFile(path, JSON.stringify(template, null, 2) + "\n");
   console.log(`${GREEN}✓${RESET} created ${path}`);
@@ -465,18 +482,32 @@ async function main(argv = process.argv.slice(2)) {
     // value that line wanted.
     process.exit(askedForHelp || sub ? 0 : 1);
   }
-  if (sub === "list") { await commandList(); return; }
+  if (sub === "list") {
+    await commandList();
+    return;
+  }
   if (sub === "show") {
-    if (!rest[0]) { console.error("error: skill name required"); process.exit(1); }
-    await commandShow(rest[0]); return;
+    if (!rest[0]) {
+      console.error("error: skill name required");
+      process.exit(1);
+    }
+    await commandShow(rest[0]);
+    return;
   }
   if (sub === "init") {
-    if (!rest[0]) { console.error("error: skill name required"); process.exit(1); }
-    await commandInit(rest[0]); return;
+    if (!rest[0]) {
+      console.error("error: skill name required");
+      process.exit(1);
+    }
+    await commandInit(rest[0]);
+    return;
   }
   if (sub === "run") {
     const name = rest[0];
-    if (!name) { console.error("error: skill name required"); process.exit(1); }
+    if (!name) {
+      console.error("error: skill name required");
+      process.exit(1);
+    }
     let target = "";
     let outputBase = join(process.cwd(), "test-results");
     for (let i = 1; i < rest.length; i++) {
@@ -484,7 +515,10 @@ async function main(argv = process.argv.slice(2)) {
       if (a === "--against") target = rest[++i] ?? "";
       else if (a === "--output-dir") outputBase = rest[++i] ?? outputBase;
     }
-    if (!target) { console.error("error: --against <target> required"); process.exit(1); }
+    if (!target) {
+      console.error("error: --against <target> required");
+      process.exit(1);
+    }
     const result = await runSkill(name, target, outputBase);
     // A check that never ran is a failure of the run, not a pass. Reporting 0 here
     // would make a skill whose every tool name is stale look green.

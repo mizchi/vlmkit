@@ -114,8 +114,9 @@ export interface ResponsiveProperty {
 
 const targetsOf = (f: IntegrityFinding): string[] => {
   const e = f.evidence ?? {};
-  const picked = [e.a, e.b, e.child, e.parent, e.occluder]
-    .filter((v): v is string => typeof v === "string" && !v.startsWith("("));
+  const picked = [e.a, e.b, e.child, e.parent, e.occluder].filter(
+    (v): v is string => typeof v === "string" && !v.startsWith("("),
+  );
   if (picked.length > 0) return [...new Set(picked)];
   return f.selector && !f.selector.startsWith("(") ? [f.selector] : [];
 };
@@ -232,17 +233,15 @@ export const BUILTIN_PROPERTIES: readonly ResponsiveProperty[] = [
   {
     kinds: ["page-overflow-x", "clipped-content"],
     measure: async (page) => {
-      const scroll = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
+      const scroll = (await page.evaluate(COLLECT_SCROLL_SCRIPT)) as Omit<ScrollScanInput, "source">;
       const report = analyzeScrollSamples({ source: "", ...scroll });
       return report.issues
         .filter((i) => i.kind === "page-overflow-x" || i.kind === "clipped-content")
         .map((i) => ({
           kind: i.kind as ResponsiveFinding["kind"],
-          severity: i.kind === "page-overflow-x" ? "fail" as const : "warn" as const,
+          severity: i.kind === "page-overflow-x" ? ("fail" as const) : ("warn" as const),
           ...(i.selector ? { selector: i.selector } : {}),
-          targets: i.selector
-            ? [i.selector]
-            : scroll.page.overflowOffenders.slice(0, 3).map((o) => o.selector),
+          targets: i.selector ? [i.selector] : scroll.page.overflowOffenders.slice(0, 3).map((o) => o.selector),
           message: i.message,
         }));
     },
@@ -250,36 +249,44 @@ export const BUILTIN_PROPERTIES: readonly ResponsiveProperty[] = [
   {
     kinds: ["text-collision"],
     measure: async (page, viewport) =>
-      findTextCollisions(await page.evaluate(COLLECT_INTEGRITY_TEXT) as IntegrityTextBlock[], viewport.width)
-        .findings.map(fromIntegrity),
+      findTextCollisions(
+        (await page.evaluate(COLLECT_INTEGRITY_TEXT)) as IntegrityTextBlock[],
+        viewport.width,
+      ).findings.map(fromIntegrity),
   },
   {
     kinds: ["text-clipped"],
     measure: async (page, viewport) =>
-      judgeClippedText(await page.evaluate(COLLECT_CLIP_CANDIDATES) as ClipCandidate[], viewport.width)
-        .findings.map(fromIntegrity),
+      judgeClippedText((await page.evaluate(COLLECT_CLIP_CANDIDATES)) as ClipCandidate[], viewport.width).findings.map(
+        fromIntegrity,
+      ),
   },
   {
     kinds: ["container-protrusion"],
     measure: async (page, viewport) =>
-      judgeProtrusions(await page.evaluate(COLLECT_PROTRUSIONS) as ProtrusionCandidate[], viewport.width)
-        .findings.map(fromIntegrity),
+      judgeProtrusions(
+        (await page.evaluate(COLLECT_PROTRUSIONS)) as ProtrusionCandidate[],
+        viewport.width,
+      ).findings.map(fromIntegrity),
   },
   {
     kinds: ["occluded-text"],
     measure: async (page, viewport) =>
-      findOccludedText(await page.evaluate(COLLECT_OCCLUSIONS) as OcclusionCandidate[], viewport.width)
-        .findings.map(fromIntegrity),
+      findOccludedText((await page.evaluate(COLLECT_OCCLUSIONS)) as OcclusionCandidate[], viewport.width).findings.map(
+        fromIntegrity,
+      ),
   },
   {
     kinds: ["collapsed-container"],
     measure: async (page, viewport) =>
-      judgeCollapsedContainers(await page.evaluate(COLLECT_COLLAPSE_CANDIDATES) as CollapseCandidate[], viewport.width)
-        .findings.map(fromIntegrity),
+      judgeCollapsedContainers(
+        (await page.evaluate(COLLECT_COLLAPSE_CANDIDATES)) as CollapseCandidate[],
+        viewport.width,
+      ).findings.map(fromIntegrity),
   },
   {
     kinds: ["text-starved"],
-    measure: async (page) => judgeStarvedText(await page.evaluate(COLLECT_STARVED_TEXT) as StarvedTextSample[]),
+    measure: async (page) => judgeStarvedText((await page.evaluate(COLLECT_STARVED_TEXT)) as StarvedTextSample[]),
   },
 ];
 
@@ -550,15 +557,18 @@ async function applyCase(h: Harness, c: ResponsiveCase): Promise<void> {
     await h.page.emulateMedia({ colorScheme: c.colorScheme, reducedMotion: c.reducedMotion });
   }
   if (!prev || prev.textScale !== c.textScale) {
-    await h.page.evaluate(({ scale, base, inline }) => {
-      const root = document.documentElement;
-      if (scale === 1) {
-        if (inline.value) root.style.setProperty("font-size", inline.value, inline.priority);
-        else root.style.removeProperty("font-size");
-      } else {
-        root.style.setProperty("font-size", `${parseFloat(base) * scale}px`, "important");
-      }
-    }, { scale: c.textScale, base: h.baseFontSize, inline: h.baseInlineFontSize });
+    await h.page.evaluate(
+      ({ scale, base, inline }) => {
+        const root = document.documentElement;
+        if (scale === 1) {
+          if (inline.value) root.style.setProperty("font-size", inline.value, inline.priority);
+          else root.style.removeProperty("font-size");
+        } else {
+          root.style.setProperty("font-size", `${parseFloat(base) * scale}px`, "important");
+        }
+      },
+      { scale: c.textScale, base: h.baseFontSize, inline: h.baseInlineFontSize },
+    );
   }
   h.current = c;
   await h.page.evaluate(SETTLE);
@@ -567,7 +577,7 @@ async function applyCase(h: Harness, c: ResponsiveCase): Promise<void> {
 async function measureAll(h: Harness, c: ResponsiveCase): Promise<ResponsiveFinding[]> {
   await applyCase(h, c);
   const findings: ResponsiveFinding[] = [];
-  for (const property of h.properties) findings.push(...await property.measure(h.page, c));
+  for (const property of h.properties) findings.push(...(await property.measure(h.page, c)));
   // As in `check integrity`: a box whose text the clip probe already ruled on is not also clipped content.
   const clippedText = new Set(findings.filter((f) => f.kind === "text-clipped").map((f) => f.selector));
   return findings.filter((f) => !(f.kind === "clipped-content" && f.selector && clippedText.has(f.selector)));
@@ -581,12 +591,28 @@ async function measureKey(h: Harness, c: ResponsiveCase, key: string, kind: stri
   return findings.find((f) => failureKey(f) === key) ?? null;
 }
 
-const matchSignature = async (page: Page, conditions: readonly string[], width: number, height: number): Promise<string[]> => {
+const matchSignature = async (
+  page: Page,
+  conditions: readonly string[],
+  width: number,
+  height: number,
+): Promise<string[]> => {
   await page.setViewportSize({ width, height });
   return await page.evaluate(
-    (conds) => new Promise<string[]>((r) => requestAnimationFrame(() => r(conds.filter((c) => {
-      try { return matchMedia(c).matches; } catch { return false; }
-    })))),
+    (conds) =>
+      new Promise<string[]>((r) =>
+        requestAnimationFrame(() =>
+          r(
+            conds.filter((c) => {
+              try {
+                return matchMedia(c).matches;
+              } catch {
+                return false;
+              }
+            }),
+          ),
+        ),
+      ),
     [...conditions],
   );
 };
@@ -638,7 +664,7 @@ async function explainCause(
   if (targets.length === 0) return { note: "no element to attribute it to (nothing past the edge relieves it alone)" };
   if (!h.css) return { note: "not searched — reading the page's cascade needs Chromium's DevTools protocol" };
   await applyCase(h, c);
-  const tagged = await h.page.evaluate(`${TAG_CAUSE_NODES}(${JSON.stringify(targets)})`) as TaggedNode[];
+  const tagged = (await h.page.evaluate(`${TAG_CAUSE_NODES}(${JSON.stringify(targets)})`)) as TaggedNode[];
   try {
     const collected = await h.css.causeCandidates(tagged);
     if (collected.length === 0) {
@@ -646,7 +672,10 @@ async function explainCause(
     }
     const candidates = rankCauseCandidates(collected, anchor);
     let attempts = 0;
-    const clears = async (subset: (CauseDeclaration & { node: number })[], at: ResponsiveCase = c): Promise<boolean> => {
+    const clears = async (
+      subset: (CauseDeclaration & { node: number })[],
+      at: ResponsiveCase = c,
+    ): Promise<boolean> => {
       attempts++;
       await applyCase(h, at);
       await h.page.evaluate(`${APPLY_OVERRIDES}(${JSON.stringify(subset)})`);
@@ -681,8 +710,9 @@ async function explainCause(
     }
     const holdsAt: number[] = [];
     const failsAt: number[] = [];
-    const checkWidths = [...new Set([interval.lo, Math.round((interval.lo + interval.hi) / 2), interval.hi])]
-      .filter((w) => w !== c.width);
+    const checkWidths = [...new Set([interval.lo, Math.round((interval.lo + interval.hi) / 2), interval.hi])].filter(
+      (w) => w !== c.width,
+    );
     for (const w of checkWidths) {
       ((await clears(chosen, { ...c, width: w })) ? holdsAt : failsAt).push(w);
     }
@@ -767,14 +797,21 @@ export function textScaleLadder(max: number | undefined): number[] {
  * The PBT loop on a page that is already loaded. Exposed for library use: a Playwright
  * test can navigate and log in its own way, then hand the page over.
  */
-export async function runResponsiveOnPage(page: Page, options: Omit<ResponsiveOptions, keyof PageLoadOptions | "storageState">): Promise<Omit<ResponsiveReport, "issues"> & { issues: ResponsiveIssue[] }> {
+export async function runResponsiveOnPage(
+  page: Page,
+  options: Omit<ResponsiveOptions, keyof PageLoadOptions | "storageState">,
+): Promise<Omit<ResponsiveReport, "issues"> & { issues: ResponsiveIssue[] }> {
   const properties = options.properties ?? BUILTIN_PROPERTIES;
   const seed = options.seed ?? 1;
   const runs = Math.max(1, options.runs ?? 60);
   const t0 = Date.now();
 
   const css = await CssInspector.open(page);
-  const collected = await page.evaluate(COLLECT_MEDIA_CONDITIONS) as { conditions: string[]; crossOrigin: string[]; container: number };
+  const collected = (await page.evaluate(COLLECT_MEDIA_CONDITIONS)) as {
+    conditions: string[];
+    crossOrigin: string[];
+    container: number;
+  };
   const conditions = new Set(collected.conditions);
   // The protocol reads every sheet, cross-origin ones included; the fetch below is the
   // fallback for a browser without it.
@@ -785,10 +822,10 @@ export async function runResponsiveOnPage(page: Page, options: Omit<ResponsiveOp
       const css = href.startsWith("file:")
         ? await readFile(fileURLToPath(href), "utf-8")
         : await (async () => {
-          const res = await fetch(href);
-          if (!res.ok) throw new Error(String(res.status));
-          return await res.text();
-        })();
+            const res = await fetch(href);
+            if (!res.ok) throw new Error(String(res.status));
+            return await res.text();
+          })();
       for (const m of css.matchAll(/@media\s+([^{]+)\{/g)) {
         const text = m[1]!.trim();
         if (text && text !== "all" && text !== "screen") conditions.add(text);
@@ -814,7 +851,8 @@ export async function runResponsiveOnPage(page: Page, options: Omit<ResponsiveOp
     colorSchemes: reactsTo("prefers-color-scheme") ? ["light", "dark"] : ["light"],
     reducedMotions: reactsTo("prefers-reduced-motion") ? ["no-preference", "reduce"] : ["no-preference"],
   };
-  if (space.minWidth > space.maxWidth) throw new RangeError(`--min-width ${space.minWidth} is above --max-width ${space.maxWidth}`);
+  if (space.minWidth > space.maxWidth)
+    throw new RangeError(`--min-width ${space.minWidth} is above --max-width ${space.maxWidth}`);
 
   const baseFontSize = await page.evaluate(() => getComputedStyle(document.documentElement).fontSize);
   const baseInlineFontSize = await page.evaluate(() => ({
@@ -873,17 +911,22 @@ export async function runResponsiveOnPage(page: Page, options: Omit<ResponsiveOp
         40,
       );
       const rawAnchor = anchorInterval(interval.lo, interval.hi, transitions, space.minWidth, space.maxWidth);
-      const witnessWidth = rawAnchor.kind === "ends-at-breakpoint" && interval.lo !== space.minWidth ? interval.hi : interval.lo;
+      const witnessWidth =
+        rawAnchor.kind === "ends-at-breakpoint" && interval.lo !== space.minWidth ? interval.hi : interval.lo;
       const witness: ResponsiveCase = { ...dims.value, width: witnessWidth };
       const atWitness = await measureKey(h, witness, key, kind);
-      const needs = (["height", "textScale", "colorScheme", "reducedMotion"] as const)
-        .filter((d) => witness[d] !== baseCase(space, witness.width)[d]);
-      const anchor = qualifyAnchor(rawAnchor, needs.map((d) => ({ dimension: d, value: witness[d] })));
+      const needs = (["height", "textScale", "colorScheme", "reducedMotion"] as const).filter(
+        (d) => witness[d] !== baseCase(space, witness.width)[d],
+      );
+      const anchor = qualifyAnchor(
+        rawAnchor,
+        needs.map((d) => ({ dimension: d, value: witness[d] })),
+      );
       const moves = breakpointMoves(rawAnchor, interval.lo, interval.hi, space.minWidth);
       const move = moves.length > 0 ? await checkBreakpointMove(h, witness, moves, key, interval) : undefined;
-      const alsoFailsAt = [...new Set(group.cases
-        .map((i) => outcomes[i]!.case.width)
-        .filter((w) => w < interval.lo || w > interval.hi))].sort((a, b) => a - b);
+      const alsoFailsAt = [
+        ...new Set(group.cases.map((i) => outcomes[i]!.case.width).filter((w) => w < interval.lo || w > interval.hi)),
+      ].sort((a, b) => a - b);
       failure.shrunk = {
         case: witness,
         steps: dims.steps,
@@ -923,7 +966,9 @@ export async function runResponsiveOnPage(page: Page, options: Omit<ResponsiveOp
     regimes: regimeStats,
     unvaried,
     containerQueries: collected.container,
-    ...(collected.crossOrigin.length > 0 ? { stylesheets: { crossOrigin: collected.crossOrigin.length, fetched } } : {}),
+    ...(collected.crossOrigin.length > 0
+      ? { stylesheets: { crossOrigin: collected.crossOrigin.length, fetched } }
+      : {}),
     properties: [...new Set(properties.flatMap((p) => p.kinds))],
     cases: outcomes.length,
     failingCases: failingIndexes.size,
@@ -939,10 +984,12 @@ export async function runResponsiveOnPage(page: Page, options: Omit<ResponsiveOp
 
 export async function runResponsiveCheck(options: ResponsiveOptions): Promise<ResponsiveReport> {
   return await withBrowser(async (browser) => {
-    const page = await browser.newPage(withAuthState(
-      { viewport: { width: options.replay?.width ?? 1280, height: options.height ?? 900 } },
-      options.storageState,
-    ));
+    const page = await browser.newPage(
+      withAuthState(
+        { viewport: { width: options.replay?.width ?? 1280, height: options.height ?? 900 } },
+        options.storageState,
+      ),
+    );
     const url = sourceToUrl(options.source);
     await navigatePage(page, url, options);
     await settlePage(page, 100);
@@ -970,11 +1017,14 @@ const describeDeclaration = (d: CauseDeclaration): string => {
 
 export function describeMove(move: BreakpointMoveCheck): string {
   const rewrite = move.moves.map((m) => `${m.from} → ${m.to}`).join(", ");
-  if (move.rewritten === 0) return `${rewrite}: not tried — no stylesheet rule with that condition could be rewritten (inline media attribute, or not Chromium)`;
-  if (move.verified) return `${rewrite}: verified — rewritten in the stylesheet, the failure clears at ${move.checkedAt.join(", ")}px and nothing else fails there`;
+  if (move.rewritten === 0)
+    return `${rewrite}: not tried — no stylesheet rule with that condition could be rewritten (inline media attribute, or not Chromium)`;
+  if (move.verified)
+    return `${rewrite}: verified — rewritten in the stylesheet, the failure clears at ${move.checkedAt.join(", ")}px and nothing else fails there`;
   const parts: string[] = [];
   if (move.stillFailsAt.length > 0) parts.push(`still fails at ${move.stillFailsAt.join(", ")}px`);
-  if (move.introduces.length > 0) parts.push(`introduces ${move.introduces.slice(0, 3).join(", ")}${move.introduces.length > 3 ? " …" : ""}`);
+  if (move.introduces.length > 0)
+    parts.push(`introduces ${move.introduces.slice(0, 3).join(", ")}${move.introduces.length > 3 ? " …" : ""}`);
   return `${rewrite}: tried and rejected — ${parts.join("; ")}`;
 }
 
@@ -988,13 +1038,18 @@ export function describeCause(cause: ResponsiveCause): string {
     else byRule.set(k, { decl: d, count: 1 });
   }
   const decls = [...byRule.values()].map(({ decl, count }) =>
-    count === 1 ? describeDeclaration(decl) : `${describeDeclaration({ ...decl, role: "target" })} (on ${count} elements)`);
-  const holds = cause.failsAt.length === 0
-    ? `clears it at ${cause.holdsAt.join(", ")}px`
-    : `clears it at ${cause.holdsAt.join(", ")}px but not at ${cause.failsAt.join(", ")}px`;
-  const alternatives = cause.alternatives.length > 0
-    ? `; also clears it alone: ${cause.alternatives.map(describeDeclaration).join("; ")}`
-    : "";
+    count === 1
+      ? describeDeclaration(decl)
+      : `${describeDeclaration({ ...decl, role: "target" })} (on ${count} elements)`,
+  );
+  const holds =
+    cause.failsAt.length === 0
+      ? `clears it at ${cause.holdsAt.join(", ")}px`
+      : `clears it at ${cause.holdsAt.join(", ")}px but not at ${cause.failsAt.join(", ")}px`;
+  const alternatives =
+    cause.alternatives.length > 0
+      ? `; also clears it alone: ${cause.alternatives.map(describeDeclaration).join("; ")}`
+      : "";
   return `${decls.join(" + ")}; overriding ${cause.declarations.length === 1 ? "it" : "them"} to ${cause.declarations.map((d) => `\`${d.override}\``).join(" / ")} ${holds}${cause.complete ? "" : " (search budget ran out: may not be minimal)"}${alternatives}`;
 }
 
@@ -1008,7 +1063,9 @@ export function deriveResponsiveIssues(report: Omit<ResponsiveReport, "issues">)
     const cause = f.cause ? `; cause: ${describeCause(f.cause)}` : f.causeNote ? `; cause: ${f.causeNote}` : "";
     const suggestion = f.shrunk?.move
       ? `; breakpoint move ${describeMove(f.shrunk.move)}`
-      : f.shrunk?.anchor.suggestion ? `; ${f.shrunk.anchor.suggestion}` : "";
+      : f.shrunk?.anchor.suggestion
+        ? `; ${f.shrunk.anchor.suggestion}`
+        : "";
     issues.push({
       kind: f.kind as ResponsiveIssueKind,
       severity: f.severity === "fail" ? "suspect" : "warn",
@@ -1042,20 +1099,31 @@ export function formatResponsiveReport(report: ResponsiveReport, rules?: RuleVie
   if (report.replay) {
     lines.push(`replay: ${describeCase(report.replay, s)} — one case, not shrunk`);
   } else {
-    lines.push(`seed ${report.seed} · ${report.cases} cases · widths ${s.minWidth}-${s.maxWidth} · heights ${s.minHeight}-${s.maxHeight}`
-      + (s.textScales.length > 1 ? ` · text ${s.textScales.join("/")}x` : "")
-      + (s.colorSchemes.length > 1 ? " · light/dark" : "")
-      + (s.reducedMotions.length > 1 ? " · reduced motion" : ""));
+    lines.push(
+      `seed ${report.seed} · ${report.cases} cases · widths ${s.minWidth}-${s.maxWidth} · heights ${s.minHeight}-${s.maxHeight}` +
+        (s.textScales.length > 1 ? ` · text ${s.textScales.join("/")}x` : "") +
+        (s.colorSchemes.length > 1 ? " · light/dark" : "") +
+        (s.reducedMotions.length > 1 ? " · reduced motion" : ""),
+    );
   }
-  lines.push(`media: ${report.conditions.length} condition(s) → ${report.regimes.length} width regime(s)`
-    + (report.transitions.length > 0 ? ` (transitions at ${report.transitions.map((t) => t.width).join(", ")}px)` : "")
-    + (report.containerQueries > 0 ? ` · ${report.containerQueries} @container rule(s) followed indirectly` : ""));
+  lines.push(
+    `media: ${report.conditions.length} condition(s) → ${report.regimes.length} width regime(s)` +
+      (report.transitions.length > 0
+        ? ` (transitions at ${report.transitions.map((t) => t.width).join(", ")}px)`
+        : "") +
+      (report.containerQueries > 0 ? ` · ${report.containerQueries} @container rule(s) followed indirectly` : ""),
+  );
   if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
-    lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} cross-origin stylesheet(s) unreadable — their media queries are not partitioned on${RESET}`);
+    lines.push(
+      `${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} cross-origin stylesheet(s) unreadable — their media queries are not partitioned on${RESET}`,
+    );
   }
   for (const r of report.regimes) {
-    const verdict = r.failingCases === 0 ? `${GREEN}clean${RESET}` : `${YELLOW}${r.failingCases}/${r.cases} case(s) failing${RESET}`;
-    lines.push(`  ${range(r.from, r.to).padEnd(12)} ${String(r.cases).padStart(3)} case(s) ${verdict}${r.matches.length > 0 ? ` ${DIM}${r.matches.slice(0, 2).join(" · ")}${r.matches.length > 2 ? " …" : ""}${RESET}` : ""}`);
+    const verdict =
+      r.failingCases === 0 ? `${GREEN}clean${RESET}` : `${YELLOW}${r.failingCases}/${r.cases} case(s) failing${RESET}`;
+    lines.push(
+      `  ${range(r.from, r.to).padEnd(12)} ${String(r.cases).padStart(3)} case(s) ${verdict}${r.matches.length > 0 ? ` ${DIM}${r.matches.slice(0, 2).join(" · ")}${r.matches.length > 2 ? " …" : ""}${RESET}` : ""}`,
+    );
   }
   lines.push(`properties: ${report.properties.join(", ")}`);
 
@@ -1065,19 +1133,29 @@ export function formatResponsiveReport(report: ResponsiveReport, rules?: RuleVie
     .map((e) => ({ ...report.failures[e.row.failure!]!, tier: e.tier, retune: retuneNote(e) }));
   if (visibleFailures.length === 0) {
     lines.push("");
-    lines.push(report.failures.length === 0
-      ? `${GREEN}No property failed in ${report.cases} case(s).${RESET}`
-      : `${GREEN}Every failure is on a rule turned off.${RESET}`);
+    lines.push(
+      report.failures.length === 0
+        ? `${GREEN}No property failed in ${report.cases} case(s).${RESET}`
+        : `${GREEN}Every failure is on a rule turned off.${RESET}`,
+    );
   }
   for (const f of visibleFailures.slice(0, 20)) {
-    const icon = f.tier === "suspect" ? `${RED}x${RESET}` : f.tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+    const icon =
+      f.tier === "suspect" ? `${RED}x${RESET}` : f.tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
     lines.push("");
-    lines.push(`${icon} ${BOLD}${f.kind}${RESET}${f.retune} ${f.selectors[0]}${f.selectors.length > 1 ? ` ${DIM}+${f.selectors.length - 1}: ${f.selectors.slice(1, 4).join(", ")}${f.selectors.length > 4 ? " …" : ""}${RESET}` : ""}`);
+    lines.push(
+      `${icon} ${BOLD}${f.kind}${RESET}${f.retune} ${f.selectors[0]}${f.selectors.length > 1 ? ` ${DIM}+${f.selectors.length - 1}: ${f.selectors.slice(1, 4).join(", ")}${f.selectors.length > 4 ? " …" : ""}${RESET}` : ""}`,
+    );
     if (f.shrunk) {
       const sh = f.shrunk;
       const edges = `${sh.interval.atMin ? "≤" : ""}${range(sh.interval.lo, sh.interval.hi)}${sh.interval.atMax ? "+" : ""}`;
-      lines.push(`    fails at ${edges}${sh.needs.length > 0 ? ` and needs ${sh.needs.map((d) => `${d}=${String(sh.case[d])}`).join(", ")}` : ""} ${DIM}(${f.failingCases} generated case(s); shrunk from ${describeCase(f.firstCase, s)} in ${sh.attempts} checks${sh.exhausted ? ", budget ran out" : ""})${RESET}`);
-      if (sh.alsoFailsAt.length > 0) lines.push(`    also failed at ${sh.alsoFailsAt.slice(0, 8).join(", ")}px — outside that interval, a second range`);
+      lines.push(
+        `    fails at ${edges}${sh.needs.length > 0 ? ` and needs ${sh.needs.map((d) => `${d}=${String(sh.case[d])}`).join(", ")}` : ""} ${DIM}(${f.failingCases} generated case(s); shrunk from ${describeCase(f.firstCase, s)} in ${sh.attempts} checks${sh.exhausted ? ", budget ran out" : ""})${RESET}`,
+      );
+      if (sh.alsoFailsAt.length > 0)
+        lines.push(
+          `    also failed at ${sh.alsoFailsAt.slice(0, 8).join(", ")}px — outside that interval, a second range`,
+        );
       lines.push(`    ${sh.anchor.diagnosis}`);
       if (sh.move) {
         const colour = sh.move.verified ? GREEN : YELLOW;
@@ -1086,7 +1164,9 @@ export function formatResponsiveReport(report: ResponsiveReport, rules?: RuleVie
         lines.push(`    ${GREEN}→ ${sh.anchor.suggestion}${RESET}`);
       }
     } else {
-      lines.push(`    failed in ${f.failingCases} case(s), first at ${describeCase(f.firstCase, s)} ${DIM}(not shrunk: over --max-shrinks)${RESET}`);
+      lines.push(
+        `    failed in ${f.failingCases} case(s), first at ${describeCase(f.firstCase, s)} ${DIM}(not shrunk: over --max-shrinks)${RESET}`,
+      );
     }
     lines.push(`    ${f.message}`);
     if (f.cause) lines.push(`    cause: ${describeCause(f.cause)}`);
@@ -1100,7 +1180,9 @@ export function formatResponsiveReport(report: ResponsiveReport, rules?: RuleVie
     for (const entry of infos) lines.push(`${DIM}i ${entry.row.message}${RESET}`);
   }
   lines.push("");
-  lines.push(`${DIM}timing: partition ${report.timing.partitionMs}ms · cases ${report.timing.casesMs}ms · shrink ${report.timing.shrinkMs}ms${RESET}`);
+  lines.push(
+    `${DIM}timing: partition ${report.timing.partitionMs}ms · cases ${report.timing.casesMs}ms · shrink ${report.timing.shrinkMs}ms${RESET}`,
+  );
   if (note) lines.push(`${DIM}${note}${RESET}`);
   return lines.join("\n");
 }

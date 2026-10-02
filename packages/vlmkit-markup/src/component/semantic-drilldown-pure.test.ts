@@ -37,9 +37,14 @@ describe("describeScrollportStatus", () => {
     const y = describeScrollportStatus(region({ overflowY: "scroll", scrollHeight: 900 }));
     assert.deepEqual({ status: y.status, scroll: y.scroll }, { status: "ok", scroll: "y" });
 
-    const both = describeScrollportStatus(region({
-      overflowX: "auto", overflowY: "auto", scrollWidth: 900, scrollHeight: 900,
-    }));
+    const both = describeScrollportStatus(
+      region({
+        overflowX: "auto",
+        overflowY: "auto",
+        scrollWidth: 900,
+        scrollHeight: 900,
+      }),
+    );
     assert.equal(both.scroll, "xy");
   });
 
@@ -112,7 +117,10 @@ describe("describeLandmarkLayoutContract", () => {
   });
 
   it("describes a width bounded on both sides, one side, or neither", () => {
-    assert.match(describeLandmarkLayoutContract(contract({ minWidth: "320px", maxWidth: "1200px" })).width, /bounded 320px\.\.1200px/);
+    assert.match(
+      describeLandmarkLayoutContract(contract({ minWidth: "320px", maxWidth: "1200px" })).width,
+      /bounded 320px\.\.1200px/,
+    );
     assert.match(describeLandmarkLayoutContract(contract({ maxWidth: "1200px" })).width, /bounded max 1200px/);
     assert.match(describeLandmarkLayoutContract(contract({ minWidth: "320px" })).width, /bounded min 320px/);
   });

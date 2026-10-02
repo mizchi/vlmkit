@@ -24,15 +24,21 @@ const URL_BASE = `file://${process.cwd()}/examples/solitaire/index.html`;
 const still = (extra = "") => `${URL_BASE}?seed=1&animate=0${extra}`;
 
 let browser;
-beforeAll(async () => { browser = await chromium.launch(); }, 120_000);
-afterAll(async () => { await browser?.close(); });
+beforeAll(async () => {
+  browser = await chromium.launch();
+}, 120_000);
+afterAll(async () => {
+  await browser?.close();
+});
 
 /** A page with the console watched, because a silent exception looks like a passing test. */
 async function open(url) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.message)));
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
   await page.goto(url, { waitUntil: "load" });
   await page.waitForFunction(() => document.body.dataset.dealComplete === "true");
   return { page, errors };
@@ -71,13 +77,18 @@ describe("HTML5 drag and drop", () => {
     // The evidence for the README's claim: Playwright's dragAndDrop performs a genuine HTML5
     // drag, dataTransfer and all. J♥ (red) onto Q♠ (black) is descending and alternating.
     const { page, errors } = await open(still());
-    await page.dragAndDrop("#tableau .slot:nth-of-type(2) .card:last-child",
-      "#tableau .slot:nth-of-type(5) .card:last-child");
+    await page.dragAndDrop(
+      "#tableau .slot:nth-of-type(2) .card:last-child",
+      "#tableau .slot:nth-of-type(5) .card:last-child",
+    );
     assert.equal(await pile(page, 5).locator(".card").count(), 6, "Q♠ pile gained the J♥");
     assert.equal(await topCard(page, 5).getAttribute("aria-label"), "J of hearts");
     assert.equal(await pile(page, 2).locator(".card").count(), 1, "and pile 2 lost it");
-    assert.equal(await topCard(page, 2).getAttribute("aria-label"), "6 of clubs",
-      "the card it uncovered turned face up");
+    assert.equal(
+      await topCard(page, 2).getAttribute("aria-label"),
+      "6 of clubs",
+      "the card it uncovered turned face up",
+    );
     assert.equal(await page.locator("#moves").textContent(), "1");
     assert.deepEqual(errors, []);
     await page.close();
@@ -87,8 +98,10 @@ describe("HTML5 drag and drop", () => {
     // Q♥ onto J♥ is ascending — the browser must reject it, which is what NOT calling
     // preventDefault in dragover achieves.
     const { page } = await open(still());
-    await page.dragAndDrop("#tableau .slot:nth-of-type(1) .card:last-child",
-      "#tableau .slot:nth-of-type(2) .card:last-child");
+    await page.dragAndDrop(
+      "#tableau .slot:nth-of-type(1) .card:last-child",
+      "#tableau .slot:nth-of-type(2) .card:last-child",
+    );
     assert.equal(await pile(page, 1).locator(".card").count(), 1);
     assert.equal(await pile(page, 2).locator(".card").count(), 2);
     assert.equal(await page.locator("#moves").textContent(), "0", "an illegal drop is not a move");
@@ -145,8 +158,10 @@ describe("HTML5 drag and drop", () => {
     // Build a run: J♥ onto Q♠, then move both onto nothing legal and back — simplest real run
     // is J♥+10♠ but seed 1 has no 10♠ exposed, so this drives the two-card case through the
     // state the first move creates and asserts the run travels together.
-    await page.dragAndDrop("#tableau .slot:nth-of-type(2) .card:last-child",
-      "#tableau .slot:nth-of-type(5) .card:last-child");
+    await page.dragAndDrop(
+      "#tableau .slot:nth-of-type(2) .card:last-child",
+      "#tableau .slot:nth-of-type(5) .card:last-child",
+    );
     const run = await page.evaluate(() => {
       const s = window.solitaire.state;
       return { pile5: s.tableau[4].map((c) => c.id) };
@@ -265,9 +280,7 @@ describe("the foundations", () => {
   it("claims no suit until a card is on it", async () => {
     const { page } = await open(still());
 
-    const labels = await page.$$eval("#foundations .slot", (els) =>
-      els.map((e) => e.getAttribute("aria-label")),
-    );
+    const labels = await page.$$eval("#foundations .slot", (els) => els.map((e) => e.getAttribute("aria-label")));
     assert.deepEqual(labels, [
       "Foundation 1, empty",
       "Foundation 2, empty",
@@ -278,10 +291,12 @@ describe("the foundations", () => {
     for (const suit of ["spade", "heart", "diamond", "club"]) {
       assert.doesNotMatch(labels.join(" "), new RegExp(suit, "i"));
     }
-    assert.deepEqual(
-      await page.$$eval("#foundations .slot", (els) => els.map((e) => e.dataset.hint ?? null)),
-      [null, null, null, null],
-    );
+    assert.deepEqual(await page.$$eval("#foundations .slot", (els) => els.map((e) => e.dataset.hint ?? null)), [
+      null,
+      null,
+      null,
+      null,
+    ]);
     await page.close();
   });
 
@@ -296,9 +311,7 @@ describe("the foundations", () => {
     const state = await page.evaluate(() =>
       window.solitaire.state.foundations.map((p) => (p.at(-1) ? p.at(-1).suit : null)),
     );
-    const labels = await page.$$eval("#foundations .slot", (els) =>
-      els.map((e) => e.getAttribute("aria-label")),
-    );
+    const labels = await page.$$eval("#foundations .slot", (els) => els.map((e) => e.getAttribute("aria-label")));
     assert.ok(state.every(Boolean), "20 deal+auto-finish passes place all four Aces on seed 1");
 
     state.forEach((suit, i) => {
@@ -320,9 +333,7 @@ describe("the foundations", () => {
       await page.locator("#stock").click();
       await page.locator("#auto-finish").click();
     }
-    const placed = await page.evaluate(() =>
-      window.solitaire.state.foundations.reduce((n, p) => n + p.length, 0),
-    );
+    const placed = await page.evaluate(() => window.solitaire.state.foundations.reduce((n, p) => n + p.length, 0));
     assert.ok(placed > 0);
     assert.equal(await page.locator("#remaining").textContent(), String(placed));
     await page.close();
@@ -368,7 +379,7 @@ describe("animation", () => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     await page.goto(`${URL_BASE}?seed=1`, { waitUntil: "load" });
     assert.equal(await page.evaluate(() => document.body.dataset.dealComplete), "false");
-    assert.ok(await page.locator(".card.dealing").count() > 0, "cards are animating");
+    assert.ok((await page.locator(".card.dealing").count()) > 0, "cards are animating");
     await page.waitForFunction(() => document.body.dataset.dealComplete === "true", null, { timeout: 15_000 });
     assert.equal(await page.locator(".card.dealing").count(), 0, "and the class is cleaned up");
     await page.close();
@@ -379,8 +390,11 @@ describe("animation", () => {
     // query cannot reach them.
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
     await page.goto(`${URL_BASE}?seed=1`, { waitUntil: "load" });
-    assert.equal(await page.evaluate(() => document.body.dataset.dealComplete), "true",
-      "the deal completes immediately rather than over 2.3s");
+    assert.equal(
+      await page.evaluate(() => document.body.dataset.dealComplete),
+      "true",
+      "the deal completes immediately rather than over 2.3s",
+    );
     assert.equal(await page.locator(".card.dealing").count(), 0);
     await page.close();
   });
@@ -389,12 +403,15 @@ describe("animation", () => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     await page.goto(`${URL_BASE}?seed=1`, { waitUntil: "load" });
     await page.waitForFunction(() => document.body.dataset.dealComplete === "true");
-    await page.dragAndDrop("#tableau .slot:nth-of-type(2) .card:last-child",
-      "#tableau .slot:nth-of-type(5) .card:last-child");
+    await page.dragAndDrop(
+      "#tableau .slot:nth-of-type(2) .card:last-child",
+      "#tableau .slot:nth-of-type(5) .card:last-child",
+    );
     // The flip is 220ms; catching the class requires looking while it runs.
-    assert.ok(await page.locator(".card.flipping").count() >= 0);
-    await page.waitForFunction(() => document.querySelectorAll(".card.flipping").length === 0,
-      null, { timeout: 5_000 });
+    assert.ok((await page.locator(".card.flipping").count()) >= 0);
+    await page.waitForFunction(() => document.querySelectorAll(".card.flipping").length === 0, null, {
+      timeout: 5_000,
+    });
     assert.equal(await topCard(page, 2).getAttribute("aria-label"), "6 of clubs");
     await page.close();
   });
@@ -415,9 +432,13 @@ describe("animation", () => {
       s.waste = [];
       s.foundations = suits.map((suit, i) =>
         Array.from({ length: i === 3 ? 12 : 13 }, (_, r) => ({
-          id: `${suit}-${r + 1}`, suit, rank: r + 1,
-          red: suit === "hearts" || suit === "diamonds", faceUp: true,
-        })));
+          id: `${suit}-${r + 1}`,
+          suit,
+          rank: r + 1,
+          red: suit === "hearts" || suit === "diamonds",
+          faceUp: true,
+        })),
+      );
       // The 52nd card, waiting in a tableau pile.
       s.tableau[0] = [{ id: "clubs-13", suit: "clubs", rank: 13, red: false, faceUp: true }];
       void K;
@@ -425,7 +446,7 @@ describe("animation", () => {
     await page.locator("#auto-finish").click();
     await page.waitForSelector("#win-banner:not([hidden])", { timeout: 10_000 });
     assert.equal(await page.locator("#win-banner").textContent(), "You win.");
-    assert.ok(await page.locator(".card.bouncing").count() > 0, "the cascade is running");
+    assert.ok((await page.locator(".card.bouncing").count()) > 0, "the cascade is running");
     assert.match(await page.locator("#announcer").textContent(), /You win/);
     await page.close();
   });
@@ -465,10 +486,7 @@ describe("a played win", () => {
         if (step.draw) {
           await page.locator("#stock").click();
         } else {
-          const applied = await page.evaluate(
-            ([from, to]) => window.solitaire.commit(from, to),
-            [step.from, step.to],
-          );
+          const applied = await page.evaluate(([from, to]) => window.solitaire.commit(from, to), [step.from, step.to]);
           assert.equal(applied, true, `seed ${seed}: the page refused ply ${ply} of a winning line`);
         }
         const problems = await page.evaluate(AUDIT);

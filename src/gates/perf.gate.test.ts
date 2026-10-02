@@ -53,9 +53,12 @@ describe("check perf page-load flags", () => {
   it("honours --timeout and --wait-until on a page that never goes idle", { timeout: 120_000 }, async () => {
     const argv = (extra: string[]) => [
       url,
-      "--observe", "0",
-      "--output-dir", join(outDir, extra.length ? "lowered" : "default"),
-      "--timeout", "1500",
+      "--observe",
+      "0",
+      "--output-dir",
+      join(outDir, extra.length ? "lowered" : "default"),
+      "--timeout",
+      "1500",
       ...extra,
     ];
     // Default milestone: the never-answered fetch keeps networkidle away, so the
@@ -69,13 +72,13 @@ describe("check perf page-load flags", () => {
     // wording it replaced.
     await assert.rejects(
       async () => perfGate.run(perfGate.parse(argv([]), ctx), ctx),
-      (e: Error) => /page load timed out after 1500ms waiting for `networkidle`/.test(e.message)
-        && /--wait-until load/.test(e.message),
+      (e: Error) =>
+        /page load timed out after 1500ms waiting for `networkidle`/.test(e.message) &&
+        /--wait-until load/.test(e.message),
     );
-    const report = await perfGate.run(
-      perfGate.parse(argv(["--wait-until", "domcontentloaded"]), ctx),
-      ctx,
-    ) as { verdicts: { cls: string } };
+    const report = (await perfGate.run(perfGate.parse(argv(["--wait-until", "domcontentloaded"]), ctx), ctx)) as {
+      verdicts: { cls: string };
+    };
     assert.ok(report.verdicts.cls, "the run completed and produced a CLS verdict");
   });
 });

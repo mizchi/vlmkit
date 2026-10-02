@@ -36,11 +36,7 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 // made `vlmkit build page` a no-op that printed nothing and exited 0. See
 // `page-render.ts`.
 import { loadPng, renderHtmlToPng } from "../component/page-render.ts";
-import {
-  composePageDiff,
-  type PageComposition,
-  type PageComponent,
-} from "../component/page-compose-diff.ts";
+import { composePageDiff, type PageComposition, type PageComponent } from "../component/page-compose-diff.ts";
 import { detectBackground } from "../component/component-bbox.ts";
 import { captureRegionElementsFromHtml, type RegionElementRect } from "../region-selector-match.ts";
 // The kickback text and the terminal report live in `markup-verify-report.ts`:
@@ -145,9 +141,7 @@ export function pixelPresence(
   if (background) {
     // Halve the fill-to-background distance and step inside it, so a
     // background pixel can never be counted as the fill present.
-    const bgDist = Math.sqrt(
-      (background[0] - r0) ** 2 + (background[1] - g0) ** 2 + (background[2] - b0) ** 2,
-    );
+    const bgDist = Math.sqrt((background[0] - r0) ** 2 + (background[1] - g0) ** 2 + (background[2] - b0) ** 2);
     if (bgDist > 0) tolerance = Math.max(1, Math.min(tolerance, Math.floor(bgDist / 2) - 1));
   }
   let inside = 0;
@@ -202,13 +196,14 @@ export interface VerifyTrend {
  * signal.
  */
 export function computeTrend(previous: VerifyTrendPoint, current: VerifyTrendPoint): VerifyTrend {
-  const direction = current.targetsPassed < previous.targetsPassed
-      || (current.targetsPassed === previous.targetsPassed && current.residuals > previous.residuals)
-    ? "regressed"
-    : current.targetsPassed > previous.targetsPassed
-        || (current.targetsPassed === previous.targetsPassed && current.residuals < previous.residuals)
-      ? "improved"
-      : "flat";
+  const direction =
+    current.targetsPassed < previous.targetsPassed ||
+    (current.targetsPassed === previous.targetsPassed && current.residuals > previous.residuals)
+      ? "regressed"
+      : current.targetsPassed > previous.targetsPassed ||
+          (current.targetsPassed === previous.targetsPassed && current.residuals < previous.residuals)
+        ? "improved"
+        : "flat";
   return { previous, current, direction };
 }
 
@@ -223,9 +218,6 @@ export interface MarkupVerifyReport {
   kickback: string[];
 }
 
-
-
-
 /** Last verify-markup ledger entry for this attempt, if any. */
 function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPoint | undefined {
   try {
@@ -236,9 +228,12 @@ function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPo
         source?: string;
         headline?: { targetsPassed?: number; residuals?: number };
       };
-      if (entry.tool === "verify-markup" && entry.source === attempt
-        && typeof entry.headline?.targetsPassed === "number"
-        && typeof entry.headline?.residuals === "number") {
+      if (
+        entry.tool === "verify-markup" &&
+        entry.source === attempt &&
+        typeof entry.headline?.targetsPassed === "number" &&
+        typeof entry.headline?.residuals === "number"
+      ) {
         return { targetsPassed: entry.headline.targetsPassed, residuals: entry.headline.residuals };
       }
     }
@@ -258,7 +253,11 @@ async function fullPageRestShot(
     await page.goto(pathToFileURL(resolve(htmlPath)).href, { waitUntil: "networkidle", timeout: 30000 });
     const buffer = await page.screenshot({ fullPage: true, animations: "disabled" });
     const png = PNG.sync.read(buffer);
-    return { data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength), width: png.width, height: png.height };
+    return {
+      data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),
+      width: png.width,
+      height: png.height,
+    };
   });
 }
 
@@ -342,7 +341,8 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     // pixel-presence match through the noise.
     let degraded = false;
     try {
-      degraded = (JSON.parse(readFileSync(`${targetPath}.meta.json`, "utf8")) as { degraded?: boolean }).degraded === true;
+      degraded =
+        (JSON.parse(readFileSync(`${targetPath}.meta.json`, "utf8")) as { degraded?: boolean }).degraded === true;
     } catch {
       // No sidecar — clean-capture semantics.
     }
@@ -389,10 +389,11 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     const extraBlocking = composition.extra.filter((e) => !isSegmentationOnly(e, shot, target));
     const extraConfirmed = composition.extra.filter((e) => isSegmentationOnly(e, shot, target));
 
-    const pass = missingBlocking.length === 0
-      && extraBlocking.length === 0
-      && composition.orderViolations.length === 0
-      && heightOk;
+    const pass =
+      missingBlocking.length === 0 &&
+      extraBlocking.length === 0 &&
+      composition.orderViolations.length === 0 &&
+      heightOk;
     const targetKickback: string[] = [];
     if (!pass) {
       const elements = fixContext ? await attemptElements(target.width, target.height) : undefined;
@@ -401,11 +402,17 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
         box: { left: number; top: number; width: number; height: number },
         hex: string,
       ): number => pixelPresence(side === "target" ? target : shot, { ...box, hex }, presenceFillTolerance, presenceBg);
-      targetKickback.push(...kickbackForComposition(label, {
-        ...composition,
-        missing: missingBlocking,
-        extra: extraBlocking,
-      }, { ...(elements ? { elements } : {}), presence }));
+      targetKickback.push(
+        ...kickbackForComposition(
+          label,
+          {
+            ...composition,
+            missing: missingBlocking,
+            extra: extraBlocking,
+          },
+          { ...(elements ? { elements } : {}), presence },
+        ),
+      );
     }
     for (const m of missingConfirmed) {
       targetKickback.push(
@@ -471,16 +478,14 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       gateId: gate.id,
       suspects: outcome.counts.suspect,
       warns: outcome.counts.warn,
-      summary: gate.headline?.(outcome.report)
-        ?? `${outcome.counts.suspect} suspect, ${outcome.counts.warn} warn`,
+      summary: gate.headline?.(outcome.report) ?? `${outcome.counts.suspect} suspect, ${outcome.counts.warn} warn`,
     });
   }
 
   for (const g of gates) {
     if (g.suspects > 0) {
       kickback.push(
-        `gate ${g.gate}: ${g.suspects} suspect issue(s) —`
-        + ` run \`vlmkit ${g.gate}\` for detail and fix them.`,
+        `gate ${g.gate}: ${g.suspects} suspect issue(s) —` + ` run \`vlmkit ${g.gate}\` for detail and fix them.`,
       );
     }
   }
@@ -522,7 +527,6 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
   });
   return { attempt: options.attempt, targets, gates, done, ...(trend ? { trend } : {}), kickback };
 }
-
 
 /**
  * CLI entry removed: this module is measurement code now, not a command.

@@ -62,24 +62,27 @@ describe("heal", () => {
     const testFile = tmpTestFile();
     const m = failThenOk("Expected URL to contain critical");
     let capturedContext = "";
-    const result = await heal({
-      ...baseOpts(testFile),
-      guardrailContext: [
-        "# Original request",
-        "Click the critical severity filter and keep the shareable URL assertion.",
-        "# Locator inventory",
-        "button \"critical\"",
-        "text \"Checkout webhook retry storm\"",
-      ].join("\n"),
-    }, {
-      runTest: m.runTest,
-      codegen: {
-        propose: async ({ context }) => {
-          capturedContext = context;
-          return { newTestSource: "// patched test\n", costUsd: 0.001 };
+    const result = await heal(
+      {
+        ...baseOpts(testFile),
+        guardrailContext: [
+          "# Original request",
+          "Click the critical severity filter and keep the shareable URL assertion.",
+          "# Locator inventory",
+          'button "critical"',
+          'text "Checkout webhook retry storm"',
+        ].join("\n"),
+      },
+      {
+        runTest: m.runTest,
+        codegen: {
+          propose: async ({ context }) => {
+            capturedContext = context;
+            return { newTestSource: "// patched test\n", costUsd: 0.001 };
+          },
         },
       },
-    });
+    );
 
     assert.equal(result.verdict, "fixed");
     assert.match(capturedContext, /Original request\/plan\/locator guardrails/);
@@ -124,7 +127,13 @@ describe("heal", () => {
       captureVrt: async () => ({ baseline: Buffer.from("BEFORE"), actual: Buffer.from("AFTER") }),
       reviewVrt: async ({ baselinePng }) => {
         sawBaseline = baselinePng;
-        return { verdict: "accept", confidence: 0.95, reason: "matches intent", intentSource: "expectedChange", costUsd: 0.0002 };
+        return {
+          verdict: "accept",
+          confidence: 0.95,
+          reason: "matches intent",
+          intentSource: "expectedChange",
+          costUsd: 0.0002,
+        };
       },
       codegen: {
         propose: async () => {
@@ -157,8 +166,18 @@ describe("heal", () => {
             : { ok: true, stdout: "", stderr: "" };
         },
         captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
-        reviewVrt: async () => ({ verdict: "accept", confidence: 0.95, reason: "intended", intentSource: "expectedChange", costUsd: 0.0001 }),
-        codegen: { propose: async () => { throw new Error("codegen must NOT run"); } },
+        reviewVrt: async () => ({
+          verdict: "accept",
+          confidence: 0.95,
+          reason: "intended",
+          intentSource: "expectedChange",
+          costUsd: 0.0001,
+        }),
+        codegen: {
+          propose: async () => {
+            throw new Error("codegen must NOT run");
+          },
+        },
       },
     );
 
@@ -173,8 +192,18 @@ describe("heal", () => {
       {
         runTest: async () => ({ ok: false, stdout: "", stderr: "Error: Screenshot comparison failed" }),
         captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
-        reviewVrt: async () => ({ verdict: "accept", confidence: 0.6, reason: "looks intentional, not sure", intentSource: "vision-only", costUsd: 0.0001 }),
-        codegen: { propose: async () => { throw new Error("codegen must NOT run on needs-review"); } },
+        reviewVrt: async () => ({
+          verdict: "accept",
+          confidence: 0.6,
+          reason: "looks intentional, not sure",
+          intentSource: "vision-only",
+          costUsd: 0.0001,
+        }),
+        codegen: {
+          propose: async () => {
+            throw new Error("codegen must NOT run on needs-review");
+          },
+        },
       },
     );
     assert.equal(result.verdict, "needs-review");
@@ -184,10 +213,12 @@ describe("heal", () => {
     const testFile = tmpTestFile();
     const opts: HealOptions = {
       ...baseOpts(testFile),
-      observe: { tiers: [
-        { provider: "openrouter", model: "cheap", vision: true },
-        { provider: "openrouter", model: "strong", vision: true },
-      ]},
+      observe: {
+        tiers: [
+          { provider: "openrouter", model: "cheap", vision: true },
+          { provider: "openrouter", model: "strong", vision: true },
+        ],
+      },
     };
     let strongCalled = false;
     const result = await heal(opts, {
@@ -196,11 +227,27 @@ describe("heal", () => {
       reviewVrt: async ({ tier }) => {
         if (tier.model === "strong") {
           strongCalled = true;
-          return { verdict: "reject", confidence: 0.9, reason: "collateral breakage", intentSource: "expectedChange", costUsd: 0.001 };
+          return {
+            verdict: "reject",
+            confidence: 0.9,
+            reason: "collateral breakage",
+            intentSource: "expectedChange",
+            costUsd: 0.001,
+          };
         }
-        return { verdict: "accept", confidence: 0.99, reason: "looks intended", intentSource: "expectedChange", costUsd: 0.0001 };
+        return {
+          verdict: "accept",
+          confidence: 0.99,
+          reason: "looks intended",
+          intentSource: "expectedChange",
+          costUsd: 0.0001,
+        };
       },
-      codegen: { propose: async () => { throw new Error("codegen must NOT run on the VRT path"); } },
+      codegen: {
+        propose: async () => {
+          throw new Error("codegen must NOT run on the VRT path");
+        },
+      },
     });
     assert.equal(result.verdict, "needs-review");
     assert.equal(strongCalled, true, "the strong tier must confirm an accept");
@@ -210,18 +257,30 @@ describe("heal", () => {
     const testFile = tmpTestFile();
     const opts: HealOptions = {
       ...baseOpts(testFile),
-      observe: { tiers: [
-        { provider: "openrouter", model: "cheap", vision: true },
-        { provider: "openrouter", model: "strong", vision: true },
-      ]},
+      observe: {
+        tiers: [
+          { provider: "openrouter", model: "cheap", vision: true },
+          { provider: "openrouter", model: "strong", vision: true },
+        ],
+      },
     };
     const m = failThenOk("Error: Screenshot comparison failed");
     const result = await heal(opts, {
       runTest: m.runTest,
       updateSnapshotsCommand: "noop --update-snapshots",
       captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
-      reviewVrt: async () => ({ verdict: "accept", confidence: 0.95, reason: "intended", intentSource: "expectedChange", costUsd: 0.0001 }),
-      codegen: { propose: async () => { throw new Error("codegen must NOT run on the accept path"); } },
+      reviewVrt: async () => ({
+        verdict: "accept",
+        confidence: 0.95,
+        reason: "intended",
+        intentSource: "expectedChange",
+        costUsd: 0.0001,
+      }),
+      codegen: {
+        propose: async () => {
+          throw new Error("codegen must NOT run on the accept path");
+        },
+      },
     });
     assert.equal(result.verdict, "fixed");
     assert.equal(result.finalPatch, "baseline-update");
@@ -237,8 +296,15 @@ describe("heal", () => {
         runTest: m.runTest,
         updateSnapshotsCommand: "noop --update-snapshots",
         captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
-        reviewVrt: async () => { reviewCalls++; return { verdict: "accept", confidence: 0.95, reason: "ok", intentSource: "expectedChange", costUsd: 0.0001 }; },
-        codegen: { propose: async () => { throw new Error("codegen must NOT run"); } },
+        reviewVrt: async () => {
+          reviewCalls++;
+          return { verdict: "accept", confidence: 0.95, reason: "ok", intentSource: "expectedChange", costUsd: 0.0001 };
+        },
+        codegen: {
+          propose: async () => {
+            throw new Error("codegen must NOT run");
+          },
+        },
       },
     );
     assert.equal(result.verdict, "fixed");
@@ -277,7 +343,13 @@ describe("heal", () => {
     const result = await heal(baseOpts(testFile), {
       runTest: async () => ({ ok: false, stdout: "", stderr: "toHaveScreenshot pixels differ" }),
       captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
-      reviewVrt: async () => ({ verdict: "reject", confidence: 0.9, reason: "broken layout", intentSource: "vision-only", costUsd: 0.0002 }),
+      reviewVrt: async () => ({
+        verdict: "reject",
+        confidence: 0.9,
+        reason: "broken layout",
+        intentSource: "vision-only",
+        costUsd: 0.0002,
+      }),
       codegen: { propose: async () => ({ newTestSource: "x", costUsd: 0 }) },
     });
     assert.equal(result.verdict, "regression");

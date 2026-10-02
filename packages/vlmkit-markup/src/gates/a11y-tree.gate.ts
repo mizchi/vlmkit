@@ -28,7 +28,9 @@ const semanticsEmpty = (report: ScanA11yReport): string | null =>
 function formatScanA11y(report: ScanA11yReport, rules?: RuleView): string {
   const issues = [
     ...(report.redirect ? [{ kind: "redirected", severity: "suspect" as const, message: report.redirect }] : []),
-    ...(semanticsEmpty(report) ? [{ kind: "semantics-empty", severity: "suspect" as const, message: semanticsEmpty(report)! }] : []),
+    ...(semanticsEmpty(report)
+      ? [{ kind: "semantics-empty", severity: "suspect" as const, message: semanticsEmpty(report)! }]
+      : []),
   ];
   const { shown, note } = tierIssues(issues, rules);
   return [
@@ -39,7 +41,10 @@ function formatScanA11y(report: ScanA11yReport, rules?: RuleView): string {
     `tree:  ${report.out}  (${report.viewport.width}x${report.viewport.height})`,
     `frame: ${report.frame ?? `${DIM}none — contrast will not be measured (pass --frame)${RESET}`}`,
     `  ${report.counts.nodes} node(s), ${report.counts.named} named, ${report.counts.interactive} operable`,
-    ...shown.map(({ row, tier }) => `\n${YELLOW}! [${row.kind}]${tier === row.severity ? "" : ` (re-tuned to ${tier})`} ${row.message}${RESET}`),
+    ...shown.map(
+      ({ row, tier }) =>
+        `\n${YELLOW}! [${row.kind}]${tier === row.severity ? "" : ` (re-tuned to ${tier})`} ${row.message}${RESET}`,
+    ),
     ...(note ? [`${DIM}${note}${RESET}`] : []),
     "",
     `${DIM}judge it without a browser:${RESET}`,
@@ -83,27 +88,77 @@ contract. Then: vlmkit check a11y tree a11y.json`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "url|page.html|dump.xml", kind: "path-or-url", description: "Flutter web page, or a uiautomator dump", positional: 0, required: true },
-    { name: "out", placeholder: "file", kind: "path", description: "Tree file to write", defaultDescription: DEFAULT_A11Y_TREE },
     {
-      name: "frame", placeholder: "frame.png", kind: "path",
+      name: "source",
+      placeholder: "url|page.html|dump.xml",
+      kind: "path-or-url",
+      description: "Flutter web page, or a uiautomator dump",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "out",
+      placeholder: "file",
+      kind: "path",
+      description: "Tree file to write",
+      defaultDescription: DEFAULT_A11Y_TREE,
+    },
+    {
+      name: "frame",
+      placeholder: "frame.png",
+      kind: "path",
       description: "Page: where to write the screenshot. Dump: the screenshot taken with it",
       defaultDescription: "page: beside --out",
     },
-    { name: "viewport", placeholder: "WxH", kind: "string", description: "Page viewport", defaultDescription: "375x812" },
-    { name: "click", placeholder: "name", kind: "string", repeatable: true, description: "Tap a node by its exact accessible name before collecting (page)" },
-    { name: "locale", placeholder: "bcp47", kind: "string", description: "Page locale (pinned so the host's LANG cannot change the app)", defaultDescription: "en-US" },
-    { name: "density", placeholder: "dpi", kind: "number", description: "Device dpi, required for a dump (adb shell wm density)" },
-    { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    {
+      name: "viewport",
+      placeholder: "WxH",
+      kind: "string",
+      description: "Page viewport",
+      defaultDescription: "375x812",
+    },
+    {
+      name: "click",
+      placeholder: "name",
+      kind: "string",
+      repeatable: true,
+      description: "Tap a node by its exact accessible name before collecting (page)",
+    },
+    {
+      name: "locale",
+      placeholder: "bcp47",
+      kind: "string",
+      description: "Page locale (pinned so the host's LANG cannot change the app)",
+      defaultDescription: "en-US",
+    },
+    {
+      name: "density",
+      placeholder: "dpi",
+      kind: "number",
+      description: "Device dpi, required for a dump (adb shell wm density)",
+    },
+    {
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
+      description: "Playwright storage state for pages behind a login",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit scan a11y <url|page.html|dump.xml> [--out a11y.json]", [
-      "--out", "--frame", "--viewport", "--click", "--density", "--locale", "--storage-state",
+      "--out",
+      "--frame",
+      "--viewport",
+      "--click",
+      "--density",
+      "--locale",
+      "--storage-state",
     ]);
     const densityRaw = readFlag(argv, "density");
     const density = densityRaw === undefined ? undefined : Number(densityRaw);
-    if (density !== undefined && !(density > 0)) throw new UsageError(`--density expects the device dpi, got ${JSON.stringify(densityRaw)}.`);
+    if (density !== undefined && !(density > 0))
+      throw new UsageError(`--density expects the device dpi, got ${JSON.stringify(densityRaw)}.`);
     const frame = readFlag(argv, "frame");
     const viewport = viewportFlag(argv);
     const clicks = readAll(argv, "click");
@@ -124,10 +179,13 @@ contract. Then: vlmkit check a11y tree a11y.json`,
   run: (options) => runScanA11y(options),
   findings: (report): Finding[] => [
     ...(report.redirect ? [{ rule: "redirected", severity: "suspect" as const, message: report.redirect }] : []),
-    ...(semanticsEmpty(report) ? [{ rule: "semantics-empty", severity: "suspect" as const, message: semanticsEmpty(report)! }] : []),
+    ...(semanticsEmpty(report)
+      ? [{ rule: "semantics-empty", severity: "suspect" as const, message: semanticsEmpty(report)! }]
+      : []),
   ],
   format: formatScanA11y,
-  headline: (report) => `${report.platform} tree ${report.out}: ${report.counts.nodes} node(s), ${report.counts.named} named, ${report.counts.interactive} operable`,
+  headline: (report) =>
+    `${report.platform} tree ${report.out}: ${report.counts.nodes} node(s), ${report.counts.named} named, ${report.counts.interactive} operable`,
   ledger: (report) => ({
     tool: "scan-a11y",
     source: report.source,
@@ -153,24 +211,27 @@ function treeFindings(report: CheckA11yTreeReport): Finding[] {
     ...report.unreachable.map((f): Finding => ({
       rule: "unreachable-content",
       severity: "suspect",
-      message: `${f.count} named node(s) past the ${f.beyond.join("/")} edge with nothing that scrolls to them`
-        + ` — first: "${f.first.name || f.first.role}" (${rect(f.first.rect)})${f.container ? ` in ${f.container}` : ""}`,
+      message:
+        `${f.count} named node(s) past the ${f.beyond.join("/")} edge with nothing that scrolls to them` +
+        ` — first: "${f.first.name || f.first.role}" (${rect(f.first.rect)})${f.container ? ` in ${f.container}` : ""}`,
       selector: f.first.path,
       evidence: { container: f.container, first: f.first, count: f.count, beyond: f.beyond },
     })),
     ...(report.contrast?.failures ?? []).map((f): Finding => ({
       rule: "contrast-below-aa",
       severity: "suspect",
-      message: `"${f.name}" ${f.ratio}:1, needs ${f.floor}:1 — ${formatRgb(f.ink)} on ${formatRgb(f.background)}`
-        + ` (text ${f.textSize}, ${f.textSizeFrom})`,
+      message:
+        `"${f.name}" ${f.ratio}:1, needs ${f.floor}:1 — ${formatRgb(f.ink)} on ${formatRgb(f.background)}` +
+        ` (text ${f.textSize}, ${f.textSizeFrom})`,
       selector: f.path,
       evidence: { ...f },
     })),
     ...report.touch.failures.map((f): Finding => ({
       rule: "target-undersized",
       severity: "suspect",
-      message: `${Math.round(f.bbox.width)}x${Math.round(f.bbox.height)} (min side ${f.minSide}, need ${f.required})`
-        + `${f.cluster ? ", clustered" : ""} — "${f.text}"`,
+      message:
+        `${Math.round(f.bbox.width)}x${Math.round(f.bbox.height)} (min side ${f.minSide}, need ${f.required})` +
+        `${f.cluster ? ", clustered" : ""} — "${f.text}"`,
       selector: f.path,
       evidence: { path: f.path, minSide: f.minSide, required: f.required, cluster: f.cluster },
     })),
@@ -181,8 +242,10 @@ function formatCheckA11yTree(report: CheckA11yTreeReport, rules?: RuleView): str
   const rows = treeFindings(report).map((f) => ({ kind: f.rule, severity: f.severity, message: f.message }));
   const { shown, note } = tierIssues(rows, rules);
   const measured = report.contrast
-    ? `${report.contrast.samples.length} text node(s) measured on the frame`
-      + (report.contrast.skipped.length ? `, ${report.contrast.skipped.length} skipped (${[...new Set(report.contrast.skipped.map((s) => s.reason))].join(", ")})` : "")
+    ? `${report.contrast.samples.length} text node(s) measured on the frame` +
+      (report.contrast.skipped.length
+        ? `, ${report.contrast.skipped.length} skipped (${[...new Set(report.contrast.skipped.map((s) => s.reason))].join(", ")})`
+        : "")
     : `${YELLOW}no frame — contrast NOT measured (pass --image, or scan with a frame)${RESET}`;
   return [
     "",
@@ -190,16 +253,29 @@ function formatCheckA11yTree(report: CheckA11yTreeReport, rules?: RuleView): str
     `${DIM}source: ${report.source}${report.frame ? `  frame: ${report.frame}` : ""}${RESET}`,
     "",
     `${report.inspected.nodes} node(s), ${report.inspected.interactive} operable; ${measured}`,
-    `touch floor ${report.touch.required} (${report.touch.level})`
-      + (report.touch.wcagExempt.length ? `; ${report.touch.wcagExempt.length} undersized but spaced (2.5.8 exception)` : "")
-      + (report.touch.enclosed.length ? `; ${report.touch.enclosed.length} smaller target(s) inside a target that meets it, judged as that one` : ""),
+    `touch floor ${report.touch.required} (${report.touch.level})` +
+      (report.touch.wcagExempt.length
+        ? `; ${report.touch.wcagExempt.length} undersized but spaced (2.5.8 exception)`
+        : "") +
+      (report.touch.enclosed.length
+        ? `; ${report.touch.enclosed.length} smaller target(s) inside a target that meets it, judged as that one`
+        : ""),
     "",
     ...(shown.length === 0
       ? [`${GREEN}✓ no finding${RESET}`]
-      : shown.map(({ row, tier }) => `${tier === "suspect" ? RED : YELLOW}✗ [${row.kind}]${tier === row.severity ? "" : ` (re-tuned to ${tier})`} ${row.message}${RESET}`)),
+      : shown.map(
+          ({ row, tier }) =>
+            `${tier === "suspect" ? RED : YELLOW}✗ [${row.kind}]${tier === row.severity ? "" : ` (re-tuned to ${tier})`} ${row.message}${RESET}`,
+        )),
     ...(note ? [`${DIM}${note}${RESET}`] : []),
-    ...(report.allowed.length ? ["", `${DIM}allowed: ${report.allowed.map((a) => `${a.selector} — ${a.reason}`).join("; ")}${RESET}`] : []),
-    ...(report.unusedAllow.length ? [`${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`] : []),
+    ...(report.allowed.length
+      ? ["", `${DIM}allowed: ${report.allowed.map((a) => `${a.selector} — ${a.reason}`).join("; ")}${RESET}`]
+      : []),
+    ...(report.unusedAllow.length
+      ? [
+          `${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`,
+        ]
+      : []),
     "",
   ].join("\n");
 }
@@ -230,7 +306,11 @@ means on each platform. --allow matches a node's path or its quoted name:
   --allow '"Seed: 1234";decorative debug readout'`,
   rules: [
     { id: "unlabelled-control", title: "Operable node with no accessible name", severity: "suspect" },
-    { id: "unreachable-content", title: "Named content outside the viewport with nothing that scrolls to it", severity: "suspect" },
+    {
+      id: "unreachable-content",
+      title: "Named content outside the viewport with nothing that scrolls to it",
+      severity: "suspect",
+    },
     { id: "contrast-below-aa", title: "Text contrast below WCAG AA, measured on the frame", severity: "suspect" },
     {
       id: "target-undersized",
@@ -240,19 +320,42 @@ means on each platform. --allow matches a node's path or its quoted name:
     },
   ],
   inputs: [
-    { name: "source", placeholder: "a11y.json", kind: "path", description: "Accessibility tree (vlmkit-a11y/1)", positional: 0, required: true },
-    { name: "image", placeholder: "frame.png", kind: "path", description: "Frame PNG", defaultDescription: "the tree's own frame" },
     {
-      name: "level", kind: "string", choices: ["AAA", "AA"], defaultDescription: "AA",
+      name: "source",
+      placeholder: "a11y.json",
+      kind: "path",
+      description: "Accessibility tree (vlmkit-a11y/1)",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "image",
+      placeholder: "frame.png",
+      kind: "path",
+      description: "Frame PNG",
+      defaultDescription: "the tree's own frame",
+    },
+    {
+      name: "level",
+      kind: "string",
+      choices: ["AAA", "AA"],
+      defaultDescription: "AA",
       description: "Target-size floor — AA is 24 (WCAG 2.5.8), AAA is 44 (2.5.5)",
     },
     {
-      name: "allow", placeholder: "<path-or-\"name\">;<reason>", kind: "string", repeatable: true,
+      name: "allow",
+      placeholder: '<path-or-"name">;<reason>',
+      kind: "string",
+      repeatable: true,
       description: "Exempt one node from every rule, with the reason; unused rules are reported",
     },
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check a11y tree <a11y.json> [--image frame.png]", ["--image", "--level", "--allow"]);
+    const source = firstPositional(argv, "vlmkit check a11y tree <a11y.json> [--image frame.png]", [
+      "--image",
+      "--level",
+      "--allow",
+    ]);
     const allow = readAll(argv, "allow");
     parseSelectorAllowRules(allow); // a typo fails before the tree is read
     const image = readFlag(argv, "image");
@@ -267,9 +370,9 @@ means on each platform. --allow matches a node's path or its quoted name:
   findings: treeFindings,
   format: formatCheckA11yTree,
   headline: (report) =>
-    `${report.platform}: ${report.unlabelled.length} unlabelled, ${report.unreachable.length} unreachable,`
-    + ` ${report.contrast ? `${report.contrast.failures.length} low-contrast` : "contrast not measured"},`
-    + ` ${report.touch.failures.length} undersized`,
+    `${report.platform}: ${report.unlabelled.length} unlabelled, ${report.unreachable.length} unreachable,` +
+    ` ${report.contrast ? `${report.contrast.failures.length} low-contrast` : "contrast not measured"},` +
+    ` ${report.touch.failures.length} undersized`,
   ledger: (report) => ({
     tool: "check-a11y-tree",
     source: report.source,

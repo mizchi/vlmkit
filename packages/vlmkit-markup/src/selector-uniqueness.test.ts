@@ -64,7 +64,7 @@ describe("STABLE_SELECTOR_JS", () => {
     try {
       const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
       await page.setContent(html);
-      const rows = await page.evaluate(`(() => {
+      const rows = (await page.evaluate(`(() => {
         ${STABLE_SELECTOR_JS}
         return Array.from(document.querySelectorAll("body, body *")).map((el) => {
           const selector = stableSelector(el);
@@ -72,7 +72,7 @@ describe("STABLE_SELECTOR_JS", () => {
           try { matches = document.querySelectorAll(selector).length; } catch { matches = -2; }
           return { tag: el.tagName.toLowerCase(), selector, matches, self: matches === 1 && document.querySelector(selector) === el };
         });
-      })()`) as Array<{ tag: string; selector: string; matches: number; self: boolean }>;
+      })()`)) as Array<{ tag: string; selector: string; matches: number; self: boolean }>;
 
       assert.ok(rows.length >= 12, `fixture got smaller: only ${rows.length} elements`);
       const ambiguous = rows.filter((r) => r.matches !== 1);
@@ -82,7 +82,10 @@ describe("STABLE_SELECTOR_JS", () => {
         "a selector that does not resolve to exactly one element names nothing",
       );
       // Unique is not enough — it has to be the element it was generated FOR.
-      assert.deepEqual(rows.filter((r) => !r.self).map((r) => r.selector), []);
+      assert.deepEqual(
+        rows.filter((r) => !r.self).map((r) => r.selector),
+        [],
+      );
       // And distinct elements must get distinct selectors, which is the property that
       // lets two findings be told apart.
       const selectors = rows.map((r) => r.selector);
@@ -97,7 +100,7 @@ describe("STABLE_SELECTOR_JS", () => {
     try {
       const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
       await page.setContent(html);
-      const of = await page.evaluate(`(() => {
+      const of = (await page.evaluate(`(() => {
         ${STABLE_SELECTOR_JS}
         const pick = (sel) => stableSelector(document.querySelector(sel));
         return {
@@ -106,7 +109,7 @@ describe("STABLE_SELECTOR_JS", () => {
           sharedClass: pick("#alpha .box"),
           nested: pick("span span p"),
         };
-      })()`) as Record<string, string>;
+      })()`)) as Record<string, string>;
 
       assert.equal(of.id, "#alpha", "an id needs no path");
       assert.equal(of.uniqueClass, "div.box.only-one", "a class combination that matches once is the most useful name");
@@ -149,8 +152,7 @@ describe("no seventh copy", () => {
     // this happened the first time, and a copy is invisible to any test of behaviour it
     // is not yet wired into.
     const root = resolve(import.meta.dirname, "..", "..", "..");
-    const files = execSync("git ls-files '*.ts'", { cwd: root, encoding: "utf8" })
-      .trim().split("\n").filter(Boolean);
+    const files = execSync("git ls-files '*.ts'", { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
     assert.ok(files.length > 200, `git ls-files returned ${files.length}`);
     const definers = files.filter((rel) => {
       if (rel.endsWith(".test.ts")) return false;
@@ -158,12 +160,9 @@ describe("no seventh copy", () => {
     });
     assert.deepEqual(
       definers.sort(),
-      [
-        "packages/vlmkit-core/src/stable-selector.ts",
-        "packages/vlmkit-markup/src/style/motion-detect.ts",
-      ],
-      "a new copy of `stableSelector` — interpolate STABLE_SELECTOR_JS instead. Three of "
-      + "the original six copies had silently lost the recursive call.",
+      ["packages/vlmkit-core/src/stable-selector.ts", "packages/vlmkit-markup/src/style/motion-detect.ts"],
+      "a new copy of `stableSelector` — interpolate STABLE_SELECTOR_JS instead. Three of " +
+        "the original six copies had silently lost the recursive call.",
     );
   });
 });

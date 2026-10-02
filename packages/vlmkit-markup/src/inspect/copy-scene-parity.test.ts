@@ -63,12 +63,13 @@ const COLLECT_SCENE = `(() => {
   return out;
 })()`;
 
-const verdicts = (report: CopyCheckReport) => MANIFEST.map((line) => {
-  const invisible = report.invisibleLines.find((l) => l.line === line);
-  if (invisible) return `${line}: invisible (${invisible.reason})`;
-  if (report.missingLines.includes(line)) return `${line}: missing`;
-  return `${line}: visible`;
-});
+const verdicts = (report: CopyCheckReport) =>
+  MANIFEST.map((line) => {
+    const invisible = report.invisibleLines.find((l) => l.line === line);
+    if (invisible) return `${line}: invisible (${invisible.reason})`;
+    if (report.missingLines.includes(line)) return `${line}: missing`;
+    return `${line}: visible`;
+  });
 
 describe("check copy: DOM collectors vs scene adapter on one page", () => {
   it("sort every manifest line the same way", async () => {
@@ -76,10 +77,22 @@ describe("check copy: DOM collectors vs scene adapter on one page", () => {
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
       await tab.setContent(HTML);
-      const pageText = await tab.evaluate(COLLECT_RAW_TEXT) as string;
-      const { visible, invisible } = await tab.evaluate(COLLECT_TEXT_VISIBILITY) as { visible: string; invisible: { reason: string; text: string }[] };
-      const dom = analyzeCopy({ source: "page", pageText, visibleText: visible, invisibleChunks: invisible, manifestLines: MANIFEST });
-      const scene = judgeSceneCopy(await tab.evaluate(COLLECT_SCENE) as SceneElement[], { source: "scene", manifestLines: MANIFEST });
+      const pageText = (await tab.evaluate(COLLECT_RAW_TEXT)) as string;
+      const { visible, invisible } = (await tab.evaluate(COLLECT_TEXT_VISIBILITY)) as {
+        visible: string;
+        invisible: { reason: string; text: string }[];
+      };
+      const dom = analyzeCopy({
+        source: "page",
+        pageText,
+        visibleText: visible,
+        invisibleChunks: invisible,
+        manifestLines: MANIFEST,
+      });
+      const scene = judgeSceneCopy((await tab.evaluate(COLLECT_SCENE)) as SceneElement[], {
+        source: "scene",
+        manifestLines: MANIFEST,
+      });
 
       // Not a vacuous agreement: the page itself must sort the lines into every class.
       assert.deepEqual(verdicts(dom), [

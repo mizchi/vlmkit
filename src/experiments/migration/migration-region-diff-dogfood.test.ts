@@ -3,20 +3,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vite-plus/test";
-import {
-  runMigrationCompare,
-  type MigrationCompareOptions,
-} from "./migration-compare.ts";
+import { runMigrationCompare, type MigrationCompareOptions } from "./migration-compare.ts";
 
-const FIXTURE_DIR = join(
-  import.meta.dirname!,
-  "..",
-  "..",
-  "..",
-  "fixtures",
-  "migration",
-  "region-diff-handoff",
-);
+const FIXTURE_DIR = join(import.meta.dirname!, "..", "..", "..", "fixtures", "migration", "region-diff-handoff");
 
 describe("migration compare region-diff dogfood", () => {
   it("writes region-diff artifacts and report summaries for a CTA paint regression", async () => {
@@ -169,22 +158,24 @@ describe("migration compare region-diff dogfood", () => {
             verdict: "diff",
             regions: [],
             summary: `Mock diff at ${viewport}.`,
-            changes: [{
-              type: "CHANGE",
-              source: "vlm-region-diff",
-              selector: ".cta",
-              selectorHint: "primary CTA",
-              selectorConfidence: "high",
-              property: "background-color",
-              from: "#2d69ec",
-              to: "#f04b4b",
-              delta: { kind: "color", averageChannelDelta: 128.67 },
-              bbox: { left: 170, top: 338, width: 156, height: 50 },
-              region: "Start review button",
-              description: "The CTA fill changed from blue to red.",
-              confidence: "high",
-              evidence: {},
-            }],
+            changes: [
+              {
+                type: "CHANGE",
+                source: "vlm-region-diff",
+                selector: ".cta",
+                selectorHint: "primary CTA",
+                selectorConfidence: "high",
+                property: "background-color",
+                from: "#2d69ec",
+                to: "#f04b4b",
+                delta: { kind: "color", averageChannelDelta: 128.67 },
+                bbox: { left: 170, top: 338, width: 156, height: 50 },
+                region: "Start review button",
+                description: "The CTA fill changed from blue to red.",
+                confidence: "high",
+                evidence: {},
+              },
+            ],
           };
         },
       };

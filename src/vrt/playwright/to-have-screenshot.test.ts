@@ -17,10 +17,10 @@ describe("buildToHaveScreenshotArgs", () => {
     assert.deepEqual(buildToHaveScreenshotArgs({}), []);
     assert.deepEqual(buildToHaveScreenshotArgs({ options: { fullPage: true } }), [{ fullPage: true }]);
     assert.deepEqual(buildToHaveScreenshotArgs({ name: "home.png" }), ["home.png"]);
-    assert.deepEqual(
-      buildToHaveScreenshotArgs({ name: ["home", "desktop.png"], options: { threshold: 0.2 } }),
-      [["home", "desktop.png"], { threshold: 0.2 }],
-    );
+    assert.deepEqual(buildToHaveScreenshotArgs({ name: ["home", "desktop.png"], options: { threshold: 0.2 } }), [
+      ["home", "desktop.png"],
+      { threshold: 0.2 },
+    ]);
   });
 });
 

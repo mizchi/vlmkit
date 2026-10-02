@@ -48,12 +48,7 @@ export interface SnapshotReportMetrics {
   };
 }
 
-export type SnapshotStatusMatrixStatus =
-  | "pass"
-  | "diff"
-  | "shift-only"
-  | "new-baseline"
-  | "missing";
+export type SnapshotStatusMatrixStatus = "pass" | "diff" | "shift-only" | "new-baseline" | "missing";
 
 export interface SnapshotStatusMatrixCell {
   component: string;
@@ -156,9 +151,7 @@ export interface ParsedSnapshotReportEvaluateCliArgs extends SnapshotReportEvalu
   format: "markdown" | "json";
 }
 
-export type ParsedSnapshotReportCliArgs =
-  | ParsedSnapshotReportSummaryCliArgs
-  | ParsedSnapshotReportEvaluateCliArgs;
+export type ParsedSnapshotReportCliArgs = ParsedSnapshotReportSummaryCliArgs | ParsedSnapshotReportEvaluateCliArgs;
 
 export function summarizeSnapshotReport(report: SnapshotReportDocument): SnapshotReportMetrics {
   const compared = report.results.filter((entry) => !entry.isNew);
@@ -212,22 +205,18 @@ const SNAPSHOT_MATRIX_STATUS_RANK: Record<SnapshotStatusMatrixStatus, number> = 
   missing: 4,
 };
 
-function pickWorstSnapshotStatus(
-  statuses: SnapshotStatusMatrixStatus[],
-): SnapshotStatusMatrixStatus {
-  return statuses.reduce<SnapshotStatusMatrixStatus>((worst, status) =>
-    SNAPSHOT_MATRIX_STATUS_RANK[status] > SNAPSHOT_MATRIX_STATUS_RANK[worst] ? status : worst,
-  "pass");
+function pickWorstSnapshotStatus(statuses: SnapshotStatusMatrixStatus[]): SnapshotStatusMatrixStatus {
+  return statuses.reduce<SnapshotStatusMatrixStatus>(
+    (worst, status) => (SNAPSHOT_MATRIX_STATUS_RANK[status] > SNAPSHOT_MATRIX_STATUS_RANK[worst] ? status : worst),
+    "pass",
+  );
 }
 
 export function buildSnapshotStatusMatrix(
   report: SnapshotReportDocument,
   options: SnapshotStatusMatrixOptions = {},
 ): SnapshotStatusMatrix {
-  const components = options.labels ?? uniqueInOrder([
-    ...report.labels,
-    ...report.results.map((entry) => entry.label),
-  ]);
+  const components = options.labels ?? uniqueInOrder([...report.labels, ...report.results.map((entry) => entry.label)]);
   const viewports = options.viewports ?? uniqueInOrder(report.results.map((entry) => entry.viewport));
   const byKey = new Map(report.results.map((entry) => [snapshotEntryKey(entry), entry]));
   const rows = components.map((component): SnapshotStatusMatrixRow => {
@@ -401,7 +390,9 @@ export function formatSnapshotSummaryMarkdown(
   ];
 
   if (metrics.worstDiff) {
-    lines.push(`- Worst diff: ${metrics.worstDiff.label} / ${metrics.worstDiff.viewport} (${(metrics.worstDiff.diffRatio * 100).toFixed(2)}%)`);
+    lines.push(
+      `- Worst diff: ${metrics.worstDiff.label} / ${metrics.worstDiff.viewport} (${(metrics.worstDiff.diffRatio * 100).toFixed(2)}%)`,
+    );
   }
 
   if (metrics.labelsWithDiff.length > 0) {
@@ -452,7 +443,7 @@ export function formatSnapshotReportEvaluationMarkdown(
   for (const target of summary.targets) {
     lines.push(
       `| ${target.label} / ${target.viewport} | ${formatDiffPct(target.beforeDiffRatio)} | ` +
-      `${formatDiffPct(target.afterDiffRatio)} | ${target.result} |`,
+        `${formatDiffPct(target.afterDiffRatio)} | ${target.result} |`,
     );
   }
 
@@ -643,14 +634,15 @@ async function runSummary(options: ParsedSnapshotReportSummaryCliArgs) {
   const metrics = summarizeSnapshotReport(report);
   const exitStatus = determineSnapshotReportExitStatus(metrics, options);
 
-  const output = options.format === "json"
-    ? JSON.stringify({ metrics, exitStatus }, null, 2)
-    : [
-        formatSnapshotSummaryMarkdown(metrics, { reportPath: options.reportPath }),
-        exitStatus.reasons.length > 0
-          ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
-          : "",
-      ].join("\n");
+  const output =
+    options.format === "json"
+      ? JSON.stringify({ metrics, exitStatus }, null, 2)
+      : [
+          formatSnapshotSummaryMarkdown(metrics, { reportPath: options.reportPath }),
+          exitStatus.reasons.length > 0
+            ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
+            : "",
+        ].join("\n");
 
   console.log(output.trimEnd());
 
@@ -672,17 +664,18 @@ async function runEvaluate(options: ParsedSnapshotReportEvaluateCliArgs) {
     minImprovementRate: options.minImprovementRate,
   });
 
-  const output = options.format === "json"
-    ? JSON.stringify({ summary, exitStatus }, null, 2)
-    : [
-        formatSnapshotReportEvaluationMarkdown(summary, {
-          beforeReportPath: options.beforeReportPath,
-          afterReportPath: options.afterReportPath,
-        }),
-        exitStatus.reasons.length > 0
-          ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
-          : "",
-      ].join("\n");
+  const output =
+    options.format === "json"
+      ? JSON.stringify({ summary, exitStatus }, null, 2)
+      : [
+          formatSnapshotReportEvaluationMarkdown(summary, {
+            beforeReportPath: options.beforeReportPath,
+            afterReportPath: options.afterReportPath,
+          }),
+          exitStatus.reasons.length > 0
+            ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
+            : "",
+        ].join("\n");
 
   if (options.outputPath) {
     await writeOutput(options.outputPath, output);

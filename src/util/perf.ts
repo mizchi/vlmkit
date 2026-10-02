@@ -95,7 +95,9 @@ export interface PerfReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
+function isUrl(s: string): boolean {
+  return /^https?:\/\//.test(s);
+}
 
 const PERF_INSTALL_SCRIPT = `
 (function installPerf() {
@@ -250,10 +252,10 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
       await page.evaluate(PERF_INSTALL_SCRIPT);
       await page.waitForTimeout(Math.min(observeMs, 1500));
     }
-    const measured = await page.evaluate(() => {
+    const measured = (await page.evaluate(() => {
       const w = window as unknown as { __vrtPerf?: PerfRaw };
       return w.__vrtPerf ?? { cls: 0, shifts: [], shiftEvents: 0, lcp: 0, fcp: 0, ttfb: 0, lcpEl: null };
-    }) as PerfRaw;
+    })) as PerfRaw;
     await page.close();
     return measured;
   });
@@ -261,7 +263,7 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
   // Aggregate per-element shift contributions; sort by largest.
   const byElement = new Map<string, LayoutShiftSource>();
   for (const s of raw.shifts) {
-    if (s.hadRecentInput) continue;  // input-triggered shifts don't count toward CLS
+    if (s.hadRecentInput) continue; // input-triggered shifts don't count toward CLS
     const existing = byElement.get(s.path);
     if (existing) existing.value += s.value;
     else byElement.set(s.path, { ...s });
@@ -281,18 +283,33 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
-    source: options.source, viewport, observeMs,
-    cls, lcp, fcp, ttfb,
-    shiftSources, shiftEvents: raw.shiftEvents,
-    lcpElement: raw.lcpEl ?? undefined, verdicts,
+    source: options.source,
+    viewport,
+    observeMs,
+    cls,
+    lcp,
+    fcp,
+    ttfb,
+    shiftSources,
+    shiftEvents: raw.shiftEvents,
+    lcpElement: raw.lcpEl ?? undefined,
+    verdicts,
   });
   await writeFile(reportPath, md);
 
-
   return {
-    source: options.source, viewport, observeMs,
-    cls, lcp, fcp, ttfb, shiftSources, shiftEvents: raw.shiftEvents,
-    lcpElement: raw.lcpEl ?? undefined, verdicts, reportPath,
+    source: options.source,
+    viewport,
+    observeMs,
+    cls,
+    lcp,
+    fcp,
+    ttfb,
+    shiftSources,
+    shiftEvents: raw.shiftEvents,
+    lcpElement: raw.lcpEl ?? undefined,
+    verdicts,
+    reportPath,
   };
 }
 
@@ -319,14 +336,24 @@ export function formatPerfReport(report: PerfReport, rules?: RuleView): string {
     }
     return tier === "suspect" ? `${RED}✗${RESET}` : `${YELLOW}!${RESET}`;
   };
-  lines.push(`  ${icon("cls", report.verdicts.cls)} CLS  ${report.cls.toString().padStart(6)}  ${DIM}(good ≤ 0.1, poor > 0.25)${RESET}`);
-  lines.push(`  ${icon("lcp", report.verdicts.lcp)} LCP  ${report.lcp.toString().padStart(6)}  ${DIM}ms (good ≤ 2500, poor > 4000)${RESET}`);
-  lines.push(`  ${icon("fcp", report.verdicts.fcp)} FCP  ${report.fcp.toString().padStart(6)}  ${DIM}ms (good ≤ 1800, poor > 3000)${RESET}`);
+  lines.push(
+    `  ${icon("cls", report.verdicts.cls)} CLS  ${report.cls.toString().padStart(6)}  ${DIM}(good ≤ 0.1, poor > 0.25)${RESET}`,
+  );
+  lines.push(
+    `  ${icon("lcp", report.verdicts.lcp)} LCP  ${report.lcp.toString().padStart(6)}  ${DIM}ms (good ≤ 2500, poor > 4000)${RESET}`,
+  );
+  lines.push(
+    `  ${icon("fcp", report.verdicts.fcp)} FCP  ${report.fcp.toString().padStart(6)}  ${DIM}ms (good ≤ 1800, poor > 3000)${RESET}`,
+  );
   if (off.size > 0) {
-    lines.push(`  ${DIM}${off.size} metric(s) measured and NOT reported — rule turned off (${[...off.values()].join(", ")})${RESET}`);
+    lines.push(
+      `  ${DIM}${off.size} metric(s) measured and NOT reported — rule turned off (${[...off.values()].join(", ")})${RESET}`,
+    );
   }
   if (report.shiftSources.length > 0) {
-    lines.push(`  ${DIM}top shift source: ${report.shiftSources[0]!.path} (${report.shiftSources[0]!.value.toFixed(4)})${RESET}`);
+    lines.push(
+      `  ${DIM}top shift source: ${report.shiftSources[0]!.path} (${report.shiftSources[0]!.value.toFixed(4)})${RESET}`,
+    );
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
@@ -338,32 +365,40 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
   lines.push("");
   lines.push(`Source: \`${r.source}\` at ${r.viewport.width}×${r.viewport.height}`);
   lines.push("");
-  lines.push("Captures Web Vitals via in-page `PerformanceObserver` — no Lighthouse " +
-    "dependency. Numbers reflect a single observation window from `networkidle` " +
-    "+ a settling delay; for production monitoring use a dedicated RUM tool.");
+  lines.push(
+    "Captures Web Vitals via in-page `PerformanceObserver` — no Lighthouse " +
+      "dependency. Numbers reflect a single observation window from `networkidle` " +
+      "+ a settling delay; for production monitoring use a dedicated RUM tool.",
+  );
   lines.push("");
   lines.push("## Core Web Vitals");
   lines.push("");
   lines.push("| Metric | Value | Verdict |");
   lines.push("|---|---|---|");
-  const icon = (v: string) => v === "good" ? "✓" : v === "needs-improvement" ? "⚠" : "✗";
+  const icon = (v: string) => (v === "good" ? "✓" : v === "needs-improvement" ? "⚠" : "✗");
   lines.push(`| **CLS** (Cumulative Layout Shift) | ${r.cls} | ${icon(r.verdicts.cls)} ${r.verdicts.cls} |`);
   lines.push(`| **LCP** (Largest Contentful Paint) | ${r.lcp} ms | ${icon(r.verdicts.lcp)} ${r.verdicts.lcp} |`);
   lines.push(`| **FCP** (First Contentful Paint) | ${r.fcp} ms | ${icon(r.verdicts.fcp)} ${r.verdicts.fcp} |`);
   lines.push(`| TTFB | ${r.ttfb} ms | — |`);
   lines.push("");
-  lines.push("Thresholds: CLS good ≤ 0.1 / poor > 0.25 · LCP good ≤ 2500 ms / poor > 4000 ms · FCP good ≤ 1800 ms / poor > 3000 ms.");
+  lines.push(
+    "Thresholds: CLS good ≤ 0.1 / poor > 0.25 · LCP good ≤ 2500 ms / poor > 4000 ms · FCP good ≤ 1800 ms / poor > 3000 ms.",
+  );
   lines.push("");
 
   if (r.lcpElement) {
     lines.push("## LCP element");
     lines.push("");
-    lines.push(`The largest contentful element on this page is \`${r.lcpElement.path}\` ` +
-      `(\`${r.lcpElement.tag}\`)${r.lcpElement.text ? ` — "${r.lcpElement.text}"` : ""}.`);
+    lines.push(
+      `The largest contentful element on this page is \`${r.lcpElement.path}\` ` +
+        `(\`${r.lcpElement.tag}\`)${r.lcpElement.text ? ` — "${r.lcpElement.text}"` : ""}.`,
+    );
     lines.push("");
     if (r.verdicts.lcp !== "good") {
-      lines.push("LCP optimization usually targets this specific element: preload its " +
-        "image, inline its critical CSS, or move it earlier in the DOM.");
+      lines.push(
+        "LCP optimization usually targets this specific element: preload its " +
+          "image, inline its critical CSS, or move it earlier in the DOM.",
+      );
       lines.push("");
     }
   }
@@ -371,7 +406,9 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
   if (r.cls > 0 || r.shiftSources.length > 0) {
     lines.push("## Layout-shift sources");
     lines.push("");
-    lines.push(`Observed **${r.shiftEvents}** layout-shift event(s) during the ${r.viewport.width}×${r.viewport.height} capture window.`);
+    lines.push(
+      `Observed **${r.shiftEvents}** layout-shift event(s) during the ${r.viewport.width}×${r.viewport.height} capture window.`,
+    );
     lines.push("");
     if (r.shiftSources.length > 0) {
       lines.push("| Element | Tag | Contribution |");
@@ -381,35 +418,44 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
       }
       lines.push("");
     } else {
-      lines.push("_(No element-level source attribution available — Chromium's " +
-        "`LayoutShift.sources` is empty for shifts that propagate from " +
-        "the document root, JS-injected content, or font swap. The CLS " +
-        "score is still trustworthy.)_");
+      lines.push(
+        "_(No element-level source attribution available — Chromium's " +
+          "`LayoutShift.sources` is empty for shifts that propagate from " +
+          "the document root, JS-injected content, or font swap. The CLS " +
+          "score is still trustworthy.)_",
+      );
       lines.push("");
     }
     if (r.verdicts.cls !== "good") {
       lines.push("CLS fixes by element:");
-      lines.push("- **Images**: add explicit `width` + `height` attrs so the browser " +
-        "reserves space before the image loads.");
-      lines.push("- **Fonts**: use `font-display: optional` or preload critical fonts to " +
-        "avoid mid-load layout reflow.");
-      lines.push("- **Ads / embeds**: reserve fixed-size containers with `min-height` " +
-        "even when content is dynamic.");
-      lines.push("- **`@media` / responsive layouts**: avoid layout-affecting CSS that " +
-        "applies after first paint.");
+      lines.push(
+        "- **Images**: add explicit `width` + `height` attrs so the browser " +
+          "reserves space before the image loads.",
+      );
+      lines.push(
+        "- **Fonts**: use `font-display: optional` or preload critical fonts to " + "avoid mid-load layout reflow.",
+      );
+      lines.push(
+        "- **Ads / embeds**: reserve fixed-size containers with `min-height` " + "even when content is dynamic.",
+      );
+      lines.push(
+        "- **`@media` / responsive layouts**: avoid layout-affecting CSS that " + "applies after first paint.",
+      );
       lines.push("");
     }
   }
 
   lines.push("## Note on scope");
   lines.push("");
-  lines.push("`vlmkit check perf` covers visual-stability metrics (CLS, LCP) that overlap " +
-    "with the VRT toolkit's lane. For full Web Vitals analysis (TBT, INP, " +
-    "JavaScript bundle size, network waterfall), run a dedicated tool like " +
-    "Lighthouse, PageSpeed Insights, or WebPageTest. This tool's value is " +
-    "a fast (~3s) check that catches the regression classes a pixel-diff " +
-    "tool can't see directly — fonts swapping in, images loading without " +
-    "reserved space, JS-injected content shifting layout post-paint.");
+  lines.push(
+    "`vlmkit check perf` covers visual-stability metrics (CLS, LCP) that overlap " +
+      "with the VRT toolkit's lane. For full Web Vitals analysis (TBT, INP, " +
+      "JavaScript bundle size, network waterfall), run a dedicated tool like " +
+      "Lighthouse, PageSpeed Insights, or WebPageTest. This tool's value is " +
+      "a fast (~3s) check that catches the regression classes a pixel-diff " +
+      "tool can't see directly — fonts swapping in, images loading without " +
+      "reserved space, JS-injected content shifting layout post-paint.",
+  );
   lines.push("");
   return lines.join("\n");
 }

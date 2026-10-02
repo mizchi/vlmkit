@@ -33,12 +33,5 @@ export function regionClassifyKind(input: {
 }
 
 function isRegionKind(value: string): value is RegionKind {
-  return (
-    value === "text" ||
-    value === "filled-rect" ||
-    value === "icon" ||
-    value === "image" ||
-    value === "unknown"
-  );
+  return value === "text" || value === "filled-rect" || value === "icon" || value === "image" || value === "unknown";
 }
-

@@ -1,19 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
-import {
-  buildQualityFailures,
-  buildReport,
-  renderReportArtifacts,
-} from "./run-report.mjs";
+import { buildQualityFailures, buildReport, renderReportArtifacts } from "./run-report.mjs";
 
 test("run-report exposes only the orchestration API used across module boundaries", async () => {
   const reportModule = await import("./run-report.mjs");
 
-  assert.deepEqual(Object.keys(reportModule).sort(), [
-    "buildQualityFailures",
-    "buildReport",
-    "renderReportArtifacts",
-  ]);
+  assert.deepEqual(Object.keys(reportModule).sort(), ["buildQualityFailures", "buildReport", "renderReportArtifacts"]);
 });
 
 test("buildReport owns expected-change approval and repair image artifact mapping", () => {
@@ -42,18 +34,21 @@ test("buildQualityFailures keeps the gate list separate from orchestration", () 
     reasons: [],
   };
 
-  assert.deepEqual(buildQualityFailures({
-    planHasSingleScenario: true,
-    generatedScreenshotAssertions: 2,
-    generatedDirectPageGoto: false,
-    generatedCommentLines: 0,
-    generatedUsesReleaseRowTestId: true,
-    visualRegressionDetected: true,
-    repairContext,
-    visualContext: { viewports: [{}, {}, {}] },
-    stabilityRuns: [{ exitCode: 0 }, { exitCode: 0 }],
-    expectedChangeApproval,
-  }), []);
+  assert.deepEqual(
+    buildQualityFailures({
+      planHasSingleScenario: true,
+      generatedScreenshotAssertions: 2,
+      generatedDirectPageGoto: false,
+      generatedCommentLines: 0,
+      generatedUsesReleaseRowTestId: true,
+      visualRegressionDetected: true,
+      repairContext,
+      visualContext: { viewports: [{}, {}, {}] },
+      stabilityRuns: [{ exitCode: 0 }, { exitCode: 0 }],
+      expectedChangeApproval,
+    }),
+    [],
+  );
 
   const failures = buildQualityFailures({
     planHasSingleScenario: false,
@@ -72,8 +67,14 @@ test("buildQualityFailures keeps the gate list separate from orchestration", () 
   });
 
   assert.equal(failures.length, 9);
-  assert.equal(failures.some((failure) => failure.includes("exactly one scenario")), true);
-  assert.equal(failures.some((failure) => failure.includes("expected-change approval failed")), true);
+  assert.equal(
+    failures.some((failure) => failure.includes("exactly one scenario")),
+    true,
+  );
+  assert.equal(
+    failures.some((failure) => failure.includes("expected-change approval failed")),
+    true,
+  );
 });
 
 test("renderMarkdown includes VLM rows and omits null artifacts", () => {
@@ -149,7 +150,7 @@ function makeReportInput(overrides = {}) {
     steps: [{ name: "observe", exitCode: 0, durationMs: 123 }],
     generatedSource: [
       "test('Release Queue', async ({ page }) => {",
-      "  await expect(page.getByTestId(\"release-row-invoice-export\")).toBeVisible();",
+      '  await expect(page.getByTestId("release-row-invoice-export")).toBeVisible();',
       "  await expect(page).toHaveScreenshot('initial.png');",
       "  await expect(page).toHaveScreenshot('filtered.png');",
       "});",
@@ -206,14 +207,16 @@ function makeVlmRegionSummary() {
     cost: 0.01,
     summary: "Badge changed color.",
     changeCount: 1,
-    changes: [{
-      selector: ".pill",
-      property: "background-color",
-      from: "#fee",
-      to: "#eff",
-      confidence: "high",
-      region: "detail badge",
-    }],
+    changes: [
+      {
+        selector: ".pill",
+        property: "background-color",
+        from: "#fee",
+        to: "#eff",
+        confidence: "high",
+        region: "detail badge",
+      },
+    ],
   };
 }
 
@@ -227,27 +230,33 @@ function makeRepairContext() {
       changedPixels: 10,
       diffRatio: 0.1,
       bbox: { left: 1, top: 2, width: 3, height: 4 },
-      selectorMatches: [{
-        selector: ".queue",
-        confidence: "medium",
-        evidence: { score: 0.7 },
-      }],
-      edgeCandidates: [{
-        selector: ".metric",
-        reason: "4px from diff top",
-        score: 1,
-      }],
+      selectorMatches: [
+        {
+          selector: ".queue",
+          confidence: "medium",
+          evidence: { score: 0.7 },
+        },
+      ],
+      edgeCandidates: [
+        {
+          selector: ".metric",
+          reason: "4px from diff top",
+          score: 1,
+        },
+      ],
     },
     repairHints: ["Inspect .metric min-height."],
     styleAttribution: {
-      changedProperties: [{
-        selector: ".metric",
-        property: "min-height",
-        before: "116px",
-        after: "148px",
-        category: "layout",
-        score: 8.3,
-      }],
+      changedProperties: [
+        {
+          selector: ".metric",
+          property: "min-height",
+          before: "116px",
+          after: "148px",
+          category: "layout",
+          score: 8.3,
+        },
+      ],
     },
     drift: {
       kind: "visual-only",
@@ -269,11 +278,13 @@ function makeReport(overrides = {}) {
     provider: "anthropic",
     scenario: "Release Queue",
     qualityFailures: [],
-    steps: [{
-      name: "observe",
-      exitCode: 0,
-      durationMs: 123,
-    }],
+    steps: [
+      {
+        name: "observe",
+        exitCode: 0,
+        durationMs: 123,
+      },
+    ],
     metrics: {
       visualRegressionDetected: true,
       planHasSingleScenario: true,
@@ -305,14 +316,16 @@ function makeReport(overrides = {}) {
       bbox: { left: 1, top: 2, width: 3, height: 4 },
       selectorMatches: [{ selector: ".queue", confidence: "medium" }],
       edgeCandidates: [{ selector: ".metric", reason: "4px from diff top" }],
-      cssAttribution: [{
-        selector: ".metric",
-        property: "min-height",
-        before: "116px",
-        after: "148px",
-        category: "layout",
-        score: 8.3,
-      }],
+      cssAttribution: [
+        {
+          selector: ".metric",
+          property: "min-height",
+          before: "116px",
+          after: "148px",
+          category: "layout",
+          score: 8.3,
+        },
+      ],
       artifacts: {
         expectedPng: ".vlmkit/markup-vrt-eval/test-results/expected.png",
         actualPng: ".vlmkit/markup-vrt-eval/test-results/actual.png",

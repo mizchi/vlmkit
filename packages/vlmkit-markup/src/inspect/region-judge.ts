@@ -73,9 +73,10 @@ export function measureRegionDelta(
       if (y < 0 || x < 0 || y >= a.height || y >= b.height || x >= a.width || x >= b.width) continue;
       const i = (y * a.width + x) * 4;
       const j = (y * b.width + x) * 4;
-      sum += Math.abs(a.data[i]! - b.data[j]!)
-        + Math.abs(a.data[i + 1]! - b.data[j + 1]!)
-        + Math.abs(a.data[i + 2]! - b.data[j + 2]!);
+      sum +=
+        Math.abs(a.data[i]! - b.data[j]!) +
+        Math.abs(a.data[i + 1]! - b.data[j + 1]!) +
+        Math.abs(a.data[i + 2]! - b.data[j + 2]!);
       n += 3;
     }
   }
@@ -119,7 +120,7 @@ export function buildPairImage(
   pair.data.fill(0xff);
   const blit = (src: PNG, yOff: number) => {
     for (let dy = 0; dy < src.height; dy++) {
-      src.data.copy(pair.data, ((yOff + dy) * width) * 4, dy * src.width * 4, (dy + 1) * src.width * 4);
+      src.data.copy(pair.data, (yOff + dy) * width * 4, dy * src.width * 4, (dy + 1) * src.width * 4);
     }
   };
   blit(ca, 0);
@@ -193,7 +194,7 @@ async function loadSourcePng(
   viewport: { width: number; height: number },
 ): Promise<{ data: Uint8Array; width: number; height: number }> {
   if (/\.png$/i.test(source)) {
-    const png = PNG.sync.read(await readFile(source) as Buffer);
+    const png = PNG.sync.read((await readFile(source)) as Buffer);
     return { data: png.data, width: png.width, height: png.height };
   }
   const { renderHtmlToPng } = await import("../component/page-compose.ts");
@@ -203,7 +204,7 @@ async function loadSourcePng(
 }
 
 export async function runRegionJudge(options: RegionJudgeOptions): Promise<RegionJudgeReport> {
-  const target = PNG.sync.read(await readFile(options.targetPath) as Buffer);
+  const target = PNG.sync.read((await readFile(options.targetPath)) as Buffer);
   const source = await loadSourcePng(options.source, { width: target.width, height: target.height });
   const outDir = options.outDir ?? join(dirname(resolve(options.source)), ".vlmkit-region-judge");
   await mkdir(outDir, { recursive: true });
@@ -265,40 +266,46 @@ export function formatRegionJudgeReport(report: RegionJudgeReport, rules?: RuleV
     const where = `(${v.region.left},${v.region.top}) ${v.region.width}x${v.region.height}`;
     const tier = v.outcome === "same" ? undefined : tierOf(v.outcome);
     if (tier === "off") offOutcomes.set(v.outcome, (offOutcomes.get(v.outcome) ?? 0) + 1);
-    const color = v.outcome === "same"
-      ? GREEN
-      : tier === "off"
-      ? DIM
-      : tier === "warn"
-      ? YELLOW
-      : RED;
-    const retuned = tier !== undefined && tier !== "off" && tier !== (v.outcome === "different" || v.outcome === "contradicted" ? "suspect" : "warn")
-      ? ` ${DIM}[${v.outcome} re-tuned to ${tier}]${RESET}`
-      : "";
-    lines.push(`${where}: ${color}${v.outcome.toUpperCase()}${RESET} — measured mean channel delta ${v.measuredDelta.toFixed(2)}${retuned}`
-      + (tier === "off" ? ` ${DIM}— NOT reported (${v.outcome} off)${RESET}` : ""));
+    const color = v.outcome === "same" ? GREEN : tier === "off" ? DIM : tier === "warn" ? YELLOW : RED;
+    const retuned =
+      tier !== undefined &&
+      tier !== "off" &&
+      tier !== (v.outcome === "different" || v.outcome === "contradicted" ? "suspect" : "warn")
+        ? ` ${DIM}[${v.outcome} re-tuned to ${tier}]${RESET}`
+        : "";
+    lines.push(
+      `${where}: ${color}${v.outcome.toUpperCase()}${RESET} — measured mean channel delta ${v.measuredDelta.toFixed(2)}${retuned}` +
+        (tier === "off" ? ` ${DIM}— NOT reported (${v.outcome} off)${RESET}` : ""),
+    );
     if (v.vlmEvidence) lines.push(`  ${DIM}vlm: ${v.vlmEvidence}${RESET}`);
     if (v.outcome === "refuted") {
-      lines.push(`  ${DIM}the measured pixels refute the VLM's difference claim (delta < ${REFUTE_FLOOR}) — treat as same${RESET}`);
+      lines.push(
+        `  ${DIM}the measured pixels refute the VLM's difference claim (delta < ${REFUTE_FLOOR}) — treat as same${RESET}`,
+      );
     }
     if (v.outcome === "contradicted") {
-      lines.push(`  ${DIM}the measurement contradicts the VLM's same claim (delta > ${CONTRADICT_CEILING}) — re-read the pair image yourself${RESET}`);
+      lines.push(
+        `  ${DIM}the measurement contradicts the VLM's same claim (delta > ${CONTRADICT_CEILING}) — re-read the pair image yourself${RESET}`,
+      );
     }
     lines.push(`  pair: ${v.pairImage}`);
   }
   if (offOutcomes.size > 0) {
     const detail = [...offOutcomes].map(([outcome, n]) => `${outcome} x${n}`).join(", ");
     lines.push("");
-    lines.push(`${DIM}${[...offOutcomes.values()].reduce((a, b) => a + b, 0)} region verdict(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
+    lines.push(
+      `${DIM}${[...offOutcomes.values()].reduce((a, b) => a + b, 0)} region verdict(s) measured and NOT reported — rule turned off (${detail})${RESET}`,
+    );
   }
   // `pending-review` off means the project accepts unjudged regions, so the block demanding a
   // human reader would be asking for work it has said it does not want.
-  const pending = tierOf("pending-review") === "off"
-    ? 0
-    : report.verdicts.filter((v) => v.outcome === "pending-review").length;
+  const pending =
+    tierOf("pending-review") === "off" ? 0 : report.verdicts.filter((v) => v.outcome === "pending-review").length;
   if (pending > 0) {
     lines.push("");
-    lines.push(`${BOLD}ACTION REQUIRED — keyless mode:${RESET} ${pending} pair image(s) need a reader. Version A is above the gray bar, B below. The reader must not be the author of the pixels being judged (S9-fresh: same-eyes review misses its own errors).`);
+    lines.push(
+      `${BOLD}ACTION REQUIRED — keyless mode:${RESET} ${pending} pair image(s) need a reader. Version A is above the gray bar, B below. The reader must not be the author of the pixels being judged (S9-fresh: same-eyes review misses its own errors).`,
+    );
   }
   return lines.join("\n");
 }

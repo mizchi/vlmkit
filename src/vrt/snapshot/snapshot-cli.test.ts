@@ -28,10 +28,13 @@ function page(name: string, body: string): string {
   return file;
 }
 
-const stable = page("stable", `
+const stable = page(
+  "stable",
+  `
 <style>body{margin:0;font:16px sans-serif;background:#fff}
 .hero{padding:48px;background:#2d6cdf;color:#fff}</style>
-<body><div class="hero"><h1>Stable</h1><p>Deterministic content.</p></div></body>`);
+<body><div class="hero"><h1>Stable</h1><p>Deterministic content.</p></div></body>`,
+);
 
 describe("runSnapshotCli — the CLI surface, callable", () => {
   it("returns 0 for --help and 1 for no arguments, rather than exiting the process", () => {
@@ -60,10 +63,9 @@ describe("runSnapshotCli — the CLI surface, callable", () => {
 
   it("captures a first run as a baseline and reports it as new", async () => {
     const output = join(dir, "shots-baseline");
-    const code = await runSnapshotCli(
-      [pathToFileURL(stable).href, "--output", output, "--label", "stable"],
-      { cwd: dir },
-    );
+    const code = await runSnapshotCli([pathToFileURL(stable).href, "--output", output, "--label", "stable"], {
+      cwd: dir,
+    });
     assert.equal(code, 0, "a first run has nothing to compare against, so it cannot fail");
     assert.ok(existsSync(join(output, "snapshot-report.json")), "the report is the run's artifact");
   });
@@ -86,13 +88,12 @@ describe("runSnapshotCli — the CLI surface, callable", () => {
     // parameter: vitest runs test files in shared workers, so a chdir corrupts
     // whatever else is running.
     const sandbox = mkdtempSync(join(tmpdir(), "vlmkit-snapshot-cwd-"));
-    await runSnapshotCli(
-      [pathToFileURL(stable).href, "--output", "shots-relative", "--label", "stable"],
-      { cwd: sandbox },
-    );
+    await runSnapshotCli([pathToFileURL(stable).href, "--output", "shots-relative", "--label", "stable"], {
+      cwd: sandbox,
+    });
     assert.ok(
-      existsSync(join(sandbox, "shots-relative", "snapshot-report.json"))
-      || existsSync(join(process.cwd(), "shots-relative", "snapshot-report.json")),
+      existsSync(join(sandbox, "shots-relative", "snapshot-report.json")) ||
+        existsSync(join(process.cwd(), "shots-relative", "snapshot-report.json")),
       "the output landed somewhere findable",
     );
     // The point of the assertion: it must NOT be under the process cwd.
@@ -115,10 +116,13 @@ describe("runSnapshotCli — the CLI surface, callable", () => {
  */
 describe("runSnapshotCli — subcommands", () => {
   /** A page that differs from `stable` in one measurable way. */
-  const shifted = page("shifted", `
+  const shifted = page(
+    "shifted",
+    `
 <style>body{margin:0;font:16px sans-serif;background:#fff}
 .hero{padding:96px;background:#2d6cdf;color:#fff}</style>
-<body><div class="hero"><h1>Stable</h1><p>Deterministic content.</p></div></body>`);
+<body><div class="hero"><h1>Stable</h1><p>Deterministic content.</p></div></body>`,
+  );
 
   it("--fail-on-diff turns a real difference into a non-zero exit", async () => {
     const output = join(dir, "shots-faildiff");
@@ -134,8 +138,9 @@ describe("runSnapshotCli — subcommands", () => {
       { cwd: dir },
     );
     assert.equal(code, 1, "a diff above threshold with --fail-on-diff must fail the command");
-    const report = JSON.parse(readFileSync(join(output, "snapshot-report.json"), "utf-8")) as
-      { results: { diffRatio?: number; status?: string }[] };
+    const report = JSON.parse(readFileSync(join(output, "snapshot-report.json"), "utf-8")) as {
+      results: { diffRatio?: number; status?: string }[];
+    };
     assert.ok(report.results.length > 0);
   });
 
@@ -158,7 +163,9 @@ describe("runSnapshotCli — subcommands", () => {
     // The point of approving: the difference that was reported is now the expected state, so the
     // same comparison passes even under --fail-on-diff.
     assert.equal(
-      await runSnapshotCli([pathToFileURL(shifted).href, "--output", output, "--label", "hero", "--fail-on-diff"], { cwd: dir }),
+      await runSnapshotCli([pathToFileURL(shifted).href, "--output", output, "--label", "hero", "--fail-on-diff"], {
+        cwd: dir,
+      }),
       0,
       "after approve, the promoted baseline matches",
     );
@@ -204,10 +211,11 @@ describe("runSnapshotCli — subcommands", () => {
     // target and reached the browser: `Cannot navigate to invalid URL`, naming neither the
     // subcommand nor the fix.
     await assert.rejects(
-      () => runSnapshotCli(
-        [pathToFileURL(stable).href, "stability", "--iterations", "2", "--output", join(dir, "shots-order")],
-        { cwd: dir },
-      ),
+      () =>
+        runSnapshotCli(
+          [pathToFileURL(stable).href, "stability", "--iterations", "2", "--output", join(dir, "shots-order")],
+          { cwd: dir },
+        ),
       (err: unknown) => {
         assert.match((err as Error).message, /`stability` is a subcommand and has to come first/);
         assert.match((err as Error).message, /vlmkit snapshot stability file:/, "and shows the corrected line");

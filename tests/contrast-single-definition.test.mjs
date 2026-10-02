@@ -25,7 +25,10 @@ const LINEARISE = /\/\s*12\.92\b/;
 const ALLOWED = new Map([
   ["packages/vlmkit-judge/src/color.ts", "the definition"],
   ["packages/vlmkit-markup/src/contrast-background.ts", "in-page script; held to color.ts by contrast-parity.test.ts"],
-  ["packages/vlmkit-markup/src/component/component-from-image.ts", "one copy inside a page.evaluate callback, which is serialized into the browser"],
+  [
+    "packages/vlmkit-markup/src/component/component-from-image.ts",
+    "one copy inside a page.evaluate callback, which is serialized into the browser",
+  ],
   ["src/experiments/migration/design-md-tokens.ts", "sRGB to Lab for colour distance, not contrast"],
 ]);
 
@@ -42,7 +45,11 @@ describe("color.ts is the only WCAG luminance", () => {
     }
     assert.ok(scanned > 100, `scanned only ${scanned} files — the glob is not reaching the sources`);
     const offenders = [...found.keys()].filter((file) => !ALLOWED.has(file));
-    assert.deepEqual(offenders, [], "linearise with relativeLuminance / contrastRatio / luminanceContrast from @mizchi/vlmkit-judge/color.ts");
+    assert.deepEqual(
+      offenders,
+      [],
+      "linearise with relativeLuminance / contrastRatio / luminanceContrast from @mizchi/vlmkit-judge/color.ts",
+    );
     // The in-page component copy is one, not two: the Node-side twin was the one replaced.
     assert.equal(found.get("packages/vlmkit-markup/src/component/component-from-image.ts"), 1);
     const gone = [...ALLOWED.keys()].filter((file) => !found.has(file));

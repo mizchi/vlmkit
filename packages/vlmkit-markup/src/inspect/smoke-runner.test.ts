@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
 import type { A11ySnapshot } from "./smoke-types.ts";
-import {
-  annotateA11ySnapshotConsistency,
-  evaluateA11ySnapshotConsistency,
-  runSmokeTest,
-} from "./smoke-runner.ts";
+import { annotateA11ySnapshotConsistency, evaluateA11ySnapshotConsistency, runSmokeTest } from "./smoke-runner.ts";
 
 function snapshot(
   step: number,
@@ -37,10 +33,7 @@ describe("evaluateA11ySnapshotConsistency", () => {
   });
 
   it("flags a post-action a11y tree that loses all interactive targets", () => {
-    const errors = evaluateA11ySnapshotConsistency([
-      snapshot(0, 3, 2),
-      snapshot(1, 0, 2, ["banner", "main"]),
-    ]);
+    const errors = evaluateA11ySnapshotConsistency([snapshot(0, 3, 2), snapshot(1, 0, 2, ["banner", "main"])]);
 
     assert.equal(errors.length, 1);
     assert.equal(errors[0]?.type, "a11y-regression");
@@ -49,10 +42,7 @@ describe("evaluateA11ySnapshotConsistency", () => {
   });
 
   it("annotates the affected snapshot with consistency issues", () => {
-    const snapshots = [
-      snapshot(0, 2, 2),
-      snapshot(1, 0, 0, []),
-    ];
+    const snapshots = [snapshot(0, 2, 2), snapshot(1, 0, 0, [])];
 
     const errors = annotateA11ySnapshotConsistency(snapshots);
 
@@ -80,9 +70,9 @@ describe("evaluateA11ySnapshotConsistency", () => {
     assert.equal(result.status, "error");
     assert.equal(result.errors.filter((error) => error.type === "a11y-regression").length, 1);
     assert.ok(result.errors.some((error) => error.type === "a11y-regression"));
-    assert.ok(result.snapshots?.some((snap) =>
-      snap.issues.some((issue) => issue.includes("interactive targets disappeared"))
-    ));
+    assert.ok(
+      result.snapshots?.some((snap) => snap.issues.some((issue) => issue.includes("interactive targets disappeared"))),
+    );
   });
 });
 

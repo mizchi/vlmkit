@@ -65,10 +65,7 @@ const NEUTRALIZE_ANIMATIONS = `*, *::before, *::after {
   animation: none !important;
 }`;
 
-export async function runA11yOnPage(
-  page: Page,
-  options: OnPageA11yOptions = {},
-): Promise<OnPageA11yResult> {
+export async function runA11yOnPage(page: Page, options: OnPageA11yOptions = {}): Promise<OnPageA11yResult> {
   const runContrast = options.contrast ?? true;
   const runTouch = options.touch ?? true;
   const minLen = options.minTextLength ?? 1;
@@ -91,19 +88,17 @@ export async function runA11yOnPage(
   let semanticFailures: SemanticFinding[] = [];
 
   if (runContrast) {
-    const samples = await page.evaluate(
-      `(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`,
-    ) as A11yContrastRawSample[];
+    const samples = (await page.evaluate(`(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`)) as A11yContrastRawSample[];
     contrastFailures = analyzeA11yContrastSamples(samples);
   }
   if (runTouch) {
-    const samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
+    const samples = (await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT)) as A11yTouchRawSample[];
     touchFailures = analyzeA11yTouchSamples(samples, touchLevel);
   }
   // Semantic check runs before focus-order so we don't snapshot a
   // page mid-Tab. Cheap one-shot evaluate.
   if (options.semantic ?? true) {
-    const sample = await page.evaluate(A11Y_SEMANTIC_SAMPLE_SCRIPT) as A11ySemanticRawSample;
+    const sample = (await page.evaluate(A11Y_SEMANTIC_SAMPLE_SCRIPT)) as A11ySemanticRawSample;
     semanticFailures = analyzeA11ySemanticSamples(sample);
   }
   // Focus order is intentionally run LAST — it mutates the page's

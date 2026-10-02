@@ -37,10 +37,7 @@ export interface MotionComputedSample {
   transitionDelay: string;
 }
 
-export type MotionIssueKind =
-  | "missing-reduced-motion"
-  | "unreadable-stylesheet"
-  | "running-animation";
+export type MotionIssueKind = "missing-reduced-motion" | "unreadable-stylesheet" | "running-animation";
 
 export interface MotionIssue {
   kind: MotionIssueKind;
@@ -79,7 +76,6 @@ export interface MotionDetectionOptions extends PageLoadOptions {
   viewport?: { width: number; height: number };
 }
 
-
 function cssTimeToMs(value: string): number {
   const v = value.trim().toLowerCase();
   if (!v) return 0;
@@ -99,15 +95,19 @@ function maxCssTime(value: string): number {
 }
 
 function hasActiveAnimation(sample: MotionComputedSample): boolean {
-  return sample.animationName.trim() !== "none" &&
+  return (
+    sample.animationName.trim() !== "none" &&
     sample.animationName.trim() !== "" &&
-    maxCssTime(sample.animationDuration) > 0;
+    maxCssTime(sample.animationDuration) > 0
+  );
 }
 
 function hasActiveTransition(sample: MotionComputedSample): boolean {
-  return sample.transitionProperty.trim() !== "none" &&
+  return (
+    sample.transitionProperty.trim() !== "none" &&
     sample.transitionProperty.trim() !== "" &&
-    maxCssTime(sample.transitionDuration) > 0;
+    maxCssTime(sample.transitionDuration) > 0
+  );
 }
 
 export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetectionReport {
@@ -115,10 +115,10 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
   const activeAnimationSamples = input.samples.filter(hasActiveAnimation);
   const activeTransitionSamples = input.samples.filter(hasActiveTransition);
   const runningAnimationSamples = activeAnimationSamples.filter((sample) =>
-    sample.animationPlayState.split(",").some((state) => state.trim() === "running")
+    sample.animationPlayState.split(",").some((state) => state.trim() === "running"),
   );
   const pausedAnimationSamples = activeAnimationSamples.filter((sample) =>
-    sample.animationPlayState.split(",").some((state) => state.trim() === "paused")
+    sample.animationPlayState.split(",").some((state) => state.trim() === "paused"),
   );
 
   const unreadable = input.unreadableStylesheets ?? [];
@@ -129,20 +129,24 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
     // emulation and does not depend on CSS text, so a dogfood run got
     // `missing-reduced-motion` from here and `reduced-motion: honored` from there
     // on one file, with no way to tell which to trust.
-    issues.push(unreadable.length === 0
-      ? {
-        kind: "missing-reduced-motion",
-        severity: "suspect",
-        message: "Active animation or transition declarations exist, but no `prefers-reduced-motion: reduce` rule was found.",
-      }
-      : {
-        kind: "unreadable-stylesheet",
-        severity: "warn",
-        message: `Active animation or transition declarations exist and no \`prefers-reduced-motion: reduce\` rule was found`
-          + ` in the CSS this gate could read — but ${unreadable.length} stylesheet(s) could not be read`
-          + ` (${unreadable.slice(0, 3).join(", ")}), so the rule may be in one of them.`
-          + ` \`check animation\` measures the behaviour under emulation instead and does not depend on CSS text.`,
-      });
+    issues.push(
+      unreadable.length === 0
+        ? {
+            kind: "missing-reduced-motion",
+            severity: "suspect",
+            message:
+              "Active animation or transition declarations exist, but no `prefers-reduced-motion: reduce` rule was found.",
+          }
+        : {
+            kind: "unreadable-stylesheet",
+            severity: "warn",
+            message:
+              `Active animation or transition declarations exist and no \`prefers-reduced-motion: reduce\` rule was found` +
+              ` in the CSS this gate could read — but ${unreadable.length} stylesheet(s) could not be read` +
+              ` (${unreadable.slice(0, 3).join(", ")}), so the rule may be in one of them.` +
+              ` \`check animation\` measures the behaviour under emulation instead and does not depend on CSS text.`,
+          },
+    );
   }
 
   for (const sample of runningAnimationSamples.slice(0, 10)) {
@@ -167,9 +171,7 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
   };
 }
 
-export async function runMotionDetection(
-  options: MotionDetectionOptions,
-): Promise<MotionDetectionReport> {
+export async function runMotionDetection(options: MotionDetectionOptions): Promise<MotionDetectionReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const maxSamples = options.maxSamples ?? 100;
   return await withBrowser(async (browser) => {
@@ -192,7 +194,10 @@ export async function runMotionDetection(
       function stableSelector(el: Element): string {
         const id = el.getAttribute("id");
         if (id) return `#${CSS.escape(id)}`;
-        const className = Array.from(el.classList).slice(0, 3).map((c) => `.${CSS.escape(c)}`).join("");
+        const className = Array.from(el.classList)
+          .slice(0, 3)
+          .map((c) => `.${CSS.escape(c)}`)
+          .join("");
         if (className) {
           const classSelector = `${el.tagName.toLowerCase()}${className}`;
           if (document.querySelectorAll(classSelector).length === 1) return classSelector;
@@ -253,10 +258,9 @@ export async function runMotionDetection(
           transitionDuration: style.transitionDuration,
           transitionDelay: style.transitionDelay,
         };
-        const hasAnimation = sample.animationName.trim() !== "none" &&
-          maxTimeInPage(sample.animationDuration) > 0;
-        const hasTransition = sample.transitionProperty.trim() !== "none" &&
-          maxTimeInPage(sample.transitionDuration) > 0;
+        const hasAnimation = sample.animationName.trim() !== "none" && maxTimeInPage(sample.animationDuration) > 0;
+        const hasTransition =
+          sample.transitionProperty.trim() !== "none" && maxTimeInPage(sample.transitionDuration) > 0;
         if (hasAnimation || hasTransition) samples.push(sample);
         if (samples.length >= limit) break;
       }

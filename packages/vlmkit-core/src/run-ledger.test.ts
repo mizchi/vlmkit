@@ -3,13 +3,7 @@ import { describe, it } from "vite-plus/test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  LEDGER_RELATIVE_PATH,
-  VLMKIT_IGNORE_ENTRIES,
-  appendRunLedger,
-  isGitIgnored,
-  isGitRepo,
-} from "./run-ledger.ts";
+import { LEDGER_RELATIVE_PATH, VLMKIT_IGNORE_ENTRIES, appendRunLedger, isGitIgnored, isGitRepo } from "./run-ledger.ts";
 
 const workdir = (): string => mkdtempSync(join(tmpdir(), "vlmkit-ledger-"));
 

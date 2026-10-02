@@ -137,7 +137,10 @@ export function solve(seed, { draw = 1, nodes: nodeBudget = 400_000 } = {}) {
     if (nodes >= nodeBudget) return { seed, solved: false, reason: "budget", nodes };
     const frame = stack[stack.length - 1];
     const action = frame.todo.shift();
-    if (!action) { stack.pop(); continue; }
+    if (!action) {
+      stack.pop();
+      continue;
+    }
 
     const next = clone(frame.state);
     if (action.kind === "draw") K.drawFromStock(next);
@@ -167,9 +170,10 @@ if (process.argv[1] && process.argv[1].endsWith("solve.mjs")) {
   const draw = Number(flag("--draw", 1));
   const nodes = Number(flag("--nodes", 400_000));
   const json = argv.includes("--json");
-  const seeds = argv.indexOf("--seed") >= 0
-    ? [Number(flag("--seed"))]
-    : Array.from({ length: Number(flag("--seeds", 20)) }, (_, i) => i + 1);
+  const seeds =
+    argv.indexOf("--seed") >= 0
+      ? [Number(flag("--seed"))]
+      : Array.from({ length: Number(flag("--seeds", 20)) }, (_, i) => i + 1);
 
   const results = [];
   for (const seed of seeds) {
@@ -179,12 +183,18 @@ if (process.argv[1] && process.argv[1].endsWith("solve.mjs")) {
     results.push(result);
     if (json) continue;
     console.log(
-      `seed ${String(seed).padStart(3)}  ${result.solved ? `SOLVED in ${result.plies} plies` : `unsolved (${result.reason})`}`
-      + `  ${result.nodes} nodes, ${ms.toFixed(0)}ms`,
+      `seed ${String(seed).padStart(3)}  ${result.solved ? `SOLVED in ${result.plies} plies` : `unsolved (${result.reason})`}` +
+        `  ${result.nodes} nodes, ${ms.toFixed(0)}ms`,
     );
   }
   if (json) {
-    console.log(JSON.stringify(results.filter((r) => r.solved).map((r) => ({ seed: r.seed, line: r.line })), null, 0));
+    console.log(
+      JSON.stringify(
+        results.filter((r) => r.solved).map((r) => ({ seed: r.seed, line: r.line })),
+        null,
+        0,
+      ),
+    );
   } else {
     const solved = results.filter((r) => r.solved).length;
     console.log(`\n${solved}/${results.length} solvable at draw ${draw} within ${nodes} nodes`);

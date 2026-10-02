@@ -57,7 +57,14 @@ behaviour under emulation and does not depend on CSS text.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
     { name: "max-samples", kind: "number", description: "Max motion elements to sample", defaultDescription: "100" },
     ...PAGE_LOAD_INPUTS,
   ],
@@ -76,8 +83,7 @@ behaviour under emulation and does not depend on CSS text.`,
     })),
   format: formatMotionDetectionReport,
   headline: (report) =>
-    `running ${report.runningAnimationCount},`
-    + ` reduced-motion rule ${report.hasReducedMotionRule ? "yes" : "no"}`,
+    `running ${report.runningAnimationCount},` + ` reduced-motion rule ${report.hasReducedMotionRule ? "yes" : "no"}`,
   ledger: (report, options) => ({
     tool: "check-motion",
     source: options.source,

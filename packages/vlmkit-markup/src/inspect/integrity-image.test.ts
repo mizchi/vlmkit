@@ -25,11 +25,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vite-plus/test";
-import {
-  IMAGE_MODE_SKIPPED_RULES,
-  parseIntegrityImageElements,
-  runImageIntegrityCheck,
-} from "./integrity-image.ts";
+import { IMAGE_MODE_SKIPPED_RULES, parseIntegrityImageElements, runImageIntegrityCheck } from "./integrity-image.ts";
 
 async function withElements(elements: unknown[]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-integrity-image-"));
@@ -46,8 +42,26 @@ describe("text collision", () => {
   it("reports two overlapping text blocks", async () => {
     const path = await withElements([
       ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "HP 9999999/9999999" },
-      { path: "hud[0]>a[1]", tag: "label", classes: "mp", top: 20, left: 40, width: 180, height: 20, text: "MP 500/500" },
+      {
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "hp",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
+        text: "HP 9999999/9999999",
+      },
+      {
+        path: "hud[0]>a[1]",
+        tag: "label",
+        classes: "mp",
+        top: 20,
+        left: 40,
+        width: 180,
+        height: 20,
+        text: "MP 500/500",
+      },
     ]);
     const report = await runImageIntegrityCheck({ elementsPath: path });
     assert.ok(kinds(report).includes("text-collision"), kinds(report).join(", "));
@@ -59,8 +73,28 @@ describe("text collision", () => {
     // wall of collisions and the feature would be unusable on its intended target.
     const path = await withElements([
       ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "HP 120/120" },
-      { path: "hud[0]>a[1]", tag: "label", classes: "toast", top: 16, left: 16, width: 200, height: 20, text: "Level up!", overlay: true, z_index: 10 },
+      {
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "hp",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
+        text: "HP 120/120",
+      },
+      {
+        path: "hud[0]>a[1]",
+        tag: "label",
+        classes: "toast",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
+        text: "Level up!",
+        overlay: true,
+        z_index: 10,
+      },
     ]);
     const report = await runImageIntegrityCheck({ elementsPath: path });
     assert.ok(!kinds(report).includes("text-collision"), kinds(report).join(", "));
@@ -81,7 +115,13 @@ describe("text clipped", () => {
     const path = await withElements([
       ROOT,
       {
-        path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20,
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "hp",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
         text: "HP 9999999/9999999",
         text_measured: { width: 320, height: 18 },
         clip: { top: 16, left: 16, width: 200, height: 20 },
@@ -100,7 +140,13 @@ describe("text clipped", () => {
     const path = await withElements([
       ROOT,
       {
-        path: "hud[0]>a[0]", tag: "label", classes: "mp", top: 20, left: 40, width: 180, height: 20,
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "mp",
+        top: 20,
+        left: 40,
+        width: 180,
+        height: 20,
         text: "MP 500/500",
         text_measured: { width: 90, height: 18 },
         clip: { top: 20, left: 40, width: 180, height: 20 },
@@ -116,7 +162,13 @@ describe("text clipped", () => {
     const path = await withElements([
       ROOT,
       {
-        path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20,
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "hp",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
         text: "HP 9999999/9999999",
         text_measured: { width: 320, height: 18 },
       },
@@ -143,7 +195,15 @@ describe("containment, derived from the path", () => {
     // what makes this usable on real captures.
     const path = await withElements([
       ROOT,
-      { path: "hud[0]>wrap[0]>deep[0]>badge[0]", tag: "badge", classes: "badge", top: 330, left: 600, width: 120, height: 40 },
+      {
+        path: "hud[0]>wrap[0]>deep[0]>badge[0]",
+        tag: "badge",
+        classes: "badge",
+        top: 330,
+        left: 600,
+        width: 120,
+        height: 40,
+      },
     ]);
     const report = await runImageIntegrityCheck({ elementsPath: path });
     assert.ok(kinds(report).includes("container-protrusion"), kinds(report).join(", "));
@@ -199,16 +259,33 @@ describe("coverage is reported, not implied", () => {
     // The specific danger: a clean verdict over a third of the rules reading as a clean
     // verdict over all of them. Every skipped rule carries a reason so the gap is auditable
     // rather than a number to shrug at.
-    assert.ok(report.skippedRules.every((r) => r.reason.length > 10), JSON.stringify(report.skippedRules));
+    assert.ok(
+      report.skippedRules.every((r) => r.reason.length > 10),
+      JSON.stringify(report.skippedRules),
+    );
     for (const needsDom of ["low-contrast-text", "occluded-text", "js-error"]) {
-      assert.ok(report.skippedRules.some((r) => r.rule === needsDom), `${needsDom} must be listed`);
+      assert.ok(
+        report.skippedRules.some((r) => r.rule === needsDom),
+        `${needsDom} must be listed`,
+      );
     }
   });
 
   it("runs the contrast rules once text carries paint, and stops listing them as skipped", async () => {
     const path = await withElements([
       { ...ROOT, background: "#1b1f24" },
-      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "Health 42", color: "#5a6068", font_size: 14 },
+      {
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "hp",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
+        text: "Health 42",
+        color: "#5a6068",
+        font_size: 14,
+      },
     ]);
     const report = await runImageIntegrityCheck({ elementsPath: path });
     assert.ok(kinds(report).includes("low-contrast-text"), kinds(report).join(", "));
@@ -221,9 +298,21 @@ describe("parsing", () => {
   it("accepts a bare array and both field-name conventions", () => {
     // The caller writes this JSON from a non-JS language; rejecting `text_measured` would
     // be a gratuitous obstacle.
-    const parsed = parseIntegrityImageElements(JSON.stringify([
-      { path: "a[0]", tag: "a", top: 0, left: 0, width: 10, height: 10, text_measured: { width: 5, height: 5 }, aria_hidden: true, z_index: 3 },
-    ]));
+    const parsed = parseIntegrityImageElements(
+      JSON.stringify([
+        {
+          path: "a[0]",
+          tag: "a",
+          top: 0,
+          left: 0,
+          width: 10,
+          height: 10,
+          text_measured: { width: 5, height: 5 },
+          aria_hidden: true,
+          z_index: 3,
+        },
+      ]),
+    );
     assert.equal(parsed.length, 1);
     assert.deepEqual(parsed[0]!.textMeasured, { width: 5, height: 5 });
     assert.equal(parsed[0]!.ariaHidden, true);

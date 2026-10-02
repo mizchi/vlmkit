@@ -64,8 +64,8 @@ describe("settlePage is the only settle", () => {
     assert.deepEqual(
       offenders,
       [],
-      `these wait on fonts themselves instead of calling settlePage (${DEFINITION}). `
-      + "Two thirds of a settle is what makes a client-rendered page read as broken markup.",
+      `these wait on fonts themselves instead of calling settlePage (${DEFINITION}). ` +
+        "Two thirds of a settle is what makes a client-rendered page read as broken markup.",
     );
   });
 

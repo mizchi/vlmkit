@@ -50,7 +50,13 @@ the CI job that is supposed to have Crater running.`,
     },
   ],
   inputs: [
-    { name: "url", placeholder: "ws-url", kind: "string", description: "Crater BiDi URL", defaultDescription: "ws://127.0.0.1:9222 or VLMKIT_CRATER_BIDI_URL" },
+    {
+      name: "url",
+      placeholder: "ws-url",
+      kind: "string",
+      description: "Crater BiDi URL",
+      defaultDescription: "ws://127.0.0.1:9222 or VLMKIT_CRATER_BIDI_URL",
+    },
     { name: "require", kind: "boolean", description: "Fail if Crater is unavailable" },
     { name: "deep", kind: "boolean", description: "Exercise heavier v0.18.0 APIs (batchRender)" },
   ],
@@ -76,8 +82,9 @@ the CI job that is supposed to have Crater running.`,
       findings.push({
         rule: "unavailable",
         severity: options.requireAvailable ? "suspect" : "info",
-        message: `Crater not reachable at ${report.url}`
-          + (options.requireAvailable ? " (--require)" : " — checks were skipped."),
+        message:
+          `Crater not reachable at ${report.url}` +
+          (options.requireAvailable ? " (--require)" : " — checks were skipped."),
       });
     }
     return findings;

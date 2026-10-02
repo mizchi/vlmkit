@@ -24,9 +24,7 @@ export function getDefaultApprovalHistoryPath(outputPath: string): string {
   return join(dirname(outputPath), "approval-history.jsonl");
 }
 
-export function buildApprovalHistoryEntry(
-  input: ApprovalHistoryEntryInput,
-): ApprovalHistoryEntry {
+export function buildApprovalHistoryEntry(input: ApprovalHistoryEntryInput): ApprovalHistoryEntry {
   return {
     actor: input.actor,
     action: input.action,
@@ -37,10 +35,7 @@ export function buildApprovalHistoryEntry(
   };
 }
 
-export async function appendApprovalHistory(
-  entries: ApprovalHistoryEntry[],
-  historyPath: string,
-): Promise<void> {
+export async function appendApprovalHistory(entries: ApprovalHistoryEntry[], historyPath: string): Promise<void> {
   if (entries.length === 0) return;
   await mkdir(dirname(historyPath), { recursive: true });
   const lines = entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";

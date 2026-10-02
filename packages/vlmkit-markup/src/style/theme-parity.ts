@@ -194,13 +194,18 @@ function sampleBboxFill(
 ): { r: number; g: number; b: number } {
   // Sample a 5×5 grid inside the bbox, avoid edges (anti-aliasing).
   const inset = 2;
-  const x0 = bbox.left + inset, x1 = bbox.left + bbox.width - inset;
-  const y0 = bbox.top + inset, y1 = bbox.top + bbox.height - inset;
+  const x0 = bbox.left + inset,
+    x1 = bbox.left + bbox.width - inset;
+  const y0 = bbox.top + inset,
+    y1 = bbox.top + bbox.height - inset;
   if (x1 <= x0 || y1 <= y0) {
     const i = (bbox.top * width + bbox.left) * 4;
     return { r: data[i]!, g: data[i + 1]!, b: data[i + 2]! };
   }
-  let r = 0, g = 0, b = 0, n = 0;
+  let r = 0,
+    g = 0,
+    b = 0,
+    n = 0;
   const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
   const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
   for (let y = y0; y < y1; y += stepY) {
@@ -216,13 +221,13 @@ function sampleBboxFill(
 }
 
 function dist(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }): number {
-  const dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
+  const dr = a.r - b.r,
+    dg = a.g - b.g,
+    db = a.b - b.b;
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
-export async function runThemeParity(
-  options: ThemeParityOptions,
-): Promise<ThemeParityReport> {
+export async function runThemeParity(options: ThemeParityOptions): Promise<ThemeParityReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   // A URL is a valid source now that loading goes through `openSource`;
@@ -257,12 +262,12 @@ export async function runThemeParity(
     // `0.0% delta, 8 of 8 unthemed` for a site whose theme toggle works.
     const detected = options.darkSelector
       ? {
-        strategy: (options.darkSelector.includes("=") ? "attribute" : "class") as ThemeStrategy,
-        mediaRules: 0,
-        darkSelector: options.darkSelector,
-        unreadableSheets: 0,
-      }
-      : await lightPage.evaluate(DETECT_THEME_STRATEGY) as ThemeStrategyDetection;
+          strategy: (options.darkSelector.includes("=") ? "attribute" : "class") as ThemeStrategy,
+          mediaRules: 0,
+          darkSelector: options.darkSelector,
+          unreadableSheets: 0,
+        }
+      : ((await lightPage.evaluate(DETECT_THEME_STRATEGY)) as ThemeStrategyDetection);
     const lightPath = join(outputDir, "light.png");
     await lightPage.screenshot({ path: lightPath, fullPage: false });
     await lightPage.close();
@@ -300,10 +305,11 @@ export async function runThemeParity(
     let changedPixels = 0;
     const totalPixels = lightPng.width * lightPng.height;
     for (let i = 0; i < lightPng.data.length; i += 4) {
-      const d = Math.abs(lightPng.data[i]! - darkPng.data[i]!)
-        + Math.abs(lightPng.data[i + 1]! - darkPng.data[i + 1]!)
-        + Math.abs(lightPng.data[i + 2]! - darkPng.data[i + 2]!);
-      if (d >= 24) changedPixels++;  // ~8/channel — robust to AA
+      const d =
+        Math.abs(lightPng.data[i]! - darkPng.data[i]!) +
+        Math.abs(lightPng.data[i + 1]! - darkPng.data[i + 1]!) +
+        Math.abs(lightPng.data[i + 2]! - darkPng.data[i + 2]!);
+      if (d >= 24) changedPixels++; // ~8/channel — robust to AA
     }
     const themePixelDelta = changedPixels / totalPixels;
 
@@ -376,44 +382,60 @@ export function formatThemeParityReport(report: ThemeParityReport, rules?: RuleV
     ? `${GREEN}\u2713${RESET}`
     : inertTier === "off"
       ? `${DIM}-${RESET}`
-      : inertTier === "suspect" ? `${RED}\u2717${RESET}` : inertTier === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
+      : inertTier === "suspect"
+        ? `${RED}\u2717${RESET}`
+        : inertTier === "info"
+          ? `${DIM}i${RESET}`
+          : `${YELLOW}!${RESET}`;
   lines.push(
-    `  ${inertIcon} theme pixel delta: ${pct}%`
-    + ` (page ${inert ? "barely" : "broadly"} responds to ${strategy?.strategy === "media" || strategy === undefined
-      ? "color scheme"
-      : strategy.strategy === "none" ? "either dark-mode strategy" : `\`${strategy.darkSelector}\``})`
-    + (inert && inertTier === "off" ? `${DIM} \u2014 theme-inert is off, reported as a reading only${RESET}` : ""),
+    `  ${inertIcon} theme pixel delta: ${pct}%` +
+      ` (page ${inert ? "barely" : "broadly"} responds to ${
+        strategy?.strategy === "media" || strategy === undefined
+          ? "color scheme"
+          : strategy.strategy === "none"
+            ? "either dark-mode strategy"
+            : `\`${strategy.darkSelector}\``
+      })` +
+      (inert && inertTier === "off" ? `${DIM} \u2014 theme-inert is off, reported as a reading only${RESET}` : ""),
   );
   // Next to the delta, not in a footnote: what a 0.0% means depends on which strategy was
   // exercised, and the gate spent a year flipping the media query at pages that theme by class.
   if (strategy) {
-    lines.push(strategy.strategy === "none"
-      ? `    ${DIM}strategy: none found in the readable CSS — no \`prefers-color-scheme\` rule,`
-        + ` no root \`.dark\` / \`[data-theme=dark]\` selector`
-        + (strategy.unreadableSheets > 0 ? `; ${strategy.unreadableSheets} cross-origin sheet(s) could not be read` : "")
-        + `${RESET}`
-      : `    ${DIM}strategy: ${strategy.strategy}`
-        + (strategy.strategy === "media"
-          ? ` (${strategy.mediaRules} \`prefers-color-scheme: dark\` rule(s))`
-          : ` — the dark render applied \`${strategy.darkSelector}\` to the root element`
-            + (strategy.mediaRules > 0 ? `, and the page also has ${strategy.mediaRules} media rule(s)` : ""))
-        + (strategy.unreadableSheets > 0 ? `; ${strategy.unreadableSheets} cross-origin sheet(s) unreadable` : "")
-        + `${RESET}`);
+    lines.push(
+      strategy.strategy === "none"
+        ? `    ${DIM}strategy: none found in the readable CSS — no \`prefers-color-scheme\` rule,` +
+            ` no root \`.dark\` / \`[data-theme=dark]\` selector` +
+            (strategy.unreadableSheets > 0
+              ? `; ${strategy.unreadableSheets} cross-origin sheet(s) could not be read`
+              : "") +
+            `${RESET}`
+        : `    ${DIM}strategy: ${strategy.strategy}` +
+            (strategy.strategy === "media"
+              ? ` (${strategy.mediaRules} \`prefers-color-scheme: dark\` rule(s))`
+              : ` — the dark render applied \`${strategy.darkSelector}\` to the root element` +
+                (strategy.mediaRules > 0 ? `, and the page also has ${strategy.mediaRules} media rule(s)` : "")) +
+            (strategy.unreadableSheets > 0 ? `; ${strategy.unreadableSheets} cross-origin sheet(s) unreadable` : "") +
+            `${RESET}`,
+    );
   }
   const unthemedOff = unthemedTier === "off";
   const unthemedIcon = unthemedOff
     ? `${DIM}-${RESET}`
     : report.unthemed.length === 0
       ? `${GREEN}\u2713${RESET}`
-      : unthemedTier === "suspect" ? `${RED}\u2717${RESET}` : unthemedTier === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
+      : unthemedTier === "suspect"
+        ? `${RED}\u2717${RESET}`
+        : unthemedTier === "info"
+          ? `${DIM}i${RESET}`
+          : `${YELLOW}!${RESET}`;
   lines.push(
-    `  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}`
-    + (unthemedOff ? `${DIM} \u2014 measured and NOT reported, unthemed-component is off${RESET}` : ""),
+    `  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}` +
+      (unthemedOff ? `${DIM} \u2014 measured and NOT reported, unthemed-component is off${RESET}` : ""),
   );
   for (const u of unthemedOff ? [] : report.unthemed.slice(0, 5)) {
     lines.push(
-      `    ${DIM}#${u.rank} ${u.bbox.left},${u.bbox.top} ${u.bbox.width}\u00d7${u.bbox.height}`
-      + ` fill ${u.lightFill.hex} (\u0394 ${u.fillDelta.toFixed(1)})${RESET}`,
+      `    ${DIM}#${u.rank} ${u.bbox.left},${u.bbox.top} ${u.bbox.width}\u00d7${u.bbox.height}` +
+        ` fill ${u.lightFill.hex} (\u0394 ${u.fillDelta.toFixed(1)})${RESET}`,
     );
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
@@ -428,37 +450,48 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
   lines.push("");
   const pct = (r.themePixelDelta * 100).toFixed(2);
   const strat = r.themeStrategy;
-  const flipped = strat === undefined || strat.strategy === "media" || strat.strategy === "none"
-    ? "`prefers-color-scheme` from `light` to `dark`"
-    : `\`${strat.darkSelector}\` on the root element (${strat.strategy} strategy)`;
-  lines.push(`**Theme pixel delta**: ${pct}% — fraction of pixels that changed when switching ` +
-    `${flipped}.`);
+  const flipped =
+    strat === undefined || strat.strategy === "media" || strat.strategy === "none"
+      ? "`prefers-color-scheme` from `light` to `dark`"
+      : `\`${strat.darkSelector}\` on the root element (${strat.strategy} strategy)`;
+  lines.push(`**Theme pixel delta**: ${pct}% — fraction of pixels that changed when switching ` + `${flipped}.`);
   lines.push("");
   if (strat) {
-    lines.push(`**Dark-mode strategy detected**: \`${strat.strategy}\`` +
-      (strat.strategy === "media" ? ` (${strat.mediaRules} \`prefers-color-scheme: dark\` rule(s) in the readable CSS)`
-        : strat.strategy === "none" ? " — neither a `prefers-color-scheme` rule nor a root `.dark` / `[data-theme=dark]` selector is in the readable CSS"
-        : ` — root \`${strat.darkSelector}\`, applied by this gate for the dark render` +
-          (strat.mediaRules > 0 ? `; the page also carries ${strat.mediaRules} media rule(s)` : "")));
+    lines.push(
+      `**Dark-mode strategy detected**: \`${strat.strategy}\`` +
+        (strat.strategy === "media"
+          ? ` (${strat.mediaRules} \`prefers-color-scheme: dark\` rule(s) in the readable CSS)`
+          : strat.strategy === "none"
+            ? " — neither a `prefers-color-scheme` rule nor a root `.dark` / `[data-theme=dark]` selector is in the readable CSS"
+            : ` — root \`${strat.darkSelector}\`, applied by this gate for the dark render` +
+              (strat.mediaRules > 0 ? `; the page also carries ${strat.mediaRules} media rule(s)` : "")),
+    );
     if (strat.unreadableSheets > 0) {
       lines.push("");
-      lines.push(`> ${strat.unreadableSheets} cross-origin stylesheet(s) could not be read, so the ` +
-        "strategy count is a lower bound. If the page themes from one of those, pass " +
-        "`--dark-selector` to name the class or attribute directly.");
+      lines.push(
+        `> ${strat.unreadableSheets} cross-origin stylesheet(s) could not be read, so the ` +
+          "strategy count is a lower bound. If the page themes from one of those, pass " +
+          "`--dark-selector` to name the class or attribute directly.",
+      );
     }
     lines.push("");
   }
   if (r.themePixelDelta < 0.02) {
-    lines.push(strat && (strat.strategy === "class" || strat.strategy === "attribute")
-      // Reaching this line under a class strategy means the class WAS applied and the pixels
-      // still did not move, which is a real finding rather than the gate testing the wrong knob.
-      ? "> The page barely responds to its own dark-mode " + strat.strategy +
-        " (`" + strat.darkSelector + "` was applied to the root and the render hardly changed). " +
-        "Either the dark rules are not reaching these elements, or the values behind them are " +
-        "the same in both themes."
-      : "> The page barely responds to the color-scheme toggle. Either dark-mode " +
-      "styles are missing entirely, or the page doesn't use the standard " +
-      "`@media (prefers-color-scheme: dark)` query.");
+    lines.push(
+      strat && (strat.strategy === "class" || strat.strategy === "attribute")
+        ? // Reaching this line under a class strategy means the class WAS applied and the pixels
+          // still did not move, which is a real finding rather than the gate testing the wrong knob.
+          "> The page barely responds to its own dark-mode " +
+            strat.strategy +
+            " (`" +
+            strat.darkSelector +
+            "` was applied to the root and the render hardly changed). " +
+            "Either the dark rules are not reaching these elements, or the values behind them are " +
+            "the same in both themes."
+        : "> The page barely responds to the color-scheme toggle. Either dark-mode " +
+            "styles are missing entirely, or the page doesn't use the standard " +
+            "`@media (prefers-color-scheme: dark)` query.",
+    );
     lines.push("");
   }
   lines.push("- Light: `" + r.lightScreenshot + "`");
@@ -466,9 +499,11 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
   lines.push("");
   lines.push("## Unthemed components");
   lines.push("");
-  lines.push("Components whose dominant fill is **identical** in light and dark mode " +
-    "(distance < 16 RGB units). These elements have hard-coded colors that " +
-    "don't reference a theme variable — a classic dark-mode regression.");
+  lines.push(
+    "Components whose dominant fill is **identical** in light and dark mode " +
+      "(distance < 16 RGB units). These elements have hard-coded colors that " +
+      "don't reference a theme variable — a classic dark-mode regression.",
+  );
   lines.push("");
   if (r.unthemed.length === 0) {
     lines.push("_None — every detected component changed fill between themes._");
@@ -486,15 +521,21 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
   lines.push("## Suggested next step");
   lines.push("");
   if (r.themePixelDelta < 0.02) {
-    lines.push("1. Add `@media (prefers-color-scheme: dark) { ... }` styles or a " +
-      "`:root { --bg: ...; }` / `[data-theme='dark']` toggle. Currently no theme " +
-      "switching is wired up.");
+    lines.push(
+      "1. Add `@media (prefers-color-scheme: dark) { ... }` styles or a " +
+        "`:root { --bg: ...; }` / `[data-theme='dark']` toggle. Currently no theme " +
+        "switching is wired up.",
+    );
   } else if (r.unthemed.length > 0) {
-    lines.push("1. Open `light.png` and `dark.png` side-by-side. Locate the elements at " +
-      "the bboxes listed above — they keep the same fill color across themes.");
-    lines.push("2. Replace the hard-coded color values in the CSS for those elements with " +
-      "either a `var(--token)` reference, or matching dark-mode overrides via " +
-      "`@media (prefers-color-scheme: dark)`.");
+    lines.push(
+      "1. Open `light.png` and `dark.png` side-by-side. Locate the elements at " +
+        "the bboxes listed above — they keep the same fill color across themes.",
+    );
+    lines.push(
+      "2. Replace the hard-coded color values in the CSS for those elements with " +
+        "either a `var(--token)` reference, or matching dark-mode overrides via " +
+        "`@media (prefers-color-scheme: dark)`.",
+    );
     lines.push("3. Re-run `vlmkit check theme`. Unthemed count should drop to 0.");
   } else {
     lines.push("Every detected component changed fill between themes. Page is theme-clean.");

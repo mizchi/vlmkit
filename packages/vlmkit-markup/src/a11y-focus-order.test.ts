@@ -143,7 +143,7 @@ describe("analyzeFocusOrderSteps", () => {
       step({ tabIndex: 0, path: "a", x: 0, y: 100 }),
       step({ tabIndex: 1, path: "b", x: 200, y: 100 }),
       step({ tabIndex: 2, path: "c", x: 100, y: 100 }), // reverse-left
-      step({ tabIndex: 3, path: "d", x: 100, y: 40 }),  // reverse-up
+      step({ tabIndex: 3, path: "d", x: 100, y: 40 }), // reverse-up
     ];
     const findings = analyzeFocusOrderSteps(steps);
     assert.equal(findings.length, 2);
@@ -154,10 +154,7 @@ describe("analyzeFocusOrderSteps", () => {
   });
 
   it("flags skip-row with the y delta in the message", () => {
-    const steps = [
-      step({ tabIndex: 0, path: "a", x: 0, y: 0 }),
-      step({ tabIndex: 1, path: "b", x: 0, y: 250 }),
-    ];
+    const steps = [step({ tabIndex: 0, path: "a", x: 0, y: 0 }), step({ tabIndex: 1, path: "b", x: 0, y: 250 })];
     const findings = analyzeFocusOrderSteps(steps);
     assert.equal(findings.length, 1);
     assert.equal(findings[0]!.kind, "skip-row");
@@ -180,8 +177,8 @@ describe("multi-column tab order", () => {
   it("a jump to the top of the next column is not a reverse", () => {
     const t = classifyFocusOrderStep({
       samePath: false,
-      prev: { x: 113, y: 696, width: 52 },   // last link of column one
-      cur: { x: 245, y: 616 },               // first link of column two
+      prev: { x: 113, y: 696, width: 52 }, // last link of column one
+      cur: { x: 245, y: 616 }, // first link of column two
     });
     assert.equal(t, "column-advance");
   });
@@ -200,7 +197,7 @@ describe("multi-column tab order", () => {
 
   it("overlapping columns are not columns", () => {
     // 40px to the right while still overlapping horizontally is not a column boundary; a real
-        // tabindex mistake inside one column can move slightly right, and must survive.
+    // tabindex mistake inside one column can move slightly right, and must survive.
     const t = classifyFocusOrderStep({
       samePath: false,
       prev: { x: 100, y: 700, width: 200 },
@@ -226,14 +223,17 @@ describe("multi-column tab order", () => {
       step({ x: 113, y: 616, bbox: { width: 42, height: 20 } as never }),
       step({ x: 113, y: 656, bbox: { width: 48, height: 20 } as never }),
       step({ x: 113, y: 696, bbox: { width: 52, height: 20 } as never }),
-      step({ x: 245, y: 616, bbox: { width: 41, height: 20 } as never }),   // column advance
+      step({ x: 245, y: 616, bbox: { width: 41, height: 20 } as never }), // column advance
       step({ x: 245, y: 656, bbox: { width: 33, height: 20 } as never }),
       step({ x: 245, y: 696, bbox: { width: 66, height: 20 } as never }),
-      step({ x: 391, y: 616, bbox: { width: 125, height: 20 } as never }),  // column advance
-      step({ x: 391, y: 355, bbox: { width: 84, height: 20 } as never }),   // real reverse
+      step({ x: 391, y: 616, bbox: { width: 125, height: 20 } as never }), // column advance
+      step({ x: 391, y: 355, bbox: { width: 84, height: 20 } as never }), // real reverse
     ];
     const findings = analyzeFocusOrderSteps(steps);
-    assert.deepEqual(findings.map((f) => `${f.kind} ${f.fromIndex}->${f.toIndex}`), ["reverse 6->7"]);
+    assert.deepEqual(
+      findings.map((f) => `${f.kind} ${f.fromIndex}->${f.toIndex}`),
+      ["reverse 6->7"],
+    );
   });
 });
 
@@ -246,19 +246,24 @@ describe("multi-column tab order", () => {
  * position and the other a document position, and comparing them says nothing about reading order.
  */
 describe("viewport-pinned focus steps", () => {
-  const pinned = (over: Partial<FocusStep> & { x: number; y: number }): FocusStep =>
-    ({ ...step(over), pinned: true });
+  const pinned = (over: Partial<FocusStep> & { x: number; y: number }): FocusStep => ({ ...step(over), pinned: true });
 
   it("a reverse into or out of a pinned element is not a finding", () => {
     // Both directions: a fixed control tabbed first (Bootstrap's case) and one tabbed last.
-    assert.deepEqual(analyzeFocusOrderSteps([
-      pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
-      step({ x: 0, y: 0, path: "a.navbar-brand" }),
-    ]), []);
-    assert.deepEqual(analyzeFocusOrderSteps([
-      step({ x: 0, y: 600, path: "a.footer-link" }),
-      pinned({ x: 1200, y: 20, path: "button#to-top" }),
-    ]), []);
+    assert.deepEqual(
+      analyzeFocusOrderSteps([
+        pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
+        step({ x: 0, y: 0, path: "a.navbar-brand" }),
+      ]),
+      [],
+    );
+    assert.deepEqual(
+      analyzeFocusOrderSteps([
+        step({ x: 0, y: 600, path: "a.footer-link" }),
+        pinned({ x: 1200, y: 20, path: "button#to-top" }),
+      ]),
+      [],
+    );
   });
 
   it("a trap on a pinned element is still a finding", () => {
@@ -268,7 +273,10 @@ describe("viewport-pinned focus steps", () => {
       pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
       pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
     ]);
-    assert.deepEqual(findings.map((f) => f.kind), ["trap"]);
+    assert.deepEqual(
+      findings.map((f) => f.kind),
+      ["trap"],
+    );
   });
 
   it("in-flow reverses are untouched by the pinned rule", () => {
@@ -277,7 +285,10 @@ describe("viewport-pinned focus steps", () => {
       step({ x: 100, y: 600, path: "a.one" }),
       step({ x: 100, y: 200, path: "a.two" }),
     ]);
-    assert.deepEqual(findings.map((f) => f.kind), ["reverse"]);
+    assert.deepEqual(
+      findings.map((f) => f.kind),
+      ["reverse"],
+    );
   });
 
   it("steps with no `pinned` field analyse exactly as before", () => {
@@ -287,7 +298,10 @@ describe("viewport-pinned focus steps", () => {
       { ...step({ x: 100, y: 600, path: "a.one" }), pinned: undefined },
       { ...step({ x: 100, y: 200, path: "a.two" }), pinned: undefined },
     ]);
-    assert.deepEqual(findings.map((f) => f.kind), ["reverse"]);
+    assert.deepEqual(
+      findings.map((f) => f.kind),
+      ["reverse"],
+    );
   });
 });
 
@@ -307,8 +321,14 @@ describe("runFocusOrder on a page that scrolls while it is tabbed", () => {
     const { runFocusOrder } = await import("./a11y-focus-order.ts");
     const dir = mkdtempSync(join(tmpdir(), "focus-scroll-"));
     try {
-      const column = Array.from({ length: 8 }, (_, i) => `<p style="height:160px;margin:0"><button>Step ${i}</button></p>`).join("");
-      const list = Array.from({ length: 8 }, (_, i) => `<div style="height:40px"><button>Item ${i}</button></div>`).join("");
+      const column = Array.from(
+        { length: 8 },
+        (_, i) => `<p style="height:160px;margin:0"><button>Step ${i}</button></p>`,
+      ).join("");
+      const list = Array.from(
+        { length: 8 },
+        (_, i) => `<div style="height:40px"><button>Item ${i}</button></div>`,
+      ).join("");
       writeFileSync(
         join(dir, "page.html"),
         `<!doctype html><html><head><meta charset="utf-8"><title>t</title></head><body style="margin:0">
@@ -316,9 +336,16 @@ describe("runFocusOrder on a page that scrolls while it is tabbed", () => {
       );
       const report = await runFocusOrder({ source: join(dir, "page.html"), outputDir: join(dir, "out"), quiet: true });
       assert.equal(report.steps.length, 16, "every button was reached");
-      assert.deepEqual(report.findings.filter((f) => f.kind === "reverse").map((f) => f.message), []);
+      assert.deepEqual(
+        report.findings.filter((f) => f.kind === "reverse").map((f) => f.message),
+        [],
+      );
       const ys = report.steps.map((s) => s.bbox.y);
-      assert.deepEqual(ys, [...ys].sort((a, b) => a - b), "positions only ever increase down the page");
+      assert.deepEqual(
+        ys,
+        [...ys].sort((a, b) => a - b),
+        "positions only ever increase down the page",
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

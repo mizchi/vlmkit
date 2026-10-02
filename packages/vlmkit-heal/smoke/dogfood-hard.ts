@@ -34,7 +34,8 @@ interface Scenario {
 const SCENARIOS: Scenario[] = [
   {
     name: "multi-break (locator + assert)",
-    transform: (s) => s.replace('name: "Submit"', 'name: "Send"').replace('toHaveText("Dashboard")', 'toHaveText("Welcome")'),
+    transform: (s) =>
+      s.replace('name: "Submit"', 'name: "Send"').replace('toHaveText("Dashboard")', 'toHaveText("Welcome")'),
     override: { codegen: { tiers: price([CODER, FALLBACK]) }, budgetUsd: 1, maxAttempts: 4 },
     expect: "fixed",
     why: "two breakages fixed in one rewrite",
@@ -66,7 +67,15 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
-interface Row { name: string; got: Verdict; want: Verdict; ok: boolean; tiers: string; attempts: number; cost: number }
+interface Row {
+  name: string;
+  got: Verdict;
+  want: Verdict;
+  ok: boolean;
+  tiers: string;
+  attempts: number;
+  cost: number;
+}
 const rows: Row[] = [];
 
 for (let i = 0; i < SCENARIOS.length; i++) {

@@ -3,11 +3,7 @@ import { describe, it } from "vite-plus/test";
 import { extractTextRowsFromRgba, matchTextRows, compareRowTypography, type TextRow } from "./text-rows.ts";
 
 /** Synthesize an RGBA buffer: white background with dark horizontal text bands. */
-function synth(
-  width: number,
-  height: number,
-  bands: Array<{ y: number; h: number; luma?: number }>,
-): Uint8Array {
+function synth(width: number, height: number, bands: Array<{ y: number; h: number; luma?: number }>): Uint8Array {
   const data = new Uint8Array(width * height * 4);
   data.fill(255); // white background, alpha included
   // Reset alpha (fill(255) already sets it to 255, fine)
@@ -16,7 +12,10 @@ function synth(
     for (let y = b.y; y < b.y + b.h; y++) {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
-        data[idx] = v; data[idx + 1] = v; data[idx + 2] = v; data[idx + 3] = 255;
+        data[idx] = v;
+        data[idx + 1] = v;
+        data[idx + 2] = v;
+        data[idx + 3] = 255;
       }
     }
   }
@@ -76,10 +75,7 @@ describe("matchTextRows", () => {
   }
 
   it("pairs rows by ordered index and emits Δy", () => {
-    const matches = matchTextRows(
-      [row(50), row(100), row(200)],
-      [row(50), row(110), row(204)],
-    );
+    const matches = matchTextRows([row(50), row(100), row(200)], [row(50), row(110), row(204)]);
     assert.equal(matches.length, 2); // row 0 has Δ=0 (below default minDeltaY=2)
     assert.equal(matches[0]!.rank, 1);
     assert.equal(matches[0]!.deltaY, 10);
@@ -116,7 +112,9 @@ describe("annotateTypography (via extractTextRowsFromRgba)", () => {
     for (let y = band.y; y < band.y + band.h; y++) {
       for (let x = inkStart; x < inkStart + inkWidth; x += band.spacing) {
         const i = (y * width + x) * 4;
-        data[i] = v; data[i + 1] = v; data[i + 2] = v;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
       }
     }
     return data;
@@ -143,16 +141,19 @@ describe("annotateTypography (via extractTextRowsFromRgba)", () => {
 describe("compareRowTypography", () => {
   function row(yCenter: number, fontSize: number, weight: TextRow["weightBucket"], density: number): TextRow {
     return {
-      yStart: yCenter - 5, yEnd: yCenter + 5, yCenter, height: 11, meanLuma: 200,
-      estimatedFontSize: fontSize, weightBucket: weight, inkDensity: density,
+      yStart: yCenter - 5,
+      yEnd: yCenter + 5,
+      yCenter,
+      height: 11,
+      meanLuma: 200,
+      estimatedFontSize: fontSize,
+      weightBucket: weight,
+      inkDensity: density,
     };
   }
 
   it("flags size mismatches", () => {
-    const mismatches = compareRowTypography(
-      [row(50, 24, "bold", 0.4)],
-      [row(50, 16, "bold", 0.4)],
-    );
+    const mismatches = compareRowTypography([row(50, 24, "bold", 0.4)], [row(50, 16, "bold", 0.4)]);
     assert.equal(mismatches.length, 1);
     assert.equal(mismatches[0]!.kind, "size");
     assert.equal(mismatches[0]!.baselineFontSize, 24);
@@ -160,28 +161,19 @@ describe("compareRowTypography", () => {
   });
 
   it("flags weight mismatches when density delta exceeds threshold", () => {
-    const mismatches = compareRowTypography(
-      [row(50, 24, "bold", 0.4)],
-      [row(50, 24, "regular", 0.2)],
-    );
+    const mismatches = compareRowTypography([row(50, 24, "bold", 0.4)], [row(50, 24, "regular", 0.2)]);
     assert.equal(mismatches.length, 1);
     assert.equal(mismatches[0]!.kind, "weight");
   });
 
   it("does NOT flag weight when density delta is below threshold", () => {
     // Buckets differ ("regular" vs "medium") but density delta only 0.02.
-    const mismatches = compareRowTypography(
-      [row(50, 24, "medium", 0.28)],
-      [row(50, 24, "regular", 0.26)],
-    );
+    const mismatches = compareRowTypography([row(50, 24, "medium", 0.28)], [row(50, 24, "regular", 0.26)]);
     assert.equal(mismatches.length, 0);
   });
 
   it("classifies kind=both when size and weight both differ", () => {
-    const mismatches = compareRowTypography(
-      [row(50, 24, "bold", 0.4)],
-      [row(50, 14, "regular", 0.2)],
-    );
+    const mismatches = compareRowTypography([row(50, 24, "bold", 0.4)], [row(50, 14, "regular", 0.2)]);
     assert.equal(mismatches.length, 1);
     assert.equal(mismatches[0]!.kind, "both");
   });

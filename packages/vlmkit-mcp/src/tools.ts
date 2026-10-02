@@ -77,21 +77,27 @@ const checkLayoutTool: McpTool = {
     "Layout contract: verifies a brief's STRUCTURAL requirements deterministically per viewport — element widths (±tolerance), matches per visual row (4-across at 1280 / 2x2 at 768 / stacked at 375), full-width collapse, stacking order (A above B), visibility, and counts. Turns 'the sidebar is 260px on desktop and collapses above the main column on tablet' into a machine-checkable spec the generation loop can run every round. Pure DOM math, no VLM. Complements check_integrity (defects) — this checks conformance to stated structure.",
   inputSchema: {
     source: z.string().describe("Path or URL of the page."),
-    contract: z.object({
-      rules: z.array(z.object({
-        selector: z.string(),
-        at: z.number().describe("Viewport width this rule is checked at."),
-        width: z.number().optional(),
-        tolerance: z.number().optional(),
-        minWidth: z.number().optional(),
-        maxWidth: z.number().optional(),
-        perRow: z.number().optional().describe("Modal number of matches per visual row."),
-        fullWidth: z.boolean().optional(),
-        above: z.string().optional().describe("Selector whose matches must all start below this rule's matches."),
-        count: z.number().optional(),
-        visible: z.boolean().optional(),
-      })).min(1),
-    }).describe("The layout contract."),
+    contract: z
+      .object({
+        rules: z
+          .array(
+            z.object({
+              selector: z.string(),
+              at: z.number().describe("Viewport width this rule is checked at."),
+              width: z.number().optional(),
+              tolerance: z.number().optional(),
+              minWidth: z.number().optional(),
+              maxWidth: z.number().optional(),
+              perRow: z.number().optional().describe("Modal number of matches per visual row."),
+              fullWidth: z.boolean().optional(),
+              above: z.string().optional().describe("Selector whose matches must all start below this rule's matches."),
+              count: z.number().optional(),
+              visible: z.boolean().optional(),
+            }),
+          )
+          .min(1),
+      })
+      .describe("The layout contract."),
   },
   run: async (args) => {
     const { runLayoutVerify } = await import("@mizchi/vlmkit-markup/inspect/layout-contract.ts");
@@ -105,7 +111,7 @@ const checkLayoutTool: McpTool = {
 
 const checkInteractionsTool = gateTool(interactionsGate, {
   description:
-    "A11y-event state map: discovers interactive elements (roles + implicit semantics), probes their canonical keyboard events (Tab/Enter/Space/arrows/Escape) and records the resulting ARIA transitions, popup patterns (dialog focus-trap, menu focus/arrows/Escape-return), composite navigation (listbox activedescendant, grid roving), and live-region announcements. With `reference`, the reference's inventory becomes the behavioral contract matched by (role, accessible name) — this fails pages that match every screenshot but respond wrongly to keyboard events. Deterministic, no VLM. `waitUntil: \"domcontentloaded\"` gates an SPA dev server whose background requests never reach network idle.",
+    'A11y-event state map: discovers interactive elements (roles + implicit semantics), probes their canonical keyboard events (Tab/Enter/Space/arrows/Escape) and records the resulting ARIA transitions, popup patterns (dialog focus-trap, menu focus/arrows/Escape-return), composite navigation (listbox activedescendant, grid roving), and live-region announcements. With `reference`, the reference\'s inventory becomes the behavioral contract matched by (role, accessible name) — this fails pages that match every screenshot but respond wrongly to keyboard events. Deterministic, no VLM. `waitUntil: "domcontentloaded"` gates an SPA dev server whose background requests never reach network idle.',
   // `har` omitted for the same reason as on check_integrity: recording one is a
   // CLI/CI operation. `timeout` / `waitUntil` stay — pointing at a dev server
   // that never goes idle is exactly what an MCP client does.
@@ -129,7 +135,7 @@ const checkCopyTool = gateTool(copyGate, {
 
 const checkEquivalenceTool = gateTool(equivalenceGate, {
   description:
-    "Visual-equivalence judge for residual regions: crops each region from both the attempt render (or PNG) and the target into a stacked pair image, and measures the mean per-channel delta deterministically. Keyless mode (this tool) writes the pair images + measured deltas for a SECOND reader to judge — it does not itself decide same/different (that needs a VLM and must not be the author of the pixels). Use as the tie-breaker for residuals that pass/fail a gate but may be visually equivalent (a reflowed line, a sub-pixel metric drift). Region spec: \"x,y,WxH\" or a kickback-shaped \"(x,y) WxH\".",
+    'Visual-equivalence judge for residual regions: crops each region from both the attempt render (or PNG) and the target into a stacked pair image, and measures the mean per-channel delta deterministically. Keyless mode (this tool) writes the pair images + measured deltas for a SECOND reader to judge — it does not itself decide same/different (that needs a VLM and must not be the author of the pixels). Use as the tie-breaker for residuals that pass/fail a gate but may be visually equivalent (a reflowed line, a sub-pixel metric drift). Region spec: "x,y,WxH" or a kickback-shaped "(x,y) WxH".',
   // Keyless by construction: without `--vlm` the gate writes pair images and
   // measured deltas for a second reader instead of deciding same/different
   // itself — which it must not, being the author of the pixels.
@@ -150,7 +156,8 @@ const buildPageTool: McpTool = {
     current: z.string().describe("Current attempt: an HTML file (rendered at the target viewport) or a PNG."),
   },
   run: async (args) => {
-    const { loadPng, renderHtmlToPng, composePageDiff } = await import("@mizchi/vlmkit-markup/component/page-compose.ts");
+    const { loadPng, renderHtmlToPng, composePageDiff } =
+      await import("@mizchi/vlmkit-markup/component/page-compose.ts");
     const target = await loadPng(args.target as string);
     const currentPath = args.current as string;
     const current = /\.png$/i.test(currentPath)
@@ -162,7 +169,6 @@ const buildPageTool: McpTool = {
     return result(summary, composition, residuals > 0);
   },
 };
-
 
 const checkStoryTool = gateTool(storyGate, {
   // `--out` is a CLI-shaped operational flag; an MCP client wants the project's
@@ -180,22 +186,30 @@ const buildGalleryTool: McpTool = {
   inputSchema: {
     source: z.string().describe("Page HTML path or URL — the converged page to capture from."),
     out: z.string().optional().describe("Output directory for gallery.html and stories.json. Default: .vlmkit/gallery"),
-    selectors: z.array(z.string()).min(1).optional()
+    selectors: z
+      .array(z.string())
+      .min(1)
+      .optional()
       .describe("Class selectors (e.g. '.c-card') to turn into stories. Bypasses discovery entirely."),
     prefix: z.string().optional().describe("Story id prefix. Default: components"),
     viewport: z.string().optional().describe("Viewport to render the source page at, as WxH. Default: 1280x800"),
-    noisePixels: z.number().optional()
+    noisePixels: z
+      .number()
+      .optional()
       .describe("Pixel budget converted to each story's ratio threshold. Default: 24. Lower is stricter."),
     includeAll: z.boolean().optional().describe("Also write the candidates discovery did not recommend."),
   },
   run: async (args) => {
-    const { scaffoldStoryGallery, buildGatesConfigSnippet } = await import(
-      "@mizchi/vlmkit-markup/component/story-scaffold.ts"
-    );
+    const { scaffoldStoryGallery, buildGatesConfigSnippet } =
+      await import("@mizchi/vlmkit-markup/component/story-scaffold.ts");
     const raw = (args.viewport as string | undefined) ?? "1280x800";
     const match = /^(\d+)x(\d+)$/.exec(raw.trim());
     if (!match) {
-      return result(`build_gallery: viewport expects <width>x<height>, got ${JSON.stringify(raw)}`, { error: raw }, true);
+      return result(
+        `build_gallery: viewport expects <width>x<height>, got ${JSON.stringify(raw)}`,
+        { error: raw },
+        true,
+      );
     }
     const report = await scaffoldStoryGallery({
       source: args.source as string,
@@ -221,10 +235,11 @@ const buildGalleryTool: McpTool = {
     // because a gallery missing its CSS yields baselines that look right and are
     // wrong — the one outcome worse than no baseline at all.
     const failed = report.stories.length === 0 || report.unreadableStylesheets.length > 0;
-    const summary = report.stories.length === 0
-      ? "build_gallery: no stories written — pass `selectors` to name components explicitly, or `includeAll` to see what discovery rejected"
-      : `build_gallery: ${report.stories.length} story/stories, ${report.skipped.length} not recommended`
-        + `${report.unreadableStylesheets.length > 0 ? `, ${report.unreadableStylesheets.length} UNREADABLE stylesheet(s) — baselines from this gallery are not trustworthy` : ""}`;
+    const summary =
+      report.stories.length === 0
+        ? "build_gallery: no stories written — pass `selectors` to name components explicitly, or `includeAll` to see what discovery rejected"
+        : `build_gallery: ${report.stories.length} story/stories, ${report.skipped.length} not recommended` +
+          `${report.unreadableStylesheets.length > 0 ? `, ${report.unreadableStylesheets.length} UNREADABLE stylesheet(s) — baselines from this gallery are not trustworthy` : ""}`;
     return result(summary, structured, failed);
   },
 };
@@ -235,14 +250,27 @@ const verifyFlowTool: McpTool = {
     "Verified scripted browser flow: runs a given list of steps (each an action + deterministic post-condition assertions on the live DOM) and FAILS at the first unmet post-condition. Unlike LLM-per-step browser agents, 'it did something' is not success — 'the asserted state actually holds' is. No LLM (the flow is provided; a planner may emit it later, the verification is deterministic). Assertions: attr / visible / hidden / focused / text / count.",
   inputSchema: {
     source: z.string().describe("Page HTML path or URL."),
-    flow: z.object({
-      viewport: z.object({ width: z.number(), height: z.number() }).optional(),
-      steps: z.array(z.object({
-        label: z.string().optional(),
-        do: z.record(z.unknown()).describe("Action: {action:'click'|'focus'|'hover', selector} | {action:'press', key, selector?} | {action:'fill'|'type', selector, value|text} | {action:'wait', ms}"),
-        expect: z.array(z.record(z.unknown())).optional().describe("Post-conditions: {assert:'attr', selector, name, equals} | {assert:'visible'|'hidden'|'focused', selector} | {assert:'text', selector, contains} | {assert:'count', selector, equals}"),
-      })),
-    }).describe("The flow to run."),
+    flow: z
+      .object({
+        viewport: z.object({ width: z.number(), height: z.number() }).optional(),
+        steps: z.array(
+          z.object({
+            label: z.string().optional(),
+            do: z
+              .record(z.unknown())
+              .describe(
+                "Action: {action:'click'|'focus'|'hover', selector} | {action:'press', key, selector?} | {action:'fill'|'type', selector, value|text} | {action:'wait', ms}",
+              ),
+            expect: z
+              .array(z.record(z.unknown()))
+              .optional()
+              .describe(
+                "Post-conditions: {assert:'attr', selector, name, equals} | {assert:'visible'|'hidden'|'focused', selector} | {assert:'text', selector, contains} | {assert:'count', selector, equals}",
+              ),
+          }),
+        ),
+      })
+      .describe("The flow to run."),
   },
   run: async (args) => {
     const { runFlowVerify } = await import("@mizchi/vlmkit-markup/inspect/flow-verify.ts");

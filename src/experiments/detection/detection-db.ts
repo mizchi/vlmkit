@@ -11,11 +11,11 @@ import type { SelectorType, UndetectedReason, ViewportDetectionResult } from "./
 // ---- Types ----
 
 export interface DetectionRecord {
-  runId: string;                // ISO timestamp of the bench run
-  fixture: string;              // fixture name (e.g. "page", "dashboard")
-  backend: string;              // "chromium" | "crater"
-  fallbackUsed?: boolean;       // prescanner: Chromium fallback was required
-  backendResolvedBy?: string;   // prescanner: "crater" | "chromium" | "none"
+  runId: string; // ISO timestamp of the bench run
+  fixture: string; // fixture name (e.g. "page", "dashboard")
+  backend: string; // "chromium" | "crater"
+  fallbackUsed?: boolean; // prescanner: Chromium fallback was required
+  backendResolvedBy?: string; // prescanner: "crater" | "chromium" | "none"
   selector: string;
   property: string;
   value: string;
@@ -24,7 +24,7 @@ export interface DetectionRecord {
   isInteractive: boolean;
   mediaCondition: string | null;
   viewports: ViewportDetectionResult[];
-  detected: boolean;            // true if ANY viewport detected
+  detected: boolean; // true if ANY viewport detected
   undetectedReason: UndetectedReason | null;
 }
 
@@ -57,7 +57,12 @@ export async function readAllRecords(dbPath?: string): Promise<DetectionRecord[]
     if (!trimmed) continue;
     try {
       const parsed = JSON.parse(trimmed);
-      if (parsed && typeof parsed === "object" && typeof parsed.selector === "string" && typeof parsed.detected === "boolean") {
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        typeof parsed.selector === "string" &&
+        typeof parsed.detected === "boolean"
+      ) {
         records.push(parsed);
       }
     } catch {

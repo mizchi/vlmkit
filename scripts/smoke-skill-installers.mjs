@@ -26,7 +26,10 @@ const apmInvocation = process.env.VLMKIT_APM_PACKAGE
  */
 async function shippedWorkflows() {
   const entries = await readdir(join(sourcePackage, "workflows"), { withFileTypes: true });
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
 }
 
 function run(command, args, cwd) {
@@ -36,19 +39,17 @@ function run(command, args, cwd) {
     env: { ...process.env, CI: "1", NO_COLOR: "1" },
   });
   if (result.status !== 0) {
-    throw new Error(
-      `${command} ${args.join(" ")} failed (${result.status})\n${result.stdout}\n${result.stderr}`,
-    );
+    throw new Error(`${command} ${args.join(" ")} failed (${result.status})\n${result.stdout}\n${result.stderr}`);
   }
   return `${result.stdout}${result.stderr}`;
 }
 
 async function exportRepository(destination) {
-  const result = spawnSync(
-    "git",
-    ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-    { cwd: repoRoot, encoding: "buffer", maxBuffer: 10 * 1024 * 1024 },
-  );
+  const result = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
+    cwd: repoRoot,
+    encoding: "buffer",
+    maxBuffer: 10 * 1024 * 1024,
+  });
   if (result.status !== 0) {
     throw new Error(`git ls-files failed (${result.status})\n${result.stderr.toString()}`);
   }
@@ -113,21 +114,13 @@ try {
 
   const apmConsumer = join(temporaryRoot, "apm-consumer");
   await mkdir(join(apmConsumer, ".claude"), { recursive: true });
-  run(
-    apmInvocation.command,
-    [...apmInvocation.prefix, "install", packageSource, "--target", "claude"],
-    apmConsumer,
-  );
+  run(apmInvocation.command, [...apmInvocation.prefix, "install", packageSource, "--target", "claude"], apmConsumer);
   const apmBytes = await verifyInstalledPackage(apmConsumer, "APM");
 
   const skillsConsumer = join(temporaryRoot, "skills-consumer");
   await mkdir(join(skillsConsumer, ".claude"), { recursive: true });
   await writeFile(join(skillsConsumer, "package.json"), '{"private":true}\n');
-  run(
-    "npx",
-    ["--yes", "skills", "add", repoRoot, "--agent", "claude-code", "--copy", "--yes"],
-    skillsConsumer,
-  );
+  run("npx", ["--yes", "skills", "add", repoRoot, "--agent", "claude-code", "--copy", "--yes"], skillsConsumer);
   const skillsBytes = await verifyInstalledPackage(skillsConsumer, "skills CLI");
 
   console.log(`APM installed ${apmBytes} bytes; skills CLI installed ${skillsBytes} bytes.`);

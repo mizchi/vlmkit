@@ -79,32 +79,94 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
     { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
     { name: "samples", kind: "number", description: "Sample points per animation", defaultDescription: "4" },
-    { name: "max-animations", kind: "number", description: "Max animations to frame-evaluate", defaultDescription: "8" },
-    { name: "frames", placeholder: "dir", kind: "path", description: "Write each sampled frame PNG into this directory" },
-    { name: "strip", placeholder: "file.png", kind: "path", description: "Composite every sampled frame into one image (row per animation)" },
-    { name: "strip-max-width", placeholder: "px", kind: "number", description: "Cap the strip width, downscaling to fit", defaultDescription: "1600" },
-    { name: "strip-window", placeholder: "ms", kind: "number", description: "Page-timeline span the strip's columns cover", defaultDescription: "when the last finite animation ends" },
-    { name: "strip-selector", placeholder: "css", kind: "string", description: "Restrict the strip's rows to animations on elements matching this selector" },
+    {
+      name: "max-animations",
+      kind: "number",
+      description: "Max animations to frame-evaluate",
+      defaultDescription: "8",
+    },
+    {
+      name: "frames",
+      placeholder: "dir",
+      kind: "path",
+      description: "Write each sampled frame PNG into this directory",
+    },
+    {
+      name: "strip",
+      placeholder: "file.png",
+      kind: "path",
+      description: "Composite every sampled frame into one image (row per animation)",
+    },
+    {
+      name: "strip-max-width",
+      placeholder: "px",
+      kind: "number",
+      description: "Cap the strip width, downscaling to fit",
+      defaultDescription: "1600",
+    },
+    {
+      name: "strip-window",
+      placeholder: "ms",
+      kind: "number",
+      description: "Page-timeline span the strip's columns cover",
+      defaultDescription: "when the last finite animation ends",
+    },
+    {
+      name: "strip-selector",
+      placeholder: "css",
+      kind: "string",
+      description: "Restrict the strip's rows to animations on elements matching this selector",
+    },
     {
       name: "strip-animated",
       kind: "boolean",
       description: "Write --strip as an animated PNG of the whole page instead of a cropped still sheet",
     },
-    { name: "settle-threshold", placeholder: "ms", kind: "number", description: "long-settle threshold", defaultDescription: "3000" },
+    {
+      name: "settle-threshold",
+      placeholder: "ms",
+      kind: "number",
+      description: "long-settle threshold",
+      defaultDescription: "3000",
+    },
     { name: "skip-reduced-motion", kind: "boolean", description: "Skip the reduced-motion emulation pass" },
     {
       name: "virtual-time",
       kind: "boolean",
-      description: "Hold the page clock (rAF, performance.now, Date, timers) and drive it, so script-driven motion is measured instead of reported as uncontrolled",
+      description:
+        "Hold the page clock (rAF, performance.now, Date, timers) and drive it, so script-driven motion is measured instead of reported as uncontrolled",
     },
-    { name: "clock-window", placeholder: "ms", kind: "number", description: "Virtual-time span to sample script-driven motion over (--virtual-time)", defaultDescription: "2000" },
+    {
+      name: "clock-window",
+      placeholder: "ms",
+      kind: "number",
+      description: "Virtual-time span to sample script-driven motion over (--virtual-time)",
+      defaultDescription: "2000",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames", "--strip", "--strip-max-width", "--strip-window", "--strip-selector", "--clock-window"]);
+    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", [
+      "--samples",
+      "--max-animations",
+      "--settle-threshold",
+      "--frames",
+      "--strip",
+      "--strip-max-width",
+      "--strip-window",
+      "--strip-selector",
+      "--clock-window",
+    ]);
     const samples = optionalInt(argv, "samples", { min: 1 });
     const maxAnimations = optionalInt(argv, "max-animations", { min: 1 });
     const settleThresholdMs = optionalInt(argv, "settle-threshold", { min: 0 });
@@ -145,12 +207,10 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
     })),
   format: formatAnimationEvalReport,
   headline: (report) =>
-    `${report.animationCount} animation(s),`
-    + ` settle ${report.settleMs === null ? "never" : `${Math.round(report.settleMs)}ms`},`
-    + ` reduced-motion ${
-      report.reducedMotion
-        ? (report.reducedMotion.remainingCount === 0 ? "honored" : "IGNORED")
-        : "n/a"
+    `${report.animationCount} animation(s),` +
+    ` settle ${report.settleMs === null ? "never" : `${Math.round(report.settleMs)}ms`},` +
+    ` reduced-motion ${
+      report.reducedMotion ? (report.reducedMotion.remainingCount === 0 ? "honored" : "IGNORED") : "n/a"
     }`,
   ledger: (report, options) => ({
     tool: "check-animation",

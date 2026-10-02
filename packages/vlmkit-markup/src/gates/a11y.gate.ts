@@ -94,7 +94,14 @@ threshold for its font size and weight.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to scan",
+      positional: 0,
+      required: true,
+    },
     {
       name: "allow",
       placeholder: "<selector>;<reason>",
@@ -104,9 +111,9 @@ threshold for its font size and weight.`,
         ruleId: "contrast-below-aa",
         example: "p.hint;brand grey signed off pending the palette refresh",
         extra:
-          "`check integrity` reports the same colours as a warn and has had a per-selector"
-          + " exemption for a while; this gate reports them as a fail, so without one an"
-          + " approved brand grey forced the whole rule off.",
+          "`check integrity` reports the same colours as a warn and has had a per-selector" +
+          " exemption for a while; this gate reports them as a fail, so without one an" +
+          " approved brand grey forced the whole rule off.",
       }),
     },
     ...REPORT_INPUTS("a11y-contrast"),
@@ -187,7 +194,14 @@ If the level's floor is right but a failing build is not,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to scan",
+      positional: 0,
+      required: true,
+    },
     {
       name: "level",
       kind: "string",
@@ -204,8 +218,8 @@ If the level's floor is right but a failing build is not,
         ruleId: "target-undersized",
         example: "button.vendor-zoom-in;MapLibre's own control, sized by the library",
         extra:
-          "Use it for a vendor widget's controls, which are a page-level fact this gate"
-          + " cannot infer. Turning the rule off page-wide would also stop checking your own.",
+          "Use it for a vendor widget's controls, which are a page-level fact this gate" +
+          " cannot infer. Turning the rule off page-wide would also stop checking your own.",
       }),
     },
     ...REPORT_INPUTS("a11y-touch"),
@@ -230,9 +244,9 @@ If the level's floor is right but a failing build is not,
       rule: "target-undersized",
       severity: "suspect",
       message:
-        `${Math.round(f.bbox.width)}x${Math.round(f.bbox.height)}`
-        + ` (min side ${Math.round(f.minSide)}, need ${f.required})${f.cluster ? ", clustered" : ""}`
-        + ` — "${f.text}"`,
+        `${Math.round(f.bbox.width)}x${Math.round(f.bbox.height)}` +
+        ` (min side ${Math.round(f.minSide)}, need ${f.required})${f.cluster ? ", clustered" : ""}` +
+        ` — "${f.text}"`,
       evidence: { path: f.path, tag: f.tag, minSide: f.minSide, required: f.required, cluster: f.cluster },
     })),
   format: formatA11yTouchReport,
@@ -273,8 +287,21 @@ moves backward, or jumps several visual rows at a time is reported.`,
     { id: "skip-row", title: "Focus skipped more than one visual row", severity: "warn" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to walk", positional: 0, required: true },
-    { name: "max-steps", placeholder: "n", kind: "number", description: "Maximum Tab presses", defaultDescription: "64" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to walk",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "max-steps",
+      placeholder: "n",
+      kind: "number",
+      description: "Maximum Tab presses",
+      defaultDescription: "64",
+    },
     // Focus order is judged from each stop's x/y, so the width is part of the
     // question. A dogfood agent: "`check a11y focus` has no `--viewport` flag while
     // `check animation` does — focus order is only checkable at one unnamed width,

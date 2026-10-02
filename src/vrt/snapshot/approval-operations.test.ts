@@ -3,10 +3,7 @@ import { describe, it } from "vite-plus/test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  applyApprovalOperation,
-  listApprovalManifest,
-} from "./approval-operations.ts";
+import { applyApprovalOperation, listApprovalManifest } from "./approval-operations.ts";
 
 describe("approval operations", () => {
   it("lists an empty manifest when approval.json does not exist yet", async () => {
@@ -90,12 +87,13 @@ describe("approval operations", () => {
     const manifestPath = join(dir, "approval.json");
     try {
       await assert.rejects(
-        () => applyApprovalOperation(manifestPath, {
-          action: "add",
-          rule: {
-            reason: "would approve every visual diff",
-          },
-        }),
+        () =>
+          applyApprovalOperation(manifestPath, {
+            action: "add",
+            rule: {
+              reason: "would approve every visual diff",
+            },
+          }),
         /at least one matcher/i,
       );
     } finally {

@@ -23,7 +23,12 @@ describe("zoom accuracy cases, built from real renders", () => {
     browser = await launchBrowser();
     dir = await mkdtemp(join(tmpdir(), "zoom-accuracy-"));
     ({ cases } = await buildCases(browser, {
-      fixtures: FIXTURES, kinds: ["text", "color", "offset", "none"], seed: 1, deviceScaleFactor: 2, viewportWidth: 1440, outDir: dir,
+      fixtures: FIXTURES,
+      kinds: ["text", "color", "offset", "none"],
+      seed: 1,
+      deviceScaleFactor: 2,
+      viewportWidth: 1440,
+      outDir: dir,
     }));
   }, 120_000);
   afterAll(async () => {
@@ -34,7 +39,10 @@ describe("zoom accuracy cases, built from real renders", () => {
   it("plants one change per kind per fixture, each a small patch of the page", () => {
     assert.equal(cases.length, 8);
     for (const c of cases) {
-      if (c.expected.kind === "none") { assert.equal(c.diffBox, null, c.id); continue; }
+      if (c.expected.kind === "none") {
+        assert.equal(c.diffBox, null, c.id);
+        continue;
+      }
       const d = c.diffBox!;
       const share = ((d.x2 - d.x1) * (d.y2 - d.y1)) / (c.page.width * c.page.height);
       assert.ok(share > 0 && share < 0.01, `${c.id}: the change covers ${(share * 100).toFixed(3)}% of the page`);
@@ -44,7 +52,9 @@ describe("zoom accuracy cases, built from real renders", () => {
   it("the pixels that changed are where the planted element was", () => {
     for (const c of cases) {
       if (!c.targetBox || !c.diffBox) continue;
-      const t = c.targetBox, d = c.diffBox, slack = 8;
+      const t = c.targetBox,
+        d = c.diffBox,
+        slack = 8;
       const overlaps = d.x1 < t.x2 + slack && d.x2 > t.x1 - slack && d.y1 < t.y2 + slack && d.y2 > t.y1 - slack;
       assert.ok(overlaps, `${c.id}: diff ${JSON.stringify(d)} is not at target ${JSON.stringify(t)}`);
     }
@@ -67,7 +77,16 @@ describe("zoom accuracy cases, built from real renders", () => {
 
   it("scores saved answers per arm and pairs the two arms on the same cases", () => {
     const answer = (arm: "single" | "zoom", c: BuiltCase, text: string): SavedAnswer => ({
-      model: "m", arm, caseId: c.id, answer: text, promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: 0, zooms: arm === "zoom" ? 1 : 0, turns: 1,
+      model: "m",
+      arm,
+      caseId: c.id,
+      answer: text,
+      promptTokens: 0,
+      completionTokens: 0,
+      costUsd: 0,
+      latencyMs: 0,
+      zooms: arm === "zoom" ? 1 : 0,
+      turns: 1,
     });
     const blind = JSON.stringify({ changed: false });
     const answers = [
@@ -75,7 +94,13 @@ describe("zoom accuracy cases, built from real renders", () => {
       ...cases.map((c) => answer("zoom", c, oracleReply(c))),
     ];
     const reports = report(cases, answers);
-    assert.deepEqual(reports.map((r) => [r.arm, r.summary.correct]), [["single", 2], ["zoom", 8]]);
+    assert.deepEqual(
+      reports.map((r) => [r.arm, r.summary.correct]),
+      [
+        ["single", 2],
+        ["zoom", 8],
+      ],
+    );
     const [comp] = comparisons(reports);
     assert.deepEqual([comp!.fixed, comp!.broke, comp!.bothRight], [6, 0, 2]);
     assert.ok(comp!.p < 0.05);
@@ -83,10 +108,18 @@ describe("zoom accuracy cases, built from real renders", () => {
 
   it("agent packet: nothing in it names a case, and its images are what a provider would be sent", async () => {
     const packet = join(dir, "packet-zoom");
-    await exportPacket(cases, dir, packet, "zoom", { budget: DEFAULT_IMAGE_BUDGET, coordinates: "normalized", maxZooms: 2, seed: 1 }, "zoom-helper");
+    await exportPacket(
+      cases,
+      dir,
+      packet,
+      "zoom",
+      { budget: DEFAULT_IMAGE_BUDGET, coordinates: "normalized", maxZooms: 2, seed: 1 },
+      "zoom-helper",
+    );
     const files: string[] = [];
     const walk = async (d: string) => {
-      for (const e of await readdir(d, { withFileTypes: true })) e.isDirectory() ? await walk(join(d, e.name)) : files.push(join(d, e.name));
+      for (const e of await readdir(d, { withFileTypes: true }))
+        e.isDirectory() ? await walk(join(d, e.name)) : files.push(join(d, e.name));
     };
     await walk(packet);
     const leaks = [...cases.map((c) => c.id), "dashboard", "fixtures", "css-challenge", "cases.json", "agent-map"];
@@ -100,7 +133,10 @@ describe("zoom accuracy cases, built from real renders", () => {
     }
     const first = files.find((f) => f.endsWith("image1.png"))!;
     const view = PNG.sync.read(await readFile(first));
-    assert.ok(Math.max(view.width, view.height) <= DEFAULT_IMAGE_BUDGET.maxEdge && view.width * view.height <= DEFAULT_IMAGE_BUDGET.maxPixels);
+    assert.ok(
+      Math.max(view.width, view.height) <= DEFAULT_IMAGE_BUDGET.maxEdge &&
+        view.width * view.height <= DEFAULT_IMAGE_BUDGET.maxPixels,
+    );
 
     const task = "task-1";
     const z1 = await agentZoom(packet, task, 1, [0, 0, 500, 500]);
@@ -112,7 +148,9 @@ describe("zoom accuracy cases, built from real renders", () => {
     assert.match((await agentZoom(packet, "task-99", 0, [0, 0, 10, 10])).text, /no task/);
 
     // An agent that answers like the oracle scores like the oracle, through the import.
-    const map = JSON.parse(await readFile(join(dir, "agent-map-zoom.json"), "utf8")) as { tasks: Record<string, string> };
+    const map = JSON.parse(await readFile(join(dir, "agent-map-zoom.json"), "utf8")) as {
+      tasks: Record<string, string>;
+    };
     const byId = new Map(cases.map((c) => [c.id, c]));
     const answers = Object.fromEntries(Object.entries(map.tasks).map(([t, id]) => [t, oracleReply(byId.get(id)!)]));
     delete answers["task-2"];
@@ -120,7 +158,8 @@ describe("zoom accuracy cases, built from real renders", () => {
     const r = await importAnswers(dir, join(packet, "answers.json"), "zoom", "agent");
     assert.deepEqual([r.imported, r.missing], [7, ["task-2"]]);
     const saved: SavedAnswer[] = [];
-    for (const f of await readdir(join(dir, "answers", "agent", "zoom"))) saved.push(JSON.parse(await readFile(join(dir, "answers", "agent", "zoom", f), "utf8")));
+    for (const f of await readdir(join(dir, "answers", "agent", "zoom")))
+      saved.push(JSON.parse(await readFile(join(dir, "answers", "agent", "zoom", f), "utf8")));
     const [rep] = report(cases, saved);
     assert.equal(rep!.summary.correct, 7, "the missing task scores as wrong, not as absent");
     assert.equal(saved.find((a) => a.caseId === map.tasks[task])!.zooms, 2, "zooms are counted from the helper's log");
@@ -130,15 +169,31 @@ describe("zoom accuracy cases, built from real renders", () => {
     const vdir = await mkdtemp(join(tmpdir(), "zoom-accuracy-v-"));
     try {
       const { cases: vs } = await buildCases(browser, {
-        fixtures: FIXTURES, kinds: ["color", "offset", "none"], seed: 3, deviceScaleFactor: 2, viewportWidth: 1440, outDir: vdir, variants: 3,
+        fixtures: FIXTURES,
+        kinds: ["color", "offset", "none"],
+        seed: 3,
+        deviceScaleFactor: 2,
+        viewportWidth: 1440,
+        outDir: vdir,
+        variants: 3,
       });
-      assert.equal(vs.filter((c) => c.expected.kind === "none").length, 2, "one none per fixture, whatever the variants");
+      assert.equal(
+        vs.filter((c) => c.expected.kind === "none").length,
+        2,
+        "one none per fixture, whatever the variants",
+      );
       const colors = vs.flatMap((c) => (c.expected.kind === "color" ? [c.expected.newColor] : []));
-      assert.ok(colors.length >= 5 && new Set(colors).size === colors.length, `distinct planted colours: ${colors.join(" ")}`);
+      assert.ok(
+        colors.length >= 5 && new Set(colors).size === colors.length,
+        `distinct planted colours: ${colors.join(" ")}`,
+      );
       for (const c of vs) {
         if (c.expected.kind !== "offset") continue;
         const { dx, dy } = c.expected;
-        assert.ok((dx === 0) !== (dy === 0) && Math.abs(dx + dy) >= 1 && Math.abs(dx + dy) <= 6, `${c.id}: ${dx},${dy}`);
+        assert.ok(
+          (dx === 0) !== (dy === 0) && Math.abs(dx + dy) >= 1 && Math.abs(dx + dy) <= 6,
+          `${c.id}: ${dx},${dy}`,
+        );
       }
     } finally {
       await rm(vdir, { recursive: true, force: true });
@@ -149,14 +204,32 @@ describe("zoom accuracy cases, built from real renders", () => {
     const odir = await mkdtemp(join(tmpdir(), "zoom-accuracy-o-"));
     try {
       const page = join(odir, "overlay.html");
-      const rows = Array.from({ length: 12 }, (_, i) => `<p style="font-size:12px">Row ${i + 10} updated ${i + 2} days ago</p>`).join("");
-      await writeFile(page, `<!doctype html><body style="margin:0;font-family:sans-serif">
+      const rows = Array.from(
+        { length: 12 },
+        (_, i) => `<p style="font-size:12px">Row ${i + 10} updated ${i + 2} days ago</p>`,
+      ).join("");
+      await writeFile(
+        page,
+        `<!doctype html><body style="margin:0;font-family:sans-serif">
         <main style="filter:blur(3px)">${rows}</main>
         <div style="position:fixed;inset:0;background:rgba(0,0,0,.3);backdrop-filter:blur(4px)"></div>
-        <dialog open style="position:fixed;top:40%;z-index:2"><p style="font-size:12px">Plan 42 of 90</p></dialog></body>`);
-      const { cases: os } = await buildCases(browser, { fixtures: [page], kinds: ["text"], seed: 5, deviceScaleFactor: 2, viewportWidth: 800, outDir: odir, variants: 3 });
+        <dialog open style="position:fixed;top:40%;z-index:2"><p style="font-size:12px">Plan 42 of 90</p></dialog></body>`,
+      );
+      const { cases: os } = await buildCases(browser, {
+        fixtures: [page],
+        kinds: ["text"],
+        seed: 5,
+        deviceScaleFactor: 2,
+        viewportWidth: 800,
+        outDir: odir,
+        variants: 3,
+      });
       assert.ok(os.length > 0);
-      for (const c of os) assert.ok(c.expected.kind === "text" && /^Plan \d\d of \d\d$/.test(c.expected.oldText), `${c.id} planted in "${c.expected.kind === "text" ? c.expected.oldText : ""}"`);
+      for (const c of os)
+        assert.ok(
+          c.expected.kind === "text" && /^Plan \d\d of \d\d$/.test(c.expected.oldText),
+          `${c.id} planted in "${c.expected.kind === "text" ? c.expected.oldText : ""}"`,
+        );
     } finally {
       await rm(odir, { recursive: true, force: true });
     }

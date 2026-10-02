@@ -62,16 +62,13 @@ describe("captureAuthoredStyleSnapshotInDom", () => {
       [
         styleRule(".shell", {
           "grid-template-columns": "minmax(0, 1fr) 4px minmax(0, 1fr)",
-          "color": "red",
+          color: "red",
         }),
       ],
     ]);
     try {
       const snap = captureAuthoredStyleSnapshotInDom(AUTHORED_PROPERTIES);
-      assert.equal(
-        snap[".shell"]!["grid-template-columns"],
-        "minmax(0, 1fr) 4px minmax(0, 1fr)",
-      );
+      assert.equal(snap[".shell"]!["grid-template-columns"], "minmax(0, 1fr) 4px minmax(0, 1fr)");
       assert.equal(snap[".shell"]!["color"], undefined, "non-tracked props are skipped");
     } finally {
       clearStubStylesheets();
@@ -82,7 +79,7 @@ describe("captureAuthoredStyleSnapshotInDom", () => {
     installStubStylesheets([
       [
         styleRule(".a, .b", {
-          "transform": "translateY(4px)",
+          transform: "translateY(4px)",
         }),
       ],
     ]);
@@ -160,16 +157,10 @@ describe("parseAuthoredStyleSnapshot", () => {
 
 describe("hasMeaningfulAuthoredStyleSnapshot", () => {
   it("returns true when any value is non-empty", () => {
-    assert.equal(
-      hasMeaningfulAuthoredStyleSnapshot({ ".a": { transform: "rotate(1deg)" } }),
-      true,
-    );
+    assert.equal(hasMeaningfulAuthoredStyleSnapshot({ ".a": { transform: "rotate(1deg)" } }), true);
   });
   it("returns false on whitespace-only values", () => {
-    assert.equal(
-      hasMeaningfulAuthoredStyleSnapshot({ ".a": { transform: "   " } }),
-      false,
-    );
+    assert.equal(hasMeaningfulAuthoredStyleSnapshot({ ".a": { transform: "   " } }), false);
   });
 });
 
@@ -189,13 +180,7 @@ describe("diffAuthoredStyles", () => {
     assert.equal(result.totalDiffs, 1);
     assert.equal(result.entries[0]!.selector, ".shell");
     assert.equal(result.entries[0]!.property, "grid-template-columns");
-    assert.equal(
-      result.entries[0]!.baseline,
-      "minmax(0, 1fr) minmax(0, 1fr)",
-    );
-    assert.equal(
-      result.entries[0]!.variant,
-      "minmax(0, 1fr) 4px minmax(0, 1fr)",
-    );
+    assert.equal(result.entries[0]!.baseline, "minmax(0, 1fr) minmax(0, 1fr)");
+    assert.equal(result.entries[0]!.variant, "minmax(0, 1fr) 4px minmax(0, 1fr)");
   });
 });

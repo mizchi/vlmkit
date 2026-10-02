@@ -78,11 +78,32 @@ async function frame(
 
 describe("manifest lines against renderer text", () => {
   it("reports a manifest line the renderer never draws", async () => {
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "HP 120/120" },
-      { path: "hud[0]>a[1]", tag: "label", classes: "start", top: 200, left: 16, width: 200, height: 24, text: "Start Game" },
-    ], "HP 120/120\nStart Game\nOptions\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        {
+          path: "hud[0]>a[0]",
+          tag: "label",
+          classes: "hp",
+          top: 16,
+          left: 16,
+          width: 200,
+          height: 20,
+          text: "HP 120/120",
+        },
+        {
+          path: "hud[0]>a[1]",
+          tag: "label",
+          classes: "start",
+          top: 200,
+          left: 16,
+          width: 200,
+          height: 24,
+          text: "Start Game",
+        },
+      ],
+      "HP 120/120\nStart Game\nOptions\n",
+    );
     const report = await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! });
     assert.deepEqual(report.missingLines, ["Options"]);
     assert.ok(kinds(report).includes("copy-missing"), kinds(report).join(", "));
@@ -90,11 +111,32 @@ describe("manifest lines against renderer text", () => {
 
   it("reports nothing when every line is drawn", async () => {
     // The inverse of the case above, same fixture minus the one absent line.
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "HP 120/120" },
-      { path: "hud[0]>a[1]", tag: "label", classes: "start", top: 200, left: 16, width: 200, height: 24, text: "Start Game" },
-    ], "HP 120/120\nStart Game\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        {
+          path: "hud[0]>a[0]",
+          tag: "label",
+          classes: "hp",
+          top: 16,
+          left: 16,
+          width: 200,
+          height: 20,
+          text: "HP 120/120",
+        },
+        {
+          path: "hud[0]>a[1]",
+          tag: "label",
+          classes: "start",
+          top: 200,
+          left: 16,
+          width: 200,
+          height: 24,
+          text: "Start Game",
+        },
+      ],
+      "HP 120/120\nStart Game\n",
+    );
     const report = await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! });
     assert.deepEqual(report.issues, []);
     assert.equal(report.manifestLines, 2);
@@ -104,10 +146,22 @@ describe("manifest lines against renderer text", () => {
   it("catches an untranslated string shipped in place of the localized one", async () => {
     // The engine drew the source-language fallback. Casing and spelling are spec in copy, so
     // the manifest's localized line simply is not there.
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "start", top: 200, left: 16, width: 200, height: 24, text: "Start Game" },
-    ], "はじめる\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        {
+          path: "hud[0]>a[0]",
+          tag: "label",
+          classes: "start",
+          top: 200,
+          left: 16,
+          width: 200,
+          height: 24,
+          text: "Start Game",
+        },
+      ],
+      "はじめる\n",
+    );
     const report = await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! });
     assert.deepEqual(report.missingLines, ["はじめる"]);
     assert.match(report.issues[0]!.message, /はじめる/);
@@ -116,11 +170,32 @@ describe("manifest lines against renderer text", () => {
   it("matches a line spanning two adjacent strings in reading order", async () => {
     // The DOM path lets one manifest line span several text nodes; element rects have no
     // document order, so the adapter sorts by (top, left). Out of that order this fails.
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>b[0]", tag: "label", classes: "score-value", top: 16, left: 120, width: 80, height: 20, text: "1200" },
-      { path: "hud[0]>a[0]", tag: "label", classes: "score-label", top: 16, left: 16, width: 100, height: 20, text: "Score:" },
-    ], "Score: 1200\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        {
+          path: "hud[0]>b[0]",
+          tag: "label",
+          classes: "score-value",
+          top: 16,
+          left: 120,
+          width: 80,
+          height: 20,
+          text: "1200",
+        },
+        {
+          path: "hud[0]>a[0]",
+          tag: "label",
+          classes: "score-label",
+          top: 16,
+          left: 16,
+          width: 100,
+          height: 20,
+          text: "Score:",
+        },
+      ],
+      "Score: 1200\n",
+    );
     const report = await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! });
     assert.deepEqual(report.missingLines, []);
   });
@@ -130,7 +205,16 @@ describe("placeholder copy", () => {
   it("reports a TODO shipped in a drawn string", async () => {
     const { elementsPath } = await fixture([
       ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "title", top: 40, left: 16, width: 300, height: 32, text: "TODO title" },
+      {
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "title",
+        top: 40,
+        left: 16,
+        width: 300,
+        height: 32,
+        text: "TODO title",
+      },
     ]);
     const report = await runImageCopyCheck({ elementsPath });
     assert.deepEqual(report.placeholders, ["TODO"]);
@@ -140,7 +224,16 @@ describe("placeholder copy", () => {
   it("stays quiet on real copy", async () => {
     const { elementsPath } = await fixture([
       ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "title", top: 40, left: 16, width: 300, height: 32, text: "Chapter 3: The Ashfall" },
+      {
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "title",
+        top: 40,
+        left: 16,
+        width: 300,
+        height: 32,
+        text: "Chapter 3: The Ashfall",
+      },
     ]);
     const report = await runImageCopyCheck({ elementsPath });
     assert.deepEqual(report.placeholders, []);
@@ -152,15 +245,24 @@ describe("truncation", () => {
   it("reports the px actually cut, and names the manifest line it only appears to satisfy", async () => {
     // The reported pain in #118: a number outgrew its box. Matching the manifest against the
     // renderer's `text` alone would call this satisfied — the user reads a cut-off string.
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      {
-        path: "hud[0]>a[0]", tag: "label", classes: "score", top: 16, left: 16, width: 200, height: 20,
-        text: "Score: 1234567890",
-        text_measured: { width: 320, height: 18 },
-        clip: { top: 16, left: 16, width: 200, height: 20 },
-      },
-    ], "Score: 1234567890\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        {
+          path: "hud[0]>a[0]",
+          tag: "label",
+          classes: "score",
+          top: 16,
+          left: 16,
+          width: 200,
+          height: 20,
+          text: "Score: 1234567890",
+          text_measured: { width: 320, height: 18 },
+          clip: { top: 16, left: 16, width: 200, height: 20 },
+        },
+      ],
+      "Score: 1234567890\n",
+    );
     const report = await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! });
     assert.deepEqual(report.missingLines, [], "the string IS drawn; it is only unreadable");
     const issue = report.issues.find((i) => i.kind === "copy-truncated");
@@ -168,14 +270,23 @@ describe("truncation", () => {
     // 320 measured - 200 clip = 120. Not 16 (the `left`), the mistake image-mode integrity made.
     assert.match(issue!.message, /120px horizontally/);
     assert.match(issue!.message, /"Score: 1234567890" on paper/);
-    assert.deepEqual(report.truncated.map((t) => t.selector), [".score"]);
+    assert.deepEqual(
+      report.truncated.map((t) => t.selector),
+      [".score"],
+    );
   });
 
   it("does not report text that fits its clip", async () => {
     const { elementsPath } = await fixture([
       ROOT,
       {
-        path: "hud[0]>a[0]", tag: "label", classes: "score", top: 16, left: 16, width: 200, height: 20,
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "score",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
         text: "Score: 1200",
         text_measured: { width: 90, height: 18 },
         clip: { top: 16, left: 16, width: 200, height: 20 },
@@ -192,7 +303,13 @@ describe("truncation", () => {
     const { elementsPath } = await fixture([
       ROOT,
       {
-        path: "hud[0]>a[0]", tag: "label", classes: "score", top: 16, left: 16, width: 200, height: 20,
+        path: "hud[0]>a[0]",
+        tag: "label",
+        classes: "score",
+        top: 16,
+        left: 16,
+        width: 200,
+        height: 20,
         text: "Score: 1234567890",
         text_measured: { width: 320, height: 18 },
       },
@@ -210,10 +327,13 @@ describe("text the renderer reports but the user cannot see", () => {
   it("calls a manifest line in a zero-area box invisible, not missing", async () => {
     // "Missing" would send the reader to write the string that is already there. The two
     // repairs are different, which is the whole point of the reason classes.
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "toast", top: 100, left: 16, width: 0, height: 0, text: "Saved" },
-    ], "Saved\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        { path: "hud[0]>a[0]", tag: "label", classes: "toast", top: 100, left: 16, width: 0, height: 0, text: "Saved" },
+      ],
+      "Saved\n",
+    );
     const report = await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! });
     assert.deepEqual(report.missingLines, []);
     assert.deepEqual(report.invisibleLines, [{ line: "Saved", reason: "zero-size" }]);
@@ -221,10 +341,13 @@ describe("text the renderer reports but the user cannot see", () => {
   });
 
   it("accepts a zero-size match when the caller allows that class", async () => {
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "toast", top: 100, left: 16, width: 0, height: 0, text: "Saved" },
-    ], "Saved\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        { path: "hud[0]>a[0]", tag: "label", classes: "toast", top: 100, left: 16, width: 0, height: 0, text: "Saved" },
+      ],
+      "Saved\n",
+    );
     const report = await runImageCopyCheck({
       elementsPath,
       manifestPath: manifestPath!,
@@ -240,13 +363,34 @@ describe("text the renderer reports but the user cannot see", () => {
     // exactly what makes the ink check worth its pixels.
     const base = await dir();
     const elementsPath = join(base, "elements.json");
-    await writeFile(elementsPath, JSON.stringify({
-      elements: [
-        ROOT,
-        { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "HP 120/120" },
-        { path: "hud[0]>a[1]", tag: "label", classes: "start", top: 200, left: 16, width: 200, height: 24, text: "Start Game" },
-      ],
-    }));
+    await writeFile(
+      elementsPath,
+      JSON.stringify({
+        elements: [
+          ROOT,
+          {
+            path: "hud[0]>a[0]",
+            tag: "label",
+            classes: "hp",
+            top: 16,
+            left: 16,
+            width: 200,
+            height: 20,
+            text: "HP 120/120",
+          },
+          {
+            path: "hud[0]>a[1]",
+            tag: "label",
+            classes: "start",
+            top: 200,
+            left: 16,
+            width: 200,
+            height: 24,
+            text: "Start Game",
+          },
+        ],
+      }),
+    );
     const manifestPath = join(base, "copy.txt");
     await writeFile(manifestPath, "HP 120/120\nStart Game\n");
     // Only the HP label's bbox got ink; ROOT carries no text, so it is not ink-checked.
@@ -265,18 +409,33 @@ describe("text the renderer reports but the user cannot see", () => {
   it("does not report a bbox that carries ink", async () => {
     const base = await dir();
     const elementsPath = join(base, "elements.json");
-    await writeFile(elementsPath, JSON.stringify({
-      elements: [
-        ROOT,
-        { path: "hud[0]>a[0]", tag: "label", classes: "start", top: 200, left: 16, width: 200, height: 24, text: "Start Game" },
-      ],
-    }));
+    await writeFile(
+      elementsPath,
+      JSON.stringify({
+        elements: [
+          ROOT,
+          {
+            path: "hud[0]>a[0]",
+            tag: "label",
+            classes: "start",
+            top: 200,
+            left: 16,
+            width: 200,
+            height: 24,
+            text: "Start Game",
+          },
+        ],
+      }),
+    );
     const manifestPath = join(base, "copy.txt");
     await writeFile(manifestPath, "Start Game\n");
     const imagePath = await frame(base, [{ top: 200, left: 16, width: 200, height: 24 }]);
     const report = await runImageCopyCheck({ elementsPath, imagePath, manifestPath });
     assert.deepEqual(report.issues, []);
-    assert.ok(report.coverageNotes.some((n) => /Ink checked in 1 text bbox/.test(n)), report.coverageNotes.join(" | "));
+    assert.ok(
+      report.coverageNotes.some((n) => /Ink checked in 1 text bbox/.test(n)),
+      report.coverageNotes.join(" | "),
+    );
   });
 
   it("counts off-frame elements instead of guessing why they are off-frame", async () => {
@@ -284,12 +443,24 @@ describe("text the renderer reports but the user cannot see", () => {
     // frame" are indistinguishable. Reporting either would be a guess; the count is not.
     const base = await dir();
     const elementsPath = join(base, "elements.json");
-    await writeFile(elementsPath, JSON.stringify({
-      elements: [
-        ROOT,
-        { path: "hud[0]>a[0]", tag: "row", classes: "row-9", top: 900, left: 16, width: 200, height: 24, text: "Row 9" },
-      ],
-    }));
+    await writeFile(
+      elementsPath,
+      JSON.stringify({
+        elements: [
+          ROOT,
+          {
+            path: "hud[0]>a[0]",
+            tag: "row",
+            classes: "row-9",
+            top: 900,
+            left: 16,
+            width: 200,
+            height: 24,
+            text: "Row 9",
+          },
+        ],
+      }),
+    );
     const imagePath = await frame(base, []);
     const report = await runImageCopyCheck({ elementsPath, imagePath });
     assert.deepEqual(kinds(report), []);
@@ -305,9 +476,15 @@ describe("coverage is reported, not implied", () => {
     const { elementsPath } = await fixture([ROOT]);
     const report = await runImageCopyCheck({ elementsPath });
     assert.equal(report.skippedRules.length, COPY_IMAGE_SKIPPED_RULES.length);
-    assert.ok(report.skippedRules.every((r) => r.reason.length > 10), JSON.stringify(report.skippedRules));
+    assert.ok(
+      report.skippedRules.every((r) => r.reason.length > 10),
+      JSON.stringify(report.skippedRules),
+    );
     for (const needsPage of ["redirected", "copy-image-mismatch"]) {
-      assert.ok(report.skippedRules.some((r) => r.rule === needsPage), `${needsPage} must be listed`);
+      assert.ok(
+        report.skippedRules.some((r) => r.rule === needsPage),
+        `${needsPage} must be listed`,
+      );
     }
     // The partial rule matters as much as the absent ones: copy-invisible running over 2 of
     // its 7 reason classes is not the same gate as copy-invisible running over all 7.
@@ -317,10 +494,22 @@ describe("coverage is reported, not implied", () => {
 
   it("prints the coverage block next to a clean verdict, not in a footnote", async () => {
     // The one way this feature could do harm is a clean line reading as full coverage.
-    const { elementsPath, manifestPath } = await fixture([
-      ROOT,
-      { path: "hud[0]>a[0]", tag: "label", classes: "hp", top: 16, left: 16, width: 200, height: 20, text: "HP 120/120" },
-    ], "HP 120/120\n");
+    const { elementsPath, manifestPath } = await fixture(
+      [
+        ROOT,
+        {
+          path: "hud[0]>a[0]",
+          tag: "label",
+          classes: "hp",
+          top: 16,
+          left: 16,
+          width: 200,
+          height: 20,
+          text: "HP 120/120",
+        },
+      ],
+      "HP 120/120\n",
+    );
     const text = formatCopyCheckReport(await runImageCopyCheck({ elementsPath, manifestPath: manifestPath! }));
     assert.match(text, /No copy issues detected/);
     assert.match(text, /Coverage: element-rect mode — 2 rule\(s\) cannot be evaluated without a DOM/);
@@ -335,9 +524,6 @@ describe("parsing is the shared one", () => {
     // this gate is specific: a dropped row makes its copy read as missing, so a typo in the
     // elements file would look like a copy bug in the game.
     const { elementsPath } = await fixture([{ path: "a[0]", tag: "a", top: 0, left: 0, text: "hi" }]);
-    await assert.rejects(
-      () => runImageCopyCheck({ elementsPath }),
-      /needs path\/top\/left\/width\/height/,
-    );
+    await assert.rejects(() => runImageCopyCheck({ elementsPath }), /needs path\/top\/left\/width\/height/);
   });
 });

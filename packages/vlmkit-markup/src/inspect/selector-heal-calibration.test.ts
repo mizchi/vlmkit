@@ -3,11 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
 import { healSelector } from "../heal/selector-heal.ts";
-import {
-  classifyHealTier,
-  STRONG_HEAL_THRESHOLD,
-  WEAK_HEAL_THRESHOLD,
-} from "./selector-heal-calibration.ts";
+import { classifyHealTier, STRONG_HEAL_THRESHOLD, WEAK_HEAL_THRESHOLD } from "./selector-heal-calibration.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 type CalibrationCase = {
@@ -19,7 +15,9 @@ type CalibrationCase = {
   label: "true-positive" | "false-positive" | "true-negative";
 };
 
-const corpusPath = fileURLToPath(new URL("../../../../docs/reports/data/2026-07-30-selector-heal-calibration.json", import.meta.url));
+const corpusPath = fileURLToPath(
+  new URL("../../../../docs/reports/data/2026-07-30-selector-heal-calibration.json", import.meta.url),
+);
 
 test("selector-heal calibration corpus has 20+ labeled real fixture cases", async () => {
   const corpus = JSON.parse(await readFile(corpusPath, "utf8")) as { cases: CalibrationCase[] };
@@ -28,11 +26,17 @@ test("selector-heal calibration corpus has 20+ labeled real fixture cases", asyn
   return await withBrowser(async (browser) => {
     const page = await browser.newPage();
     for (const entry of corpus.cases) {
-      await page.goto(`file://${fileURLToPath(new URL(`../../../../fixtures/interact/${entry.fixture}`, import.meta.url))}`);
+      await page.goto(
+        `file://${fileURLToPath(new URL(`../../../../fixtures/interact/${entry.fixture}`, import.meta.url))}`,
+      );
       const actual = (await healSelector(page, entry.brokenSelector, { maxCandidates: 1 }))[0];
       assert.equal(actual?.selector ?? null, entry.actualSelector, entry.brokenSelector);
       assert.ok(Math.abs((actual?.confidence ?? 0) - entry.confidence) < 1e-9, entry.brokenSelector);
-      assert.equal(entry.actualSelector === entry.expectedSelector, entry.label !== "false-positive", entry.brokenSelector);
+      assert.equal(
+        entry.actualSelector === entry.expectedSelector,
+        entry.label !== "false-positive",
+        entry.brokenSelector,
+      );
     }
     await page.close();
   });

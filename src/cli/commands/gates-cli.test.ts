@@ -138,11 +138,16 @@ describe("expandPlanSources", () => {
   for (const name of ["a.html", "b.html", "c.html"]) writeFileSync(join(dir, name), "<p>x");
 
   it("turns one glob entry into one job per file", async () => {
-    const plan = await expandPlanSources(planFor({
-      pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
-    }));
+    const plan = await expandPlanSources(
+      planFor({
+        pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
+      }),
+    );
     assert.equal(plan.jobs.length, 3);
-    assert.deepEqual(plan.jobs.map((j) => j.source.replace(`${dir}/`, "")), ["a.html", "b.html", "c.html"]);
+    assert.deepEqual(
+      plan.jobs.map((j) => j.source.replace(`${dir}/`, "")),
+      ["a.html", "b.html", "c.html"],
+    );
   });
 
   it("expands a relative glob against the config's directory, not the process cwd", async () => {
@@ -155,30 +160,42 @@ describe("expandPlanSources", () => {
       planFor({ pages: [{ id: "routes", source: "*.html", gates: ["check integrity"] }] }),
       dir,
     );
-    assert.deepEqual(plan.jobs.map((j) => j.source), ["a.html", "b.html", "c.html"]);
+    assert.deepEqual(
+      plan.jobs.map((j) => j.source),
+      ["a.html", "b.html", "c.html"],
+    );
   });
 
   it("keeps resolving against the process cwd when no base is given", async () => {
     // Library callers and `gates suppressions` pass none; that path must not start
     // silently resolving somewhere else.
     await assert.rejects(
-      expandPlanSources(planFor({ pages: [{ id: "x", source: "definitely-not-here-*.html", gates: ["check integrity"] }] })),
+      expandPlanSources(
+        planFor({ pages: [{ id: "x", source: "definitely-not-here-*.html", gates: ["check integrity"] }] }),
+      ),
       /matched no files/,
     );
   });
 
   it("prefixes expanded ids with the config's own name so --only still addresses the group", async () => {
-    const plan = await expandPlanSources(planFor({
-      pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
-    }));
+    const plan = await expandPlanSources(
+      planFor({
+        pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
+      }),
+    );
     assert.ok(plan.jobs.every((j) => j.pageId.startsWith("routes:")));
   });
 
   it("leaves a single literal source's id alone", async () => {
-    const plan = await expandPlanSources(planFor({
-      pages: [{ id: "home", source: `${dir}/a.html`, gates: ["check integrity"] }],
-    }));
-    assert.deepEqual(plan.jobs.map((j) => j.pageId), ["home"]);
+    const plan = await expandPlanSources(
+      planFor({
+        pages: [{ id: "home", source: `${dir}/a.html`, gates: ["check integrity"] }],
+      }),
+    );
+    assert.deepEqual(
+      plan.jobs.map((j) => j.pageId),
+      ["home"],
+    );
   });
 
   it("refuses a pattern that matches nothing instead of gating on nothing", async () => {
@@ -189,10 +206,15 @@ describe("expandPlanSources", () => {
   });
 
   it("keeps URLs as-is", async () => {
-    const plan = await expandPlanSources(planFor({
-      pages: [{ id: "prod", source: "https://example.com/", gates: ["check integrity"] }],
-    }));
-    assert.deepEqual(plan.jobs.map((j) => j.source), ["https://example.com/"]);
+    const plan = await expandPlanSources(
+      planFor({
+        pages: [{ id: "prod", source: "https://example.com/", gates: ["check integrity"] }],
+      }),
+    );
+    assert.deepEqual(
+      plan.jobs.map((j) => j.source),
+      ["https://example.com/"],
+    );
   });
 });
 
@@ -224,15 +246,29 @@ describe("shardPlan", () => {
 
 describe("formatPlan", () => {
   it("prints the exact command each page will run, with suppression flags visible", () => {
-    const text = plain(formatPlan(planFor({
-      defaults: { gates: ["check integrity"] },
-      pages: [{
-        id: "checkout",
-        source: "checkout.html",
-        extraGates: ["check copy --manifest c.txt"],
-        suppressions: [{ gate: "check copy", flag: "--allow-invisible visually-hidden", reason: "sr-only", expires: "2026-12-01" }],
-      }],
-    }), "vlmkit.gates.json"));
+    const text = plain(
+      formatPlan(
+        planFor({
+          defaults: { gates: ["check integrity"] },
+          pages: [
+            {
+              id: "checkout",
+              source: "checkout.html",
+              extraGates: ["check copy --manifest c.txt"],
+              suppressions: [
+                {
+                  gate: "check copy",
+                  flag: "--allow-invisible visually-hidden",
+                  reason: "sr-only",
+                  expires: "2026-12-01",
+                },
+              ],
+            },
+          ],
+        }),
+        "vlmkit.gates.json",
+      ),
+    );
     assert.match(text, /1 page\(s\), 2 gate run\(s\)/);
     assert.match(text, /vlmkit check integrity checkout\.html/);
     assert.match(text, /vlmkit check copy --manifest c\.txt --allow-invisible visually-hidden checkout\.html/);
@@ -240,14 +276,23 @@ describe("formatPlan", () => {
   });
 
   it("flags an expired entry in the plan itself", () => {
-    const text = plain(formatPlan(planFor({
-      pages: [{
-        id: "game",
-        source: "game.html",
-        gates: ["check design"],
-        suppressions: [{ gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" }],
-      }],
-    }), "cfg.json"));
+    const text = plain(
+      formatPlan(
+        planFor({
+          pages: [
+            {
+              id: "game",
+              source: "game.html",
+              gates: ["check design"],
+              suppressions: [
+                { gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" },
+              ],
+            },
+          ],
+        }),
+        "cfg.json",
+      ),
+    );
     assert.match(text, /1 expired suppression\(s\) NOT applied/);
     assert.doesNotMatch(text, /--min-reuse 2/); // not applied, so not in the command
   });
@@ -256,7 +301,13 @@ describe("formatPlan", () => {
 describe("formatSuppressions", () => {
   const rows = [
     { gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" },
-    { gate: "check copy", flag: "--allow-invisible visually-hidden", reason: "sr-only nav", owner: "web-platform", expires: "2026-08-10" },
+    {
+      gate: "check copy",
+      flag: "--allow-invisible visually-hidden",
+      reason: "sr-only nav",
+      owner: "web-platform",
+      expires: "2026-08-10",
+    },
     { gate: "check copy", flag: "--allow-invisible camouflage", reason: "brand watermark" },
   ].map((s, i) => resolveSuppression(s, `page-${i}`, NOW));
 
@@ -283,9 +334,15 @@ describe("formatSuppressions", () => {
 
 describe("formatExpiredNotice", () => {
   it("warns before the run that a failure may be stale config, not a regression", () => {
-    const text = plain(formatExpiredNotice([
-      resolveSuppression({ gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" }, "game", NOW),
-    ]));
+    const text = plain(
+      formatExpiredNotice([
+        resolveSuppression(
+          { gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" },
+          "game",
+          NOW,
+        ),
+      ]),
+    );
     assert.match(text, /1 suppression\(s\) expired — the gate\(s\) below run unmuted/);
     assert.match(text, /expired 32d ago: zones differ/);
     assert.match(text, /may be this, not a new regression/);
@@ -305,10 +362,17 @@ describe("gates run (end to end)", () => {
   const runCli = async (args: string[], cwd: string) => {
     const { spawn } = await import("node:child_process");
     return new Promise<{ code: number; out: string }>((resolveRun) => {
-      const child = spawn(process.execPath, [...process.execArgv, CLI, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+      const child = spawn(process.execPath, [...process.execArgv, CLI, ...args], {
+        cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       let out = "";
-      child.stdout.on("data", (d) => { out += d; });
-      child.stderr.on("data", (d) => { out += d; });
+      child.stdout.on("data", (d) => {
+        out += d;
+      });
+      child.stderr.on("data", (d) => {
+        out += d;
+      });
       child.on("close", (code) => resolveRun({ code: code ?? 1, out: plain(out) }));
     });
   };
@@ -334,11 +398,15 @@ describe("gates run (end to end)", () => {
     // the config, and CI is where that gets noticed.
     const dir = withConfig({
       defaults: { gates: ["check design"] },
-      pages: [{
-        id: "tool-ui",
-        source: FIXTURE,
-        suppressions: [{ gate: "check design", flag: "--min-reuse 2", reason: "stale on purpose", expires: "2020-01-01" }],
-      }],
+      pages: [
+        {
+          id: "tool-ui",
+          source: FIXTURE,
+          suppressions: [
+            { gate: "check design", flag: "--min-reuse 2", reason: "stale on purpose", expires: "2020-01-01" },
+          ],
+        },
+      ],
     });
     const { code, out } = await runCli(["gates", "run", "--concurrency", "1", "--quiet"], dir);
     assert.match(out, /ALL PASS/);
@@ -349,11 +417,15 @@ describe("gates run (end to end)", () => {
   it("--advisory prints the same thing and exits 0", async () => {
     const dir = withConfig({
       defaults: { gates: ["check design"] },
-      pages: [{
-        id: "tool-ui",
-        source: FIXTURE,
-        suppressions: [{ gate: "check design", flag: "--min-reuse 2", reason: "stale on purpose", expires: "2020-01-01" }],
-      }],
+      pages: [
+        {
+          id: "tool-ui",
+          source: FIXTURE,
+          suppressions: [
+            { gate: "check design", flag: "--min-reuse 2", reason: "stale on purpose", expires: "2020-01-01" },
+          ],
+        },
+      ],
     });
     const { code, out } = await runCli(["gates", "run", "--concurrency", "1", "--quiet", "--advisory"], dir);
     assert.match(out, /suppression\(s\) expired/);

@@ -8,15 +8,24 @@ import { parsePlanCliArgs, runPlanCli } from "./cli.ts";
 describe("parsePlanCliArgs", () => {
   it("parses required files and retry/model options", () => {
     const args = parsePlanCliArgs([
-      "--title", "Checkout",
-      "--request", "Plan checkout.",
-      "--out", "specs/checkout.md",
-      "--structured-out", "specs/checkout.plan.json",
-      "--locator-inventory-out", "specs/checkout.locators.json",
-      "--provider", "anthropic",
-      "--max-attempts", "3",
-      "--scope", "focused",
-      "--constraint", "Use role locators.",
+      "--title",
+      "Checkout",
+      "--request",
+      "Plan checkout.",
+      "--out",
+      "specs/checkout.md",
+      "--structured-out",
+      "specs/checkout.plan.json",
+      "--locator-inventory-out",
+      "specs/checkout.locators.json",
+      "--provider",
+      "anthropic",
+      "--max-attempts",
+      "3",
+      "--scope",
+      "focused",
+      "--constraint",
+      "Use role locators.",
     ]);
 
     assert.equal(args.title, "Checkout");
@@ -40,11 +49,7 @@ describe("runPlanCli", () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-plan-cli-"));
     try {
       const out = join(dir, "specs", "checkout.md");
-      const code = await runPlanCli([
-        "--title", "Checkout",
-        "--request", "Plan checkout.",
-        "--out", out,
-      ], {
+      const code = await runPlanCli(["--title", "Checkout", "--request", "Plan checkout.", "--out", out], {
         complete: async () => ({
           content: `# Checkout
 
@@ -82,37 +87,54 @@ Use role locators.
       const locatorInventoryOut = join(dir, "specs", "checkout.locators.json");
       const observationPath = join(dir, "specs", "observations.json");
       await mkdir(join(dir, "specs"), { recursive: true });
-      await writeFile(observationPath, JSON.stringify([{
-        roles: ['button "Pay now"'],
-        labels: ["Email"],
-        testIds: ["cart-total"],
-      }]), "utf8");
-      const code = await runPlanCli([
-        "--title", "Checkout",
-        "--request", "Plan checkout.",
-        "--out", out,
-        "--observations", observationPath,
-        "--structured-out", structuredOut,
-        "--locator-inventory-out", locatorInventoryOut,
-      ], {
-        complete: async () => ({
-          content: JSON.stringify({
-            title: "Checkout",
-            applicationOverview: "Guest checkout.",
-            scenarios: [{
-              title: "Checkout succeeds",
-              steps: ["Open checkout.", "Pay."],
-              expectedResults: ["Confirmation is visible."],
-            }],
-            generationNotes: ["Use role locators."],
-            locatorInventory: {
-              roles: ['button "Pay now"'],
-              labels: ["Email"],
-              testIds: ["cart-total"],
-            },
+      await writeFile(
+        observationPath,
+        JSON.stringify([
+          {
+            roles: ['button "Pay now"'],
+            labels: ["Email"],
+            testIds: ["cart-total"],
+          },
+        ]),
+        "utf8",
+      );
+      const code = await runPlanCli(
+        [
+          "--title",
+          "Checkout",
+          "--request",
+          "Plan checkout.",
+          "--out",
+          out,
+          "--observations",
+          observationPath,
+          "--structured-out",
+          structuredOut,
+          "--locator-inventory-out",
+          locatorInventoryOut,
+        ],
+        {
+          complete: async () => ({
+            content: JSON.stringify({
+              title: "Checkout",
+              applicationOverview: "Guest checkout.",
+              scenarios: [
+                {
+                  title: "Checkout succeeds",
+                  steps: ["Open checkout.", "Pay."],
+                  expectedResults: ["Confirmation is visible."],
+                },
+              ],
+              generationNotes: ["Use role locators."],
+              locatorInventory: {
+                roles: ['button "Pay now"'],
+                labels: ["Email"],
+                testIds: ["cart-total"],
+              },
+            }),
           }),
-        }),
-      });
+        },
+      );
 
       assert.equal(code, 0);
       assert.match(await readFile(out, "utf8"), /## Locator Inventory/);
@@ -131,14 +153,12 @@ Use role locators.
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-plan-cli-"));
     try {
       const out = join(dir, "checkout.md");
-      const code = await runPlanCli([
-        "--title", "Checkout",
-        "--request", "Plan checkout.",
-        "--out", out,
-        "--max-attempts", "1",
-      ], {
-        complete: async () => ({ content: "# Checkout\n" }),
-      });
+      const code = await runPlanCli(
+        ["--title", "Checkout", "--request", "Plan checkout.", "--out", out, "--max-attempts", "1"],
+        {
+          complete: async () => ({ content: "# Checkout\n" }),
+        },
+      );
 
       assert.equal(code, 2);
       await assert.rejects(() => readFile(out, "utf8"));
@@ -161,19 +181,28 @@ Use role locators.
       await writeFile(seedPath, "test('seed', async () => {});\n", "utf8");
 
       let prompt = "";
-      const code = await runPlanCli([
-        "--title", "Login",
-        "--request-file", requestPath,
-        "--prd", prdPath,
-        "--observations", observationPath,
-        "--seed", seedPath,
-        "--seed-source", seedPath,
-        "--out", out,
-      ], {
-        complete: async (p) => {
-          prompt = p;
-          return {
-            content: `# Login
+      const code = await runPlanCli(
+        [
+          "--title",
+          "Login",
+          "--request-file",
+          requestPath,
+          "--prd",
+          prdPath,
+          "--observations",
+          observationPath,
+          "--seed",
+          seedPath,
+          "--seed-source",
+          seedPath,
+          "--out",
+          out,
+        ],
+        {
+          complete: async (p) => {
+            prompt = p;
+            return {
+              content: `# Login
 
 ## Application Overview
 Login.
@@ -192,9 +221,10 @@ Login.
 ## Generation Notes
 Use role locators.
 `,
-          };
+            };
+          },
         },
-      });
+      );
 
       assert.equal(code, 0);
       assert.match(prompt, /Users sign in with email/);

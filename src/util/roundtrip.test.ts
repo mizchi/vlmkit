@@ -47,9 +47,19 @@ function introspectFromTree(testId: string, tree: A11yNode) {
     description: `Page ${testId}`,
     landmarks,
     interactiveElements: interactive,
-    stats: { totalNodes, landmarkCount: landmarks.length, interactiveCount: interactive.length, unlabeledCount: interactive.filter((e) => !e.hasLabel).length, headingLevels: [...new Set(headingLevels)].sort() },
+    stats: {
+      totalNodes,
+      landmarkCount: landmarks.length,
+      interactiveCount: interactive.length,
+      unlabeledCount: interactive.filter((e) => !e.hasLabel).length,
+      headingLevels: [...new Set(headingLevels)].sort(),
+    },
     suggestedInvariants: [
-      ...landmarks.map((l) => ({ description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`, check: "landmark-exists" as const, cost: "low" as const })),
+      ...landmarks.map((l) => ({
+        description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`,
+        check: "landmark-exists" as const,
+        cost: "low" as const,
+      })),
       ...[...roleCounts].map(([role, count]) => ({
         description: `${count} ${role} element(s) expected`,
         check: "element-count" as const,
@@ -70,16 +80,34 @@ describe("Round-trip: introspect → spec → verify", () => {
     baselineSpec = introspectToSpec({ generatedAt: "test", pages: [introspection] });
 
     assert.ok(baselineSpec.pages.length === 1);
-    assert.ok(baselineSpec.pages[0].invariants.length > 5, `Should have many invariants: ${baselineSpec.pages[0].invariants.length}`);
+    assert.ok(
+      baselineSpec.pages[0].invariants.length > 5,
+      `Should have many invariants: ${baselineSpec.pages[0].invariants.length}`,
+    );
     assert.ok(baselineSpec.global!.length > 0);
 
     // Check specific invariants exist
     const descs = baselineSpec.pages[0].invariants.map((i) => i.description);
-    assert.ok(descs.some((d) => d.includes("banner")), "Should have banner invariant");
-    assert.ok(descs.some((d) => d.includes("navigation")), "Should have navigation invariant");
-    assert.ok(descs.some((d) => d.includes("form")), "Should have form invariant");
-    assert.ok(descs.some((d) => d.includes("link")), "Should have link element-count");
-    assert.ok(descs.some((d) => d.includes("button")), "Should have button element-count");
+    assert.ok(
+      descs.some((d) => d.includes("banner")),
+      "Should have banner invariant",
+    );
+    assert.ok(
+      descs.some((d) => d.includes("navigation")),
+      "Should have navigation invariant",
+    );
+    assert.ok(
+      descs.some((d) => d.includes("form")),
+      "Should have form invariant",
+    );
+    assert.ok(
+      descs.some((d) => d.includes("link")),
+      "Should have link element-count",
+    );
+    assert.ok(
+      descs.some((d) => d.includes("button")),
+      "Should have button element-count",
+    );
   });
 
   it("should PASS for identical baseline", async () => {
@@ -109,7 +137,7 @@ describe("Round-trip: introspect → spec → verify", () => {
     assert.ok(failed.length > 0, "Should detect failures");
     assert.ok(
       failed.some((f) => f.invariant.description.includes("navigation")),
-      `Should fail on navigation: ${failed.map((f) => f.invariant.description).join(", ")}`
+      `Should fail on navigation: ${failed.map((f) => f.invariant.description).join(", ")}`,
     );
   });
 
@@ -122,7 +150,7 @@ describe("Round-trip: introspect → spec → verify", () => {
     assert.ok(failed.length > 0, "Should detect form removal");
     assert.ok(
       failed.some((f) => f.invariant.description.includes("form")),
-      `Should fail on form: ${failed.map((f) => f.invariant.description).join(", ")}`
+      `Should fail on form: ${failed.map((f) => f.invariant.description).join(", ")}`,
     );
   });
 
@@ -134,7 +162,7 @@ describe("Round-trip: introspect → spec → verify", () => {
     const failed = result.results[0].checked.filter((c) => !c.passed);
     assert.ok(
       failed.some((f) => f.invariant.check === "label-present"),
-      `Should fail on labels: ${failed.map((f) => `${f.invariant.check}: ${f.reasoning}`).join(", ")}`
+      `Should fail on labels: ${failed.map((f) => `${f.invariant.check}: ${f.reasoning}`).join(", ")}`,
     );
   });
 
@@ -148,7 +176,7 @@ describe("Round-trip: introspect → spec → verify", () => {
     // link count changed (3 link → 0 link, 3 button → 6 button)
     assert.ok(
       failed.some((f) => f.invariant.check === "element-count"),
-      `Should fail on element-count: ${failed.map((f) => `${f.invariant.description}: ${f.reasoning}`).join("; ")}`
+      `Should fail on element-count: ${failed.map((f) => `${f.invariant.description}: ${f.reasoning}`).join("; ")}`,
     );
   });
 
@@ -169,6 +197,9 @@ describe("Round-trip: introspect → spec → verify", () => {
     const broken = await loadTree("snapshot-label-broken.a11y.json");
     const issues = verifyA11yTree(broken);
     assert.ok(issues.length >= 3, `Should find 3+ issues: ${issues.length}`);
-    assert.ok(issues.every((i) => i.rule === "label-missing"), "All should be label-missing");
+    assert.ok(
+      issues.every((i) => i.rule === "label-missing"),
+      "All should be label-missing",
+    );
   });
 });

@@ -27,7 +27,10 @@ const recorded = (name: string) => JSON.parse(readFileSync(join(recordings, `${n
 /** A 1x1 PNG, base64 — enough for `resizeBase64Png` to have something to resize. */
 const PIXEL = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
 
-interface Call { url: string; body: Record<string, unknown> }
+interface Call {
+  url: string;
+  body: Record<string, unknown>;
+}
 
 const calls: Call[] = [];
 let realFetch: typeof globalThis.fetch;
@@ -44,17 +47,19 @@ function serve(queue: unknown[]) {
   let i = 0;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {} });
+    calls.push({ url, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {} });
     if (url.includes("/models")) {
       // The catalogue lookup `resolveModel` makes before any analysis. Served separately so a
       // test's queue only contains the replies it is about.
       return json({
-        data: [{
-          id: "bytedance/ui-tars-1.5-7b",
-          architecture: { input_modalities: ["text", "image"] },
-          pricing: { prompt: "0.0000001", completion: "0.0000002" },
-          context_length: 128000,
-        }],
+        data: [
+          {
+            id: "bytedance/ui-tars-1.5-7b",
+            architecture: { input_modalities: ["text", "image"] },
+            pricing: { prompt: "0.0000001", completion: "0.0000002" },
+            context_length: 128000,
+          },
+        ],
       });
     }
     const next = queue[Math.min(i++, queue.length - 1)];
@@ -75,7 +80,14 @@ beforeEach(() => {
   realFetch = globalThis.fetch;
   calls.length = 0;
   resetVisionModelCache();
-  for (const key of ["OPENROUTER_API_KEY", "GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "ANTHROPIC_API_KEY", "VLMKIT_LLM_PROVIDER", "VLMKIT_VLM_MODEL"]) {
+  for (const key of [
+    "OPENROUTER_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_AI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "VLMKIT_LLM_PROVIDER",
+    "VLMKIT_VLM_MODEL",
+  ]) {
     savedEnv[key] = process.env[key];
     delete process.env[key];
   }
@@ -126,7 +138,9 @@ describe("createReasoningPipeline — provider availability", () => {
 });
 
 describe("stage 1 — VLM reply to a structured report", () => {
-  beforeEach(() => { process.env.OPENROUTER_API_KEY = "or-key"; });
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+  });
 
   it("parses the CHANGE lines, deduplicates, and reads SUMMARY / REGRESSION", async () => {
     serve([recorded("stage1-openrouter")]);
@@ -194,7 +208,9 @@ describe("stage 1 — VLM reply to a structured report", () => {
 });
 
 describe("stage 2 — report to CSS fixes", () => {
-  beforeEach(() => { process.env.OPENROUTER_API_KEY = "or-key"; });
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+  });
 
   it("parses FIX lines with their reason, and the confidence", async () => {
     serve([recorded("stage1-openrouter"), recorded("stage2-openrouter")]);
@@ -222,12 +238,15 @@ describe("stage 2 — report to CSS fixes", () => {
 });
 
 describe("analyzeAndFix — the escalation ladder", () => {
-  beforeEach(() => { process.env.OPENROUTER_API_KEY = "or-key"; });
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+  });
 
   it("runs stage 1 then stage 2, and does not escalate a confident fix", async () => {
     serve([recorded("stage1-openrouter"), recorded("stage2-openrouter")]);
     const result = await createReasoningPipeline()!.analyzeAndFix({
-      heatmapBase64: PIXEL, cssSource: ".readme-body pre { }",
+      heatmapBase64: PIXEL,
+      cssSource: ".readme-body pre { }",
     });
     assert.equal(result.escalated, false, "confidence is high — a second pass would just cost money");
     assert.equal(result.analysis.changes.length, 3);
@@ -250,7 +269,9 @@ describe("analyzeAndFix — the escalation ladder", () => {
     };
     serve([oneChange, lowConf]);
     const result = await createReasoningPipeline({ resolution: "medium", maxResolution: "high" })!.analyzeAndFix({
-      heatmapBase64: PIXEL, cssSource: ".a { }", highResHeatmapBase64: PIXEL,
+      heatmapBase64: PIXEL,
+      cssSource: ".a { }",
+      highResHeatmapBase64: PIXEL,
     });
     assert.equal(result.escalated, true);
     assert.equal(calls.filter((c) => !c.url.includes("/models")).length, 4, "stage 1+2 twice");
@@ -268,14 +289,16 @@ describe("analyzeAndFix — the escalation ladder", () => {
 
     serve([oneChange, lowConf]);
     const atCeiling = await createReasoningPipeline({ resolution: "high", maxResolution: "high" })!.analyzeAndFix({
-      heatmapBase64: PIXEL, cssSource: ".a { }",
+      heatmapBase64: PIXEL,
+      cssSource: ".a { }",
     });
     assert.equal(atCeiling.escalated, false, "already at the ceiling");
 
     calls.length = 0;
     serve([oneChange, lowConf]);
     const off = await createReasoningPipeline({ adaptiveResolution: false, resolution: "low" })!.analyzeAndFix({
-      heatmapBase64: PIXEL, cssSource: ".a { }",
+      heatmapBase64: PIXEL,
+      cssSource: ".a { }",
     });
     assert.equal(off.escalated, false);
     assert.equal(calls.filter((c) => !c.url.includes("/models")).length, 2, "one pass only");
@@ -294,7 +317,8 @@ describe("analyzeAndFix — the escalation ladder", () => {
     };
     serve([oneChange, lowConf]);
     const result = await createReasoningPipeline({ resolution: "low" })!.analyzeAndFix({
-      currentBase64: PIXEL, cssSource: ".a { }",
+      currentBase64: PIXEL,
+      cssSource: ".a { }",
     });
     assert.equal(result.escalated, false);
   });

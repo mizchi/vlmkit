@@ -189,7 +189,10 @@ export function controlBoundary(sample: ControlSample): ControlBoundary {
   let borderHex: string | null = null;
   for (const color of sample.borders) {
     const ratio = contrastRatio(blendColor(sample.on, color), sample.on);
-    if (ratio > borderRatio) { borderRatio = ratio; borderHex = toHex(color); }
+    if (ratio > borderRatio) {
+      borderRatio = ratio;
+      borderHex = toHex(color);
+    }
   }
   return {
     selector: sample.selector,
@@ -232,9 +235,10 @@ export function linkCue(sample: LinkSample): LinkCue {
     proseChars: sample.proseChars,
     linkHex: toHex(sample.link),
     bodyHex: toHex(sample.body),
-    vsBody: sample.behind === null
-      ? null
-      : round2(contrastRatio(blendColor(sample.behind, sample.link), blendColor(sample.behind, sample.body))),
+    vsBody:
+      sample.behind === null
+        ? null
+        : round2(contrastRatio(blendColor(sample.behind, sample.link), blendColor(sample.behind, sample.body))),
     underlined: sample.underlined,
     weightStep: sample.weightStep,
     hasFill: sample.hasFill,
@@ -349,7 +353,12 @@ export function findBase(input: ColorRolesInput): ColorUse | null {
   const declared = trimPalette(input.palette.surfaces)[0];
   if (declared) return declared;
   if (!input.baseHex) return null;
-  return { hex: input.baseHex, area: input.viewport.width * input.viewport.height, count: 0, samples: ["(page background)"] };
+  return {
+    hex: input.baseHex,
+    area: input.viewport.width * input.viewport.height,
+    count: 0,
+    samples: ["(page background)"],
+  };
 }
 
 /** The ink the page's text is mostly set in: the largest by painted area. */
@@ -378,9 +387,7 @@ export function findBodyInk(input: ColorRolesInput): ColorUse | null {
  */
 export function findLinkInk(input: ColorRolesInput): ColorUse | null {
   const body = findBodyInk(input)?.hex;
-  const ranked = input.interactiveInk
-    .filter((c) => c.hex !== body)
-    .sort((a, b) => b.count - a.count);
+  const ranked = input.interactiveInk.filter((c) => c.hex !== body).sort((a, b) => b.count - a.count);
   return ranked[0] ?? null;
 }
 
@@ -397,12 +404,14 @@ export function invisibleControls(controls: readonly ControlBoundary[]): Control
  * contrast" and should not be reported as a ratio.
  */
 export function colorOnlyLinks(links: readonly LinkCue[]): { weak: LinkCue[]; none: LinkCue[] } {
-  const candidates = links.filter((l) =>
-    l.proseChars >= PROSE_FLOOR_CHARS
-    && !l.underlined
-    && l.weightStep < WEIGHT_CUE_STEP
-    && !l.hasFill
-    && !l.hasBorder);
+  const candidates = links.filter(
+    (l) =>
+      l.proseChars >= PROSE_FLOOR_CHARS &&
+      !l.underlined &&
+      l.weightStep < WEIGHT_CUE_STEP &&
+      !l.hasFill &&
+      !l.hasBorder,
+  );
   return {
     none: candidates.filter((l) => l.sameInk),
     weak: candidates.filter((l) => !l.sameInk && l.vsBody !== null && l.vsBody < NON_TEXT_CONTRAST_FLOOR),
@@ -419,8 +428,8 @@ export function judgeColorRoles(
 ): ColorRolesReport {
   const input = {
     ...rawInput,
-    controls: rawInput.controls.map((c) => isControlSample(c) ? controlBoundary(c) : c),
-    links: rawInput.links.map((l) => isLinkSample(l) ? linkCue(l) : l),
+    controls: rawInput.controls.map((c) => (isControlSample(c) ? controlBoundary(c) : c)),
+    links: rawInput.links.map((l) => (isLinkSample(l) ? linkCue(l) : l)),
   };
   /**
    * An allowed row leaves the verdict and is still listed — the repo-wide
@@ -433,20 +442,25 @@ export function judgeColorRoles(
   const findings: ColorFinding[] = [];
   const controls = invisibleControls(input.controls).filter((c) => keep(c.selector));
   for (const c of controls.slice(0, 5)) {
-    const edge = c.best === 0
-      ? "draws no fill, border, shadow or outline at all"
-      : `draws its strongest edge at ${c.best}:1 (${c.fillRatio >= c.borderRatio ? `fill ${c.fillHex}` : `border ${c.borderHex}`})`;
+    const edge =
+      c.best === 0
+        ? "draws no fill, border, shadow or outline at all"
+        : `draws its strongest edge at ${c.best}:1 (${c.fillRatio >= c.borderRatio ? `fill ${c.fillHex}` : `border ${c.borderHex}`})`;
     findings.push({
       kind: "control-boundary-invisible",
       severity: "warn",
       selector: c.selector,
       message:
-        `<${c.tag}> ${edge} against the ${c.onHex} behind it, so where to type is not visible.`
-        + ` WCAG 1.4.11 asks for ${NON_TEXT_CONTRAST_FLOOR}:1 on a control's boundary; a shadow or an outline`
-        + ` would satisfy it too, and this has neither.`,
+        `<${c.tag}> ${edge} against the ${c.onHex} behind it, so where to type is not visible.` +
+        ` WCAG 1.4.11 asks for ${NON_TEXT_CONTRAST_FLOOR}:1 on a control's boundary; a shadow or an outline` +
+        ` would satisfy it too, and this has neither.`,
       evidence: {
-        onHex: c.onHex, fillHex: c.fillHex, fillRatio: c.fillRatio,
-        borderHex: c.borderHex, borderRatio: c.borderRatio, best: c.best,
+        onHex: c.onHex,
+        fillHex: c.fillHex,
+        fillRatio: c.fillRatio,
+        borderHex: c.borderHex,
+        borderRatio: c.borderRatio,
+        best: c.best,
       },
     });
   }
@@ -475,15 +489,19 @@ export function judgeColorRoles(
       severity: "warn",
       selector: sample.selector,
       message:
-        `${sample.linkHex} link inside ${sample.bodyHex} prose at ${sample.vsBody}:1, with no underline,`
-        + ` weight step, border or fill to mark it — so colour is the only thing saying it is a link`
-        + ` (${rows.length} element(s), e.g. in ${sample.flow}).`
-        + ` WCAG 1.4.1 technique G183 asks for ${NON_TEXT_CONTRAST_FLOOR}:1 against the surrounding text when`
-        + ` colour is the only cue. This is disjoint from check a11y contrast, which measures the link`
-        + ` against its BACKGROUND and passes.`,
+        `${sample.linkHex} link inside ${sample.bodyHex} prose at ${sample.vsBody}:1, with no underline,` +
+        ` weight step, border or fill to mark it — so colour is the only thing saying it is a link` +
+        ` (${rows.length} element(s), e.g. in ${sample.flow}).` +
+        ` WCAG 1.4.1 technique G183 asks for ${NON_TEXT_CONTRAST_FLOOR}:1 against the surrounding text when` +
+        ` colour is the only cue. This is disjoint from check a11y contrast, which measures the link` +
+        ` against its BACKGROUND and passes.`,
       evidence: {
-        linkHex: sample.linkHex, bodyHex: sample.bodyHex, vsBody: sample.vsBody,
-        proseChars: sample.proseChars, flow: sample.flow, elements: rows.length,
+        linkHex: sample.linkHex,
+        bodyHex: sample.bodyHex,
+        vsBody: sample.vsBody,
+        proseChars: sample.proseChars,
+        flow: sample.flow,
+        elements: rows.length,
       },
     });
   }
@@ -493,8 +511,8 @@ export function judgeColorRoles(
       severity: "warn",
       selector: l.selector,
       message:
-        `Link renders in exactly the ${l.bodyHex} of the prose around it, with no underline, weight step,`
-        + ` border or fill — nothing distinguishes it from the sentence (in ${l.flow}).`,
+        `Link renders in exactly the ${l.bodyHex} of the prose around it, with no underline, weight step,` +
+        ` border or fill — nothing distinguishes it from the sentence (in ${l.flow}).`,
       evidence: { ink: l.bodyHex, flow: l.flow, proseChars: l.proseChars },
     });
   }
@@ -505,11 +523,11 @@ export function judgeColorRoles(
       kind: "unreadable-color",
       severity: "info",
       message:
-        `${unreadableTotal} declared colour(s) could not be read and were left out of everything above`
-        + ` (${input.unreadable.map((u) => `${u.property} x${u.count}`).join(", ")};`
-        + ` e.g. ${input.unreadable[0]?.samples[0] ?? "?"}).`
-        + ` Reported rather than dropped: a colour gate that silently skips what it cannot parse is`
-        + ` indistinguishable from one that found it acceptable.`,
+        `${unreadableTotal} declared colour(s) could not be read and were left out of everything above` +
+        ` (${input.unreadable.map((u) => `${u.property} x${u.count}`).join(", ")};` +
+        ` e.g. ${input.unreadable[0]?.samples[0] ?? "?"}).` +
+        ` Reported rather than dropped: a colour gate that silently skips what it cannot parse is` +
+        ` indistinguishable from one that found it acceptable.`,
       evidence: { total: unreadableTotal, byProperty: input.unreadable },
     });
   }
@@ -520,9 +538,9 @@ export function judgeColorRoles(
       kind: "nothing-judged",
       severity: "info",
       message:
-        `No control and no link in a text flow, so neither rule had anything to measure`
-        + ` — the palette below is reported, and this verdict rests on nothing.`
-        + ` A page of ${input.boxes} box(es) with no interactive text is a document, not a defect.`,
+        `No control and no link in a text flow, so neither rule had anything to measure` +
+        ` — the palette below is reported, and this verdict rests on nothing.` +
+        ` A page of ${input.boxes} box(es) with no interactive text is a document, not a defect.`,
       evidence: { boxes: input.boxes },
     });
   }
@@ -541,7 +559,6 @@ export function judgeColorRoles(
   };
 }
 
-
 /**
  * `--allow "<selector>;<reason>"`, named after the rule an exemption most often
  * serves — the same convention `parseCompositionAllowRules` and
@@ -552,5 +569,5 @@ export function parseColorAllowRules(specs: readonly string[]): SelectorAllowRul
 }
 
 export const COLOR_ALLOW_HELP =
-  'Sign off a control or link: --allow "<selector>;<reason>". The reason is required and the'
-  + " exempted row is still listed, so an exemption reads as a decision rather than as silence.";
+  'Sign off a control or link: --allow "<selector>;<reason>". The reason is required and the' +
+  " exempted row is still listed, so an exemption reads as a decision rather than as silence.";

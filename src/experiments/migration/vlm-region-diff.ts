@@ -147,25 +147,24 @@ function computeRegionImageScale(
 }
 
 /** Map VLM bboxes from downscaled image coordinates back to original pixels. */
-function scaleRegionBboxesToOriginal(
-  result: VlmReviewResult,
-  imageScale: number,
-): VlmReviewResult {
+function scaleRegionBboxesToOriginal(result: VlmReviewResult, imageScale: number): VlmReviewResult {
   if (imageScale === 1) return result;
   const inverse = 1 / imageScale;
   return {
     ...result,
-    regions: result.regions.map((region) => region.bbox
-      ? {
-          ...region,
-          bbox: {
-            left: Math.round(region.bbox.left * inverse),
-            top: Math.round(region.bbox.top * inverse),
-            width: Math.round(region.bbox.width * inverse),
-            height: Math.round(region.bbox.height * inverse),
-          },
-        }
-      : region),
+    regions: result.regions.map((region) =>
+      region.bbox
+        ? {
+            ...region,
+            bbox: {
+              left: Math.round(region.bbox.left * inverse),
+              top: Math.round(region.bbox.top * inverse),
+              width: Math.round(region.bbox.width * inverse),
+              height: Math.round(region.bbox.height * inverse),
+            },
+          }
+        : region,
+    ),
   };
 }
 
@@ -178,10 +177,7 @@ const DEFAULT_REGION_DIFF_MAX_TOKENS = 1500;
  * content contains an opening brace but never parses (mid-JSON cut)
  * while no finish reason is available.
  */
-function isTruncatedRegionDiffResponse(
-  content: string,
-  finishReason: string | undefined,
-): boolean {
+function isTruncatedRegionDiffResponse(content: string, finishReason: string | undefined): boolean {
   if (finishReason === "length") return true;
   if (finishReason != null) return false;
   if (!content.includes("{")) return false;
@@ -259,9 +255,7 @@ interface RegionDiffRequest {
 }
 
 async function buildRegionDiffRequest(args: RegionDiffRequestArgs): Promise<RegionDiffRequest> {
-  const userContent: Array<Record<string, unknown>> = [
-    { type: "text", text: buildPrompt(args) },
-  ];
+  const userContent: Array<Record<string, unknown>> = [{ type: "text", text: buildPrompt(args) }];
   let imageScale = 1;
   if (args.triptych) {
     const data = await readFile(args.triptych);
@@ -271,14 +265,8 @@ async function buildRegionDiffRequest(args: RegionDiffRequestArgs): Promise<Regi
       image_url: { url: `data:image/png;base64,${downscaleForVlm(data, imageScale).toString("base64")}` },
     });
   } else {
-    const [base, variant] = await Promise.all([
-      readFile(args.baseline!),
-      readFile(args.variant!),
-    ]);
-    imageScale = computeRegionImageScale(
-      [readPngDimensions(base), readPngDimensions(variant)],
-      args.maxImageEdge,
-    );
+    const [base, variant] = await Promise.all([readFile(args.baseline!), readFile(args.variant!)]);
+    imageScale = computeRegionImageScale([readPngDimensions(base), readPngDimensions(variant)], args.maxImageEdge);
     userContent.push({ type: "text", text: "Baseline:" });
     userContent.push({
       type: "image_url",
@@ -405,11 +393,7 @@ function parseRegionBbox(value: unknown): RegionBbox | null {
 }
 
 function numberFromUnknown(value: unknown): number | null {
-  const n = typeof value === "number"
-    ? value
-    : typeof value === "string"
-      ? Number.parseFloat(value)
-      : Number.NaN;
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
   return Number.isFinite(n) ? n : null;
 }
 
@@ -422,11 +406,7 @@ interface BboxColorPairSample {
   averageChannelDelta: number;
 }
 
-function sampleBboxColorPair(
-  baselinePng: PNG,
-  variantPng: PNG,
-  bbox: RegionBbox,
-): BboxColorPairSample | null {
+function sampleBboxColorPair(baselinePng: PNG, variantPng: PNG, bbox: RegionBbox): BboxColorPairSample | null {
   const baselineBounds = clampBboxToPng(baselinePng, bbox);
   const variantBounds = clampBboxToPng(variantPng, bbox);
   if (!baselineBounds || !variantBounds) return null;
@@ -505,27 +485,15 @@ function addPair(
   acc.count++;
 }
 
-function averageRgb(
-  acc: [number, number, number],
-  count: number,
-): [number, number, number] {
-  return [
-    Math.round(acc[0] / count),
-    Math.round(acc[1] / count),
-    Math.round(acc[2] / count),
-  ];
+function averageRgb(acc: [number, number, number], count: number): [number, number, number] {
+  return [Math.round(acc[0] / count), Math.round(acc[1] / count), Math.round(acc[2] / count)];
 }
 
 function rgbToHex([r, g, b]: [number, number, number]): string {
-  return "#" + [r, g, b].map((c) =>
-    Math.max(0, Math.min(255, c)).toString(16).padStart(2, "0")
-  ).join("");
+  return "#" + [r, g, b].map((c) => Math.max(0, Math.min(255, c)).toString(16).padStart(2, "0")).join("");
 }
 
-function averageChannelDelta(
-  a: [number, number, number],
-  b: [number, number, number],
-): number {
+function averageChannelDelta(a: [number, number, number], b: [number, number, number]): number {
   const delta = (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])) / 3;
   return Number(delta.toFixed(2));
 }
@@ -563,11 +531,11 @@ function buildStructuredRegionChanges(
 ): RegionStructuredChange[] {
   if (result.verdict === "no-diff") return [];
   return result.regions.map((region): RegionStructuredChange => {
-    const averageDelta = region.colorSample?.averageChannelDelta
-      ?? computeAverageDeltaFromColorStrings(region.baselineColor, region.variantColor);
-    const selectorMatch = region.bbox && options.elements
-      ? matchRegionBboxToElement(region.bbox, options.elements)
-      : null;
+    const averageDelta =
+      region.colorSample?.averageChannelDelta ??
+      computeAverageDeltaFromColorStrings(region.baselineColor, region.variantColor);
+    const selectorMatch =
+      region.bbox && options.elements ? matchRegionBboxToElement(region.bbox, options.elements) : null;
     const evidence: RegionStructuredChange["evidence"] = {};
     if (region.colorSample) evidence.colorSample = region.colorSample;
     if (selectorMatch) evidence.selectorMatch = selectorMatch.evidence;
@@ -576,20 +544,17 @@ function buildStructuredRegionChanges(
     // delta is below the floor means the pixels show no change — the VLM's
     // claim is fabricated or the bbox is misplaced. Demote it so a zero-delta
     // row never reads as a confident finding (drafts 06/09).
-    const measured = region.colorSample?.source === "bbox-average"
-      ? region.colorSample.averageChannelDelta
-      : null;
-    const verification = measured !== null
-      ? {
-          measuredDelta: measured,
-          refuted: measured < PIXEL_REFUTE_FLOOR,
-          floor: PIXEL_REFUTE_FLOOR,
-        }
-      : undefined;
+    const measured = region.colorSample?.source === "bbox-average" ? region.colorSample.averageChannelDelta : null;
+    const verification =
+      measured !== null
+        ? {
+            measuredDelta: measured,
+            refuted: measured < PIXEL_REFUTE_FLOOR,
+            floor: PIXEL_REFUTE_FLOOR,
+          }
+        : undefined;
 
-    const confidence = verification?.refuted
-      ? "low"
-      : inferRegionChangeConfidence(region, averageDelta);
+    const confidence = verification?.refuted ? "low" : inferRegionChangeConfidence(region, averageDelta);
 
     return {
       type: "CHANGE",
@@ -641,10 +606,7 @@ function inferRegionChangeConfidence(
   return "low";
 }
 
-function computeAverageDeltaFromColorStrings(
-  baselineColor: string | null,
-  variantColor: string | null,
-): number | null {
+function computeAverageDeltaFromColorStrings(baselineColor: string | null, variantColor: string | null): number | null {
   const baseline = parseColorString(baselineColor);
   const variant = parseColorString(variantColor);
   if (!baseline || !variant) return null;
@@ -656,9 +618,13 @@ function parseColorString(value: string | null): [number, number, number] | null
   const hex = value.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
   if (hex) {
     const raw = hex[1]!;
-    const full = raw.length === 3
-      ? raw.split("").map((char) => char + char).join("")
-      : raw;
+    const full =
+      raw.length === 3
+        ? raw
+            .split("")
+            .map((char) => char + char)
+            .join("")
+        : raw;
     return [
       Number.parseInt(full.slice(0, 2), 16),
       Number.parseInt(full.slice(2, 4), 16),
@@ -679,9 +645,7 @@ function clampRgb(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-async function runRegionDiffAnalysis(
-  options: RunRegionDiffAnalysisOptions,
-): Promise<RegionDiffOutput> {
+async function runRegionDiffAnalysis(options: RunRegionDiffAnalysisOptions): Promise<RegionDiffOutput> {
   const model = options.model ?? DEFAULT_REGION_DIFF_MODEL;
   const args: RegionDiffRequestArgs = {
     baseline: resolve(options.baseline),
@@ -697,10 +661,7 @@ async function runRegionDiffAnalysis(
     throw new Error("OPENROUTER_API_KEY is required for region diff analysis");
   }
   const { data, content } = await callRegionDiffWithTruncationRetry(body, apiKey, args.maxTokens);
-  const [baselinePng, variantPng] = await Promise.all([
-    readPng(args.baseline!),
-    readPng(args.variant!),
-  ]);
+  const [baselinePng, variantPng] = await Promise.all([readPng(args.baseline!), readPng(args.variant!)]);
   const parsed = enrichRegionColorsWithBboxSamples(
     scaleRegionBboxesToOriginal(parseVlmResponse(content), imageScale),
     baselinePng,
@@ -735,7 +696,7 @@ async function callOpenRouterRegionDiff(
     const text = await response.text();
     throw new Error(`OpenRouter ${response.status}: ${text.slice(0, 500)}`);
   }
-  return await response.json() as {
+  return (await response.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     usage?: { total_tokens?: number; cost?: number; prompt_tokens?: number; completion_tokens?: number };
   };
@@ -782,23 +743,28 @@ function formatRegionDiffMarkdown(result: RegionDiffOutput): string {
     lines.push("## Unverified — measured pixels refute the VLM claim");
     lines.push("");
     lines.push(
-      `These regions were reported by the VLM but the measured average channel `
-        + `delta in their bbox stayed below ${PIXEL_REFUTE_FLOOR} — the pixels show `
-        + `no change there, so the bbox is likely misplaced or the property is `
-        + `fabricated. Do not treat as findings without independent evidence.`,
+      `These regions were reported by the VLM but the measured average channel ` +
+        `delta in their bbox stayed below ${PIXEL_REFUTE_FLOOR} — the pixels show ` +
+        `no change there, so the bbox is likely misplaced or the property is ` +
+        `fabricated. Do not treat as findings without independent evidence.`,
     );
     lines.push("");
     lines.push("| Selector | Property | Claimed From | Claimed To | Measured Delta | Bbox |");
     lines.push("|---|---|---|---|---:|---|");
     for (const change of refuted) {
-      lines.push([
-        codeCell(change.selector ?? change.selectorHint),
-        codeCell(change.property),
-        codeCell(change.from),
-        codeCell(change.to),
-        formatDelta(change.verification?.measuredDelta ?? change.delta.averageChannelDelta),
-        codeCell(formatBbox(change.bbox)),
-      ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
+      lines.push(
+        [
+          codeCell(change.selector ?? change.selectorHint),
+          codeCell(change.property),
+          codeCell(change.from),
+          codeCell(change.to),
+          formatDelta(change.verification?.measuredDelta ?? change.delta.averageChannelDelta),
+          codeCell(formatBbox(change.bbox)),
+        ]
+          .join(" | ")
+          .replace(/^/, "| ")
+          .replace(/$/, " |"),
+      );
     }
   }
 
@@ -815,7 +781,10 @@ function formatRegionChangeRow(change: RegionStructuredChange): string {
     codeCell(formatBbox(change.bbox)),
     escapeMarkdownCell(`${change.confidence}${change.selectorConfidence ? ` / ${change.selectorConfidence}` : ""}`),
     escapeMarkdownCell(formatSelectorEvidence(change.evidence.selectorMatch)),
-  ].join(" | ").replace(/^/, "| ").replace(/$/, " |");
+  ]
+    .join(" | ")
+    .replace(/^/, "| ")
+    .replace(/$/, " |");
 }
 
 function codeCell(value: string | null): string {

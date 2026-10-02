@@ -19,7 +19,14 @@ import { crossValidate, crossValidationToQualityChecks } from "../../experiments
 import { loadExpectation, crossValidateWithExpectation, scoreLoop } from "../../vrt/snapshot/expectation.ts";
 import { runQualityChecks } from "@mizchi/vlmkit-markup/quality.ts";
 import { runVerificationLoop } from "../../util/agent.ts";
-import type { VrtDiff, A11yDiff, VisualSemanticDiff, UnifiedAgentContext, VrtExpectation, ChangeIntent } from "@mizchi/vlmkit-core/types.ts";
+import type {
+  VrtDiff,
+  A11yDiff,
+  VisualSemanticDiff,
+  UnifiedAgentContext,
+  VrtExpectation,
+  ChangeIntent,
+} from "@mizchi/vlmkit-core/types.ts";
 
 export interface VerifyPaths {
   projectRoot: string;
@@ -108,9 +115,7 @@ export async function runVerifyPipeline(paths: VerifyPaths): Promise<VerifyResul
     const diff = await compareScreenshots(snapshot, { outputDir });
     if (diff && diff.diffPixels > 0) {
       vrtDiffs.push(diff);
-      console.log(
-        `  CHANGED: ${name} — ${(diff.diffRatio * 100).toFixed(2)}% (${diff.regions.length} region(s))`
-      );
+      console.log(`  CHANGED: ${name} — ${(diff.diffRatio * 100).toFixed(2)}% (${diff.regions.length} region(s))`);
     } else {
       console.log(`  OK: ${name}`);
     }
@@ -139,9 +144,7 @@ export async function runVerifyPipeline(paths: VerifyPaths): Promise<VerifyResul
       if (diff.changes.length > 0) {
         a11yDiffs.push(diff);
         const emoji = diff.hasRegression ? "NG" : "~~";
-        console.log(
-          `  [${emoji}] ${name}: +${diff.stats.added}/-${diff.stats.removed}/~${diff.stats.modified}`
-        );
+        console.log(`  [${emoji}] ${name}: +${diff.stats.added}/-${diff.stats.removed}/~${diff.stats.modified}`);
       } else {
         console.log(`  OK: ${name}`);
       }
@@ -201,8 +204,7 @@ export async function runVerifyPipeline(paths: VerifyPaths): Promise<VerifyResul
   });
 
   for (const cv of crossValidations) {
-    const icon = cv.recommendation === "approve" ? "OK"
-      : cv.recommendation === "reject" ? "NG" : "??";
+    const icon = cv.recommendation === "approve" ? "OK" : cv.recommendation === "reject" ? "NG" : "??";
     console.log(`  [${icon}] ${cv.testId}: ${cv.reasoning}`);
   }
 
@@ -211,7 +213,7 @@ export async function runVerifyPipeline(paths: VerifyPaths): Promise<VerifyResul
   const snapshots = vrtDiffs.map((d) => d.snapshot);
 
   const approvedTestIds = new Set(
-    crossValidations.filter((cv) => cv.recommendation === "approve").map((cv) => cv.testId)
+    crossValidations.filter((cv) => cv.recommendation === "approve").map((cv) => cv.testId),
   );
   const filteredCrossValidations = crossValidations.map((cv) => {
     if (approvedTestIds.has(cv.testId) && cv.a11yDiff?.hasRegression) {

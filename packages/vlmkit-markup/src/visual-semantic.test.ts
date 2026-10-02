@@ -23,26 +23,20 @@ function makeDiff(regions: DiffRegion[], totalPixels = 1_000_000): VrtDiff {
 
 describe("classifyVisualDiff", () => {
   it("should classify small square as icon-change", () => {
-    const diff = makeDiff([
-      { x: 10, y: 10, width: 32, height: 32, diffPixelCount: 800 },
-    ]);
+    const diff = makeDiff([{ x: 10, y: 10, width: 32, height: 32, diffPixelCount: 800 }]);
     const result = classifyVisualDiff(diff);
     assert.equal(result.changes.length, 1);
     assert.equal(result.changes[0].type, "icon-change");
   });
 
   it("should classify wide thin region as text-change", () => {
-    const diff = makeDiff([
-      { x: 50, y: 100, width: 400, height: 20, diffPixelCount: 2000 },
-    ]);
+    const diff = makeDiff([{ x: 50, y: 100, width: 400, height: 20, diffPixelCount: 2000 }]);
     const result = classifyVisualDiff(diff);
     assert.equal(result.changes[0].type, "text-change");
   });
 
   it("should classify high-density region as color-change", () => {
-    const diff = makeDiff([
-      { x: 0, y: 0, width: 200, height: 100, diffPixelCount: 18000 },
-    ]);
+    const diff = makeDiff([{ x: 0, y: 0, width: 200, height: 100, diffPixelCount: 18000 }]);
     const result = classifyVisualDiff(diff);
     assert.equal(result.changes[0].type, "color-change");
   });
@@ -193,9 +187,7 @@ describe("classifyVisualDiff", () => {
   });
 
   it("should classify large region as layout-shift", () => {
-    const diff = makeDiff([
-      { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },
-    ]);
+    const diff = makeDiff([{ x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 }]);
     const result = classifyVisualDiff(diff);
     assert.equal(result.changes[0].type, "layout-shift");
   });
@@ -204,9 +196,7 @@ describe("classifyVisualDiff", () => {
     // Large region, no `shift` field: the label comes from the shape
     // heuristic, not a measured translation. The description must not read
     // as if an offset was found.
-    const diff = makeDiff([
-      { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },
-    ]);
+    const diff = makeDiff([{ x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 }]);
     const result = classifyVisualDiff(diff);
     assert.equal(result.changes[0].type, "layout-shift");
     assert.match(result.changes[0].description, /no translation measured/);
@@ -295,9 +285,7 @@ describe("classifyVisualDiff", () => {
     ]);
     const result = classifyVisualDiff(diff);
     // Both should be layout shifts, and grouped into 1
-    const layoutShifts = result.changes.filter(
-      (c) => c.type === "layout-shift"
-    );
+    const layoutShifts = result.changes.filter((c) => c.type === "layout-shift");
     assert.equal(layoutShifts.length, 1);
   });
 

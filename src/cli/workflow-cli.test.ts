@@ -36,11 +36,20 @@ let lines: string[] = [];
 const realLog = console.log;
 const realError = console.error;
 beforeAll(() => {
-  console.log = (...a: unknown[]) => { lines.push(a.map(String).join(" ")); };
-  console.error = (...a: unknown[]) => { lines.push(a.map(String).join(" ")); };
+  console.log = (...a: unknown[]) => {
+    lines.push(a.map(String).join(" "));
+  };
+  console.error = (...a: unknown[]) => {
+    lines.push(a.map(String).join(" "));
+  };
 });
-afterAll(() => { console.log = realLog; console.error = realError; });
-afterEach(() => { delete process.env.VLMKIT_PROJECT_ROOT; });
+afterAll(() => {
+  console.log = realLog;
+  console.error = realError;
+});
+afterEach(() => {
+  delete process.env.VLMKIT_PROJECT_ROOT;
+});
 
 const output = () => lines.join("\n").replace(/\[[0-9;]*m/g, "");
 
@@ -61,7 +70,18 @@ describe("runWorkflowCli", () => {
       const text = output();
       assert.match(text, /vlmkit workflow <command>/);
       // Every command in the table has to appear, or the usage is a trap.
-      for (const cmd of ["init", "capture", "verify", "approve", "report", "graph", "affected", "introspect", "spec-verify", "expect"]) {
+      for (const cmd of [
+        "init",
+        "capture",
+        "verify",
+        "approve",
+        "report",
+        "graph",
+        "affected",
+        "introspect",
+        "spec-verify",
+        "expect",
+      ]) {
         assert.ok(text.includes(cmd), `usage omits ${cmd}`);
       }
     }
@@ -88,8 +108,9 @@ describe("runWorkflowCli", () => {
     // Minimal 1x1 PNG bytes; `approve` copies files and counts `.png`, it does not
     // decode them.
     const png = Buffer.from(
-      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001"
-      + "0d0a2db40000000049454e44ae426082", "hex",
+      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001" +
+        "0d0a2db40000000049454e44ae426082",
+      "hex",
     );
     writeFileSync(join(project, "snapshots", "home.png"), png);
     writeFileSync(join(project, "snapshots", "about.png"), png);
@@ -116,15 +137,20 @@ describe("runWorkflowCli", () => {
     const ctx: UnifiedAgentContext = {
       intent: { summary: "restyle the header", changeType: "visual-only", confidence: 0.9, evidence: [] },
       crossValidations: [
-        { testId: "home", recommendation: "review", reasoning: "header moved 12px", visualChanged: true, a11yChanged: false, agreement: "visual-only" },
+        {
+          testId: "home",
+          recommendation: "review",
+          reasoning: "header moved 12px",
+          visualChanged: true,
+          a11yChanged: false,
+          agreement: "visual-only",
+        },
       ],
       qualityChecks: [
         { check: "contrast", passed: false, severity: "warning", details: "3.9:1 on .subtitle" },
         { check: "focus-order", passed: true, severity: "info", details: "unchanged" },
       ],
-      verdicts: [
-        { snapshotId: "home", decision: "approve", reasoning: "matches the intent", confidence: 0.82 },
-      ],
+      verdicts: [{ snapshotId: "home", decision: "approve", reasoning: "matches the intent", confidence: 0.82 }],
     } as unknown as UnifiedAgentContext;
     writeFileSync(join(project, "vrt-report.json"), JSON.stringify(ctx));
 
@@ -192,10 +218,11 @@ describe("capture preflight (no browser)", () => {
   it("the published package carries everything init and capture need", () => {
     // The other half: with no spec file, `files` needs no exclusion for one, and the build needs
     // no entry for one. If either comes back, the command is source-checkout-only again.
-    const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8")) as
-      { files: string[]; scripts: Record<string, string> };
-    assert.ok(!pkg.files.some((f) => f.includes("e2e")),
-      `files still mentions e2e: ${JSON.stringify(pkg.files)}`);
+    const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8")) as {
+      files: string[];
+      scripts: Record<string, string>;
+    };
+    assert.ok(!pkg.files.some((f) => f.includes("e2e")), `files still mentions e2e: ${JSON.stringify(pkg.files)}`);
     const build = readFileSync(resolve(REPO_ROOT, "vite.config.ts"), "utf8");
     assert.doesNotMatch(build, /e2e\//, "the build no longer emits a capture spec");
   });

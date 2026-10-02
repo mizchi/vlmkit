@@ -61,9 +61,30 @@ const ENTRY = resolve(ROOT, "src", "cli", "vlmkit.ts");
 
 /** Every top-level command the CLI advertises as current (not a deprecated alias). */
 const COMMANDS = [
-  "diff", "check", "inspect", "stress", "scan", "build", "contract", "heal", "verify",
-  "snapshot", "migration", "workflow", "bench", "report", "skill", "markup-loop",
-  "api", "mcp", "batch", "gates", "manifest", "watch", "diff-pr", "baseline",
+  "diff",
+  "check",
+  "inspect",
+  "stress",
+  "scan",
+  "build",
+  "contract",
+  "heal",
+  "verify",
+  "snapshot",
+  "migration",
+  "workflow",
+  "bench",
+  "report",
+  "skill",
+  "markup-loop",
+  "api",
+  "mcp",
+  "batch",
+  "gates",
+  "manifest",
+  "watch",
+  "diff-pr",
+  "baseline",
 ];
 
 /**
@@ -72,15 +93,20 @@ const COMMANDS = [
  * breaking change.
  */
 const ALLOWED = [
-  ".vrt-skills",      // state directory `vlmkit skill` reads
+  ".vrt-skills", // state directory `vlmkit skill` reads
 ];
 
 const strip = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 function help(args: string[]): string {
   try {
-    return strip(execFileSync(process.execPath, ["--experimental-strip-types", ENTRY, ...args],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, NO_COLOR: "1" } }));
+    return strip(
+      execFileSync(process.execPath, ["--experimental-strip-types", ENTRY, ...args], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, NO_COLOR: "1" },
+      }),
+    );
   } catch (e) {
     // Several groups exit non-zero when given no leaf; the text is what matters.
     const err = e as { stdout?: string; stderr?: string };
@@ -129,8 +155,11 @@ describe("the allowlist is real, not slack", () => {
   it("each allowlisted spelling is actually present in the source", () => {
     // If one of these stops existing, the exception should be deleted rather
     // than left as a hole the next sweep can drive through.
-    const src = execFileSync("git", ["grep", "-rhoE", ALLOWED.map((a) =>
-      a.replace(/[.]/g, "\\.")).join("|"), "--", "*.ts"], { cwd: ROOT, encoding: "utf8" });
+    const src = execFileSync(
+      "git",
+      ["grep", "-rhoE", ALLOWED.map((a) => a.replace(/[.]/g, "\\.")).join("|"), "--", "*.ts"],
+      { cwd: ROOT, encoding: "utf8" },
+    );
     for (const a of ALLOWED) {
       assert.ok(src.includes(a), `${a} is allowlisted but no longer appears in the source — drop it`);
     }
@@ -145,7 +174,8 @@ describe("a rename never leaves a definition and its reference disagreeing", () 
     // the sweep's pattern. The template still parsed — the review step just
     // silently never ran.
     const files = execFileSync("git", ["ls-files", "*.yml", "*.yaml"], { cwd: ROOT, encoding: "utf8" })
-      .split("\n").filter(Boolean);
+      .split("\n")
+      .filter(Boolean);
     const problems: string[] = [];
     for (const f of files) {
       const path = resolve(ROOT, f);
@@ -177,7 +207,8 @@ describe("the rename did not invert text that is about the old name", () => {
    */
   it("no file claims the shipped binary does not exist — in English or Japanese", () => {
     const files = execFileSync("git", ["ls-files", "*.ts", "*.md"], { cwd: ROOT, encoding: "utf8" })
-      .split("\n").filter(Boolean);
+      .split("\n")
+      .filter(Boolean);
     const claims: string[] = [];
     for (const f of files) {
       const path = resolve(ROOT, f);
@@ -192,8 +223,9 @@ describe("the rename did not invert text that is about the old name", () => {
         // exist where it meant `vrt`, in Japanese, one line below saying `bin` is `vlmkit`.
         // This repo's notes are bilingual, so a guard that reads one language guards half the
         // prose.
-        const claimsMissing = /\bno\s+`?vlmkit`?\s+binary\b/i.test(line)
-          || /`?vlmkit`?\s*(バイナリ|コマンド)\s*(は|が)\s*(存在しない|存在せず|無い|ない)/.test(line);
+        const claimsMissing =
+          /\bno\s+`?vlmkit`?\s+binary\b/i.test(line) ||
+          /`?vlmkit`?\s*(バイナリ|コマンド)\s*(は|が)\s*(存在しない|存在せず|無い|ない)/.test(line);
         if (!claimsMissing) return;
         // An old -> new illustration is not a claim. Narrowly defined: a line
         // that shows a quoted before AND a quoted after, separated by an arrow —
@@ -232,7 +264,8 @@ describe("workflows that run a src/ entrypoint build the packages first", () => 
     //
     // `pnpm test` counts as satisfying it — `pretest` runs build:packages.
     const files = execFileSync("git", ["ls-files", ".github/workflows/*.yml"], { cwd: ROOT, encoding: "utf8" })
-      .split("\n").filter(Boolean);
+      .split("\n")
+      .filter(Boolean);
     const missing: string[] = [];
     for (const f of files) {
       const path = resolve(ROOT, f);

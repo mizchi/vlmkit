@@ -21,11 +21,13 @@ import {
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
-import { CraterClient, diffPaintTrees, type PaintNode, type PaintTreeChange } from "@mizchi/vlmkit-capture/crater-client.ts";
 import {
-  filterComputedStyleDiffsByTargets,
-  type ComputedStyleTarget,
-} from "./css-custom-properties.ts";
+  CraterClient,
+  diffPaintTrees,
+  type PaintNode,
+  type PaintTreeChange,
+} from "@mizchi/vlmkit-capture/crater-client.ts";
+import { filterComputedStyleDiffsByTargets, type ComputedStyleTarget } from "./css-custom-properties.ts";
 import {
   buildInteractionTargetPlans,
   captureEmulatedInteractionStyleSnapshotInDom,
@@ -43,7 +45,11 @@ import {
   type InteractionTargetPlan,
   waitForInteractionStylesInDom,
 } from "@mizchi/vlmkit-core/computed-style-capture.ts";
-import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import {
+  diagnoseSandboxLaunchFailure,
+  formatPlaywrightLaunchError,
+  isPlaywrightSandboxRestrictionError,
+} from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type { A11yNode, VrtSnapshot, VrtDiff, VisualSemanticDiff, A11yDiff } from "@mizchi/vlmkit-core/types.ts";
 import { debugEnabled } from "@mizchi/vlmkit-core/project-config.ts";
@@ -51,21 +57,21 @@ import { debugEnabled } from "@mizchi/vlmkit-core/project-config.ts";
 // ---- Types ----
 
 export interface CssDeclaration {
-  index: number;       // line index in full CSS text
-  text: string;        // original line text
-  property: string;    // e.g. "padding"
-  value: string;       // e.g. "12px 24px"
-  selector: string;    // containing selector
-  mediaCondition: string | null;  // e.g. "(max-width: 768px)" or null
+  index: number; // line index in full CSS text
+  text: string; // original line text
+  property: string; // e.g. "padding"
+  value: string; // e.g. "12px 24px"
+  selector: string; // containing selector
+  mediaCondition: string | null; // e.g. "(max-width: 768px)" or null
 }
 
 export interface CapturedState {
   a11yTree: A11yNode;
   screenshotPath: string;
   visualCaptureSkipped?: boolean;
-  computedStyles: Map<string, Record<string, string>>;  // selector → { property: value }
-  hoverComputedStyles: Map<string, Record<string, string>>;  // hover-forced computed styles
-  paintTree?: PaintNode;  // crater only: internal paint tree
+  computedStyles: Map<string, Record<string, string>>; // selector → { property: value }
+  hoverComputedStyles: Map<string, Record<string, string>>; // hover-forced computed styles
+  paintTree?: PaintNode; // crater only: internal paint tree
 }
 
 /** Computed style diff between two captures */
@@ -95,8 +101,7 @@ export function diffComputedStyles(
 }
 
 function hasCapturedStyleValues(styles: Record<string, string>): boolean {
-  return Object.keys(styles).length > 0 &&
-    Object.values(styles).some((value) => value.trim().length > 0);
+  return Object.keys(styles).length > 0 && Object.values(styles).some((value) => value.trim().length > 0);
 }
 
 export async function captureCraterForcedStateStyles(
@@ -112,11 +117,7 @@ export async function captureCraterForcedStateStyles(
   // selector. Crater forces all extracted states in one BiDi call.
   for (const plan of plans) {
     if (plan.forcedStates.length === 0) continue;
-    const result = await client.getComputedStylesWithState(
-      plan.selector,
-      plan.forcedStates,
-      properties,
-    );
+    const result = await client.getComputedStylesWithState(plan.selector, plan.forcedStates, properties);
     if (!hasCapturedStyleValues(result.forced)) continue;
     styles.set(plan.selector, result.forced);
   }
@@ -140,33 +141,26 @@ export function applyApprovalsToAnalysisSignals(
   }
 
   const context = options.context ?? {};
-  const resolvedChangeType = context.changeType ?? (
-    context.property ? inferApprovalChangeType(context.property, context.category) : undefined
-  );
+  const resolvedChangeType =
+    context.changeType ?? (context.property ? inferApprovalChangeType(context.property, context.category) : undefined);
 
   const visualApproval = vrtDiff
     ? applyApprovalToVrtDiff(
-      vrtDiff,
-      options.manifest,
-      { ...context, changeType: resolvedChangeType },
-      { strict: options.strict },
-    )
+        vrtDiff,
+        options.manifest,
+        { ...context, changeType: resolvedChangeType },
+        { strict: options.strict },
+      )
     : null;
 
-  const paintApproval = filterApprovedPaintTreeChanges(
-    paintTreeChanges,
-    options.manifest,
-    context,
-    { strict: options.strict },
-  );
+  const paintApproval = filterApprovedPaintTreeChanges(paintTreeChanges, options.manifest, context, {
+    strict: options.strict,
+  });
 
   return {
     vrtDiff: visualApproval?.diff ?? vrtDiff,
     paintTreeChanges: paintApproval.remainingChanges,
-    approvalWarnings: dedupeApprovalWarnings([
-      ...(visualApproval?.warnings ?? []),
-      ...paintApproval.warnings,
-    ]),
+    approvalWarnings: dedupeApprovalWarnings([...(visualApproval?.warnings ?? []), ...paintApproval.warnings]),
     approvedVisualRules: visualApproval?.matchedRules ?? [],
     approvedPaintTreeMatches: paintApproval.matches,
   };
@@ -285,8 +279,8 @@ export function parseCssDeclarations(css: string): CssDeclaration[] {
 /** CSS selector block (groups declarations on the same line) */
 export interface CssSelectorBlock {
   selector: string;
-  index: number;           // line index
-  text: string;            // original line text
+  index: number; // line index
+  text: string; // original line text
   declarations: CssDeclaration[];
   mediaCondition: string | null;
 }
@@ -298,7 +292,13 @@ export function groupBySelector(declarations: CssDeclaration[]): CssSelectorBloc
     const key = `${d.index}:${d.selector}`;
     let block = map.get(key);
     if (!block) {
-      block = { selector: d.selector, index: d.index, text: d.text, declarations: [], mediaCondition: d.mediaCondition };
+      block = {
+        selector: d.selector,
+        index: d.index,
+        text: d.text,
+        declarations: [],
+        mediaCondition: d.mediaCondition,
+      };
       map.set(key, block);
     }
     block.declarations.push(d);
@@ -395,7 +395,9 @@ export function seededRandom(seed: number): () => number {
 
 export type RenderBackend = "chromium" | "crater";
 
-export async function createBrowser(viewport = { width: 1280, height: 900 }): Promise<{ browser: Browser; viewport: { width: number; height: number } }> {
+export async function createBrowser(
+  viewport = { width: 1280, height: 900 },
+): Promise<{ browser: Browser; viewport: { width: number; height: number } }> {
   let browser: Browser;
   // The sandbox diagnosis now travels with the launch instead of being copied
   // around it: `diagnoseSandboxLaunchFailure` declines anything that is not the
@@ -428,7 +430,7 @@ export async function capturePageState(
   try {
     // Use JSON-based expression to avoid __name transpilation issue in page.evaluate
     const expr = buildComputedStyleCaptureJsonExpression(trackedProperties);
-    const jsonStr = await page.evaluate(expr) as string;
+    const jsonStr = (await page.evaluate(expr)) as string;
     const snapshot = parseComputedStyleSnapshot(JSON.parse(jsonStr));
     for (const [selector, props] of computedStyleSnapshotToMap(snapshot)) {
       computedStyles.set(selector, props);
@@ -444,20 +446,18 @@ export async function capturePageState(
   if (options?.captureHover) {
     try {
       const interactionPlansExpr = `(function(){ ${ESBUILD_NAME_POLYFILL} return (${collectInteractionTargetPlansInDom.toString()})(); })()`;
-      const interactionPlans = await page.evaluate(interactionPlansExpr) as InteractionTargetPlan[];
+      const interactionPlans = (await page.evaluate(interactionPlansExpr)) as InteractionTargetPlan[];
       const expectedInteractionPlans = buildInteractionTargetPlans(options.interactionSelectors ?? []);
       const hoverExpr = `(function(){ ${ESBUILD_NAME_POLYFILL} return (${captureEmulatedInteractionStyleSnapshotInDom.toString()})(${JSON.stringify(trackedProperties)}); })()`;
-      const emulatedHoverStyles = await page.evaluate(hoverExpr) as ComputedStyleSnapshot;
+      const emulatedHoverStyles = (await page.evaluate(hoverExpr)) as ComputedStyleSnapshot;
       const fallbackPlans = dedupeInteractionPlans([
         ...expectedInteractionPlans,
-        ...selectInteractionFallbackPlans(
-        interactionPlans,
-        hasMeaningfulComputedStyleSnapshot(emulatedHoverStyles),
-        ),
+        ...selectInteractionFallbackPlans(interactionPlans, hasMeaningfulComputedStyleSnapshot(emulatedHoverStyles)),
       ]).slice(0, 8);
-      const fallbackHoverStyles = fallbackPlans.length > 0
-        ? await capturePlaywrightInteractionFallbackSnapshot(page, fallbackPlans, trackedProperties)
-        : {};
+      const fallbackHoverStyles =
+        fallbackPlans.length > 0
+          ? await capturePlaywrightInteractionFallbackSnapshot(page, fallbackPlans, trackedProperties)
+          : {};
       // Fallback (CDP) result wins over emulated values — CDP forces the
       // pseudo-state and reads the real computed value, while emulation
       // rewrites CSS rules and is unreliable when the rule body is empty
@@ -466,7 +466,9 @@ export async function capturePageState(
       for (const [sel, props] of Object.entries(mergedHoverStyles)) {
         hoverComputedStyles.set(sel, props);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   // Capture a11y tree via CDP
@@ -484,9 +486,7 @@ export async function capturePageState(
   return { a11yTree, screenshotPath, computedStyles, hoverComputedStyles };
 }
 
-function dedupeInteractionPlans(
-  plans: InteractionTargetPlan[],
-): InteractionTargetPlan[] {
+function dedupeInteractionPlans(plans: InteractionTargetPlan[]): InteractionTargetPlan[] {
   const deduped: InteractionTargetPlan[] = [];
   const seen = new Set<string>();
   for (const plan of plans) {
@@ -518,9 +518,9 @@ function planSpecificity(plan: InteractionTargetPlan): number {
   // specific plan rather than letting the broader plan's forced-state
   // capture overwrite it.
   return (
-    (plan.normalizedSelector.match(/\./g)?.length ?? 0) * 10
-    + (plan.normalizedSelector.match(/#/g)?.length ?? 0) * 100
-    + plan.normalizedSelector.length
+    (plan.normalizedSelector.match(/\./g)?.length ?? 0) * 10 +
+    (plan.normalizedSelector.match(/#/g)?.length ?? 0) * 100 +
+    plan.normalizedSelector.length
   );
 }
 
@@ -545,14 +545,22 @@ async function capturePlaywrightInteractionFallbackSnapshot(
     transitionStyleTag = await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-  } catch { /* page may be detached; CDP path still works without */ }
+  } catch {
+    /* page may be detached; CDP path still works without */
+  }
 
   let cdp: CDPSession | null = null;
   try {
     cdp = await page.context().newCDPSession(page);
   } catch {
     if (transitionStyleTag) {
-      try { await transitionStyleTag.evaluate((el) => { (el as HTMLElement).remove(); }); } catch { /* ignore */ }
+      try {
+        await transitionStyleTag.evaluate((el) => {
+          (el as HTMLElement).remove();
+        });
+      } catch {
+        /* ignore */
+      }
     }
     return {};
   }
@@ -585,9 +593,11 @@ async function capturePlaywrightInteractionFallbackSnapshot(
         }
         if (forcedNodeIds.length === 0) continue;
 
-        await page.evaluate(`(function(){ ${ESBUILD_NAME_POLYFILL} return (${waitForInteractionStylesInDom.toString()})(); })()`);
+        await page.evaluate(
+          `(function(){ ${ESBUILD_NAME_POLYFILL} return (${waitForInteractionStylesInDom.toString()})(); })()`,
+        );
         const targetExpr = `(function(){ ${ESBUILD_NAME_POLYFILL} return (${captureComputedStyleSnapshotForTargetSelectorsInDom.toString()})(${JSON.stringify({ props: trackedProperties, selectors: [plan.normalizedSelector] })}); })()`;
-        snapshots.push(await page.evaluate(targetExpr) as ComputedStyleSnapshot);
+        snapshots.push((await page.evaluate(targetExpr)) as ComputedStyleSnapshot);
       } catch {
         // ignore per-plan failures
       } finally {
@@ -599,14 +609,26 @@ async function capturePlaywrightInteractionFallbackSnapshot(
               nodeId,
               forcedPseudoClasses: [],
             });
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       }
     }
   } finally {
-    try { await cdp.detach(); } catch { /* ignore */ }
+    try {
+      await cdp.detach();
+    } catch {
+      /* ignore */
+    }
     if (transitionStyleTag) {
-      try { await transitionStyleTag.evaluate((el) => { (el as HTMLElement).remove(); }); } catch { /* ignore */ }
+      try {
+        await transitionStyleTag.evaluate((el) => {
+          (el as HTMLElement).remove();
+        });
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -649,7 +671,9 @@ export async function capturePageStateCrater(
   let paintTree: PaintNode | undefined;
   try {
     paintTree = await client.capturePaintTree();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // a11y tree -- crater returns empty (future support)
   const a11yTree: A11yNode = { role: "document", name: "", children: [] };
@@ -657,7 +681,9 @@ export async function capturePageStateCrater(
   let computedStyles = new Map<string, Record<string, string>>();
   try {
     computedStyles = await client.captureComputedStyles(trackedProperties);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   let hoverComputedStyles = new Map<string, Record<string, string>>();
   if (options?.captureHover && options.interactionSelectors?.length) {
     try {
@@ -666,7 +692,9 @@ export async function capturePageStateCrater(
         options.interactionSelectors,
         trackedProperties,
       );
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return {
@@ -679,13 +707,15 @@ export async function capturePageStateCrater(
   };
 }
 
-function cdpNodesToTree(nodes: Array<{
-  nodeId: string;
-  role?: { value?: string };
-  name?: { value?: string };
-  properties?: Array<{ name: string; value: { value?: unknown } }>;
-  childIds?: string[];
-}>): unknown {
+function cdpNodesToTree(
+  nodes: Array<{
+    nodeId: string;
+    role?: { value?: string };
+    name?: { value?: string };
+    properties?: Array<{ name: string; value: { value?: unknown } }>;
+    childIds?: string[];
+  }>,
+): unknown {
   if (!nodes || nodes.length === 0) return { role: "document", name: "", children: [] };
 
   const nodeMap = new Map<string, Record<string, unknown>>();
@@ -730,7 +760,9 @@ export async function analyzeVrtDiff(
   options?: { skipHeatmap?: boolean },
 ): Promise<VrtAnalysis> {
   const vrtSnap: VrtSnapshot = {
-    testId: "page", testTitle: "page", projectName: "css-challenge",
+    testId: "page",
+    testTitle: "page",
+    projectName: "css-challenge",
     screenshotPath: brokenState.screenshotPath,
     baselinePath: baselineState.screenshotPath,
     status: "changed",
@@ -751,13 +783,9 @@ export async function analyzeVrtDiff(
 
   // Hover diff (computed style based)
   const hoverStyleDiffs = diffComputedStyles(baselineState.hoverComputedStyles, brokenState.hoverComputedStyles);
-  const referencedHoverStyleDiffs = filterComputedStyleDiffsByTargets(
-    hoverStyleDiffs,
-    trackedComputedStyleTargets,
-  );
-  const hoverDiffDetected = trackedComputedStyleTargets.length > 0
-    ? referencedHoverStyleDiffs.length > 0
-    : hoverStyleDiffs.length > 0;
+  const referencedHoverStyleDiffs = filterComputedStyleDiffsByTargets(hoverStyleDiffs, trackedComputedStyleTargets);
+  const hoverDiffDetected =
+    trackedComputedStyleTargets.length > 0 ? referencedHoverStyleDiffs.length > 0 : hoverStyleDiffs.length > 0;
 
   // Paint tree diff (crater only)
   let rawPaintTreeChanges: PaintTreeChange[] = [];
@@ -771,7 +799,8 @@ export async function analyzeVrtDiff(
 
   if (vrtDiff && vrtDiff.diffPixels > 0) {
     visualSemantic = classifyVisualDiff(vrtDiff);
-    visualReport = `Visual diff: ${(vrtDiff.diffRatio * 100).toFixed(1)}% pixels changed\n` +
+    visualReport =
+      `Visual diff: ${(vrtDiff.diffRatio * 100).toFixed(1)}% pixels changed\n` +
       `Regions: ${vrtDiff.regions.map((r) => `(${r.x},${r.y} ${r.width}x${r.height})`).join(", ")}\n` +
       `Semantic: ${visualSemantic.summary}\n` +
       visualSemantic.changes.map((c) => `  - [${c.type}] ${c.description}`).join("\n");
@@ -793,7 +822,8 @@ export async function analyzeVrtDiff(
 
   let a11yReport = "";
   if (a11yDiff.changes.length > 0) {
-    a11yReport = `A11y changes: ${a11yDiff.changes.length}\n` +
+    a11yReport =
+      `A11y changes: ${a11yDiff.changes.length}\n` +
       a11yDiff.changes.map((c) => `  - [${c.type}] ${c.description}`).join("\n");
   } else {
     a11yReport = "No a11y tree changes detected.";
@@ -811,7 +841,8 @@ export async function analyzeVrtDiff(
     computedReport = `\nTracked var() targets: ${trackedComputedStyleTargets.length}\n${trackedLines}`;
 
     if (referencedComputedStyleDiffs.length > 0) {
-      computedReport += `\nReferenced computed style changes: ${referencedComputedStyleDiffs.length}\n` +
+      computedReport +=
+        `\nReferenced computed style changes: ${referencedComputedStyleDiffs.length}\n` +
         referencedComputedStyleDiffs
           .slice(0, 10)
           .map((d) => `  - ${d.selector} { ${d.property}: ${d.before} → ${d.after} }`)
@@ -821,7 +852,8 @@ export async function analyzeVrtDiff(
     }
 
     if (referencedHoverStyleDiffs.length > 0) {
-      computedReport += `\nReferenced hover style changes: ${referencedHoverStyleDiffs.length}\n` +
+      computedReport +=
+        `\nReferenced hover style changes: ${referencedHoverStyleDiffs.length}\n` +
         referencedHoverStyleDiffs
           .slice(0, 10)
           .map((d) => `  - ${d.selector} { ${d.property}: ${d.before} → ${d.after} }`)
@@ -832,24 +864,33 @@ export async function analyzeVrtDiff(
       computedReport += `\nTotal computed style changes: ${computedStyleDiffs.length}`;
     }
   } else if (computedStyleDiffs.length > 0) {
-    computedReport = `\nComputed style changes: ${computedStyleDiffs.length}\n` +
-      computedStyleDiffs.slice(0, 10).map((d) => `  - ${d.selector} { ${d.property}: ${d.before} → ${d.after} }`).join("\n");
+    computedReport =
+      `\nComputed style changes: ${computedStyleDiffs.length}\n` +
+      computedStyleDiffs
+        .slice(0, 10)
+        .map((d) => `  - ${d.selector} { ${d.property}: ${d.before} → ${d.after} }`)
+        .join("\n");
   }
 
   let paintTreeReport = "";
   if (paintTreeChanges.length > 0) {
-    paintTreeReport = `\nPaint tree changes: ${paintTreeChanges.length}\n` +
-      paintTreeChanges.slice(0, 10).map((c) => `  - [${c.type}] ${c.path} ${c.property ?? ""}: ${c.before ?? ""} → ${c.after ?? ""}`).join("\n");
+    paintTreeReport =
+      `\nPaint tree changes: ${paintTreeChanges.length}\n` +
+      paintTreeChanges
+        .slice(0, 10)
+        .map((c) => `  - [${c.type}] ${c.path} ${c.property ?? ""}: ${c.before ?? ""} → ${c.after ?? ""}`)
+        .join("\n");
   } else if (approvals.approvedPaintTreeMatches.length > 0) {
     const reasons = [...new Set(approvals.approvedPaintTreeMatches.map((match) => match.rule.reason))];
-    paintTreeReport = `\nPaint tree changes approved: ${approvals.approvedPaintTreeMatches.length}\n` +
+    paintTreeReport =
+      `\nPaint tree changes approved: ${approvals.approvedPaintTreeMatches.length}\n` +
       reasons.map((reason) => `  - ${reason}`).join("\n");
   }
 
   let approvalReport = "";
   if (approvals.approvalWarnings.length > 0) {
-    approvalReport = `\nApproval warnings:\n` +
-      approvals.approvalWarnings.map((warning) => `  - ${warning.message}`).join("\n");
+    approvalReport =
+      `\nApproval warnings:\n` + approvals.approvalWarnings.map((warning) => `  - ${warning.message}`).join("\n");
   }
 
   const fullReport = `${visualReport}\n\n${a11yReport}${computedReport}${paintTreeReport}${approvalReport}`;
@@ -940,46 +981,111 @@ export function replaceCss(html: string, originalCss: string, newCss: string): s
 // ---- Property categorization ----
 
 const LAYOUT_PROPS = new Set([
-  "display", "flex", "flex-direction", "flex-wrap", "flex-shrink", "flex-grow",
-  "align-items", "justify-content", "gap", "grid-template-columns", "grid-template-rows",
-  "position", "top", "right", "bottom", "left", "float", "clear", "overflow", "overflow-x", "overflow-y",
+  "display",
+  "flex",
+  "flex-direction",
+  "flex-wrap",
+  "flex-shrink",
+  "flex-grow",
+  "align-items",
+  "justify-content",
+  "gap",
+  "grid-template-columns",
+  "grid-template-rows",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "float",
+  "clear",
+  "overflow",
+  "overflow-x",
+  "overflow-y",
 ]);
 const SPACING_PROPS = new Set([
-  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-  "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+  "margin",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "padding",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
 ]);
-const SIZING_PROPS = new Set([
-  "width", "height", "max-width", "max-height", "min-width", "min-height",
-  "line-height",
-]);
+const SIZING_PROPS = new Set(["width", "height", "max-width", "max-height", "min-width", "min-height", "line-height"]);
 const VISUAL_PROPS = new Set([
-  "background", "background-color", "background-image",
-  "color", "opacity",
-  "border", "border-top", "border-right", "border-bottom", "border-left",
-  "border-color", "border-radius", "border-spacing",
-  "box-shadow", "text-shadow",
+  "background",
+  "background-color",
+  "background-image",
+  "color",
+  "opacity",
+  "border",
+  "border-top",
+  "border-right",
+  "border-bottom",
+  "border-left",
+  "border-color",
+  "border-radius",
+  "border-spacing",
+  "box-shadow",
+  "text-shadow",
   "outline",
 ]);
 const TYPO_PROPS = new Set([
-  "font-family", "font-size", "font-weight", "font-style",
-  "text-align", "text-decoration", "text-transform", "text-indent",
-  "letter-spacing", "word-spacing", "white-space",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "font-style",
+  "text-align",
+  "text-decoration",
+  "text-transform",
+  "text-indent",
+  "letter-spacing",
+  "word-spacing",
+  "white-space",
 ]);
 
 const ANIMATION_PROPS = new Set([
-  "animation", "animation-name", "animation-duration", "animation-delay",
-  "animation-timing-function", "animation-iteration-count", "animation-direction",
-  "animation-fill-mode", "animation-play-state",
-  "transition", "transition-property", "transition-duration", "transition-delay",
+  "animation",
+  "animation-name",
+  "animation-duration",
+  "animation-delay",
+  "animation-timing-function",
+  "animation-iteration-count",
+  "animation-direction",
+  "animation-fill-mode",
+  "animation-play-state",
+  "transition",
+  "transition-property",
+  "transition-duration",
+  "transition-delay",
   "transition-timing-function",
 ]);
 
 const TRANSFORM_PROPS = new Set([
-  "transform", "transform-origin", "translate", "rotate", "scale",
-  "filter", "backdrop-filter", "clip-path", "mask",
+  "transform",
+  "transform-origin",
+  "translate",
+  "rotate",
+  "scale",
+  "filter",
+  "backdrop-filter",
+  "clip-path",
+  "mask",
 ]);
 
-export type PropertyCategory = "layout" | "spacing" | "sizing" | "visual" | "typography" | "animation" | "transform" | "other";
+export type PropertyCategory =
+  | "layout"
+  | "spacing"
+  | "sizing"
+  | "visual"
+  | "typography"
+  | "animation"
+  | "transform"
+  | "other";
 
 export function categorizeProperty(property: string): PropertyCategory {
   if (LAYOUT_PROPS.has(property)) return "layout";

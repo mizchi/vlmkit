@@ -25,7 +25,7 @@ describe("runTest", () => {
     assert.equal(r.ok, true);
   });
   it("reports not-ok for a failing command and captures output", async () => {
-    const r = await runTest('node -e "console.error(\'boom\'); process.exit(1)"', process.cwd());
+    const r = await runTest("node -e \"console.error('boom'); process.exit(1)\"", process.cwd());
     assert.equal(r.ok, false);
     assert.match(r.stderr + r.stdout, /boom/);
   });

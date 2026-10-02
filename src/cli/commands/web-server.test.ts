@@ -62,7 +62,7 @@ describe("parsing webServer", () => {
     });
   });
 
-  it("requires url, so \"started\" cannot come to mean \"spawned\"", () => {
+  it('requires url, so "started" cannot come to mean "spawned"', () => {
     // Without a readiness probe the first gate races the bundler, and a flake
     // there is indistinguishable from a real finding.
     assert.throws(() => config({ command: "npm run dev" }), /url is required/);
@@ -81,7 +81,10 @@ describe("parsing webServer", () => {
   });
 
   it("leaves the field absent when it is not declared", () => {
-    assert.equal(parseGateConfig(json({ defaults: { gates: ["check integrity"] }, pages: [{ source: "a.html" }] })).webServer, undefined);
+    assert.equal(
+      parseGateConfig(json({ defaults: { gates: ["check integrity"] }, pages: [{ source: "a.html" }] })).webServer,
+      undefined,
+    );
   });
 });
 
@@ -103,7 +106,9 @@ describe("shouldReuseExistingServer", () => {
 
 describe("formatWebServerPlan", () => {
   it("says on `gates list` that a run would start a server", () => {
-    const text = plain(formatWebServerPlan({ command: "npm run dev", url: "http://localhost:5173/", reuseExistingServer: false }));
+    const text = plain(
+      formatWebServerPlan({ command: "npm run dev", url: "http://localhost:5173/", reuseExistingServer: false }),
+    );
     assert.match(text, /npm run dev/);
     assert.match(text, /http:\/\/localhost:5173\//);
     assert.match(text, /always starts its own/);
@@ -111,7 +116,9 @@ describe("formatWebServerPlan", () => {
   });
 
   it("says when it would adopt a running server instead", () => {
-    const text = plain(formatWebServerPlan({ command: "npm run dev", url: "http://localhost:5173/", reuseExistingServer: true }));
+    const text = plain(
+      formatWebServerPlan({ command: "npm run dev", url: "http://localhost:5173/", reuseExistingServer: true }),
+    );
     assert.match(text, /reuses a running server/);
   });
 });
@@ -120,9 +127,14 @@ describe("withWebServer", () => {
   it("has the server serving inside the body and stopped after it", async () => {
     const spec = server(4491);
     let servedDuringBody = false;
-    await withWebServer(spec, spec.cwd!, async () => {
-      servedDuringBody = await responds(spec.url);
-    }, () => {});
+    await withWebServer(
+      spec,
+      spec.cwd!,
+      async () => {
+        servedDuringBody = await responds(spec.url);
+      },
+      () => {},
+    );
     assert.equal(servedDuringBody, true, "the body should run against a serving URL");
     assert.equal(await responds(spec.url), false, "the server should be stopped afterwards");
   });
@@ -132,7 +144,14 @@ describe("withWebServer", () => {
     // run through reuseExistingServer, silently gating a stale build.
     const spec = server(4492);
     await assert.rejects(
-      withWebServer(spec, spec.cwd!, async () => { throw new Error("gate blew up"); }, () => {}),
+      withWebServer(
+        spec,
+        spec.cwd!,
+        async () => {
+          throw new Error("gate blew up");
+        },
+        () => {},
+      ),
       /gate blew up/,
     );
     assert.equal(await responds(spec.url), false);
@@ -144,9 +163,14 @@ describe("withWebServer", () => {
     try {
       const adopted = server(4493, { reuseExistingServer: true, cwd: spec.cwd });
       let reused = false;
-      await withWebServer(adopted, adopted.cwd!, async () => {
-        reused = await responds(adopted.url);
-      }, () => {});
+      await withWebServer(
+        adopted,
+        adopted.cwd!,
+        async () => {
+          reused = await responds(adopted.url);
+        },
+        () => {},
+      );
       assert.equal(reused, true);
       // It did not start this one, so it must not stop it.
       assert.equal(await responds(spec.url), true);
@@ -175,7 +199,12 @@ describe("withWebServer", () => {
     }
     assert.ok(listener && port, "no port from fetch's bad-port list could be bound here");
     try {
-      const spec: GateWebServer = { command: "exit 9", url: `http://127.0.0.1:${port}/`, timeout: 5_000, reuseExistingServer: true };
+      const spec: GateWebServer = {
+        command: "exit 9",
+        url: `http://127.0.0.1:${port}/`,
+        timeout: 5_000,
+        reuseExistingServer: true,
+      };
       const started = await startWebServer(spec, tmpdir(), () => {});
       assert.equal(started.reused, true, `a server answering on ${port} is adopted, not started again`);
     } finally {
@@ -191,7 +220,12 @@ describe("withWebServer", () => {
       reuseExistingServer: false,
     };
     await assert.rejects(
-      withWebServer(spec, tmpdir(), async () => "unreached", () => {}),
+      withWebServer(
+        spec,
+        tmpdir(),
+        async () => "unreached",
+        () => {},
+      ),
       /exited with code 3 before .* responded/,
     );
   });
@@ -204,7 +238,12 @@ describe("withWebServer", () => {
       reuseExistingServer: false,
     };
     await assert.rejects(
-      withWebServer(spec, tmpdir(), async () => "unreached", () => {}),
+      withWebServer(
+        spec,
+        tmpdir(),
+        async () => "unreached",
+        () => {},
+      ),
       /did not serve .* within 1000ms/,
     );
   });

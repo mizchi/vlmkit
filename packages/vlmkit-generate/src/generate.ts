@@ -1,6 +1,13 @@
 import { createUnifiedLLMClient } from "@mizchi/vlmkit-ai";
 import * as ts from "typescript";
-import type { GenerateDeps, GenerateInput, GenerateResult, GenerateRetryOptions, GeneratorModelOptions, LocatorInventory } from "./types.ts";
+import type {
+  GenerateDeps,
+  GenerateInput,
+  GenerateResult,
+  GenerateRetryOptions,
+  GeneratorModelOptions,
+  LocatorInventory,
+} from "./types.ts";
 
 type ResolvedGeneratorModelOptions = GeneratorModelOptions & {
   provider: NonNullable<GeneratorModelOptions["provider"]>;
@@ -21,7 +28,7 @@ export function buildGeneratePrompt(input: GenerateInput): string {
     "- Import `test` and `expect` from `@playwright/test`.",
     `- Import and use \`gotoApp\` from \`${helperImportPath}\`; do not call \`page.goto\` directly.`,
     "- Prefer role, label, and test id locators. Avoid CSS and XPath unless no semantic locator exists.",
-    "- For live-region roles such as `status`, `alert`, and `log`, use `getByRole(\"status\")` and assert text separately; do not pass a `name` filter.",
+    '- For live-region roles such as `status`, `alert`, and `log`, use `getByRole("status")` and assert text separately; do not pass a `name` filter.',
     "- Keep comments sparse. Do not narrate obvious Playwright actions; comment only non-obvious locator or determinism constraints.",
     "- Every visual assertion must also have semantic assertions.",
     requireScreenshots
@@ -32,7 +39,9 @@ export function buildGeneratePrompt(input: GenerateInput): string {
     input.rulesMarkdown?.trim() ? `Additional generation rules:\n${input.rulesMarkdown.trim()}` : undefined,
     "",
     `Plan:\n${input.planMarkdown.trim()}`,
-  ].filter((p): p is string => Boolean(p)).join("\n");
+  ]
+    .filter((p): p is string => Boolean(p))
+    .join("\n");
 }
 
 export function extractTypescriptSource(raw: string): string {
@@ -63,7 +72,8 @@ export function validateGeneratedTestSource(
   }
   const sourceFile = ts.createSourceFile("generated.spec.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   // parseDiagnostics is a TypeScript-internal field not in the public SourceFile type.
-  const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: ts.DiagnosticWithLocation[] }).parseDiagnostics ?? [];
+  const parseDiagnostics =
+    (sourceFile as ts.SourceFile & { parseDiagnostics?: ts.DiagnosticWithLocation[] }).parseDiagnostics ?? [];
   for (const parseDiagnostic of parseDiagnostics) {
     const message = ts.flattenDiagnosticMessageText(parseDiagnostic.messageText, " ");
     diagnostics.push(`typescript syntax error: ${message}`);
@@ -242,10 +252,18 @@ function collectGeneratedTestAstInfo(sourceFile: ts.SourceFile, helperImportPath
         if (node.expression.text === "expect") info.usesExpect = true;
       } else if (ts.isPropertyAccessExpression(node.expression)) {
         const property = node.expression.name.text;
-        if (property === "goto" && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === "page") {
+        if (
+          property === "goto" &&
+          ts.isIdentifier(node.expression.expression) &&
+          node.expression.expression.text === "page"
+        ) {
           info.usesPageGoto = true;
         }
-        if (property === "soft" && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === "expect") {
+        if (
+          property === "soft" &&
+          ts.isIdentifier(node.expression.expression) &&
+          node.expression.expression.text === "expect"
+        ) {
           info.usesExpect = true;
         }
         if (property === "toHaveScreenshot") {
@@ -362,10 +380,12 @@ function isAllowedNamelessObservedRole(
   locator: UsedLocator,
   allowed: ReturnType<typeof normalizeLocatorInventory>,
 ): boolean {
-  return locator.kind === "role"
-    && !locator.name
-    && namelessObservedRoleNames.has(locator.role)
-    && allowed.observedRoleKinds.has(locator.role);
+  return (
+    locator.kind === "role" &&
+    !locator.name &&
+    namelessObservedRoleNames.has(locator.role) &&
+    allowed.observedRoleKinds.has(locator.role)
+  );
 }
 
 const namelessObservedRoleNames = new Set(["status", "alert", "log"]);
@@ -388,7 +408,9 @@ function formatLocatorInventory(inventory: LocatorInventory): string {
   if (inventory.labels?.length) lines.push(`- Labels: ${inventory.labels.join(", ")}`);
   if (inventory.testIds?.length) lines.push(`- Test IDs: ${inventory.testIds.join(", ")}`);
   if (inventory.texts?.length) lines.push(`- Text: ${inventory.texts.join(", ")}`);
-  lines.push("- Do not invent locators outside this observed set unless the plan explicitly says to discover them first.");
+  lines.push(
+    "- Do not invent locators outside this observed set unless the plan explicitly says to discover them first.",
+  );
   return lines.join("\n");
 }
 
@@ -413,7 +435,9 @@ function normalizeMaxAttempts(value: number | undefined): number {
   return Math.max(1, Math.floor(value!));
 }
 
-function resolveDefaultProvider(env: Record<string, string | undefined>): NonNullable<GeneratorModelOptions["provider"]> {
+function resolveDefaultProvider(
+  env: Record<string, string | undefined>,
+): NonNullable<GeneratorModelOptions["provider"]> {
   const fromEnv = env.VLMKIT_LLM_PROVIDER;
   if (fromEnv) {
     if (fromEnv === "anthropic" || fromEnv === "gemini" || fromEnv === "openrouter") return fromEnv;

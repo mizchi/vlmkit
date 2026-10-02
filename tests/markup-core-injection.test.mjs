@@ -37,10 +37,7 @@ import { resolve } from "node:path";
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const RUNTIME = resolve(REPO_ROOT, "packages/vlmkit-markup/src/markup-core-runtime.ts");
 const BUNDLED = resolve(REPO_ROOT, "scripts/vlmkit-bundled.mjs");
-const BRIDGE = resolve(
-  REPO_ROOT,
-  "packages/vlmkit-markup/_build/js/debug/build/markup-core-api/markup-core-api.js",
-);
+const BRIDGE = resolve(REPO_ROOT, "packages/vlmkit-markup/_build/js/debug/build/markup-core-api/markup-core-api.js");
 
 /** Field names of `interface DirectMarkupCoreModule`. */
 function declaredEntryPoints() {
@@ -88,8 +85,8 @@ describe("the generated bridge exports every entry point the runtime declares", 
     assert.deepEqual(
       missing,
       [],
-      `the bridge is missing ${missing.join(", ")}. A namespace import cannot fix an export `
-      + "that does not exist: markup-core-api/main.mbt must expose it, and _build must be rebuilt.",
+      `the bridge is missing ${missing.join(", ")}. A namespace import cannot fix an export ` +
+        "that does not exist: markup-core-api/main.mbt must expose it, and _build must be rebuilt.",
     );
   });
 

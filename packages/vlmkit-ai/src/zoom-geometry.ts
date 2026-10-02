@@ -82,7 +82,10 @@ export function fitToBudget(size: Size, budget: ImageBudget = DEFAULT_IMAGE_BUDG
  * original pixel several of the model's, which is what lets it read an 8px gap.)
  */
 export function zoomSize(crop: Size, budget: ImageBudget = DEFAULT_IMAGE_BUDGET): Size {
-  const scale = Math.min(budget.maxEdge / Math.max(crop.width, crop.height), Math.sqrt(budget.maxPixels / (crop.width * crop.height)));
+  const scale = Math.min(
+    budget.maxEdge / Math.max(crop.width, crop.height),
+    Math.sqrt(budget.maxPixels / (crop.width * crop.height)),
+  );
   return scaled(crop, scale);
 }
 
@@ -112,7 +115,10 @@ export function clampBox(box: Box, view: Size): { ok: true; box: Box } | BoxProb
     y2: Math.max(0, Math.min(Math.round(box.y2), view.height)),
   };
   if (clamped.x1 >= clamped.x2 || clamped.y1 >= clamped.y2) {
-    return { ok: false, reason: `invalid region (need x1 < x2 and y1 < y2 inside the ${view.width}x${view.height} image)` };
+    return {
+      ok: false,
+      reason: `invalid region (need x1 < x2 and y1 < y2 inside the ${view.width}x${view.height} image)`,
+    };
   }
   return { ok: true, box: clamped };
 }

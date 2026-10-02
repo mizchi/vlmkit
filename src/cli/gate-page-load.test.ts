@@ -79,28 +79,22 @@ const BASE_ARGV: Record<string, () => string[]> = {
     "--contract",
     tempJson("contract.json", { rules: [{ selector: "body", at: 1280, visible: true }] }),
   ],
-  "verify flow": () => [
-    "page.html",
-    "--flow",
-    tempJson("flow.json", { steps: [{ do: { action: "wait", ms: 1 } }] }),
-  ],
+  "verify flow": () => ["page.html", "--flow", tempJson("flow.json", { steps: [{ do: { action: "wait", ms: 1 } }] })],
   "check drift component": () => ["page.html", "--selector", ".card"],
-  "check drift pages": () => [
-    "--selector", ".card",
-    "--urls", "http://a.test/",
-    "--urls", "http://b.test/",
-  ],
+  "check drift pages": () => ["--selector", ".card", "--urls", "http://a.test/", "--urls", "http://b.test/"],
   "check story": () => ["Button/Primary", "--gallery", "http://localhost:5173/"],
 };
 
 async function navigatingGates(): Promise<AnyGateDefinition[]> {
   resetGateRegistryCache();
   const registry = await loadGateRegistry({ builtinsOnly: true });
-  return registry.list()
+  return registry
+    .list()
     .map(({ gate }) => gate)
-    .filter((gate) =>
-      (gate.inputs ?? []).some((input: GateInput) => input.kind === "path-or-url")
-      || URL_BY_FLAG.includes(gate.command.join(" "))
+    .filter(
+      (gate) =>
+        (gate.inputs ?? []).some((input: GateInput) => input.kind === "path-or-url") ||
+        URL_BY_FLAG.includes(gate.command.join(" ")),
     );
 }
 
@@ -130,15 +124,16 @@ describe("page-load options on the gates that navigate", () => {
         if (!shared) continue;
         if (input !== shared) {
           divergent.push(
-            `${command(gate)} declares its own --${input.name}`
-            + (input.description === shared.description ? " (identical today, and still a copy)" : ` ("${input.description}")`),
+            `${command(gate)} declares its own --${input.name}` +
+              (input.description === shared.description
+                ? " (identical today, and still a copy)"
+                : ` ("${input.description}")`),
           );
         }
       }
     }
     assert.deepEqual(divergent, [], `spread ...PAGE_LOAD_INPUTS instead:\n  ${divergent.join("\n  ")}`);
   });
-
 
   it("covers every one of them, with the exceptions named and justified", async () => {
     const gates = await navigatingGates();
@@ -167,7 +162,10 @@ describe("page-load options on the gates that navigate", () => {
       // The reason has to survive in the code, not only in this table.
       const prose = `${gate.usage ?? ""}\n${(gate.inputs ?? []).map((i: GateInput) => i.description).join("\n")}`;
       const explained = exception.because.test(prose) || exception.because.test(String(gate.parse));
-      assert.ok(explained, `${command(gate)}: nothing in the gate explains why it omits ${exception.missing.join(", ")}`);
+      assert.ok(
+        explained,
+        `${command(gate)}: nothing in the gate explains why it omits ${exception.missing.join(", ")}`,
+      );
     }
     assert.deepEqual(missing, []);
   });
@@ -256,7 +254,11 @@ describe("page-load options on the gates that navigate", () => {
     const registry = await loadGateRegistry({ builtinsOnly: true });
     const copy = registry.byCommand("check copy")!;
     const ctx = { cwd: process.cwd(), argv: [] as string[], json: false };
-    for (const [flag, value] of [["--timeout", "1000"], ["--wait-until", "load"], ["--har", "a.har"]]) {
+    for (const [flag, value] of [
+      ["--timeout", "1000"],
+      ["--wait-until", "load"],
+      ["--har", "a.har"],
+    ]) {
       assert.throws(
         () => copy.parse(["--elements", "rects.json", flag!, value!], ctx),
         new RegExp(`${flag!.replace(/-/g, "\\-")} does not apply with --elements`),

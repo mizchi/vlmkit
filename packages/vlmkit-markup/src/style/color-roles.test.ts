@@ -22,8 +22,13 @@ import {
 } from "./color-roles.ts";
 
 /** Colour caught in floating point out of the palette maps is not the subject here. */
-const use = (hex: string, over: Partial<ColorUse> = {}): ColorUse =>
-  ({ hex, area: 1000, count: 1, samples: [`div.${hex.slice(1)}`], ...over });
+const use = (hex: string, over: Partial<ColorUse> = {}): ColorUse => ({
+  hex,
+  area: 1000,
+  count: 1,
+  samples: [`div.${hex.slice(1)}`],
+  ...over,
+});
 
 const input = (over: Partial<ColorRolesInput> = {}): ColorRolesInput => ({
   palette: { surfaces: [], ink: [], marks: [] },
@@ -70,9 +75,11 @@ const link = (over: Partial<LinkCue> = {}): LinkCue => ({
 
 describe("findBase / findBodyInk / findLinkInk", () => {
   it("takes the base from the largest declared surface", () => {
-    const base = findBase(input({
-      palette: { surfaces: [use("#ffffff", { area: 100 }), use("#f7f7f7", { area: 9000 })], ink: [], marks: [] },
-    }));
+    const base = findBase(
+      input({
+        palette: { surfaces: [use("#ffffff", { area: 100 }), use("#f7f7f7", { area: 9000 })], ink: [], marks: [] },
+      }),
+    );
     assert.equal(base?.hex, "#f7f7f7");
   });
 
@@ -93,10 +100,7 @@ describe("findBase / findBodyInk / findLinkInk", () => {
     // against 46 at #044c9f, and #044c9f is MDN's link colour.
     const report = input({
       palette: { surfaces: [], ink: [use("#000000", { area: 90_000, count: 400 })], marks: [] },
-      interactiveInk: [
-        use("#000000", { count: 275, area: 50_000 }),
-        use("#044c9f", { count: 46, area: 9_000 }),
-      ],
+      interactiveInk: [use("#000000", { count: 275, area: 50_000 }), use("#044c9f", { count: 46, area: 9_000 })],
     });
     assert.equal(findBodyInk(report)?.hex, "#000000");
     assert.equal(findLinkInk(report)?.hex, "#044c9f");
@@ -112,12 +116,15 @@ describe("findBase / findBodyInk / findLinkInk", () => {
   });
 
   it("ranks the palette by painted area and drops the trace colours", () => {
-    const report = judgeColorRoles(input({
-      palette: {
-        surfaces: [use("#ffffff", { area: 100_000 }), use("#ff0000", { area: 1 })],
-        ink: [], marks: [],
-      },
-    }));
+    const report = judgeColorRoles(
+      input({
+        palette: {
+          surfaces: [use("#ffffff", { area: 100_000 }), use("#ff0000", { area: 1 })],
+          ink: [],
+          marks: [],
+        },
+      }),
+    );
     const text = formatColorRolesReport(report).replace(/\u001B\[[0-9;]*m/g, "");
     assert.match(text, /#ffffff/);
     assert.doesNotMatch(text, /#ff0000/, "a colour under 0.5% of its role is not the palette");
@@ -131,18 +138,31 @@ describe("invisibleControls", () => {
 
   it("reports a field whose fill and border are both under the floor", () => {
     // chromedev's book-nav filter: #f5f6f7 on #ffffff is 1.08:1 with no border.
-    const found = invisibleControls([control({
-      fillHex: "#f5f6f7", fillRatio: 1.08, borderHex: null, borderRatio: 0, best: 1.08,
-    })]);
+    const found = invisibleControls([
+      control({
+        fillHex: "#f5f6f7",
+        fillRatio: 1.08,
+        borderHex: null,
+        borderRatio: 0,
+        best: 1.08,
+      }),
+    ]);
     assert.equal(found.length, 1);
   });
 
   it("reports a field that draws nothing at all", () => {
     // NN/g's newsletter input on its dark footer: no fill, no border, no shadow,
     // no outline. The screenshot shows a caret and nothing else.
-    const found = invisibleControls([control({
-      onHex: "#2c1111", fillHex: null, fillRatio: 0, borderHex: null, borderRatio: 0, best: 0,
-    })]);
+    const found = invisibleControls([
+      control({
+        onHex: "#2c1111",
+        fillHex: null,
+        fillRatio: 0,
+        borderHex: null,
+        borderRatio: 0,
+        best: 0,
+      }),
+    ]);
     assert.equal(found.length, 1);
   });
 
@@ -177,9 +197,14 @@ describe("colorOnlyLinks", () => {
 
   it("reports a colour-only link under 3:1 against the prose", () => {
     // caniuse's note links: #0046d1 in #000000 prose at 2.8:1, no underline.
-    const { weak } = colorOnlyLinks([link({
-      underlined: false, linkHex: "#0046d1", bodyHex: "#000000", vsBody: 2.8,
-    })]);
+    const { weak } = colorOnlyLinks([
+      link({
+        underlined: false,
+        linkHex: "#0046d1",
+        bodyHex: "#000000",
+        vsBody: 2.8,
+      }),
+    ]);
     assert.equal(weak.length, 1);
   });
 
@@ -234,9 +259,15 @@ describe("judgeColorRoles", () => {
   it("groups colour-only links by colour pair rather than by element", () => {
     // One stylesheet rule produces as many rows as it has links, and
     // "3 findings" reads as three fixes. web.dev's content footer has three.
-    const links = [1, 2, 3].map((i) => link({
-      selector: `p>a:nth-child(${i})`, underlined: false, linkHex: "#185abc", bodyHex: "#202124", vsBody: 2.47,
-    }));
+    const links = [1, 2, 3].map((i) =>
+      link({
+        selector: `p>a:nth-child(${i})`,
+        underlined: false,
+        linkHex: "#185abc",
+        bodyHex: "#202124",
+        vsBody: 2.47,
+      }),
+    );
     const report = judgeColorRoles(input({ links }));
     const rows = report.findings.filter((f) => f.kind === "color-only-link");
     assert.equal(rows.length, 1);
@@ -248,10 +279,12 @@ describe("judgeColorRoles", () => {
     // understood rgb() only, Chromium serialises oklch() as lab(), and
     // `check a11y contrast` inspected 10 of 1068 elements on the Tailwind docs
     // page and called it clean.
-    const report = judgeColorRoles(input({
-      controls: [control()],
-      unreadable: [{ property: "color", count: 783, samples: ["lab(1.90334 0.278696 -5.48866)"] }],
-    }));
+    const report = judgeColorRoles(
+      input({
+        controls: [control()],
+        unreadable: [{ property: "color", count: 783, samples: ["lab(1.90334 0.278696 -5.48866)"] }],
+      }),
+    );
     const row = report.findings.find((f) => f.kind === "unreadable-color");
     assert.ok(row, "an unreadable colour is never silent");
     assert.equal(row?.severity, "info");
@@ -267,11 +300,13 @@ describe("judgeColorRoles", () => {
 
   it("honours --allow, and the exempted row still exists in the input", () => {
     const bad = control({ selector: "input#search", best: 0, fillHex: null, borderHex: null });
-    const report = judgeColorRoles(
-      input({ controls: [bad], links: [link()] }),
-      { allow: ["input#search;the search field is marked by its icon"] },
+    const report = judgeColorRoles(input({ controls: [bad], links: [link()] }), {
+      allow: ["input#search;the search field is marked by its icon"],
+    });
+    assert.deepEqual(
+      report.findings.filter((f) => f.kind === "control-boundary-invisible"),
+      [],
     );
-    assert.deepEqual(report.findings.filter((f) => f.kind === "control-boundary-invisible"), []);
     assert.equal(report.controls.length, 1, "an exemption hides the finding, not the measurement");
     assert.deepEqual(report.unusedAllow, [], "and a rule that matched is not reported as unused");
   });
@@ -281,12 +316,15 @@ describe("judgeColorRoles", () => {
     // never recorded which rules matched: a mistyped selector did nothing and
     // said nothing. The three style gates share one filter now.
     const bad = control({ selector: "input#search", best: 0, fillHex: null, borderHex: null });
-    const report = judgeColorRoles(
-      input({ controls: [bad], links: [link()] }),
-      { allow: ["input#serach;typo'd, so it exempts nothing"] },
-    );
+    const report = judgeColorRoles(input({ controls: [bad], links: [link()] }), {
+      allow: ["input#serach;typo'd, so it exempts nothing"],
+    });
     assert.deepEqual(report.unusedAllow, ["input#serach;typo'd, so it exempts nothing"]);
-    assert.equal(report.findings.filter((f) => f.kind === "control-boundary-invisible").length, 1, "the finding stands");
+    assert.equal(
+      report.findings.filter((f) => f.kind === "control-boundary-invisible").length,
+      1,
+      "the finding stands",
+    );
     const text = formatColorRolesReport(report).replace(/\x1b\[[0-9;]*m/g, "");
     assert.match(text, /1 --allow rule\(s\) matched nothing: input#serach/);
   });
@@ -297,7 +335,10 @@ describe("COLLECT_COLOR_ROLES", () => {
     // It embeds CONTRAST_BACKGROUND_JS, so the same two rules apply to the
     // whole string. One backtick ends the script.
     assert.equal(COLLECT_COLOR_ROLES.includes("`"), false);
-    assert.ok(COLLECT_COLOR_ROLES.includes("function resolveTextBackground"), "background resolution is shared, not reimplemented");
+    assert.ok(
+      COLLECT_COLOR_ROLES.includes("function resolveTextBackground"),
+      "background resolution is shared, not reimplemented",
+    );
     assert.ok(COLLECT_COLOR_ROLES.includes("function parseColor"), "and so is colour parsing");
   });
 
@@ -335,7 +376,7 @@ describe("COLLECT_COLOR_ROLES", () => {
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
       await tab.setContent(page);
-      const input = await tab.evaluate(COLLECT_COLOR_ROLES) as ColorRolesInput;
+      const input = (await tab.evaluate(COLLECT_COLOR_ROLES)) as ColorRolesInput;
 
       // oklch() on the body resolves, which is the whole of the parser fix.
       assert.equal(input.baseHex, "#fbfcfd");
@@ -360,9 +401,12 @@ describe("COLLECT_COLOR_ROLES", () => {
 
       // The collector ships resolved colours; the judge measures them. Measure here the
       // way judgeColorRoles does, so the assertions below read boundaries, not samples.
-      const controls = input.controls.map((c) => "on" in c ? controlBoundary(c) : c);
-      const links = input.links.map((l) => "link" in l ? linkCue(l) : l);
-      assert.ok(input.controls.every((c) => "on" in c), "the collector ships samples, not ratios");
+      const controls = input.controls.map((c) => ("on" in c ? controlBoundary(c) : c));
+      const links = input.links.map((l) => ("link" in l ? linkCue(l) : l));
+      assert.ok(
+        input.controls.every((c) => "on" in c),
+        "the collector ships samples, not ratios",
+      );
       const byId = new Map(controls.map((c) => [c.selector.replace(/^.*#/, "#"), c]));
       const ghost = byId.get("#ghost");
       assert.ok(ghost, "the bare field was collected");

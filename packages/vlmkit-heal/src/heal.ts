@@ -11,7 +11,14 @@ import type { HealAttempt, HealOptions, HealResult, ModelTier } from "./types.ts
 export interface HealDeps {
   runTest: (command: string, cwd: string) => Promise<RunResult>;
   /** Judge a vrt-diff (baseline vs actual) -> accept/reject/unsure. Default: reviewVrtDiff. */
-  reviewVrt: (input: { baselinePng: Buffer; actualPng: Buffer; diffPng?: Buffer; expectedChange?: string; gitContext?: string; tier: ModelTier }) => Promise<VrtReview>;
+  reviewVrt: (input: {
+    baselinePng: Buffer;
+    actualPng: Buffer;
+    diffPng?: Buffer;
+    expectedChange?: string;
+    gitContext?: string;
+    tier: ModelTier;
+  }) => Promise<VrtReview>;
   codegen: CodegenClient;
   /** Baseline files the loop is also allowed to overwrite (besides testFile). */
   baselineAllow?: string[];
@@ -161,7 +168,13 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     const context = contextParts.join("\n\n");
     const proposal = await d.codegen.propose({ tier: ctier, errorKind, testSource, context });
     codegenRouter.record({ costUsd: proposal.costUsd });
-    attempts.push({ tier: ctier, phase: "codegen", costUsd: proposal.costUsd, errorKind, patch: proposal.newTestSource });
+    attempts.push({
+      tier: ctier,
+      phase: "codegen",
+      costUsd: proposal.costUsd,
+      errorKind,
+      patch: proposal.newTestSource,
+    });
 
     if (proposal.updateBaseline) {
       const cmd = d.updateSnapshotsCommand ?? `${opts.testCommand} --update-snapshots`;

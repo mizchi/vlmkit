@@ -19,11 +19,7 @@ async function captureHtml(htmlPath: string, outputPng: string) {
   });
 }
 
-async function getDiffReport(
-  baselinePng: string,
-  currentPng: string,
-  testId: string,
-): Promise<DiffReport | null> {
+async function getDiffReport(baselinePng: string, currentPng: string, testId: string): Promise<DiffReport | null> {
   const snap: VrtSnapshot = {
     testId,
     testTitle: testId,
@@ -40,7 +36,9 @@ function buildShiftPromptContext(report: DiffReport): string {
   lines.push("Shift detection:");
   if (report.globalShift !== 0) {
     lines.push(`- Global vertical shift: ${report.globalShift > 0 ? "+" : ""}${report.globalShift}px`);
-    lines.push(`- Compensated diff (shift excluded): ${(report.compensatedDiffCount / report.totalPixels * 100).toFixed(1)}%`);
+    lines.push(
+      `- Compensated diff (shift excluded): ${((report.compensatedDiffCount / report.totalPixels) * 100).toFixed(1)}%`,
+    );
     if (report.shiftOnly) {
       lines.push("- SHIFT ONLY: all changes appear to be positional shifts, not content changes.");
     } else {
@@ -96,7 +94,12 @@ describe("shift detection patterns", () => {
     console.log(`    Content changes: ${report.contentChangeCount}`);
     console.log();
     console.log("  Prompt context:");
-    console.log(ctx.split("\n").map((l) => "    " + l).join("\n"));
+    console.log(
+      ctx
+        .split("\n")
+        .map((l) => "    " + l)
+        .join("\n"),
+    );
   });
 
   it("Pattern B: content-change (no shift) — detects content change, no shift compensation", async () => {
@@ -110,10 +113,7 @@ describe("shift detection patterns", () => {
     assert.ok(report.diffRatio > 0, "should detect differences");
 
     // Should NOT detect significant vertical shift (colors changed, not positions)
-    assert.ok(
-      Math.abs(report.globalShift) < 5,
-      `should have no/minimal shift, got ${report.globalShift}px`,
-    );
+    assert.ok(Math.abs(report.globalShift) < 5, `should have no/minimal shift, got ${report.globalShift}px`);
 
     // Compensated diff should be similar to raw diff (no shift to compensate)
     const compensatedRatio = report.compensatedDiffCount / report.totalPixels;
@@ -135,7 +135,12 @@ describe("shift detection patterns", () => {
     console.log(`    Content changes: ${report.contentChangeCount}`);
     console.log();
     console.log("  Prompt context:");
-    console.log(ctx.split("\n").map((l) => "    " + l).join("\n"));
+    console.log(
+      ctx
+        .split("\n")
+        .map((l) => "    " + l)
+        .join("\n"),
+    );
   });
 
   it("Pattern C: mixed (shift + content) — detects both shift and content changes", async () => {
@@ -153,7 +158,10 @@ describe("shift detection patterns", () => {
 
     // Compensated diff should be >0 (content changes remain after shift compensation)
     const compensatedRatio = report.compensatedDiffCount / report.totalPixels;
-    assert.ok(compensatedRatio > 0.005, `compensated should be >0.5% (content changes remain), got ${(compensatedRatio * 100).toFixed(1)}%`);
+    assert.ok(
+      compensatedRatio > 0.005,
+      `compensated should be >0.5% (content changes remain), got ${(compensatedRatio * 100).toFixed(1)}%`,
+    );
 
     // Should NOT be shiftOnly (has content changes too)
     // Note: region classification may merge everything into one big content region
@@ -175,6 +183,11 @@ describe("shift detection patterns", () => {
     console.log(`    Content changes: ${report.contentChangeCount}`);
     console.log();
     console.log("  Prompt context:");
-    console.log(ctx.split("\n").map((l) => "    " + l).join("\n"));
+    console.log(
+      ctx
+        .split("\n")
+        .map((l) => "    " + l)
+        .join("\n"),
+    );
   });
 });

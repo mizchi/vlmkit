@@ -17,7 +17,17 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { createImageGenClient } from "../packages/vlmkit-ai/src/image-gen-client.ts";
-import { ANCHOR_ICON, HERO, ICON_PX, ICONS, ILLUSTRATIONS, LOCK_FILE, artHash, iconFile, iconPrompt } from "./readme-art.manifest.mjs";
+import {
+  ANCHOR_ICON,
+  HERO,
+  ICON_PX,
+  ICONS,
+  ILLUSTRATIONS,
+  LOCK_FILE,
+  artHash,
+  iconFile,
+  iconPrompt,
+} from "./readme-art.manifest.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ALPHA_FLOOR = 48;
@@ -50,28 +60,31 @@ const page = await browser.newPage();
 /** Scale to `width` in a canvas and encode; icons also lose their sub-floor halo. */
 async function finish(bytes, { width, type, alphaFloor }) {
   const src = `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`;
-  const dataUrl = await page.evaluate(async ({ src, width, type, alphaFloor }) => {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
-    const full = document.createElement("canvas");
-    full.width = img.naturalWidth;
-    full.height = img.naturalHeight;
-    const fctx = full.getContext("2d");
-    fctx.drawImage(img, 0, 0);
-    if (alphaFloor) {
-      const data = fctx.getImageData(0, 0, full.width, full.height);
-      for (let i = 3; i < data.data.length; i += 4) if (data.data[i] < alphaFloor) data.data[i] = 0;
-      fctx.putImageData(data, 0, 0);
-    }
-    const out = document.createElement("canvas");
-    out.width = width;
-    out.height = Math.round((img.naturalHeight * width) / img.naturalWidth);
-    const ctx = out.getContext("2d");
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(full, 0, 0, out.width, out.height);
-    return out.toDataURL(type, 0.86);
-  }, { src, width, type, alphaFloor });
+  const dataUrl = await page.evaluate(
+    async ({ src, width, type, alphaFloor }) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const full = document.createElement("canvas");
+      full.width = img.naturalWidth;
+      full.height = img.naturalHeight;
+      const fctx = full.getContext("2d");
+      fctx.drawImage(img, 0, 0);
+      if (alphaFloor) {
+        const data = fctx.getImageData(0, 0, full.width, full.height);
+        for (let i = 3; i < data.data.length; i += 4) if (data.data[i] < alphaFloor) data.data[i] = 0;
+        fctx.putImageData(data, 0, 0);
+      }
+      const out = document.createElement("canvas");
+      out.width = width;
+      out.height = Math.round((img.naturalHeight * width) / img.naturalWidth);
+      const ctx = out.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(full, 0, 0, out.width, out.height);
+      return out.toDataURL(type, 0.86);
+    },
+    { src, width, type, alphaFloor },
+  );
   return Buffer.from(dataUrl.split(",")[1], "base64");
 }
 
@@ -80,21 +93,31 @@ try {
   for (const e of todo) {
     const isIllustration = ILLUSTRATIONS.some((i) => i.id === e.id);
     const referenceFile = isIllustration
-      ? (e.reference ? ILLUSTRATIONS.find((i) => i.id === e.reference).file : null)
-      : e.id !== ANCHOR_ICON ? iconFile(ANCHOR_ICON) : null;
+      ? e.reference
+        ? ILLUSTRATIONS.find((i) => i.id === e.reference).file
+        : null
+      : e.id !== ANCHOR_ICON
+        ? iconFile(ANCHOR_ICON)
+        : null;
     const reference = referenceFile ? join(repoRoot, referenceFile) : null;
-    if (reference && !existsSync(reference)) throw new Error(`${e.id} is drawn against ${referenceFile}, which does not exist yet`);
+    if (reference && !existsSync(reference))
+      throw new Error(`${e.id} is drawn against ${referenceFile}, which does not exist yet`);
     const res = await client.generate({
       prompt: isIllustration ? e.prompt : iconPrompt(e),
       aspectRatio: isIllustration ? e.aspectRatio : "1:1",
       quality: "medium",
       ...(isIllustration ? {} : { background: "transparent" }),
-      ...(reference ? { inputReferences: [`data:image/webp;base64,${readFileSync(reference).toString("base64")}`] } : {}),
+      ...(reference
+        ? { inputReferences: [`data:image/webp;base64,${readFileSync(reference).toString("base64")}`] }
+        : {}),
     });
     if (!res.images[0]) throw new Error(`${e.id}: no image in the response`);
-    const out = await finish(res.images[0], isIllustration
-      ? { width: e.width, type: "image/webp" }
-      : { width: ICON_PX, type: "image/webp", alphaFloor: ALPHA_FLOOR });
+    const out = await finish(
+      res.images[0],
+      isIllustration
+        ? { width: e.width, type: "image/webp" }
+        : { width: ICON_PX, type: "image/webp", alphaFloor: ALPHA_FLOOR },
+    );
     mkdirSync(dirname(join(repoRoot, e.file)), { recursive: true });
     writeFileSync(join(repoRoot, e.file), out);
     lock.entries[e.id] = { hash: artHash(e), costUsd: res.costUsd, date: new Date().toISOString().slice(0, 10) };
@@ -102,7 +125,10 @@ try {
     spent += res.costUsd;
     console.log(`  ${e.file}  $${res.costUsd.toFixed(3)}  ${(res.latencyMs / 1000).toFixed(1)}s`);
     // Written after every image: a failure half way keeps what was paid for.
-    writeFileSync(lockPath, `${JSON.stringify({ model: lock.model, entries: Object.fromEntries(Object.entries(lock.entries).sort()) }, null, 2)}\n`);
+    writeFileSync(
+      lockPath,
+      `${JSON.stringify({ model: lock.model, entries: Object.fromEntries(Object.entries(lock.entries).sort()) }, null, 2)}\n`,
+    );
   }
 } finally {
   await browser.close();

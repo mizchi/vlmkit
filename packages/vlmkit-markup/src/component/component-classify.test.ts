@@ -3,11 +3,7 @@ import { describe, it } from "vite-plus/test";
 import { classifyRegion, kindsCanPair, type ComponentKindInfo } from "./component-classify.ts";
 
 /** Build an RGBA buffer via a per-pixel color function. */
-function image(
-  width: number,
-  height: number,
-  colorAt: (x: number, y: number) => [number, number, number],
-): Uint8Array {
+function image(width: number, height: number, colorAt: (x: number, y: number) => [number, number, number]): Uint8Array {
   const data = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -40,8 +36,7 @@ describe("classifyRegion", () => {
   it("classifies ink runs on a background as text", () => {
     // 4px-wide "glyph" strokes with 4px gaps on white — high transition
     // density, dominant white background.
-    const data = image(200, 16, (x, y) =>
-      y >= 3 && y <= 12 && x % 8 < 3 ? [40, 40, 40] : [255, 255, 255]);
+    const data = image(200, 16, (x, y) => (y >= 3 && y <= 12 && x % 8 < 3 ? [40, 40, 40] : [255, 255, 255]));
     const info = classifyRegion(data, 200, full(200, 16));
     strictEqual(info.kind, "text");
     ok(info.confident);
@@ -64,7 +59,8 @@ describe("classifyRegion", () => {
     // CTA-like: 85%+ blue with a white word — must not be a CONFIDENT
     // solid (the gate must not fire against its text pairing).
     const data = image(120, 40, (x, y) =>
-      y >= 16 && y <= 24 && x >= 20 && x <= 100 && x % 6 < 3 ? [255, 255, 255] : [14, 165, 233]);
+      y >= 16 && y <= 24 && x >= 20 && x <= 100 && x % 6 < 3 ? [255, 255, 255] : [14, 165, 233],
+    );
     const info = classifyRegion(data, 120, full(120, 40));
     ok(!(info.kind === "solid" && info.confident));
   });
@@ -72,7 +68,8 @@ describe("classifyRegion", () => {
   it("respects the bbox (classifies only the region)", () => {
     // Noise everywhere, solid patch in the middle.
     const data = image(100, 100, (x, y) =>
-      x >= 30 && x < 70 && y >= 30 && y < 70 ? [10, 10, 10] : [(x * 37) % 256, (y * 91) % 256, 128]);
+      x >= 30 && x < 70 && y >= 30 && y < 70 ? [10, 10, 10] : [(x * 37) % 256, (y * 91) % 256, 128],
+    );
     const info = classifyRegion(data, 100, { top: 30, left: 30, width: 40, height: 40 });
     strictEqual(info.kind, "solid");
   });

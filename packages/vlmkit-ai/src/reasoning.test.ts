@@ -50,9 +50,7 @@ describe("Reasoning: search form added to header", () => {
     const exp: PageExpectation = {
       testId: "home",
       expect: "Add search form with search landmark to the header",
-      expectedA11yChanges: [
-        { description: "Search landmark added to the header" },
-      ],
+      expectedA11yChanges: [{ description: "Search landmark added to the header" }],
     };
 
     const chain = reasonAboutChanges("home", exp, diff, {
@@ -78,9 +76,7 @@ describe("Reasoning: search form added to header", () => {
     const exp: PageExpectation = {
       testId: "home",
       expect: "Add a search landmark to the header banner",
-      expectedA11yChanges: [
-        { description: "Search landmark with searchbox added to header", role: "search" },
-      ],
+      expectedA11yChanges: [{ description: "Search landmark with searchbox added to header", role: "search" }],
     };
 
     const chain = reasonAboutChanges("home", exp, diff, {
@@ -92,7 +88,7 @@ describe("Reasoning: search form added to header", () => {
     assert.ok(!chain.mappings[0].realized, `Should not match: ${chain.reasoning}`);
     assert.ok(
       chain.verdict === "not-realized" || chain.verdict === "unexpected-side-effects",
-      `Verdict: ${chain.verdict}`
+      `Verdict: ${chain.verdict}`,
     );
   });
 });
@@ -110,9 +106,7 @@ describe("Reasoning: button label renamed", () => {
     const exp: PageExpectation = {
       testId: "home",
       expect: "Change the send button label from 'Send' to 'Submit'",
-      expectedA11yChanges: [
-        { description: "Button name changed from Send to Submit", name: "Send" },
-      ],
+      expectedA11yChanges: [{ description: "Button name changed from Send to Submit", name: "Send" }],
     };
 
     const chain = reasonAboutChanges("home", exp, diff, {
@@ -167,7 +161,7 @@ describe("Reasoning: a11y improvement (label fix)", () => {
     // verdict は realized or unexpected-side-effects (form name change が extra)
     assert.ok(
       chain.verdict === "realized" || chain.verdict === "unexpected-side-effects",
-      `Verdict: ${chain.verdict}. ${chain.reasoning}`
+      `Verdict: ${chain.verdict}. ${chain.reasoning}`,
     );
   });
 
@@ -179,9 +173,7 @@ describe("Reasoning: a11y improvement (label fix)", () => {
     const exp: PageExpectation = {
       testId: "home",
       expect: "Add accessible labels to form inputs",
-      expectedA11yChanges: [
-        { description: "Email textbox gets label", role: "textbox" },
-      ],
+      expectedA11yChanges: [{ description: "Email textbox gets label", role: "textbox" }],
     };
 
     const chain = reasonAboutChanges("home", exp, diff, {
@@ -194,9 +186,8 @@ describe("Reasoning: a11y improvement (label fix)", () => {
     const emailMapping = chain.mappings[0];
     assert.ok(emailMapping.realized, chain.reasoning);
     assert.ok(
-      emailMapping.reasoning.includes("name changed") ||
-      emailMapping.reasoning.includes("Accessible name"),
-      `Reasoning should describe the name change: ${emailMapping.reasoning}`
+      emailMapping.reasoning.includes("name changed") || emailMapping.reasoning.includes("Accessible name"),
+      `Reasoning should describe the name change: ${emailMapping.reasoning}`,
     );
   });
 });
@@ -227,9 +218,8 @@ describe("Reasoning: unexpected side effects", () => {
     assert.ok(chain.actualChanges.length > 0, "Should detect actual changes");
     assert.ok(
       chain.verdict === "not-realized" || chain.verdict === "unexpected-side-effects",
-      `Should flag unexpected changes: ${chain.verdict}`
+      `Should flag unexpected changes: ${chain.verdict}`,
     );
-    assert.ok(chain.reasoning.includes("not detected") || chain.reasoning.includes("NOT"),
-      chain.reasoning);
+    assert.ok(chain.reasoning.includes("not detected") || chain.reasoning.includes("NOT"), chain.reasoning);
   });
 });

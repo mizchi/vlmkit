@@ -26,31 +26,27 @@ export const VLMKIT_CRATER_ROOT_ENV = "VLMKIT_CRATER_ROOT";
 export const CRATER_ROOT_ENV = "CRATER_ROOT";
 
 export interface ResolveCraterBidiUrlOptions {
-  env?: Partial<Record<
-    | typeof VLMKIT_CRATER_BIDI_URL_ENV
-    | typeof CRATER_BIDI_URL_ENV
-    | typeof VLMKIT_CRATER_ROOT_ENV
-    | typeof CRATER_ROOT_ENV,
-    string | undefined
-  >>;
+  env?: Partial<
+    Record<
+      | typeof VLMKIT_CRATER_BIDI_URL_ENV
+      | typeof CRATER_BIDI_URL_ENV
+      | typeof VLMKIT_CRATER_ROOT_ENV
+      | typeof CRATER_ROOT_ENV,
+      string | undefined
+    >
+  >;
   craterRoot?: string;
   urlFile?: string;
 }
 
-export function resolveCraterBidiUrl(
-  options: ResolveCraterBidiUrlOptions = {},
-): string {
+export function resolveCraterBidiUrl(options: ResolveCraterBidiUrlOptions = {}): string {
   const env = options.env ?? process.env;
   const fromEnv = env[VLMKIT_CRATER_BIDI_URL_ENV] ?? env[CRATER_BIDI_URL_ENV];
   if (fromEnv?.trim()) return fromEnv.trim();
 
   const fileCandidates = [
     options.urlFile,
-    resolveCraterBidiUrlFile(
-      options.craterRoot
-        ?? env[VLMKIT_CRATER_ROOT_ENV]
-        ?? env[CRATER_ROOT_ENV],
-    ),
+    resolveCraterBidiUrlFile(options.craterRoot ?? env[VLMKIT_CRATER_ROOT_ENV] ?? env[CRATER_ROOT_ENV]),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of fileCandidates) {
@@ -178,7 +174,9 @@ export class CraterClient {
     if (this.contextId) {
       try {
         await this.sendBidi("browsingContext.close", { context: this.contextId });
-      } catch (e) { console.warn("[crater] close context failed:", e instanceof Error ? e.message : e); }
+      } catch (e) {
+        console.warn("[crater] close context failed:", e instanceof Error ? e.message : e);
+      }
     }
     this.contextId = null;
     this.ws?.close();
@@ -233,10 +231,14 @@ export class CraterClient {
 
   /** Raw RGBA data (pixelmatch compatible) */
   async capturePaintData(): Promise<{ width: number; height: number; data: Uint8Array }> {
-    const resp = await this.sendBidi("browsingContext.capturePaintData", {
-      context: this.requireContextId(),
-      origin: "viewport",
-    }, 120_000);
+    const resp = await this.sendBidi(
+      "browsingContext.capturePaintData",
+      {
+        context: this.requireContextId(),
+        origin: "viewport",
+      },
+      120_000,
+    );
     if (resp.type === "error") {
       throw new Error(resp.message || resp.error || "capturePaintData failed");
     }
@@ -257,15 +259,11 @@ export class CraterClient {
     return { png: pngBuffer, width, height };
   }
 
-  async captureComputedStyles(
-    properties: string[],
-  ): Promise<Map<string, Record<string, string>>> {
+  async captureComputedStyles(properties: string[]): Promise<Map<string, Record<string, string>>> {
     const nativeSnapshot = await this.captureNativeComputedStyles(properties);
     if (nativeSnapshot) return nativeSnapshot;
 
-    const rawSnapshot = await this.evaluate<unknown>(
-      buildComputedStyleCaptureJsonExpression(properties),
-    );
+    const rawSnapshot = await this.evaluate<unknown>(buildComputedStyleCaptureJsonExpression(properties));
     const snapshot = parseComputedStyleSnapshot(rawSnapshot);
     if (!hasMeaningfulComputedStyleSnapshot(snapshot)) {
       return new Map();
@@ -273,9 +271,7 @@ export class CraterClient {
     return computedStyleSnapshotToMap(snapshot);
   }
 
-  private async captureNativeComputedStyles(
-    properties: string[],
-  ): Promise<Map<string, Record<string, string>> | null> {
+  private async captureNativeComputedStyles(properties: string[]): Promise<Map<string, Record<string, string>> | null> {
     let context: string;
     try {
       context = this.requireContextId();
@@ -284,10 +280,14 @@ export class CraterClient {
     }
 
     try {
-      const resp = await this.sendBidi("browsingContext.getAllComputedStyles", {
-        context,
-        properties,
-      }, 30_000);
+      const resp = await this.sendBidi(
+        "browsingContext.getAllComputedStyles",
+        {
+          context,
+          properties,
+        },
+        30_000,
+      );
       if (resp.type === "error") return null;
       const result = resp.result as { styles?: ComputedStyleRecord } | undefined;
       const snapshot = parseComputedStyleSnapshot(result?.styles ?? {});
@@ -307,12 +307,16 @@ export class CraterClient {
       includeDiagnostics?: boolean;
     } = {},
   ): Promise<CraterBreakpointDiscoveryResult> {
-    const resp = await this.sendBidi("browsingContext.getResponsiveBreakpoints", {
-      context: this.requireContextId(),
-      mode: options.mode ?? "live-inline",
-      axis: options.axis ?? "width",
-      includeDiagnostics: options.includeDiagnostics ?? true,
-    }, 30_000);
+    const resp = await this.sendBidi(
+      "browsingContext.getResponsiveBreakpoints",
+      {
+        context: this.requireContextId(),
+        mode: options.mode ?? "live-inline",
+        axis: options.axis ?? "width",
+        includeDiagnostics: options.includeDiagnostics ?? true,
+      },
+      30_000,
+    );
     if (resp.type === "error") {
       throw new Error(resp.message || resp.error || "getResponsiveBreakpoints failed");
     }
@@ -325,19 +329,27 @@ export class CraterClient {
 
   /** CSS rule → viewport mapping (#33) */
   async getCssRuleViewportMap(viewportWidths?: number[]): Promise<CraterRuleViewportMap> {
-    const resp = await this.sendBidi("browsingContext.getCssRuleViewportMap", {
-      context: this.requireContextId(),
-      ...(viewportWidths ? { viewportWidths } : {}),
-    }, 30_000);
+    const resp = await this.sendBidi(
+      "browsingContext.getCssRuleViewportMap",
+      {
+        context: this.requireContextId(),
+        ...(viewportWidths ? { viewportWidths } : {}),
+      },
+      30_000,
+    );
     if (resp.type === "error") throw new Error(resp.message || resp.error || "getCssRuleViewportMap failed");
     return (resp.result as CraterRuleViewportMap) ?? { rules: [] };
   }
 
   /** Required test viewports (#33) */
   async getRequiredTestViewports(): Promise<{ viewports: Array<{ width: number; reason: string }> }> {
-    const resp = await this.sendBidi("browsingContext.getRequiredTestViewports", {
-      context: this.requireContextId(),
-    }, 30_000);
+    const resp = await this.sendBidi(
+      "browsingContext.getRequiredTestViewports",
+      {
+        context: this.requireContextId(),
+      },
+      30_000,
+    );
     if (resp.type === "error") throw new Error(resp.message || resp.error || "getRequiredTestViewports failed");
     return (resp.result as { viewports: Array<{ width: number; reason: string }> }) ?? { viewports: [] };
   }
@@ -348,12 +360,16 @@ export class CraterClient {
     forcedStates: string[],
     properties: string[],
   ): Promise<CraterComputedStyleWithState> {
-    const resp = await this.sendBidi("browsingContext.getComputedStylesWithState", {
-      context: this.requireContextId(),
-      selector,
-      forcedStates,
-      properties,
-    }, 30_000);
+    const resp = await this.sendBidi(
+      "browsingContext.getComputedStylesWithState",
+      {
+        context: this.requireContextId(),
+        selector,
+        forcedStates,
+        properties,
+      },
+      30_000,
+    );
     if (resp.type === "error") throw new Error(resp.message || resp.error || "getComputedStylesWithState failed");
     return (resp.result as CraterComputedStyleWithState) ?? { normal: {}, forced: {}, diff: [] };
   }
@@ -364,12 +380,16 @@ export class CraterClient {
     viewport: { width: number; height: number },
     variants: CraterRenderVariant[],
   ): Promise<CraterBatchRenderResult> {
-    const resp = await this.sendBidi("browsingContext.batchRender", {
-      context: this.requireContextId(),
-      baseHtml,
-      viewport,
-      variants,
-    }, 120_000);
+    const resp = await this.sendBidi(
+      "browsingContext.batchRender",
+      {
+        context: this.requireContextId(),
+        baseHtml,
+        viewport,
+        variants,
+      },
+      120_000,
+    );
     if (resp.type === "error") throw new Error(resp.message || resp.error || "batchRender failed");
     return (resp.result as CraterBatchRenderResult) ?? { results: [] };
   }
@@ -406,8 +426,14 @@ export class CraterClient {
       }, timeoutMs);
 
       this.pendingCommands.set(id, {
-        resolve: (resp) => { clearTimeout(timer); resolve(resp); },
-        reject: (err) => { clearTimeout(timer); reject(err); },
+        resolve: (resp) => {
+          clearTimeout(timer);
+          resolve(resp);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
       });
 
       this.ws?.send(JSON.stringify({ id, method, params }));
@@ -416,9 +442,13 @@ export class CraterClient {
 
   /** Paint tree (render tree JSON) */
   async capturePaintTree(): Promise<PaintNode> {
-    const resp = await this.sendBidi("browsingContext.capturePaintTree", {
-      context: this.requireContextId(),
-    }, 120_000);
+    const resp = await this.sendBidi(
+      "browsingContext.capturePaintTree",
+      {
+        context: this.requireContextId(),
+      },
+      120_000,
+    );
     if (resp.type === "error") {
       throw new Error(resp.message || resp.error || "capturePaintTree failed");
     }
@@ -444,17 +474,17 @@ export interface PaintNode {
 }
 
 export interface PaintProps {
-  op?: number;     // opacity
-  c?: number[];    // color [r,g,b,a]
-  bg?: number[];   // background [r,g,b,a]
-  fs?: number;     // font-size
-  ib?: boolean;    // is-bold
-  vis?: string;    // visibility
-  br?: number[];   // border-radius
+  op?: number; // opacity
+  c?: number[]; // color [r,g,b,a]
+  bg?: number[]; // background [r,g,b,a]
+  fs?: number; // font-size
+  ib?: boolean; // is-bold
+  vis?: string; // visibility
+  br?: number[]; // border-radius
 }
 
 export interface PaintTreeChange {
-  path: string;       // e.g. "body > div > div[0]"
+  path: string; // e.g. "body > div > div[0]"
   type: "geometry" | "paint" | "text" | "added" | "removed";
   property?: string;
   before?: string;
@@ -466,10 +496,10 @@ export function diffPaintTrees(baseline: PaintNode, current: PaintNode, path = "
   const changes: PaintTreeChange[] = [];
 
   // Geometry diff
-  if (baseline.x !== current.x || baseline.y !== current.y ||
-      baseline.w !== current.w || baseline.h !== current.h) {
+  if (baseline.x !== current.x || baseline.y !== current.y || baseline.w !== current.w || baseline.h !== current.h) {
     changes.push({
-      path, type: "geometry",
+      path,
+      type: "geometry",
       property: "bounds",
       before: `${baseline.x},${baseline.y} ${baseline.w}x${baseline.h}`,
       after: `${current.x},${current.y} ${current.w}x${current.h}`,
@@ -484,10 +514,22 @@ export function diffPaintTrees(baseline: PaintNode, current: PaintNode, path = "
       changes.push({ path, type: "paint", property: "opacity", before: String(bp.op), after: String(cp.op) });
     }
     if (JSON.stringify(bp.c) !== JSON.stringify(cp.c)) {
-      changes.push({ path, type: "paint", property: "color", before: JSON.stringify(bp.c), after: JSON.stringify(cp.c) });
+      changes.push({
+        path,
+        type: "paint",
+        property: "color",
+        before: JSON.stringify(bp.c),
+        after: JSON.stringify(cp.c),
+      });
     }
     if (JSON.stringify(bp.bg) !== JSON.stringify(cp.bg)) {
-      changes.push({ path, type: "paint", property: "background", before: JSON.stringify(bp.bg), after: JSON.stringify(cp.bg) });
+      changes.push({
+        path,
+        type: "paint",
+        property: "background",
+        before: JSON.stringify(bp.bg),
+        after: JSON.stringify(cp.bg),
+      });
     }
     if (bp.fs !== cp.fs) {
       changes.push({ path, type: "paint", property: "font-size", before: String(bp.fs), after: String(cp.fs) });
@@ -496,7 +538,13 @@ export function diffPaintTrees(baseline: PaintNode, current: PaintNode, path = "
       changes.push({ path, type: "paint", property: "font-weight", before: String(bp.ib), after: String(cp.ib) });
     }
     if (JSON.stringify(bp.br) !== JSON.stringify(cp.br)) {
-      changes.push({ path, type: "paint", property: "border-radius", before: JSON.stringify(bp.br), after: JSON.stringify(cp.br) });
+      changes.push({
+        path,
+        type: "paint",
+        property: "border-radius",
+        before: JSON.stringify(bp.br),
+        after: JSON.stringify(cp.br),
+      });
     }
   }
 

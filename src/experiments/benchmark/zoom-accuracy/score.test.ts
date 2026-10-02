@@ -16,17 +16,32 @@ import {
 const page = { width: 1000, height: 2000 };
 const base = { fixture: "page.html", page, deviceScaleFactor: 2 };
 const textCase: BenchCase = {
-  ...base, id: "t",
+  ...base,
+  id: "t",
   expected: { kind: "text", oldText: "2 days ago", newText: "7 days ago", oldToken: "2", newToken: "7" },
   diffBox: { x1: 900, y1: 400, x2: 910, y2: 412 },
 };
-const colorCase: BenchCase = { ...base, id: "c", expected: { kind: "color", oldColor: "#6b7280", newColor: "#ea580c" }, diffBox: { x1: 10, y1: 10, x2: 80, y2: 24 } };
-const offsetCase: BenchCase = { ...base, id: "o", expected: { kind: "offset", dx: -4, dy: 0 }, diffBox: { x1: 100, y1: 100, x2: 200, y2: 130 } };
+const colorCase: BenchCase = {
+  ...base,
+  id: "c",
+  expected: { kind: "color", oldColor: "#6b7280", newColor: "#ea580c" },
+  diffBox: { x1: 10, y1: 10, x2: 80, y2: 24 },
+};
+const offsetCase: BenchCase = {
+  ...base,
+  id: "o",
+  expected: { kind: "offset", dx: -4, dy: 0 },
+  diffBox: { x1: 100, y1: 100, x2: 200, y2: 130 },
+};
 const noneCase: BenchCase = { ...base, id: "n", expected: { kind: "none" }, diffBox: null };
 
 describe("parseAnswer", () => {
   it("finds the object inside a code fence and prose", () => {
-    assert.deepEqual(parseAnswer('Sure.\n```json\n{"changed": true, "kind": "text", "new": "7 days ago"}\n```'), { changed: true, kind: "text", new: "7 days ago" });
+    assert.deepEqual(parseAnswer('Sure.\n```json\n{"changed": true, "kind": "text", "new": "7 days ago"}\n```'), {
+      changed: true,
+      kind: "text",
+      new: "7 days ago",
+    });
   });
   it("skips a brace that does not open valid JSON and keeps braces inside strings", () => {
     assert.deepEqual(parseAnswer('see {this} then {"changed": false, "old": "a}b"}'), { changed: false, old: "a}b" });
@@ -56,7 +71,10 @@ describe("value parsers", () => {
 
 describe("scoreAnswer", () => {
   it("text: right when the changed token is read, whatever else is transcribed", () => {
-    const s = scoreAnswer(textCase, '{"changed":true,"box":[895,198,915,208],"kind":"text","old":"2 days ago","new":"7 day ago"}');
+    const s = scoreAnswer(
+      textCase,
+      '{"changed":true,"box":[895,198,915,208],"kind":"text","old":"2 days ago","new":"7 day ago"}',
+    );
     assert.deepEqual([s.correct, s.located], [true, true]);
     assert.equal(scoreAnswer(textCase, '{"changed":true,"new":"1 days ago"}').correct, false);
   });
@@ -71,7 +89,11 @@ describe("scoreAnswer", () => {
   });
   it("offset: direction and exact magnitude both matter", () => {
     assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"-4,0"}').correct, true);
-    assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"-3,0"}').correct, false, "off by one is wrong now");
+    assert.equal(
+      scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"-3,0"}').correct,
+      false,
+      "off by one is wrong now",
+    );
     assert.equal(scoreAnswer(offsetCase, '{"changed":true,"kind":"position","new":"4,0"}').correct, false);
   });
   it("location is scored separately from correctness", () => {
@@ -98,15 +120,25 @@ describe("scoreAnswer", () => {
 });
 
 describe("aggregation", () => {
-  const sc = (correct: boolean): CaseScore => ({ parsed: true, detected: correct, located: null, value: null, correct });
+  const sc = (correct: boolean): CaseScore => ({
+    parsed: true,
+    detected: correct,
+    located: null,
+    value: null,
+    correct,
+  });
   it("summarize counts per kind", () => {
-    const s = summarize([{ case: textCase, score: sc(true) }, { case: noneCase, score: sc(false) }]);
+    const s = summarize([
+      { case: textCase, score: sc(true) },
+      { case: noneCase, score: sc(false) },
+    ]);
     assert.equal(s.correct, 1);
     assert.deepEqual(s.byKind.text, { cases: 1, correct: 1 });
     assert.deepEqual(s.byKind.none, { cases: 1, correct: 0 });
   });
   it("pairedFlips separates fixed from broken", () => {
-    const single = [false, false, true, true].map(sc), zoom = [true, false, false, true].map(sc);
+    const single = [false, false, true, true].map(sc),
+      zoom = [true, false, false, true].map(sc);
     assert.deepEqual(pairedFlips(single, zoom), { fixed: 1, broke: 1, bothRight: 1, bothWrong: 1 });
   });
   it("signTestP is the exact two-sided binomial tail", () => {

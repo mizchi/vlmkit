@@ -27,9 +27,7 @@ function createDiagnostics(
   };
 }
 
-function createMockClient(
-  results: CraterBreakpointDiscoveryResult[],
-): BreakpointDiscoveryClient {
+function createMockClient(results: CraterBreakpointDiscoveryResult[]): BreakpointDiscoveryClient {
   let index = 0;
   return {
     async connect() {},
@@ -154,10 +152,7 @@ describe("discoverResponsiveBreakpointsForHtmlDocuments", () => {
     );
     assert.equal(status.diagnostics.totals.stylesheetCount, 3);
     assert.deepEqual(status.diagnostics.totals.ignoredQueries, ["print"]);
-    assert.deepEqual(
-      status.diagnostics.totals.unsupportedQueries,
-      ["(prefers-color-scheme: dark)"],
-    );
+    assert.deepEqual(status.diagnostics.totals.unsupportedQueries, ["(prefers-color-scheme: dark)"]);
   });
 
   it("should include local external stylesheet breakpoints in regex fallback", async () => {
@@ -167,7 +162,7 @@ describe("discoverResponsiveBreakpointsForHtmlDocuments", () => {
       const cssPath = join(dir, "layout.css");
       await writeFile(cssPath, "@media (min-width: 60rem) { .shell { display: grid } }");
       const html = [
-        "<link rel=\"stylesheet\" href=\"./layout.css\">",
+        '<link rel="stylesheet" href="./layout.css">',
         "<style>@media (min-width: 720px) { .card { display:block } }</style>",
       ].join("\n");
       await writeFile(htmlPath, html);

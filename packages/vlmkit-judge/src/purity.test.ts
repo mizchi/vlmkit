@@ -20,7 +20,10 @@ const specifiers = (text: string): string[] =>
 
 /** Code only: a judge's doc comment may well say "the DOM". */
 const code = (text: string): string =>
-  text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "").replace(/`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"/g, '""');
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"/g, '""');
 
 describe("@mizchi/vlmkit-judge purity", () => {
   it("has sources to check", () => {

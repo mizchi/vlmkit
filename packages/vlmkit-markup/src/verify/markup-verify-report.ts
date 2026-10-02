@@ -18,10 +18,7 @@ import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { kindLabel } from "../component/component-classify.ts";
 import type { PageComponent, PageComposition, PageMatch } from "../component/page-compose-diff.ts";
-import {
-  matchRegionBboxToElement,
-  type RegionElementRect,
-} from "../region-selector-match.ts";
+import { matchRegionBboxToElement, type RegionElementRect } from "../region-selector-match.ts";
 import type { MarkupVerifyReport } from "./markup-verify.ts";
 
 /** "[text] " style prefix when the pixel-stat kind is informative. */
@@ -31,11 +28,8 @@ function kindTag(c: PageComponent): string {
 }
 
 function fillDistanceHex(a: string, b: string): number {
-  const p = (hex: string) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ] as const;
+  const p = (hex: string) =>
+    [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)] as const;
   const [ar, ag, ab] = p(a);
   const [br, bg, bb] = p(b);
   return Math.sqrt((ar - br) ** 2 + (ag - bg) ** 2 + (ab - bb) ** 2);
@@ -71,27 +65,18 @@ export interface KickbackContext {
   ) => number;
 }
 
-export function kickbackForComposition(
-  label: string,
-  c: PageComposition,
-  context?: KickbackContext,
-): string[] {
+export function kickbackForComposition(label: string, c: PageComposition, context?: KickbackContext): string[] {
   const lines: string[] = [];
   const elements = context?.elements;
   const probe = context?.presence;
-  const selectorNote = (
-    box: { left: number; top: number; width: number; height: number },
-    phrase: string,
-  ): string => {
+  const selectorNote = (box: { left: number; top: number; width: number; height: number }, phrase: string): string => {
     if (!elements || elements.length === 0) return "";
     const m = matchRegionBboxToElement(box, elements);
     if (!m) return "";
     return ` [${phrase} \`${m.selector}\`]`;
   };
-  const renderedBy = (p: PageComponent): string =>
-    selectorNote(p, "rendered by");
-  const buildSite = (p: PageComponent): string =>
-    selectorNote(p, "target box falls in your");
+  const renderedBy = (p: PageComponent): string => selectorNote(p, "rendered by");
+  const buildSite = (p: PageComponent): string => selectorNote(p, "target box falls in your");
   // Near-miss: an extra whose fill exists in the target a few px away
   // (or a missing whose fill exists in the render a few px away) is a
   // small displacement, not a build/remove. The extractor misses these
@@ -144,10 +129,11 @@ export function kickbackForComposition(
   }
   const claimedExtra = new Set<number>();
   for (const m of c.missing) {
-    const twin = c.extra.find((e) =>
-      !claimedExtra.has(e.index)
-      && fillDistanceHex(m.hex, e.hex) < 40
-      && Math.max(m.area, e.area) / Math.max(1, Math.min(m.area, e.area)) < 3
+    const twin = c.extra.find(
+      (e) =>
+        !claimedExtra.has(e.index) &&
+        fillDistanceHex(m.hex, e.hex) < 40 &&
+        Math.max(m.area, e.area) / Math.max(1, Math.min(m.area, e.area)) < 3,
     );
     if (twin) {
       claimedExtra.add(twin.index);
@@ -162,9 +148,10 @@ export function kickbackForComposition(
   }
   for (const e of c.extra) {
     if (claimedExtra.has(e.index)) continue;
-    const advice = e.kind?.kind === "text"
-      ? "this is a TEXT block — read the crop before touching it; the fix is usually its color/weight or the space around it, NEVER deleting visible text"
-      : "remove, merge, or restyle (a too-dark fill can make an interior crest as a component)";
+    const advice =
+      e.kind?.kind === "text"
+        ? "this is a TEXT block — read the crop before touching it; the fix is usually its color/weight or the space around it, NEVER deleting visible text"
+        : "remove, merge, or restyle (a too-dark fill can make an interior crest as a component)";
     lines.push(
       `${label}: extra ${kindTag(e)}(${e.left},${e.top}) ${e.width}x${e.height} fill ${e.hex} — not in target; ${advice}.${renderedBy(e)}${nearMissNote("target", e)}`,
     );
@@ -177,7 +164,10 @@ export function kickbackForComposition(
   for (const g of c.gapDeltas) {
     const dir = g.delta > 0 ? `reduce ${g.delta}px` : `add ${-g.delta}px`;
     lines.push(
-      `${label}: gap #${g.above} -> #${g.below} is ${g.currentGap}px vs target ${g.targetGap}px — ${dir} of vertical space between them.${(() => { const below = c.matches.find((x) => x.target.index === g.below); return below ? selectorNote(below.current, "the gap sits above") : ""; })()}`,
+      `${label}: gap #${g.above} -> #${g.below} is ${g.currentGap}px vs target ${g.targetGap}px — ${dir} of vertical space between them.${(() => {
+        const below = c.matches.find((x) => x.target.index === g.below);
+        return below ? selectorNote(below.current, "the gap sits above") : "";
+      })()}`,
     );
   }
   for (const m of c.matches) {
@@ -202,22 +192,30 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: Rul
   if (off("regressed")) offRules.push("regressed");
   if (off("target-failed")) offRules.push("target-failed");
   if (off("gate-suspect")) offRules.push("gate-suspect");
-  const liveResiduals = (!off("target-failed") && report.targets.some((t) => !t.pass))
-    || (!off("gate-suspect") && report.gates.some((g) => g.suspects > 0))
-    || (!off("regressed") && report.trend?.direction === "regressed");
+  const liveResiduals =
+    (!off("target-failed") && report.targets.some((t) => !t.pass)) ||
+    (!off("gate-suspect") && report.gates.some((g) => g.suspects > 0)) ||
+    (!off("regressed") && report.trend?.direction === "regressed");
   // `report.done` is the measurement; the word printed is what the settings leave of it. They
   // agree unless a rule is off, and then the runner's exit code agrees with this line.
   const done = report.done || !liveResiduals;
   lines.push(`${BOLD}${CYAN}vlmkit verify markup${RESET}`);
   lines.push(`${DIM}attempt: ${report.attempt}${RESET}`);
   lines.push("");
-  lines.push(`verdict: ${done ? `${GREEN}DONE${RESET}` : `${RED}NOT DONE${RESET}`}`
-    + (done && !report.done ? ` ${DIM}(residuals remain, but every rule covering them is off)${RESET}` : ""));
+  lines.push(
+    `verdict: ${done ? `${GREEN}DONE${RESET}` : `${RED}NOT DONE${RESET}`}` +
+      (done && !report.done ? ` ${DIM}(residuals remain, but every rule covering them is off)${RESET}` : ""),
+  );
   if (report.trend) {
     const t = report.trend;
-    const label = t.direction === "regressed"
-      ? (off("regressed") ? `${DIM}regressed — NOT reported (regressed off)${RESET}` : `${RED}REGRESSED${RESET}`)
-      : t.direction === "improved" ? `${GREEN}improved${RESET}` : `${DIM}flat${RESET}`;
+    const label =
+      t.direction === "regressed"
+        ? off("regressed")
+          ? `${DIM}regressed — NOT reported (regressed off)${RESET}`
+          : `${RED}REGRESSED${RESET}`
+        : t.direction === "improved"
+          ? `${GREEN}improved${RESET}`
+          : `${DIM}flat${RESET}`;
     lines.push(
       `trend vs previous run: ${label} (targets passed ${t.previous.targetsPassed} -> ${t.current.targetsPassed}, residuals ${t.previous.residuals} -> ${t.current.residuals})`,
     );
@@ -227,13 +225,16 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: Rul
   for (const t of report.targets) {
     const mark = t.pass
       ? `${GREEN}pass${RESET}`
-      : off("target-failed") ? `${DIM}fail — NOT reported${RESET}` : `${RED}fail${RESET}`;
+      : off("target-failed")
+        ? `${DIM}fail — NOT reported${RESET}`
+        : `${RED}fail${RESET}`;
     const cal = t.calibration
       ? ` ${DIM}(calibration floor: ${t.calibration.matched} matched, ${t.calibration.missing}/${t.calibration.extra} missing/extra)${RESET}`
       : "";
-    const demoted = (t.missing - t.missingBlocking) + (t.extra - t.extraBlocking);
-    const demotedNote = (demoted > 0 ? ` ${DIM}(+${demoted} pixel-confirmed, not blocking)${RESET}` : "")
-      + (t.degraded ? ` ${DIM}[degraded-capture tolerances]${RESET}` : "");
+    const demoted = t.missing - t.missingBlocking + (t.extra - t.extraBlocking);
+    const demotedNote =
+      (demoted > 0 ? ` ${DIM}(+${demoted} pixel-confirmed, not blocking)${RESET}` : "") +
+      (t.degraded ? ` ${DIM}[degraded-capture tolerances]${RESET}` : "");
     lines.push(
       `  - ${basename(t.target)} ${t.width}x${t.height}: ${mark} — matched ${t.matched}, missing ${t.missingBlocking}, extra ${t.extraBlocking}, ordering ${t.orderViolations}, pixel diff ${(t.pixelDiffRatio * 100).toFixed(2)}%, rendered height ${t.renderedHeight}px${demotedNote}${cal}`,
     );
@@ -241,14 +242,21 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: Rul
   lines.push("");
   lines.push("Gates:");
   for (const g of report.gates) {
-    const mark = g.suspects > 0
-      ? (off("gate-suspect") ? `${DIM}suspect x${g.suspects} — NOT reported${RESET}` : `${RED}suspect x${g.suspects}${RESET}`)
-      : g.warns > 0 ? `${YELLOW}warn x${g.warns}${RESET}` : `${GREEN}clean${RESET}`;
+    const mark =
+      g.suspects > 0
+        ? off("gate-suspect")
+          ? `${DIM}suspect x${g.suspects} — NOT reported${RESET}`
+          : `${RED}suspect x${g.suspects}${RESET}`
+        : g.warns > 0
+          ? `${YELLOW}warn x${g.warns}${RESET}`
+          : `${GREEN}clean${RESET}`;
     lines.push(`  - ${g.gate}: ${mark} — ${g.summary}`);
   }
   if (offRules.length > 0) {
     lines.push("");
-    lines.push(`${DIM}rule(s) turned off for this run: ${offRules.join(", ")} — the counts above are still measured${RESET}`);
+    lines.push(
+      `${DIM}rule(s) turned off for this run: ${offRules.join(", ")} — the counts above are still measured${RESET}`,
+    );
   }
   if (report.kickback.length > 0) {
     lines.push("");

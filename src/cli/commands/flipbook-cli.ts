@@ -19,7 +19,7 @@ import { DIM, RESET, GREEN, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colo
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit snapshot flipbook <frame1.png> [frame2.png ...] [--out flipbook.html] [--title \"…\"] [--delay 700] [--label A --label B] [--no-loop] [--no-autoplay]",
+    '  vlmkit snapshot flipbook <frame1.png> [frame2.png ...] [--out flipbook.html] [--title "…"] [--delay 700] [--label A --label B] [--no-loop] [--no-autoplay]',
     "",
     "Examples:",
     "  vlmkit snapshot flipbook round-0.png round-1.png round-2.png --out fix-loop.html --title 'Fix-loop convergence'",

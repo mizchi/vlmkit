@@ -15,7 +15,11 @@ import { sceneFromTree, sceneToCompositionInput, type SceneNode } from "./scene.
 /** A settings menu: a section per group, each a title over two labelled sliders. */
 function menu(gapAbove: number, gapBelow: number): SceneNode {
   const section = (name: string, title: string, y: number): SceneNode => ({
-    name, x: 40, y, width: 600, height: 30 + gapBelow + 40 + 10 + 40,
+    name,
+    x: 40,
+    y,
+    width: 600,
+    height: 30 + gapBelow + 40 + 10 + 40,
     children: [
       { name: "title", x: 0, y: 0, width: 600, height: 30, text: title, fontSize: 26, heading: 2 },
       { name: "slider", x: 0, y: 30 + gapBelow, width: 600, height: 40, text: "Master volume" },
@@ -57,12 +61,14 @@ describe("composition judge on a non-DOM scene graph", () => {
   });
 
   it("honours an exemption written against the scene path", () => {
-    const report = judgeComposition(
-      sceneToCompositionInput(sceneFromTree(menu(10, 40)), viewport),
-      { allow: ["video[0]>title;the video group is deliberately set apart"] },
-    );
+    const report = judgeComposition(sceneToCompositionInput(sceneFromTree(menu(10, 40)), viewport), {
+      allow: ["video[0]>title;the video group is deliberately set apart"],
+    });
     assert.equal(report.findings.filter((f) => f.kind === "proximity-inversion").length, 0);
-    assert.deepEqual(report.allowed.map((a) => a.selector), ["menu[0]>video[0]>title[0]"]);
+    assert.deepEqual(
+      report.allowed.map((a) => a.selector),
+      ["menu[0]>video[0]>title[0]"],
+    );
   });
 
   it("compares backgrounds as colours, not as the strings a scene spelled them with", () => {
@@ -70,13 +76,18 @@ describe("composition judge on a non-DOM scene graph", () => {
     // still judged; one in a different colour groups its contents itself. The judge compares
     // the page's computed-style strings, so `#1b1f24` under `rgb(27, 31, 36)` has to reach it
     // as one colour — spelled two ways, it read as a painted panel and hid the inversion.
-    const painted = (menuBg: string, sectionBg: string) => sceneFromTree(menu(10, 40)).map((e) => (
-      e.path === "menu[0]" ? { ...e, background: menuBg }
-        : /^menu\[0\]>\w+\[0\]$/.test(e.path) ? { ...e, background: sectionBg }
-          : e
-    ));
+    const painted = (menuBg: string, sectionBg: string) =>
+      sceneFromTree(menu(10, 40)).map((e) =>
+        e.path === "menu[0]"
+          ? { ...e, background: menuBg }
+          : /^menu\[0\]>\w+\[0\]$/.test(e.path)
+            ? { ...e, background: sectionBg }
+            : e,
+      );
     const inversions = (elements: ReturnType<typeof painted>) =>
-      judgeComposition(sceneToCompositionInput(elements, viewport)).findings.filter((f) => f.kind === "proximity-inversion").length;
+      judgeComposition(sceneToCompositionInput(elements, viewport)).findings.filter(
+        (f) => f.kind === "proximity-inversion",
+      ).length;
     assert.equal(inversions(painted("rgb(27, 31, 36)", "#1b1f24")), 1, "same colour, two spellings");
     assert.equal(inversions(painted("#000", "#1b1f24")), 0, "a panel in its own colour is its own group");
   });

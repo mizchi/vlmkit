@@ -209,14 +209,19 @@ interface RawSample {
   boxShadow: string;
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
+function isUrl(s: string): boolean {
+  return /^https?:\/\//.test(s);
+}
 
 function nearestOnScale(value: number, scale: number[]): number {
   let best = scale[0]!;
   let bestDist = Math.abs(value - best);
   for (const s of scale) {
     const d = Math.abs(value - s);
-    if (d < bestDist) { best = s; bestDist = d; }
+    if (d < bestDist) {
+      best = s;
+      bestDist = d;
+    }
   }
   return best;
 }
@@ -243,9 +248,7 @@ function normalizeShadow(s: string): string {
   });
 }
 
-export async function runDesignTokens(
-  options: DesignTokensOptions,
-): Promise<DesignTokensReport> {
+export async function runDesignTokens(options: DesignTokensOptions): Promise<DesignTokensReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
@@ -261,7 +264,7 @@ export async function runDesignTokens(
     // `sourceToUrl` is identity for a URL, so the two branches were the same
     // call; one navigation now, honouring --timeout / --wait-until / --har.
     await navigatePage(page, sourceToUrl(options.source), options);
-    const collected = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
+    const collected = (await page.evaluate(SAMPLE_SCRIPT)) as RawSample[];
     await page.close();
     return collected;
   });
@@ -280,10 +283,13 @@ export async function runDesignTokens(
       if (v === 0) continue;
       if (!isOnScale(v, config.radius, config.tolerance)) {
         violations.push({
-          property: "border-radius", path: s.path, tag: s.tag,
-          value: v, nearest: nearestOnScale(v, config.radius),
+          property: "border-radius",
+          path: s.path,
+          tag: s.tag,
+          value: v,
+          nearest: nearestOnScale(v, config.radius),
         });
-        break;  // one report per element is enough
+        break; // one report per element is enough
       }
     }
     // padding + margin per side.
@@ -295,8 +301,11 @@ export async function runDesignTokens(
         if (prop === "margin" && s.marginAuto?.[side]) continue;
         if (!isOnScale(v, config.spacing, config.tolerance)) {
           violations.push({
-            property: prop, path: s.path, tag: s.tag,
-            value: v, nearest: nearestOnScale(v, config.spacing),
+            property: prop,
+            path: s.path,
+            tag: s.tag,
+            value: v,
+            nearest: nearestOnScale(v, config.spacing),
             side,
           });
         }
@@ -307,8 +316,11 @@ export async function runDesignTokens(
       const v = parseInt(s.zIndex, 10);
       if (Number.isFinite(v) && !isOnScale(v, config.zIndex, config.tolerance)) {
         violations.push({
-          property: "z-index", path: s.path, tag: s.tag,
-          value: v, nearest: nearestOnScale(v, config.zIndex),
+          property: "z-index",
+          path: s.path,
+          tag: s.tag,
+          value: v,
+          nearest: nearestOnScale(v, config.zIndex),
         });
       }
     }
@@ -340,8 +352,13 @@ export async function runDesignTokens(
   await writeFile(reportPath, md);
 
   return {
-    source: options.source, viewport, config,
-    inspectedCount: byPath.size, violations, shadow, reportPath,
+    source: options.source,
+    viewport,
+    config,
+    inspectedCount: byPath.size,
+    violations,
+    shadow,
+    reportPath,
     ...(options.strict ? { strict: true } : {}),
   };
 }
@@ -373,9 +390,12 @@ export function formatDesignTokensReport(report: DesignTokensReport, rules?: Rul
   const shownShadow = shadowOver && shadowTier !== "off";
   const totalFindings = (scaleTier === "off" ? 0 : report.violations.length) + (shownShadow ? 1 : 0);
   const worst = [scaleTier, shadowTier].includes("suspect") ? "suspect" : "warn";
-  const icon = totalFindings === 0
-    ? `${GREEN}\u2713${RESET}`
-    : worst === "suspect" ? `${RED}\u2717${RESET}` : `${YELLOW}!${RESET}`;
+  const icon =
+    totalFindings === 0
+      ? `${GREEN}\u2713${RESET}`
+      : worst === "suspect"
+        ? `${RED}\u2717${RESET}`
+        : `${YELLOW}!${RESET}`;
   lines.push(`  ${icon} ${totalFindings} finding(s)`);
   const hidden = new Map<string, number>();
   if (scaleTier === "off" && report.violations.length > 0) hidden.set("scale-violation", report.violations.length);
@@ -387,8 +407,8 @@ export function formatDesignTokensReport(report: DesignTokensReport, rules?: Rul
   }
   if (shownShadow) {
     lines.push(
-      `    ${DIM}box-shadow      ${report.shadow.distinctShadows.length} distinct`
-      + ` (allowed: ${report.shadow.allowedTiers})${RESET}`,
+      `    ${DIM}box-shadow      ${report.shadow.distinctShadows.length} distinct` +
+        ` (allowed: ${report.shadow.allowedTiers})${RESET}`,
     );
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
@@ -423,7 +443,9 @@ function renderReport(r: Omit<DesignTokensReport, "reportPath">): string {
     return lines.join("\n");
   }
 
-  lines.push(`## Violations: ${r.violations.length} scale + ${r.shadow.distinctShadows.length > r.shadow.allowedTiers ? "1" : "0"} shadow-tier`);
+  lines.push(
+    `## Violations: ${r.violations.length} scale + ${r.shadow.distinctShadows.length > r.shadow.allowedTiers ? "1" : "0"} shadow-tier`,
+  );
   lines.push("");
 
   for (const [prop, list] of byProperty) {
@@ -441,7 +463,9 @@ function renderReport(r: Omit<DesignTokensReport, "reportPath">): string {
   }
 
   if (r.shadow.distinctShadows.length > r.shadow.allowedTiers) {
-    lines.push(`### box-shadow: ${r.shadow.distinctShadows.length} distinct tier(s) (allowed: ${r.shadow.allowedTiers})`);
+    lines.push(
+      `### box-shadow: ${r.shadow.distinctShadows.length} distinct tier(s) (allowed: ${r.shadow.allowedTiers})`,
+    );
     lines.push("");
     lines.push("Distinct normalized shadow values found:");
     lines.push("");
@@ -453,9 +477,13 @@ function renderReport(r: Omit<DesignTokensReport, "reportPath">): string {
 
   lines.push("## Suggested next step");
   lines.push("");
-  lines.push("1. Replace each violating value with its nearest in-scale equivalent (the \"Nearest in-scale\" column).");
-  lines.push("2. If a value needs to be off-scale (intentional outlier), document why in a comment — the violation is a code smell, not a hard ban.");
-  lines.push("3. Consolidate `box-shadow` values into a small named tier set (e.g., `--shadow-sm`, `--shadow-md`, `--shadow-lg`) and reference the variables instead of inline values.");
+  lines.push('1. Replace each violating value with its nearest in-scale equivalent (the "Nearest in-scale" column).');
+  lines.push(
+    "2. If a value needs to be off-scale (intentional outlier), document why in a comment — the violation is a code smell, not a hard ban.",
+  );
+  lines.push(
+    "3. Consolidate `box-shadow` values into a small named tier set (e.g., `--shadow-sm`, `--shadow-md`, `--shadow-lg`) and reference the variables instead of inline values.",
+  );
   lines.push("4. Re-run `vlmkit check tokens`. The violation count should drop.");
   lines.push("");
   return lines.join("\n");

@@ -129,7 +129,8 @@ function parseString(v: string, lineNo: number): string {
   }
   const body = v.slice(1, -1);
   // Basic escapes only for double-quoted strings.
-  if (quote === '"') return body.replace(/\\(["\\nt])/g, (_, c) => ({ '"': '"', "\\": "\\", n: "\n", t: "\t" }[c as string] ?? c));
+  if (quote === '"')
+    return body.replace(/\\(["\\nt])/g, (_, c) => ({ '"': '"', "\\": "\\", n: "\n", t: "\t" })[c as string] ?? c);
   return body;
 }
 

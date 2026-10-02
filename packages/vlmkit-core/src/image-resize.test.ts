@@ -43,7 +43,10 @@ describe("resolveResolutionForViewport", () => {
 
   it("keeps the presets ordered, since the search relies on it", () => {
     const widths = (["low", "medium", "high", "full"] as const).map((p) => RESOLUTION_PRESETS[p].maxWidth);
-    assert.deepEqual([...widths].sort((a, b) => a - b), widths);
+    assert.deepEqual(
+      [...widths].sort((a, b) => a - b),
+      widths,
+    );
   });
 });
 

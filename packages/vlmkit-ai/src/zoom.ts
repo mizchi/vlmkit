@@ -33,7 +33,10 @@ export function createZoomDriver(model: VlmModel, options: ZoomDriverOptions = {
   if (isGeminiDirectModel(model.id)) {
     return geminiDriver({
       model: model.id.replace("gemini:", ""),
-      apiKey: need(options.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY, "GEMINI_API_KEY (or GOOGLE_AI_API_KEY)"),
+      apiKey: need(
+        options.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY,
+        "GEMINI_API_KEY (or GOOGLE_AI_API_KEY)",
+      ),
     });
   }
   if (isClaudeDirectModel(model.id)) {
@@ -74,7 +77,8 @@ export async function analyzeWithZoom(
     promptTokens: usage.promptTokens,
     completionTokens: usage.completionTokens,
     totalTokens: usage.promptTokens + usage.completionTokens,
-    costUsd: (usage.promptTokens / 1000) * model.promptCostPer1k + (usage.completionTokens / 1000) * model.completionCostPer1k,
+    costUsd:
+      (usage.promptTokens / 1000) * model.promptCostPer1k + (usage.completionTokens / 1000) * model.completionCostPer1k,
     latencyMs: Date.now() - start,
     zoom,
   };

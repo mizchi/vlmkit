@@ -17,13 +17,7 @@
  * those drivers send the crop as a user image right after it. The loop hands every driver the
  * same `ZoomResult`.
  */
-import {
-  DEFAULT_IMAGE_BUDGET,
-  toViewBox,
-  type Box,
-  type ImageBudget,
-  type ZoomCoordinates,
-} from "./zoom-geometry.ts";
+import { DEFAULT_IMAGE_BUDGET, toViewBox, type Box, type ImageBudget, type ZoomCoordinates } from "./zoom-geometry.ts";
 import { prepareZoomSource, zoomInto, type ZoomSource } from "./zoom-image.ts";
 
 export type ZoomPart = { type: "text"; text: string } | { type: "image"; png: Buffer };
@@ -47,18 +41,18 @@ export interface ZoomResult {
 export type ZoomTurn =
   | { role: "user"; parts: ZoomPart[] }
   | {
-    role: "assistant";
-    text: string;
-    calls: ZoomCall[];
-    /** The provider's own assistant message, so a driver can replay it verbatim. */
-    raw?: unknown;
-  }
+      role: "assistant";
+      text: string;
+      calls: ZoomCall[];
+      /** The provider's own assistant message, so a driver can replay it verbatim. */
+      raw?: unknown;
+    }
   | {
-    role: "tool";
-    /** True when the results answer native function calls; false for the text protocol. */
-    native: boolean;
-    results: ZoomResult[];
-  };
+      role: "tool";
+      /** True when the results answer native function calls; false for the text protocol. */
+      native: boolean;
+      results: ZoomResult[];
+    };
 
 export interface ZoomUsage {
   promptTokens: number;
@@ -120,14 +114,15 @@ export interface ZoomLoopResult {
 }
 
 export function zoomToolSpec(imageCount: number, coordinates: ZoomCoordinates): ZoomToolSpec {
-  const unit = coordinates === "pixels"
-    ? "in pixels of the image as you see it (origin top-left, x right, y down)"
-    : "as 0-1000 of the image's width (x) and height (y), origin top-left";
+  const unit =
+    coordinates === "pixels"
+      ? "in pixels of the image as you see it (origin top-left, x right, y down)"
+      : "as 0-1000 of the image's width (x) and height (y), origin top-left";
   return {
     name: "zoom",
     description:
-      "Crop a region of an image and see it magnified from the full-resolution original. "
-      + "Use it for any detail too small to read with confidence: small text, thin lines, the exact colour or edge of an element.",
+      "Crop a region of an image and see it magnified from the full-resolution original. " +
+      "Use it for any detail too small to read with confidence: small text, thin lines, the exact colour or edge of an element.",
     parameters: {
       type: "object",
       properties: {
@@ -149,17 +144,24 @@ export function zoomToolSpec(imageCount: number, coordinates: ZoomCoordinates): 
 export function zoomCallFromArgs(id: string, args: unknown): ZoomCall | { id: string; error: string } {
   let value = args;
   if (typeof value === "string") {
-    try { value = JSON.parse(value); } catch { return { id, error: "arguments are not valid JSON" }; }
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return { id, error: "arguments are not valid JSON" };
+    }
   }
   const a = (value ?? {}) as Record<string, unknown>;
-  const num = (k: string) => (typeof a[k] === "number" ? a[k] as number : typeof a[k] === "string" ? Number(a[k]) : NaN);
+  const num = (k: string) =>
+    typeof a[k] === "number" ? (a[k] as number) : typeof a[k] === "string" ? Number(a[k]) : NaN;
   const box = { x1: num("x1"), y1: num("y1"), x2: num("x2"), y2: num("y2") };
-  if (![box.x1, box.y1, box.x2, box.y2].every(Number.isFinite)) return { id, error: "x1, y1, x2 and y2 are required numbers" };
+  if (![box.x1, box.y1, box.x2, box.y2].every(Number.isFinite))
+    return { id, error: "x1, y1, x2 and y2 are required numbers" };
   const index = a.image_index === undefined ? 0 : num("image_index");
   return { id, imageIndex: Number.isFinite(index) ? Math.trunc(index) : NaN, box };
 }
 
-const ZOOM_LINE = /^\s*ZOOM\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*$/gim;
+const ZOOM_LINE =
+  /^\s*ZOOM\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*$/gim;
 
 /**
  * Zoom requests written in a reply, one `ZOOM <image> <x1> <y1> <x2> <y2>` per line. The
@@ -178,11 +180,14 @@ export function parseZoomRequests(text: string, turn: number): ZoomCall[] {
 }
 
 function textProtocolInstructions(coordinates: ZoomCoordinates): string {
-  const unit = coordinates === "pixels" ? "pixels of the image as you see it" : "0-1000 of the image's width and height";
-  return "You can zoom: to see a region magnified from the full-resolution original, reply with only lines of the form\n"
-    + "ZOOM <image> <x1> <y1> <x2> <y2>\n"
-    + `where <image> counts from 0 and the box is in ${unit} (origin top-left). `
-    + "You will get the magnified regions back. When you can answer, reply with the answer and no ZOOM line.";
+  const unit =
+    coordinates === "pixels" ? "pixels of the image as you see it" : "0-1000 of the image's width and height";
+  return (
+    "You can zoom: to see a region magnified from the full-resolution original, reply with only lines of the form\n" +
+    "ZOOM <image> <x1> <y1> <x2> <y2>\n" +
+    `where <image> counts from 0 and the box is in ${unit} (origin top-left). ` +
+    "You will get the magnified regions back. When you can answer, reply with the answer and no ZOOM line."
+  );
 }
 
 /** The opening message: each image labelled with its index and the size it is shown at, then the question. */
@@ -199,9 +204,10 @@ function introParts(
     intro.push({ type: "text", text: `${label}Image ${i} (${src.view.width}x${src.view.height} pixels):` });
     intro.push({ type: "image", png: src.viewPng });
   });
-  const coordNote = coordinates === "pixels"
-    ? "Coordinates are absolute pixels of the image as shown, origin top-left."
-    : "Coordinates are 0-1000 of each image's width and height, origin top-left.";
+  const coordNote =
+    coordinates === "pixels"
+      ? "Coordinates are absolute pixels of the image as shown, origin top-left."
+      : "Coordinates are 0-1000 of each image's width and height, origin top-left.";
   intro.push({ type: "text", text: `${question}\n\n${coordNote}${instructions ? ` ${instructions}` : ""}` });
   return intro;
 }
@@ -252,12 +258,19 @@ export async function runZoomLoop(
   const maxZooms = Math.max(0, options.maxZooms ?? 6);
   const maxTokens = options.maxTokens ?? 2048;
   const protocol: "native" | "text" = options.protocol ?? (driver.nativeTools ? "native" : "text");
-  if (protocol === "native" && !driver.nativeTools) throw new Error(`${driver.model}: this driver has no native tools; use protocol "text"`);
+  if (protocol === "native" && !driver.nativeTools)
+    throw new Error(`${driver.model}: this driver has no native tools; use protocol "text"`);
 
   const sources: ZoomSource[] = images.map((img) => prepareZoomSource(img.png, budget));
-  const intro = introParts(images, sources, question, coordinates, protocol === "native"
-    ? "Use the zoom tool to examine any detail too small to read confidently."
-    : textProtocolInstructions(coordinates));
+  const intro = introParts(
+    images,
+    sources,
+    question,
+    coordinates,
+    protocol === "native"
+      ? "Use the zoom tool to examine any detail too small to read confidently."
+      : textProtocolInstructions(coordinates),
+  );
 
   const transcript: ZoomTurn[] = [{ role: "user", parts: intro }];
   const tool = zoomToolSpec(images.length, coordinates);
@@ -278,18 +291,33 @@ export async function runZoomLoop(
     usage.completionTokens += reply.usage?.completionTokens ?? 0;
     const calls = protocol === "native" ? reply.calls : parseZoomRequests(reply.text, turns);
     const done = (answer: string) => ({
-      answer, zooms, rejected, turns, wrappedUp, protocol, usage,
+      answer,
+      zooms,
+      rejected,
+      turns,
+      wrappedUp,
+      protocol,
+      usage,
       ...(reply.stop ? { stop: reply.stop } : {}),
     });
     if (calls.length === 0 || wrappedUp) {
       return done(protocol === "text" ? reply.text.replace(ZOOM_LINE, "").trim() : reply.text.trim());
     }
-    transcript.push({ role: "assistant", text: reply.text, calls, ...(reply.raw !== undefined ? { raw: reply.raw } : {}) });
+    transcript.push({
+      role: "assistant",
+      text: reply.text,
+      calls,
+      ...(reply.raw !== undefined ? { raw: reply.raw } : {}),
+    });
 
     const results: ZoomResult[] = [];
     for (const call of calls) {
       if (zooms.length >= maxZooms) {
-        results.push({ callId: call.id, isError: true, parts: [{ type: "text", text: "Zoom budget used up; answer from what you have seen." }] });
+        results.push({
+          callId: call.id,
+          isError: true,
+          parts: [{ type: "text", text: "Zoom budget used up; answer from what you have seen." }],
+        });
         continue;
       }
       if (call.error) {
@@ -311,7 +339,14 @@ export async function runZoomLoop(
         continue;
       }
       zooms.push({ imageIndex: call.imageIndex, viewBox: outcome.viewBox, originalBox: outcome.originalBox });
-      results.push({ callId: call.id, isError: false, parts: [{ type: "text", text: outcome.text }, { type: "image", png: outcome.png }] });
+      results.push({
+        callId: call.id,
+        isError: false,
+        parts: [
+          { type: "text", text: outcome.text },
+          { type: "image", png: outcome.png },
+        ],
+      });
     }
     transcript.push({ role: "tool", native: protocol === "native", results });
     // A model that keeps naming boxes the loop refuses would never spend its budget; the turn
@@ -320,7 +355,12 @@ export async function runZoomLoop(
       wrappedUp = true;
       transcript.push({
         role: "user",
-        parts: [{ type: "text", text: "You have used your zoom budget. Answer the original question now, based on everything you have seen." }],
+        parts: [
+          {
+            type: "text",
+            text: "You have used your zoom budget. Answer the original question now, based on everything you have seen.",
+          },
+        ],
       });
     }
   }

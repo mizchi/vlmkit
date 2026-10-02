@@ -36,7 +36,15 @@ import { firstPositional, runOutputDir } from "@mizchi/vlmkit-core/plugin/args.t
 
 const DEFAULT_THRESHOLD = 0.03;
 
-const DRIFT_VALUE_FLAGS = ["--selector", "--output-dir", "--report", "--threshold", "--pixel-tolerance", "--reference-index", "--allow"];
+const DRIFT_VALUE_FLAGS = [
+  "--selector",
+  "--output-dir",
+  "--report",
+  "--threshold",
+  "--pixel-tolerance",
+  "--reference-index",
+  "--allow",
+];
 
 /** Options plus the threshold, which the verdict needs and the report lacks. */
 export interface ComponentDriftGateOptions extends ComponentConsistencyOptions {
@@ -46,7 +54,6 @@ export interface ComponentDriftGateOptions extends ComponentConsistencyOptions {
 export interface PageDriftGateOptions extends MultiPageConsistencyOptions {
   threshold: number;
 }
-
 
 export const driftComponentGate = defineGate<ComponentConsistencyReport, ComponentDriftGateOptions>({
   id: "check.drift.component",
@@ -75,7 +82,7 @@ network to replay. Pass a URL and it fails as a missing file.`,
       // with --threshold rather than disabling the rule` actively pointed me toward the
       // wrong lever — `--threshold` would have been a blunt fudge; `--allow` was the
       // correct, reviewable one."
-      docs: "For a deliberate variant, declare the properties with --allow \"<property>[@<selector>];<reason>\" — the difference stays listed and a stale rule is reported. --threshold is a pass line on the *pixel ratio*, which is not what this rule reads. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
+      docs: 'For a deliberate variant, declare the properties with --allow "<property>[@<selector>];<reason>" — the difference stays listed and a stale rule is reported. --threshold is a pass line on the *pixel ratio*, which is not what this rule reads. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.',
     },
     {
       id: "instance-content-differs",
@@ -87,17 +94,64 @@ tracked style property matches, so the gate can pass on a page with real content
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page containing the instances", positional: 0, required: true },
-    { name: "selector", placeholder: "sel", kind: "string", description: "CSS selector matching >=2 instances", required: true },
-    { name: "reference-index", placeholder: "n", kind: "number", description: "Which match is the reference", defaultDescription: "0" },
-    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pass line on the measured diff ratio (does not change the measurement)", defaultDescription: String(DEFAULT_THRESHOLD) },
-    { name: "pixel-tolerance", placeholder: "0..1", kind: "number", description: "Comparator per-pixel colour tolerance", defaultDescription: "0.1" },
-    { name: "allow", placeholder: "<property>[@<selector>];<reason>", kind: "string", repeatable: true, description: DRIFT_ALLOW_HELP },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/component-consistency" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page containing the instances",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "selector",
+      placeholder: "sel",
+      kind: "string",
+      description: "CSS selector matching >=2 instances",
+      required: true,
+    },
+    {
+      name: "reference-index",
+      placeholder: "n",
+      kind: "number",
+      description: "Which match is the reference",
+      defaultDescription: "0",
+    },
+    {
+      name: "threshold",
+      placeholder: "0..1",
+      kind: "number",
+      description: "Pass line on the measured diff ratio (does not change the measurement)",
+      defaultDescription: String(DEFAULT_THRESHOLD),
+    },
+    {
+      name: "pixel-tolerance",
+      placeholder: "0..1",
+      kind: "number",
+      description: "Comparator per-pixel colour tolerance",
+      defaultDescription: "0.1",
+    },
+    {
+      name: "allow",
+      placeholder: "<property>[@<selector>];<reason>",
+      kind: "string",
+      repeatable: true,
+      description: DRIFT_ALLOW_HELP,
+    },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Output directory",
+      defaultDescription: "./test-results/component-consistency",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
   ],
   parse: (argv) => {
-    const htmlPath = firstPositional(argv, "vlmkit check drift component <html-or-url> --selector <sel>", DRIFT_VALUE_FLAGS);
+    const htmlPath = firstPositional(
+      argv,
+      "vlmkit check drift component <html-or-url> --selector <sel>",
+      DRIFT_VALUE_FLAGS,
+    );
     const selector = readFlag(argv, "selector");
     if (!selector) throw new UsageError("--selector <sel> is required (it must match at least two instances)");
     const threshold = readNumber(argv, "threshold", { min: 0, max: 1 }) ?? DEFAULT_THRESHOLD;
@@ -140,30 +194,35 @@ tracked style property matches, so the gate can pass on a page with real content
   findings: (report, options): Finding[] =>
     report.deltas
       .filter((d) => d.diffRatio > options.threshold)
-      .map((d) => d.styleDeltas.length > 0
-        ? {
-          rule: "instance-drift",
-          severity: "suspect" as const,
-          message:
-            `instance #${d.candidateIndex} is styled differently from reference #${report.referenceIndex}`
-            + ` — ${d.styleDeltas.length} computed propert${d.styleDeltas.length === 1 ? "y" : "ies"} differ:`
-            + ` ${d.styleDeltas.slice(0, 4).map((s) => `${s.property} ${s.reference} → ${s.candidate}`).join("; ")}`
-            + `${d.styleDeltas.length > 4 ? `; and ${d.styleDeltas.length - 4} more` : ""}`
-            + ` (${(d.diffRatio * 100).toFixed(2)}% of pixels, size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px)`,
-          selector: report.selector,
-          evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas, styleDeltas: d.styleDeltas },
-        }
-        : {
-          rule: "instance-content-differs",
-          severity: "info" as const,
-          message:
-            `instance #${d.candidateIndex} differs from reference #${report.referenceIndex}`
-            + ` by ${(d.diffRatio * 100).toFixed(2)}% of pixels, but every tracked computed style property`
-            + ` matches — this is different content in the same component, not drift.`
-            + ` Size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px is what the copy costs.`,
-          selector: report.selector,
-          evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
-        }),
+      .map((d) =>
+        d.styleDeltas.length > 0
+          ? {
+              rule: "instance-drift",
+              severity: "suspect" as const,
+              message:
+                `instance #${d.candidateIndex} is styled differently from reference #${report.referenceIndex}` +
+                ` — ${d.styleDeltas.length} computed propert${d.styleDeltas.length === 1 ? "y" : "ies"} differ:` +
+                ` ${d.styleDeltas
+                  .slice(0, 4)
+                  .map((s) => `${s.property} ${s.reference} → ${s.candidate}`)
+                  .join("; ")}` +
+                `${d.styleDeltas.length > 4 ? `; and ${d.styleDeltas.length - 4} more` : ""}` +
+                ` (${(d.diffRatio * 100).toFixed(2)}% of pixels, size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px)`,
+              selector: report.selector,
+              evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas, styleDeltas: d.styleDeltas },
+            }
+          : {
+              rule: "instance-content-differs",
+              severity: "info" as const,
+              message:
+                `instance #${d.candidateIndex} differs from reference #${report.referenceIndex}` +
+                ` by ${(d.diffRatio * 100).toFixed(2)}% of pixels, but every tracked computed style property` +
+                ` matches — this is different content in the same component, not drift.` +
+                ` Size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px is what the copy costs.`,
+              selector: report.selector,
+              evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
+            },
+      ),
   format: formatComponentConsistencyReport,
   ledger: (report, options) => ({
     tool: "check-drift-component",
@@ -218,12 +277,36 @@ Pass either --urls or --files, each repeatable.`,
     },
   ],
   inputs: [
-    { name: "selector", placeholder: "sel", kind: "string", description: "CSS selector present on every page", required: true },
+    {
+      name: "selector",
+      placeholder: "sel",
+      kind: "string",
+      description: "CSS selector present on every page",
+      required: true,
+    },
     { name: "urls", placeholder: "url", kind: "string", description: "Page URL", repeatable: true },
     { name: "files", placeholder: "path", kind: "string", description: "Page file", repeatable: true },
-    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pass line on the measured diff ratio (does not change the measurement)", defaultDescription: String(DEFAULT_THRESHOLD) },
-    { name: "pixel-tolerance", placeholder: "0..1", kind: "number", description: "Comparator per-pixel colour tolerance", defaultDescription: "0.1" },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/consistency" },
+    {
+      name: "threshold",
+      placeholder: "0..1",
+      kind: "number",
+      description: "Pass line on the measured diff ratio (does not change the measurement)",
+      defaultDescription: String(DEFAULT_THRESHOLD),
+    },
+    {
+      name: "pixel-tolerance",
+      placeholder: "0..1",
+      kind: "number",
+      description: "Comparator per-pixel colour tolerance",
+      defaultDescription: "0.1",
+    },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Output directory",
+      defaultDescription: "./test-results/consistency",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     ...PAGE_LOAD_INPUTS,
   ],
@@ -256,26 +339,30 @@ Pass either --urls or --files, each repeatable.`,
       // Absent, not different: there is no ratio to compare to the pass line, so
       // this branch must come first — `NaN > threshold` is false and would drop it.
       if (Number.isNaN(d.diffRatio)) {
-        return [{
-          rule: "selector-missing",
-          severity: "warn",
-          message:
-            `${report.selector} is not on ${d.candidate}, so it could not be compared`
-            + ` against ${report.reference}`,
-          selector: report.selector,
-          evidence: { candidate: d.candidate, matched: false },
-        }];
+        return [
+          {
+            rule: "selector-missing",
+            severity: "warn",
+            message:
+              `${report.selector} is not on ${d.candidate}, so it could not be compared` +
+              ` against ${report.reference}`,
+            selector: report.selector,
+            evidence: { candidate: d.candidate, matched: false },
+          },
+        ];
       }
       if (d.diffRatio <= options.threshold) return [];
-      return [{
-        rule: "page-drift",
-        severity: "suspect",
-        message:
-          `${d.candidate} differs from ${report.reference}`
-          + ` by ${(d.diffRatio * 100).toFixed(2)}% (threshold ${(options.threshold * 100).toFixed(2)}%)`,
-        selector: report.selector,
-        evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
-      }];
+      return [
+        {
+          rule: "page-drift",
+          severity: "suspect",
+          message:
+            `${d.candidate} differs from ${report.reference}` +
+            ` by ${(d.diffRatio * 100).toFixed(2)}% (threshold ${(options.threshold * 100).toFixed(2)}%)`,
+          selector: report.selector,
+          evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
+        },
+      ];
     }),
   format: formatMultiPageConsistencyReport,
   ledger: (report, options) => ({

@@ -76,9 +76,7 @@ const FLAG = /--[a-z][a-z0-9-]{2,}/g;
  * write and hard to pattern-match, and because this list is the audit trail — an entry that
  * later becomes real is one that must be deleted here.
  */
-const DOCUMENTED_AS_ABSENT = new Set([
-  "--capture-spec",
-]);
+const DOCUMENTED_AS_ABSENT = new Set(["--capture-spec"]);
 
 /**
  * Flags of a binary the docs tell the reader to run that is NOT vlmkit.
@@ -125,14 +123,23 @@ function knownFlags({ skillAssets = true } = {}) {
     }
   };
   const sources = grep([
-    "-rho", "--include=*.ts", "--include=*.mjs", "--include=*.pkl", "--include=*.yml",
-    "-e", "--[a-z][a-z0-9-]*",
+    "-rho",
+    "--include=*.ts",
+    "--include=*.mjs",
+    "--include=*.pkl",
+    "--include=*.yml",
+    "-e",
+    "--[a-z][a-z0-9-]*",
     // `hasFlag(args, "no-baseline-sanity")`, `readFlag(argv, "level")`, `name = "scenario"`,
     // `{ name: "level" }` — every place a flag name appears without its dashes.
-    "-e", 'name: "[a-z][a-z0-9-]*"',
-    "-e", 'name = "[a-z][a-z0-9-]*"',
-    "-e", '(argv, "[a-z][a-z0-9-]*"',
-    "-e", '(args, "[a-z][a-z0-9-]*"',
+    "-e",
+    'name: "[a-z][a-z0-9-]*"',
+    "-e",
+    'name = "[a-z][a-z0-9-]*"',
+    "-e",
+    '(argv, "[a-z][a-z0-9-]*"',
+    "-e",
+    '(args, "[a-z][a-z0-9-]*"',
     // Only paths that exist: `e2e/` was here until the capture spec was retired, and grep
     // exits 2 (not 1) on a missing path, so the helper above rethrows and all three tests in
     // this file fail with a message about nothing.
@@ -167,7 +174,8 @@ function documentedCommandVerbs() {
   const found = new Map();
   for (const doc of REFERENCE_DOCS) {
     const text = readFileSync(join(repoRoot, doc), "utf8");
-    const chunks = [...text.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1])
+    const chunks = [...text.matchAll(/```[a-z]*\n([\s\S]*?)```/g)]
+      .map((m) => m[1])
       .concat([...text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]));
     for (const chunk of chunks) {
       for (const line of chunk.split("\n")) {
@@ -236,7 +244,10 @@ async function declaredPairs() {
   let group = null;
   for (const line of groupsBlock.split("\n")) {
     const opening = line.match(/^ {2}([a-z][a-z0-9-]*):\s*\{/);
-    if (opening) { group = opening[1]; continue; }
+    if (opening) {
+      group = opening[1];
+      continue;
+    }
     const member = line.match(/^ {4}([a-z][a-z0-9-]*):\s*\{/);
     if (member && group) pairs.add(`${group} ${member[1]}`);
     if (/^ {2}\}/.test(line)) group = null;
@@ -249,7 +260,8 @@ function documentedPairs(groupVerbs) {
   const found = new Map();
   for (const doc of REFERENCE_DOCS) {
     const text = readFileSync(join(repoRoot, doc), "utf8");
-    const chunks = [...text.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1])
+    const chunks = [...text.matchAll(/```[a-z]*\n([\s\S]*?)```/g)]
+      .map((m) => m[1])
       .concat([...text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]));
     for (const chunk of chunks) {
       for (const line of chunk.split("\n")) {
@@ -278,9 +290,9 @@ describe("flags in the reference docs", () => {
     assert.deepEqual(
       missing.map(([flag, doc]) => `${flag} (${doc})`),
       [],
-      "documented in the reference docs, absent from every source file — either implement it or "
-      + "delete the line. `--capture-spec` sat in docs/cli-reference.md through a rename it "
-      + "predated, and the reader who typed it got `Unknown workflow option`.",
+      "documented in the reference docs, absent from every source file — either implement it or " +
+        "delete the line. `--capture-spec` sat in docs/cli-reference.md through a rename it " +
+        "predated, and the reader who typed it got `Unknown workflow option`.",
     );
   });
 
@@ -326,7 +338,10 @@ describe("flags in the reference docs", () => {
     const unknown = [...documented]
       .filter(([verb]) => !declared.has(verb))
       .filter(([verb]) => !DOCUMENTED_AS_RENAMED.has(verb));
-    assert.deepEqual(unknown.map(([verb, doc]) => `vlmkit ${verb} (${doc})`), []);
+    assert.deepEqual(
+      unknown.map(([verb, doc]) => `vlmkit ${verb} (${doc})`),
+      [],
+    );
     // Non-vacuity: the same set must reject a verb that does not exist.
     assert.equal(declared.has("compare"), false, "renamed to `diff html` in 0.9.1");
     assert.equal(declared.has("check"), true);
@@ -367,9 +382,9 @@ describe("flags in the reference docs", () => {
     assert.deepEqual(
       unknown.map(([pair, doc]) => `vlmkit ${pair} (${doc})`),
       [],
-      "a group subcommand in the docs that the dispatcher does not have. A renamed gate leaves "
-      + "the group verb valid, so the first-token check stays green and the reader gets a usage "
-      + "dump instead of the command.",
+      "a group subcommand in the docs that the dispatcher does not have. A renamed gate leaves " +
+        "the group verb valid, so the first-token check stays green and the reader gets a usage " +
+        "dump instead of the command.",
     );
 
     // Non-vacuity, and the reason the `vlmkit ` prefix is required: without it

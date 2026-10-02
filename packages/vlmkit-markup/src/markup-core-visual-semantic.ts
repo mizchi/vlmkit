@@ -34,9 +34,9 @@ export function classifyRegionPolicy(input: VisualClassifyInput): VisualClassify
     total_pixels: intOr(input.totalPixels),
     ...(input.colorSample
       ? {
-        baseline_color: rgb(input.colorSample.baseline),
-        current_color: rgb(input.colorSample.current),
-      }
+          baseline_color: rgb(input.colorSample.baseline),
+          current_color: rgb(input.colorSample.current),
+        }
       : {}),
   });
   const [type, confidence] = out.split("|");
@@ -81,5 +81,3 @@ function isVisualChangeType(value: string): value is VisualChangeType {
     value === "element-removed"
   );
 }
-
-

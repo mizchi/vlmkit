@@ -14,10 +14,7 @@ export function computeShiftRoundDelta(value: number): number {
 
 export type ShiftSuspectedAxis = "height" | "margin/padding-above" | "y-position";
 
-export function computeShiftClassifySuspect(
-  absHeightDelta: number,
-  absTopDelta: number,
-): ShiftSuspectedAxis {
+export function computeShiftClassifySuspect(absHeightDelta: number, absTopDelta: number): ShiftSuspectedAxis {
   const out = callMarkupCoreJson<string>("shift-classify-suspect", {
     abs_height_delta: finiteOr(absHeightDelta),
     abs_top_delta: finiteOr(absTopDelta),

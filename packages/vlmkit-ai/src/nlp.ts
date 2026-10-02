@@ -3,8 +3,18 @@
  */
 
 export const STOP_WORDS = new Set([
-  "gets", "from", "with", "that", "this", "should",
-  "have", "the", "for", "and", "all", "proper",
+  "gets",
+  "from",
+  "with",
+  "that",
+  "this",
+  "should",
+  "have",
+  "the",
+  "for",
+  "and",
+  "all",
+  "proper",
 ]);
 
 export const SYNONYMS: Record<string, string[]> = {

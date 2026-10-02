@@ -238,7 +238,7 @@ export const COLLECT_COLOR_ROLES = `(() => {
 // Formatting
 // ---------------------------------------------------------------------------
 
-const pct = (n: number, total: number): string => total <= 0 ? "  —  " : `${(n / total * 100).toFixed(1)}%`;
+const pct = (n: number, total: number): string => (total <= 0 ? "  —  " : `${((n / total) * 100).toFixed(1)}%`);
 
 function paletteBlock(name: string, list: readonly ColorUse[], limit = 5): string[] {
   const kept = trimPalette(list);
@@ -247,8 +247,8 @@ function paletteBlock(name: string, list: readonly ColorUse[], limit = 5): strin
   const lines = [`  ${name.padEnd(9)} ${kept.length} distinct`];
   for (const c of kept.slice(0, limit)) {
     lines.push(
-      `    ${c.hex}  ${pct(c.area, total).padStart(6)}  ${String(c.count).padStart(4)} el`
-      + `  ${DIM}${c.samples[0] ?? ""}${RESET}`,
+      `    ${c.hex}  ${pct(c.area, total).padStart(6)}  ${String(c.count).padStart(4)} el` +
+        `  ${DIM}${c.samples[0] ?? ""}${RESET}`,
     );
   }
   if (kept.length > limit) lines.push(`    ${DIM}…and ${kept.length - limit} more${RESET}`);
@@ -268,30 +268,34 @@ export function formatColorRolesReport(report: ColorRolesReport, rules?: RuleVie
   const shown = tiers.shown;
   const suspects = shown.filter((f) => f.tier === "suspect").length;
   out.push(
-    `verdict: ${verdictColor}${report.verdict.toUpperCase()}${RESET}`
-    + ` (${shown.length} finding(s)${suspects > 0 ? `, ${suspects} suspect` : ""})`,
+    `verdict: ${verdictColor}${report.verdict.toUpperCase()}${RESET}` +
+      ` (${shown.length} finding(s)${suspects > 0 ? `, ${suspects} suspect` : ""})`,
   );
   const hidden = hiddenByRuleNote(tiers.hiddenByRule);
   if (hidden) out.push(`${DIM}  ${hidden} — the verdict word above predates the settings${RESET}`);
   out.push(
-    `${DIM}  measured: ${report.controls.length} control(s), ${report.links.length} link(s) in a text flow`
-    + ` — from ${report.boxes} visible box(es)${RESET}`,
+    `${DIM}  measured: ${report.controls.length} control(s), ${report.links.length} link(s) in a text flow` +
+      ` — from ${report.boxes} visible box(es)${RESET}`,
   );
   if (report.controlsSkipped.length > 0) {
-    out.push(`${DIM}  ${report.controlsSkipped.length} control(s) not measurable: background-image behind them${RESET}`);
+    out.push(
+      `${DIM}  ${report.controlsSkipped.length} control(s) not measurable: background-image behind them${RESET}`,
+    );
   }
   out.push("");
-  out.push(`${BOLD}Palette${RESET} ${DIM}(by painted area; reported, never judged — see the rejected candidates in the module docs)${RESET}`);
+  out.push(
+    `${BOLD}Palette${RESET} ${DIM}(by painted area; reported, never judged — see the rejected candidates in the module docs)${RESET}`,
+  );
   out.push(...paletteBlock("surfaces", report.palette.surfaces));
   out.push(...paletteBlock("ink", report.palette.ink));
   out.push(...paletteBlock("marks", report.palette.marks));
   out.push(
-    `  ${DIM}base ${report.base?.hex ?? "?"}`
-    + (report.base?.count === 0 ? " (page background; nothing declares one)" : "")
-    + `, body ink ${report.bodyInk?.hex ?? "?"}`
-    + `, link ink ${report.linkInk?.hex ?? "none"}`
-    + (report.linkInk ? ` on ${report.linkInk.count} element(s)` : " — every link is set in the body ink")
-    + `${RESET}`,
+    `  ${DIM}base ${report.base?.hex ?? "?"}` +
+      (report.base?.count === 0 ? " (page background; nothing declares one)" : "") +
+      `, body ink ${report.bodyInk?.hex ?? "?"}` +
+      `, link ink ${report.linkInk?.hex ?? "none"}` +
+      (report.linkInk ? ` on ${report.linkInk.count} element(s)` : " — every link is set in the body ink") +
+      `${RESET}`,
   );
 
   // Tiers, not the emitted severity: a rule promoted to suspect or demoted to
@@ -303,8 +307,8 @@ export function formatColorRolesReport(report: ColorRolesReport, rules?: RuleVie
     out.push(`${BOLD}Findings${RESET}`);
     for (const f of carried) {
       out.push(
-        `  ${f.tier === "suspect" ? RED + "✗" : YELLOW + "!"}${RESET} [${f.row.kind}]:`
-        + ` ${f.row.selector ? `${f.row.selector} — ` : ""}${f.row.message}`,
+        `  ${f.tier === "suspect" ? RED + "✗" : YELLOW + "!"}${RESET} [${f.row.kind}]:` +
+          ` ${f.row.selector ? `${f.row.selector} — ` : ""}${f.row.message}`,
       );
     }
   }
@@ -320,7 +324,9 @@ export function formatColorRolesReport(report: ColorRolesReport, rules?: RuleVie
   }
   if (report.unusedAllow.length > 0) {
     out.push("");
-    out.push(`${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`);
+    out.push(
+      `${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing: ${report.unusedAllow.join(", ")}${RESET}`,
+    );
   }
   out.push("");
   return out.join("\n");
@@ -341,9 +347,7 @@ export interface ColorRolesOptions extends PageLoadOptions {
 export async function runColorRolesCheck(options: ColorRolesOptions): Promise<ColorRolesReport> {
   return await withBrowser(async (browser) => {
     const width = options.viewport ?? 1280;
-    const page = await browser.newPage(
-      withAuthState({ viewport: { width, height: 900 } }, options.storageState),
-    );
+    const page = await browser.newPage(withAuthState({ viewport: { width, height: 900 } }, options.storageState));
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
@@ -354,7 +358,7 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
     });
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
-    const input = await page.evaluate(COLLECT_COLOR_ROLES) as ColorRolesInput;
+    const input = (await page.evaluate(COLLECT_COLOR_ROLES)) as ColorRolesInput;
     return await judgeCollectedColorRoles(input, redirect, options);
   });
 }
@@ -439,10 +443,10 @@ function markdownReport(report: ColorRolesReport): string {
     "",
     `Verdict: **${report.verdict.toUpperCase()}** (${report.findings.length} finding(s))`,
     "",
-    `Base \`${report.base?.hex ?? "?"}\`, body ink \`${report.bodyInk?.hex ?? "?"}\`,`
-    + ` link ink \`${report.linkInk?.hex ?? "none"}\`.`,
-    `${report.controls.length} control(s) and ${report.links.length} link(s) in a text flow measured,`
-    + ` from ${report.boxes} visible boxes.`,
+    `Base \`${report.base?.hex ?? "?"}\`, body ink \`${report.bodyInk?.hex ?? "?"}\`,` +
+      ` link ink \`${report.linkInk?.hex ?? "none"}\`.`,
+    `${report.controls.length} control(s) and ${report.links.length} link(s) in a text flow measured,` +
+      ` from ${report.boxes} visible boxes.`,
     "",
     "## Palette",
     "",
@@ -453,7 +457,9 @@ function markdownReport(report: ColorRolesReport): string {
     "",
     ...(report.findings.length === 0
       ? ["None."]
-      : report.findings.map((f) => `- **${f.kind}** (${f.severity})${f.selector ? ` \`${f.selector}\`` : ""}: ${f.message}`)),
+      : report.findings.map(
+          (f) => `- **${f.kind}** (${f.severity})${f.selector ? ` \`${f.selector}\`` : ""}: ${f.message}`,
+        )),
     "",
   ].join("\n");
 }

@@ -46,7 +46,10 @@ describe("healAll", () => {
     const items = [opts("test a", tmpFile()), opts("test b", tmpFile())];
     const r = await healAll(items, undefined, deps());
     assert.equal(r.fixed, 2);
-    assert.equal(r.entries.every((e) => !e.skipped), true);
+    assert.equal(
+      r.entries.every((e) => !e.skipped),
+      true,
+    );
     assert.ok(Math.abs(r.totalCostUsd - 0.6) < 1e-9);
   });
 

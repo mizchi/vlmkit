@@ -38,20 +38,22 @@ function createDiff(overrides: Partial<VrtDiff> = {}): VrtDiff {
 
 describe("parseApprovalManifest", () => {
   it("should parse a valid manifest", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          selector: ".header",
-          property: "padding",
-          category: "spacing",
-          changeType: "paint",
-          tolerance: { pixels: 60, ratio: 0.1 },
-          reason: "known renderer drift",
-          issue: "mizchi/crater#21",
-          expires: "2026-06-01",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            selector: ".header",
+            property: "padding",
+            category: "spacing",
+            changeType: "paint",
+            tolerance: { pixels: 60, ratio: 0.1 },
+            reason: "known renderer drift",
+            issue: "mizchi/crater#21",
+            expires: "2026-06-01",
+          },
+        ],
+      }),
+    );
 
     assert.equal(manifest.rules.length, 1);
     assert.equal(manifest.rules[0].selector, ".header");
@@ -59,33 +61,33 @@ describe("parseApprovalManifest", () => {
   });
 
   it("should reject a rule without reason", () => {
-    assert.throws(
-      () => parseApprovalManifest(JSON.stringify({ rules: [{ property: "color" }] })),
-      /reason/i,
-    );
+    assert.throws(() => parseApprovalManifest(JSON.stringify({ rules: [{ property: "color" }] })), /reason/i);
   });
 });
 
 describe("applyApprovalToVrtDiff", () => {
   it("should approve a matching pixel diff within tolerance", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          selector: ".header",
-          property: "padding",
-          category: "spacing",
-          changeType: "paint",
-          tolerance: { pixels: 50, ratio: 0.05 },
-          reason: "small known drift",
-        },
-      ],
-    }));
-
-    const result = applyApprovalToVrtDiff(
-      createDiff(),
-      manifest,
-      { selector: ".header", property: "padding", category: "spacing", changeType: "paint" },
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            selector: ".header",
+            property: "padding",
+            category: "spacing",
+            changeType: "paint",
+            tolerance: { pixels: 50, ratio: 0.05 },
+            reason: "small known drift",
+          },
+        ],
+      }),
     );
+
+    const result = applyApprovalToVrtDiff(createDiff(), manifest, {
+      selector: ".header",
+      property: "padding",
+      category: "spacing",
+      changeType: "paint",
+    });
 
     assert.equal(result.approved, true);
     assert.equal(result.diff.diffPixels, 0);
@@ -95,16 +97,18 @@ describe("applyApprovalToVrtDiff", () => {
   });
 
   it("should ignore approval rules in strict mode", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          property: "padding",
-          changeType: "paint",
-          tolerance: { pixels: 50 },
-          reason: "small known drift",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            property: "padding",
+            changeType: "paint",
+            tolerance: { pixels: 50 },
+            reason: "small known drift",
+          },
+        ],
+      }),
+    );
 
     const result = applyApprovalToVrtDiff(
       createDiff(),
@@ -119,29 +123,26 @@ describe("applyApprovalToVrtDiff", () => {
   });
 
   it("should warn for expired rules and stop applying them", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          property: "color",
-          changeType: "paint",
-          tolerance: { pixels: 50 },
-          reason: "temporary approval",
-          expires: "2026-03-01",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            property: "color",
+            changeType: "paint",
+            tolerance: { pixels: 50 },
+            reason: "temporary approval",
+            expires: "2026-03-01",
+          },
+        ],
+      }),
+    );
     const now = new Date("2026-04-02T12:00:00+09:00");
 
     const warnings = collectApprovalWarnings(manifest, { now });
     assert.equal(warnings.length, 1);
     assert.match(warnings[0].message, /expired/i);
 
-    const result = applyApprovalToVrtDiff(
-      createDiff(),
-      manifest,
-      { property: "color", changeType: "paint" },
-      { now },
-    );
+    const result = applyApprovalToVrtDiff(createDiff(), manifest, { property: "color", changeType: "paint" }, { now });
     assert.equal(result.approved, false);
     assert.equal(result.diff.diffPixels, 40);
   });
@@ -165,22 +166,24 @@ describe("filterApprovedPaintTreeChanges", () => {
         after: "0,7 100x40",
       },
     ];
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          property: "background",
-          changeType: "paint",
-          tolerance: { colorDelta: 8 },
-          reason: "minor background color drift",
-        },
-        {
-          property: "bounds",
-          changeType: "geometry",
-          tolerance: { geometryDelta: 4 },
-          reason: "tiny layout shift",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            property: "background",
+            changeType: "paint",
+            tolerance: { colorDelta: 8 },
+            reason: "minor background color drift",
+          },
+          {
+            property: "bounds",
+            changeType: "geometry",
+            tolerance: { geometryDelta: 4 },
+            reason: "tiny layout shift",
+          },
+        ],
+      }),
+    );
 
     const result = filterApprovedPaintTreeChanges(changes, manifest);
 
@@ -200,24 +203,26 @@ describe("filterApprovedPaintTreeChanges", () => {
         after: "0,3 100x40",
       },
     ];
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          selector: ".card",
-          property: "margin-left",
-          category: "spacing",
-          changeType: "geometry",
-          tolerance: { geometryDelta: 4 },
-          reason: "small spacing drift",
-        },
-      ],
-    }));
-
-    const result = filterApprovedPaintTreeChanges(
-      changes,
-      manifest,
-      { selector: ".card", property: "margin-left", category: "spacing" },
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            selector: ".card",
+            property: "margin-left",
+            category: "spacing",
+            changeType: "geometry",
+            tolerance: { geometryDelta: 4 },
+            reason: "small spacing drift",
+          },
+        ],
+      }),
     );
+
+    const result = filterApprovedPaintTreeChanges(changes, manifest, {
+      selector: ".card",
+      property: "margin-left",
+      category: "spacing",
+    });
 
     assert.equal(result.approvedChanges.length, 1);
     assert.equal(result.remainingChanges.length, 0);
@@ -234,16 +239,18 @@ describe("filterApprovedVrtRegions", () => {
         { x: 40, y: 0, width: 20, height: 20, diffPixelCount: 60 },
       ],
     });
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          category: "spacing",
-          changeType: "geometry",
-          tolerance: { pixels: 50, ratio: 0.05 },
-          reason: "known compact spacing drift",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            category: "spacing",
+            changeType: "geometry",
+            tolerance: { pixels: 50, ratio: 0.05 },
+            reason: "known compact spacing drift",
+          },
+        ],
+      }),
+    );
 
     const result = filterApprovedVrtRegions(diff, manifest, [
       { category: "spacing", changeType: "geometry" },
@@ -265,24 +272,22 @@ describe("filterApprovedVrtRegions", () => {
       diffPixels: 1600,
       totalPixels: 1_296_000,
       diffRatio: 1600 / 1_296_000,
-      regions: [
-        { x: 0, y: 0, width: 1440, height: 928, diffPixelCount: 1_296_000 },
-      ],
+      regions: [{ x: 0, y: 0, width: 1440, height: 928, diffPixelCount: 1_296_000 }],
     });
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          category: "spacing",
-          changeType: "geometry",
-          tolerance: { pixels: 50, ratio: 0.001 },
-          reason: "unrelated rule",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            category: "spacing",
+            changeType: "geometry",
+            tolerance: { pixels: 50, ratio: 0.001 },
+            reason: "unrelated rule",
+          },
+        ],
+      }),
+    );
 
-    const result = filterApprovedVrtRegions(diff, manifest, [
-      { category: "visual", changeType: "paint" },
-    ]);
+    const result = filterApprovedVrtRegions(diff, manifest, [{ category: "visual", changeType: "paint" }]);
 
     assert.equal(result.approved, false);
     assert.equal(result.diff.diffPixels, 1600);
@@ -295,20 +300,20 @@ describe("filterApprovedVrtRegions region bbox matching", () => {
   const diff = createDiff({
     diffPixels: 100,
     diffRatio: 0.1,
-    regions: [
-      { x: 100, y: 120, width: 220, height: 80, diffPixelCount: 100 },
-    ],
+    regions: [{ x: 100, y: 120, width: 220, height: 80, diffPixelCount: 100 }],
   });
 
   it("suppresses a diff region covered by an approved zone", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          region: { x: 90, y: 110, width: 240, height: 100 },
-          reason: "marquee animation; intentionally dynamic",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            region: { x: 90, y: 110, width: 240, height: 100 },
+            reason: "marquee animation; intentionally dynamic",
+          },
+        ],
+      }),
+    );
     const result = filterApprovedVrtRegions(diff, manifest, [{}]);
     assert.equal(result.approved, true);
     assert.equal(result.approvedRegions.length, 1);
@@ -316,28 +321,32 @@ describe("filterApprovedVrtRegions region bbox matching", () => {
   });
 
   it("does not suppress a diff region outside the approved zone", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          region: { x: 0, y: 0, width: 50, height: 50 },
-          reason: "unrelated zone",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            region: { x: 0, y: 0, width: 50, height: 50 },
+            reason: "unrelated zone",
+          },
+        ],
+      }),
+    );
     const result = filterApprovedVrtRegions(diff, manifest, [{}]);
     assert.equal(result.approved, false);
     assert.equal(result.remainingRegions.length, 1);
   });
 
   it("honors a viewport-scoped region rule only on the matching viewport", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          region: { x: 90, y: 110, width: 240, height: 100, viewport: "mobile" },
-          reason: "mobile-only dynamic banner",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            region: { x: 90, y: 110, width: 240, height: 100, viewport: "mobile" },
+            reason: "mobile-only dynamic banner",
+          },
+        ],
+      }),
+    );
     const onMobile = filterApprovedVrtRegions(diff, manifest, [{}], { viewport: "mobile" });
     assert.equal(onMobile.approved, true);
     const onDesktop = filterApprovedVrtRegions(diff, manifest, [{}], { viewport: "desktop" });
@@ -411,27 +420,32 @@ describe("suggestApprovalRule", () => {
 
 describe("parseApprovalManifest audit fields", () => {
   it("round-trips acknowledgedBy and createdAt", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          selector: ".hero__body",
-          reason: "sub-pixel AA",
-          tolerance: { pixels: 2 },
-          expires: "2026-08-15",
-          acknowledgedBy: "mizchi",
-          createdAt: "2026-06-08",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            selector: ".hero__body",
+            reason: "sub-pixel AA",
+            tolerance: { pixels: 2 },
+            expires: "2026-08-15",
+            acknowledgedBy: "mizchi",
+            createdAt: "2026-06-08",
+          },
+        ],
+      }),
+    );
     assert.equal(manifest.rules[0].acknowledgedBy, "mizchi");
     assert.equal(manifest.rules[0].createdAt, "2026-06-08");
   });
 
   it("rejects a non-string acknowledgedBy", () => {
     assert.throws(
-      () => parseApprovalManifest(JSON.stringify({
-        rules: [{ selector: ".x", reason: "r", acknowledgedBy: 5 }],
-      })),
+      () =>
+        parseApprovalManifest(
+          JSON.stringify({
+            rules: [{ selector: ".x", reason: "r", acknowledgedBy: 5 }],
+          }),
+        ),
       /acknowledgedBy/i,
     );
   });
@@ -468,10 +482,7 @@ describe("buildApprovalRuleFromInput", () => {
   });
 
   it("throws on an invalid expiry date", () => {
-    assert.throws(
-      () => buildApprovalRuleFromInput({ selector: ".x", reason: "r", expires: "not-a-date" }),
-      /expiry/i,
-    );
+    assert.throws(() => buildApprovalRuleFromInput({ selector: ".x", reason: "r", expires: "not-a-date" }), /expiry/i);
   });
 
   it("requires a selector or region, and a reason", () => {
@@ -491,11 +502,12 @@ describe("buildApprovalRuleFromInput", () => {
 
   it("rejects supplying both selector and region", () => {
     assert.throws(
-      () => buildApprovalRuleFromInput({
-        selector: ".x",
-        region: { x: 0, y: 0, width: 10, height: 10 },
-        reason: "r",
-      }),
+      () =>
+        buildApprovalRuleFromInput({
+          selector: ".x",
+          region: { x: 0, y: 0, width: 10, height: 10 },
+          reason: "r",
+        }),
       /both/i,
     );
   });
@@ -507,11 +519,9 @@ describe("buildApprovalRuleFromInput", () => {
       maxRatio: 0.05,
     });
     const merged = mergeApprovalManifest({ rules: [] }, [rule]);
-    const result = applyApprovalToVrtDiff(
-      createDiff({ diffRatio: 0.04, diffPixels: 40 }),
-      merged,
-      { selector: ".hero" },
-    );
+    const result = applyApprovalToVrtDiff(createDiff({ diffRatio: 0.04, diffPixels: 40 }), merged, {
+      selector: ".hero",
+    });
     assert.equal(result.approved, true);
   });
 });
@@ -535,18 +545,20 @@ describe("mergeApprovalManifest", () => {
   });
 
   it("should replace an existing rule with the same identity", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          selector: ".card",
-          property: "margin-left",
-          category: "spacing",
-          changeType: "geometry",
-          tolerance: { geometryDelta: 2 },
-          reason: "old reason",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            selector: ".card",
+            property: "margin-left",
+            category: "spacing",
+            changeType: "geometry",
+            tolerance: { geometryDelta: 2 },
+            reason: "old reason",
+          },
+        ],
+      }),
+    );
 
     const merged = mergeApprovalManifest(manifest, [
       {

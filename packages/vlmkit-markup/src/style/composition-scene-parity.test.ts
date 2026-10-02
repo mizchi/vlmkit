@@ -88,7 +88,9 @@ const EDGE_CASES = `<!doctype html><html><body style="margin:0;font:16px sans-se
 </main></body></html>`;
 
 describe("check composition: DOM collector vs scene adapter on the paired mutants", () => {
-  const pages = readdirSync(FIXTURES).filter((f) => f.endsWith(".html")).sort();
+  const pages = readdirSync(FIXTURES)
+    .filter((f) => f.endsWith(".html"))
+    .sort();
 
   it("covers every fixture, intact and broken", () => {
     assert.ok(pages.length >= 7 && pages.includes("composed.html"), pages.join(", "));
@@ -102,9 +104,9 @@ describe("check composition: DOM collector vs scene adapter on the paired mutant
         const tab = await browser.newPage({ viewport: { width: 1280, height: 900 } });
         if (file === "edge-cases") await tab.setContent(EDGE_CASES);
         else await tab.goto(pathToFileURL(join(FIXTURES, file)).href);
-        const input = await tab.evaluate(COLLECT_COMPOSITION) as CompositionInput;
+        const input = (await tab.evaluate(COLLECT_COMPOSITION)) as CompositionInput;
         const dom = judgeComposition(input);
-        const elements = await tab.evaluate(COLLECT_SCENE) as (SceneElement & { dom: string })[];
+        const elements = (await tab.evaluate(COLLECT_SCENE)) as (SceneElement & { dom: string })[];
         const scene = judgeComposition(sceneToCompositionInput(elements, input.viewport));
         assert.deepEqual(mapSelectors(scene, elements), dom, file);
         verdicts.push(`${file}: ${dom.verdict} [${dom.findings.map((f) => f.kind).join(", ")}]`);

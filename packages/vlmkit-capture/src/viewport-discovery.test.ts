@@ -110,26 +110,29 @@ describe("generateViewports", () => {
   });
 
   it("should generate boundary viewports for canonical gt/lt breakpoints", () => {
-    const vps = generateViewports([
-      {
-        axis: "width",
-        op: "gt",
-        valuePx: 768,
-        raw: "(width > 768px)",
-        normalized: "(width > 768px)",
-        guards: [],
-        ruleCount: 1,
-      },
-      {
-        axis: "width",
-        op: "lt",
-        valuePx: 1024,
-        raw: "(width < 1024px)",
-        normalized: "(width < 1024px)",
-        guards: [],
-        ruleCount: 1,
-      },
-    ], { includeStandard: false });
+    const vps = generateViewports(
+      [
+        {
+          axis: "width",
+          op: "gt",
+          valuePx: 768,
+          raw: "(width > 768px)",
+          normalized: "(width > 768px)",
+          guards: [],
+          ruleCount: 1,
+        },
+        {
+          axis: "width",
+          op: "lt",
+          valuePx: 1024,
+          raw: "(width < 1024px)",
+          normalized: "(width < 1024px)",
+          guards: [],
+          ruleCount: 1,
+        },
+      ],
+      { includeStandard: false },
+    );
     const widths = vps.map((v) => v.width);
     assert.ok(widths.includes(768), "should include 768 at gt boundary");
     assert.ok(widths.includes(769), "should include 769 above gt boundary");
@@ -171,9 +174,7 @@ describe("discoverViewportsViaCrater", () => {
         ],
       }),
       getCssRuleViewportMap: async () => ({
-        rules: [
-          { activeAtWidths: [1024, 1280], inactiveAtWidths: [639] },
-        ],
+        rules: [{ activeAtWidths: [1024, 1280], inactiveAtWidths: [639] }],
       }),
     });
 
@@ -194,7 +195,9 @@ describe("discoverViewportsViaCrater", () => {
   it("ignores RPC failures gracefully", async () => {
     const { discoverViewportsViaCrater } = await import("./viewport-discovery.ts");
     const result = await discoverViewportsViaCrater({
-      getRequiredTestViewports: async () => { throw new Error("boom"); },
+      getRequiredTestViewports: async () => {
+        throw new Error("boom");
+      },
     });
     assert.equal(result.viewports.length, 0);
   });
@@ -223,7 +226,10 @@ describe("discoverViewportsWithBackend", () => {
       },
     });
     assert.equal(result.backend, "crater");
-    assert.deepEqual(result.viewports.map((v) => v.width), [720]);
+    assert.deepEqual(
+      result.viewports.map((v) => v.width),
+      [720],
+    );
     assert.equal(result.viewports[0]?.source, "crater-required");
   });
 
@@ -259,17 +265,12 @@ describe("external stylesheet helpers", () => {
       <link rel="stylesheet alternate" href="theme.css?version=1">
     `;
 
-    assert.deepEqual(
-      extractStylesheetHrefsFromHtml(html),
-      ["./base.css", "theme.css?version=1"],
-    );
+    assert.deepEqual(extractStylesheetHrefsFromHtml(html), ["./base.css", "theme.css?version=1"]);
   });
 
   it("should extract breakpoints from HTML plus stylesheet texts", () => {
     const html = `<style>@media (min-width: 640px) { .a {} }</style>`;
-    const breakpoints = extractBreakpointsFromHtmlWithStylesheets(html, [
-      "@media (min-width: 960px) { .b {} }",
-    ]);
+    const breakpoints = extractBreakpointsFromHtmlWithStylesheets(html, ["@media (min-width: 960px) { .b {} }"]);
 
     assert.deepEqual(
       breakpoints.map((bp) => bp.value),

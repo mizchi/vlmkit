@@ -1,8 +1,4 @@
-import {
-  withOnlyOnFailure,
-  type FailureDiagnostic,
-  type PlaywrightLikeTestInfo,
-} from "./only-on-failure.ts";
+import { withOnlyOnFailure, type FailureDiagnostic, type PlaywrightLikeTestInfo } from "./only-on-failure.ts";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -42,9 +38,7 @@ export function buildToHaveScreenshotArgs(
   return [];
 }
 
-export async function toHaveScreenshotWithDiagnostics(
-  options: ToHaveScreenshotWithDiagnosticsOptions,
-): Promise<void> {
+export async function toHaveScreenshotWithDiagnostics(options: ToHaveScreenshotWithDiagnosticsOptions): Promise<void> {
   const args = buildToHaveScreenshotArgs(options);
   await withOnlyOnFailure(
     () => options.expect(options.target).toHaveScreenshot(...args),

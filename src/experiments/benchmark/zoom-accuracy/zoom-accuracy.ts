@@ -101,18 +101,50 @@ async function ask(
   const cost = (p: number, q: number) => (p / 1000) * model.promptCostPer1k + (q / 1000) * model.completionCostPer1k;
   try {
     if (arm === "single") {
-      const r = await runSingleLook(driver, images, prompt, { maxTokens: opts.maxTokens, budget: opts.budget, coordinates: opts.coordinates });
-      return { ...base, answer: r.answer, promptTokens: r.usage.promptTokens, completionTokens: r.usage.completionTokens,
-        costUsd: cost(r.usage.promptTokens, r.usage.completionTokens), latencyMs: Date.now() - start, zooms: 0, turns: 1 };
+      const r = await runSingleLook(driver, images, prompt, {
+        maxTokens: opts.maxTokens,
+        budget: opts.budget,
+        coordinates: opts.coordinates,
+      });
+      return {
+        ...base,
+        answer: r.answer,
+        promptTokens: r.usage.promptTokens,
+        completionTokens: r.usage.completionTokens,
+        costUsd: cost(r.usage.promptTokens, r.usage.completionTokens),
+        latencyMs: Date.now() - start,
+        zooms: 0,
+        turns: 1,
+      };
     }
     const r = await runZoomLoop(driver, images, prompt, {
-      maxZooms: opts.maxZooms, maxTokens: opts.maxTokens, budget: opts.budget, coordinates: opts.coordinates,
+      maxZooms: opts.maxZooms,
+      maxTokens: opts.maxTokens,
+      budget: opts.budget,
+      coordinates: opts.coordinates,
     });
-    return { ...base, answer: r.answer, promptTokens: r.usage.promptTokens, completionTokens: r.usage.completionTokens,
-      costUsd: cost(r.usage.promptTokens, r.usage.completionTokens), latencyMs: Date.now() - start, zooms: r.zooms.length, turns: r.turns };
+    return {
+      ...base,
+      answer: r.answer,
+      promptTokens: r.usage.promptTokens,
+      completionTokens: r.usage.completionTokens,
+      costUsd: cost(r.usage.promptTokens, r.usage.completionTokens),
+      latencyMs: Date.now() - start,
+      zooms: r.zooms.length,
+      turns: r.turns,
+    };
   } catch (e) {
-    return { ...base, answer: "", promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: Date.now() - start, zooms: 0, turns: 0,
-      error: (e as Error).message.slice(0, 300) };
+    return {
+      ...base,
+      answer: "",
+      promptTokens: 0,
+      completionTokens: 0,
+      costUsd: 0,
+      latencyMs: Date.now() - start,
+      zooms: 0,
+      turns: 0,
+      error: (e as Error).message.slice(0, 300),
+    };
   }
 }
 
@@ -127,10 +159,12 @@ export function report(cases: readonly BuiltCase[], answers: readonly SavedAnswe
   const out: ArmReport[] = [];
   for (const [key, list] of groups) {
     const [model, arm] = key.split("\u0000") as [string, Arm];
-    const rows = list.flatMap((a) => {
-      const c = byId.get(a.caseId);
-      return c ? [{ case: c as BuiltCase, score: scoreAnswer(c, a.answer), answer: a }] : [];
-    }).sort((x, y) => x.case.id.localeCompare(y.case.id));
+    const rows = list
+      .flatMap((a) => {
+        const c = byId.get(a.caseId);
+        return c ? [{ case: c as BuiltCase, score: scoreAnswer(c, a.answer), answer: a }] : [];
+      })
+      .sort((x, y) => x.case.id.localeCompare(y.case.id));
     out.push({
       model,
       arm,
@@ -154,7 +188,10 @@ export function comparisons(reports: readonly ArmReport[]) {
     if (!single || !zoom) return [];
     const zoomById = new Map(zoom.scores.map((s) => [s.caseId, s.score]));
     const paired = single.scores.filter((s) => zoomById.has(s.caseId));
-    const flips = pairedFlips(paired.map((s) => s.score), paired.map((s) => zoomById.get(s.caseId)!));
+    const flips = pairedFlips(
+      paired.map((s) => s.score),
+      paired.map((s) => zoomById.get(s.caseId)!),
+    );
     return [{ model, pairs: paired.length, ...flips, p: signTestP(flips.fixed, flips.broke) }];
   });
 }
@@ -171,33 +208,54 @@ export function selfCheck(cases: readonly BuiltCase[]): { oracle: number; blind:
 
 const pct = (n: number, d: number) => (d === 0 ? "—" : `${Math.round((n / d) * 100)}%`);
 
-export function markdownReport(cases: readonly BuiltCase[], reports: readonly ArmReport[], meta: Record<string, unknown>): string {
+export function markdownReport(
+  cases: readonly BuiltCase[],
+  reports: readonly ArmReport[],
+  meta: Record<string, unknown>,
+): string {
   const kinds = CASE_KINDS.filter((k) => cases.some((c) => c.expected.kind === k));
   const lines: string[] = [];
   lines.push(`# Zoom accuracy bench`, "");
-  lines.push(`${cases.length} cases (${kinds.map((k) => `${cases.filter((c) => c.expected.kind === k).length} ${k}`).join(", ")}). `
-    + Object.entries(meta).map(([k, v]) => `${k}: \`${typeof v === "string" ? v : JSON.stringify(v)}\``).join(", "), "");
-  lines.push(`| model | arm | correct | ${kinds.join(" | ")} | detected | located | zooms/case | latency | cost | errors |`);
+  lines.push(
+    `${cases.length} cases (${kinds.map((k) => `${cases.filter((c) => c.expected.kind === k).length} ${k}`).join(", ")}). ` +
+      Object.entries(meta)
+        .map(([k, v]) => `${k}: \`${typeof v === "string" ? v : JSON.stringify(v)}\``)
+        .join(", "),
+    "",
+  );
+  lines.push(
+    `| model | arm | correct | ${kinds.join(" | ")} | detected | located | zooms/case | latency | cost | errors |`,
+  );
   lines.push(`|---|---|---:|${kinds.map(() => "---:").join("|")}|---:|---:|---:|---:|---:|---:|`);
   for (const r of reports) {
     const s = r.summary;
-    lines.push(`| ${r.model} | ${r.arm} | ${s.correct}/${s.cases} (${pct(s.correct, s.cases)}) | `
-      + kinds.map((k) => `${s.byKind[k].correct}/${s.byKind[k].cases}`).join(" | ")
-      + ` | ${pct(s.detected, s.cases)} | ${pct(s.located, s.locatable)} | ${r.avgZooms.toFixed(1)} | ${(r.avgLatencyMs / 1000).toFixed(1)}s | $${r.costUsd.toFixed(4)} | ${r.errors} |`);
+    lines.push(
+      `| ${r.model} | ${r.arm} | ${s.correct}/${s.cases} (${pct(s.correct, s.cases)}) | ` +
+        kinds.map((k) => `${s.byKind[k].correct}/${s.byKind[k].cases}`).join(" | ") +
+        ` | ${pct(s.detected, s.cases)} | ${pct(s.located, s.locatable)} | ${r.avgZooms.toFixed(1)} | ${(r.avgLatencyMs / 1000).toFixed(1)}s | $${r.costUsd.toFixed(4)} | ${r.errors} |`,
+    );
   }
   const comp = comparisons(reports);
   if (comp.length) {
     lines.push("", "## Single look → zoom, paired on the same cases", "");
     lines.push("| model | pairs | fixed by zoom | broken by zoom | both right | both wrong | sign test p |");
     lines.push("|---|---:|---:|---:|---:|---:|---:|");
-    for (const c of comp) lines.push(`| ${c.model} | ${c.pairs} | ${c.fixed} | ${c.broke} | ${c.bothRight} | ${c.bothWrong} | ${c.p.toFixed(3)} |`);
-    lines.push("", "_p is the exact two-sided sign test on the discordant pairs: the chance of a split at least this lopsided if zoom made no difference._");
+    for (const c of comp)
+      lines.push(
+        `| ${c.model} | ${c.pairs} | ${c.fixed} | ${c.broke} | ${c.bothRight} | ${c.bothWrong} | ${c.p.toFixed(3)} |`,
+      );
+    lines.push(
+      "",
+      "_p is the exact two-sided sign test on the discordant pairs: the chance of a split at least this lopsided if zoom made no difference._",
+    );
   }
   lines.push("", "## Misses", "");
   for (const r of reports) {
     const misses = r.scores.filter((s) => !s.score.correct);
     if (!misses.length) continue;
-    lines.push(`- **${r.model} / ${r.arm}**: ` + misses.map((m) => `\`${m.caseId}\` ${m.score.note ?? ""}`.trim()).join("; "));
+    lines.push(
+      `- **${r.model} / ${r.arm}**: ` + misses.map((m) => `\`${m.caseId}\` ${m.score.note ?? ""}`.trim()).join("; "),
+    );
   }
   return lines.join("\n") + "\n";
 }
@@ -218,31 +276,54 @@ async function loadAnswers(outDir: string): Promise<SavedAnswer[]> {
 
 function printTable(reports: readonly ArmReport[]) {
   console.log();
-  console.log(`  ${"model".padEnd(44)} ${"arm".padEnd(6)} ${"correct".padStart(12)} ${"zooms".padStart(6)} ${"latency".padStart(8)} ${"cost".padStart(10)}`);
+  console.log(
+    `  ${"model".padEnd(44)} ${"arm".padEnd(6)} ${"correct".padStart(12)} ${"zooms".padStart(6)} ${"latency".padStart(8)} ${"cost".padStart(10)}`,
+  );
   for (const r of reports) {
     const s = r.summary;
     const color = s.correct === s.cases ? GREEN : s.correct === 0 ? RED : YELLOW;
-    console.log(`  ${r.model.padEnd(44)} ${r.arm.padEnd(6)} ${color}${`${s.correct}/${s.cases} ${pct(s.correct, s.cases)}`.padStart(12)}${RESET} `
-      + `${r.avgZooms.toFixed(1).padStart(6)} ${`${(r.avgLatencyMs / 1000).toFixed(1)}s`.padStart(8)} ${`$${r.costUsd.toFixed(4)}`.padStart(10)}`
-      + (r.errors ? ` ${RED}${r.errors} error(s)${RESET}` : ""));
+    console.log(
+      `  ${r.model.padEnd(44)} ${r.arm.padEnd(6)} ${color}${`${s.correct}/${s.cases} ${pct(s.correct, s.cases)}`.padStart(12)}${RESET} ` +
+        `${r.avgZooms.toFixed(1).padStart(6)} ${`${(r.avgLatencyMs / 1000).toFixed(1)}s`.padStart(8)} ${`$${r.costUsd.toFixed(4)}`.padStart(10)}` +
+        (r.errors ? ` ${RED}${r.errors} error(s)${RESET}` : ""),
+    );
   }
   for (const c of comparisons(reports)) {
-    console.log(`  ${DIM}${c.model}: zoom fixed ${c.fixed}, broke ${c.broke} of ${c.pairs} paired cases (sign test p=${c.p.toFixed(3)})${RESET}`);
+    console.log(
+      `  ${DIM}${c.model}: zoom fixed ${c.fixed}, broke ${c.broke} of ${c.pairs} paired cases (sign test p=${c.p.toFixed(3)})${RESET}`,
+    );
   }
   console.log();
 }
 
 const SELF = "node --experimental-strip-types src/experiments/benchmark/zoom-accuracy/zoom-accuracy.ts";
 
-async function exportAgent(cases: readonly BuiltCase[], outDir: string, to: string, opts: { maxZooms: number; budget: ImageBudget; coordinates: ZoomCoordinates }) {
+async function exportAgent(
+  cases: readonly BuiltCase[],
+  outDir: string,
+  to: string,
+  opts: { maxZooms: number; budget: ImageBudget; coordinates: ZoomCoordinates },
+) {
   const arm = getArg("arm", "") as Arm;
-  if (arm !== "single" && arm !== "zoom") throw new Error("--export-agent needs --arm single|zoom (one packet per arm, answered by separate agents)");
+  if (arm !== "single" && arm !== "zoom")
+    throw new Error("--export-agent needs --arm single|zoom (one packet per arm, answered by separate agents)");
   const packet = resolve(to);
   const helper = `${SELF} --agent-zoom ${packet}`;
   const r = await exportPacket(cases, outDir, packet, arm, { ...opts, seed: getIntArg("seed", 1) }, helper);
-  await writeFile(join(outDir, "run-options.json"), JSON.stringify({ maxZooms: opts.maxZooms, budget: opts.budget, coordinates: opts.coordinates, maxTokens: 0 }, null, 2));
-  console.log(`  ${CYAN}${r.tasks} task(s)${RESET} for the ${arm} arm in ${packet} — hand the agent ${join(packet, "BRIEF.md")}, then:`);
-  console.log(`  ${DIM}${SELF} --import-agent ${join(packet, "answers.json")} --arm ${arm} --model agent --out ${outDir}${RESET}`);
+  await writeFile(
+    join(outDir, "run-options.json"),
+    JSON.stringify(
+      { maxZooms: opts.maxZooms, budget: opts.budget, coordinates: opts.coordinates, maxTokens: 0 },
+      null,
+      2,
+    ),
+  );
+  console.log(
+    `  ${CYAN}${r.tasks} task(s)${RESET} for the ${arm} arm in ${packet} — hand the agent ${join(packet, "BRIEF.md")}, then:`,
+  );
+  console.log(
+    `  ${DIM}${SELF} --import-agent ${join(packet, "answers.json")} --arm ${arm} --model agent --out ${outDir}${RESET}`,
+  );
 }
 
 async function main() {
@@ -261,11 +342,35 @@ async function main() {
     return;
   }
   const outDir = resolve(getArg("out", "test-results/zoom-accuracy"));
-  const models = getPositionalArgs(["out", "fixtures", "kinds", "seed", "variants", "scale", "width", "max-zooms", "max-tokens", "max-edge", "max-pixels", "coordinates", "md", "arms", "arm", "export-agent", "import-agent", "model"]);
+  const models = getPositionalArgs([
+    "out",
+    "fixtures",
+    "kinds",
+    "seed",
+    "variants",
+    "scale",
+    "width",
+    "max-zooms",
+    "max-tokens",
+    "max-edge",
+    "max-pixels",
+    "coordinates",
+    "md",
+    "arms",
+    "arm",
+    "export-agent",
+    "import-agent",
+    "model",
+  ]);
   const fixtureNames = getArg("fixtures", "");
-  const fixtures = (fixtureNames ? fixtureNames.split(",").map((f) => (f.endsWith(".html") ? f : `${f}.html`)) : readdirSync(FIXTURE_DIR).filter((f) => f.endsWith(".html")).sort())
-    .map((f) => join(FIXTURE_DIR, f));
-  const kinds = (getArg("kinds", CASE_KINDS.join(","))).split(",") as CaseKind[];
+  const fixtures = (
+    fixtureNames
+      ? fixtureNames.split(",").map((f) => (f.endsWith(".html") ? f : `${f}.html`))
+      : readdirSync(FIXTURE_DIR)
+          .filter((f) => f.endsWith(".html"))
+          .sort()
+  ).map((f) => join(FIXTURE_DIR, f));
+  const kinds = getArg("kinds", CASE_KINDS.join(",")).split(",") as CaseKind[];
   for (const k of kinds) if (!CASE_KINDS.includes(k)) throw new Error(`unknown kind "${k}" (${CASE_KINDS.join(", ")})`);
   const arms = getArg("arms", "single,zoom").split(",") as Arm[];
   const budget: ImageBudget = {
@@ -273,7 +378,12 @@ async function main() {
     maxPixels: getIntArg("max-pixels", DEFAULT_IMAGE_BUDGET.maxPixels, { min: 4096 }),
   };
   const coordinates = getArg("coordinates", "normalized") as ZoomCoordinates;
-  const opts = { maxZooms: getIntArg("max-zooms", 6, { min: 0 }), maxTokens: getIntArg("max-tokens", 1024, { min: 64 }), budget, coordinates };
+  const opts = {
+    maxZooms: getIntArg("max-zooms", 6, { min: 0 }),
+    maxTokens: getIntArg("max-tokens", 1024, { min: 64 }),
+    budget,
+    coordinates,
+  };
 
   await mkdir(outDir, { recursive: true });
   let cases: BuiltCase[];
@@ -286,7 +396,9 @@ async function main() {
       if (arm !== "single" && arm !== "zoom") throw new Error("--import-agent needs --arm single|zoom");
       const model = getArg("model", "agent");
       const r = await importAnswers(outDir, resolve(importFrom), arm, model);
-      console.log(`  imported ${r.imported} answer(s) as ${model} / ${arm}${r.missing.length ? `  ${YELLOW}missing: ${r.missing.join(", ")}${RESET}` : ""}`);
+      console.log(
+        `  imported ${r.imported} answer(s) as ${model} / ${arm}${r.missing.length ? `  ${YELLOW}missing: ${r.missing.join(", ")}${RESET}` : ""}`,
+      );
     }
     if (exportTo) {
       await exportAgent(cases, outDir, exportTo, opts);
@@ -294,17 +406,26 @@ async function main() {
     }
   } else {
     const buildOptions: BuildOptions = {
-      fixtures, kinds, seed: getIntArg("seed", 1), variants: getIntArg("variants", 1, { min: 1, max: 10 }), deviceScaleFactor: getIntArg("scale", 2, { min: 1, max: 4 }),
-      viewportWidth: getIntArg("width", 1440, { min: 320 }), outDir,
+      fixtures,
+      kinds,
+      seed: getIntArg("seed", 1),
+      variants: getIntArg("variants", 1, { min: 1, max: 10 }),
+      deviceScaleFactor: getIntArg("scale", 2, { min: 1, max: 4 }),
+      viewportWidth: getIntArg("width", 1440, { min: 320 }),
+      outDir,
     };
     const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
     console.log(`  ${DIM}Rendering ${fixtures.length} fixture(s) × ${kinds.length} kind(s)…${RESET}`);
     const built = await withBrowser((browser) => buildCases(browser, buildOptions));
     cases = built.cases;
-    console.log(`  ${CYAN}${cases.length} case(s)${RESET} in ${outDir}${built.skipped.length ? `  ${YELLOW}skipped: ${built.skipped.map((s) => `${s.id} (${s.reason})`).join("; ")}${RESET}` : ""}`);
+    console.log(
+      `  ${CYAN}${cases.length} case(s)${RESET} in ${outDir}${built.skipped.length ? `  ${YELLOW}skipped: ${built.skipped.map((s) => `${s.id} (${s.reason})`).join("; ")}${RESET}` : ""}`,
+    );
     if (hasFlag("self-check")) {
       const check = selfCheck(cases);
-      console.log(`  oracle ${check.oracle}/${cases.length}, always-unchanged ${check.blind}/${cases.length} (expected ${check.none})`);
+      console.log(
+        `  oracle ${check.oracle}/${cases.length}, always-unchanged ${check.blind}/${cases.length} (expected ${check.none})`,
+      );
       if (check.oracle !== cases.length || check.blind !== check.none) process.exit(1);
     }
     if (exportTo) {
@@ -313,11 +434,16 @@ async function main() {
     }
     if (hasFlag("render-only") || hasFlag("self-check")) return;
     if (models.length === 0) {
-      console.log(`  ${YELLOW}No models given. Pass model ids, or --render-only / --rescore / --export-agent (no API key: the agent's own vision).${RESET}`);
+      console.log(
+        `  ${YELLOW}No models given. Pass model ids, or --render-only / --rescore / --export-agent (no API key: the agent's own vision).${RESET}`,
+      );
       process.exit(1);
     }
     // What the answers were collected with, so a later --rescore reports the run, not its own flags.
-    await writeFile(join(outDir, "run-options.json"), JSON.stringify({ maxZooms: opts.maxZooms, budget, coordinates, maxTokens: opts.maxTokens }, null, 2));
+    await writeFile(
+      join(outDir, "run-options.json"),
+      JSON.stringify({ maxZooms: opts.maxZooms, budget, coordinates, maxTokens: opts.maxTokens }, null, 2),
+    );
     for (const id of models) {
       const model = await resolveModel(id);
       createZoomDriver(model); // fail on a missing key before spending on any other model
@@ -329,19 +455,38 @@ async function main() {
           const a = await ask(model, arm, c, opts);
           await writeFile(join(dir, `${c.id}.json`), JSON.stringify(a, null, 2));
           const s = scoreAnswer(c, a.answer);
-          console.log(a.error ? `${RED}ERROR ${a.error.slice(0, 60)}${RESET}` : s.correct ? `${GREEN}✓${RESET}` : `${RED}✗${RESET} ${DIM}${s.note ?? ""}${RESET}`);
+          console.log(
+            a.error
+              ? `${RED}ERROR ${a.error.slice(0, 60)}${RESET}`
+              : s.correct
+                ? `${GREEN}✓${RESET}`
+                : `${RED}✗${RESET} ${DIM}${s.note ?? ""}${RESET}`,
+          );
         }
       }
     }
   }
-  const answers = (await loadAnswers(outDir)).filter((a) => models.length === 0 || models.some((m) => a.model === m || a.model.includes(m)));
+  const answers = (await loadAnswers(outDir)).filter(
+    (a) => models.length === 0 || models.some((m) => a.model === m || a.model.includes(m)),
+  );
   const reports = report(cases, answers);
   printTable(reports);
   const ran = existsSync(join(outDir, "run-options.json"))
-    ? JSON.parse(await readFile(join(outDir, "run-options.json"), "utf8")) as { maxZooms: number; budget: ImageBudget; coordinates: ZoomCoordinates }
+    ? (JSON.parse(await readFile(join(outDir, "run-options.json"), "utf8")) as {
+        maxZooms: number;
+        budget: ImageBudget;
+        coordinates: ZoomCoordinates;
+      })
     : { maxZooms: opts.maxZooms, budget, coordinates };
-  const meta = { maxZooms: ran.maxZooms, budget: `${ran.budget.maxEdge}px / ${ran.budget.maxPixels}px²`, coordinates: ran.coordinates };
-  await writeFile(join(outDir, "report.json"), JSON.stringify({ date: new Date().toISOString(), meta, reports, comparisons: comparisons(reports) }, null, 2));
+  const meta = {
+    maxZooms: ran.maxZooms,
+    budget: `${ran.budget.maxEdge}px / ${ran.budget.maxPixels}px²`,
+    coordinates: ran.coordinates,
+  };
+  await writeFile(
+    join(outDir, "report.json"),
+    JSON.stringify({ date: new Date().toISOString(), meta, reports, comparisons: comparisons(reports) }, null, 2),
+  );
   const md = getArg("md", "");
   if (md) {
     await writeFile(md, markdownReport(cases, reports, meta));

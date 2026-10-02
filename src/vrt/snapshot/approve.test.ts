@@ -18,24 +18,28 @@ describe("approveSnapshotsFromReport", () => {
     await writeFile(baselineDesktop, "desktop-old", "utf-8");
     await writeFile(currentMobile, "mobile-current", "utf-8");
     await writeFile(baselineMobile, "mobile-old", "utf-8");
-    await writeFile(reportPath, JSON.stringify({
-      results: [
-        {
-          label: "home",
-          viewport: "desktop",
-          screenshotPath: currentDesktop,
-          baselinePath: baselineDesktop,
-          isNew: false,
-        },
-        {
-          label: "home",
-          viewport: "mobile",
-          screenshotPath: currentMobile,
-          baselinePath: baselineMobile,
-          isNew: false,
-        },
-      ],
-    }), "utf-8");
+    await writeFile(
+      reportPath,
+      JSON.stringify({
+        results: [
+          {
+            label: "home",
+            viewport: "desktop",
+            screenshotPath: currentDesktop,
+            baselinePath: baselineDesktop,
+            isNew: false,
+          },
+          {
+            label: "home",
+            viewport: "mobile",
+            screenshotPath: currentMobile,
+            baselinePath: baselineMobile,
+            isNew: false,
+          },
+        ],
+      }),
+      "utf-8",
+    );
 
     const result = await approveSnapshotsFromReport(reportPath, []);
 
@@ -57,24 +61,28 @@ describe("approveSnapshotsFromReport", () => {
     await writeFile(baselineHome, "home-old", "utf-8");
     await writeFile(currentIssues, "issues-current", "utf-8");
     await writeFile(baselineIssues, "issues-old", "utf-8");
-    await writeFile(reportPath, JSON.stringify({
-      results: [
-        {
-          label: "home",
-          viewport: "desktop",
-          screenshotPath: currentHome,
-          baselinePath: baselineHome,
-          isNew: false,
-        },
-        {
-          label: "critical-issues",
-          viewport: "desktop",
-          screenshotPath: currentIssues,
-          baselinePath: baselineIssues,
-          isNew: false,
-        },
-      ],
-    }), "utf-8");
+    await writeFile(
+      reportPath,
+      JSON.stringify({
+        results: [
+          {
+            label: "home",
+            viewport: "desktop",
+            screenshotPath: currentHome,
+            baselinePath: baselineHome,
+            isNew: false,
+          },
+          {
+            label: "critical-issues",
+            viewport: "desktop",
+            screenshotPath: currentIssues,
+            baselinePath: baselineIssues,
+            isNew: false,
+          },
+        ],
+      }),
+      "utf-8",
+    );
 
     const result = await approveSnapshotsFromReport(reportPath, ["critical-issues"]);
 
@@ -90,24 +98,25 @@ describe("approveSnapshotsFromReport", () => {
     const reportPath = join(dir, "snapshot-report.json");
 
     await writeFile(currentDesktop, "desktop-current", "utf-8");
-    await writeFile(reportPath, JSON.stringify({
-      results: [
-        {
-          label: "home",
-          viewport: "desktop",
-          screenshotPath: currentDesktop,
-          isNew: true,
-        },
-      ],
-    }), "utf-8");
+    await writeFile(
+      reportPath,
+      JSON.stringify({
+        results: [
+          {
+            label: "home",
+            viewport: "desktop",
+            screenshotPath: currentDesktop,
+            isNew: true,
+          },
+        ],
+      }),
+      "utf-8",
+    );
 
     const result = await approveSnapshotsFromReport(reportPath, []);
 
     assert.equal(result.updated, 1);
-    assert.equal(
-      await readFile(join(dir, "home-desktop-baseline.png"), "utf-8"),
-      "desktop-current",
-    );
+    assert.equal(await readFile(join(dir, "home-desktop-baseline.png"), "utf-8"), "desktop-current");
   });
 
   it("fails when the requested label does not exist in the report", async () => {
@@ -118,17 +127,21 @@ describe("approveSnapshotsFromReport", () => {
 
     await writeFile(currentDesktop, "desktop-current", "utf-8");
     await writeFile(baselineDesktop, "desktop-old", "utf-8");
-    await writeFile(reportPath, JSON.stringify({
-      results: [
-        {
-          label: "home",
-          viewport: "desktop",
-          screenshotPath: currentDesktop,
-          baselinePath: baselineDesktop,
-          isNew: false,
-        },
-      ],
-    }), "utf-8");
+    await writeFile(
+      reportPath,
+      JSON.stringify({
+        results: [
+          {
+            label: "home",
+            viewport: "desktop",
+            screenshotPath: currentDesktop,
+            baselinePath: baselineDesktop,
+            isNew: false,
+          },
+        ],
+      }),
+      "utf-8",
+    );
 
     await assert.rejects(
       () => approveSnapshotsFromReport(reportPath, ["unknown"]),

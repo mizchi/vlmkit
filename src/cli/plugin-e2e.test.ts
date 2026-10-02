@@ -109,8 +109,11 @@ describe("a project-declared plugin gate", { timeout: 120_000 }, () => {
 
   it("gets rule tuning, and reports what was suppressed", () => {
     const { stdout, status } = run(project(OFF_BRAND), [
-      "check", "house-brand", "page.html",
-      "--rule", "check.house-brand/forbidden-font=off",
+      "check",
+      "house-brand",
+      "page.html",
+      "--rule",
+      "check.house-brand/forbidden-font=off",
     ]);
     assert.equal(status, 0);
     assert.match(stdout, /1 finding\(s\) suppressed by rule settings/);
@@ -122,8 +125,11 @@ describe("a project-declared plugin gate", { timeout: 120_000 }, () => {
     // existed the reference simply matched nothing, which is the failure mode
     // rule settings are supposed to remove.
     const { stderr, status } = run(project(OFF_BRAND), [
-      "check", "house-brand", "page.html",
-      "--rule", "check.house-brand/forbidden-fnt=off",
+      "check",
+      "house-brand",
+      "page.html",
+      "--rule",
+      "check.house-brand/forbidden-fnt=off",
     ]);
     assert.equal(status, 1);
     assert.match(stderr, /--rule check\.house-brand\/forbidden-fnt: check\.house-brand has no rule "forbidden-fnt"/);
@@ -136,13 +142,18 @@ describe("a project-declared plugin gate", { timeout: 120_000 }, () => {
     // directions is what proves the repeated occurrences arrived — a single
     // `--font a,b` (the comma-joined shape) would fail the first case.
     const full = run(project(OFF_BRAND), [
-      "check", "house-brand", "page.html",
-      "--font", "Comic Sans MS", "--font", "Inter", "--font", "sans-serif",
+      "check",
+      "house-brand",
+      "page.html",
+      "--font",
+      "Comic Sans MS",
+      "--font",
+      "Inter",
+      "--font",
+      "sans-serif",
     ]);
     assert.equal(full.status, 0, full.stdout);
-    const partial = run(project(OFF_BRAND), [
-      "check", "house-brand", "page.html", "--font", "Comic Sans MS",
-    ]);
+    const partial = run(project(OFF_BRAND), ["check", "house-brand", "page.html", "--font", "Comic Sans MS"]);
     assert.equal(partial.status, 1);
     assert.match(partial.stdout, /allowlist: Comic Sans MS$/m);
   });
@@ -290,8 +301,11 @@ describe("examples/gate-plugin as a project", { timeout: 240_000 }, () => {
   it("promotes that same warn to a failure with one --rule", () => {
     // The claim every `warn` rule's docs make: one config line from enforced.
     const { status } = example([
-      "check", "dom-budget", "page-broken.html",
-      "--rule", "check.dom-budget/depth-over-budget=suspect",
+      "check",
+      "dom-budget",
+      "page-broken.html",
+      "--rule",
+      "check.dom-budget/depth-over-budget=suspect",
     ]);
     assert.equal(status, 1);
   });

@@ -72,11 +72,10 @@ async function workflowCommands() {
  * without doing work.
  */
 function resolves(command) {
-  const r = spawnSync(
-    process.execPath,
-    ["--experimental-strip-types", CLI, ...command.split(" "), "--help"],
-    { encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } },
-  );
+  const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, ...command.split(" "), "--help"], {
+    encoding: "utf8",
+    env: { ...process.env, NO_COLOR: "1" },
+  });
   const output = `${r.stdout ?? ""}${r.stderr ?? ""}`;
   const unknown = output.match(/Unknown (?:command|\w+ subcommand): .*/);
   return { ok: unknown === null, reason: unknown?.[0] ?? "", output };
@@ -119,15 +118,7 @@ describe("workflow CLI invocations", { timeout: 300_000 }, async () => {
  * these files grow — this is the dependency-free guard for the specific mistake
  * that has already been made once.
  */
-const CONTEXTS_ALLOWED_IN_JOB_ENV = new Set([
-  "github",
-  "inputs",
-  "matrix",
-  "needs",
-  "secrets",
-  "strategy",
-  "vars",
-]);
+const CONTEXTS_ALLOWED_IN_JOB_ENV = new Set(["github", "inputs", "matrix", "needs", "secrets", "strategy", "vars"]);
 
 /**
  * The `env:` mapping directly under a job, by indentation.
@@ -175,10 +166,10 @@ describe("workflow expression contexts", async () => {
           const context = match[1];
           assert.ok(
             CONTEXTS_ALLOWED_IN_JOB_ENV.has(context),
-            `${file}:${line} uses \${{ ${context}.… }} in a job-level env block.`
-              + ` GitHub rejects the whole FILE for this, reporting a zero-second failed run with no`
-              + ` jobs rather than an error. Allowed here: ${[...CONTEXTS_ALLOWED_IN_JOB_ENV].join(", ")}.`
-              + ` For runner.temp, set the variable in a step via $RUNNER_TEMP and $GITHUB_ENV instead.`,
+            `${file}:${line} uses \${{ ${context}.… }} in a job-level env block.` +
+              ` GitHub rejects the whole FILE for this, reporting a zero-second failed run with no` +
+              ` jobs rather than an error. Allowed here: ${[...CONTEXTS_ALLOWED_IN_JOB_ENV].join(", ")}.` +
+              ` For runner.temp, set the variable in a step via $RUNNER_TEMP and $GITHUB_ENV instead.`,
           );
         }
       }
@@ -219,8 +210,8 @@ describe("test runners in workflows", async () => {
       assert.deepEqual(
         offenders.map(({ line, text }) => `${file}:${line} ${text.trim()}`),
         [],
-        `use \`pnpm exec vp test run <paths>\`. Every test file in this repo imports from vitest,`
-        + ` which throws when imported outside its runner, so \`node --test\` cannot pass.`,
+        `use \`pnpm exec vp test run <paths>\`. Every test file in this repo imports from vitest,` +
+          ` which throws when imported outside its runner, so \`node --test\` cannot pass.`,
       );
     });
   }
@@ -346,10 +337,10 @@ describe("full-suite workflow triggers", async () => {
       assert.deepEqual(
         missing,
         [],
-        `${file} runs \`pnpm test\` but its pull_request paths do not cover ${missing.join(", ")}.`
-          + ` vitest reads those roots, so a PR confined to one of them would run no unit tests`
-          + ` and report green. Add "<root>/**" to the paths list, or move the step to a workflow`
-          + ` whose trigger covers the suite.`,
+        `${file} runs \`pnpm test\` but its pull_request paths do not cover ${missing.join(", ")}.` +
+          ` vitest reads those roots, so a PR confined to one of them would run no unit tests` +
+          ` and report green. Add "<root>/**" to the paths list, or move the step to a workflow` +
+          ` whose trigger covers the suite.`,
       );
     });
   }

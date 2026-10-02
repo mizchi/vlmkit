@@ -139,8 +139,13 @@ export function modalRowSize(rects: LayoutRect[]): number {
   rows.push(size);
   const counts = new Map<number, number>();
   for (const s of rows) counts.set(s, (counts.get(s) ?? 0) + 1);
-  let best = 0, bestN = 0;
-  for (const [s, n] of counts) if (n > bestN || (n === bestN && s > best)) { best = s; bestN = n; }
+  let best = 0,
+    bestN = 0;
+  for (const [s, n] of counts)
+    if (n > bestN || (n === bestN && s > best)) {
+      best = s;
+      bestN = n;
+    }
   return best;
 }
 
@@ -157,36 +162,52 @@ export function evaluateLayoutRule(rule: LayoutRule, m: LayoutMeasurement): Layo
     checks.push({ name, expected, measured, passed });
 
   if (rule.visible !== undefined) {
-    push("visible", String(rule.visible), String(m.rects.length > 0), (m.rects.length > 0) === rule.visible);
+    push("visible", String(rule.visible), String(m.rects.length > 0), m.rects.length > 0 === rule.visible);
   }
   if (rule.count !== undefined) {
     push("count", String(rule.count), String(m.rects.length), m.rects.length === rule.count);
   }
   if (rule.width !== undefined) {
     const tol = rule.tolerance ?? 1;
-    push("width", `${rule.width}±${tol}px`, first ? `${Math.round(first.width)}px` : "(no match)",
-      !!first && Math.abs(first.width - rule.width) <= tol);
+    push(
+      "width",
+      `${rule.width}±${tol}px`,
+      first ? `${Math.round(first.width)}px` : "(no match)",
+      !!first && Math.abs(first.width - rule.width) <= tol,
+    );
   }
   if (rule.minWidth !== undefined) {
-    push("minWidth", `>=${rule.minWidth}px`, first ? `${Math.round(first.width)}px` : "(no match)",
-      !!first && first.width >= rule.minWidth);
+    push(
+      "minWidth",
+      `>=${rule.minWidth}px`,
+      first ? `${Math.round(first.width)}px` : "(no match)",
+      !!first && first.width >= rule.minWidth,
+    );
   }
   if (rule.maxWidth !== undefined) {
-    push("maxWidth", `<=${rule.maxWidth}px`, first ? `${Math.round(first.width)}px` : "(no match)",
-      !!first && first.width <= rule.maxWidth);
+    push(
+      "maxWidth",
+      `<=${rule.maxWidth}px`,
+      first ? `${Math.round(first.width)}px` : "(no match)",
+      !!first && first.width <= rule.maxWidth,
+    );
   }
   if (rule.minHeight !== undefined) {
-    const shortest = m.rects.length > 0
-      ? m.rects.reduce((a, b) => (b.height < a.height ? b : a))
-      : undefined;
-    push("minHeight", `every match >=${rule.minHeight}px`,
+    const shortest = m.rects.length > 0 ? m.rects.reduce((a, b) => (b.height < a.height ? b : a)) : undefined;
+    push(
+      "minHeight",
+      `every match >=${rule.minHeight}px`,
       shortest ? `shortest ${Math.round(shortest.height)}px of ${m.rects.length}` : "(no match)",
-      !!shortest && shortest.height >= rule.minHeight);
+      !!shortest && shortest.height >= rule.minHeight,
+    );
   }
   if (rule.fullWidth) {
-    push("fullWidth", `>=${Math.round(m.viewport * 0.95)}px (95% of ${m.viewport})`,
+    push(
+      "fullWidth",
+      `>=${Math.round(m.viewport * 0.95)}px (95% of ${m.viewport})`,
       first ? `${Math.round(first.width)}px` : "(no match)",
-      !!first && first.width >= m.viewport * 0.95);
+      !!first && first.width >= m.viewport * 0.95,
+    );
   }
   if (rule.perRow !== undefined) {
     const modal = modalRowSize(m.rects);
@@ -196,10 +217,16 @@ export function evaluateLayoutRule(rule: LayoutRule, m: LayoutMeasurement): Layo
     const others = m.aboveRects ?? [];
     const maxBottom = m.rects.length ? Math.max(...m.rects.map((r) => r.top + r.height)) : Number.POSITIVE_INFINITY;
     const minTop = others.length ? Math.min(...others.map((r) => r.top)) : Number.NEGATIVE_INFINITY;
-    push("above", `every ${rule.selector} ends above every ${rule.above}`,
-      m.rects.length === 0 ? "(no match)" : others.length === 0 ? `(no match for ${rule.above})`
-        : `bottom ${Math.round(maxBottom)} vs top ${Math.round(minTop)}`,
-      m.rects.length > 0 && others.length > 0 && maxBottom <= minTop + 4);
+    push(
+      "above",
+      `every ${rule.selector} ends above every ${rule.above}`,
+      m.rects.length === 0
+        ? "(no match)"
+        : others.length === 0
+          ? `(no match for ${rule.above})`
+          : `bottom ${Math.round(maxBottom)} vs top ${Math.round(minTop)}`,
+      m.rects.length > 0 && others.length > 0 && maxBottom <= minTop + 4,
+    );
   }
   if (checks.length === 0) {
     push("(no assertion)", "at least one assertion field", "none", false);
@@ -220,7 +247,11 @@ function collectRects(selectors: string[]): { rects: Record<string, LayoutRect[]
   for (const sel of selectors) {
     const rects: LayoutRect[] = [];
     let list: Element[] = [];
-    try { list = Array.from(document.querySelectorAll(sel)); } catch { invalid.push(sel); }
+    try {
+      list = Array.from(document.querySelectorAll(sel));
+    } catch {
+      invalid.push(sel);
+    }
     for (const el of list) {
       const style = getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") continue;
@@ -260,19 +291,21 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
       const page = await browser.newPage(withAuthState({ viewport: { width, height } }, options.storageState));
       await navigatePage(page, url, options);
       redirected ??= /^https?:\/\//.test(options.source)
-        ? describeRedirect(options.source, page.url()) ?? undefined
+        ? (describeRedirect(options.source, page.url()) ?? undefined)
         : undefined;
       const rules = options.contract.rules.filter((r) => r.at === width);
-      const selectors = [...new Set(rules.flatMap((r) => r.above ? [r.selector, r.above] : [r.selector]))];
+      const selectors = [...new Set(rules.flatMap((r) => (r.above ? [r.selector, r.above] : [r.selector])))];
       const collected = await page.evaluate(collectRects, selectors);
       const rectMap = collected.rects;
       for (const sel of collected.invalid) invalidSelectors.add(sel);
       for (const rule of rules) {
-        results.push(evaluateLayoutRule(rule, {
-          viewport: width,
-          rects: rectMap[rule.selector] ?? [],
-          ...(rule.above ? { aboveRects: rectMap[rule.above] ?? [] } : {}),
-        }));
+        results.push(
+          evaluateLayoutRule(rule, {
+            viewport: width,
+            rects: rectMap[rule.selector] ?? [],
+            ...(rule.above ? { aboveRects: rectMap[rule.above] ?? [] } : {}),
+          }),
+        );
       }
       await page.close();
     }
@@ -290,7 +323,9 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     tool: "layout-contract",
     source: options.source,
     headline: {
-      done, passed, total: results.length,
+      done,
+      passed,
+      total: results.length,
       ...(redirected ? { redirected: true } : {}),
       ...(invalid.length > 0 ? { invalidSelectors: invalid.length } : {}),
     },
@@ -342,18 +377,22 @@ export function formatLayoutReport(report: LayoutReport, rules?: RuleView): stri
   // measurements and stay exactly as measured.
   const offChecks = new Map<string, number>();
   const failures = report.results.flatMap((r) =>
-    r.checks.filter((c) => !c.passed).map((c) => ({ result: r, check: c, rule: layoutCheckRule(c.name) })));
+    r.checks.filter((c) => !c.passed).map((c) => ({ result: r, check: c, rule: layoutCheckRule(c.name) })),
+  );
   for (const f of failures) {
     if (tierOf(f.rule) === "off") offChecks.set(f.rule, (offChecks.get(f.rule) ?? 0) + 1);
   }
   const liveFailures = failures.filter((f) => tierOf(f.rule) !== "off");
-  const violated = liveFailures.length > 0
-    || (report.redirected !== undefined && tierOf("redirected") !== "off")
-    || (report.invalidSelectors ?? []).length > 0 && tierOf("invalid-selector") !== "off";
+  const violated =
+    liveFailures.length > 0 ||
+    (report.redirected !== undefined && tierOf("redirected") !== "off") ||
+    ((report.invalidSelectors ?? []).length > 0 && tierOf("invalid-selector") !== "off");
   lines.push(`${BOLD}${CYAN}vlmkit check layout${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
-  lines.push(`verdict: ${violated ? `${RED}VIOLATED${RESET}` : `${GREEN}SATISFIED${RESET}`} (${report.passed}/${report.total} rules)`);
+  lines.push(
+    `verdict: ${violated ? `${RED}VIOLATED${RESET}` : `${GREEN}SATISFIED${RESET}`} (${report.passed}/${report.total} rules)`,
+  );
   if (report.redirected && tierOf("redirected") !== "off") {
     // Ahead of the per-rule list: without this a stale session reads as
     // "your cards are missing", sending the reader to debug their markup.
@@ -364,8 +403,12 @@ export function formatLayoutReport(report: LayoutReport, rules?: RuleView): stri
     for (const selector of report.invalidSelectors ?? []) {
       // Also ahead of the list, and for the same reason: below, this reads as
       // "no match", which sends the reader to their markup instead of their contract.
-      lines.push(`${markFor(tierOf("invalid-selector"))} \`${selector}\` is not valid CSS — the browser refused it${RESET}`);
-      lines.push(`${DIM}  Rules naming it measured nothing; a \`visible: false\` rule would have passed on that.${RESET}`);
+      lines.push(
+        `${markFor(tierOf("invalid-selector"))} \`${selector}\` is not valid CSS — the browser refused it${RESET}`,
+      );
+      lines.push(
+        `${DIM}  Rules naming it measured nothing; a \`visible: false\` rule would have passed on that.${RESET}`,
+      );
     }
   }
   lines.push("");
@@ -385,17 +428,23 @@ export function formatLayoutReport(report: LayoutReport, rules?: RuleView): stri
       // vanished line reads as a contract that no longer covers the selector — but it states
       // what it measured without claiming a violation.
       if (tier === "off") {
-        lines.push(`    ${DIM}- ${c.name}: expected ${c.expected}, measured ${c.measured} — NOT reported (${ruleId} off)${RESET}`);
+        lines.push(
+          `    ${DIM}- ${c.name}: expected ${c.expected}, measured ${c.measured} — NOT reported (${ruleId} off)${RESET}`,
+        );
         continue;
       }
       const retuned = tier === "suspect" ? "" : ` ${DIM}[${ruleId} re-tuned to ${tier}]${RESET}`;
-      lines.push(`    ${markFor(tier)} ${c.name}: expected ${c.expected}, ${RED}measured ${c.measured}${RESET}${retuned}`);
+      lines.push(
+        `    ${markFor(tier)} ${c.name}: expected ${c.expected}, ${RED}measured ${c.measured}${RESET}${retuned}`,
+      );
     }
   }
   if (offChecks.size > 0) {
     const detail = [...offChecks].map(([rule, n]) => `${rule} x${n}`).join(", ");
     lines.push("");
-    lines.push(`${DIM}${[...offChecks.values()].reduce((a, b) => a + b, 0)} failing check(s) not reported — rule turned off (${detail})${RESET}`);
+    lines.push(
+      `${DIM}${[...offChecks.values()].reduce((a, b) => a + b, 0)} failing check(s) not reported — rule turned off (${detail})${RESET}`,
+    );
   }
   return lines.join("\n");
 }

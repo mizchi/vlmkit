@@ -18,9 +18,16 @@ const PORT = Number(process.env.RELAY_PORT ?? 8910);
 const origin = new URL(TARGET).origin;
 
 const HOP = new Set([
-  "connection", "keep-alive", "transfer-encoding", "upgrade",
-  "proxy-authenticate", "proxy-authorization", "te", "trailer",
-  "content-encoding", "content-length",
+  "connection",
+  "keep-alive",
+  "transfer-encoding",
+  "upgrade",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "content-encoding",
+  "content-length",
 ]);
 
 createServer(async (req, res) => {
@@ -50,11 +57,13 @@ createServer(async (req, res) => {
       if (HOP.has(lk)) continue;
       // Rewrite absolute Location / cookie domains onto the local origin so
       // the browser stays inside the relay.
-      if (lk === "location") { out[k] = v.replace(origin, `http://127.0.0.1:${PORT}`); continue; }
+      if (lk === "location") {
+        out[k] = v.replace(origin, `http://127.0.0.1:${PORT}`);
+        continue;
+      }
       if (lk === "set-cookie") {
         const list = up.headers.getSetCookie ? up.headers.getSetCookie() : [v];
-        out["set-cookie"] = list.map((c) =>
-          c.replace(/;\s*Domain=[^;]*/i, "").replace(/;\s*Secure/gi, ""));
+        out["set-cookie"] = list.map((c) => c.replace(/;\s*Domain=[^;]*/i, "").replace(/;\s*Secure/gi, ""));
         continue;
       }
       out[k] = v;

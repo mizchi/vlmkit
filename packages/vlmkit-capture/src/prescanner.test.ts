@@ -8,9 +8,7 @@ import {
   summarizePrescannerTrials,
 } from "./prescanner.ts";
 
-function makeViewportResult(
-  overrides: Partial<ViewportDetectionResult> = {},
-): ViewportDetectionResult {
+function makeViewportResult(overrides: Partial<ViewportDetectionResult> = {}): ViewportDetectionResult {
   return {
     width: 1280,
     height: 900,
@@ -27,32 +25,22 @@ function makeViewportResult(
 
 describe("hasCraterPrescanSignal", () => {
   it("treats paint tree changes as crater detection", () => {
-    assert.equal(hasCraterPrescanSignal([
-      makeViewportResult({ paintTreeDiffCount: 2 }),
-    ]), true);
+    assert.equal(hasCraterPrescanSignal([makeViewportResult({ paintTreeDiffCount: 2 })]), true);
   });
 
   it("treats native computed style changes as crater detection", () => {
-    assert.equal(hasCraterPrescanSignal([
-      makeViewportResult({ computedStyleDiffCount: 3 }),
-    ]), true);
+    assert.equal(hasCraterPrescanSignal([makeViewportResult({ computedStyleDiffCount: 3 })]), true);
   });
 
   it("treats forced hover style changes as crater detection", () => {
-    assert.equal(hasCraterPrescanSignal([
-      makeViewportResult({ hoverDiffDetected: true }),
-    ]), true);
+    assert.equal(hasCraterPrescanSignal([makeViewportResult({ hoverDiffDetected: true })]), true);
   });
 });
 
 describe("hasAnyDetectionSignal", () => {
   it("treats chromium-only signals as detection", () => {
-    assert.equal(hasAnyDetectionSignal([
-      makeViewportResult({ computedStyleDiffCount: 1 }),
-    ]), true);
-    assert.equal(hasAnyDetectionSignal([
-      makeViewportResult({ hoverDiffDetected: true }),
-    ]), true);
+    assert.equal(hasAnyDetectionSignal([makeViewportResult({ computedStyleDiffCount: 1 })]), true);
+    assert.equal(hasAnyDetectionSignal([makeViewportResult({ hoverDiffDetected: true })]), true);
   });
 });
 
@@ -123,10 +111,7 @@ describe("resolvePrescannerTrial", () => {
   });
 
   it("returns pass when both crater and chromium are silent", () => {
-    const resolution = resolvePrescannerTrial(
-      [makeViewportResult()],
-      [makeViewportResult()],
-    );
+    const resolution = resolvePrescannerTrial([makeViewportResult()], [makeViewportResult()]);
 
     assert.deepEqual(resolution, {
       craterDetected: false,
@@ -142,9 +127,30 @@ describe("resolvePrescannerTrial", () => {
 describe("summarizePrescannerTrials", () => {
   it("counts crater resolution and chromium fallback separately", () => {
     const summary = summarizePrescannerTrials([
-      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: false, craterSignal: "visual" },
-      { craterDetected: false, fallbackUsed: true, finalDetected: true, resolvedBy: "chromium", metadataOnly: false, craterSignal: "none" },
-      { craterDetected: false, fallbackUsed: true, finalDetected: false, resolvedBy: "none", metadataOnly: false, craterSignal: "none" },
+      {
+        craterDetected: true,
+        fallbackUsed: false,
+        finalDetected: true,
+        resolvedBy: "crater",
+        metadataOnly: false,
+        craterSignal: "visual",
+      },
+      {
+        craterDetected: false,
+        fallbackUsed: true,
+        finalDetected: true,
+        resolvedBy: "chromium",
+        metadataOnly: false,
+        craterSignal: "none",
+      },
+      {
+        craterDetected: false,
+        fallbackUsed: true,
+        finalDetected: false,
+        resolvedBy: "none",
+        metadataOnly: false,
+        craterSignal: "none",
+      },
     ]);
 
     assert.deepEqual(summary, {
@@ -161,9 +167,30 @@ describe("summarizePrescannerTrials", () => {
 
   it("counts metadata-only crater wins and per-signal breakdown", () => {
     const summary = summarizePrescannerTrials([
-      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: true, craterSignal: "paint-tree" },
-      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: true, craterSignal: "computed-style" },
-      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: false, craterSignal: "forced-state" },
+      {
+        craterDetected: true,
+        fallbackUsed: false,
+        finalDetected: true,
+        resolvedBy: "crater",
+        metadataOnly: true,
+        craterSignal: "paint-tree",
+      },
+      {
+        craterDetected: true,
+        fallbackUsed: false,
+        finalDetected: true,
+        resolvedBy: "crater",
+        metadataOnly: true,
+        craterSignal: "computed-style",
+      },
+      {
+        craterDetected: true,
+        fallbackUsed: false,
+        finalDetected: true,
+        resolvedBy: "crater",
+        metadataOnly: false,
+        craterSignal: "forced-state",
+      },
     ]);
 
     assert.equal(summary.craterResolved, 3);

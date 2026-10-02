@@ -51,19 +51,19 @@ export interface TieredIssues<T> {
  * per gate and are not worth unifying — but they must read `tier` from the returned rows rather
  * than `severity` from their own, which is the point of routing through here.
  */
-export function tierIssues<T extends IssueLike>(
-  issues: readonly T[],
-  rules?: RuleView,
-): TieredIssues<T> {
+export function tierIssues<T extends IssueLike>(issues: readonly T[], rules?: RuleView): TieredIssues<T> {
   const { shown, hiddenByRule } = applyRuleTiers(
     issues,
     (issue) => ({ rule: issue.kind, emitted: issue.severity }),
     rules,
   );
-  const status = shown.some((s) => s.tier === "suspect") ? "suspect"
-    : shown.some((s) => s.tier === "warn") ? "warn"
-    : shown.length > 0 ? "info"
-    : "ok";
+  const status = shown.some((s) => s.tier === "suspect")
+    ? "suspect"
+    : shown.some((s) => s.tier === "warn")
+      ? "warn"
+      : shown.length > 0
+        ? "info"
+        : "ok";
   const note = hiddenByRuleNote(hiddenByRule);
   return { shown, status, ...(note ? { note } : {}) };
 }

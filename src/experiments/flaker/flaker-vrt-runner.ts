@@ -2,7 +2,12 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { loadFlakerVrtConfig, toViewportSpec, type FlakerVrtConfig, type FlakerVrtMigrationScenario } from "./flaker-vrt-config.ts";
+import {
+  loadFlakerVrtConfig,
+  toViewportSpec,
+  type FlakerVrtConfig,
+  type FlakerVrtMigrationScenario,
+} from "./flaker-vrt-config.ts";
 import {
   runMigrationCompare,
   type MigrationCompareOptions,
@@ -67,13 +72,9 @@ interface ExecutionGroup {
   viewports: ReturnType<typeof toViewportSpec>[];
 }
 
-type RunMigrationCompareFn = (
-  options: MigrationCompareOptions,
-) => Promise<MigrationCompareReport>;
+type RunMigrationCompareFn = (options: MigrationCompareOptions) => Promise<MigrationCompareReport>;
 
-export function parseFlakerVrtRunnerCliArgs(
-  args: string[],
-): FlakerVrtRunnerCliArgs {
+export function parseFlakerVrtRunnerCliArgs(args: string[]): FlakerVrtRunnerCliArgs {
   const [mode, ...rest] = args;
   if (mode !== "list" && mode !== "execute") {
     throw new Error(`Unknown mode: ${mode ?? "(missing)"}`);
@@ -85,12 +86,9 @@ export function parseFlakerVrtRunnerCliArgs(
   return { mode, ...(configPath ? { configPath } : {}) };
 }
 
-export function listFlakerVrtTests(
-  config: FlakerVrtConfig,
-  cwd = process.cwd(),
-): FlakerTestId[] {
+export function listFlakerVrtTests(config: FlakerVrtConfig, cwd = process.cwd()): FlakerTestId[] {
   return config.scenarios.flatMap((scenario) =>
-      scenario.variants.flatMap((variantFile) =>
+    scenario.variants.flatMap((variantFile) =>
       scenario.viewports.map((viewport) => {
         const suite = resolveScenarioSuite(cwd, scenario.dir, variantFile);
         const variant = buildFlakerVariantMetadata(scenario.backend, viewport);
@@ -130,13 +128,7 @@ export async function executeFlakerVrtTests(input: {
 
   for (const group of groups) {
     const timestamp = formatTimestamp(input.now ?? new Date());
-    const outputDir = join(
-      input.cwd,
-      "test-results",
-      "flaker-vrt",
-      timestamp,
-      sanitizeScenarioId(group.scenario.id),
-    );
+    const outputDir = join(input.cwd, "test-results", "flaker-vrt", timestamp, sanitizeScenarioId(group.scenario.id));
 
     try {
       await ensureDir(outputDir);
@@ -159,18 +151,10 @@ export async function executeFlakerVrtTests(input: {
       const groupStartedAt = Date.now();
       const report = await runCompare(compareOptions);
       const groupDurationMs = Date.now() - groupStartedAt;
-      const mapped = mapMigrationReportToFlakerResults(
-        group.tests,
-        group.scenario,
-        report,
-        groupDurationMs,
-        input.cwd,
-      );
+      const mapped = mapMigrationReportToFlakerResults(group.tests, group.scenario, report, groupDurationMs, input.cwd);
 
       results.push(...mapped);
-      stdoutLines.push(
-        `${group.scenario.id}: ${report.reportPath} (${mapped.length} tests)`,
-      );
+      stdoutLines.push(`${group.scenario.id}: ${report.reportPath} (${mapped.length} tests)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       stderrLines.push(`${group.scenario.id}: ${message}`);
@@ -307,12 +291,14 @@ if (invokedPath && import.meta.url === new URL(`file://${invokedPath}`).href) {
       handleCliError(error);
     }
     const message = error instanceof Error ? error.message : String(error);
-    console.log(JSON.stringify({
-      exitCode: 0,
-      results: [],
-      durationMs: 0,
-      stdout: "",
-      stderr: message,
-    } satisfies FlakerExecuteResult));
+    console.log(
+      JSON.stringify({
+        exitCode: 0,
+        results: [],
+        durationMs: 0,
+        stdout: "",
+        stderr: message,
+      } satisfies FlakerExecuteResult),
+    );
   });
 }

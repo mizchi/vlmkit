@@ -1,6 +1,4 @@
-import {
-  definePlugin,
-} from "@mizchi/vlmkit-core/plugin";
+import { definePlugin } from "@mizchi/vlmkit-core/plugin";
 /**
  * The plugin this example directory registers — both worked gates in one
  * module.

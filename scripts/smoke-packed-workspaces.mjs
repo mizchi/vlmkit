@@ -105,14 +105,23 @@ async function main() {
     const localReferences = Object.fromEntries(
       [...tarballs].map(([name, tarball]) => [name, `file:${relative(consumerDir, tarball)}`]),
     );
-    await writeFile(join(consumerDir, "package.json"), `${JSON.stringify({
-      name: "vlmkit-packed-workspaces-consumer",
-      private: true,
-      type: "module",
-      dependencies: { "@playwright/test": "1.61.0", ...localReferences },
-      pnpm: { overrides: localReferences },
-    }, null, 2)}\n`);
-    await writeFile(join(consumerDir, "smoke.mjs"), `
+    await writeFile(
+      join(consumerDir, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "vlmkit-packed-workspaces-consumer",
+          private: true,
+          type: "module",
+          dependencies: { "@playwright/test": "1.61.0", ...localReferences },
+          pnpm: { overrides: localReferences },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(
+      join(consumerDir, "smoke.mjs"),
+      `
 import assert from "node:assert/strict";
 
 const packageNames = ${JSON.stringify([...tarballs.keys()])};
@@ -145,7 +154,8 @@ assert.equal(listComponentGoals().includes("app"), true);
 await import("@mizchi/vlmkit-generate/cli");
 await import("@mizchi/vlmkit-plan/cli");
 console.log("workspace package imports passed");
-`);
+`,
+    );
 
     console.log("==> installing tarballs in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });

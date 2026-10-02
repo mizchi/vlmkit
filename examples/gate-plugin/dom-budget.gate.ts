@@ -159,9 +159,27 @@ docs/authoring-gates.md.`,
       positional: 0,
       required: true,
     },
-    { name: "max-nodes", placeholder: "n", kind: "number", description: "Element-count budget", defaultDescription: String(DEFAULT_BUDGET.maxNodes) },
-    { name: "max-depth", placeholder: "n", kind: "number", description: "Nesting-depth budget", defaultDescription: String(DEFAULT_BUDGET.maxDepth) },
-    { name: "max-style-bytes", placeholder: "n", kind: "number", description: "Inline-stylesheet byte budget", defaultDescription: String(DEFAULT_BUDGET.maxStylesheetBytes) },
+    {
+      name: "max-nodes",
+      placeholder: "n",
+      kind: "number",
+      description: "Element-count budget",
+      defaultDescription: String(DEFAULT_BUDGET.maxNodes),
+    },
+    {
+      name: "max-depth",
+      placeholder: "n",
+      kind: "number",
+      description: "Nesting-depth budget",
+      defaultDescription: String(DEFAULT_BUDGET.maxDepth),
+    },
+    {
+      name: "max-style-bytes",
+      placeholder: "n",
+      kind: "number",
+      description: "Inline-stylesheet byte budget",
+      defaultDescription: String(DEFAULT_BUDGET.maxStylesheetBytes),
+    },
   ],
   parse: (argv, ctx) => {
     const source = readPositionals(argv, ["--max-nodes", "--max-depth", "--max-style-bytes"])[0];
@@ -177,7 +195,11 @@ docs/authoring-gates.md.`,
     };
     const config = budgetFromConfig(ctx.cwd);
     const budget = { ...DEFAULT_BUDGET } as Budget;
-    const origin = { maxNodes: "default", maxDepth: "default", maxStylesheetBytes: "default" } as DomBudgetOptions["origin"];
+    const origin = {
+      maxNodes: "default",
+      maxDepth: "default",
+      maxStylesheetBytes: "default",
+    } as DomBudgetOptions["origin"];
     for (const key of ["maxNodes", "maxDepth", "maxStylesheetBytes"] as const) {
       if (config[key] !== undefined) {
         budget[key] = config[key]!;
@@ -197,7 +219,7 @@ docs/authoring-gates.md.`,
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
       const url = /^(https?|file):\/\//.test(source) ? source : pathToFileURL(resolve(source)).href;
       await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
-      const measured = await page.evaluate(MEASURE) as Omit<DomBudgetReport, "source" | "budget" | "origin">;
+      const measured = (await page.evaluate(MEASURE)) as Omit<DomBudgetReport, "source" | "budget" | "origin">;
       return { source, budget, origin, ...measured };
     });
   },
@@ -239,8 +261,10 @@ docs/authoring-gates.md.`,
       const icon = value <= budget ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
       // Saying where a budget came from is what stops the argument about
       // whether it was ever configured.
-      return `  ${icon} ${label.padEnd(22)} ${String(value).padStart(7)} / ${String(budget).padStart(7)}`
-        + `  ${DIM}(${report.origin[key]})${RESET}`;
+      return (
+        `  ${icon} ${label.padEnd(22)} ${String(value).padStart(7)} / ${String(budget).padStart(7)}` +
+        `  ${DIM}(${report.origin[key]})${RESET}`
+      );
     };
     const lines = [
       `${BOLD}${CYAN}vlmkit check dom-budget${RESET}`,
@@ -255,8 +279,7 @@ docs/authoring-gates.md.`,
     }
     return lines.join("\n");
   },
-  headline: (report) =>
-    `${report.nodes} nodes, depth ${report.depth}, ${report.stylesheetBytes}B inline CSS`,
+  headline: (report) => `${report.nodes} nodes, depth ${report.depth}, ${report.stylesheetBytes}B inline CSS`,
   ledger: (report) => ({
     tool: "check-dom-budget",
     source: report.source,

@@ -51,12 +51,9 @@ export function summarizeMigrationFixCandidates(
   const aggregated = new Map<string, MigrationFixCandidateSummary>();
   for (const group of groups) {
     for (const candidate of group) {
-      const key = [
-        candidate.selector,
-        candidate.property,
-        candidate.value,
-        candidate.mediaCondition ?? "",
-      ].join("\u0000");
+      const key = [candidate.selector, candidate.property, candidate.value, candidate.mediaCondition ?? ""].join(
+        "\u0000",
+      );
       const existing = aggregated.get(key);
       if (existing) {
         existing.occurrences++;
@@ -137,15 +134,20 @@ function dedupeCandidates(candidates: MigrationFixCandidate[]): MigrationFixCand
   });
 }
 
-function categoryWeight(
-  migrationCategory: MigrationDiffCategory,
-  propertyCategory: PropertyCategory,
-): number {
+function categoryWeight(migrationCategory: MigrationDiffCategory, propertyCategory: PropertyCategory): number {
   switch (migrationCategory) {
     case "spacing":
-      return propertyCategory === "spacing" ? 6 : propertyCategory === "layout" || propertyCategory === "sizing" ? 3 : 0;
+      return propertyCategory === "spacing"
+        ? 6
+        : propertyCategory === "layout" || propertyCategory === "sizing"
+          ? 3
+          : 0;
     case "layout-shift":
-      return propertyCategory === "layout" ? 5 : propertyCategory === "spacing" || propertyCategory === "sizing" ? 3 : 0;
+      return propertyCategory === "layout"
+        ? 5
+        : propertyCategory === "spacing" || propertyCategory === "sizing"
+          ? 3
+          : 0;
     case "color-change":
       return propertyCategory === "visual" ? 6 : 0;
     case "typography":

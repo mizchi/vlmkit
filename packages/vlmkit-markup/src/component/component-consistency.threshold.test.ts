@@ -18,14 +18,17 @@ import { formatComponentConsistencyReport, runComponentConsistency } from "./com
 async function twoCards(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-drift-thr-"));
   const path = join(dir, "page.html");
-  await writeFile(path, `<!doctype html><html><head><meta charset="utf-8"><style>
+  await writeFile(
+    path,
+    `<!doctype html><html><head><meta charset="utf-8"><style>
     body { margin: 0; padding: 10px; background: #fff; font: 14px system-ui; }
     .card { width: 160px; padding: 12px; border: 2px solid #333; background: #fff; margin: 6px; }
     .card--other { background: #ffdddd; border-color: #cc0000; }
   </style></head><body>
     <div class="card">Alpha</div>
     <div class="card card--other">Beta</div>
-  </body></html>`);
+  </body></html>`,
+  );
   return path;
 }
 
@@ -75,11 +78,14 @@ describe("check drift component: --threshold is a pass line only", () => {
 async function page(cards: string, extraCss = ""): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-drift-style-"));
   const path = join(dir, "page.html");
-  await writeFile(path, `<!doctype html><html><head><meta charset="utf-8"><style>
+  await writeFile(
+    path,
+    `<!doctype html><html><head><meta charset="utf-8"><style>
     body { margin: 0; padding: 10px; background: #fff; font: 14px/1.4 system-ui; }
     .card { width: 180px; padding: 12px; border: 2px solid #333; background: #fff; margin: 6px; }
     ${extraCss}
-  </style></head><body>${cards}</body></html>`);
+  </style></head><body>${cards}</body></html>`,
+  );
   return path;
 }
 
@@ -134,7 +140,11 @@ describe("check drift component: styling decides, content does not", () => {
     });
     const delta = report.deltas.find((d) => d.candidateIndex === 1)!;
     assert.ok(delta.bboxDeltas.height !== 0, "the wrapped card is taller");
-    assert.deepEqual(delta.styleDeltas.map((s) => s.property), [], "and that is not a style delta");
+    assert.deepEqual(
+      delta.styleDeltas.map((s) => s.property),
+      [],
+      "and that is not a style delta",
+    );
   });
 });
 
@@ -165,40 +175,46 @@ describe("check drift component: the scope of the check, stated honestly", () =>
     assert.ok(properties.includes("outline-color"), `expected outline colour in ${properties.join(",")}`);
   });
 
-  it("flags a descendant-only difference through the palette instead of calling it content", { timeout: 180_000 }, async () => {
-    // The comparison is the instance root, so `.card--accent h2 { color }` is outside
-    // it. The palette diff already saw the colour; now the wording does too.
-    const report = await runComponentConsistency({
-      htmlPath: await page(
-        `<div class="card"><h2>Alpha</h2></div><div class="card card--accent"><h2>Alpha</h2></div>`,
-        `.card--accent h2 { color: #2255cc; }`,
-      ),
-      selector: ".card",
-      outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
-    });
-    const delta = report.deltas[0]!;
-    assert.deepEqual(delta.styleDeltas, [], "the root really is styled identically");
-    assert.ok(
-      delta.paletteOnlyInCand + delta.paletteOnlyInRef > 0,
-      "but the accent colour is visible in the palette",
-    );
-    const formatted = formatComponentConsistencyReport(report);
-    assert.match(formatted, /colour\(s\) appear in/);
-    // The sentence that was false: it must not be reachable when the palettes disagree.
-    assert.doesNotMatch(formatted, /this looks like different content/);
-  });
+  it(
+    "flags a descendant-only difference through the palette instead of calling it content",
+    { timeout: 180_000 },
+    async () => {
+      // The comparison is the instance root, so `.card--accent h2 { color }` is outside
+      // it. The palette diff already saw the colour; now the wording does too.
+      const report = await runComponentConsistency({
+        htmlPath: await page(
+          `<div class="card"><h2>Alpha</h2></div><div class="card card--accent"><h2>Alpha</h2></div>`,
+          `.card--accent h2 { color: #2255cc; }`,
+        ),
+        selector: ".card",
+        outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
+      });
+      const delta = report.deltas[0]!;
+      assert.deepEqual(delta.styleDeltas, [], "the root really is styled identically");
+      assert.ok(
+        delta.paletteOnlyInCand + delta.paletteOnlyInRef > 0,
+        "but the accent colour is visible in the palette",
+      );
+      const formatted = formatComponentConsistencyReport(report);
+      assert.match(formatted, /colour\(s\) appear in/);
+      // The sentence that was false: it must not be reachable when the palettes disagree.
+      assert.doesNotMatch(formatted, /this looks like different content/);
+    },
+  );
 
-  it("says 'this looks like' rather than 'not drift' when everything it checked matches", { timeout: 180_000 }, async () => {
-    const report = await runComponentConsistency({
-      htmlPath: await page(
-        `<div class="card">Alpha one</div><div class="card">Beta two</div>`,
-      ),
-      selector: ".card",
-      outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
-    });
-    const formatted = formatComponentConsistencyReport(report);
-    assert.match(formatted, /every property on the instance root matches/);
-    // No claim about what the difference *is not*.
-    assert.doesNotMatch(formatted, /not drift/);
-  });
+  it(
+    "says 'this looks like' rather than 'not drift' when everything it checked matches",
+    { timeout: 180_000 },
+    async () => {
+      const report = await runComponentConsistency({
+        htmlPath: await page(`<div class="card">Alpha one</div><div class="card">Beta two</div>`),
+        selector: ".card",
+        outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
+      });
+      const formatted = formatComponentConsistencyReport(report);
+      assert.match(formatted, /every property on the instance root matches/);
+      // No claim about what the difference *is not*.
+      assert.doesNotMatch(formatted, /not drift/);
+    },
+  );
 });

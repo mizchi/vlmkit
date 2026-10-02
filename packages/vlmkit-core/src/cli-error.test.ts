@@ -61,17 +61,19 @@ describe("formatMissingPlaywrightBrowserError", () => {
   });
 
   it("asks for the engine that actually failed, not always chromium", () => {
-    const firefox = formatMissingPlaywrightBrowserError(
-      new Error("browserType.launch: Executable doesn't exist at /opt/pw/firefox-1490/firefox/firefox"),
-      TARGET,
-    ) ?? "";
+    const firefox =
+      formatMissingPlaywrightBrowserError(
+        new Error("browserType.launch: Executable doesn't exist at /opt/pw/firefox-1490/firefox/firefox"),
+        TARGET,
+      ) ?? "";
     assert.match(firefox, /no firefox browser executable/);
     assert.match(firefox, /cli\.js install firefox/);
 
-    const webkit = formatMissingPlaywrightBrowserError(
-      new Error("browserType.launch: Executable doesn't exist at /opt/pw/webkit-2247/pw_run.sh"),
-      TARGET,
-    ) ?? "";
+    const webkit =
+      formatMissingPlaywrightBrowserError(
+        new Error("browserType.launch: Executable doesn't exist at /opt/pw/webkit-2247/pw_run.sh"),
+        TARGET,
+      ) ?? "";
     assert.match(webkit, /no webkit browser executable/);
     assert.match(webkit, /cli\.js install webkit/);
   });
@@ -106,9 +108,7 @@ describe("playwrightEngineFromLaunchError", () => {
 
 describe("formatMissingPlaywrightModuleError", () => {
   const err = Object.assign(
-    new Error(
-      "Cannot find package 'playwright' imported from /app/node_modules/@mizchi/vlmkit/dist/perf.gate-abc.mjs",
-    ),
+    new Error("Cannot find package 'playwright' imported from /app/node_modules/@mizchi/vlmkit/dist/perf.gate-abc.mjs"),
     { code: "ERR_MODULE_NOT_FOUND" },
   );
 
@@ -180,8 +180,8 @@ describe("formatCliError", () => {
     );
     const fromBrowser = formatCliError(
       new Error(
-        `page.goto: net::ERR_FILE_NOT_FOUND at file:///repo/nope.html\n`
-          + `Call log:\n  - navigating to "file:///repo/nope.html", waiting until "networkidle"\n`,
+        `page.goto: net::ERR_FILE_NOT_FOUND at file:///repo/nope.html\n` +
+          `Call log:\n  - navigating to "file:///repo/nope.html", waiting until "networkidle"\n`,
       ),
     );
     assert.equal(fromFs, "error: file not found: /repo/nope.html");
@@ -189,9 +189,7 @@ describe("formatCliError", () => {
   });
 
   it("decodes a percent-encoded file URL back to the path the caller typed", () => {
-    const text = formatCliError(
-      new Error("page.goto: net::ERR_FILE_NOT_FOUND at file:///repo/my%20pages/a%2Bb.html"),
-    );
+    const text = formatCliError(new Error("page.goto: net::ERR_FILE_NOT_FOUND at file:///repo/my%20pages/a%2Bb.html"));
     assert.equal(text, "error: file not found: /repo/my pages/a+b.html");
   });
 
@@ -211,12 +209,13 @@ describe("formatCliError", () => {
     // Chromium refuses ports 1, 7, 22, 25, 6000 … before any request is sent, so
     // "connection refused (is the server running?)" would send the reader to
     // check a server that was never contacted.
-    const text = formatCliError(
-      new Error(
-        `page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:1/x.html\n`
-          + `Call log:\n  - navigating to "http://127.0.0.1:1/x.html", waiting until "networkidle"\n`,
-      ),
-    ) ?? "";
+    const text =
+      formatCliError(
+        new Error(
+          `page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:1/x.html\n` +
+            `Call log:\n  - navigating to "http://127.0.0.1:1/x.html", waiting until "networkidle"\n`,
+        ),
+      ) ?? "";
     assert.match(text, /blocked-port list/);
     assert.doesNotMatch(text, /is the server running/);
   });
@@ -249,17 +248,20 @@ describe("formatCliError", () => {
   });
 
   it("prints a UsageError as one line without a stack", () => {
-    assert.equal(formatCliError(new UsageError("--concurrency expects a number, got \"abc\"")),
-      'error: --concurrency expects a number, got "abc"');
+    assert.equal(
+      formatCliError(new UsageError('--concurrency expects a number, got "abc"')),
+      'error: --concurrency expects a number, got "abc"',
+    );
   });
 
   it("adds the directory hint for EISDIR", () => {
-    const text = formatCliError(
-      Object.assign(new Error("EISDIR: illegal operation on a directory, read"), {
-        code: "EISDIR",
-        path: "/repo/fixtures",
-      }),
-    ) ?? "";
+    const text =
+      formatCliError(
+        Object.assign(new Error("EISDIR: illegal operation on a directory, read"), {
+          code: "EISDIR",
+          path: "/repo/fixtures",
+        }),
+      ) ?? "";
     assert.match(text, /expected an HTML file, got a directory: \/repo\/fixtures/);
     assert.match(text, /e\.g\. \/repo\/fixtures\/page\.html/);
   });
@@ -275,10 +277,10 @@ describe("formatCliError", () => {
     // "Timeout 30000ms exceeded" wording, so this branch has to match first or the
     // whole explanation is replaced by one line — or dumped as a stack trace.
     const explained = new Error(
-      "page load timed out after 30000ms waiting for `networkidle`\n"
-      + "  1 request(s) still open:\n"
-      + "    http://localhost:5199/api/live (open 30.0s)\n"
-      + "  Try `--wait-until load`",
+      "page load timed out after 30000ms waiting for `networkidle`\n" +
+        "  1 request(s) still open:\n" +
+        "    http://localhost:5199/api/live (open 30.0s)\n" +
+        "  Try `--wait-until load`",
     );
     const text = formatCliError(explained);
     assert.ok(text?.startsWith("error: page load timed out after 30000ms waiting for `networkidle`"));

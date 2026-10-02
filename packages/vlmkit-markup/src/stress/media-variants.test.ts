@@ -24,7 +24,9 @@ function page(name: string, body: string): string {
 }
 
 /** A page that responds to each variant, so every delta is non-trivial. */
-const responsive = page("responsive", `
+const responsive = page(
+  "responsive",
+  `
 <style>
   body { margin: 0; font: 16px sans-serif; background: #fff; color: #111; }
   .box { margin: 20px; padding: 40px; background: #2d6cdf; color: #fff; }
@@ -37,7 +39,8 @@ const responsive = page("responsive", `
   <div class="box">Primary surface</div>
   <div class="spin"></div>
   <p>Body copy that reflows when the direction flips, with enough words to move.</p>
-</body>`);
+</body>`,
+);
 
 describe("runMediaVariants", () => {
   it("captures a baseline plus one screenshot per requested variant", async () => {
@@ -111,8 +114,8 @@ describe("runMediaVariants", () => {
     });
     assert.ok(
       sensitive.variants[0]!.deltaRatio > tolerant.variants[0]!.deltaRatio,
-      `a smaller threshold must find at least as much change:`
-      + ` sensitive=${sensitive.variants[0]!.deltaRatio} tolerant=${tolerant.variants[0]!.deltaRatio}`,
+      `a smaller threshold must find at least as much change:` +
+        ` sensitive=${sensitive.variants[0]!.deltaRatio} tolerant=${tolerant.variants[0]!.deltaRatio}`,
     );
     // And a tolerance of 0.99 accepts almost any colour distance, so a page that
     // visibly changes measures as unchanged. That is the flag doing its job, not a bug.

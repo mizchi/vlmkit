@@ -33,9 +33,7 @@ export function extractCustomPropertyReferences(value: string): string[] {
   return refs;
 }
 
-export function collectComputedStyleTrackingProperties(
-  declarations: CssDeclaration[],
-): string[] {
+export function collectComputedStyleTrackingProperties(declarations: CssDeclaration[]): string[] {
   const properties = new Set<string>();
   for (const declaration of declarations) {
     if (isCustomProperty(declaration.property)) continue;
@@ -45,15 +43,11 @@ export function collectComputedStyleTrackingProperties(
   return [...properties].sort();
 }
 
-export function mergeComputedStyleProperties(
-  ...groups: readonly string[][]
-): string[] {
+export function mergeComputedStyleProperties(...groups: readonly string[][]): string[] {
   return [...new Set(groups.flat())].sort();
 }
 
-export function buildCustomPropertyUsageIndex(
-  declarations: CssDeclaration[],
-): CustomPropertyUsageIndex {
+export function buildCustomPropertyUsageIndex(declarations: CssDeclaration[]): CustomPropertyUsageIndex {
   const consumersByCustomProperty = new Map<string, CustomPropertyConsumer[]>();
 
   for (const declaration of declarations) {
@@ -70,9 +64,7 @@ export function buildCustomPropertyUsageIndex(
 
   return {
     findImpactedTargets(customProperty: string): ComputedStyleTarget[] {
-      const queue: Array<{ customProperty: string; path: string[] }> = [
-        { customProperty, path: [customProperty] },
-      ];
+      const queue: Array<{ customProperty: string; path: string[] }> = [{ customProperty, path: [customProperty] }];
       const seenCustomProperties = new Set<string>([customProperty]);
       const targets = new Map<string, ComputedStyleTarget>();
 
@@ -130,10 +122,10 @@ export function filterComputedStyleDiffsByTargets(
 ): ComputedStyleDiff[] {
   if (targets.length === 0) return diffs;
   return diffs.filter((diff) =>
-    targets.some((target) =>
-      target.property === diff.property &&
-      matchesComputedStyleTargetSelector(diff.selector, target.selector)
-    )
+    targets.some(
+      (target) =>
+        target.property === diff.property && matchesComputedStyleTargetSelector(diff.selector, target.selector),
+    ),
   );
 }
 
@@ -147,15 +139,15 @@ function compareTargets(a: ComputedStyleTarget, b: ComputedStyleTarget): number 
 
 function normalizeComputedStyleTargetSelector(selector: string): string {
   return selector
-    .replace(/:(hover|focus|active|focus-within|focus-visible|checked|disabled|invalid|valid|required|read-only)\b/g, "")
+    .replace(
+      /:(hover|focus|active|focus-within|focus-visible|checked|disabled|invalid|valid|required|read-only)\b/g,
+      "",
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function matchesComputedStyleTargetSelector(
-  diffSelector: string,
-  targetSelector: string,
-): boolean {
+function matchesComputedStyleTargetSelector(diffSelector: string, targetSelector: string): boolean {
   const normalizedTarget = normalizeComputedStyleTargetSelector(targetSelector);
   if (diffSelector === targetSelector || diffSelector === normalizedTarget) return true;
 
@@ -166,7 +158,8 @@ function matchesComputedStyleTargetSelector(
     diffSelector === semanticPrefix ||
     diffSelector.startsWith(`${semanticPrefix}[`) ||
     diffSelector.startsWith(`${semanticPrefix}::`)
-  ) return true;
+  )
+    return true;
 
   // Hover/forced-state snapshots key by the element's full joined-class
   // identifier (e.g. `.btn.btn-cart`), but the target's selector comes
@@ -177,9 +170,7 @@ function matchesComputedStyleTargetSelector(
     const sigil = semanticPrefix[0];
     const token = semanticPrefix.slice(1);
     if (!token) return false;
-    const tokens = diffSelector
-      .split(/[.#\s>+~]/)
-      .filter(Boolean);
+    const tokens = diffSelector.split(/[.#\s>+~]/).filter(Boolean);
     if (sigil === "." && tokens.includes(token)) return true;
     if (sigil === "#" && tokens.includes(token)) return true;
   }

@@ -66,10 +66,7 @@ describe("firstPositional", () => {
   });
 
   it("takes extra value flags a gate declares itself", () => {
-    assert.equal(
-      firstPositional(["--manifest", "copy.txt", "page.html"], "usage", ["--manifest"]),
-      "page.html",
-    );
+    assert.equal(firstPositional(["--manifest", "copy.txt", "page.html"], "usage", ["--manifest"]), "page.html");
     // Undeclared, so the value reads as the source — which is why a gate passing
     // its own value flags is not optional.
     assert.equal(firstPositional(["--manifest", "copy.txt", "page.html"], "usage"), "copy.txt");

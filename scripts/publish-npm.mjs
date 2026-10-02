@@ -33,7 +33,10 @@ const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 export function publicPackages(root = repoRoot) {
   const pkgs = readdirSync(join(root, "packages"), { withFileTypes: true })
     .filter((d) => d.isDirectory())
-    .map((d) => ({ dir: join(root, "packages", d.name), manifest: readJson(join(root, "packages", d.name, "package.json")) }))
+    .map((d) => ({
+      dir: join(root, "packages", d.name),
+      manifest: readJson(join(root, "packages", d.name, "package.json")),
+    }))
     .filter((p) => !p.manifest.private);
   pkgs.push({ dir: root, manifest: readJson(join(root, "package.json")) });
   return pkgs;
@@ -42,7 +45,12 @@ export function publicPackages(root = repoRoot) {
 /** Dependencies first. Only `dependencies` and `peerDependencies` order a publish. */
 export function publishOrder(pkgs) {
   const byName = new Map(pkgs.map((p) => [p.manifest.name, p]));
-  const deps = (p) => Object.keys({ ...p.manifest.dependencies, ...p.manifest.peerDependencies, ...p.manifest.optionalDependencies }).filter((n) => byName.has(n));
+  const deps = (p) =>
+    Object.keys({
+      ...p.manifest.dependencies,
+      ...p.manifest.peerDependencies,
+      ...p.manifest.optionalDependencies,
+    }).filter((n) => byName.has(n));
   const out = [];
   const state = new Map();
   const visit = (p) => {
@@ -54,7 +62,10 @@ export function publishOrder(pkgs) {
     out.push(p);
   };
   // The root last: it is the CLI and nothing depends on it.
-  for (const p of [...pkgs].sort((a, b) => (a.dir === repoRoot) - (b.dir === repoRoot) || a.manifest.name.localeCompare(b.manifest.name))) visit(p);
+  for (const p of [...pkgs].sort(
+    (a, b) => (a.dir === repoRoot) - (b.dir === repoRoot) || a.manifest.name.localeCompare(b.manifest.name),
+  ))
+    visit(p);
   return out;
 }
 
@@ -73,7 +84,10 @@ function onRegistry(name, version) {
 function main() {
   const order = publishOrder(publicPackages());
   const versions = new Set(order.map((p) => p.manifest.version));
-  if (versions.size !== 1) throw new Error(`packages are at different versions: ${order.map((p) => `${p.manifest.name}@${p.manifest.version}`).join(", ")}`);
+  if (versions.size !== 1)
+    throw new Error(
+      `packages are at different versions: ${order.map((p) => `${p.manifest.name}@${p.manifest.version}`).join(", ")}`,
+    );
   const [version] = versions;
   if (tag && tag !== `v${version}`) throw new Error(`tag ${tag} does not match the packages' version ${version}`);
   console.log(`publishing ${version}${dryRun ? " (dry run)" : ""}: ${order.map((p) => p.manifest.name).join(" → ")}`);
@@ -85,8 +99,15 @@ function main() {
     const tarballs = order.map((p) => {
       const file = run("pnpm", ["pack", "--pack-destination", out], p.dir).trim().split("\n").pop().trim();
       const manifest = JSON.parse(run("tar", ["-xOzf", file, "package/package.json"], out));
-      const leaked = Object.entries({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.optionalDependencies }).filter(([, v]) => String(v).startsWith("workspace:"));
-      if (leaked.length) throw new Error(`${p.manifest.name}: packed package.json still has ${leaked.map(([k, v]) => `${k}@${v}`).join(", ")}`);
+      const leaked = Object.entries({
+        ...manifest.dependencies,
+        ...manifest.peerDependencies,
+        ...manifest.optionalDependencies,
+      }).filter(([, v]) => String(v).startsWith("workspace:"));
+      if (leaked.length)
+        throw new Error(
+          `${p.manifest.name}: packed package.json still has ${leaked.map(([k, v]) => `${k}@${v}`).join(", ")}`,
+        );
       return { name: p.manifest.name, file };
     });
     for (const { name, file } of tarballs) {

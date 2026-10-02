@@ -50,15 +50,18 @@ export interface TouchPolicyResult {
  * 160,000 of each. The spacing exception needs every target's geometry anyway, so passing
  * the page once is both faster and the only shape in which the exception is expressible.
  */
-export function touchPolicy(
-  level: WcagTouchLevel,
-  targets: readonly TouchPolicyTarget[],
-): TouchPolicyResult {
+export function touchPolicy(level: WcagTouchLevel, targets: readonly TouchPolicyTarget[]): TouchPolicyResult {
   // `cache: false` equivalent — this payload is the whole page and memoizing it would
   // retain every page ever measured in a long-lived process.
   const out = callMarkupCoreJson<{
     required: number;
-    verdicts: { target_position: number; min_side: number; undersized: boolean; exception: string; clustered: boolean }[];
+    verdicts: {
+      target_position: number;
+      min_side: number;
+      undersized: boolean;
+      exception: string;
+      clustered: boolean;
+    }[];
   }>("touch-policy", {
     level,
     targets: targets.map((t) => ({

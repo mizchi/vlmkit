@@ -92,9 +92,17 @@ export function designSample(s: DesignStyleSample): DesignSample {
     boxSignature: box.join("|"),
     signature: box.concat(font).join("|"),
     textFree: s.textFree,
-    described: "padding " + box.slice(0, 4).join("/") + ", radius " + box[4]
-      + ", " + (s.textFree ? "no painted text" : font[0] + "px/" + font[1])
-      + ", border " + box[5] + ", bg " + box[6],
+    described:
+      "padding " +
+      box.slice(0, 4).join("/") +
+      ", radius " +
+      box[4] +
+      ", " +
+      (s.textFree ? "no painted text" : font[0] + "px/" + font[1]) +
+      ", border " +
+      box[5] +
+      ", bg " +
+      box[6],
   };
 }
 
@@ -267,8 +275,7 @@ const SCALE_FLOOR_PX = 8;
  * "common" `21.3px` was the reductio: two rem-derived neighbours, zero design
  * content). Both the outlier and its reference must be integral.
  */
-const isScaleValue = (v: number): boolean =>
-  v >= SCALE_FLOOR_PX && Math.abs(v - Math.round(v)) < 0.05;
+const isScaleValue = (v: number): boolean => v >= SCALE_FLOOR_PX && Math.abs(v - Math.round(v)) < 0.05;
 
 /**
  * How far off the scale still counts as "just off" rather than "a different
@@ -286,9 +293,15 @@ const scaleWindow = (reference: number): number => Math.max(2, Math.round(refere
  * a label here shows up as `field 9` rather than as a silently wrong name.
  */
 const SIGNATURE_FIELDS = [
-  "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "border-radius", "border-width", "background-color",
-  "font-size", "font-weight",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "border-radius",
+  "border-width",
+  "background-color",
+  "font-size",
+  "font-weight",
 ] as const;
 
 /**
@@ -364,7 +377,7 @@ ON A SMALL ROLE, PASS --min-instances TOO. Allowing 1 of 3 leaves 2, under the d
 --min-instances 3, and the role then stops being judged at all: the run reports
 \`NOT JUDGED\` and a real drift among the remaining instances would not be found. For a
 3-element role that is \`--min-instances 2 --min-reuse 2\` — both, because 2 instances
-cannot reach 3x however low the instance floor goes.`
+cannot reach 3x however low the instance floor goes.`;
 
 export function judgeDesignPolicy(
   rawInput: DesignPolicyInput,
@@ -372,7 +385,7 @@ export function judgeDesignPolicy(
 ): Omit<DesignPolicyReport, "source"> {
   const input = {
     ...rawInput,
-    samples: rawInput.samples.map((sample) => "signature" in sample ? sample : designSample(sample)),
+    samples: rawInput.samples.map((sample) => ("signature" in sample ? sample : designSample(sample))),
   };
   const minReuse = options.minReuse ?? DEFAULT_MIN_REUSE;
   const minInstances = options.minInstances ?? DEFAULT_MIN_INSTANCES;
@@ -471,14 +484,14 @@ export function judgeDesignPolicy(
       ...(allowedHere.length > 0 ? { allowed: allowedHere.length } : {}),
       ...(notJudged
         ? {
-          notJudged: true as const,
-          // Would it have been judged without the exemptions? That distinction is
-          // the difference between "this page is small" and "your config silenced
-          // the only role on the page".
-          ...(allowedHere.length > 0 && judged.length + allowedHere.length >= minInstances
-            ? { unjudgedByAllow: true as const }
-            : {}),
-        }
+            notJudged: true as const,
+            // Would it have been judged without the exemptions? That distinction is
+            // the difference between "this page is small" and "your config silenced
+            // the only role on the page".
+            ...(allowedHere.length > 0 && judged.length + allowedHere.length >= minInstances
+              ? { unjudgedByAllow: true as const }
+              : {}),
+          }
         : {}),
     });
 
@@ -496,36 +509,38 @@ export function judgeDesignPolicy(
     // the stylesheet to learn whether the deviation was one property or two."
     const examples = minority.slice(0, 3).map(([, els]) => {
       const differing = describeSignatureDelta(dominant[1][0]!, els[0]!);
-      return `${els[0]!.selector} (${els[0]!.described})`
-        + (differing ? ` — differs in ${differing}` : "");
+      return `${els[0]!.selector} (${els[0]!.described})` + (differing ? ` — differs in ${differing}` : "");
     });
     findings.push({
       kind: "component-drift",
       severity: "warn",
       role,
       message:
-        `${list.length} "${role}" elements render ${signatures} distinct styles `
+        `${list.length} "${role}" elements render ${signatures} distinct styles ` +
         // `reuse` is instances/styles — an average, and it used to be printed as
         // "each style reused only 1.5x", which contradicted the very next sentence
         // ("Dominant style, used 2x") and described a count no style had. The same
         // agent: "No style is used 1.5 times. […] I could not tune the gate into
         // agreement with itself, and had to reverse-engineer the formula."
-        + `(used ${ranked.map(([, els]) => `${els.length}x`).slice(0, 4).join(", ")}`
-        + `${ranked.length > 4 ? ", …" : ""}; `
-        + `a system reuses each style ${minReuse}x or more, and this role averages ${reuse}x). `
-        + `Dominant style, used ${dominant[1].length}x: ${dominant[1][0]!.described}. `
-        + `Deviating: ${examples.join("; ")}`
-        + (minority.length > 3 ? ` and ${minority.length - 3} more.` : ".")
-        + ` This reports inconsistency, not which style is correct.`
+        `(used ${ranked
+          .map(([, els]) => `${els.length}x`)
+          .slice(0, 4)
+          .join(", ")}` +
+        `${ranked.length > 4 ? ", …" : ""}; ` +
+        `a system reuses each style ${minReuse}x or more, and this role averages ${reuse}x). ` +
+        `Dominant style, used ${dominant[1].length}x: ${dominant[1][0]!.described}. ` +
+        `Deviating: ${examples.join("; ")}` +
+        (minority.length > 3 ? ` and ${minority.length - 3} more.` : ".") +
+        ` This reports inconsistency, not which style is correct.` +
         // The escape hatch #112 asked for, offered where the problem appears. Two
         // agents found `--exclude` only by opening `--help`, and one of them pointed
         // out that the gate has the evidence to suggest it: a dominant style that
         // paints no text in a zero-padding, zero-radius, transparent box is vendor
         // chrome, not a design decision.
-        + (looksLikeVendorChrome(dominant[1][0]!)
-          ? ` The dominant style paints no text and has no padding, radius or background`
-            + ` — that shape is usually a third-party widget's own controls. If it is not yours,`
-            + ` exclude its subtree: --exclude "<selector>" (the exclusion is reported, not silent).`
+        (looksLikeVendorChrome(dominant[1][0]!)
+          ? ` The dominant style paints no text and has no padding, radius or background` +
+            ` — that shape is usually a third-party widget's own controls. If it is not yours,` +
+            ` exclude its subtree: --exclude "<selector>" (the exclusion is reported, not silent).`
           : ""),
     });
   }
@@ -544,27 +559,30 @@ export function judgeDesignPolicy(
   // web.dev — pages the study established as coherent — on rows like
   // "21.4px, nearest common 21.3px". A metric that fires on the reference set
   // is not a metric.
-  const scaleReferences = [...spacingCounts.entries()]
-    .filter(([value, uses]) => isScaleValue(value) && uses.length > outlierMax);
-  const candidates = [...spacingCounts.entries()]
-    .filter(([value, uses]) => isScaleValue(value) && uses.length <= outlierMax);
+  const scaleReferences = [...spacingCounts.entries()].filter(
+    ([value, uses]) => isScaleValue(value) && uses.length > outlierMax,
+  );
+  const candidates = [...spacingCounts.entries()].filter(
+    ([value, uses]) => isScaleValue(value) && uses.length <= outlierMax,
+  );
   // Only meaningful once the page HAS a vocabulary to deviate from.
   if (scaleReferences.length >= 3 && candidates.length > 0) {
-    const nearest = (v: number) => scaleReferences
-      .reduce((best, entry) => (Math.abs(entry[0] - v) < Math.abs(best[0] - v) ? entry : best));
+    const nearest = (v: number) =>
+      scaleReferences.reduce((best, entry) => (Math.abs(entry[0] - v) < Math.abs(best[0] - v) ? entry : best));
     const worst = candidates
       .map(([value, uses]) => {
         const [near, nearUses] = nearest(value);
         return { value, uses: uses.length, near, nearUses: nearUses.length, sample: uses[0]! };
       })
-      .filter((r) =>
-        r.value !== r.near
-        && Math.abs(r.value - r.near) <= scaleWindow(r.near)
-        // The reference has to be genuinely established, or "off the page's own
-        // scale" is claiming a scale that does not exist: 2 uses vs 3 uses is
-        // not a majority worth snapping to.
-        && r.nearUses >= 4
-        && r.nearUses >= r.uses * 3
+      .filter(
+        (r) =>
+          r.value !== r.near &&
+          Math.abs(r.value - r.near) <= scaleWindow(r.near) &&
+          // The reference has to be genuinely established, or "off the page's own
+          // scale" is claiming a scale that does not exist: 2 uses vs 3 uses is
+          // not a majority worth snapping to.
+          r.nearUses >= 4 &&
+          r.nearUses >= r.uses * 3,
       )
       .sort((a, b) => Math.abs(a.value - a.near) - Math.abs(b.value - b.near))
       .slice(0, 5);
@@ -573,11 +591,14 @@ export function judgeDesignPolicy(
         kind: "scale-outlier",
         severity: "info",
         message:
-          `${worst.length} spacing value(s) sit just off the page's own scale: `
-          + worst.map((w) =>
-            `${w.value}px (${w.uses}x) next to ${w.near}px (${w.nearUses}x) — ${w.sample.selector} ${w.sample.property}`
-          ).join("; ")
-          + `. Snap them to the established value or add them deliberately.`,
+          `${worst.length} spacing value(s) sit just off the page's own scale: ` +
+          worst
+            .map(
+              (w) =>
+                `${w.value}px (${w.uses}x) next to ${w.near}px (${w.nearUses}x) — ${w.sample.selector} ${w.sample.property}`,
+            )
+            .join("; ") +
+          `. Snap them to the established value or add them deliberately.`,
       });
     }
   }
@@ -599,15 +620,15 @@ export function judgeDesignPolicy(
       kind: "nothing-judged",
       severity: "info",
       message:
-        `No role had ${minInstances} or more instances, so the reuse check ran on nothing`
-        + ` and this verdict rests on no component evidence`
-        + ` (roles seen: ${roles.map((r) => `${r.role} (${r.instances})`).join(", ")}).`
-        + (byAllow.length > 0
-          ? ` --allow took ${byAllow.map((r) => r.role).join(", ")} under the floor, so a real`
-            + ` drift there would not be reported.`
-          : "")
-        + ` To judge them: --min-instances 2 --min-reuse 2 — both, because a 2-instance role`
-        + ` cannot reach ${minReuse}x.`,
+        `No role had ${minInstances} or more instances, so the reuse check ran on nothing` +
+        ` and this verdict rests on no component evidence` +
+        ` (roles seen: ${roles.map((r) => `${r.role} (${r.instances})`).join(", ")}).` +
+        (byAllow.length > 0
+          ? ` --allow took ${byAllow.map((r) => r.role).join(", ")} under the floor, so a real` +
+            ` drift there would not be reported.`
+          : "") +
+        ` To judge them: --min-instances 2 --min-reuse 2 — both, because a 2-instance role` +
+        ` cannot reach ${minReuse}x.`,
     });
   }
 

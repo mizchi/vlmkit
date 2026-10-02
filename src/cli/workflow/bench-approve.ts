@@ -54,13 +54,17 @@ async function main() {
 
   if (ALL_APPROVE) {
     approvedRules.push(...suggestions.rules);
-    historyEntries.push(...suggestions.rules.map((rule) => buildApprovalHistoryEntry({
-      actor: ACTOR,
-      action: "approve",
-      sourcePath: INPUT_PATH,
-      outputPath: OUTPUT_PATH,
-      finalRule: rule,
-    })));
+    historyEntries.push(
+      ...suggestions.rules.map((rule) =>
+        buildApprovalHistoryEntry({
+          actor: ACTOR,
+          action: "approve",
+          sourcePath: INPUT_PATH,
+          outputPath: OUTPUT_PATH,
+          finalRule: rule,
+        }),
+      ),
+    );
   } else {
     const rl = readline.createInterface({ input, output });
     try {
@@ -75,38 +79,44 @@ async function main() {
         const decision = await promptDecision(rl);
         if (decision === "reject") {
           rejected++;
-          historyEntries.push(buildApprovalHistoryEntry({
-            actor: ACTOR,
-            action: "reject",
-            sourcePath: INPUT_PATH,
-            outputPath: OUTPUT_PATH,
-            finalRule: rule,
-          }));
+          historyEntries.push(
+            buildApprovalHistoryEntry({
+              actor: ACTOR,
+              action: "reject",
+              sourcePath: INPUT_PATH,
+              outputPath: OUTPUT_PATH,
+              finalRule: rule,
+            }),
+          );
           console.log(`  ${RED}rejected${RESET}\n`);
           continue;
         }
         if (decision === "skip") {
           skipped++;
-          historyEntries.push(buildApprovalHistoryEntry({
-            actor: ACTOR,
-            action: "skip",
-            sourcePath: INPUT_PATH,
-            outputPath: OUTPUT_PATH,
-            finalRule: rule,
-          }));
+          historyEntries.push(
+            buildApprovalHistoryEntry({
+              actor: ACTOR,
+              action: "skip",
+              sourcePath: INPUT_PATH,
+              outputPath: OUTPUT_PATH,
+              finalRule: rule,
+            }),
+          );
           console.log(`  ${YELLOW}skipped${RESET}\n`);
           continue;
         }
 
         const approved = await promptApprovedRule(rl, rule);
         approvedRules.push(approved);
-        historyEntries.push(buildApprovalHistoryEntry({
-          actor: ACTOR,
-          action: "approve",
-          sourcePath: INPUT_PATH,
-          outputPath: OUTPUT_PATH,
-          finalRule: approved,
-        }));
+        historyEntries.push(
+          buildApprovalHistoryEntry({
+            actor: ACTOR,
+            action: "approve",
+            sourcePath: INPUT_PATH,
+            outputPath: OUTPUT_PATH,
+            finalRule: approved,
+          }),
+        );
         console.log(`  ${GREEN}approved${RESET}\n`);
       }
     } finally {
@@ -155,10 +165,7 @@ async function promptDecision(rl: readline.Interface): Promise<"approve" | "reje
   }
 }
 
-async function promptApprovedRule(
-  rl: readline.Interface,
-  rule: ApprovalRule,
-): Promise<ApprovalRule> {
+async function promptApprovedRule(rl: readline.Interface, rule: ApprovalRule): Promise<ApprovalRule> {
   const reason = await promptDefault(rl, "  Reason", rule.reason);
   const issue = await promptDefault(rl, "  Issue (optional)", rule.issue ?? "");
   const expires = await promptDefault(rl, "  Expires (optional)", rule.expires ?? "");
@@ -176,12 +183,7 @@ async function promptDefault(rl: readline.Interface, label: string, current: str
 }
 
 function formatRule(rule: ApprovalRule): string {
-  const parts = [
-    rule.selector,
-    `{ ${rule.property ?? "*"} }`,
-    rule.category,
-    rule.changeType,
-  ].filter(Boolean);
+  const parts = [rule.selector, `{ ${rule.property ?? "*"} }`, rule.category, rule.changeType].filter(Boolean);
   return parts.join(" ");
 }
 

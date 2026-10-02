@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
 import { chromium } from "playwright";
-import {
-  blendColor,
-  contrastRatio,
-  parseColor,
-  type Rgb,
-  type Rgba,
-} from "@mizchi/vlmkit-judge/color.ts";
+import { blendColor, contrastRatio, parseColor, type Rgb, type Rgba } from "@mizchi/vlmkit-judge/color.ts";
 import { sceneContrastCandidates, sceneToColorRolesInput, type SceneElement } from "@mizchi/vlmkit-judge/scene.ts";
 import { judgeColorRoles, type ColorRolesInput } from "@mizchi/vlmkit-judge/color-roles.ts";
 import { COLLECT_COLOR_ROLES } from "./style/color-roles.ts";
@@ -110,16 +104,26 @@ describe("text contrast: DOM collector vs scene adapter on one page", () => {
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
       await tab.setContent(HTML);
-      const { samples } = await tab.evaluate(COLLECT_TEXT_CONTRAST) as { samples: TextContrastSample[] };
+      const { samples } = (await tab.evaluate(COLLECT_TEXT_CONTRAST)) as { samples: TextContrastSample[] };
       // The page ships facts only; the ratio is never computed in the browser.
       assert.ok(samples.length > 0 && samples.every((sample) => !("ratio" in sample)), JSON.stringify(samples[0]));
       const dom = textContrastCandidates(samples);
-      const scene = await tab.evaluate(COLLECT_SCENE) as SceneElement[];
+      const scene = (await tab.evaluate(COLLECT_SCENE)) as SceneElement[];
       const byPath = new Map(scene.map((e) => [e.path, e]));
-      const fromScene = sceneContrastCandidates(scene.filter((e) => e.color !== undefined), byPath, 800);
+      const fromScene = sceneContrastCandidates(
+        scene.filter((e) => e.color !== undefined),
+        byPath,
+        800,
+      );
 
       const key = (c: ContrastCandidate) => ({
-        text: c.text, ratio: c.ratio, fg: c.fg, bg: c.bg, floor: c.floor, large: c.large, fontSizePx: c.fontSizePx,
+        text: c.text,
+        ratio: c.ratio,
+        fg: c.fg,
+        bg: c.bg,
+        floor: c.floor,
+        large: c.large,
+        fontSizePx: c.fontSizePx,
       });
       const sort = (list: ContrastCandidate[]) => list.map(key).sort((a, b) => a.text.localeCompare(b.text));
       assert.ok(dom.candidates.length >= 5, `fixture should produce candidates, got ${JSON.stringify(dom.candidates)}`);
@@ -191,12 +195,29 @@ describe("check color: DOM collector vs scene adapter on one page", () => {
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
       await tab.setContent(COLOR_HTML);
-      const dom = judgeColorRoles(await tab.evaluate(COLLECT_COLOR_ROLES) as ColorRolesInput);
-      const elements = await tab.evaluate(COLLECT_COLOR_SCENE) as SceneElement[];
+      const dom = judgeColorRoles((await tab.evaluate(COLLECT_COLOR_ROLES)) as ColorRolesInput);
+      const elements = (await tab.evaluate(COLLECT_COLOR_SCENE)) as SceneElement[];
       const scene = judgeColorRoles(sceneToColorRolesInput(elements, { width: 800, height: 600 }));
 
-      const controls = (r: typeof dom) => r.controls.map((c) => ({ onHex: c.onHex, fillHex: c.fillHex, fillRatio: c.fillRatio, borderHex: c.borderHex, borderRatio: c.borderRatio, best: c.best, hasShadow: c.hasShadow }));
-      const links = (r: typeof dom) => r.links.map((l) => ({ linkHex: l.linkHex, bodyHex: l.bodyHex, vsBody: l.vsBody, underlined: l.underlined, sameInk: l.sameInk, proseChars: l.proseChars }));
+      const controls = (r: typeof dom) =>
+        r.controls.map((c) => ({
+          onHex: c.onHex,
+          fillHex: c.fillHex,
+          fillRatio: c.fillRatio,
+          borderHex: c.borderHex,
+          borderRatio: c.borderRatio,
+          best: c.best,
+          hasShadow: c.hasShadow,
+        }));
+      const links = (r: typeof dom) =>
+        r.links.map((l) => ({
+          linkHex: l.linkHex,
+          bodyHex: l.bodyHex,
+          vsBody: l.vsBody,
+          underlined: l.underlined,
+          sameInk: l.sameInk,
+          proseChars: l.proseChars,
+        }));
       assert.equal(dom.controls.length, 4);
       assert.equal(dom.links.length, 3);
       assert.deepEqual(controls(scene), controls(dom));

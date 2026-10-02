@@ -1,12 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
-import type {
-  PlaywrightReport,
-  TestSuite,
-  TestSpec,
-  VrtSnapshot,
-  Attachment,
-} from "@mizchi/vlmkit-core/types.ts";
+import type { PlaywrightReport, TestSuite, TestSpec, VrtSnapshot, Attachment } from "@mizchi/vlmkit-core/types.ts";
 
 export interface AnalyzedReport {
   snapshots: VrtSnapshot[];
@@ -34,9 +28,7 @@ export interface ReportStats {
 /**
  * Playwright JSON レポートを読み込み、構造化された VRT データに変換する
  */
-export async function analyzeReport(
-  reportPath: string
-): Promise<AnalyzedReport> {
+export async function analyzeReport(reportPath: string): Promise<AnalyzedReport> {
   const raw = await readFile(reportPath, "utf-8");
   const report: PlaywrightReport = JSON.parse(raw);
 
@@ -83,8 +75,7 @@ export async function analyzeReport(
       // 各 attempt からスクリーンショットを抽出
       for (const attempt of test.results) {
         const screenshots = attempt.attachments.filter(
-          (a) =>
-            a.contentType === "image/png" && a.path && !a.name.includes("trace")
+          (a) => a.contentType === "image/png" && a.path && !a.name.includes("trace"),
         );
 
         for (const screenshot of screenshots) {
@@ -119,10 +110,7 @@ export async function analyzeReport(
  * test-results ディレクトリからスクリーンショットファイルを収集し、
  * ベースラインとの対応関係を構築する
  */
-export async function collectScreenshots(
-  resultsDir: string,
-  baselineDir: string
-): Promise<VrtSnapshot[]> {
+export async function collectScreenshots(resultsDir: string, baselineDir: string): Promise<VrtSnapshot[]> {
   const snapshots: VrtSnapshot[] = [];
 
   async function walk(dir: string) {

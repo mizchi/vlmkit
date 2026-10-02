@@ -21,15 +21,15 @@ export interface ApprovalManifestListResponse {
 
 export type ApprovalOperationRequest =
   | {
-    action: "add";
-    rule: ApprovalRule;
-    dryRun?: boolean;
-  }
+      action: "add";
+      rule: ApprovalRule;
+      dryRun?: boolean;
+    }
   | {
-    action: "remove";
-    index: number;
-    dryRun?: boolean;
-  };
+      action: "remove";
+      index: number;
+      dryRun?: boolean;
+    };
 
 export interface ApprovalOperationResponse extends ApprovalManifestListResponse {
   action: ApprovalOperationAction;

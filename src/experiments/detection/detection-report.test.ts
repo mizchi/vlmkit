@@ -35,46 +35,48 @@ const viewport = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const record = (over: Partial<DetectionRecord> = {}): DetectionRecord => ({
-  runId: "2026-08-14T00:00:00.000Z",
-  fixture: "page",
-  backend: "chromium",
-  selector: ".hero",
-  property: "padding",
-  value: "32px",
-  category: "spacing",
-  selectorType: "class",
-  isInteractive: false,
-  mediaCondition: null,
-  viewports: [viewport({ visualDiffDetected: true, visualDiffRatio: 0.04 })],
-  detected: true,
-  undetectedReason: null,
-  ...over,
-} as DetectionRecord);
+const record = (over: Partial<DetectionRecord> = {}): DetectionRecord =>
+  ({
+    runId: "2026-08-14T00:00:00.000Z",
+    fixture: "page",
+    backend: "chromium",
+    selector: ".hero",
+    property: "padding",
+    value: "32px",
+    category: "spacing",
+    selectorType: "class",
+    isInteractive: false,
+    mediaCondition: null,
+    viewports: [viewport({ visualDiffDetected: true, visualDiffRatio: 0.04 })],
+    detected: true,
+    undetectedReason: null,
+    ...over,
+  }) as DetectionRecord;
 
-const history = (over: Partial<BenchHistoryRecord> = {}): BenchHistoryRecord => ({
-  runId: "2026-08-14T00:00:00.000Z",
-  fixture: "page",
-  backend: "chromium",
-  trials: 10,
-  startSeed: 1,
-  elapsedMs: 12_000,
-  avgMsPerTrial: 1_200,
-  llmEnabled: false,
-  strict: false,
-  suggestApproval: false,
-  visualDetected: 7,
-  computedDetected: 9,
-  hoverDetected: 1,
-  paintTreeDetected: 2,
-  a11yDetected: 3,
-  eitherDetected: 9,
-  neitherDetected: 1,
-  detectionRate: 0.9,
-  metadataOnly: null,
-  prescanner: null,
-  ...over,
-} as BenchHistoryRecord);
+const history = (over: Partial<BenchHistoryRecord> = {}): BenchHistoryRecord =>
+  ({
+    runId: "2026-08-14T00:00:00.000Z",
+    fixture: "page",
+    backend: "chromium",
+    trials: 10,
+    startSeed: 1,
+    elapsedMs: 12_000,
+    avgMsPerTrial: 1_200,
+    llmEnabled: false,
+    strict: false,
+    suggestApproval: false,
+    visualDetected: 7,
+    computedDetected: 9,
+    hoverDetected: 1,
+    paintTreeDetected: 2,
+    a11yDetected: 3,
+    eitherDetected: 9,
+    neitherDetected: 1,
+    detectionRate: 0.9,
+    metadataOnly: null,
+    prescanner: null,
+    ...over,
+  }) as BenchHistoryRecord;
 
 function jsonl(name: string, rows: unknown[]): string {
   const file = join(dir, name);
@@ -86,9 +88,13 @@ function jsonl(name: string, rows: unknown[]): string {
 let lines: string[] = [];
 const realLog = console.log;
 beforeAll(() => {
-  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
 });
-afterAll(() => { console.log = realLog; });
+afterAll(() => {
+  console.log = realLog;
+});
 
 const output = () => lines.join("\n").replace(/\[[0-9;]*m/g, "");
 
@@ -104,7 +110,13 @@ describe("runDetectionReport", () => {
     await runDetectionReport({
       dbPath: jsonl("some.jsonl", [
         record(),
-        record({ selector: ".card", property: "border-radius", detected: false, undetectedReason: "hover-only", viewports: [viewport()] }),
+        record({
+          selector: ".card",
+          property: "border-radius",
+          detected: false,
+          undetectedReason: "hover-only",
+          viewports: [viewport()],
+        }),
         record({ fixture: "dashboard", selector: "nav a", property: "color" }),
       ]),
       historyPath: jsonl("some-h.jsonl", [history()]),
@@ -125,7 +137,10 @@ describe("runDetectionReport", () => {
     lines = [];
     await runDetectionReport({
       dbPath: jsonl("none.jsonl", []),
-      historyPath: jsonl("hist-only.jsonl", [history(), history({ runId: "2026-08-14T01:00:00.000Z", detectionRate: 0.95 })]),
+      historyPath: jsonl("hist-only.jsonl", [
+        history(),
+        history({ runId: "2026-08-14T01:00:00.000Z", detectionRate: 0.95 }),
+      ]),
     });
     const text = output();
     assert.doesNotMatch(text, /No data found/);

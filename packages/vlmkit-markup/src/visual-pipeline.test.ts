@@ -18,9 +18,20 @@ import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "visual-test");
 
 // PNG 生成ヘルパ: 単色矩形を描く
-function createTestPng(width: number, height: number, regions: Array<{
-  x: number; y: number; w: number; h: number; r: number; g: number; b: number;
-}>, bgColor = { r: 255, g: 255, b: 255 }): { width: number; height: number; data: Uint8Array } {
+function createTestPng(
+  width: number,
+  height: number,
+  regions: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    r: number;
+    g: number;
+    b: number;
+  }>,
+  bgColor = { r: 255, g: 255, b: 255 },
+): { width: number; height: number; data: Uint8Array } {
   const data = new Uint8Array(width * height * 4);
   // 背景色
   for (let i = 0; i < width * height; i++) {
@@ -60,13 +71,9 @@ afterAll(async () => {
 describe("Visual pipeline: real PNG diff", () => {
   it("should detect color change in a button region", async () => {
     // Baseline: 白背景 + 青いボタン領域
-    const baseline = createTestPng(200, 100, [
-      { x: 50, y: 30, w: 100, h: 40, r: 0, g: 100, b: 255 },
-    ]);
+    const baseline = createTestPng(200, 100, [{ x: 50, y: 30, w: 100, h: 40, r: 0, g: 100, b: 255 }]);
     // Current: 白背景 + 緑のボタン領域 (色変更)
-    const current = createTestPng(200, 100, [
-      { x: 50, y: 30, w: 100, h: 40, r: 0, g: 200, b: 50 },
-    ]);
+    const current = createTestPng(200, 100, [{ x: 50, y: 30, w: 100, h: 40, r: 0, g: 200, b: 50 }]);
 
     const baselinePath = join(TMP, "button-blue.png");
     const currentPath = join(TMP, "button-green.png");
@@ -96,13 +103,9 @@ describe("Visual pipeline: real PNG diff", () => {
 
   it("should detect layout shift (element moved)", async () => {
     // Baseline: ボタンが左にある
-    const baseline = createTestPng(300, 100, [
-      { x: 10, y: 30, w: 80, h: 40, r: 50, g: 50, b: 200 },
-    ]);
+    const baseline = createTestPng(300, 100, [{ x: 10, y: 30, w: 80, h: 40, r: 50, g: 50, b: 200 }]);
     // Current: ボタンが右に移動
-    const current = createTestPng(300, 100, [
-      { x: 210, y: 30, w: 80, h: 40, r: 50, g: 50, b: 200 },
-    ]);
+    const current = createTestPng(300, 100, [{ x: 210, y: 30, w: 80, h: 40, r: 50, g: 50, b: 200 }]);
 
     const baselinePath = join(TMP, "layout-before.png");
     const currentPath = join(TMP, "layout-after.png");
@@ -125,9 +128,7 @@ describe("Visual pipeline: real PNG diff", () => {
   });
 
   it("should detect no diff for identical images", async () => {
-    const img = createTestPng(100, 100, [
-      { x: 10, y: 10, w: 80, h: 80, r: 100, g: 150, b: 200 },
-    ]);
+    const img = createTestPng(100, 100, [{ x: 10, y: 10, w: 80, h: 80, r: 100, g: 150, b: 200 }]);
 
     const path1 = join(TMP, "identical-a.png");
     const path2 = join(TMP, "identical-b.png");
@@ -175,13 +176,9 @@ describe("Visual pipeline: real PNG diff", () => {
 
   it("should detect text-like region change", async () => {
     // Baseline: 横長のテキスト領域
-    const baseline = createTestPng(400, 100, [
-      { x: 20, y: 40, w: 360, h: 16, r: 0, g: 0, b: 0 },
-    ]);
+    const baseline = createTestPng(400, 100, [{ x: 20, y: 40, w: 360, h: 16, r: 0, g: 0, b: 0 }]);
     // Current: テキストが変わった (微妙に異なるピクセル)
-    const current = createTestPng(400, 100, [
-      { x: 20, y: 40, w: 300, h: 16, r: 0, g: 0, b: 0 },
-    ]);
+    const current = createTestPng(400, 100, [{ x: 20, y: 40, w: 300, h: 16, r: 0, g: 0, b: 0 }]);
 
     const baselinePath = join(TMP, "text-before.png");
     const currentPath = join(TMP, "text-after.png");
@@ -207,12 +204,8 @@ describe("Visual pipeline: real PNG diff", () => {
   });
 
   it("should generate heatmap file", async () => {
-    const baseline = createTestPng(100, 100, [
-      { x: 10, y: 10, w: 30, h: 30, r: 255, g: 0, b: 0 },
-    ]);
-    const current = createTestPng(100, 100, [
-      { x: 10, y: 10, w: 30, h: 30, r: 0, g: 0, b: 255 },
-    ]);
+    const baseline = createTestPng(100, 100, [{ x: 10, y: 10, w: 30, h: 30, r: 255, g: 0, b: 0 }]);
+    const current = createTestPng(100, 100, [{ x: 10, y: 10, w: 30, h: 30, r: 0, g: 0, b: 255 }]);
 
     const baselinePath = join(TMP, "heatmap-base.png");
     const currentPath = join(TMP, "heatmap-curr.png");

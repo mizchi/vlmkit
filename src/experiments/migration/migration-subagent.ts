@@ -60,9 +60,7 @@ export interface MigrationSubagentThresholdOptions {
   minImprovementRate?: number;
 }
 
-export function selectMigrationFixTargetsByVariant(
-  report: MigrationCompareReport,
-): SelectedMigrationFixTarget[] {
+export function selectMigrationFixTargetsByVariant(report: MigrationCompareReport): SelectedMigrationFixTarget[] {
   return [...new Set(report.results.map((result) => result.variant))]
     .map((variant) => selectMigrationFixTarget(report, { variant }))
     .filter((target): target is SelectedMigrationFixTarget => target !== null);
@@ -104,10 +102,12 @@ export function summarizeMigrationSubagentEvaluation(
   const beforeVariants = new Map(beforeConvergence.variants.map((variant) => [variant.variant, variant]));
   const afterVariants = new Map(afterConvergence.variants.map((variant) => [variant.variant, variant]));
 
-  const variants = [...new Set([
-    ...beforeReport.results.map((result) => result.variant),
-    ...afterReport.results.map((result) => result.variant),
-  ])]
+  const variants = [
+    ...new Set([
+      ...beforeReport.results.map((result) => result.variant),
+      ...afterReport.results.map((result) => result.variant),
+    ]),
+  ]
     .sort((a, b) => a.localeCompare(b))
     .map((variant) => {
       const beforeVariant = beforeVariants.get(variant);
@@ -117,9 +117,8 @@ export function summarizeMigrationSubagentEvaluation(
       const beforeRemainingResults = beforeVariant?.remainingResults ?? 0;
       const afterRemainingResults = afterVariant?.remainingResults ?? 0;
       const resolved = (afterVariant?.status ?? "remaining") !== "remaining";
-      const improved = resolved
-        || afterRemainingResults < beforeRemainingResults
-        || afterWorstDiffRatio < beforeWorstDiffRatio;
+      const improved =
+        resolved || afterRemainingResults < beforeRemainingResults || afterWorstDiffRatio < beforeWorstDiffRatio;
 
       return {
         variant,
@@ -200,7 +199,9 @@ export function formatMigrationSubagentEvaluationMarkdown(
     const beforePct = `${(variant.beforeWorstDiffRatio * 100).toFixed(2)}%`;
     const afterPct = `${(variant.afterWorstDiffRatio * 100).toFixed(2)}%`;
     const result = variant.resolved ? "resolved" : variant.improved ? "improved" : "unchanged";
-    lines.push(`| ${variant.variant} | ${variant.beforeStatus} | ${variant.afterStatus} | ${beforePct} → ${afterPct} | ${result} |`);
+    lines.push(
+      `| ${variant.variant} | ${variant.beforeStatus} | ${variant.afterStatus} | ${beforePct} → ${afterPct} | ${result} |`,
+    );
   }
 
   return lines.join("\n");
@@ -259,29 +260,36 @@ async function runPrepare(args: string[]) {
     const variantHtml = await readFile(variantPath, "utf-8");
     const currentCss = extractCss(variantHtml);
     if (!currentCss) continue;
-    tasks.push(buildMigrationSubagentTask({
-      baselineFile,
-      variantFile: basename(variantPath),
-      currentCss,
-      target,
-    }));
+    tasks.push(
+      buildMigrationSubagentTask({
+        baselineFile,
+        variantFile: basename(variantPath),
+        currentCss,
+        target,
+      }),
+    );
   }
 
-  const output = format === "json"
-    ? JSON.stringify({ tasks }, null, 2)
-    : tasks.map((task, index) => [
-        `# Task ${index + 1}: ${task.variant} @ ${task.viewport}`,
-        "",
-        `- Variant file: \`${task.variantFile}\``,
-        `- Baseline file: \`${task.baselineFile}\``,
-        `- Diff: ${(task.diffRatio * 100).toFixed(2)}% (${task.diffPixels} px)`,
-        `- Category: ${task.categorySummary}`,
-        `- Paint tree: ${task.paintTreeSummary}`,
-        "",
-        "```text",
-        task.prompt,
-        "```",
-      ].join("\n")).join("\n\n");
+  const output =
+    format === "json"
+      ? JSON.stringify({ tasks }, null, 2)
+      : tasks
+          .map((task, index) =>
+            [
+              `# Task ${index + 1}: ${task.variant} @ ${task.viewport}`,
+              "",
+              `- Variant file: \`${task.variantFile}\``,
+              `- Baseline file: \`${task.baselineFile}\``,
+              `- Diff: ${(task.diffRatio * 100).toFixed(2)}% (${task.diffPixels} px)`,
+              `- Category: ${task.categorySummary}`,
+              `- Paint tree: ${task.paintTreeSummary}`,
+              "",
+              "```text",
+              task.prompt,
+              "```",
+            ].join("\n"),
+          )
+          .join("\n\n");
 
   if (outputPath) {
     const resolvedOutput = resolve(outputPath);
@@ -311,14 +319,15 @@ async function runEvaluate(args: string[]) {
     minImprovementRate,
   });
 
-  const output = format === "json"
-    ? JSON.stringify({ summary, exitStatus }, null, 2)
-    : [
-        formatMigrationSubagentEvaluationMarkdown(summary, { beforeReportPath, afterReportPath }),
-        exitStatus.reasons.length > 0
-          ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
-          : "",
-      ].join("\n");
+  const output =
+    format === "json"
+      ? JSON.stringify({ summary, exitStatus }, null, 2)
+      : [
+          formatMigrationSubagentEvaluationMarkdown(summary, { beforeReportPath, afterReportPath }),
+          exitStatus.reasons.length > 0
+            ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
+            : "",
+        ].join("\n");
 
   if (outputPath) {
     const resolvedOutput = resolve(outputPath);

@@ -87,13 +87,14 @@ test("`@playwright/test` is optional, and only the root declares it", () => {
   // And no runtime source actually imports it. `markup-loop.ts` mentions the
   // specifier inside a template literal it emits; that is not an import, so the
   // check anchors on a real import statement.
-  const sources = execFileSync(
-    "git",
-    ["ls-files", "src/**/*.ts", "packages/*/src/**/*.ts"],
-    { cwd: ROOT, encoding: "utf8" },
-  ).split("\n").filter((f) => f && !f.includes(".test."));
+  const sources = execFileSync("git", ["ls-files", "src/**/*.ts", "packages/*/src/**/*.ts"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter((f) => f && !f.includes(".test."));
   const offenders = sources.filter((file) =>
-    /^\s*import\s[^\n]*from\s+["']@playwright\/test["']/m.test(readFileSync(resolve(ROOT, file), "utf8"))
+    /^\s*import\s[^\n]*from\s+["']@playwright\/test["']/m.test(readFileSync(resolve(ROOT, file), "utf8")),
   );
   assert.deepEqual(offenders, [], `optional peer imported at runtime by: ${offenders.join(", ")}`);
 });
@@ -113,10 +114,7 @@ test("the published bin entry routes failures through handleCliError", () => {
   // Both entries must agree; `vite.config.ts` must still point `bin` here.
   const tsdown = readFileSync(resolve(ROOT, "vite.config.ts"), "utf8");
   assert.match(tsdown, /vlmkit: "scripts\/vlmkit-bundled\.mjs"/);
-  assert.match(
-    readFileSync(resolve(ROOT, "src/cli/vlmkit.ts"), "utf8"),
-    /runCli\(\)\.catch\(handleCliError\);/,
-  );
+  assert.match(readFileSync(resolve(ROOT, "src/cli/vlmkit.ts"), "utf8"), /runCli\(\)\.catch\(handleCliError\);/);
 });
 
 test("PLAYWRIGHT_PEER_RANGE quotes the range the manifests declare", () => {

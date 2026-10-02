@@ -37,7 +37,9 @@ Options:
 
 async function main(argv = process.argv.slice(2)) {
   const help = argv.includes("--help") || argv.includes("-h");
-  const positional = argv.filter((arg, i) => !arg.startsWith("-") && argv[i - 1] !== "--max" && argv[i - 1] !== "--viewport");
+  const positional = argv.filter(
+    (arg, i) => !arg.startsWith("-") && argv[i - 1] !== "--max" && argv[i - 1] !== "--viewport",
+  );
   if (help || positional.length < 2) {
     printHelp();
     if (positional.length < 2 && !help) process.exit(1);
@@ -60,7 +62,10 @@ async function main(argv = process.argv.slice(2)) {
     // which is the opposite of useful when healing a selector that broke.
     await settlePage(page);
 
-    const alreadyMatches = await page.locator(brokenSelector).count().catch(() => 0);
+    const alreadyMatches = await page
+      .locator(brokenSelector)
+      .count()
+      .catch(() => 0);
     const candidates = await healSelector(page, brokenSelector, { maxCandidates });
 
     if (json) {
@@ -68,7 +73,9 @@ async function main(argv = process.argv.slice(2)) {
       return;
     }
     if (alreadyMatches > 0) {
-      console.log(`Note: "${brokenSelector}" currently matches ${alreadyMatches} element(s) — candidates below are alternatives.\n`);
+      console.log(
+        `Note: "${brokenSelector}" currently matches ${alreadyMatches} element(s) — candidates below are alternatives.\n`,
+      );
     }
     if (candidates.length === 0) {
       console.log(`No replacement candidates found for "${brokenSelector}".`);
@@ -86,8 +93,9 @@ async function main(argv = process.argv.slice(2)) {
   });
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "selector-heal-cli"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "selector-heal-cli" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

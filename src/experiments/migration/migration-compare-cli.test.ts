@@ -2,24 +2,30 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { describe, it } from "vite-plus/test";
 import { DEFAULT_BIDI_URL } from "@mizchi/vlmkit-capture/crater-client.ts";
-import {
-  parseMigrationCompareArgs,
-  summarizeMigrationRegionDiffOutput,
-} from "./migration-compare.ts";
+import { parseMigrationCompareArgs, summarizeMigrationRegionDiffOutput } from "./migration-compare.ts";
 
 describe("parseMigrationCompareArgs", () => {
   it("should parse explicit flags into reusable options", () => {
     const options = parseMigrationCompareArgs([
-      "--dir", "fixtures/migration/reset-css",
-      "--baseline", "normalize.html",
-      "--variants", "modern-normalize.html", "destyle.html",
-      "--output-dir", "artifacts/migration-report",
-      "--approval", "approval.json",
+      "--dir",
+      "fixtures/migration/reset-css",
+      "--baseline",
+      "normalize.html",
+      "--variants",
+      "modern-normalize.html",
+      "destyle.html",
+      "--output-dir",
+      "artifacts/migration-report",
+      "--approval",
+      "approval.json",
       "--strict",
       "--no-discover",
-      "--max-viewports", "7",
-      "--random-samples", "2",
-      "--paint-tree-url", "ws://127.0.0.1:9333",
+      "--max-viewports",
+      "7",
+      "--random-samples",
+      "2",
+      "--paint-tree-url",
+      "ws://127.0.0.1:9333",
       "--no-paint-tree",
     ]);
 
@@ -54,22 +60,14 @@ describe("parseMigrationCompareArgs", () => {
   });
 
   it("should parse explicit discover backend", () => {
-    const options = parseMigrationCompareArgs([
-      "--discover-backend", "crater",
-      "before.html",
-      "after.html",
-    ]);
+    const options = parseMigrationCompareArgs(["--discover-backend", "crater", "before.html", "after.html"]);
 
     assert.equal(options.discoverBackend, "crater");
   });
 
   it("should reject unsupported discover backend", () => {
     assert.throws(
-      () => parseMigrationCompareArgs([
-        "--discover-backend", "unsupported",
-        "before.html",
-        "after.html",
-      ]),
+      () => parseMigrationCompareArgs(["--discover-backend", "unsupported", "before.html", "after.html"]),
       /invalid --discover-backend/i,
     );
   });
@@ -77,18 +75,16 @@ describe("parseMigrationCompareArgs", () => {
   it("should accept --output as alias for --output-dir", () => {
     // Agents typed `--output` first; the typo'd flag was silently swallowed
     // and reports always landed at the default location. See #22.
-    const options = parseMigrationCompareArgs([
-      "--output", "/tmp/agent-output",
-      "before.html",
-      "after.html",
-    ]);
+    const options = parseMigrationCompareArgs(["--output", "/tmp/agent-output", "before.html", "after.html"]);
     assert.equal(options.outputDir, resolve("/tmp/agent-output"));
   });
 
   it("should prefer --output-dir over --output when both passed", () => {
     const options = parseMigrationCompareArgs([
-      "--output", "/tmp/alias",
-      "--output-dir", "/tmp/explicit",
+      "--output",
+      "/tmp/alias",
+      "--output-dir",
+      "/tmp/explicit",
       "before.html",
       "after.html",
     ]);
@@ -120,21 +116,21 @@ describe("parseMigrationCompareArgs", () => {
     const def = parseMigrationCompareArgs(["before.html", "after.html"]);
     assert.equal(def.triptych, true);
 
-    const optOut = parseMigrationCompareArgs([
-      "--no-triptych",
-      "before.html",
-      "after.html",
-    ]);
+    const optOut = parseMigrationCompareArgs(["--no-triptych", "before.html", "after.html"]);
     assert.equal(optOut.triptych, false);
   });
 
   it("should parse optional VLM region diff handoff flags", () => {
     const options = parseMigrationCompareArgs([
       "--region-diff",
-      "--region-diff-format", "markdown",
-      "--region-diff-model", "anthropic/custom",
-      "--region-diff-max-tokens", "900",
-      "--region-diff-max-viewports", "2",
+      "--region-diff-format",
+      "markdown",
+      "--region-diff-model",
+      "anthropic/custom",
+      "--region-diff-max-tokens",
+      "900",
+      "--region-diff-max-viewports",
+      "2",
       "before.html",
       "after.html",
     ]);
@@ -148,11 +144,7 @@ describe("parseMigrationCompareArgs", () => {
 
   it("should reject invalid VLM region diff formats", () => {
     assert.throws(
-      () => parseMigrationCompareArgs([
-        "--region-diff-format", "xml",
-        "before.html",
-        "after.html",
-      ]),
+      () => parseMigrationCompareArgs(["--region-diff-format", "xml", "before.html", "after.html"]),
       /invalid --region-diff-format/i,
     );
   });

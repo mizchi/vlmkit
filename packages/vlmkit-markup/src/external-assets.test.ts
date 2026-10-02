@@ -43,8 +43,10 @@ const EXTERNAL = join(FIXTURE_DIR, "page.html");
 /** Same document, CSS moved from the external file into a `<style>` block. */
 const inlinedTwin = (): string => {
   const css = readFileSync(join(FIXTURE_DIR, "style.css"), "utf-8");
-  const html = readFileSync(EXTERNAL, "utf-8")
-    .replace('<link rel="stylesheet" href="style.css">', `<style>\n${css}\n</style>`);
+  const html = readFileSync(EXTERNAL, "utf-8").replace(
+    '<link rel="stylesheet" href="style.css">',
+    `<style>\n${css}\n</style>`,
+  );
   const dir = mkdtempSync(join(tmpdir(), "inlined-twin-"));
   const file = join(dir, "page.html");
   writeFileSync(file, html);
@@ -82,8 +84,12 @@ describe("gates resolve a file's relative assets", () => {
       `expected the CSS-sized tap target, got ${JSON.stringify(measured(external).map((f) => f.path))}`,
     );
     assert.deepEqual(
-      measured(external).map((f) => `${f.path}:${f.minSide}`).sort(),
-      measured(inlined).map((f) => `${f.path}:${f.minSide}`).sort(),
+      measured(external)
+        .map((f) => `${f.path}:${f.minSide}`)
+        .sort(),
+      measured(inlined)
+        .map((f) => `${f.path}:${f.minSide}`)
+        .sort(),
     );
   });
 

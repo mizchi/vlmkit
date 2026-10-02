@@ -60,7 +60,14 @@ and horizontal overflow at boundary widths.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
     {
       name: "breakpoints",
       placeholder: "list",

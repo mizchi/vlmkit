@@ -19,9 +19,7 @@ export interface NlAssertReviewResult {
   evidence?: string[];
 }
 
-export type NlAssertReviewer = (
-  request: NlAssertReviewRequest,
-) => MaybePromise<NlAssertReviewResult>;
+export type NlAssertReviewer = (request: NlAssertReviewRequest) => MaybePromise<NlAssertReviewResult>;
 
 export interface NlAssertOptions {
   assertion: string;

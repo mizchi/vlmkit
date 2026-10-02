@@ -132,10 +132,23 @@ describe("bench-history round trip", () => {
     const dir = await mkdtemp(join(tmpdir(), "bench-history-"));
     const historyPath = join(dir, "bench-history.jsonl");
     try {
-      await appendBenchHistory([
-        makeRecord({ backend: "chromium" }),
-        makeRecord({ backend: "prescanner", prescanner: makePrescannerSummary({ total: 10, detected: 9, craterResolved: 4, chromiumFallbacks: 6, chromiumDetected: 5, passedAfterFallback: 1 }) }),
-      ], historyPath);
+      await appendBenchHistory(
+        [
+          makeRecord({ backend: "chromium" }),
+          makeRecord({
+            backend: "prescanner",
+            prescanner: makePrescannerSummary({
+              total: 10,
+              detected: 9,
+              craterResolved: 4,
+              chromiumFallbacks: 6,
+              chromiumDetected: 5,
+              passedAfterFallback: 1,
+            }),
+          }),
+        ],
+        historyPath,
+      );
 
       const loaded = await readBenchHistory(historyPath);
       assert.equal(loaded.length, 2);
@@ -165,7 +178,14 @@ describe("getBenchHistoryStats", () => {
         avgMsPerTrial: 375.8667,
         trials: 15,
         startSeed: 1,
-        prescanner: makePrescannerSummary({ total: 15, detected: 15, craterResolved: 7, chromiumFallbacks: 8, chromiumDetected: 8, passedAfterFallback: 0 }),
+        prescanner: makePrescannerSummary({
+          total: 15,
+          detected: 15,
+          craterResolved: 7,
+          chromiumFallbacks: 8,
+          chromiumDetected: 8,
+          passedAfterFallback: 0,
+        }),
       }),
       makeRecord({
         runId: "2026-04-02T00:00:00.000Z",
@@ -188,48 +208,51 @@ describe("getBenchHistoryStats", () => {
 
 describe("buildBenchDetectionSeries", () => {
   it("returns the latest filtered points in chronological order for charting", () => {
-    const series = buildBenchDetectionSeries([
-      makeRecord({
-        runId: "2026-04-03T00:00:00.000Z",
+    const series = buildBenchDetectionSeries(
+      [
+        makeRecord({
+          runId: "2026-04-03T00:00:00.000Z",
+          backend: "prescanner",
+          fixture: "page",
+          trials: 10,
+          eitherDetected: 7,
+          detectionRate: 0.7,
+          avgMsPerTrial: 410,
+        }),
+        makeRecord({
+          runId: "2026-04-01T00:00:00.000Z",
+          backend: "prescanner",
+          fixture: "page",
+          trials: 10,
+          eitherDetected: 6,
+          detectionRate: 0.6,
+          avgMsPerTrial: 430,
+        }),
+        makeRecord({
+          runId: "2026-04-02T00:00:00.000Z",
+          backend: "chromium",
+          fixture: "page",
+          trials: 10,
+          eitherDetected: 9,
+          detectionRate: 0.9,
+          avgMsPerTrial: 690,
+        }),
+        makeRecord({
+          runId: "2026-04-04T00:00:00.000Z",
+          backend: "prescanner",
+          fixture: "dashboard",
+          trials: 10,
+          eitherDetected: 8,
+          detectionRate: 0.8,
+          avgMsPerTrial: 390,
+        }),
+      ],
+      {
         backend: "prescanner",
         fixture: "page",
-        trials: 10,
-        eitherDetected: 7,
-        detectionRate: 0.7,
-        avgMsPerTrial: 410,
-      }),
-      makeRecord({
-        runId: "2026-04-01T00:00:00.000Z",
-        backend: "prescanner",
-        fixture: "page",
-        trials: 10,
-        eitherDetected: 6,
-        detectionRate: 0.6,
-        avgMsPerTrial: 430,
-      }),
-      makeRecord({
-        runId: "2026-04-02T00:00:00.000Z",
-        backend: "chromium",
-        fixture: "page",
-        trials: 10,
-        eitherDetected: 9,
-        detectionRate: 0.9,
-        avgMsPerTrial: 690,
-      }),
-      makeRecord({
-        runId: "2026-04-04T00:00:00.000Z",
-        backend: "prescanner",
-        fixture: "dashboard",
-        trials: 10,
-        eitherDetected: 8,
-        detectionRate: 0.8,
-        avgMsPerTrial: 390,
-      }),
-    ], {
-      backend: "prescanner",
-      fixture: "page",
-      limit: 1,
-    });
+        limit: 1,
+      },
+    );
 
     assert.equal(series.total, 2);
     assert.equal(series.points.length, 1);
@@ -240,19 +263,22 @@ describe("buildBenchDetectionSeries", () => {
   });
 
   it("keeps limited points ascending after selecting the newest records", () => {
-    const series = buildBenchDetectionSeries([
-      makeRecord({ runId: "2026-04-01T00:00:00.000Z", detectionRate: 0.5 }),
-      makeRecord({ runId: "2026-04-03T00:00:00.000Z", detectionRate: 0.7 }),
-      makeRecord({ runId: "2026-04-02T00:00:00.000Z", detectionRate: 0.6 }),
-    ], {
-      limit: 2,
-    });
+    const series = buildBenchDetectionSeries(
+      [
+        makeRecord({ runId: "2026-04-01T00:00:00.000Z", detectionRate: 0.5 }),
+        makeRecord({ runId: "2026-04-03T00:00:00.000Z", detectionRate: 0.7 }),
+        makeRecord({ runId: "2026-04-02T00:00:00.000Z", detectionRate: 0.6 }),
+      ],
+      {
+        limit: 2,
+      },
+    );
 
     assert.equal(series.total, 3);
-    assert.deepEqual(series.points.map((point) => point.runId), [
-      "2026-04-02T00:00:00.000Z",
-      "2026-04-03T00:00:00.000Z",
-    ]);
+    assert.deepEqual(
+      series.points.map((point) => point.runId),
+      ["2026-04-02T00:00:00.000Z", "2026-04-03T00:00:00.000Z"],
+    );
   });
 });
 

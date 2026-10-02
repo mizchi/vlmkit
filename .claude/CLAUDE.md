@@ -789,8 +789,13 @@ before changing it:
   `VP_PACKAGE_MANAGER=pnpm@10…` set. It also runs Oxfmt over every file it rewrites, which turned an
   import rename into 24,568 changed lines. The migration was redone by hand for that reason. Never
   run `vp migrate` on this repository to "update" Vite+: bump the versions instead.
-- **`vp lint` and `vp fmt` are configured but run nowhere** (no script, hook or CI job). The repository
-  has never been formatted by a tool, so the first `vp fmt` is a commit of its own.
+- **Formatting is enforced: run `pnpm fmt` before committing.** The `format` workflow runs `pnpm fmt:check`
+  (`vp fmt --check`) on every PR and fails on any file Oxfmt would change. The scope is TS/JS only.
+  `fmt.ignorePatterns` in vite.config.ts leaves out Markdown, JSON, HTML, CSS, YAML, the browser
+  scripts of the judged pages (`examples/sites/*/`, the landing page's `app/content/preferences/scenarios.js`,
+  solitaire's `game.js`) and `design-runs/`. Their bytes are compared elsewhere (fresh renders,
+  fixture copies, judgment rounds), so formatting them would turn a style change into a behaviour
+  change. `vp lint` is configured but not yet enforced.
 - **`clearMocks: false` and `deps.resolveDepSubpath: true` keep the Vitest 4 / tsdown 0.21 behaviour**, and
   the comment beside each says how to drop it. With them, `vp pack` emits the same files with the same
   exported names as tsdown 0.21 did. The JavaScript differs only by `/* @__PURE__ */` notes and constant

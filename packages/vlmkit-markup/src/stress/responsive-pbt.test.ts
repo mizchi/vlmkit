@@ -46,24 +46,37 @@ describe("fixtures/responsive-patterns: mutants", () => {
   it("are what build.mjs writes from the patterns", async () => {
     const { buildAll } = await import(join(FIXTURES, "build.mjs"));
     for (const { path, html } of buildAll() as { path: string; html: string }[]) {
-      assert.equal(readFileSync(path, "utf8"), html, `${path} is stale: run node fixtures/responsive-patterns/build.mjs`);
+      assert.equal(
+        readFileSync(path, "utf8"),
+        html,
+        `${path} is stale: run node fixtures/responsive-patterns/build.mjs`,
+      );
     }
   });
 
   for (const m of mutants) {
     it(`${m.id} reports ${m.expect.kind}${m.expect.anchor ? ` (${m.expect.anchor})` : ""}`, async () => {
       const report = await runResponsiveCheck(options(join(FIXTURES, "mutants", `${m.id}.html`), m.args));
-      const failure = report.failures.find((f) =>
-        f.kind === m.expect.kind
-        && (m.expect.anchor === undefined || f.shrunk?.anchor.kind === m.expect.anchor)
-        && (m.expect.lo === undefined || f.shrunk?.interval.lo === m.expect.lo)
-        && (m.expect.hi === undefined || f.shrunk?.interval.hi === m.expect.hi));
+      const failure = report.failures.find(
+        (f) =>
+          f.kind === m.expect.kind &&
+          (m.expect.anchor === undefined || f.shrunk?.anchor.kind === m.expect.anchor) &&
+          (m.expect.lo === undefined || f.shrunk?.interval.lo === m.expect.lo) &&
+          (m.expect.hi === undefined || f.shrunk?.interval.hi === m.expect.hi),
+      );
       assert.ok(failure, `expected ${JSON.stringify(m.expect)}; got:\n${summary(report)}`);
-      if (m.expect.needs) assert.ok(failure.shrunk?.needs.includes(m.expect.needs as never), `needs ${m.expect.needs}: ${JSON.stringify(failure.shrunk)}`);
+      if (m.expect.needs)
+        assert.ok(
+          failure.shrunk?.needs.includes(m.expect.needs as never),
+          `needs ${m.expect.needs}: ${JSON.stringify(failure.shrunk)}`,
+        );
       if (m.expect.causeProperty) {
         const wanted = [m.expect.causeProperty].flat();
         const primary = failure.cause?.declarations.map((d) => d.property) ?? [];
-        assert.ok(primary.some((p) => wanted.includes(p)), `cause ${JSON.stringify(primary)} not in ${JSON.stringify(wanted)}: ${failure.causeNote ?? ""}`);
+        assert.ok(
+          primary.some((p) => wanted.includes(p)),
+          `cause ${JSON.stringify(primary)} not in ${JSON.stringify(wanted)}: ${failure.causeNote ?? ""}`,
+        );
       }
       // A mutant anchored at a breakpoint gets its move tried; every such move on this set is sound.
       if (failure.shrunk?.move) assert.equal(failure.shrunk.move.verified, true, JSON.stringify(failure.shrunk.move));
@@ -78,7 +91,10 @@ describe("check responsive: replay and determinism", () => {
     const report = await runResponsiveCheck({ ...options(orphan), runs: 12 });
     const overflow = report.failures.find((f) => f.kind === "page-overflow-x");
     assert.deepEqual([overflow?.shrunk?.interval.lo, overflow?.shrunk?.interval.hi], [768, 768]);
-    assert.deepEqual(report.transitions.map((t) => t.width), [768, 769, 1100]);
+    assert.deepEqual(
+      report.transitions.map((t) => t.width),
+      [768, 769, 1100],
+    );
   });
 
   it("replays one case from a reproduce line without generating or shrinking", async () => {
@@ -95,7 +111,10 @@ describe("check responsive: replay and determinism", () => {
     const page = join(FIXTURES, "patterns", "sidebar-layout.html");
     const a = await runResponsiveCheck({ ...options(page, ["--seed", "7", "--runs", "15"]), noCause: true });
     const b = await runResponsiveCheck({ ...options(page, ["--seed", "7", "--runs", "15"]), noCause: true });
-    assert.deepEqual(a.regimes.map((r) => r.cases), b.regimes.map((r) => r.cases));
+    assert.deepEqual(
+      a.regimes.map((r) => r.cases),
+      b.regimes.map((r) => r.cases),
+    );
     assert.equal(a.cases, 15);
   });
 });
@@ -109,7 +128,17 @@ describe("check responsive as a library: a caller's own property", () => {
       kinds: ["toc-shown"],
       measure: async (page) => {
         const shown = await page.evaluate(() => getComputedStyle(document.querySelector(".toc")!).display !== "none");
-        return shown ? [{ kind: "toc-shown", severity: "warn", selector: "aside.toc", targets: ["aside.toc"], message: "the contents column is showing" }] : [];
+        return shown
+          ? [
+              {
+                kind: "toc-shown",
+                severity: "warn",
+                selector: "aside.toc",
+                targets: ["aside.toc"],
+                message: "the contents column is showing",
+              },
+            ]
+          : [];
       },
     };
     const report = await withBrowser(async (browser) => {
@@ -130,7 +159,16 @@ describe("check responsive as a library: a caller's own property", () => {
 
 describe("check responsive: argument parsing", () => {
   it("turns --width into a replay that pins the other dimensions given", () => {
-    const o = options("page.html", ["--width", "390", "--height", "700", "--text-scale", "1.5", "--color-scheme", "dark"]);
+    const o = options("page.html", [
+      "--width",
+      "390",
+      "--height",
+      "700",
+      "--text-scale",
+      "1.5",
+      "--color-scheme",
+      "dark",
+    ]);
     assert.deepEqual(o.replay, { width: 390, height: 700, textScale: 1.5, colorScheme: "dark" });
     assert.equal(o.textScale, undefined, "in a replay --text-scale is the case, not the ladder's top");
   });
@@ -147,7 +185,12 @@ describe("check responsive: argument parsing", () => {
 });
 
 function summary(report: ResponsiveReport): string {
-  return report.failures.map((f) =>
-    `  ${f.kind} ${f.selectors[0]} ${f.shrunk ? `${f.shrunk.interval.lo}-${f.shrunk.interval.hi} ${f.shrunk.anchor.kind}` : "(unshrunk)"} cause=${f.cause?.declarations.map((d) => d.property).join("+") ?? f.causeNote}`,
-  ).join("\n") || "  (no failures)";
+  return (
+    report.failures
+      .map(
+        (f) =>
+          `  ${f.kind} ${f.selectors[0]} ${f.shrunk ? `${f.shrunk.interval.lo}-${f.shrunk.interval.hi} ${f.shrunk.anchor.kind}` : "(unshrunk)"} cause=${f.cause?.declarations.map((d) => d.property).join("+") ?? f.causeNote}`,
+      )
+      .join("\n") || "  (no failures)"
+  );
 }

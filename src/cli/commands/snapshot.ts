@@ -107,9 +107,10 @@ export function urlToSnapshotLabel(url: string): string {
       .map(([key, value]) => [sanitizeLabelPart(key), sanitizeLabelPart(value)] as const)
       .sort(([aKey, aValue], [bKey, bValue]) => aKey.localeCompare(bKey) || aValue.localeCompare(bValue));
 
-    const querySuffix = queryPairs.length > 0
-      ? `__query_${queryPairs.map(([key, value]) => `${key}_${value || "empty"}`).join("__")}`
-      : "";
+    const querySuffix =
+      queryPairs.length > 0
+        ? `__query_${queryPairs.map(([key, value]) => `${key}_${value || "empty"}`).join("__")}`
+        : "";
 
     const hashPart = sanitizeLabelPart(parsed.hash.replace(/^#\/?/, ""));
     const hashSuffix = hashPart ? `__hash_${hashPart}` : "";
@@ -150,21 +151,36 @@ export function parseSnapshotConfig(raw: string): SnapshotConfig {
 
   const record = parsed as Record<string, unknown>;
   const routes = record.routes == null ? undefined : parseSnapshotRoutes(record.routes);
-  const mask = record.mask == null ? undefined : parseStringArray(record.mask, "snapshot config mask must be a string array");
-  const threshold = record.threshold == null ? undefined : parseRatio(record.threshold, "snapshot config threshold must be between 0 and 1");
-  const maxDiffRatio = record.maxDiffRatio == null
-    ? undefined
-    : parseNonNegativeNumber(record.maxDiffRatio, "snapshot config maxDiffRatio must be a non-negative number");
+  const mask =
+    record.mask == null ? undefined : parseStringArray(record.mask, "snapshot config mask must be a string array");
+  const threshold =
+    record.threshold == null
+      ? undefined
+      : parseRatio(record.threshold, "snapshot config threshold must be between 0 and 1");
+  const maxDiffRatio =
+    record.maxDiffRatio == null
+      ? undefined
+      : parseNonNegativeNumber(record.maxDiffRatio, "snapshot config maxDiffRatio must be a non-negative number");
 
   return {
-    baseUrl: record.baseUrl == null ? undefined : parseString(record.baseUrl, "snapshot config baseUrl must be a non-empty string"),
+    baseUrl:
+      record.baseUrl == null
+        ? undefined
+        : parseString(record.baseUrl, "snapshot config baseUrl must be a non-empty string"),
     routes,
-    outputDir: record.outputDir == null ? undefined : parseString(record.outputDir, "snapshot config outputDir must be a non-empty string"),
+    outputDir:
+      record.outputDir == null
+        ? undefined
+        : parseString(record.outputDir, "snapshot config outputDir must be a non-empty string"),
     threshold,
-    failOnDiff: record.failOnDiff == null ? undefined : parseBoolean(record.failOnDiff, "snapshot config failOnDiff must be a boolean"),
-    failOnNewBaseline: record.failOnNewBaseline == null
-      ? undefined
-      : parseBoolean(record.failOnNewBaseline, "snapshot config failOnNewBaseline must be a boolean"),
+    failOnDiff:
+      record.failOnDiff == null
+        ? undefined
+        : parseBoolean(record.failOnDiff, "snapshot config failOnDiff must be a boolean"),
+    failOnNewBaseline:
+      record.failOnNewBaseline == null
+        ? undefined
+        : parseBoolean(record.failOnNewBaseline, "snapshot config failOnNewBaseline must be a boolean"),
     maxDiffRatio,
     mask,
   };
@@ -353,14 +369,14 @@ export function parseSnapshotCliArgs(
 
   if (positional[0] === "stability") {
     const stabilityUrls = positional.slice(1);
-    const configuredStabilityUrls = stabilityUrls.length > 0
-      ? stabilityUrls
-      : resolveSnapshotConfigUrls(config);
-    const stabilityLabels = explicitLabels.length > 0
-      ? resolveSnapshotLabels(configuredStabilityUrls, explicitLabels)
-      : configuredStabilityUrls.map((url, index) =>
-          (stabilityUrls.length === 0 ? (config.routes ?? [])[index]?.label : undefined)
-            ?? urlToSnapshotLabel(url));
+    const configuredStabilityUrls = stabilityUrls.length > 0 ? stabilityUrls : resolveSnapshotConfigUrls(config);
+    const stabilityLabels =
+      explicitLabels.length > 0
+        ? resolveSnapshotLabels(configuredStabilityUrls, explicitLabels)
+        : configuredStabilityUrls.map(
+            (url, index) =>
+              (stabilityUrls.length === 0 ? (config.routes ?? [])[index]?.label : undefined) ?? urlToSnapshotLabel(url),
+          );
 
     return {
       mode: "stability",
@@ -458,22 +474,19 @@ export function parseSnapshotCliArgs(
   const misplaced = positional.slice(1).filter((value) => SNAPSHOT_SUBCOMMANDS.includes(value));
   if (misplaced.length > 0) {
     throw new UsageError(
-      `\`${misplaced[0]}\` is a subcommand and has to come first: `
-      + `vlmkit snapshot ${misplaced[0]} ${positional.filter((p) => !misplaced.includes(p)).join(" ")}`.trim(),
+      `\`${misplaced[0]}\` is a subcommand and has to come first: ` +
+        `vlmkit snapshot ${misplaced[0]} ${positional.filter((p) => !misplaced.includes(p)).join(" ")}`.trim(),
     );
   }
 
-  const configuredUrls = positional.length > 0
-    ? positional
-    : resolveSnapshotConfigUrls(config);
+  const configuredUrls = positional.length > 0 ? positional : resolveSnapshotConfigUrls(config);
 
-  const configuredLabels = positional.length > 0
-    ? []
-    : (config.routes ?? []).map((route) => route.label);
+  const configuredLabels = positional.length > 0 ? [] : (config.routes ?? []).map((route) => route.label);
 
-  const labels = explicitLabels.length > 0
-    ? resolveSnapshotLabels(configuredUrls, explicitLabels)
-    : configuredUrls.map((url, index) => configuredLabels[index] ?? urlToSnapshotLabel(url));
+  const labels =
+    explicitLabels.length > 0
+      ? resolveSnapshotLabels(configuredUrls, explicitLabels)
+      : configuredUrls.map((url, index) => configuredLabels[index] ?? urlToSnapshotLabel(url));
 
   return {
     mode: "capture",
@@ -534,7 +547,10 @@ function parseSnapshotRoutes(value: unknown): SnapshotRouteConfig[] {
     const path = record.path ?? record.url;
     return {
       path: parseString(path, `snapshot config route at index ${index} must have a path`),
-      label: record.label == null ? undefined : parseString(record.label, `snapshot config route at index ${index} has an invalid label`),
+      label:
+        record.label == null
+          ? undefined
+          : parseString(record.label, `snapshot config route at index ${index} has an invalid label`),
     };
   });
 }

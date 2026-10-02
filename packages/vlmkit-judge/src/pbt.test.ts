@@ -64,7 +64,10 @@ describe("shrinkRecord", () => {
       async (c) => c.width < 500,
     );
     assert.deepEqual(result.value, { width: 480, height: 900, scale: 1 });
-    assert.deepEqual(result.steps.map((s) => s.dimension), ["height", "scale"]);
+    assert.deepEqual(
+      result.steps.map((s) => s.dimension),
+      ["height", "scale"],
+    );
     assert.equal(result.exhausted, false);
   });
 

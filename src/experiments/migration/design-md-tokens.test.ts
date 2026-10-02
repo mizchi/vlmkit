@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  parseDesignTokens,
-  parseLengthToPx,
-  snapColor,
-  snapSpacing,
-} from "./design-md-tokens.ts";
+import { parseDesignTokens, parseLengthToPx, snapColor, snapSpacing } from "./design-md-tokens.ts";
 
 const PAWS_FRONT_MATTER = `---
 name: Paws & Paths

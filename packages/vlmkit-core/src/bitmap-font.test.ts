@@ -87,7 +87,13 @@ describe("drawText", () => {
   it("renders distinct glyphs for case pairs, so a selector reads correctly", () => {
     // `nth-of-type` came out as `nth-of-tYPe` when the descender letters were drawn
     // at cap height, which is exactly the misreading a labelled row exists to avoid.
-    for (const [lower, upper] of [["p", "P"], ["y", "Y"], ["g", "G"], ["q", "Q"], ["j", "J"]]) {
+    for (const [lower, upper] of [
+      ["p", "P"],
+      ["y", "Y"],
+      ["g", "G"],
+      ["q", "Q"],
+      ["j", "J"],
+    ]) {
       const a = canvas(10, 10);
       const b = canvas(10, 10);
       drawText(a, lower!, 0, 0, [255, 255, 255], 1);

@@ -58,7 +58,10 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
   const pathOf = (el: Element): string => {
     const parts: string[] = [];
     for (let e: Element | null = el; e && e !== document.body && parts.length < 4; e = e.parentElement) {
-      const cls = [...e.classList].slice(0, 2).map((c) => `.${c}`).join("");
+      const cls = [...e.classList]
+        .slice(0, 2)
+        .map((c) => `.${c}`)
+        .join("");
       parts.unshift(`${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ""}${cls}`);
     }
     return parts.join(">");
@@ -70,7 +73,9 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
   const visible = (el: Element) => {
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
-    return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.5;
+    return (
+      r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.5
+    );
   };
   // Topmost at its own centre, and no filtered or faded ancestor between it and the page.
   const unobstructed = (el: Element) => {
@@ -84,20 +89,29 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
     window.scrollTo(0, 0);
     return !!hit && (hit === el || el.contains(hit));
   };
-  const leaves = [...document.querySelectorAll("body *")].filter((el) =>
-    el.children.length === 0 && (el.textContent ?? "").trim() !== "" && visible(el)
-    && !["SCRIPT", "STYLE", "TITLE", "OPTION"].includes(el.tagName));
-  const pick = <T,>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)];
+  const leaves = [...document.querySelectorAll("body *")].filter(
+    (el) =>
+      el.children.length === 0 &&
+      (el.textContent ?? "").trim() !== "" &&
+      visible(el) &&
+      !["SCRIPT", "STYLE", "TITLE", "OPTION"].includes(el.tagName),
+  );
+  const pick = <T>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)];
   const hex = (rgb: string) => {
-    const m = rgb.match(/\d+(\.\d+)?/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+    const m = rgb
+      .match(/\d+(\.\d+)?/g)
+      ?.slice(0, 3)
+      .map(Number) ?? [0, 0, 0];
     return `#${m.map((n) => Math.round(n).toString(16).padStart(2, "0")).join("")}`;
   };
 
   if (args.kind === "text") {
-    const candidates = leaves.filter((el) => {
-      const t = el.textContent!.trim();
-      return parseFloat(getComputedStyle(el).fontSize) <= 13 && /\d/.test(t) && t.length <= 60;
-    }).filter(unobstructed);
+    const candidates = leaves
+      .filter((el) => {
+        const t = el.textContent!.trim();
+        return parseFloat(getComputedStyle(el).fontSize) <= 13 && /\d/.test(t) && t.length <= 60;
+      })
+      .filter(unobstructed);
     const el = pick(candidates);
     if (!el) return { skip: "no small text with a digit" };
     const node = [...el.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && /\d/.test(n.textContent ?? ""));
@@ -107,7 +121,8 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
     const at = digits[Math.floor(rand() * digits.length)]!;
     const after = before.slice(0, at) + String((Number(before[at]) + 5) % 10) + before.slice(at + 1);
     const tokenAt = (s: string) => {
-      let a = at, b = at + 1;
+      let a = at,
+        b = at + 1;
       while (a > 0 && !/\s/.test(s[a - 1]!)) a--;
       while (b < s.length && !/\s/.test(s[b]!)) b++;
       return s.slice(a, b);
@@ -128,10 +143,12 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
   }
 
   if (args.kind === "color") {
-    const candidates = leaves.filter((el) => {
-      const t = el.textContent!.trim();
-      return parseFloat(getComputedStyle(el).fontSize) <= 16 && t.length >= 2 && t.length <= 40;
-    }).filter(unobstructed);
+    const candidates = leaves
+      .filter((el) => {
+        const t = el.textContent!.trim();
+        return parseFloat(getComputedStyle(el).fontSize) <= 16 && t.length >= 2 && t.length <= 40;
+      })
+      .filter(unobstructed);
     const el = pick(candidates);
     if (!el) return { skip: "no short small label" };
     const oldColor = hex(getComputedStyle(el).color);
@@ -141,7 +158,9 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
       const f = (n: number) => {
         const k = (n + h / 30) % 12;
         const c = l - sat * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-        return Math.round(c * 255).toString(16).padStart(2, "0");
+        return Math.round(c * 255)
+          .toString(16)
+          .padStart(2, "0");
       };
       return `#${f(0)}${f(8)}${f(4)}`;
     };
@@ -149,7 +168,8 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
     // readers named #ea580c exactly in 14 of 18 answers, which is recall, not reading. The
     // colour must still differ visibly from the old one (>= 96 on some channel).
     let newColor = oldColor;
-    for (let i = 0; i < 24 && dist(newColor, oldColor) < 96; i++) newColor = fromHsl(rand() * 360, 0.55 + rand() * 0.35, 0.35 + rand() * 0.25);
+    for (let i = 0; i < 24 && dist(newColor, oldColor) < 96; i++)
+      newColor = fromHsl(rand() * 360, 0.55 + rand() * 0.35, 0.35 + rand() * 0.25);
     if (dist(newColor, oldColor) < 96) return { skip: "no visibly different colour found" };
     const box = boxOf(el);
     (el as HTMLElement).style.setProperty("color", newColor, "important");
@@ -157,18 +177,28 @@ function plantInPage(args: { kind: CaseKind; seed: number }): Planted {
   }
 
   if (args.kind === "offset") {
-    const candidates = [...document.querySelectorAll("body *")].filter((el) => {
-      if (!visible(el)) return false;
-      const r = el.getBoundingClientRect();
-      return r.width >= 16 && r.width <= 320 && r.height >= 12 && r.height <= 64 && (el.textContent ?? "").trim() !== "";
-    }).filter(unobstructed);
+    const candidates = [...document.querySelectorAll("body *")]
+      .filter((el) => {
+        if (!visible(el)) return false;
+        const r = el.getBoundingClientRect();
+        return (
+          r.width >= 16 && r.width <= 320 && r.height >= 12 && r.height <= 64 && (el.textContent ?? "").trim() !== ""
+        );
+      })
+      .filter(unobstructed);
     const el = pick(candidates);
     if (!el) return { skip: "no small element to move" };
     // 1-6px in one of four directions, scored exactly: v1's four fixed shifts (±4,0 / 0,4 / 3,0)
     // with ±1px tolerance let "4 in the direction it looked" pass once a shift was noticed.
     const size = 1 + Math.floor(rand() * 6);
-    const [ux, uy] = pick([[1, 0], [-1, 0], [0, 1], [0, -1]])!;
-    const dx = ux! * size, dy = uy! * size;
+    const [ux, uy] = pick([
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ])!;
+    const dx = ux! * size,
+      dy = uy! * size;
     const box = boxOf(el);
     // `translate` moves the painted box without re-running layout, so exactly one element moves.
     (el as HTMLElement).style.setProperty("translate", `${dx}px ${dy}px`, "important");
@@ -185,7 +215,10 @@ export function diffBounds(a: PNG, b: PNG): { x1: number; y1: number; x2: number
     // capture and let the caller see a tall box.
     return { x1: 0, y1: 0, x2: Math.max(a.width, b.width), y2: Math.max(a.height, b.height) };
   }
-  let x1 = Infinity, y1 = Infinity, x2 = -1, y2 = -1;
+  let x1 = Infinity,
+    y1 = Infinity,
+    x2 = -1,
+    y2 = -1;
   for (let y = 0; y < a.height; y++) {
     for (let x = 0; x < a.width; x++) {
       const i = (y * a.width + x) * 4;
@@ -213,9 +246,14 @@ export async function buildCases(browser: Browser, options: BuildOptions): Promi
   const dsf = options.deviceScaleFactor;
   for (const fixture of options.fixtures) {
     const variants = Math.max(1, options.variants ?? 1);
-    for (const [kind, v] of options.kinds.flatMap((k) => Array.from({ length: k === "none" ? 1 : variants }, (_, i) => [k, i] as const))) {
+    for (const [kind, v] of options.kinds.flatMap((k) =>
+      Array.from({ length: k === "none" ? 1 : variants }, (_, i) => [k, i] as const),
+    )) {
       const id = `${basename(fixture).replace(/\.html?$/, "")}-${kind}${v === 0 ? "" : `-${v + 1}`}`;
-      const page = await browser.newPage({ viewport: { width: options.viewportWidth, height: 900 }, deviceScaleFactor: dsf });
+      const page = await browser.newPage({
+        viewport: { width: options.viewportWidth, height: 900 },
+        deviceScaleFactor: dsf,
+      });
       try {
         await page.goto(`file://${fixture}`, { waitUntil: "load" });
         await settlePage(page);
@@ -230,15 +268,26 @@ export async function buildCases(browser: Browser, options: BuildOptions): Promi
           baseline = again;
         }
         const planted = await page.evaluate(plantInPage, { kind, seed: caseSeed(options.seed, id) });
-        if ("skip" in planted) { skipped.push({ id, reason: planted.skip }); continue; }
+        if ("skip" in planted) {
+          skipped.push({ id, reason: planted.skip });
+          continue;
+        }
         const current = await shot();
-        const a = PNG.sync.read(baseline), b = PNG.sync.read(current);
+        const a = PNG.sync.read(baseline),
+          b = PNG.sync.read(current);
         const px = diffBounds(a, b);
-        if (kind === "none" && px) throw new Error(`${id}: two captures of an unchanged page differ at ${JSON.stringify(px)} — the render is not deterministic, so no "none" answer could be scored`);
-        if (kind !== "none" && !px) { skipped.push({ id, reason: `the planted ${kind} change moved no pixel (${planted.target})` }); continue; }
+        if (kind === "none" && px)
+          throw new Error(
+            `${id}: two captures of an unchanged page differ at ${JSON.stringify(px)} — the render is not deterministic, so no "none" answer could be scored`,
+          );
+        if (kind !== "none" && !px) {
+          skipped.push({ id, reason: `the planted ${kind} change moved no pixel (${planted.target})` });
+          continue;
+        }
         const dir = join(options.outDir, "cases", id);
         await mkdir(dir, { recursive: true });
-        const baselinePath = join(dir, "baseline.png"), currentPath = join(dir, "current.png");
+        const baselinePath = join(dir, "baseline.png"),
+          currentPath = join(dir, "current.png");
         await writeFile(baselinePath, baseline);
         await writeFile(currentPath, current);
         cases.push({

@@ -34,9 +34,7 @@ describe("Goal Runner: dark mode implementation", () => {
         expectation: {
           testId: "page",
           expect: "Dark mode switch added to banner",
-          expectedA11yChanges: [
-            { description: "Switch element for dark mode added" },
-          ],
+          expectedA11yChanges: [{ description: "Switch element for dark mode added" }],
         },
       },
       {
@@ -45,9 +43,7 @@ describe("Goal Runner: dark mode implementation", () => {
         expectation: {
           testId: "page",
           expect: "Dark mode switch toggled to checked state",
-          expectedA11yChanges: [
-            { description: "Switch checked state changed to true" },
-          ],
+          expectedA11yChanges: [{ description: "Switch checked state changed to true" }],
         },
       },
       {
@@ -69,17 +65,16 @@ describe("Goal Runner: dark mode implementation", () => {
   it("should complete all 3 steps successfully", async () => {
     const baseline = await loadTree("baseline.a11y.json");
 
-    const state = await runGoal(
-      darkModeGoal,
-      baseline,
-      async (step, _retry) => loadTree(step.snapshotFile!),
-    );
+    const state = await runGoal(darkModeGoal, baseline, async (step, _retry) => loadTree(step.snapshotFile!));
 
     console.log(formatGoalReport(state));
 
     assert.equal(state.status, "completed", `Goal should complete: ${state.finalScore?.summary}`);
     assert.equal(state.stepResults.length, 3);
-    assert.ok(state.stepResults.every((r) => r.passed), "All steps should pass");
+    assert.ok(
+      state.stepResults.every((r) => r.passed),
+      "All steps should pass",
+    );
     assert.equal(state.finalScore!.totalRetries, 0);
     assert.equal(state.finalScore!.averageStepScore, 100);
   });
@@ -100,12 +95,9 @@ describe("Goal Runner: dark mode implementation", () => {
       ],
     };
 
-    const state = await runGoal(
-      brokenGoal,
-      baseline,
-      async (step, _retry) => loadTree(step.snapshotFile!),
-      { maxRetries: 0 },
-    );
+    const state = await runGoal(brokenGoal, baseline, async (step, _retry) => loadTree(step.snapshotFile!), {
+      maxRetries: 0,
+    });
 
     assert.equal(state.status, "failed");
     assert.ok(!state.stepResults[1].passed, "Step 2 should fail");
@@ -115,11 +107,7 @@ describe("Goal Runner: dark mode implementation", () => {
   it("should produce meaningful scores", async () => {
     const baseline = await loadTree("baseline.a11y.json");
 
-    const state = await runGoal(
-      darkModeGoal,
-      baseline,
-      async (step, _retry) => loadTree(step.snapshotFile!),
-    );
+    const state = await runGoal(darkModeGoal, baseline, async (step, _retry) => loadTree(step.snapshotFile!));
 
     const score = state.finalScore!;
     assert.equal(score.stepSuccessRate, 1);
@@ -131,32 +119,32 @@ describe("Goal Runner: dark mode implementation", () => {
   it("should verify reasoning chains at each step", async () => {
     const baseline = await loadTree("baseline.a11y.json");
 
-    const state = await runGoal(
-      darkModeGoal,
-      baseline,
-      async (step, _retry) => loadTree(step.snapshotFile!),
-    );
+    const state = await runGoal(darkModeGoal, baseline, async (step, _retry) => loadTree(step.snapshotFile!));
 
     // Step 1: switch added
     const r1 = state.stepResults[0].reasoning;
     assert.equal(r1.verdict, "realized");
-    assert.ok(r1.mappings.some((m) => m.realized && m.actual!.includes("switch")),
-      `Step 1 should realize switch: ${r1.reasoning}`);
+    assert.ok(
+      r1.mappings.some((m) => m.realized && m.actual!.includes("switch")),
+      `Step 1 should realize switch: ${r1.reasoning}`,
+    );
 
     // Step 2: state changed
     const r2 = state.stepResults[1].reasoning;
     assert.equal(r2.verdict, "realized");
-    assert.ok(r2.mappings.some((m) => m.realized),
-      `Step 2 should realize state change: ${r2.reasoning}`);
+    assert.ok(
+      r2.mappings.some((m) => m.realized),
+      `Step 2 should realize state change: ${r2.reasoning}`,
+    );
 
     // Step 3: accessibility additions (may have side effects like extra links)
     const r3 = state.stepResults[2].reasoning;
-    assert.ok(
-      r3.verdict === "realized" || r3.verdict === "unexpected-side-effects",
-      `Step 3 verdict: ${r3.verdict}`
-    );
+    assert.ok(r3.verdict === "realized" || r3.verdict === "unexpected-side-effects", `Step 3 verdict: ${r3.verdict}`);
     assert.ok(r3.mappings.length >= 2, `Step 3 should have 2+ mappings: ${r3.reasoning}`);
-    assert.ok(r3.mappings.every((m) => m.realized), `All step 3 mappings realized: ${r3.reasoning}`);
+    assert.ok(
+      r3.mappings.every((m) => m.realized),
+      `All step 3 mappings realized: ${r3.reasoning}`,
+    );
   });
 });
 
@@ -166,15 +154,17 @@ describe("Goal Runner: single-step goal", () => {
 
     const goal: Goal = {
       description: "Rename submit button",
-      steps: [{
-        description: "Change Send to Submit",
-        snapshotFile: "snapshot-button-renamed.a11y.json",
-        expectation: {
-          testId: "page",
-          expect: "Button label changed",
-          expectedA11yChanges: [{ description: "Button name changed from Send to Submit", name: "Send" }],
+      steps: [
+        {
+          description: "Change Send to Submit",
+          snapshotFile: "snapshot-button-renamed.a11y.json",
+          expectation: {
+            testId: "page",
+            expect: "Button label changed",
+            expectedA11yChanges: [{ description: "Button name changed from Send to Submit", name: "Send" }],
+          },
         },
-      }],
+      ],
       successCriteria: "Button says Submit",
     };
 
@@ -223,32 +213,42 @@ describe("Goal Runner: retry behavior", () => {
 
     const goal: Goal = {
       description: "Add search with retry",
-      steps: [{
-        description: "Add search form",
-        snapshotFile: "snapshot-search-added.a11y.json",
-        expectation: {
-          testId: "page",
-          expect: "Search landmark added",
-          expectedA11yChanges: [{ description: "Search landmark added" }],
+      steps: [
+        {
+          description: "Add search form",
+          snapshotFile: "snapshot-search-added.a11y.json",
+          expectation: {
+            testId: "page",
+            expect: "Search landmark added",
+            expectedA11yChanges: [{ description: "Search landmark added" }],
+          },
         },
-      }],
+      ],
       successCriteria: "Search exists",
     };
 
     // First call returns baseline (no change → fail), second returns search-added (pass)
     let callCount = 0;
-    const state = await runGoal(goal, baseline, async (step, retryCount) => {
-      callCount++;
-      if (retryCount === 0) return baseline; // fail first
-      return loadTree(step.snapshotFile!); // succeed on retry
-    }, { maxRetries: 2 });
+    const state = await runGoal(
+      goal,
+      baseline,
+      async (step, retryCount) => {
+        callCount++;
+        if (retryCount === 0) return baseline; // fail first
+        return loadTree(step.snapshotFile!); // succeed on retry
+      },
+      { maxRetries: 2 },
+    );
 
     assert.equal(state.status, "completed");
     assert.equal(state.stepResults[0].retries, 1);
     assert.ok(state.stepResults[0].passed);
     assert.ok(callCount >= 2, `Should call loadSnapshot at least twice: ${callCount}`);
     // Score should reflect the retry penalty
-    assert.ok(state.finalScore!.averageStepScore < 100, `Score should be penalized: ${state.finalScore!.averageStepScore}`);
+    assert.ok(
+      state.finalScore!.averageStepScore < 100,
+      `Score should be penalized: ${state.finalScore!.averageStepScore}`,
+    );
   });
 
   it("should fail after max retries exhausted", async () => {
@@ -256,15 +256,17 @@ describe("Goal Runner: retry behavior", () => {
 
     const goal: Goal = {
       description: "Impossible task",
-      steps: [{
-        description: "This always fails",
-        snapshotFile: "baseline.a11y.json", // same as baseline → no changes → not-realized
-        expectation: {
-          testId: "page",
-          expect: "Something new added",
-          expectedA11yChanges: [{ description: "New element added" }],
+      steps: [
+        {
+          description: "This always fails",
+          snapshotFile: "baseline.a11y.json", // same as baseline → no changes → not-realized
+          expectation: {
+            testId: "page",
+            expect: "Something new added",
+            expectedA11yChanges: [{ description: "New element added" }],
+          },
         },
-      }],
+      ],
       successCriteria: "Never",
     };
 

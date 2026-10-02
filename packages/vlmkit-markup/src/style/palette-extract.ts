@@ -124,8 +124,8 @@ export async function extractPaletteFromFile(
     // `error: …` line and falls back to `console.error(e)` — a full stack — for everything else.
     // A wrong argument is the caller's, not a crash, and should not read like one.
     throw new UsageError(
-      `${path} is not a PNG. \`check palette\` reads rendered images, not markup — `
-      + `screenshot the page first (\`vlmkit snapshot <url>\`) and pass the PNG.`,
+      `${path} is not a PNG. \`check palette\` reads rendered images, not markup — ` +
+        `screenshot the page first (\`vlmkit snapshot <url>\`) and pass the PNG.`,
     );
   }
   const png = PNG.sync.read(buf);
@@ -151,16 +151,24 @@ function medianColor(data: Uint8Array, samples: number[][]): { r: number; g: num
   // sparse outliers (a text pixel doesn't shift the result) and avoids
   // the quantization-bucket collisions of mode-finding (e.g. #ffffff
   // and #f6f7fb both land in the same coarse bucket).
-  const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+  const rs: number[] = [],
+    gs: number[] = [],
+    bs: number[] = [];
   for (const [x, y, width] of samples) {
     const i = (y * width + x) * 4;
     if (data[i + 3]! === 0) continue;
-    rs.push(data[i]!); gs.push(data[i + 1]!); bs.push(data[i + 2]!);
+    rs.push(data[i]!);
+    gs.push(data[i + 1]!);
+    bs.push(data[i + 2]!);
   }
   if (rs.length === 0) return { r: 255, g: 255, b: 255, hex: "#ffffff" };
-  rs.sort((a, b) => a - b); gs.sort((a, b) => a - b); bs.sort((a, b) => a - b);
+  rs.sort((a, b) => a - b);
+  gs.sort((a, b) => a - b);
+  bs.sort((a, b) => a - b);
   const mid = rs.length >> 1;
-  const r = rs[mid]!, g = gs[mid]!, b = bs[mid]!;
+  const r = rs[mid]!,
+    g = gs[mid]!,
+    b = bs[mid]!;
   return { r, g, b, hex: toHex2(r, g, b) };
 }
 
@@ -170,11 +178,7 @@ function medianColor(data: Uint8Array, samples: number[][]): { r: number; g: num
  * first-class signal — historically the agent had to deduce this
  * from the palette "missing" rows. From dogfood eval.
  */
-export function findDominantBackgrounds(
-  data: Uint8Array,
-  width: number,
-  height: number,
-): DominantBackgrounds {
+export function findDominantBackgrounds(data: Uint8Array, width: number, height: number): DominantBackgrounds {
   // Outer = pixels along a 4-px-thick frame around the edge.
   // Stride-sampled so the cost is independent of image size.
   const outerSamples: number[][] = [];
@@ -196,8 +200,10 @@ export function findDominantBackgrounds(
 
   // Inner = pixels in the central 30% × 30% rectangle.
   const innerSamples: number[][] = [];
-  const cx0 = Math.floor(width * 0.35), cx1 = Math.floor(width * 0.65);
-  const cy0 = Math.floor(height * 0.35), cy1 = Math.floor(height * 0.65);
+  const cx0 = Math.floor(width * 0.35),
+    cx1 = Math.floor(width * 0.65);
+  const cy0 = Math.floor(height * 0.35),
+    cy1 = Math.floor(height * 0.65);
   for (let y = cy0; y < cy1; y += stride) {
     for (let x = cx0; x < cx1; x += stride) {
       innerSamples.push([x, y, width]);
@@ -205,7 +211,9 @@ export function findDominantBackgrounds(
   }
   const inner = innerSamples.length > 0 ? medianColor(data, innerSamples) : outer;
 
-  const dr = outer.r - inner.r, dg = outer.g - inner.g, db = outer.b - inner.b;
+  const dr = outer.r - inner.r,
+    dg = outer.g - inner.g,
+    db = outer.b - inner.b;
   // Distance < 6 means visually indistinguishable backgrounds (page
   // is one solid color). 6-15 means subtle layering (e.g. card on
   // light gray bg with white card center) — we still report both.

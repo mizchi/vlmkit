@@ -3,7 +3,14 @@ import { test } from "vite-plus/test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { authStateNotice, readStorageState, resetAuthStateNotice, STORAGE_STATE_ENV, storageStatePath, withAuthState } from "./auth-state.ts";
+import {
+  authStateNotice,
+  readStorageState,
+  resetAuthStateNotice,
+  STORAGE_STATE_ENV,
+  storageStatePath,
+  withAuthState,
+} from "./auth-state.ts";
 
 const withEnv = async (value: string | undefined, fn: () => Promise<void> | void) => {
   const prev = process.env[STORAGE_STATE_ENV];
@@ -100,10 +107,13 @@ test("env-configured auth applies without an explicit flag", async () => {
 test("the notice reports what was applied, not what was configured", async () => {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-auth-notice-"));
   const file = join(dir, "auth.json");
-  await writeFile(file, JSON.stringify({
-    cookies: [{ name: "s", value: "v", domain: "127.0.0.1", path: "/" }],
-    origins: [],
-  }));
+  await writeFile(
+    file,
+    JSON.stringify({
+      cookies: [{ name: "s", value: "v", domain: "127.0.0.1", path: "/" }],
+      origins: [],
+    }),
+  );
   try {
     resetAuthStateNotice();
     assert.equal(authStateNotice(), null, "an unauthenticated run must say nothing");

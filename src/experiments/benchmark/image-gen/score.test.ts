@@ -12,7 +12,10 @@ describe("the saved evaluation", () => {
   it("still answers the current briefs, and every image is scored", () => {
     // A failure here after editing briefs.ts is expected: re-run the bench and save a new evaluation.
     assert.deepEqual(problems(saved), []);
-    assert.deepEqual(Object.keys(saved.briefs), BRIEFS.map((b) => b.id));
+    assert.deepEqual(
+      Object.keys(saved.briefs),
+      BRIEFS.map((b) => b.id),
+    );
   });
 
   it("gives the default image model full marks — the default is the evidence's, not a guess", () => {
@@ -57,7 +60,13 @@ describe("scoring", () => {
     ev.scorer = "test";
     for (const s of ev.scores) s.verdict = "pass";
     const rows = summarize(ev);
-    assert.deepEqual(rows.map((r) => [r.model, r.points]), [["a/x", 2], ["b/y", 1]]);
+    assert.deepEqual(
+      rows.map((r) => [r.model, r.points]),
+      [
+        ["a/x", 2],
+        ["b/y", 1],
+      ],
+    );
     const md = renderMarkdown(ev);
     assert.match(md, /\| a\/x \| ✓ \| ✓ \| 2\/2 \| 0\.050 \| 9s \|/);
     assert.match(md, /Scored by test on 2026-01-01\. 3 images/);

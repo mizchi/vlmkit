@@ -34,7 +34,12 @@ import {
   type IntegrityImageReport,
   runImageIntegrityCheck,
 } from "../inspect/integrity-image.ts";
-import { firstPositional, firstPositionalOrUndefined, numberList, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
+import {
+  firstPositional,
+  firstPositionalOrUndefined,
+  numberList,
+  optionalInt,
+} from "@mizchi/vlmkit-core/plugin/args.ts";
 
 /** Heights the CLI has always paired with its default sweep widths. */
 const VIEWPORT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
@@ -64,7 +69,12 @@ each animation's start, middle and end plus 0/250/500/1000/2000ms;
 
 ${ALLOW_HELP}`,
   rules: [
-    { id: "js-error", title: "Uncaught JS error", severity: "suspect", docs: "Construction-phase errors mean the page never finished building." },
+    {
+      id: "js-error",
+      title: "Uncaught JS error",
+      severity: "suspect",
+      docs: "Construction-phase errors mean the page never finished building.",
+    },
     { id: "degenerate-render", title: "Empty or near-empty render", severity: "suspect" },
     { id: "broken-image", title: "Image failed to load", severity: "suspect" },
     { id: "failed-stylesheet", title: "Stylesheet failed to load", severity: "suspect" },
@@ -90,7 +100,13 @@ ${ALLOW_HELP}`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check (omit when using --image/--elements)", positional: 0 },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check (omit when using --image/--elements)",
+      positional: 0,
+    },
     {
       name: "elements",
       placeholder: "elements.json",
@@ -103,7 +119,13 @@ ${ALLOW_HELP}`,
       kind: "path",
       description: "Frame PNG for --elements mode; enables the ink-based empty-render rule",
     },
-    { name: "viewports", placeholder: "w,w,...", kind: "number-list", description: "Sweep widths", defaultDescription: "1280,768,375" },
+    {
+      name: "viewports",
+      placeholder: "w,w,...",
+      kind: "number-list",
+      description: "Sweep widths",
+      defaultDescription: "1280,768,375",
+    },
     { name: "max-findings", kind: "number", description: "Per-class report cap", defaultDescription: "12" },
     {
       name: "storage-state",
@@ -111,8 +133,18 @@ ${ALLOW_HELP}`,
       description: "Playwright storage state, to measure pages behind a login (or set VLMKIT_STORAGE_STATE)",
     },
     { name: "allow", kind: "string", description: "Exempt an intentional pattern (see below)", repeatable: true },
-    { name: "timeline", kind: "boolean", description: "Also judge layout across the page's motion (clock and animations held), tiered by persistence" },
-    { name: "timeline-at", placeholder: "ms,ms,...", kind: "number-list", description: "The instants of page time --timeline judges at", defaultDescription: "each animation's start/middle/end + 0,250,500,1000,2000" },
+    {
+      name: "timeline",
+      kind: "boolean",
+      description: "Also judge layout across the page's motion (clock and animations held), tiered by persistence",
+    },
+    {
+      name: "timeline-at",
+      placeholder: "ms,ms,...",
+      kind: "number-list",
+      description: "The instants of page time --timeline judges at",
+      defaultDescription: "each animation's start/middle/end + 0,250,500,1000,2000",
+    },
     // Spread, not re-declared. Hand-written copies of these three drifted from the
     // fragment: v5's CI agent found the `--wait-until` hint present on `check copy`
     // and `check breakpoints` and absent here — "and integrity is the gate you reach
@@ -128,8 +160,8 @@ ${ALLOW_HELP}`,
       // so a run that quietly picked one would make its verdict ambiguous.
       if (firstPositionalOrUndefined(argv)) {
         throw new UsageError(
-          "check integrity takes either a page source or --elements, not both. The two modes "
-          + "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
+          "check integrity takes either a page source or --elements, not both. The two modes " +
+            "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
         );
       }
       const maxFindingsForImage = optionalInt(argv, "max-findings", { min: 1 });
@@ -145,7 +177,10 @@ ${ALLOW_HELP}`,
     if (image) {
       throw new UsageError("--image needs --elements: a PNG alone carries no element rects to judge.");
     }
-    const source = firstPositional(argv, "vlmkit check integrity <html-or-url> | --elements <elements.json> [--image <frame.png>]");
+    const source = firstPositional(
+      argv,
+      "vlmkit check integrity <html-or-url> | --elements <elements.json> [--image <frame.png>]",
+    );
     const widths = numberList(argv, "viewports");
     if (widths && widths.some((w) => w <= 0)) {
       throw new UsageError("--viewports must be positive px widths, e.g. --viewports 1280,768,375");
@@ -178,15 +213,13 @@ ${ALLOW_HELP}`,
       ...(timeline ? { timeline: timelineAt && timelineAt.length > 0 ? { at: timelineAt } : {} } : {}),
     };
   },
-  run: (options) => (options.imageMode
-    ? runImageIntegrityCheck(options.imageMode)
-    : runIntegrityCheck(options)),
+  run: (options) => (options.imageMode ? runImageIntegrityCheck(options.imageMode) : runIntegrityCheck(options)),
   findings: (report): Finding[] => [
     ...report.findings.map((finding) => ({
       rule: finding.kind,
       // The one severity translation in the codebase: integrity says "fail"
       // where every other gate says "suspect".
-      severity: finding.severity === "fail" ? "suspect" as const : "warn" as const,
+      severity: finding.severity === "fail" ? ("suspect" as const) : ("warn" as const),
       message: finding.message,
       ...(finding.selector ? { selector: finding.selector } : {}),
       viewport: finding.viewport,
@@ -213,12 +246,14 @@ ${ALLOW_HELP}`,
     // claim from `CLEAN` covering all of them, and the difference has to be visible at
     // the point someone reads the verdict.
     const coverage = image.skippedRules
-      ? ` [image mode: ${IMAGE_MODE_SKIPPED_RULES.length} rule(s) not evaluable`
-        + `${image.inertRules?.length ? `, ${image.inertRules.length} inert` : ""}]`
+      ? ` [image mode: ${IMAGE_MODE_SKIPPED_RULES.length} rule(s) not evaluable` +
+        `${image.inertRules?.length ? `, ${image.inertRules.length} inert` : ""}]`
       : "";
-    return `${report.verdict === "clean" ? "CLEAN" : "DEFECTS"}`
-      + ` (${fails} fail, ${warns} warn, ${report.exempted.length} exempted`
-      + `, ${report.viewports.length} viewport(s))${coverage}`;
+    return (
+      `${report.verdict === "clean" ? "CLEAN" : "DEFECTS"}` +
+      ` (${fails} fail, ${warns} warn, ${report.exempted.length} exempted` +
+      `, ${report.viewports.length} viewport(s))${coverage}`
+    );
   },
   ledger: (report, options) => ({
     tool: "check-integrity",

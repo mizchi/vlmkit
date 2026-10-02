@@ -92,7 +92,6 @@ export interface FocusOrderReport {
   reportPath: string;
 }
 
-
 export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
 (function focused() {
   const el = document.activeElement;
@@ -154,15 +153,12 @@ export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
  * in whatever focus state Tab ended in — callers that need the
  * pristine page should clone it first.
  */
-export async function collectFocusStepsOnPage(
-  page: Page,
-  maxSteps = 64,
-): Promise<FocusStep[]> {
+export async function collectFocusStepsOnPage(page: Page, maxSteps = 64): Promise<FocusStep[]> {
   const steps: FocusStep[] = [];
   let firstFingerprint: string | null = null;
   for (let i = 0; i < maxSteps; i++) {
     await page.keyboard.press("Tab");
-    const sample = await page.evaluate(A11Y_FOCUS_ORDER_SAMPLE_SCRIPT) as Omit<FocusStep, "tabIndex"> | null;
+    const sample = (await page.evaluate(A11Y_FOCUS_ORDER_SAMPLE_SCRIPT)) as Omit<FocusStep, "tabIndex"> | null;
     if (!sample) break;
     // Cycle detection: path + bbox together. Path alone aliases
     // sibling elements (3 buttons all serialize to "button"), which
@@ -204,25 +200,29 @@ export function analyzeFocusOrderSteps(steps: FocusStep[]): FocusOrderFinding[] 
     if (transition === "trap") {
       findings.push({
         kind: "trap",
-        fromIndex: i - 1, toIndex: i,
+        fromIndex: i - 1,
+        toIndex: i,
         message: `Focus stayed on the same element (\`${cur.path}\`) across two Tab presses.`,
       });
     } else if (transition === "reverse-left") {
       findings.push({
         kind: "reverse",
-        fromIndex: i - 1, toIndex: i,
+        fromIndex: i - 1,
+        toIndex: i,
         message: `Focus moved left within the same row (from \`${prev.path}\` at x=${prev.bbox.x.toFixed(0)} to \`${cur.path}\` at x=${cur.bbox.x.toFixed(0)}). Visual order is L-to-R; check \`tabindex\` or DOM order.`,
       });
     } else if (transition === "reverse-up") {
       findings.push({
         kind: "reverse",
-        fromIndex: i - 1, toIndex: i,
+        fromIndex: i - 1,
+        toIndex: i,
         message: `Focus moved up by ${(-dy).toFixed(0)}px (from \`${prev.path}\` at y=${prev.bbox.y.toFixed(0)} to \`${cur.path}\` at y=${cur.bbox.y.toFixed(0)}). Visual order is top-to-bottom; check \`tabindex\` or DOM order.`,
       });
     } else if (transition === "skip-row") {
       findings.push({
         kind: "skip-row",
-        fromIndex: i - 1, toIndex: i,
+        fromIndex: i - 1,
+        toIndex: i,
         message: `Focus jumped down by ${dy.toFixed(0)}px (from \`${prev.path}\` to \`${cur.path}\`). Confirm no focusable element was unintentionally skipped.`,
       });
     }
@@ -230,9 +230,7 @@ export function analyzeFocusOrderSteps(steps: FocusStep[]): FocusOrderFinding[] 
   return findings;
 }
 
-export async function runFocusOrder(
-  options: FocusOrderOptions,
-): Promise<FocusOrderReport> {
+export async function runFocusOrder(options: FocusOrderOptions): Promise<FocusOrderReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
@@ -280,15 +278,21 @@ export async function runFocusOrder(
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
-    source: options.source, viewport, screenshot: screenshotPath, steps, findings,
+    source: options.source,
+    viewport,
+    screenshot: screenshotPath,
+    steps,
+    findings,
   });
   await writeFile(reportPath, md);
 
-
-
   return {
-    source: options.source, viewport, screenshot: screenshotPath,
-    steps, findings, reportPath,
+    source: options.source,
+    viewport,
+    screenshot: screenshotPath,
+    steps,
+    findings,
+    reportPath,
   };
 }
 
@@ -311,10 +315,19 @@ export function formatFocusOrderReport(report: FocusOrderReport, rules?: RuleVie
   );
   const worst = shown.some((s) => s.tier === "suspect")
     ? "suspect"
-    : shown.some((s) => s.tier === "warn") ? "warn" : shown.length > 0 ? "info" : "none";
-  const icon = shown.length === 0
-    ? `${GREEN}✓${RESET}`
-    : worst === "suspect" ? `${RED}✗${RESET}` : worst === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+    : shown.some((s) => s.tier === "warn")
+      ? "warn"
+      : shown.length > 0
+        ? "info"
+        : "none";
+  const icon =
+    shown.length === 0
+      ? `${GREEN}✓${RESET}`
+      : worst === "suspect"
+        ? `${RED}✗${RESET}`
+        : worst === "warn"
+          ? `${YELLOW}!${RESET}`
+          : `${DIM}i${RESET}`;
   lines.push(`  ${icon} ${shown.length} finding(s)`);
   const note = hiddenByRuleNote(hiddenByRule);
   if (note) lines.push(`    ${DIM}${note}${RESET}`);
@@ -325,8 +338,10 @@ export function formatFocusOrderReport(report: FocusOrderReport, rules?: RuleVie
   // tabbed first produced `[reverse] Focus moved up by 662px`, the same shape as a skip link.
   const pinnedSteps = report.steps.filter((step) => step.pinned).length;
   if (pinnedSteps > 0) {
-    lines.push(`    ${DIM}${pinnedSteps} focusable element(s) are viewport-pinned (fixed / sticky);`
-      + ` jumps into or out of them are not read as order defects${RESET}`);
+    lines.push(
+      `    ${DIM}${pinnedSteps} focusable element(s) are viewport-pinned (fixed / sticky);` +
+        ` jumps into or out of them are not read as order defects${RESET}`,
+    );
   }
   const CONSOLE_ROWS = 5;
   for (const { row: f, tier } of shown.slice(0, CONSOLE_ROWS)) {
@@ -355,15 +370,19 @@ function renderReport(r: Omit<FocusOrderReport, "reportPath">): string {
   lines.push("|---|---|---|---|---|");
   for (const s of r.steps) {
     const idx = s.tabindexAttr === null ? "—" : `\`${s.tabindexAttr}\``;
-    lines.push(`| ${s.tabIndex} | \`${s.path}\` | \`${s.text}\` | ${s.bbox.x.toFixed(0)}, ${s.bbox.y.toFixed(0)} | ${idx} |`);
+    lines.push(
+      `| ${s.tabIndex} | \`${s.path}\` | \`${s.text}\` | ${s.bbox.x.toFixed(0)}, ${s.bbox.y.toFixed(0)} | ${idx} |`,
+    );
   }
   lines.push("");
 
   if (r.findings.length === 0) {
     lines.push("## ✓ No focus-order issues detected");
     lines.push("");
-    lines.push("Focus order matches visual order (top-to-bottom, left-to-right within rows). " +
-      "No focus traps or large unexplained jumps.");
+    lines.push(
+      "Focus order matches visual order (top-to-bottom, left-to-right within rows). " +
+        "No focus traps or large unexplained jumps.",
+    );
   } else {
     lines.push(`## ${r.findings.length} finding(s)`);
     lines.push("");
@@ -380,14 +399,20 @@ function renderReport(r: Omit<FocusOrderReport, "reportPath">): string {
     lines.push("## Suggested next step");
     lines.push("");
     lines.push("1. Open the page and step through with `Tab` manually to confirm the report.");
-    lines.push("2. For `reverse` findings: check if the divergent element has an explicit " +
-      "`tabindex` that overrides DOM order. If so, either remove the `tabindex` or " +
-      "reorder the DOM.");
-    lines.push("3. For `trap` findings: a custom widget likely captured focus and didn't " +
-      "release. Check `onkeydown` handlers or roving-`tabindex` patterns.");
-    lines.push("4. For `skip-row` findings: large vertical jumps are sometimes intentional " +
-      "(skipping a paragraph between two buttons). Verify the skipped region has no " +
-      "intended focusable elements.");
+    lines.push(
+      "2. For `reverse` findings: check if the divergent element has an explicit " +
+        "`tabindex` that overrides DOM order. If so, either remove the `tabindex` or " +
+        "reorder the DOM.",
+    );
+    lines.push(
+      "3. For `trap` findings: a custom widget likely captured focus and didn't " +
+        "release. Check `onkeydown` handlers or roving-`tabindex` patterns.",
+    );
+    lines.push(
+      "4. For `skip-row` findings: large vertical jumps are sometimes intentional " +
+        "(skipping a paragraph between two buttons). Verify the skipped region has no " +
+        "intended focusable elements.",
+    );
   }
   lines.push("");
   return lines.join("\n");

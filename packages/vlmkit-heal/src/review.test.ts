@@ -17,7 +17,11 @@ describe("resolveIntent", () => {
 
 describe("parseReview", () => {
   it("parses verdict + confidence + reason from the model's tagged output", () => {
-    const r = parseReview("VERDICT: accept\nCONFIDENCE: 0.92\nREASON: matches the declared badge change", "expectedChange", 0.001);
+    const r = parseReview(
+      "VERDICT: accept\nCONFIDENCE: 0.92\nREASON: matches the declared badge change",
+      "expectedChange",
+      0.001,
+    );
     assert.equal(r.verdict, "accept");
     assert.equal(r.confidence, 0.92);
     assert.match(r.reason, /badge change/);

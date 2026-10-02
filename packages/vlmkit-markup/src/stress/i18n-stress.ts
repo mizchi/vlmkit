@@ -158,9 +158,7 @@ interface ElementSample {
   scrollWidth: number;
 }
 
-export async function runI18nStress(
-  options: I18nStressOptions,
-): Promise<I18nStressReport> {
+export async function runI18nStress(options: I18nStressOptions): Promise<I18nStressReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   // A URL is a valid source now that loading goes through `openSource`;
@@ -180,7 +178,7 @@ export async function runI18nStress(
 
     const beforeScreenshot = join(outputDir, "before.png");
     await page.screenshot({ path: beforeScreenshot, fullPage: false });
-    const before = await page.evaluate(SAMPLE_SCRIPT) as ElementSample[];
+    const before = (await page.evaluate(SAMPLE_SCRIPT)) as ElementSample[];
 
     // Inflate every text node and re-sample.
     await page.evaluate(`(${INFLATE_SCRIPT})(${inflateFactor});`);
@@ -189,7 +187,7 @@ export async function runI18nStress(
 
     const afterScreenshot = join(outputDir, "after.png");
     await page.screenshot({ path: afterScreenshot, fullPage: false });
-    const after = await page.evaluate(SAMPLE_SCRIPT) as ElementSample[];
+    const after = (await page.evaluate(SAMPLE_SCRIPT)) as ElementSample[];
 
     await page.close();
 
@@ -227,7 +225,7 @@ export async function runI18nStress(
       // Vertical wrap: height grew much more than expected. Only flag
       // when the height delta is significant in absolute terms too
       // (avoid 4px → 6px lines flagged as 50% growth).
-      if (b.height > 0 && (a.height - b.height) >= 12 && a.height >= b.height * (1 + wrapThreshold)) {
+      if (b.height > 0 && a.height - b.height >= 12 && a.height >= b.height * (1 + wrapThreshold)) {
         overflowing.push({
           path: a.path,
           tag: a.tag,
@@ -271,8 +269,6 @@ export async function runI18nStress(
     });
     await writeFile(reportPath, md);
 
-
-
     return {
       html: htmlPath,
       inflateFactor,
@@ -300,21 +296,25 @@ export function formatI18nStressReport(report: I18nStressReport, rules?: RuleVie
     (o) => ({ rule: o.kind, emitted: o.kind === "vertical-wrap" ? "warn" : "suspect" }),
     rules,
   );
-  const icon = shown.length === 0
-    ? `${GREEN}✓${RESET}`
-    : shown.some((s) => s.tier === "suspect")
-      ? `${RED}✗${RESET}`
-      : shown.some((s) => s.tier === "warn") ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  const icon =
+    shown.length === 0
+      ? `${GREEN}✓${RESET}`
+      : shown.some((s) => s.tier === "suspect")
+        ? `${RED}✗${RESET}`
+        : shown.some((s) => s.tier === "warn")
+          ? `${YELLOW}!${RESET}`
+          : `${DIM}i${RESET}`;
   lines.push(`  ${icon} ${shown.length} overflow / wrap issue(s) across ${report.totalInspected} inspected element(s)`);
   const note = hiddenByRuleNote(hiddenByRule);
   if (note) lines.push(`    ${DIM}${note}${RESET}`);
   const CONSOLE_ROWS = 6;
   for (const { row: o } of shown.slice(0, CONSOLE_ROWS)) {
-    const detail = o.kind === "horizontal-overflow"
-      ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
-      : o.kind === "vertical-wrap"
-        ? `h ${o.before.height.toFixed(0)} → ${o.after.height.toFixed(0)}`
-        : "extends beyond parent right edge";
+    const detail =
+      o.kind === "horizontal-overflow"
+        ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
+        : o.kind === "vertical-wrap"
+          ? `h ${o.before.height.toFixed(0)} → ${o.after.height.toFixed(0)}`
+          : "extends beyond parent right edge";
     lines.push(`    ${DIM}[${o.kind}] ${o.path} — ${detail}${RESET}`);
   }
   // This gate kept its silent cut when the other three were fixed: the
@@ -332,8 +332,10 @@ function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
   lines.push("# i18n stress report");
   lines.push("");
   lines.push(`HTML: \`${r.html}\``);
-  lines.push(`Inflation factor: **${r.inflateFactor}×** — each word's length scaled by this ` +
-    `(equivalent to typical German/Finnish/Russian translation expansion).`);
+  lines.push(
+    `Inflation factor: **${r.inflateFactor}×** — each word's length scaled by this ` +
+      `(equivalent to typical German/Finnish/Russian translation expansion).`,
+  );
   lines.push("");
   lines.push("- Before: `" + r.beforeScreenshot + "`");
   lines.push("- After:  `" + r.afterScreenshot + "`");
@@ -343,49 +345,67 @@ function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
   if (r.overflowing.length === 0) {
     lines.push("## No overflow detected");
     lines.push("");
-    lines.push("Layout is robust against word-length inflation up to " + r.inflateFactor + "×. " +
-      "(Real-world German typically 1.3-1.5×, Finnish/Russian up to 1.6×.) " +
-      "Re-run with `--inflate 2` to stress-test further.");
+    lines.push(
+      "Layout is robust against word-length inflation up to " +
+        r.inflateFactor +
+        "×. " +
+        "(Real-world German typically 1.3-1.5×, Finnish/Russian up to 1.6×.) " +
+        "Re-run with `--inflate 2` to stress-test further.",
+    );
   } else {
     lines.push(`## Overflow / wrap issues: ${r.overflowing.length}`);
     lines.push("");
-    lines.push("Each row is the innermost element where the layout broke after " +
-      "text inflation. `horizontal-overflow` = text doesn't fit inside its " +
-      "box (clipped or scrolled). `extends-beyond-parent` = element spills " +
-      "past its parent's right edge. `vertical-wrap` = element grew taller, " +
-      "usually because text wrapped to extra lines.");
+    lines.push(
+      "Each row is the innermost element where the layout broke after " +
+        "text inflation. `horizontal-overflow` = text doesn't fit inside its " +
+        "box (clipped or scrolled). `extends-beyond-parent` = element spills " +
+        "past its parent's right edge. `vertical-wrap` = element grew taller, " +
+        "usually because text wrapped to extra lines.",
+    );
     lines.push("");
     lines.push("| Kind | Path | Text (truncated) | Before W×H | After W×H | Detail |");
     lines.push("|---|---|---|---|---|---|");
     for (const o of r.overflowing.slice(0, 20)) {
-      const detail = o.kind === "horizontal-overflow"
-        ? `scrollW=${o.after.scrollWidth.toFixed(0)} clientW=${o.after.clientWidth.toFixed(0)}`
-        : o.kind === "vertical-wrap"
-          ? `+${(o.after.height - o.before.height).toFixed(0)}px height`
-          : "—";
+      const detail =
+        o.kind === "horizontal-overflow"
+          ? `scrollW=${o.after.scrollWidth.toFixed(0)} clientW=${o.after.clientWidth.toFixed(0)}`
+          : o.kind === "vertical-wrap"
+            ? `+${(o.after.height - o.before.height).toFixed(0)}px height`
+            : "—";
       const bw = `${o.before.width.toFixed(0)}×${o.before.height.toFixed(0)}`;
       const aw = `${o.after.width.toFixed(0)}×${o.after.height.toFixed(0)}`;
       lines.push(`| ${o.kind} | \`${o.path}\` | \`${o.text}\` | ${bw} | ${aw} | ${detail} |`);
     }
-    if (r.overflowing.length > 20) lines.push(`\n_… ${r.overflowing.length - 20} more row(s) omitted; the JSON report has all of them._`);
+    if (r.overflowing.length > 20)
+      lines.push(`\n_… ${r.overflowing.length - 20} more row(s) omitted; the JSON report has all of them._`);
   }
   lines.push("");
   lines.push("## Suggested next step");
   lines.push("");
   if (r.overflowing.length === 0) {
-    lines.push("Layout is i18n-robust at " + r.inflateFactor + "×. Consider testing common " +
-      "edge cases like a single very long word (German compound noun, URL slug).");
+    lines.push(
+      "Layout is i18n-robust at " +
+        r.inflateFactor +
+        "×. Consider testing common " +
+        "edge cases like a single very long word (German compound noun, URL slug).",
+    );
   } else {
     lines.push("1. Open `after.png` and locate each element listed above.");
-    lines.push("2. For `horizontal-overflow` rows: the box has a fixed `width` or its " +
-      "container does. Switch to `max-width` + `min-width: 0`, or allow wrapping with " +
-      "`white-space: normal` / `word-break: break-word`.");
-    lines.push("3. For `vertical-wrap` rows: this is usually fine (text wrapped as expected), " +
-      "but verify the element's container can grow. If the container has a fixed `height` " +
-      "the wrapped text will be clipped — change to `min-height`.");
-    lines.push("4. For `extends-beyond-parent` rows: the element's content escapes its parent " +
-      "via `position: absolute`, negative margins, or a `width: 100vw` that ignores " +
-      "container constraints. Audit width-related declarations.");
+    lines.push(
+      "2. For `horizontal-overflow` rows: the box has a fixed `width` or its " +
+        "container does. Switch to `max-width` + `min-width: 0`, or allow wrapping with " +
+        "`white-space: normal` / `word-break: break-word`.",
+    );
+    lines.push(
+      "3. For `vertical-wrap` rows: this is usually fine (text wrapped as expected), " +
+        "but verify the element's container can grow. If the container has a fixed `height` " +
+        "the wrapped text will be clipped — change to `min-height`.",
+    );
+    lines.push(
+      "4. For `extends-beyond-parent` rows: the element's content escapes its parent " +
+        "via `position: absolute`, negative margins, or a `width: 100vw` that ignores " +
+        "container constraints. Audit width-related declarations.",
+    );
     lines.push("5. Re-run `vlmkit stress i18n`. The overflow list should empty out.");
   }
   lines.push("");

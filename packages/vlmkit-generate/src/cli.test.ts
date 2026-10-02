@@ -18,16 +18,25 @@ test("checkout", async ({ page }) => {
 describe("parseGenerateCliArgs", () => {
   it("parses required files and retry/model options", () => {
     const args = parseGenerateCliArgs([
-      "--plan", "specs/checkout.md",
-      "--out", "tests/checkout.spec.ts",
-      "--rules", "specs/rules.md",
-      "--helper-import", "../support/goto-app",
-      "--locator-inventory", "specs/locators.json",
+      "--plan",
+      "specs/checkout.md",
+      "--out",
+      "tests/checkout.spec.ts",
+      "--rules",
+      "specs/rules.md",
+      "--helper-import",
+      "../support/goto-app",
+      "--locator-inventory",
+      "specs/locators.json",
       "--runtime-gate",
-      "--playwright-config", "playwright.e2e.config.ts",
-      "--runtime-gate-runs", "2",
-      "--provider", "anthropic",
-      "--max-attempts", "3",
+      "--playwright-config",
+      "playwright.e2e.config.ts",
+      "--runtime-gate-runs",
+      "2",
+      "--provider",
+      "anthropic",
+      "--max-attempts",
+      "3",
     ]);
 
     assert.equal(args.plan, "specs/checkout.md");
@@ -37,11 +46,13 @@ describe("parseGenerateCliArgs", () => {
     assert.equal(args.locatorInventory, "specs/locators.json");
     assert.equal(args.runtimeGate, true);
     assert.equal(args.playwrightConfig, "playwright.e2e.config.ts");
-    assert.deepEqual(args.gateCommands, [{
-      name: "playwright-runtime",
-      command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
-      runs: 2,
-    }]);
+    assert.deepEqual(args.gateCommands, [
+      {
+        name: "playwright-runtime",
+        command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
+        runs: 2,
+      },
+    ]);
     assert.equal(args.provider, "anthropic");
     assert.equal(args.maxAttempts, 3);
   });
@@ -62,14 +73,12 @@ describe("runGenerateCli", () => {
       await writeFile(plan, "# Checkout\n", "utf8");
       await writeFile(rules, "Use role locators.\n", "utf8");
 
-      const code = await runGenerateCli([
-        "--plan", plan,
-        "--rules", rules,
-        "--out", out,
-        "--helper-import", "../support/goto-app",
-      ], {
-        complete: async () => ({ content: `\`\`\`ts\n${validSource}\`\`\`` }),
-      });
+      const code = await runGenerateCli(
+        ["--plan", plan, "--rules", rules, "--out", out, "--helper-import", "../support/goto-app"],
+        {
+          complete: async () => ({ content: `\`\`\`ts\n${validSource}\`\`\`` }),
+        },
+      );
 
       assert.equal(code, 0);
       assert.equal(await readFile(out, "utf8"), validSource);
@@ -85,11 +94,7 @@ describe("runGenerateCli", () => {
       const out = join(dir, "checkout.spec.ts");
       await writeFile(plan, "# Checkout\n", "utf8");
 
-      const code = await runGenerateCli([
-        "--plan", plan,
-        "--out", out,
-        "--max-attempts", "1",
-      ], {
+      const code = await runGenerateCli(["--plan", plan, "--out", out, "--max-attempts", "1"], {
         complete: async () => ({
           content: `\`\`\`ts
 import { test } from "@playwright/test";

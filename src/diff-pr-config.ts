@@ -168,9 +168,10 @@ export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfi
 
   // Accept routes at top level or under capture.routes for parity
   // with the existing workflow config shape.
-  const captureSection = obj.capture && typeof obj.capture === "object" && !Array.isArray(obj.capture)
-    ? obj.capture as Record<string, unknown>
-    : null;
+  const captureSection =
+    obj.capture && typeof obj.capture === "object" && !Array.isArray(obj.capture)
+      ? (obj.capture as Record<string, unknown>)
+      : null;
   const rawRoutes = captureSection?.routes ?? obj.routes;
   if (!Array.isArray(rawRoutes)) {
     throw new Error("vlmkit.config must declare `routes` (top-level or under `capture`)");
@@ -334,7 +335,7 @@ function parseThresholds(value: unknown): Record<string, number> {
 
 function parseRoute(value: unknown, index: number, baseUrl: string | undefined): DiffPrRoute {
   if (typeof value === "string") {
-    const url = hasScheme(value) ? value : (baseUrl ? joinUrl(baseUrl, value) : value);
+    const url = hasScheme(value) ? value : baseUrl ? joinUrl(baseUrl, value) : value;
     return { name: routeNameFromUrl(url), url };
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -346,7 +347,7 @@ function parseRoute(value: unknown, index: number, baseUrl: string | undefined):
   const path = asRequiredString(urlField, `routes[${index}] must have url or path`);
   // Treat scheme-prefixed values (http://, https://, file://) as
   // already-absolute. Bare leading-slash paths get joined to baseUrl.
-  const fullUrl = hasScheme(path) ? path : (baseUrl ? joinUrl(baseUrl, path) : path);
+  const fullUrl = hasScheme(path) ? path : baseUrl ? joinUrl(baseUrl, path) : path;
   const name = asOptionalString(r.name, `routes[${index}].name`) ?? routeNameFromUrl(fullUrl);
   const waitFor = asOptionalString(r.waitFor ?? r.wait_for, `routes[${index}].waitFor`);
   const thresholds = parseThresholds(r.thresholds);
@@ -376,9 +377,21 @@ function routeNameFromUrl(url: string): string {
     const u = new URL(url);
     const cleaned = u.pathname.replace(/^\/+|\/+$/g, "");
     if (!cleaned) return "home";
-    return cleaned.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase() || "home";
+    return (
+      cleaned
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toLowerCase() || "home"
+    );
   } catch {
-    return url.split("/").filter(Boolean).pop()?.replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase() || "route";
+    return (
+      url
+        .split("/")
+        .filter(Boolean)
+        .pop()
+        ?.replace(/[^a-zA-Z0-9]+/g, "_")
+        .toLowerCase() || "route"
+    );
   }
 }
 

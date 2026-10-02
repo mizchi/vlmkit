@@ -14,10 +14,7 @@ import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
 import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
-import {
-  applyAllowRules,
-  type IntegrityAllowRule,
-} from "./integrity-exemption.ts";
+import { applyAllowRules, type IntegrityAllowRule } from "./integrity-exemption.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyHar, settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -673,13 +670,13 @@ export const DEFAULT_INTEGRITY_VIEWPORTS = [
   { width: 375, height: 700 },
 ];
 
-
 function dedupeKey(f: IntegrityFinding): string {
-  const extra = f.kind === "js-error"
-    ? String(f.evidence?.text ?? f.message)
-    : f.kind === "failed-stylesheet" || f.kind === "broken-font" || f.kind === "broken-image"
-    ? String(f.evidence?.url ?? f.evidence?.src ?? f.evidence?.family ?? "")
-    : "";
+  const extra =
+    f.kind === "js-error"
+      ? String(f.evidence?.text ?? f.message)
+      : f.kind === "failed-stylesheet" || f.kind === "broken-font" || f.kind === "broken-image"
+        ? String(f.evidence?.url ?? f.evidence?.src ?? f.evidence?.family ?? "")
+        : "";
   return `${f.kind}|${f.selector ?? ""}|${extra}`;
 }
 
@@ -689,8 +686,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   // first: `--viewports 375,768,1280` attributed a page-wide defect to 375 and
   // `1280,768,375` to 1280. That made `--allow "...@1280"` silently
   // order-dependent, and read as "mobile only" for something present everywhere.
-  const viewports = [...(options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS)]
-    .sort((a, b) => b.width - a.width);
+  const viewports = [...(options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS)].sort((a, b) => b.width - a.width);
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
   const stats: IntegrityViewportStats[] = [];
@@ -729,7 +725,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       const events: RuntimeEvent[] = [];
       const netFailures: NetworkFailure[] = [];
       let loaded = false;
-      page.on("load", () => { loaded = true; });
+      page.on("load", () => {
+        loaded = true;
+      });
       page.on("pageerror", (err) => {
         // The stack's first frame, so a throw from inside a vendor bundle is attributed to
         // the vendor rather than to the page that loaded it.
@@ -763,8 +761,20 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
           party: classifyRuntimeParty(sourceUrl, url),
         });
       });
-      const pageOrigin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
-      const originOf = (u: string) => { try { return new URL(u).origin; } catch { return pageOrigin; } };
+      const pageOrigin = (() => {
+        try {
+          return new URL(url).origin;
+        } catch {
+          return "";
+        }
+      })();
+      const originOf = (u: string) => {
+        try {
+          return new URL(u).origin;
+        } catch {
+          return pageOrigin;
+        }
+      };
       page.on("requestfailed", (req) => {
         netFailures.push({
           url: req.url(),
@@ -776,7 +786,12 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       });
       page.on("response", (res) => {
         if (!res.ok() && res.status() >= 400) {
-          netFailures.push({ url: res.url(), resourceType: res.request().resourceType(), reason: `HTTP ${res.status()}`, crossOrigin: originOf(res.url()) !== pageOrigin });
+          netFailures.push({
+            url: res.url(),
+            resourceType: res.request().resourceType(),
+            reason: `HTTP ${res.status()}`,
+            crossOrigin: originOf(res.url()) !== pageOrigin,
+          });
         }
       });
       await page.goto(url, {
@@ -810,17 +825,19 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       push(classifyRuntimeEvents(correlateRuntimeEvents(events, netFailures).events, viewport.width));
 
       // A3 (+A8 fingerprint on the first viewport — layout-independent)
-      const resources = await page.evaluate(COLLECT_RESOURCES) as ResourceSample;
+      const resources = (await page.evaluate(COLLECT_RESOURCES)) as ResourceSample;
       push(judgeResources(resources, viewport.width));
       // Wire-side failures; skip image URLs the DOM probe already
       // attributed to a selector (same basename) to avoid double rows.
       const domImageTails = new Set(resources.brokenImages.map((i) => i.src.split("/").pop()));
-      push(judgeNetworkFailures(
-        netFailures.filter((f) => !(f.resourceType === "image" && domImageTails.has(f.url.split("/").pop()))),
-        viewport.width,
-      ));
+      push(
+        judgeNetworkFailures(
+          netFailures.filter((f) => !(f.resourceType === "image" && domImageTails.has(f.url.split("/").pop()))),
+          viewport.width,
+        ),
+      );
       if (vi === 0) {
-        const fp = await page.evaluate(COLLECT_STYLE_FINGERPRINT) as StyleFingerprint;
+        const fp = (await page.evaluate(COLLECT_STYLE_FINGERPRINT)) as StyleFingerprint;
         // link.sheet is non-null even for a 404 (see judgeNetworkFailures) —
         // the wire is authoritative for how many stylesheets actually loaded.
         // Only count failures of the DECLARED link URLs: a failing @import
@@ -836,7 +853,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       }
 
       // A4
-      const blocks = await page.evaluate(COLLECT_INTEGRITY_TEXT) as IntegrityTextBlock[];
+      const blocks = (await page.evaluate(COLLECT_INTEGRITY_TEXT)) as IntegrityTextBlock[];
       // The top-level cap applies to every finding class; an explicit
       // per-class collision option still wins.
       const collisions = findTextCollisions(blocks, viewport.width, {
@@ -847,42 +864,47 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       exempted.push(...collisions.exempted);
 
       // A5
-      const clipCandidates = await page.evaluate(COLLECT_CLIP_CANDIDATES) as ClipCandidate[];
+      const clipCandidates = (await page.evaluate(COLLECT_CLIP_CANDIDATES)) as ClipCandidate[];
       const clipped = judgeClippedText(clipCandidates, viewport.width, options.maxFindings ?? 12);
       push(clipped.findings);
       exempted.push(...clipped.exempted);
 
       // A6
-      const collapseCandidates = await page.evaluate(COLLECT_COLLAPSE_CANDIDATES) as CollapseCandidate[];
+      const collapseCandidates = (await page.evaluate(COLLECT_COLLAPSE_CANDIDATES)) as CollapseCandidate[];
       const collapsed = judgeCollapsedContainers(collapseCandidates, viewport.width);
       push(collapsed.findings);
       exempted.push(...collapsed.exempted);
 
       // A10 — container protrusion
-      const protrusionCandidates = await page.evaluate(COLLECT_PROTRUSIONS) as ProtrusionCandidate[];
+      const protrusionCandidates = (await page.evaluate(COLLECT_PROTRUSIONS)) as ProtrusionCandidate[];
       const protrusions = judgeProtrusions(protrusionCandidates, viewport.width, options.maxFindings ?? 12);
       push(protrusions.findings);
       exempted.push(...protrusions.exempted);
 
       // A11 — invisible / low-contrast text (solid backgrounds only)
-      const { samples } = await page.evaluate(COLLECT_TEXT_CONTRAST) as { samples: TextContrastSample[] };
+      const { samples } = (await page.evaluate(COLLECT_TEXT_CONTRAST)) as { samples: TextContrastSample[] };
       const measured = textContrastCandidates(samples);
-      const contrast = judgeTextContrast(measured.candidates, measured.skippedComposite, viewport.width, options.maxFindings ?? 12);
+      const contrast = judgeTextContrast(
+        measured.candidates,
+        measured.skippedComposite,
+        viewport.width,
+        options.maxFindings ?? 12,
+      );
       push(contrast.findings);
       exempted.push(...contrast.exempted);
 
       // A12 — near-misalignment among siblings sharing an edge
-      const alignGroups = await page.evaluate(COLLECT_ALIGN_GROUPS) as AlignmentGroup[];
+      const alignGroups = (await page.evaluate(COLLECT_ALIGN_GROUPS)) as AlignmentGroup[];
       push(judgeAlignment(alignGroups, viewport.width));
 
       // A13 — occluded text (paint-order cover by an opaque unrelated element)
-      const occlusionCandidates = await page.evaluate(COLLECT_OCCLUSIONS) as OcclusionCandidate[];
+      const occlusionCandidates = (await page.evaluate(COLLECT_OCCLUSIONS)) as OcclusionCandidate[];
       const occlusions = findOccludedText(occlusionCandidates, viewport.width);
       push(occlusions.findings);
       exempted.push(...occlusions.exempted);
 
       // A7 — scan scroll delegation (page-overflow-x is a defect here)
-      const scroll = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
+      const scroll = (await page.evaluate(COLLECT_SCROLL_SCRIPT)) as Omit<ScrollScanInput, "source">;
       const scrollReport = analyzeScrollSamples({ source: options.source, ...scroll });
       // The text probe already ruled on these selectors — as findings OR
       // as exemptions (an sr-only span must not resurface as a
@@ -893,13 +915,15 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       ]);
       for (const issue of scrollReport.issues) {
         if (issue.kind === "clipped-content" && issue.selector && clippedSelectors.has(issue.selector)) continue;
-        push([{
-          kind: issue.kind,
-          severity: issue.kind === "page-overflow-x" ? "fail" : "warn",
-          viewport: viewport.width,
-          ...(issue.selector ? { selector: issue.selector } : {}),
-          message: issue.message,
-        }]);
+        push([
+          {
+            kind: issue.kind,
+            severity: issue.kind === "page-overflow-x" ? "fail" : "warn",
+            viewport: viewport.width,
+            ...(issue.selector ? { selector: issue.selector } : {}),
+            message: issue.message,
+          },
+        ]);
       }
 
       // A2 — pixel side, last (after webfont/img settling)
@@ -947,14 +971,20 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       const perViewport: { rows: ReturnType<typeof tierByPersistence<IntegrityFinding>> }[] = [];
       const restingAnywhere = new Set<string>(exemptedKeys);
       for (const viewport of viewports) {
-        const { samples, rest } = await sampleIntegrityTimeline(browser, url, viewport, {
-          ...(options.timeline.at ? { at: options.timeline.at } : {}),
-          ...(options.storageState ? { storageState: options.storageState } : {}),
-          ...(options.har ? { har: options.har } : {}),
-          ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
-          ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
-          ...(options.maxFindings !== undefined ? { maxFindings: options.maxFindings } : {}),
-        }, collectors);
+        const { samples, rest } = await sampleIntegrityTimeline(
+          browser,
+          url,
+          viewport,
+          {
+            ...(options.timeline.at ? { at: options.timeline.at } : {}),
+            ...(options.storageState ? { storageState: options.storageState } : {}),
+            ...(options.har ? { har: options.har } : {}),
+            ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
+            ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
+            ...(options.maxFindings !== undefined ? { maxFindings: options.maxFindings } : {}),
+          },
+          collectors,
+        );
         timelineInstants.push({ viewport: viewport.width, atMs: samples.map((sample) => sample.atMs) });
         const keyed = samples.map((sample) => ({
           atMs: sample.atMs,
@@ -980,11 +1010,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
           const note = caughtMidMotion ? "; the settled run measured it mid-motion" : "";
           if (row.tier === "held") {
             const before = findings.length;
-            push([{
-              ...row.finding,
-              message: `While the page moves (held ${row.run.fromMs}-${row.run.toMs}ms of page time, ${row.run.samples} instants; absent once it stops${note}): ${row.finding.message}`,
-              evidence: { ...(row.finding.evidence ?? {}), timeline },
-            }]);
+            push([
+              {
+                ...row.finding,
+                message: `While the page moves (held ${row.run.fromMs}-${row.run.toMs}ms of page time, ${row.run.samples} instants; absent once it stops${note}): ${row.finding.message}`,
+                evidence: { ...(row.finding.evidence ?? {}), timeline },
+              },
+            ]);
             if (findings.length > before) held++;
           } else if (!transientSeen.has(row.key)) {
             transientSeen.set(row.key, { finding: row.finding, ...timeline });
@@ -1012,10 +1044,12 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
 
   const order: Record<"fail" | "warn", number> = { fail: 0, warn: 1 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.viewport - b.viewport);
-  const kickback = findings.map((f) =>
-    `[${f.kind}]${f.selector ? ` ${f.selector}` : ""} (viewport ${
-      f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : f.viewport
-    }): ${f.message}`);
+  const kickback = findings.map(
+    (f) =>
+      `[${f.kind}]${f.selector ? ` ${f.selector}` : ""} (viewport ${
+        f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : f.viewport
+      }): ${f.message}`,
+  );
   const verdict = findings.some((f) => f.severity === "fail") ? "defects" : "clean";
   // No ledger append here. `integrityGate.ledger` writes the row, so the
   // runner owns it — which is what makes `--json`-only callers, the MCP
@@ -1031,7 +1065,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     kickback,
     ...(allowed.unusedRules.length > 0 ? { unusedAllowRules: allowed.unusedRules } : {}),
     ...(options.timeline
-      ? { timeline: { instants: timelineInstants, held: timelineHeld, transient: timelineTransient.filter((row) => keptTransient.has(row.finding)) } }
+      ? {
+          timeline: {
+            instants: timelineInstants,
+            held: timelineHeld,
+            transient: timelineTransient.filter((row) => keptTransient.has(row.finding)),
+          },
+        }
       : {}),
   };
 }
@@ -1093,30 +1133,32 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
   //
   // `report.verdict` keeps its two values: it is the JSON contract, and it means
   // exactly "did anything fail". Only the printed word gains the middle case.
-  const word = fails > 0
-    ? `${RED}DEFECTS${RESET}`
-    : warns > 0
-      ? `${YELLOW}NO DEFECTS, ${warns} WARN${RESET}`
-      : `${GREEN}CLEAN${RESET}`;
+  const word =
+    fails > 0
+      ? `${RED}DEFECTS${RESET}`
+      : warns > 0
+        ? `${YELLOW}NO DEFECTS, ${warns} WARN${RESET}`
+        : `${GREEN}CLEAN${RESET}`;
   // The exit code is NOT appended here. The runner inserts it directly under this line
   // for every gate (`withExitIntent`), so stating it here too would print it twice —
   // and one gate saying it while twenty-six do not is the divergence that put the
   // `--wait-until` hint on two gates out of four.
   lines.push(
-    `verdict: ${word} (${fails} fail, ${warns} warn`
-    + (infos > 0 ? `, ${infos} info` : "")
-    + `, ${report.exempted.length} exempted)`,
+    `verdict: ${word} (${fails} fail, ${warns} warn` +
+      (infos > 0 ? `, ${infos} info` : "") +
+      `, ${report.exempted.length} exempted)`,
   );
   for (const v of report.viewports) {
-    lines.push(`${DIM}  ${v.width}x${v.height}: ${v.components} component(s), ink ${(v.inkRatio * 100).toFixed(1)}%, ${v.textBlocks} text block(s)${RESET}`);
+    lines.push(
+      `${DIM}  ${v.width}x${v.height}: ${v.components} component(s), ink ${(v.inkRatio * 100).toFixed(1)}%, ${v.textBlocks} text block(s)${RESET}`,
+    );
   }
   if (shown.length > 0) {
     lines.push("");
     lines.push("Findings:");
     for (const { finding: f, severity } of shown) {
-      const icon = severity === "fail"
-        ? `${RED}x${RESET}`
-        : severity === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
+      const icon =
+        severity === "fail" ? `${RED}x${RESET}` : severity === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
       // Show every width it appeared at: "@1280" and "@1280,768,375" are
       // different bugs to fix, and the caller cannot tell them apart otherwise.
       const at = f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : String(f.viewport);
@@ -1137,16 +1179,14 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
   if (coverage.skippedRules && coverage.skippedRules.length > 0) {
     lines.push("");
     lines.push(
-      `${YELLOW}Coverage: image mode — ${coverage.skippedRules.length} rule(s) cannot be`
-      + ` evaluated without a DOM${RESET}`,
+      `${YELLOW}Coverage: image mode — ${coverage.skippedRules.length} rule(s) cannot be` +
+        ` evaluated without a DOM${RESET}`,
     );
     for (const skipped of coverage.skippedRules) {
       lines.push(`${DIM}  - ${skipped.rule}: ${skipped.reason}${RESET}`);
     }
     if (coverage.inertRules && coverage.inertRules.length > 0) {
-      lines.push(
-        `${DIM}  ${coverage.inertRules.length} rule(s) ran with no input to judge:${RESET}`,
-      );
+      lines.push(`${DIM}  ${coverage.inertRules.length} rule(s) ran with no input to judge:${RESET}`);
       for (const inert of coverage.inertRules) {
         lines.push(`${DIM}  - ${inert.rule}: ${inert.reason}${RESET}`);
       }
@@ -1176,15 +1216,21 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
     lines.push("");
     // The instants are the reading instruction: "held" means held across consecutive ones, so
     // a reader needs to know how far apart they were.
-    lines.push(`Timeline: ${t.instants.map((i) => `${i.viewport}px at ${i.atMs.join("/")}ms`).join("; ")}`
-      + ` (page time, clock and animations held) — ${t.held} held finding(s) above, ${t.transient.length} transient`);
+    lines.push(
+      `Timeline: ${t.instants.map((i) => `${i.viewport}px at ${i.atMs.join("/")}ms`).join("; ")}` +
+        ` (page time, clock and animations held) — ${t.held} held finding(s) above, ${t.transient.length} transient`,
+    );
     for (const row of t.transient.slice(0, 10)) {
       const f = row.finding;
-      lines.push(`  ${DIM}- [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}, only at ${row.seenAtMs.join("/")}ms: ${f.message}${RESET}`);
+      lines.push(
+        `  ${DIM}- [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}, only at ${row.seenAtMs.join("/")}ms: ${f.message}${RESET}`,
+      );
     }
     if (t.transient.length > 10) lines.push(`  ${DIM}… ${t.transient.length - 10} more transient${RESET}`);
     if (t.transient.length > 0) {
-      lines.push(`${DIM}  Transient = seen at no two consecutive instants: a glimpse mid-motion, reported without weight.${RESET}`);
+      lines.push(
+        `${DIM}  Transient = seen at no two consecutive instants: a glimpse mid-motion, reported without weight.${RESET}`,
+      );
     }
   }
   if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {

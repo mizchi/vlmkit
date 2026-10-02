@@ -36,15 +36,26 @@ const CLI = fileURLToPath(new URL("./vlmkit.ts", import.meta.url));
 /** More rows than any of these gates prints, so truncation is always in play. */
 const PAGE = (() => {
   const rows = Array.from({ length: 12 }, (_, i) => `<p class="low${i}">Low contrast line ${i}</p>`).join("");
-  const taps = Array.from({ length: 12 }, (_, i) => `<a class="tap${i}" href="#${i}" aria-label="tap ${i}"></a>`).join("");
-  const wide = Array.from({ length: 12 }, (_, i) => `<div class="box${i}"><span>Overflowing label ${i}</span></div>`).join("");
-  const css = Array.from({ length: 12 }, (_, i) =>
-    `.low${i}{color:#bbb}`
-    + `.tap${i}{display:inline-block;width:18px;height:18px;background:#333;margin:2px}`
-    + `.box${i}{width:80px;overflow:auto;white-space:nowrap}`).join("");
+  const taps = Array.from({ length: 12 }, (_, i) => `<a class="tap${i}" href="#${i}" aria-label="tap ${i}"></a>`).join(
+    "",
+  );
+  const wide = Array.from(
+    { length: 12 },
+    (_, i) => `<div class="box${i}"><span>Overflowing label ${i}</span></div>`,
+  ).join("");
+  const css = Array.from(
+    { length: 12 },
+    (_, i) =>
+      `.low${i}{color:#bbb}` +
+      `.tap${i}{display:inline-block;width:18px;height:18px;background:#333;margin:2px}` +
+      `.box${i}{width:80px;overflow:auto;white-space:nowrap}`,
+  ).join("");
   const dir = mkdtempSync(join(tmpdir(), "json-contract-"));
   const file = join(dir, "page.html");
-  writeFileSync(file, `<!doctype html><meta charset="utf-8"><title>rows</title><style>body{background:#fff;font:16px sans-serif}${css}</style><body>${rows}${taps}${wide}</body>`);
+  writeFileSync(
+    file,
+    `<!doctype html><meta charset="utf-8"><title>rows</title><style>body{background:#fff;font:16px sans-serif}${css}</style><body>${rows}${taps}${wide}</body>`,
+  );
   return file;
 })();
 
@@ -187,13 +198,19 @@ describe("`vlmkit rules --json` is the machine-readable catalog", () => {
       gates: { id: string; command: string; category: string | null; plugin: string; rules: unknown[] }[];
     };
     assert.deepEqual(Object.keys(parsed.categories), [
-      "correctness", "behavior", "design-system", "verdict", "infrastructure",
+      "correctness",
+      "behavior",
+      "design-system",
+      "verdict",
+      "infrastructure",
     ]);
     assert.ok(parsed.gates.length >= 26, `only ${parsed.gates.length} gates in the catalog`);
     for (const gate of parsed.gates) {
-      assert.deepEqual(Object.keys(gate), [
-        "id", "command", "title", "summary", "category", "plugin", "rules",
-      ], `${gate.id} has the wrong keys`);
+      assert.deepEqual(
+        Object.keys(gate),
+        ["id", "command", "title", "summary", "category", "plugin", "rules"],
+        `${gate.id} has the wrong keys`,
+      );
       // `category` is nullable in the shape — a third-party gate may decline to
       // pick one — but every gate the catalog ships must name a known bucket.
       assert.ok(gate.category && gate.category in parsed.categories, `${gate.id}: ${gate.category}`);

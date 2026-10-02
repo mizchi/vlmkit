@@ -28,11 +28,15 @@ const TMP = join(import.meta.dirname!, "..", "..", "test-results", "demo-fix");
 const BG_RED = "\x1b[41m";
 const BG_GREEN = "\x1b[42m";
 
-function hr() { _hr(64); }
+function hr() {
+  _hr(64);
+}
 function banner(text: string) {
   console.log(`\n${BOLD}${CYAN}▸ ${text}${RESET}\n`);
 }
-async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 // Kitty graphics
 function kittyShow(pngBuffer: Buffer, cols = 40) {
@@ -52,7 +56,11 @@ function kittyShow(pngBuffer: Buffer, cols = 40) {
 
 async function showPng(path: string, label: string) {
   console.log(`  ${DIM}${label}:${RESET}`);
-  try { kittyShow(await readFile(path)); } catch { console.log("  (no image)"); }
+  try {
+    kittyShow(await readFile(path));
+  } catch {
+    console.log("  (no image)");
+  }
 }
 
 // ---- PNG generation ----
@@ -61,13 +69,19 @@ type Rect = { x: number; y: number; w: number; h: number; r: number; g: number; 
 function createPng(width: number, height: number, regions: Rect[], bg = { r: 245, g: 245, b: 250 }) {
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++) {
-    data[i * 4] = bg.r; data[i * 4 + 1] = bg.g; data[i * 4 + 2] = bg.b; data[i * 4 + 3] = 255;
+    data[i * 4] = bg.r;
+    data[i * 4 + 1] = bg.g;
+    data[i * 4 + 2] = bg.b;
+    data[i * 4 + 3] = 255;
   }
   for (const r of regions) {
     for (let y = r.y; y < Math.min(r.y + r.h, height); y++) {
       for (let x = r.x; x < Math.min(r.x + r.w, width); x++) {
         const i = (y * width + x) * 4;
-        data[i] = r.r; data[i + 1] = r.g; data[i + 2] = r.b; data[i + 3] = 255;
+        data[i] = r.r;
+        data[i + 1] = r.g;
+        data[i + 2] = r.b;
+        data[i + 3] = 255;
       }
     }
   }
@@ -84,26 +98,26 @@ const HEADER: Rect[] = [
 const HEADING: Rect[] = [{ x: 40, y: 45, w: 180, h: 20, r: 30, g: 30, b: 30 }];
 const FORM_OK: Rect[] = [
   { x: 40, y: 80, w: 240, h: 110, r: 255, g: 255, b: 255 },
-  { x: 50, y: 88, w: 80, h: 10, r: 120, g: 120, b: 130 },   // "Email" label
-  { x: 50, y: 100, w: 220, h: 20, r: 240, g: 240, b: 245 },  // input
-  { x: 50, y: 126, w: 80, h: 10, r: 120, g: 120, b: 130 },   // "Message" label
-  { x: 50, y: 138, w: 220, h: 20, r: 240, g: 240, b: 245 },  // input
-  { x: 50, y: 165, w: 220, h: 20, r: 35, g: 134, b: 54 },    // button
+  { x: 50, y: 88, w: 80, h: 10, r: 120, g: 120, b: 130 }, // "Email" label
+  { x: 50, y: 100, w: 220, h: 20, r: 240, g: 240, b: 245 }, // input
+  { x: 50, y: 126, w: 80, h: 10, r: 120, g: 120, b: 130 }, // "Message" label
+  { x: 50, y: 138, w: 220, h: 20, r: 240, g: 240, b: 245 }, // input
+  { x: 50, y: 165, w: 220, h: 20, r: 35, g: 134, b: 54 }, // button
 ];
 const FORM_BROKEN: Rect[] = [
   { x: 40, y: 80, w: 240, h: 110, r: 255, g: 255, b: 255 },
   // no labels -- bare inputs only
   { x: 50, y: 100, w: 220, h: 20, r: 240, g: 240, b: 245 },
   { x: 50, y: 138, w: 220, h: 20, r: 240, g: 240, b: 245 },
-  { x: 50, y: 165, w: 220, h: 20, r: 180, g: 40, b: 40 },    // red button = broken
+  { x: 50, y: 165, w: 220, h: 20, r: 180, g: 40, b: 40 }, // red button = broken
 ];
 const FORM_FIXED: Rect[] = [
   { x: 40, y: 80, w: 240, h: 110, r: 255, g: 255, b: 255 },
-  { x: 50, y: 88, w: 100, h: 10, r: 80, g: 80, b: 90 },      // "Email address" label
+  { x: 50, y: 88, w: 100, h: 10, r: 80, g: 80, b: 90 }, // "Email address" label
   { x: 50, y: 100, w: 220, h: 20, r: 240, g: 240, b: 245 },
-  { x: 50, y: 126, w: 100, h: 10, r: 80, g: 80, b: 90 },     // "Your message" label
+  { x: 50, y: 126, w: 100, h: 10, r: 80, g: 80, b: 90 }, // "Your message" label
   { x: 50, y: 138, w: 220, h: 20, r: 240, g: 240, b: 245 },
-  { x: 50, y: 165, w: 220, h: 20, r: 35, g: 134, b: 54 },    // green button = OK
+  { x: 50, y: 165, w: 220, h: 20, r: 35, g: 134, b: 54 }, // green button = OK
 ];
 
 // ---- Helpers ----
@@ -132,8 +146,7 @@ function printA11yIssues(tree: A11yNode) {
 }
 
 function printReasoning(chain: ReasoningChain) {
-  const color = chain.verdict === "realized" ? GREEN
-    : chain.verdict === "not-realized" ? RED : YELLOW;
+  const color = chain.verdict === "realized" ? GREEN : chain.verdict === "not-realized" ? RED : YELLOW;
   console.log(`  Verdict: ${color}${BOLD}${chain.verdict.toUpperCase()}${RESET}`);
   for (const m of chain.mappings) {
     const icon = m.realized ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
@@ -260,8 +273,12 @@ export async function runDemoFixLoop() {
 
   // Visual diff
   const vrtSnap: VrtSnapshot = {
-    testId: "page", testTitle: "page", projectName: "demo",
-    screenshotPath: brokenPath, baselinePath: basePath, status: "changed",
+    testId: "page",
+    testTitle: "page",
+    projectName: "demo",
+    screenshotPath: brokenPath,
+    baselinePath: basePath,
+    status: "changed",
   };
   const vrtDiff = await compareScreenshots(vrtSnap, { outputDir: TMP });
   if (vrtDiff?.heatmapPath) {
@@ -272,7 +289,9 @@ export async function runDemoFixLoop() {
 
   // A11y diff
   const a11yDiff = diffTrees(baseline, broken);
-  console.log(`\n  ${BOLD}A11y Diff:${RESET} ${RED}${a11yDiff.changes.length} change(s)${RESET}${a11yDiff.hasRegression ? ` ${BG_RED} REGRESSION ${RESET}` : ""}`);
+  console.log(
+    `\n  ${BOLD}A11y Diff:${RESET} ${RED}${a11yDiff.changes.length} change(s)${RESET}${a11yDiff.hasRegression ? ` ${BG_RED} REGRESSION ${RESET}` : ""}`,
+  );
   for (const c of a11yDiff.changes) {
     const icon = c.severity === "error" ? `${RED}✗${RESET}` : `${YELLOW}~${RESET}`;
     console.log(`  ${icon} [${c.type}] ${c.description}`);
@@ -356,12 +375,19 @@ export async function runDemoFixLoop() {
 
   // Visual diff (fixed vs baseline)
   const fixedVrtSnap: VrtSnapshot = {
-    testId: "page", testTitle: "page", projectName: "demo",
-    screenshotPath: fixedPath, baselinePath: basePath, status: "changed",
+    testId: "page",
+    testTitle: "page",
+    projectName: "demo",
+    screenshotPath: fixedPath,
+    baselinePath: basePath,
+    status: "changed",
   };
   const fixedVrtDiff = await compareScreenshots(fixedVrtSnap, { outputDir: TMP });
   if (fixedVrtDiff && fixedVrtDiff.diffPixels > 0 && fixedVrtDiff.heatmapPath) {
-    await showPng(fixedVrtDiff.heatmapPath, `Heatmap (${(fixedVrtDiff.diffRatio * 100).toFixed(1)}% — label styling diff)`);
+    await showPng(
+      fixedVrtDiff.heatmapPath,
+      `Heatmap (${(fixedVrtDiff.diffRatio * 100).toFixed(1)}% — label styling diff)`,
+    );
   }
 
   // A11y check on fixed
@@ -400,7 +426,9 @@ export async function runDemoFixLoop() {
   // Spec re-verification
   const fixedSpecResult = verifySpec(spec, new Map([["page", { a11yTree: fixed, screenshotExists: true }]]));
   const fixedSpecFailed = fixedSpecResult.results[0].checked.filter((c) => !c.passed);
-  console.log(`\n  ${BOLD}Spec Verification:${RESET} ${fixedSpecFailed.length === 0 ? `${BG_GREEN}${BOLD} ALL PASS ${RESET}` : `${RED}${fixedSpecFailed.length} failed${RESET}`}`);
+  console.log(
+    `\n  ${BOLD}Spec Verification:${RESET} ${fixedSpecFailed.length === 0 ? `${BG_GREEN}${BOLD} ALL PASS ${RESET}` : `${RED}${fixedSpecFailed.length} failed${RESET}`}`,
+  );
 
   // LLM fix evaluation
   if (llm) {
@@ -441,9 +469,13 @@ In 2-3 sentences: Is this fix adequate? Are there remaining concerns? Rate the f
   console.log(`  ${BOLD}Fix Loop Summary:${RESET}`);
   console.log();
   console.log(`  ${DIM}Phase 1:${RESET} Baseline established (spec: ${spec.pages[0].invariants.length} invariants)`);
-  console.log(`  ${DIM}Phase 2:${RESET} ${RED}Regression detected${RESET} — ${a11yDiff.changes.length} a11y changes, ${brokenIssues.length} quality issues, ${specFailed.length} spec violations`);
+  console.log(
+    `  ${DIM}Phase 2:${RESET} ${RED}Regression detected${RESET} — ${a11yDiff.changes.length} a11y changes, ${brokenIssues.length} quality issues, ${specFailed.length} spec violations`,
+  );
   console.log(`  ${DIM}Phase 3:${RESET} ${YELLOW}Fix plan generated${RESET} — ${llm ? "AI diagnosis" : "heuristic"}`);
-  console.log(`  ${DIM}Phase 4:${RESET} ${GREEN}Fix verified${RESET} — ${fixChain.verdict}, ${fixedSpecFailed.length} spec violations, 0 a11y issues${llm ? " + AI evaluation" : ""}`);
+  console.log(
+    `  ${DIM}Phase 4:${RESET} ${GREEN}Fix verified${RESET} — ${fixChain.verdict}, ${fixedSpecFailed.length} spec violations, 0 a11y issues${llm ? " + AI evaluation" : ""}`,
+  );
   console.log();
   console.log(`  ${BOLD}${GREEN}✓ Regression detected → reasoned → fixed → verified${RESET}`);
   console.log();
@@ -475,9 +507,19 @@ function quickIntrospect(testId: string, tree: A11yNode) {
     description: `Page ${testId}`,
     landmarks,
     interactiveElements: interactive,
-    stats: { totalNodes, landmarkCount: landmarks.length, interactiveCount: interactive.length, unlabeledCount: interactive.filter((e) => !e.hasLabel).length, headingLevels: [] as number[] },
+    stats: {
+      totalNodes,
+      landmarkCount: landmarks.length,
+      interactiveCount: interactive.length,
+      unlabeledCount: interactive.filter((e) => !e.hasLabel).length,
+      headingLevels: [] as number[],
+    },
     suggestedInvariants: [
-      ...landmarks.map((l) => ({ description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`, check: "landmark-exists" as const, cost: "low" as const })),
+      ...landmarks.map((l) => ({
+        description: `${l.role} landmark "${l.name || "(unnamed)"}" is present`,
+        check: "landmark-exists" as const,
+        cost: "low" as const,
+      })),
       ...[...roleCounts].map(([role, count]) => ({
         description: `${count} ${role} element(s) expected`,
         check: "element-count" as const,
@@ -493,5 +535,8 @@ function quickIntrospect(testId: string, tree: A11yNode) {
 // test — or any tool reaching for a helper here — triggers a full run, which is
 // why this file had 0% coverage.
 if (isCliEntry(import.meta.url)) {
-  runDemoFixLoop().catch((e) => { console.error(e); process.exitCode = 1; });
+  runDemoFixLoop().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  });
 }

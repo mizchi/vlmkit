@@ -33,12 +33,14 @@ import {
   runSceneCompositionCheck,
 } from "../style/composition.ts";
 
-export const compositionGate = defineGate<CompositionReport, CompositionOptions & { elementsPath?: string; fromPath?: string }>({
+export const compositionGate = defineGate<
+  CompositionReport,
+  CompositionOptions & { elementsPath?: string; fromPath?: string }
+>({
   id: "check.composition",
   command: ["check", "composition"],
   title: "Composition principles (proximity / alignment / contrast)",
-  summary:
-    "Whether spacing groups what belongs together, edges share a rail, and size encodes priority",
+  summary: "Whether spacing groups what belongs together, edges share a rail, and size encodes priority",
   category: "design-system",
   usage: `Does the layout carry the classical composition principles — 近接 proximity,
 整列 alignment, 対比 contrast — measured from rendered geometry alone? No
@@ -65,73 +67,88 @@ docs/design/composition-metrics.md`,
       title: "A label is closer to what precedes it than to what it labels",
       severity: "warn",
       docs:
-        "近接. A label reads as belonging to whatever it is closest to. Fires when the gap"
-        + " below a heading is >=1.5x the gap above it AND at least 8px wider — both, because"
-        + " 16px vs 24px is a 1.5x ratio nobody perceives. Raise to suspect to gate on it.",
+        "近接. A label reads as belonging to whatever it is closest to. Fires when the gap" +
+        " below a heading is >=1.5x the gap above it AND at least 8px wider — both, because" +
+        " 16px vs 24px is a 1.5x ratio nobody perceives. Raise to suspect to gate on it.",
     },
     {
       id: "rail-near-miss",
       title: "Two of the page's rails sit 2-8px apart",
       severity: "info",
       docs:
-        "整列, across containers — `check integrity`'s A12 covers the same window between"
-        + " siblings. Info by default: measured as real but sub-perceptual, and a padding"
-        + " change reports here as well as through check design. Sub-2px pairs are excluded"
-        + " as rounding of fractional layout, not decisions.",
+        "整列, across containers — `check integrity`'s A12 covers the same window between" +
+        " siblings. Info by default: measured as real but sub-perceptual, and a padding" +
+        " change reports here as well as through check design. Sub-2px pairs are excluded" +
+        " as rounding of fractional layout, not decisions.",
     },
     {
       id: "flat-heading-step",
       title: "Two declared heading levels render at the same size and weight",
       severity: "warn",
       docs:
-        "対比. The page asserted the levels differ; the render says they do not, so the"
-        + " structure it declares is invisible. A weight difference counts as the"
-        + " distinction, so a same-size pair at different weights is not reported.",
+        "対比. The page asserted the levels differ; the render says they do not, so the" +
+        " structure it declares is invisible. A weight difference counts as the" +
+        " distinction, so a same-size pair at different weights is not reported.",
     },
     {
       id: "no-type-contrast",
       title: "Nothing is larger or heavier than the body text",
       severity: "warn",
       docs:
-        "対比, as a floor rather than a discriminator. Requires BOTH a size ratio under"
-        + " 1.3x and a weight step under 200 — emphasis carried by weight alone is real"
-        + " emphasis, and reporting it was a false positive on a page with bold card titles.",
+        "対比, as a floor rather than a discriminator. Requires BOTH a size ratio under" +
+        " 1.3x and a weight step under 200 — emphasis carried by weight alone is real" +
+        " emphasis, and reporting it was a false positive on a page with bold card titles.",
     },
     {
       id: "nothing-judged",
       title: "No label, heading pair or rail could be measured",
       severity: "info",
       docs:
-        "Info by default — a page built from neither heading-led groups nor wide blocks has"
-        + " nothing to judge, which is not a defect. Raise to suspect to enforce that this"
-        + " gate must actually measure something rather than reporting green in silence.",
+        "Info by default — a page built from neither heading-led groups nor wide blocks has" +
+        " nothing to judge, which is not a defect. Raise to suspect to enforce that this" +
+        " gate must actually measure something rather than reporting green in silence.",
     },
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
     {
-      name: "source", placeholder: "html-or-url", kind: "path-or-url",
-      description: "Page to check (omit when using --elements)", positional: 0,
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check (omit when using --elements)",
+      positional: 0,
     },
     {
-      name: "elements", placeholder: "scene.json", kind: "path",
-      description: "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Boxes, `heading`, font size / weight, background, border and radius are what it reads",
+      name: "elements",
+      placeholder: "scene.json",
+      kind: "path",
+      description:
+        "A scene instead of a page — canvas/WebGPU, native, a game HUD (no browser). Boxes, `heading`, font size / weight, background, border and radius are what it reads",
     },
     {
-      name: "from", placeholder: "snapshot.json", kind: "path",
+      name: "from",
+      placeholder: "snapshot.json",
+      kind: "path",
       description: "A `scan style` snapshot instead of a page: judged with no browser, same report as the live run",
     },
     {
-      name: "viewport", kind: "number",
-      description: "Viewport width; composition is a function of width, so it is reported (with --elements: the frame width)",
+      name: "viewport",
+      kind: "number",
+      description:
+        "Viewport width; composition is a function of width, so it is reported (with --elements: the frame width)",
       defaultDescription: "1280; with --elements, the scene's rightmost edge",
     },
     {
-      name: "allow", placeholder: "<selector>;<reason>", kind: "string", repeatable: true,
+      name: "allow",
+      placeholder: "<selector>;<reason>",
+      kind: "string",
+      repeatable: true,
       description: COMPOSITION_ALLOW_HELP,
     },
     {
-      name: "storage-state", placeholder: "file", kind: "path",
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
       description: "Playwright storage state for pages behind a login",
     },
     // Spread, not re-declared — see the note in `integrity.gate.ts`.
@@ -161,9 +178,13 @@ docs/design/composition-metrics.md`,
         ...(allow.length > 0 ? { allow } : {}),
       };
     }
-    const source = firstPositional(argv, "vlmkit check composition <html-or-url> | --elements <scene.json>", valueFlags);
+    const source = firstPositional(
+      argv,
+      "vlmkit check composition <html-or-url> | --elements <scene.json>",
+      valueFlags,
+    );
     // Validated at read time so a typo'd width fails in milliseconds rather
-        // than rendering the page at NaN and reporting on nothing.
+    // than rendering the page at NaN and reporting on nothing.
     const viewport = readInt(argv, "viewport", { min: 200 });
     const pageLoad = parsePageLoad(argv);
     const storageState = readFlag(argv, "storage-state");
@@ -183,7 +204,10 @@ docs/design/composition-metrics.md`,
   run: async (options) => {
     if (options.fromPath) {
       const snapshot = await readStyleSnapshot(options.fromPath);
-      return judgeCollectedComposition(snapshot.composition, snapshot.redirect, { ...options, source: snapshot.source });
+      return judgeCollectedComposition(snapshot.composition, snapshot.redirect, {
+        ...options,
+        source: snapshot.source,
+      });
     }
     return options.elementsPath
       ? runSceneCompositionCheck({ ...options, elementsPath: options.elementsPath })
@@ -199,8 +223,8 @@ docs/design/composition-metrics.md`,
     })),
   format: formatCompositionReport,
   headline: (report) =>
-    `${report.labels.length} label(s), ${report.hierarchy.levels.length} heading level(s),`
-    + ` ${report.rails.blocks} wide block(s) on ${report.rails.lefts} left rail(s)`,
+    `${report.labels.length} label(s), ${report.hierarchy.levels.length} heading level(s),` +
+    ` ${report.rails.blocks} wide block(s) on ${report.rails.lefts} left rail(s)`,
   // runCompositionCheck appends its own entry.
   ledger: () => null,
 });

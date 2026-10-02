@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  evaluateRenderSanity,
-  probeSourceHtml,
-  type RenderProbe,
-} from "./render-sanity.ts";
+import { evaluateRenderSanity, probeSourceHtml, type RenderProbe } from "./render-sanity.ts";
 
 function probe(over: Partial<RenderProbe> = {}): RenderProbe {
   return {
@@ -26,9 +22,7 @@ describe("evaluateRenderSanity", () => {
 
   it("flags failed CDN load that drives Tailwind-style breakage", () => {
     const r = evaluateRenderSanity({
-      failedRequests: [
-        { url: "https://cdn.tailwindcss.com/", errorText: "net::ERR_CERT_AUTHORITY_INVALID" },
-      ],
+      failedRequests: [{ url: "https://cdn.tailwindcss.com/", errorText: "net::ERR_CERT_AUTHORITY_INVALID" }],
       probe: probe({
         bodyFontFamily: "Times New Roman",
         styleSheetCount: 1,
@@ -101,27 +95,21 @@ describe("evaluateRenderSanity", () => {
 
 describe("probeSourceHtml", () => {
   it("detects external script tags", () => {
-    assert.deepEqual(
-      probeSourceHtml('<html><head><script src="https://cdn.tailwindcss.com"></script></head></html>'),
-      { declaredExternalScripts: true, declaredExternalStylesheets: false },
-    );
+    assert.deepEqual(probeSourceHtml('<html><head><script src="https://cdn.tailwindcss.com"></script></head></html>'), {
+      declaredExternalScripts: true,
+      declaredExternalStylesheets: false,
+    });
   });
 
   it("detects external stylesheet links (both attribute orders)", () => {
-    assert.equal(
-      probeSourceHtml('<link rel="stylesheet" href="x.css">').declaredExternalStylesheets,
-      true,
-    );
-    assert.equal(
-      probeSourceHtml('<link href="x.css" rel="stylesheet">').declaredExternalStylesheets,
-      true,
-    );
+    assert.equal(probeSourceHtml('<link rel="stylesheet" href="x.css">').declaredExternalStylesheets, true);
+    assert.equal(probeSourceHtml('<link href="x.css" rel="stylesheet">').declaredExternalStylesheets, true);
   });
 
   it("does not match inline <style> blocks", () => {
-    assert.deepEqual(
-      probeSourceHtml("<html><head><style>body{color:red}</style></head></html>"),
-      { declaredExternalScripts: false, declaredExternalStylesheets: false },
-    );
+    assert.deepEqual(probeSourceHtml("<html><head><style>body{color:red}</style></head></html>"), {
+      declaredExternalScripts: false,
+      declaredExternalStylesheets: false,
+    });
   });
 });

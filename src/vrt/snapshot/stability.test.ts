@@ -44,11 +44,10 @@ describe("aggregateStability", () => {
   });
 
   it("respects threshold when classifying positives", () => {
-    const entries = aggregateStability([
-      r(1, "home", "desktop", 0.005),
-      r(2, "home", "desktop", 0.02),
-      r(3, "home", "desktop", 0.03),
-    ], { threshold: 0.01 });
+    const entries = aggregateStability(
+      [r(1, "home", "desktop", 0.005), r(2, "home", "desktop", 0.02), r(3, "home", "desktop", 0.03)],
+      { threshold: 0.01 },
+    );
 
     assert.equal(entries[0]!.positives, 2);
     assert.equal(entries[0]!.comparisons, 3);
@@ -117,11 +116,7 @@ describe("formatStabilitySummary", () => {
     const report = buildStabilityReport({
       iterations: 3,
       urls: ["http://localhost:3000/home"],
-      results: [
-        r(0, "home", "desktop", 0),
-        r(1, "home", "desktop", 0),
-        r(2, "home", "desktop", 0.005),
-      ],
+      results: [r(0, "home", "desktop", 0), r(1, "home", "desktop", 0), r(2, "home", "desktop", 0.005)],
     });
 
     const text = formatStabilitySummary(report);
@@ -137,21 +132,13 @@ describe("buildStabilityHistory", () => {
       timestamp: "2026-05-21T00:00:00.000Z",
       iterations: 3,
       urls: ["http://localhost/home"],
-      results: [
-        r(0, "home", "desktop", 0),
-        r(1, "home", "desktop", 0),
-        r(2, "home", "desktop", 0),
-      ],
+      results: [r(0, "home", "desktop", 0), r(1, "home", "desktop", 0), r(2, "home", "desktop", 0)],
     });
     const second = buildStabilityReport({
       timestamp: "2026-05-22T00:00:00.000Z",
       iterations: 3,
       urls: ["http://localhost/home"],
-      results: [
-        r(0, "home", "desktop", 0),
-        r(1, "home", "desktop", 0.02),
-        r(2, "home", "desktop", 0),
-      ],
+      results: [r(0, "home", "desktop", 0), r(1, "home", "desktop", 0.02), r(2, "home", "desktop", 0)],
     });
 
     const history = buildStabilityHistory([

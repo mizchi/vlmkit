@@ -75,8 +75,10 @@ export function resample(img: RgbaImage, size: Size): RgbaImage {
       const o = (oy * size.width + ox) * 4;
       if (sx > 1 || sy > 1) {
         // Box filter over the source rectangle this output pixel covers (weighted at the edges).
-        const x0 = ox * sx, x1 = Math.min(img.width, (ox + 1) * sx);
-        const y0 = oy * sy, y1 = Math.min(img.height, (oy + 1) * sy);
+        const x0 = ox * sx,
+          x1 = Math.min(img.width, (ox + 1) * sx);
+        const y0 = oy * sy,
+          y1 = Math.min(img.height, (oy + 1) * sy);
         const acc = [0, 0, 0];
         let total = 0;
         for (let y = Math.floor(y0); y < Math.ceil(y1); y++) {
@@ -93,9 +95,12 @@ export function resample(img: RgbaImage, size: Size): RgbaImage {
         // Bilinear between the four nearest source pixels (pixel centres at +0.5).
         const fx = Math.max(0, Math.min(img.width - 1, (ox + 0.5) * sx - 0.5));
         const fy = Math.max(0, Math.min(img.height - 1, (oy + 0.5) * sy - 0.5));
-        const x0 = Math.floor(fx), y0 = Math.floor(fy);
-        const x1 = Math.min(img.width - 1, x0 + 1), y1 = Math.min(img.height - 1, y0 + 1);
-        const tx = fx - x0, ty = fy - y0;
+        const x0 = Math.floor(fx),
+          y0 = Math.floor(fy);
+        const x1 = Math.min(img.width - 1, x0 + 1),
+          y1 = Math.min(img.height - 1, y0 + 1);
+        const tx = fx - x0,
+          ty = fy - y0;
         for (let c = 0; c < 3; c++) {
           const top = px(x0, y0, c) * (1 - tx) + px(x1, y0, c) * tx;
           const bottom = px(x0, y1, c) * (1 - tx) + px(x1, y1, c) * tx;
@@ -124,17 +129,17 @@ export function prepareZoomSource(png: Buffer, budget: ImageBudget = DEFAULT_IMA
 
 export type ZoomOutcome =
   | {
-    ok: true;
-    /** The box in view pixels after clamping. */
-    viewBox: Box;
-    /** The original's pixels that were cropped. */
-    originalBox: Box;
-    /** The magnified crop, encoded. */
-    png: Buffer;
-    size: Size;
-    /** What to tell the model alongside the image. */
-    text: string;
-  }
+      ok: true;
+      /** The box in view pixels after clamping. */
+      viewBox: Box;
+      /** The original's pixels that were cropped. */
+      originalBox: Box;
+      /** The magnified crop, encoded. */
+      png: Buffer;
+      size: Size;
+      /** What to tell the model alongside the image. */
+      text: string;
+    }
   | { ok: false; text: string };
 
 /**
@@ -156,7 +161,8 @@ export function zoomInto(source: ZoomSource, box: Box, budget: ImageBudget = DEF
     originalBox,
     png: encodePngImage(zoomed),
     size,
-    text: `Zoomed into (${b.x1},${b.y1})-(${b.x2},${b.y2}) of the image you see at ${source.view.width}x${source.view.height}px: `
-      + `a ${crop.width}x${crop.height}px region of the original, returned magnified to ${size.width}x${size.height}px.`,
+    text:
+      `Zoomed into (${b.x1},${b.y1})-(${b.x2},${b.y2}) of the image you see at ${source.view.width}x${source.view.height}px: ` +
+      `a ${crop.width}x${crop.height}px region of the original, returned magnified to ${size.width}x${size.height}px.`,
   };
 }

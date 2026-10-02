@@ -3,7 +3,22 @@ import { describe, it } from "vite-plus/test";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildJobs, formatBatchSummary, gateReported, gateVerb, jobLogName, parseGateEnvelope, parseShard, reportedWarns, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
+import {
+  buildJobs,
+  formatBatchSummary,
+  gateReported,
+  gateVerb,
+  jobLogName,
+  parseGateEnvelope,
+  parseShard,
+  reportedWarns,
+  resolvePages,
+  runBatch,
+  runPool,
+  shardPages,
+  type BatchJobResult,
+  type BatchSummary,
+} from "./batch-cli.ts";
 
 /** Colour codes out, so an assertion on the prose is not one on the palette. */
 const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
@@ -62,12 +77,10 @@ describe("buildJobs", () => {
   it("crosses every gate with every page", () => {
     const jobs = buildJobs(["check integrity", "check design"], ["a.html", "b.html"]);
     assert.equal(jobs.length, 4);
-    assert.deepEqual(jobs.map((j) => `${j.gate}|${j.page}`), [
-      "check integrity|a.html",
-      "check design|a.html",
-      "check integrity|b.html",
-      "check design|b.html",
-    ]);
+    assert.deepEqual(
+      jobs.map((j) => `${j.gate}|${j.page}`),
+      ["check integrity|a.html", "check design|a.html", "check integrity|b.html", "check design|b.html"],
+    );
   });
 });
 
@@ -75,13 +88,17 @@ describe("runPool", () => {
   it("never exceeds the concurrency limit", async () => {
     let live = 0;
     let peak = 0;
-    await runPool(Array.from({ length: 12 }, (_, i) => i), 3, async (i) => {
-      live++;
-      peak = Math.max(peak, live);
-      await new Promise((r) => setTimeout(r, 5 + (i % 3)));
-      live--;
-      return i;
-    });
+    await runPool(
+      Array.from({ length: 12 }, (_, i) => i),
+      3,
+      async (i) => {
+        live++;
+        peak = Math.max(peak, live);
+        await new Promise((r) => setTimeout(r, 5 + (i % 3)));
+        live--;
+        return i;
+      },
+    );
     assert.equal(peak, 3);
   });
 
@@ -108,8 +125,14 @@ describe("runPool", () => {
   it("refuses an unusable limit instead of silently running nothing", async () => {
     // A NaN limit made `Array.from({length: NaN})` build zero lanes: the pool
     // ran nothing, returned holes, and read as success downstream.
-    await assert.rejects(runPool([1, 2], Number.NaN, async (x) => x), /concurrency limit >= 1, got NaN/);
-    await assert.rejects(runPool([1, 2], 0, async (x) => x), /concurrency limit >= 1, got 0/);
+    await assert.rejects(
+      runPool([1, 2], Number.NaN, async (x) => x),
+      /concurrency limit >= 1, got NaN/,
+    );
+    await assert.rejects(
+      runPool([1, 2], 0, async (x) => x),
+      /concurrency limit >= 1, got 0/,
+    );
   });
 
   it("handles an empty queue", async () => {
@@ -179,11 +202,15 @@ describe("formatBatchSummary", () => {
     // v7's agent-l adopted it into a repo they did not own: "`gates run` prints
     // `ALL PASS (6/6)` and shows none of the 10 warn findings. Adopt it naively and
     // you learn nothing. Only `--output` preserves them."
-    const text = plain(formatBatchSummary(summary([
-      job({ gate: "check tokens --wait-until load", output: "  exits 0 — 20 warn(s) did not fail this command." }),
-      job({ gate: "check design", page: "b.html", output: "  exits 0 — 1 warn(s) did not fail this command." }),
-      job({ gate: "check copy", page: "c.html", output: "clean" }),
-    ])));
+    const text = plain(
+      formatBatchSummary(
+        summary([
+          job({ gate: "check tokens --wait-until load", output: "  exits 0 — 20 warn(s) did not fail this command." }),
+          job({ gate: "check design", page: "b.html", output: "  exits 0 — 1 warn(s) did not fail this command." }),
+          job({ gate: "check copy", page: "c.html", output: "clean" }),
+        ]),
+      ),
+    );
     assert.match(text, /ALL PASS/);
     assert.match(text, /21 warn\(s\) in 2 passing gate\(s\)/);
     assert.match(text, /20\s+check tokens/);
@@ -196,16 +223,23 @@ describe("formatBatchSummary", () => {
     // The landing page's review (2026-09-23) read "4 page(s) x 5 gate(s) = 8 job(s)": one shared
     // gate, and a contrast run per page that differs only by its --output-dir.
     const pages = ["en-light", "en-dark", "ja-light", "ja-dark"];
-    const uneven = plain(formatBatchSummary(summary(pages.flatMap((page) => [
-      job({ page, gate: "check integrity" }),
-      job({ page, gate: `check a11y contrast --output-dir out/${page}` }),
-    ]))));
+    const uneven = plain(
+      formatBatchSummary(
+        summary(
+          pages.flatMap((page) => [
+            job({ page, gate: "check integrity" }),
+            job({ page, gate: `check a11y contrast --output-dir out/${page}` }),
+          ]),
+        ),
+      ),
+    );
     assert.match(uneven, /8 job\(s\) over 4 page\(s\), 5 distinct gate command\(s\)/);
     assert.doesNotMatch(uneven, / x 5 gate/);
-    const even = plain(formatBatchSummary(summary(pages.flatMap((page) => [
-      job({ page, gate: "check integrity" }),
-      job({ page, gate: "check design" }),
-    ]))));
+    const even = plain(
+      formatBatchSummary(
+        summary(pages.flatMap((page) => [job({ page, gate: "check integrity" }), job({ page, gate: "check design" })])),
+      ),
+    );
     assert.match(even, /4 page\(s\) x 2 gate\(s\) = 8 job\(s\)/);
   });
 
@@ -213,13 +247,19 @@ describe("formatBatchSummary", () => {
     // The count's own hint is `--show-output`, which printed failing jobs only and dropped the
     // count: the landing page's review (2026-09-23) saw four warns announced, followed the hint,
     // and got a run in which they appeared nowhere.
-    const text = plain(formatBatchSummary(
-      summary([
-        job({ page: "en.html", gate: "check integrity", output: "  exits 0 — 1 warn(s) did not fail this command.\n  ! [near-misalignment] a @768" }),
-        job({ page: "ja.html", gate: "check integrity", output: "verdict: CLEAN" }),
-      ]),
-      { showOutput: true },
-    ));
+    const text = plain(
+      formatBatchSummary(
+        summary([
+          job({
+            page: "en.html",
+            gate: "check integrity",
+            output: "  exits 0 — 1 warn(s) did not fail this command.\n  ! [near-misalignment] a @768",
+          }),
+          job({ page: "ja.html", gate: "check integrity", output: "verdict: CLEAN" }),
+        ]),
+        { showOutput: true },
+      ),
+    );
     assert.doesNotMatch(text, /warn\(s\) in \d+ passing gate/);
     assert.match(text, /Warnings \(passing jobs\)/);
     assert.match(text, /--- check integrity en\.html/);
@@ -228,17 +268,29 @@ describe("formatBatchSummary", () => {
   });
 
   it("names the page on each warn row, so one gate over four pages is four distinct rows", () => {
-    const text = plain(formatBatchSummary(summary(["en-light", "ja-light"].map((page) =>
-      job({ page: `http://127.0.0.1:4190/?${page}`, gate: "check integrity", output: "  exits 0 — 1 warn(s) did not fail this command." }),
-    ))));
+    const text = plain(
+      formatBatchSummary(
+        summary(
+          ["en-light", "ja-light"].map((page) =>
+            job({
+              page: `http://127.0.0.1:4190/?${page}`,
+              gate: "check integrity",
+              output: "  exits 0 — 1 warn(s) did not fail this command.",
+            }),
+          ),
+        ),
+      ),
+    );
     assert.match(text, /1\s+check integrity\s+http:\/\/127\.0\.0\.1:4190\/\?en-light/);
     assert.match(text, /1\s+check integrity\s+http:\/\/127\.0\.0\.1:4190\/\?ja-light/);
   });
 
   it("does not count warns from a FAILING job, whose re-run hint already covers it", () => {
-    const text = plain(formatBatchSummary(summary([
-      job({ exitCode: 1, output: "  exits 0 — 9 warn(s) did not fail this command.\nverdict: DEFECTS" }),
-    ])));
+    const text = plain(
+      formatBatchSummary(
+        summary([job({ exitCode: 1, output: "  exits 0 — 9 warn(s) did not fail this command.\nverdict: DEFECTS" })]),
+      ),
+    );
     assert.doesNotMatch(text, /9 warn/);
   });
 
@@ -248,10 +300,12 @@ describe("formatBatchSummary", () => {
     // suppresses, so `gates run` — the path an adopter actually uses — announced
     // nothing at all. It also never covered `test-results/`: a gate prints
     // `report: <path>` but nothing says the directory is new and untracked.
-    const text = plain(formatBatchSummary({
-      ...summary([job()]),
-      createdArtifacts: [".vlmkit/", "test-results/"],
-    }));
+    const text = plain(
+      formatBatchSummary({
+        ...summary([job()]),
+        createdArtifacts: [".vlmkit/", "test-results/"],
+      }),
+    );
     assert.match(text, /This run created 2 untracked path\(s\)/);
     assert.match(text, /\.vlmkit\/\s+an append-only record of every gate run/);
     assert.match(text, /test-results\/\s+the gates' own reports and screenshots/);
@@ -259,7 +313,7 @@ describe("formatBatchSummary", () => {
     assert.match(text, /gates init/);
   });
 
-  it("says \"is not\" rather than \"is\" when only one path appeared", () => {
+  it('says "is not" rather than "is" when only one path appeared', () => {
     // The pluralized branch read "It is in .gitignore." — the opposite of the truth,
     // in the one line whose whole job is to say the path is untracked.
     const text = plain(formatBatchSummary({ ...summary([job()]), createdArtifacts: [".vlmkit/"] }));
@@ -282,10 +336,9 @@ describe("formatBatchSummary", () => {
   });
 
   it("names every failing job with its exit code", () => {
-    const text = formatBatchSummary(summary([
-      job(),
-      job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" }),
-    ]));
+    const text = formatBatchSummary(
+      summary([job(), job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" })]),
+    );
     assert.match(text, /1 FAILED/);
     assert.match(text, /bad\.html .*exit 1/);
     assert.match(text, /vlmkit check design bad\.html/); // re-run hint
@@ -293,10 +346,9 @@ describe("formatBatchSummary", () => {
   });
 
   it("prints failing reports inline on request", () => {
-    const text = formatBatchSummary(
-      summary([job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" })]),
-      { showOutput: true },
-    );
+    const text = formatBatchSummary(summary([job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" })]), {
+      showOutput: true,
+    });
     assert.match(text, /verdict: DEFECTS/);
   });
 
@@ -304,15 +356,19 @@ describe("formatBatchSummary", () => {
     // v5's CI agent, on four gates that all died in navigation: "`verdict: 4 FAILED
     // (0 passed)` with zero reasons and no distinction between 'gate found defects'
     // and 'gate never ran'. CI cannot tell a broken page from a broken harness."
-    const text = strip(formatBatchSummary(summary([
-      job({ page: "ok.html" }),
-      job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS (1 fail)" }),
-      job({
-        page: "http://localhost:1/",
-        exitCode: 1,
-        output: "error: page load timed out after 30000ms waiting for `networkidle`\n  1 request(s) still open:",
-      }),
-    ])));
+    const text = strip(
+      formatBatchSummary(
+        summary([
+          job({ page: "ok.html" }),
+          job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS (1 fail)" }),
+          job({
+            page: "http://localhost:1/",
+            exitCode: 1,
+            output: "error: page load timed out after 30000ms waiting for `networkidle`\n  1 request(s) still open:",
+          }),
+        ]),
+      ),
+    );
     assert.match(text, /1 FAILED, 1 DID NOT RUN \(1 passed\)/);
     // And the reason is inline, because re-running to find out why the harness broke
     // is a whole extra cycle and in CI there may not be one.
@@ -320,30 +376,31 @@ describe("formatBatchSummary", () => {
   });
 
   it("keeps the plain FAILED count when every failure is a real report", () => {
-    const text = strip(formatBatchSummary(summary([
-      job({ page: "bad.html", exitCode: 1, output: "status: suspect\n\nIssues:" }),
-    ])));
+    const text = strip(
+      formatBatchSummary(summary([job({ page: "bad.html", exitCode: 1, output: "status: suspect\n\nIssues:" })])),
+    );
     assert.match(text, /1 FAILED \(0 passed\)/);
     assert.doesNotMatch(text, /DID NOT RUN/);
   });
 
   it("counts a --json report as having run, since a report needs no prose", () => {
-    const text = strip(formatBatchSummary(summary([
-      job({ page: "bad.html", exitCode: 1, output: '{"findings":[{"kind":"page-overflow-x"}]}' }),
-    ])));
+    const text = strip(
+      formatBatchSummary(
+        summary([job({ page: "bad.html", exitCode: 1, output: '{"findings":[{"kind":"page-overflow-x"}]}' })]),
+      ),
+    );
     assert.doesNotMatch(text, /DID NOT RUN/);
     // Truncated JSON is not a report.
-    const cut = strip(formatBatchSummary(summary([
-      job({ page: "bad.html", exitCode: 1, output: '{"findings":[' }),
-    ])));
+    const cut = strip(formatBatchSummary(summary([job({ page: "bad.html", exitCode: 1, output: '{"findings":[' })])));
     assert.match(cut, /DID NOT RUN/);
   });
 
   it("points at the log directory instead of offering the flag that was just passed", () => {
-    const text = strip(formatBatchSummary(
-      summary([job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" })]),
-      { outputDir: "/tmp/logs" },
-    ));
+    const text = strip(
+      formatBatchSummary(summary([job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" })]), {
+        outputDir: "/tmp/logs",
+      }),
+    );
     assert.match(text, /Full logs: \/tmp\/logs/);
     assert.doesNotMatch(text, /pass --output <dir>/);
   });
@@ -438,9 +495,17 @@ describe("gateReported", () => {
   const TOKENS = "  vlmkit check tokens\n  scale: 4 8 16\n  ✗ 2 off-scale value(s)";
 
   it("counts a gate with no verdict line as having run", () => {
-    for (const [name, output] of [["a11y contrast", A11Y_CONTRAST], ["a11y touch", A11Y_TOUCH], ["tokens", TOKENS]] as const) {
+    for (const [name, output] of [
+      ["a11y contrast", A11Y_CONTRAST],
+      ["a11y touch", A11Y_TOUCH],
+      ["tokens", TOKENS],
+    ] as const) {
       assert.equal(gateReported(output), true, `${name} reported a measurement and must not read as "did not run"`);
-      assert.doesNotMatch(output, /^\s*(verdict|status):/m, `fixture for ${name} must not contain the line, or it proves nothing`);
+      assert.doesNotMatch(
+        output,
+        /^\s*(verdict|status):/m,
+        `fixture for ${name} must not contain the line, or it proves nothing`,
+      );
     }
   });
 
@@ -495,13 +560,15 @@ describe("parseGateEnvelope", () => {
     // v7's agent-l: "findings arrive as one ANSI-escaped `output` string, not
     // structured." The gates have emitted an envelope all along; the batch runner
     // never asked for one.
-    const env = parseGateEnvelope(JSON.stringify({
-      gate: "check.design",
-      command: "check design",
-      verdict: "pass",
-      counts: { suspect: 0, warn: 1, info: 0 },
-      findings: [{ rule: "component-drift", severity: "warn", message: "…" }],
-    }));
+    const env = parseGateEnvelope(
+      JSON.stringify({
+        gate: "check.design",
+        command: "check design",
+        verdict: "pass",
+        counts: { suspect: 0, warn: 1, info: 0 },
+        findings: [{ rule: "component-drift", severity: "warn", message: "…" }],
+      }),
+    );
     assert.equal(env?.command, "check design");
     assert.equal(env?.counts?.warn, 1);
     assert.equal(env?.findings?.length, 1);
@@ -517,6 +584,6 @@ describe("parseGateEnvelope", () => {
   });
 
   it("is not fooled by a JSON-looking line buried in prose", () => {
-    assert.equal(parseGateEnvelope("vlmkit check design\n{\"verdict\":\"pass\"}"), null);
+    assert.equal(parseGateEnvelope('vlmkit check design\n{"verdict":"pass"}'), null);
   });
 });

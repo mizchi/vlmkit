@@ -171,9 +171,13 @@ export function storySlug(story: string): string {
  * otherwise just a blank screenshot. So it is caught and returned as data rather
  * than surfacing as an opaque `page.evaluate` failure.
  */
-async function mountInPage(
-  { story, props }: { story: string; props: Record<string, unknown> },
-): Promise<{ ok: boolean; error?: string }> {
+async function mountInPage({
+  story,
+  props,
+}: {
+  story: string;
+  props: Record<string, unknown>;
+}): Promise<{ ok: boolean; error?: string }> {
   const mount = (globalThis as { mount?: (params: unknown) => Promise<void> }).mount;
   if (typeof mount !== "function") {
     return {
@@ -210,8 +214,7 @@ export async function runStoryVrt(options: StoryVrtOptions): Promise<StoryVrtRep
     viewport: options.viewport,
     threshold: options.threshold,
     results,
-    pagePixels: results.filter((r) => r.width !== undefined).length
-      * options.viewport.width * options.viewport.height,
+    pagePixels: results.filter((r) => r.width !== undefined).length * options.viewport.width * options.viewport.height,
     storyPixels,
   };
 }
@@ -243,9 +246,10 @@ async function captureStory(
     return {
       story,
       outcome: "mount-failed",
-      error: `could not open the gallery at ${options.gallery}`
-        + ` — ${(e instanceof Error ? e.message : String(e)).split("\n")[0]}`
-        + ". Check --gallery: a local file needs a file:// URL, a dev server needs to be running.",
+      error:
+        `could not open the gallery at ${options.gallery}` +
+        ` — ${(e instanceof Error ? e.message : String(e)).split("\n")[0]}` +
+        ". Check --gallery: a local file needs a file:// URL, a dev server needs to be running.",
     };
   }
   const mounted = await page.evaluate(mountInPage, { story, props: options.props ?? {} });
@@ -254,12 +258,12 @@ async function captureStory(
   }
 
   const root = page.locator(options.root).first();
-  if (await root.count() === 0) {
+  if ((await root.count()) === 0) {
     return {
       story,
       outcome: "mount-failed",
-      error: `window.mount resolved but ${options.root} is not in the page`
-        + " — the gallery must render the story into it",
+      error:
+        `window.mount resolved but ${options.root} is not in the page` + " — the gallery must render the story into it",
     };
   }
   if (options.settleMs > 0) await page.waitForTimeout(options.settleMs);
@@ -269,8 +273,9 @@ async function captureStory(
     return {
       story,
       outcome: "mount-failed",
-      error: `${options.root} rendered with a zero-sized box (${box?.width ?? 0}x${box?.height ?? 0})`
-        + " — the story mounted but produced nothing visible",
+      error:
+        `${options.root} rendered with a zero-sized box (${box?.width ?? 0}x${box?.height ?? 0})` +
+        " — the story mounted but produced nothing visible",
     };
   }
 
@@ -307,10 +312,7 @@ async function captureStory(
   }
   // A second decode of two component-sized PNGs, so the report can say how far
   // the pixels moved and not only how many of them the comparator counted.
-  const magnitude = measureChangeMagnitude(
-    await decodePng(baselinePath),
-    await decodePng(currentPath),
-  );
+  const magnitude = measureChangeMagnitude(await decodePng(baselinePath), await decodePng(currentPath));
   return {
     story,
     outcome: diff.diffRatio <= options.threshold ? "unchanged" : "changed",
@@ -363,32 +365,35 @@ export function formatStoryVrtReport(report: StoryVrtReport, rules?: RuleView): 
     const ruled = storyRule(r);
     const tier = ruled ? ruleTier(rules, ruled.rule, ruled.emitted) : undefined;
     if (ruled && tier === "off") offRules.set(ruled.rule, (offRules.get(ruled.rule) ?? 0) + 1);
-    const detail = r.outcome === "changed"
-      // Dim rather than red when the rule is off: the percentage is still the measurement, but
-      // red next to a `-` marker and an exit 0 is the same screen-contradicting-itself this
-      // migration exists to remove.
-      ? `${tier === "off" ? DIM : RED}${(r.diffRatio! * 100).toFixed(2)}% diff${RESET} ${DIM}(${r.diffPixels}/${r.totalPixels}px)${RESET}`
-      : r.outcome === "unchanged"
-      ? isSubPerceptualDrift(r)
-        // Loud on an "unchanged" row, because that is the point: the comparator
-        // passed it and the pixels say otherwise.
-        ? `${YELLOW}${(r.magnitude!.changedFraction * 100).toFixed(0)}% of pixels moved`
-          + ` (max ${r.magnitude!.maxChannelDelta}/255)${RESET}`
-          + ` ${DIM}but diff is ${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
-        : `${DIM}${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
-      : r.outcome === "mount-failed"
-      ? `${RED}${r.error}${RESET}`
-      : r.outcome === "new-baseline"
-      ? `${DIM}baseline written — re-run to compare${RESET}`
-      : `${DIM}baseline updated${RESET}`;
-    const icon = tier === "off"
-      ? `${DIM}-${RESET}`
-      : tier === "warn" && r.outcome === "changed"
-        ? `${YELLOW}!${RESET}`
-        : ICON[r.outcome];
-    const retuned = ruled && tier !== undefined && tier !== "off" && tier !== ruled.emitted
-      ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
-      : "";
+    const detail =
+      r.outcome === "changed"
+        ? // Dim rather than red when the rule is off: the percentage is still the measurement, but
+          // red next to a `-` marker and an exit 0 is the same screen-contradicting-itself this
+          // migration exists to remove.
+          `${tier === "off" ? DIM : RED}${(r.diffRatio! * 100).toFixed(2)}% diff${RESET} ${DIM}(${r.diffPixels}/${r.totalPixels}px)${RESET}`
+        : r.outcome === "unchanged"
+          ? isSubPerceptualDrift(r)
+            ? // Loud on an "unchanged" row, because that is the point: the comparator
+              // passed it and the pixels say otherwise.
+              `${YELLOW}${(r.magnitude!.changedFraction * 100).toFixed(0)}% of pixels moved` +
+              ` (max ${r.magnitude!.maxChannelDelta}/255)${RESET}` +
+              ` ${DIM}but diff is ${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
+            : `${DIM}${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
+          : r.outcome === "mount-failed"
+            ? `${RED}${r.error}${RESET}`
+            : r.outcome === "new-baseline"
+              ? `${DIM}baseline written — re-run to compare${RESET}`
+              : `${DIM}baseline updated${RESET}`;
+    const icon =
+      tier === "off"
+        ? `${DIM}-${RESET}`
+        : tier === "warn" && r.outcome === "changed"
+          ? `${YELLOW}!${RESET}`
+          : ICON[r.outcome];
+    const retuned =
+      ruled && tier !== undefined && tier !== "off" && tier !== ruled.emitted
+        ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
+        : "";
     lines.push(`  ${icon} ${r.story.padEnd(38)} ${size.padStart(9)}  ${detail}${retuned}`);
     if (r.heatmapPath && r.outcome === "changed") {
       lines.push(`      ${DIM}heatmap: ${r.heatmapPath}${RESET}`);
@@ -397,16 +402,16 @@ export function formatStoryVrtReport(report: StoryVrtReport, rules?: RuleView): 
     for (const region of (r.regions ?? []).slice(0, 3)) {
       const kind = region.regionType ? ` ${region.regionType}` : "";
       const shift = region.shift ? ` shifted ~${region.shift.dx},${region.shift.dy}px` : "";
-      lines.push(
-        `      ${DIM}region ${region.x},${region.y} ${region.width}x${region.height}${kind}${shift}${RESET}`,
-      );
+      lines.push(`      ${DIM}region ${region.x},${region.y} ${region.width}x${region.height}${kind}${shift}${RESET}`);
     }
   }
 
   if (offRules.size > 0) {
     const detail = [...offRules].map(([rule, n]) => `${rule} x${n}`).join(", ");
     lines.push("");
-    lines.push(`${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} story result(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
+    lines.push(
+      `${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} story result(s) measured and NOT reported — rule turned off (${detail})${RESET}`,
+    );
   }
 
   if (report.storyPixels > 0 && report.pagePixels > 0) {
@@ -415,9 +420,9 @@ export function formatStoryVrtReport(report: StoryVrtReport, rules?: RuleView): 
     const factor = report.pagePixels / report.storyPixels;
     lines.push("");
     lines.push(
-      `${DIM}${report.storyPixels.toLocaleString()}px captured vs`
-      + ` ${report.pagePixels.toLocaleString()}px for the same count of full-viewport shots`
-      + ` — ${factor.toFixed(1)}x smaller.${RESET}`,
+      `${DIM}${report.storyPixels.toLocaleString()}px captured vs` +
+        ` ${report.pagePixels.toLocaleString()}px for the same count of full-viewport shots` +
+        ` — ${factor.toFixed(1)}x smaller.${RESET}`,
     );
   }
   return lines.join("\n");

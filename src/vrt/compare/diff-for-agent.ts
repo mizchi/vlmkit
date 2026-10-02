@@ -311,7 +311,11 @@ export interface DfaReport {
       baseline: Array<{ hex: string; share: number; r: number; g: number; b: number }>;
       variant: Array<{ hex: string; share: number; r: number; g: number; b: number }>;
       diff: {
-        matched: Array<{ baseline: { hex: string; share: number }; variant: { hex: string; share: number }; distance: number }>;
+        matched: Array<{
+          baseline: { hex: string; share: number };
+          variant: { hex: string; share: number };
+          distance: number;
+        }>;
         onlyInBaseline: Array<{ hex: string; share: number; nearestNeighborDistance: number }>;
         onlyInVariant: Array<{ hex: string; share: number; nearestNeighborDistance: number }>;
       };
@@ -450,10 +454,7 @@ export function detectRegression(
  * Build the persistable summary for the *current* run. Pair with
  * `detectRegression` on the next invocation.
  */
-export function buildPreviousRunSummary(
-  report: DfaReport,
-  options: { timestamp?: string } = {},
-): PreviousRunSummary {
+export function buildPreviousRunSummary(report: DfaReport, options: { timestamp?: string } = {}): PreviousRunSummary {
   const byVariant: Record<string, Record<string, number>> = {};
   for (const r of report.results) {
     const variantBucket = byVariant[r.variantFile] ?? (byVariant[r.variantFile] = {});
@@ -484,10 +485,11 @@ function aggregateFixCandidates(results: DfaResult[]): FixCandidateAggregate[] {
       byKey.set(key, agg);
     }
   }
-  return [...byKey.values()].sort((a, b) =>
-    b.viewports.size - a.viewports.size
-    || a.selector.localeCompare(b.selector)
-    || a.property.localeCompare(b.property),
+  return [...byKey.values()].sort(
+    (a, b) =>
+      b.viewports.size - a.viewports.size ||
+      a.selector.localeCompare(b.selector) ||
+      a.property.localeCompare(b.property),
   );
 }
 
@@ -569,25 +571,17 @@ function buildAuthoredStyleValueLookup(report: DfaReport, variantFile: string): 
   return lookup;
 }
 
-function formatRegionDiffTarget(
-  change: DfaRegionDiffChange,
-  authored: DfaCsdEntry | undefined,
-): string {
+function formatRegionDiffTarget(change: DfaRegionDiffChange, authored: DfaCsdEntry | undefined): string {
   return authored
     ? `${formatNullableCode(authored.baseline)} _(authored CSSOM)_`
     : `${formatNullableCode(change.from)} _(sampled)_`;
 }
 
-function formatRegionDiffCurrent(
-  change: DfaRegionDiffChange,
-  authored: DfaCsdEntry | undefined,
-): string {
+function formatRegionDiffCurrent(change: DfaRegionDiffChange, authored: DfaCsdEntry | undefined): string {
   return authored ? formatNullableCode(authored.variant) : formatNullableCode(change.to);
 }
 
-function formatRegionDiffEvidence(
-  change: DfaRegionDiffChange,
-): string {
+function formatRegionDiffEvidence(change: DfaRegionDiffChange): string {
   const parts: string[] = [];
   if (change.from || change.to) {
     parts.push(`sampled ${formatNullableCode(change.from)} → ${formatNullableCode(change.to)}`);
@@ -623,23 +617,26 @@ function selectRegionDiffNextStep(
   const summary = (report.regionDiffs ?? []).find((entry) => entry.variantFile === variantFile);
   if (!summary) return null;
   const authoredLookup = buildAuthoredStyleValueLookup(report, variantFile);
-  const rows = summary.perViewport.flatMap((entry) =>
-    entry.changes.map((change) => ({
-      viewport: entry.viewport,
-      artifacts: formatRegionDiffArtifacts(entry),
-      selector: change.selector ?? change.selectorHint,
-      change,
-      authored: authoredLookup.get(`${change.selector ?? change.selectorHint} ${change.property}`),
-    }))
-  )
+  const rows = summary.perViewport
+    .flatMap((entry) =>
+      entry.changes.map((change) => ({
+        viewport: entry.viewport,
+        artifacts: formatRegionDiffArtifacts(entry),
+        selector: change.selector ?? change.selectorHint,
+        change,
+        authored: authoredLookup.get(`${change.selector ?? change.selectorHint} ${change.property}`),
+      })),
+    )
     .filter((row) => row.selector && !/[>\[\]]/.test(row.selector))
     .filter((row) => row.authored?.baseline || row.change.from)
     .sort((left, right) => {
       const leftPreferred = preferredViewport && left.viewport === preferredViewport ? 1 : 0;
       const rightPreferred = preferredViewport && right.viewport === preferredViewport ? 1 : 0;
       if (rightPreferred !== leftPreferred) return rightPreferred - leftPreferred;
-      const leftConfidence = regionDiffConfidenceRank(left.change.confidence) + regionDiffConfidenceRank(left.change.selectorConfidence);
-      const rightConfidence = regionDiffConfidenceRank(right.change.confidence) + regionDiffConfidenceRank(right.change.selectorConfidence);
+      const leftConfidence =
+        regionDiffConfidenceRank(left.change.confidence) + regionDiffConfidenceRank(left.change.selectorConfidence);
+      const rightConfidence =
+        regionDiffConfidenceRank(right.change.confidence) + regionDiffConfidenceRank(right.change.selectorConfidence);
       if (rightConfidence !== leftConfidence) return rightConfidence - leftConfidence;
       return (right.change.averageChannelDelta ?? 0) - (left.change.averageChannelDelta ?? 0);
     });
@@ -725,11 +722,7 @@ function buildVerifiedPairSet(report: DfaReport, variantFile: string): Set<strin
   return out;
 }
 
-function candidateMatchesVerifiedPair(
-  selector: string,
-  property: string,
-  verifiedPairs: Set<string>,
-): boolean {
+function candidateMatchesVerifiedPair(selector: string, property: string, verifiedPairs: Set<string>): boolean {
   // Direct exact match.
   if (verifiedPairs.has(`${selector}::${property}`)) return true;
 
@@ -745,8 +738,8 @@ function candidateMatchesVerifiedPair(
 interface ClassRenamePair {
   baselineClasses: string;
   variantClasses: string;
-  pathCount: number;  // distinct DOM positions where this rename appears
-  uniqueProperties: number;  // unique properties that differ for this class pair
+  pathCount: number; // distinct DOM positions where this rename appears
+  uniqueProperties: number; // unique properties that differ for this class pair
 }
 
 interface MissingCssRuleHint {
@@ -795,12 +788,15 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
   // Now we count **unique properties** that differ for this class pair
   // (`uniqueProperties`) alongside the distinct element positions
   // (`pathCount`). Same-class-name entries are skipped.
-  const pairs = new Map<string, {
-    baselineClasses: string;
-    variantClasses: string;
-    paths: Set<string>;
-    properties: Set<string>;
-  }>();
+  const pairs = new Map<
+    string,
+    {
+      baselineClasses: string;
+      variantClasses: string;
+      paths: Set<string>;
+      properties: Set<string>;
+    }
+  >();
   for (const pos of positions) {
     if (pos.baselineClasses === pos.variantClasses) continue;
     const key = `${pos.baselineClasses} ${pos.variantClasses}`;
@@ -822,10 +818,11 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
       pathCount: p.paths.size,
       uniqueProperties: p.properties.size,
     }))
-    .sort((a, b) =>
-      b.uniqueProperties - a.uniqueProperties
-      || b.pathCount - a.pathCount
-      || a.baselineClasses.localeCompare(b.baselineClasses),
+    .sort(
+      (a, b) =>
+        b.uniqueProperties - a.uniqueProperties ||
+        b.pathCount - a.pathCount ||
+        a.baselineClasses.localeCompare(b.baselineClasses),
     );
 }
 
@@ -857,10 +854,11 @@ function extractMissingCssRuleHints(report: DfaReport, variantFile: string): Mis
     if (!baselineSelector || !variantSelector) return;
     if (input.baseline === input.variant) return;
 
-    const key = `${baselineSelector}\u0000${variantSelector}\u0000${input.property}` +
+    const key =
+      `${baselineSelector}\u0000${variantSelector}\u0000${input.property}` +
       `\u0000${input.baseline}\u0000${input.variant}`;
-    const selectorEvidence = selectorsOnlyInBaseline.has(baselineSelector) ||
-      selectorsOnlyInVariant.has(variantSelector);
+    const selectorEvidence =
+      selectorsOnlyInBaseline.has(baselineSelector) || selectorsOnlyInVariant.has(variantSelector);
     const existing = hints.get(key);
     if (existing) {
       const viewports = new Set([...existing.viewports, ...input.viewports]);
@@ -917,14 +915,10 @@ function extractMissingCssRuleHints(report: DfaReport, variantFile: string): Mis
 function formatShiftBands(r: DfaResult): string {
   const bands = r.shiftRegions ?? [];
   if (bands.length === 0) {
-    return r.globalShift && r.globalShift !== 0
-      ? `global ${r.globalShift > 0 ? "+" : ""}${r.globalShift}px`
-      : "-";
+    return r.globalShift && r.globalShift !== 0 ? `global ${r.globalShift > 0 ? "+" : ""}${r.globalShift}px` : "-";
   }
   // Compact form: "[0–240]:+8 [240–600]:+20"
-  return bands
-    .map((b) => `[${b.yStart}–${b.yEnd}]:${b.shift > 0 ? "+" : ""}${b.shift}px`)
-    .join(" ");
+  return bands.map((b) => `[${b.yStart}–${b.yEnd}]:${b.shift > 0 ? "+" : ""}${b.shift}px`).join(" ");
 }
 
 interface SectionRect {
@@ -1034,12 +1028,8 @@ export function computeSectionDiffRows(
   return rows.sort((a, b) => b.sectionRatio - a.sectionRatio);
 }
 
-export function formatMigrationReportForAgent(
-  report: DfaReport,
-  options: DfaOptions = {},
-): string {
-  const outputDir = options.outputDir
-    ?? (report.reportPath ? dirname(report.reportPath) : report.dir);
+export function formatMigrationReportForAgent(report: DfaReport, options: DfaOptions = {}): string {
+  const outputDir = options.outputDir ?? (report.reportPath ? dirname(report.reportPath) : report.dir);
   const maxViewports = Math.max(1, options.maxViewports ?? 1);
 
   const filtered = options.variant
@@ -1057,7 +1047,8 @@ export function formatMigrationReportForAgent(
   for (const r of filtered) {
     const k = r.variantFile;
     const list = byVariant.get(k);
-    if (list) list.push(r); else byVariant.set(k, [r]);
+    if (list) list.push(r);
+    else byVariant.set(k, [r]);
   }
 
   const lines: string[] = [];
@@ -1078,9 +1069,10 @@ export function formatMigrationReportForAgent(
     // even when the default screenshot diff is 0% (e.g. broken hover
     // styles render identically by default but diverge under
     // interaction). Don't early-exit in that case.
-    const hasStateSignal = (report.stateDiffs ?? [])
-      .find((s) => s.variantFile === variantFile)?.perState
-      .some((ps) => ps.perViewport.some((vp) => Math.abs(vp.hoverInducedDelta) > 0.001)) ?? false;
+    const hasStateSignal =
+      (report.stateDiffs ?? [])
+        .find((s) => s.variantFile === variantFile)
+        ?.perState.some((ps) => ps.perViewport.some((vp) => Math.abs(vp.hoverInducedDelta) > 0.001)) ?? false;
 
     if (allZero && !hasStateSignal) {
       lines.push("**PASS** — 0.00% diff on every viewport. Nothing to fix.");
@@ -1088,10 +1080,12 @@ export function formatMigrationReportForAgent(
       continue;
     }
     if (allZero && hasStateSignal) {
-      lines.push("Default-state diff is **0.00%** on every viewport, but " +
-        "forced-state (`:hover` / `:focus` etc.) diff is non-zero — see the " +
-        "**Forced-state diff** section below. This pattern usually means the " +
-        "variant forgot to wire up interaction-state styles.");
+      lines.push(
+        "Default-state diff is **0.00%** on every viewport, but " +
+          "forced-state (`:hover` / `:focus` etc.) diff is non-zero — see the " +
+          "**Forced-state diff** section below. This pattern usually means the " +
+          "variant forgot to wire up interaction-state styles.",
+      );
       lines.push("");
     }
 
@@ -1105,18 +1099,24 @@ export function formatMigrationReportForAgent(
       if (finding?.regressed) {
         lines.push("### ⚠ REGRESSION");
         lines.push("");
-        lines.push(`**${finding.worsenedViewports.length} of ${finding.totalViewports} viewports got worse since the previous run** ` +
-          `(threshold ≥ ${finding.threshold}). Consider reverting the last patch and re-running.`);
+        lines.push(
+          `**${finding.worsenedViewports.length} of ${finding.totalViewports} viewports got worse since the previous run** ` +
+            `(threshold ≥ ${finding.threshold}). Consider reverting the last patch and re-running.`,
+        );
         lines.push("");
-        lines.push("Auto-revert offer: stop layering fixes on top of this regression. " +
-          "If this run followed one patch, ask for approval to revert that patch, " +
-          "then re-run against the previous report before attempting another fix.");
+        lines.push(
+          "Auto-revert offer: stop layering fixes on top of this regression. " +
+            "If this run followed one patch, ask for approval to revert that patch, " +
+            "then re-run against the previous report before attempting another fix.",
+        );
         lines.push("");
         lines.push("| Viewport | Previous | Current | Δ |");
         lines.push("|---|---|---|---|");
         for (const w of finding.worsenedViewports) {
           const deltaPct = `+${(w.delta * 100).toFixed(2)}%`;
-          lines.push(`| \`${w.viewport}\` | ${(w.previous * 100).toFixed(2)}% | ${(w.current * 100).toFixed(2)}% | ${deltaPct} |`);
+          lines.push(
+            `| \`${w.viewport}\` | ${(w.previous * 100).toFixed(2)}% | ${(w.current * 100).toFixed(2)}% | ${deltaPct} |`,
+          );
         }
         if (finding.previousReportPath) {
           lines.push("");
@@ -1132,9 +1132,11 @@ export function formatMigrationReportForAgent(
     if (renameMapEntries.length > 0) {
       lines.push("### Class-rename map");
       lines.push("");
-      lines.push("Inferred from DOM positions where the same tag in baseline " +
-        "and variant carries different `class` attributes. Read this first — " +
-        "it's the rename glossary the rest of the report assumes.");
+      lines.push(
+        "Inferred from DOM positions where the same tag in baseline " +
+          "and variant carries different `class` attributes. Read this first — " +
+          "it's the rename glossary the rest of the report assumes.",
+      );
       lines.push("");
       lines.push("| Baseline class | Variant class | Element positions | Unique properties differ |");
       lines.push("|---|---|---|---|");
@@ -1153,16 +1155,22 @@ export function formatMigrationReportForAgent(
     if (missingRuleHints.length > 0) {
       lines.push("### Missing CSS rule hints");
       lines.push("");
-      lines.push("Derived from DOM-position deltas across class-renamed elements. " +
-        "Values here are computed values, not parsed source declarations; use them as " +
-        "rule candidates for the variant selector.");
+      lines.push(
+        "Derived from DOM-position deltas across class-renamed elements. " +
+          "Values here are computed values, not parsed source declarations; use them as " +
+          "rule candidates for the variant selector.",
+      );
       lines.push("");
-      lines.push("| Baseline selector | Variant selector | Property | Computed baseline → variant | Viewports | Evidence |");
+      lines.push(
+        "| Baseline selector | Variant selector | Property | Computed baseline → variant | Viewports | Evidence |",
+      );
       lines.push("|---|---|---|---|---|---|");
       for (const hint of missingRuleHints.slice(0, 20)) {
         const viewports = hint.viewports.length > 0 ? hint.viewports.join(", ") : "-";
         const evidence = hint.selectorEvidence ? "selector-only + DOM-position" : "DOM-position";
-        lines.push(`| \`${hint.baselineSelector}\` | \`${hint.variantSelector}\` | \`${hint.property}\` | \`${hint.baseline}\` → \`${hint.variant}\` | ${viewports} | ${evidence} |`);
+        lines.push(
+          `| \`${hint.baselineSelector}\` | \`${hint.variantSelector}\` | \`${hint.property}\` | \`${hint.baseline}\` → \`${hint.variant}\` | ${viewports} | ${evidence} |`,
+        );
       }
       if (missingRuleHints.length > 20) {
         lines.push(`| _…${missingRuleHints.length - 20} more hints_ | | | | | |`);
@@ -1189,15 +1197,18 @@ export function formatMigrationReportForAgent(
       lines.push("");
 
       if (regionDiffSkippedViewports.length > 0) {
-        const capText = regionDiffSummary.maxViewports === undefined
-          ? "`--region-diff-max-viewports`"
-          : `\`--region-diff-max-viewports=${regionDiffSummary.maxViewports}\``;
+        const capText =
+          regionDiffSummary.maxViewports === undefined
+            ? "`--region-diff-max-viewports`"
+            : `\`--region-diff-max-viewports=${regionDiffSummary.maxViewports}\``;
         const analyzedCount = regionDiffSummary.perViewport.length;
         const candidateCount = analyzedCount + regionDiffSkippedViewports.length;
         const skippedText = regionDiffSkippedViewports
           .map((entry) => `\`${entry.viewport}\` ${formatPct(entry.diffRatio)} (${entry.diffPixels} px)`)
           .join(", ");
-        lines.push(`Region diff cap: analyzed ${analyzedCount}/${candidateCount} changed viewport(s) with ${capText}; skipped ${regionDiffSkippedViewports.length} changed viewport(s): ${skippedText}.`);
+        lines.push(
+          `Region diff cap: analyzed ${analyzedCount}/${candidateCount} changed viewport(s) with ${capText}; skipped ${regionDiffSkippedViewports.length} changed viewport(s): ${skippedText}.`,
+        );
         lines.push("");
       }
 
@@ -1221,9 +1232,7 @@ export function formatMigrationReportForAgent(
         for (const { entry, change } of changeRows.slice(0, 12)) {
           const selectorText = change.selector ?? change.selectorHint;
           const selector = formatNullableCode(selectorText);
-          const authored = selectorText
-            ? authoredLookup.get(`${selectorText} ${change.property}`)
-            : undefined;
+          const authored = selectorText ? authoredLookup.get(`${selectorText} ${change.property}`) : undefined;
           const target = formatRegionDiffTarget(change, authored);
           const current = formatRegionDiffCurrent(change, authored);
           const evidence = formatRegionDiffEvidence(change);
@@ -1255,16 +1264,20 @@ export function formatMigrationReportForAgent(
     if (csdPerVpSummary && csdPerVpSummary.result.totalDiffs > 0) {
       lines.push("### Verified deltas (computed-style) × viewport (catches breakpoint-gated rules)");
       lines.push("");
-      lines.push("Each (selector, property) is captured at every snapshot viewport. " +
-        "*Universal* pairs differ on every viewport — fix the base rule. " +
-        "*Breakpoint-gated* pairs differ only on a subset — almost always a missing " +
-        "or wrong `@media` rule. Without this split, mobile-only deltas were getting " +
-        "patched into the desktop rule and vice-versa.");
+      lines.push(
+        "Each (selector, property) is captured at every snapshot viewport. " +
+          "*Universal* pairs differ on every viewport — fix the base rule. " +
+          "*Breakpoint-gated* pairs differ only on a subset — almost always a missing " +
+          "or wrong `@media` rule. Without this split, mobile-only deltas were getting " +
+          "patched into the desktop rule and vice-versa.",
+      );
       lines.push("");
-      lines.push(`Total: **${csdPerVpSummary.result.totalDiffs}** (selector, property, viewport) tuples ` +
-        `across ${csdPerVpSummary.result.byViewport.length} viewports ` +
-        `(${csdPerVpSummary.result.universalPairs.length} universal pair(s), ` +
-        `${csdPerVpSummary.result.breakpointGatedPairs.length} breakpoint-gated pair(s)).`);
+      lines.push(
+        `Total: **${csdPerVpSummary.result.totalDiffs}** (selector, property, viewport) tuples ` +
+          `across ${csdPerVpSummary.result.byViewport.length} viewports ` +
+          `(${csdPerVpSummary.result.universalPairs.length} universal pair(s), ` +
+          `${csdPerVpSummary.result.breakpointGatedPairs.length} breakpoint-gated pair(s)).`,
+      );
       lines.push("");
 
       const universalRows = csdPerVpSummary.result.bySelectorProperty.filter(
@@ -1319,19 +1332,19 @@ export function formatMigrationReportForAgent(
         if (!heatmapVp || heatmapVp.regions.length === 0) continue;
         const viewportResult = results.find((r) => r.viewport === vp.viewport);
         const viewportTotalPixels = viewportResult?.totalPixels ?? 0;
-        sectionRows.push(
-          ...computeSectionDiffRows(vp, heatmapVp.regions, vp.viewport, viewportTotalPixels, 5),
-        );
+        sectionRows.push(...computeSectionDiffRows(vp, heatmapVp.regions, vp.viewport, viewportTotalPixels, 5));
       }
       if (sectionRows.length > 0) {
         lines.push("### Per-section diffRatio (heatmap × component-bbox)");
         lines.push("");
-        lines.push("For each viewport, the top-5 component bboxes (by baseline area) are " +
-          "intersected with the heatmap regions. `Section %` is diff_area_inside_section / " +
-          "section_area (= how concentrated the change is within this section). " +
-          "`Total %` is diff_area_inside_section / viewport_total (= this section's " +
-          "contribution to the overall viewport diff). The single highest `Section %` " +
-          "row across all viewports is marked ⚠ — fix that one first.");
+        lines.push(
+          "For each viewport, the top-5 component bboxes (by baseline area) are " +
+            "intersected with the heatmap regions. `Section %` is diff_area_inside_section / " +
+            "section_area (= how concentrated the change is within this section). " +
+            "`Total %` is diff_area_inside_section / viewport_total (= this section's " +
+            "contribution to the overall viewport diff). The single highest `Section %` " +
+            "row across all viewports is marked ⚠ — fix that one first.",
+        );
         lines.push("");
         lines.push("| Viewport | Rank | Section (top,left WxH) | Section % | Total % | Worst |");
         lines.push("|---|---|---|---|---|---|");
@@ -1355,14 +1368,18 @@ export function formatMigrationReportForAgent(
     if (bboxSummary && bboxSummary.perViewport.length > 0) {
       lines.push("### Component bbox diff (image-only — works without DOM correspondence)");
       lines.push("");
-      lines.push("Largest non-background regions in each viewport's screenshot, " +
-        "matched by rank-after-sort-by-area between baseline and variant. " +
-        "Survives DOM rewrites — useful when the agent invented a different " +
-        "tag tree than the reference. `iou` is intersection-over-union ∈ [0,1] " +
-        "(higher = more overlap). The CSS-axis columns name the dominant bbox " +
-        "delta and the properties most likely to affect it.");
+      lines.push(
+        "Largest non-background regions in each viewport's screenshot, " +
+          "matched by rank-after-sort-by-area between baseline and variant. " +
+          "Survives DOM rewrites — useful when the agent invented a different " +
+          "tag tree than the reference. `iou` is intersection-over-union ∈ [0,1] " +
+          "(higher = more overlap). The CSS-axis columns name the dominant bbox " +
+          "delta and the properties most likely to affect it.",
+      );
       lines.push("");
-      lines.push("| Viewport | Rank | Baseline bbox | Variant bbox | Δ top / left / W / H | Likely CSS axis | Candidate properties | IoU |");
+      lines.push(
+        "| Viewport | Rank | Baseline bbox | Variant bbox | Δ top / left / W / H | Likely CSS axis | Candidate properties | IoU |",
+      );
       lines.push("|---|---|---|---|---|---|---|---|");
       for (const vp of bboxSummary.perViewport) {
         for (const m of vp.matches) {
@@ -1371,7 +1388,9 @@ export function formatMigrationReportForAgent(
           const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
           const delta = `${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)}`;
           const axisHint = inferBboxCssAxis(m);
-          lines.push(`| \`${vp.viewport}\` | #${m.rank} | ${b} | ${v} | ${delta} | ${axisHint.axis} | ${axisHint.candidates} | ${m.iou} |`);
+          lines.push(
+            `| \`${vp.viewport}\` | #${m.rank} | ${b} | ${v} | ${delta} | ${axisHint.axis} | ${axisHint.candidates} | ${m.iou} |`,
+          );
         }
       }
       lines.push("");
@@ -1381,18 +1400,24 @@ export function formatMigrationReportForAgent(
     if (geometrySummary && geometrySummary.profiles.length > 0) {
       lines.push("### Cross-viewport geometry profile (responsive mismatch)");
       lines.push("");
-      lines.push("For each matched component (by area-rank), this is how its width / " +
-        "height moves across viewports on the baseline vs. on the variant. A " +
-        "large spread on one side and ~0 on the other means one side adapts " +
-        "to viewport width and the other doesn't — typical CSS bugs are " +
-        "missing `max-width`, missing `@media` rule, or a hard-coded pixel " +
-        "size where the baseline uses fluid units.");
+      lines.push(
+        "For each matched component (by area-rank), this is how its width / " +
+          "height moves across viewports on the baseline vs. on the variant. A " +
+          "large spread on one side and ~0 on the other means one side adapts " +
+          "to viewport width and the other doesn't — typical CSS bugs are " +
+          "missing `max-width`, missing `@media` rule, or a hard-coded pixel " +
+          "size where the baseline uses fluid units.",
+      );
       lines.push("");
-      lines.push("| Rank | Baseline width spread | Variant width spread | Baseline height spread | Variant height spread | Interpretation |");
+      lines.push(
+        "| Rank | Baseline width spread | Variant width spread | Baseline height spread | Variant height spread | Interpretation |",
+      );
       lines.push("|---|---|---|---|---|---|");
       for (const p of geometrySummary.profiles) {
         const interp = p.responsiveMismatch?.interpretation ?? "-";
-        lines.push(`| #${p.rank} | ${p.baselineSpread.width}px | ${p.variantSpread.width}px | ${p.baselineSpread.height}px | ${p.variantSpread.height}px | ${interp} |`);
+        lines.push(
+          `| #${p.rank} | ${p.baselineSpread.width}px | ${p.variantSpread.width}px | ${p.baselineSpread.height}px | ${p.variantSpread.height}px | ${interp} |`,
+        );
       }
       lines.push("");
     }
@@ -1401,11 +1426,13 @@ export function formatMigrationReportForAgent(
     if (textRowsSummary && textRowsSummary.perViewport.length > 0) {
       lines.push("### Text-row Δy (luminance-band peaks paired by order)");
       lines.push("");
-      lines.push("Dark horizontal bands in the rendered PNG, paired top-to-bottom " +
-        "with the variant's bands. When the *count* matches but y-positions don't, " +
-        "the variant has the right content but wrong vertical spacing somewhere " +
-        "above. When the count differs, the variant is missing (or has extra) " +
-        "rows of content. No DOM correspondence required.");
+      lines.push(
+        "Dark horizontal bands in the rendered PNG, paired top-to-bottom " +
+          "with the variant's bands. When the *count* matches but y-positions don't, " +
+          "the variant has the right content but wrong vertical spacing somewhere " +
+          "above. When the count differs, the variant is missing (or has extra) " +
+          "rows of content. No DOM correspondence required.",
+      );
       lines.push("");
       lines.push("| Viewport | Bands B / V | Rank | Baseline y | Variant y | Δy |");
       lines.push("|---|---|---|---|---|---|");
@@ -1419,7 +1446,9 @@ export function formatMigrationReportForAgent(
         }
         for (const m of vp.matches) {
           const signed = m.deltaY > 0 ? `+${m.deltaY}` : `${m.deltaY}`;
-          lines.push(`| \`${vp.viewport}\` | ${countCol} | #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`);
+          lines.push(
+            `| \`${vp.viewport}\` | ${countCol} | #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`,
+          );
         }
       }
       lines.push("");
@@ -1429,10 +1458,12 @@ export function formatMigrationReportForAgent(
     if (heatmapSummary && heatmapSummary.perViewport.length > 0) {
       lines.push("### Heatmap region clusters (where the diff actually is)");
       lines.push("");
-      lines.push("Connected hot-pixel clusters in `*_heatmap.png`. Each row is a " +
-        "rectangular bounding box around one cluster of pixelmatch-flagged " +
-        "pixels, sorted by hot-pixel count. Use these to localize diffs " +
-        "horizontally (per-band shift only gives vertical bands).");
+      lines.push(
+        "Connected hot-pixel clusters in `*_heatmap.png`. Each row is a " +
+          "rectangular bounding box around one cluster of pixelmatch-flagged " +
+          "pixels, sorted by hot-pixel count. Use these to localize diffs " +
+          "horizontally (per-band shift only gives vertical bands).",
+      );
       lines.push("");
       lines.push("| Viewport | Top-Left | Size | Hot pixels |");
       lines.push("|---|---|---|---|");
@@ -1448,12 +1479,14 @@ export function formatMigrationReportForAgent(
     if (stateSummary && stateSummary.perState.length > 0) {
       lines.push("### Forced-state diff (`:hover` / `:focus` etc.)");
       lines.push("");
-      lines.push("Each interactive element on the page is forced into the named " +
-        "pseudo-state via CDP `CSS.forcePseudoState` and the page is " +
-        "re-screenshot. Compare to the *default-state* diff: if the **induced " +
-        "delta** is large, the variant renders identically by default but the " +
-        "two diverge under interaction — usually means the agent forgot to " +
-        "wire up `:hover` / `:focus-visible` / etc. rules.");
+      lines.push(
+        "Each interactive element on the page is forced into the named " +
+          "pseudo-state via CDP `CSS.forcePseudoState` and the page is " +
+          "re-screenshot. Compare to the *default-state* diff: if the **induced " +
+          "delta** is large, the variant renders identically by default but the " +
+          "two diverge under interaction — usually means the agent forgot to " +
+          "wire up `:hover` / `:focus-visible` / etc. rules.",
+      );
       lines.push("");
       lines.push("| State | Viewport | Default diff | State diff | Induced delta | Forced elements |");
       lines.push("|---|---|---|---|---|---|");
@@ -1461,7 +1494,9 @@ export function formatMigrationReportForAgent(
         for (const vp of s.perViewport) {
           const induced = (vp.hoverInducedDelta * 100).toFixed(2);
           const inducedSigned = vp.hoverInducedDelta > 0 ? `+${induced}%` : `${induced}%`;
-          lines.push(`| \`:${s.state}\` | \`${vp.viewport}\` | ${(vp.defaultDiffRatio * 100).toFixed(2)}% | ${(vp.stateDiffRatio * 100).toFixed(2)}% | ${inducedSigned} | ${s.forcedCount} |`);
+          lines.push(
+            `| \`:${s.state}\` | \`${vp.viewport}\` | ${(vp.defaultDiffRatio * 100).toFixed(2)}% | ${(vp.stateDiffRatio * 100).toFixed(2)}% | ${inducedSigned} | ${s.forcedCount} |`,
+          );
         }
       }
       lines.push("");
@@ -1476,12 +1511,14 @@ export function formatMigrationReportForAgent(
     if (paletteSummary && paletteSummary.perViewport.length > 0) {
       lines.push("### Palette diff (design-token compliance)");
       lines.push("");
-      lines.push("Dominant colors extracted from each viewport's rendered PNG, " +
-        "stride-sampled and quantized to 5-bit-per-channel buckets. " +
-        "*Missing* = colors visible in the baseline target but not the variant " +
-        "(agent forgot a color); *Extra* = colors present in the variant but " +
-        "not the target (agent used a hard-coded literal instead of the token). " +
-        "Near-neighbor matches (RGB distance ≤ 12) are treated as the same color.");
+      lines.push(
+        "Dominant colors extracted from each viewport's rendered PNG, " +
+          "stride-sampled and quantized to 5-bit-per-channel buckets. " +
+          "*Missing* = colors visible in the baseline target but not the variant " +
+          "(agent forgot a color); *Extra* = colors present in the variant but " +
+          "not the target (agent used a hard-coded literal instead of the token). " +
+          "Near-neighbor matches (RGB distance ≤ 12) are treated as the same color.",
+      );
       lines.push("");
       lines.push("| Viewport | Side | Color | Share | Nearest |");
       lines.push("|---|---|---|---|---|");
@@ -1508,14 +1545,18 @@ export function formatMigrationReportForAgent(
     if (shiftOriginsSummary && shiftOriginsSummary.perViewport.length > 0) {
       lines.push("### Shift-origin diagnostics (what's causing the per-band Δy)");
       lines.push("");
-      lines.push("For each per-band Δy reported in the diff table above, the " +
-        "*first element whose y-coordinate diverges* between baseline and " +
-        "variant — i.e. the local origin of the shift. Subsequent elements " +
-        "below this one inherit the same Δy.");
+      lines.push(
+        "For each per-band Δy reported in the diff table above, the " +
+          "*first element whose y-coordinate diverges* between baseline and " +
+          "variant — i.e. the local origin of the shift. Subsequent elements " +
+          "below this one inherit the same Δy.",
+      );
       lines.push("");
       const hasOrigins = shiftOriginsSummary.perViewport.some((v) => v.origins.length > 0);
       if (hasOrigins) {
-        lines.push("| Viewport | Band (y) | Δy | Origin position | Baseline class | Variant class | Origin Δtop | Suspect |");
+        lines.push(
+          "| Viewport | Band (y) | Δy | Origin position | Baseline class | Variant class | Origin Δtop | Suspect |",
+        );
         lines.push("|---|---|---|---|---|---|---|---|");
         for (const vp of shiftOriginsSummary.perViewport) {
           for (const o of vp.origins) {
@@ -1525,16 +1566,18 @@ export function formatMigrationReportForAgent(
             const signedDelta = o.originDeltaY > 0 ? `+${o.originDeltaY}` : `${o.originDeltaY}`;
             lines.push(
               `| \`${vp.viewport}\` | ${o.bandStart}–${o.bandEnd} | ${signedShift}px | ` +
-              `\`${o.originPath}\` | \`${bcls}\` | \`${vcls}\` | ${signedDelta}px | ${o.suspectedAxis ?? "?"} |`,
+                `\`${o.originPath}\` | \`${bcls}\` | \`${vcls}\` | ${signedDelta}px | ${o.suspectedAxis ?? "?"} |`,
             );
           }
         }
         lines.push("");
-        lines.push("Suspect column: `height` = the origin element's own height " +
-          "differs (its `padding`, `line-height`, or content sizing is the " +
-          "root cause); `margin/padding-above` = same height but its top " +
-          "moved (a parent's padding or a previous sibling's height/margin " +
-          "is responsible).");
+        lines.push(
+          "Suspect column: `height` = the origin element's own height " +
+            "differs (its `padding`, `line-height`, or content sizing is the " +
+            "root cause); `margin/padding-above` = same height but its top " +
+            "moved (a parent's padding or a previous sibling's height/margin " +
+            "is responsible).",
+        );
         lines.push("");
       }
 
@@ -1548,11 +1591,13 @@ export function formatMigrationReportForAgent(
         }
       }
       if (phantomBands.length > 0) {
-        lines.push(`> **Phantom shifts**: ${phantomBands.length} band(s) reported by the pixel-shift detector ` +
-          "have no DOM-level Δy explanation. These are almost always pixelmatch " +
-          "cross-correlation artifacts (repeated patterns, subpixel font-metric " +
-          "differences) — *not* a real layout shift. Treat as noise unless the " +
-          "viewport's overall diff % is also high.");
+        lines.push(
+          `> **Phantom shifts**: ${phantomBands.length} band(s) reported by the pixel-shift detector ` +
+            "have no DOM-level Δy explanation. These are almost always pixelmatch " +
+            "cross-correlation artifacts (repeated patterns, subpixel font-metric " +
+            "differences) — *not* a real layout shift. Treat as noise unless the " +
+            "viewport's overall diff % is also high.",
+        );
         lines.push("");
         lines.push("| Viewport | Band (y) | Reported shift |");
         lines.push("|---|---|---|");
@@ -1568,11 +1613,15 @@ export function formatMigrationReportForAgent(
     if (shiftAccumulationSummary && shiftAccumulationSummary.perViewport.length > 0) {
       lines.push("### Vertical accumulation breakdown (height deltas above shift bands)");
       lines.push("");
-      lines.push("Groups upstream bbox height changes by `(baseline class → variant class)` " +
-        "for each reported shift band. This is a heuristic accounting view: " +
-        "use it to see whether many small height differences add up to the band shift.");
+      lines.push(
+        "Groups upstream bbox height changes by `(baseline class → variant class)` " +
+          "for each reported shift band. This is a heuristic accounting view: " +
+          "use it to see whether many small height differences add up to the band shift.",
+      );
       lines.push("");
-      lines.push("| Viewport | Band (y) | Reported shift | Accumulated height Δ | Class pair | Contribution | Sample paths |");
+      lines.push(
+        "| Viewport | Band (y) | Reported shift | Accumulated height Δ | Class pair | Contribution | Sample paths |",
+      );
       lines.push("|---|---|---|---|---|---|---|");
       for (const vp of shiftAccumulationSummary.perViewport) {
         for (const breakdown of vp.breakdowns) {
@@ -1582,7 +1631,9 @@ export function formatMigrationReportForAgent(
             const vcls = c.variantClasses || "_(none)_";
             const contribution = `${signedPx(c.averageDeltaHeight)} × ${c.count} = ${signedPx(c.totalDeltaHeight)}`;
             const samplePaths = c.samplePaths.map((p) => `\`${p}\``).join(", ");
-            lines.push(`| \`${vp.viewport}\` | ${band} | ${signedPx(breakdown.bandShift)} | ${signedPx(breakdown.accumulatedDeltaHeight)} | \`${bcls}\` → \`${vcls}\` | ${contribution} | ${samplePaths} |`);
+            lines.push(
+              `| \`${vp.viewport}\` | ${band} | ${signedPx(breakdown.bandShift)} | ${signedPx(breakdown.accumulatedDeltaHeight)} | \`${bcls}\` → \`${vcls}\` | ${contribution} | ${samplePaths} |`,
+            );
           }
         }
       }
@@ -1593,12 +1644,16 @@ export function formatMigrationReportForAgent(
     if (gridSummary && gridSummary.suggestions.length > 0) {
       lines.push("### Grid `fr`-ratio suggestions");
       lines.push("");
-      lines.push("Container elements whose direct children have a non-uniform width " +
-        "distribution that differs between baseline and variant. The baseline " +
-        "ratio is shown alongside an integer `fr` approximation — paste straight " +
-        "into `grid-template-columns:`.");
+      lines.push(
+        "Container elements whose direct children have a non-uniform width " +
+          "distribution that differs between baseline and variant. The baseline " +
+          "ratio is shown alongside an integer `fr` approximation — paste straight " +
+          "into `grid-template-columns:`.",
+      );
       lines.push("");
-      lines.push("| Parent | Viewport | Baseline widths (px) | Variant widths (px) | Baseline ratio | Suggested `grid-template-columns` |");
+      lines.push(
+        "| Parent | Viewport | Baseline widths (px) | Variant widths (px) | Baseline ratio | Suggested `grid-template-columns` |",
+      );
       lines.push("|---|---|---|---|---|---|");
       for (const s of gridSummary.suggestions.slice(0, 15)) {
         const bcls = s.baselineClasses || "_(none)_";
@@ -1631,14 +1686,18 @@ export function formatMigrationReportForAgent(
     if (colorSamples.length > 0) {
       lines.push("### Color-change samples");
       lines.push("");
-      lines.push("Sampled baseline/current colors for dense color-change regions. Use these as concrete paint-token hints before guessing from the PNG.");
+      lines.push(
+        "Sampled baseline/current colors for dense color-change regions. Use these as concrete paint-token hints before guessing from the PNG.",
+      );
       lines.push("");
       lines.push("| Viewport | Region | Baseline | Current | RGB distance |");
       lines.push("|---|---|---|---|---|");
       for (const sample of colorSamples.slice(0, 12)) {
         const region = `${sample.x},${sample.y} ${sample.width}x${sample.height}`;
         const distance = sample.distance === undefined ? "-" : String(sample.distance);
-        lines.push(`| \`${sample.viewport}\` | \`${region}\` | \`${sample.baseline}\` | \`${sample.variant}\` | ${distance} |`);
+        lines.push(
+          `| \`${sample.viewport}\` | \`${region}\` | \`${sample.baseline}\` | \`${sample.variant}\` | ${distance} |`,
+        );
       }
       if (colorSamples.length > 12) {
         lines.push(`| _…${colorSamples.length - 12} more_ | | | | |`);
@@ -1659,9 +1718,7 @@ export function formatMigrationReportForAgent(
       // Sort: verified ✓ first, then by viewport count desc.
       const annotated = fixCandidates.map((fc) => ({
         fc,
-        verified: verificationAvailable
-          ? candidateMatchesVerifiedPair(fc.selector, fc.property, verifiedPairs)
-          : null,
+        verified: verificationAvailable ? candidateMatchesVerifiedPair(fc.selector, fc.property, verifiedPairs) : null,
       }));
       annotated.sort((a, b) => {
         if (a.verified !== b.verified) {
@@ -1674,19 +1731,22 @@ export function formatMigrationReportForAgent(
       // they're rules whose computed value already matches baseline, so
       // the agent has no reason to look at them. `--show-unverified`
       // restores them for debugging.
-      const displayed = verificationAvailable && !showUnverified
-        ? annotated.filter((a) => a.verified === true)
-        : annotated;
+      const displayed =
+        verificationAvailable && !showUnverified ? annotated.filter((a) => a.verified === true) : annotated;
       const hiddenCount = annotated.length - displayed.length;
 
       if (displayed.length > 0) {
-        lines.push(verificationAvailable
-          ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified)"
-          : "### Heuristic fix candidates (collapsed across viewports)");
+        lines.push(
+          verificationAvailable
+            ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified)"
+            : "### Heuristic fix candidates (collapsed across viewports)",
+        );
         lines.push("");
-        lines.push("> The tool flags `selector { property }` pairs whose declaration " +
-          "matches each viewport's dominant category. These are *hints*; trust your " +
-          "eyes (or the verified computed-style section below) for the real delta.");
+        lines.push(
+          "> The tool flags `selector { property }` pairs whose declaration " +
+            "matches each viewport's dominant category. These are *hints*; trust your " +
+            "eyes (or the verified computed-style section below) for the real delta.",
+        );
         lines.push("");
         if (verificationAvailable) {
           lines.push("| Selector | Property | Viewports | Verified? |");
@@ -1711,7 +1771,9 @@ export function formatMigrationReportForAgent(
       } else if (verificationAvailable && !showUnverified && annotated.length > 0) {
         lines.push("### Heuristic fix candidates");
         lines.push("");
-        lines.push(`_All ${annotated.length} heuristic candidate(s) for this run are unverified (computed value matches baseline). The diff is elsewhere — see the verified-deltas sections below. Pass \`--show-unverified\` to see the unverified rows anyway._`);
+        lines.push(
+          `_All ${annotated.length} heuristic candidate(s) for this run are unverified (computed value matches baseline). The diff is elsewhere — see the verified-deltas sections below. Pass \`--show-unverified\` to see the unverified rows anyway._`,
+        );
         lines.push("");
       }
     }
@@ -1737,9 +1799,11 @@ export function formatMigrationReportForAgent(
       const pairs = dpPvSummary.result.byPathProperty;
       const universal = pairs.filter((p) => p.viewports.length === viewportCount).length;
       const gated = pairs.length - universal;
-      lines.push(`Total: **${dpPvSummary.result.totalDiffs}** tuples across **${viewportCount}** viewport(s).` +
-        ` ${universal} (path, property) pair(s) differ on *every* viewport (most likely a base CSS rule);` +
-        ` **${gated}** differ on only a subset (likely media-query-gated).`);
+      lines.push(
+        `Total: **${dpPvSummary.result.totalDiffs}** tuples across **${viewportCount}** viewport(s).` +
+          ` ${universal} (path, property) pair(s) differ on *every* viewport (most likely a base CSS rule);` +
+          ` **${gated}** differ on only a subset (likely media-query-gated).`,
+      );
       lines.push("");
 
       lines.push("#### Universal deltas (apply on every viewport — fix the base rule)");
@@ -1761,15 +1825,19 @@ export function formatMigrationReportForAgent(
           const ctxSuffix = displayCoercionSuffix(pp.property, pp.parentDisplayContext);
           const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
           const variantLabel = formatValueWithEm(sample.variant, sample.variantEm) + ctxSuffix;
-          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`);
+          lines.push(
+            `| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`,
+          );
         }
       } else {
         lines.push("_(none)_");
       }
       if (hiddenUniversal > 0) {
         lines.push("");
-        lines.push(`_…${hiddenUniversal} more universal pair(s) below the top 30. See ` +
-          "`domPositionDiffPerViewport.byPathProperty` in the JSON report._");
+        lines.push(
+          `_…${hiddenUniversal} more universal pair(s) below the top 30. See ` +
+            "`domPositionDiffPerViewport.byPathProperty` in the JSON report._",
+        );
       }
       lines.push("");
 
@@ -1782,9 +1850,11 @@ export function formatMigrationReportForAgent(
       if (emPairs.length > 0) {
         lines.push("#### Em-relative properties (one `em` rule may produce different px values per element)");
         lines.push("");
-        lines.push("Check whether the px values, normalized to em via each " +
-          "element's own font-size, all agree — if they do, the source is a " +
-          "single em-form rule covering multiple elements.");
+        lines.push(
+          "Check whether the px values, normalized to em via each " +
+            "element's own font-size, all agree — if they do, the source is a " +
+            "single em-form rule covering multiple elements.",
+        );
         lines.push("");
         lines.push("| Position | Class (baseline → variant) | Property | Baseline | Variant |");
         lines.push("|---|---|---|---|---|");
@@ -1794,7 +1864,9 @@ export function formatMigrationReportForAgent(
           const vcls = pp.variantClasses || "_(none)_";
           const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
           const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
-          lines.push(`| \`${pp.path}\` | \`${bcls}\` → \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`);
+          lines.push(
+            `| \`${pp.path}\` | \`${bcls}\` → \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`,
+          );
         }
         lines.push("");
       }
@@ -1803,7 +1875,9 @@ export function formatMigrationReportForAgent(
         lines.push("#### Breakpoint-gated deltas (likely a missing / wrong `@media` rule)");
         lines.push("");
         const gatedPairs = pairs.filter((p) => p.viewports.length < viewportCount).slice(0, 20);
-        lines.push("| Position | Baseline class | Variant class | Property | Affected viewports | Sample baseline → variant |");
+        lines.push(
+          "| Position | Baseline class | Variant class | Property | Affected viewports | Sample baseline → variant |",
+        );
         lines.push("|---|---|---|---|---|---|");
         for (const pp of gatedPairs) {
           const bcls = pp.baselineClasses || "_(none)_";
@@ -1814,7 +1888,9 @@ export function formatMigrationReportForAgent(
           const ctxSuffix = displayCoercionSuffix(pp.property, pp.parentDisplayContext);
           const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
           const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
-          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | ${baselineLabel} → ${variantLabel}${ctxSuffix} |`);
+          lines.push(
+            `| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | ${baselineLabel} → ${variantLabel}${ctxSuffix} |`,
+          );
         }
         lines.push("");
       }
@@ -1832,9 +1908,11 @@ export function formatMigrationReportForAgent(
     if (dpSummary && dpSummary.result.totalDiffs > 0) {
       lines.push("### Verified deltas by DOM position (class-rename-aware)");
       lines.push("");
-      lines.push(`Total tuples: **${dpSummary.result.totalDiffs}** across ${dpSummary.result.byPath.length} ` +
-        "element position(s). Each row pairs the same tree position in baseline vs variant — " +
-        "robust to class renames (`.card` → `.luna-panel`).");
+      lines.push(
+        `Total tuples: **${dpSummary.result.totalDiffs}** across ${dpSummary.result.byPath.length} ` +
+          "element position(s). Each row pairs the same tree position in baseline vs variant — " +
+          "robust to class renames (`.card` → `.luna-panel`).",
+      );
       lines.push("");
       const dpEntries = dpSummary.result.entries ?? [];
       if (dpEntries.length > 0) {
@@ -1844,7 +1922,9 @@ export function formatMigrationReportForAgent(
           const bcls = e.baselineClasses || "_(none)_";
           const vcls = e.variantClasses || "_(none)_";
           const ctxSuffix = displayCoercionSuffix(e.property, e.parentDisplayContext);
-          lines.push(`| \`${e.path}\` | \`${bcls}\` | \`${vcls}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\`${ctxSuffix} |`);
+          lines.push(
+            `| \`${e.path}\` | \`${bcls}\` | \`${vcls}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\`${ctxSuffix} |`,
+          );
         }
         if (dpEntries.length > 25) {
           lines.push(`| _…${dpEntries.length - 25} more rows_ | | | | | |`);
@@ -1862,8 +1942,10 @@ export function formatMigrationReportForAgent(
         lines.push("");
       }
       if (dpSummary.result.pathsOnlyInBaseline.length > 0 || dpSummary.result.pathsOnlyInVariant.length > 0) {
-        lines.push(`_Structural drift_: ${dpSummary.result.pathsOnlyInBaseline.length} path(s) only in baseline, ` +
-          `${dpSummary.result.pathsOnlyInVariant.length} only in variant.`);
+        lines.push(
+          `_Structural drift_: ${dpSummary.result.pathsOnlyInBaseline.length} path(s) only in baseline, ` +
+            `${dpSummary.result.pathsOnlyInVariant.length} only in variant.`,
+        );
         lines.push("");
       }
     }
@@ -1871,9 +1953,11 @@ export function formatMigrationReportForAgent(
     if (csdSummary && csdSummary.result.totalDiffs > 0) {
       lines.push("### Verified deltas (computed-style)");
       lines.push("");
-      lines.push(`Total differing (selector, property) tuples: **${csdSummary.result.totalDiffs}**. ` +
-        "Each row is a real computed-style mismatch (the baseline rendered with one value, " +
-        "the variant with another) — trust this section over the heuristic candidates above.");
+      lines.push(
+        `Total differing (selector, property) tuples: **${csdSummary.result.totalDiffs}**. ` +
+          "Each row is a real computed-style mismatch (the baseline rendered with one value, " +
+          "the variant with another) — trust this section over the heuristic candidates above.",
+      );
       lines.push("");
       const entries = csdSummary.result.entries ?? [];
       if (entries.length > 0) {
@@ -1909,10 +1993,12 @@ export function formatMigrationReportForAgent(
     if (authoredSummary && authoredSummary.result.totalDiffs > 0) {
       lines.push("### Authored CSS deltas (CSSOM)");
       lines.push("");
-      lines.push(`Total differing (selector, property) tuples: **${authoredSummary.result.totalDiffs}**. ` +
-        "Captured from `document.styleSheets.cssRules`, so values reflect the AUTHORED string. " +
-        "`grid-template-*` / `flex` / `transform` rows here are safe to write back verbatim — " +
-        "the computed channel above resolves `1fr` to `0px` and would corrupt the layout if used as the fix.");
+      lines.push(
+        `Total differing (selector, property) tuples: **${authoredSummary.result.totalDiffs}**. ` +
+          "Captured from `document.styleSheets.cssRules`, so values reflect the AUTHORED string. " +
+          "`grid-template-*` / `flex` / `transform` rows here are safe to write back verbatim — " +
+          "the computed channel above resolves `1fr` to `0px` and would corrupt the layout if used as the fix.",
+      );
       lines.push("");
       const entries = authoredSummary.result.entries ?? [];
       if (entries.length > 0) {
@@ -1962,41 +2048,69 @@ export function formatMigrationReportForAgent(
     lines.push("");
     if (regionDiffNextStep) {
       const current = regionDiffNextStep.current ? ` Current value is \`${regionDiffNextStep.current}\`.` : "";
-      const artifact = regionDiffNextStep.artifacts ? ` Then open ${regionDiffNextStep.artifacts} only if the visual interpretation needs confirmation.` : "";
-      lines.push(`1. Start from the VLM region diff table: apply \`${regionDiffNextStep.selector} { ${regionDiffNextStep.property}: ${regionDiffNextStep.target}; }\` for \`${regionDiffNextStep.viewport}\`.`);
-      lines.push(`2. Use the ${regionDiffNextStep.valueSource} value above as the target; do not substitute the sampled PNG color when an authored value is present.${current}`);
-      lines.push(`3. Cross-check the PNG pair for that viewport to confirm the row explains the visible delta.${artifact}`);
-      lines.push("4. Re-run `migration compare` and check that the same regionDiff row disappears or its viewport diff drops materially.");
+      const artifact = regionDiffNextStep.artifacts
+        ? ` Then open ${regionDiffNextStep.artifacts} only if the visual interpretation needs confirmation.`
+        : "";
+      lines.push(
+        `1. Start from the VLM region diff table: apply \`${regionDiffNextStep.selector} { ${regionDiffNextStep.property}: ${regionDiffNextStep.target}; }\` for \`${regionDiffNextStep.viewport}\`.`,
+      );
+      lines.push(
+        `2. Use the ${regionDiffNextStep.valueSource} value above as the target; do not substitute the sampled PNG color when an authored value is present.${current}`,
+      );
+      lines.push(
+        `3. Cross-check the PNG pair for that viewport to confirm the row explains the visible delta.${artifact}`,
+      );
+      lines.push(
+        "4. Re-run `migration compare` and check that the same regionDiff row disappears or its viewport diff drops materially.",
+      );
     } else if (wireframeMode) {
-      lines.push("_Wireframe / from-screenshot mode detected: no DOM correspondence " +
-        "between baseline and variant — DOM-position-diff, computed-style-diff, " +
-        "and fix-candidate sections are empty. Use the image-only signals._");
+      lines.push(
+        "_Wireframe / from-screenshot mode detected: no DOM correspondence " +
+          "between baseline and variant — DOM-position-diff, computed-style-diff, " +
+          "and fix-candidate sections are empty. Use the image-only signals._",
+      );
       lines.push("");
-      lines.push("1. Open the heatmap PNG and locate each region cluster from the " +
-        "table above — these are the *only* areas the variant differs from the " +
-        "target. Diffs outside those rectangles can be ignored.");
-      lines.push("2. For each cluster, match it to a baseline component bbox " +
-        "(top/left/size). The Δ column tells you whether the variant element is " +
-        "too small / too big / displaced.");
-      lines.push("3. Cross-check the cross-viewport geometry table: if a row has " +
-        "large baseline spread and ~0 variant spread, you're missing a responsive " +
-        "rule (typically `max-width`, `width: 100%`, or an `@media` block) — " +
-        "not a fixed-pixel correction.");
-      lines.push("4. If the text-row table shows a count mismatch (e.g. baseline " +
-        "has 6 bands, variant has 4), you're missing rows of content — add the " +
-        "missing HTML elements before tweaking CSS.");
-      lines.push("5. Write the missing HTML elements first (the bbox table tells " +
-        "you their target dimensions), then the CSS rules. Re-run `vlmkit diff html` " +
-        "and check that bbox deltas + heatmap regions + text-row Δy all shrink " +
-        "toward zero.");
+      lines.push(
+        "1. Open the heatmap PNG and locate each region cluster from the " +
+          "table above — these are the *only* areas the variant differs from the " +
+          "target. Diffs outside those rectangles can be ignored.",
+      );
+      lines.push(
+        "2. For each cluster, match it to a baseline component bbox " +
+          "(top/left/size). The Δ column tells you whether the variant element is " +
+          "too small / too big / displaced.",
+      );
+      lines.push(
+        "3. Cross-check the cross-viewport geometry table: if a row has " +
+          "large baseline spread and ~0 variant spread, you're missing a responsive " +
+          "rule (typically `max-width`, `width: 100%`, or an `@media` block) — " +
+          "not a fixed-pixel correction.",
+      );
+      lines.push(
+        "4. If the text-row table shows a count mismatch (e.g. baseline " +
+          "has 6 bands, variant has 4), you're missing rows of content — add the " +
+          "missing HTML elements before tweaking CSS.",
+      );
+      lines.push(
+        "5. Write the missing HTML elements first (the bbox table tells " +
+          "you their target dimensions), then the CSS rules. Re-run `vlmkit diff html` " +
+          "and check that bbox deltas + heatmap regions + text-row Δy all shrink " +
+          "toward zero.",
+      );
     } else {
-      lines.push("1. Read baseline + current PNGs side-by-side and enumerate visible deltas " +
-        "(font / colors / spacing / radius / shadow / gradient / typography).");
-      lines.push("2. Cross-check against the fix-candidate table — it identifies *which* " +
-        "selectors differ but may name the wrong property; trust your eyes for the " +
-        "actual property.");
-      lines.push("3. Write one CSS patch covering the deltas, re-run `vlmkit diff html`, " +
-        "and check that the dominant category count drops to zero on every viewport.");
+      lines.push(
+        "1. Read baseline + current PNGs side-by-side and enumerate visible deltas " +
+          "(font / colors / spacing / radius / shadow / gradient / typography).",
+      );
+      lines.push(
+        "2. Cross-check against the fix-candidate table — it identifies *which* " +
+          "selectors differ but may name the wrong property; trust your eyes for the " +
+          "actual property.",
+      );
+      lines.push(
+        "3. Write one CSS patch covering the deltas, re-run `vlmkit diff html`, " +
+          "and check that the dominant category count drops to zero on every viewport.",
+      );
     }
     lines.push("");
   }

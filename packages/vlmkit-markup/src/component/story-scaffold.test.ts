@@ -51,10 +51,7 @@ describe("deriveStoryThreshold", () => {
     const hero = 1258 * 204;
     const realChangeRatio = 0.001;
     assert.ok(realChangeRatio < THRESHOLD_CEILING, "premise: the gate default lets this through");
-    assert.ok(
-      realChangeRatio > deriveStoryThreshold(hero).threshold,
-      "the derived threshold must flag it",
-    );
+    assert.ok(realChangeRatio > deriveStoryThreshold(hero).threshold, "the derived threshold must flag it");
   });
 
   it("never loosens past the gate's own default", () => {
@@ -113,13 +110,13 @@ describe("componentNameFromClass", () => {
 describe("discoverStoryCandidates", () => {
   it("groups a BEM modifier as a variant of one component, not a second component", () => {
     const found = discoverStoryCandidates(
-      [
-        element({ className: "btn", index: 0 }),
-        element({ className: "btn btn--ghost", index: 1 }),
-      ],
+      [element({ className: "btn", index: 0 }), element({ className: "btn btn--ghost", index: 1 })],
       { viewport: VIEWPORT },
     );
-    assert.deepEqual(found.map((c) => c.id), ["components/Btn/Default", "components/Btn/Ghost"]);
+    assert.deepEqual(
+      found.map((c) => c.id),
+      ["components/Btn/Default", "components/Btn/Ghost"],
+    );
     // Both must share one selector, or a heal/diff pass on the component looks
     // at two different things.
     assert.deepEqual([...new Set(found.map((c) => c.selector))], [".btn"]);
@@ -136,17 +133,18 @@ describe("discoverStoryCandidates", () => {
       { viewport: VIEWPORT },
     );
     assert.deepEqual(found.map((c) => c.variant).sort(), ["Disabled", "GhostDisabled"]);
-    assert.equal(found.every((c) => c.instances === 1), true, "the two must not be grouped");
+    assert.equal(
+      found.every((c) => c.instances === 1),
+      true,
+      "the two must not be grouped",
+    );
   });
 
   it("turns a DOM state attribute into its own story", () => {
     // The "a story per named state" half of the handoff, derived rather than
     // remembered.
     const found = discoverStoryCandidates(
-      [
-        element({ className: "btn", index: 0 }),
-        element({ className: "btn", index: 1, states: ["disabled"] }),
-      ],
+      [element({ className: "btn", index: 0 }), element({ className: "btn", index: 1, states: ["disabled"] })],
       { viewport: VIEWPORT },
     );
     assert.deepEqual(found.map((c) => c.variant).sort(), ["Default", "Disabled"]);
@@ -167,18 +165,16 @@ describe("discoverStoryCandidates", () => {
   });
 
   it("skips zero-sized elements, which cannot be screenshotted", () => {
-    const found = discoverStoryCandidates(
-      [element({ className: "c-hidden", index: 0, width: 0, height: 0 })],
-      { viewport: VIEWPORT },
-    );
+    const found = discoverStoryCandidates([element({ className: "c-hidden", index: 0, width: 0, height: 0 })], {
+      viewport: VIEWPORT,
+    });
     assert.deepEqual(found, []);
   });
 
   it("rejects a block larger than the viewport as page furniture", () => {
-    const found = discoverStoryCandidates(
-      [element({ className: "c-page", index: 0, width: 1280, height: 3000 })],
-      { viewport: VIEWPORT },
-    );
+    const found = discoverStoryCandidates([element({ className: "c-page", index: 0, width: 1280, height: 3000 })], {
+      viewport: VIEWPORT,
+    });
     assert.equal(found[0]!.recommended, false);
     assert.match(found[0]!.notes.join(" "), /page furniture/);
   });
@@ -234,8 +230,24 @@ describe("discoverStoryCandidates", () => {
     const found = discoverStoryCandidates(
       [
         element({ className: "c-panel", index: 0, depth: 1, width: 400, height: 200 }),
-        element({ className: "c-badge", index: 1, depth: 2, width: 40, height: 20, ancestors: [0], outerHtml: identical }),
-        element({ className: "c-badge", index: 2, depth: 2, width: 40, height: 20, ancestors: [0], outerHtml: identical }),
+        element({
+          className: "c-badge",
+          index: 1,
+          depth: 2,
+          width: 40,
+          height: 20,
+          ancestors: [0],
+          outerHtml: identical,
+        }),
+        element({
+          className: "c-badge",
+          index: 2,
+          depth: 2,
+          width: 40,
+          height: 20,
+          ancestors: [0],
+          outerHtml: identical,
+        }),
       ],
       { viewport: VIEWPORT },
     );
@@ -244,7 +256,7 @@ describe("discoverStoryCandidates", () => {
 
   it("demotes a block that wraps three or more candidates", () => {
     const children = [1, 2, 3].map((index) =>
-      element({ className: `c-child${index}`, index, depth: 2, width: 40, height: 20, ancestors: [0] })
+      element({ className: `c-child${index}`, index, depth: 2, width: 40, height: 20, ancestors: [0] }),
     );
     const found = discoverStoryCandidates(
       [element({ className: "c-shell", index: 0, depth: 1, width: 500, height: 300 }), ...children],
@@ -257,13 +269,13 @@ describe("discoverStoryCandidates", () => {
 
   it("restricts to --selector when given, and does not renumber ids", () => {
     const found = discoverStoryCandidates(
-      [
-        element({ className: "c-card", index: 0 }),
-        element({ className: "c-alert", index: 1 }),
-      ],
+      [element({ className: "c-card", index: 0 }), element({ className: "c-alert", index: 1 })],
       { viewport: VIEWPORT, selectors: [".c-card"] },
     );
-    assert.deepEqual(found.map((c) => c.id), ["components/Card/Default"]);
+    assert.deepEqual(
+      found.map((c) => c.id),
+      ["components/Card/Default"],
+    );
   });
 
   it("honours a story id prefix", () => {
@@ -281,7 +293,7 @@ describe("buildGalleryHtml", () => {
     component: "Card",
     variant: "Default",
     selector: ".c-card",
-    html: "<div class=\"c-card\">hi</div>",
+    html: '<div class="c-card">hi</div>',
     width: 294,
     height: 88,
     instances: 1,
@@ -404,7 +416,9 @@ describe("scaffoldStoryGallery", () => {
   /** A page with two component-shaped repeats, which is what the heuristics look for. */
   const source = (() => {
     const file = join(dir, "page.html");
-    writeFileSync(file, `<!doctype html><meta charset="utf-8"><title>Shop</title>
+    writeFileSync(
+      file,
+      `<!doctype html><meta charset="utf-8"><title>Shop</title>
       <style>
         body { margin: 0; font: 16px system-ui; }
         .card { width: 260px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; margin: 12px; }
@@ -413,14 +427,17 @@ describe("scaffoldStoryGallery", () => {
       </style>
       <div class="card"><h3>First</h3><p>One description.</p><span class="btn">Buy</span></div>
       <div class="card"><h3>Second</h3><p>Another description.</p><span class="btn">Buy</span></div>
-      <div class="card"><h3>Third</h3><p>A third description.</p><span class="btn">Buy</span></div>`);
+      <div class="card"><h3>Third</h3><p>A third description.</p><span class="btn">Buy</span></div>`,
+    );
     return file;
   })();
 
-  it("writes a gallery and a stories.json that agree with each other", { timeout: 120_000 } , async () => {
+  it("writes a gallery and a stories.json that agree with each other", { timeout: 120_000 }, async () => {
     const outDir = join(dir, "out");
     const result = await scaffoldStoryGallery({
-      source, outDir, viewport: { width: 1280, height: 720 },
+      source,
+      outDir,
+      viewport: { width: 1280, height: 720 },
     });
     assert.ok(existsSync(result.galleryPath), result.galleryPath);
     assert.ok(existsSync(result.storiesPath), result.storiesPath);
@@ -441,7 +458,9 @@ describe("scaffoldStoryGallery", () => {
     assert.match(gallery, /<base href="file:\/\//);
 
     const stories = JSON.parse(readFileSync(result.storiesPath, "utf8")) as {
-      source: string; gallery: string; stories: { id: string; selector: string; html?: string }[];
+      source: string;
+      gallery: string;
+      stories: { id: string; selector: string; html?: string }[];
     };
     assert.deepEqual(
       stories.stories.map((s) => s.id).sort(),
@@ -454,21 +473,35 @@ describe("scaffoldStoryGallery", () => {
     assert.ok(stories.stories.every((s) => s.html === undefined));
   });
 
-  it("--selector is an instruction: a named element becomes a story the heuristics would drop", { timeout: 120_000 }, async () => {
-    const result = await scaffoldStoryGallery({
-      source, outDir: join(dir, "out-selector"), viewport: { width: 1280, height: 720 },
-      selectors: [".btn"],
-    });
-    assert.ok(result.stories.some((s) => s.selector.includes("btn")), "the named selector is present");
-    assert.equal(result.skipped.length, 0, "nothing is skipped when the caller named the set");
-  });
+  it(
+    "--selector is an instruction: a named element becomes a story the heuristics would drop",
+    { timeout: 120_000 },
+    async () => {
+      const result = await scaffoldStoryGallery({
+        source,
+        outDir: join(dir, "out-selector"),
+        viewport: { width: 1280, height: 720 },
+        selectors: [".btn"],
+      });
+      assert.ok(
+        result.stories.some((s) => s.selector.includes("btn")),
+        "the named selector is present",
+      );
+      assert.equal(result.skipped.length, 0, "nothing is skipped when the caller named the set");
+    },
+  );
 
   it("--include-all keeps the candidates the heuristics rejected", { timeout: 120_000 }, async () => {
     const strict = await scaffoldStoryGallery({
-      source, outDir: join(dir, "out-strict"), viewport: { width: 1280, height: 720 },
+      source,
+      outDir: join(dir, "out-strict"),
+      viewport: { width: 1280, height: 720 },
     });
     const all = await scaffoldStoryGallery({
-      source, outDir: join(dir, "out-all"), viewport: { width: 1280, height: 720 }, includeAll: true,
+      source,
+      outDir: join(dir, "out-all"),
+      viewport: { width: 1280, height: 720 },
+      includeAll: true,
     });
     assert.ok(all.stories.length >= strict.stories.length);
     assert.equal(all.skipped.length, 0, "nothing is skipped when everything is kept");
@@ -499,10 +532,20 @@ describe("formatStoryScaffoldResult", () => {
 
   it("says how to keep the candidates it dropped", () => {
     // A skipped candidate with no way to recover it reads as "this element cannot be a story".
-    const text = plain(formatStoryScaffoldResult({
-      ...base,
-      skipped: [{ id: "Wrapper/Default", selector: ".wrapper", width: 1280, height: 900, notes: ["covers 78% of the viewport"] }],
-    } as never));
+    const text = plain(
+      formatStoryScaffoldResult({
+        ...base,
+        skipped: [
+          {
+            id: "Wrapper/Default",
+            selector: ".wrapper",
+            width: 1280,
+            height: 900,
+            notes: ["covers 78% of the viewport"],
+          },
+        ],
+      } as never),
+    );
     assert.match(text, /1 candidate\(s\) not written/);
     assert.match(text, /--include-all keeps them, --selector overrides/);
     assert.match(text, /Wrapper\/Default — covers 78% of the viewport/);
@@ -511,11 +554,13 @@ describe("formatStoryScaffoldResult", () => {
   it("distinguishes a stylesheet it recovered from one it lost", () => {
     // Both are CSS the browser could not read; only one of them is missing from the gallery, and
     // a gallery missing CSS produces baselines of unstyled markup.
-    const text = plain(formatStoryScaffoldResult({
-      ...base,
-      refetchedStylesheets: ["https://cdn.example.com/ok.css"],
-      unreadableStylesheets: ["https://cdn.example.com/gone.css"],
-    } as never));
+    const text = plain(
+      formatStoryScaffoldResult({
+        ...base,
+        refetchedStylesheets: ["https://cdn.example.com/ok.css"],
+        unreadableStylesheets: ["https://cdn.example.com/gone.css"],
+      } as never),
+    );
     assert.match(text, /opaque to the browser and re-fetched by URL/);
     assert.match(text, /ok\.css/);
     assert.match(text, /gone\.css/);

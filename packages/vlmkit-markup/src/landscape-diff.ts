@@ -65,13 +65,7 @@ function toHex(r: number, g: number, b: number): string {
   return `#${part(r)}${part(g)}${part(b)}`;
 }
 
-function sampleCell(
-  img: PngData,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-): LandscapeCellStats {
+function sampleCell(img: PngData, x0: number, y0: number, x1: number, y1: number): LandscapeCellStats {
   let r = 0;
   let g = 0;
   let b = 0;
@@ -119,9 +113,10 @@ export function compareLandscapeFromRgba(
 ): LandscapeDiffResult {
   const width = Math.min(baseline.width, current.width);
   const height = Math.min(baseline.height, current.height);
-  const fallback = options.cols !== undefined && options.rows !== undefined
-    ? { cols: options.cols, rows: options.rows }
-    : computeLandscapeDefaultGrid(width, height);
+  const fallback =
+    options.cols !== undefined && options.rows !== undefined
+      ? { cols: options.cols, rows: options.rows }
+      : computeLandscapeDefaultGrid(width, height);
   const cols = options.cols ?? fallback.cols;
   const rows = options.rows ?? fallback.rows;
   const changedThreshold = options.changedThreshold ?? DEFAULT_CHANGED_THRESHOLD;
@@ -141,18 +136,20 @@ export function compareLandscapeFromRgba(
   }
 
   const totalCells = rows * cols;
-  const geometries: Array<{ x: number; y: number; w: number; h: number; row: number; col: number }> = new Array(totalCells);
+  const geometries: Array<{ x: number; y: number; w: number; h: number; row: number; col: number }> = new Array(
+    totalCells,
+  );
   const baselineStats: LandscapeCellStats[] = new Array(totalCells);
   const currentStats: LandscapeCellStats[] = new Array(totalCells);
   const baselineBulk: LandscapeCellStat[] = new Array(totalCells);
   const currentBulk: LandscapeCellStat[] = new Array(totalCells);
 
   for (let row = 0; row < rows; row++) {
-    const y0 = Math.floor(row * height / rows);
-    const y1 = Math.floor((row + 1) * height / rows);
+    const y0 = Math.floor((row * height) / rows);
+    const y1 = Math.floor(((row + 1) * height) / rows);
     for (let col = 0; col < cols; col++) {
-      const x0 = Math.floor(col * width / cols);
-      const x1 = Math.floor((col + 1) * width / cols);
+      const x0 = Math.floor((col * width) / cols);
+      const x1 = Math.floor(((col + 1) * width) / cols);
       const idx = row * cols + col;
       const base = sampleCell(baseline, x0, y0, x1, y1);
       const curr = sampleCell(current, x0, y0, x1, y1);
@@ -212,9 +209,6 @@ export async function compareLandscapeFromPngFiles(
   currentPath: string,
   options: LandscapeDiffOptions = {},
 ): Promise<LandscapeDiffResult> {
-  const [baseline, current] = await Promise.all([
-    decodePng(baselinePath),
-    decodePng(currentPath),
-  ]);
+  const [baseline, current] = await Promise.all([decodePng(baselinePath), decodePng(currentPath)]);
   return compareLandscapeFromRgba(baseline, current, options);
 }

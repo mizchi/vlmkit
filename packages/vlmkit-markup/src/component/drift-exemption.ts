@@ -51,18 +51,19 @@ export function parseDriftAllowRule(spec: string): DriftAllowRule {
   const cut = spec.indexOf(";");
   if (cut < 0) {
     throw new UsageError(
-      `--allow needs a reason: ${SYNTAX} (got "${spec}").`
-      + (spec.includes("#")
-        ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.`
-        : "")
-      + ` An exemption without a stated reason cannot be reviewed.`,
+      `--allow needs a reason: ${SYNTAX} (got "${spec}").` +
+        (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "") +
+        ` An exemption without a stated reason cannot be reviewed.`,
     );
   }
   const reason = spec.slice(cut + 1).trim();
   if (!reason) {
     throw new UsageError(`--allow reason is empty in "${spec}". Say why this difference is intentional.`);
   }
-  const [property = "", ...rest] = spec.slice(0, cut).split("@").map((p) => p.trim());
+  const [property = "", ...rest] = spec
+    .slice(0, cut)
+    .split("@")
+    .map((p) => p.trim());
   if (!property) {
     throw new UsageError(`--allow needs a property name: ${SYNTAX} (got "${spec}").`);
   }
@@ -71,8 +72,8 @@ export function parseDriftAllowRule(spec: string): DriftAllowRule {
   // show up in the re-tuned line the runner prints.
   if (property === "*") {
     throw new UsageError(
-      `--allow "*" would exempt every property, which is \`--rule instance-drift=off\`.`
-      + ` Name the properties a variant may differ in, or turn the rule off explicitly.`,
+      `--allow "*" would exempt every property, which is \`--rule instance-drift=off\`.` +
+        ` Name the properties a variant may differ in, or turn the rule off explicitly.`,
     );
   }
   const rule: DriftAllowRule = { property, reason, raw: spec };
@@ -90,7 +91,10 @@ export function propertyMatches(pattern: string, property: string): boolean {
   if (!pattern.includes("*")) return pattern === property;
   // Anchored at both ends, so `border-*-color` matches `border-top-color` and not
   // `border-top-color-something`. Only `*` is special; everything else is literal.
-  const source = pattern.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[^\\s]*");
+  const source = pattern
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("[^\\s]*");
   return new RegExp(`^${source}$`).test(property);
 }
 
@@ -128,9 +132,11 @@ export function applyDriftAllowRules(
   const exempted: ExemptedStyleDelta[] = [];
   const usedRaw = new Set<string>();
   for (const delta of styleDeltas) {
-    const rule = rules.find((r) =>
-      propertyMatches(r.property, delta.property)
-      && (r.selector === undefined || instanceSelector.includes(r.selector)));
+    const rule = rules.find(
+      (r) =>
+        propertyMatches(r.property, delta.property) &&
+        (r.selector === undefined || instanceSelector.includes(r.selector)),
+    );
     if (!rule) {
       kept.push(delta);
       continue;

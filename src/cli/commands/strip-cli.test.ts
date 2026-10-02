@@ -11,7 +11,19 @@ describe("snapshot strip: argument parsing", () => {
   });
 
   it("reads the layout flags", () => {
-    const args = parseArgs(["a.png", "--columns", "3", "--gap", "0", "--scale", "2", "--max-width", "900", "--out", "s.png"]);
+    const args = parseArgs([
+      "a.png",
+      "--columns",
+      "3",
+      "--gap",
+      "0",
+      "--scale",
+      "2",
+      "--max-width",
+      "900",
+      "--out",
+      "s.png",
+    ]);
     assert.equal(args.columns, 3);
     assert.equal(args.gap, 0);
     assert.equal(args.scale, 2);
@@ -53,7 +65,11 @@ describe("snapshot strip: numeric order detection", () => {
 
   it("stays quiet when the given order is already numeric", () => {
     assert.equal(numericOrder(["f-1.png", "f-2.png", "f-10.png"]), null);
-    assert.equal(numericOrder(["f-001.png", "f-002.png", "f-010.png"]), null, "zero-padded names sort correctly already");
+    assert.equal(
+      numericOrder(["f-001.png", "f-002.png", "f-010.png"]),
+      null,
+      "zero-padded names sort correctly already",
+    );
   });
 
   it("compares every digit run, so animation 0 sorts before animation 1", () => {
@@ -66,15 +82,12 @@ describe("snapshot strip: numeric order detection", () => {
   it("reads digits from the filename, not from the directory", () => {
     // The directory this repo's scratchpad lives in contains digits, so scanning
     // the whole path warned about ordering two files that carry no number at all.
-    assert.equal(
-      numericOrder(["/tmp/claude-0/abc123/rest.png", "/tmp/claude-0/abc123/rest-recheck.png"]),
-      null,
-    );
+    assert.equal(numericOrder(["/tmp/claude-0/abc123/rest.png", "/tmp/claude-0/abc123/rest-recheck.png"]), null);
     // And a numeric name still sorts even under a digit-laden directory.
-    assert.deepEqual(
-      numericOrder(["/tmp/x-9/f-10.png", "/tmp/x-9/f-2.png"]),
-      ["/tmp/x-9/f-2.png", "/tmp/x-9/f-10.png"],
-    );
+    assert.deepEqual(numericOrder(["/tmp/x-9/f-10.png", "/tmp/x-9/f-2.png"]), [
+      "/tmp/x-9/f-2.png",
+      "/tmp/x-9/f-10.png",
+    ]);
   });
 
   it("declines to guess when a filename carries no number", () => {

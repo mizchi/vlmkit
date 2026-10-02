@@ -16,22 +16,39 @@ import {
  * These tests pin the arithmetic itself, from the judge's side.
  */
 const control = (over: Partial<ControlSample> = {}): ControlSample => ({
-  selector: "form>input#email", tag: "input",
-  on: [255, 255, 255], fill: null, borders: [],
-  hasShadow: false, hasOutline: false,
+  selector: "form>input#email",
+  tag: "input",
+  on: [255, 255, 255],
+  fill: null,
+  borders: [],
+  hasShadow: false,
+  hasOutline: false,
   ...over,
 });
 
 const link = (over: Partial<LinkSample> = {}): LinkSample => ({
-  selector: "p>a", flow: "p", proseChars: 80,
-  link: [17, 69, 196, 1], body: [22, 35, 58, 1], behind: [255, 255, 255],
-  underlined: false, weightStep: 0, hasFill: false, hasBorder: false,
+  selector: "p>a",
+  flow: "p",
+  proseChars: 80,
+  link: [17, 69, 196, 1],
+  body: [22, 35, 58, 1],
+  behind: [255, 255, 255],
+  underlined: false,
+  weightStep: 0,
+  hasFill: false,
+  hasBorder: false,
   ...over,
 });
 
 const base: ColorRolesInput = {
-  palette: { surfaces: [], ink: [], marks: [] }, baseHex: "#ffffff", interactiveInk: [],
-  controls: [], controlsSkipped: [], links: [], unreadable: [], boxes: 10,
+  palette: { surfaces: [], ink: [], marks: [] },
+  baseHex: "#ffffff",
+  interactiveInk: [],
+  controls: [],
+  controlsSkipped: [],
+  links: [],
+  unreadable: [],
+  boxes: 10,
   viewport: { width: 800, height: 600 },
 };
 
@@ -51,7 +68,14 @@ describe("controlBoundary", () => {
   });
 
   it("keeps the first border on a tie, the order the page's loop used", () => {
-    const measured = controlBoundary(control({ borders: [[0, 0, 0, 1], [0, 0, 0, 1]] }));
+    const measured = controlBoundary(
+      control({
+        borders: [
+          [0, 0, 0, 1],
+          [0, 0, 0, 1],
+        ],
+      }),
+    );
     assert.equal(measured.borderHex, "#000000");
     assert.equal(measured.best, 21);
   });

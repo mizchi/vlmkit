@@ -21,13 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
-import {
-  type StoryResult,
-  type StoryVrtOptions,
-  isSubPerceptualDrift,
-  runStoryVrt,
-  storySlug,
-} from "./story-vrt.ts";
+import { type StoryResult, type StoryVrtOptions, isSubPerceptualDrift, runStoryVrt, storySlug } from "./story-vrt.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXAMPLE = resolve(here, "../../../../examples/story-gallery/index.html");
@@ -66,8 +60,8 @@ describe("the shipped example gallery", () => {
     assert.equal(
       readFileSync(asset, "utf8"),
       readFileSync(EXAMPLE, "utf8"),
-      "the skill's gallery.vanilla.html has drifted from examples/story-gallery/index.html"
-        + " — copy the example over it, then run `pnpm sync:skills`",
+      "the skill's gallery.vanilla.html has drifted from examples/story-gallery/index.html" +
+        " — copy the example over it, then run `pnpm sync:skills`",
     );
   });
 });
@@ -98,7 +92,10 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
 
   it("captures the component, not the viewport", async () => {
     const report = await runStoryVrt(options({ stories: ["components/Button/Primary", "Card/Default"] }));
-    assert.deepEqual(report.results.map((r) => r.outcome), ["new-baseline", "new-baseline"]);
+    assert.deepEqual(
+      report.results.map((r) => r.outcome),
+      ["new-baseline", "new-baseline"],
+    );
 
     // The whole point of the feature, asserted rather than claimed: a button is
     // a few thousand pixels, an 800x600 viewport is 480,000.
@@ -126,7 +123,10 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
     // Baselines from the previous case are reused deliberately: the sequence IS
     // the loop being tested.
     const clean = await runStoryVrt(options({ stories: ["components/Button/Primary", "Card/Default"] }));
-    assert.deepEqual(clean.results.map((r) => r.outcome), ["unchanged", "unchanged"]);
+    assert.deepEqual(
+      clean.results.map((r) => r.outcome),
+      ["unchanged", "unchanged"],
+    );
 
     // Change only the button's padding.
     const html = readFileSync(join(dir, "index.html"), "utf8");
@@ -160,10 +160,12 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
 
   it("says so when the page is not a gallery at all", async () => {
     writeFileSync(join(dir, "bare.html"), '<!doctype html><div id="root"></div>');
-    const report = await runStoryVrt(options({
-      gallery: pathToFileURL(join(dir, "bare.html")).href,
-      stories: ["anything"],
-    }));
+    const report = await runStoryVrt(
+      options({
+        gallery: pathToFileURL(join(dir, "bare.html")).href,
+        stories: ["anything"],
+      }),
+    );
     assert.equal(report.results[0]!.outcome, "mount-failed");
     assert.match(report.results[0]!.error!, /does not define window\.mount/);
   });
@@ -171,16 +173,20 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
   it("passes props through to the story", async () => {
     // Same story, different props, so a props-driven size change proves the
     // props actually reached the component rather than being dropped.
-    const short = await runStoryVrt(options({
-      stories: ["components/Button/Ghost"],
-      props: { title: "OK" },
-      updateBaseline: true,
-    }));
-    const long = await runStoryVrt(options({
-      stories: ["components/Button/Ghost"],
-      props: { title: "A considerably longer label" },
-      updateBaseline: true,
-    }));
+    const short = await runStoryVrt(
+      options({
+        stories: ["components/Button/Ghost"],
+        props: { title: "OK" },
+        updateBaseline: true,
+      }),
+    );
+    const long = await runStoryVrt(
+      options({
+        stories: ["components/Button/Ghost"],
+        props: { title: "A considerably longer label" },
+        updateBaseline: true,
+      }),
+    );
     assert.ok(
       long.results[0]!.width! > short.results[0]!.width!,
       `expected the longer label to render wider: ${short.results[0]!.width} vs ${long.results[0]!.width}`,
@@ -211,30 +217,34 @@ describe("isSubPerceptualDrift", () => {
     // Coverage is the discriminator, not magnitude: a big delta on a few percent
     // of pixels is glyph hinting, not a recolour.
     assert.equal(
-      isSubPerceptualDrift(result({
-        magnitude: {
-          changedPixels: 400,
-          totalPixels: 256_632,
-          changedFraction: 400 / 256_632,
-          maxChannelDelta: 255,
-          meanChannelDelta: 0.4,
-        },
-      })),
+      isSubPerceptualDrift(
+        result({
+          magnitude: {
+            changedPixels: 400,
+            totalPixels: 256_632,
+            changedFraction: 400 / 256_632,
+            maxChannelDelta: 255,
+            meanChannelDelta: 0.4,
+          },
+        }),
+      ),
       false,
     );
   });
 
   it("ignores a one-level delta, which PNG re-encoding alone can produce", () => {
     assert.equal(
-      isSubPerceptualDrift(result({
-        magnitude: {
-          changedPixels: 256_632,
-          totalPixels: 256_632,
-          changedFraction: 1,
-          maxChannelDelta: 1,
-          meanChannelDelta: 1,
-        },
-      })),
+      isSubPerceptualDrift(
+        result({
+          magnitude: {
+            changedPixels: 256_632,
+            totalPixels: 256_632,
+            changedFraction: 1,
+            maxChannelDelta: 1,
+            meanChannelDelta: 1,
+          },
+        }),
+      ),
       false,
     );
   });

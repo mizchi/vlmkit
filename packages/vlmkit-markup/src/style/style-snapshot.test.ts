@@ -6,7 +6,12 @@ import { describe, it } from "vite-plus/test";
 import { judgeCollectedColorRoles, runColorRolesCheck } from "./color-roles.ts";
 import { judgeCollectedComposition, runCompositionCheck } from "./composition.ts";
 import { judgeCollectedDesign, runDesignPolicyCheck } from "./design-policy.ts";
-import { captureStyleSnapshot, readFromSnapshotFlag, readStyleSnapshot, STYLE_SNAPSHOT_FORMAT } from "./style-snapshot.ts";
+import {
+  captureStyleSnapshot,
+  readFromSnapshotFlag,
+  readStyleSnapshot,
+  STYLE_SNAPSHOT_FORMAT,
+} from "./style-snapshot.ts";
 
 /**
  * A snapshot judgement is the live judgement. Each page is run the old way — three gates, three
@@ -27,19 +32,29 @@ const PAGES = [
 
 describe("scan style: one capture judges the same as three live runs", () => {
   for (const source of PAGES) {
-    it(source.slice(ROOT.length + 1), async () => {
-      const snapshot = await captureStyleSnapshot({ source });
-      assert.equal(snapshot.format, STYLE_SNAPSHOT_FORMAT);
+    it(
+      source.slice(ROOT.length + 1),
+      async () => {
+        const snapshot = await captureStyleSnapshot({ source });
+        assert.equal(snapshot.format, STYLE_SNAPSHOT_FORMAT);
 
-      const design = await runDesignPolicyCheck({ source });
-      assert.deepEqual(judgeCollectedDesign(snapshot.design, snapshot.redirect, { source: snapshot.source }), design);
+        const design = await runDesignPolicyCheck({ source });
+        assert.deepEqual(judgeCollectedDesign(snapshot.design, snapshot.redirect, { source: snapshot.source }), design);
 
-      const composition = await runCompositionCheck({ source });
-      assert.deepEqual(judgeCollectedComposition(snapshot.composition, snapshot.redirect, { source: snapshot.source }), composition);
+        const composition = await runCompositionCheck({ source });
+        assert.deepEqual(
+          judgeCollectedComposition(snapshot.composition, snapshot.redirect, { source: snapshot.source }),
+          composition,
+        );
 
-      const color = await runColorRolesCheck({ source });
-      assert.deepEqual(await judgeCollectedColorRoles(snapshot.color, snapshot.redirect, { source: snapshot.source }), color);
-    }, 120_000);
+        const color = await runColorRolesCheck({ source });
+        assert.deepEqual(
+          await judgeCollectedColorRoles(snapshot.color, snapshot.redirect, { source: snapshot.source }),
+          color,
+        );
+      },
+      120_000,
+    );
   }
 
   it("covers verdicts worth comparing, not just clean pages", async () => {
@@ -49,8 +64,10 @@ describe("scan style: one capture judges the same as three live runs", () => {
     for (const source of PAGES) {
       const s = await captureStyleSnapshot({ source });
       for (const f of judgeCollectedDesign(s.design, s.redirect, { source }).findings) kinds.design.add(f.kind);
-      for (const f of judgeCollectedComposition(s.composition, s.redirect, { source }).findings) kinds.composition.add(f.kind);
-      for (const f of (await judgeCollectedColorRoles(s.color, s.redirect, { source })).findings) kinds.color.add(f.kind);
+      for (const f of judgeCollectedComposition(s.composition, s.redirect, { source }).findings)
+        kinds.composition.add(f.kind);
+      for (const f of (await judgeCollectedColorRoles(s.color, s.redirect, { source })).findings)
+        kinds.color.add(f.kind);
     }
     assert.ok(kinds.design.has("component-drift"), [...kinds.design].join(", "));
     assert.ok(kinds.composition.has("proximity-inversion"), [...kinds.composition].join(", "));
@@ -77,12 +94,27 @@ describe("--from on a gate", () => {
   });
 
   it("refuses a page next to it, and every flag that was fixed at capture", () => {
-    assert.throws(() => readFromSnapshotFlag(["page.html", "--from", "s.json"], "check color", flags), /page source or --from, not both/);
+    assert.throws(
+      () => readFromSnapshotFlag(["page.html", "--from", "s.json"], "check color", flags),
+      /page source or --from, not both/,
+    );
     for (const flag of ["--viewport", "--har", "--wait-until", "--timeout", "--storage-state", "--elements"]) {
-      assert.throws(() => readFromSnapshotFlag(["--from", "s.json", flag, "1"], "check color", flags), new RegExp(`${flag} does not apply with --from`), flag);
+      assert.throws(
+        () => readFromSnapshotFlag(["--from", "s.json", flag, "1"], "check color", flags),
+        new RegExp(`${flag} does not apply with --from`),
+        flag,
+      );
     }
-    assert.throws(() => readFromSnapshotFlag(["--from", "s.json", "--exclude", ".ad"], "check design", [...flags, "--exclude"], ["exclude"]), /--exclude does not apply/);
+    assert.throws(
+      () =>
+        readFromSnapshotFlag(
+          ["--from", "s.json", "--exclude", ".ad"],
+          "check design",
+          [...flags, "--exclude"],
+          ["exclude"],
+        ),
+      /--exclude does not apply/,
+    );
     assert.throws(() => readFromSnapshotFlag(["--from"], "check color", flags), /needs a snapshot file/);
   });
 });
-

@@ -20,10 +20,14 @@ describe("snapshot record-har args", () => {
   it("reads the flags", () => {
     const args = parseArgs([
       "http://localhost:5173/app",
-      "--out", "fixtures/app.har",
-      "--wait-until", "domcontentloaded",
-      "--timeout", "9000",
-      "--settle", "0",
+      "--out",
+      "fixtures/app.har",
+      "--wait-until",
+      "domcontentloaded",
+      "--timeout",
+      "9000",
+      "--settle",
+      "0",
       "--no-content",
     ]);
     assert.deepEqual(
@@ -40,8 +44,10 @@ describe("snapshot record-har args", () => {
   });
 
   it("refuses a local file, which has no network to pin", () => {
-    assert.throws(() => parseArgs(["page.html"]), (e: Error) =>
-      e instanceof UsageError && /no network to pin/.test(e.message));
+    assert.throws(
+      () => parseArgs(["page.html"]),
+      (e: Error) => e instanceof UsageError && /no network to pin/.test(e.message),
+    );
   });
 
   it("refuses a wait state Playwright does not have, rather than passing it through", () => {

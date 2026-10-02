@@ -18,7 +18,13 @@ const tree = (nodes: A11yNode[], extra: Partial<A11yTree> = {}): A11yTree => ({
   ...extra,
 });
 
-const node = (path: string, role: string, name: string | undefined, rect: [number, number, number, number], more: Partial<A11yNode> = {}): A11yNode => ({
+const node = (
+  path: string,
+  role: string,
+  name: string | undefined,
+  rect: [number, number, number, number],
+  more: Partial<A11yNode> = {},
+): A11yNode => ({
   path,
   role,
   ...(name !== undefined ? { name } : {}),
@@ -27,11 +33,20 @@ const node = (path: string, role: string, name: string | undefined, rect: [numbe
 });
 
 /** A frame filled with `bg`, and `ink` rectangles standing in for glyphs. */
-function frame(width: number, height: number, bg: number[], inks: Array<{ rect: [number, number, number, number]; color: number[] }>): RgbaFrame {
+function frame(
+  width: number,
+  height: number,
+  bg: number[],
+  inks: Array<{ rect: [number, number, number, number]; color: number[] }>,
+): RgbaFrame {
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++) data.set([bg[0]!, bg[1]!, bg[2]!, 255], i * 4);
-  for (const { rect: [x, y, w, h], color } of inks) {
-    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) data.set([color[0]!, color[1]!, color[2]!, 255], (yy * width + xx) * 4);
+  for (const {
+    rect: [x, y, w, h],
+    color,
+  } of inks) {
+    for (let yy = y; yy < y + h; yy++)
+      for (let xx = x; xx < x + w; xx++) data.set([color[0]!, color[1]!, color[2]!, 255], (yy * width + xx) * 4);
   }
   return { width, height, data };
 }
@@ -43,8 +58,15 @@ describe("parseA11yTree", () => {
   });
 
   it("names the node that is malformed", () => {
-    assert.throws(() => parseA11yTree(tree([node("a[0]", "button", "OK", [0, 0, 10, 10]), node("a[0]", "text", "x", [0, 0, 1, 1])])), /nodes\[1\]: path "a\[0\]" is not unique/);
-    assert.throws(() => parseA11yTree({ ...tree([]), nodes: [{ path: "a[0]", role: "button" }] }), /nodes\[0\] \(a\[0\]\) needs `rect`/);
+    assert.throws(
+      () =>
+        parseA11yTree(tree([node("a[0]", "button", "OK", [0, 0, 10, 10]), node("a[0]", "text", "x", [0, 0, 1, 1])])),
+      /nodes\[1\]: path "a\[0\]" is not unique/,
+    );
+    assert.throws(
+      () => parseA11yTree({ ...tree([]), nodes: [{ path: "a[0]", role: "button" }] }),
+      /nodes\[0\] \(a\[0\]\) needs `rect`/,
+    );
     assert.throws(() => parseA11yTree({ ...tree([]), viewport: { width: 0, height: 1 } }), /viewport/);
   });
 });
@@ -65,18 +87,26 @@ describe("judgeUnlabelledControls", () => {
       node("r[0]>n[6]", "group", undefined, [0, 300, 375, 35], { actions: ["tap"] }),
       node("r[0]>n[6]>n[0]", "button", "Place in Top", [8, 305, 80, 20]),
     ]);
-    assert.deepEqual(judgeUnlabelledControls(t).map((f) => f.path), ["r[0]>n[1]", "r[0]>n[2]", "r[0]>n[3]", "r[0]>n[5]"]);
+    assert.deepEqual(
+      judgeUnlabelledControls(t).map((f) => f.path),
+      ["r[0]>n[1]", "r[0]>n[2]", "r[0]>n[3]", "r[0]>n[5]"],
+    );
   });
 });
 
 describe("judgeUnreachableContent", () => {
   it("reports content below the fold with nothing that scrolls, once per container", () => {
-    const log = Array.from({ length: 5 }, (_, i) => node(`r[0]>log[0]>t[${i}]`, "text", `draw: ${i}`, [16, 540 + i * 20, 200, 18]));
-    const t = tree([
-      node("r[0]", "group", undefined, [0, 0, 375, 900]),
-      node("r[0]>log[0]", "list", undefined, [0, 520, 375, 120]),
-      ...log,
-    ], { viewport: { width: 375, height: 568 } });
+    const log = Array.from({ length: 5 }, (_, i) =>
+      node(`r[0]>log[0]>t[${i}]`, "text", `draw: ${i}`, [16, 540 + i * 20, 200, 18]),
+    );
+    const t = tree(
+      [
+        node("r[0]", "group", undefined, [0, 0, 375, 900]),
+        node("r[0]>log[0]", "list", undefined, [0, 520, 375, 120]),
+        ...log,
+      ],
+      { viewport: { width: 375, height: 568 } },
+    );
     const findings = judgeUnreachableContent(t);
     assert.equal(findings.length, 1);
     assert.equal(findings[0]!.container, "r[0]>log[0]");
@@ -87,8 +117,26 @@ describe("judgeUnreachableContent", () => {
 
   it("is silent when an ancestor scrolls, by role or by action", () => {
     const inner = node("r[0]>s[0]>t[0]", "text", "far down", [0, 2000, 100, 20]);
-    assert.deepEqual(judgeUnreachableContent(tree([node("r[0]", "group", undefined, [0, 0, 375, 812]), node("r[0]>s[0]", "scrollview", undefined, [0, 0, 375, 812]), inner])), []);
-    assert.deepEqual(judgeUnreachableContent(tree([node("r[0]", "group", undefined, [0, 0, 375, 812], { actions: ["scroll"] }), node("r[0]>s[0]", "group", undefined, [0, 0, 375, 812]), inner])), []);
+    assert.deepEqual(
+      judgeUnreachableContent(
+        tree([
+          node("r[0]", "group", undefined, [0, 0, 375, 812]),
+          node("r[0]>s[0]", "scrollview", undefined, [0, 0, 375, 812]),
+          inner,
+        ]),
+      ),
+      [],
+    );
+    assert.deepEqual(
+      judgeUnreachableContent(
+        tree([
+          node("r[0]", "group", undefined, [0, 0, 375, 812], { actions: ["scroll"] }),
+          node("r[0]>s[0]", "group", undefined, [0, 0, 375, 812]),
+          inner,
+        ]),
+      ),
+      [],
+    );
   });
 
   it("does not count a descendant of an out-of-reach node again, and ignores unnamed decoration and a 1px overhang", () => {
@@ -114,13 +162,22 @@ describe("measurePixelContrast", () => {
       { rect: [10, 10, 60, 13], color: [0x77, 0x77, 0x77] },
       { rect: [110, 10, 60, 13], color: [0x76, 0x76, 0x76] },
     ]);
-    const t = tree([
-      node("a[0]", "text", "Game Mode", [0, 5, 100, 25]),
-      node("b[0]", "text", "Seed", [100, 5, 100, 25]),
-    ], { viewport: { width: 200, height: 60 } });
+    const t = tree(
+      [node("a[0]", "text", "Game Mode", [0, 5, 100, 25]), node("b[0]", "text", "Seed", [100, 5, 100, 25])],
+      { viewport: { width: 200, height: 60 } },
+    );
     const report = measurePixelContrast(t, f);
-    assert.deepEqual(report.samples.map((s) => [s.name, s.ratio, s.floor]), [["Game Mode", 4.47, 4.5], ["Seed", 4.54, 4.5]]);
-    assert.deepEqual(report.failures.map((s) => s.name), ["Game Mode"]);
+    assert.deepEqual(
+      report.samples.map((s) => [s.name, s.ratio, s.floor]),
+      [
+        ["Game Mode", 4.47, 4.5],
+        ["Seed", 4.54, 4.5],
+      ],
+    );
+    assert.deepEqual(
+      report.failures.map((s) => s.name),
+      ["Game Mode"],
+    );
     assert.deepEqual(report.samples[0]!.background, [255, 255, 255]);
     assert.equal(report.samples[0]!.textSizeFrom, "measured");
   });
@@ -144,16 +201,29 @@ describe("measurePixelContrast", () => {
 
   it("skips disabled, off-frame and ink-less nodes, and measures a repeated name once, at the innermost node", () => {
     const f = frame(100, 100, white, [{ rect: [10, 10, 30, 12], color: [0xaa, 0xaa, 0xaa] }]);
-    const t = tree([
-      node("b[0]", "button", "Next", [0, 0, 50, 30]),
-      node("b[0]>t[0]", "text", "Next", [5, 5, 40, 20]),
-      node("c[0]", "button", "Commit", [0, 40, 50, 30], { states: { disabled: true } }),
-      node("d[0]", "text", "Below", [0, 200, 50, 20]),
-      node("e[0]", "text", "Blank", [60, 60, 30, 30]),
-    ], { viewport: { width: 100, height: 100 } });
+    const t = tree(
+      [
+        node("b[0]", "button", "Next", [0, 0, 50, 30]),
+        node("b[0]>t[0]", "text", "Next", [5, 5, 40, 20]),
+        node("c[0]", "button", "Commit", [0, 40, 50, 30], { states: { disabled: true } }),
+        node("d[0]", "text", "Below", [0, 200, 50, 20]),
+        node("e[0]", "text", "Blank", [60, 60, 30, 30]),
+      ],
+      { viewport: { width: 100, height: 100 } },
+    );
     const report = measurePixelContrast(t, f);
-    assert.deepEqual(report.samples.map((s) => s.path), ["b[0]>t[0]"]);
-    assert.deepEqual(report.skipped.map((s) => [s.name, s.reason]), [["Commit", "disabled"], ["Below", "outside-frame"], ["Blank", "no-ink"]]);
+    assert.deepEqual(
+      report.samples.map((s) => s.path),
+      ["b[0]>t[0]"],
+    );
+    assert.deepEqual(
+      report.skipped.map((s) => [s.name, s.reason]),
+      [
+        ["Commit", "disabled"],
+        ["Below", "outside-frame"],
+        ["Blank", "no-ink"],
+      ],
+    );
   });
 
   it("reads a chip's label, not its outline: the outline is neither the ink nor the text height", () => {
@@ -164,7 +234,10 @@ describe("measurePixelContrast", () => {
       { rect: [x, y, 1, h] as [number, number, number, number], color: [0, 0, 0] },
       { rect: [x + w - 1, y, 1, h] as [number, number, number, number], color: [0, 0, 0] },
     ];
-    const f = frame(140, 40, white, [...outline(10, 4, 114, 32), { rect: [40, 13, 50, 13], color: [0x94, 0x94, 0x94] }]);
+    const f = frame(140, 40, white, [
+      ...outline(10, 4, 114, 32),
+      { rect: [40, 13, 50, 13], color: [0x94, 0x94, 0x94] },
+    ]);
     const t = tree([node("c[0]", "button", "Deuces", [10, 4, 114, 32])], { viewport: { width: 140, height: 40 } });
     const sample = measurePixelContrast(t, f).samples[0]!;
     assert.deepEqual(sample.ink, [0x94, 0x94, 0x94]);
@@ -191,7 +264,10 @@ describe("measurePixelContrast", () => {
     const f = frame(60, 30, white, [{ rect: [5, 8, 40, 12], color: [0xee, 0xee, 0xee] }]);
     const t = tree([node("a[0]", "text", "faint", [0, 0, 60, 30])], { viewport: { width: 60, height: 30 } });
     const report = measurePixelContrast(t, f);
-    assert.deepEqual(report.failures.map((s) => [s.name, s.ratio]), [["faint", 1.16]]);
+    assert.deepEqual(
+      report.failures.map((s) => [s.name, s.ratio]),
+      [["faint", 1.16]],
+    );
   });
 
   it("does not take one stray anti-aliased pixel for the ink", () => {

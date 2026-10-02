@@ -81,8 +81,8 @@ describe("workspace package test scripts", () => {
         assert.doesNotMatch(
           pkg.script,
           /node\s+--test/,
-          `${pkg.name}: ${importsVitest.length} of ${pkg.tests.length} test files import Vitest, `
-          + `so \`node --test\` fails every one of them`,
+          `${pkg.name}: ${importsVitest.length} of ${pkg.tests.length} test files import Vitest, ` +
+            `so \`node --test\` fails every one of them`,
         );
         assert.match(pkg.script, /\bvp test run\b/, `${pkg.name} must run its tests with \`vp test run\``);
       }
@@ -92,12 +92,13 @@ describe("workspace package test scripts", () => {
       // than a wrong argument.
       const filters = pkg.script.split(/\s+/).filter((token) => token.includes("/"));
       const selects = filters.some((filter) =>
-        pkg.tests.some((file) => relative(repoRoot, file).replaceAll("\\", "/").startsWith(filter)));
+        pkg.tests.some((file) => relative(repoRoot, file).replaceAll("\\", "/").startsWith(filter)),
+      );
       assert.ok(
         selects,
-        `${pkg.name}: none of the path arguments ${JSON.stringify(filters)} match a test file `
-        + `(e.g. ${relative(repoRoot, pkg.tests[0])}). Paths are resolved from the repo root, `
-        + `because the script runs vitest through \`pnpm --dir ../..\` to pick up the root config.`,
+        `${pkg.name}: none of the path arguments ${JSON.stringify(filters)} match a test file ` +
+          `(e.g. ${relative(repoRoot, pkg.tests[0])}). Paths are resolved from the repo root, ` +
+          `because the script runs vitest through \`pnpm --dir ../..\` to pick up the root config.`,
       );
     });
   }

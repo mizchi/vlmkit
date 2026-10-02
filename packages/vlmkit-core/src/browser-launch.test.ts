@@ -21,13 +21,22 @@ describe("withBrowser", () => {
     // assertion, so the guarantee is checked against a stub Browser: what
     // matters is that `finally` runs, not which process it kills.
     let closed = 0;
-    const stub = { close: async () => { closed++; } };
+    const stub = {
+      close: async () => {
+        closed++;
+      },
+    };
     const boom = new Error("measurement blew up");
 
     const original = BROWSER_ENGINES.chromium;
     BROWSER_ENGINES.chromium = { launch: async () => stub } as never;
     try {
-      await assert.rejects(withBrowser(async () => { throw boom; }), /measurement blew up/);
+      await assert.rejects(
+        withBrowser(async () => {
+          throw boom;
+        }),
+        /measurement blew up/,
+      );
       assert.equal(closed, 1, "browser must be closed even though the callback threw");
     } finally {
       BROWSER_ENGINES.chromium = original;
@@ -37,7 +46,13 @@ describe("withBrowser", () => {
   it("closes the browser on the success path and returns the callback's value", async () => {
     let closed = 0;
     const original = BROWSER_ENGINES.chromium;
-    BROWSER_ENGINES.chromium = { launch: async () => ({ close: async () => { closed++; } }) } as never;
+    BROWSER_ENGINES.chromium = {
+      launch: async () => ({
+        close: async () => {
+          closed++;
+        },
+      }),
+    } as never;
     try {
       assert.equal(await withBrowser(async () => 42), 42);
       assert.equal(closed, 1);
@@ -53,7 +68,10 @@ describe("engine selection", () => {
     const saved = { ...BROWSER_ENGINES };
     for (const name of ["chromium", "firefox", "webkit"] as const) {
       BROWSER_ENGINES[name] = {
-        launch: async () => { calls.push(name); return { close: async () => {} }; },
+        launch: async () => {
+          calls.push(name);
+          return { close: async () => {} };
+        },
       } as never;
     }
     try {
@@ -70,7 +88,10 @@ describe("engine selection", () => {
     let seen: unknown;
     const original = BROWSER_ENGINES.chromium;
     BROWSER_ENGINES.chromium = {
-      launch: async (opts: unknown) => { seen = opts; return { close: async () => {} }; },
+      launch: async (opts: unknown) => {
+        seen = opts;
+        return { close: async () => {} };
+      },
     } as never;
     try {
       const args = ["--font-render-hinting=none", "--disable-lcd-text"];
@@ -90,11 +111,18 @@ describe("launch-failure diagnosis at the helper", () => {
 
   it("surfaces the missing-browser diagnosis from the launch, not only from handleCliError", async () => {
     const original = BROWSER_ENGINES.chromium;
-    BROWSER_ENGINES.chromium = { launch: async () => { throw new Error(MISSING); } } as never;
+    BROWSER_ENGINES.chromium = {
+      launch: async () => {
+        throw new Error(MISSING);
+      },
+    } as never;
     try {
       // A library caller — no CLI, no `handleCliError` — must get the actionable
       // text and the install command aimed at the resolved Playwright.
-      const error = await launchBrowser().then(() => null, (e) => e as Error);
+      const error = await launchBrowser().then(
+        () => null,
+        (e) => e as Error,
+      );
       assert.ok(error instanceof BrowserLaunchError, `expected BrowserLaunchError, got ${error?.name}`);
       assert.match(error.message, /has no chromium browser executable installed/);
       assert.match(error.message, /cli\.js install chromium/);
@@ -122,7 +150,10 @@ describe("launch-failure diagnosis at the helper", () => {
       },
     } as never;
     try {
-      const error = await launchBrowser({ engine: "firefox" }).then(() => null, (e) => e as Error);
+      const error = await launchBrowser({ engine: "firefox" }).then(
+        () => null,
+        (e) => e as Error,
+      );
       assert.ok(error instanceof BrowserLaunchError, `expected BrowserLaunchError, got ${error?.name}`);
       assert.match(error.message, /has no firefox browser executable installed/);
       assert.match(error.message, /cli\.js install firefox/);
@@ -134,10 +165,16 @@ describe("launch-failure diagnosis at the helper", () => {
 
   it("prefers a caller-supplied diagnosis (the sandbox detector lives in vlmkit-capture)", async () => {
     const original = BROWSER_ENGINES.chromium;
-    BROWSER_ENGINES.chromium = { launch: async () => { throw new Error(MISSING); } } as never;
+    BROWSER_ENGINES.chromium = {
+      launch: async () => {
+        throw new Error(MISSING);
+      },
+    } as never;
     try {
-      const error = await launchBrowser({ diagnose: () => "error: sandbox says no." })
-        .then(() => null, (e) => e as Error);
+      const error = await launchBrowser({ diagnose: () => "error: sandbox says no." }).then(
+        () => null,
+        (e) => e as Error,
+      );
       assert.match(error?.message ?? "", /sandbox says no/);
     } finally {
       BROWSER_ENGINES.chromium = original;
@@ -147,11 +184,18 @@ describe("launch-failure diagnosis at the helper", () => {
   it("leaves an unrecognized launch failure exactly as it was", async () => {
     const raw = new Error("browserType.launch: something nobody has a hint for");
     const original = BROWSER_ENGINES.chromium;
-    BROWSER_ENGINES.chromium = { launch: async () => { throw raw; } } as never;
+    BROWSER_ENGINES.chromium = {
+      launch: async () => {
+        throw raw;
+      },
+    } as never;
     try {
       // Wrapping everything would have routed the navigation / timeout branches
       // of `handleCliError` into its generic `console.error(e)` fallthrough.
-      const error = await launchBrowser().then(() => null, (e) => e);
+      const error = await launchBrowser().then(
+        () => null,
+        (e) => e,
+      );
       assert.equal(error, raw);
     } finally {
       BROWSER_ENGINES.chromium = original;
@@ -162,11 +206,21 @@ describe("launch-failure diagnosis at the helper", () => {
     const writes: string[] = [];
     const stderr = process.stderr.write;
     const exit = process.exit;
-    process.stderr.write = ((s: string) => { writes.push(s); return true; }) as never;
-    process.exit = ((code?: number) => { throw new Error(`exit:${code}`); }) as never;
+    process.stderr.write = ((s: string) => {
+      writes.push(s);
+      return true;
+    }) as never;
+    process.exit = ((code?: number) => {
+      throw new Error(`exit:${code}`);
+    }) as never;
     try {
       assert.throws(
-        () => handleCliError(new BrowserLaunchError("error: Playwright 1.61.1 browser executable is not installed.\n       run: node cli.js install chromium")),
+        () =>
+          handleCliError(
+            new BrowserLaunchError(
+              "error: Playwright 1.61.1 browser executable is not installed.\n       run: node cli.js install chromium",
+            ),
+          ),
         /exit:1/,
       );
       assert.deepEqual(writes, [
@@ -227,10 +281,10 @@ describe("navigation timeout diagnosis", () => {
   }
 
   it("names the milestone, the open requests, and the flag that ends the wait", async () => {
-    const message = await timeoutMessage(
-      { waitUntil: "networkidle", timeout: 30_000 },
-      ["http://localhost:1/api/live", "http://localhost:1/api/poll"],
-    );
+    const message = await timeoutMessage({ waitUntil: "networkidle", timeout: 30_000 }, [
+      "http://localhost:1/api/live",
+      "http://localhost:1/api/poll",
+    ]);
     assert.match(message, /waiting for `networkidle`/);
     assert.match(message, /2 request\(s\) still open/);
     assert.match(message, /api\/live/);

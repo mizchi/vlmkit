@@ -32,31 +32,15 @@ describe("findGridSuggestions", () => {
   });
 
   it("suggests an integer-fr ratio when one fits", () => {
-    const baseline = [
-      bbox("main[0]", 1000),
-      bbox("main[0]>div[0]", 800),
-      bbox("main[0]>div[1]", 200),
-    ];
-    const variant = [
-      bbox("main[0]", 1000),
-      bbox("main[0]>div[0]", 500),
-      bbox("main[0]>div[1]", 500),
-    ];
+    const baseline = [bbox("main[0]", 1000), bbox("main[0]>div[0]", 800), bbox("main[0]>div[1]", 200)];
+    const variant = [bbox("main[0]", 1000), bbox("main[0]>div[0]", 500), bbox("main[0]>div[1]", 500)];
     const out = findGridSuggestions(baseline, variant, "desktop");
     assert.equal(out[0]!.baselineFrSuggestion, "4fr 1fr");
   });
 
   it("falls back to decimal fr when no clean integer ratio fits", () => {
-    const baseline = [
-      bbox("main[0]", 700),
-      bbox("main[0]>div[0]", 393),
-      bbox("main[0]>div[1]", 298),
-    ];
-    const variant = [
-      bbox("main[0]", 700),
-      bbox("main[0]>div[0]", 350),
-      bbox("main[0]>div[1]", 350),
-    ];
+    const baseline = [bbox("main[0]", 700), bbox("main[0]>div[0]", 393), bbox("main[0]>div[1]", 298)];
+    const variant = [bbox("main[0]", 700), bbox("main[0]>div[0]", 350), bbox("main[0]>div[1]", 350)];
     const out = findGridSuggestions(baseline, variant, "desktop");
     assert.match(out[0]!.baselineFrSuggestion, /fr/);
   });
@@ -113,25 +97,15 @@ describe("findGridSuggestions", () => {
   });
 
   it("ignores parents whose baseline + variant child widths are equal", () => {
-    const baseline = [
-      bbox("main[0]", 600),
-      bbox("main[0]>div[0]", 400),
-      bbox("main[0]>div[1]", 200),
-    ];
+    const baseline = [bbox("main[0]", 600), bbox("main[0]>div[0]", 400), bbox("main[0]>div[1]", 200)];
     const variant = baseline.map((b) => ({ ...b }));
     const out = findGridSuggestions(baseline, variant, "desktop");
     assert.equal(out.length, 0);
   });
 
   it("respects minChildren threshold", () => {
-    const baseline = [
-      bbox("main[0]", 600),
-      bbox("main[0]>div[0]", 400),
-    ];
-    const variant = [
-      bbox("main[0]", 600),
-      bbox("main[0]>div[0]", 600),
-    ];
+    const baseline = [bbox("main[0]", 600), bbox("main[0]>div[0]", 400)];
+    const variant = [bbox("main[0]", 600), bbox("main[0]>div[0]", 600)];
     const out = findGridSuggestions(baseline, variant, "desktop", { minChildren: 2 });
     assert.equal(out.length, 0);
   });
@@ -141,16 +115,8 @@ describe("findGridSuggestions", () => {
   });
 
   it("preserves document-order siblings via tag[N] index", () => {
-    const baseline = [
-      bbox("main[0]", 1000),
-      bbox("main[0]>div[1]", 200),
-      bbox("main[0]>div[0]", 800),
-    ];
-    const variant = [
-      bbox("main[0]", 1000),
-      bbox("main[0]>div[0]", 500),
-      bbox("main[0]>div[1]", 500),
-    ];
+    const baseline = [bbox("main[0]", 1000), bbox("main[0]>div[1]", 200), bbox("main[0]>div[0]", 800)];
+    const variant = [bbox("main[0]", 1000), bbox("main[0]>div[0]", 500), bbox("main[0]>div[1]", 500)];
     const out = findGridSuggestions(baseline, variant, "desktop");
     assert.equal(out.length, 1);
     assert.deepEqual(out[0]!.baselineWidths, [800, 200]);

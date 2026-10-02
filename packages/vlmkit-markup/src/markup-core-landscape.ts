@@ -125,4 +125,3 @@ export function computeLandscapeDiffSummary(input: LandscapeDiffSummaryInput): L
     topIndices: summary.top,
   };
 }
-

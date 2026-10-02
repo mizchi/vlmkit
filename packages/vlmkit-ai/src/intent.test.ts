@@ -69,7 +69,7 @@ describe("buildIntent", () => {
           ],
         },
       ],
-      "style: change button color to green"
+      "style: change button color to green",
     );
 
     assert.equal(intent.changeType, "style");
@@ -94,7 +94,7 @@ describe("buildIntent", () => {
           ],
         },
       ],
-      "refactor: extract helper function"
+      "refactor: extract helper function",
     );
 
     assert.equal(intent.changeType, "refactor");

@@ -33,11 +33,25 @@ describe("ACCESSIBLE_NAME_JS", () => {
     try {
       const tab = await browser.newPage();
       await tab.setContent(page);
-      const ids = ["plan", "email", "day", "notes", "glaze", "bare", "send", "submit", "icon", "card", "copy", "logo", "titled"];
-      const ours = await tab.evaluate(`(() => {
+      const ids = [
+        "plan",
+        "email",
+        "day",
+        "notes",
+        "glaze",
+        "bare",
+        "send",
+        "submit",
+        "icon",
+        "card",
+        "copy",
+        "logo",
+        "titled",
+      ];
+      const ours = (await tab.evaluate(`(() => {
         ${ACCESSIBLE_NAME_JS}
         return Object.fromEntries(${JSON.stringify(ids)}.map((id) => [id, accessibleName(document.getElementById(id))]));
-      })()`) as Record<string, string>;
+      })()`)) as Record<string, string>;
 
       assert.deepEqual(ours, {
         plan: "2 people · 3 meals a week $59.94",

@@ -147,23 +147,23 @@ export function parseAnnotatedRuleSettings(raw: unknown, path: string): Annotate
     }
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new UsageError(
-        `${path}["${key}"]: must be one of ${RULE_SETTINGS.join(", ")},`
-        + ` or { "setting": ..., "reason": ... }, got ${JSON.stringify(value)}`,
+        `${path}["${key}"]: must be one of ${RULE_SETTINGS.join(", ")},` +
+          ` or { "setting": ..., "reason": ... }, got ${JSON.stringify(value)}`,
       );
     }
     const entry = value as Record<string, unknown>;
     if (!isRuleSetting(entry.setting)) {
       throw new UsageError(
-        `${path}["${key}"].setting: must be one of ${RULE_SETTINGS.join(", ")},`
-        + ` got ${JSON.stringify(entry.setting)}`,
+        `${path}["${key}"].setting: must be one of ${RULE_SETTINGS.join(", ")},` +
+          ` got ${JSON.stringify(entry.setting)}`,
       );
     }
     // Required, and this is the whole reason the long form exists. Optional would
     // reproduce the state the long form was added to end.
     if (typeof entry.reason !== "string" || !entry.reason.trim()) {
       throw new UsageError(
-        `${path}["${key}"].reason: required — say why the tool is wrong about this rule.`
-        + ` Use the short form ("${key}": "${entry.setting}") only when there is nothing to record.`,
+        `${path}["${key}"].reason: required — say why the tool is wrong about this rule.` +
+          ` Use the short form ("${key}": "${entry.setting}") only when there is nothing to record.`,
       );
     }
     if (entry.owner !== undefined && typeof entry.owner !== "string") {

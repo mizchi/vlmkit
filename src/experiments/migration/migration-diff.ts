@@ -4,12 +4,7 @@ import type { PropertyCategory } from "../css-challenge/css-challenge-core.ts";
 import type { VisualSemanticChange, VrtDiff } from "@mizchi/vlmkit-core/types.ts";
 import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vlmkit-core/diff-regions.ts";
 
-export type MigrationDiffCategory =
-  | "layout-shift"
-  | "color-change"
-  | "spacing"
-  | "typography"
-  | "other";
+export type MigrationDiffCategory = "layout-shift" | "color-change" | "spacing" | "typography" | "other";
 
 export interface MigrationDiffClassification {
   dominantCategory: MigrationDiffCategory | "none";
@@ -31,10 +26,7 @@ const MIGRATION_DIFF_CATEGORIES: MigrationDiffCategory[] = [
   "other",
 ];
 
-export function classifyMigrationVisualChange(
-  change: VisualSemanticChange,
-  diff: VrtDiff,
-): MigrationDiffCategory {
+export function classifyMigrationVisualChange(change: VisualSemanticChange, diff: VrtDiff): MigrationDiffCategory {
   switch (change.type) {
     case "text-change":
       return "typography";
@@ -53,9 +45,7 @@ export function classifyMigrationVisualChange(
   }
 }
 
-export function classifyMigrationDiff(
-  diff: VrtDiff | null,
-): MigrationDiffClassification {
+export function classifyMigrationDiff(diff: VrtDiff | null): MigrationDiffClassification {
   const counts = createCategoryCounts();
   const weights = createCategoryCounts();
   if (!diff || diff.diffPixels === 0) {
@@ -73,9 +63,9 @@ export function classifyMigrationDiff(
     weights[category] += change.region.diffPixelCount;
   }
 
-  const nonZeroEntries = MIGRATION_DIFF_CATEGORIES
-    .map((category) => [category, counts[category]] as const)
-    .filter((entry) => entry[1] > 0);
+  const nonZeroEntries = MIGRATION_DIFF_CATEGORIES.map((category) => [category, counts[category]] as const).filter(
+    (entry) => entry[1] > 0,
+  );
 
   if (nonZeroEntries.length === 0) {
     return {
@@ -91,9 +81,7 @@ export function classifyMigrationDiff(
     return current;
   });
 
-  const summary = nonZeroEntries
-    .map(([category, count]) => `${count} ${category}`)
-    .join(", ");
+  const summary = nonZeroEntries.map(([category, count]) => `${count} ${category}`).join(", ");
 
   return {
     dominantCategory,
@@ -102,9 +90,7 @@ export function classifyMigrationDiff(
   };
 }
 
-export function buildMigrationRegionApprovalContexts(
-  diff: VrtDiff,
-): MigrationRegionApprovalContext[] {
+export function buildMigrationRegionApprovalContexts(diff: VrtDiff): MigrationRegionApprovalContext[] {
   const normalizedDiff = normalizeMigrationDiff(diff);
   return normalizedDiff.regions.map((region) => {
     const regionDiff = createScopedVrtDiff(normalizedDiff, region);
@@ -128,10 +114,7 @@ function createCategoryCounts(): Record<MigrationDiffCategory, number> {
   };
 }
 
-function isSpacingLikeChange(
-  change: VisualSemanticChange,
-  diff: VrtDiff,
-): boolean {
+function isSpacingLikeChange(change: VisualSemanticChange, diff: VrtDiff): boolean {
   const shortEdge = Math.min(change.region.width, change.region.height);
   const longEdge = Math.max(change.region.width, change.region.height);
   const globalRatio = change.region.diffPixelCount / Math.max(diff.totalPixels, 1);

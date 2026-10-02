@@ -64,10 +64,19 @@ export class CssInspector {
   private readonly sheets = new Map<string, { url: string; inline: boolean }>();
   private moved: { styleSheetId: string; range: CssMedia["range"]; text: string; to: string }[] = [];
 
-  private constructor(private readonly session: CDPSession, private readonly documentUrl: string) {
-    session.on("CSS.styleSheetAdded", (event: { header: { styleSheetId: string; sourceURL: string; isInline?: boolean } }) => {
-      this.sheets.set(event.header.styleSheetId, { url: event.header.sourceURL, inline: event.header.isInline === true });
-    });
+  private constructor(
+    private readonly session: CDPSession,
+    private readonly documentUrl: string,
+  ) {
+    session.on(
+      "CSS.styleSheetAdded",
+      (event: { header: { styleSheetId: string; sourceURL: string; isInline?: boolean } }) => {
+        this.sheets.set(event.header.styleSheetId, {
+          url: event.header.sourceURL,
+          inline: event.header.isInline === true,
+        });
+      },
+    );
   }
 
   static async open(page: Page): Promise<CssInspector | null> {
@@ -91,7 +100,7 @@ export class CssInspector {
   }
 
   async mediaConditions(): Promise<string[]> {
-    const { medias } = await this.session.send("CSS.getMediaQueries") as { medias: CssMedia[] };
+    const { medias } = (await this.session.send("CSS.getMediaQueries")) as { medias: CssMedia[] };
     return [...new Set(medias.map((m) => m.text.trim()).filter((t) => t && t !== "all" && t !== "screen"))];
   }
 
@@ -103,39 +112,48 @@ export class CssInspector {
    * skipped, so `flex: 0 0 auto` is one candidate, not four.
    */
   async causeCandidates(tagged: readonly TaggedNode[]): Promise<(CauseCandidate & { node: number })[]> {
-    const { root } = await this.session.send("DOM.getDocument", { depth: 0 }) as { root: { nodeId: number } };
-    const { nodeIds } = await this.session.send("DOM.querySelectorAll", { nodeId: root.nodeId, selector: "[data-vlmkit-pbt]" }) as { nodeIds: number[] };
+    const { root } = (await this.session.send("DOM.getDocument", { depth: 0 })) as { root: { nodeId: number } };
+    const { nodeIds } = (await this.session.send("DOM.querySelectorAll", {
+      nodeId: root.nodeId,
+      selector: "[data-vlmkit-pbt]",
+    })) as { nodeIds: number[] };
     const byIndex = new Map(tagged.map((t) => [t.index, t]));
     const out: (CauseCandidate & { node: number })[] = [];
     for (const nodeId of nodeIds) {
-      const { attributes } = await this.session.send("DOM.getAttributes", { nodeId }) as { attributes: string[] };
+      const { attributes } = (await this.session.send("DOM.getAttributes", { nodeId })) as { attributes: string[] };
       const at = attributes.indexOf("data-vlmkit-pbt");
       const node = byIndex.get(Number(attributes[at + 1]));
       if (!node) continue;
-      const matched = await this.session.send("CSS.getMatchedStylesForNode", { nodeId }) as {
+      const matched = (await this.session.send("CSS.getMatchedStylesForNode", { nodeId })) as {
         matchedCSSRules?: CssRuleMatch[];
         inlineStyle?: { cssProperties: CssProperty[] };
       };
-      const winners = new Map<string, { important: boolean; order: number; value: string; rule: string; media: string[]; sheet: string }>();
+      const winners = new Map<
+        string,
+        { important: boolean; order: number; value: string; rule: string; media: string[]; sheet: string }
+      >();
       const consider = (p: CssProperty, order: number, rule: string, media: string[], sheet: string) => {
         if (p.range === undefined || p.disabled || p.parsedOk === false) return;
         const important = p.important === true;
         const prev = winners.get(p.name);
-        if (prev && (prev.important && !important)) return;
+        if (prev && prev.important && !important) return;
         if (prev && prev.important === important && prev.order > order) return;
         winners.set(p.name, { important, order, value: p.value, rule, media, sheet });
       };
       (matched.matchedCSSRules ?? []).forEach((match, order) => {
         if (match.rule.origin !== "regular") return;
         const media = [
-          ...(match.rule.media ?? []).filter((m) => m.source === "mediaRule" || m.source === "importRule").map((m) => m.text),
+          ...(match.rule.media ?? [])
+            .filter((m) => m.source === "mediaRule" || m.source === "importRule")
+            .map((m) => m.text),
           ...(match.rule.containerQueries ?? []).map((q) => `@container ${q.text}`),
         ];
         for (const p of match.rule.style.cssProperties) {
           consider(p, order, match.rule.selectorList.text, media, this.sheetName(match.rule.styleSheetId));
         }
       });
-      for (const p of matched.inlineStyle?.cssProperties ?? []) consider(p, Number.MAX_SAFE_INTEGER, "style attribute", [], "inline");
+      for (const p of matched.inlineStyle?.cssProperties ?? [])
+        consider(p, Number.MAX_SAFE_INTEGER, "style attribute", [], "inline");
       for (const [property, w] of winners) {
         const override = neutralOverride(property, w.value);
         if (override === null) continue;
@@ -164,15 +182,16 @@ export class CssInspector {
     let rewritten = 0;
     for (const move of moves) {
       for (let guard = 0; guard < 32; guard++) {
-        const { medias } = await this.session.send("CSS.getMediaQueries") as { medias: CssMedia[] };
-        const target = medias.find((m) => m.source === "mediaRule" && m.styleSheetId && m.range
-          && normalise(m.text) === normalise(move.from));
+        const { medias } = (await this.session.send("CSS.getMediaQueries")) as { medias: CssMedia[] };
+        const target = medias.find(
+          (m) => m.source === "mediaRule" && m.styleSheetId && m.range && normalise(m.text) === normalise(move.from),
+        );
         if (!target) break;
-        const { media } = await this.session.send("CSS.setMediaText", {
+        const { media } = (await this.session.send("CSS.setMediaText", {
           styleSheetId: target.styleSheetId!,
           range: target.range!,
           text: move.to,
-        }) as { media: CssMedia };
+        })) as { media: CssMedia };
         this.moved.push({ styleSheetId: target.styleSheetId!, range: media.range, text: target.text, to: move.to });
         rewritten++;
       }
@@ -187,14 +206,18 @@ export class CssInspector {
    */
   async restoreConditions(): Promise<void> {
     for (const m of this.moved.reverse()) {
-      const { medias } = await this.session.send("CSS.getMediaQueries") as { medias: CssMedia[] };
+      const { medias } = (await this.session.send("CSS.getMediaQueries")) as { medias: CssMedia[] };
       const distance = (r: CssMedia["range"]) =>
-        r && m.range ? Math.abs(r.startLine - m.range.startLine) * 1e6 + Math.abs(r.startColumn - m.range.startColumn) : 0;
+        r && m.range
+          ? Math.abs(r.startLine - m.range.startLine) * 1e6 + Math.abs(r.startColumn - m.range.startColumn)
+          : 0;
       const found = medias
         .filter((x) => x.styleSheetId === m.styleSheetId && x.range && normalise(x.text) === normalise(m.to))
         .sort((a, b) => distance(a.range) - distance(b.range))[0];
       if (!found) continue;
-      await this.session.send("CSS.setMediaText", { styleSheetId: m.styleSheetId, range: found.range!, text: m.text }).catch(() => {});
+      await this.session
+        .send("CSS.setMediaText", { styleSheetId: m.styleSheetId, range: found.range!, text: m.text })
+        .catch(() => {});
     }
     this.moved = [];
   }

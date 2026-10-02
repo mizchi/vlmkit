@@ -27,11 +27,28 @@ import {
   type ApprovalRule,
 } from "../../vrt/snapshot/approval.ts";
 import {
-  parseCssDeclarations, removeCssProperty, removeSelectorBlock, groupBySelector, applyCssFix, normalizeValue,
-  seededRandom, createBrowser, createCraterClient, capturePageState, capturePageStateCrater, analyzeVrtDiff,
-  buildFixPrompt, parseLLMFix, categorizeProperty,
-  extractCss, replaceCss,
-  type CssDeclaration, type CapturedState, type TrialResult, type RenderBackend, type VrtAnalysis,
+  parseCssDeclarations,
+  removeCssProperty,
+  removeSelectorBlock,
+  groupBySelector,
+  applyCssFix,
+  normalizeValue,
+  seededRandom,
+  createBrowser,
+  createCraterClient,
+  capturePageState,
+  capturePageStateCrater,
+  analyzeVrtDiff,
+  buildFixPrompt,
+  parseLLMFix,
+  categorizeProperty,
+  extractCss,
+  replaceCss,
+  type CssDeclaration,
+  type CapturedState,
+  type TrialResult,
+  type RenderBackend,
+  type VrtAnalysis,
 } from "./css-challenge-core.ts";
 import { isCraterAvailable, type CraterClient } from "@mizchi/vlmkit-capture/crater-client.ts";
 import {
@@ -67,7 +84,10 @@ import {
   type ComputedStyleTarget,
 } from "./css-custom-properties.ts";
 import { TRACKED_PROPERTIES } from "@mizchi/vlmkit-core/computed-style-capture.ts";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import {
+  formatPlaywrightLaunchError,
+  isPlaywrightSandboxRestrictionError,
+} from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import {
   hasAnyDetectionSignal,
   hasCraterPrescanSignal,
@@ -275,42 +295,50 @@ async function analyzeAcrossViewports(
   let anyComputed = false;
   let anyHover = false;
   let anyPaintTree = false;
-  const interactionSelectors = [...new Set([
-    options.approvalContext.selector,
-    ...options.expectedComputedStyleTargets.map((target) => target.selector),
-  ])];
+  const interactionSelectors = [
+    ...new Set([
+      options.approvalContext.selector,
+      ...options.expectedComputedStyleTargets.map((target) => target.selector),
+    ]),
+  ];
 
   for (const viewport of VIEWPORTS) {
     const brokenPath = join(trialDir, `${backend}-broken-${viewport.label}.png`);
     const brokenState = await captureStateForBackend(backend, viewport, html, brokenPath, {
-        browser: options.browser,
-        craterClient: options.craterClient,
-        captureHover: options.captureHover,
-        trackedProperties: options.trackedProperties,
-        interactionSelectors,
-        skipScreenshot: options.skipScreenshot,
-      });
+      browser: options.browser,
+      craterClient: options.craterClient,
+      captureHover: options.captureHover,
+      trackedProperties: options.trackedProperties,
+      interactionSelectors,
+      skipScreenshot: options.skipScreenshot,
+    });
     const baseline = baselines.get(viewport.label);
     if (!baseline) throw new Error(`Missing ${backend} baseline for viewport ${viewport.label}`);
 
-    const analysis = await analyzeVrtDiff(baseline, brokenState, trialDir, {
-      manifest: options.manifest,
-      context: options.approvalContext,
-      strict: options.strict,
-      expectedComputedStyleTargets: options.expectedComputedStyleTargets,
-    }, { skipHeatmap: true });
+    const analysis = await analyzeVrtDiff(
+      baseline,
+      brokenState,
+      trialDir,
+      {
+        manifest: options.manifest,
+        context: options.approvalContext,
+        strict: options.strict,
+        expectedComputedStyleTargets: options.expectedComputedStyleTargets,
+      },
+      { skipHeatmap: true },
+    );
 
     const visualDiffDetected = (analysis.vrtDiff?.diffPixels ?? 0) > 0;
     const paintTreeDiffCount = analysis.paintTreeChanges.length;
     // In selector mode, use all computed style diffs (tracked targets filter is unreliable for multi-property deletion)
-    const computedStyleDiffCount = MODE === "selector"
-      ? analysis.computedStyleDiffs.length
-      : (analysis.trackedComputedStyleTargets.length > 0
-        ? analysis.referencedComputedStyleDiffs.length
-        : analysis.computedStyleDiffs.length);
+    const computedStyleDiffCount =
+      MODE === "selector"
+        ? analysis.computedStyleDiffs.length
+        : analysis.trackedComputedStyleTargets.length > 0
+          ? analysis.referencedComputedStyleDiffs.length
+          : analysis.computedStyleDiffs.length;
 
-    const visualCaptureSkipped =
-      brokenState.visualCaptureSkipped === true || baseline.visualCaptureSkipped === true;
+    const visualCaptureSkipped = brokenState.visualCaptureSkipped === true || baseline.visualCaptureSkipped === true;
 
     viewportResults.push({
       width: viewport.width,
@@ -363,7 +391,10 @@ async function runFixtureBenchmark(fixture: string) {
 
   const htmlRaw = await readFile(fixturePath, "utf-8");
   const originalCss = extractCss(htmlRaw);
-  if (!originalCss) { console.error("CSS not found"); process.exit(1); }
+  if (!originalCss) {
+    console.error("CSS not found");
+    process.exit(1);
+  }
 
   const declarations = parseCssDeclarations(originalCss);
   const selectorBlocks = groupBySelector(declarations);
@@ -373,9 +404,11 @@ async function runFixtureBenchmark(fixture: string) {
   // call its v0.18.0 intelligence APIs against the loaded baseline.
   let craterClient: CraterClient | null = null;
   if (BACKEND === "crater" || BACKEND === "prescanner") {
-    if (!await isCraterAvailable()) {
+    if (!(await isCraterAvailable())) {
       console.log(`  ${RED}Crater BiDi server not available at ws://127.0.0.1:9222${RESET}`);
-      console.log(`  ${DIM}Start it: cd ~/ghq/github.com/mizchi/crater && just build-bidi && just start-bidi-with-font${RESET}`);
+      console.log(
+        `  ${DIM}Start it: cd ~/ghq/github.com/mizchi/crater && just build-bidi && just start-bidi-with-font${RESET}`,
+      );
       process.exit(1);
     }
     craterClient = await createCraterClient();
@@ -410,11 +443,9 @@ async function runFixtureBenchmark(fixture: string) {
     TRACKED_PROPERTIES,
     collectComputedStyleTrackingProperties(declarations),
   );
-  const interactionSelectors = [...new Set(
-    declarations
-      .map((declaration) => declaration.selector)
-      .filter(isInteractiveSelector),
-  )];
+  const interactionSelectors = [
+    ...new Set(declarations.map((declaration) => declaration.selector).filter(isInteractiveSelector)),
+  ];
   const llm = ENABLE_LLM ? createLLMProvider({ throwIfMissing: false }) : null;
   const approvalManifest = APPROVAL_PATH ? await loadApprovalManifest(APPROVAL_PATH) : null;
   const approvalWarnings = approvalManifest ? collectApprovalWarnings(approvalManifest) : [];
@@ -423,8 +454,12 @@ async function runFixtureBenchmark(fixture: string) {
   console.log(`${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════════════════╗${RESET}`);
   console.log(`${BOLD}${CYAN}║  CSS Recovery Challenge — Benchmark                                     ║${RESET}`);
   console.log(`${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════════════════╝${RESET}`);
-  console.log(`  ${DIM}Fixture: ${fixture} | Mode: ${MODE} | Trials: ${TRIALS} | Declarations: ${declarations.length} | Selectors: ${selectorBlocks.length}${RESET}`);
-  console.log(`  ${DIM}Backend: ${BACKEND} | Viewports: ${VIEWPORTS.map((v) => `${v.label}(${v.width}x${v.height})`).join(", ")}${RESET}`);
+  console.log(
+    `  ${DIM}Fixture: ${fixture} | Mode: ${MODE} | Trials: ${TRIALS} | Declarations: ${declarations.length} | Selectors: ${selectorBlocks.length}${RESET}`,
+  );
+  console.log(
+    `  ${DIM}Backend: ${BACKEND} | Viewports: ${VIEWPORTS.map((v) => `${v.label}(${v.width}x${v.height})`).join(", ")}${RESET}`,
+  );
   console.log(`  ${DIM}LLM: ${llm ? "enabled" : "disabled"} | DB: ${SAVE_DB ? "enabled" : "disabled"}${RESET}`);
   if (approvalManifest) {
     console.log(`  ${DIM}Approval: ${APPROVAL_PATH}${STRICT ? " (strict mode: ignored)" : ""}${RESET}`);
@@ -500,17 +535,10 @@ async function runFixtureBenchmark(fixture: string) {
   // time) per detected trial. Silent trials still fall through to the
   // existing crater capture so computed-style / forced-state can fire.
   const batchPrescanEnv = process.env.VLMKIT_BATCH_PRESCAN;
-  const batchPrescanSize = batchPrescanEnv === undefined
-    ? 0
-    : Math.max(0, Number.parseInt(batchPrescanEnv, 10) || 0);
+  const batchPrescanSize = batchPrescanEnv === undefined ? 0 : Math.max(0, Number.parseInt(batchPrescanEnv, 10) || 0);
   const batchPrescanResults = new Map<number, ReturnType<typeof buildBatchPrescanBundle>>();
-  let batchPrescanRepresentativeViewport: typeof VIEWPORTS[number] | null = null;
-  if (
-    batchPrescanSize >= 1
-    && BACKEND === "prescanner"
-    && craterClient
-    && craterBaselines.size > 0
-  ) {
+  let batchPrescanRepresentativeViewport: (typeof VIEWPORTS)[number] | null = null;
+  if (batchPrescanSize >= 1 && BACKEND === "prescanner" && craterClient && craterBaselines.size > 0) {
     batchPrescanRepresentativeViewport = VIEWPORTS[Math.floor(VIEWPORTS.length / 2)];
     const baseline = craterBaselines.get(batchPrescanRepresentativeViewport.label);
     if (baseline?.paintTree && batchPrescanSize >= 2) {
@@ -534,9 +562,10 @@ async function runFixtureBenchmark(fixture: string) {
           propertyNames = [decl.property];
         }
         if (!selector || propertyNames.length === 0) continue;
-        const mutations = propertyNames.length === 1
-          ? mutationsForPropertyRemoval(selector, propertyNames[0])
-          : mutationsForSelectorBlockRemoval(selector, propertyNames);
+        const mutations =
+          propertyNames.length === 1
+            ? mutationsForPropertyRemoval(selector, propertyNames[0])
+            : mutationsForSelectorBlockRemoval(selector, propertyNames);
         plans.push({ seed, request: { id: `trial-${seed}`, mutations } });
       }
 
@@ -611,14 +640,13 @@ async function runFixtureBenchmark(fixture: string) {
       category: categorizeProperty(removed.property),
     } as const;
     // In selector mode, track computed styles for ALL declarations in the block
-    const removedDeclarations = MODE === "selector"
-      ? (shuffledBlocks[i % shuffledBlocks.length]?.declarations ?? [removed])
-      : [removed];
-    const expectedComputedStyleTargets = removedDeclarations.flatMap(
-      (d) => findExpectedComputedStyleTargets(d, customPropertyUsage),
+    const removedDeclarations =
+      MODE === "selector" ? (shuffledBlocks[i % shuffledBlocks.length]?.declarations ?? [removed]) : [removed];
+    const expectedComputedStyleTargets = removedDeclarations.flatMap((d) =>
+      findExpectedComputedStyleTargets(d, customPropertyUsage),
     );
-    const captureHover = classified.isInteractive ||
-      expectedComputedStyleTargets.some((target) => isInteractiveSelector(target.selector));
+    const captureHover =
+      classified.isInteractive || expectedComputedStyleTargets.some((target) => isInteractiveSelector(target.selector));
 
     let analysisBundle: ViewportAnalysisBundle;
     let prescannerResolution: PrescannerTrialResolution | null = null;
@@ -631,21 +659,17 @@ async function runFixtureBenchmark(fixture: string) {
       // viewport synthesizes a metadata-only bundle covering every
       // viewport and short-circuits the per-viewport setContent loop.
       let batchSignalBundle: ViewportAnalysisBundle | null = batchPrescanResults.get(seed) ?? null;
-      if (
-        !batchSignalBundle
-        && batchPrescanSize === 1
-        && craterClient
-        && craterBaselines.size > 0
-      ) {
+      if (!batchSignalBundle && batchPrescanSize === 1 && craterClient && craterBaselines.size > 0) {
         const fastViewport = VIEWPORTS[Math.floor(VIEWPORTS.length / 2)];
         const baseline = craterBaselines.get(fastViewport.label);
         if (baseline?.paintTree) {
-          const mutations = MODE === "selector"
-            ? mutationsForSelectorBlockRemoval(
-              removed.selector,
-              removedDeclarations.map((d) => d.property),
-            )
-            : mutationsForPropertyRemoval(removed.selector, removed.property);
+          const mutations =
+            MODE === "selector"
+              ? mutationsForSelectorBlockRemoval(
+                  removed.selector,
+                  removedDeclarations.map((d) => d.property),
+                )
+              : mutationsForPropertyRemoval(removed.selector, removed.property);
           const request: BatchPrescanRequest = { id: `trial-${seed}`, mutations };
           try {
             const batch = await runBatchPrescan(
@@ -658,12 +682,15 @@ async function runFixtureBenchmark(fixture: string) {
             if (hasAnyBatchPrescanSignal(batch)) {
               batchSignalBundle = buildBatchPrescanBundle(VIEWPORTS, fastViewport, batch[0]!.changes.length);
             }
-          } catch { /* fall through to per-viewport capture */ }
+          } catch {
+            /* fall through to per-viewport capture */
+          }
         }
       }
 
-      const craterBundle = batchSignalBundle
-        ?? await analyzeAcrossViewports("crater", brokenHtml, trialDir, craterBaselines, {
+      const craterBundle =
+        batchSignalBundle ??
+        (await analyzeAcrossViewports("crater", brokenHtml, trialDir, craterBaselines, {
           browser: null,
           craterClient,
           captureHover,
@@ -673,23 +700,29 @@ async function runFixtureBenchmark(fixture: string) {
           expectedComputedStyleTargets,
           strict: STRICT,
           skipScreenshot: true,
-        });
+        }));
 
       if (hasCraterPrescanSignal(craterBundle.viewportResults)) {
         prescannerResolution = resolvePrescannerTrial(craterBundle.viewportResults, craterBundle.viewportResults);
         analysisBundle = craterBundle;
       } else {
         const chromiumResources = await ensureChromiumResources();
-        const chromiumBundle = await analyzeAcrossViewports("chromium", brokenHtml, trialDir, chromiumResources.baselines, {
-          browser: chromiumResources.browser,
-          craterClient: null,
-          captureHover,
-          trackedProperties,
-          manifest: approvalManifest,
-          approvalContext,
-          expectedComputedStyleTargets,
-          strict: STRICT,
-        });
+        const chromiumBundle = await analyzeAcrossViewports(
+          "chromium",
+          brokenHtml,
+          trialDir,
+          chromiumResources.baselines,
+          {
+            browser: chromiumResources.browser,
+            craterClient: null,
+            captureHover,
+            trackedProperties,
+            manifest: approvalManifest,
+            approvalContext,
+            expectedComputedStyleTargets,
+            strict: STRICT,
+          },
+        );
         prescannerResolution = resolvePrescannerTrial(craterBundle.viewportResults, chromiumBundle.viewportResults);
         analysisBundle = chromiumBundle;
       }
@@ -730,7 +763,9 @@ async function runFixtureBenchmark(fixture: string) {
       visualChangeTypes: primaryAnalysis?.visualSemantic?.changes.map((c) => c.type) ?? [],
       a11yDiffDetected: anyA11y,
       a11yChangeCount: totalA11yChanges,
-      newA11yIssues: primaryAnalysis ? Math.max(0, primaryAnalysis.brokenIssueCount - primaryAnalysis.baselineIssueCount) : 0,
+      newA11yIssues: primaryAnalysis
+        ? Math.max(0, primaryAnalysis.brokenIssueCount - primaryAnalysis.baselineIssueCount)
+        : 0,
       llmAttempted: false,
       llmFixParsed: false,
       selectorMatch: false,
@@ -772,12 +807,17 @@ async function runFixtureBenchmark(fixture: string) {
             trackedProperties,
           });
           const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
-          const fixedDiff = await compareScreenshots({
-            testId: "page", testTitle: "page", projectName: "css-challenge",
-            screenshotPath: fixedPath,
-            baselinePath: chromiumResources.baselines.get("desktop")!.screenshotPath,
-            status: "changed",
-          }, { outputDir: trialDir });
+          const fixedDiff = await compareScreenshots(
+            {
+              testId: "page",
+              testTitle: "page",
+              projectName: "css-challenge",
+              screenshotPath: fixedPath,
+              baselinePath: chromiumResources.baselines.get("desktop")!.screenshotPath,
+              status: "changed",
+            },
+            { outputDir: trialDir },
+          );
           result.fixedDiffRatio = fixedDiff?.diffRatio ?? 0;
           result.pixelPerfect = result.fixedDiffRatio === 0;
           result.nearPerfect = result.fixedDiffRatio < 0.01;
@@ -790,14 +830,16 @@ async function runFixtureBenchmark(fixture: string) {
     results.push(result);
 
     if (SUGGEST_APPROVAL && primaryAnalysis) {
-      approvalSuggestions.push(suggestApprovalRule({
-        selector: removed.selector,
-        property: removed.property,
-        category: approvalContext.category,
-        maxDiffPixels,
-        maxDiffRatio,
-        paintTreeChanges: primaryAnalysis.paintTreeChanges,
-      }));
+      approvalSuggestions.push(
+        suggestApprovalRule({
+          selector: removed.selector,
+          property: removed.property,
+          category: approvalContext.category,
+          maxDiffPixels,
+          maxDiffRatio,
+          paintTreeChanges: primaryAnalysis.paintTreeChanges,
+        }),
+      );
     }
 
     // Build detection record
@@ -839,7 +881,10 @@ async function runFixtureBenchmark(fixture: string) {
     if (anyComputed && !anyVisual) status.push(`${CYAN}css-diff${RESET}`);
     if (anyHover && !anyVisual) status.push(`${CYAN}hover${RESET}`);
     if (anyPaintTree && !anyVisual) status.push(`${CYAN}paint-tree${RESET}`);
-    if (primaryAnalysis && (primaryAnalysis.approvedVisualRules.length > 0 || primaryAnalysis.approvedPaintTreeMatches.length > 0)) {
+    if (
+      primaryAnalysis &&
+      (primaryAnalysis.approvedVisualRules.length > 0 || primaryAnalysis.approvedPaintTreeMatches.length > 0)
+    ) {
       status.push(`${CYAN}approved${RESET}`);
     }
     if (!detected) status.push(`${RED}silent${RESET}${undetectedReason ? `(${undetectedReason})` : ""}`);
@@ -870,7 +915,9 @@ async function runFixtureBenchmark(fixture: string) {
   console.log();
   hr();
   console.log();
-  console.log(`  ${BOLD}${CYAN}Benchmark Results${RESET}  ${DIM}(${TRIALS} trials, ${elapsed}s, ${VIEWPORTS.length} viewports)${RESET}`);
+  console.log(
+    `  ${BOLD}${CYAN}Benchmark Results${RESET}  ${DIM}(${TRIALS} trials, ${elapsed}s, ${VIEWPORTS.length} viewports)${RESET}`,
+  );
   console.log();
 
   // Detection metrics
@@ -882,9 +929,7 @@ async function runFixtureBenchmark(fixture: string) {
   const computedDetected = dbRecords.filter((r) => r.viewports.some((v) => v.computedStyleDiffCount > 0)).length;
   const hoverDetected = dbRecords.filter((r) => r.viewports.some((v) => v.hoverDiffDetected)).length;
   const paintTreeDetected = dbRecords.filter((r) => r.viewports.some((v) => v.paintTreeDiffCount > 0)).length;
-  const prescannerSummary = BACKEND === "prescanner"
-    ? summarizePrescannerTrials(prescannerResolutions)
-    : null;
+  const prescannerSummary = BACKEND === "prescanner" ? summarizePrescannerTrials(prescannerResolutions) : null;
 
   console.log(`  ${BOLD}Detection${RESET}`);
   console.log(`    Visual diff:           ${fmtRate(visualDetected, TRIALS)}`);
@@ -901,7 +946,9 @@ async function runFixtureBenchmark(fixture: string) {
     console.log(`  ${BOLD}Prescanner${RESET}`);
     console.log(`    Resolved by crater:    ${fmtRate(prescannerSummary.craterResolved, prescannerSummary.total)}`);
     if (prescannerSummary.metadataOnly > 0) {
-      console.log(`    ${DIM}└─ metadata-only:    ${fmtRate(prescannerSummary.metadataOnly, prescannerSummary.craterResolved)} (no PNG captured)${RESET}`);
+      console.log(
+        `    ${DIM}└─ metadata-only:    ${fmtRate(prescannerSummary.metadataOnly, prescannerSummary.craterResolved)} (no PNG captured)${RESET}`,
+      );
     }
     const bySignal = prescannerSummary.craterBySignal;
     if (prescannerSummary.craterResolved > 0) {
@@ -915,9 +962,13 @@ async function runFixtureBenchmark(fixture: string) {
         console.log(`    ${DIM}└─ first signal:     ${signalParts.join(" | ")}${RESET}`);
       }
     }
-    console.log(`    Chromium fallback:     ${fmtRate(prescannerSummary.chromiumFallbacks, prescannerSummary.total, true)}`);
+    console.log(
+      `    Chromium fallback:     ${fmtRate(prescannerSummary.chromiumFallbacks, prescannerSummary.total, true)}`,
+    );
     console.log(`    Fallback detected:     ${fmtRate(prescannerSummary.chromiumDetected, prescannerSummary.total)}`);
-    console.log(`    Fallback pass:         ${fmtRate(prescannerSummary.passedAfterFallback, prescannerSummary.total, true)}`);
+    console.log(
+      `    Fallback pass:         ${fmtRate(prescannerSummary.passedAfterFallback, prescannerSummary.total, true)}`,
+    );
   }
 
   // Scoped rate (excluding animation)
@@ -925,7 +976,9 @@ async function runFixtureBenchmark(fixture: string) {
   const scopedDetected = scoped.filter((r) => r.detected).length;
   if (scoped.length < dbRecords.length) {
     const outOfScope = dbRecords.length - scoped.length;
-    console.log(`    ${DIM}(excl. animation: ${fmtRate(scopedDetected, scoped.length)} | ${outOfScope} animation skipped)${RESET}`);
+    console.log(
+      `    ${DIM}(excl. animation: ${fmtRate(scopedDetected, scoped.length)} | ${outOfScope} animation skipped)${RESET}`,
+    );
   }
   console.log();
 
@@ -969,7 +1022,9 @@ async function runFixtureBenchmark(fixture: string) {
   for (const [cat, recs] of [...categories.entries()].sort((a, b) => b[1].length - a[1].length)) {
     const det = recs.filter((r) => r.detected).length;
     const silent = recs.filter((r) => !r.detected).length;
-    console.log(`    ${cat.padEnd(14)} ${String(recs.length).padStart(5)}  ${fmtRateCompact(det, recs.length).padStart(8)}  ${fmtRateCompact(silent, recs.length, true).padStart(8)}`);
+    console.log(
+      `    ${cat.padEnd(14)} ${String(recs.length).padStart(5)}  ${fmtRateCompact(det, recs.length).padStart(8)}  ${fmtRateCompact(silent, recs.length, true).padStart(8)}`,
+    );
   }
   console.log();
 
@@ -984,7 +1039,9 @@ async function runFixtureBenchmark(fixture: string) {
     console.log(`  ${BOLD}${YELLOW}Undetected Reasons${RESET}`);
     for (const [reason, count] of [...reasonCounts.entries()].sort((a, b) => b[1] - a[1])) {
       const examples = dbRecords.filter((r) => r.undetectedReason === reason).slice(0, 2);
-      console.log(`    ${reason.padEnd(20)} ${String(count).padStart(3)}  ${DIM}${examples.map((e) => `${e.selector}{${e.property}}`).join(", ")}${RESET}`);
+      console.log(
+        `    ${reason.padEnd(20)} ${String(count).padStart(3)}  ${DIM}${examples.map((e) => `${e.selector}{${e.property}}`).join(", ")}${RESET}`,
+      );
     }
     console.log();
   }
@@ -1089,20 +1146,30 @@ function shuffleWithSeed<T>(arr: T[], seed: number): T[] {
 function fmtRate(count: number, total: number, inverse = false): string {
   const pct = ((count / total) * 100).toFixed(1);
   const color = inverse
-    ? (count === 0 ? GREEN : count <= total * 0.1 ? YELLOW : RED)
-    : (count === total ? GREEN : count >= total * 0.9 ? YELLOW : count >= total * 0.5 ? YELLOW : RED);
+    ? count === 0
+      ? GREEN
+      : count <= total * 0.1
+        ? YELLOW
+        : RED
+    : count === total
+      ? GREEN
+      : count >= total * 0.9
+        ? YELLOW
+        : count >= total * 0.5
+          ? YELLOW
+          : RED;
   return `${color}${count}/${total}${RESET} ${DIM}(${pct}%)${RESET}`;
 }
 
 function fmtRateCompact(count: number, total: number, inverse = false): string {
   const pct = ((count / total) * 100).toFixed(0);
-  const color = inverse
-    ? (count === 0 ? GREEN : RED)
-    : (count === total ? GREEN : count >= total * 0.5 ? YELLOW : RED);
+  const color = inverse ? (count === 0 ? GREEN : RED) : count === total ? GREEN : count >= total * 0.5 ? YELLOW : RED;
   return `${color}${pct}%${RESET}`;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "css-challenge-bench" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "css-challenge-bench" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch((error) => {
     if (isPlaywrightSandboxRestrictionError(error)) {

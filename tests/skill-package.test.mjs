@@ -53,10 +53,7 @@ test("the repository exposes one lightweight public vlmkit skill", async () => {
   for (const workflow of workflows) {
     const workflowPath = `workflows/${workflow}/SKILL.md`;
     assert.ok(router.includes(`./${workflowPath}`), `${workflow} is not routed relatively`);
-    assert.match(
-      await readFile(join(skillsPackage, workflowPath), "utf8"),
-      new RegExp(`name: ${workflow}`),
-    );
+    assert.match(await readFile(join(skillsPackage, workflowPath), "utf8"), new RegExp(`name: ${workflow}`));
 
     const sourceRoot = join(repoRoot, ".claude/skills", workflow);
     const bundledRoot = join(skillsPackage, "workflows", workflow);
@@ -101,14 +98,8 @@ test("the router pins the vlmkit version the workflows are written against", asy
   // The install line an agent will actually run, and the sample `--version` output it compares
   // against. Both carry the number, and a bump that fixes only the heading leaves the instruction
   // telling the agent to install the previous release.
-  assert.ok(
-    skill.includes(`@mizchi/vlmkit@${version}`),
-    `the install instruction must name ${version}`,
-  );
-  assert.ok(
-    skill.includes(`vlmkit/${version} `),
-    `the sample --version output must show ${version}`,
-  );
+  assert.ok(skill.includes(`@mizchi/vlmkit@${version}`), `the install instruction must name ${version}`);
+  assert.ok(skill.includes(`vlmkit/${version} `), `the sample --version output must show ${version}`);
 });
 
 test("the APM package is an exact, bounded mirror of the skills CLI package", async () => {
@@ -174,28 +165,33 @@ test("the plugin marketplace reuses the existing package rather than adding a co
   // failure a user sees is about JSON, not about what is wrong.
   assert.equal(manifest.name, "vlmkit");
   assert.equal(typeof manifest.owner?.name, "string");
-  assert.ok(Array.isArray(manifest.plugins) && manifest.plugins.length === 1,
-    "one plugin: the router is the only thing either other installer exposes, and the 17 "
-    + "workflows are bundled resources rather than separately installable skills");
+  assert.ok(
+    Array.isArray(manifest.plugins) && manifest.plugins.length === 1,
+    "one plugin: the router is the only thing either other installer exposes, and the 17 " +
+      "workflows are bundled resources rather than separately installable skills",
+  );
 
   const [plugin] = manifest.plugins;
   assert.equal(plugin.name, "vlmkit");
-  assert.equal(plugin.source, "./skills/vlmkit",
-    "the plugin must point at the package the other two installers already publish — a new "
-    + "directory here is a fourth copy and a fourth thing `pnpm sync:skills` has to remember");
+  assert.equal(
+    plugin.source,
+    "./skills/vlmkit",
+    "the plugin must point at the package the other two installers already publish — a new " +
+      "directory here is a fourth copy and a fourth thing `pnpm sync:skills` has to remember",
+  );
   // Relative sources resolve from the marketplace ROOT, not from `.claude-plugin/`.
   const pluginRoot = join(repoRoot, plugin.source.replace(/^\.\//, ""));
   assert.equal(pluginRoot, skillsPackage, "and that package is the skills-CLI one");
   await access(join(pluginRoot, "SKILL.md"));
   await assert.rejects(
     access(join(pluginRoot, "skills")),
-    "a `skills/` subdirectory next to a root SKILL.md would make Claude Code load this as a "
-    + "multi-skill plugin and stop treating the router as the entry",
+    "a `skills/` subdirectory next to a root SKILL.md would make Claude Code load this as a " +
+      "multi-skill plugin and stop treating the router as the entry",
   );
   await assert.rejects(
     access(join(repoRoot, ".claude-plugin/skills")),
-    "the marketplace directory holds the manifest only; vendoring skills beside it is the copy "
-    + "this test exists to prevent",
+    "the marketplace directory holds the manifest only; vendoring skills beside it is the copy " +
+      "this test exists to prevent",
   );
 
   // `strict: false` is the documented signal for "this plugin ships no
@@ -209,6 +205,5 @@ test("the plugin marketplace reuses the existing package rather than adding a co
   // every skill edit reaches users. Pinning it would hide edits until someone
   // bumped the string — and the obvious string to reach for, package.json's
   // 0.23.0, is the CLI's version and has never described the skills.
-  assert.equal("version" in plugin, false,
-    "omitted on purpose: a pinned version hides skill edits until it is bumped");
+  assert.equal("version" in plugin, false, "omitted on purpose: a pinned version hides skill edits until it is bumped");
 });

@@ -148,7 +148,10 @@ export function detectBackground(data: Uint8Array, width: number, height: number
   // Sample the corners + the middle of each edge. Most-frequent triple wins.
   const samples: Array<[number, number, number]> = [];
   const points = [
-    [0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1],
+    [0, 0],
+    [width - 1, 0],
+    [0, height - 1],
+    [width - 1, height - 1],
     [Math.floor(width / 2), 0],
     [Math.floor(width / 2), height - 1],
     [0, Math.floor(height / 2)],
@@ -176,20 +179,22 @@ export function detectBackground(data: Uint8Array, width: number, height: number
   // the bin floor: `(255,255,255) >> 3 << 3` = 248 would shift the
   // reference by up to 7/channel and let pale fills (e.g. #eef2ff on
   // white) fall inside the background tolerance.
-  let sr = 0, sg = 0, sb = 0, sn = 0;
+  let sr = 0,
+    sg = 0,
+    sb = 0,
+    sn = 0;
   for (const [r, g, b] of samples) {
     if (`${r >> 3},${g >> 3},${b >> 3}` === best) {
-      sr += r; sg += g; sb += b; sn++;
+      sr += r;
+      sg += g;
+      sb += b;
+      sn++;
     }
   }
   return [Math.round(sr / sn), Math.round(sg / sn), Math.round(sb / sn)];
 }
 
-function inBackground(
-  r: number, g: number, b: number,
-  bgR: number, bgG: number, bgB: number,
-  tol: number,
-): boolean {
+function inBackground(r: number, g: number, b: number, bgR: number, bgG: number, bgB: number, tol: number): boolean {
   return Math.abs(r - bgR) <= tol && Math.abs(g - bgG) <= tol && Math.abs(b - bgB) <= tol;
 }
 
@@ -245,12 +250,7 @@ export function adaptiveBgTolerance(
  * Two-pass union-find connected components on a foreground mask.
  * Returns the per-label bbox + area. 4-connectivity.
  */
-function labelAndMeasure(
-  mask: Uint8Array,
-  width: number,
-  height: number,
-  data: Uint8Array,
-): ComponentBbox[] {
+function labelAndMeasure(mask: Uint8Array, width: number, height: number, data: Uint8Array): ComponentBbox[] {
   const labels = new Int32Array(width * height);
   // Union-find parent map; index 0 = "no label."
   const parent: number[] = [0];
@@ -262,7 +262,8 @@ function labelAndMeasure(
     return x;
   }
   function union(a: number, b: number): void {
-    const ra = find(a), rb = find(b);
+    const ra = find(a),
+      rb = find(b);
     if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
   }
   let next = 1;
@@ -289,7 +290,16 @@ function labelAndMeasure(
   }
 
   // Second pass: resolve labels + accumulate per-root stats.
-  type Stat = { minX: number; minY: number; maxX: number; maxY: number; area: number; sumR: number; sumG: number; sumB: number };
+  type Stat = {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    area: number;
+    sumR: number;
+    sumG: number;
+    sumB: number;
+  };
   const byRoot = new Map<number, Stat>();
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -351,7 +361,9 @@ export function extractComponentsFromRgba(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
-      const r = data[idx]!, g = data[idx + 1]!, b = data[idx + 2]!;
+      const r = data[idx]!,
+        g = data[idx + 1]!,
+        b = data[idx + 2]!;
       if (!inBackground(r, g, b, bgR, bgG, bgB, tol)) {
         mask[y * width + x] = 1;
       }

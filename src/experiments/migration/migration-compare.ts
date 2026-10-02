@@ -50,10 +50,7 @@ import {
   classifyMigrationDiff,
   type MigrationDiffCategory,
 } from "./migration-diff.ts";
-import {
-  capturePaintTreeForViewport,
-  summarizeMigrationPaintTreeChanges,
-} from "./migration-paint-tree.ts";
+import { capturePaintTreeForViewport, summarizeMigrationPaintTreeChanges } from "./migration-paint-tree.ts";
 import {
   buildMigrationViewportFixCandidatesFromHtml,
   summarizeMigrationFixCandidates,
@@ -69,7 +66,11 @@ import {
   type ResponsiveBreakpoint,
   type ViewportSpec,
 } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
-import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import {
+  diagnoseSandboxLaunchFailure,
+  formatPlaywrightLaunchError,
+  isPlaywrightSandboxRestrictionError,
+} from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type { ShiftRegion, VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { applyMask, formatMaskProblems, MaskTally, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
@@ -87,10 +88,28 @@ import {
   type DomFingerprint,
   type DomEquivalenceResult,
 } from "@mizchi/vlmkit-core/dom-equivalence.ts";
-import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "@mizchi/vlmkit-core/computed-style-capture.ts";
-import { aggregateCsdByViewport, diffComputedStyles, type CsdPerViewportResult, type CsdResult, type ComputedStyleSnapshot } from "@mizchi/vlmkit-core/computed-style-diff.ts";
-import { buildAuthoredStyleCaptureJsonExpression, parseAuthoredStyleSnapshot, type AuthoredStyleSnapshot } from "@mizchi/vlmkit-core/authored-style-capture.ts";
-import { aggregateAuthoredStyleByViewport, diffAuthoredStyles, type AuthoredStyleDiffResult, type AuthoredStylePerViewportResult } from "@mizchi/vlmkit-core/authored-style-diff.ts";
+import {
+  buildComputedStyleCaptureJsonExpression,
+  parseComputedStyleSnapshot,
+} from "@mizchi/vlmkit-core/computed-style-capture.ts";
+import {
+  aggregateCsdByViewport,
+  diffComputedStyles,
+  type CsdPerViewportResult,
+  type CsdResult,
+  type ComputedStyleSnapshot,
+} from "@mizchi/vlmkit-core/computed-style-diff.ts";
+import {
+  buildAuthoredStyleCaptureJsonExpression,
+  parseAuthoredStyleSnapshot,
+  type AuthoredStyleSnapshot,
+} from "@mizchi/vlmkit-core/authored-style-capture.ts";
+import {
+  aggregateAuthoredStyleByViewport,
+  diffAuthoredStyles,
+  type AuthoredStyleDiffResult,
+  type AuthoredStylePerViewportResult,
+} from "@mizchi/vlmkit-core/authored-style-diff.ts";
 import {
   diffDomPositionStyles,
   diffPositionStylesAcrossViewports,
@@ -117,11 +136,7 @@ import {
 } from "@mizchi/vlmkit-markup/component/component-bbox.ts";
 import { buildGeometryProfiles, type PerRankGeometry } from "@mizchi/vlmkit-markup/component/component-geometry.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
-import {
-  extractTextRowsFromFile,
-  matchTextRows,
-  type MatchedTextRow,
-} from "@mizchi/vlmkit-core/text-rows.ts";
+import { extractTextRowsFromFile, matchTextRows, type MatchedTextRow } from "@mizchi/vlmkit-core/text-rows.ts";
 import { extractPaletteFromFile, type PaletteColor } from "@mizchi/vlmkit-markup/style/palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "@mizchi/vlmkit-markup/style/palette-diff.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -147,7 +162,9 @@ function getArgList(args: string[], name: string): string[] {
   }
   return values;
 }
-function hasFlag(args: string[], name: string): boolean { return args.includes(`--${name}`); }
+function hasFlag(args: string[], name: string): boolean {
+  return args.includes(`--${name}`);
+}
 
 interface DomPositionTrimEntry {
   baselineClasses: string;
@@ -159,10 +176,7 @@ function domPositionClassPairKey(entry: DomPositionTrimEntry): string {
   return `${entry.baselineClasses}\u0000${entry.variantClasses}\u0000${entry.property}`;
 }
 
-export function trimDomPositionEntriesByClassPair<T extends DomPositionTrimEntry>(
-  entries: T[],
-  limit: number,
-): T[] {
+export function trimDomPositionEntriesByClassPair<T extends DomPositionTrimEntry>(entries: T[], limit: number): T[] {
   if (limit <= 0) return [];
   if (entries.length <= limit) return entries;
 
@@ -196,9 +210,7 @@ export function trimDomPositionEntriesByClassPair<T extends DomPositionTrimEntry
 
 export type BreakpointDiscoveryBackend = "auto" | "regex" | "crater";
 export type MigrationRegionDiffFormat = "json" | "markdown" | "both";
-export type MigrationRegionDiffAnalyzer = (
-  options: RunRegionDiffAnalysisOptions,
-) => Promise<RegionDiffOutput>;
+export type MigrationRegionDiffAnalyzer = (options: RunRegionDiffAnalysisOptions) => Promise<RegionDiffOutput>;
 
 function parseDiscoveryBackend(args: string[]): BreakpointDiscoveryBackend {
   const value = getArg(args, "discover-backend", "auto");
@@ -312,10 +324,12 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
   return {
     dir: getArg(args, "dir", "."),
     baseline: getArg(args, "baseline", baselineUrl ? "" : (args[0] ?? "")),
-    variants: variants.length > 0 ? variants : (currentUrl ? [] : (args[1] ? [args[1]] : [])),
+    variants: variants.length > 0 ? variants : currentUrl ? [] : args[1] ? [args[1]] : [],
     // Accept `--output` as an alias for `--output-dir`. Agents reach for
     // `--output` first; the typo'd flag was silently swallowed before.
-    outputDir: resolve(getArg(args, "output-dir", getArg(args, "output", join(process.cwd(), "test-results", "migration")))),
+    outputDir: resolve(
+      getArg(args, "output-dir", getArg(args, "output", join(process.cwd(), "test-results", "migration"))),
+    ),
     autoDiscover: !hasFlag(args, "no-discover"),
     discoverBackend: parseDiscoveryBackend(args),
     maxViewports: parseInt(getArg(args, "max-viewports", "15"), 10),
@@ -325,7 +339,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     paintTreeUrl: getArg(args, "paint-tree-url", DEFAULT_BIDI_URL),
     enablePaintTree: !hasFlag(args, "no-paint-tree"),
     baselineUrl: baselineUrl || undefined,
-    variantUrls: currentUrl ? [currentUrl] : (variantUrls.length > 0 ? variantUrls : undefined),
+    variantUrls: currentUrl ? [currentUrl] : variantUrls.length > 0 ? variantUrls : undefined,
     maskSelectors: parseMaskSelectors(args),
     baselineSanityCheck: !hasFlag(args, "no-baseline-sanity"),
     strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
@@ -384,7 +398,9 @@ const STATIC_VIEWPORTS: ViewportSpec[] = [
   { width: 375, height: 812, label: "mobile", reason: "standard" },
 ];
 
-function hr() { _hr(76); }
+function hr() {
+  _hr(76);
+}
 
 /**
  * Render-sanity warnings (failed stylesheet loads, fallback fonts, etc.)
@@ -397,7 +413,9 @@ function hr() { _hr(76); }
  */
 function printRenderSanityBanner(side: "baseline" | "variant", sanity: RenderSanityResult): void {
   console.log();
-  console.log(`  ${RED}${BOLD}┌─ render sanity (${side}) ─ ${sanity.warnings.length} warning(s) ─${"─".repeat(Math.max(0, 38 - side.length))}${RESET}`);
+  console.log(
+    `  ${RED}${BOLD}┌─ render sanity (${side}) ─ ${sanity.warnings.length} warning(s) ─${"─".repeat(Math.max(0, 38 - side.length))}${RESET}`,
+  );
   for (const w of sanity.warnings) {
     console.log(`  ${RED}│${RESET}  [${w.code}] ${w.message}`);
   }
@@ -426,10 +444,7 @@ function printRenderSanityBanner(side: "baseline" | "variant", sanity: RenderSan
  * Symmetric ⇔ same set of warning codes AND same set of (url,
  * errorText) failed-request pairs.
  */
-function isSymmetricSanity(
-  baseline: RenderSanityResult | undefined,
-  variant: RenderSanityResult | undefined,
-): boolean {
+function isSymmetricSanity(baseline: RenderSanityResult | undefined, variant: RenderSanityResult | undefined): boolean {
   if (!baseline || !variant) return false;
   if (baseline.ok && variant.ok) return false;
   const bWarn = new Set(baseline.warnings.map((w) => w.code));
@@ -830,12 +845,10 @@ async function writeMigrationRegionDiffArtifacts(options: {
     maxTokens: options.maxTokens,
   });
   const baseName = `${options.variantName}-${options.viewport}-region-diff`;
-  const jsonPath = options.format === "json" || options.format === "both"
-    ? join(options.outputDir, `${baseName}.json`)
-    : undefined;
-  const markdownPath = options.format === "markdown" || options.format === "both"
-    ? join(options.outputDir, `${baseName}.md`)
-    : undefined;
+  const jsonPath =
+    options.format === "json" || options.format === "both" ? join(options.outputDir, `${baseName}.json`) : undefined;
+  const markdownPath =
+    options.format === "markdown" || options.format === "both" ? join(options.outputDir, `${baseName}.md`) : undefined;
 
   if (jsonPath) {
     await writeFile(jsonPath, JSON.stringify(output, null, 2) + "\n");
@@ -906,7 +919,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   if (options.tokensPath) {
     try {
       designTokens = await loadDesignTokens(options.tokensPath);
-      console.log(`  ${DIM}Tokens: ${designTokens.colors.size} colors, ${designTokens.spacing.length} spacing, ${designTokens.rounded.size} rounded loaded from ${options.tokensPath}${RESET}`);
+      console.log(
+        `  ${DIM}Tokens: ${designTokens.colors.size} colors, ${designTokens.spacing.length} spacing, ${designTokens.rounded.size} rounded loaded from ${options.tokensPath}${RESET}`,
+      );
     } catch (error) {
       console.log(`  ${YELLOW}Failed to load --tokens ${options.tokensPath}: ${String(error)}${RESET}`);
     }
@@ -1002,7 +1017,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     }
     if (breakpointDiscoveryStatus.breakpoints.length > 0) {
       console.log();
-      console.log(`  ${DIM}Discovered breakpoints: ${breakpointDiscoveryStatus.breakpoints.map(formatResponsiveBreakpoint).join(", ")}${RESET}`);
+      console.log(
+        `  ${DIM}Discovered breakpoints: ${breakpointDiscoveryStatus.breakpoints.map(formatResponsiveBreakpoint).join(", ")}${RESET}`,
+      );
     }
   } else {
     VIEWPORTS = STATIC_VIEWPORTS;
@@ -1014,7 +1031,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   console.log(`${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════════════════╝${RESET}`);
   console.log(`  ${DIM}Baseline: ${isUrlMode ? options.baselineUrl : baseline}${RESET}`);
   console.log(`  ${DIM}Variants: ${isUrlMode ? (options.variantUrls ?? []).join(", ") : variants.join(", ")}${RESET}`);
-  console.log(`  ${DIM}Viewports (${VIEWPORTS.length}): ${VIEWPORTS.map((v) => `${v.label}(${v.width})`).join(", ")}${RESET}`);
+  console.log(
+    `  ${DIM}Viewports (${VIEWPORTS.length}): ${VIEWPORTS.map((v) => `${v.label}(${v.width})`).join(", ")}${RESET}`,
+  );
   if (resolvedApprovalPath) {
     console.log(`  ${DIM}Approval: ${resolvedApprovalPath}${strict ? " (strict mode: ignored)" : ""}${RESET}`);
     for (const warning of approvalWarnings) {
@@ -1027,7 +1046,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   if (!enablePaintTree) {
     console.log(`  ${DIM}Paint tree: disabled${RESET}`);
   } else if (paintTreeStatus.error) {
-    console.log(`  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`);
+    console.log(
+      `  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`,
+    );
   }
   console.log();
   let browser: Browser | null = null;
@@ -1070,7 +1091,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       console.log(`  ${DIM}Paint tree: enabled via ${paintTreeUrl}${RESET}`);
       console.log();
     } else if (enablePaintTree && paintTreeStatus.error) {
-      console.log(`  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`);
+      console.log(
+        `  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`,
+      );
       console.log();
     }
 
@@ -1121,7 +1144,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
       if (shouldProbe) {
         try {
-          const browserProbe = await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT) as {
+          const browserProbe = (await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT)) as {
             bodyFontFamily: string;
             styleSheetCount: number;
             hasClassAttributes: boolean;
@@ -1148,7 +1171,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       // Capture baseline DOM fingerprint once (first viewport).
       if (domEnabled && vpIndex === 0) {
         try {
-          baselineDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
+          baselineDomFingerprint = (await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT)) as DomFingerprint;
         } catch (error) {
           console.log(`  ${YELLOW}Baseline DOM fingerprint error: ${String(error)}${RESET}`);
         }
@@ -1204,11 +1227,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         try {
           baselinePaintTrees.set(
             vp.label,
-            await capturePaintTreeForViewport(
-              paintTreeClient,
-              { width: vp.width, height: vp.height },
-              baselineHtml,
-            ),
+            await capturePaintTreeForViewport(paintTreeClient, { width: vp.width, height: vp.height }, baselineHtml),
           );
         } catch (error) {
           await disablePaintTree(`Failed to capture baseline paint tree at ${vp.label}: ${String(error)}`);
@@ -1223,18 +1242,36 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const computedStyleDiffPerViewportReports: Array<{ variantFile: string; result: CsdPerViewportResult }> = [];
     const authoredStyleDiffReports: Array<{ variantFile: string; result: AuthoredStyleDiffResult }> = [];
-    const authoredStyleDiffPerViewportReports: Array<{ variantFile: string; result: AuthoredStylePerViewportResult }> = [];
+    const authoredStyleDiffPerViewportReports: Array<{ variantFile: string; result: AuthoredStylePerViewportResult }> =
+      [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
-    const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
-    const shiftAccumulationsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; breakdowns: ShiftAccumulationBreakdown[] }> }> = [];
+    const shiftOriginsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }>;
+    }> = [];
+    const shiftAccumulationsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; breakdowns: ShiftAccumulationBreakdown[] }>;
+    }> = [];
     const gridSuggestionsReports: Array<{ variantFile: string; suggestions: GridSuggestion[] }> = [];
-    const componentBboxReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> }> = [];
+    const componentBboxReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; matches: MatchedBbox[] }>;
+    }> = [];
     const componentGeometryReports: Array<{ variantFile: string; profiles: PerRankGeometry[] }> = [];
-    const heatmapRegionsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }> }> = [];
+    const heatmapRegionsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }>;
+    }> = [];
     const textRowShiftsReports: Array<{
       variantFile: string;
-      perViewport: Array<{ viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number }>;
+      perViewport: Array<{
+        viewport: string;
+        matches: MatchedTextRow[];
+        baselineRowCount: number;
+        variantRowCount: number;
+      }>;
     }> = [];
     const paletteDiffsReports: Array<{
       variantFile: string;
@@ -1253,7 +1290,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         state: ForcedPseudoState;
         forcedCount: number;
         affectedElements: string[];
-        perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }>;
+        perViewport: Array<{
+          viewport: string;
+          defaultDiffRatio: number;
+          stateDiffRatio: number;
+          hoverInducedDelta: number;
+        }>;
       }>;
     }> = [];
     for (const variant of variantSources) {
@@ -1321,7 +1363,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
         if (variantSanityEnabled) {
           try {
-            const browserProbe = await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT) as {
+            const browserProbe = (await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT)) as {
               bodyFontFamily: string;
               styleSheetCount: number;
               hasClassAttributes: boolean;
@@ -1355,7 +1397,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
         if (domEnabled && vpIndex === 0 && !variantDomFingerprint) {
           try {
-            variantDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
+            variantDomFingerprint = (await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT)) as DomFingerprint;
           } catch (error) {
             console.log(`  ${YELLOW}Variant DOM fingerprint error (${variantName}): ${String(error)}${RESET}`);
           }
@@ -1367,7 +1409,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             variantComputedStylesByVp.set(vp.label, snapshot);
             if (vpIndex === 0 && !variantComputedStyles) variantComputedStyles = snapshot;
           } catch (error) {
-            console.log(`  ${YELLOW}Variant computed-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+            console.log(
+              `  ${YELLOW}Variant computed-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`,
+            );
           }
           try {
             const raw = await page.evaluate(buildAuthoredStyleCaptureJsonExpression());
@@ -1375,7 +1419,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             variantAuthoredStylesByVp.set(vp.label, snapshot);
             if (vpIndex === 0 && !variantAuthoredStyles) variantAuthoredStyles = snapshot;
           } catch (error) {
-            console.log(`  ${YELLOW}Variant authored-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+            console.log(
+              `  ${YELLOW}Variant authored-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`,
+            );
           }
         }
         if (dpEnabled) {
@@ -1385,7 +1431,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             variantDomPositionByVp.set(vp.label, captured);
             if (vpIndex === 0) variantDomPositionStyles = captured;
           } catch (error) {
-            console.log(`  ${YELLOW}Variant DOM-position capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+            console.log(
+              `  ${YELLOW}Variant DOM-position capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`,
+            );
           }
         }
         if (variantBboxEnabled) {
@@ -1393,7 +1441,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const rawBbox = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
             variantBboxesByVp.set(vp.label, parseBboxes(rawBbox));
           } catch (error) {
-            console.log(`  ${YELLOW}Variant bbox capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+            console.log(
+              `  ${YELLOW}Variant bbox capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`,
+            );
           }
         }
 
@@ -1434,18 +1484,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
 
         // Shift detection
-        const diffReport = rawDiffRatio > 0
-          ? await generateDiffReport(snap, { outputDir, detectShift: true, skipHeatmap: true })
-          : null;
+        const diffReport =
+          rawDiffRatio > 0 ? await generateDiffReport(snap, { outputDir, detectShift: true, skipHeatmap: true }) : null;
         const rawClassification = classifyMigrationDiff(diff);
-        const approved = diff && approvalManifest
-          ? filterApprovedVrtRegions(
-            diff,
-            approvalManifest,
-            buildMigrationRegionApprovalContexts(diff),
-            { strict, viewport: vp.label },
-          )
-          : null;
+        const approved =
+          diff && approvalManifest
+            ? filterApprovedVrtRegions(diff, approvalManifest, buildMigrationRegionApprovalContexts(diff), {
+                strict,
+                viewport: vp.label,
+              })
+            : null;
         const finalDiff = approved?.diff ?? diff;
         const diffRatio = finalDiff?.diffRatio ?? 0;
         const diffPixels = finalDiff?.diffPixels ?? 0;
@@ -1467,32 +1515,28 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               { width: vp.width, height: vp.height },
               variantHtml,
             );
-            rawPaintTreeChanges = diffPaintTrees(
-              baselinePaintTrees.get(vp.label)!,
-              variantPaintTree,
-            );
+            rawPaintTreeChanges = diffPaintTrees(baselinePaintTrees.get(vp.label)!, variantPaintTree);
             const approvedPaintTree = approvalManifest
               ? filterApprovedPaintTreeChanges(rawPaintTreeChanges, approvalManifest, {}, { strict })
               : null;
             filteredPaintTreeChanges = approvedPaintTree?.remainingChanges ?? rawPaintTreeChanges;
             approvedPaintTreeCount = approvedPaintTree?.approvedChanges.length ?? 0;
-            approvedPaintTreeReasons = [...new Set(
-              approvedPaintTree?.matches.map((match) => match.rule.reason) ?? [],
-            )];
+            approvedPaintTreeReasons = [...new Set(approvedPaintTree?.matches.map((match) => match.rule.reason) ?? [])];
           } catch (error) {
             await disablePaintTree(`Failed to capture paint tree at ${vp.label}: ${String(error)}`);
           }
         }
         const rawPaintTreeSummary = summarizeMigrationPaintTreeChanges(rawPaintTreeChanges);
         const finalPaintTreeSummary = summarizeMigrationPaintTreeChanges(filteredPaintTreeChanges);
-        const fixCandidates = diffRatio > 0
-          ? buildMigrationViewportFixCandidatesFromHtml(variantHtml, {
-            viewportWidth: vp.width,
-            dominantCategory: classification.dominantCategory,
-            categorySummary: classification.summary,
-            paintTreeChanges: filteredPaintTreeChanges,
-          })
-          : [];
+        const fixCandidates =
+          diffRatio > 0
+            ? buildMigrationViewportFixCandidatesFromHtml(variantHtml, {
+                viewportWidth: vp.width,
+                dominantCategory: classification.dominantCategory,
+                categorySummary: classification.summary,
+                paintTreeChanges: filteredPaintTreeChanges,
+              })
+            : [];
 
         results.push({
           variant: variantName,
@@ -1522,12 +1566,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           approvedPaintTreeCount,
           approvedPaintTreeReasons,
           fixCandidates,
-          shiftRegions: diffReport?.shiftRegions && diffReport.shiftRegions.length > 0
-            ? diffReport.shiftRegions
-            : undefined,
-          globalShift: diffReport?.globalShift && diffReport.globalShift !== 0
-            ? diffReport.globalShift
-            : undefined,
+          shiftRegions:
+            diffReport?.shiftRegions && diffReport.shiftRegions.length > 0 ? diffReport.shiftRegions : undefined,
+          globalShift: diffReport?.globalShift && diffReport.globalShift !== 0 ? diffReport.globalShift : undefined,
           colorSamples: colorSamples.length > 0 ? colorSamples : undefined,
         });
         if (diffReport?.shiftRegions && diffReport.shiftRegions.length > 0) {
@@ -1556,7 +1597,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               : `${RED}✗${RESET}`;
         process.stdout.write(`    ${icon} ${vp.label.padEnd(12)} ${pct}%`);
         if (approved?.approved) {
-          process.stdout.write(` ${DIM}(approved from ${(rawDiffRatio * 100).toFixed(1)}%, ${rawDiffPixels} px)${RESET}`);
+          process.stdout.write(
+            ` ${DIM}(approved from ${(rawDiffRatio * 100).toFixed(1)}%, ${rawDiffPixels} px)${RESET}`,
+          );
         } else if (partiallyApproved) {
           process.stdout.write(` ${DIM}(approved ${approvedPixels} px, ${diffPixels} px remain)${RESET}`);
         } else if (diffRatio > 0) {
@@ -1568,9 +1611,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           process.stdout.write(` ${DIM}[${classification.summary}]${RESET}`);
         }
         if (rawPaintTreeSummary.totalChanges > 0) {
-          const paintTreeDisplay = approvedPaintTreeCount > 0 && finalPaintTreeSummary.totalChanges === 0
-            ? `PT approved ${approvedPaintTreeCount}`
-            : finalPaintTreeSummary.summary;
+          const paintTreeDisplay =
+            approvedPaintTreeCount > 0 && finalPaintTreeSummary.totalChanges === 0
+              ? `PT approved ${approvedPaintTreeCount}`
+              : finalPaintTreeSummary.summary;
           process.stdout.write(` ${DIM}{${paintTreeDisplay}}${RESET}`);
         }
         if (fixCandidates.length > 0) {
@@ -1578,24 +1622,27 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           process.stdout.write(` ${DIM}<${topCandidate.selector} { ${topCandidate.property} }>${RESET}`);
         }
         if (diffReport && diffReport.globalShift !== 0) {
-          const compPct = (diffReport.compensatedDiffCount / diffReport.totalPixels * 100).toFixed(1);
-          process.stdout.write(` ${DIM}[shift ${diffReport.globalShift > 0 ? "+" : ""}${diffReport.globalShift}px → ${compPct}%]${RESET}`);
+          const compPct = ((diffReport.compensatedDiffCount / diffReport.totalPixels) * 100).toFixed(1);
+          process.stdout.write(
+            ` ${DIM}[shift ${diffReport.globalShift > 0 ? "+" : ""}${diffReport.globalShift}px → ${compPct}%]${RESET}`,
+          );
         }
         console.log();
       }
 
       if (regionDiffCandidates.length > 0) {
-        const orderedRegionDiffCandidates = regionDiffMaxViewports === undefined
-          ? regionDiffCandidates
-          : [...regionDiffCandidates]
-            .sort((left, right) => {
-              if (right.diffRatio !== left.diffRatio) return right.diffRatio - left.diffRatio;
-              if (right.diffPixels !== left.diffPixels) return right.diffPixels - left.diffPixels;
-              return left.order - right.order;
-            });
-        const selectedRegionDiffCandidates = regionDiffMaxViewports === undefined
-          ? orderedRegionDiffCandidates
-          : orderedRegionDiffCandidates.slice(0, regionDiffMaxViewports);
+        const orderedRegionDiffCandidates =
+          regionDiffMaxViewports === undefined
+            ? regionDiffCandidates
+            : [...regionDiffCandidates].sort((left, right) => {
+                if (right.diffRatio !== left.diffRatio) return right.diffRatio - left.diffRatio;
+                if (right.diffPixels !== left.diffPixels) return right.diffPixels - left.diffPixels;
+                return left.order - right.order;
+              });
+        const selectedRegionDiffCandidates =
+          regionDiffMaxViewports === undefined
+            ? orderedRegionDiffCandidates
+            : orderedRegionDiffCandidates.slice(0, regionDiffMaxViewports);
         if (regionDiffMaxViewports !== undefined) {
           for (const candidate of orderedRegionDiffCandidates.slice(regionDiffMaxViewports)) {
             regionDiffSkippedViewports.push({
@@ -1629,7 +1676,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               changes: [],
               error: message,
             });
-            console.log(`  ${YELLOW}Region diff handoff error (${variantName} / ${candidate.viewport}): ${message}${RESET}`);
+            console.log(
+              `  ${YELLOW}Region diff handoff error (${variantName} / ${candidate.viewport}): ${message}${RESET}`,
+            );
           }
         }
       }
@@ -1639,15 +1688,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           variantFile: variant.url || variant.file,
           maxViewports: regionDiffMaxViewports,
           perViewport: regionDiffPerViewport,
-          skippedViewports: regionDiffSkippedViewports.length > 0
-            ? regionDiffSkippedViewports
-            : undefined,
+          skippedViewports: regionDiffSkippedViewports.length > 0 ? regionDiffSkippedViewports : undefined,
         });
         const okCount = regionDiffPerViewport.filter((entry) => !entry.error).length;
-        const skippedText = regionDiffSkippedViewports.length > 0
-          ? `, skipped ${regionDiffSkippedViewports.length} by cap`
-          : "";
-        console.log(`  ${DIM}Region diff handoff: ${okCount}/${regionDiffPerViewport.length} viewport artifact(s)${skippedText}${RESET}`);
+        const skippedText =
+          regionDiffSkippedViewports.length > 0 ? `, skipped ${regionDiffSkippedViewports.length} by cap` : "";
+        console.log(
+          `  ${DIM}Region diff handoff: ${okCount}/${regionDiffPerViewport.length} viewport artifact(s)${skippedText}${RESET}`,
+        );
       }
 
       // DOM-equivalence preflight comparison (variant-side completion)
@@ -1674,11 +1722,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         };
         domPositionDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
         if (result.totalDiffs > 0) {
-          const topProps = result.byProperty.slice(0, 5)
+          const topProps = result.byProperty
+            .slice(0, 5)
             .map((p) => `${p.property}(${p.count})`)
             .join(", ");
-          console.log(`  ${DIM}DOM-position diff: ${result.totalDiffs} tuples across ${result.byPath.length} paths. ` +
-            `Top properties: ${topProps}${RESET}`);
+          console.log(
+            `  ${DIM}DOM-position diff: ${result.totalDiffs} tuples across ${result.byPath.length} paths. ` +
+              `Top properties: ${topProps}${RESET}`,
+          );
         }
       }
 
@@ -1692,10 +1743,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         // viewports.
         const trimmedPerVp = {
           ...perVp,
-          entries: trimDomPositionEntriesByClassPair(
-            perVp.entries,
-            200,
-          ),
+          entries: trimDomPositionEntriesByClassPair(perVp.entries, 200),
           byPathProperty: perVp.byPathProperty.slice(0, 200),
         };
         domPositionDiffPerViewportReports.push({ variantFile: variantFileLabel, result: trimmedPerVp });
@@ -1712,9 +1760,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               maxGroups: 6,
             });
             const explainedBandKeys = new Set(origins.map((o) => `${o.bandStart}-${o.bandEnd}-${o.bandShift}`));
-            const unexplainedBands = bands.filter(
-              (b) => !explainedBandKeys.has(`${b.yStart}-${b.yEnd}-${b.shift}`),
-            );
+            const unexplainedBands = bands.filter((b) => !explainedBandKeys.has(`${b.yStart}-${b.yEnd}-${b.shift}`));
             if (origins.length > 0 || unexplainedBands.length > 0) {
               perViewport.push({
                 viewport: vpLabel,
@@ -1729,7 +1775,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           if (perViewport.length > 0) {
             shiftOriginsReports.push({ variantFile: variantFileLabel, perViewport });
             const totalOrigins = perViewport.reduce((s, v) => s + v.origins.length, 0);
-            console.log(`  ${DIM}Shift origins: ${totalOrigins} explanation(s) across ${perViewport.length} viewport(s)${RESET}`);
+            console.log(
+              `  ${DIM}Shift origins: ${totalOrigins} explanation(s) across ${perViewport.length} viewport(s)${RESET}`,
+            );
           }
           if (accumulationPerViewport.length > 0) {
             shiftAccumulationsReports.push({ variantFile: variantFileLabel, perViewport: accumulationPerViewport });
@@ -1760,15 +1808,21 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               variantFile: variantFileLabel,
               suggestions: deduped.slice(0, 30),
             });
-            console.log(`  ${DIM}Grid suggestions: ${deduped.length} container(s) with non-uniform child widths${RESET}`);
+            console.log(
+              `  ${DIM}Grid suggestions: ${deduped.length} container(s) with non-uniform child widths${RESET}`,
+            );
           }
         }
 
         if (perVp.totalDiffs > 0) {
-          const breakpointGated = perVp.byPathProperty.filter((pp) => pp.viewports.length < baselineDomPositionByVp.size).length;
-          console.log(`  ${DIM}Per-viewport DOM-position diff: ${perVp.totalDiffs} tuples, ` +
-            `${perVp.byPathProperty.length} unique (path, property) pairs, ` +
-            `${breakpointGated} appear only on a subset of viewports (media-query-gated)${RESET}`);
+          const breakpointGated = perVp.byPathProperty.filter(
+            (pp) => pp.viewports.length < baselineDomPositionByVp.size,
+          ).length;
+          console.log(
+            `  ${DIM}Per-viewport DOM-position diff: ${perVp.totalDiffs} tuples, ` +
+              `${perVp.byPathProperty.length} unique (path, property) pairs, ` +
+              `${breakpointGated} appear only on a subset of viewports (media-query-gated)${RESET}`,
+          );
         }
       }
 
@@ -1777,15 +1831,18 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const variantFileLabel = variant.url || variant.file;
         const result = diffComputedStyles(baselineComputedStyles, variantComputedStyles);
         // Trim entries to keep diff-report.json size sane while still
-      // surfacing the top diffs to diff-for-agent.
-      const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
-      computedStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
+        // surfacing the top diffs to diff-for-agent.
+        const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
+        computedStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
         if (result.totalDiffs > 0) {
-          const topProps = result.byProperty.slice(0, 5)
+          const topProps = result.byProperty
+            .slice(0, 5)
             .map((p) => `${p.property}(${p.count})`)
             .join(", ");
-          console.log(`  ${DIM}Computed-style diff: ${result.totalDiffs} (selector, prop) ` +
-            `tuples. Top properties: ${topProps}${RESET}`);
+          console.log(
+            `  ${DIM}Computed-style diff: ${result.totalDiffs} (selector, prop) ` +
+              `tuples. Top properties: ${topProps}${RESET}`,
+          );
         }
 
         // Per-viewport CSD: diff each viewport pair, then aggregate to
@@ -1817,9 +1874,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               result: trimmedPerViewport,
             });
             if (perViewportResult.totalDiffs > 0) {
-              console.log(`  ${DIM}Per-viewport CSD: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
-                `(${perViewportResult.universalPairs.length} universal, ` +
-                `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`);
+              console.log(
+                `  ${DIM}Per-viewport CSD: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
+                  `(${perViewportResult.universalPairs.length} universal, ` +
+                  `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`,
+              );
             }
           }
         }
@@ -1835,11 +1894,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
         authoredStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
         if (result.totalDiffs > 0) {
-          const topProps = result.byProperty.slice(0, 5)
+          const topProps = result.byProperty
+            .slice(0, 5)
             .map((p) => `${p.property}(${p.count})`)
             .join(", ");
-          console.log(`  ${DIM}Authored-style diff: ${result.totalDiffs} (selector, prop) ` +
-            `tuples. Top properties: ${topProps}${RESET}`);
+          console.log(
+            `  ${DIM}Authored-style diff: ${result.totalDiffs} (selector, prop) ` +
+              `tuples. Top properties: ${topProps}${RESET}`,
+          );
         }
 
         if (baselineAuthoredStylesByVp.size > 0 && variantAuthoredStylesByVp.size > 0) {
@@ -1864,9 +1926,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               result: trimmedPerViewport,
             });
             if (perViewportResult.totalDiffs > 0) {
-              console.log(`  ${DIM}Per-viewport authored-style: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
-                `(${perViewportResult.universalPairs.length} universal, ` +
-                `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`);
+              console.log(
+                `  ${DIM}Per-viewport authored-style: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
+                  `(${perViewportResult.universalPairs.length} universal, ` +
+                  `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`,
+              );
             }
           }
         }
@@ -1889,10 +1953,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const perViewportFull: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
         const perViewportHeatmap: Array<{ viewport: string; regions: HeatmapRegion[] }> = [];
         const perViewportTextRows: Array<{
-          viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number;
+          viewport: string;
+          matches: MatchedTextRow[];
+          baselineRowCount: number;
+          variantRowCount: number;
         }> = [];
         const perViewportPalette: Array<{
-          viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff;
+          viewport: string;
+          baseline: PaletteColor[];
+          variant: PaletteColor[];
+          diff: PaletteDiff;
         }> = [];
         for (const vp of VIEWPORTS) {
           const baselinePngPath = join(outputDir, `${baselineName}-${vp.label}.png`);
@@ -1906,9 +1976,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             perViewportFull.push({ viewport: vp.label, matches });
             // Only keep matches where at least one axis differs by > 1px
             // (anything smaller is subpixel rounding, not actionable).
-            const meaningful = matches.filter((m) =>
-              Math.abs(m.deltaTop) > 1 || Math.abs(m.deltaLeft) > 1
-              || Math.abs(m.deltaWidth) > 1 || Math.abs(m.deltaHeight) > 1,
+            const meaningful = matches.filter(
+              (m) =>
+                Math.abs(m.deltaTop) > 1 ||
+                Math.abs(m.deltaLeft) > 1 ||
+                Math.abs(m.deltaWidth) > 1 ||
+                Math.abs(m.deltaHeight) > 1,
             );
             if (meaningful.length > 0) {
               perViewport.push({ viewport: vp.label, matches: meaningful.slice(0, 5) });
@@ -1940,8 +2013,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               extractTextRowsFromFile(variantPngPath),
             ]);
             const matches = matchTextRows(baselineRows, variantRows);
-            const countMismatch = baselineRows.length !== variantRows.length
-              && (baselineRows.length > 0 || variantRows.length > 0);
+            const countMismatch =
+              baselineRows.length !== variantRows.length && (baselineRows.length > 0 || variantRows.length > 0);
             if (matches.length > 0 || countMismatch) {
               perViewportTextRows.push({
                 viewport: vp.label,
@@ -1979,7 +2052,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         if (perViewport.length > 0) {
           componentBboxReports.push({ variantFile: variantFileLabel, perViewport });
           const total = perViewport.reduce((s, v) => s + v.matches.length, 0);
-          console.log(`  ${DIM}Component bbox diff: ${total} component delta(s) across ${perViewport.length} viewport(s)${RESET}`);
+          console.log(
+            `  ${DIM}Component bbox diff: ${total} component delta(s) across ${perViewport.length} viewport(s)${RESET}`,
+          );
         }
         // Cross-viewport geometry profiles (wireframe-mode: detect
         // responsive mismatches like "baseline card shrinks 18px on
@@ -1999,38 +2074,58 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         if (perViewportHeatmap.length > 0) {
           heatmapRegionsReports.push({ variantFile: variantFileLabel, perViewport: perViewportHeatmap });
           const total = perViewportHeatmap.reduce((s, v) => s + v.regions.length, 0);
-          console.log(`  ${DIM}Heatmap regions: ${total} cluster(s) across ${perViewportHeatmap.length} viewport(s)${RESET}`);
+          console.log(
+            `  ${DIM}Heatmap regions: ${total} cluster(s) across ${perViewportHeatmap.length} viewport(s)${RESET}`,
+          );
         }
         if (perViewportTextRows.length > 0) {
           textRowShiftsReports.push({ variantFile: variantFileLabel, perViewport: perViewportTextRows });
           const total = perViewportTextRows.reduce((s, v) => s + v.matches.length, 0);
-          console.log(`  ${DIM}Text-row shifts: ${total} row(s) with Δy across ${perViewportTextRows.length} viewport(s)${RESET}`);
+          console.log(
+            `  ${DIM}Text-row shifts: ${total} row(s) with Δy across ${perViewportTextRows.length} viewport(s)${RESET}`,
+          );
         }
         if (perViewportPalette.length > 0) {
           paletteDiffsReports.push({ variantFile: variantFileLabel, perViewport: perViewportPalette });
           const totalMissing = perViewportPalette.reduce((s, v) => s + v.diff.onlyInBaseline.length, 0);
           const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
-          console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
+          console.log(
+            `  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`,
+          );
 
           // Reverse-resolve each unmatched hex against the DESIGN.md
           // color tokens so the agent sees "swap surface-variant →
           // surface-container-high" instead of two bare hex strings.
           if (designTokens && designTokens.colors.size > 0) {
-            const swapsByVp = new Map<string, Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }>>();
+            const swapsByVp = new Map<
+              string,
+              Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }>
+            >();
             for (const vp of perViewportPalette) {
               // Pair each missing baseline color with the closest
               // remaining variant extra (same Euclidean RGB threshold
               // as `diffPalettes`'s pairing pass would use). We just
               // want a candidate rename surface here.
               const extras = [...vp.diff.onlyInVariant];
-              const pairs: Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }> = [];
+              const pairs: Array<{
+                from?: string;
+                to?: string;
+                baselineHex: string;
+                variantHex: string;
+                deltaE: number;
+              }> = [];
               for (const miss of vp.diff.onlyInBaseline) {
                 let bestIdx = -1;
                 let bestDist = Infinity;
                 for (let i = 0; i < extras.length; i++) {
-                  const dr = miss.r - extras[i].r, dg = miss.g - extras[i].g, db = miss.b - extras[i].b;
+                  const dr = miss.r - extras[i].r,
+                    dg = miss.g - extras[i].g,
+                    db = miss.b - extras[i].b;
                   const d = Math.sqrt(dr * dr + dg * dg + db * db);
-                  if (d < bestDist) { bestDist = d; bestIdx = i; }
+                  if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = i;
+                  }
                 }
                 if (bestIdx < 0) continue;
                 const extra = extras.splice(bestIdx, 1)[0];
@@ -2059,9 +2154,13 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 const nowTok = p.to ?? `${p.variantHex}`;
                 const targetTok = p.from ?? `${p.baselineHex}`;
                 if (p.from && p.to && p.from !== p.to) {
-                  console.log(`    ${CYAN}swap${RESET} ${nowTok} (now) → ${targetTok} (target) ${DIM}(${p.variantHex} → ${p.baselineHex}, ${vp})${RESET}`);
+                  console.log(
+                    `    ${CYAN}swap${RESET} ${nowTok} (now) → ${targetTok} (target) ${DIM}(${p.variantHex} → ${p.baselineHex}, ${vp})${RESET}`,
+                  );
                 } else if (p.from || p.to) {
-                  console.log(`    ${DIM}near${RESET} ${nowTok} (now) ↔ ${targetTok} (target) ${DIM}(${p.variantHex} ↔ ${p.baselineHex}, ${vp})${RESET}`);
+                  console.log(
+                    `    ${DIM}near${RESET} ${nowTok} (now) ↔ ${targetTok} (target) ${DIM}(${p.variantHex} ↔ ${p.baselineHex}, ${vp})${RESET}`,
+                  );
                 }
               }
             }
@@ -2083,14 +2182,18 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 if (paired.has(`miss:${miss.hex}`)) continue;
                 const tok = snapColor(designTokens, miss.hex);
                 if (tok) {
-                  console.log(`    ${DIM}miss${RESET} ${miss.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`);
+                  console.log(
+                    `    ${DIM}miss${RESET} ${miss.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`,
+                  );
                 }
               }
               for (const extra of vp.diff.onlyInVariant) {
                 if (paired.has(`extra:${extra.hex}`)) continue;
                 const tok = snapColor(designTokens, extra.hex);
                 if (tok) {
-                  console.log(`    ${DIM}extra${RESET} ${extra.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`);
+                  console.log(
+                    `    ${DIM}extra${RESET} ${extra.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`,
+                  );
                 }
               }
             }
@@ -2107,9 +2210,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         // candidate selector for each suggestion. Falls through
         // silently when DOM correspondence is missing — the
         // generator handles undefined.
-        const dpForVariant = domPositionDiffPerViewportReports
-          .find((r) => r.variantFile === variantFileLabel)
-          ?.result.entries;
+        const dpForVariant = domPositionDiffPerViewportReports.find((r) => r.variantFile === variantFileLabel)?.result
+          .entries;
 
         const wireframeSuggestions: WireframeFixSuggestion[] = generateWireframeFixCandidates({
           bboxByViewport: perViewport,
@@ -2148,35 +2250,41 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             if (aLead !== bLead) return aLead ? -1 : 1;
             if (!!b.isHighImpact !== !!a.isHighImpact) return (b.isHighImpact ? 1 : 0) - (a.isHighImpact ? 1 : 0);
             const scopeRank = (s: typeof a.scope) =>
-              s === "structural" ? -2
-              : s === "reflow" ? -1
-              : s === "divergent" ? 0
-              : s === "magnitude-divergent" ? 1
-              : s === "subset" ? 2
-              : 3;
+              s === "structural"
+                ? -2
+                : s === "reflow"
+                  ? -1
+                  : s === "divergent"
+                    ? 0
+                    : s === "magnitude-divergent"
+                      ? 1
+                      : s === "subset"
+                        ? 2
+                        : 3;
             if (scopeRank(a.scope) !== scopeRank(b.scope)) return scopeRank(a.scope) - scopeRank(b.scope);
             return 0;
           });
           const top = sorted.slice(0, 5);
-          console.log(`  ${CYAN}Wireframe fix suggestions (${wireframeSuggestions.length}, top ${top.length}):${RESET}`);
+          console.log(
+            `  ${CYAN}Wireframe fix suggestions (${wireframeSuggestions.length}, top ${top.length}):${RESET}`,
+          );
           for (const s of top) {
             const conf = s.confidence === "high" ? GREEN : s.confidence === "medium" ? YELLOW : DIM;
             // Divergent suggestions get a magenta "DIVERGENT" prefix so
             // they can't be missed; subset gets a subtle "SUBSET" tag.
-            const scopeTag = s.scope === "structural"
-              ? ` ${BOLD}\x1b[35m[STRUCTURAL]${RESET}`
-              : s.scope === "reflow"
-                ? ` ${BOLD}\x1b[33m[REFLOW]${RESET}`
-                : s.scope === "divergent"
-                  ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
-                  : s.scope === "magnitude-divergent"
-                    ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
-                    : s.scope === "subset"
-                      ? ` ${YELLOW}[SUBSET]${RESET}`
-                      : "";
-            const impactTag = s.isHighImpact
-              ? ` ${BOLD}${GREEN}[HIGH-IMPACT]${RESET}`
-              : "";
+            const scopeTag =
+              s.scope === "structural"
+                ? ` ${BOLD}\x1b[35m[STRUCTURAL]${RESET}`
+                : s.scope === "reflow"
+                  ? ` ${BOLD}\x1b[33m[REFLOW]${RESET}`
+                  : s.scope === "divergent"
+                    ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
+                    : s.scope === "magnitude-divergent"
+                      ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
+                      : s.scope === "subset"
+                        ? ` ${YELLOW}[SUBSET]${RESET}`
+                        : "";
+            const impactTag = s.isHighImpact ? ` ${BOLD}${GREEN}[HIGH-IMPACT]${RESET}` : "";
             console.log(`    ${conf}[${s.confidence}]${RESET}${impactTag}${scopeTag} ${s.evidence}`);
             console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
             if (s.candidates && s.candidates.length > 0) {
@@ -2193,14 +2301,18 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 // edits FROM what they have TO what the baseline has.
                 // Backwards rendering misled agent-e (v5).
                 const anyCascades = rows.some((r) => r.cascades);
-                const propList = [...new Set(rows.map((r) => `${r.property}: ${r.current} (now) → ${r.target} (target)`))].join("; ");
+                const propList = [
+                  ...new Set(rows.map((r) => `${r.property}: ${r.current} (now) → ${r.target} (target)`)),
+                ].join("; ");
                 // F2: cascade hint — when the property is a box-size
                 // property (height / margin-bottom / etc.), changing
                 // it pushes downstream siblings. Without this hint
                 // agent-f thought the candidate was a "non-sequitur"
                 // — connected to a different rank's suggestion.
                 const cascadeHint = anyCascades ? ` ${YELLOW}[cascades to siblings]${RESET}` : "";
-                console.log(`      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}${cascadeHint}`);
+                console.log(
+                  `      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}${cascadeHint}`,
+                );
               }
             }
           }
@@ -2208,7 +2320,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       }
 
       if (triptychPaths.size > 0) {
-        console.log(`  ${DIM}Triptych: ${triptychPaths.size} viewport(s) → ${outputDir}/${variantName}-<viewport>-triptych.png (baseline | variant | heatmap)${RESET}`);
+        console.log(
+          `  ${DIM}Triptych: ${triptychPaths.size} viewport(s) → ${outputDir}/${variantName}-<viewport>-triptych.png (baseline | variant | heatmap)${RESET}`,
+        );
       }
 
       // Multi-state capture (opt-in via --states hover focus ...).
@@ -2223,11 +2337,21 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           state: ForcedPseudoState;
           forcedCount: number;
           affectedElements: string[];
-          perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }>;
+          perViewport: Array<{
+            viewport: string;
+            defaultDiffRatio: number;
+            stateDiffRatio: number;
+            hoverInducedDelta: number;
+          }>;
         }> = [];
 
         for (const state of options.states) {
-          const perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }> = [];
+          const perViewport: Array<{
+            viewport: string;
+            defaultDiffRatio: number;
+            stateDiffRatio: number;
+            hoverInducedDelta: number;
+          }> = [];
           let aggregateForcedCount = 0;
           let aggregateAffected: string[] = [];
 
@@ -2246,7 +2370,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             try {
               baselineApplied = await applyForcedPseudoState(baselinePage, { state });
             } catch (error) {
-              console.log(`  ${YELLOW}State capture failed (baseline / ${state} / ${vp.label}): ${String(error)}${RESET}`);
+              console.log(
+                `  ${YELLOW}State capture failed (baseline / ${state} / ${vp.label}): ${String(error)}${RESET}`,
+              );
               await baselinePage.close();
               continue;
             }
@@ -2269,7 +2395,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             try {
               variantApplied = await applyForcedPseudoState(variantPage, { state });
             } catch (error) {
-              console.log(`  ${YELLOW}State capture failed (variant / ${state} / ${vp.label}): ${String(error)}${RESET}`);
+              console.log(
+                `  ${YELLOW}State capture failed (variant / ${state} / ${vp.label}): ${String(error)}${RESET}`,
+              );
               await variantPage.close();
               continue;
             }
@@ -2295,7 +2423,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             // the dark/light-blue dimming pair); the 0.1 luminance
             // threshold filters them out entirely. 0.03 picks up real
             // pseudo-state effects while still rejecting subpixel AA.
-            const stateDiff = await compareScreenshots(stateSnap, { outputDir, skipHeatmap: true, threshold: 0.03 } as Parameters<typeof compareScreenshots>[1]);
+            const stateDiff = await compareScreenshots(stateSnap, {
+              outputDir,
+              skipHeatmap: true,
+              threshold: 0.03,
+            } as Parameters<typeof compareScreenshots>[1]);
             const stateRatio = stateDiff?.diffRatio ?? 0;
             // Pull the default-state ratio out of the results array.
             const defaultResult = results.find((r) => r.variant === variantName && r.viewport === vp.label);
@@ -2317,7 +2449,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             });
             const inducedMax = Math.max(...perViewport.map((p) => p.hoverInducedDelta));
             const inducedDisplay = (inducedMax * 100).toFixed(2);
-            console.log(`  ${DIM}:${state} state diff: max ${inducedDisplay}% induced delta across ${perViewport.length} viewport(s) (${aggregateForcedCount} forced element(s))${RESET}`);
+            console.log(
+              `  ${DIM}:${state} state diff: max ${inducedDisplay}% induced delta across ${perViewport.length} viewport(s) (${aggregateForcedCount} forced element(s))${RESET}`,
+            );
           }
         }
 
@@ -2408,13 +2542,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       baselineSanity,
       domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
       computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
-      computedStyleDiffPerViewport: computedStyleDiffPerViewportReports.length > 0 ? computedStyleDiffPerViewportReports : undefined,
+      computedStyleDiffPerViewport:
+        computedStyleDiffPerViewportReports.length > 0 ? computedStyleDiffPerViewportReports : undefined,
       authoredStyleDiff: authoredStyleDiffReports.length > 0 ? authoredStyleDiffReports : undefined,
-      authoredStyleDiffPerViewport: authoredStyleDiffPerViewportReports.length > 0 ? authoredStyleDiffPerViewportReports : undefined,
+      authoredStyleDiffPerViewport:
+        authoredStyleDiffPerViewportReports.length > 0 ? authoredStyleDiffPerViewportReports : undefined,
       domPositionDiff: domPositionDiffReports.length > 0 ? domPositionDiffReports : undefined,
-      domPositionDiffPerViewport: domPositionDiffPerViewportReports.length > 0
-        ? domPositionDiffPerViewportReports
-        : undefined,
+      domPositionDiffPerViewport:
+        domPositionDiffPerViewportReports.length > 0 ? domPositionDiffPerViewportReports : undefined,
       shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
       shiftAccumulations: shiftAccumulationsReports.length > 0 ? shiftAccumulationsReports : undefined,
       gridSuggestions: gridSuggestionsReports.length > 0 ? gridSuggestionsReports : undefined,
@@ -2480,7 +2615,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const total = failing.reduce((s, d) => s + d.result.warnings.length, 0);
         throw new Error(
           `DOM equivalence check failed (${total} warning(s) across ${failing.length} variant(s)). ` +
-          `See report at ${reportPath}.`,
+            `See report at ${reportPath}.`,
         );
       }
     }
@@ -2488,7 +2623,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     if (options.strictBaselineSanity && baselineSanity && !baselineSanity.ok) {
       throw new Error(
         `Baseline render sanity check failed (${baselineSanity.warnings.length} warning(s)). ` +
-        `See report at ${reportPath}.`,
+          `See report at ${reportPath}.`,
       );
     }
 
@@ -2523,9 +2658,7 @@ function createMigrationCategoryCounts(): Record<MigrationDiffCategory, number> 
   };
 }
 
-function formatMigrationCategorySummary(
-  counts: Record<MigrationDiffCategory, number>,
-): string {
+function formatMigrationCategorySummary(counts: Record<MigrationDiffCategory, number>): string {
   const entries = (Object.entries(counts) as Array<[MigrationDiffCategory, number]>)
     .filter((entry) => entry[1] > 0)
     .map(([category, count]) => `${count} ${category}`);
@@ -2556,18 +2689,14 @@ function createPaintTreeCounts(): Record<PaintTreeChangeType, number> {
   };
 }
 
-function formatPaintTreeCountSummary(
-  counts: Record<PaintTreeChangeType, number>,
-): string {
+function formatPaintTreeCountSummary(counts: Record<PaintTreeChangeType, number>): string {
   const entries = (Object.entries(counts) as Array<[PaintTreeChangeType, number]>)
     .filter((entry) => entry[1] > 0)
     .map(([type, count]) => `${count} ${type}`);
   return entries.join(", ") || "no changes";
 }
 
-function formatMigrationFixCandidateSummary(
-  candidates: MigrationFixCandidateSummary[],
-): string {
+function formatMigrationFixCandidateSummary(candidates: MigrationFixCandidateSummary[]): string {
   return candidates
     .slice(0, 3)
     .map((candidate) => `${candidate.occurrences}x ${candidate.selector} { ${candidate.property} }`)
@@ -2645,9 +2774,9 @@ export function summarizeBreakpointDiscoveryDiagnostics(
     diagnostics: CraterBreakpointDiscoveryDiagnostics | undefined;
   }>,
 ): BreakpointDiscoveryDiagnosticsSummary | undefined {
-  const entries: BreakpointDiscoveryDocumentDiagnostics[] = documents.flatMap(({ label, diagnostics }) => (
-    diagnostics ? [{ label, ...diagnostics }] : []
-  ));
+  const entries: BreakpointDiscoveryDocumentDiagnostics[] = documents.flatMap(({ label, diagnostics }) =>
+    diagnostics ? [{ label, ...diagnostics }] : [],
+  );
   if (entries.length === 0) return undefined;
 
   return {
@@ -2655,13 +2784,9 @@ export function summarizeBreakpointDiscoveryDiagnostics(
     totals: {
       stylesheetCount: entries.reduce((sum, entry) => sum + entry.stylesheetCount, 0),
       ruleCount: entries.reduce((sum, entry) => sum + entry.ruleCount, 0),
-      externalStylesheetLinks: uniqueStrings(
-        entries.flatMap((entry) => entry.externalStylesheetLinks),
-      ),
+      externalStylesheetLinks: uniqueStrings(entries.flatMap((entry) => entry.externalStylesheetLinks)),
       ignoredQueries: uniqueStrings(entries.flatMap((entry) => entry.ignoredQueries)),
-      unsupportedQueries: uniqueStrings(
-        entries.flatMap((entry) => entry.unsupportedQueries),
-      ),
+      unsupportedQueries: uniqueStrings(entries.flatMap((entry) => entry.unsupportedQueries)),
     },
   };
 }
@@ -2767,7 +2892,9 @@ function formatResponsiveBreakpoint(breakpoint: ResponsiveBreakpoint): string {
   return `width${opLabel}${breakpoint.valuePx}px`;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-compare" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-compare" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 
 if (isCliEntry) {
   main().catch((error) => {

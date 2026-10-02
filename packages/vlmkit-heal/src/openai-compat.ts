@@ -10,9 +10,7 @@ export interface ChatUsage {
   completionTokens: number;
 }
 
-type Block =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
+type Block = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
 /** Build an OpenAI `content` array from a text prompt + optional PNG screenshot. */
 export function buildUserContent(text: string, screenshotPng?: Buffer): string | Block[] {

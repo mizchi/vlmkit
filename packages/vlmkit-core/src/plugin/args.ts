@@ -47,11 +47,7 @@ const COMMON_VALUE_FLAGS = [
   "--image",
 ] as const;
 
-export function firstPositional(
-  argv: readonly string[],
-  usage: string,
-  valueFlags: readonly string[] = [],
-): string {
+export function firstPositional(argv: readonly string[], usage: string, valueFlags: readonly string[] = []): string {
   const first = firstPositionalOrUndefined(argv, valueFlags);
   if (!first) throw new UsageError(`missing required argument. Usage: ${usage}`);
   return first;
@@ -106,11 +102,15 @@ export function withoutOptionalValue(argv: readonly string[], name: string): str
 export function numberList(argv: readonly string[], name: string): number[] | undefined {
   const raw = readFlag(argv, name);
   if (raw === undefined) return undefined;
-  const values = raw.split(",").map((part) => part.trim()).filter(Boolean).map((part) => {
-    const n = Number.parseInt(part, 10);
-    if (!Number.isFinite(n)) throw new UsageError(`--${name}: "${part}" is not a number`);
-    return n;
-  });
+  const values = raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const n = Number.parseInt(part, 10);
+      if (!Number.isFinite(n)) throw new UsageError(`--${name}: "${part}" is not a number`);
+      return n;
+    });
   return values;
 }
 
@@ -121,11 +121,15 @@ export function numberList(argv: readonly string[], name: string): number[] | un
 export function numberListFloat(argv: readonly string[], name: string): number[] | undefined {
   const raw = readFlag(argv, name);
   if (raw === undefined) return undefined;
-  return raw.split(",").map((part) => part.trim()).filter(Boolean).map((part) => {
-    const n = Number.parseFloat(part);
-    if (!Number.isFinite(n)) throw new UsageError(`--${name}: "${part}" is not a number`);
-    return n;
-  });
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const n = Number.parseFloat(part);
+      if (!Number.isFinite(n)) throw new UsageError(`--${name}: "${part}" is not a number`);
+      return n;
+    });
 }
 
 /** `--viewport 1280x720` → `{width, height}`. */
@@ -140,11 +144,7 @@ export function viewportFlag(
   return { width: Number(match[1]), height: Number(match[2]) };
 }
 
-export function optionalInt(
-  argv: readonly string[],
-  name: string,
-  options: { min?: number } = {},
-): number | undefined {
+export function optionalInt(argv: readonly string[], name: string, options: { min?: number } = {}): number | undefined {
   return readInt(argv, name, options);
 }
 
@@ -183,6 +183,9 @@ export function runOutputDir(gateDir: string, source: string, discriminator = ""
   // Hashed, not embedded: a URL source or a long selector is not a path component, and
   // two sources can share a basename. The readable half stays first so the directory is
   // still recognisable at a glance.
-  const hash = createHash("sha1").update(resolve(source) + " " + discriminator).digest("hex").slice(0, 8);
+  const hash = createHash("sha1")
+    .update(resolve(source) + " " + discriminator)
+    .digest("hex")
+    .slice(0, 8);
   return join(process.cwd(), "test-results", gateDir, name.replace(/[^A-Za-z0-9._-]+/g, "-") + "-" + hash);
 }

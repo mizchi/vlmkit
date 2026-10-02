@@ -41,7 +41,6 @@ import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
-
 /**
  * The properties that say "this is the same component", with `width` and `height`
  * deliberately left out.
@@ -58,7 +57,10 @@ const STYLE_PROPERTIES = [
   // agent distinguished a variant with `outline: 3px solid #2255cc` and the gate
   // answered "every tracked computed style matches — different content, not drift" at
   // a 12.50% pixel difference. It is a styling difference; it just was not looked at.
-  "outline-width", "outline-style", "outline-color", "outline-offset",
+  "outline-width",
+  "outline-style",
+  "outline-color",
+  "outline-offset",
 ];
 export interface ComponentConsistencyOptions {
   htmlPath: string;
@@ -197,7 +199,9 @@ export async function runComponentConsistency(
         const element = el as Element;
         // Prefixed with `.` per class so `@.card--featured` matches as a substring the
         // way an author writes it, and the tag name is included so `@article` works too.
-        const classes = Array.from(element.classList).map((c) => `.${c}`).join("");
+        const classes = Array.from(element.classList)
+          .map((c) => `.${c}`)
+          .join("");
         return `${element.tagName.toLowerCase()}${classes}`;
       });
       instances.push({ index: i, screenshotPath, bbox, style, classList });
@@ -247,7 +251,6 @@ export async function runComponentConsistency(
   const md = renderReport(htmlPath, options.selector, instances, reference.index, deltas);
   await writeFile(reportPath, md);
 
-
   return {
     html: htmlPath,
     selector: options.selector,
@@ -275,9 +278,10 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
   // some other reason -> `instance-content-differs`. The gate additionally drops rows below
   // `--threshold`, and this cannot see that number; dimming a sub-threshold row whose rule is
   // off is still true — nothing under an off rule is being reported either way.
-  const ruleOf = (d: InstanceDelta) => d.styleDeltas.length > 0
-    ? { rule: "instance-drift", emitted: "suspect" as const }
-    : { rule: "instance-content-differs", emitted: "info" as const };
+  const ruleOf = (d: InstanceDelta) =>
+    d.styleDeltas.length > 0
+      ? { rule: "instance-drift", emitted: "suspect" as const }
+      : { rule: "instance-content-differs", emitted: "info" as const };
   const offRules = new Map<string, number>();
   lines.push(`  ${BOLD}${CYAN}vlmkit check drift component${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}  selector: ${report.selector}${RESET}`);
@@ -299,27 +303,34 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
     if (tier === "off" && !(d.styleDeltas.length === 0 && d.diffRatio === 0)) {
       offRules.set(ruled.rule, (offRules.get(ruled.rule) ?? 0) + 1);
     }
-    const icon = tier === "off"
-      ? `${DIM}-${RESET}`
-      : d.styleDeltas.length > 0
-      ? (tier === "suspect" ? `${RED}✗${RESET}` : `${YELLOW}!${RESET}`)
-      : d.diffRatio === 0
-        ? `${GREEN}✓${RESET}`
-        : `${YELLOW}~${RESET}`;
+    const icon =
+      tier === "off"
+        ? `${DIM}-${RESET}`
+        : d.styleDeltas.length > 0
+          ? tier === "suspect"
+            ? `${RED}✗${RESET}`
+            : `${YELLOW}!${RESET}`
+          : d.diffRatio === 0
+            ? `${GREEN}✓${RESET}`
+            : `${YELLOW}~${RESET}`;
     // And the verdict in words next to the icon, so the row states its own reason
     // rather than leaving the reader to infer it from which number moved.
-    const verdict = d.styleDeltas.length > 0
-      ? `${d.styleDeltas.length} tracked propert${d.styleDeltas.length === 1 ? "y" : "ies"} differ`
-      : d.exemptedStyleDeltas.length > 0
-        ? `all ${d.exemptedStyleDeltas.length} difference(s) exempted`
-        : d.diffRatio === 0
-          ? "identical"
-          : "no tracked property differs";
+    const verdict =
+      d.styleDeltas.length > 0
+        ? `${d.styleDeltas.length} tracked propert${d.styleDeltas.length === 1 ? "y" : "ies"} differ`
+        : d.exemptedStyleDeltas.length > 0
+          ? `all ${d.exemptedStyleDeltas.length} difference(s) exempted`
+          : d.diffRatio === 0
+            ? "identical"
+            : "no tracked property differs";
     const whDelta = `Δ ${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
-    const retuned = tier !== "off" && tier !== ruled.emitted && d.styleDeltas.length > 0
-      ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
-      : "";
-    lines.push(`  ${icon} instance #${d.candidateIndex}  ${verdict.padEnd(30)}  ${DIM}${pct.padStart(6)}% px  ${whDelta}${RESET}${retuned}`);
+    const retuned =
+      tier !== "off" && tier !== ruled.emitted && d.styleDeltas.length > 0
+        ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
+        : "";
+    lines.push(
+      `  ${icon} instance #${d.candidateIndex}  ${verdict.padEnd(30)}  ${DIM}${pct.padStart(6)}% px  ${whDelta}${RESET}${retuned}`,
+    );
     if (d.styleDeltas.length > 0) {
       // The properties are the actionable part: an agent told to "replace the inline
       // markup with the shared component invocation" on markup that was already
@@ -328,7 +339,9 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
         lines.push(`      ${DIM}${s.property}: ${s.reference} → ${s.candidate}${RESET}`);
       }
       if (d.styleDeltas.length > 6) {
-        lines.push(`      ${DIM}and ${d.styleDeltas.length - 6} more propert${d.styleDeltas.length - 6 === 1 ? "y" : "ies"}${RESET}`);
+        lines.push(
+          `      ${DIM}and ${d.styleDeltas.length - 6} more propert${d.styleDeltas.length - 6 === 1 ? "y" : "ies"}${RESET}`,
+        );
       }
     }
     for (const e of d.exemptedStyleDeltas.slice(0, 4)) {
@@ -344,17 +357,21 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
       // verdict read "different content, not drift" for a variant whose accent lived
       // on a child `h2`. State the scope of the check instead of the conclusion.
       const palette = d.paletteOnlyInCand + d.paletteOnlyInRef;
-      lines.push(palette > 0
-        ? `      ${YELLOW}every property on the instance root matches, but ${palette} colour(s) appear in`
-          + ` one instance and not the other — a styling difference on a descendant or in an`
-          + ` untracked property, not necessarily content${RESET}`
-        : `      ${DIM}every property on the instance root matches and the palettes agree —`
-          + ` this looks like different content${RESET}`);
+      lines.push(
+        palette > 0
+          ? `      ${YELLOW}every property on the instance root matches, but ${palette} colour(s) appear in` +
+              ` one instance and not the other — a styling difference on a descendant or in an` +
+              ` untracked property, not necessarily content${RESET}`
+          : `      ${DIM}every property on the instance root matches and the palettes agree —` +
+              ` this looks like different content${RESET}`,
+      );
     }
   }
   if (offRules.size > 0) {
     const detail = [...offRules].map(([rule, n]) => `${rule} x${n}`).join(", ");
-    lines.push(`  ${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} instance(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
+    lines.push(
+      `  ${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} instance(s) measured and NOT reported — rule turned off (${detail})${RESET}`,
+    );
   }
   // The escape hatch was documented only in `--help`, which is not where a reader of a
   // failing run is looking. v4's repair agent found it there and said what it cost:
@@ -365,14 +382,20 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
   // `--threshold`, a blunt fudge, where `--allow` is the reviewable answer.
   const failing = report.deltas.find((d) => d.styleDeltas.length > 0);
   if (failing && report.allowRuleCount === 0) {
-    lines.push(`  ${DIM}if a difference is intentional, declare it — it stays listed and a stale rule is reported:${RESET}`);
-    lines.push(`  ${DIM}  --allow "${failing.styleDeltas[0].property}${variantScope(report, failing.candidateIndex)};<why>"${RESET}`);
+    lines.push(
+      `  ${DIM}if a difference is intentional, declare it — it stays listed and a stale rule is reported:${RESET}`,
+    );
+    lines.push(
+      `  ${DIM}  --allow "${failing.styleDeltas[0].property}${variantScope(report, failing.candidateIndex)};<why>"${RESET}`,
+    );
   }
   if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {
     // A rule that matched nothing is either stale or misspelled, and either way it is
     // widening the blind spot for a defect that is no longer there.
-    lines.push(`  ${YELLOW}! ${report.unusedAllowRules.length} --allow rule(s) matched nothing:`
-      + ` ${report.unusedAllowRules.join(", ")}${RESET}`);
+    lines.push(
+      `  ${YELLOW}! ${report.unusedAllowRules.length} --allow rule(s) matched nothing:` +
+        ` ${report.unusedAllowRules.join(", ")}${RESET}`,
+    );
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
@@ -432,10 +455,12 @@ function renderReport(
   lines.push(`Selector: \`${selector}\`  —  **${instances.length}** instance(s) detected.`);
   lines.push(`Reference: instance **#${refIdx}**.`);
   lines.push("");
-  lines.push("After an inline → componentized refactor, every call site should " +
-    "render identically. Per-instance pixel diff against the reference reveals " +
-    "which instances drifted — typically because one call site was missed during " +
-    "the refactor and is still inline with stale styles.");
+  lines.push(
+    "After an inline → componentized refactor, every call site should " +
+      "render identically. Per-instance pixel diff against the reference reveals " +
+      "which instances drifted — typically because one call site was missed during " +
+      "the refactor and is still inline with stale styles.",
+  );
   lines.push("");
   lines.push("## Drift summary");
   lines.push("");
@@ -451,7 +476,9 @@ function renderReport(
   lines.push("");
   for (const inst of instances) {
     const ref = inst.index === refIdx ? "  **(reference)**" : "";
-    lines.push(`- instance #${inst.index}${ref} — ${inst.bbox.width}×${inst.bbox.height} at ${inst.bbox.x},${inst.bbox.y} — \`${inst.screenshotPath}\``);
+    lines.push(
+      `- instance #${inst.index}${ref} — ${inst.bbox.width}×${inst.bbox.height} at ${inst.bbox.x},${inst.bbox.y} — \`${inst.screenshotPath}\``,
+    );
   }
   lines.push("");
   lines.push("## Suggested next step");
@@ -463,18 +490,22 @@ function renderReport(
   const drifters = deltas.filter((d) => d.styleDeltas.length > 0);
   const contentOnly = deltas.filter((d) => d.styleDeltas.length === 0 && d.diffRatio > 0.005);
   if (drifters.length === 0) {
-    lines.push(contentOnly.length === 0
-      ? "All instances render identically to the reference — refactor is consistent."
-      : `No instance differs in any tracked style property. ${contentOnly.length} differ(s) in pixels,`
-        + " which is what different copy costs — compare the screenshots if you want to confirm that is"
-        + " all it is, since a difference on a descendant or in an untracked property would look the same"
-        + " from here.");
+    lines.push(
+      contentOnly.length === 0
+        ? "All instances render identically to the reference — refactor is consistent."
+        : `No instance differs in any tracked style property. ${contentOnly.length} differ(s) in pixels,` +
+            " which is what different copy costs — compare the screenshots if you want to confirm that is" +
+            " all it is, since a difference on a descendant or in an untracked property would look the same" +
+            " from here.",
+    );
   } else {
     lines.push(`${drifters.length} instance(s) differ from the reference. For each:`);
     lines.push("1. Open the candidate screenshot next to the reference; identify the visible delta.");
-    lines.push("2. Locate the call site in the source. If the page contains a mix of inline " +
-      "markup and component invocations (`<Card>`), the drifting instance is likely the " +
-      "still-inline one.");
+    lines.push(
+      "2. Locate the call site in the source. If the page contains a mix of inline " +
+        "markup and component invocations (`<Card>`), the drifting instance is likely the " +
+        "still-inline one.",
+    );
     lines.push("3. Replace the inline markup with the shared component invocation.");
   }
   lines.push("");

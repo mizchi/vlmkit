@@ -47,9 +47,22 @@ suspects, declared-but-dead scrollports, and nested scrolling.
     { id: "nested-scroll", title: "Scroll container nested inside a scroll container", severity: "warn" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to scan",
+      positional: 0,
+      required: true,
+    },
     { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
-    { name: "clip-threshold", placeholder: "px", kind: "number", description: "Hidden px below which clipping is ignored", defaultDescription: "16" },
+    {
+      name: "clip-threshold",
+      placeholder: "px",
+      kind: "number",
+      description: "Hidden px below which clipping is ignored",
+      defaultDescription: "16",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -72,8 +85,7 @@ suspects, declared-but-dead scrollports, and nested scrolling.
       ...(issue.selector ? { selector: issue.selector } : {}),
     })),
   format: formatScrollScanReport,
-  headline: (report) =>
-    `${report.containers.length} container(s), page overflow-x ${report.page.horizontalOverflow}px`,
+  headline: (report) => `${report.containers.length} container(s), page overflow-x ${report.page.horizontalOverflow}px`,
   ledger: (report, options) => ({
     tool: "scan-scroll",
     source: options.source,

@@ -14,7 +14,9 @@ function fillRgba(
     for (let y = f.y0; y < f.y1; y++) {
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
-        data[i] = f.r; data[i + 1] = f.g; data[i + 2] = f.b;
+        data[i] = f.r;
+        data[i + 1] = f.g;
+        data[i + 2] = f.b;
       }
     }
   }
@@ -87,9 +89,7 @@ describe("diffPalettes", () => {
     const baseline = [
       { r: 200, g: 0, b: 0, hex: "#c80000", share: 0.001, count: 1 }, // tiny
     ];
-    const variant = [
-      { r: 255, g: 255, b: 255, hex: "#ffffff", share: 1.0, count: 100 },
-    ];
+    const variant = [{ r: 255, g: 255, b: 255, hex: "#ffffff", share: 1.0, count: 100 }];
     const result = diffPalettes(baseline, variant, { minReportShare: 0.01 });
     assert.equal(result.onlyInBaseline.length, 0); // dropped — below floor
   });

@@ -82,9 +82,7 @@ export interface IntegrityImageReport extends IntegrityReport {
   inertRules: { rule: string; reason: string }[];
 }
 
-export async function runImageIntegrityCheck(
-  options: IntegrityImageOptions,
-): Promise<IntegrityImageReport> {
+export async function runImageIntegrityCheck(options: IntegrityImageOptions): Promise<IntegrityImageReport> {
   const elements = parseIntegrityImageElements(await readFile(options.elementsPath, "utf-8"));
   let image: { data: Uint8Array; width: number; height: number } | undefined;
   if (options.imagePath) {

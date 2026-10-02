@@ -61,10 +61,14 @@ export function classifyRegion(
   let pairs = 0;
   for (let y = bbox.top; y < bbox.top + bbox.height; y += stride) {
     let prev = -1;
-    let pr = 0, pg = 0, pb = 0;
+    let pr = 0,
+      pg = 0,
+      pb = 0;
     for (let x = bbox.left; x < bbox.left + bbox.width; x += stride) {
       const o = (y * imageWidth + x) * 4;
-      const r = data[o]!, g = data[o + 1]!, b = data[o + 2]!;
+      const r = data[o]!,
+        g = data[o + 1]!,
+        b = data[o + 2]!;
       const key = bucket(r, g, b);
       counts.set(key, (counts.get(key) ?? 0) + 1);
       samples++;
@@ -75,7 +79,9 @@ export function classifyRegion(
         if (jump > 48) bigJumps++;
       }
       prev = key;
-      pr = r; pg = g; pb = b;
+      pr = r;
+      pg = g;
+      pb = b;
     }
   }
   if (samples === 0) return { kind: "mixed", confident: false };

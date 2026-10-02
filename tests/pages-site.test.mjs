@@ -60,7 +60,11 @@ test("the site manifest: the landing page at the root, solitaire, the gallery an
       { id: "intro", sourceDir: "examples/vlmkit-intro-page", basePath: "" },
       { id: "solitaire", sourceDir: "examples/solitaire", basePath: "solitaire" },
       { id: "sites", sourceDir: "examples/sites", basePath: "sites" },
-      ...DEMO_SITES.map((name) => ({ id: `sites-${name}`, sourceDir: `examples/sites/${name}`, basePath: `sites/${name}` })),
+      ...DEMO_SITES.map((name) => ({
+        id: `sites-${name}`,
+        sourceDir: `examples/sites/${name}`,
+        basePath: `sites/${name}`,
+      })),
       { id: "demos", sourceDir: "examples/demos", basePath: "demos" },
       { id: "icons", sourceDir: "docs/assets/icons", basePath: "icons" },
     ],
@@ -87,12 +91,7 @@ test("the site manifest: the landing page at the root, solitaire, the gallery an
     "styles.css",
   ]);
   // Four files and no build step is why solitaire can be published as-is.
-  assert.deepEqual(siteSections[1].assets, [
-    "game.js",
-    "index.html",
-    "rules.js",
-    "solitaire.css",
-  ]);
+  assert.deepEqual(siteSections[1].assets, ["game.js", "index.html", "rules.js", "solitaire.css"]);
   // The gallery is one generated page (examples/sites/gallery.mjs) and its own log; the briefs,
   // the protocol and the judge tool beside it are the repository's.
   assert.deepEqual(siteSections[2].assets, ["index.html"]);
@@ -110,7 +109,9 @@ test("the site manifest: the landing page at the root, solitaire, the gallery an
       assert.match(asset, /^judgment\/(index\.html|shots\/S\d+-\d+\.webp)$/, `${section.id}: ${asset}`);
     }
   }
-  const logged = siteSections.filter((section) => section.judgment.some((asset) => asset.path === "judgment/index.html")).map((s) => s.id);
+  const logged = siteSections
+    .filter((section) => section.judgment.some((asset) => asset.path === "judgment/index.html"))
+    .map((s) => s.id);
   assert.deepEqual(logged, ["intro", "sites", ...DEMO_SITES.map((name) => `sites-${name}`)]);
 });
 
@@ -146,7 +147,9 @@ test("the build publishes exactly the manifest, byte-identical to the sources", 
 
   const expected = [
     ".nojekyll",
-    ...siteSections.flatMap((s) => [...s.assets, ...s.judgment.map((j) => j.path)].map((a) => posix.join(s.basePath, a))),
+    ...siteSections.flatMap((s) =>
+      [...s.assets, ...s.judgment.map((j) => j.path)].map((a) => posix.join(s.basePath, a)),
+    ),
   ];
   const published = await walk(outputDir);
   assert.deepEqual(published.sort(), expected.sort(), "the published tree is the manifest, file for file");
@@ -196,7 +199,8 @@ test("every relative link on every published page arrives at a published file", 
       let target = posix.normalize(posix.join(posix.dirname(page), path));
       assert.ok(!target.startsWith(".."), `${page}: ${url} climbs above the site root`);
       if (path.endsWith("/") || target === ".") target = posix.join(target, "index.html");
-      else if (!published.has(target) && published.has(posix.join(target, "index.html"))) target = posix.join(target, "index.html");
+      else if (!published.has(target) && published.has(posix.join(target, "index.html")))
+        target = posix.join(target, "index.html");
       assert.ok(published.has(target), `${page}: ${url} → ${target} is not published`);
       checked++;
     }

@@ -52,8 +52,8 @@ describe("the declared version", () => {
       assert.equal(
         literal?.[0],
         undefined,
-        `${relative} carries its own version literal (${literal?.[0]}) again — import `
-        + "VLMKIT_VERSION from @mizchi/vlmkit-core/version.ts instead",
+        `${relative} carries its own version literal (${literal?.[0]}) again — import ` +
+          "VLMKIT_VERSION from @mizchi/vlmkit-core/version.ts instead",
       );
     }
   });
@@ -62,7 +62,9 @@ describe("the declared version", () => {
     // They are published together and cross-depend by `workspace:*`, so a package left
     // behind is a package whose published version pins nothing meaningful.
     const files = execSync("git ls-files 'packages/*/package.json'", { cwd: REPO_ROOT, encoding: "utf8" })
-      .trim().split("\n").filter(Boolean);
+      .trim()
+      .split("\n")
+      .filter(Boolean);
     assert.ok(files.length >= 8, `only ${files.length} workspace packages found`);
     const mismatched = files
       .map((rel) => [rel, JSON.parse(read(rel)).version as string] as const)
@@ -80,9 +82,9 @@ describe("the declared version", () => {
     assert.match(
       firstHeading,
       new RegExp(`^## ${rootVersion.replace(/\./g, "\\.")} — \\d{4}-\\d{2}-\\d{2}$`),
-      `the newest changelog heading is ${JSON.stringify(firstHeading)}; it should be `
-      + `\`## ${rootVersion} — YYYY-MM-DD\`. Rename \`## Unreleased\` when stamping a release, `
-      + `or add a new \`## Unreleased\` above it when starting the next one.`,
+      `the newest changelog heading is ${JSON.stringify(firstHeading)}; it should be ` +
+        `\`## ${rootVersion} — YYYY-MM-DD\`. Rename \`## Unreleased\` when stamping a release, ` +
+        `or add a new \`## Unreleased\` above it when starting the next one.`,
     );
   });
 });

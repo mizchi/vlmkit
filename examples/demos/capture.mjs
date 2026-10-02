@@ -33,13 +33,15 @@ const MARK_STYLE = "outline: 3px solid #e5484d !important; outline-offset: 2px !
 
 /** Colour codes out, this machine's paths out. */
 export function cleanOutput(text, outDir) {
-  return text
-    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, "")
-    .replaceAll(outDir, "<out>")
-    .replaceAll(`${repoRoot}/`, "")
-    .replaceAll(repoRoot, ".")
-    .replace(/[ \t]+$/gm, "")
-    .trimEnd() + "\n";
+  return (
+    text
+      .replace(/\x1b\[[0-9;]*[A-Za-z]/g, "")
+      .replaceAll(outDir, "<out>")
+      .replaceAll(`${repoRoot}/`, "")
+      .replaceAll(repoRoot, ".")
+      .replace(/[ \t]+$/gm, "")
+      .trimEnd() + "\n"
+  );
 }
 
 function runCli(bin, args, outDir) {
@@ -108,39 +110,59 @@ async function captureZoom(browser, demo, outDir, dir) {
   const { buildCases } = await import("../../src/experiments/benchmark/zoom-accuracy/cases.ts");
   const { prepareZoomSource, zoomInto, DEFAULT_IMAGE_BUDGET } = await import("@mizchi/vlmkit-ai/zoom.ts");
   const { cases, skipped } = await buildCases(browser, {
-    fixtures: [join(repoRoot, demo.page)], kinds: ["offset"], seed: 1, deviceScaleFactor: 2, viewportWidth: 1440, outDir, variants: 1,
+    fixtures: [join(repoRoot, demo.page)],
+    kinds: ["offset"],
+    seed: 1,
+    deviceScaleFactor: 2,
+    viewportWidth: 1440,
+    outDir,
+    variants: 1,
   });
   const c = cases[0];
-  if (!c || c.expected.kind !== "offset" || !c.diffBox) throw new Error(`zoom demo: no offset case (${JSON.stringify(skipped)})`);
-  const [base, cur] = [c.baselinePath, c.currentPath].map((p) => prepareZoomSource(readFileSync(p), DEFAULT_IMAGE_BUDGET));
+  if (!c || c.expected.kind !== "offset" || !c.diffBox)
+    throw new Error(`zoom demo: no offset case (${JSON.stringify(skipped)})`);
+  const [base, cur] = [c.baselinePath, c.currentPath].map((p) =>
+    prepareZoomSource(readFileSync(p), DEFAULT_IMAGE_BUDGET),
+  );
   const k = (cur.view.width / cur.original.width) * c.deviceScaleFactor; // CSS px → view px
   const pad = 48;
   const d = c.diffBox;
   const box = {
-    x1: Math.max(0, Math.floor((d.x1 - pad) * k)), y1: Math.max(0, Math.floor((d.y1 - pad) * k)),
-    x2: Math.min(cur.view.width, Math.ceil((d.x2 + pad) * k)), y2: Math.min(cur.view.height, Math.ceil((d.y2 + pad) * k)),
+    x1: Math.max(0, Math.floor((d.x1 - pad) * k)),
+    y1: Math.max(0, Math.floor((d.y1 - pad) * k)),
+    x2: Math.min(cur.view.width, Math.ceil((d.x2 + pad) * k)),
+    y2: Math.min(cur.view.height, Math.ceil((d.y2 + pad) * k)),
   };
   const zb = zoomInto(base, box);
   const zc = zoomInto(cur, box);
   if (!zb.ok || !zc.ok) throw new Error(`zoom demo: ${zb.text} / ${zc.text}`);
   const rect = { x: box.x1, y: box.y1, width: box.x2 - box.x1, height: box.y2 - box.y1 };
   const images = [
-    { file: "view.webp", caption: `Image 1 as the model is sent it: ${cur.view.width}x${cur.view.height}, about ${k.toFixed(2)}x of CSS size. The box is the zoom asked for below.`, ...(await toWebp(browser, cur.viewPng, { boxes: [rect] })) },
-    { file: "zoom-baseline.webp", caption: "One zoom into Image 0 (baseline), cropped from the full-resolution original.", ...(await toWebp(browser, zb.png)) },
+    {
+      file: "view.webp",
+      caption: `Image 1 as the model is sent it: ${cur.view.width}x${cur.view.height}, about ${k.toFixed(2)}x of CSS size. The box is the zoom asked for below.`,
+      ...(await toWebp(browser, cur.viewPng, { boxes: [rect] })),
+    },
+    {
+      file: "zoom-baseline.webp",
+      caption: "One zoom into Image 0 (baseline), cropped from the full-resolution original.",
+      ...(await toWebp(browser, zb.png)),
+    },
     { file: "zoom-current.webp", caption: "The same box in Image 1 (current).", ...(await toWebp(browser, zc.png)) },
   ];
   for (const img of images) writeFileSync(join(dir, img.file), img.bytes);
   const e = c.expected;
-  const output = [
-    `planted: ${c.target} moved dx=${e.dx}, dy=${e.dy} CSS px (the known answer; seed 1)`,
-    `page: ${c.page.width}x${c.page.height} CSS px at ${c.deviceScaleFactor}x → original ${cur.original.width}x${cur.original.height}`,
-    `view sent to the model (DEFAULT_IMAGE_BUDGET ${DEFAULT_IMAGE_BUDGET.maxEdge}px / ${DEFAULT_IMAGE_BUDGET.maxPixels / 1e6}MP): ${cur.view.width}x${cur.view.height}`,
-    `pixel diff bounds: (${d.x1},${d.y1})-(${d.x2},${d.y2}) CSS px`,
-    ``,
-    `zoom Image 0 → ${zb.text}`,
-    `zoom Image 1 → ${zc.text}`,
-    `original box: (${zc.originalBox.x1},${zc.originalBox.y1})-(${zc.originalBox.x2},${zc.originalBox.y2})`,
-  ].join("\n") + "\n";
+  const output =
+    [
+      `planted: ${c.target} moved dx=${e.dx}, dy=${e.dy} CSS px (the known answer; seed 1)`,
+      `page: ${c.page.width}x${c.page.height} CSS px at ${c.deviceScaleFactor}x → original ${cur.original.width}x${cur.original.height}`,
+      `view sent to the model (DEFAULT_IMAGE_BUDGET ${DEFAULT_IMAGE_BUDGET.maxEdge}px / ${DEFAULT_IMAGE_BUDGET.maxPixels / 1e6}MP): ${cur.view.width}x${cur.view.height}`,
+      `pixel diff bounds: (${d.x1},${d.y1})-(${d.x2},${d.y2}) CSS px`,
+      ``,
+      `zoom Image 0 → ${zb.text}`,
+      `zoom Image 1 → ${zc.text}`,
+      `original box: (${zc.originalBox.x1},${zc.originalBox.y1})-(${zc.originalBox.x2},${zc.originalBox.y2})`,
+    ].join("\n") + "\n";
   return { exit: 0, output, images: images.map(({ bytes, ...rest }) => rest) };
 }
 
@@ -151,7 +173,8 @@ async function captureDemo(browser, demo, settlePage) {
   try {
     const pageAs = demo.pageAs ?? "page.html";
     if (resolve(repoRoot, demo.page) !== join(dir, pageAs)) copyFileSync(join(repoRoot, demo.page), join(dir, pageAs));
-    for (const e of demo.extras ?? []) if (resolve(repoRoot, e.from) !== join(dir, e.as)) copyFileSync(join(repoRoot, e.from), join(dir, e.as));
+    for (const e of demo.extras ?? [])
+      if (resolve(repoRoot, e.from) !== join(dir, e.as)) copyFileSync(join(repoRoot, e.from), join(dir, e.as));
 
     let result;
     if (demo.special === "zoom") {
@@ -168,7 +191,8 @@ async function captureDemo(browser, demo, settlePage) {
       const said = `${result.output}${result.thenOutput ?? ""}`;
       for (const shot of demo.shots ?? []) {
         for (const sel of shot.mark ?? []) {
-          if (!said.includes(sel)) throw new Error(`${demo.id}: marked selector "${sel}" is not in the command's output`);
+          if (!said.includes(sel))
+            throw new Error(`${demo.id}: marked selector "${sel}" is not in the command's output`);
         }
       }
       for (const [i, shot] of (demo.shots ?? []).entries()) {
@@ -190,7 +214,9 @@ async function captureDemo(browser, demo, settlePage) {
     if (demo.run) result.command = [demo.bin ?? "vlmkit", ...demo.run].join(" ");
     if (demo.then) result.thenCommand = [demo.bin ?? "vlmkit", ...demo.then].join(" ");
     writeFileSync(join(dir, "result.json"), JSON.stringify(result, null, 2) + "\n");
-    console.log(`  ${demo.id}: exit ${result.exit}${result.thenExit !== undefined ? ` / ${result.thenExit}` : ""}, ${result.images.length} image(s)`);
+    console.log(
+      `  ${demo.id}: exit ${result.exit}${result.thenExit !== undefined ? ` / ${result.thenExit}` : ""}, ${result.images.length} image(s)`,
+    );
   } finally {
     rmSync(outDir, { recursive: true, force: true });
   }

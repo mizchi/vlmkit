@@ -2,25 +2,43 @@ import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
 import { classifyRegion } from "./region-classify.ts";
 
-function fillRect(data: Uint8Array, width: number, x0: number, y0: number, w: number, h: number, r: number, g: number, b: number) {
+function fillRect(
+  data: Uint8Array,
+  width: number,
+  x0: number,
+  y0: number,
+  w: number,
+  h: number,
+  r: number,
+  g: number,
+  b: number,
+) {
   for (let y = y0; y < y0 + h; y++) {
     for (let x = x0; x < x0 + w; x++) {
       const i = (y * width + x) * 4;
-      data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = 255;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = 255;
     }
   }
 }
 
 function blankRgba(width: number, height: number, r = 255, g = 255, b = 255): Uint8Array {
   const data = new Uint8Array(width * height * 4);
-  for (let i = 0; i < data.length; i += 4) { data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = 255; }
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+    data[i + 3] = 255;
+  }
   return data;
 }
 
 describe("classifyRegion", () => {
   it("classifies a solid color rectangle as filled-rect", () => {
     const data = blankRgba(200, 200);
-    fillRect(data, 200, 40, 40, 80, 30, 37, 99, 235);  // solid blue
+    fillRect(data, 200, 40, 40, 80, 30, 37, 99, 235); // solid blue
     const c = classifyRegion(data, 200, 200, { top: 40, left: 40, width: 80, height: 30 });
     assert.equal(c.kind, "filled-rect");
     assert.ok(c.features.colorCount <= 4);

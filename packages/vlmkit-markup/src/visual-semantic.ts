@@ -5,10 +5,7 @@ import type {
   VisualSemanticDiff,
   VisualChangeType,
 } from "@mizchi/vlmkit-core/types.ts";
-import {
-  classifyRegionPolicy,
-  layoutShiftGroupThreshold,
-} from "./markup-core-visual-semantic.ts";
+import { classifyRegionPolicy, layoutShiftGroupThreshold } from "./markup-core-visual-semantic.ts";
 
 /**
  * Convert VRT pixel diff into visual semantics.
@@ -59,9 +56,7 @@ function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange
   // Shape says "wide band = shift", but if the pixels recolored in place
   // (large color delta, no measured movement) the shape hint is wrong —
   // a full-width background recolor has the same silhouette.
-  const recoloredInPlace = !region.shift
-    && region.colorSample !== undefined
-    && region.colorSample.distance >= 24;
+  const recoloredInPlace = !region.shift && region.colorSample !== undefined && region.colorSample.distance >= 24;
 
   const policy = classifyRegionPolicy({
     regionType: region.regionType === "shift" && !recoloredInPlace ? "shift" : undefined,
@@ -80,11 +75,7 @@ function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange
   };
 }
 
-function describeChange(
-  type: VisualChangeType,
-  region: DiffRegion,
-  diff: VrtDiff,
-): string {
+function describeChange(type: VisualChangeType, region: DiffRegion, diff: VrtDiff): string {
   const area = region.width * region.height;
   const density = area > 0 ? region.diffPixelCount / area : 0;
   const globalRatio = region.diffPixelCount / diff.totalPixels;
@@ -103,9 +94,7 @@ function describeChange(
     case "reflow":
       // A measured reflow returns early via describeShift; this defensive
       // branch keeps the switch exhaustive over VisualChangeType.
-      return region.shift
-        ? describeShift(region, true)
-        : `Vertical reflow at ${where}, ${dims}`;
+      return region.shift ? describeShift(region, true) : `Vertical reflow at ${where}, ${dims}`;
     case "icon-change":
       return `Small square region changed at ${where}`;
     case "text-change":
@@ -129,9 +118,8 @@ function describeShift(region: DiffRegion, isReflow = false): string {
   const shift = region.shift!;
   const fmt = (v: number) => (v >= 0 ? `+${v}` : String(v));
   const offset = `${fmt(shift.dx)}, ${fmt(shift.dy)}`;
-  const recolor = region.colorSample && region.colorSample.distance >= 24
-    ? `${formatColorSample(region)} (also recolored)`
-    : "";
+  const recolor =
+    region.colorSample && region.colorSample.distance >= 24 ? `${formatColorSample(region)} (also recolored)` : "";
   const lead = isReflow
     ? `Vertical reflow: content below shifted by ${fmt(shift.dy)}px`
     : `Content translated by (${offset}) px`;
@@ -155,9 +143,7 @@ function formatColorSample(region: DiffRegion): string {
  * Group layout-shifts with close Y coordinates.
  * Multiple regions shifting on the same row = one layout shift.
  */
-function groupLayoutShifts(
-  changes: VisualSemanticChange[],
-): VisualSemanticChange[] {
+function groupLayoutShifts(changes: VisualSemanticChange[]): VisualSemanticChange[] {
   const layoutShifts = changes.filter((c) => c.type === "layout-shift");
   const others = changes.filter((c) => c.type !== "layout-shift");
 
@@ -188,10 +174,7 @@ function groupLayoutShifts(
     const minY = Math.min(...group.map((c) => c.region.y));
     const maxX = Math.max(...group.map((c) => c.region.x + c.region.width));
     const maxY = Math.max(...group.map((c) => c.region.y + c.region.height));
-    const totalDiff = group.reduce(
-      (sum, c) => sum + c.region.diffPixelCount,
-      0,
-    );
+    const totalDiff = group.reduce((sum, c) => sum + c.region.diffPixelCount, 0);
 
     return {
       type: "layout-shift",

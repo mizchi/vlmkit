@@ -103,14 +103,15 @@ describe("markup-core JSON boundary", { timeout: 240_000 }, () => {
     // The payoff over positional strings: the error says WHICH field and what was
     // expected, instead of a rule silently seeing a value it parsed differently.
     assert.throws(
-      () => callMarkupCoreJson(COMMAND, {
-        width_kind: "fluid",
-        width_value: "not a number",
-        height_kind: "content",
-        display_kind: "block",
-        display_columns_count: 1,
-        display_rows_count: 1,
-      }),
+      () =>
+        callMarkupCoreJson(COMMAND, {
+          width_kind: "fluid",
+          width_value: "not a number",
+          height_kind: "content",
+          display_kind: "block",
+          display_columns_count: 1,
+          display_rows_count: 1,
+        }),
       /width_value/,
     );
   });
@@ -144,7 +145,10 @@ describe("markup-core JSON boundary", { timeout: 240_000 }, () => {
     assert.ok(commands.includes("goal-status"));
     assert.ok(commands.includes("interaction-issues"));
     assert.equal(new Set(commands).size, commands.length, "duplicate command names");
-    assert.ok(commands.every((name) => /^[a-z0-9-]+$/.test(name)), commands.join(", "));
+    assert.ok(
+      commands.every((name) => /^[a-z0-9-]+$/.test(name)),
+      commands.join(", "),
+    );
     // `markup-core-migration.test.ts` is what checks the whole set has coverage.
   });
 
@@ -167,11 +171,9 @@ describe("markup-core JSON boundary", { timeout: 240_000 }, () => {
       display_rows_count: 0,
     };
     const direct = callMarkupCoreJson<string[]>(COMMAND, payload);
-    const spawned = spawnSync(
-      process.execPath,
-      [cli, "--json", COMMAND, JSON.stringify(payload)],
-      { encoding: "utf8" },
-    );
+    const spawned = spawnSync(process.execPath, [cli, "--json", COMMAND, JSON.stringify(payload)], {
+      encoding: "utf8",
+    });
     assert.equal(spawned.status, 0, spawned.stderr);
     assert.deepEqual(JSON.parse(spawned.stdout.trim()), direct);
     // And it is a non-trivial answer, so agreeing on `[]` cannot pass this.

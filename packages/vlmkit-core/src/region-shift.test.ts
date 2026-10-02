@@ -9,14 +9,7 @@ function blankImage(width: number, height: number): PngData {
   return { width, height, data };
 }
 
-function drawRect(
-  img: PngData,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  [r, g, b]: [number, number, number],
-): void {
+function drawRect(img: PngData, x: number, y: number, w: number, h: number, [r, g, b]: [number, number, number]): void {
   for (let yy = y; yy < y + h; yy++) {
     for (let xx = x; xx < x + w; xx++) {
       const i = (yy * img.width + xx) * 4;

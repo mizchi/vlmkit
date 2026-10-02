@@ -9,11 +9,7 @@ import { parseDiffPrConfig } from "./diff-pr-config.ts";
 
 const CLI_PATH = new URL("./cli/vlmkit.ts", import.meta.url).pathname;
 function cli(cwd: string, ...argv: string[]): { stdout: string; stderr: string; status: number } {
-  const r = spawnSync(
-    "node",
-    ["--experimental-strip-types", CLI_PATH, "diff-pr", ...argv],
-    { encoding: "utf-8", cwd },
-  );
+  const r = spawnSync("node", ["--experimental-strip-types", CLI_PATH, "diff-pr", ...argv], { encoding: "utf-8", cwd });
   // Strip ANSI so regex assertions can match content without
   // accounting for color codes between meaningful tokens.
   // eslint-disable-next-line no-control-regex
@@ -25,14 +21,14 @@ function cli(cwd: string, ...argv: string[]): { stdout: string; stderr: string; 
   };
 }
 
-const config = parseDiffPrConfig(JSON.stringify({
-  baseUrl: "http://localhost:3000",
-  thresholds: { mobile: 0.01, desktop: 0.005, wide: 0.005 },
-  routes: [
-    "/",
-    { name: "admin", path: "/admin", thresholds: { mobile: 0.03, desktop: 0.02, wide: 0.02 } },
-  ],
-}), "/example/vlmkit.config.json");
+const config = parseDiffPrConfig(
+  JSON.stringify({
+    baseUrl: "http://localhost:3000",
+    thresholds: { mobile: 0.01, desktop: 0.005, wide: 0.005 },
+    routes: ["/", { name: "admin", path: "/admin", thresholds: { mobile: 0.03, desktop: 0.02, wide: 0.02 } }],
+  }),
+  "/example/vlmkit.config.json",
+);
 
 describe("buildMarkdownSummary", () => {
   it("declares PASS when every route is within threshold", () => {
@@ -188,7 +184,8 @@ describe("vlmkit diff-pr a11y gate", () => {
     cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-a11y-"));
     await mkdir(join(cwd, "pages"), { recursive: true });
     // Good: high contrast + big buttons + DOM-order Tab.
-    await writeFile(join(cwd, "pages", "good.html"),
+    await writeFile(
+      join(cwd, "pages", "good.html"),
       `<!doctype html><html><head><style>
         body { margin: 0; padding: 24px; background: #fff; color: #111; font: 16px sans-serif; }
         button { background: #1a73e8; color: #fff; font: 700 16px sans-serif;
@@ -197,7 +194,8 @@ describe("vlmkit diff-pr a11y gate", () => {
       </style></head><body>
       <h1>Accessible page</h1><p>Body text reads cleanly.</p>
       <button>One</button><button>Two</button>
-      </body></html>`);
+      </body></html>`,
+    );
     // Bad: muted text, and a row of tiny buttons.
     //
     // TWO adjacent buttons, not one. A single isolated tiny button satisfies WCAG 2.5.8's
@@ -205,7 +203,8 @@ describe("vlmkit diff-pr a11y gate", () => {
     // touch failure when the exceptions landed in 0.11.0, and this test's whole subject is
     // a route that exceeds the touch budget. Adjacent controls are the case the criterion
     // is actually aimed at.
-    await writeFile(join(cwd, "pages", "bad.html"),
+    await writeFile(
+      join(cwd, "pages", "bad.html"),
       `<!doctype html><html><head><style>
         body { margin: 0; padding: 24px; background: #fff; color: #999; font: 14px sans-serif; }
         button { background: #ccc; color: #999; font: 11px sans-serif;
@@ -214,7 +213,8 @@ describe("vlmkit diff-pr a11y gate", () => {
       <h1>Low contrast heading</h1>
       <p>Muted body text.</p>
       <button>x</button><button>y</button>
-      </body></html>`);
+      </body></html>`,
+    );
     const cfg = {
       thresholds: { mobile: 0.5, desktop: 0.5, wide: 0.5 },
       baselineDir: ".vlmkit/baselines",
@@ -251,14 +251,21 @@ describe("vlmkit diff-pr a11y gate", () => {
 
   it("approval-manifest suppression flips bad route to pass", async () => {
     const manifestPath = join(cwd, "approval.json");
-    await writeFile(manifestPath, JSON.stringify({
-      rules: [
-        { kind: "a11y-contrast", selector: "button", reason: "decorative button" },
-        { kind: "a11y-contrast", selector: "h1", reason: "branded muted heading" },
-        { kind: "a11y-contrast", selector: "p", reason: "secondary body text" },
-        { kind: "a11y-touch", selector: "button", reason: "tiny dismiss" },
-      ],
-    }, null, 2));
+    await writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          rules: [
+            { kind: "a11y-contrast", selector: "button", reason: "decorative button" },
+            { kind: "a11y-contrast", selector: "h1", reason: "branded muted heading" },
+            { kind: "a11y-contrast", selector: "p", reason: "secondary body text" },
+            { kind: "a11y-touch", selector: "button", reason: "tiny dismiss" },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
     const r = cli(cwd);
     assert.equal(r.status, 0, `expected pass with suppression: ${r.stdout}\n${r.stderr}`);
     assert.match(r.stdout, /good\s+pass.*\[a11y c=0\/t=0/);
@@ -267,18 +274,21 @@ describe("vlmkit diff-pr a11y gate", () => {
 
   it("expired manifest rules don't suppress findings", async () => {
     const manifestPath = join(cwd, "approval.json");
-    await writeFile(manifestPath, JSON.stringify({
-      rules: [
-        { kind: "a11y-contrast", selector: "button",
-          reason: "decorative", expires: "2020-01-01" },
-        { kind: "a11y-contrast", selector: "h1",
-          reason: "branded", expires: "2020-01-01" },
-        { kind: "a11y-contrast", selector: "p",
-          reason: "secondary", expires: "2020-01-01" },
-        { kind: "a11y-touch", selector: "button",
-          reason: "tiny", expires: "2020-01-01" },
-      ],
-    }, null, 2));
+    await writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          rules: [
+            { kind: "a11y-contrast", selector: "button", reason: "decorative", expires: "2020-01-01" },
+            { kind: "a11y-contrast", selector: "h1", reason: "branded", expires: "2020-01-01" },
+            { kind: "a11y-contrast", selector: "p", reason: "secondary", expires: "2020-01-01" },
+            { kind: "a11y-touch", selector: "button", reason: "tiny", expires: "2020-01-01" },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
     const r = cli(cwd);
     assert.equal(r.status, 1, `expected fail with expired rules: ${r.stdout}\n${r.stderr}`);
     assert.match(r.stdout, /bad\s+FAIL/);
@@ -403,8 +413,14 @@ describe("vlmkit diff-pr post", () => {
       const r = spawnSync(
         "node",
         [
-          "--experimental-strip-types", CLI_PATH, "diff-pr", "post",
-          "--pr", "owner/repo#42", "--marker", "vrt-ui-team-staging",
+          "--experimental-strip-types",
+          CLI_PATH,
+          "diff-pr",
+          "post",
+          "--pr",
+          "owner/repo#42",
+          "--marker",
+          "vrt-ui-team-staging",
         ],
         { encoding: "utf-8", cwd, env: { ...process.env, CI: "", PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
       );
@@ -464,12 +480,19 @@ describe("a declared viewport with no baseline", () => {
       join(cwd, "pages", "home.html"),
       "<!doctype html><html><body style='margin:0;background:#0a0;height:400px'></body></html>",
     );
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["mobile", "desktop"],
-      thresholds: { mobile: 0.01, desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["mobile", "desktop"],
+          thresholds: { mobile: 0.01, desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
+        },
+        null,
+        2,
+      ),
+    );
     const pin = cli(cwd, "pin");
     assert.equal(pin.status, 0, `seed pin failed: ${pin.stderr}`);
   });
@@ -504,10 +527,14 @@ describe("a declared viewport with no baseline", () => {
     // is not empty.
     await rm(join(cwd, ".vlmkit/baselines/home"), { recursive: true, force: true });
     await mkdir(join(cwd, ".vlmkit/baselines/home"), { recursive: true });
-    await writeFile(join(cwd, ".vlmkit/baselines/home/tablet.png"), Buffer.from(
-      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001"
-      + "0d0a2db40000000049454e44ae426082", "hex",
-    ));
+    await writeFile(
+      join(cwd, ".vlmkit/baselines/home/tablet.png"),
+      Buffer.from(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001" +
+          "0d0a2db40000000049454e44ae426082",
+        "hex",
+      ),
+    );
     const r = cli(cwd, "--output", "out-none");
     assert.equal(r.status, 1, `zero comparisons must not pass:\n${r.stdout}`);
     assert.match(r.stdout, /not compared: mobile, desktop/);
@@ -557,17 +584,24 @@ describe("a waitFor selector that never matches", () => {
     // this is exactly the page that gets measured too early.
     await writeFile(
       join(cwd, "pages", "app.html"),
-      "<!doctype html><html><head><style>body{margin:0}#root{height:400px;background:#eee}"
-      + ".card{height:120px;background:#c00}</style></head><body><div id=\"root\">Loading…</div>"
-      + "<script>setTimeout(() => { document.getElementById('root').innerHTML = "
-      + "'<div class=\"app-root\"><div class=\"card\"></div></div>'; }, 300);</script></body></html>",
+      "<!doctype html><html><head><style>body{margin:0}#root{height:400px;background:#eee}" +
+        '.card{height:120px;background:#c00}</style></head><body><div id="root">Loading…</div>' +
+        "<script>setTimeout(() => { document.getElementById('root').innerHTML = " +
+        '\'<div class="app-root"><div class="card"></div></div>\'; }, 300);</script></body></html>',
     );
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["desktop"],
-      thresholds: { desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["desktop"],
+          thresholds: { desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
+        },
+        null,
+        2,
+      ),
+    );
     const pin = cli(cwd, "pin");
     assert.equal(pin.status, 0, `a matching waitFor must pin cleanly: ${pin.stdout}${pin.stderr}`);
   });
@@ -578,12 +612,19 @@ describe("a waitFor selector that never matches", () => {
 
   it("fails the pin and writes no baseline, rather than pinning a placeholder", async () => {
     await rm(join(cwd, ".vlmkit/baselines"), { recursive: true, force: true });
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["desktop"],
-      thresholds: { desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-rooot" }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["desktop"],
+          thresholds: { desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-rooot" }],
+        },
+        null,
+        2,
+      ),
+    );
 
     const pin = cli(cwd, "pin");
     assert.equal(pin.status, 1, `an unmet waitFor must fail the pin:\n${pin.stdout}`);
@@ -593,7 +634,10 @@ describe("a waitFor selector that never matches", () => {
     // No PNG, so the next run reports "not compared" rather than agreeing with a
     // baseline captured before the page rendered.
     const files = await readdir(join(cwd, ".vlmkit/baselines/app")).catch(() => []);
-    assert.deepEqual(files.filter((f) => f.endsWith(".png")), []);
+    assert.deepEqual(
+      files.filter((f) => f.endsWith(".png")),
+      [],
+    );
   });
 
   it("fails the gate run and reports it as a render error, not a 100% breach", async () => {
@@ -601,19 +645,33 @@ describe("a waitFor selector that never matches", () => {
     // current side fails. `diffRatio: 1` in the catch is there to force the failure —
     // reporting it as `100.00%` under "Worst offenders" sent the reader to look at
     // screenshots for a config typo.
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["desktop"],
-      thresholds: { desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["desktop"],
+          thresholds: { desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
+        },
+        null,
+        2,
+      ),
+    );
     assert.equal(cli(cwd, "pin").status, 0);
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["desktop"],
-      thresholds: { desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-rooot" }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["desktop"],
+          thresholds: { desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-rooot" }],
+        },
+        null,
+        2,
+      ),
+    );
 
     const r = cli(cwd, "--output", "out-wait");
     assert.equal(r.status, 1, `an unmet waitFor must fail the run:\n${r.stdout}`);
@@ -634,12 +692,19 @@ describe("a waitFor selector that never matches", () => {
     // per viewport. Asserted well under that rather than at a tight number, because this
     // is a browser launch on shared CI — what is being ruled out is "waited out the
     // timeout and carried on", not a performance target.
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["desktop"],
-      thresholds: { desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["desktop"],
+          thresholds: { desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
+        },
+        null,
+        2,
+      ),
+    );
     const started = Date.now();
     const pin = cli(cwd, "pin");
     const elapsed = Date.now() - started;
@@ -681,14 +746,21 @@ describe("a declared policy whose run throws", () => {
       join(cwd, "pages", "home.html"),
       "<!doctype html><html><body style='margin:0;background:#0a0;height:400px'></body></html>",
     );
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["desktop"],
-      thresholds: { desktop: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      // One variant, so the run is quick; `print` needs no extra engine.
-      mediaVariants: { variants: ["print"], maxSuspects: 5, maxWarns: 5 },
-      routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["desktop"],
+          thresholds: { desktop: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          // One variant, so the run is quick; `print` needs no extra engine.
+          mediaVariants: { variants: ["print"], maxSuspects: 5, maxWarns: 5 },
+          routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
+        },
+        null,
+        2,
+      ),
+    );
     const pin = cli(cwd, "pin");
     assert.equal(pin.status, 0, `seed pin failed: ${pin.stderr}`);
   });
@@ -757,12 +829,19 @@ describe("a malformed flag", () => {
       join(cwd, "pages", "home.html"),
       "<!doctype html><html><body style='margin:0;background:#0a0;height:200px'></body></html>",
     );
-    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
-      viewports: ["mobile"],
-      thresholds: { mobile: 0.01 },
-      baselineDir: ".vlmkit/baselines",
-      routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
-    }, null, 2));
+    await writeFile(
+      join(cwd, "vlmkit.config.json"),
+      JSON.stringify(
+        {
+          viewports: ["mobile"],
+          thresholds: { mobile: 0.01 },
+          baselineDir: ".vlmkit/baselines",
+          routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
+        },
+        null,
+        2,
+      ),
+    );
     assert.equal(cli(cwd, "pin").status, 0);
   });
 

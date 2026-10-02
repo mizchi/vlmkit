@@ -14,7 +14,10 @@ function makePng(
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const [r, g, b, a] = paint(x, y);
-      png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b; png.data[i + 3] = a;
+      png.data[i] = r;
+      png.data[i + 1] = g;
+      png.data[i + 2] = b;
+      png.data[i + 3] = a;
     }
   }
   return png;
@@ -23,7 +26,8 @@ function makePng(
 /** A centered orange disc on a transparent canvas (a well-formed sprite). */
 const disc = (w: number, h: number, color: [number, number, number] = [230, 120, 40]) =>
   makePng(w, h, (x, y) => {
-    const dx = x - w / 2, dy = y - h / 2;
+    const dx = x - w / 2,
+      dy = y - h / 2;
     const r = Math.min(w, h) * 0.35;
     return dx * dx + dy * dy <= r * r ? [...color, 255] : [0, 0, 0, 0];
   });
@@ -44,7 +48,8 @@ test("well-formed transparent sprite passes with no issues", () => {
 
 test("matted background is reported with its color and flagged under --expect-transparent", () => {
   const matted = makePng(120, 120, (x, y) => {
-    const dx = x - 60, dy = y - 60;
+    const dx = x - 60,
+      dy = y - 60;
     return dx * dx + dy * dy <= 30 * 30 ? [230, 120, 40, 255] : [255, 255, 255, 255];
   });
   const report = analyzeAssetPng(matted, { source: "matted.png", expectTransparent: true });
@@ -92,13 +97,15 @@ test("palette harmony compares asset dominants against the page palette", () => 
     { hex: "#e67828", r: 230, g: 120, b: 40, share: 0.4, count: 400 },
   ];
   const matching = analyzeAssetPng(disc(120, 120, [230, 120, 40]), {
-    source: "match.png", pagePalette,
+    source: "match.png",
+    pagePalette,
   });
   assert.equal(matching.paletteHarmony, 1);
   assert.equal(matching.issues.filter((i) => i.kind === "palette-clash").length, 0);
 
   const clashing = analyzeAssetPng(disc(120, 120, [40, 230, 90]), {
-    source: "clash.png", pagePalette,
+    source: "clash.png",
+    pagePalette,
   });
   assert.ok(clashing.paletteHarmony! < 0.25);
   assert.equal(clashing.issues.filter((i) => i.kind === "palette-clash" && i.severity === "warn").length, 1);

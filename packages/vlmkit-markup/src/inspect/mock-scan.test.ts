@@ -32,8 +32,10 @@ test("inferScaleCandidates: unknown widths fall back to @1x with a note", () => 
 test("boxDownscale averages each block and inverts a nearest 2x upscale exactly", () => {
   // 2x2 source image at @1x, nearest-upscaled to 4x4.
   const px = [
-    [10, 20, 30, 255], [200, 210, 220, 255],
-    [50, 60, 70, 255], [90, 100, 110, 255],
+    [10, 20, 30, 255],
+    [200, 210, 220, 255],
+    [50, 60, 70, 255],
+    [90, 100, 110, 255],
   ];
   const up = new Uint8Array(4 * 4 * 4);
   for (let y = 0; y < 4; y++) {

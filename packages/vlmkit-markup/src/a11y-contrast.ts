@@ -275,9 +275,7 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
   return findings;
 }
 
-export async function runA11yContrast(
-  options: A11yContrastOptions,
-): Promise<A11yContrastReport> {
+export async function runA11yContrast(options: A11yContrastOptions): Promise<A11yContrastReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   // A URL is a valid source now that loading goes through `openSource`;
@@ -300,7 +298,7 @@ export async function runA11yContrast(
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    const samples = await page.evaluate(`(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`) as A11yContrastRawSample[];
+    const samples = (await page.evaluate(`(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`)) as A11yContrastRawSample[];
     const screenshotPath = join(outputDir, "page.png");
     await page.screenshot({ path: screenshotPath, fullPage: false });
     await page.close();
@@ -331,8 +329,6 @@ export async function runA11yContrast(
   });
   await writeFile(reportPath, md);
 
-
-
   const allowRules = parseSelectorAllowRules(options.allow ?? [], { ruleId: "contrast-below-aa" });
   const applied = applySelectorAllowRules(findings, allowRules, (f) => f.path);
   return {
@@ -344,12 +340,12 @@ export async function runA11yContrast(
     ...(compositeCount > 0 ? { unmeasuredComposite: compositeCount } : {}),
     ...(applied.exempted.length > 0
       ? {
-        exempted: applied.exempted.map((e) => ({
-          finding: e.finding,
-          reason: e.rule.reason,
-          rule: e.rule.raw.split(";")[0] ?? e.rule.raw,
-        })),
-      }
+          exempted: applied.exempted.map((e) => ({
+            finding: e.finding,
+            reason: e.rule.reason,
+            rule: e.rule.raw.split(";")[0] ?? e.rule.raw,
+          })),
+        }
       : {}),
     ...(applied.unused.length > 0 ? { unusedAllow: applied.unused.map((r) => r.raw) } : {}),
     reportPath,
@@ -366,13 +362,13 @@ export function formatA11yContrastReport(report: A11yContrastReport, rules?: Rul
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
   lines.push(
-    `  ${DIM}inspected ${report.totalText} text-bearing element(s)`
-    // Stated on the coverage line, not buried: "0 failures over 59" and "0 failures over 59, 26
-    // of them unmeasurable" are different claims and only the second is honest.
-    + (report.unmeasuredComposite
-      ? `, ${report.unmeasuredComposite} not measurable (background-image/gradient behind the text)`
-      : "")
-    + `${RESET}`,
+    `  ${DIM}inspected ${report.totalText} text-bearing element(s)` +
+      // Stated on the coverage line, not buried: "0 failures over 59" and "0 failures over 59, 26
+      // of them unmeasurable" are different claims and only the second is honest.
+      (report.unmeasuredComposite
+        ? `, ${report.unmeasuredComposite} not measurable (background-image/gradient behind the text)`
+        : "") +
+      `${RESET}`,
   );
   // `--rule contrast-below-aa=off` used to change the exit code and nothing on this screen.
   // The measured count survives the rule being off, because the ratios were still measured;
@@ -383,18 +379,26 @@ export function formatA11yContrastReport(report: A11yContrastReport, rules?: Rul
     ? `${DIM}-${RESET}`
     : report.failures.length === 0
       ? `${GREEN}✓${RESET}`
-      : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+      : tier === "suspect"
+        ? `${RED}✗${RESET}`
+        : tier === "warn"
+          ? `${YELLOW}!${RESET}`
+          : `${DIM}i${RESET}`;
   lines.push(
-    `  ${icon} ${report.failures.length} contrast failure(s)`
-    + (off
-      ? `${DIM} measured and NOT reported — contrast-below-aa is off${RESET}`
-      : tier === "suspect" ? "" : `${DIM} [contrast-below-aa re-tuned to ${tier}]${RESET}`)
-    + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
+    `  ${icon} ${report.failures.length} contrast failure(s)` +
+      (off
+        ? `${DIM} measured and NOT reported — contrast-below-aa is off${RESET}`
+        : tier === "suspect"
+          ? ""
+          : `${DIM} [contrast-below-aa re-tuned to ${tier}]${RESET}`) +
+      `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
   );
   const CONSOLE_ROWS = 5;
   for (const f of off ? [] : report.failures.slice(0, CONSOLE_ROWS)) {
     const shared = f.elements > 1 ? ` ${f.elements} element(s)` : "";
-    lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${shared}${RESET}`);
+    lines.push(
+      `    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${shared}${RESET}`,
+    );
   }
   // Disclose the cut: a headline count above a five-row list reads as "here they
   // are", and a reader has no way to know seven more exist. Same wording as
@@ -405,14 +409,14 @@ export function formatA11yContrastReport(report: A11yContrastReport, rules?: Rul
   // Listed, never merely subtracted.
   for (const e of report.exempted ?? []) {
     lines.push(
-      `    ${DIM}- ${e.finding.path} — ${e.finding.ratio.toFixed(2)}:1:`
-      + ` user exemption (${e.rule}): ${e.reason}${RESET}`,
+      `    ${DIM}- ${e.finding.path} — ${e.finding.ratio.toFixed(2)}:1:` +
+        ` user exemption (${e.rule}): ${e.reason}${RESET}`,
     );
   }
   if (report.unusedAllow?.length) {
     lines.push(
-      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:`
-      + ` ${report.unusedAllow.join(", ")}${RESET}`,
+      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:` +
+        ` ${report.unusedAllow.join(", ")}${RESET}`,
     );
     lines.push(`    ${DIM}Delete them: an exemption kept past what it covered only widens the blind spot.${RESET}`);
   }
@@ -426,39 +430,45 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
   lines.push("");
   lines.push(`HTML: \`${r.html}\``);
   lines.push("");
-  lines.push(`Inspected **${r.totalText}** unique text-bearing elements. ` +
-    `Screenshot: \`${r.screenshot}\`.`);
+  lines.push(`Inspected **${r.totalText}** unique text-bearing elements. ` + `Screenshot: \`${r.screenshot}\`.`);
   if (r.unmeasuredComposite) {
     lines.push("");
     lines.push(
-      `**${r.unmeasuredComposite}** of them were NOT measured: a \`background-image\` or gradient`
-      + " sits behind the text, so the colour underneath varies across the element and is not"
-      + " derivable from computed style. Guessing white there is how near-white text on a dark"
-      + " gradient gets reported as a 1.08:1 failure. Sampling the rendered pixels would answer"
-      + " it; a style walk cannot.",
+      `**${r.unmeasuredComposite}** of them were NOT measured: a \`background-image\` or gradient` +
+        " sits behind the text, so the colour underneath varies across the element and is not" +
+        " derivable from computed style. Guessing white there is how near-white text on a dark" +
+        " gradient gets reported as a 1.08:1 failure. Sampling the rendered pixels would answer" +
+        " it; a style walk cannot.",
     );
   }
   lines.push("");
   if (r.failures.length === 0) {
     lines.push("## All text passes WCAG AA contrast");
     lines.push("");
-    lines.push("Every visible text element has a contrast ratio ≥ 4.5:1 (or ≥ 3:1 for " +
-      "large text, defined as ≥ 18px regular or ≥ 14px bold).");
+    lines.push(
+      "Every visible text element has a contrast ratio ≥ 4.5:1 (or ≥ 3:1 for " +
+        "large text, defined as ≥ 18px regular or ≥ 14px bold).",
+    );
   } else {
     lines.push(`## ${r.failures.length} contrast failure(s)`);
     lines.push("");
-    lines.push("WCAG 2.1 AA requires ≥ 4.5:1 contrast for normal text and ≥ 3:1 for " +
-      "large text (≥ 18px regular, or ≥ 14px bold). Ratios below these thresholds " +
-      "make text hard to read for users with low vision.");
+    lines.push(
+      "WCAG 2.1 AA requires ≥ 4.5:1 contrast for normal text and ≥ 3:1 for " +
+        "large text (≥ 18px regular, or ≥ 14px bold). Ratios below these thresholds " +
+        "make text hard to read for users with low vision.",
+    );
     lines.push("");
     lines.push("| Element | Text (truncated) | Foreground | Background | Ratio | Need |");
     lines.push("|---|---|---|---|---|---|");
     for (const f of r.failures.slice(0, 20)) {
       const fgSwatch = `\`${f.foreground.hex}\``;
       const bgSwatch = `\`${f.background.hex}\``;
-      lines.push(`| \`${f.path}\` (${f.fontSize.toFixed(0)}px${f.fontWeight >= 600 ? " b" : ""}) | \`${f.text}\` | ${fgSwatch} | ${bgSwatch} | **${f.ratio}:1** | ${f.requiredAA}:1 |`);
+      lines.push(
+        `| \`${f.path}\` (${f.fontSize.toFixed(0)}px${f.fontWeight >= 600 ? " b" : ""}) | \`${f.text}\` | ${fgSwatch} | ${bgSwatch} | **${f.ratio}:1** | ${f.requiredAA}:1 |`,
+      );
     }
-    if (r.failures.length > 20) lines.push(`\n_… ${r.failures.length - 20} more row(s) omitted; the JSON report has all of them._`);
+    if (r.failures.length > 20)
+      lines.push(`\n_… ${r.failures.length - 20} more row(s) omitted; the JSON report has all of them._`);
     if (r.failures.length > 20) {
       lines.push(`| _…${r.failures.length - 20} more_ | | | | | |`);
     }
@@ -467,16 +477,24 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
   lines.push("## Suggested next step");
   lines.push("");
   if (r.failures.length === 0) {
-    lines.push("Page is WCAG AA contrast-clean. Consider running with `--strict` to also " +
-      "check AAA (7:1 normal, 4.5:1 large) when supporting low-vision users.");
+    lines.push(
+      "Page is WCAG AA contrast-clean. Consider running with `--strict` to also " +
+        "check AAA (7:1 normal, 4.5:1 large) when supporting low-vision users.",
+    );
   } else {
     lines.push("For each failing row:");
-    lines.push("1. Increase contrast by darkening the foreground or lightening the background " +
-      "until the ratio crosses 4.5:1 (or 3:1 for large text).");
-    lines.push("2. Use a contrast-ratio calculator to find specific hex values — every step " +
-      "toward black/white on a light/dark bg adds ratio.");
-    lines.push("3. Common fix: muted-gray-on-white text (e.g. `#9ca3af` on `#ffffff` = 2.85:1) " +
-      "→ try `#6b7280` (4.69:1) or darker.");
+    lines.push(
+      "1. Increase contrast by darkening the foreground or lightening the background " +
+        "until the ratio crosses 4.5:1 (or 3:1 for large text).",
+    );
+    lines.push(
+      "2. Use a contrast-ratio calculator to find specific hex values — every step " +
+        "toward black/white on a light/dark bg adds ratio.",
+    );
+    lines.push(
+      "3. Common fix: muted-gray-on-white text (e.g. `#9ca3af` on `#ffffff` = 2.85:1) " +
+        "→ try `#6b7280` (4.69:1) or darker.",
+    );
     lines.push("4. Re-run `vlmkit check a11y contrast`. Failures should clear.");
   }
   lines.push("");

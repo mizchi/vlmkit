@@ -13,9 +13,17 @@ import {
 } from "./storage.ts";
 
 class FakeR2Bucket implements WorkerR2BucketLike {
-  puts: Array<{ key: string; value: string; options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> } }> = [];
+  puts: Array<{
+    key: string;
+    value: string;
+    options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> };
+  }> = [];
 
-  async put(key: string, value: string | ArrayBuffer | Uint8Array, options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> }) {
+  async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+    options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> },
+  ) {
     this.puts.push({
       key,
       value: typeof value === "string" ? value : String(value),
@@ -168,28 +176,31 @@ describe("createWorkerStorage", () => {
 
 describe("buildWorkerExecutionResults", () => {
   it("searches across run metadata and artifact paths", () => {
-    const result = buildWorkerExecutionResults([
-      {
-        runId: "daily-1",
-        runType: "snapshot",
-        artifactKind: "snapshot",
-        artifactPath: "snapshot-report.json",
-        r2Key: "runs/daily-1/snapshot/snapshot-report.json",
-        kvKey: "artifacts:daily-1:snapshot:snapshot-report.json",
-        contentType: "application/json",
-        createdAt: "2026-05-22T00:00:00.000Z",
-      },
-      {
-        runId: "migration-1",
-        runType: "migration-blind",
-        artifactKind: "heatmap",
-        artifactPath: "diffs/home_heatmap.png",
-        r2Key: "runs/migration-1/heatmap/diffs/home_heatmap.png",
-        kvKey: "artifacts:migration-1:heatmap:diffs/home_heatmap.png",
-        contentType: "image/png",
-        createdAt: "2026-05-22T00:01:00.000Z",
-      },
-    ], { q: "home", limit: 10 });
+    const result = buildWorkerExecutionResults(
+      [
+        {
+          runId: "daily-1",
+          runType: "snapshot",
+          artifactKind: "snapshot",
+          artifactPath: "snapshot-report.json",
+          r2Key: "runs/daily-1/snapshot/snapshot-report.json",
+          kvKey: "artifacts:daily-1:snapshot:snapshot-report.json",
+          contentType: "application/json",
+          createdAt: "2026-05-22T00:00:00.000Z",
+        },
+        {
+          runId: "migration-1",
+          runType: "migration-blind",
+          artifactKind: "heatmap",
+          artifactPath: "diffs/home_heatmap.png",
+          r2Key: "runs/migration-1/heatmap/diffs/home_heatmap.png",
+          kvKey: "artifacts:migration-1:heatmap:diffs/home_heatmap.png",
+          contentType: "image/png",
+          createdAt: "2026-05-22T00:01:00.000Z",
+        },
+      ],
+      { q: "home", limit: 10 },
+    );
 
     assert.equal(result.total, 1);
     assert.equal(result.results[0]?.runId, "migration-1");
@@ -198,38 +209,41 @@ describe("buildWorkerExecutionResults", () => {
 
 describe("buildWorkerVisualDiffDisplays", () => {
   it("groups baseline/current/heatmap artifacts into dashboard display models", () => {
-    const result = buildWorkerVisualDiffDisplays([
-      {
-        runId: "run-1",
-        runType: "snapshot",
-        artifactKind: "baseline",
-        artifactPath: "home-desktop-baseline.png",
-        r2Key: "runs/run-1/baseline/home-desktop-baseline.png",
-        kvKey: "artifacts:run-1:baseline:home-desktop-baseline.png",
-        contentType: "image/png",
-        createdAt: "2026-05-22T00:00:00.000Z",
-      },
-      {
-        runId: "run-1",
-        runType: "snapshot",
-        artifactKind: "current",
-        artifactPath: "home-desktop-current.png",
-        r2Key: "runs/run-1/current/home-desktop-current.png",
-        kvKey: "artifacts:run-1:current:home-desktop-current.png",
-        contentType: "image/png",
-        createdAt: "2026-05-22T00:00:01.000Z",
-      },
-      {
-        runId: "run-1",
-        runType: "snapshot",
-        artifactKind: "heatmap",
-        artifactPath: "home-desktop_heatmap.png",
-        r2Key: "runs/run-1/heatmap/home-desktop_heatmap.png",
-        kvKey: "artifacts:run-1:heatmap:home-desktop_heatmap.png",
-        contentType: "image/png",
-        createdAt: "2026-05-22T00:00:02.000Z",
-      },
-    ], { q: "home" });
+    const result = buildWorkerVisualDiffDisplays(
+      [
+        {
+          runId: "run-1",
+          runType: "snapshot",
+          artifactKind: "baseline",
+          artifactPath: "home-desktop-baseline.png",
+          r2Key: "runs/run-1/baseline/home-desktop-baseline.png",
+          kvKey: "artifacts:run-1:baseline:home-desktop-baseline.png",
+          contentType: "image/png",
+          createdAt: "2026-05-22T00:00:00.000Z",
+        },
+        {
+          runId: "run-1",
+          runType: "snapshot",
+          artifactKind: "current",
+          artifactPath: "home-desktop-current.png",
+          r2Key: "runs/run-1/current/home-desktop-current.png",
+          kvKey: "artifacts:run-1:current:home-desktop-current.png",
+          contentType: "image/png",
+          createdAt: "2026-05-22T00:00:01.000Z",
+        },
+        {
+          runId: "run-1",
+          runType: "snapshot",
+          artifactKind: "heatmap",
+          artifactPath: "home-desktop_heatmap.png",
+          r2Key: "runs/run-1/heatmap/home-desktop_heatmap.png",
+          kvKey: "artifacts:run-1:heatmap:home-desktop_heatmap.png",
+          contentType: "image/png",
+          createdAt: "2026-05-22T00:00:02.000Z",
+        },
+      ],
+      { q: "home" },
+    );
 
     assert.equal(result.total, 1);
     assert.equal(result.results[0]?.displayKey, "home-desktop");

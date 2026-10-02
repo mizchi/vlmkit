@@ -30,17 +30,11 @@ export interface FlakerVrtConfig {
   scenarios: FlakerVrtMigrationScenario[];
 }
 
-export function resolveFlakerVrtConfigPath(
-  cwd: string,
-  configPath = DEFAULT_FLAKER_VRT_CONFIG_FILE,
-): string {
+export function resolveFlakerVrtConfigPath(cwd: string, configPath = DEFAULT_FLAKER_VRT_CONFIG_FILE): string {
   return resolve(cwd, configPath);
 }
 
-export async function loadFlakerVrtConfig(opts: {
-  cwd: string;
-  configPath?: string;
-}): Promise<FlakerVrtConfig> {
+export async function loadFlakerVrtConfig(opts: { cwd: string; configPath?: string }): Promise<FlakerVrtConfig> {
   const path = resolveFlakerVrtConfigPath(opts.cwd, opts.configPath);
   return parseFlakerVrtConfig(await readFile(path, "utf-8"));
 }
@@ -83,10 +77,7 @@ export function toViewportSpec(viewport: FlakerVrtViewport): ViewportSpec {
   };
 }
 
-function validateMigrationScenario(
-  value: unknown,
-  index: number,
-): FlakerVrtMigrationScenario {
+function validateMigrationScenario(value: unknown, index: number): FlakerVrtMigrationScenario {
   const record = asRecord(value, `Scenario at index ${index} must be an object`);
   const id = requireString(record.id, `Scenario at index ${index} must have an id`);
   const kind = requireString(record.kind, `Scenario ${id} must have a kind`);
@@ -101,22 +92,24 @@ function validateMigrationScenario(
     throw new Error(`Scenario ${id} must define at least one variant`);
   }
 
-  const backend = record.backend == null
-    ? "chromium"
-    : requireString(record.backend, `Scenario ${id} has an invalid backend`);
+  const backend =
+    record.backend == null ? "chromium" : requireString(record.backend, `Scenario ${id} has an invalid backend`);
   if (backend !== "chromium") {
     throw new Error(`Scenario ${id} has unsupported backend: ${backend}`);
   }
 
   const viewports = validateViewports(record.viewports, id);
-  const strict = record.strict == null ? false : requireBoolean(record.strict, `Scenario ${id} has an invalid strict flag`);
-  const enablePaintTree = record.enablePaintTree == null
-    ? true
-    : requireBoolean(record.enablePaintTree, `Scenario ${id} has an invalid enablePaintTree flag`);
+  const strict =
+    record.strict == null ? false : requireBoolean(record.strict, `Scenario ${id} has an invalid strict flag`);
+  const enablePaintTree =
+    record.enablePaintTree == null
+      ? true
+      : requireBoolean(record.enablePaintTree, `Scenario ${id} has an invalid enablePaintTree flag`);
   const approval = optionalString(record.approval, `Scenario ${id} has an invalid approval path`);
-  const paintTreeUrl = record.paintTreeUrl == null
-    ? DEFAULT_BIDI_URL
-    : requireString(record.paintTreeUrl, `Scenario ${id} has an invalid paintTreeUrl`);
+  const paintTreeUrl =
+    record.paintTreeUrl == null
+      ? DEFAULT_BIDI_URL
+      : requireString(record.paintTreeUrl, `Scenario ${id} has an invalid paintTreeUrl`);
 
   return {
     id,
@@ -150,8 +143,14 @@ function validateViewports(value: unknown, scenarioId: string): FlakerVrtViewpor
     }
     seenLabels.add(label);
 
-    const width = requirePositiveNumber(record.width, `Scenario ${scenarioId} viewport ${label} must have a positive width`);
-    const height = requirePositiveNumber(record.height, `Scenario ${scenarioId} viewport ${label} must have a positive height`);
+    const width = requirePositiveNumber(
+      record.width,
+      `Scenario ${scenarioId} viewport ${label} must have a positive width`,
+    );
+    const height = requirePositiveNumber(
+      record.height,
+      `Scenario ${scenarioId} viewport ${label} must have a positive height`,
+    );
     const reason = optionalString(record.reason, `Scenario ${scenarioId} viewport ${label} has an invalid reason`);
 
     return {

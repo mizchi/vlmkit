@@ -139,8 +139,23 @@ async function cmdAdd(args: string[]): Promise<void> {
   // A11y short-hand: --a11y-contrast / --a11y-touch sets `kind` so
   // the rule suppresses a11y findings instead of pixel/paint diffs.
   // These flags require a --selector (the path-substring matcher).
-  let kind: "visual" | "a11y-contrast" | "a11y-touch" | "a11y-focus-order" | "a11y-semantic" | "media-variant" | "cross-browser" | undefined;
-  const kindFlags = ["a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic", "media-variant", "cross-browser"] as const;
+  let kind:
+    | "visual"
+    | "a11y-contrast"
+    | "a11y-touch"
+    | "a11y-focus-order"
+    | "a11y-semantic"
+    | "media-variant"
+    | "cross-browser"
+    | undefined;
+  const kindFlags = [
+    "a11y-contrast",
+    "a11y-touch",
+    "a11y-focus-order",
+    "a11y-semantic",
+    "media-variant",
+    "cross-browser",
+  ] as const;
   const flags = kindFlags.filter((k) => hasFlag(args, k));
   if (flags.length > 1) {
     console.error(`${RED}error:${RESET} only one of --${kindFlags.join(" / --")} at a time`);
@@ -149,11 +164,12 @@ async function cmdAdd(args: string[]): Promise<void> {
     kind = flags[0];
   }
   if (kind && !selector) {
-    const hint = kind === "media-variant"
-      ? "(--selector is the variant name: forced-colors, reduced-motion, print, rtl, or zoom-200)"
-      : kind === "cross-browser"
-        ? "(--selector is the engine name: chromium, firefox, or webkit)"
-        : "(path-substring matcher)";
+    const hint =
+      kind === "media-variant"
+        ? "(--selector is the variant name: forced-colors, reduced-motion, print, rtl, or zoom-200)"
+        : kind === "cross-browser"
+          ? "(--selector is the engine name: chromium, firefox, or webkit)"
+          : "(path-substring matcher)";
     console.error(`${RED}error:${RESET} ${kind} rules require --selector ${hint}`);
     process.exit(1);
   }
@@ -182,8 +198,10 @@ async function cmdAdd(args: string[]): Promise<void> {
   if (issue) rule.issue = issue;
 
   if (!selector && !property && !category && !changeType && !kind) {
-    console.error(`${RED}error:${RESET} at least one matcher is required ` +
-      `(--selector, --property, --category, --change-type, --a11y-contrast, --a11y-touch)`);
+    console.error(
+      `${RED}error:${RESET} at least one matcher is required ` +
+        `(--selector, --property, --category, --change-type, --a11y-contrast, --a11y-touch)`,
+    );
     console.error(`A rule with no matcher would approve every diff — refusing.`);
     process.exit(1);
   }
@@ -197,8 +215,7 @@ async function cmdAdd(args: string[]): Promise<void> {
   const existing = await loadManifestOrEmpty(path);
   const merged = mergeApprovalManifest(existing, [rule]);
   await writeManifest(path, merged);
-  console.log(`${GREEN}✓${RESET} added rule to ${path} ` +
-    `${DIM}(${merged.rules.length} total)${RESET}`);
+  console.log(`${GREEN}✓${RESET} added rule to ${path} ` + `${DIM}(${merged.rules.length} total)${RESET}`);
   console.log(`  ${describeMatcher(rule)}`);
   console.log(`  reason: ${reason}`);
   if (expires) console.log(`  ${DIM}expires: ${expires}${RESET}`);
@@ -230,16 +247,13 @@ interface MigrationReport {
 async function cmdAddFromRun(args: string[], runDir: string, manifestPath: string): Promise<void> {
   // Locate the diff-report.json — accept either the file or
   // the dir that contains it.
-  const reportPath = runDir.endsWith(".json")
-    ? resolve(runDir)
-    : resolve(runDir, "diff-report.json");
+  const reportPath = runDir.endsWith(".json") ? resolve(runDir) : resolve(runDir, "diff-report.json");
   if (!existsSync(reportPath)) {
     console.error(`${RED}error:${RESET} no diff-report.json at ${reportPath}`);
     process.exit(1);
   }
   const report = JSON.parse(await readFile(reportPath, "utf-8")) as MigrationReport;
-  const suggestions = (report.wireframeFixSuggestions ?? [])
-    .flatMap((g) => g.suggestions);
+  const suggestions = (report.wireframeFixSuggestions ?? []).flatMap((g) => g.suggestions);
   if (suggestions.length === 0) {
     console.log(`${DIM}No wireframe-fix suggestions in ${reportPath} — nothing to add.${RESET}`);
     return;
@@ -264,7 +278,8 @@ async function cmdAddFromRun(args: string[], runDir: string, manifestPath: strin
     return;
   }
 
-  const baseReason = getArg(args, "reason") ?? "auto-acknowledged from vlmkit diff (rule needs a human-readable reason on next edit)";
+  const baseReason =
+    getArg(args, "reason") ?? "auto-acknowledged from vlmkit diff (rule needs a human-readable reason on next edit)";
   const expires = getArg(args, "expires");
   const maxPx = getArg(args, "max-px");
   const tolerancePixels = maxPx ? Number(maxPx) : 2;
@@ -314,8 +329,10 @@ async function cmdAddFromRun(args: string[], runDir: string, manifestPath: strin
   const existing = await loadManifestOrEmpty(manifestPath);
   const merged = mergeApprovalManifest(existing, newRules);
   await writeManifest(manifestPath, merged);
-  console.log(`${GREEN}✓${RESET} added ${newRules.length} rule(s) to ${manifestPath} ` +
-    `${DIM}(${merged.rules.length} total)${RESET}`);
+  console.log(
+    `${GREEN}✓${RESET} added ${newRules.length} rule(s) to ${manifestPath} ` +
+      `${DIM}(${merged.rules.length} total)${RESET}`,
+  );
   for (const rule of newRules.slice(0, 5)) {
     console.log(`  ${describeMatcher(rule)}`);
   }
@@ -335,7 +352,10 @@ async function cmdRm(args: string[]): Promise<void> {
   let target: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a.startsWith("--")) { i++; continue; } // skip --flag value pair
+    if (a.startsWith("--")) {
+      i++;
+      continue;
+    } // skip --flag value pair
     target = a;
     break;
   }
@@ -368,8 +388,10 @@ async function cmdRm(args: string[]): Promise<void> {
     return;
   }
   await writeManifest(path, manifest);
-  console.log(`${GREEN}✓${RESET} removed rule [${removeIdx}] from ${path} ` +
-    `${DIM}(${manifest.rules.length} remaining)${RESET}`);
+  console.log(
+    `${GREEN}✓${RESET} removed rule [${removeIdx}] from ${path} ` +
+      `${DIM}(${manifest.rules.length} remaining)${RESET}`,
+  );
   console.log(`  ${describeMatcher(removed)}`);
 }
 
@@ -469,7 +491,6 @@ async function main(argv = process.argv.slice(2)) {
       process.exit(1);
   }
 }
-
 
 if (isCliEntry(import.meta.url, "manifest-cli")) {
   main().catch((err) => {

@@ -49,9 +49,11 @@ export interface WebpEncodeOptions {
  */
 export function formatMissingWebpEncoderError(error?: unknown): string {
   const detail = error === undefined ? "" : `\n       (${String((error as Error)?.message ?? error).split("\n")[0]})`;
-  return `error: WebP output needs the optional \`${WEBP_ENCODER_PACKAGE}\` package.`
-    + `\n       run:  npm install --save-dev ${WEBP_ENCODER_PACKAGE}`
-    + `\n       or write a .png instead — PNG needs no extra dependency.${detail}`;
+  return (
+    `error: WebP output needs the optional \`${WEBP_ENCODER_PACKAGE}\` package.` +
+    `\n       run:  npm install --save-dev ${WEBP_ENCODER_PACKAGE}` +
+    `\n       or write a .png instead — PNG needs no extra dependency.${detail}`
+  );
 }
 
 export class WebpEncoderMissingError extends Error {
@@ -68,7 +70,9 @@ export class WebpEncoderMissingError extends Error {
  * gets bundled into a hashed chunk in the shipped CLI, and only a package
  * resolution survives that.
  */
-let encoderPromise: Promise<(data: ImageData, options?: { quality?: number; lossless?: number }) => Promise<ArrayBuffer>> | null = null;
+let encoderPromise: Promise<
+  (data: ImageData, options?: { quality?: number; lossless?: number }) => Promise<ArrayBuffer>
+> | null = null;
 
 async function loadEncoder() {
   if (encoderPromise) return encoderPromise;
@@ -106,10 +110,7 @@ export async function webpEncoderAvailable(): Promise<boolean> {
   }
 }
 
-export async function encodeWebp(
-  image: PngData,
-  options: WebpEncodeOptions = {},
-): Promise<Uint8Array> {
+export async function encodeWebp(image: PngData, options: WebpEncodeOptions = {}): Promise<Uint8Array> {
   const encode = await loadEncoder();
   const buffer = await encode(
     {

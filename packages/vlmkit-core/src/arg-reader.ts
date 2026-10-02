@@ -48,9 +48,7 @@ export function readChoice<const T extends readonly string[]>(
   const value = readFlag(argv, name);
   if (value === undefined) return undefined;
   if ((choices as readonly string[]).includes(value)) return value as T[number];
-  throw new UsageError(
-    `${flagName(name)} must be one of ${choices.join(", ")}, got ${JSON.stringify(value)}`,
-  );
+  throw new UsageError(`${flagName(name)} must be one of ${choices.join(", ")}, got ${JSON.stringify(value)}`);
 }
 
 /** Every occurrence, for repeatable flags (`--gate`, `--only`, `--pages`). */
@@ -74,11 +72,7 @@ export interface NumberFlagOptions {
   integer?: boolean;
 }
 
-export function readNumber(
-  argv: readonly string[],
-  name: string,
-  options: NumberFlagOptions = {},
-): number | undefined {
+export function readNumber(argv: readonly string[], name: string, options: NumberFlagOptions = {}): number | undefined {
   const raw = readFlag(argv, name);
   if (raw === undefined) return undefined;
   const flag = flagName(name);

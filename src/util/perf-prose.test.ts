@@ -20,10 +20,16 @@ const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("check perf", () => {
   const report = {
-    source: "p.html", observeMs: 3000, viewport: { width: 1280, height: 720 },
-    cls: 0.31, lcp: 4600, fcp: 1200, ttfb: 90,
+    source: "p.html",
+    observeMs: 3000,
+    viewport: { width: 1280, height: 720 },
+    cls: 0.31,
+    lcp: 4600,
+    fcp: 1200,
+    ttfb: 90,
     verdicts: { cls: "poor", lcp: "needs-improvement", fcp: "good" },
-    shiftSources: [], reportPath: "r.md",
+    shiftSources: [],
+    reportPath: "r.md",
   };
 
   it("off keeps the number and drops only the grade", () => {

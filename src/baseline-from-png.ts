@@ -106,7 +106,7 @@ export async function assertPng(file: string): Promise<void> {
     if (bytesRead < 8 || !head.equals(PNG_MAGIC)) {
       throw new Error(
         `${file} is not a PNG (bad signature). ` +
-        `--from-png / --from-dir compare pixels, so the file must be a real PNG.`,
+          `--from-png / --from-dir compare pixels, so the file must be a real PNG.`,
       );
     }
   } finally {
@@ -181,9 +181,10 @@ async function collectDirPngs(dir: string): Promise<Array<{ key: string; file: s
 }
 
 function declaredSidesMessage(routes: DiffPrRoute[], viewports: string[]): string {
-  const forms = viewports.length === 1
-    ? `<route>/<viewport>.png, <route>-<viewport>.png, or <route>.png`
-    : `<route>/<viewport>.png or <route>-<viewport>.png`;
+  const forms =
+    viewports.length === 1
+      ? `<route>/<viewport>.png, <route>-<viewport>.png, or <route>.png`
+      : `<route>/<viewport>.png or <route>-<viewport>.png`;
   return [
     `  declared routes:    ${routes.map((r) => r.name).join(", ")}`,
     `  declared viewports: ${viewports.join(", ")}`,
@@ -218,8 +219,8 @@ export async function resolvePngSources(opts: ResolvePngSourcesOptions): Promise
     if (prior) {
       throw new Error(
         `two files both map to route \`${entry.route.name}\` viewport \`${entry.viewport}\`:\n` +
-        `  ${prior.file}\n  ${file}\n` +
-        `Remove or rename one — a pair must have exactly one source.`,
+          `  ${prior.file}\n  ${file}\n` +
+          `Remove or rename one — a pair must have exactly one source.`,
       );
     }
     const src: PngSource = { route: entry.route, viewport: entry.viewport, file, matchedAs };
@@ -243,20 +244,18 @@ export async function resolvePngSources(opts: ResolvePngSourcesOptions): Promise
       if (!opts.routeOverride || !opts.viewportOverride) {
         throw new Error(
           `--route and --viewport must be given together with --from-png ` +
-          `(got ${opts.routeOverride ? "--route only" : "--viewport only"}).`,
+            `(got ${opts.routeOverride ? "--route only" : "--viewport only"}).`,
         );
       }
       const route = routes.find((r) => r.name === opts.routeOverride);
       if (!route) {
         throw new Error(
-          `--route ${opts.routeOverride} is not a declared route.\n` +
-          declaredSidesMessage(routes, viewports),
+          `--route ${opts.routeOverride} is not a declared route.\n` + declaredSidesMessage(routes, viewports),
         );
       }
       if (!viewports.includes(opts.viewportOverride)) {
         throw new Error(
-          `--viewport ${opts.viewportOverride} is not a declared viewport.\n` +
-          declaredSidesMessage(routes, viewports),
+          `--viewport ${opts.viewportOverride} is not a declared viewport.\n` + declaredSidesMessage(routes, viewports),
         );
       }
       claim({ route, viewport: opts.viewportOverride, matchedAs: "explicit" }, file, "explicit");
@@ -272,9 +271,10 @@ export async function resolvePngSources(opts: ResolvePngSourcesOptions): Promise
         const amb = ambiguous.has(nestedKey) || ambiguous.has(stem);
         throw new Error(
           `${file} maps to no declared route/viewport pair` +
-          (amb ? ` (its name is claimed by more than one pair)` : "") + `.\n` +
-          declaredSidesMessage(routes, viewports) +
-          `\nOr name the pair explicitly: --from-png ${opts.fromPng} --route <route> --viewport <viewport>`,
+            (amb ? ` (its name is claimed by more than one pair)` : "") +
+            `.\n` +
+            declaredSidesMessage(routes, viewports) +
+            `\nOr name the pair explicitly: --from-png ${opts.fromPng} --route <route> --viewport <viewport>`,
         );
       }
       claim(hit, file, hit.matchedAs);
@@ -287,9 +287,7 @@ export async function resolvePngSources(opts: ResolvePngSourcesOptions): Promise
     }
     const found = await collectDirPngs(dir);
     if (found.length === 0) {
-      throw new Error(
-        `--from-dir ${dir} contains no .png files.\n` + declaredSidesMessage(routes, viewports),
-      );
+      throw new Error(`--from-dir ${dir} contains no .png files.\n` + declaredSidesMessage(routes, viewports));
     }
     const unmapped: string[] = [];
     for (const f of found) {
@@ -304,8 +302,9 @@ export async function resolvePngSources(opts: ResolvePngSourcesOptions): Promise
     if (unmapped.length > 0) {
       throw new Error(
         `${unmapped.length} file(s) in ${dir} map to no declared route/viewport pair:\n` +
-        unmapped.map((u) => `  ${u}`).join("\n") + "\n" +
-        declaredSidesMessage(routes, viewports),
+          unmapped.map((u) => `  ${u}`).join("\n") +
+          "\n" +
+          declaredSidesMessage(routes, viewports),
       );
     }
   }
@@ -320,9 +319,10 @@ export async function resolvePngSources(opts: ResolvePngSourcesOptions): Promise
     if (missing.length > 0) {
       throw new Error(
         `no PNG supplied for ${missing.length} declared route/viewport pair(s):\n` +
-        missing.map((m) => `  ${m}  (expected ${m}.png or ${m.replace("/", "-")}.png)`).join("\n") + "\n" +
-        `supplied: ${sources.map((s) => `${s.route.name}/${s.viewport}`).join(", ") || "(none)"}\n` +
-        `Supply every pair, or narrow the run with positional route name(s).`,
+          missing.map((m) => `  ${m}  (expected ${m}.png or ${m.replace("/", "-")}.png)`).join("\n") +
+          "\n" +
+          `supplied: ${sources.map((s) => `${s.route.name}/${s.viewport}`).join(", ") || "(none)"}\n` +
+          `Supply every pair, or narrow the run with positional route name(s).`,
       );
     }
   }

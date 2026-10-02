@@ -81,7 +81,9 @@ function responds(url: string): Promise<boolean> {
 async function waitForResponse(url: string, timeoutMs: number, child?: ChildProcess): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let exited: number | null = null;
-  child?.once("exit", (code) => { exited = code ?? 0; });
+  child?.once("exit", (code) => {
+    exited = code ?? 0;
+  });
   while (Date.now() < deadline) {
     if (await responds(url)) return;
     // A server that has already died will never answer. Failing now, with its
@@ -89,17 +91,17 @@ async function waitForResponse(url: string, timeoutMs: number, child?: ChildProc
     // reporting a timeout — the wrong diagnosis for a command that did not run.
     if (exited !== null) {
       throw new UsageError(
-        `webServer exited with code ${exited} before ${url} responded.`
-        + ` Its output is above — the command itself is the thing to fix, not the timeout.`,
+        `webServer exited with code ${exited} before ${url} responded.` +
+          ` Its output is above — the command itself is the thing to fix, not the timeout.`,
       );
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
   throw new UsageError(
-    `webServer did not serve ${url} within ${timeoutMs}ms.`
-    + ` Raise webServer.timeout if the build is genuinely slower than that, or check that`
-    + ` the command serves this exact URL — the probe accepts any HTTP response, so a`
-    + ` timeout means nothing is listening.`,
+    `webServer did not serve ${url} within ${timeoutMs}ms.` +
+      ` Raise webServer.timeout if the build is genuinely slower than that, or check that` +
+      ` the command serves this exact URL — the probe accepts any HTTP response, so a` +
+      ` timeout means nothing is listening.`,
   );
 }
 
@@ -116,7 +118,7 @@ export async function startWebServer(
 ): Promise<StartedWebServer> {
   const timeout = server.timeout ?? DEFAULT_TIMEOUT_MS;
   const reuse = shouldReuseExistingServer(server);
-  if (reuse && await responds(server.url)) {
+  if (reuse && (await responds(server.url))) {
     log(`${DIM}webServer: reusing the server already answering ${server.url}${RESET}`);
     return { reused: true, stop: async () => {} };
   }
@@ -163,7 +165,9 @@ export async function startWebServer(
     const forced = setTimeout(() => {
       try {
         process.kill(-child.pid!, "SIGKILL");
-      } catch { /* raced with a normal exit */ }
+      } catch {
+        /* raced with a normal exit */
+      }
     }, 5_000);
     await done;
     clearTimeout(forced);
@@ -217,7 +221,9 @@ export async function withWebServer<T>(
 /** One line for `gates list`, which does not start anything. */
 export function formatWebServerPlan(server: GateWebServer): string {
   const reuse = shouldReuseExistingServer(server);
-  return `${DIM}webServer:${RESET} ${server.command} ${DIM}→ ${server.url}`
-    + ` (${reuse ? "reuses a running server" : `${YELLOW}always starts its own${RESET}${DIM}`}`
-    + `, timeout ${server.timeout ?? DEFAULT_TIMEOUT_MS}ms)${RESET}`;
+  return (
+    `${DIM}webServer:${RESET} ${server.command} ${DIM}→ ${server.url}` +
+    ` (${reuse ? "reuses a running server" : `${YELLOW}always starts its own${RESET}${DIM}`}` +
+    `, timeout ${server.timeout ?? DEFAULT_TIMEOUT_MS}ms)${RESET}`
+  );
 }

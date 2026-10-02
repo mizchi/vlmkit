@@ -99,14 +99,16 @@ const DEFAULT_MAX_BANDS = 64;
 
 interface RowStats {
   mean: Float32Array;
-  range: Float32Array;  // max − min per row; high for text rows (dark on light bg).
+  range: Float32Array; // max − min per row; high for text rows (dark on light bg).
 }
 
 function rowStats(data: Uint8Array, width: number, height: number): RowStats {
   const mean = new Float32Array(height);
   const range = new Float32Array(height);
   for (let y = 0; y < height; y++) {
-    let sum = 0, mn = 255, mx = 0;
+    let sum = 0,
+      mn = 255,
+      mx = 0;
     const rowStart = y * width * 4;
     for (let x = 0; x < width; x++) {
       const idx = rowStart + x * 4;
@@ -136,7 +138,10 @@ function snapFontSize(rawPx: number): number {
   let bestDist = Math.abs(rawPx - best);
   for (const b of buckets) {
     const d = Math.abs(rawPx - b);
-    if (d < bestDist) { best = b; bestDist = d; }
+    if (d < bestDist) {
+      best = b;
+      bestDist = d;
+    }
   }
   return best;
 }
@@ -161,12 +166,7 @@ function bucketWeight(density: number): TextRow["weightBucket"] {
  * vertical spacing tuning — and a font-size / weight estimate per
  * heatmap region would push this to < 1% in one more round."
  */
-function annotateTypography(
-  band: TextRow,
-  data: Uint8Array,
-  width: number,
-  height: number,
-): void {
+function annotateTypography(band: TextRow, data: Uint8Array, width: number, height: number): void {
   // 1. Find the horizontal extent of ink within the band. Use an
   //    *adaptive* threshold so muted-gray text (e.g. #9ca3af on white,
   //    luma ≈ 165) is still detected. A pixel is "ink" if its luma is
@@ -174,7 +174,8 @@ function annotateTypography(
   //    good proxy for the band's background since text occupies a
   //    small fraction of the band's area.
   const inkThreshold = Math.max(40, band.meanLuma - 50);
-  let inkLeft = width, inkRight = -1;
+  let inkLeft = width,
+    inkRight = -1;
   let inkPixels = 0;
   for (let y = band.yStart; y <= band.yEnd && y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -281,10 +282,7 @@ export function extractTextRowsFromRgba(
   return capped;
 }
 
-export async function extractTextRowsFromFile(
-  path: string,
-  options: ExtractTextRowsOptions = {},
-): Promise<TextRow[]> {
+export async function extractTextRowsFromFile(path: string, options: ExtractTextRowsOptions = {}): Promise<TextRow[]> {
   const buf = await readFile(path);
   const png = PNG.sync.read(buf);
   return extractTextRowsFromRgba(png.data, png.width, png.height, options);
@@ -298,11 +296,7 @@ export async function extractTextRowsFromFile(
  * Reports rows with |Δy| above `minDeltaY` to keep the table focused on
  * actionable shifts (small subpixel deltas are excluded by default).
  */
-export function matchTextRows(
-  baseline: TextRow[],
-  variant: TextRow[],
-  minDeltaY = 2,
-): MatchedTextRow[] {
+export function matchTextRows(baseline: TextRow[], variant: TextRow[], minDeltaY = 2): MatchedTextRow[] {
   const out: MatchedTextRow[] = [];
   const n = Math.min(baseline.length, variant.length);
   for (let i = 0; i < n; i++) {
@@ -364,7 +358,8 @@ export function compareRowTypography(
   const n = Math.min(baseline.length, variant.length);
   const out: TypographyMismatch[] = [];
   for (let i = 0; i < n; i++) {
-    const b = baseline[i]!, v = variant[i]!;
+    const b = baseline[i]!,
+      v = variant[i]!;
     if (b.estimatedFontSize === undefined || v.estimatedFontSize === undefined) continue;
     const sizeDiffers = b.estimatedFontSize !== v.estimatedFontSize;
     // Weight differs if buckets differ AND the underlying density
@@ -387,11 +382,7 @@ export function compareRowTypography(
   return out;
 }
 
-export function computeRowGapDeltas(
-  baseline: TextRow[],
-  variant: TextRow[],
-  minAbsoluteDelta = 2,
-): RowGapDelta[] {
+export function computeRowGapDeltas(baseline: TextRow[], variant: TextRow[], minAbsoluteDelta = 2): RowGapDelta[] {
   const n = Math.min(baseline.length, variant.length);
   const out: RowGapDelta[] = [];
   for (let i = 0; i < n - 1; i++) {

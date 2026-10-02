@@ -54,19 +54,25 @@ const REST_POSE_SCRIPT = `(() => {
   }
 })()`;
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
-import {
-  compareLandscapeFromPngFiles,
-  type LandscapeDiffResult,
-} from "../landscape-diff.ts";
-import {
-  extractComponentsFromFile,
-  matchComponents,
-  type MatchedBbox,
-} from "./component-bbox.ts";
+import { compareLandscapeFromPngFiles, type LandscapeDiffResult } from "../landscape-diff.ts";
+import { extractComponentsFromFile, matchComponents, type MatchedBbox } from "./component-bbox.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
-import { extractTextRowsFromFile, matchTextRows, computeRowGapDeltas, compareRowTypography, type MatchedTextRow, type RowGapDelta, type TypographyMismatch } from "@mizchi/vlmkit-core/text-rows.ts";
-import { extractPaletteFromFile, findDominantBackgroundsFromFile, type PaletteColor, type DominantBackgrounds } from "../style/palette-extract.ts";
+import {
+  extractTextRowsFromFile,
+  matchTextRows,
+  computeRowGapDeltas,
+  compareRowTypography,
+  type MatchedTextRow,
+  type RowGapDelta,
+  type TypographyMismatch,
+} from "@mizchi/vlmkit-core/text-rows.ts";
+import {
+  extractPaletteFromFile,
+  findDominantBackgroundsFromFile,
+  type PaletteColor,
+  type DominantBackgrounds,
+} from "../style/palette-extract.ts";
 // The Markdown rendering and its summaries live in `component-report-format.ts`:
 // pure, and previously untestable without a browser because they shared this file
 // with the Playwright orchestrator below. Re-exported because callers and tests
@@ -83,11 +89,7 @@ import {
 export { renderReportMarkdown, summarizeScrollportEvidence };
 export type { RenderInput } from "./component-report-format.ts";
 import { diffPalettes, type PaletteDiff } from "../style/palette-diff.ts";
-import {
-  applyForcedPseudoState,
-  clearStateMarkers,
-  type ForcedPseudoState,
-} from "../stress/multi-state.ts";
+import { applyForcedPseudoState, clearStateMarkers, type ForcedPseudoState } from "../stress/multi-state.ts";
 import {
   buildSemanticDrilldown,
   captureLandmarkRegions,
@@ -109,9 +111,7 @@ import {
   type ComponentLandingEvidence,
   type ComponentScrollportEvidence,
 } from "./component-goal.ts";
-import {
-  type UiExpectedScrollportContract,
-} from "../contract/ui-contract.ts";
+import { type UiExpectedScrollportContract } from "../contract/ui-contract.ts";
 import {
   isComponentProbeState,
   loadComponentContractPlan,
@@ -224,10 +224,7 @@ export interface PixelContrastResult {
   sampledPixels: number;
 }
 
-export function sampleContrastFromImage(
-  png: PNG,
-  input: PixelContrastInput,
-): PixelContrastResult {
+export function sampleContrastFromImage(png: PNG, input: PixelContrastInput): PixelContrastResult {
   const dpr = input.dpr ?? 1;
   const x0 = Math.max(0, Math.floor(input.bbox.x * dpr));
   const y0 = Math.max(0, Math.floor(input.bbox.y * dpr));
@@ -245,11 +242,7 @@ export function sampleContrastFromImage(
       const i = (y * png.width + x) * 4;
       const a = png.data[i + 3] ?? 0;
       if (a < 128) continue;
-      const rgb: [number, number, number] = [
-        png.data[i] ?? 0,
-        png.data[i + 1] ?? 0,
-        png.data[i + 2] ?? 0,
-      ];
+      const rgb: [number, number, number] = [png.data[i] ?? 0, png.data[i + 1] ?? 0, png.data[i + 2] ?? 0];
       if (rgbDistance(rgb, input.color) < 35) continue;
       const quantized = quantizeRgb(rgb, 8);
       const key = quantized.join(",");
@@ -275,11 +268,7 @@ export function sampleContrastFromImage(
 }
 
 function quantizeRgb(rgb: [number, number, number], step: number): [number, number, number] {
-  return [
-    quantizeChannel(rgb[0], step),
-    quantizeChannel(rgb[1], step),
-    quantizeChannel(rgb[2], step),
-  ];
+  return [quantizeChannel(rgb[0], step), quantizeChannel(rgb[1], step), quantizeChannel(rgb[2], step)];
 }
 
 function quantizeChannel(value: number, step: number): number {
@@ -290,10 +279,10 @@ function rgbDistance(a: [number, number, number], b: [number, number, number]): 
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
-
-export function suggestDeviceScaleFactorForTarget(
-  viewport: { width: number; height: number },
-): DeviceScaleFactorSuggestion | undefined {
+export function suggestDeviceScaleFactorForTarget(viewport: {
+  width: number;
+  height: number;
+}): DeviceScaleFactorSuggestion | undefined {
   if (viewport.height <= viewport.width) return undefined;
   if (viewport.width < 720) return undefined;
 
@@ -339,10 +328,7 @@ function isLocalStylesheetHref(href: string): boolean {
   return true;
 }
 
-export async function inlineLocalStylesheets(
-  html: string,
-  htmlPath: string,
-): Promise<string> {
+export async function inlineLocalStylesheets(html: string, htmlPath: string): Promise<string> {
   const baseDir = dirname(resolve(htmlPath));
   const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
   let out = html;
@@ -382,8 +368,7 @@ function parseArgs(argv: string[]) {
     else if (a === "--goal") goal = argv[++i] ?? "app";
     else if (a === "--device-scale-factor" || a === "--dpr") {
       deviceScaleFactor = parseFloat(argv[++i] ?? "1");
-    }
-    else if (a === "--states") {
+    } else if (a === "--states") {
       while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
         const v = argv[++i];
         if (isComponentProbeState(v)) {
@@ -397,9 +382,7 @@ function parseArgs(argv: string[]) {
   return { positional, outputDir, report, contract, threshold, goal, states, deviceScaleFactor };
 }
 
-export async function runComponentFromImage(
-  options: ComponentFromImageOptions,
-): Promise<ComponentFromImageReport> {
+export async function runComponentFromImage(options: ComponentFromImageOptions): Promise<ComponentFromImageReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const contractPlan = await loadComponentContractPlan(options.contractPath);
@@ -428,12 +411,10 @@ export async function runComponentFromImage(
   // page lays out at the *intended* dimensions, but render at the
   // higher dpr.
   const dpr = options.deviceScaleFactor ?? 1;
-  const dprSuggestion = options.deviceScaleFactor === undefined
-    ? suggestDeviceScaleFactorForTarget(viewport)
-    : undefined;
-  const cssViewport = dpr > 1
-    ? { width: Math.round(viewport.width / dpr), height: Math.round(viewport.height / dpr) }
-    : viewport;
+  const dprSuggestion =
+    options.deviceScaleFactor === undefined ? suggestDeviceScaleFactorForTarget(viewport) : undefined;
+  const cssViewport =
+    dpr > 1 ? { width: Math.round(viewport.width / dpr), height: Math.round(viewport.height / dpr) } : viewport;
 
   return await withBrowser(async (browser) => {
     const page = await browser.newPage({
@@ -477,7 +458,7 @@ export async function runComponentFromImage(
     });
     const diffRatio = diff?.diffRatio ?? 0;
     const diffPixels = diff?.diffPixels ?? 0;
-    const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
+    const totalPixels = diff?.totalPixels ?? viewport.width * viewport.height;
     const heatmapPath = join(outputDir, "component_heatmap.png");
     const landscapeDiff = await compareLandscapeFromPngFiles(targetCopyPath, currentPath);
     const scrollportEvidence = summarizeScrollportEvidence(scrollportRegions, contractPlan.expectations.scrollports);
@@ -532,11 +513,15 @@ export async function runComponentFromImage(
     // dogfood: even with transitions disabled, a clear `:hover` rule
     // can register low under the perceptual threshold; raw diff shows
     // unambiguously when something changed.
-    async function countRawDiff(pathA: string, pathB: string, minChannelDelta = 4): Promise<{ ratio: number; pixels: number; total: number }> {
+    async function countRawDiff(
+      pathA: string,
+      pathB: string,
+      minChannelDelta = 4,
+    ): Promise<{ ratio: number; pixels: number; total: number }> {
       const [bufA, bufB] = await Promise.all([readFile(pathA), readFile(pathB)]);
       const pA = PNG.sync.read(bufA);
       const pB = PNG.sync.read(bufB);
-      const total = (pA.width * pA.height);
+      const total = pA.width * pA.height;
       if (pA.data.length !== pB.data.length) return { ratio: 0, pixels: 0, total };
       let count = 0;
       for (let i = 0; i < pA.data.length; i += 4) {
@@ -575,8 +560,10 @@ export async function runComponentFromImage(
     ): Promise<number | null> {
       const buf = await readFile(path);
       const png = PNG.sync.read(buf);
-      const w = png.width, h = png.height;
-      let sum = 0, n = 0;
+      const w = png.width,
+        h = png.height;
+      let sum = 0,
+        n = 0;
       const inset = 4;
       for (const b of bboxes) {
         const x0 = Math.max(0, Math.floor(b.x + inset));
@@ -616,24 +603,34 @@ export async function runComponentFromImage(
       // A pixel that is "edge" for one bbox and "interior" for
       // another counts as interior (the stronger signal wins).
       const w = pA.width;
-      let edge = 0, interior = 0, outside = 0;
-      const dpr = 1;  // assume CSS-px = device-px for screenshots
+      let edge = 0,
+        interior = 0,
+        outside = 0;
+      const dpr = 1; // assume CSS-px = device-px for screenshots
       for (let i = 0; i < pA.data.length; i += 4) {
         const dr = Math.abs(pA.data[i]! - pB.data[i]!);
         const dg = Math.abs(pA.data[i + 1]! - pB.data[i + 1]!);
         const db = Math.abs(pA.data[i + 2]! - pB.data[i + 2]!);
         if (dr < 4 && dg < 4 && db < 4) continue;
         const px = (i / 4) | 0;
-        const x = px % w, y = (px / w) | 0;
-        let isInterior = false, isEdge = false;
+        const x = px % w,
+          y = (px / w) | 0;
+        let isInterior = false,
+          isEdge = false;
         for (const b of bboxes) {
-          const bx = b.x * dpr, by = b.y * dpr, bw = b.width * dpr, bh = b.height * dpr;
-          const insideOuter = x >= bx - edgeWidth && x <= bx + bw + edgeWidth
-            && y >= by - edgeWidth && y <= by + bh + edgeWidth;
+          const bx = b.x * dpr,
+            by = b.y * dpr,
+            bw = b.width * dpr,
+            bh = b.height * dpr;
+          const insideOuter =
+            x >= bx - edgeWidth && x <= bx + bw + edgeWidth && y >= by - edgeWidth && y <= by + bh + edgeWidth;
           if (!insideOuter) continue;
-          const insideInner = x >= bx + edgeWidth && x <= bx + bw - edgeWidth
-            && y >= by + edgeWidth && y <= by + bh - edgeWidth;
-          if (insideInner) { isInterior = true; break; }
+          const insideInner =
+            x >= bx + edgeWidth && x <= bx + bw - edgeWidth && y >= by + edgeWidth && y <= by + bh - edgeWidth;
+          if (insideInner) {
+            isInterior = true;
+            break;
+          }
           isEdge = true;
         }
         if (isInterior) interior++;
@@ -666,9 +663,10 @@ export async function runComponentFromImage(
         // page is attributed to the forced state, inflating the induced
         // diff (and masking a genuinely missing state rule).
         await statePage.evaluate(REST_POSE_SCRIPT).catch(() => {});
-        const applied = state === "scrolled"
-          ? await applyScrolledState(statePage, contractPlan.probes.scrollTargets)
-          : await applyForcedPseudoState(statePage, { state });
+        const applied =
+          state === "scrolled"
+            ? await applyScrolledState(statePage, contractPlan.probes.scrollTargets)
+            : await applyForcedPseudoState(statePage, { state });
         const stateShotPath = join(outputDir, `current-${state}.png`);
         await statePage.screenshot({ path: stateShotPath, fullPage: false, animations: "disabled" });
         if (state !== "scrolled") await clearStateMarkers(statePage).catch(() => {});
@@ -688,16 +686,23 @@ export async function runComponentFromImage(
           skipHeatmap: true,
         });
         const raw = await countRawDiff(currentPath, stateShotPath).catch(() => ({ ratio: 0, pixels: 0, total: 0 }));
-        const edgeClass = applied.bboxes.length > 0
-          ? await classifyEdgeVsInterior(currentPath, stateShotPath, applied.bboxes).catch(() => ({ edgePixels: 0, interiorPixels: 0, outsidePixels: 0, edgeFraction: 0 }))
-          : { edgePixels: 0, interiorPixels: 0, outsidePixels: 0, edgeFraction: 0 };
-        const [defaultLuma, stateLuma] = applied.bboxes.length > 0
-          ? await Promise.all([
-            meanInteriorLuma(currentPath, applied.bboxes),
-            meanInteriorLuma(stateShotPath, applied.bboxes),
-          ])
-          : [null, null];
-        const lumaDelta = (defaultLuma !== null && stateLuma !== null) ? stateLuma - defaultLuma : null;
+        const edgeClass =
+          applied.bboxes.length > 0
+            ? await classifyEdgeVsInterior(currentPath, stateShotPath, applied.bboxes).catch(() => ({
+                edgePixels: 0,
+                interiorPixels: 0,
+                outsidePixels: 0,
+                edgeFraction: 0,
+              }))
+            : { edgePixels: 0, interiorPixels: 0, outsidePixels: 0, edgeFraction: 0 };
+        const [defaultLuma, stateLuma] =
+          applied.bboxes.length > 0
+            ? await Promise.all([
+                meanInteriorLuma(currentPath, applied.bboxes),
+                meanInteriorLuma(stateShotPath, applied.bboxes),
+              ])
+            : [null, null];
+        const lumaDelta = defaultLuma !== null && stateLuma !== null ? stateLuma - defaultLuma : null;
         stateResults.push({
           state,
           forcedCount: applied.forcedCount,
@@ -712,7 +717,12 @@ export async function runComponentFromImage(
       }
     }
 
-    const expressiveMenuGoalEvidence = await enrichExpressiveMenuEvidence(expressiveMenuEvidence, stateResults, currentPath, dpr);
+    const expressiveMenuGoalEvidence = await enrichExpressiveMenuEvidence(
+      expressiveMenuEvidence,
+      stateResults,
+      currentPath,
+      dpr,
+    );
     const goalEvaluation = evaluateComponentGoal({
       goal: effectiveGoal,
       pixelDiffRatio: diffRatio,
@@ -724,7 +734,8 @@ export async function runComponentFromImage(
     });
     const reportLandingEvidence = goalEvaluation.goal === "landing" ? landingEvidence : undefined;
     const reportCanvasEvidence = goalEvaluation.goal === "canvas" ? canvasEvidence : undefined;
-    const reportExpressiveMenuEvidence = goalEvaluation.goal === "expressive-menu" ? expressiveMenuGoalEvidence : undefined;
+    const reportExpressiveMenuEvidence =
+      goalEvaluation.goal === "expressive-menu" ? expressiveMenuGoalEvidence : undefined;
 
     const reportPath = options.reportPath ?? join(outputDir, "report.md");
     const markdown = renderReportMarkdown({
@@ -761,17 +772,24 @@ export async function runComponentFromImage(
     await writeFile(reportPath, markdown);
 
     const pct = (diffRatio * 100).toFixed(2);
-    const icon = goalEvaluation.status === "pass"
-      ? `${GREEN}✓${RESET}`
-      : goalEvaluation.status === "review"
-        ? `${YELLOW}~${RESET}`
-        : `${RED}✗${RESET}`;
+    const icon =
+      goalEvaluation.status === "pass"
+        ? `${GREEN}✓${RESET}`
+        : goalEvaluation.status === "review"
+          ? `${YELLOW}~${RESET}`
+          : `${RED}✗${RESET}`;
     console.log(`  ${icon} ${goalEvaluation.summary}`);
-    console.log(`  ${DIM}diff: ${pct}% (${diffPixels} px), landscape ${(landscapeDiff.score * 100).toFixed(2)}%${RESET}`);
+    console.log(
+      `  ${DIM}diff: ${pct}% (${diffPixels} px), landscape ${(landscapeDiff.score * 100).toFixed(2)}%${RESET}`,
+    );
     if (dprSuggestion) {
-      console.log(`  ${YELLOW}!${RESET} ${DIM}${dprSuggestion.reason}; try --dpr ${dprSuggestion.deviceScaleFactor} (${dprSuggestion.cssViewport.width}×${dprSuggestion.cssViewport.height} CSS px)${RESET}`);
+      console.log(
+        `  ${YELLOW}!${RESET} ${DIM}${dprSuggestion.reason}; try --dpr ${dprSuggestion.deviceScaleFactor} (${dprSuggestion.cssViewport.width}×${dprSuggestion.cssViewport.height} CSS px)${RESET}`,
+      );
     }
-    console.log(`  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`);
+    console.log(
+      `  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`,
+    );
     if (scrollportRegions.length > 0) {
       console.log(`  ${DIM}scrollports: ${formatScrollportEvidence(scrollportEvidence)}${RESET}`);
     }
@@ -786,7 +804,9 @@ export async function runComponentFromImage(
     }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
-        console.log(`  ${DIM}${formatProbeState(s.state)} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} applied)${RESET}`);
+        console.log(
+          `  ${DIM}${formatProbeState(s.state)} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} applied)${RESET}`,
+        );
       }
     }
     console.log(`  ${DIM}report: ${reportPath}${RESET}`);
@@ -818,9 +838,7 @@ export async function runComponentFromImage(
 
     // Machine-readable twin of report.md — agents consume this instead of
     // scraping the Markdown section headers.
-    const jsonReportPath = reportPath.endsWith(".md")
-      ? `${reportPath.slice(0, -3)}.json`
-      : `${reportPath}.json`;
+    const jsonReportPath = reportPath.endsWith(".md") ? `${reportPath.slice(0, -3)}.json` : `${reportPath}.json`;
     await writeFile(jsonReportPath, JSON.stringify(result, null, 2));
     console.log(`  ${DIM}report json: ${jsonReportPath}${RESET}`);
 
@@ -839,23 +857,27 @@ async function captureLandingEvidence(page: Page): Promise<ComponentLandingEvide
     function intersectsViewport(el: Element | null): boolean {
       if (!el) return false;
       const rect = el.getBoundingClientRect();
-      return rect.width > 1
-        && rect.height > 1
-        && rect.right > 0
-        && rect.bottom > 0
-        && rect.left < window.innerWidth
-        && rect.top < window.innerHeight;
+      return (
+        rect.width > 1 &&
+        rect.height > 1 &&
+        rect.right > 0 &&
+        rect.bottom > 0 &&
+        rect.left < window.innerWidth &&
+        rect.top < window.innerHeight
+      );
     }
 
     function fullyInViewport(el: Element | null): boolean {
       if (!el) return false;
       const rect = el.getBoundingClientRect();
-      return rect.width > 1
-        && rect.height > 1
-        && rect.left >= 0
-        && rect.top >= 0
-        && rect.right <= window.innerWidth
-        && rect.bottom <= window.innerHeight;
+      return (
+        rect.width > 1 &&
+        rect.height > 1 &&
+        rect.left >= 0 &&
+        rect.top >= 0 &&
+        rect.right <= window.innerWidth &&
+        rect.bottom <= window.innerHeight
+      );
     }
 
     function mediaSlotVisible(el: Element | null): boolean {
@@ -877,8 +899,8 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ExpressiveMenu
   return await page.evaluate(() => {
     const layers = Array.from(document.querySelectorAll("[data-composition-layer]"));
     const shapes = Array.from(document.querySelectorAll("[data-shape]"));
-    const selected = document.querySelector("[data-selected=\"true\"], [aria-current=\"page\"], .is-selected");
-    const menuItems = Array.from(document.querySelectorAll("nav button, nav a, [role=\"menuitem\"], [data-menu-item]"));
+    const selected = document.querySelector('[data-selected="true"], [aria-current="page"], .is-selected');
+    const menuItems = Array.from(document.querySelectorAll('nav button, nav a, [role="menuitem"], [data-menu-item]'));
     if (layers.length === 0 && shapes.length === 0 && menuItems.length === 0 && !selected) return undefined;
 
     function visibleText(el: Element): string {
@@ -889,10 +911,7 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ExpressiveMenu
       if (!el) return false;
       const rect = el.getBoundingClientRect();
       const style = getComputedStyle(el);
-      return rect.width > 1
-        && rect.height > 1
-        && style.visibility !== "hidden"
-        && style.display !== "none";
+      return rect.width > 1 && rect.height > 1 && style.visibility !== "hidden" && style.display !== "none";
     }
 
     function parseRgb(value: string): [number, number, number] | undefined {
@@ -934,39 +953,44 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ExpressiveMenu
       return (high + 0.05) / (low + 0.05);
     }
 
-    const contrastTargets = [
-      selected,
-      ...menuItems.slice(0, 6),
-      document.querySelector("[data-accent=\"red\"]"),
-    ].filter((el): el is Element => !!el);
+    const contrastTargets = [selected, ...menuItems.slice(0, 6), document.querySelector('[data-accent="red"]')].filter(
+      (el): el is Element => !!el,
+    );
     const menuContrastRatios = menuItems.filter(isVisible).map((el) => {
       const style = getComputedStyle(el);
       const color = parseRgb(style.color);
       const bg = effectiveBackground(el);
       return color && bg ? contrastRatio(color, bg) : 0;
     });
-    const minMenuContrastRatio = menuContrastRatios.length > 0
-      ? Math.min(...menuContrastRatios)
-      : null;
+    const minMenuContrastRatio = menuContrastRatios.length > 0 ? Math.min(...menuContrastRatios) : null;
     const lowContrastItemCount = menuContrastRatios.filter((ratio) => ratio < 4.5).length;
-    const highContrast = menuContrastRatios.length > 0
-      ? lowContrastItemCount === 0
-      : contrastTargets.some((el) => {
+    const highContrast =
+      menuContrastRatios.length > 0
+        ? lowContrastItemCount === 0
+        : contrastTargets.some((el) => {
+            const style = getComputedStyle(el);
+            const color = parseRgb(style.color);
+            const bg = effectiveBackground(el);
+            return !!color && !!bg && contrastRatio(color, bg) >= 4.5;
+          });
+    const menuItemSamples = menuItems
+      .filter(isVisible)
+      .map((el) => {
         const style = getComputedStyle(el);
         const color = parseRgb(style.color);
-        const bg = effectiveBackground(el);
-        return !!color && !!bg && contrastRatio(color, bg) >= 4.5;
-      });
-    const menuItemSamples = menuItems.filter(isVisible).map((el) => {
-      const style = getComputedStyle(el);
-      const color = parseRgb(style.color);
-      if (!color) return undefined;
-      const rect = el.getBoundingClientRect();
-      return {
-        bbox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-        color,
-      };
-    }).filter((item): item is { bbox: { x: number; y: number; width: number; height: number }; color: [number, number, number] } => !!item);
+        if (!color) return undefined;
+        const rect = el.getBoundingClientRect();
+        return {
+          bbox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          color,
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is { bbox: { x: number; y: number; width: number; height: number }; color: [number, number, number] } =>
+          !!item,
+      );
     const diagonalEvidence = [...layers, ...shapes].some((el) => {
       const style = getComputedStyle(el);
       return style.transform !== "none" || style.clipPath !== "none";
@@ -997,7 +1021,9 @@ async function enrichExpressiveMenuEvidence(
   dpr: number,
 ): Promise<ComponentExpressiveMenuEvidence | undefined> {
   if (!evidence) return undefined;
-  const pixelContrast = await sampleMenuItemContrasts(currentPath, evidence.menuItemSamples, dpr).catch(() => undefined);
+  const pixelContrast = await sampleMenuItemContrasts(currentPath, evidence.menuItemSamples, dpr).catch(
+    () => undefined,
+  );
   return {
     ...evidence,
     ...(pixelContrast ?? {}),
@@ -1010,7 +1036,13 @@ async function sampleMenuItemContrasts(
   currentPath: string,
   samples: ExpressiveMenuPixelSample[] | undefined,
   dpr: number,
-): Promise<Pick<ComponentExpressiveMenuEvidence, "highContrast" | "minMenuContrastRatio" | "lowContrastItemCount" | "contrastSource"> | undefined> {
+): Promise<
+  | Pick<
+      ComponentExpressiveMenuEvidence,
+      "highContrast" | "minMenuContrastRatio" | "lowContrastItemCount" | "contrastSource"
+    >
+  | undefined
+> {
   if (!samples || samples.length === 0) return undefined;
   const png = PNG.sync.read(await readFile(currentPath));
   const ratios = samples
@@ -1054,9 +1086,12 @@ async function applyScrolledState(
       axis?: "x" | "y" | "both";
     };
     const targets = rawTargets as Target[];
-    const selectors = targets.length > 0
-      ? targets.flatMap((target) => target.selector ? [target.selector] : target.name ? [`[data-scrollport="${target.name}"]`] : [])
-      : ["[data-scrollport], [data-vlmkit-scrollport], [data-ui-scrollport], [data-scroll-region]"];
+    const selectors =
+      targets.length > 0
+        ? targets.flatMap((target) =>
+            target.selector ? [target.selector] : target.name ? [`[data-scrollport="${target.name}"]`] : [],
+          )
+        : ["[data-scrollport], [data-vlmkit-scrollport], [data-ui-scrollport], [data-scroll-region]"];
     const elements: Element[] = [];
     const seen = new Set<Element>();
     for (const selector of selectors) {
@@ -1078,7 +1113,11 @@ async function applyScrolledState(
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i] as HTMLElement;
       const target = targets.find((candidate) =>
-        candidate.selector ? matchesSelector(el, candidate.selector) : candidate.name ? scrollportName(el) === candidate.name : false
+        candidate.selector
+          ? matchesSelector(el, candidate.selector)
+          : candidate.name
+            ? scrollportName(el) === candidate.name
+            : false,
       );
       const axis = target?.axis ?? "y";
       const beforeTop = el.scrollTop;
@@ -1116,15 +1155,16 @@ async function applyScrolledState(
     }
 
     function scrollportName(el: Element): string {
-      return el.getAttribute("data-scrollport")
-        || el.getAttribute("data-vlmkit-scrollport")
-        || el.getAttribute("data-ui-scrollport")
-        || el.getAttribute("data-scroll-region")
-        || "";
+      return (
+        el.getAttribute("data-scrollport") ||
+        el.getAttribute("data-vlmkit-scrollport") ||
+        el.getAttribute("data-ui-scrollport") ||
+        el.getAttribute("data-scroll-region") ||
+        ""
+      );
     }
   }, targets);
 }
-
 
 async function main(argv = process.argv.slice(2)) {
   const showHelp = argv[0] === "--help" || argv[0] === "-h";
@@ -1159,7 +1199,9 @@ async function main(argv = process.argv.slice(2)) {
   });
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "component-from-image" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "component-from-image" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

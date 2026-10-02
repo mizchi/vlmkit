@@ -44,7 +44,6 @@ export interface DesignPolicyOptions extends DesignJudgeOptions {
   storageState?: string;
 }
 
-
 /**
  * Collect role-grouped style signatures and spacing usage.
  *
@@ -191,7 +190,7 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
     // before the webfont resolves reports the fallback face's metrics as the design system's.
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
-    const input = await page.evaluate(buildDesignSampleScript(options.exclude)) as DesignPolicyInput;
+    const input = (await page.evaluate(buildDesignSampleScript(options.exclude))) as DesignPolicyInput;
     return judgeCollectedDesign(input, redirect, options);
   });
 }
@@ -263,9 +262,9 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
         : report.verdict === "drift"
           ? `${YELLOW}DRIFT${RESET}`
           : `${YELLOW}NOT JUDGED${RESET}`
-    }`
-    + ` (${shownFindings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
-    + `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
+    }` +
+      ` (${shownFindings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}` +
+      `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
   );
   // The verdict WORD still comes from `report.verdict` — it is the JSON contract, the same
   // choice `check integrity` made. So a page whose only drift rule is off can print DRIFT
@@ -276,9 +275,9 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
   // page where the reuse check ran on nothing at all.
   const judgedRoleCount = report.roles.filter((r) => !r.notJudged).length;
   lines.push(
-    `${DIM}  roles judged: ${judgedRoleCount}`
-    + `${judgedRoleCount < report.roles.length ? ` of ${report.roles.length} seen` : ""}`
-    + `, spacing values: ${report.spacingValues}${RESET}`,
+    `${DIM}  roles judged: ${judgedRoleCount}` +
+      `${judgedRoleCount < report.roles.length ? ` of ${report.roles.length} seen` : ""}` +
+      `, spacing values: ${report.spacingValues}${RESET}`,
   );
   // `skipped: 28 (no inferable role)` was the whole of this before, and v6's
   // adopting agent could not act on it: "28 of 30 elements skipped means the
@@ -288,11 +287,14 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
   // elements ARE), and one line saying where a role comes from at all.
   const considered = report.judgedElements + report.skipped + report.statefulSkipped;
   lines.push(
-    `${DIM}  coverage: ${report.judgedElements} of ${considered} visible element(s) carried an`
-    + ` inferable role${report.statefulSkipped > 0 ? `; ${report.statefulSkipped} skipped as non-resting` : ""}${RESET}`,
+    `${DIM}  coverage: ${report.judgedElements} of ${considered} visible element(s) carried an` +
+      ` inferable role${report.statefulSkipped > 0 ? `; ${report.statefulSkipped} skipped as non-resting` : ""}${RESET}`,
   );
   if (report.skippedTags.length > 0) {
-    const shown = report.skippedTags.slice(0, 6).map((t) => `${t.tag} x${t.count}`).join(", ");
+    const shown = report.skippedTags
+      .slice(0, 6)
+      .map((t) => `${t.tag} x${t.count}`)
+      .join(", ");
     const rest = report.skippedTags.length - 6;
     lines.push(`${DIM}    no role: ${shown}${rest > 0 ? `, +${rest} more tag(s)` : ""}${RESET}`);
   }
@@ -301,12 +303,11 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
     // it is looking at a number they did not expect. This mirrors `roleOf` in the
     // browser script above — if that list grows, this sentence grows with it.
     lines.push(
-      `${DIM}    A role comes from role="..." or from button/input/select/textarea/h1-h6.`
-      + ` Layout elements${RESET}`,
+      `${DIM}    A role comes from role="..." or from button/input/select/textarea/h1-h6.` + ` Layout elements${RESET}`,
     );
     lines.push(
-      `${DIM}    (div, span, p, a) have none, so a large skip count is normal —`
-      + ` this gate judges components,${RESET}`,
+      `${DIM}    (div, span, p, a) have none, so a large skip count is normal —` +
+        ` this gate judges components,${RESET}`,
     );
     lines.push(
       `${DIM}    not every box. Add role="..." where an element IS a component to widen the coverage.${RESET}`,
@@ -314,15 +315,15 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
   }
   if (report.textFreeSamples > 0) {
     lines.push(
-      `${DIM}  text-free: ${report.textFreeSamples} (${report.textFreeFolded} judged on box alone —`
-      + ` font-size/weight is not observable without painted text)${RESET}`,
+      `${DIM}  text-free: ${report.textFreeSamples} (${report.textFreeFolded} judged on box alone —` +
+        ` font-size/weight is not observable without painted text)${RESET}`,
     );
   }
   lines.push("");
   if (report.roles.length > 0) {
     lines.push(
-      `${BOLD}Role reuse${RESET} ${DIM}(instances / distinct styles;`
-      + ` drift below ${report.thresholds.minReuse}x from ${report.thresholds.minInstances} instances)${RESET}`,
+      `${BOLD}Role reuse${RESET} ${DIM}(instances / distinct styles;` +
+        ` drift below ${report.thresholds.minReuse}x from ${report.thresholds.minInstances} instances)${RESET}`,
     );
     const { minReuse, minInstances } = report.thresholds;
     for (const r of report.roles.slice(0, 10)) {
@@ -334,15 +335,17 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
         : r.reuse < minReuse
           ? `${YELLOW}drift${RESET}`
           : `${GREEN}ok${RESET}`;
-      lines.push(`  ${r.role.padEnd(14)} ${String(r.instances).padStart(3)} inst  ${String(r.signatures).padStart(3)} styles`
-        + `  reuse ${String(r.reuse).padStart(5)}x  ${r.singletons} one-off  ${flag}`);
+      lines.push(
+        `  ${r.role.padEnd(14)} ${String(r.instances).padStart(3)} inst  ${String(r.signatures).padStart(3)} styles` +
+          `  reuse ${String(r.reuse).padStart(5)}x  ${r.singletons} one-off  ${flag}`,
+      );
     }
     const unjudged = report.roles.filter((r) => r.notJudged);
     if (unjudged.length > 0) {
       lines.push(
-        `${DIM}  not judged: ${unjudged.map((r) => `${r.role} (${r.instances})`).join(", ")}`
-        + ` — under --min-instances ${minInstances}, so no finding can come from`
-        + ` ${unjudged.length === 1 ? "it" : "them"}.${RESET}`,
+        `${DIM}  not judged: ${unjudged.map((r) => `${r.role} (${r.instances})`).join(", ")}` +
+          ` — under --min-instances ${minInstances}, so no finding can come from` +
+          ` ${unjudged.length === 1 ? "it" : "them"}.${RESET}`,
       );
       // The remedy has to name both flags. Lowering --min-instances alone leaves a
       // 2-instance role unable to clear a 3x floor, so the run would still never
@@ -350,14 +353,14 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
       const byAllow = unjudged.filter((r) => r.unjudgedByAllow);
       if (byAllow.length > 0) {
         lines.push(
-          `${YELLOW}  --allow took ${byAllow.map((r) => r.role).join(", ")} under that floor.`
-          + ` A real drift there would NOT be reported.${RESET}`,
+          `${YELLOW}  --allow took ${byAllow.map((r) => r.role).join(", ")} under that floor.` +
+            ` A real drift there would NOT be reported.${RESET}`,
         );
       }
       lines.push(
-        `${DIM}  To keep judging ${unjudged.length === 1 ? "it" : "them"}:`
-        + ` --min-instances 2 --min-reuse 2 (both — a 2-instance role cannot reach`
-        + ` ${minReuse}x however many instances the floor allows).${RESET}`,
+        `${DIM}  To keep judging ${unjudged.length === 1 ? "it" : "them"}:` +
+          ` --min-instances 2 --min-reuse 2 (both — a 2-instance role cannot reach` +
+          ` ${minReuse}x however many instances the floor allows).${RESET}`,
       );
     }
     lines.push("");
@@ -370,8 +373,8 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
       // with 0 elements means it matched outside the measured tree.
       const marker = exclusion.elements === 0 ? `${YELLOW}!${RESET}` : `${DIM}-${RESET}`;
       lines.push(
-        `  ${marker} ${exclusion.selector}: ${exclusion.matches} root match(es),`
-        + ` ${exclusion.elements} element(s) removed`,
+        `  ${marker} ${exclusion.selector}: ${exclusion.matches} root match(es),` +
+          ` ${exclusion.elements} element(s) removed`,
       );
     }
     if (report.unusedExcludes.length > 0) {
@@ -385,19 +388,25 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
   const allowedRoles = report.roles.filter((r) => (r.allowed ?? 0) > 0);
   if (allowedRoles.length > 0 || (report.unusedAllow ?? []).length > 0) {
     for (const r of allowedRoles) {
-      lines.push(`${DIM}allowed: ${r.allowed} ${r.role} instance(s) declared deliberate and left out of the reuse figure${RESET}`);
+      lines.push(
+        `${DIM}allowed: ${r.allowed} ${r.role} instance(s) declared deliberate and left out of the reuse figure${RESET}`,
+      );
     }
     if ((report.unusedAllow ?? []).length > 0) {
-      lines.push(`${YELLOW}${report.unusedAllow!.length} --allow rule(s) matched nothing: ${report.unusedAllow!.join(", ")}${RESET}`);
+      lines.push(
+        `${YELLOW}${report.unusedAllow!.length} --allow rule(s) matched nothing: ${report.unusedAllow!.join(", ")}${RESET}`,
+      );
     }
     lines.push("");
   }
   if (shownFindings.length === 0) {
     // Not "No design drift detected" when the drift was found and silenced: that sentence
     // would be false, and it is the one line a reader quotes back.
-    lines.push(tiers.hiddenByRule.size > 0
-      ? `${DIM}No design drift reported — every finding's rule is off.${RESET}`
-      : `${GREEN}No design drift detected.${RESET}`);
+    lines.push(
+      tiers.hiddenByRule.size > 0
+        ? `${DIM}No design drift reported — every finding's rule is off.${RESET}`
+        : `${GREEN}No design drift detected.${RESET}`,
+    );
     return lines.join("\n");
   }
   const carried = shownFindings.filter((f) => f.tier !== "info");
@@ -405,8 +414,8 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
   const mark = (tier: DesignFinding["severity"]) =>
     tier === "suspect" ? `${RED}x${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
   const row = ({ row: f, tier }: { row: DesignFinding; tier: DesignFinding["severity"] }) =>
-    `  ${mark(tier)} [${f.kind}]${f.role ? ` ${f.role}` : ""}${tier === f.severity ? "" : ` (re-tuned to ${tier})`}`
-    + `: ${f.message}`;
+    `  ${mark(tier)} [${f.kind}]${f.role ? ` ${f.role}` : ""}${tier === f.severity ? "" : ` (re-tuned to ${tier})`}` +
+    `: ${f.message}`;
   if (carried.length > 0) {
     lines.push(`${BOLD}Findings${RESET}`);
     for (const f of carried) lines.push(row(f));

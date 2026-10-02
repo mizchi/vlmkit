@@ -165,8 +165,13 @@ const COMMANDS: CommandSpec[] = [
     positional: "ui-contract-required-state-issue-ids",
     json: "required-state-issue-ids",
     args: [
-      s("id"), s("kind", ["", "hover"]), b("required"), b("has_selector"), b("has_trigger"),
-      b("duplicate_id"), opt("min_change_ratio"),
+      s("id"),
+      s("kind", ["", "hover"]),
+      b("required"),
+      b("has_selector"),
+      b("has_trigger"),
+      b("duplicate_id"),
+      opt("min_change_ratio"),
     ],
     listResult: true,
   },
@@ -174,8 +179,14 @@ const COMMANDS: CommandSpec[] = [
     positional: "ui-contract-expected-scrollport-issue-ids",
     json: "expected-scrollport-issue-ids",
     args: [
-      s("id"), s("axis", ["", "y"]), b("required"), b("has_selector"), b("has_name"),
-      b("has_landmark_id"), b("duplicate_id"), opt("min_overflow"),
+      s("id"),
+      s("axis", ["", "y"]),
+      b("required"),
+      b("has_selector"),
+      b("has_name"),
+      b("has_landmark_id"),
+      b("duplicate_id"),
+      opt("min_overflow"),
     ],
     listResult: true,
   },
@@ -225,9 +236,15 @@ const COMMANDS: CommandSpec[] = [
       disc("width_kind", ["", "fluid", "fixed"]),
       // The two present-flags here are separate optionals on the JSON side, so the
       // generic pair handling does not apply; they are sent as their own fields.
-      opt("width_min"), opt("width_max"), n("width_value"),
-      disc("height_kind", ["", "fixed", "scrollport"]), n("height_value"), n("height_max"),
-      disc("display_kind", ["", "grid", "block"]), i("display_columns_count"), i("display_rows_count"),
+      opt("width_min"),
+      opt("width_max"),
+      n("width_value"),
+      disc("height_kind", ["", "fixed", "scrollport"]),
+      n("height_value"),
+      n("height_max"),
+      disc("display_kind", ["", "grid", "block"]),
+      i("display_columns_count"),
+      i("display_rows_count"),
     ],
     listResult: true,
   },
@@ -252,9 +269,13 @@ function encode(spec: ArgSpec, value: string | number | boolean | readonly strin
  * into the generic rule, because bending it would have made the generic rule wrong
  * for everything else.
  */
-function positionalArgvFor(command: CommandSpec, values: (string | number | boolean | readonly string[] | undefined)[]): string[] {
+function positionalArgvFor(
+  command: CommandSpec,
+  values: (string | number | boolean | readonly string[] | undefined)[],
+): string[] {
   if (command.json === "layout-policy-issue-ids") {
-    const [widthKind, widthMin, widthMax, widthValue, heightKind, heightValue, heightMax, displayKind, cols, rows] = values;
+    const [widthKind, widthMin, widthMax, widthValue, heightKind, heightValue, heightMax, displayKind, cols, rows] =
+      values;
     return [
       command.positional,
       String(widthKind),
@@ -272,7 +293,10 @@ function positionalArgvFor(command: CommandSpec, values: (string | number | bool
   return [command.positional, ...command.args.flatMap((spec, index) => encode(spec, values[index]))];
 }
 
-function payloadFor(command: CommandSpec, values: (string | number | boolean | readonly string[] | undefined)[]): Record<string, unknown> {
+function payloadFor(
+  command: CommandSpec,
+  values: (string | number | boolean | readonly string[] | undefined)[],
+): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   command.args.forEach((spec, index) => {
     const value = values[index];
@@ -292,7 +316,9 @@ function baseValues(command: CommandSpec): (string | number | boolean | readonly
  * single argument at a time is what makes a swap detectable: if i and j were
  * exchanged, the case that varies i differs from the reference.
  */
-function casesFor(command: CommandSpec): { label: string; values: (string | number | boolean | readonly string[] | undefined)[] }[] {
+function casesFor(
+  command: CommandSpec,
+): { label: string; values: (string | number | boolean | readonly string[] | undefined)[] }[] {
   type Values = (string | number | boolean | readonly string[] | undefined)[];
   const out: { label: string; values: Values }[] = [];
   const crossIndexes = command.args.flatMap((spec, index) => (spec.cross ? [index] : []));
@@ -416,11 +442,26 @@ const NESTED_COMMANDS: NestedCommandSpec[] = [
     positional: "a11y-contrast-evaluate",
     json: "contrast-evaluate",
     args: [
-      ch("fr"), ch("fg"), ch("fb"), ch("br"), ch("bg"), ch("bb"),
+      ch("fr"),
+      ch("fg"),
+      ch("fb"),
+      ch("br"),
+      ch("bg"),
+      ch("bb"),
       { kind: "number", field: "font_size", values: [0, 13, 14, 18, 24] },
       { kind: "int", field: "font_weight", values: [400, 700] },
     ],
-    toArgv: (v) => ["a11y-contrast-evaluate", int(v[0]), int(v[1]), int(v[2]), int(v[3]), int(v[4]), int(v[5]), num(v[6]), int(v[7])],
+    toArgv: (v) => [
+      "a11y-contrast-evaluate",
+      int(v[0]),
+      int(v[1]),
+      int(v[2]),
+      int(v[3]),
+      int(v[4]),
+      int(v[5]),
+      num(v[6]),
+      int(v[7]),
+    ],
     toPayload: (v) => ({
       foreground: { r: v[0], g: v[1], b: v[2] },
       background: { r: v[3], g: v[4], b: v[5] },
@@ -477,7 +518,10 @@ const NESTED_COMMANDS: NestedCommandSpec[] = [
   {
     positional: "grid-gcd",
     json: "grid-gcd",
-    args: [{ kind: "int", field: "a", values: [0, 1, 24, -36] }, { kind: "int", field: "b", values: [0, 1, 36, -24] }],
+    args: [
+      { kind: "int", field: "a", values: [0, 1, 24, -36] },
+      { kind: "int", field: "b", values: [0, 1, 36, -24] },
+    ],
     toArgv: (v) => ["grid-gcd", int(v[0]), int(v[1])],
     toPayload: (v) => ({ a: v[0], b: v[1] }),
     normalize: asIs,
@@ -567,11 +611,28 @@ const NESTED_COMMANDS: NestedCommandSpec[] = [
       { kind: "int", field: "diff_pixel_count", values: [0, 50, 2000] },
       { kind: "int", field: "total_pixels", values: [0, 2000] },
       { kind: "bool", field: "has_color_sample", values: BOOLS },
-      ch("baseline_r"), ch("baseline_g"), ch("baseline_b"),
-      ch("current_r"), ch("current_g"), ch("current_b"),
+      ch("baseline_r"),
+      ch("baseline_g"),
+      ch("baseline_b"),
+      ch("current_r"),
+      ch("current_g"),
+      ch("current_b"),
     ],
-    toArgv: (v) => ["visual-classify-region", String(v[0]), int(v[1]), int(v[2]), int(v[3]), int(v[4]),
-      String(v[5]), int(v[6]), int(v[7]), int(v[8]), int(v[9]), int(v[10]), int(v[11])],
+    toArgv: (v) => [
+      "visual-classify-region",
+      String(v[0]),
+      int(v[1]),
+      int(v[2]),
+      int(v[3]),
+      int(v[4]),
+      String(v[5]),
+      int(v[6]),
+      int(v[7]),
+      int(v[8]),
+      int(v[9]),
+      int(v[10]),
+      int(v[11]),
+    ],
     toPayload: (v) => ({
       region_type: v[0],
       width: v[1],
@@ -582,9 +643,9 @@ const NESTED_COMMANDS: NestedCommandSpec[] = [
       // this migration introduced, so the sweep must cross it with both values.
       ...(v[5]
         ? {
-          baseline_color: { r: v[6], g: v[7], b: v[8] },
-          current_color: { r: v[9], g: v[10], b: v[11] },
-        }
+            baseline_color: { r: v[6], g: v[7], b: v[8] },
+            current_color: { r: v[9], g: v[10], b: v[11] },
+          }
         : {}),
     }),
     normalize: asIs,
@@ -625,8 +686,12 @@ const NESTED_COMMANDS: NestedCommandSpec[] = [
       { kind: "list", field: "priority_scores", values: [["0.2", "0.9"], [], ["0.2"], ["0.9", "0.2"]] },
       { kind: "list", field: "orders", values: [["1", "0"], [], ["0"], ["0", "1"]] },
     ],
-    toArgv: (v) => ["semantic-drilldown-select-index",
-      (v[0] as string[]).join("|"), (v[1] as string[]).join("|"), (v[2] as string[]).join("|")],
+    toArgv: (v) => [
+      "semantic-drilldown-select-index",
+      (v[0] as string[]).join("|"),
+      (v[1] as string[]).join("|"),
+      (v[2] as string[]).join("|"),
+    ],
     toPayload: (v) => {
       const flows = v[0] as string[];
       const scores = v[1] as string[];
@@ -673,10 +738,7 @@ const NESTED_COMMANDS: NestedCommandSpec[] = [
 describe("nested-payload commands match their positional arms", { timeout: 300_000 }, () => {
   it("covers every nested command the JSON boundary claims", async () => {
     const { markupCoreJsonCommands } = await import("./markup-core-runtime.ts");
-    const covered = new Set([
-      ...COMMANDS.map((c) => c.json),
-      ...NESTED_COMMANDS.map((c) => c.json),
-    ]);
+    const covered = new Set([...COMMANDS.map((c) => c.json), ...NESTED_COMMANDS.map((c) => c.json)]);
     // `landscape-diff-summary` has its own test: its positional twin takes a
     // sub-encoded stat blob and returns a "mismatch|..." sentinel instead of raising,
     // so the two are not comparable case-for-case. See below.
@@ -686,12 +748,7 @@ describe("nested-payload commands match their positional arms", { timeout: 300_0
     // Their coverage is behavioural instead — `touch-policy`'s is
     // `a11y-touch.test.ts > analyzeA11yTouch — the criteria's own exceptions`, which drives
     // the same JSON boundary. An exemption here means "tested elsewhere", never "untested".
-    const exempt = new Set([
-      "interaction-issues",
-      "touch-policy",
-      "goal-status",
-      "landscape-diff-summary",
-    ]);
+    const exempt = new Set(["interaction-issues", "touch-policy", "goal-status", "landscape-diff-summary"]);
     const uncovered = markupCoreJsonCommands().filter((name) => !covered.has(name) && !exempt.has(name));
     assert.deepEqual(uncovered, [], `migrated with no differential coverage: ${uncovered.join(", ")}`);
   });
@@ -734,10 +791,15 @@ describe("nested-payload commands match their positional arms", { timeout: 300_0
  * old form returned a sentinel.
  */
 describe("landscape-diff-summary matches its positional arm", { timeout: 120_000 }, () => {
-  interface Cell { r: number; g: number; b: number; l: number; ink: number }
+  interface Cell {
+    r: number;
+    g: number;
+    b: number;
+    l: number;
+    ink: number;
+  }
 
-  const encodeStats = (cells: Cell[]): string =>
-    cells.map((c) => [c.r, c.g, c.b, c.l, c.ink].join(",")).join("|");
+  const encodeStats = (cells: Cell[]): string => cells.map((c) => [c.r, c.g, c.b, c.l, c.ink].join(",")).join("|");
 
   /** Deterministic cells; `seed` shifts them so baseline and current differ per case. */
   const cellsFor = (count: number, seed: number): Cell[] =>
@@ -767,16 +829,31 @@ describe("landscape-diff-summary matches its positional arm", { timeout: 120_000
           const total = cols * rows;
           const baseline = cellsFor(total, 1);
           const current = cellsFor(total, 5);
-          const reference = runMarkupCore([
-            "landscape-diff-summary",
-            String(cols), String(rows), String(threshold), String(topN),
-            encodeStats(baseline), encodeStats(current),
-          ], { cache: false });
+          const reference = runMarkupCore(
+            [
+              "landscape-diff-summary",
+              String(cols),
+              String(rows),
+              String(threshold),
+              String(topN),
+              encodeStats(baseline),
+              encodeStats(current),
+            ],
+            { cache: false },
+          );
           const migrated = callMarkupCoreJson<{
-            mean: number; similarity: number; changed: number; total: number;
+            mean: number;
+            similarity: number;
+            changed: number;
+            total: number;
             top: { index: number; score: number }[];
           }>("landscape-diff-summary", {
-            cols, rows, changed_threshold: threshold, top_n: topN, baseline, current,
+            cols,
+            rows,
+            changed_threshold: threshold,
+            top_n: topN,
+            baseline,
+            current,
           });
           // Rebuild the joined form the positional arm returns. Stated here rather than
           // hidden in a helper, because this mapping IS the migration's output claim.
@@ -802,27 +879,30 @@ describe("landscape-diff-summary matches its positional arm", { timeout: 120_000
 
   it("raises on a cell-count mismatch where the positional arm returned a sentinel", () => {
     const short = cellsFor(3, 1);
-    const reference = runMarkupCore([
-      "landscape-diff-summary", "2", "2", "0.1", "2",
-      encodeStats(short), encodeStats(cellsFor(4, 2)),
-    ], { cache: false });
+    const reference = runMarkupCore(
+      ["landscape-diff-summary", "2", "2", "0.1", "2", encodeStats(short), encodeStats(cellsFor(4, 2))],
+      { cache: false },
+    );
     // The old contract: an error delivered as data, in the same shape as a result.
     assert.match(reference, /^mismatch\|4\|3\|4$/);
 
     assert.throws(
-      () => callMarkupCoreJson("landscape-diff-summary", {
-        cols: 2, rows: 2, changed_threshold: 0.1, top_n: 2,
-        baseline: short, current: cellsFor(4, 2),
-      }),
+      () =>
+        callMarkupCoreJson("landscape-diff-summary", {
+          cols: 2,
+          rows: 2,
+          changed_threshold: 0.1,
+          top_n: 2,
+          baseline: short,
+          current: cellsFor(4, 2),
+        }),
       /cell count mismatch: expected 4 \(2x2\), baseline has 3, current has 4/,
       "the raise must name the counts — the sentinel's only virtue was carrying them",
     );
   });
 
   it("returns the empty-grid result for a zero-cell grid, as the positional arm does", () => {
-    const reference = runMarkupCore([
-      "landscape-diff-summary", "0", "0", "0.1", "2", "", "",
-    ], { cache: false });
+    const reference = runMarkupCore(["landscape-diff-summary", "0", "0", "0.1", "2", "", ""], { cache: false });
     assert.equal(reference, "1|0|0|0");
     const migrated = callMarkupCoreJson<{ mean: number; similarity: number; changed: number; total: number }>(
       "landscape-diff-summary",
@@ -852,11 +932,7 @@ describe("migrated wrappers survive malformed input", { timeout: 240_000 }, () =
       ["NaN", Number.NaN],
       ["Infinity", Number.POSITIVE_INFINITY],
     ] as const) {
-      assert.deepEqual(
-        viewport(value),
-        ["viewport-size-positive"],
-        `width ${label} must report the issue, not raise`,
-      );
+      assert.deepEqual(viewport(value), ["viewport-size-positive"], `width ${label} must report the issue, not raise`);
     }
   });
 

@@ -24,7 +24,7 @@ describe("trimDomPositionEntriesByClassPair", () => {
         baselineClasses: "baseline-card",
         variantClasses: "variant-card",
         property: "margin-top",
-      })
+      }),
     );
     const entries = [
       ...repeated,

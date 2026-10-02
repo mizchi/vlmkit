@@ -23,8 +23,16 @@ import {
 } from "../stress/responsive-pbt.ts";
 
 const VALUE_FLAGS = [
-  "--seed", "--runs", "--min-width", "--max-width", "--min-height", "--max-height",
-  "--text-scale", "--width", "--color-scheme", "--max-shrinks",
+  "--seed",
+  "--runs",
+  "--min-width",
+  "--max-width",
+  "--min-height",
+  "--max-height",
+  "--text-scale",
+  "--width",
+  "--color-scheme",
+  "--max-shrinks",
 ];
 
 export const responsiveGate = defineGate<ResponsiveReport, ResponsiveOptions>({
@@ -56,19 +64,31 @@ B / B+1 agree); this is the exploration of every regime in between.`,
     { id: "page-overflow-x", title: "Page scrolls horizontally at a generated viewport", severity: "suspect" },
     { id: "text-collision", title: "Overlapping text runs at a generated viewport", severity: "suspect" },
     { id: "text-clipped", title: "Text clipped by its container at a generated viewport", severity: "suspect" },
-    { id: "container-protrusion", title: "Child protrudes past its container at a generated viewport", severity: "suspect" },
+    {
+      id: "container-protrusion",
+      title: "Child protrudes past its container at a generated viewport",
+      severity: "suspect",
+    },
     { id: "occluded-text", title: "Text covered by another element at a generated viewport", severity: "suspect" },
-    { id: "collapsed-container", title: "Container collapsed to zero size at a generated viewport", severity: "suspect" },
-    { id: "clipped-content", title: "Content clipped by an overflow container at a generated viewport", severity: "warn" },
+    {
+      id: "collapsed-container",
+      title: "Container collapsed to zero size at a generated viewport",
+      severity: "suspect",
+    },
+    {
+      id: "clipped-content",
+      title: "Content clipped by an overflow container at a generated viewport",
+      severity: "warn",
+    },
     {
       id: "text-starved",
       title: "Text squeezed to a word or a character per line",
       severity: "warn",
       docs:
-        "A block that wraps more than its author asked and is under 4em wide, under 6em over"
-        + " three or more lines, or breaks a word of 15 characters or fewer: a flex/grid item"
-        + " shrunk to min-content, or a breakpoint switched on before its row fits. Found by eye"
-        + " 17 times on the demo sites and by no other gate.",
+        "A block that wraps more than its author asked and is under 4em wide, under 6em over" +
+        " three or more lines, or breaks a word of 15 characters or fewer: a flex/grid item" +
+        " shrunk to min-content, or a breakpoint switched on before its row fits. Found by eye" +
+        " 17 times on the demo sites and by no other gate.",
     },
     {
       id: "untested-media-feature",
@@ -79,26 +99,97 @@ B / B+1 agree); this is the exploration of every regime in between.`,
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
-    { name: "seed", kind: "number", description: "Seed for the case stream (printed with every failure)", defaultDescription: "1" },
-    { name: "runs", kind: "number", description: "Cases evaluated, transition edges included", defaultDescription: "60" },
-    { name: "min-width", placeholder: "px", kind: "number", description: "Narrowest width generated", defaultDescription: "320" },
-    { name: "max-width", placeholder: "px", kind: "number", description: "Widest width generated", defaultDescription: "max(1440, largest breakpoint + 160)" },
-    { name: "min-height", placeholder: "px", kind: "number", description: "Shortest height generated", defaultDescription: "480" },
-    { name: "max-height", placeholder: "px", kind: "number", description: "Tallest height generated", defaultDescription: "1000" },
-    { name: "height", placeholder: "px", kind: "number", description: "Default height: most cases use it and failures shrink toward it", defaultDescription: "900" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "seed",
+      kind: "number",
+      description: "Seed for the case stream (printed with every failure)",
+      defaultDescription: "1",
+    },
+    {
+      name: "runs",
+      kind: "number",
+      description: "Cases evaluated, transition edges included",
+      defaultDescription: "60",
+    },
+    {
+      name: "min-width",
+      placeholder: "px",
+      kind: "number",
+      description: "Narrowest width generated",
+      defaultDescription: "320",
+    },
+    {
+      name: "max-width",
+      placeholder: "px",
+      kind: "number",
+      description: "Widest width generated",
+      defaultDescription: "max(1440, largest breakpoint + 160)",
+    },
+    {
+      name: "min-height",
+      placeholder: "px",
+      kind: "number",
+      description: "Shortest height generated",
+      defaultDescription: "480",
+    },
+    {
+      name: "max-height",
+      placeholder: "px",
+      kind: "number",
+      description: "Tallest height generated",
+      defaultDescription: "1000",
+    },
+    {
+      name: "height",
+      placeholder: "px",
+      kind: "number",
+      description: "Default height: most cases use it and failures shrink toward it",
+      defaultDescription: "900",
+    },
     {
       name: "text-scale",
       placeholder: "x",
       kind: "number",
-      description: "Largest root font-size multiplier to generate (e.g. 2 for WCAG 1.4.4); with --width, the one scale replayed",
+      description:
+        "Largest root font-size multiplier to generate (e.g. 2 for WCAG 1.4.4); with --width, the one scale replayed",
       defaultDescription: "off",
     },
-    { name: "width", placeholder: "px", kind: "number", description: "Replay one case at this width instead of generating (reproduce lines use it)" },
-    { name: "color-scheme", kind: "string", choices: ["light", "dark"], description: "With --width: the colour scheme replayed" },
-    { name: "reduced-motion", kind: "boolean", description: "With --width: replay with prefers-reduced-motion: reduce" },
-    { name: "max-shrinks", kind: "number", description: "Failure groups shrunk and explained; the rest are listed", defaultDescription: "8" },
-    { name: "no-cause", kind: "boolean", description: "Skip the declaration search (faster; intervals and anchors still reported)" },
+    {
+      name: "width",
+      placeholder: "px",
+      kind: "number",
+      description: "Replay one case at this width instead of generating (reproduce lines use it)",
+    },
+    {
+      name: "color-scheme",
+      kind: "string",
+      choices: ["light", "dark"],
+      description: "With --width: the colour scheme replayed",
+    },
+    {
+      name: "reduced-motion",
+      kind: "boolean",
+      description: "With --width: replay with prefers-reduced-motion: reduce",
+    },
+    {
+      name: "max-shrinks",
+      kind: "number",
+      description: "Failure groups shrunk and explained; the rest are listed",
+      defaultDescription: "8",
+    },
+    {
+      name: "no-cause",
+      kind: "boolean",
+      description: "Skip the declaration search (faster; intervals and anchors still reported)",
+    },
     {
       name: "storage-state",
       kind: "path",
@@ -125,7 +216,9 @@ B / B+1 agree); this is the exploration of every regime in between.`,
       throw new UsageError(`--min-width ${minWidth} is above --max-width ${maxWidth}`);
     }
     if (width === undefined && (colorScheme !== undefined || reducedMotion)) {
-      throw new UsageError("--color-scheme and --reduced-motion pin a replayed case: pass --width too. Without it, both are generated whenever the page has a query for them.");
+      throw new UsageError(
+        "--color-scheme and --reduced-motion pin a replayed case: pass --width too. Without it, both are generated whenever the page has a query for them.",
+      );
     }
     const storageState = readFlag(argv, "storage-state");
     return {
@@ -141,14 +234,14 @@ B / B+1 agree); this is the exploration of every regime in between.`,
       ...(width === undefined && textScale !== undefined ? { textScale } : {}),
       ...(width !== undefined
         ? {
-          replay: {
-            width,
-            ...(height !== undefined ? { height } : {}),
-            ...(textScale !== undefined ? { textScale } : {}),
-            ...(colorScheme !== undefined ? { colorScheme } : {}),
-            ...(reducedMotion ? { reducedMotion: "reduce" as const } : {}),
-          },
-        }
+            replay: {
+              width,
+              ...(height !== undefined ? { height } : {}),
+              ...(textScale !== undefined ? { textScale } : {}),
+              ...(colorScheme !== undefined ? { colorScheme } : {}),
+              ...(reducedMotion ? { reducedMotion: "reduce" as const } : {}),
+            },
+          }
         : {}),
       ...(argv.includes("--no-cause") ? { noCause: true } : {}),
       ...(storageState ? { storageState } : {}),

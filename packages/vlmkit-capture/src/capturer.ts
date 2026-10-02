@@ -104,19 +104,13 @@ export interface ResolvedCaptureBackend {
  * + `CLOUDFLARE_API_TOKEN`) regardless of how the backend was selected, so
  * CI configs can stay declarative.
  */
-export function resolveCaptureBackend(
-  options: ResolveCaptureBackendOptions = {},
-): ResolvedCaptureBackend {
+export function resolveCaptureBackend(options: ResolveCaptureBackendOptions = {}): ResolvedCaptureBackend {
   const env = options.env ?? process.env;
   const explicit = options.backendFlag?.trim().toLowerCase();
   const envChoice = env.VLMKIT_CAPTURE_BACKEND?.trim().toLowerCase();
 
   const choice = explicit || envChoice || "local";
-  const source: ResolvedCaptureBackend["source"] = explicit
-    ? "flag"
-    : envChoice
-      ? "env"
-      : "default";
+  const source: ResolvedCaptureBackend["source"] = explicit ? "flag" : envChoice ? "env" : "default";
 
   switch (choice) {
     case "local":

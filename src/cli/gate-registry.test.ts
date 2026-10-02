@@ -23,10 +23,11 @@ async function registry() {
 describe("composed built-in registry", () => {
   it("loads all three built-in plugins", async () => {
     const r = await registry();
-    assert.deepEqual(
-      r.plugins.map((p) => p.name).sort(),
-      ["@mizchi/vlmkit-capture", "@mizchi/vlmkit-markup", "vlmkit-app"],
-    );
+    assert.deepEqual(r.plugins.map((p) => p.name).sort(), [
+      "@mizchi/vlmkit-capture",
+      "@mizchi/vlmkit-markup",
+      "vlmkit-app",
+    ]);
   });
 
   it("registers every gate without an id or command conflict", async () => {
@@ -44,7 +45,13 @@ describe("composed built-in registry", () => {
 
   it("resolves three-token gates by longest prefix", async () => {
     const r = await registry();
-    for (const command of ["check a11y contrast", "check a11y touch", "check a11y focus", "check drift component", "check drift pages"]) {
+    for (const command of [
+      "check a11y contrast",
+      "check a11y touch",
+      "check a11y focus",
+      "check drift component",
+      "check drift pages",
+    ]) {
       const tokens = command.split(" ");
       const resolved = r.resolve([...tokens, "page.html", "--json"]);
       assert.equal(resolved?.gate.command.join(" "), command, `${command} did not resolve`);
@@ -248,8 +255,14 @@ describe("composed built-in registry", () => {
     // gate is migrated; naming the blind ones makes the remaining work visible, and makes a
     // migration that forgets to update this list fail rather than pass quietly.
     const rows = (await registry()).list().map(({ gate }) => ({ id: gate.id, aware: gate.format.length >= 2 }));
-    const aware = rows.filter((r) => r.aware).map((r) => r.id).sort();
-    const blind = rows.filter((r) => !r.aware).map((r) => r.id).sort();
+    const aware = rows
+      .filter((r) => r.aware)
+      .map((r) => r.id)
+      .sort();
+    const blind = rows
+      .filter((r) => !r.aware)
+      .map((r) => r.id)
+      .sort();
     // Every gate, as of the migration that finished the set. The list stays asserted rather
     // than reduced to `blind.length === 0`: a gate added tomorrow with a one-parameter
     // formatter should fail here and be named, not silently restart the backlog.
@@ -298,7 +311,8 @@ describe("composed built-in registry", () => {
     // such excuse: `vlmkit rules` groups by category, so an uncategorized
     // built-in lands under "other", which tells a reader deciding what to run
     // nothing at all.
-    const uncategorized = (await registry()).list()
+    const uncategorized = (await registry())
+      .list()
       .filter(({ gate }) => gate.category === undefined)
       .map(({ gate }) => gate.id);
     assert.deepEqual(uncategorized, []);
@@ -327,7 +341,10 @@ describe("composed built-in registry", () => {
       "expected `infrastructure` to span two plugins",
     );
     const markupCategories = new Set(
-      r.list().filter((e) => e.plugin === "@mizchi/vlmkit-markup").map((e) => e.gate.category),
+      r
+        .list()
+        .filter((e) => e.plugin === "@mizchi/vlmkit-markup")
+        .map((e) => e.gate.category),
     );
     assert.ok(markupCategories.size > 1, "expected one plugin to span several categories");
   });

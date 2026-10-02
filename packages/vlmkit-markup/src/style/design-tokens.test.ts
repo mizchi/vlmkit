@@ -59,10 +59,10 @@ describe("check tokens", () => {
     });
 
     const margins = report.violations.filter((v) => v.property === "margin");
-    assert.deepEqual(
-      margins.map((v) => `${v.path} ${v.side} ${v.value}`).sort(),
-      ["div.offscale left 13", "div.offscale top 7"],
-    );
+    assert.deepEqual(margins.map((v) => `${v.path} ${v.side} ${v.value}`).sort(), [
+      "div.offscale left 13",
+      "div.offscale top 7",
+    ]);
 
     // Stated as their own assertions so a failure names the regression rather than a diff.
     const paths = report.violations.map((v) => v.path).join(" ");

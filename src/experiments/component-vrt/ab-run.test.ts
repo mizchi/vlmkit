@@ -36,10 +36,7 @@ import {
   visionTokens,
 } from "./ab-run.ts";
 
-const CSS = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "fixture", "components.css"),
-  "utf8",
-);
+const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixture", "components.css"), "utf8");
 
 describe("declarationsIn", () => {
   it("reads every declaration of a multi-line rule block", () => {
@@ -202,8 +199,14 @@ describe("applySeed", () => {
     // gallery reported changed and the component arm was scored with 15 false
     // positives it had not earned.
     const plan = {
-      seed: 1, page: "flat" as const, seedClass: "colour" as const, component: "Card" as const,
-      selector: ".c-card", property: "background", value: "#fff", replacement: "#8a5cf6",
+      seed: 1,
+      page: "flat" as const,
+      seedClass: "colour" as const,
+      component: "Card" as const,
+      selector: ".c-card",
+      property: "background",
+      value: "#fff",
+      replacement: "#8a5cf6",
     };
     const mutated = applySeed(CSS, plan);
     assert.equal(
@@ -243,10 +246,7 @@ describe("blast radius", () => {
   });
 
   it("keeps COMPOSES in step with what the fixture actually renders", () => {
-    const markup = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "fixture", "_markup.js"),
-      "utf8",
-    );
+    const markup = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixture", "_markup.js"), "utf8");
     const toolbar = markup.slice(markup.indexOf("Toolbar:"));
     for (const part of COMPOSES.Toolbar!) {
       assert.match(toolbar, new RegExp(`COMPONENTS\\.${part}`), `Toolbar no longer renders ${part}`);
@@ -298,10 +298,7 @@ describe("trial comparability", () => {
     // A page drawing only a Toolbar still shows Avatar/Badge/Button, so mutating
     // one of those is observable there.
     for (const part of COMPOSES.Toolbar!) {
-      assert.ok(
-        COMPONENTS.includes(part),
-        `${part} should be a real component for the expansion to mean anything`,
-      );
+      assert.ok(COMPONENTS.includes(part), `${part} should be a real component for the expansion to mean anything`);
     }
     assert.deepEqual(expectedChanged("Avatar").sort(), ["Avatar", "Toolbar"]);
   });

@@ -63,12 +63,16 @@ export interface ScanA11yReport {
 const isDump = (source: string) => extname(source).toLowerCase() === ".xml";
 
 /** The semantics tree is built asynchronously; it is ready when its size stops changing. */
-async function waitForSemantics(page: Page, deadline: number, minQuietMs = 500): Promise<{ flutter: boolean; nodes: number }> {
+async function waitForSemantics(
+  page: Page,
+  deadline: number,
+  minQuietMs = 500,
+): Promise<{ flutter: boolean; nodes: number }> {
   let last = -1;
   let quietSince = Date.now();
   let state = { flutter: false, nodes: 0 };
   while (Date.now() < deadline) {
-    state = await page.evaluate(FLUTTER_STATE_JS) as typeof state;
+    state = (await page.evaluate(FLUTTER_STATE_JS)) as typeof state;
     if (!state.flutter) return state;
     if (state.nodes !== last) {
       last = state.nodes;
@@ -81,7 +85,10 @@ async function waitForSemantics(page: Page, deadline: number, minQuietMs = 500):
   return state;
 }
 
-async function captureFlutterWeb(options: ScanA11yOptions, framePath: string): Promise<{ tree: A11yTree; redirect: string | null }> {
+async function captureFlutterWeb(
+  options: ScanA11yOptions,
+  framePath: string,
+): Promise<{ tree: A11yTree; redirect: string | null }> {
   return withBrowser(async (browser) => {
     const viewport = options.viewport ?? { width: 375, height: 812 };
     // Pinned, not inherited: a container with no LANG gives the page an empty locale, and a
@@ -97,18 +104,21 @@ async function captureFlutterWeb(options: ScanA11yOptions, framePath: string): P
     const state = await waitForSemantics(page, Date.now() + timeout);
     if (!state.flutter) {
       throw new UsageError(
-        `${options.source} is not a Flutter web app (no flutter-view / flt-semantics). For a DOM page,`
-        + " the DOM gates read accessibility directly: vlmkit check a11y touch|contrast|focus.",
+        `${options.source} is not a Flutter web app (no flutter-view / flt-semantics). For a DOM page,` +
+          " the DOM gates read accessibility directly: vlmkit check a11y touch|contrast|focus.",
       );
     }
     for (const name of options.clicks ?? []) {
-      const found = await page.evaluate(markFlutterTarget(name)) as number;
+      const found = (await page.evaluate(markFlutterTarget(name))) as number;
       if (found === 0) {
-        const raw = (await page.evaluate(COLLECT_FLUTTER_SEMANTICS) ?? []) as FlutterWebRawNode[];
-        const names = flutterWebNodes(raw).filter(isInteractive).map((n) => n.name).filter(Boolean);
+        const raw = ((await page.evaluate(COLLECT_FLUTTER_SEMANTICS)) ?? []) as FlutterWebRawNode[];
+        const names = flutterWebNodes(raw)
+          .filter(isInteractive)
+          .map((n) => n.name)
+          .filter(Boolean);
         throw new UsageError(
-          `--click ${JSON.stringify(name)}: no tappable node has that exact name on this screen.`
-          + ` Tappable names here: ${names.length ? names.map((n) => JSON.stringify(n)).join(", ") : "(none)"}.`,
+          `--click ${JSON.stringify(name)}: no tappable node has that exact name on this screen.` +
+            ` Tappable names here: ${names.length ? names.map((n) => JSON.stringify(n)).join(", ") : "(none)"}.`,
         );
       }
       // Forced: the semantics DOM is transparent by design, so Playwright's visibility check refuses it.
@@ -117,8 +127,12 @@ async function captureFlutterWeb(options: ScanA11yOptions, framePath: string): P
       await page.waitForTimeout(600);
       await waitForSemantics(page, Date.now() + timeout);
     }
-    const raw = (await page.evaluate(COLLECT_FLUTTER_SEMANTICS) ?? []) as FlutterWebRawNode[];
-    const measured = await page.evaluate("({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio })") as { w: number; h: number; dpr: number };
+    const raw = ((await page.evaluate(COLLECT_FLUTTER_SEMANTICS)) ?? []) as FlutterWebRawNode[];
+    const measured = (await page.evaluate("({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio })")) as {
+      w: number;
+      h: number;
+      dpr: number;
+    };
     await mkdir(dirname(framePath), { recursive: true });
     await page.screenshot({ path: framePath });
     await page.close();
@@ -143,8 +157,8 @@ export async function runScanA11y(options: ScanA11yOptions): Promise<ScanA11yRep
   if (isDump(options.source)) {
     if (options.density === undefined) {
       throw new UsageError(
-        "a uiautomator dump needs --density: its bounds are device pixels and target sizes are judged in dp."
-        + " Read it with: adb shell wm density",
+        "a uiautomator dump needs --density: its bounds are device pixels and target sizes are judged in dp." +
+          " Read it with: adb shell wm density",
       );
     }
     frame = options.frame ? resolve(options.frame) : null;

@@ -54,12 +54,30 @@ gate the page itself.`,
   inputs: [
     { name: "source", placeholder: "asset.png", kind: "path", description: "Asset PNG", positional: 0, required: true },
     { name: "slot", placeholder: "WxH", kind: "string", description: "Target slot size (aspect + upscale checks)" },
-    { name: "expect-transparent", kind: "boolean", description: "The asset must be a cut-out (transparent border ring)" },
-    { name: "against-bg", placeholder: "#rrggbb", kind: "string", description: "Backdrop the asset will sit on (silhouette contrast check)" },
-    { name: "page-palette", placeholder: "png", kind: "path", description: "Page screenshot to check palette harmony against" },
+    {
+      name: "expect-transparent",
+      kind: "boolean",
+      description: "The asset must be a cut-out (transparent border ring)",
+    },
+    {
+      name: "against-bg",
+      placeholder: "#rrggbb",
+      kind: "string",
+      description: "Backdrop the asset will sit on (silhouette contrast check)",
+    },
+    {
+      name: "page-palette",
+      placeholder: "png",
+      kind: "path",
+      description: "Page screenshot to check palette harmony against",
+    },
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check asset <asset.png>", ["--slot", "--against-bg", "--page-palette"]);
+    const source = firstPositional(argv, "vlmkit check asset <asset.png>", [
+      "--slot",
+      "--against-bg",
+      "--page-palette",
+    ]);
     const rawSlot = readFlag(argv, "slot");
     let slot: { w: number; h: number } | undefined;
     if (rawSlot !== undefined) {

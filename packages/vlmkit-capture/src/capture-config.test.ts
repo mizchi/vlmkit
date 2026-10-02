@@ -26,16 +26,14 @@ describe("routeNameFromPath", () => {
 
 describe("parseCaptureConfig", () => {
   it("accepts a baseUrl + capture.routes block", () => {
-    const config = parseCaptureConfig(JSON.stringify({
-      baseUrl: "http://localhost:3000",
-      capture: {
-        routes: [
-          { name: "home", path: "/", waitFor: "main" },
-          { path: "/about" },
-          "/contact",
-        ],
-      },
-    }));
+    const config = parseCaptureConfig(
+      JSON.stringify({
+        baseUrl: "http://localhost:3000",
+        capture: {
+          routes: [{ name: "home", path: "/", waitFor: "main" }, { path: "/about" }, "/contact"],
+        },
+      }),
+    );
 
     assert.equal(config.baseUrl, "http://localhost:3000");
     assert.deepEqual(config.routes, [
@@ -50,26 +48,32 @@ describe("parseCaptureConfig", () => {
     // both places and `baseUrl` from the top level only, so this one silently used the
     // default URL — a capture pointed at 127.0.0.1:4174 while the config said otherwise,
     // with nothing in the output to say the key had been dropped.
-    const config = parseCaptureConfig(JSON.stringify({
-      capture: { baseUrl: "http://localhost:9999", routes: ["/"] },
-    }));
+    const config = parseCaptureConfig(
+      JSON.stringify({
+        capture: { baseUrl: "http://localhost:9999", routes: ["/"] },
+      }),
+    );
     assert.equal(config.baseUrl, "http://localhost:9999");
     assert.deepEqual(config.routes, [{ name: "home", path: "/" }]);
   });
 
   it("prefers capture.baseUrl over a top-level one, matching how routes resolve", () => {
-    const config = parseCaptureConfig(JSON.stringify({
-      baseUrl: "http://outer:3000",
-      capture: { baseUrl: "http://inner:4000" },
-    }));
+    const config = parseCaptureConfig(
+      JSON.stringify({
+        baseUrl: "http://outer:3000",
+        capture: { baseUrl: "http://inner:4000" },
+      }),
+    );
     assert.equal(config.baseUrl, "http://inner:4000");
   });
 
   it("still falls back to the top-level baseUrl when the capture block omits it", () => {
-    const config = parseCaptureConfig(JSON.stringify({
-      baseUrl: "http://outer:3000",
-      capture: { routes: ["/"] },
-    }));
+    const config = parseCaptureConfig(
+      JSON.stringify({
+        baseUrl: "http://outer:3000",
+        capture: { routes: ["/"] },
+      }),
+    );
     assert.equal(config.baseUrl, "http://outer:3000");
   });
 
@@ -84,12 +88,12 @@ describe("parseCaptureConfig", () => {
   });
 
   it("falls back to top-level routes when no capture block exists", () => {
-    const config = parseCaptureConfig(JSON.stringify({
-      baseUrl: "http://localhost:3000",
-      routes: [
-        { path: "/dashboard", label: "dash" },
-      ],
-    }));
+    const config = parseCaptureConfig(
+      JSON.stringify({
+        baseUrl: "http://localhost:3000",
+        routes: [{ path: "/dashboard", label: "dash" }],
+      }),
+    );
 
     assert.deepEqual(config.routes, [{ name: "dash", path: "/dashboard" }]);
   });
@@ -126,12 +130,15 @@ describe("resolveCaptureRoutes", () => {
   it("loads routes from vlmkit.config.json in cwd", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
-      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
-        baseUrl: "http://localhost:5173",
-        capture: {
-          routes: [{ name: "home", path: "/", waitFor: "main" }],
-        },
-      }));
+      await writeFile(
+        join(dir, "vlmkit.config.json"),
+        JSON.stringify({
+          baseUrl: "http://localhost:5173",
+          capture: {
+            routes: [{ name: "home", path: "/", waitFor: "main" }],
+          },
+        }),
+      );
 
       const result = resolveCaptureRoutes({ cwd: dir });
       assert.equal(result.source, "config");
@@ -147,12 +154,18 @@ describe("resolveCaptureRoutes", () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
       const explicit = join(dir, "custom.json");
-      await writeFile(explicit, JSON.stringify({
-        capture: { routes: [{ path: "/custom" }] },
-      }));
-      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
-        capture: { routes: [{ path: "/default" }] },
-      }));
+      await writeFile(
+        explicit,
+        JSON.stringify({
+          capture: { routes: [{ path: "/custom" }] },
+        }),
+      );
+      await writeFile(
+        join(dir, "vlmkit.config.json"),
+        JSON.stringify({
+          capture: { routes: [{ path: "/default" }] },
+        }),
+      );
 
       const result = resolveCaptureRoutes({ configPath: explicit, cwd: dir });
       assert.equal(result.source, "config");
@@ -165,9 +178,12 @@ describe("resolveCaptureRoutes", () => {
   it("VLMKIT_CAPTURE_ROUTES env var overrides config files", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
-      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
-        capture: { routes: [{ path: "/from-config" }] },
-      }));
+      await writeFile(
+        join(dir, "vlmkit.config.json"),
+        JSON.stringify({
+          capture: { routes: [{ path: "/from-config" }] },
+        }),
+      );
       const result = resolveCaptureRoutes({
         cwd: dir,
         envRoutes: JSON.stringify([{ name: "envhome", path: "/" }]),
@@ -185,10 +201,13 @@ describe("resolveCaptureRoutes", () => {
   it("env base URL overrides config baseUrl", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
-      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
-        baseUrl: "http://config-base:3000",
-        capture: { routes: [{ path: "/" }] },
-      }));
+      await writeFile(
+        join(dir, "vlmkit.config.json"),
+        JSON.stringify({
+          baseUrl: "http://config-base:3000",
+          capture: { routes: [{ path: "/" }] },
+        }),
+      );
       const result = resolveCaptureRoutes({
         cwd: dir,
         envBaseUrl: "http://override:8080",

@@ -1,11 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative, resolve, dirname, extname } from "node:path";
-import type {
-  DepGraph,
-  DepNode,
-  Language,
-  AffectedComponent,
-} from "@mizchi/vlmkit-core/types.ts";
+import type { DepGraph, DepNode, Language, AffectedComponent } from "@mizchi/vlmkit-core/types.ts";
 
 // ---- Language-specific import parsers ----
 
@@ -26,8 +21,7 @@ const typescriptParser: ImportParser = {
   parseImports(content: string): ParsedImport[] {
     const imports: ParsedImport[] = [];
     // import { X } from "Y" / import X from "Y" / import "Y"
-    const importRe =
-      /import\s+(?:(?:(\{[^}]*\})|(\w+))\s+from\s+)?['"]([^'"]+)['"]/g;
+    const importRe = /import\s+(?:(?:(\{[^}]*\})|(\w+))\s+from\s+)?['"]([^'"]+)['"]/g;
     let m;
     while ((m = importRe.exec(content)) !== null) {
       const specifiers: string[] = [];
@@ -38,7 +32,7 @@ const typescriptParser: ImportParser = {
             .replace(/[{}]/g, "")
             .split(",")
             .map((s) => s.trim().split(/\s+as\s+/)[0])
-            .filter(Boolean)
+            .filter(Boolean),
         );
       }
       if (m[2]) {
@@ -114,15 +108,11 @@ function getParser(filePath: string): ImportParser | undefined {
  */
 export async function buildDepGraph(
   rootDir: string,
-  opts: { languages?: Language[]; ignore?: string[] } = {}
+  opts: { languages?: Language[]; ignore?: string[] } = {},
 ): Promise<DepGraph> {
   const languages = opts.languages ?? ["typescript"];
   const ignore = opts.ignore ?? ["node_modules", ".git", "dist", "_build", ".jj"];
-  const allowedExts = new Set(
-    parsers
-      .filter((p) => languages.includes(p.language))
-      .flatMap((p) => p.extensions)
-  );
+  const allowedExts = new Set(parsers.filter((p) => languages.includes(p.language)).flatMap((p) => p.extensions));
 
   const graph: DepGraph = { nodes: new Map(), edges: [] };
   const files: string[] = [];
@@ -195,18 +185,9 @@ export async function buildDepGraph(
   return graph;
 }
 
-function resolveImport(
-  source: string,
-  fromFile: string,
-  rootDir: string,
-  parser: ImportParser
-): string | undefined {
+function resolveImport(source: string, fromFile: string, rootDir: string, parser: ImportParser): string | undefined {
   // skip external packages
-  if (
-    !source.startsWith(".") &&
-    !source.startsWith("/") &&
-    !source.startsWith("@")
-  ) {
+  if (!source.startsWith(".") && !source.startsWith("/") && !source.startsWith("@")) {
     return undefined;
   }
   // MoonBit package refs are kept as-is
@@ -239,7 +220,7 @@ function resolveImport(
 export function findAffectedComponents(
   graph: DepGraph,
   changedFiles: string[],
-  opts: { maxDepth?: number } = {}
+  opts: { maxDepth?: number } = {},
 ): AffectedComponent[] {
   const maxDepth = opts.maxDepth ?? 10;
 

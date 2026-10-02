@@ -74,10 +74,8 @@ interface GoalInput {
  */
 function positionalArgv(input: GoalInput): string[] {
   const dbl = (v: number) => String(Number.isFinite(v) ? v : 0);
-  const optDbl = (v: number | undefined) =>
-    typeof v === "number" && Number.isFinite(v) ? String(v) : "null";
-  const int = (v: number | undefined) =>
-    typeof v === "number" && Number.isFinite(v) ? String(Math.trunc(v)) : "0";
+  const optDbl = (v: number | undefined) => (typeof v === "number" && Number.isFinite(v) ? String(v) : "null");
+  const int = (v: number | undefined) => (typeof v === "number" && Number.isFinite(v) ? String(Math.trunc(v)) : "0");
   const bool = (v: boolean | undefined) => (v ? "true" : "false");
   const optBool = (v: boolean | null | undefined) => (typeof v === "boolean" ? String(v) : "null");
   return [
@@ -165,7 +163,12 @@ function jsonPayload(input: GoalInput): unknown {
 }
 
 const GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas", "expressive-menu"];
-const RATIOS: [number, number][] = [[0, 0], [0.004, 0.001], [0.041, 0.02], [0.4, 0.3]];
+const RATIOS: [number, number][] = [
+  [0, 0],
+  [0.004, 0.001],
+  [0.041, 0.02],
+  [0.4, 0.3],
+];
 const THRESHOLDS: { pass: GoalInput["pass"]; review: GoalInput["review"] }[] = [
   { pass: {}, review: {} },
   { pass: { landscape: 0.02, pixel: 0.03 }, review: { landscape: 0.05, pixel: 0.06 } },
@@ -234,37 +237,99 @@ const LANDINGS: GoalInput["landing"][] = [
 ];
 const CANVASES: GoalInput["canvas"][] = [
   undefined,
-  { canvasCount: 1, nonblank: true, frameDelta: false, inputResponsive: true, stateHookPresent: false, missingStateFieldCount: 3 },
-  { canvasCount: 2, nonblank: false, frameDelta: true, inputResponsive: false, stateHookPresent: true, missingStateFieldCount: 5 },
-  { canvasCount: 3, nonblank: true, frameDelta: true, inputResponsive: true, stateHookPresent: true, missingStateFieldCount: 0 },
+  {
+    canvasCount: 1,
+    nonblank: true,
+    frameDelta: false,
+    inputResponsive: true,
+    stateHookPresent: false,
+    missingStateFieldCount: 3,
+  },
+  {
+    canvasCount: 2,
+    nonblank: false,
+    frameDelta: true,
+    inputResponsive: false,
+    stateHookPresent: true,
+    missingStateFieldCount: 5,
+  },
+  {
+    canvasCount: 3,
+    nonblank: true,
+    frameDelta: true,
+    inputResponsive: true,
+    stateHookPresent: true,
+    missingStateFieldCount: 0,
+  },
   { canvasCount: 0, nonblank: false, frameDelta: false, missingStateFieldCount: 4 },
   // `nonblank` and `frame_delta` sit in different guards with different outcomes
   // (fail vs review), so a swap between them is only visible when they differ AND
   // nothing earlier short-circuits: canvas_count > 0, state hook present, no
   // missing fields. Property 3 above, third instance.
-  { canvasCount: 1, nonblank: true, frameDelta: false, inputResponsive: true, stateHookPresent: true, missingStateFieldCount: 0 },
-  { canvasCount: 1, nonblank: false, frameDelta: true, inputResponsive: true, stateHookPresent: true, missingStateFieldCount: 0 },
+  {
+    canvasCount: 1,
+    nonblank: true,
+    frameDelta: false,
+    inputResponsive: true,
+    stateHookPresent: true,
+    missingStateFieldCount: 0,
+  },
+  {
+    canvasCount: 1,
+    nonblank: false,
+    frameDelta: true,
+    inputResponsive: true,
+    stateHookPresent: true,
+    missingStateFieldCount: 0,
+  },
 ];
 const MENUS: GoalInput["expressiveMenu"][] = [
   undefined,
   {
-    compositionLayers: 3, compositionShapes: 2, selectedVisible: true, focusableItemCount: 7,
-    semanticMenuText: true, diagonalEvidence: false, highContrast: true, lowContrastItemCount: 1,
-    hoverChanged: true, focusVisibleChanged: false,
+    compositionLayers: 3,
+    compositionShapes: 2,
+    selectedVisible: true,
+    focusableItemCount: 7,
+    semanticMenuText: true,
+    diagonalEvidence: false,
+    highContrast: true,
+    lowContrastItemCount: 1,
+    hoverChanged: true,
+    focusVisibleChanged: false,
   },
   {
-    compositionLayers: 6, compositionShapes: 4, selectedVisible: false, focusableItemCount: 2,
-    semanticMenuText: false, diagonalEvidence: true, highContrast: false, lowContrastItemCount: 9,
+    compositionLayers: 6,
+    compositionShapes: 4,
+    selectedVisible: false,
+    focusableItemCount: 2,
+    semanticMenuText: false,
+    diagonalEvidence: true,
+    highContrast: false,
+    lowContrastItemCount: 9,
   },
   {
-    compositionLayers: 0, compositionShapes: 5, selectedVisible: true, focusableItemCount: 0,
-    semanticMenuText: true, diagonalEvidence: true, highContrast: true, lowContrastItemCount: 3,
-    hoverChanged: false, focusVisibleChanged: true,
+    compositionLayers: 0,
+    compositionShapes: 5,
+    selectedVisible: true,
+    focusableItemCount: 0,
+    semanticMenuText: true,
+    diagonalEvidence: true,
+    highContrast: true,
+    lowContrastItemCount: 3,
+    hoverChanged: false,
+    focusVisibleChanged: true,
   },
   {
-    compositionLayers: 4, compositionShapes: 0, selectedVisible: true, focusableItemCount: 6,
-    semanticMenuText: true, diagonalEvidence: true, highContrast: true, lowContrastItemCount: 0,
-    hoverChanged: true, focusVisibleChanged: true,
+    compositionLayers: 4,
+    compositionShapes: 0,
+    selectedVisible: true,
+    focusableItemCount: 6,
+    semanticMenuText: true,
+    diagonalEvidence: true,
+    highContrast: true,
+    lowContrastItemCount: 0,
+    hoverChanged: true,
+    focusVisibleChanged: true,
   },
 ];
 
@@ -334,10 +399,7 @@ describe("component-goal-status: positional vs JSON decoder", { timeout: 240_000
 
     // A sweep where every case returns the same verdict would pass while proving
     // nothing about the decoding, so require the rules to have actually branched.
-    assert.ok(
-      verdicts.size >= 3,
-      `expected pass/review/fail to all occur, saw ${JSON.stringify([...verdicts])}`,
-    );
+    assert.ok(verdicts.size >= 3, `expected pass/review/fail to all occur, saw ${JSON.stringify([...verdicts])}`);
     for (const [verdict, count] of verdicts) {
       assert.ok(count >= 5, `verdict ${verdict} occurred only ${count} time(s) — thin coverage`);
     }

@@ -38,13 +38,21 @@ export interface CreateApiAppOptions {
   resolveCraterAvailable?: () => Promise<boolean>;
   resolveStorageStatus?: () => Promise<StorageStatus | undefined> | StorageStatus | undefined;
   listExecutionResults?: (query: ExecutionResultsQuery) => Promise<ExecutionResultsResponse> | ExecutionResultsResponse;
-  listVisualDiffDisplays?: (query: ExecutionResultsQuery) => Promise<VisualDiffDisplaysResponse> | VisualDiffDisplaysResponse;
+  listVisualDiffDisplays?: (
+    query: ExecutionResultsQuery,
+  ) => Promise<VisualDiffDisplaysResponse> | VisualDiffDisplaysResponse;
   listDetectionSeries?: (query: DetectionSeriesQuery) => Promise<DetectionSeriesResponse> | DetectionSeriesResponse;
-  getComponentStatusMatrix?: (query: ComponentStatusMatrixQuery) => Promise<ComponentStatusMatrixResponse> | ComponentStatusMatrixResponse;
+  getComponentStatusMatrix?: (
+    query: ComponentStatusMatrixQuery,
+  ) => Promise<ComponentStatusMatrixResponse> | ComponentStatusMatrixResponse;
   listApprovals?: (query: ApprovalListQuery) => Promise<ApprovalListResponse> | ApprovalListResponse;
-  applyApprovalOperation?: (request: ApprovalOperationApiRequest) => Promise<ApprovalOperationResponse> | ApprovalOperationResponse;
+  applyApprovalOperation?: (
+    request: ApprovalOperationApiRequest,
+  ) => Promise<ApprovalOperationResponse> | ApprovalOperationResponse;
   cloudflareQuickActions?: {
-    screenshot: (request: CloudflareScreenshotRequest) => Promise<CloudflareScreenshotResult> | CloudflareScreenshotResult;
+    screenshot: (
+      request: CloudflareScreenshotRequest,
+    ) => Promise<CloudflareScreenshotResult> | CloudflareScreenshotResult;
     startCrawl: (request: CloudflareCrawlRequest) => Promise<CloudflareCrawlStartResult> | CloudflareCrawlStartResult;
     getCrawlResult: (jobId: string) => Promise<CloudflareCrawlResult> | CloudflareCrawlResult;
   };
@@ -74,9 +82,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     const craterAvailable = options.resolveCraterAvailable
       ? await options.resolveCraterAvailable()
       : await loadCraterAvailability();
-    const storage = options.resolveStorageStatus
-      ? await options.resolveStorageStatus()
-      : undefined;
+    const storage = options.resolveStorageStatus ? await options.resolveStorageStatus() : undefined;
     const status: StatusResponse = {
       version: API_VERSION,
       capabilities: [
@@ -301,9 +307,7 @@ function parseResultQuery(url: URL): ExecutionResultsQuery {
 function parseDetectionSeriesQuery(url: URL): DetectionSeriesQuery {
   const backend = url.searchParams.get("backend");
   return {
-    backend: backend === "chromium" || backend === "crater" || backend === "prescanner"
-      ? backend
-      : undefined,
+    backend: backend === "chromium" || backend === "crater" || backend === "prescanner" ? backend : undefined,
     fixture: url.searchParams.get("fixture") ?? undefined,
     limit: parsePositiveInt(url.searchParams.get("limit")),
   };

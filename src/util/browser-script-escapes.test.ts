@@ -144,9 +144,7 @@ function bodyFrom(text: string, start: number): string {
 /** Undo the literal's own escapes, the way the engine does. `String.raw` keeps them. */
 function cook(body: string, raw: boolean): string {
   if (raw) return body;
-  return body.replace(/\\(.)/g, (_, ch: string) =>
-    ch === "n" ? "\n" : ch === "t" ? "\t" : ch === "r" ? "\r" : ch,
-  );
+  return body.replace(/\\(.)/g, (_, ch: string) => (ch === "n" ? "\n" : ch === "t" ? "\t" : ch === "r" ? "\r" : ch));
 }
 
 /** Blank out `${…}` runs: inside an interpolation, `\s` is real code and keeps its backslash. */
@@ -235,7 +233,7 @@ async function collectSourceFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      if (!ignoredDirectories.has(entry.name)) files.push(...await collectSourceFiles(join(dir, entry.name)));
+      if (!ignoredDirectories.has(entry.name)) files.push(...(await collectSourceFiles(join(dir, entry.name))));
       continue;
     }
     if (entry.isFile() && sourceExtensions.has(extname(entry.name))) files.push(join(dir, entry.name));
@@ -254,8 +252,12 @@ test("detects the escape a template literal eats, and only that", () => {
   // String.raw, a doubled backslash, and an escape inside an interpolation.
   const raw = "const A_SCRIPT = String.raw`el.className.split(/\\s+/)`;";
   const doubled = "const B_SCRIPT = `el.className.split(/\\\\s+/)`;";
-  const interpolated = "const C_SCRIPT = `${text.replace(/\\s+/g, \" \")}`;";
-  for (const [label, source] of [["String.raw", raw], ["doubled", doubled], ["interpolated", interpolated]]) {
+  const interpolated = 'const C_SCRIPT = `${text.replace(/\\s+/g, " ")}`;';
+  for (const [label, source] of [
+    ["String.raw", raw],
+    ["doubled", doubled],
+    ["interpolated", interpolated],
+  ]) {
     assert.deepEqual(findEatenEscapesInText(source!), [], label);
   }
 });
@@ -295,7 +297,8 @@ test("no browser script silently loses a regex escape", async () => {
   assert.deepEqual(
     suspects,
     [],
-    suspects.map((s) => `${s.file}: ${s.constant} loses ${s.escape} — use String.raw\`…\` or double the backslash`)
+    suspects
+      .map((s) => `${s.file}: ${s.constant} loses ${s.escape} — use String.raw\`…\` or double the backslash`)
       .join("\n"),
   );
 });
@@ -336,10 +339,7 @@ test("every browser script parses as JavaScript once its fragments are spliced i
   // Non-vacuity, in the two shapes the compiler cannot see. A run of declarations and an IIFE
   // are both valid function bodies; an unbalanced brace and a bare `continue` are not, and
   // TypeScript accepts either inside a template literal without a word.
-  for (const bad of [
-    "const X_JS = `function f() { return 1;`;",
-    "const COLLECT_Y = `(() => { continue; })()`;",
-  ]) {
+  for (const bad of ["const X_JS = `function f() { return 1;`;", "const COLLECT_Y = `(() => { continue; })()`;"]) {
     const [script] = findBrowserScriptsInText(bad);
     assert.ok(script, `the probe itself has to match: ${bad}`);
     assert.throws(() => new Function(resolveScript(script!.value, new Map())), SyntaxError, bad);

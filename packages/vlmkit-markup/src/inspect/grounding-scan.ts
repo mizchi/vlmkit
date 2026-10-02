@@ -453,9 +453,10 @@ export function resolveAgentFrame(
 ): AgentFrame {
   const chosen = resolution ?? resolveResolutionForViewport(viewport.width);
   const box = typeof chosen === "string" ? RESOLUTION_PRESETS[chosen] : chosen;
-  const label = typeof chosen === "string"
-    ? `${chosen}, cap ${box.maxWidth}x${box.maxHeight}`
-    : `cap ${box.maxWidth}x${box.maxHeight}`;
+  const label =
+    typeof chosen === "string"
+      ? `${chosen}, cap ${box.maxWidth}x${box.maxHeight}`
+      : `cap ${box.maxWidth}x${box.maxHeight}`;
   // `min(1, ...)` because `resizePngBuffer` returns the original when it already
   // fits: a preset LARGER than the viewport must not scale the coordinates up.
   const scale = Math.min(1, box.maxWidth / viewport.width, box.maxHeight / viewport.height);
@@ -483,10 +484,12 @@ function boxDistance(point: { x: number; y: number }, box: Box): number {
 
 /** Does `outer` fully contain `inner`? */
 function encloses(outer: Box, inner: Box): boolean {
-  return outer.x <= inner.x
-    && outer.y <= inner.y
-    && outer.x + outer.width >= inner.x + inner.width
-    && outer.y + outer.height >= inner.y + inner.height;
+  return (
+    outer.x <= inner.x &&
+    outer.y <= inner.y &&
+    outer.x + outer.width >= inner.x + inner.width &&
+    outer.y + outer.height >= inner.y + inner.height
+  );
 }
 
 function scaleBox(box: Box, scale: number): Box {
@@ -566,48 +569,48 @@ export function analyzeGroundingSamples(
     // The point that reaches the target beats the point at its centre.
     const aim = sample.reachable ?? sample.clickPoint;
     return {
-    id: `t${i + 1}`,
-    selector: sample.selector,
-    role: sample.role,
-    label: labels[i]!,
-    point: {
-      x: Math.round(aim.x * frame.scale),
-      y: Math.round(aim.y * frame.scale),
-    },
-    cssPoint: { x: Math.round(aim.x), y: Math.round(aim.y) },
-    ...(sample.reachable
-      ? {
-        aimedOffCentre: {
-          reason: "occluded" as const,
-          centre: {
-            x: Math.round(sample.clickPoint.x * frame.scale),
-            y: Math.round(sample.clickPoint.y * frame.scale),
-          },
-          room: Math.round(sample.reachable.room * frame.scale),
-        },
-      }
-      : {}),
-    box: scaleBox(sample.bbox, frame.scale),
-    visibleBox: scaleBox(sample.bbox, frame.scale),
-    minSide: 0,
-    disabled: sample.disabled,
-    inFrame: sample.inFrame,
-    clipped: sample.clipped,
-    ...(sample.clippedBy
-      ? {
-        clippedBy: {
-          selector: sample.clippedBy.selector,
-          scrollable: sample.clippedBy.scrollable,
-          dy: Math.round(sample.clippedBy.dy * frame.scale),
-          dx: Math.round(sample.clippedBy.dx * frame.scale),
-          wheelAt: {
-            x: Math.round(sample.clippedBy.wheelAt.x * frame.scale),
-            y: Math.round(sample.clippedBy.wheelAt.y * frame.scale),
-          },
-        },
-      }
-      : {}),
-    risks: [],
+      id: `t${i + 1}`,
+      selector: sample.selector,
+      role: sample.role,
+      label: labels[i]!,
+      point: {
+        x: Math.round(aim.x * frame.scale),
+        y: Math.round(aim.y * frame.scale),
+      },
+      cssPoint: { x: Math.round(aim.x), y: Math.round(aim.y) },
+      ...(sample.reachable
+        ? {
+            aimedOffCentre: {
+              reason: "occluded" as const,
+              centre: {
+                x: Math.round(sample.clickPoint.x * frame.scale),
+                y: Math.round(sample.clickPoint.y * frame.scale),
+              },
+              room: Math.round(sample.reachable.room * frame.scale),
+            },
+          }
+        : {}),
+      box: scaleBox(sample.bbox, frame.scale),
+      visibleBox: scaleBox(sample.bbox, frame.scale),
+      minSide: 0,
+      disabled: sample.disabled,
+      inFrame: sample.inFrame,
+      clipped: sample.clipped,
+      ...(sample.clippedBy
+        ? {
+            clippedBy: {
+              selector: sample.clippedBy.selector,
+              scrollable: sample.clippedBy.scrollable,
+              dy: Math.round(sample.clippedBy.dy * frame.scale),
+              dx: Math.round(sample.clippedBy.dx * frame.scale),
+              wheelAt: {
+                x: Math.round(sample.clippedBy.wheelAt.x * frame.scale),
+                y: Math.round(sample.clippedBy.wheelAt.y * frame.scale),
+              },
+            },
+          }
+        : {}),
+      risks: [],
     };
   });
 
@@ -622,11 +625,11 @@ export function analyzeGroundingSamples(
     const visible = sample.painted
       ? scaleBox(sample.painted, frame.scale)
       : {
-        x: Math.max(target.box.x, 0),
-        y: Math.max(target.box.y, 0),
-        width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
-        height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
-      };
+          x: Math.max(target.box.x, 0),
+          y: Math.max(target.box.y, 0),
+          width: Math.max(0, Math.min(target.box.x + target.box.width, frame.width) - Math.max(target.box.x, 0)),
+          height: Math.max(0, Math.min(target.box.y + target.box.height, frame.height) - Math.max(target.box.y, 0)),
+        };
     if (sample.inFrame) {
       target.visibleBox = visible;
       // The collector already clamps the click point into the visible part, so
@@ -648,12 +651,17 @@ export function analyzeGroundingSamples(
         target.aimedOffCentre = {
           reason: "clipped",
           centre: boxCentre,
-          room: Math.max(0, Math.round(Math.min(
-            target.point.x - visible.x,
-            visible.x + visible.width - target.point.x,
-            target.point.y - visible.y,
-            visible.y + visible.height - target.point.y,
-          ))),
+          room: Math.max(
+            0,
+            Math.round(
+              Math.min(
+                target.point.x - visible.x,
+                visible.x + visible.width - target.point.x,
+                target.point.y - visible.y,
+                visible.y + visible.height - target.point.y,
+              ),
+            ),
+          ),
         };
       }
     }
@@ -699,18 +707,19 @@ export function analyzeGroundingSamples(
         kind: "occluded-target",
         severity: "suspect",
         selector: target.selector,
-        message: `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})`
-          + ` is covered at its own centre (${centre.x},${centre.y}): a click there goes to`
-          + ` ${sample.interceptedBy ?? "nothing"}`
+        message:
+          `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})` +
+          ` is covered at its own centre (${centre.x},${centre.y}): a click there goes to` +
+          ` ${sample.interceptedBy ?? "nothing"}` +
           // Say where it CAN be clicked, when it can. The alternative — telling an
           // agent a target is hopeless and letting it aim at the covered centre
           // anyway — is what v1's haiku run did, and it activated the interceptor.
-          + (target.aimedOffCentre
-            ? `. This map aims at (${target.point.x},${target.point.y}) instead, which does reach it,`
-              + ` with ${target.aimedOffCentre.room}px of room before the nearest thing that is not`
-              + ` this element — still a defect, because anything aiming at the centre misses.`
-            : ` — and no point inside the box routes here, so nothing can click it`
-              + ` until ${sample.interceptedBy ?? "the interceptor"} moves or drops pointer-events.`),
+          (target.aimedOffCentre
+            ? `. This map aims at (${target.point.x},${target.point.y}) instead, which does reach it,` +
+              ` with ${target.aimedOffCentre.room}px of room before the nearest thing that is not` +
+              ` this element — still a defect, because anything aiming at the centre misses.`
+            : ` — and no point inside the box routes here, so nothing can click it` +
+              ` until ${sample.interceptedBy ?? "the interceptor"} moves or drops pointer-events.`),
       });
     }
     if (!sample.visibleText.trim() && !sample.hasGlyph) {
@@ -718,9 +727,10 @@ export function analyzeGroundingSamples(
         kind: "unlabeled-target",
         severity: "warn",
         selector: target.selector,
-        message: `${target.selector} (${target.role}) paints no text and no icon`
-          + (sample.name ? `; its accessible name is "${shorten(sample.name)}", which is not on screen` : "")
-          + ` — there is nothing in the screenshot for an agent to aim at.`,
+        message:
+          `${target.selector} (${target.role}) paints no text and no icon` +
+          (sample.name ? `; its accessible name is "${shorten(sample.name)}", which is not on screen` : "") +
+          ` — there is nothing in the screenshot for an agent to aim at.`,
       });
     }
     if (target.minSide < precisionFloor) {
@@ -729,24 +739,24 @@ export function analyzeGroundingSamples(
       // "#publish (button \"Send\") is 34x18 screenshot px — under the 10px
       // floor": a self-contradicting line, because the 18 is the element's
       // height and the 6 the frame leaves of it is what the rule measured.
-      const cut = target.visibleBox.width !== target.box.width
-        || target.visibleBox.height !== target.box.height;
+      const cut = target.visibleBox.width !== target.box.width || target.visibleBox.height !== target.box.height;
       raise(target, {
         kind: "imprecise-target",
         severity: "warn",
         selector: target.selector,
-        message: `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})`
-          + ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame,`
-          + ` under the ${precisionFloor}px floor: a few pixels for the model to aim at`
-          + (cut && target.clippedBy
-            ? ` — ${target.clippedBy.selector} cuts it (the element is ${target.box.width}x${target.box.height});`
-              + (target.clippedBy.scrollable
+        message:
+          `${target.selector} (${target.role}${target.label ? ` "${target.label}"` : ""})` +
+          ` shows ${target.visibleBox.width}x${target.visibleBox.height} screenshot px in the ${frame.width}x${frame.height} frame,` +
+          ` under the ${precisionFloor}px floor: a few pixels for the model to aim at` +
+          (cut && target.clippedBy
+            ? ` — ${target.clippedBy.selector} cuts it (the element is ${target.box.width}x${target.box.height});` +
+              (target.clippedBy.scrollable
                 ? ` scroll it ${target.clippedBy.dy}px (--after "wheel ${target.clippedBy.wheelAt.x},${target.clippedBy.wheelAt.y} ${target.clippedBy.dy}") and re-run before aiming`
                 : ` it does not scroll, so this is all of it there is to aim at`)
             : cut
               ? ` — the frame cuts it (the element is ${target.box.width}x${target.box.height}); scroll it into view (--after "wheel x,y dy") and re-run before aiming`
-              : ` — the whole element`)
-          + `.`,
+              : ` — the whole element`) +
+          `.`,
       });
     }
     if (target.aimMargin !== undefined && target.aimMargin < aimFloor && target.nearest) {
@@ -755,9 +765,10 @@ export function analyzeGroundingSamples(
         kind: "crowded-target",
         severity: "warn",
         selector: target.selector,
-        message: `${target.selector}'s click point is ${Math.round(target.aimMargin)}px from`
-          + ` ${neighbour.id} ${neighbour.selector} (${neighbour.role}${neighbour.label ? ` "${neighbour.label}"` : ""})`
-          + ` — a coordinate off by ${aimFloor}px activates the neighbour instead.`,
+        message:
+          `${target.selector}'s click point is ${Math.round(target.aimMargin)}px from` +
+          ` ${neighbour.id} ${neighbour.selector} (${neighbour.role}${neighbour.label ? ` "${neighbour.label}"` : ""})` +
+          ` — a coordinate off by ${aimFloor}px activates the neighbour instead.`,
       });
     }
     const visible = normalizeLabel(sample.visibleText);
@@ -767,8 +778,9 @@ export function analyzeGroundingSamples(
         kind: "label-mismatch",
         severity: "warn",
         selector: target.selector,
-        message: `${target.selector} reads "${shorten(sample.visibleText)}" on screen but its accessible name is`
-          + ` "${shorten(sample.name)}" — an agent told to click one of the two cannot find the other.`,
+        message:
+          `${target.selector} reads "${shorten(sample.visibleText)}" on screen but its accessible name is` +
+          ` "${shorten(sample.name)}" — an agent told to click one of the two cannot find the other.`,
       });
     }
   }
@@ -793,11 +805,12 @@ export function analyzeGroundingSamples(
       kind: "ambiguous-target",
       severity: "warn",
       selector: first.selector,
-      message: `${group.length} ${first.role}s in the frame all read "${first.label}"`
-        + ` (${group.map((t) => `${t.id} at ${t.point.x},${t.point.y}`).join(", ")})`
-        + (disambiguator
-          ? ` — distinguishable only by their surrounding text (${disambiguator.join(" / ")}),`
-            + ` so an accessible name carrying it would let an agent name one.`
+      message:
+        `${group.length} ${first.role}s in the frame all read "${first.label}"` +
+        ` (${group.map((t) => `${t.id} at ${t.point.x},${t.point.y}`).join(", ")})` +
+        (disambiguator
+          ? ` — distinguishable only by their surrounding text (${disambiguator.join(" / ")}),` +
+            ` so an accessible name carrying it would let an agent name one.`
           : ` — nothing visible distinguishes them, so "click ${first.label}" has no answer.`),
     });
   }
@@ -1094,11 +1107,14 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
       // the click missed, or reached a control that shows nothing.
       const last = options.after[options.after.length - 1]!;
       if (last.kind === "click") {
-        landed = await hitTest(page, { x: Math.round(last.at.x / frame.scale), y: Math.round(last.at.y / frame.scale) });
+        landed = await hitTest(page, {
+          x: Math.round(last.at.x / frame.scale),
+          y: Math.round(last.at.y / frame.scale),
+        });
       }
       await replayActions(page, options.after.slice(-1), frame);
     }
-    const collected = await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">;
+    const collected = (await page.evaluate(COLLECT_GROUNDING_SCRIPT)) as Omit<GroundingScanInput, "source">;
     const report = analyzeGroundingSamples({ source: options.source, ...collected }, options);
     if (options.after && options.after.length > 0) {
       report.after = options.after.map((a) => ({ ...a, at: { ...a.at } }));
@@ -1109,7 +1125,10 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
         // Where the pointer was and is, so a change that is only `:hover` can
         // say so: every action leaves the pointer where it acted.
         const frame = resolveAgentFrame(viewport, options.resolution);
-        const css = (a: GroundingAction) => ({ x: Math.round(a.at.x / frame.scale), y: Math.round(a.at.y / frame.scale) });
+        const css = (a: GroundingAction) => ({
+          x: Math.round(a.at.x / frame.scale),
+          y: Math.round(a.at.y / frame.scale),
+        });
         const last = options.after[options.after.length - 1]!;
         const prev = options.after[options.after.length - 2];
         report.changed = diffScreens(before, now, last, (sel) => idOf.get(sel), {
@@ -1119,12 +1138,17 @@ export async function runGroundingScan(options: GroundingScanOptions): Promise<G
         if (landed) {
           // Resolved against the screen the click landed on: a row the click
           // removed is still the row it reached.
-          const reached = before.targets.find((t) => t.selector === landed.hit)
-            ?? before.targets.find((t) => t.selector === landed.wouldReach);
+          const reached =
+            before.targets.find((t) => t.selector === landed.hit) ??
+            before.targets.find((t) => t.selector === landed.wouldReach);
           const targetId = reached ? idOf.get(reached.selector) : undefined;
           report.changed.landedOn = reached
             ? { selector: reached.selector, label: reached.label, ...(targetId ? { targetId } : {}) }
-            : { selector: landed.hit ?? "nothing", label: "", ...(landed.wouldReach ? { wouldReach: landed.wouldReach } : {}) };
+            : {
+                selector: landed.hit ?? "nothing",
+                label: "",
+                ...(landed.wouldReach ? { wouldReach: landed.wouldReach } : {}),
+              };
         }
       }
     }
@@ -1153,15 +1177,15 @@ async function readScreenState(
   page: import("playwright").Page,
   samples?: readonly GroundingTargetSample[],
 ): Promise<ScreenState> {
-  const targets = samples
-    ?? (await page.evaluate(COLLECT_GROUNDING_SCRIPT) as Omit<GroundingScanInput, "source">).targets;
+  const targets =
+    samples ?? ((await page.evaluate(COLLECT_GROUNDING_SCRIPT)) as Omit<GroundingScanInput, "source">).targets;
   const labels = distinctLabels(targets.map((t) => t.visibleText || t.name));
   const selectors = targets.map((t) => t.selector);
-  const rest = await page.evaluate(
+  const rest = (await page.evaluate(
     // eslint-disable-next-line no-eval
     ([src, sels]) => (0, eval)(`(${src})`)(sels),
     [SCREEN_STATE_JS, selectors] as const,
-  ) as Omit<ScreenState, "targets">;
+  )) as Omit<ScreenState, "targets">;
   return {
     targets: targets.map((t, i) => ({ selector: t.selector, label: labels[i]!, onScreen: t.inFrame, box: t.bbox })),
     ...rest,
@@ -1191,8 +1215,8 @@ async function replayActions(
     const { x, y } = action.at;
     if (x < 0 || y < 0 || x >= frame.width || y >= frame.height) {
       throw new UsageError(
-        `--after ${describeAction(action)}: outside the ${frame.width}x${frame.height} frame`
-        + " — coordinates are screenshot px, like the map's.",
+        `--after ${describeAction(action)}: outside the ${frame.width}x${frame.height} frame` +
+          " — coordinates are screenshot px, like the map's.",
       );
     }
     const css = { x: Math.round(x / frame.scale), y: Math.round(y / frame.scale) };
@@ -1216,20 +1240,24 @@ async function hitTest(
   page: import("playwright").Page,
   cssPoint: { x: number; y: number },
 ): Promise<{ hit: string | null; wouldReach: string | null }> {
-  return await page.evaluate(
+  return (await page.evaluate(
     ([x, y, selectorJs]) => {
       // eslint-disable-next-line no-eval
-      const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (el: Element) => string;
+      const stableSelector = (0, eval)(`(function(){${selectorJs};return stableSelector})()`) as (
+        el: Element,
+      ) => string;
       const el = document.elementFromPoint(x, y);
       if (!el) return { hit: null, wouldReach: null };
       let node: Element | null = el;
       let wouldReach: string | null = null;
       while (node && node.tagName !== "BODY") {
         const tabindex = node.getAttribute("tabindex");
-        if (node.getAttribute("role")
-          || node.hasAttribute("onclick")
-          || (tabindex !== null && Number(tabindex) >= 0)
-          || /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)) {
+        if (
+          node.getAttribute("role") ||
+          node.hasAttribute("onclick") ||
+          (tabindex !== null && Number(tabindex) >= 0) ||
+          /^(a|area|button|input|select|textarea|summary)$/i.test(node.tagName)
+        ) {
           wouldReach = stableSelector(node);
           break;
         }
@@ -1238,7 +1266,7 @@ async function hitTest(
       return { hit: stableSelector(el), wouldReach };
     },
     [cssPoint.x, cssPoint.y, STABLE_SELECTOR_JS] as const,
-  ) as { hit: string | null; wouldReach: string | null };
+  )) as { hit: string | null; wouldReach: string | null };
 }
 
 /**
@@ -1310,8 +1338,10 @@ export async function writeMarkedScreenshot(
   const yRatio = src.height / height;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const si = (Math.min(Math.floor(y * yRatio), src.height - 1) * src.width
-        + Math.min(Math.floor(x * xRatio), src.width - 1)) * 4;
+      const si =
+        (Math.min(Math.floor(y * yRatio), src.height - 1) * src.width +
+          Math.min(Math.floor(x * xRatio), src.width - 1)) *
+        4;
       const di = (y * width + x) * 4;
       dst.data[di] = src.data[si]!;
       dst.data[di + 1] = src.data[si + 1]!;
@@ -1393,24 +1423,24 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
   lines.push("");
   lines.push(`status: ${status}`);
   lines.push(
-    `frame: ${report.frame.width}x${report.frame.height} screenshot px`
-    + ` — ${report.frame.resolution}, scale ${report.frame.scale.toFixed(2)}`
-    + ` (every coordinate below is in these ${report.frame.width}x${report.frame.height} pixels)`,
+    `frame: ${report.frame.width}x${report.frame.height} screenshot px` +
+      ` — ${report.frame.resolution}, scale ${report.frame.scale.toFixed(2)}` +
+      ` (every coordinate below is in these ${report.frame.width}x${report.frame.height} pixels)`,
   );
   // Which screen this is. A map of the first load read as a map of the screen an
   // agent is looking at after three actions is the v3 failure, so it is stated
   // either way — and the plain case names the flag that measures the other.
   lines.push(
     report.after && report.after.length > 0
-      ? `screen: after ${report.after.map(describeAction).join(", then ")}`
-        + (report.navigatedTo ? ` (now at ${report.navigatedTo})` : "")
+      ? `screen: after ${report.after.map(describeAction).join(", then ")}` +
+          (report.navigatedTo ? ` (now at ${report.navigatedTo})` : "")
       : `screen: as first loaded — --after "click x,y" measures the screen an action leaves`,
   );
   lines.push(
-    `targets: ${inFrame.length} actionable in frame`
-    + ` (${report.targets.length - inFrame.length} disabled or out of the frame`
-    + (report.capped > 0 ? `, ${report.capped} dropped by the cap` : "")
-    + `)`,
+    `targets: ${inFrame.length} actionable in frame` +
+      ` (${report.targets.length - inFrame.length} disabled or out of the frame` +
+      (report.capped > 0 ? `, ${report.capped} dropped by the cap` : "") +
+      `)`,
   );
   // First after the header: after acting, "did it work" is the question a
   // caller has, and it is the one a map of the new screen cannot answer.
@@ -1432,7 +1462,7 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
       byContainer.set(key, [...(byContainer.get(key) ?? []), t]);
     }
     for (const [selector, rows] of byContainer) {
-      const nearest = rows.map((r) => r.clippedBy!.dy).reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b);
+      const nearest = rows.map((r) => r.clippedBy!.dy).reduce((a, b) => (Math.abs(a) < Math.abs(b) ? a : b));
       const wheel = rows[0]!.clippedBy!.wheelAt;
       const how = rows[0]!.clippedBy!.scrollable
         ? `scroll it (nearest needs ${nearest}px: --after "wheel ${wheel.x},${wheel.y} ${nearest}")`
@@ -1457,10 +1487,13 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
       const label = t.label ? ` "${t.label}"` : ` ${DIM}(no visible label)${RESET}`;
       // The painted size when something cuts the box: "149x28" on a row showing
       // one pixel of itself is the number v4's smaller model aimed by.
-      const size = t.visibleBox.width !== t.box.width || t.visibleBox.height !== t.box.height
-        ? `${t.visibleBox.width}x${t.visibleBox.height} painted of ${t.box.width}x${t.box.height}`
-        : `${t.box.width}x${t.box.height}`;
-      lines.push(`  ${t.id} ${t.role}${label} @ (${t.point.x},${t.point.y}) ${size} ${DIM}${t.selector}${RESET}${risk}`);
+      const size =
+        t.visibleBox.width !== t.box.width || t.visibleBox.height !== t.box.height
+          ? `${t.visibleBox.width}x${t.visibleBox.height} painted of ${t.box.width}x${t.box.height}`
+          : `${t.box.width}x${t.box.height}`;
+      lines.push(
+        `  ${t.id} ${t.role}${label} @ (${t.point.x},${t.point.y}) ${size} ${DIM}${t.selector}${RESET}${risk}`,
+      );
     }
     if (inFrame.length > 20) {
       lines.push(`  ${DIM}… ${inFrame.length - 20} more — --json emits the full map${RESET}`);
@@ -1474,14 +1507,16 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
         ? `${RED}outside the ${report.frame.width}x${report.frame.height} frame${RESET}`
         : probe.hit
           ? `${probe.hit}${
-            probe.targetId
-              ? ` ${DIM}(${probe.targetId})${RESET}`
-              : probe.wouldReach
-                ? ` ${YELLOW}(not in this map, and the click would set off ${probe.wouldReach})${RESET}`
-                : ` ${DIM}(not in this map; nothing up to <body> declares itself interactive)${RESET}`
-          }`
+              probe.targetId
+                ? ` ${DIM}(${probe.targetId})${RESET}`
+                : probe.wouldReach
+                  ? ` ${YELLOW}(not in this map, and the click would set off ${probe.wouldReach})${RESET}`
+                  : ` ${DIM}(not in this map; nothing up to <body> declares itself interactive)${RESET}`
+            }`
           : `${YELLOW}nothing${RESET}`;
-      lines.push(`  (${probe.point.x},${probe.point.y}) ${DIM}= css (${probe.cssPoint.x},${probe.cssPoint.y})${RESET} -> ${where}`);
+      lines.push(
+        `  (${probe.point.x},${probe.point.y}) ${DIM}= css (${probe.cssPoint.x},${probe.cssPoint.y})${RESET} -> ${where}`,
+      );
     }
   }
   if (shown.length > 0) {
@@ -1490,7 +1525,9 @@ export function formatGroundingReport(report: GroundingScanReport, rules?: RuleV
     for (const entry of shown) {
       const issue = entry.row;
       const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.targetId ? `${issue.targetId} ` : ""}${issue.kind}: ${issue.message}${retuneNote(entry)}`);
+      lines.push(
+        `  ${icon} ${issue.targetId ? `${issue.targetId} ` : ""}${issue.kind}: ${issue.message}${retuneNote(entry)}`,
+      );
     }
   } else if (note === undefined) {
     lines.push("");

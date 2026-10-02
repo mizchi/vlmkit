@@ -90,9 +90,7 @@ const UNPAINTED_TOLERANCE = 2;
 export async function runImageCopyCheck(options: CopyImageOptions): Promise<CopyImageReport> {
   const elements = parseSceneElements(await readFile(options.elementsPath, "utf-8"));
   const image = options.imagePath ? PNG.sync.read(await readFile(options.imagePath)) : undefined;
-  const forbiddenLines = options.forbidPath
-    ? parseCopyManifest(await readFile(options.forbidPath, "utf8"))
-    : undefined;
+  const forbiddenLines = options.forbidPath ? parseCopyManifest(await readFile(options.forbidPath, "utf8")) : undefined;
   const manifestLines = options.manifestPath
     ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))
     : undefined;

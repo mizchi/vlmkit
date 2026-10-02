@@ -33,7 +33,7 @@ interface FixSummary {
 }
 
 function loadSummary(path: string): Promise<FixSummary & { path: string }> {
-  return readFile(path, "utf-8").then((content) => ({ ...JSON.parse(content) as FixSummary, path }));
+  return readFile(path, "utf-8").then((content) => ({ ...(JSON.parse(content) as FixSummary), path }));
 }
 
 function patternName(variantFile: string): string {
@@ -59,7 +59,7 @@ function buildRows(summary: FixSummary): PerViewportRow[] {
   for (const vp of [...viewports].sort()) {
     const before = beforeMap.get(vp) ?? null;
     const after = afterMap.get(vp) ?? null;
-    const delta = (before !== null && after !== null) ? after - before : null;
+    const delta = before !== null && after !== null ? after - before : null;
     rows.push({ viewport: vp, before, after, delta });
   }
   return rows;
@@ -108,7 +108,9 @@ function renderMarkdown(summaries: Array<FixSummary & { path: string }>): string
   lines.push("");
   if (totalCount > 0) {
     const avgDelta = totalDelta / totalCount;
-    lines.push(`**Aggregate**: avg Δ across ${totalCount} viewport(s) = ${(avgDelta * 100).toFixed(2)}%; total applied = ${totalApplied}/${totalProposed}.`);
+    lines.push(
+      `**Aggregate**: avg Δ across ${totalCount} viewport(s) = ${(avgDelta * 100).toFixed(2)}%; total applied = ${totalApplied}/${totalProposed}.`,
+    );
   } else {
     lines.push(`**Aggregate**: no before/after deltas available (rerun was disabled or skipped).`);
   }
@@ -120,16 +122,18 @@ function renderTsv(summaries: Array<FixSummary & { path: string }>): string {
   for (const summary of summaries) {
     const pattern = patternName(summary.target.variantFile);
     for (const row of buildRows(summary)) {
-      lines.push([
-        pattern,
-        row.viewport,
-        row.before === null ? "" : row.before.toFixed(6),
-        row.after === null ? "" : row.after.toFixed(6),
-        row.delta === null ? "" : row.delta.toFixed(6),
-        summary.counts.applied,
-        summary.counts.proposed,
-        summary.counts.dropped,
-      ].join("\t"));
+      lines.push(
+        [
+          pattern,
+          row.viewport,
+          row.before === null ? "" : row.before.toFixed(6),
+          row.after === null ? "" : row.after.toFixed(6),
+          row.delta === null ? "" : row.delta.toFixed(6),
+          summary.counts.applied,
+          summary.counts.proposed,
+          summary.counts.dropped,
+        ].join("\t"),
+      );
     }
   }
   return lines.join("\n") + "\n";

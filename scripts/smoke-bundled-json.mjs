@@ -102,10 +102,10 @@ for (const gate of GATES) {
     // What must not appear is the runtime reaching for a toolchain that is not there.
     if (/moon|not in a Moon project|ENOENT|run_markup_core_json|is unavailable/i.test(combined)) {
       fail(
-        `the built CLI could not reach markup-core's \`${gate.command}\` over the JSON boundary:\n`
-        + `${combined.split("\n").slice(0, 12).join("\n")}\n\n`
-        + "scripts/vlmkit-bundled.mjs must hand the runtime the complete generated bridge "
-        + "(namespace import), and the bridge must be rebuilt after adding an entry point.",
+        `the built CLI could not reach markup-core's \`${gate.command}\` over the JSON boundary:\n` +
+          `${combined.split("\n").slice(0, 12).join("\n")}\n\n` +
+          "scripts/vlmkit-bundled.mjs must hand the runtime the complete generated bridge " +
+          "(namespace import), and the bridge must be rebuilt after adding an entry point.",
       );
     }
     output = combined;

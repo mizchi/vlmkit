@@ -137,8 +137,8 @@ export function validateFlow(flow: Flow): void {
       }
       if (!FLOW_ASSERTS.includes(name as (typeof FLOW_ASSERTS)[number])) {
         throw new UsageError(
-          `${where}, expect[${j}]: unknown assert "${name}". Valid asserts: ${FLOW_ASSERTS.join(", ")}.`
-          + ` This is a flow-file error, not a page defect — it used to be reported as a failing post-condition.`,
+          `${where}, expect[${j}]: unknown assert "${name}". Valid asserts: ${FLOW_ASSERTS.join(", ")}.` +
+            ` This is a flow-file error, not a page defect — it used to be reported as a failing post-condition.`,
         );
       }
     });
@@ -147,28 +147,47 @@ export function validateFlow(flow: Flow): void {
 
 function describeAction(a: FlowAction): string {
   switch (a.action) {
-    case "click": return `click ${a.selector}${a.force ? " (force)" : ""}`;
-    case "press": return `press ${a.key}${a.selector ? ` on ${a.selector}` : ""}`;
-    case "fill": return `fill ${a.selector}`;
-    case "type": return `type into ${a.selector}`;
-    case "focus": return `focus ${a.selector}`;
-    case "hover": return `hover ${a.selector}`;
-    case "wait": return `wait ${a.ms}ms`;
+    case "click":
+      return `click ${a.selector}${a.force ? " (force)" : ""}`;
+    case "press":
+      return `press ${a.key}${a.selector ? ` on ${a.selector}` : ""}`;
+    case "fill":
+      return `fill ${a.selector}`;
+    case "type":
+      return `type into ${a.selector}`;
+    case "focus":
+      return `focus ${a.selector}`;
+    case "hover":
+      return `hover ${a.selector}`;
+    case "wait":
+      return `wait ${a.ms}ms`;
   }
 }
 
 async function runAction(page: Page, a: FlowAction): Promise<void> {
   switch (a.action) {
-    case "click": await page.click(a.selector, { timeout: 5000, ...(a.force ? { force: true } : {}) }); return;
+    case "click":
+      await page.click(a.selector, { timeout: 5000, ...(a.force ? { force: true } : {}) });
+      return;
     case "press":
       if (a.selector) await page.press(a.selector, a.key, { timeout: 5000 });
       else await page.keyboard.press(a.key);
       return;
-    case "fill": await page.fill(a.selector, a.value, { timeout: 5000 }); return;
-    case "type": await page.type(a.selector, a.text, { timeout: 5000 }); return;
-    case "focus": await page.focus(a.selector, { timeout: 5000 }); return;
-    case "hover": await page.hover(a.selector, { timeout: 5000 }); return;
-    case "wait": await page.waitForTimeout(a.ms); return;
+    case "fill":
+      await page.fill(a.selector, a.value, { timeout: 5000 });
+      return;
+    case "type":
+      await page.type(a.selector, a.text, { timeout: 5000 });
+      return;
+    case "focus":
+      await page.focus(a.selector, { timeout: 5000 });
+      return;
+    case "hover":
+      await page.hover(a.selector, { timeout: 5000 });
+      return;
+    case "wait":
+      await page.waitForTimeout(a.ms);
+      return;
   }
 }
 
@@ -192,22 +211,31 @@ function evalAssertion(spec: FlowAssert): (s: FlowAssert) => [boolean, string] {
         const actual = el ? el.getAttribute(s.name) : "(no element)";
         return [el != null && actual === s.equals, String(actual)];
       }
-      case "visible": { const el = q(s.selector); return [visible(el), visible(el) ? "visible" : "hidden/absent"]; }
-      case "hidden": { const el = q(s.selector); return [!visible(el), visible(el) ? "visible" : "hidden/absent"]; }
+      case "visible": {
+        const el = q(s.selector);
+        return [visible(el), visible(el) ? "visible" : "hidden/absent"];
+      }
+      case "hidden": {
+        const el = q(s.selector);
+        return [!visible(el), visible(el) ? "visible" : "hidden/absent"];
+      }
       case "focused": {
-        const el = q(s.selector); const active = document.activeElement;
+        const el = q(s.selector);
+        const active = document.activeElement;
         const ok = !!el && (el === active || el.contains(active));
         return [ok, active ? (active.id ? "#" + active.id : active.tagName.toLowerCase()) : "(none)"];
       }
       case "text": {
-        const el = q(s.selector); const t = el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
+        const el = q(s.selector);
+        const t = el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
         return [t.includes(s.contains), t.slice(0, 80)];
       }
       case "count": {
         const n = document.querySelectorAll(s.selector).length;
         return [n === s.equals, String(n)];
       }
-      default: return [false, "unknown assert"];
+      default:
+        return [false, "unknown assert"];
     }
   };
 }
@@ -227,7 +255,9 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
   const steps: StepResult[] = [];
   let redirected: string | undefined;
   await withBrowser(async (browser) => {
-    const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
+    const page = await browser.newPage(
+      withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState),
+    );
     const url = sourceToUrl(options.source);
     await applyHar(page, options.har);
     // `load` stays this gate's default milestone — the settle below already
@@ -243,7 +273,7 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
     // at an explicit `{"action":"wait"}` first step.
     await settlePage(page);
     redirected = /^https?:\/\//.test(options.source)
-      ? describeRedirect(options.source, page.url()) ?? undefined
+      ? (describeRedirect(options.source, page.url()) ?? undefined)
       : undefined;
 
     for (let i = 0; i < options.flow.steps.length; i++) {
@@ -263,7 +293,7 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
       }
       if (!res.actionError) {
         for (const spec of step.expect ?? []) {
-          const [passed, actual] = await page.evaluate(evalAssertion(spec), spec) as [boolean, string];
+          const [passed, actual] = (await page.evaluate(evalAssertion(spec), spec)) as [boolean, string];
           res.assertions.push({ assert: spec, passed, actual });
           if (!passed) res.passed = false;
         }
@@ -308,8 +338,12 @@ export function formatFlowReport(report: FlowVerifyReport, rules?: RuleView): st
   const failedLive = !stepFailedOff && report.steps.some((s) => !s.passed);
   const redirectLive = report.redirected !== undefined && !off("redirected");
   const done = report.done || !(failedLive || redirectLive);
-  lines.push(`verdict: ${done ? `${GREEN}DONE${RESET}` : `${RED}FAILED${RESET}`} (${report.passed}/${report.total} steps)`
-    + (done && !report.done ? ` ${DIM}(step-failed off — the failing steps below are measured, not reported)${RESET}` : ""));
+  lines.push(
+    `verdict: ${done ? `${GREEN}DONE${RESET}` : `${RED}FAILED${RESET}`} (${report.passed}/${report.total} steps)` +
+      (done && !report.done
+        ? ` ${DIM}(step-failed off — the failing steps below are measured, not reported)${RESET}`
+        : ""),
+  );
   lines.push("");
   for (const s of report.steps) {
     const mark = s.passed ? `${GREEN}✓${RESET}` : stepFailedOff ? `${DIM}-${RESET}` : `${RED}✗${RESET}`;
@@ -318,14 +352,17 @@ export function formatFlowReport(report: FlowVerifyReport, rules?: RuleView): st
     for (const a of s.assertions) {
       const m = a.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
       const spec = a.assert;
-      const want = spec.assert === "attr"
-        ? `${spec.name}=${spec.equals}`
-        : spec.assert === "text"
-        ? `text~"${spec.contains}"`
-        : spec.assert === "count"
-        ? `count=${spec.equals}`
-        : spec.assert;
-      lines.push(`    ${m} ${"selector" in spec ? spec.selector : ""} ${want} ${a.passed ? "" : `${RED}(got: ${a.actual})${RESET}`}`);
+      const want =
+        spec.assert === "attr"
+          ? `${spec.name}=${spec.equals}`
+          : spec.assert === "text"
+            ? `text~"${spec.contains}"`
+            : spec.assert === "count"
+              ? `count=${spec.equals}`
+              : spec.assert;
+      lines.push(
+        `    ${m} ${"selector" in spec ? spec.selector : ""} ${want} ${a.passed ? "" : `${RED}(got: ${a.actual})${RESET}`}`,
+      );
     }
   }
   return lines.join("\n");

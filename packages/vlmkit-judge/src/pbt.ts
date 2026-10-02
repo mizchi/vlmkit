@@ -43,7 +43,7 @@ export interface Rng {
  * and is short enough to reimplement anywhere a failure must be replayed.
  */
 export function createRng(seed: number): Rng {
-  let state = (Math.trunc(seed) >>> 0) || 0x9e3779b9;
+  let state = Math.trunc(seed) >>> 0 || 0x9e3779b9;
   const next = (): number => {
     state = (state + 0x6d2b79f5) >>> 0;
     let t = state;
@@ -229,11 +229,7 @@ export async function failingInterval(
  * The smallest `x` in (lo, hi] whose oracle disagrees with `lo`'s, given that `hi`'s
  * does. Used to pin a media-query transition that no parsed number predicted.
  */
-export async function bisectChange(
-  lo: number,
-  hi: number,
-  sameAsLo: (x: number) => Promise<boolean>,
-): Promise<number> {
+export async function bisectChange(lo: number, hi: number, sameAsLo: (x: number) => Promise<boolean>): Promise<number> {
   let same = lo;
   let changed = hi;
   while (changed - same > 1) {

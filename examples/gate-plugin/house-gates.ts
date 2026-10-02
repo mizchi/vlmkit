@@ -24,13 +24,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import {
-  UsageError,
-  defineGate,
-  definePlugin,
-  readAll,
-  readPositionals,
-} from "@mizchi/vlmkit-core/plugin";
+import { UsageError, defineGate, definePlugin, readAll, readPositionals } from "@mizchi/vlmkit-core/plugin";
 import type { Finding } from "@mizchi/vlmkit-core/plugin";
 
 interface HouseBrandOptions {
@@ -50,11 +44,7 @@ interface HouseBrandReport {
 const DEFAULT_FONTS = ["Inter", "IBM Plex Sans", "ui-sans-serif", "system-ui", "sans-serif", "monospace"];
 
 /** Extracted so a unit test can cover the judgment without touching the disk. */
-export function analyzeHouseBrand(
-  source: string,
-  css: string,
-  allowedFonts: readonly string[],
-): HouseBrandReport {
+export function analyzeHouseBrand(source: string, css: string, allowedFonts: readonly string[]): HouseBrandReport {
   const lines = css.split("\n");
   const declaredFonts: string[] = [];
   const offenders: { font: string; line: number }[] = [];
@@ -107,7 +97,14 @@ This is the worked plugin example from examples/gate-plugin/.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-css", kind: "path", description: "File to scan", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-css",
+      kind: "path",
+      description: "File to scan",
+      positional: 0,
+      required: true,
+    },
     {
       name: "font",
       kind: "string",

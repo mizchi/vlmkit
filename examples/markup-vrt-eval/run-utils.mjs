@@ -4,15 +4,15 @@ export function summarizeVlmRegionDiff(doc) {
   }
   const changes = Array.isArray(doc.changes)
     ? doc.changes.map((change) => ({
-      selector: change.selector ?? change.selectorHint ?? "unknown",
-      selectorHint: change.selectorHint ?? null,
-      property: change.property ?? "unknown",
-      from: change.from ?? null,
-      to: change.to ?? null,
-      confidence: change.confidence ?? "unknown",
-      region: change.region ?? "unknown",
-      description: change.description ?? "",
-    }))
+        selector: change.selector ?? change.selectorHint ?? "unknown",
+        selectorHint: change.selectorHint ?? null,
+        property: change.property ?? "unknown",
+        from: change.from ?? null,
+        to: change.to ?? null,
+        confidence: change.confidence ?? "unknown",
+        region: change.region ?? "unknown",
+        description: change.description ?? "",
+      }))
     : [];
   return {
     available: true,

@@ -65,15 +65,29 @@ const VLMKIT_TS = resolve(fileURLToPath(import.meta.url), "..", "vlmkit.ts");
  * bespoke argument handling; `cli.test.ts` is what fails if this list goes stale
  * against the command table.
  */
-const TOP_LEVEL = ["snapshot", "baseline", "watch", "diff-pr", "batch", "gates", "rules",
-  "manifest", "markup-loop", "skill", "bench", "report", "migration", "workflow"] as const;
+const TOP_LEVEL = [
+  "snapshot",
+  "baseline",
+  "watch",
+  "diff-pr",
+  "batch",
+  "gates",
+  "rules",
+  "manifest",
+  "markup-loop",
+  "skill",
+  "bench",
+  "report",
+  "migration",
+  "workflow",
+] as const;
 
 function runHelp(argv: string[]): { output: string; status: number | null } {
-  const r = spawnSync(
-    process.execPath,
-    ["--experimental-strip-types", VLMKIT_TS, ...argv, "--help"],
-    { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" }, timeout: 60_000 },
-  );
+  const r = spawnSync(process.execPath, ["--experimental-strip-types", VLMKIT_TS, ...argv, "--help"], {
+    encoding: "utf-8",
+    env: { ...process.env, NO_COLOR: "1" },
+    timeout: 60_000,
+  });
   return { output: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim(), status: r.status };
 }
 
@@ -82,9 +96,9 @@ function assertHelpIsSuccessful(argv: string[], output: string, status: number |
   assert.notEqual(
     output,
     "",
-    `\`${name} --help\` printed nothing. Its module's CLI guard did not fire — `
-    + "most likely something imports it statically before `delegate` sets "
-    + "__VLMKIT_DISPATCHER_LEAF__ (a gate module is the usual culprit). See page-render.ts.",
+    `\`${name} --help\` printed nothing. Its module's CLI guard did not fire — ` +
+      "most likely something imports it statically before `delegate` sets " +
+      "__VLMKIT_DISPATCHER_LEAF__ (a gate module is the usual culprit). See page-render.ts.",
   );
   assert.doesNotMatch(
     output,
@@ -94,11 +108,11 @@ function assertHelpIsSuccessful(argv: string[], output: string, status: number |
   assert.equal(
     status,
     0,
-    `\`${name} --help\` exited ${status}. Asking for help is a request that succeeded; `
-    + "every gate command exits 0 through the plugin runner and these must match. If the "
-    + "usage text is shared with the missing-arguments branch, keep an `askedForHelp` flag "
-    + "before blanking argv and exit `askedForHelp ? 0 : 1`.\n\n"
-    + output.slice(0, 400),
+    `\`${name} --help\` exited ${status}. Asking for help is a request that succeeded; ` +
+      "every gate command exits 0 through the plugin runner and these must match. If the " +
+      "usage text is shared with the missing-arguments branch, keep an `askedForHelp` flag " +
+      "before blanking argv and exit `askedForHelp ? 0 : 1`.\n\n" +
+      output.slice(0, 400),
   );
 }
 

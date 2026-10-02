@@ -127,8 +127,8 @@ export function encodeApng(frames: readonly PngData[], options: ApngOptions = {}
   for (const [index, frame] of frames.entries()) {
     if (frame.width !== width || frame.height !== height) {
       throw new ApngFrameMismatchError(
-        `frame ${index} is ${frame.width}x${frame.height}, frame 0 is ${width}x${height}`
-        + " — every frame of an APNG must be the same size here",
+        `frame ${index} is ${frame.width}x${frame.height}, frame 0 is ${width}x${height}` +
+          " — every frame of an APNG must be the same size here",
       );
     }
     if (frame.data.length < width * height * 4) {
@@ -144,11 +144,11 @@ export function encodeApng(frames: readonly PngData[], options: ApngOptions = {}
   const ihdrView = new DataView(ihdr.buffer);
   ihdrView.setUint32(0, width);
   ihdrView.setUint32(4, height);
-  ihdr[8] = 8;   // bit depth
-  ihdr[9] = 6;   // colour type: truecolour with alpha
-  ihdr[10] = 0;  // deflate
-  ihdr[11] = 0;  // adaptive filtering
-  ihdr[12] = 0;  // no interlace
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // colour type: truecolour with alpha
+  ihdr[10] = 0; // deflate
+  ihdr[11] = 0; // adaptive filtering
+  ihdr[12] = 0; // no interlace
   parts.push(chunk("IHDR", ihdr));
 
   const actl = new Uint8Array(8);
@@ -167,8 +167,8 @@ export function encodeApng(frames: readonly PngData[], options: ApngOptions = {}
     fctlView.setUint32(0, sequence++);
     fctlView.setUint32(4, width);
     fctlView.setUint32(8, height);
-    fctlView.setUint32(12, 0);       // x offset
-    fctlView.setUint32(16, 0);       // y offset
+    fctlView.setUint32(12, 0); // x offset
+    fctlView.setUint32(16, 0); // y offset
     fctlView.setUint16(20, num);
     fctlView.setUint16(22, den);
     // dispose 0 (leave as-is) + blend 0 (source over the canvas, not composited): full frames,
@@ -230,7 +230,9 @@ export function readApngChunks(bytes: Uint8Array): ApngChunk[] {
     chunks.push({
       type,
       length,
-      ...(type === "fcTL" || type === "fdAT" ? { sequence: new DataView(payload.buffer, payload.byteOffset).getUint32(0) } : {}),
+      ...(type === "fcTL" || type === "fdAT"
+        ? { sequence: new DataView(payload.buffer, payload.byteOffset).getUint32(0) }
+        : {}),
     });
     offset += 12 + length;
   }

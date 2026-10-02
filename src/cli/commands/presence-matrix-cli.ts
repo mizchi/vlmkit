@@ -124,9 +124,8 @@ function parseArgs(argv: string[]): Args | null {
 }
 
 async function resolveBreakpoints(args: Args): Promise<PresenceMatrixBreakpoint[]> {
-  const { extractBreakpoints, extractBreakpointsFromHtml } = await import(
-    "@mizchi/vlmkit-capture/viewport-discovery.ts"
-  );
+  const { extractBreakpoints, extractBreakpointsFromHtml } =
+    await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
   const collected: PresenceMatrixBreakpoint[] = [];
   if (args.cssPath) {
     const css = await readFile(args.cssPath, "utf-8");

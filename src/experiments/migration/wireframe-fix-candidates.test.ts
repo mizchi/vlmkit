@@ -126,14 +126,11 @@ describe("generateWireframeFixCandidates", () => {
     assert.match(divergent[0].evidence, /mobile: \+12px/);
     assert.match(divergent[0].evidence, /desktop: -12px/);
     assert.match(divergent[0].suggestion, /media query/);
-    assert.deepEqual(
-      divergent[0].perViewport,
-      [
-        { viewport: "mobile", deltaPx: 12 },
-        { viewport: "desktop", deltaPx: -12 },
-        { viewport: "wide", deltaPx: -12 },
-      ],
-    );
+    assert.deepEqual(divergent[0].perViewport, [
+      { viewport: "mobile", deltaPx: 12 },
+      { viewport: "desktop", deltaPx: -12 },
+      { viewport: "wide", deltaPx: -12 },
+    ]);
     // No standalone +12 or -12 row for this rank — divergent replaces both.
     const nonDivergentRank0 = out.filter((s) => !s.evidence.includes("divergent") && s.evidence.includes("rank=0"));
     assert.equal(nonDivergentRank0.length, 0);
@@ -276,8 +273,11 @@ describe("generateWireframeFixCandidates", () => {
       ],
     });
     assert.equal(out[0].scope, "subset");
-    assert.equal(out[0].candidates, undefined,
-      "desktop entry should not be surfaced as a candidate for a mobile-only suggestion");
+    assert.equal(
+      out[0].candidates,
+      undefined,
+      "desktop entry should not be surfaced as a candidate for a mobile-only suggestion",
+    );
   });
 
   it("flags same-sign-different-magnitude responsive divergence as MAG-DIVERGENT (#31)", () => {
@@ -370,14 +370,24 @@ describe("generateWireframeFixCandidates", () => {
         // height change — should cascade
         {
           path: "body[0]>main[0]>section[1]",
-          tag: "section", baselineClasses: "profile", variantClasses: "profile",
-          property: "height", baseline: "100px", variant: "76px", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "height",
+          baseline: "100px",
+          variant: "76px",
+          viewport: "mobile",
         },
         // margin-top — does NOT cascade (changes the element's own offset, not siblings')
         {
           path: "body[0]>main[0]>div[2]",
-          tag: "div", baselineClasses: "stats", variantClasses: "stats",
-          property: "margin-top", baseline: "24px", variant: "0px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "stats",
+          variantClasses: "stats",
+          property: "margin-top",
+          baseline: "24px",
+          variant: "0px",
+          viewport: "mobile",
         },
       ],
     });
@@ -421,18 +431,33 @@ describe("generateWireframeFixCandidates", () => {
       domPositionEntries: [
         {
           path: `${sharedParent}>h2.name`,
-          tag: "h2", baselineClasses: "name", variantClasses: "name",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "h2",
+          baselineClasses: "name",
+          variantClasses: "name",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>p.meta`,
-          tag: "p", baselineClasses: "meta", variantClasses: "meta",
-          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+          tag: "p",
+          baselineClasses: "meta",
+          variantClasses: "meta",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "40px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>span.badge`,
-          tag: "span", baselineClasses: "badge", variantClasses: "badge",
-          property: "margin-top", baseline: "0px", variant: "48px", viewport: "mobile",
+          tag: "span",
+          baselineClasses: "badge",
+          variantClasses: "badge",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "48px",
+          viewport: "mobile",
         },
       ],
     });
@@ -463,18 +488,33 @@ describe("generateWireframeFixCandidates", () => {
       domPositionEntries: [
         {
           path: `${sharedParent}>h2.name`,
-          tag: "h2", baselineClasses: "name", variantClasses: "name",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "h2",
+          baselineClasses: "name",
+          variantClasses: "name",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>p.meta`,
-          tag: "p", baselineClasses: "meta", variantClasses: "meta",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "p",
+          baselineClasses: "meta",
+          variantClasses: "meta",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>span.badge`,
-          tag: "span", baselineClasses: "badge", variantClasses: "badge",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "span",
+          baselineClasses: "badge",
+          variantClasses: "badge",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
       ],
     });
@@ -485,53 +525,77 @@ describe("generateWireframeFixCandidates", () => {
     // Children of `body[0]` (single-segment parent) — too generic
     // to claim a layout-strategy mismatch.
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
       domPositionEntries: [
         {
           path: "body[0]>header",
-          tag: "header", baselineClasses: "", variantClasses: "",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "header",
+          baselineClasses: "",
+          variantClasses: "",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: "body[0]>main",
-          tag: "main", baselineClasses: "", variantClasses: "",
-          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+          tag: "main",
+          baselineClasses: "",
+          variantClasses: "",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "40px",
+          viewport: "mobile",
         },
         {
           path: "body[0]>footer",
-          tag: "footer", baselineClasses: "", variantClasses: "",
-          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+          tag: "footer",
+          baselineClasses: "",
+          variantClasses: "",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "60px",
+          viewport: "mobile",
         },
       ],
     });
-    assert.equal(out.filter((s) => s.scope === "structural").length, 0,
-      "body-rooted clusters are too generic to claim layout-strategy mismatch");
+    assert.equal(
+      out.filter((s) => s.scope === "structural").length,
+      0,
+      "body-rooted clusters are too generic to claim layout-strategy mismatch",
+    );
   });
 
   it("does NOT emit STRUCTURAL when only 2 candidates share a parent (threshold = 3)", () => {
     const sharedParent = "body[0]>main[0]>section.profile";
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 24)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 24)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
       domPositionEntries: [
         {
           path: `${sharedParent}>h2.name`,
-          tag: "h2", baselineClasses: "name", variantClasses: "name",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "h2",
+          baselineClasses: "name",
+          variantClasses: "name",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>p.meta`,
-          tag: "p", baselineClasses: "meta", variantClasses: "meta",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "p",
+          baselineClasses: "meta",
+          variantClasses: "meta",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
       ],
     });
@@ -604,9 +668,7 @@ describe("generateWireframeFixCandidates", () => {
         { viewport: "desktop", matches: [bbox(0, 12)] },
         { viewport: "wide", matches: [bbox(0, 12)] },
       ],
-      textRowsByViewport: [
-        { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 8 },
-      ],
+      textRowsByViewport: [{ viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 8 }],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
     });
@@ -623,9 +685,7 @@ describe("generateWireframeFixCandidates", () => {
         { viewport: "desktop", matches: [bbox(0, 20)] },
         { viewport: "wide", matches: [bbox(0, 20)] },
       ],
-      textRowsByViewport: [
-        { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 10 },
-      ],
+      textRowsByViewport: [{ viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 10 }],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
     });
@@ -643,17 +703,18 @@ describe("generateWireframeFixCandidates", () => {
         { viewport: "desktop", matches: [bbox(0, 20)] },
         { viewport: "wide", matches: [bbox(0, 20)] },
       ],
-      textRowsByViewport: [
-        { viewport: "mobile", matches: [] },
-      ],
+      textRowsByViewport: [{ viewport: "mobile", matches: [] }],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
     });
     const reflow = out.filter((s) => s.scope === "reflow");
     assert.equal(reflow.length, 1);
     assert.match(reflow[0].suggestion, /upstream cascade/);
-    assert.doesNotMatch(reflow[0].suggestion, /typography cascade/,
-      "without row-count data we can't claim text wrap specifically");
+    assert.doesNotMatch(
+      reflow[0].suggestion,
+      /typography cascade/,
+      "without row-count data we can't claim text wrap specifically",
+    );
   });
 
   it("appends a ⚠ converging warning when multiple suggestions blame the same selector (#34)", () => {
@@ -672,13 +733,23 @@ describe("generateWireframeFixCandidates", () => {
       domPositionEntries: [
         {
           path: "body[0]>main[0]>div.container",
-          tag: "div", baselineClasses: "container", variantClasses: "container",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "container",
+          variantClasses: "container",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: "body[0]>main[0]>div.container",
-          tag: "div", baselineClasses: "container", variantClasses: "container",
-          property: "padding-top", baseline: "0px", variant: "16px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "container",
+          variantClasses: "container",
+          property: "padding-top",
+          baseline: "0px",
+          variant: "16px",
+          viewport: "mobile",
         },
       ],
     });
@@ -703,8 +774,13 @@ describe("generateWireframeFixCandidates", () => {
       domPositionEntries: [
         {
           path: "body[0]>div.solo",
-          tag: "div", baselineClasses: "solo", variantClasses: "solo",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "solo",
+          variantClasses: "solo",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
       ],
     });
@@ -714,22 +790,30 @@ describe("generateWireframeFixCandidates", () => {
   it("does NOT warn when cumulative is within tolerance of max single", () => {
     // 24 + 4 = 28. max single = 24. overage = 4 ≤ 8 → no warning.
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 4)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 4)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
       domPositionEntries: [
         {
           path: "body[0]>div.x",
-          tag: "div", baselineClasses: "x", variantClasses: "x",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "x",
+          variantClasses: "x",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: "body[0]>div.x",
-          tag: "div", baselineClasses: "x", variantClasses: "x",
-          property: "padding-top", baseline: "0px", variant: "4px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "x",
+          variantClasses: "x",
+          property: "padding-top",
+          baseline: "0px",
+          variant: "4px",
+          viewport: "mobile",
         },
       ],
     });
@@ -743,9 +827,7 @@ describe("generateWireframeFixCandidates", () => {
     // display delta in the suggestion text.
     const sharedParent = "body[0]>main[0]>section.profile";
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
@@ -753,29 +835,54 @@ describe("generateWireframeFixCandidates", () => {
         // Child entries that drive the STRUCTURAL detection
         {
           path: `${sharedParent}>h2.name`,
-          tag: "h2", baselineClasses: "name", variantClasses: "name",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "h2",
+          baselineClasses: "name",
+          variantClasses: "name",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>p.meta`,
-          tag: "p", baselineClasses: "meta", variantClasses: "meta",
-          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+          tag: "p",
+          baselineClasses: "meta",
+          variantClasses: "meta",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "40px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>span.badge`,
-          tag: "span", baselineClasses: "badge", variantClasses: "badge",
-          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+          tag: "span",
+          baselineClasses: "badge",
+          variantClasses: "badge",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "60px",
+          viewport: "mobile",
         },
         // Parent-level entry that names the actual layout-strategy mismatch
         {
           path: sharedParent,
-          tag: "section", baselineClasses: "profile", variantClasses: "profile",
-          property: "display", baseline: "grid", variant: "flex", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "display",
+          baseline: "grid",
+          variant: "flex",
+          viewport: "mobile",
         },
         {
           path: sharedParent,
-          tag: "section", baselineClasses: "profile", variantClasses: "profile",
-          property: "grid-template-columns", baseline: "64px 1fr", variant: "none", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "grid-template-columns",
+          baseline: "64px 1fr",
+          variant: "none",
+          viewport: "mobile",
         },
       ],
     });
@@ -789,9 +896,7 @@ describe("generateWireframeFixCandidates", () => {
   it("STRUCTURAL falls back to generic suggestion when parent properties match (#35)", () => {
     const sharedParent = "body[0]>main[0]>section.profile";
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
@@ -799,18 +904,33 @@ describe("generateWireframeFixCandidates", () => {
         // No parent-level entries → fall back to generic message
         {
           path: `${sharedParent}>h2.name`,
-          tag: "h2", baselineClasses: "name", variantClasses: "name",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "h2",
+          baselineClasses: "name",
+          variantClasses: "name",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>p.meta`,
-          tag: "p", baselineClasses: "meta", variantClasses: "meta",
-          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+          tag: "p",
+          baselineClasses: "meta",
+          variantClasses: "meta",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "40px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>span.badge`,
-          tag: "span", baselineClasses: "badge", variantClasses: "badge",
-          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+          tag: "span",
+          baselineClasses: "badge",
+          variantClasses: "badge",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "60px",
+          viewport: "mobile",
         },
       ],
     });
@@ -836,13 +956,23 @@ describe("generateWireframeFixCandidates", () => {
       domPositionEntries: [
         {
           path: "body[0]>main[0]>div.container",
-          tag: "div", baselineClasses: "container", variantClasses: "container",
-          property: "padding-bottom", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "container",
+          variantClasses: "container",
+          property: "padding-bottom",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: "body[0]>main[0]>div.container>section.hero",
-          tag: "section", baselineClasses: "hero", variantClasses: "hero",
-          property: "margin-bottom", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "hero",
+          variantClasses: "hero",
+          property: "margin-bottom",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
       ],
     });
@@ -859,9 +989,7 @@ describe("generateWireframeFixCandidates", () => {
     // agent clears them at the same time.
     const sharedParent = "body[0]>main[0]>section.profile";
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
@@ -869,24 +997,44 @@ describe("generateWireframeFixCandidates", () => {
         // Parent introduces a new gap.
         {
           path: sharedParent,
-          tag: "section", baselineClasses: "profile", variantClasses: "profile",
-          property: "gap", baseline: "16px", variant: "0px", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "gap",
+          baseline: "16px",
+          variant: "0px",
+          viewport: "mobile",
         },
         // Child entries (so STRUCTURAL fires).
         {
           path: `${sharedParent}>div.card-1`,
-          tag: "div", baselineClasses: "card-1", variantClasses: "card-1",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "card-1",
+          variantClasses: "card-1",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>div.card-2`,
-          tag: "div", baselineClasses: "card-2", variantClasses: "card-2",
-          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "card-2",
+          variantClasses: "card-2",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "40px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>div.card-3`,
-          tag: "div", baselineClasses: "card-3", variantClasses: "card-3",
-          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "card-3",
+          variantClasses: "card-3",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "60px",
+          viewport: "mobile",
         },
       ],
     });
@@ -903,32 +1051,50 @@ describe("generateWireframeFixCandidates", () => {
     // legitimately want existing margins preserved.
     const sharedParent = "body[0]>main[0]>section.profile";
     const out = generateWireframeFixCandidates({
-      bboxByViewport: [
-        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
-      ],
+      bboxByViewport: [{ viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] }],
       textRowsByViewport: [],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
       domPositionEntries: [
         {
           path: sharedParent,
-          tag: "section", baselineClasses: "profile", variantClasses: "profile",
-          property: "align-items", baseline: "center", variant: "stretch", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "align-items",
+          baseline: "center",
+          variant: "stretch",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>div.card-1`,
-          tag: "div", baselineClasses: "card-1", variantClasses: "card-1",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "card-1",
+          variantClasses: "card-1",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>div.card-2`,
-          tag: "div", baselineClasses: "card-2", variantClasses: "card-2",
-          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "card-2",
+          variantClasses: "card-2",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "40px",
+          viewport: "mobile",
         },
         {
           path: `${sharedParent}>div.card-3`,
-          tag: "div", baselineClasses: "card-3", variantClasses: "card-3",
-          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "card-3",
+          variantClasses: "card-3",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "60px",
+          viewport: "mobile",
         },
       ],
     });
@@ -995,14 +1161,24 @@ describe("generateWireframeFixCandidates", () => {
         // Single cascading candidate
         {
           path: "body[0]>main[0]>div.container",
-          tag: "div", baselineClasses: "container", variantClasses: "container",
-          property: "padding-bottom", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "div",
+          baselineClasses: "container",
+          variantClasses: "container",
+          property: "padding-bottom",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
         // Non-cascading (margin-top doesn't cascade siblings)
         {
           path: "body[0]>main[0]>section.hero",
-          tag: "section", baselineClasses: "hero", variantClasses: "hero",
-          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+          tag: "section",
+          baselineClasses: "hero",
+          variantClasses: "hero",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
         },
       ],
     });

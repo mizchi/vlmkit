@@ -10,9 +10,37 @@ import { judgeSceneCopy, sceneTextVisibility, type SceneElement } from "./scene.
 const HUD = (overrides: Partial<Record<string, Partial<SceneElement>>> = {}): SceneElement[] => {
   const rows: SceneElement[] = [
     { path: "hud[0]", tag: "hud", top: 0, left: 0, width: 640, height: 360, background: "#101418" },
-    { path: "hud[0]>title[0]", tag: "label", top: 16, left: 16, width: 200, height: 24, text: "Start Game", color: "#f0f0f0" },
-    { path: "hud[0]>hint[0]", tag: "label", top: 48, left: 16, width: 200, height: 20, text: "Press A to continue", color: "#141a1f" },
-    { path: "hud[0]>toast[0]", tag: "label", top: 80, left: 16, width: 200, height: 20, text: "Saved", color: "#f0f0f0", opacity: 0 },
+    {
+      path: "hud[0]>title[0]",
+      tag: "label",
+      top: 16,
+      left: 16,
+      width: 200,
+      height: 24,
+      text: "Start Game",
+      color: "#f0f0f0",
+    },
+    {
+      path: "hud[0]>hint[0]",
+      tag: "label",
+      top: 48,
+      left: 16,
+      width: 200,
+      height: 20,
+      text: "Press A to continue",
+      color: "#141a1f",
+    },
+    {
+      path: "hud[0]>toast[0]",
+      tag: "label",
+      top: 80,
+      left: 16,
+      width: 200,
+      height: 20,
+      text: "Saved",
+      color: "#f0f0f0",
+      opacity: 0,
+    },
   ];
   return rows.map((row) => ({ ...row, ...(overrides[row.path] ?? {}) }));
 };
@@ -20,13 +48,19 @@ const byPath = (elements: SceneElement[]) => new Map(elements.map((e) => [e.path
 
 describe("judgeSceneCopy", () => {
   it("sorts a HUD's strings into seen and unseen with the page's reason classes", () => {
-    const report = judgeSceneCopy(HUD(), { source: "hud", manifestLines: ["Start Game", "Press A to continue", "Saved"] });
+    const report = judgeSceneCopy(HUD(), {
+      source: "hud",
+      manifestLines: ["Start Game", "Press A to continue", "Saved"],
+    });
     assert.deepEqual(report.invisibleLines, [
       { line: "Press A to continue", reason: "camouflage" },
       { line: "Saved", reason: "hidden" },
     ]);
     assert.deepEqual(report.missingLines, []);
-    assert.match(report.coverageNotes[0]!, /covers 5 of its 7 reason classes here: zero-size, visually-hidden, hidden, transparent, camouflage\./);
+    assert.match(
+      report.coverageNotes[0]!,
+      /covers 5 of its 7 reason classes here: zero-size, visually-hidden, hidden, transparent, camouflage\./,
+    );
   });
 
   it("leaves camouflage unjudged when nothing opaque is behind the text, and says so", () => {
@@ -37,7 +71,10 @@ describe("judgeSceneCopy", () => {
     assert.equal(sceneTextVisibility(elements[2]!, byPath(elements)), null);
     const report = judgeSceneCopy(elements, { source: "hud", manifestLines: ["Press A to continue"] });
     assert.deepEqual(report.invisibleLines, []);
-    assert.ok(report.coverageNotes.some((n) => /2 text element\(s\) carry a colour but nothing opaque behind them/.test(n)), report.coverageNotes.join(" | "));
+    assert.ok(
+      report.coverageNotes.some((n) => /2 text element\(s\) carry a colour but nothing opaque behind them/.test(n)),
+      report.coverageNotes.join(" | "),
+    );
   });
 
   it("an image or a text shadow behind the text rescues it, as on the page", () => {
@@ -69,6 +106,9 @@ describe("judgeSceneCopy", () => {
       inkSource: "frame.png",
     });
     assert.deepEqual(report.invisibleLines, [{ line: "Start Game", reason: "unpainted" }]);
-    assert.ok(report.coverageNotes.some((n) => /Ink checked in 1 text bbox\(es\) against frame\.png/.test(n)), report.coverageNotes.join(" | "));
+    assert.ok(
+      report.coverageNotes.some((n) => /Ink checked in 1 text bbox\(es\) against frame\.png/.test(n)),
+      report.coverageNotes.join(" | "),
+    );
   });
 });

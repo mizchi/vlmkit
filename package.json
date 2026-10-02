@@ -55,6 +55,8 @@
     "smoke:pack:workspaces": "node scripts/smoke-packed-workspaces.mjs",
     "test": "vp test run",
     "typecheck": "tsc -p tsconfig.json",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
     "test:examples": "vp test run examples",
     "dogfood:markup-vrt:offline": "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs",
     "demo": "node src/demo/demo.ts",

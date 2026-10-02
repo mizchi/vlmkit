@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  isUnexpectedPlaywrightStatus,
-  onlyOnFailure,
-  withOnlyOnFailure,
-} from "./only-on-failure.ts";
+import { isUnexpectedPlaywrightStatus, onlyOnFailure, withOnlyOnFailure } from "./only-on-failure.ts";
 
 describe("isUnexpectedPlaywrightStatus", () => {
   it("returns true for failed Playwright tests", () => {

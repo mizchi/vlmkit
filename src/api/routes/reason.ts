@@ -1,8 +1,5 @@
 import type { Hono } from "hono";
-import type {
-  ReasoningPipelineRequest,
-  ReasoningPipelineResponse,
-} from "../api-types.ts";
+import type { ReasoningPipelineRequest, ReasoningPipelineResponse } from "../api-types.ts";
 
 export function registerReasonRoute(app: Hono): void {
   app.post("/api/reason", async (c) => {
@@ -24,7 +21,10 @@ export function registerReasonRoute(app: Hono): void {
     });
 
     if (!pipeline) {
-      return c.json({ error: "No VLM/LLM API keys configured (OPENROUTER_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)" }, 503);
+      return c.json(
+        { error: "No VLM/LLM API keys configured (OPENROUTER_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY)" },
+        503,
+      );
     }
 
     const start = Date.now();

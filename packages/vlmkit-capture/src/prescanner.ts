@@ -3,12 +3,7 @@ import type { ViewportDetectionResult } from "./detection-types.ts";
 export type PrescannerResolvedBy = "crater" | "chromium" | "none";
 
 /** Which Crater metadata signal first fired for a trial resolved by crater. */
-export type PrescannerCraterSignal =
-  | "paint-tree"
-  | "computed-style"
-  | "forced-state"
-  | "visual"
-  | "none";
+export type PrescannerCraterSignal = "paint-tree" | "computed-style" | "forced-state" | "visual" | "none";
 
 export interface PrescannerTrialResolution {
   craterDetected: boolean;
@@ -40,21 +35,23 @@ export interface PrescannerTrialSummary {
 }
 
 export function hasCraterPrescanSignal(viewports: ViewportDetectionResult[]): boolean {
-  return viewports.some((viewport) =>
-    viewport.visualDiffDetected ||
-    viewport.computedStyleDiffCount > 0 ||
-    viewport.hoverDiffDetected ||
-    viewport.paintTreeDiffCount > 0
+  return viewports.some(
+    (viewport) =>
+      viewport.visualDiffDetected ||
+      viewport.computedStyleDiffCount > 0 ||
+      viewport.hoverDiffDetected ||
+      viewport.paintTreeDiffCount > 0,
   );
 }
 
 export function hasAnyDetectionSignal(viewports: ViewportDetectionResult[]): boolean {
-  return viewports.some((viewport) =>
-    viewport.visualDiffDetected ||
-    viewport.a11yDiffDetected ||
-    viewport.computedStyleDiffCount > 0 ||
-    viewport.hoverDiffDetected ||
-    viewport.paintTreeDiffCount > 0,
+  return viewports.some(
+    (viewport) =>
+      viewport.visualDiffDetected ||
+      viewport.a11yDiffDetected ||
+      viewport.computedStyleDiffCount > 0 ||
+      viewport.hoverDiffDetected ||
+      viewport.paintTreeDiffCount > 0,
   );
 }
 
@@ -101,9 +98,7 @@ export function resolvePrescannerTrial(
   };
 }
 
-export function summarizePrescannerTrials(
-  resolutions: PrescannerTrialResolution[],
-): PrescannerTrialSummary {
+export function summarizePrescannerTrials(resolutions: PrescannerTrialResolution[]): PrescannerTrialSummary {
   const craterResolved = resolutions.filter((r) => r.resolvedBy === "crater");
   return {
     total: resolutions.length,

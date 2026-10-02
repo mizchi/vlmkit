@@ -37,10 +37,7 @@ describe("Cloudflare Quick Actions", () => {
   });
 
   it("rejects missing credentials", () => {
-    assert.throws(
-      () => resolveCloudflareQuickActionsConfig({}),
-      /CLOUDFLARE_ACCOUNT_ID/,
-    );
+    assert.throws(() => resolveCloudflareQuickActionsConfig({}), /CLOUDFLARE_ACCOUNT_ID/);
   });
 
   it("posts screenshot requests and returns binary metadata", async () => {
@@ -90,19 +87,34 @@ describe("Cloudflare Quick Actions", () => {
 
     assert.equal(started.jobId, "job-1");
 
-    const routes = extractCloudflareCrawlRoutes({
-      id: "job-1",
-      status: "completed",
-      total: 3,
-      finished: 3,
-      records: [
-        { url: "https://example.com/docs", status: "completed", metadata: { status: 200, url: "https://example.com/docs", title: "Docs" } },
-        { url: "https://example.com/docs/api#hash", status: "completed", metadata: { status: 200, url: "https://example.com/docs/api#hash" } },
-        { url: "https://external.example.net/", status: "completed", metadata: { status: 200, url: "https://external.example.net/" } },
-      ],
-    }, {
-      baseUrl: "https://example.com",
-    });
+    const routes = extractCloudflareCrawlRoutes(
+      {
+        id: "job-1",
+        status: "completed",
+        total: 3,
+        finished: 3,
+        records: [
+          {
+            url: "https://example.com/docs",
+            status: "completed",
+            metadata: { status: 200, url: "https://example.com/docs", title: "Docs" },
+          },
+          {
+            url: "https://example.com/docs/api#hash",
+            status: "completed",
+            metadata: { status: 200, url: "https://example.com/docs/api#hash" },
+          },
+          {
+            url: "https://external.example.net/",
+            status: "completed",
+            metadata: { status: 200, url: "https://external.example.net/" },
+          },
+        ],
+      },
+      {
+        baseUrl: "https://example.com",
+      },
+    );
 
     assert.deepEqual(routes, [
       { url: "https://example.com/docs", path: "/docs", title: "Docs" },

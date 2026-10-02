@@ -27,7 +27,9 @@ function page(name: string, body: string): string {
 }
 
 /** Honours the toggle: every surface flips. */
-const themed = page("themed", `
+const themed = page(
+  "themed",
+  `
 <style>
   :root { --bg: #ffffff; --fg: #111111; --card: #f2f2f2; }
   @media (prefers-color-scheme: dark) {
@@ -36,15 +38,19 @@ const themed = page("themed", `
   body { margin: 0; background: var(--bg); color: var(--fg); font: 16px sans-serif; }
   .card { background: var(--card); margin: 24px; padding: 32px; }
 </style>
-<body><div class="card"><h1>Themed</h1><p>Everything here follows the scheme.</p></div></body>`);
+<body><div class="card"><h1>Themed</h1><p>Everything here follows the scheme.</p></div></body>`,
+);
 
 /** Ignores the toggle entirely: the dark render is identical to the light one. */
-const unthemed = page("unthemed", `
+const unthemed = page(
+  "unthemed",
+  `
 <style>
   body { margin: 0; background: #ffffff; color: #111111; font: 16px sans-serif; }
   .card { background: #f2f2f2; margin: 24px; padding: 32px; }
 </style>
-<body><div class="card"><h1>Unthemed</h1><p>No media query anywhere.</p></div></body>`);
+<body><div class="card"><h1>Unthemed</h1><p>No media query anywhere.</p></div></body>`,
+);
 
 describe("runThemeParity", () => {
   it("measures a real difference on a page that honours prefers-color-scheme", async () => {
@@ -92,14 +98,17 @@ describe("runThemeParity", () => {
   it("treats near-identical colours as unchanged, per --unchanged-color-threshold", async () => {
     // A page whose dark scheme moves #ffffff to #fefefe has not themed anything a
     // human can see. The threshold is what stops the gate reporting that as parity.
-    const almost = page("almost", `
+    const almost = page(
+      "almost",
+      `
 <style>
   :root { --bg: #ffffff; }
   @media (prefers-color-scheme: dark) { :root { --bg: #fdfdfd; } }
   body { margin: 0; background: var(--bg); }
   .card { background: #f2f2f2; margin: 24px; padding: 32px; }
 </style>
-<body><div class="card">Almost</div></body>`);
+<body><div class="card">Almost</div></body>`,
+    );
     const strict = await runThemeParity({
       htmlPath: almost,
       outputDir: join(dir, "out-strict"),
@@ -167,7 +176,9 @@ describe("dark-mode strategy detection", () => {
     // For the case detection cannot see: a dark rule injected by script after measurement, or a
     // class applied to something other than the root.
     const report = await runThemeParity({
-      htmlPath: classOnly, outputDir: join(dir, "out-override"), darkSelector: "dark",
+      htmlPath: classOnly,
+      outputDir: join(dir, "out-override"),
+      darkSelector: "dark",
     });
     assert.equal(report.themeStrategy.strategy, "class");
     assert.equal(report.themeStrategy.mediaRules, 0);

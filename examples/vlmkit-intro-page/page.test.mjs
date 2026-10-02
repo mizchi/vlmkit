@@ -133,11 +133,7 @@ test("the playable-demo section routes to the game and states what proves it", a
   );
   assert.ok(solitaireStep.length > 0, "the deploy workflow no longer has a solitaire gate step");
   const runLines = solitaireStep.replace(/\\\n\s*/g, " ").split("\n");
-  for (const gate of [
-    "vlmkit check integrity",
-    "vlmkit check a11y focus",
-    "vlmkit check a11y touch --level AAA",
-  ]) {
+  for (const gate of ["vlmkit check integrity", "vlmkit check a11y focus", "vlmkit check a11y touch --level AAA"]) {
     assert.ok(section.includes(`<code>${gate}</code>`), `${gate} is missing from the demo section`);
     const tokens = gate.split(" ").slice(1);
     assert.ok(
@@ -187,14 +183,8 @@ test("the section numbers run in order with no gaps or repeats", async () => {
 test("the hero display type keeps readable size and tracking", async () => {
   const css = await read("styles.css");
 
-  assert.match(
-    css,
-    /\.hero h1 \{[\s\S]*?font-size: clamp\(44px, 5\.2vw, 68px\);[\s\S]*?letter-spacing: -0\.035em;/,
-  );
-  assert.match(
-    css,
-    /@media \(max-width: 640px\)[\s\S]*?\.hero h1 \{\s*font-size: clamp\(38px, 11\.5vw, 52px\);/,
-  );
+  assert.match(css, /\.hero h1 \{[\s\S]*?font-size: clamp\(44px, 5\.2vw, 68px\);[\s\S]*?letter-spacing: -0\.035em;/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.hero h1 \{\s*font-size: clamp\(38px, 11\.5vw, 52px\);/);
 });
 
 test("the visual system stays quiet and documentation-like", async () => {
@@ -264,7 +254,10 @@ test("the meta entry and catalog classify every specialized skill", async () => 
   ]);
 
   assert.deepEqual(
-    skillDirectories.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort(),
+    skillDirectories
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort(),
     specializedSkills,
   );
   assert.match(rootSkill, /name: vlmkit/);
@@ -307,11 +300,12 @@ test("one install lets the agent route natural-language UI work automatically", 
    * hand-placed at each wrap point that existed when they were written, which is the same bug
    * being patched one instance at a time.
    */
-  const says = (phrase) => assert.match(
-    rootSkill,
-    new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")),
-    `the router no longer says: ${phrase}`,
-  );
+  const says = (phrase) =>
+    assert.match(
+      rootSkill,
+      new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")),
+      `the router no longer says: ${phrase}`,
+    );
   says("relative to the directory containing this `SKILL.md`");
   says("Default to `markup-assist`");
   assert.match(rootSkill, /## Automatic tool bootstrap/);
@@ -349,9 +343,7 @@ test("the first visible message identifies the page as vlmkit dogfood", async ()
     html,
     /data-testid="dogfood-notice"[^>]*>[\s\S]*This site is generated and debugged with vlmkit itself\./,
   );
-  assert.ok(
-    html.indexOf('data-testid="dogfood-notice"') < html.indexOf('<header class="site-header">'),
-  );
+  assert.ok(html.indexOf('data-testid="dogfood-notice"') < html.indexOf('<header class="site-header">'));
 });
 
 test("the header exposes language, theme, and GitHub controls", async () => {
@@ -476,28 +468,23 @@ test("the local server serves both pages with usable content types", async () =>
 test("the command deck exposes deterministic scenarios", async () => {
   const { commandScenarios, findCommandScenario } = await import("./scenarios.js");
 
-  assert.deepEqual(commandScenarios.map(({ id }) => id), ["inspect", "snapshot", "ship"]);
+  assert.deepEqual(
+    commandScenarios.map(({ id }) => id),
+    ["inspect", "snapshot", "ship"],
+  );
   assert.equal(findCommandScenario("inspect")?.command, "vlmkit check integrity http://localhost:3000");
   assert.equal(findCommandScenario("missing"), null);
   assert.ok(commandScenarios.every(({ output }) => output.length >= 2));
 });
 
 test("locale content and display preferences have strict contracts", async () => {
-  const [
-    { messages, translate },
-    { defaultLocale, nextLocale, nextTheme, resolveLocale, resolveTheme },
-  ] = await Promise.all([import("./content.js"), import("./preferences.js")]);
+  const [{ messages, translate }, { defaultLocale, nextLocale, nextTheme, resolveLocale, resolveTheme }] =
+    await Promise.all([import("./content.js"), import("./preferences.js")]);
 
   assert.equal(defaultLocale, "en");
   assert.deepEqual(Object.keys(messages.ja).sort(), Object.keys(messages.en).sort());
-  assert.equal(
-    translate("ja", "dogfood.message"),
-    "このサイトは vlmkit 自身で生成、デバッグされています。",
-  );
-  assert.equal(
-    translate("en", "dogfood.message"),
-    "This site is generated and debugged with vlmkit itself.",
-  );
+  assert.equal(translate("ja", "dogfood.message"), "このサイトは vlmkit 自身で生成、デバッグされています。");
+  assert.equal(translate("en", "dogfood.message"), "This site is generated and debugged with vlmkit itself.");
   assert.equal(translate("ja", "skills.apmLabel"), "APM でインストール");
   assert.equal(translate("en", "skills.apmLabel"), "Install with APM");
   assert.equal(translate("ja", "skills.metaLabel"), "メタエントリー");
@@ -509,10 +496,7 @@ test("locale content and display preferences have strict contracts", async () =>
   assert.equal(nextLocale("ja"), "en");
   assert.equal(nextTheme("light"), "dark");
   assert.equal(resolveLocale("unknown"), "en");
-  assert.equal(
-    translate("unknown", "dogfood.message"),
-    "This site is generated and debugged with vlmkit itself.",
-  );
+  assert.equal(translate("unknown", "dogfood.message"), "This site is generated and debugged with vlmkit itself.");
   assert.equal(resolveTheme("unknown"), "light");
 });
 
@@ -521,10 +505,7 @@ test("locale content and display preferences have strict contracts", async () =>
 // the moment this page stopped being the whole site.
 
 test("the GitHub Pages workflow validates and deploys the composed site", async () => {
-  const workflow = await readFile(
-    join(exampleDir, "../../.github/workflows/deploy-pages.yml"),
-    "utf8",
-  );
+  const workflow = await readFile(join(exampleDir, "../../.github/workflows/deploy-pages.yml"), "utf8");
 
   assert.match(workflow, /branches:\s*\[main\]/);
   assert.match(workflow, /pull_request:/);
@@ -581,33 +562,25 @@ test("the dogfood gate covers every locale and theme before Pages deploys", asyn
     ],
   );
   for (const page of config.pages) {
-    assert.deepEqual(page.extraGates, [
-      `check a11y contrast --output-dir test-results/a11y-contrast/${page.id}`,
-    ]);
+    assert.deepEqual(page.extraGates, [`check a11y contrast --output-dir test-results/a11y-contrast/${page.id}`]);
   }
   assert.match(tasks, /gates run --config vlmkit\.gates\.json/);
   assert.match(workflow, /name: Install MoonBit/);
   assert.match(workflow, /cli\.moonbitlang\.com\/install\/unix\.sh/);
   assert.match(workflow, /\.moon\/bin.*GITHUB_PATH/);
   assert.match(workflow, /Run vlmkit dogfood state matrix/);
-  assert.match(
-    workflow,
-    /gates run[\s\\]+--config examples\/vlmkit-intro-page\/vlmkit\.gates\.json/,
-  );
+  assert.match(workflow, /gates run[\s\\]+--config examples\/vlmkit-intro-page\/vlmkit\.gates\.json/);
   assert.ok(
-    workflow.indexOf("Install MoonBit")
-      < workflow.indexOf("Run vlmkit dogfood state matrix"),
+    workflow.indexOf("Install MoonBit") < workflow.indexOf("Run vlmkit dogfood state matrix"),
     "MoonBit must be available before the contrast gate runs",
   );
   assert.ok(
-    workflow.indexOf("Run vlmkit dogfood state matrix")
-      < workflow.indexOf("Build the Pages artifact"),
+    workflow.indexOf("Run vlmkit dogfood state matrix") < workflow.indexOf("Build the Pages artifact"),
     "the state matrix must block artifact creation",
   );
   // Same for solitaire: its gates are only worth running if a red one stops the deploy.
   assert.ok(
-    workflow.indexOf("Run vlmkit gates on the solitaire demo")
-      < workflow.indexOf("Build the Pages artifact"),
+    workflow.indexOf("Run vlmkit gates on the solitaire demo") < workflow.indexOf("Build the Pages artifact"),
     "the solitaire gates must block artifact creation",
   );
 });
@@ -617,8 +590,29 @@ test("the feature-gallery link counts the demos the gallery has", async () => {
   // found by eye in R8 (D38). The count is derived from the manifest, as the workflow count is.
   const { DEMOS } = await import("../demos/demos.mjs");
   const { messages } = await import("./content.js");
-  const words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+  const words = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+  ];
   const word = words[DEMOS.length];
   assert.ok(word, `no word for ${DEMOS.length} demos`);
   const html = await read("index.html");

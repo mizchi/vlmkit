@@ -37,14 +37,14 @@ export type PluginImporter = (specifier: string) => Promise<unknown>;
 function isGateLike(value: unknown): value is AnyGateDefinition {
   const gate = value as Partial<AnyGateDefinition> | null;
   return Boolean(
-    gate
-    && typeof gate.id === "string"
-    && Array.isArray(gate.command)
-    && typeof gate.parse === "function"
-    && typeof gate.run === "function"
-    && typeof gate.findings === "function"
-    && typeof gate.format === "function"
-    && Array.isArray(gate.rules),
+    gate &&
+    typeof gate.id === "string" &&
+    Array.isArray(gate.command) &&
+    typeof gate.parse === "function" &&
+    typeof gate.run === "function" &&
+    typeof gate.findings === "function" &&
+    typeof gate.format === "function" &&
+    Array.isArray(gate.rules),
   );
 }
 
@@ -71,11 +71,15 @@ export function asPlugin(moduleNamespace: unknown, specifier: string): VlmkitPlu
   const bad = candidate.gates.findIndex((gate) => !isGateLike(gate));
   if (bad >= 0) {
     throw new Error(
-      `${specifier}: gates[${bad}] is not a gate definition`
-      + ` — it must carry id, command, rules, parse, run, findings and format (use defineGate()).`,
+      `${specifier}: gates[${bad}] is not a gate definition` +
+        ` — it must carry id, command, rules, parse, run, findings and format (use defineGate()).`,
     );
   }
-  return { name: candidate.name.trim(), ...(candidate.version ? { version: candidate.version } : {}), gates: candidate.gates };
+  return {
+    name: candidate.name.trim(),
+    ...(candidate.version ? { version: candidate.version } : {}),
+    gates: candidate.gates,
+  };
 }
 
 export interface LoadPluginsOptions {
@@ -99,9 +103,9 @@ export async function loadPlugins(
       ns = await importer(resolved);
     } catch (e) {
       throw new Error(
-        `failed to load gate plugin "${specifier}"`
-        + (isPath ? ` (resolved to ${resolved})` : "")
-        + `: ${e instanceof Error ? e.message : String(e)}`,
+        `failed to load gate plugin "${specifier}"` +
+          (isPath ? ` (resolved to ${resolved})` : "") +
+          `: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
     loaded.push({ plugin: asPlugin(ns, specifier), specifier, resolved });

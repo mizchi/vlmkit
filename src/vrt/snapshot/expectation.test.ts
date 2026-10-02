@@ -8,7 +8,7 @@ const navRemovalDiff: A11yDiff = {
   changes: [
     {
       type: "landmark-changed",
-      path: 'banner > navigation[navigation]',
+      path: "banner > navigation[navigation]",
       before: { role: "navigation", name: "navigation" },
       severity: "error",
       description: 'Removed navigation "navigation"',
@@ -26,7 +26,7 @@ const navRemovalDiff: A11yDiff = {
   landmarkChanges: [
     {
       type: "landmark-changed",
-      path: 'banner > navigation[navigation]',
+      path: "banner > navigation[navigation]",
       before: { role: "navigation", name: "navigation" },
       severity: "error",
       description: 'Removed navigation "navigation"',
@@ -123,14 +123,19 @@ describe("crossValidateWithExpectation", () => {
       testId: "home",
       visual: "changed",
       a11y: "regression-expected",
-      expectedA11yChanges: [
-        { type: "landmark-changed", role: "navigation", description: "Nav removed" },
-      ],
+      expectedA11yChanges: [{ type: "landmark-changed", role: "navigation", description: "Nav removed" }],
     };
 
     const visualDiff = {
       testId: "home",
-      changes: [{ type: "layout-shift" as const, region: { x: 0, y: 0, width: 100, height: 20, diffPixelCount: 1000 }, confidence: 0.5, description: "Nav area" }],
+      changes: [
+        {
+          type: "layout-shift" as const,
+          region: { x: 0, y: 0, width: 100, height: 20, diffPixelCount: 1000 },
+          confidence: 0.5,
+          description: "Nav area",
+        },
+      ],
       summary: "1 layout-shift",
     };
 
@@ -143,9 +148,7 @@ describe("crossValidateWithExpectation", () => {
       testId: "home",
       visual: "any",
       a11y: "regression-expected",
-      expectedA11yChanges: [
-        { type: "landmark-changed", role: "navigation", description: "Nav removed" },
-      ],
+      expectedA11yChanges: [{ type: "landmark-changed", role: "navigation", description: "Nav removed" }],
     };
 
     const result = crossValidateWithExpectation("home", exp, undefined, undefined, intent);

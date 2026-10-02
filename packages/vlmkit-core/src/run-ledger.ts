@@ -139,7 +139,10 @@ export function isGitIgnored(cwd: string, target: string): boolean {
   if (!rel || rel.startsWith("..")) return true; // Outside the tree: not ours to warn about.
   try {
     const text = readFileSync(join(cwd, ".gitignore"), "utf8");
-    const lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+    const lines = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
     const segments = rel.split("/");
     return lines.some((line) => {
       const bare = line.replace(/^\/+/, "").replace(/\/+$/, "");

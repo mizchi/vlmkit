@@ -1,22 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  aggregateCsdByViewport,
-  diffComputedStyles,
-  type ComputedStyleSnapshot,
-} from "./computed-style-diff.ts";
+import { aggregateCsdByViewport, diffComputedStyles, type ComputedStyleSnapshot } from "./computed-style-diff.ts";
 
 const A: ComputedStyleSnapshot = {
   ".luna-page": { "padding-left": "20px", "padding-right": "20px", "max-width": "1180px" },
-  ".luna-stack": { "display": "flex", "flex-direction": "column", "gap": "20px" },
-  ".luna-action": { "padding": "11px 16px", "border-radius": "12px" },
+  ".luna-stack": { display: "flex", "flex-direction": "column", gap: "20px" },
+  ".luna-action": { padding: "11px 16px", "border-radius": "12px" },
 };
 const B: ComputedStyleSnapshot = {
   ".luna-page": { "padding-left": "16px", "padding-right": "16px", "max-width": "1180px" },
   // .luna-stack uses margin instead of gap → "margin between siblings" rewrite
-  ".luna-stack": { "display": "flex", "flex-direction": "column", "gap": "0px" },
-  ".luna-action": { "padding": "8px 12px", "border-radius": "6px" },
-  ".luna-extra": { "color": "red" }, // new selector
+  ".luna-stack": { display: "flex", "flex-direction": "column", gap: "0px" },
+  ".luna-action": { padding: "8px 12px", "border-radius": "6px" },
+  ".luna-extra": { color: "red" }, // new selector
 };
 
 describe("diffComputedStyles", () => {
@@ -59,10 +55,7 @@ describe("diffComputedStyles", () => {
   });
 
   it("treats missing property as empty string", () => {
-    const r = diffComputedStyles(
-      { ".x": { "color": "red" } },
-      { ".x": {} },
-    );
+    const r = diffComputedStyles({ ".x": { color: "red" } }, { ".x": {} });
     assert.equal(r.totalDiffs, 1);
     assert.equal(r.entries[0]!.baseline, "red");
     assert.equal(r.entries[0]!.variant, "");

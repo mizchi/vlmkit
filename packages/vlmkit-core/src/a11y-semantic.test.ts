@@ -91,9 +91,7 @@ describe("diffA11yTrees", () => {
     const before: A11yNode = {
       role: "main",
       name: "",
-      children: [
-        { role: "navigation", name: "Main nav", children: [] },
-      ],
+      children: [{ role: "navigation", name: "Main nav", children: [] }],
     };
     const after: A11yNode = {
       role: "main",
@@ -156,5 +154,4 @@ describe("verifyA11yTree", () => {
     const issues = verifyA11yTree(tree);
     assert.equal(issues.length, 0);
   });
-
 });

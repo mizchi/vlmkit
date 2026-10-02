@@ -82,7 +82,9 @@ describe("openSource / openHtml (real browser)", () => {
     p.evaluate(() => getComputedStyle(document.querySelector("p")!).color);
 
   it("resolves a relative stylesheet when navigating to the file", async () => {
-    const { page: opened, redirect } = await openSource(await getBrowser(), page, { viewport: { width: 800, height: 600 } });
+    const { page: opened, redirect } = await openSource(await getBrowser(), page, {
+      viewport: { width: 800, height: 600 },
+    });
     assert.equal(await colorOf(opened), "rgb(4, 5, 6)");
     assert.equal(redirect, null);
     await opened.close();
@@ -93,7 +95,7 @@ describe("openSource / openHtml (real browser)", () => {
     const html = (await readFile(page, "utf-8")).replace("hello", "HELLO WORLD");
     const opened = await openHtml(await getBrowser(), html, { baseSource: page });
     assert.equal(await colorOf(opened), "rgb(4, 5, 6)");
-    assert.match(await opened.textContent("p") ?? "", /HELLO WORLD/);
+    assert.match((await opened.textContent("p")) ?? "", /HELLO WORLD/);
     await opened.close();
   });
 
@@ -117,17 +119,22 @@ describe("settlePage waits for finite animations", () => {
   const dir = mkdtempSync(join(tmpdir(), "settle-anim-"));
   let browser: Browser | undefined;
   const getBrowser = async (): Promise<Browser> => (browser ??= await launchBrowser());
-  afterAll(async () => { await browser?.close(); });
+  afterAll(async () => {
+    await browser?.close();
+  });
 
   /** A page whose text fades from transparent to opaque over `ms`, with an optional spinner. */
   const animatedPage = (name: string, ms: number, infinite = false): string => {
     const file = join(dir, name);
-    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>
+    writeFileSync(
+      file,
+      `<!doctype html><meta charset="utf-8"><style>
       @keyframes fade { from { opacity: 0.05 } to { opacity: 1 } }
       @keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
       p { animation: fade ${ms}ms linear forwards; }
       ${infinite ? ".spinner { animation: spin 400ms linear infinite; }" : ""}
-    </style><body><p>hello</p>${infinite ? '<div class="spinner">x</div>' : ""}</body>`);
+    </style><body><p>hello</p>${infinite ? '<div class="spinner">x</div>' : ""}</body>`,
+    );
     return file;
   };
 

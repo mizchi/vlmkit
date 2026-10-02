@@ -16,14 +16,14 @@ export async function resolveHtmlSource(source: HtmlSource): Promise<string | nu
     const parsed = new URL(source.url);
     const hostname = parsed.hostname;
     if (
-      hostname === "localhost"
-      || hostname.startsWith("127.")
-      || hostname.startsWith("10.")
-      || hostname.startsWith("172.")
-      || hostname.startsWith("192.168.")
-      || hostname === "169.254.169.254"
-      || hostname === "[::1]"
-      || hostname === "0.0.0.0"
+      hostname === "localhost" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("172.") ||
+      hostname.startsWith("192.168.") ||
+      hostname === "169.254.169.254" ||
+      hostname === "[::1]" ||
+      hostname === "0.0.0.0"
     ) {
       return null;
     }

@@ -10,11 +10,7 @@
 import { serve } from "@hono/node-server";
 import { readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
-import type {
-  ApprovalListQuery,
-  ApprovalOperationApiRequest,
-  ComponentStatusMatrixQuery,
-} from "./api-types.ts";
+import type { ApprovalListQuery, ApprovalOperationApiRequest, ComponentStatusMatrixQuery } from "./api-types.ts";
 import {
   createCloudflareQuickActionsClient,
   resolveCloudflareQuickActionsConfig,
@@ -25,10 +21,7 @@ import {
   type CraterWasmLayoutBackend,
 } from "@mizchi/vlmkit-capture/crater-wasm.ts";
 import { buildBenchDetectionSeries, readBenchHistory } from "../experiments/benchmark/bench-history.ts";
-import {
-  applyApprovalOperation,
-  listApprovalManifest,
-} from "../vrt/snapshot/approval-operations.ts";
+import { applyApprovalOperation, listApprovalManifest } from "../vrt/snapshot/approval-operations.ts";
 import { buildSnapshotStatusMatrix, parseSnapshotReport } from "../vrt/snapshot/snapshot-report.ts";
 import { createApiApp } from "./api-app.ts";
 
@@ -89,17 +82,18 @@ async function applyLocalApprovalOperation(request: ApprovalOperationApiRequest)
   if (!resolved) {
     throw new Error("Approval path must stay under the project root");
   }
-  const operation = request.action === "add"
-    ? {
-      action: "add" as const,
-      rule: request.rule,
-      dryRun: request.dryRun,
-    }
-    : {
-      action: "remove" as const,
-      index: request.index,
-      dryRun: request.dryRun,
-    };
+  const operation =
+    request.action === "add"
+      ? {
+          action: "add" as const,
+          rule: request.rule,
+          dryRun: request.dryRun,
+        }
+      : {
+          action: "remove" as const,
+          index: request.index,
+          dryRun: request.dryRun,
+        };
   return applyApprovalOperation(resolved, operation);
 }
 
@@ -117,8 +111,7 @@ function resolveLocalCraterWasmLayout() {
   let backendPromise: Promise<CraterWasmLayoutBackend> | undefined;
   return {
     async renderLayout(request: Parameters<CraterWasmLayoutBackend["renderLayout"]>[0]) {
-      backendPromise ??= loadCraterWasmModule({ modulePath })
-        .then((module) => createCraterWasmLayoutBackend(module));
+      backendPromise ??= loadCraterWasmModule({ modulePath }).then((module) => createCraterWasmLayoutBackend(module));
       return (await backendPromise).renderLayout(request);
     },
   };

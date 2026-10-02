@@ -3,11 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  appendApprovalHistory,
-  buildApprovalHistoryEntry,
-  getDefaultApprovalHistoryPath,
-} from "./approval-history.ts";
+import { appendApprovalHistory, buildApprovalHistoryEntry, getDefaultApprovalHistoryPath } from "./approval-history.ts";
 
 describe("getDefaultApprovalHistoryPath", () => {
   it("should place the history file next to approval.json", () => {

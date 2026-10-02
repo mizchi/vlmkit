@@ -33,9 +33,7 @@ export async function captureMigrationPaintTreeDiff(
   return diffPaintTrees(baselinePaintTree, currentPaintTree);
 }
 
-export function summarizeMigrationPaintTreeChanges(
-  changes: PaintTreeChange[],
-): MigrationPaintTreeSummary {
+export function summarizeMigrationPaintTreeChanges(changes: PaintTreeChange[]): MigrationPaintTreeSummary {
   const counts = createPaintTreeChangeCounts();
   for (const change of changes) {
     counts[change.type]++;

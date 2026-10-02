@@ -137,11 +137,7 @@ function clamp(v: number, lo: number, hi: number): number {
  * longer — the overhang must be visible in the crop or the omission
  * class of bug stays invisible.
  */
-export function cropRegion(
-  src: PNG,
-  bbox: { x: number; y: number; width: number; height: number },
-  pad = 6,
-): PNG {
+export function cropRegion(src: PNG, bbox: { x: number; y: number; width: number; height: number }, pad = 6): PNG {
   const padRight = Math.max(pad, 32, Math.round(bbox.width * 0.25));
   const x1 = clamp(bbox.x - pad, 0, src.width);
   const y1 = clamp(bbox.y - pad, 0, src.height);
@@ -176,8 +172,7 @@ export function buildContactSheets(
     const slice = blocks.slice(start, start + maxRows);
     const crops = slice.map((b) => cropRegion(target, b, pad));
     const width = Math.max(...crops.map((c) => c.width));
-    const height = crops.reduce((sum, c) => sum + c.height, 0) +
-      SEPARATOR_HEIGHT * (crops.length - 1);
+    const height = crops.reduce((sum, c) => sum + c.height, 0) + SEPARATOR_HEIGHT * (crops.length - 1);
     const sheet = new PNG({ width, height });
     sheet.data.fill(0xff);
     let y = 0;
@@ -185,7 +180,7 @@ export function buildContactSheets(
       const crop = crops[i]!;
       for (let dy = 0; dy < crop.height; dy++) {
         const srcStart = dy * crop.width * 4;
-        const dstStart = ((y + dy) * width) * 4;
+        const dstStart = (y + dy) * width * 4;
         crop.data.copy(sheet.data, dstStart, srcStart, srcStart + crop.width * 4);
       }
       y += crop.height;
@@ -226,9 +221,7 @@ export function formatCopyWorksheet(input: {
   lines.push(`- attempt: ${input.source}`);
   lines.push(`- target image: ${input.target}`);
   lines.push("");
-  lines.push(
-    `Each sheet stacks crops FROM THE TARGET IMAGE, top to bottom, separated by gray bars.`,
-  );
+  lines.push(`Each sheet stacks crops FROM THE TARGET IMAGE, top to bottom, separated by gray bars.`);
   lines.push(
     `For each row, read the pixels and compare against the expected text below (what the attempt's DOM renders at that position). Any character difference — a digit, a year, punctuation, a separator glyph like \`·\`, a proper-noun spelling — is a copy bug in the attempt. Whitespace and straight-vs-curly quote differences are fine.`,
   );

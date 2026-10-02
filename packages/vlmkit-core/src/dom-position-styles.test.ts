@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  diffDomPositionStyles,
-  parseDomPositionStyles,
-  type PositionedElement,
-} from "./dom-position-styles.ts";
+import { diffDomPositionStyles, parseDomPositionStyles, type PositionedElement } from "./dom-position-styles.ts";
 
 function el(over: Partial<PositionedElement>): PositionedElement {
   return {
@@ -49,9 +45,7 @@ describe("diffDomPositionStyles", () => {
       el({ path: "main[0]>section[0]", tag: "section", classes: "hero" }),
       el({ path: "main[0]>section[1]", tag: "section", classes: "workspace" }),
     ];
-    const variant = [
-      el({ path: "main[0]>section[0]", tag: "section", classes: "luna-hero" }),
-    ];
+    const variant = [el({ path: "main[0]>section[0]", tag: "section", classes: "luna-hero" })];
     const r = diffDomPositionStyles(baseline, variant);
     assert.deepEqual(r.pathsOnlyInBaseline, ["main[0]>section[1]"]);
     assert.deepEqual(r.pathsOnlyInVariant, []);
@@ -126,12 +120,8 @@ describe("em normalization in diffDomPositionStyles", () => {
   });
 
   it("emits em for line-height in px form", () => {
-    const baseline = [
-      el({ path: "p[0]", tag: "p", styles: { "font-size": "16px", "line-height": "24px" } }),
-    ];
-    const variant = [
-      el({ path: "p[0]", tag: "p", styles: { "font-size": "16px", "line-height": "20px" } }),
-    ];
+    const baseline = [el({ path: "p[0]", tag: "p", styles: { "font-size": "16px", "line-height": "24px" } })];
+    const variant = [el({ path: "p[0]", tag: "p", styles: { "font-size": "16px", "line-height": "20px" } })];
     const r = diffSingle(baseline, variant);
     const lh = r.entries.find((e) => e.property === "line-height")!;
     // 24/16 = 1.5, 20/16 = 1.25
@@ -275,10 +265,7 @@ describe("diffPositionStylesAcrossViewports", () => {
 
   it("returns empty result when either input is empty", () => {
     assert.equal(diffPositionStylesAcrossViewports(new Map(), new Map()).totalDiffs, 0);
-    assert.equal(
-      diffPositionStylesAcrossViewports({ mobile: [] }, { mobile: [] }).totalDiffs,
-      0,
-    );
+    assert.equal(diffPositionStylesAcrossViewports({ mobile: [] }, { mobile: [] }).totalDiffs, 0);
   });
 
   it("ignores viewports present in only one capture", () => {
@@ -286,11 +273,12 @@ describe("diffPositionStylesAcrossViewports", () => {
       ["mobile", [el({ path: "p", tag: "div", styles: { color: "red" } })]],
       ["wide", [el({ path: "p", tag: "div", styles: { color: "red" } })]],
     ]);
-    const variant = new Map([
-      ["mobile", [el({ path: "p", tag: "div", styles: { color: "blue" } })]],
-    ]);
+    const variant = new Map([["mobile", [el({ path: "p", tag: "div", styles: { color: "blue" } })]]]);
     const r = diffPositionStylesAcrossViewports(baseline, variant);
     assert.equal(r.totalDiffs, 1);
-    assert.deepEqual(r.byViewport.map((v) => v.viewport), ["mobile"]);
+    assert.deepEqual(
+      r.byViewport.map((v) => v.viewport),
+      ["mobile"],
+    );
   });
 });

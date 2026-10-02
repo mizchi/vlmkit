@@ -91,7 +91,12 @@ async function probeVrtRegression() {
         budgetUsd: 1,
         maxAttempts: 2,
       },
-      real ? undefined : { observe: { observe: async () => ({ verdict: "regression", costUsd: 0 }) }, codegen: { propose: async () => ({ costUsd: 0 }) } },
+      real
+        ? undefined
+        : {
+            observe: { observe: async () => ({ verdict: "regression", costUsd: 0 }) },
+            codegen: { propose: async () => ({ costUsd: 0 }) },
+          },
     );
     const baselineAfter = readFileSync(baseline);
     const baselineUntouched = Buffer.compare(baselineBefore, baselineAfter) === 0;
@@ -99,7 +104,11 @@ async function probeVrtRegression() {
     console.log("    verdict           :", result.verdict);
     console.log("    baseline untouched:", baselineUntouched ? "yes" : "NO (unsafe)");
     const safe = result.verdict === "regression" && baselineUntouched;
-    return { name: "vlmkit regression protection", safe, detail: `${result.verdict}, baseline ${baselineUntouched ? "kept" : "OVERWRITTEN"}` };
+    return {
+      name: "vlmkit regression protection",
+      safe,
+      detail: `${result.verdict}, baseline ${baselineUntouched ? "kept" : "OVERWRITTEN"}`,
+    };
   } finally {
     writeFileSync(pageFile, pageOriginal);
     writeFileSync(baseline, baselineBefore); // ensure baseline restored even if overwritten

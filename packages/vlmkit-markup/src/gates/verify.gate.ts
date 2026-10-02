@@ -24,12 +24,7 @@ import {
   formatMarkupVerifyReport,
   runMarkupVerify,
 } from "../verify/markup-verify.ts";
-import {
-  type Flow,
-  type FlowVerifyReport,
-  formatFlowReport,
-  runFlowVerify,
-} from "../inspect/flow-verify.ts";
+import { type Flow, type FlowVerifyReport, formatFlowReport, runFlowVerify } from "../inspect/flow-verify.ts";
 import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const verifyMarkupGate = defineGate<MarkupVerifyReport, MarkupVerifyOptions>({
@@ -63,7 +58,14 @@ listing every residual. Add --reference to print the calibration floor.`,
     },
   ],
   inputs: [
-    { name: "attempt", placeholder: "attempt.html", kind: "path", description: "Attempt page", positional: 0, required: true },
+    {
+      name: "attempt",
+      placeholder: "attempt.html",
+      kind: "path",
+      description: "Attempt page",
+      positional: 0,
+      required: true,
+    },
     {
       name: "target",
       placeholder: "png",
@@ -72,11 +74,23 @@ listing every residual. Add --reference to print the calibration floor.`,
       repeatable: true,
       required: true,
     },
-    { name: "reference", placeholder: "html", kind: "path", description: "Reference page measured against the same targets (calibration floor)" },
-    { name: "no-fix-context", kind: "boolean", description: "Skip selector attribution on kickback residuals (saves one page load)" },
+    {
+      name: "reference",
+      placeholder: "html",
+      kind: "path",
+      description: "Reference page measured against the same targets (calibration floor)",
+    },
+    {
+      name: "no-fix-context",
+      kind: "boolean",
+      description: "Skip selector attribution on kickback residuals (saves one page load)",
+    },
   ],
   parse: (argv) => {
-    const attempt = firstPositional(argv, "vlmkit verify markup <attempt.html> --target <png>", ["--target", "--reference"]);
+    const attempt = firstPositional(argv, "vlmkit verify markup <attempt.html> --target <png>", [
+      "--target",
+      "--reference",
+    ]);
     const targets = readAll(argv, "target");
     if (targets.length === 0) throw new UsageError("--target <png> is required (repeatable)");
     const reference = readFlag(argv, "reference");
@@ -102,9 +116,9 @@ listing every residual. Add --reference to print the calibration floor.`,
         rule: "regressed",
         severity: "suspect",
         message:
-          `worse than the previous run (targets passed ${report.trend.previous.targetsPassed}`
-          + ` -> ${report.trend.current.targetsPassed}, residuals ${report.trend.previous.residuals}`
-          + ` -> ${report.trend.current.residuals})`,
+          `worse than the previous run (targets passed ${report.trend.previous.targetsPassed}` +
+          ` -> ${report.trend.current.targetsPassed}, residuals ${report.trend.previous.residuals}` +
+          ` -> ${report.trend.current.residuals})`,
         evidence: { trend: report.trend },
       });
     }
@@ -114,9 +128,9 @@ listing every residual. Add --reference to print the calibration floor.`,
         rule: "target-failed",
         severity: "suspect",
         message:
-          `${target.target}: ${target.missingBlocking} missing, ${target.extraBlocking} extra,`
-          + ` ${target.orderViolations} order, ${target.gapDeltas} gap,`
-          + ` pixel diff ${(target.pixelDiffRatio * 100).toFixed(2)}%`,
+          `${target.target}: ${target.missingBlocking} missing, ${target.extraBlocking} extra,` +
+          ` ${target.orderViolations} order, ${target.gapDeltas} gap,` +
+          ` pixel diff ${(target.pixelDiffRatio * 100).toFixed(2)}%`,
         viewport: target.width,
         evidence: { target: target.target, matched: target.matched, renderedHeight: target.renderedHeight },
       });
@@ -134,9 +148,9 @@ listing every residual. Add --reference to print the calibration floor.`,
   },
   format: formatMarkupVerifyReport,
   headline: (report) =>
-    `${report.done ? "DONE" : "NOT DONE"}`
-    + ` (${report.targets.filter((t) => t.pass).length}/${report.targets.length} targets passed,`
-    + ` ${report.kickback.length} kickback item(s))`,
+    `${report.done ? "DONE" : "NOT DONE"}` +
+    ` (${report.targets.filter((t) => t.pass).length}/${report.targets.length} targets passed,` +
+    ` ${report.kickback.length} kickback item(s))`,
   // runMarkupVerify appends its own entry — and the trend it reports is read
   // back out of that ledger, so a second write would corrupt the next run's
   // comparison.
@@ -182,9 +196,21 @@ flow.json: { "viewport"?, "steps": [ { "label"?, "do": <action>, "expect": [<ass
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to drive", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to drive",
+      positional: 0,
+      required: true,
+    },
     { name: "flow", placeholder: "file", kind: "path", description: "Flow JSON", required: true },
-    { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    {
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
+      description: "Playwright storage state for pages behind a login",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {

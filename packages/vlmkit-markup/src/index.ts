@@ -73,11 +73,7 @@ export {
 } from "./style/palette-diff.ts";
 
 // ---- Dep graph (project structure) ----
-export {
-  buildDepGraph,
-  findAffectedComponents,
-  graphStats,
-} from "./inspect/dep-graph.ts";
+export { buildDepGraph, findAffectedComponents, graphStats } from "./inspect/dep-graph.ts";
 
 // ---- UI Contract IR ----
 export {

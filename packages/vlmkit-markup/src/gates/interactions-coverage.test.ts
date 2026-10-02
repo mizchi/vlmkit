@@ -20,9 +20,12 @@ import { interactionsGate } from "./interactions.gate.ts";
 function page(body: string): string {
   const dir = mkdtempSync(join(tmpdir(), "ix-coverage-"));
   const file = join(dir, "page.html");
-  writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><title>t</title></head><body>
+  writeFileSync(
+    file,
+    `<!doctype html><html><head><meta charset="utf-8"><title>t</title></head><body>
     ${body}
-  </body></html>`);
+  </body></html>`,
+  );
   return file;
 }
 
@@ -31,9 +34,10 @@ async function unprobedTypes(source: string): Promise<string[] | "no-warn"> {
     { source, maxElements: 30, handlers: true } as never,
     { cwd: process.cwd() } as never,
   );
-  const warn = (report as { handlerIssues?: { kind: string; types?: string[] }[] })
-    .handlerIssues?.find((i) => i.kind === "unprobed-handler-types");
-  return warn ? warn.types ?? [] : "no-warn";
+  const warn = (report as { handlerIssues?: { kind: string; types?: string[] }[] }).handlerIssues?.find(
+    (i) => i.kind === "unprobed-handler-types",
+  );
+  return warn ? (warn.types ?? []) : "no-warn";
 }
 
 describe("check interactions --handlers coverage claims", { timeout: 180_000 }, () => {

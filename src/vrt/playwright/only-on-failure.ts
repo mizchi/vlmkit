@@ -21,10 +21,7 @@ export function isUnexpectedPlaywrightStatus(testInfo: PlaywrightLikeTestInfo): 
   return status !== expectedStatus;
 }
 
-export async function onlyOnFailure(
-  testInfo: PlaywrightLikeTestInfo,
-  diagnostic: FailureDiagnostic,
-): Promise<boolean> {
+export async function onlyOnFailure(testInfo: PlaywrightLikeTestInfo, diagnostic: FailureDiagnostic): Promise<boolean> {
   if (!isUnexpectedPlaywrightStatus(testInfo)) return false;
   await diagnostic({ testInfo });
   return true;

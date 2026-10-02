@@ -95,9 +95,10 @@ export async function buildRepairContext(options) {
   const errorContext = findErrorContext(root, outputDir);
   const visualContext = await readVisualContext(options.visualContextPath);
   const visualElements = parseRegionElementsJson(JSON.stringify(visualContext ?? {}));
-  const imageDiff = artifacts.baseline && artifacts.actual
-    ? analyzePngDiff(artifacts.baseline, artifacts.actual, visualElements)
-    : null;
+  const imageDiff =
+    artifacts.baseline && artifacts.actual
+      ? analyzePngDiff(artifacts.baseline, artifacts.actual, visualElements)
+      : null;
   const playwrightFailure = await readPlaywrightFailure(options.playwrightReportPath);
   const stableVisual = visualContext?.variants?.stable ?? visualContext;
   const regressionVisual = visualContext?.variants?.regression ?? null;
@@ -201,15 +202,13 @@ export function analyzePngDiff(baselineBuffer, actualBuffer, elements = []) {
   }
 
   const totalPixels = baseline.width * baseline.height;
-  const bbox = changedPixels > 0
-    ? { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
-    : null;
+  const bbox = changedPixels > 0 ? { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 } : null;
   const selectorMatches = bbox
     ? elements
-      .map((element) => matchRegionBboxToElement(bbox, [element]))
-      .filter(Boolean)
-      .sort((a, b) => b.evidence.score - a.evidence.score)
-      .slice(0, 5)
+        .map((element) => matchRegionBboxToElement(bbox, [element]))
+        .filter(Boolean)
+        .sort((a, b) => b.evidence.score - a.evidence.score)
+        .slice(0, 5)
     : [];
   const edgeCandidates = bbox ? findEdgeCandidates(bbox, elements).slice(0, 6) : [];
   const result = {
@@ -269,7 +268,9 @@ export function renderRepairContextMarkdown(context) {
   lines.push("", "## CSS Property Attribution", "");
   if (context.styleAttribution?.changedProperties?.length) {
     for (const row of context.styleAttribution.changedProperties.slice(0, 10)) {
-      lines.push(`- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`);
+      lines.push(
+        `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`,
+      );
     }
   } else {
     lines.push("- No candidate computed-style delta.");
@@ -392,22 +393,32 @@ function buildRepairHints({
     hints.push(`Inspect CSS for matched selector candidates: ${selectors}.`);
   }
   if (imageDiff?.edgeCandidates?.length) {
-    const selectors = imageDiff.edgeCandidates.slice(0, 4).map((candidate) => candidate.selector).join(", ");
+    const selectors = imageDiff.edgeCandidates
+      .slice(0, 4)
+      .map((candidate) => candidate.selector)
+      .join(", ");
     hints.push(`Also inspect elements near the first changed row: ${selectors}.`);
   }
   if (styleAttribution?.changedProperties?.length) {
-    const props = styleAttribution.changedProperties.slice(0, 4)
+    const props = styleAttribution.changedProperties
+      .slice(0, 4)
       .map((row) => `${row.selector} ${row.property}`)
       .join(", ");
     hints.push(`Prioritize computed-style deltas: ${props}.`);
   }
   if (drift?.kind === "visual-only") {
-    hints.push(`Semantic snapshot is unchanged; repair should target visual CSS or baseline approval, not locator semantics.`);
+    hints.push(
+      `Semantic snapshot is unchanged; repair should target visual CSS or baseline approval, not locator semantics.`,
+    );
   } else if (drift?.kind === "semantic-regression") {
-    hints.push(`Semantic snapshot changed; inspect accessible text, roles, and test-id state before approving screenshots.`);
+    hints.push(
+      `Semantic snapshot changed; inspect accessible text, roles, and test-id state before approving screenshots.`,
+    );
   }
   if (requestPath && planPath && rulesPath) {
-    hints.push(`Keep any fix aligned with ${requestPath}, ${planPath}, and ${rulesPath}; do not weaken the generated scenario.`);
+    hints.push(
+      `Keep any fix aligned with ${requestPath}, ${planPath}, and ${rulesPath}; do not weaken the generated scenario.`,
+    );
   }
   return [...new Set(hints)];
 }
@@ -421,9 +432,10 @@ export function attributeCssProperties(imageDiff, baselineElements = [], actualE
   const rectDeltas = [];
 
   for (const base of baselineCandidates) {
-    const actual = actualByKey.get(elementKey(base))
-      ?? actualByPath.get(base.path)
-      ?? nearestElement(base, actualBySelector.get(selectorHintForElement(base)) ?? []);
+    const actual =
+      actualByKey.get(elementKey(base)) ??
+      actualByPath.get(base.path) ??
+      nearestElement(base, actualBySelector.get(selectorHintForElement(base)) ?? []);
     if (!actual) continue;
     const rectDelta = buildRectDelta(base, actual);
     if (hasRectDelta(rectDelta)) rectDeltas.push(rectDelta);
@@ -445,11 +457,12 @@ export function attributeCssProperties(imageDiff, baselineElements = [], actualE
     }
   }
 
-  changedProperties.sort((a, b) =>
-    b.score - a.score
-    || propertyRank(a.property) - propertyRank(b.property)
-    || a.selector.localeCompare(b.selector)
-    || a.property.localeCompare(b.property)
+  changedProperties.sort(
+    (a, b) =>
+      b.score - a.score ||
+      propertyRank(a.property) - propertyRank(b.property) ||
+      a.selector.localeCompare(b.selector) ||
+      a.property.localeCompare(b.property),
   );
   rectDeltas.sort((a, b) => b.score - a.score || a.selector.localeCompare(b.selector));
   return {
@@ -541,10 +554,11 @@ function selectCandidateElements(imageDiff, elements) {
     if (candidate.path) candidateKeys.add(candidate.path);
     if (candidate.selector) candidateSelectors.add(candidate.selector);
   }
-  const candidates = elements.filter((element) =>
-    candidateKeys.has(element.key)
-    || candidateKeys.has(element.path)
-    || candidateSelectors.has(selectorHintForElement(element))
+  const candidates = elements.filter(
+    (element) =>
+      candidateKeys.has(element.key) ||
+      candidateKeys.has(element.path) ||
+      candidateSelectors.has(selectorHintForElement(element)),
   );
   return candidates.length > 0 ? uniqueElements(candidates) : elements.slice(0, 12);
 }
@@ -605,7 +619,8 @@ function scoreStyleDelta({ property, category, base, actual, imageDiff, rectDelt
   score += Math.max(0, 20 - propertyRank(property)) / 10;
   if (category === "layout" && hasRectDelta(rectDelta)) score += 3;
   if (category === "layout" && imageDiff?.bbox && imageDiff.bbox.height / imageDiff.height > 0.25) score += 1;
-  if (category === "paint" && colorDistance(imageDiff?.averageBaselineColor, imageDiff?.averageActualColor) > 10) score += 1;
+  if (category === "paint" && colorDistance(imageDiff?.averageBaselineColor, imageDiff?.averageActualColor) > 10)
+    score += 1;
   score += Math.min(2, Math.abs((actual.height ?? 0) - (base.height ?? 0)) / 16);
   return round(score);
 }
@@ -619,28 +634,23 @@ function buildRectDelta(base, actual) {
     widthDelta: Math.round((actual.width ?? 0) - (base.width ?? 0)),
     heightDelta: Math.round((actual.height ?? 0) - (base.height ?? 0)),
     score: round(
-      Math.abs((actual.top ?? 0) - (base.top ?? 0))
-      + Math.abs((actual.left ?? 0) - (base.left ?? 0))
-      + Math.abs((actual.width ?? 0) - (base.width ?? 0))
-      + Math.abs((actual.height ?? 0) - (base.height ?? 0)),
+      Math.abs((actual.top ?? 0) - (base.top ?? 0)) +
+        Math.abs((actual.left ?? 0) - (base.left ?? 0)) +
+        Math.abs((actual.width ?? 0) - (base.width ?? 0)) +
+        Math.abs((actual.height ?? 0) - (base.height ?? 0)),
     ),
   };
 }
 
 function hasRectDelta(delta) {
-  return !!delta && (
-    delta.topDelta !== 0
-    || delta.leftDelta !== 0
-    || delta.widthDelta !== 0
-    || delta.heightDelta !== 0
+  return (
+    !!delta && (delta.topDelta !== 0 || delta.leftDelta !== 0 || delta.widthDelta !== 0 || delta.heightDelta !== 0)
   );
 }
 
 function nearestElement(base, candidates) {
   if (candidates.length === 0) return null;
-  return [...candidates].sort((a, b) =>
-    elementDistance(base, a) - elementDistance(base, b)
-  )[0] ?? null;
+  return [...candidates].sort((a, b) => elementDistance(base, a) - elementDistance(base, b))[0] ?? null;
 }
 
 function elementDistance(a, b) {
@@ -661,7 +671,9 @@ function buildStyleAttributionHints(changedProperties, rectDeltas) {
   const hints = [];
   const top = changedProperties[0];
   if (top) {
-    hints.push(`Top computed-style candidate: ${top.selector} ${top.property} changed from ${top.before} to ${top.after}.`);
+    hints.push(
+      `Top computed-style candidate: ${top.selector} ${top.property} changed from ${top.before} to ${top.after}.`,
+    );
   }
   const layout = changedProperties.find((row) => row.category === "layout");
   if (layout) {
@@ -684,10 +696,12 @@ function flattenSemanticSnapshot(value, prefix = "") {
     return value.flatMap((item, index) => flattenSemanticSnapshot(item, `${prefix}[${index}]`));
   }
   if (typeof value === "object") {
-    return Object.keys(value).sort().flatMap((key) => {
-      const nextPrefix = prefix ? `${prefix}.${key}` : key;
-      return flattenSemanticSnapshot(value[key], nextPrefix);
-    });
+    return Object.keys(value)
+      .sort()
+      .flatMap((key) => {
+        const nextPrefix = prefix ? `${prefix}.${key}` : key;
+        return flattenSemanticSnapshot(value[key], nextPrefix);
+      });
   }
   return [{ key: prefix, value: String(value) }];
 }
@@ -699,17 +713,25 @@ function buildImageDiffHints(result) {
   const nearFullWidth = result.bbox.width / result.width > 0.75;
   const tallDiff = result.bbox.height / result.height > 0.35;
   if (nearFullWidth || tallDiff) {
-    hints.push("The diff spans a large area; first inspect layout-affecting CSS such as height, min-height, margin, padding, grid, or gap near the top of the bbox.");
+    hints.push(
+      "The diff spans a large area; first inspect layout-affecting CSS such as height, min-height, margin, padding, grid, or gap near the top of the bbox.",
+    );
   }
   const colorDelta = colorDistance(result.averageBaselineColor, result.averageActualColor);
   if (colorDelta > 20) {
-    hints.push("Average changed-pixel color moved noticeably; inspect background-color, color, border-color, fill, and box-shadow before changing layout.");
+    hints.push(
+      "Average changed-pixel color moved noticeably; inspect background-color, color, border-color, fill, and box-shadow before changing layout.",
+    );
   }
   if (bboxBottom >= result.height - 2) {
-    hints.push("The diff reaches the page bottom; a vertical shift or changed section height may be cascading through later content.");
+    hints.push(
+      "The diff reaches the page bottom; a vertical shift or changed section height may be cascading through later content.",
+    );
   }
   for (const match of result.selectorMatches) {
-    hints.push(`Diff bbox overlaps ${match.selector} (${match.confidence}, region coverage ${match.evidence.regionCoverage}).`);
+    hints.push(
+      `Diff bbox overlaps ${match.selector} (${match.confidence}, region coverage ${match.evidence.regionCoverage}).`,
+    );
   }
   for (const candidate of result.edgeCandidates.slice(0, 3)) {
     hints.push(`Diff begins near ${candidate.selector}; this is a likely upstream layout or paint source.`);
@@ -751,7 +773,7 @@ function findEdgeCandidates(bbox, elements) {
         width: element.width,
         height: element.height,
       },
-      score: round((overlap / area) + Math.max(0, 1 - verticalDistance / 48)),
+      score: round(overlap / area + Math.max(0, 1 - verticalDistance / 48)),
       reason: `${Math.round(verticalDistance)}px from diff top`,
     });
   }
@@ -792,7 +814,12 @@ function extractScreenshotName(text) {
 }
 
 function firstLine(value) {
-  return stripAnsi(value).split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
+  return (
+    stripAnsi(value)
+      .split(/\r?\n/)
+      .find((line) => line.trim())
+      ?.trim() ?? ""
+  );
 }
 
 function stripAnsi(value) {
@@ -800,21 +827,20 @@ function stripAnsi(value) {
 }
 
 function averageColor(sum, count) {
-  return `rgba(${sum.slice(0, 4).map((value, index) => {
-    const avg = Math.round(value / count);
-    return index === 3 ? round(avg / 255) : avg;
-  }).join(", ")})`;
+  return `rgba(${sum
+    .slice(0, 4)
+    .map((value, index) => {
+      const avg = Math.round(value / count);
+      return index === 3 ? round(avg / 255) : avg;
+    })
+    .join(", ")})`;
 }
 
 function colorDistance(a, b) {
   const left = parseRgba(a);
   const right = parseRgba(b);
   if (!left || !right) return 0;
-  return Math.sqrt(
-    (left[0] - right[0]) ** 2
-    + (left[1] - right[1]) ** 2
-    + (left[2] - right[2]) ** 2,
-  );
+  return Math.sqrt((left[0] - right[0]) ** 2 + (left[1] - right[1]) ** 2 + (left[2] - right[2]) ** 2);
 }
 
 function parseRgba(value) {

@@ -1,0 +1,43 @@
+name: Format
+
+# `vp fmt --check` (Oxfmt, through Vite+) on every pull request and every push to main.
+#
+# The repository was formatted once, in the PR that added this file. This job keeps it that way.
+# Without it, the first file edited without the formatter starts the drift again, and the next
+# person to run `pnpm fmt` gets a diff full of other people's lines. A red check here means:
+# run `pnpm fmt`, and commit the result.
+#
+# What is formatted, and what is deliberately not, is the `fmt` block in vite.config.ts. Pages
+# under test, generated files and docs are excluded there, because their bytes are compared
+# elsewhere. No paths filter: the check takes seconds, and a filter is one more list that can
+# fall behind the config.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # `--ignore-scripts`: formatting needs the `vp` binary and its native Oxfmt, nothing that a
+      # postinstall builds.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - run: pnpm fmt:check

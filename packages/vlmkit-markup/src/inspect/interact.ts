@@ -177,37 +177,59 @@ function parseArgs(argv: string[]) {
   return { positional, sequence, outputDir, report, threshold, healAll };
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
+function isUrl(s: string): boolean {
+  return /^https?:\/\//.test(s);
+}
 
 function summarizeAction(a: SequenceAction): string {
   switch (a.action) {
-    case "snapshot": return `snapshot "${a.name}"`;
-    case "click": return `click \`${a.selector}\``;
-    case "hover": return `hover \`${a.selector}\``;
-    case "focus": return `focus \`${a.selector}\``;
-    case "blur": return `blur \`${a.selector}\``;
-    case "press": return a.selector
-      ? `press "${a.key}" on \`${a.selector}\``
-      : `press "${a.key}"`;
-    case "type": return `type "${a.text}" into \`${a.selector}\``;
-    case "fill": return `fill \`${a.selector}\` = "${a.value}"`;
-    case "select": return `select \`${a.selector}\` → "${a.value}"`;
-    case "scroll": return a.selector
-      ? `scroll \`${a.selector}\` to (${a.x ?? 0}, ${a.y ?? 0})`
-      : `scroll window to (${a.x ?? 0}, ${a.y ?? 0})`;
-    case "wait": return `wait ${a.ms}ms`;
-    case "waitForSelector": return `waitFor \`${a.selector}\``;
+    case "snapshot":
+      return `snapshot "${a.name}"`;
+    case "click":
+      return `click \`${a.selector}\``;
+    case "hover":
+      return `hover \`${a.selector}\``;
+    case "focus":
+      return `focus \`${a.selector}\``;
+    case "blur":
+      return `blur \`${a.selector}\``;
+    case "press":
+      return a.selector ? `press "${a.key}" on \`${a.selector}\`` : `press "${a.key}"`;
+    case "type":
+      return `type "${a.text}" into \`${a.selector}\``;
+    case "fill":
+      return `fill \`${a.selector}\` = "${a.value}"`;
+    case "select":
+      return `select \`${a.selector}\` → "${a.value}"`;
+    case "scroll":
+      return a.selector
+        ? `scroll \`${a.selector}\` to (${a.x ?? 0}, ${a.y ?? 0})`
+        : `scroll window to (${a.x ?? 0}, ${a.y ?? 0})`;
+    case "wait":
+      return `wait ${a.ms}ms`;
+    case "waitForSelector":
+      return `waitFor \`${a.selector}\``;
   }
 }
 
 async function executeStep(page: Page, step: SequenceAction): Promise<void> {
   switch (step.action) {
-    case "snapshot": return;  // handled by caller
-    case "click": await page.click(step.selector, { timeout: 5000 }); return;
-    case "hover": await page.hover(step.selector, { timeout: 5000 }); return;
-    case "focus": await page.focus(step.selector, { timeout: 5000 }); return;
+    case "snapshot":
+      return; // handled by caller
+    case "click":
+      await page.click(step.selector, { timeout: 5000 });
+      return;
+    case "hover":
+      await page.hover(step.selector, { timeout: 5000 });
+      return;
+    case "focus":
+      await page.focus(step.selector, { timeout: 5000 });
+      return;
     case "blur":
-      await page.locator(step.selector).first().evaluate((el) => (el as HTMLElement).blur());
+      await page
+        .locator(step.selector)
+        .first()
+        .evaluate((el) => (el as HTMLElement).blur());
       return;
     case "press":
       if (step.selector) {
@@ -216,22 +238,41 @@ async function executeStep(page: Page, step: SequenceAction): Promise<void> {
         await page.keyboard.press(step.key);
       }
       return;
-    case "type": await page.type(step.selector, step.text, { timeout: 5000 }); return;
-    case "fill": await page.fill(step.selector, step.value, { timeout: 5000 }); return;
-    case "select": await page.selectOption(step.selector, step.value, { timeout: 5000 }); return;
+    case "type":
+      await page.type(step.selector, step.text, { timeout: 5000 });
+      return;
+    case "fill":
+      await page.fill(step.selector, step.value, { timeout: 5000 });
+      return;
+    case "select":
+      await page.selectOption(step.selector, step.value, { timeout: 5000 });
+      return;
     case "scroll":
       if (step.selector) {
-        await page.locator(step.selector).first().evaluate((el, pos) => {
-          el.scrollTo(pos.x ?? 0, pos.y ?? 0);
-        }, { x: step.x ?? 0, y: step.y ?? 0 });
+        await page
+          .locator(step.selector)
+          .first()
+          .evaluate(
+            (el, pos) => {
+              el.scrollTo(pos.x ?? 0, pos.y ?? 0);
+            },
+            { x: step.x ?? 0, y: step.y ?? 0 },
+          );
       } else {
-        await page.evaluate((pos) => {
-          window.scrollTo(pos.x ?? 0, pos.y ?? 0);
-        }, { x: step.x ?? 0, y: step.y ?? 0 });
+        await page.evaluate(
+          (pos) => {
+            window.scrollTo(pos.x ?? 0, pos.y ?? 0);
+          },
+          { x: step.x ?? 0, y: step.y ?? 0 },
+        );
       }
       return;
-    case "wait": await page.waitForTimeout(step.ms); return;
-    case "waitForSelector": await page.waitForSelector(step.selector, { timeout: 5000 }); return;
+    case "wait":
+      await page.waitForTimeout(step.ms);
+      return;
+    case "waitForSelector":
+      await page.waitForSelector(step.selector, { timeout: 5000 });
+      return;
   }
 }
 
@@ -295,17 +336,22 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
           // browser-harness pattern + WebMCP extract — tell the
           // agent what to fix, don't just fail silently.
           const failedSelector = (step as { selector?: string }).selector;
-          const isSelectorMiss = failedSelector
-            && (/Timeout.*exceeded/i.test(msg) || /no element matched/i.test(msg) || /strict mode violation/i.test(msg));
+          const isSelectorMiss =
+            failedSelector &&
+            (/Timeout.*exceeded/i.test(msg) || /no element matched/i.test(msg) || /strict mode violation/i.test(msg));
           if (isSelectorMiss) {
             try {
               const candidates = await healSelector(page, failedSelector, { maxCandidates: 3 });
               if (candidates.length > 0) {
                 failure.suggestions = candidates.map((c) => ({
-                  selector: c.selector, confidence: c.confidence, text: c.text,
+                  selector: c.selector,
+                  confidence: c.confidence,
+                  text: c.text,
                 }));
               }
-            } catch { /* healer failure is non-fatal */ }
+            } catch {
+              /* healer failure is non-fatal */
+            }
           }
           stepFailures.push(failure);
         }
@@ -335,7 +381,9 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
                 });
               }
             }
-          } catch { /* healer failure is non-fatal */ }
+          } catch {
+            /* healer failure is non-fatal */
+          }
         }
         pendingActions.push(step);
       }
@@ -416,12 +464,18 @@ export function formatInteractReport(
 ): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit inspect interact${RESET}`);
-  lines.push(`  ${DIM}source: ${report.source}${options.sequencePath ? `  sequence: ${options.sequencePath}` : ""}${RESET}`);
-  lines.push(`  ${DIM}captured ${report.snapshots.length} snapshot(s), ${report.transitions.length} transition(s)${RESET}`);
+  lines.push(
+    `  ${DIM}source: ${report.source}${options.sequencePath ? `  sequence: ${options.sequencePath}` : ""}${RESET}`,
+  );
+  lines.push(
+    `  ${DIM}captured ${report.snapshots.length} snapshot(s), ${report.transitions.length} transition(s)${RESET}`,
+  );
   for (const f of report.stepFailures) {
     lines.push(`  ${YELLOW}step ${f.stepIndex} failed (${summarizeAction(f.action)}): ${f.message}${RESET}`);
     for (const c of f.suggestions ?? []) {
-      lines.push(`      ${DIM}${(c.confidence * 100).toFixed(0).padStart(3)}%  \`${c.selector}\`  ${c.text ? `"${c.text}"` : ""}${RESET}`);
+      lines.push(
+        `      ${DIM}${(c.confidence * 100).toFixed(0).padStart(3)}%  \`${c.selector}\`  ${c.text ? `"${c.text}"` : ""}${RESET}`,
+      );
     }
   }
   for (const t of report.transitions) {
@@ -434,7 +488,9 @@ export function formatInteractReport(
     const findings = report.healAllFindings ?? [];
     const strongCount = findings.filter((f) => f.tier === "strong").length;
     const weakCount = findings.length - strongCount;
-    lines.push(`  ${DIM}heal-all: ${strongCount} strong + ${weakCount} weak suggestion(s) across ${options.selectorStepCount ?? 0} selector step(s)${RESET}`);
+    lines.push(
+      `  ${DIM}heal-all: ${strongCount} strong + ${weakCount} weak suggestion(s) across ${options.selectorStepCount ?? 0} selector step(s)${RESET}`,
+    );
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
@@ -459,15 +515,19 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
   if (r.stepFailures.length > 0) {
     lines.push("## Steps that failed");
     lines.push("");
-    lines.push("These steps threw and were skipped. Any transition spanning one of them "
-      + "measured a page the sequence never finished setting up, so read its delta as "
-      + "incomplete rather than as a finding.");
+    lines.push(
+      "These steps threw and were skipped. Any transition spanning one of them " +
+        "measured a page the sequence never finished setting up, so read its delta as " +
+        "incomplete rather than as a finding.",
+    );
     lines.push("");
     for (const f of r.stepFailures) {
       lines.push(`- **step ${f.stepIndex}** — ${summarizeAction(f.action)}`);
       lines.push(`  - \`${f.message}\``);
       for (const c of f.suggestions ?? []) {
-        lines.push(`  - did you mean \`${c.selector}\`? _(${(c.confidence * 100).toFixed(0)}% confidence${c.text ? `, "${c.text}"` : ""})_`);
+        lines.push(
+          `  - did you mean \`${c.selector}\`? _(${(c.confidence * 100).toFixed(0)}% confidence${c.text ? `, "${c.text}"` : ""})_`,
+        );
       }
     }
     lines.push("");
@@ -478,27 +538,31 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
   if (r.transitions.length === 0) {
     lines.push("_No transitions to report — sequence had only one snapshot._");
   } else {
-    lines.push("Each transition shows the actions executed between two snapshots " +
-      "and the pixel diff they induced. A near-zero delta means the actions had " +
-      "no visible effect — usually a sign the selector didn't match, or the " +
-      "click hit a no-op.");
+    lines.push(
+      "Each transition shows the actions executed between two snapshots " +
+        "and the pixel diff they induced. A near-zero delta means the actions had " +
+        "no visible effect — usually a sign the selector didn't match, or the " +
+        "click hit a no-op.",
+    );
     lines.push("");
     lines.push("| From → To | Actions | Pixel diff | Regions | Note |");
     lines.push("|---|---|---|---|---|");
     for (const t of r.transitions) {
-      const acts = t.actions.length === 0
-        ? "_(nothing)_"
-        : t.actions.map((a) => `\`${summarizeAction(a).replace(/\|/g, "\\|")}\``).join("<br>");
+      const acts =
+        t.actions.length === 0
+          ? "_(nothing)_"
+          : t.actions.map((a) => `\`${summarizeAction(a).replace(/\|/g, "\\|")}\``).join("<br>");
       // "dead" = non-snapshot actions executed but no visible change.
       // Subagent dogfood: "0% on hover caught a real bug — surface it
       // prominently per-row, not only in the next-step section."
-      const nonSnapshotActions = t.actions.filter((a) =>
-        a.action !== "wait" && a.action !== "waitForSelector" && a.action !== "snapshot");
+      const nonSnapshotActions = t.actions.filter(
+        (a) => a.action !== "wait" && a.action !== "waitForSelector" && a.action !== "snapshot",
+      );
       const dead = nonSnapshotActions.length > 0 && t.diffRatio < 0.001;
-      const note = dead
-        ? "**dead** — actions had no visible effect (selector miss? no-op?)"
-        : "";
-      lines.push(`| **${t.from}** → **${t.to}** | ${acts} | ${(t.diffRatio * 100).toFixed(2)}% (${t.diffPixels} px) | ${t.heatmapRegions.length} | ${note} |`);
+      const note = dead ? "**dead** — actions had no visible effect (selector miss? no-op?)" : "";
+      lines.push(
+        `| **${t.from}** → **${t.to}** | ${acts} | ${(t.diffRatio * 100).toFixed(2)}% (${t.diffPixels} px) | ${t.heatmapRegions.length} | ${note} |`,
+      );
     }
     lines.push("");
 
@@ -526,14 +590,18 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
     lines.push("## Heal-all: did-you-mean suggestions");
     lines.push("");
     if (r.healAllFindings.length === 0) {
-      lines.push("`--heal-all` enabled. No higher-confidence sibling found for any successful selector step — the selectors look unambiguous.");
+      lines.push(
+        "`--heal-all` enabled. No higher-confidence sibling found for any successful selector step — the selectors look unambiguous.",
+      );
     } else {
       const strongCount = r.healAllFindings.filter((f) => f.tier === "strong").length;
       const weakCount = r.healAllFindings.length - strongCount;
-      lines.push(`\`--heal-all\` enabled. ${strongCount} strong + ${weakCount} weak suggestion(s). ` +
-        "Each step below succeeded technically, but the healer found a sibling element with overlapping class-token signal. " +
-        "**Strong** tier (≥30% confidence) is the typo-the-wrong-element case worth investigating; " +
-        "**weak** tier (10-30%) is the sibling-button-style overlap that's mostly informational.");
+      lines.push(
+        `\`--heal-all\` enabled. ${strongCount} strong + ${weakCount} weak suggestion(s). ` +
+          "Each step below succeeded technically, but the healer found a sibling element with overlapping class-token signal. " +
+          "**Strong** tier (≥30% confidence) is the typo-the-wrong-element case worth investigating; " +
+          "**weak** tier (10-30%) is the sibling-button-style overlap that's mostly informational.",
+      );
       lines.push("");
       lines.push("| Step | Tier | Action | Used selector | Did you mean? | Confidence |");
       lines.push("|---|---|---|---|---|---|");
@@ -541,11 +609,15 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
         const summary = summarizeAction(f.action).replace(/\|/g, "\\|");
         const text = f.suggestion.text ? ` _(${f.suggestion.text.replace(/\|/g, "\\|")})_` : "";
         const tierCell = f.tier === "strong" ? "**strong**" : "_weak_";
-        lines.push(`| ${f.stepIndex} | ${tierCell} | \`${summary}\` | \`${f.originalSelector}\` | \`${f.suggestion.selector}\`${text} | ${(f.suggestion.confidence * 100).toFixed(0)}% |`);
+        lines.push(
+          `| ${f.stepIndex} | ${tierCell} | \`${summary}\` | \`${f.originalSelector}\` | \`${f.suggestion.selector}\`${text} | ${(f.suggestion.confidence * 100).toFixed(0)}% |`,
+        );
       }
       lines.push("");
-      lines.push("**Remediation**: if a strong suggestion is correct, edit the step in your sequence JSON to use the suggested selector. " +
-        "If all suggestions are false positives, re-run without `--heal-all` to silence them (default behavior is failure-only healing).");
+      lines.push(
+        "**Remediation**: if a strong suggestion is correct, edit the step in your sequence JSON to use the suggested selector. " +
+          "If all suggestions are false positives, re-run without `--heal-all` to silence them (default behavior is failure-only healing).",
+      );
     }
     lines.push("");
   }
@@ -554,19 +626,25 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
   lines.push("");
   const zeroDeltas = r.transitions.filter((t) => t.diffRatio < 0.001 && t.actions.length > 0);
   if (zeroDeltas.length > 0) {
-    lines.push(`${zeroDeltas.length} transition(s) induced essentially zero pixel change — likely a no-op or selector miss:`);
+    lines.push(
+      `${zeroDeltas.length} transition(s) induced essentially zero pixel change — likely a no-op or selector miss:`,
+    );
     lines.push("");
     for (const t of zeroDeltas) {
       lines.push(`- **${t.from} → ${t.to}**: ${t.actions.map(summarizeAction).join(", ")}`);
     }
     lines.push("");
-    lines.push("Verify each: open the source HTML, confirm the selector matches a real " +
-      "element, and confirm the action is supposed to be visible (e.g., `click` on a " +
-      "submit button without server response will show no visible change in static HTML).");
+    lines.push(
+      "Verify each: open the source HTML, confirm the selector matches a real " +
+        "element, and confirm the action is supposed to be visible (e.g., `click` on a " +
+        "submit button without server response will show no visible change in static HTML).",
+    );
   } else {
-    lines.push("Every action produced visible change. If a transition surfaces an " +
-      "*unexpected* region in the Fill / Kind columns above (e.g., wrong color, " +
-      "wrong element type), inspect the source CSS for that element.");
+    lines.push(
+      "Every action produced visible change. If a transition surfaces an " +
+        "*unexpected* region in the Fill / Kind columns above (e.g., wrong color, " +
+        "wrong element type), inspect the source CSS for that element.",
+    );
   }
   lines.push("");
   return lines.join("\n");
@@ -579,17 +657,13 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
  * @param cwd resolved against for the default output directory — an argument,
  *   because `process.chdir` is process-wide.
  */
-export async function runInteractCli(
-  cliArgs: readonly string[],
-  options: { cwd?: string } = {},
-): Promise<number> {
+export async function runInteractCli(cliArgs: readonly string[], options: { cwd?: string } = {}): Promise<number> {
   const argv = [...cliArgs];
   // `--help` is a request that was satisfied; missing arguments are an error. Both
   // printed the same usage and both exited 1, so `vlmkit inspect interact --help`
   // failed in any `&&` chain or CI help check.
   const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
-  const { positional, sequence, outputDir, report, threshold, healAll } =
-    parseArgs(askedForHelp ? [] : argv);
+  const { positional, sequence, outputDir, report, threshold, healAll } = parseArgs(askedForHelp ? [] : argv);
   if (askedForHelp || positional.length === 0 || !sequence) {
     console.log("Usage: vlmkit inspect interact <html-or-url> --sequence <path.json> [options]");
     console.log("Options:");
@@ -598,7 +672,7 @@ export async function runInteractCli(
     console.log("  --report <path>     Markdown report path");
     console.log("  --threshold <0..1>  Pixel diff threshold (default: 0.03)");
     console.log("  --heal-all          Run the healer probe on every selector step,");
-    console.log("                      not only on failures. Surfaces \"did you mean?\"");
+    console.log('                      not only on failures. Surfaces "did you mean?"');
     console.log("                      siblings for steps that technically succeed —");
     console.log("                      catches the typo-matched-the-wrong-element case.");
     console.log("                      Adds one DOM scan per selector step (expect a");
@@ -611,19 +685,21 @@ export async function runInteractCli(
     console.log('      { "action": "click", "selector": ".btn" },');
     console.log('      { "action": "snapshot", "name": "after-click" } ] }');
     console.log("");
-    console.log("Actions: snapshot | click | hover | focus | blur | press | type | fill | select | scroll | wait | waitForSelector");
+    console.log(
+      "Actions: snapshot | click | hover | focus | blur | press | type | fill | select | scroll | wait | waitForSelector",
+    );
     console.log("");
     console.log("Action arguments:");
-    console.log('  snapshot         { name: string }');
-    console.log('  click | hover    { selector: string }');
-    console.log('  focus | blur     { selector: string }');
+    console.log("  snapshot         { name: string }");
+    console.log("  click | hover    { selector: string }");
+    console.log("  focus | blur     { selector: string }");
     console.log('  press            { selector?: string, key: string }   // e.g. "Enter", "Escape", "Tab"');
-    console.log('  type             { selector: string, text: string }   // appends text');
-    console.log('  fill             { selector: string, value: string }  // replaces value');
-    console.log('  select           { selector: string, value: string }  // <select>');
-    console.log('  scroll           { selector?: string, x?: number, y?: number }');
-    console.log('  wait             { ms: number }');
-    console.log('  waitForSelector  { selector: string }');
+    console.log("  type             { selector: string, text: string }   // appends text");
+    console.log("  fill             { selector: string, value: string }  // replaces value");
+    console.log("  select           { selector: string, value: string }  // <select>");
+    console.log("  scroll           { selector?: string, x?: number, y?: number }");
+    console.log("  wait             { ms: number }");
+    console.log("  waitForSelector  { selector: string }");
     return askedForHelp ? 0 : 1;
   }
   const result = await runInteract({
@@ -634,9 +710,7 @@ export async function runInteractCli(
     threshold,
     healAll,
   });
-  const selectorStepCount = (await readSequenceSteps(sequence)).filter(
-    (s) => "selector" in s && s.selector,
-  ).length;
+  const selectorStepCount = (await readSequenceSteps(sequence)).filter((s) => "selector" in s && s.selector).length;
   console.log(formatInteractReport(result, { sequencePath: sequence, healAll, selectorStepCount }));
   return 0;
 }
@@ -653,6 +727,8 @@ async function readSequenceSteps(sequencePath: string): Promise<SequenceAction[]
 
 if (isCliEntry(import.meta.url, "interact")) {
   runInteractCli(process.argv.slice(2))
-    .then((code) => { process.exitCode = code; })
+    .then((code) => {
+      process.exitCode = code;
+    })
     .catch(handleCliError);
 }

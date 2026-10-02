@@ -6,11 +6,7 @@
  * and the delta-rounding rule live in MoonBit (`markup-core/shift_origin.mbt`).
  */
 import type { ShiftRegion } from "@mizchi/vlmkit-core/types.ts";
-import {
-  computeShiftClassifySuspect,
-  computeShiftRoundDelta,
-  type ShiftSuspectedAxis,
-} from "./markup-core-shift.ts";
+import { computeShiftClassifySuspect, computeShiftRoundDelta, type ShiftSuspectedAxis } from "./markup-core-shift.ts";
 
 export interface BboxElement {
   path: string;
@@ -64,10 +60,7 @@ const DEFAULT_MIN_DELTA = 5;
 const DEFAULT_PER_BAND_LIMIT = 3;
 
 function classifySuspect(baseline: BboxElement, variant: BboxElement): ShiftSuspectedAxis {
-  return computeShiftClassifySuspect(
-    Math.abs(baseline.height - variant.height),
-    Math.abs(baseline.top - variant.top),
-  );
+  return computeShiftClassifySuspect(Math.abs(baseline.height - variant.height), Math.abs(baseline.top - variant.top));
 }
 
 export function findShiftOrigins(
@@ -115,10 +108,10 @@ export function findShiftOrigins(
       });
     }
 
-    candidates.sort((a, b) =>
-      Math.abs(Math.abs(a.originDeltaY) - Math.abs(bandShift)) -
-      Math.abs(Math.abs(b.originDeltaY) - Math.abs(bandShift))
-      || a.originBaselineTop - b.originBaselineTop,
+    candidates.sort(
+      (a, b) =>
+        Math.abs(Math.abs(a.originDeltaY) - Math.abs(bandShift)) -
+          Math.abs(Math.abs(b.originDeltaY) - Math.abs(bandShift)) || a.originBaselineTop - b.originBaselineTop,
     );
     origins.push(...candidates.slice(0, perBandLimit));
   }
@@ -141,13 +134,16 @@ export function explainShiftAccumulations(
 
   const out: ShiftAccumulationBreakdown[] = [];
   for (const band of shiftRegions) {
-    const groups = new Map<string, {
-      tag: string;
-      baselineClasses: string;
-      variantClasses: string;
-      deltas: number[];
-      samplePaths: string[];
-    }>();
+    const groups = new Map<
+      string,
+      {
+        tag: string;
+        baselineClasses: string;
+        variantClasses: string;
+        deltas: number[];
+        samplePaths: string[];
+      }
+    >();
 
     for (const b of baseline) {
       if (b.top >= band.yStart) continue;
@@ -182,9 +178,10 @@ export function explainShiftAccumulations(
           samplePaths: g.samplePaths,
         };
       })
-      .sort((a, b) =>
-        Math.abs(b.totalDeltaHeight) - Math.abs(a.totalDeltaHeight) ||
-        a.baselineClasses.localeCompare(b.baselineClasses),
+      .sort(
+        (a, b) =>
+          Math.abs(b.totalDeltaHeight) - Math.abs(a.totalDeltaHeight) ||
+          a.baselineClasses.localeCompare(b.baselineClasses),
       )
       .slice(0, maxGroups);
 
@@ -241,7 +238,7 @@ export function parseBboxes(value: unknown): BboxElement[] {
   if (typeof value !== "string") return [];
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed as BboxElement[] : [];
+    return Array.isArray(parsed) ? (parsed as BboxElement[]) : [];
   } catch {
     return [];
   }

@@ -217,9 +217,7 @@ function checkAriaRelationships(tree: A11yNode): SpecCheckOutcome {
 
   const missing = refs.filter((ref) => !ids.has(ref.targetId));
   if (missing.length > 0) {
-    const details = missing
-      .map((ref) => `${ref.attribute} -> ${ref.targetId} from ${ref.source}`)
-      .join("; ");
+    const details = missing.map((ref) => `${ref.attribute} -> ${ref.targetId} from ${ref.source}`).join("; ");
     return { passed: false, reasoning: `Missing ARIA relationship target(s): ${details}` };
   }
 
@@ -296,9 +294,8 @@ function checkColorContrast(data: SpecPageData): SpecCheckOutcome {
     const sampleCount = data.contrastSamples?.length ?? 0;
     return {
       passed: true,
-      reasoning: sampleCount > 0
-        ? `All ${sampleCount} color contrast sample(s) pass WCAG AA`
-        : "No color contrast failures",
+      reasoning:
+        sampleCount > 0 ? `All ${sampleCount} color contrast sample(s) pass WCAG AA` : "No color contrast failures",
     };
   }
 
@@ -326,9 +323,10 @@ function checkResponsiveLayout(data: SpecPageData): SpecCheckOutcome {
     const snapshotCount = data.responsiveSnapshots?.length ?? 0;
     return {
       passed: true,
-      reasoning: snapshotCount > 0
-        ? `All ${snapshotCount} responsive snapshot(s) pass layout invariants`
-        : "No responsive layout issues",
+      reasoning:
+        snapshotCount > 0
+          ? `All ${snapshotCount} responsive snapshot(s) pass layout invariants`
+          : "No responsive layout issues",
     };
   }
 
@@ -344,9 +342,9 @@ function checkResponsiveLayout(data: SpecPageData): SpecCheckOutcome {
 export function analyzeResponsiveSnapshot(snapshot: SpecResponsiveSnapshot): SpecResponsiveIssue[] {
   const issues: SpecResponsiveIssue[] = [...(snapshot.issues ?? [])];
   if (
-    typeof snapshot.scrollWidth === "number"
-    && typeof snapshot.clientWidth === "number"
-    && snapshot.scrollWidth > snapshot.clientWidth + 1
+    typeof snapshot.scrollWidth === "number" &&
+    typeof snapshot.clientWidth === "number" &&
+    snapshot.scrollWidth > snapshot.clientWidth + 1
   ) {
     issues.push({
       severity: "error",
@@ -356,11 +354,7 @@ export function analyzeResponsiveSnapshot(snapshot: SpecResponsiveSnapshot): Spe
   }
 
   for (const region of snapshot.regions ?? []) {
-    if (
-      typeof region.width === "number"
-      && typeof region.maxWidth === "number"
-      && region.width > region.maxWidth + 1
-    ) {
+    if (typeof region.width === "number" && typeof region.maxWidth === "number" && region.width > region.maxWidth + 1) {
       issues.push({
         severity: "warning",
         viewport: snapshot.viewport,
@@ -368,11 +362,7 @@ export function analyzeResponsiveSnapshot(snapshot: SpecResponsiveSnapshot): Spe
         message: `${responsiveRegionLabel(region)} width ${region.width} exceeds maxWidth ${region.maxWidth}`,
       });
     }
-    if (
-      typeof region.width === "number"
-      && typeof region.minWidth === "number"
-      && region.width < region.minWidth - 1
-    ) {
+    if (typeof region.width === "number" && typeof region.minWidth === "number" && region.width < region.minWidth - 1) {
       issues.push({
         severity: "warning",
         viewport: snapshot.viewport,
@@ -381,10 +371,10 @@ export function analyzeResponsiveSnapshot(snapshot: SpecResponsiveSnapshot): Spe
       });
     }
     if (
-      typeof region.left === "number"
-      && typeof region.width === "number"
-      && typeof snapshot.clientWidth === "number"
-      && (region.left < -1 || region.left + region.width > snapshot.clientWidth + 1)
+      typeof region.left === "number" &&
+      typeof region.width === "number" &&
+      typeof snapshot.clientWidth === "number" &&
+      (region.left < -1 || region.left + region.width > snapshot.clientWidth + 1)
     ) {
       issues.push({
         severity: "error",
@@ -444,11 +434,12 @@ export function countUnknownContrastFailures(entries: unknown[], treatUnknownAsF
       continue;
     }
     const ratio = typeof entry.ratio === "number" ? entry.ratio : undefined;
-    const requiredAA = typeof entry.requiredAA === "number"
-      ? entry.requiredAA
-      : typeof entry.required === "number"
-        ? entry.required
-        : undefined;
+    const requiredAA =
+      typeof entry.requiredAA === "number"
+        ? entry.requiredAA
+        : typeof entry.required === "number"
+          ? entry.required
+          : undefined;
     if (ratio !== undefined && ratio < (requiredAA ?? 4.5)) {
       count++;
       continue;
@@ -463,18 +454,17 @@ export function countUnknownContrastFailures(entries: unknown[], treatUnknownAsF
 }
 
 function isContrastSampleLike(value: Record<string, unknown>): value is Record<string, unknown> & SpecContrastSample {
-  return typeof value.path === "string"
-    && typeof value.fontSize === "number"
-    && typeof value.fontWeight === "number"
-    && isColor(value.foreground)
-    && isColor(value.background);
+  return (
+    typeof value.path === "string" &&
+    typeof value.fontSize === "number" &&
+    typeof value.fontWeight === "number" &&
+    isColor(value.foreground) &&
+    isColor(value.background)
+  );
 }
 
 function isColor(value: unknown): value is SpecContrastColor {
-  return isRecord(value)
-    && typeof value.r === "number"
-    && typeof value.g === "number"
-    && typeof value.b === "number";
+  return isRecord(value) && typeof value.r === "number" && typeof value.g === "number" && typeof value.b === "number";
 }
 
 function requiredContrastRatio(fontSize: number, fontWeight: number): number {

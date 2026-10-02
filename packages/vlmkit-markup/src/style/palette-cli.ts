@@ -11,11 +11,7 @@
  */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  extractPaletteFromFile,
-  findDominantBackgroundsFromFile,
-  type PaletteColor,
-} from "./palette-extract.ts";
+import { extractPaletteFromFile, findDominantBackgroundsFromFile, type PaletteColor } from "./palette-extract.ts";
 import { diffPalettes, type UnmatchedPaletteColor } from "./palette-diff.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
@@ -63,7 +59,9 @@ Options:
 
 async function main(argv = process.argv.slice(2)) {
   const help = argv.includes("--help") || argv.includes("-h");
-  const positional = argv.filter((arg, i) => !arg.startsWith("-") && argv[i - 1] !== "--top" && argv[i - 1] !== "--max-distance");
+  const positional = argv.filter(
+    (arg, i) => !arg.startsWith("-") && argv[i - 1] !== "--top" && argv[i - 1] !== "--max-distance",
+  );
   if (help || positional.length === 0) {
     printHelp();
     if (positional.length === 0 && !help) process.exit(1);
@@ -101,15 +99,18 @@ async function main(argv = process.argv.slice(2)) {
   console.log(`# Palette diff\n`);
   console.log(`Target: ${targetPath}`);
   console.log(`Current: ${currentPath}\n`);
-  console.log(`Matched: ${diff.matched.length} colors (target coverage ${pct(diff.baselineMatchedShare)}, current coverage ${pct(diff.variantMatchedShare)})\n`);
+  console.log(
+    `Matched: ${diff.matched.length} colors (target coverage ${pct(diff.baselineMatchedShare)}, current coverage ${pct(diff.variantMatchedShare)})\n`,
+  );
   console.log(`## Missing from current (add these)\n`);
   console.log(unmatchedTable(diff.onlyInBaseline));
   console.log(`\n## Extra in current (hard-coded literals?)\n`);
   console.log(unmatchedTable(diff.onlyInVariant));
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "palette-cli"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "palette-cli" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

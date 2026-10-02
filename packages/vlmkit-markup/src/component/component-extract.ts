@@ -139,9 +139,7 @@ function parseArgs(argv: string[]) {
     else if (a === "--preset") {
       const name = argv[++i] ?? "";
       if (!isExtractPresetName(name)) {
-        throw new UsageError(
-          `Unknown --preset "${name}". Available: ${EXTRACT_PRESET_NAMES.join(", ")}.`,
-        );
+        throw new UsageError(`Unknown --preset "${name}". Available: ${EXTRACT_PRESET_NAMES.join(", ")}.`);
       }
       preset = name;
     } else if (a === "--at") {
@@ -184,10 +182,7 @@ async function probeSmallFrame(
   const probed = await extractComponentsFromFile(sourcePath, p);
   const extraComponents = probed.length - returnedCount;
   if (extraComponents < HINT_MIN_EXTRA) return undefined;
-  const largestExcludedArea = Math.max(
-    0,
-    ...probed.filter((c) => c.area < applied.minArea).map((c) => c.area),
-  );
+  const largestExcludedArea = Math.max(0, ...probed.filter((c) => c.area < applied.minArea).map((c) => c.area));
   return { extraComponents, largestExcludedArea, preset };
 }
 
@@ -201,15 +196,20 @@ function findContainingRank(components: ComponentBbox[], x: number, y: number): 
     const c = components[i]!;
     if (x >= c.left && x < c.left + c.width && y >= c.top && y < c.top + c.height) {
       const area = c.width * c.height;
-      if (area < bestArea) { bestArea = area; bestRank = i; }
+      if (area < bestArea) {
+        bestArea = area;
+        bestRank = i;
+      }
     }
   }
   return bestRank;
 }
 
 async function cropToFile(
-  sourcePng: PNG, bbox: { left: number; top: number; width: number; height: number },
-  outputPath: string, padding = 0,
+  sourcePng: PNG,
+  bbox: { left: number; top: number; width: number; height: number },
+  outputPath: string,
+  padding = 0,
 ): Promise<void> {
   const x0 = Math.max(0, bbox.left - padding);
   const y0 = Math.max(0, bbox.top - padding);
@@ -220,15 +220,13 @@ async function cropToFile(
   const out = new PNG({ width: w, height: h });
   for (let y = 0; y < h; y++) {
     const srcRow = ((y0 + y) * sourcePng.width + x0) * 4;
-    const dstRow = (y * w) * 4;
+    const dstRow = y * w * 4;
     sourcePng.data.copy(out.data, dstRow, srcRow, srcRow + w * 4);
   }
   await writeFile(outputPath, PNG.sync.write(out));
 }
 
-export async function runComponentExtract(
-  options: ComponentExtractOptions,
-): Promise<ComponentExtractReport> {
+export async function runComponentExtract(options: ComponentExtractOptions): Promise<ComponentExtractReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const sourcePath = resolve(options.source);
@@ -248,7 +246,11 @@ export async function runComponentExtract(
     topN: settings.topN,
   });
   const smallFrameHint = await probeSmallFrame(
-    sourcePath, sourcePng.width, sourcePng.height, settings, rawComponents.length,
+    sourcePath,
+    sourcePng.width,
+    sourcePng.height,
+    settings,
+    rawComponents.length,
   );
 
   // Determine which rank(s) to crop.
@@ -306,13 +308,17 @@ export async function runComponentExtract(
 
   console.log(`  ${BOLD}${CYAN}vlmkit scan component${RESET}`);
   console.log(`  ${DIM}source: ${sourcePath} (${sourcePng.width}×${sourcePng.height})${RESET}`);
-  console.log(`  ${DIM}settings: --min-area ${settings.minArea} --top-n ${settings.topN}${settings.preset ? ` (--preset ${settings.preset})` : ""}${RESET}`);
+  console.log(
+    `  ${DIM}settings: --min-area ${settings.minArea} --top-n ${settings.topN}${settings.preset ? ` (--preset ${settings.preset})` : ""}${RESET}`,
+  );
   console.log(`  ${DIM}found ${components.length} component(s)${RESET}`);
   for (const c of components.slice(0, 8)) {
     const fill = c.dominantColor?.hex ?? "—";
     const kind = c.kind ?? "—";
     const cropped = c.croppedPath ? ` ${GREEN}cropped${RESET} ${DIM}${c.croppedPath}${RESET}` : "";
-    console.log(`  ${DIM}#${c.rank}  ${c.bbox.left},${c.bbox.top} ${c.bbox.width}×${c.bbox.height}  fill ${fill}  ${kind}${RESET}${cropped}`);
+    console.log(
+      `  ${DIM}#${c.rank}  ${c.bbox.left},${c.bbox.top} ${c.bbox.width}×${c.bbox.height}  fill ${fill}  ${kind}${RESET}${cropped}`,
+    );
   }
   if (components.length > 8) console.log(`  ${DIM}…${components.length - 8} more${RESET}`);
   if (smallFrameHint) console.log(`  ${DIM}${smallFrameHintLine(smallFrameHint, settings)}${RESET}`);
@@ -328,13 +334,11 @@ export async function runComponentExtract(
   };
 }
 
-function smallFrameHintLine(
-  hint: SmallFrameHint,
-  settings: { minArea: number; topN: number },
-): string {
-  const excluded = hint.largestExcludedArea > 0
-    ? `; largest region below --min-area ${settings.minArea} is ${hint.largestExcludedArea}px`
-    : "";
+function smallFrameHintLine(hint: SmallFrameHint, settings: { minArea: number; topN: number }): string {
+  const excluded =
+    hint.largestExcludedArea > 0
+      ? `; largest region below --min-area ${settings.minArea} is ${hint.largestExcludedArea}px`
+      : "";
   return `small frame: --preset ${hint.preset} finds ${hint.extraComponents} more component(s)${excluded}`;
 }
 
@@ -344,15 +348,19 @@ function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
   lines.push("");
   lines.push(`Source: \`${r.source}\` (${r.imageSize.width}×${r.imageSize.height})`);
   lines.push("");
-  lines.push(`Settings: \`--min-area ${r.settings.minArea} --top-n ${r.settings.topN}\`` +
-    (r.settings.preset ? ` (\`--preset ${r.settings.preset}\`)` : ""));
+  lines.push(
+    `Settings: \`--min-area ${r.settings.minArea} --top-n ${r.settings.topN}\`` +
+      (r.settings.preset ? ` (\`--preset ${r.settings.preset}\`)` : ""),
+  );
   lines.push("");
   if (r.components.length === 0) {
     lines.push("## No components detected");
     lines.push("");
-    lines.push("Either the image has no foreground content the connected-component " +
-      "extractor recognizes, or every detected region was below the `--min-area` " +
-      "threshold.");
+    lines.push(
+      "Either the image has no foreground content the connected-component " +
+        "extractor recognizes, or every detected region was below the `--min-area` " +
+        "threshold.",
+    );
     if (r.smallFrameHint) lines.push("", ...smallFrameHintSection(r.smallFrameHint, r.settings));
     return lines.join("\n");
   }
@@ -372,36 +380,44 @@ function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
   if (r.smallFrameHint) lines.push(...smallFrameHintSection(r.smallFrameHint, r.settings), "");
   lines.push("## Suggested next step");
   lines.push("");
-  lines.push("1. Visually verify the rank → component mapping (open the source PNG, " +
-    "compare against the bbox column).");
-  lines.push("2. Crop the component you want as a target: `vlmkit scan component " +
-    "<src> --crop <rank>` (or `--at x,y` to crop by point).");
-  lines.push("3. Feed the cropped PNG to `vlmkit build component <cropped> <your.html>` " +
-    "to iterate against just that component.");
+  lines.push(
+    "1. Visually verify the rank → component mapping (open the source PNG, " + "compare against the bbox column).",
+  );
+  lines.push(
+    "2. Crop the component you want as a target: `vlmkit scan component " +
+      "<src> --crop <rank>` (or `--at x,y` to crop by point).",
+  );
+  lines.push(
+    "3. Feed the cropped PNG to `vlmkit build component <cropped> <your.html>` " +
+      "to iterate against just that component.",
+  );
   lines.push("");
   return lines.join("\n");
 }
 
-export function smallFrameHintSection(
-  hint: SmallFrameHint,
-  settings: { minArea: number; topN: number },
-): string[] {
+export function smallFrameHintSection(hint: SmallFrameHint, settings: { minArea: number; topN: number }): string[] {
   const p = EXTRACT_PRESETS[hint.preset];
   const lines = [
     `## Small frame — \`--preset ${hint.preset}\` finds ${hint.extraComponents} more`,
     "",
     `This frame is small enough that the default thresholds are the limit, not the ` +
-    `image. \`--preset ${hint.preset}\` (\`--min-area ${p.minArea} --top-n ${p.topN}\`) ` +
-    `returns ${hint.extraComponents} component(s) beyond the ${settings.minArea}/${settings.topN} ` +
-    `run above.`,
+      `image. \`--preset ${hint.preset}\` (\`--min-area ${p.minArea} --top-n ${p.topN}\`) ` +
+      `returns ${hint.extraComponents} component(s) beyond the ${settings.minArea}/${settings.topN} ` +
+      `run above.`,
   ];
   if (hint.largestExcludedArea > 0) {
-    lines.push("", `The largest region excluded by \`--min-area ${settings.minArea}\` fills ` +
-      `${hint.largestExcludedArea}px — for reference, a 12×12 HUD icon fills 144px and a ` +
-      `10×10 one fills 100px.`);
+    lines.push(
+      "",
+      `The largest region excluded by \`--min-area ${settings.minArea}\` fills ` +
+        `${hint.largestExcludedArea}px — for reference, a 12×12 HUD icon fills 144px and a ` +
+        `10×10 one fills 100px.`,
+    );
   }
-  lines.push("", "Ignore this if the frame is a page render rather than a game/pixel-art " +
-    "frame: at page scale the extra components are usually individual glyphs.");
+  lines.push(
+    "",
+    "Ignore this if the frame is a page render rather than a game/pixel-art " +
+      "frame: at page scale the extra components are usually individual glyphs.",
+  );
   return lines;
 }
 
@@ -412,7 +428,8 @@ async function main(argv = process.argv.slice(2)) {
   // that succeeded.
   const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
   if (askedForHelp) argv = [];
-  const { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset } = parseArgs(argv);
+  const { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset } =
+    parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vlmkit scan component <screenshot.png> [options]");
     console.log("Options:");
@@ -424,7 +441,9 @@ async function main(argv = process.argv.slice(2)) {
     console.log(`  --top-n <n>             Cap on reported components (default ${DEFAULT_TOP_N});`);
     console.log("                          the binding limit on element-dense frames");
     console.log(`  --preset <name>         Threshold bundle: ${EXTRACT_PRESET_NAMES.join(", ")}.`);
-    console.log(`                          game-ui = --min-area ${EXTRACT_PRESETS["game-ui"].minArea} --top-n ${EXTRACT_PRESETS["game-ui"].topN},`);
+    console.log(
+      `                          game-ui = --min-area ${EXTRACT_PRESETS["game-ui"].minArea} --top-n ${EXTRACT_PRESETS["game-ui"].topN},`,
+    );
     console.log("                          for low-resolution / high-contrast frames");
     console.log("  --output-dir <dir>      Default: ./test-results/component-extract");
     console.log("  --report <path>         Markdown report path");
@@ -436,11 +455,19 @@ async function main(argv = process.argv.slice(2)) {
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "component-extract"),
     reportPath: report || undefined,
-    cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset,
+    cropRank,
+    cropAll,
+    pointXY,
+    cropPadding,
+    minArea,
+    topN,
+    preset,
   });
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "component-extract" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "component-extract" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

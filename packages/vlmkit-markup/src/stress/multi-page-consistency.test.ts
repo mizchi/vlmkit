@@ -4,10 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import {
-  formatMultiPageConsistencyReport,
-  runMultiPageConsistency,
-} from "./multi-page-consistency.ts";
+import { formatMultiPageConsistencyReport, runMultiPageConsistency } from "./multi-page-consistency.ts";
 import { driftPagesGate } from "../gates/drift.gate.ts";
 
 /**
@@ -128,13 +125,14 @@ describe("runMultiPageConsistency", () => {
     const loose = await runMultiPageConsistency({ ...base, outputDir: join(dir, "out-loose"), pixelTolerance: 0.99 });
     assert.ok(
       tight.deltas[0]!.diffRatio > loose.deltas[0]!.diffRatio,
-      `smaller tolerance must find at least as much change:`
-      + ` tight=${tight.deltas[0]!.diffRatio} loose=${loose.deltas[0]!.diffRatio}`,
+      `smaller tolerance must find at least as much change:` +
+        ` tight=${tight.deltas[0]!.diffRatio} loose=${loose.deltas[0]!.diffRatio}`,
     );
     const lowBar = await runMultiPageConsistency({ ...base, outputDir: join(dir, "out-bar-low"), threshold: 0.001 });
     const highBar = await runMultiPageConsistency({ ...base, outputDir: join(dir, "out-bar-high"), threshold: 0.9 });
     assert.equal(
-      lowBar.deltas[0]!.diffRatio, highBar.deltas[0]!.diffRatio,
+      lowBar.deltas[0]!.diffRatio,
+      highBar.deltas[0]!.diffRatio,
       "--threshold is a pass line applied to findings; it must not change what was measured",
     );
   });
@@ -151,11 +149,12 @@ describe("runMultiPageConsistency", () => {
     // A reference page with no match has nothing to compare the others to. Falling
     // back to the second page would silently change what "reference" means.
     await assert.rejects(
-      () => runMultiPageConsistency({
-        selector: ".footer",
-        files: [routeMissing, routeA],
-        outputDir: join(dir, "out-noref"),
-      }),
+      () =>
+        runMultiPageConsistency({
+          selector: ".footer",
+          files: [routeMissing, routeA],
+          outputDir: join(dir, "out-noref"),
+        }),
       (e: unknown) => e instanceof UsageError && /did not match on the reference page/.test((e as Error).message),
     );
   });

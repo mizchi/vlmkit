@@ -42,7 +42,10 @@ export function parseProbeFamilies(argv: readonly string[]): ProbeFamily[] {
   const raw = readFlag(argv, "probe");
   if (!raw) return [];
   if (raw === "all") return [...PROBE_FAMILIES];
-  const asked = raw.split(",").map((f) => f.trim()).filter(Boolean);
+  const asked = raw
+    .split(",")
+    .map((f) => f.trim())
+    .filter(Boolean);
   const unknown = asked.filter((f) => !(PROBE_FAMILIES as readonly string[]).includes(f));
   if (unknown.length > 0) {
     throw new UsageError(
@@ -132,7 +135,14 @@ on the delegation root; per-element granularity is a vanilla/Web
 Components property.`,
   rules: [...HANDLER_SURFACE_RULES],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to scan",
+      positional: 0,
+      required: true,
+    },
     {
       name: "probe-drag",
       kind: "boolean",

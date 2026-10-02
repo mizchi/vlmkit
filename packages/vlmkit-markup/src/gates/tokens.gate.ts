@@ -78,15 +78,57 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
-    { name: "config", placeholder: "path", kind: "path", description: "JSON config: { radius, spacing, zIndex, shadowTiers, tolerance }" },
-    { name: "radius-scale", placeholder: "list", kind: "number-list", description: "Allowed border-radius values", defaultDescription: "0,2,4,6,8,12,16,20,24,32,48,999" },
-    { name: "spacing-scale", placeholder: "list", kind: "number-list", description: "Allowed padding/margin values", defaultDescription: "0,2,4,8,12,16,20,24,32,40,48,64,80,96" },
-    { name: "z-scale", placeholder: "list", kind: "number-list", description: "Allowed z-index values", defaultDescription: "0,1,10,100,1000,9999" },
-    { name: "shadow-tiers", placeholder: "n", kind: "number", description: "Max distinct box-shadow values", defaultDescription: "5" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "config",
+      placeholder: "path",
+      kind: "path",
+      description: "JSON config: { radius, spacing, zIndex, shadowTiers, tolerance }",
+    },
+    {
+      name: "radius-scale",
+      placeholder: "list",
+      kind: "number-list",
+      description: "Allowed border-radius values",
+      defaultDescription: "0,2,4,6,8,12,16,20,24,32,48,999",
+    },
+    {
+      name: "spacing-scale",
+      placeholder: "list",
+      kind: "number-list",
+      description: "Allowed padding/margin values",
+      defaultDescription: "0,2,4,8,12,16,20,24,32,40,48,64,80,96",
+    },
+    {
+      name: "z-scale",
+      placeholder: "list",
+      kind: "number-list",
+      description: "Allowed z-index values",
+      defaultDescription: "0,1,10,100,1000,9999",
+    },
+    {
+      name: "shadow-tiers",
+      placeholder: "n",
+      kind: "number",
+      description: "Max distinct box-shadow values",
+      defaultDescription: "5",
+    },
     { name: "tolerance", placeholder: "px", kind: "number", description: "Snap tolerance", defaultDescription: "0.5" },
     { name: "strict", kind: "boolean", description: "Treat violations as suspects (exit 1)" },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/design-tokens" },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Output directory",
+      defaultDescription: "./test-results/design-tokens",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     ...PAGE_LOAD_INPUTS,
   ],
@@ -100,7 +142,11 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
     const configPath = readFlag(argv, "config");
-    for (const [flag, scale] of [["--radius-scale", radius], ["--spacing-scale", spacing], ["--z-scale", zIndex]] as const) {
+    for (const [flag, scale] of [
+      ["--radius-scale", radius],
+      ["--spacing-scale", spacing],
+      ["--z-scale", zIndex],
+    ] as const) {
       if (scale && scale.length === 0) throw new UsageError(`${flag} needs at least one value`);
     }
     return {
@@ -144,8 +190,8 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
       rule: "scale-violation",
       severity,
       message:
-        `${violation.property}${violation.side ? ` (${violation.side})` : ""} ${violation.value.toFixed(2)}`
-        + ` is off scale — nearest in-scale value is ${violation.nearest}`,
+        `${violation.property}${violation.side ? ` (${violation.side})` : ""} ${violation.value.toFixed(2)}` +
+        ` is off scale — nearest in-scale value is ${violation.nearest}`,
       evidence: { path: violation.path, tag: violation.tag, value: violation.value, nearest: violation.nearest },
     }));
     if (report.shadow.distinctShadows.length > report.shadow.allowedTiers) {
@@ -153,8 +199,8 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
         rule: "shadow-tier-excess",
         severity,
         message:
-          `${report.shadow.distinctShadows.length} distinct box-shadow values`
-          + ` (allowed: ${report.shadow.allowedTiers})`,
+          `${report.shadow.distinctShadows.length} distinct box-shadow values` +
+          ` (allowed: ${report.shadow.allowedTiers})`,
         evidence: { shadows: report.shadow.distinctShadows },
       });
     }

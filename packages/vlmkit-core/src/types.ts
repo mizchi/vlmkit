@@ -396,10 +396,10 @@ export interface NlAssertion {
 // ---- Scoring ----
 
 export interface LoopScore {
-  usability: number;       // 0-100
-  practicality: number;    // 0-100
-  fixSteps: number;        // fewer is better
-  finalQuality: number;    // 0-100
+  usability: number; // 0-100
+  practicality: number; // 0-100
+  fixSteps: number; // fewer is better
+  finalQuality: number; // 0-100
   tokenUsage: number;
   summary: string;
   details: ScoreDetail[];

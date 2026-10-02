@@ -51,25 +51,12 @@
 // matched nothing is reported. A consumer applying these to its own findings
 // gets the same auditability the gates have.
 
-export {
-  applySelectorAllowRules,
-  parseSelectorAllowRules,
-  selectorAllowHelp,
-} from "./inspect/selector-exemption.ts";
-export type {
-  AppliedSelectorAllow,
-  SelectorAllowRule,
-  SelectorExemption,
-} from "./inspect/selector-exemption.ts";
+export { applySelectorAllowRules, parseSelectorAllowRules, selectorAllowHelp } from "./inspect/selector-exemption.ts";
+export type { AppliedSelectorAllow, SelectorAllowRule, SelectorExemption } from "./inspect/selector-exemption.ts";
 
 // `check integrity`'s richer form, which carries a rule kind and a viewport
 // because that gate has 19 rules and measures at three widths.
-export {
-  ALLOW_HELP,
-  applyAllowRules,
-  parseAllowRules,
-  ruleMatches,
-} from "./inspect/integrity-exemption.ts";
+export { ALLOW_HELP, applyAllowRules, parseAllowRules, ruleMatches } from "./inspect/integrity-exemption.ts";
 export type { AppliedExemptions, IntegrityAllowRule } from "./inspect/integrity-exemption.ts";
 
 // ---------------------------------------------------------------------------
@@ -81,7 +68,12 @@ export type { AppliedExemptions, IntegrityAllowRule } from "./inspect/integrity-
 // when no role had enough instances: a role too small to judge must not read as
 // a coherent one.
 
-export { COLLECT_DESIGN_SAMPLES, buildDesignSampleScript, judgeDesignPolicy, parseDesignAllowRules } from "./style/design-policy.ts";
+export {
+  COLLECT_DESIGN_SAMPLES,
+  buildDesignSampleScript,
+  judgeDesignPolicy,
+  parseDesignAllowRules,
+} from "./style/design-policy.ts";
 export type {
   DesignFinding,
   DesignFindingKind,
@@ -198,11 +190,7 @@ export {
   judgeTextContrast,
   judgeUnstyled,
 } from "./inspect/integrity-check.ts";
-export type {
-  IntegrityFinding,
-  IntegrityFindingKind,
-  IntegrityReport,
-} from "./inspect/integrity-check.ts";
+export type { IntegrityFinding, IntegrityFindingKind, IntegrityReport } from "./inspect/integrity-check.ts";
 
 // ---------------------------------------------------------------------------
 // a11y — contrast and touch targets

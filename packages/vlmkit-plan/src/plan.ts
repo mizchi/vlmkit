@@ -150,11 +150,7 @@ export function validatePlanMarkdown(markdown: string, input: Pick<PlanInput, "s
   if (!/^#{2,4}\s+\d+\.\s+\S/m.test(markdown)) {
     diagnostics.push("missing numbered scenario heading");
   }
-  validateScenarioCountForScope(
-    diagnostics,
-    normalizePlanScope(input.scope),
-    countMarkdownScenarios(markdown),
-  );
+  validateScenarioCountForScope(diagnostics, normalizePlanScope(input.scope), countMarkdownScenarios(markdown));
   if (input.seed && !/\*\*Seed:\*\*/i.test(markdown)) {
     diagnostics.push("missing Seed reference");
   }
@@ -180,7 +176,10 @@ function extractStructuredPlanJson(raw: string): string {
   return (fence?.[1] ?? text).trim();
 }
 
-export function validateStructuredPlan(plan: StructuredPlan, input: Pick<PlanInput, "seed" | "observations" | "scope"> = {}): string[] {
+export function validateStructuredPlan(
+  plan: StructuredPlan,
+  input: Pick<PlanInput, "seed" | "observations" | "scope"> = {},
+): string[] {
   const diagnostics: string[] = [];
   if (!plan.title?.trim()) diagnostics.push("missing title");
   if (!plan.applicationOverview?.trim()) diagnostics.push("missing Application Overview");
@@ -407,11 +406,7 @@ function scopeGuidance(scope: PlanScope): string {
   return "- Plan comprehensive coverage when it is justified by the request.";
 }
 
-function validateScenarioCountForScope(
-  diagnostics: string[],
-  scope: PlanScope,
-  count: number,
-): void {
+function validateScenarioCountForScope(diagnostics: string[], scope: PlanScope, count: number): void {
   const max = scenarioLimitForScope(scope);
   if (max !== null && count > max) {
     diagnostics.push(`scope ${scope} allows at most ${max} scenario${max === 1 ? "" : "s"}`);
@@ -447,10 +442,22 @@ function validateStructuredLocatorInventory(
   }
 
   const observed = {
-    roles: normalizedObservedSet("roles", observations.flatMap((obs) => obs.roles ?? [])),
-    labels: normalizedObservedSet("labels", observations.flatMap((obs) => obs.labels ?? [])),
-    testIds: normalizedObservedSet("testIds", observations.flatMap((obs) => obs.testIds ?? [])),
-    texts: normalizedObservedSet("texts", observations.flatMap((obs) => obs.texts ?? [])),
+    roles: normalizedObservedSet(
+      "roles",
+      observations.flatMap((obs) => obs.roles ?? []),
+    ),
+    labels: normalizedObservedSet(
+      "labels",
+      observations.flatMap((obs) => obs.labels ?? []),
+    ),
+    testIds: normalizedObservedSet(
+      "testIds",
+      observations.flatMap((obs) => obs.testIds ?? []),
+    ),
+    texts: normalizedObservedSet(
+      "texts",
+      observations.flatMap((obs) => obs.texts ?? []),
+    ),
   };
   validateInventorySubset(diagnostics, "roles", inventory?.roles, observed.roles);
   validateInventorySubset(diagnostics, "labels", inventory?.labels, observed.labels);
@@ -461,18 +468,16 @@ function validateStructuredLocatorInventory(
 
 function validateRetryDiagnosticLeak(plan: StructuredPlan): string[] {
   const text = JSON.stringify(plan);
-  return /\b(previous (structured )?plan diagnostics|previous structured plan output|fix every diagnostic|diagnostics revealed)\b/i
-    .test(text)
+  return /\b(previous (structured )?plan diagnostics|previous structured plan output|fix every diagnostic|diagnostics revealed)\b/i.test(
+    text,
+  )
     ? ["plan leaks retry diagnostics"]
     : [];
 }
 
 function hasInventoryEntries(inventory: PlanLocatorInventory | undefined): boolean {
   return Boolean(
-    inventory?.roles?.length
-      || inventory?.labels?.length
-      || inventory?.testIds?.length
-      || inventory?.texts?.length,
+    inventory?.roles?.length || inventory?.labels?.length || inventory?.testIds?.length || inventory?.texts?.length,
   );
 }
 
@@ -533,7 +538,9 @@ function canonicalizeRoleInventoryEntry(entry: string): string {
 }
 
 function parseRoleInventoryEntry(entry: string): { role: string; name?: string } {
-  const roleLocator = entry.match(/^role\s*=\s*([A-Za-z0-9_-]+)(?:\s*\[\s*name\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\]]+))\s*\])?$/i);
+  const roleLocator = entry.match(
+    /^role\s*=\s*([A-Za-z0-9_-]+)(?:\s*\[\s*name\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\]]+))\s*\])?$/i,
+  );
   if (roleLocator) {
     return {
       role: normalizeRoleName(roleLocator[1]!),
@@ -549,7 +556,11 @@ function parseRoleInventoryEntry(entry: string): { role: string; name?: string }
 }
 
 function normalizeRoleName(role: string): string {
-  return role.trim().replace(/^role\s*=\s*/i, "").replace(/:$/, "").toLowerCase();
+  return role
+    .trim()
+    .replace(/^role\s*=\s*/i, "")
+    .replace(/:$/, "")
+    .toLowerCase();
 }
 
 function buildPlanRepairPrompt(basePrompt: string, markdown: string, diagnostics: string[]): string {
@@ -600,10 +611,7 @@ function evaluateStructuredPlanContent(
     return {
       plan,
       markdown,
-      diagnostics: [
-        ...validateStructuredPlan(plan, input),
-        ...validatePlanMarkdown(markdown, input),
-      ],
+      diagnostics: [...validateStructuredPlan(plan, input), ...validatePlanMarkdown(markdown, input)],
     };
   } catch (error) {
     return {

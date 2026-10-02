@@ -27,7 +27,10 @@ const CLASS_ROLES: Array<[RegExp, string]> = [
   [/(^|\.)(Switch|SwitchCompat|SwitchMaterial|ToggleButton)$/, "switch"],
   [/(^|\.)(SeekBar|Slider|RatingBar)$/, "slider"],
   [/(^|\.)Spinner$/, "combobox"],
-  [/(^|\.)(ScrollView|HorizontalScrollView|NestedScrollView|RecyclerView|ListView|GridView|ViewPager2?)$/, "scrollview"],
+  [
+    /(^|\.)(ScrollView|HorizontalScrollView|NestedScrollView|RecyclerView|ListView|GridView|ViewPager2?)$/,
+    "scrollview",
+  ],
   [/(^|\.)ImageView$/, "image"],
   [/(^|\.)TextView$/, "text"],
   [/(^|\.)WebView$/, "group"],
@@ -38,7 +41,7 @@ const decode = (s: string): string =>
     if (e === "amp") return "&";
     if (e === "lt") return "<";
     if (e === "gt") return ">";
-    if (e === "quot") return "\"";
+    if (e === "quot") return '"';
     if (e === "apos") return "'";
     return String.fromCodePoint(e[1] === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
   });
@@ -85,7 +88,10 @@ export function importUiautomatorDump(xml: string, options: UiautomatorOptions):
     const short = cls.slice(cls.lastIndexOf(".") + 1);
     const path = `${parent.path ? `${parent.path}>` : ""}${short}[${parent.children++}]`;
     const b = BOUNDS.exec(a.get("bounds") ?? "");
-    if (!b) throw new UsageError(`uiautomator dump: node ${path} has no parsable bounds (${JSON.stringify(a.get("bounds"))}).`);
+    if (!b)
+      throw new UsageError(
+        `uiautomator dump: node ${path} has no parsable bounds (${JSON.stringify(a.get("bounds"))}).`,
+      );
     const [x0, y0, x1, y1] = [Number(b[1]), Number(b[2]), Number(b[3]), Number(b[4])];
     screen ??= { width: x1, height: y1 };
     const clickable = a.get("clickable") === "true" || a.get("long-clickable") === "true";

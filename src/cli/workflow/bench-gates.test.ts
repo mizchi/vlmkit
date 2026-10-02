@@ -15,12 +15,7 @@ import { describe, it } from "vite-plus/test";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { BenchGatesReport } from "./bench-gates.ts";
-import {
-  formatBenchGates,
-  formatBenchGatesMarkdown,
-  isBenchable,
-  parseBenchGatesArgs,
-} from "./bench-gates.ts";
+import { formatBenchGates, formatBenchGatesMarkdown, isBenchable, parseBenchGatesArgs } from "./bench-gates.ts";
 import { loadGateRegistry, resetGateRegistryCache } from "../gate-registry.ts";
 
 const stub = (inputs: Parameters<typeof defineGate>[0]["inputs"]) =>
@@ -40,20 +35,38 @@ const stub = (inputs: Parameters<typeof defineGate>[0]["inputs"]) =>
 describe("which gates the bench can run", () => {
   it("accepts a gate whose positional is a page and needs nothing else", () => {
     assert.equal(
-      isBenchable(stub([
-        { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page", positional: 0, required: true },
-        { name: "viewports", kind: "number-list", description: "Widths" },
-      ])),
+      isBenchable(
+        stub([
+          {
+            name: "source",
+            placeholder: "html-or-url",
+            kind: "path-or-url",
+            description: "Page",
+            positional: 0,
+            required: true,
+          },
+          { name: "viewports", kind: "number-list", description: "Widths" },
+        ]),
+      ),
       true,
     );
   });
 
   it("rejects a gate with another required input", () => {
     assert.equal(
-      isBenchable(stub([
-        { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page", positional: 0, required: true },
-        { name: "target", kind: "path", description: "Target image", required: true },
-      ])),
+      isBenchable(
+        stub([
+          {
+            name: "source",
+            placeholder: "html-or-url",
+            kind: "path-or-url",
+            description: "Page",
+            positional: 0,
+            required: true,
+          },
+          { name: "target", kind: "path", description: "Target image", required: true },
+        ]),
+      ),
       false,
     );
   });
@@ -63,9 +76,18 @@ describe("which gates the bench can run", () => {
     // with "unrecognised content at end of stream", which reads like a broken
     // fixture rather than a gate that was never applicable.
     assert.equal(
-      isBenchable(stub([
-        { name: "source", placeholder: "asset.png", kind: "path", description: "Asset PNG", positional: 0, required: true },
-      ])),
+      isBenchable(
+        stub([
+          {
+            name: "source",
+            placeholder: "asset.png",
+            kind: "path",
+            description: "Asset PNG",
+            positional: 0,
+            required: true,
+          },
+        ]),
+      ),
       false,
     );
   });
@@ -89,7 +111,10 @@ describe("which gates the bench can run", () => {
       assert.equal(positional?.kind, "path-or-url", `${gate.id} positional is not a page`);
     }
     // And the excluded ones are excluded for a stated reason, not by accident.
-    const excluded = registry.list().filter(({ gate }) => !isBenchable(gate)).map(({ gate }) => gate.id);
+    const excluded = registry
+      .list()
+      .filter(({ gate }) => !isBenchable(gate))
+      .map(({ gate }) => gate.id);
     assert.deepEqual(excluded.sort(), [
       "check.a11y.tree",
       "check.asset",

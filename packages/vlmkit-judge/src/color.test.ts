@@ -66,14 +66,25 @@ describe("relativeLuminance", () => {
     };
     for (let v = 0; v <= 255; v++) {
       assert.equal(lin(v, 0.04045), lin(v, 0.03928), `channel ${v}`);
-      assert.equal(relativeLuminance([v, v, v]), 0.2126 * lin(v, 0.04045) + 0.7152 * lin(v, 0.04045) + 0.0722 * lin(v, 0.04045), `grey ${v}`);
+      assert.equal(
+        relativeLuminance([v, v, v]),
+        0.2126 * lin(v, 0.04045) + 0.7152 * lin(v, 0.04045) + 0.0722 * lin(v, 0.04045),
+        `grey ${v}`,
+      );
     }
   });
 });
 
 describe("compositeBackground", () => {
   it("stops at the first opaque layer, as the page's own walk does", () => {
-    assert.deepEqual(compositeBackground([[0, 0, 0, 0.5], [0, 0, 255, 1], [255, 0, 0, 1]]), [0, 0, 127.5]);
+    assert.deepEqual(
+      compositeBackground([
+        [0, 0, 0, 0.5],
+        [0, 0, 255, 1],
+        [255, 0, 0, 1],
+      ]),
+      [0, 0, 127.5],
+    );
   });
 
   it("paints what is left over white", () => {

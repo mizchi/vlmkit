@@ -23,15 +23,27 @@ const repoRoot = resolve(here, "../..");
 
 test("ids are unique, and every demo sits in a group that exists", () => {
   assert.equal(new Set(DEMOS.map((d) => d.id)).size, DEMOS.length);
-  for (const d of DEMOS) assert.ok(GROUPS.some((g) => g.id === d.group), `${d.id}: group ${d.group}`);
-  for (const g of GROUPS) assert.ok(DEMOS.some((d) => d.group === g.id), `group ${g.id} is empty`);
+  for (const d of DEMOS)
+    assert.ok(
+      GROUPS.some((g) => g.id === d.group),
+      `${d.id}: group ${d.group}`,
+    );
+  for (const g of GROUPS)
+    assert.ok(
+      DEMOS.some((d) => d.group === g.id),
+      `group ${g.id} is empty`,
+    );
 });
 
 test("every page under test and every extra is a byte copy of its source", () => {
   for (const d of DEMOS) {
     const copies = [{ from: d.page, as: d.pageAs ?? "page.html" }, ...(d.extras ?? [])];
     for (const { from, as } of copies) {
-      assert.deepEqual(readFileSync(join(here, d.id, as)), readFileSync(join(repoRoot, from)), `${d.id}/${as} ← ${from}`);
+      assert.deepEqual(
+        readFileSync(join(here, d.id, as)),
+        readFileSync(join(repoRoot, from)),
+        `${d.id}/${as} ← ${from}`,
+      );
     }
   }
 });
@@ -43,10 +55,18 @@ test("every demo was captured: output, exit code, and each image it names", () =
     assert.equal(typeof r.exit, "number", `${d.id}: exit code`);
     assert.ok(r.output.trim().length > 0, `${d.id}: output`);
     if (d.then) assert.ok(r.thenOutput?.trim(), `${d.id}: second command's output`);
-    assert.equal(r.images.length, (d.shots ?? []).length + (d.evidence ?? []).length + (d.special === "zoom" ? 3 : 0), `${d.id}: images`);
+    assert.equal(
+      r.images.length,
+      (d.shots ?? []).length + (d.evidence ?? []).length + (d.special === "zoom" ? 3 : 0),
+      `${d.id}: images`,
+    );
     for (const f of demoFiles(d, r)) assert.ok(existsSync(join(here, d.id, f)), `${d.id}/${f}`);
     // No machine paths leak into a published page.
-    assert.doesNotMatch(`${r.output}${r.thenOutput ?? ""}${r.report ?? ""}`, /\/home\/|\/tmp\/|\/Users\//, `${d.id}: output carries a local path`);
+    assert.doesNotMatch(
+      `${r.output}${r.thenOutput ?? ""}${r.report ?? ""}`,
+      /\/home\/|\/tmp\/|\/Users\//,
+      `${d.id}: output carries a local path`,
+    );
   }
 });
 
@@ -54,7 +74,8 @@ test("an outline only marks what the command itself named", () => {
   for (const d of DEMOS) {
     const r = readResult(d.id);
     const said = `${r.output}${r.thenOutput ?? ""}`;
-    for (const shot of d.shots ?? []) for (const sel of shot.mark ?? []) assert.ok(said.includes(sel), `${d.id}: "${sel}"`);
+    for (const shot of d.shots ?? [])
+      for (const sel of shot.mark ?? []) assert.ok(said.includes(sel), `${d.id}: "${sel}"`);
   }
 });
 

@@ -400,14 +400,12 @@ export const COLLECT_RAW_TEXT = `(() => {
 /** The visible half of COLLECT_TEXT_VISIBILITY (the disclosure sweep only needs this). */
 export const COLLECT_VISIBLE_TEXT = `${COLLECT_TEXT_VISIBILITY}.visible`;
 
-async function sweepDisclosureStates(page: {
-  evaluate: (script: string) => Promise<unknown>;
-}): Promise<StateSweep> {
-  const actions = await page.evaluate(TAG_STATE_ACTIONS) as { kind: StateText["kind"]; label: string }[];
+async function sweepDisclosureStates(page: { evaluate: (script: string) => Promise<unknown> }): Promise<StateSweep> {
+  const actions = (await page.evaluate(TAG_STATE_ACTIONS)) as { kind: StateText["kind"]; label: string }[];
   const kept = actions.slice(0, MAX_STATE_ACTIONS);
   const states: StateText[] = [];
   for (let i = 0; i < kept.length; i++) {
-    const performed = await page.evaluate(`(() => {
+    const performed = (await page.evaluate(`(() => {
       const el = document.querySelector('[data-vlmkit-state="${i}"]');
       if (!el) return false;
       try {
@@ -415,10 +413,10 @@ async function sweepDisclosureStates(page: {
         else el.click();
       } catch { return false; }
       return true;
-    })()`) as boolean;
+    })()`)) as boolean;
     if (!performed) continue;
     await page.evaluate(AWAIT_RENDER_COMMIT);
-    const text = await page.evaluate(COLLECT_VISIBLE_TEXT) as string;
+    const text = (await page.evaluate(COLLECT_VISIBLE_TEXT)) as string;
     states.push({ kind: kept[i]!.kind, label: kept[i]!.label, text });
   }
   return { states, droppedActions: Math.max(0, actions.length - kept.length) };
@@ -455,18 +453,14 @@ export interface CopyCheckOptions extends PageLoadOptions {
   allowInvisible?: InvisibleReason[];
 }
 
-
 /** Rows beyond this are dropped from the sheets (and counted, loudly). */
 const MAX_REVIEW_ROWS = 80;
 
 export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheckReport> {
-  const target = options.targetPath
-    ? PNG.sync.read(await readFile(options.targetPath) as Buffer)
-    : undefined;
-  const viewport = options.viewport ??
-    (target
-      ? { width: target.width, height: Math.min(target.height, 4000) }
-      : { width: 1280, height: 720 });
+  const target = options.targetPath ? PNG.sync.read((await readFile(options.targetPath)) as Buffer) : undefined;
+  const viewport =
+    options.viewport ??
+    (target ? { width: target.width, height: Math.min(target.height, 4000) } : { width: 1280, height: 720 });
 
   let blocks: TextBlock[] = [];
   let stateSweep: StateSweep | undefined;
@@ -483,12 +477,15 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
-    const pageText = await page.evaluate(COLLECT_RAW_TEXT) as string;
-    const { visible: visibleText, invisible: invisibleChunks } =
-      await page.evaluate(COLLECT_TEXT_VISIBILITY) as { visible: string; invisible: { reason: string; text: string }[] };
+    const pageText = (await page.evaluate(COLLECT_RAW_TEXT)) as string;
+    const { visible: visibleText, invisible: invisibleChunks } = (await page.evaluate(COLLECT_TEXT_VISIBILITY)) as {
+      visible: string;
+      invisible: { reason: string; text: string }[];
+    };
     if (target) {
-      blocks = (await page.evaluate(COLLECT_TEXT_BLOCKS) as TextBlock[])
-        .filter((b) => b.y < target.height && b.x < target.width);
+      blocks = ((await page.evaluate(COLLECT_TEXT_BLOCKS)) as TextBlock[]).filter(
+        (b) => b.y < target.height && b.x < target.width,
+      );
     }
     if (options.exploreStates !== false) {
       stateSweep = await sweepDisclosureStates(page);
@@ -504,9 +501,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   const manifestLines = options.manifestPath
     ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))
     : undefined;
-  const forbiddenLines = options.forbidPath
-    ? parseCopyManifest(await readFile(options.forbidPath, "utf8"))
-    : undefined;
+  const forbiddenLines = options.forbidPath ? parseCopyManifest(await readFile(options.forbidPath, "utf8")) : undefined;
   const report = analyzeCopy({
     source: options.source,
     pageText,
@@ -554,13 +549,16 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       sheetFiles.push(file);
     }
     const worksheetPath = join(outDir, "copy-review.md");
-    await writeFile(worksheetPath, formatCopyWorksheet({
-      source: options.source,
-      target: options.targetPath,
-      sheetFiles,
-      sheets,
-      blocks: kept,
-    }));
+    await writeFile(
+      worksheetPath,
+      formatCopyWorksheet({
+        source: options.source,
+        target: options.targetPath,
+        sheetFiles,
+        sheets,
+        blocks: kept,
+      }),
+    );
     report.imageReview = {
       blocks: kept.length,
       sheetFiles,
@@ -577,8 +575,8 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     ...(options.targetPath
       ? { target: options.targetPath }
       : options.manifestPath
-      ? { target: options.manifestPath }
-      : {}),
+        ? { target: options.manifestPath }
+        : {}),
     headline: {
       missing: report.missingLines.length,
       placeholders: report.placeholders.length,
@@ -590,11 +588,10 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
         : {}),
       ...(report.imageReview
         ? {
-          imageBlocks: report.imageReview.blocks,
-          imageMismatches: report.imageReview.reviewedBy === "vlm"
-            ? report.imageReview.mismatches.length
-            : "pending-agent-review",
-        }
+            imageBlocks: report.imageReview.blocks,
+            imageMismatches:
+              report.imageReview.reviewedBy === "vlm" ? report.imageReview.mismatches.length : "pending-agent-review",
+          }
         : {}),
     },
   });
@@ -621,8 +618,8 @@ export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView)
   lines.push(`status: ${status}`);
   if (imageMode) {
     lines.push(
-      `elements: ${coverage.elements ?? 0} (${coverage.textElements ?? 0} carrying text),`
-      + ` ${report.textLength} chars`,
+      `elements: ${coverage.elements ?? 0} (${coverage.textElements ?? 0} carrying text),` +
+        ` ${report.textLength} chars`,
     );
   } else {
     lines.push(`rendered text: ${report.textLength} chars`);
@@ -636,10 +633,15 @@ export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView)
   if (report.manifestLines > 0) {
     const revealed = report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : "";
     const invisible = report.invisibleLines.length > 0 ? `, ${report.invisibleLines.length} invisible-only` : "";
-    const allowed = report.allowedInvisibleLines.length > 0 ? `, ${report.allowedInvisibleLines.length} invisible-allowed` : "";
-    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${invisible}${allowed}${revealed}`);
+    const allowed =
+      report.allowedInvisibleLines.length > 0 ? `, ${report.allowedInvisibleLines.length} invisible-allowed` : "";
+    lines.push(
+      `manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${invisible}${allowed}${revealed}`,
+    );
     for (const r of report.revealedLines) {
-      lines.push(`  ${DIM}revealed: "${r.line}" ← ${r.state} (hidden by default is fine — do NOT ship it open just for this gate)${RESET}`);
+      lines.push(
+        `  ${DIM}revealed: "${r.line}" ← ${r.state} (hidden by default is fine — do NOT ship it open just for this gate)${RESET}`,
+      );
     }
     for (const a of report.allowedInvisibleLines) {
       lines.push(`  ${DIM}invisible-allowed: "${a.line}" (${a.reason} — accepted via --allow-invisible)${RESET}`);
@@ -650,7 +652,9 @@ export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView)
     lines.push(`manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)`);
   }
   if (report.forbidLines > 0) {
-    lines.push(`forbid: ${report.forbidLines} line(s) that must be gone, ${report.forbiddenLines.length} still present`);
+    lines.push(
+      `forbid: ${report.forbidLines} line(s) that must be gone, ${report.forbiddenLines.length} still present`,
+    );
     for (const f of report.forbiddenLines) {
       lines.push(`  ${YELLOW}! still present (${f.where}): "${f.line}"${RESET}`);
     }
@@ -665,7 +669,9 @@ export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView)
       lines.push(`  transcribed by VLM: ${r.mismatches.length} mismatch(es) (details in Issues below)`);
     } else {
       lines.push("");
-      lines.push(`${BOLD}ACTION REQUIRED — keyless mode:${RESET} read the contact sheet(s) with your own vision and compare each row against the expected text in the worksheet. Any character difference is a copy bug.`);
+      lines.push(
+        `${BOLD}ACTION REQUIRED — keyless mode:${RESET} read the contact sheet(s) with your own vision and compare each row against the expected text in the worksheet. Any character difference is a copy bug.`,
+      );
       lines.push(`  worksheet: ${r.worksheetPath}`);
       for (const f of r.sheetFiles) lines.push(`  sheet: ${f}`);
     }
@@ -692,8 +698,8 @@ export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView)
   if (coverage.skippedRules && coverage.skippedRules.length > 0) {
     lines.push("");
     lines.push(
-      `${YELLOW}Coverage: element-rect mode — ${coverage.skippedRules.length} rule(s) cannot be`
-      + ` evaluated without a DOM${RESET}`,
+      `${YELLOW}Coverage: element-rect mode — ${coverage.skippedRules.length} rule(s) cannot be` +
+        ` evaluated without a DOM${RESET}`,
     );
     for (const skipped of coverage.skippedRules) {
       lines.push(`${DIM}  - ${skipped.rule}: ${skipped.reason}${RESET}`);

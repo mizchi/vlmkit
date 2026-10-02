@@ -103,10 +103,7 @@ describe("buildFlakerVariantMetadata", () => {
 
 describe("inferFlakerScenarioIdFromReport", () => {
   it("infers migration/<dir-name> from report.dir", () => {
-    assert.equal(
-      inferFlakerScenarioIdFromReport(createReport()),
-      "migration/reset-css",
-    );
+    assert.equal(inferFlakerScenarioIdFromReport(createReport()), "migration/reset-css");
   });
 });
 

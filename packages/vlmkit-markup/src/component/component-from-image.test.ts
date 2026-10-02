@@ -16,16 +16,19 @@ test("inlineLocalStylesheets inlines relative stylesheet links", async () => {
     const htmlPath = join(dir, "page.html");
     const cssPath = join(dir, "style.css");
     await writeFile(cssPath, "body { background: rgb(1, 2, 3); }\n");
-    await writeFile(htmlPath, [
-      "<!doctype html>",
-      "<html>",
-      "<head>",
-      '<link rel="stylesheet" href="./style.css">',
-      '<link rel="preconnect" href="https://example.com">',
-      "</head>",
-      "<body>hello</body>",
-      "</html>",
-    ].join("\n"));
+    await writeFile(
+      htmlPath,
+      [
+        "<!doctype html>",
+        "<html>",
+        "<head>",
+        '<link rel="stylesheet" href="./style.css">',
+        '<link rel="preconnect" href="https://example.com">',
+        "</head>",
+        "<body>hello</body>",
+        "</html>",
+      ].join("\n"),
+    );
 
     const html = await inlineLocalStylesheets(await readFile(htmlPath, "utf-8"), htmlPath);
 

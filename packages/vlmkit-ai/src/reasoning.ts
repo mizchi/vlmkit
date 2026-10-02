@@ -49,11 +49,10 @@ export function reasonAboutChanges(
   testId: string,
   pageExp: PageExpectation,
   a11yDiff: A11yDiff | undefined,
-  intent: ChangeIntent
+  intent: ChangeIntent,
 ): ReasoningChain {
-  const expectation = pageExp.expect
-    ?? pageExp.expectedA11yChanges?.map((e) => e.description).join("; ")
-    ?? intent.summary;
+  const expectation =
+    pageExp.expect ?? pageExp.expectedA11yChanges?.map((e) => e.description).join("; ") ?? intent.summary;
 
   const actualChanges: ActualChange[] = (a11yDiff?.changes ?? []).map((c) => ({
     type: c.type,
@@ -112,9 +111,7 @@ export function reasonAboutChanges(
   }
 
   // Human-readable reasoning
-  const reasoning = buildReasoning(
-    testId, expectation, mappings, sideEffects, verdict
-  );
+  const reasoning = buildReasoning(testId, expectation, mappings, sideEffects, verdict);
 
   return {
     testId,
@@ -126,11 +123,7 @@ export function reasonAboutChanges(
   };
 }
 
-function findBestMatchIdx(
-  exp: ExpectedA11yChange,
-  changes: A11yChange[],
-  consumed: Set<number>
-): number {
+function findBestMatchIdx(exp: ExpectedA11yChange, changes: A11yChange[], consumed: Set<number>): number {
   // Best-score match on structured fields (optimal, not greedy)
   if (exp.type || exp.role || exp.name) {
     let bestIdx = -1;
@@ -227,7 +220,7 @@ function buildReasoning(
   expectation: string,
   mappings: ExpectationMapping[],
   sideEffects: ActualChange[],
-  verdict: ReasoningChain["verdict"]
+  verdict: ReasoningChain["verdict"],
 ): string {
   const lines: string[] = [];
 
@@ -256,7 +249,7 @@ function buildReasoning(
   }
 
   const verdictText = {
-    "realized": "All expected changes were realized in the a11y tree",
+    realized: "All expected changes were realized in the a11y tree",
     "partially-realized": "Some expected changes were realized, but not all",
     "not-realized": "Expected changes were not detected in the a11y tree",
     "unexpected-side-effects": "All expected changes were realized, but additional unexpected changes were detected",

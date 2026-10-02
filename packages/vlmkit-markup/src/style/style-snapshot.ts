@@ -77,9 +77,9 @@ export async function captureStyleSnapshot(options: StyleSnapshotOptions): Promi
     await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
     const exclude = [...(options.exclude ?? [])];
-    const design = await page.evaluate(buildDesignSampleScript(exclude)) as DesignPolicyInput;
-    const composition = await page.evaluate(COLLECT_COMPOSITION) as CompositionInput;
-    const color = await page.evaluate(COLLECT_COLOR_ROLES) as ColorRolesInput;
+    const design = (await page.evaluate(buildDesignSampleScript(exclude))) as DesignPolicyInput;
+    const composition = (await page.evaluate(COLLECT_COMPOSITION)) as CompositionInput;
+    const color = (await page.evaluate(COLLECT_COLOR_ROLES)) as ColorRolesInput;
     return {
       format: STYLE_SNAPSHOT_FORMAT,
       source: options.source,
@@ -110,8 +110,8 @@ export async function readStyleSnapshot(path: string): Promise<StyleSnapshot> {
   const record = parsed as Partial<StyleSnapshot> | null;
   if (!record || record.format !== STYLE_SNAPSHOT_FORMAT) {
     throw new UsageError(
-      `--from ${path} is not a style snapshot (format ${JSON.stringify(record?.format ?? null)}; expected "${STYLE_SNAPSHOT_FORMAT}").`
-      + " Write one with: vlmkit scan style <page> --out <file>",
+      `--from ${path} is not a style snapshot (format ${JSON.stringify(record?.format ?? null)}; expected "${STYLE_SNAPSHOT_FORMAT}").` +
+        " Write one with: vlmkit scan style <page> --out <file>",
     );
   }
   if (!record.design || !record.composition || !record.color || typeof record.source !== "string") {
@@ -138,13 +138,16 @@ export function readFromSnapshotFlag(
   const at = argv.findIndex((arg) => arg === "--from" || arg.startsWith("--from="));
   if (at === -1) return undefined;
   const from = argv[at]!.startsWith("--from=") ? argv[at]!.slice("--from=".length) : argv[at + 1];
-  if (!from || from.startsWith("--")) throw new UsageError(`--from needs a snapshot file: vlmkit ${command} --from snap.json`);
+  if (!from || from.startsWith("--"))
+    throw new UsageError(`--from needs a snapshot file: vlmkit ${command} --from snap.json`);
   if (firstPositionalOrUndefined(argv, [...valueFlags, "--from"])) {
     throw new UsageError(`${command} takes a page source or --from, not both: the snapshot already names its page.`);
   }
   for (const flag of [...CAPTURE_FLAGS, ...alsoRefused]) {
     if (argv.some((arg) => arg === `--${flag}` || arg.startsWith(`--${flag}=`))) {
-      throw new UsageError(`--${flag} does not apply with --from: it was fixed when the snapshot was captured (vlmkit scan style --${flag} …).`);
+      throw new UsageError(
+        `--${flag} does not apply with --from: it was fixed when the snapshot was captured (vlmkit scan style --${flag} …).`,
+      );
     }
   }
   return from;

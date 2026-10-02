@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  buildCloudflareCdpUrl,
-  createCloudflareCdpCapturer,
-  resolveCaptureBackend,
-} from "./capturer.ts";
+import { buildCloudflareCdpUrl, createCloudflareCdpCapturer, resolveCaptureBackend } from "./capturer.ts";
 
 describe("buildCloudflareCdpUrl", () => {
   it("builds the default URL from an account id", () => {
@@ -29,10 +25,7 @@ describe("buildCloudflareCdpUrl", () => {
 
 describe("createCloudflareCdpCapturer", () => {
   it("rejects empty API tokens at construction time", () => {
-    assert.throws(
-      () => createCloudflareCdpCapturer({ accountId: "abc", apiToken: "" }),
-      /API token is required/i,
-    );
+    assert.throws(() => createCloudflareCdpCapturer({ accountId: "abc", apiToken: "" }), /API token is required/i);
   });
 
   it("produces a backend tagged cloudflare-cdp", () => {
@@ -89,24 +82,19 @@ describe("resolveCaptureBackend", () => {
   });
 
   it("throws a clear error when CF credentials are missing", () => {
+    assert.throws(() => resolveCaptureBackend({ backendFlag: "cloudflare", env: {} }), /CLOUDFLARE_ACCOUNT_ID/);
     assert.throws(
-      () => resolveCaptureBackend({ backendFlag: "cloudflare", env: {} }),
-      /CLOUDFLARE_ACCOUNT_ID/,
-    );
-    assert.throws(
-      () => resolveCaptureBackend({
-        backendFlag: "cloudflare",
-        env: { CLOUDFLARE_ACCOUNT_ID: "abc" },
-      }),
+      () =>
+        resolveCaptureBackend({
+          backendFlag: "cloudflare",
+          env: { CLOUDFLARE_ACCOUNT_ID: "abc" },
+        }),
       /CLOUDFLARE_API_TOKEN/,
     );
   });
 
   it("rejects unknown backend names", () => {
-    assert.throws(
-      () => resolveCaptureBackend({ backendFlag: "firefox" }),
-      /Unknown capture backend/,
-    );
+    assert.throws(() => resolveCaptureBackend({ backendFlag: "firefox" }), /Unknown capture backend/);
   });
 
   it("ignores case in flag and env values", () => {

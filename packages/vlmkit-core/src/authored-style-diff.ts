@@ -5,12 +5,7 @@
  * label differs.
  */
 import { diffComputedStyles, aggregateCsdByViewport } from "./computed-style-diff.ts";
-import type {
-  CsdEntry,
-  CsdResult,
-  CsdPerViewportResult,
-  CsdPerViewportEntry,
-} from "./computed-style-diff.ts";
+import type { CsdEntry, CsdResult, CsdPerViewportResult, CsdPerViewportEntry } from "./computed-style-diff.ts";
 import type { AuthoredStyleSnapshot } from "./authored-style-capture.ts";
 
 export type AuthoredStyleEntry = CsdEntry;

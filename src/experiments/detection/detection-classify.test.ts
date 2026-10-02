@@ -67,12 +67,42 @@ describe("isInteractiveSelector", () => {
 
 describe("classifyUndetectedReason", () => {
   const noDetection: ViewportDetectionResult[] = [
-    { width: 1280, height: 900, visualDiffDetected: false, visualDiffRatio: 0, a11yDiffDetected: false, a11yChangeCount: 0, computedStyleDiffCount: 0, hoverDiffDetected: false, paintTreeDiffCount: 0 },
+    {
+      width: 1280,
+      height: 900,
+      visualDiffDetected: false,
+      visualDiffRatio: 0,
+      a11yDiffDetected: false,
+      a11yChangeCount: 0,
+      computedStyleDiffCount: 0,
+      hoverDiffDetected: false,
+      paintTreeDiffCount: 0,
+    },
   ];
 
   const partialDetection: ViewportDetectionResult[] = [
-    { width: 1280, height: 900, visualDiffDetected: false, visualDiffRatio: 0, a11yDiffDetected: false, a11yChangeCount: 0, computedStyleDiffCount: 0, hoverDiffDetected: false, paintTreeDiffCount: 0 },
-    { width: 375, height: 812, visualDiffDetected: true, visualDiffRatio: 0.05, a11yDiffDetected: false, a11yChangeCount: 0, computedStyleDiffCount: 0, hoverDiffDetected: false, paintTreeDiffCount: 0 },
+    {
+      width: 1280,
+      height: 900,
+      visualDiffDetected: false,
+      visualDiffRatio: 0,
+      a11yDiffDetected: false,
+      a11yChangeCount: 0,
+      computedStyleDiffCount: 0,
+      hoverDiffDetected: false,
+      paintTreeDiffCount: 0,
+    },
+    {
+      width: 375,
+      height: 812,
+      visualDiffDetected: true,
+      visualDiffRatio: 0.05,
+      a11yDiffDetected: false,
+      a11yChangeCount: 0,
+      computedStyleDiffCount: 0,
+      hoverDiffDetected: false,
+      paintTreeDiffCount: 0,
+    },
   ];
 
   it("should classify hover-only", () => {
@@ -90,14 +120,8 @@ describe("classifyUndetectedReason", () => {
   });
 
   it("should classify same-as-default", () => {
-    assert.equal(
-      classifyUndetectedReason(".item", "text-decoration", "none", null, noDetection),
-      "same-as-default",
-    );
-    assert.equal(
-      classifyUndetectedReason(".item", "font-weight", "normal", null, noDetection),
-      "same-as-default",
-    );
+    assert.equal(classifyUndetectedReason(".item", "text-decoration", "none", null, noDetection), "same-as-default");
+    assert.equal(classifyUndetectedReason(".item", "font-weight", "normal", null, noDetection), "same-as-default");
   });
 
   it("should classify same-as-parent for common bg colors", () => {
@@ -108,27 +132,15 @@ describe("classifyUndetectedReason", () => {
   });
 
   it("should classify content-dependent", () => {
-    assert.equal(
-      classifyUndetectedReason(".date", "white-space", "nowrap", null, noDetection),
-      "content-dependent",
-    );
-    assert.equal(
-      classifyUndetectedReason(".lang-list", "flex-wrap", "wrap", null, noDetection),
-      "content-dependent",
-    );
+    assert.equal(classifyUndetectedReason(".date", "white-space", "nowrap", null, noDetection), "content-dependent");
+    assert.equal(classifyUndetectedReason(".lang-list", "flex-wrap", "wrap", null, noDetection), "content-dependent");
   });
 
   it("should classify viewport-dependent when partially detected", () => {
-    assert.equal(
-      classifyUndetectedReason(".sidebar", "width", "100%", null, partialDetection),
-      "viewport-dependent",
-    );
+    assert.equal(classifyUndetectedReason(".sidebar", "width", "100%", null, partialDetection), "viewport-dependent");
   });
 
   it("should return unknown for unclassifiable cases", () => {
-    assert.equal(
-      classifyUndetectedReason(".main", "margin", "0 auto", null, noDetection),
-      "unknown",
-    );
+    assert.equal(classifyUndetectedReason(".main", "margin", "0 auto", null, noDetection), "unknown");
   });
 });

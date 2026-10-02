@@ -57,13 +57,19 @@ type Rect = { x: number; y: number; w: number; h: number; r: number; g: number; 
 function createPng(width: number, height: number, regions: Rect[], bg = { r: 245, g: 245, b: 250 }) {
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++) {
-    data[i * 4] = bg.r; data[i * 4 + 1] = bg.g; data[i * 4 + 2] = bg.b; data[i * 4 + 3] = 255;
+    data[i * 4] = bg.r;
+    data[i * 4 + 1] = bg.g;
+    data[i * 4 + 2] = bg.b;
+    data[i * 4 + 3] = 255;
   }
   for (const r of regions) {
     for (let y = r.y; y < Math.min(r.y + r.h, height); y++) {
       for (let x = r.x; x < Math.min(r.x + r.w, width); x++) {
         const i = (y * width + x) * 4;
-        data[i] = r.r; data[i + 1] = r.g; data[i + 2] = r.b; data[i + 3] = 255;
+        data[i] = r.r;
+        data[i + 1] = r.g;
+        data[i + 2] = r.b;
+        data[i + 3] = 255;
       }
     }
   }
@@ -72,29 +78,31 @@ function createPng(width: number, height: number, regions: Rect[], bg = { r: 245
 
 // UI parts
 const HEADER = (hasNav: boolean): Rect[] => [
-  { x: 0, y: 0, w: 320, h: 32, r: 36, g: 41, b: 46 },         // header bg
-  { x: 8, y: 8, w: 60, h: 16, r: 88, g: 166, b: 255 },        // logo
-  ...(hasNav ? [
-    { x: 80, y: 10, w: 30, h: 12, r: 200, g: 200, b: 210 },   // nav link 1
-    { x: 118, y: 10, w: 30, h: 12, r: 200, g: 200, b: 210 },  // nav link 2
-    { x: 156, y: 10, w: 30, h: 12, r: 200, g: 200, b: 210 },  // nav link 3
-  ] : []),
+  { x: 0, y: 0, w: 320, h: 32, r: 36, g: 41, b: 46 }, // header bg
+  { x: 8, y: 8, w: 60, h: 16, r: 88, g: 166, b: 255 }, // logo
+  ...(hasNav
+    ? [
+        { x: 80, y: 10, w: 30, h: 12, r: 200, g: 200, b: 210 }, // nav link 1
+        { x: 118, y: 10, w: 30, h: 12, r: 200, g: 200, b: 210 }, // nav link 2
+        { x: 156, y: 10, w: 30, h: 12, r: 200, g: 200, b: 210 }, // nav link 3
+      ]
+    : []),
 ];
 
 const FORM = (color: { r: number; g: number; b: number }): Rect[] => [
-  { x: 40, y: 80, w: 240, h: 100, r: 255, g: 255, b: 255 },    // form bg
-  { x: 50, y: 90, w: 220, h: 24, r: 240, g: 240, b: 245 },     // input 1
-  { x: 50, y: 120, w: 220, h: 24, r: 240, g: 240, b: 245 },    // input 2
-  { x: 50, y: 152, w: 220, h: 24, ...color },                    // button
+  { x: 40, y: 80, w: 240, h: 100, r: 255, g: 255, b: 255 }, // form bg
+  { x: 50, y: 90, w: 220, h: 24, r: 240, g: 240, b: 245 }, // input 1
+  { x: 50, y: 120, w: 220, h: 24, r: 240, g: 240, b: 245 }, // input 2
+  { x: 50, y: 152, w: 220, h: 24, ...color }, // button
 ];
 
 const HEADING: Rect[] = [
-  { x: 40, y: 45, w: 180, h: 20, r: 30, g: 30, b: 30 },        // heading text
+  { x: 40, y: 45, w: 180, h: 20, r: 30, g: 30, b: 30 }, // heading text
 ];
 
 const SEARCH_BOX: Rect[] = [
-  { x: 200, y: 8, w: 100, h: 16, r: 60, g: 60, b: 70 },        // search input
-  { x: 306, y: 8, w: 14, h: 16, r: 100, g: 180, b: 100 },      // search btn
+  { x: 200, y: 8, w: 100, h: 16, r: 60, g: 60, b: 70 }, // search input
+  { x: 306, y: 8, w: 14, h: 16, r: 100, g: 180, b: 100 }, // search btn
 ];
 
 // ---- Scenarios ----
@@ -117,7 +125,13 @@ const scenarios: DemoScenario[] = [
     baselineRegions: [...HEADER(true), ...HEADING, ...FORM({ r: 35, g: 134, b: 54 })],
     snapshotRegions: [...HEADER(true), ...HEADING, ...FORM({ r: 35, g: 134, b: 54 })],
     expectation: { testId: "home", expect: "No a11y changes, visual only", a11y: "no-change" },
-    intent: { summary: "style: change button color", changeType: "style", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: [] },
+    intent: {
+      summary: "style: change button color",
+      changeType: "style",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: [],
+    },
   },
   {
     name: "2. Nav Removed (Intentional)",
@@ -130,7 +144,13 @@ const scenarios: DemoScenario[] = [
       expect: "Navigation removed from header",
       expectedA11yChanges: [{ description: "Navigation landmark removed" }],
     },
-    intent: { summary: "style: hide nav on home", changeType: "style", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "style: hide nav on home",
+      changeType: "style",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
   },
   {
     name: "3. Search Added (Feature)",
@@ -143,7 +163,13 @@ const scenarios: DemoScenario[] = [
       expect: "Search landmark added",
       expectedA11yChanges: [{ description: "Search landmark added" }],
     },
-    intent: { summary: "feat: add search", changeType: "feature", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "feat: add search",
+      changeType: "feature",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
   },
   {
     name: "4. Labels Broken (Regression)",
@@ -152,7 +178,13 @@ const scenarios: DemoScenario[] = [
     baselineRegions: [...HEADER(true), ...HEADING, ...FORM({ r: 35, g: 134, b: 54 })],
     snapshotRegions: [...HEADER(true), ...HEADING, ...FORM({ r: 180, g: 40, b: 40 })], // red = broken
     expectation: { testId: "home", expect: "No changes expected in refactor", a11y: "no-change" },
-    intent: { summary: "refactor: extract utils", changeType: "refactor", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: [] },
+    intent: {
+      summary: "refactor: extract utils",
+      changeType: "refactor",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: [],
+    },
   },
   {
     name: "5. A11y Fixed (Improvement)",
@@ -170,7 +202,13 @@ const scenarios: DemoScenario[] = [
         { description: "Button gets label" },
       ],
     },
-    intent: { summary: "a11y: fix form labels", changeType: "a11y", expectedVisualChanges: [], expectedA11yChanges: [], affectedComponents: ["home"] },
+    intent: {
+      summary: "a11y: fix form labels",
+      changeType: "a11y",
+      expectedVisualChanges: [],
+      expectedA11yChanges: [],
+      affectedComponents: ["home"],
+    },
   },
 ];
 
@@ -216,8 +254,12 @@ export async function runDemo() {
 
     // Visual diff + heatmap
     const snapshot: VrtSnapshot = {
-      testId: sc.name, testTitle: sc.name, projectName: "demo",
-      screenshotPath: snapPath, baselinePath: basePath, status: "changed",
+      testId: sc.name,
+      testTitle: sc.name,
+      projectName: "demo",
+      screenshotPath: snapPath,
+      baselinePath: basePath,
+      status: "changed",
     };
     const vrtDiff = await compareScreenshots(snapshot, { outputDir: TMP });
     if (vrtDiff && vrtDiff.diffPixels > 0) {
@@ -236,7 +278,9 @@ export async function runDemo() {
     const a11yDiff = diffA11yTrees(baseSnap, snapSnap);
 
     if (a11yDiff.changes.length > 0) {
-      console.log(`\n  ${BOLD}A11y Diff:${RESET} ${a11yDiff.changes.length} change(s)${a11yDiff.hasRegression ? ` ${RED}(REGRESSION)${RESET}` : ""}`);
+      console.log(
+        `\n  ${BOLD}A11y Diff:${RESET} ${a11yDiff.changes.length} change(s)${a11yDiff.hasRegression ? ` ${RED}(REGRESSION)${RESET}` : ""}`,
+      );
       for (const c of a11yDiff.changes.slice(0, 5)) {
         const icon = c.severity === "error" ? RED + "✗" : c.severity === "warning" ? YELLOW + "~" : DIM + "·";
         console.log(`    ${icon}${RESET} [${c.type}] ${c.description}`);
@@ -252,10 +296,20 @@ export async function runDemo() {
     console.log(`  ${DIM}${match.reasoning}${RESET}`);
 
     // Reasoning chain
-    const chain = reasonAboutChanges("home", sc.expectation, a11yDiff.changes.length > 0 ? a11yDiff : undefined, sc.intent);
-    const verdictColor = chain.verdict === "realized" ? GREEN
-      : chain.verdict === "unexpected-side-effects" ? YELLOW
-      : chain.verdict === "not-realized" ? RED : DIM;
+    const chain = reasonAboutChanges(
+      "home",
+      sc.expectation,
+      a11yDiff.changes.length > 0 ? a11yDiff : undefined,
+      sc.intent,
+    );
+    const verdictColor =
+      chain.verdict === "realized"
+        ? GREEN
+        : chain.verdict === "unexpected-side-effects"
+          ? YELLOW
+          : chain.verdict === "not-realized"
+            ? RED
+            : DIM;
     console.log(`\n  ${BOLD}Verdict:${RESET} ${verdictColor}${chain.verdict.toUpperCase()}${RESET}`);
 
     for (const m of chain.mappings) {
@@ -269,7 +323,9 @@ export async function runDemo() {
   }
 
   separator();
-  console.log(`\n${BOLD}${CYAN}Demo complete.${RESET} ${DIM}150 tests, 10 fixture scenarios, 5 demo scenarios.${RESET}\n`);
+  console.log(
+    `\n${BOLD}${CYAN}Demo complete.${RESET} ${DIM}150 tests, 10 fixture scenarios, 5 demo scenarios.${RESET}\n`,
+  );
 
   // Cleanup
   await rm(TMP, { recursive: true, force: true });
@@ -279,5 +335,8 @@ export async function runDemo() {
 // test — or any tool reaching for a helper here — triggers a full run, which is
 // why this file had 0% coverage.
 if (isCliEntry(import.meta.url)) {
-  runDemo().catch((e) => { console.error(e); process.exitCode = 1; });
+  runDemo().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  });
 }

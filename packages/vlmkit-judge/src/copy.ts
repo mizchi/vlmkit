@@ -165,8 +165,10 @@ export function analyzeCopy(input: {
   for (const chunk of input.invisibleChunks ?? []) {
     invisibleByReason.set(chunk.reason, `${invisibleByReason.get(chunk.reason) ?? ""}\n${chunk.text}`);
   }
-  const reasonBuckets = [...invisibleByReason.entries()]
-    .map(([reason, text]) => ({ reason: reason as InvisibleReason, normalized: normalizeWhitespace(text) }));
+  const reasonBuckets = [...invisibleByReason.entries()].map(([reason, text]) => ({
+    reason: reason as InvisibleReason,
+    normalized: normalizeWhitespace(text),
+  }));
   const allowInvisible = new Set(input.allowInvisible ?? []);
   const states = (input.stateSweep?.states ?? []).map((s) => ({
     ...s,
@@ -232,9 +234,8 @@ export function analyzeCopy(input: {
       continue;
     }
     missingLines.push(line);
-    const scope = states.length > 0
-      ? `rendered text or any of ${states.length} revealed disclosure state(s)`
-      : "rendered text";
+    const scope =
+      states.length > 0 ? `rendered text or any of ${states.length} revealed disclosure state(s)` : "rendered text";
     issues.push({
       kind: "copy-missing",
       severity: "suspect",
@@ -262,8 +263,9 @@ export function analyzeCopy(input: {
     issues.push({
       kind: "copy-forbidden",
       severity: "suspect",
-      message: `Copy that must be gone is still on the page (${where}): "${line}"`
-        + " — the forbid list is for a claim that was edited out; remove it from the source rather than hiding it.",
+      message:
+        `Copy that must be gone is still on the page (${where}): "${line}"` +
+        " — the forbid list is for a claim that was edited out; remove it from the source rather than hiding it.",
     });
   }
 

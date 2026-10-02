@@ -1,13 +1,11 @@
 import { describe, it } from "vite-plus/test";
 import assert from "node:assert/strict";
 import { analyzeA11yTouch, analyzeA11yTouchSamples, type A11yTouchRawSample } from "./a11y-touch.ts";
-import {
-  requiredTouchSide,
-  touchTargetBelowRequired,
-  touchTargetInCluster,
-} from "./markup-core-a11y-touch.ts";
+import { requiredTouchSide, touchTargetBelowRequired, touchTargetInCluster } from "./markup-core-a11y-touch.ts";
 
-function sample(overrides: Partial<A11yTouchRawSample> & { width: number; height: number; x?: number; y?: number; path?: string }): A11yTouchRawSample {
+function sample(
+  overrides: Partial<A11yTouchRawSample> & { width: number; height: number; x?: number; y?: number; path?: string },
+): A11yTouchRawSample {
   return {
     path: overrides.path ?? "button[0]",
     tag: overrides.tag ?? "button",
@@ -62,10 +60,10 @@ describe("touchTargetInCluster", () => {
 
 describe("analyzeA11yTouchSamples", () => {
   it("flags small targets but not full-size ones", () => {
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: ".small", width: 32, height: 32 }),
-      sample({ path: ".ok", width: 48, height: 48 }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples(
+      [sample({ path: ".small", width: 32, height: 32 }), sample({ path: ".ok", width: 48, height: 48 })],
+      "AAA",
+    );
     assert.equal(findings.length, 1);
     assert.equal(findings[0]!.path, ".small");
     assert.equal(findings[0]!.minSide, 32);
@@ -73,10 +71,7 @@ describe("analyzeA11yTouchSamples", () => {
   });
 
   it("respects the WCAG AA level (24 px threshold)", () => {
-    const findings = analyzeA11yTouchSamples(
-      [sample({ path: ".aa-ok", width: 32, height: 32 })],
-      "AA",
-    );
+    const findings = analyzeA11yTouchSamples([sample({ path: ".aa-ok", width: 32, height: 32 })], "AA");
     assert.equal(findings.length, 0);
   });
 
@@ -97,11 +92,14 @@ describe("analyzeA11yTouchSamples", () => {
     assert.equal(shared.length, 3, "three rendered buttons are three targets");
     assert.equal(shared.filter((f) => f.cluster).length, 3, "and they are adjacent");
 
-    const classed = analyzeA11yTouchSamples([
-      sample({ path: ".a", x: 0, y: 0, width: 20, height: 20 }),
-      sample({ path: ".b", x: 22, y: 0, width: 20, height: 20 }),
-      sample({ path: ".c", x: 44, y: 0, width: 20, height: 20 }),
-    ], "AA");
+    const classed = analyzeA11yTouchSamples(
+      [
+        sample({ path: ".a", x: 0, y: 0, width: 20, height: 20 }),
+        sample({ path: ".b", x: 22, y: 0, width: 20, height: 20 }),
+        sample({ path: ".c", x: 44, y: 0, width: 20, height: 20 }),
+      ],
+      "AA",
+    );
     assert.equal(classed.length, shared.length, "class names must not change the measurement");
   });
 
@@ -109,10 +107,13 @@ describe("analyzeA11yTouchSamples", () => {
     // At AAA on purpose. The same case at AA is now spacing-exempt — one isolated 20x20
     // button clears every neighbour because it has none — and a test about the dedupe
     // must not be able to pass or fail on the exception logic.
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: "main>button", x: 8, y: 8, width: 20, height: 20 }),
-      sample({ path: "main>button", x: 8, y: 8, width: 20, height: 20 }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples(
+      [
+        sample({ path: "main>button", x: 8, y: 8, width: 20, height: 20 }),
+        sample({ path: "main>button", x: 8, y: 8, width: 20, height: 20 }),
+      ],
+      "AAA",
+    );
     assert.equal(findings.length, 1);
   });
 
@@ -120,18 +121,24 @@ describe("analyzeA11yTouchSamples", () => {
     // WCAG 2.5.8 sizes targets; it does not condemn a compliant one for being
     // adjacent. The old help said "clustered targets are flagged", which read as
     // the opposite and is what sent v7's agent-m looking for a bug here.
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: ".a", x: 0, y: 0, width: 24, height: 24 }),
-      sample({ path: ".b", x: 28, y: 0, width: 24, height: 24 }),
-    ], "AA");
+    const findings = analyzeA11yTouchSamples(
+      [
+        sample({ path: ".a", x: 0, y: 0, width: 24, height: 24 }),
+        sample({ path: ".b", x: 28, y: 0, width: 24, height: 24 }),
+      ],
+      "AA",
+    );
     assert.deepEqual(findings, []);
   });
 
   it("marks a target as `cluster: true` when another center is within 24 px", () => {
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: ".a", x: 0, y: 0, width: 32, height: 32 }),
-      sample({ path: ".b", x: 5, y: 5, width: 32, height: 32 }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples(
+      [
+        sample({ path: ".a", x: 0, y: 0, width: 32, height: 32 }),
+        sample({ path: ".b", x: 5, y: 5, width: 32, height: 32 }),
+      ],
+      "AAA",
+    );
     // Both are small; both should mark cluster.
     assert.equal(findings.length, 2);
     assert.equal(findings[0]!.cluster, true);
@@ -139,10 +146,13 @@ describe("analyzeA11yTouchSamples", () => {
   });
 
   it("marks `cluster: false` when targets are well-spaced", () => {
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: ".a", x: 0, y: 0, width: 32, height: 32 }),
-      sample({ path: ".b", x: 200, y: 0, width: 32, height: 32 }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples(
+      [
+        sample({ path: ".a", x: 0, y: 0, width: 32, height: 32 }),
+        sample({ path: ".b", x: 200, y: 0, width: 32, height: 32 }),
+      ],
+      "AAA",
+    );
     assert.equal(findings.length, 2);
     assert.equal(findings[0]!.cluster, false);
     assert.equal(findings[1]!.cluster, false);
@@ -153,10 +163,13 @@ describe("analyzeA11yTouchSamples", () => {
     // `targetKey` was written to fix rather than the behaviour: the key is the path plus
     // the rounded position, so identical siblings stay separate. Both samples here are at
     // the same position, which only one element can be, so collapsing them is right.
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: ".dup", width: 30, height: 30, text: "first" }),
-      sample({ path: ".dup", width: 40, height: 40, text: "second" }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples(
+      [
+        sample({ path: ".dup", width: 30, height: 30, text: "first" }),
+        sample({ path: ".dup", width: 40, height: 40, text: "second" }),
+      ],
+      "AAA",
+    );
     assert.equal(findings.length, 1);
     assert.equal(findings[0]!.text, "first");
     assert.equal(findings[0]!.minSide, 30);
@@ -166,19 +179,20 @@ describe("analyzeA11yTouchSamples", () => {
     // The compatibility direction. A caller that built samples by hand, or a run recorded
     // before `display` existed, must keep its findings rather than gain an exemption from
     // a field that was never measured — same policy as `FocusStep.pinned`.
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: "p>a", width: 40, height: 18 }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples([sample({ path: "p>a", width: 40, height: 18 })], "AAA");
     assert.equal(findings.length, 1);
     assert.equal(findings[0]!.exception, undefined);
   });
 
   it("sorts findings by minSide ascending (worst first)", () => {
-    const findings = analyzeA11yTouchSamples([
-      sample({ path: ".medium", width: 40, height: 40 }),
-      sample({ path: ".tiny", width: 16, height: 16 }),
-      sample({ path: ".small", width: 28, height: 28 }),
-    ], "AAA");
+    const findings = analyzeA11yTouchSamples(
+      [
+        sample({ path: ".medium", width: 40, height: 40 }),
+        sample({ path: ".tiny", width: 16, height: 16 }),
+        sample({ path: ".small", width: 28, height: 28 }),
+      ],
+      "AAA",
+    );
     assert.equal(findings.length, 3);
     assert.equal(findings[0]!.minSide, 16);
     assert.equal(findings[1]!.minSide, 28);
@@ -213,14 +227,20 @@ describe("analyzeA11yTouch — the criteria's own exceptions", () => {
   it("reports a row of adjacent icon buttons at AA — the case spacing does not excuse", () => {
     // Centers 22px apart, so the 24px circles overlap. This is the pattern the criterion
     // is actually aimed at, and it must survive the exception being implemented.
-    const row = analyzeA11yTouch([
-      sample({ path: ".a", x: 0, y: 0, width: 20, height: 20 }),
-      sample({ path: ".b", x: 22, y: 0, width: 20, height: 20 }),
-      sample({ path: ".c", x: 44, y: 0, width: 20, height: 20 }),
-    ], "AA");
+    const row = analyzeA11yTouch(
+      [
+        sample({ path: ".a", x: 0, y: 0, width: 20, height: 20 }),
+        sample({ path: ".b", x: 22, y: 0, width: 20, height: 20 }),
+        sample({ path: ".c", x: 44, y: 0, width: 20, height: 20 }),
+      ],
+      "AA",
+    );
     assert.equal(row.failures.length, 3);
     assert.deepEqual(row.wcagExempt, []);
-    assert.equal(row.failures.every((f) => f.cluster), true);
+    assert.equal(
+      row.failures.every((f) => f.cluster),
+      true,
+    );
   });
 
   it("measures a compliant neighbour by its box, not its center", () => {
@@ -229,20 +249,26 @@ describe("analyzeA11yTouch — the criteria's own exceptions", () => {
     // so it reaches x=22. A 300px-wide button starting at x=20 is inside that, and the
     // exception does not apply — while its CENTER is at x=170, 160px away, which any
     // center-based test would have called clear.
-    const beside = analyzeA11yTouch([
-      sample({ path: ".small", x: 0, y: 0, width: 20, height: 20 }),
-      sample({ path: ".wide", x: 20, y: 0, width: 300, height: 40 }),
-    ], "AA");
+    const beside = analyzeA11yTouch(
+      [
+        sample({ path: ".small", x: 0, y: 0, width: 20, height: 20 }),
+        sample({ path: ".wide", x: 20, y: 0, width: 300, height: 40 }),
+      ],
+      "AA",
+    );
     assert.equal(beside.failures.length, 1, "the small one is a real failure");
     assert.equal(beside.failures[0]!.path, ".small");
     assert.equal(beside.failures[0]!.cluster, false, "the wide button is not below the floor");
     assert.deepEqual(beside.wcagExempt, []);
 
     // Same pair, the wide button moved to x=28 — past the circle's reach at x=22.
-    const clear = analyzeA11yTouch([
-      sample({ path: ".small", x: 0, y: 0, width: 20, height: 20 }),
-      sample({ path: ".wide", x: 28, y: 0, width: 300, height: 40 }),
-    ], "AA");
+    const clear = analyzeA11yTouch(
+      [
+        sample({ path: ".small", x: 0, y: 0, width: 20, height: 20 }),
+        sample({ path: ".wide", x: 28, y: 0, width: 300, height: 40 }),
+      ],
+      "AA",
+    );
     assert.deepEqual(clear.failures, []);
     assert.equal(clear.wcagExempt[0]!.exception, "spacing");
   });
@@ -261,14 +287,16 @@ describe("analyzeA11yTouch — the criteria's own exceptions", () => {
     // A nav item is a lone `<a>` in an `<li>`: inline, but nothing in the block
     // constrains it, so the author can grow it. And an inline-BLOCK control carries its
     // own height, so prose around it changes nothing.
-    const navItem = analyzeA11yTouch([
-      sample({ path: "li>a", width: 40, height: 18, display: "inline", inSentence: false }),
-    ], "AAA");
+    const navItem = analyzeA11yTouch(
+      [sample({ path: "li>a", width: 40, height: 18, display: "inline", inSentence: false })],
+      "AAA",
+    );
     assert.equal(navItem.failures.length, 1);
 
-    const inlineBlock = analyzeA11yTouch([
-      sample({ path: "p>button", width: 40, height: 18, display: "inline-block", inSentence: true }),
-    ], "AAA");
+    const inlineBlock = analyzeA11yTouch(
+      [sample({ path: "p>button", width: 40, height: 18, display: "inline-block", inSentence: true })],
+      "AAA",
+    );
     assert.equal(inlineBlock.failures.length, 1);
     assert.equal(inlineBlock.failures[0]!.exception, undefined);
   });
@@ -277,14 +305,23 @@ describe("analyzeA11yTouch — the criteria's own exceptions", () => {
     // Two adjacent links in one sentence. Inline excuses them where Spacing would not,
     // and `cluster` stays true — a reader auditing the exemption wants to see exactly the
     // adjacency it is excusing.
-    const analysis = analyzeA11yTouch([
-      inProse({ path: "p>a.one", x: 0, y: 0, width: 16, height: 16 }),
-      inProse({ path: "p>a.two", x: 18, y: 0, width: 16, height: 16 }),
-    ], "AA");
+    const analysis = analyzeA11yTouch(
+      [
+        inProse({ path: "p>a.one", x: 0, y: 0, width: 16, height: 16 }),
+        inProse({ path: "p>a.two", x: 18, y: 0, width: 16, height: 16 }),
+      ],
+      "AA",
+    );
     assert.deepEqual(analysis.failures, []);
     assert.equal(analysis.wcagExempt.length, 2);
-    assert.equal(analysis.wcagExempt.every((f) => f.exception === "inline"), true);
-    assert.equal(analysis.wcagExempt.every((f) => f.cluster), true);
+    assert.equal(
+      analysis.wcagExempt.every((f) => f.exception === "inline"),
+      true,
+    );
+    assert.equal(
+      analysis.wcagExempt.every((f) => f.cluster),
+      true,
+    );
   });
 
   it("counts every distinct target as inspected, exempt or not", () => {
@@ -292,11 +329,14 @@ describe("analyzeA11yTouch — the criteria's own exceptions", () => {
     // another. It is the number of distinct rendered targets, and it must not shrink
     // because targets became exempt — that would report a smaller measurement as an
     // improvement.
-    const analysis = analyzeA11yTouch([
-      sample({ path: ".big", x: 0, y: 0, width: 48, height: 48 }),
-      sample({ path: ".lone", x: 300, y: 0, width: 20, height: 20 }),
-      inProse({ path: "p>a", x: 0, y: 300, width: 40, height: 18 }),
-    ], "AA");
+    const analysis = analyzeA11yTouch(
+      [
+        sample({ path: ".big", x: 0, y: 0, width: 48, height: 48 }),
+        sample({ path: ".lone", x: 300, y: 0, width: 20, height: 20 }),
+        inProse({ path: "p>a", x: 0, y: 300, width: 40, height: 18 }),
+      ],
+      "AA",
+    );
     assert.equal(analysis.inspectedCount, 3);
     assert.equal(analysis.failures.length, 0);
     assert.equal(analysis.wcagExempt.length, 2);
@@ -313,7 +353,10 @@ describe("analyzeA11yTouch — the criteria's own exceptions", () => {
     ];
     const failures = analyzeA11yTouchSamples(samples, "AA");
     assert.deepEqual(failures.map((f) => f.path).sort(), [".a", ".b"]);
-    assert.equal(failures.every((f) => f.exception === undefined), true);
+    assert.equal(
+      failures.every((f) => f.exception === undefined),
+      true,
+    );
     assert.equal(analyzeA11yTouch(samples, "AA").wcagExempt.length, 1);
   });
 });

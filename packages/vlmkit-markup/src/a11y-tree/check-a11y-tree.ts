@@ -103,7 +103,8 @@ export async function runCheckA11yTree(options: CheckA11yTreeOptions): Promise<C
   const minSide = (n: A11yNode) => Math.min(n.rect.width, n.rect.height);
   const enclosing = (n: A11yNode) =>
     operable.find((a) => a !== n && n.path.startsWith(`${a.path}>`) && minSide(a) >= floor);
-  const enclosed = operable.filter((n) => minSide(n) < floor && enclosing(n))
+  const enclosed = operable
+    .filter((n) => minSide(n) < floor && enclosing(n))
     .map((n) => ({ path: n.path, name: n.name ?? "", by: enclosing(n)!.path }));
   const judged = operable.filter((n) => !enclosed.some((e) => e.path === n.path));
   const touch = analyzeA11yTouch(

@@ -49,7 +49,12 @@ export interface ControlState {
 /** Everything compared about one screen. */
 export interface ScreenState {
   /** The map's own rows: selector, label as the map prints it, and whether it is painted. */
-  targets: { selector: string; label: string; onScreen: boolean; box?: { x: number; y: number; width: number; height: number } }[];
+  targets: {
+    selector: string;
+    label: string;
+    onScreen: boolean;
+    box?: { x: number; y: number; width: number; height: number };
+  }[];
   controls: Record<string, ControlState>;
   /** Painted text runs, collapsed, as a multiset. */
   texts: string[];
@@ -267,8 +272,11 @@ export function diffScreens(
       change.restyled.push({
         ...row(selector, t.label),
         properties,
-        ...(onlyHover && entered ? { hoverOnly: "entered" as const }
-          : onlyHover && left ? { hoverOnly: "left" as const } : {}),
+        ...(onlyHover && entered
+          ? { hoverOnly: "entered" as const }
+          : onlyHover && left
+            ? { hoverOnly: "left" as const }
+            : {}),
       });
     }
   }
@@ -281,9 +289,15 @@ export function diffScreens(
 }
 
 export function isEmptyChange(change: ScreenChange): boolean {
-  return change.appeared.length === 0 && change.disappeared.length === 0
-    && change.relabelled.length === 0 && change.restated.length === 0 && change.restyled.length === 0
-    && change.textAdded.length === 0 && change.textRemoved.length === 0;
+  return (
+    change.appeared.length === 0 &&
+    change.disappeared.length === 0 &&
+    change.relabelled.length === 0 &&
+    change.restated.length === 0 &&
+    change.restyled.length === 0 &&
+    change.textAdded.length === 0 &&
+    change.textRemoved.length === 0
+  );
 }
 
 /** The prose block. Lines are capped per kind; `--json` carries all of them. */
@@ -292,16 +306,22 @@ export function formatScreenChange(change: ScreenChange, describe: (a: Grounding
   const name = (c: ChangedControl) => `${c.targetId ?? c.selector} "${c.label}"`;
   const landed = change.landedOn;
   if (landed) {
-    lines.push(landed.label
-      ? `  the click went to ${name(landed)}`
-      : `  the click went to ${landed.selector}, which is not in the map`
-        + (landed.wouldReach ? ` (it would set off ${landed.wouldReach})` : " — nothing up to <body> declares itself interactive"));
+    lines.push(
+      landed.label
+        ? `  the click went to ${name(landed)}`
+        : `  the click went to ${landed.selector}, which is not in the map` +
+            (landed.wouldReach
+              ? ` (it would set off ${landed.wouldReach})`
+              : " — nothing up to <body> declares itself interactive"),
+    );
   }
   if (isEmptyChange(change)) {
     // Stated as what was compared, not as "the click missed": a handler can do
     // work the page does not show.
-    lines.push("  nothing on screen — no control came, went, changed state or look, and no text changed"
-      + (landed?.label ? "; the control may still have done something the page does not show" : ""));
+    lines.push(
+      "  nothing on screen — no control came, went, changed state or look, and no text changed" +
+        (landed?.label ? "; the control may still have done something the page does not show" : ""),
+    );
     return lines;
   }
   const cap = <T>(items: T[], render: (item: T) => string, max = 6): void => {
@@ -311,13 +331,21 @@ export function formatScreenChange(change: ScreenChange, describe: (a: Grounding
   cap(change.appeared, (c) => `+ ${name(c)} is on screen`);
   cap(change.disappeared, (c) => `- ${c.selector} "${c.label}" is gone from the screen`);
   cap(change.relabelled, (c) => `~ ${c.targetId ?? c.selector} now reads "${c.label}" (was "${c.from}")`);
-  cap(change.restated, (c) => `~ ${name(c)} ${[
-    ...c.added.map((s) => `is now ${s}`),
-    ...c.removed.map((s) => `is no longer ${s}`),
-  ].join(", ")}`);
-  cap(change.restyled, (c) => `~ ${name(c)} changed ${c.properties.join(", ")}`
-    + (c.hoverOnly === "entered" ? " — its :hover style, and the pointer is now on it"
-      : c.hoverOnly === "left" ? " — its :hover style, and the pointer just left it" : ""));
+  cap(
+    change.restated,
+    (c) =>
+      `~ ${name(c)} ${[...c.added.map((s) => `is now ${s}`), ...c.removed.map((s) => `is no longer ${s}`)].join(", ")}`,
+  );
+  cap(
+    change.restyled,
+    (c) =>
+      `~ ${name(c)} changed ${c.properties.join(", ")}` +
+      (c.hoverOnly === "entered"
+        ? " — its :hover style, and the pointer is now on it"
+        : c.hoverOnly === "left"
+          ? " — its :hover style, and the pointer just left it"
+          : ""),
+  );
   cap(change.textAdded, (t) => `+ text "${t}"`, 4);
   cap(change.textRemoved, (t) => `- text "${t}"`, 4);
   return lines;

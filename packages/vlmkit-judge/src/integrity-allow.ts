@@ -50,12 +50,7 @@ export const INTEGRITY_FINDING_KINDS: IntegrityFindingKind[] = [
  * them would let a project silence "your JS threw" or "we followed a redirect
  * to the login page", which is how a gate becomes decoration.
  */
-export const NON_EXEMPTABLE_KINDS: readonly string[] = [
-  "js-error",
-  "degenerate-render",
-  "unstyled-page",
-  "redirected",
-];
+export const NON_EXEMPTABLE_KINDS: readonly string[] = ["js-error", "degenerate-render", "unstyled-page", "redirected"];
 
 export interface IntegrityAllowRule {
   kind: IntegrityFindingKind;
@@ -90,27 +85,26 @@ export function parseAllowRule(spec: string): IntegrityAllowRule {
   const cut = spec.indexOf(";");
   if (cut < 0) {
     throw new UsageError(
-      `--allow needs a reason: ${SYNTAX} (got "${spec}").`
-      + (spec.includes("#")
-        ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.`
-        : "")
-      + ` An exemption without a stated reason cannot be reviewed.`,
+      `--allow needs a reason: ${SYNTAX} (got "${spec}").` +
+        (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "") +
+        ` An exemption without a stated reason cannot be reviewed.`,
     );
   }
   const reason = spec.slice(cut + 1).trim();
   if (!reason) throw new UsageError(`--allow reason is empty in "${spec}". Say why this pattern is intentional.`);
-  const parts = spec.slice(0, cut).split("@").map((p) => p.trim());
+  const parts = spec
+    .slice(0, cut)
+    .split("@")
+    .map((p) => p.trim());
   const kind = parts[0] ?? "";
   if (!INTEGRITY_FINDING_KINDS.includes(kind as IntegrityFindingKind)) {
     if (NON_EXEMPTABLE_KINDS.includes(kind)) {
       throw new UsageError(
-        `--allow cannot exempt "${kind}": it reports the page being broken or unmeasurable,`
-        + ` not an intentional design pattern. Fix the page.`,
+        `--allow cannot exempt "${kind}": it reports the page being broken or unmeasurable,` +
+          ` not an intentional design pattern. Fix the page.`,
       );
     }
-    throw new UsageError(
-      `--allow: unknown finding kind "${kind}". Valid kinds: ${INTEGRITY_FINDING_KINDS.join(", ")}`,
-    );
+    throw new UsageError(`--allow: unknown finding kind "${kind}". Valid kinds: ${INTEGRITY_FINDING_KINDS.join(", ")}`);
   }
   const rule: IntegrityAllowRule = { kind: kind as IntegrityFindingKind, reason, raw: spec };
   for (const part of parts.slice(1)) {

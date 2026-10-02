@@ -122,10 +122,7 @@ export function scalePngData(src: PngData, factor: number): PngData {
  * Where each frame lands. Exported so a caller can label the sheet (in Markdown,
  * a report, a PR comment) without re-deriving the arithmetic.
  */
-export function filmstripLayout(
-  frames: readonly PngData[],
-  options: FilmstripOptions = {},
-): FilmstripLayout {
+export function filmstripLayout(frames: readonly PngData[], options: FilmstripOptions = {}): FilmstripLayout {
   if (frames.length === 0) throw new Error("filmstrip needs at least one frame");
   const gap = options.gap ?? 8;
   const padding = options.padding ?? gap;
@@ -212,8 +209,11 @@ export function composeFilmstrip(
   const [bgR, bgG, bgB] = options.background ?? DEFAULT_BACKGROUND;
 
   const width = padding * 2 + layout.columns * layout.cell.width + gap * (layout.columns - 1);
-  const height = padding * 2 + layout.columnLabelBand
-    + layout.rows * (layout.cell.height + layout.rowLabelBand) + gap * (layout.rows - 1);
+  const height =
+    padding * 2 +
+    layout.columnLabelBand +
+    layout.rows * (layout.cell.height + layout.rowLabelBand) +
+    gap * (layout.rows - 1);
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < data.length; i += 4) {
     data[i] = bgR;
@@ -265,8 +265,7 @@ export function composeFilmstrip(
     //
     const rowWidth = width - padding * 2;
     options.rowLabels!.slice(0, layout.rows).forEach((label, row) => {
-      const y = padding + layout.columnLabelBand
-        + row * (layout.cell.height + gap + layout.rowLabelBand);
+      const y = padding + layout.columnLabelBand + row * (layout.cell.height + gap + layout.rowLabelBand);
       drawText(sheet, fitText(label, rowWidth, labelScale), padding, y, ink, labelScale);
     });
   }

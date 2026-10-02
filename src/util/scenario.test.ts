@@ -59,8 +59,13 @@ function introspectFromTree(testId: string, tree: A11yNode): PageIntrospection {
       headingLevels: [],
     },
     suggestedInvariants: [
-      ...landmarks.filter((l) => ["banner", "main", "navigation"].includes(l.role))
-        .map((l) => ({ description: `${l.role} landmark is present`, check: "landmark-exists" as const, cost: "low" as const })),
+      ...landmarks
+        .filter((l) => ["banner", "main", "navigation"].includes(l.role))
+        .map((l) => ({
+          description: `${l.role} landmark is present`,
+          check: "landmark-exists" as const,
+          cost: "low" as const,
+        })),
       { description: "All interactive elements have labels", check: "label-present" as const, cost: "low" as const },
       { description: "No whiteout", check: "no-whiteout" as const, cost: "low" as const },
     ],
@@ -105,9 +110,7 @@ describe("Scenario: intentional nav removal", () => {
     const data = new Map([["home", { a11yTree: snapshot, screenshotExists: true }]]);
     const result = verifySpec(spec, data);
 
-    const navCheck = result.results[0].checked.find((c) =>
-      c.invariant.description.includes("navigation")
-    );
+    const navCheck = result.results[0].checked.find((c) => c.invariant.description.includes("navigation"));
 
     assert.ok(navCheck, "Should check for navigation landmark");
     assert.equal(navCheck!.passed, false, "Navigation landmark should be missing");
@@ -175,15 +178,11 @@ describe("Scenario: accidental label breakage", () => {
     const data = new Map([["home", { a11yTree: snapshot, screenshotExists: true }]]);
     const result = verifySpec(spec, data);
 
-    const labelCheck = result.results[0].checked.find((c) =>
-      c.invariant.check === "label-present"
-    );
+    const labelCheck = result.results[0].checked.find((c) => c.invariant.check === "label-present");
 
     assert.ok(labelCheck, "Should check for labels");
     // Global invariant also checks labels
-    const globalLabel = result.results[0].checked.filter((c) =>
-      c.invariant.check === "label-present"
-    );
+    const globalLabel = result.results[0].checked.filter((c) => c.invariant.check === "label-present");
     const anyFailed = globalLabel.some((c) => !c.passed);
     assert.ok(anyFailed, "Should detect unlabeled elements");
   });
@@ -211,17 +210,29 @@ describe("Scenario: dep graph skip", () => {
 
     const spec = introspectToSpec({
       generatedAt: "test",
-      pages: [{
-        testId: "home",
-        description: "Home",
-        landmarks: [{ role: "navigation", name: "" }],
-        interactiveElements: [],
-        stats: { totalNodes: 10, landmarkCount: 1, interactiveCount: 0, unlabeledCount: 0, headingLevels: [] },
-        suggestedInvariants: [
-          { description: "navigation landmark is present", check: "landmark-exists", cost: "low", dependsOn: ["src/Header.tsx"] },
-          { description: "NL: header looks professional", check: "nl-assertion", cost: "high", assert: "Header looks professional" },
-        ],
-      }],
+      pages: [
+        {
+          testId: "home",
+          description: "Home",
+          landmarks: [{ role: "navigation", name: "" }],
+          interactiveElements: [],
+          stats: { totalNodes: 10, landmarkCount: 1, interactiveCount: 0, unlabeledCount: 0, headingLevels: [] },
+          suggestedInvariants: [
+            {
+              description: "navigation landmark is present",
+              check: "landmark-exists",
+              cost: "low",
+              dependsOn: ["src/Header.tsx"],
+            },
+            {
+              description: "NL: header looks professional",
+              check: "nl-assertion",
+              cost: "high",
+              assert: "Header looks professional",
+            },
+          ],
+        },
+      ],
     });
 
     const data = new Map([["home", { a11yTree: tree, screenshotExists: true }]]);

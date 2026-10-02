@@ -13,7 +13,10 @@ test("offline structured plan is a single smoke scenario with observed locators"
   assert.equal(plan.scenarios.length, 1);
   assert.match(plan.scenarios[0]?.title ?? "", /Blocked filter/);
   assert.deepEqual(plan.locatorInventory?.testIds?.includes("release-row-invoice-export"), true);
-  assert.equal(plan.locatorInventory?.roles?.some((role) => role.includes("Open Invoice Export details")), true);
+  assert.equal(
+    plan.locatorInventory?.roles?.some((role) => role.includes("Open Invoice Export details")),
+    true,
+  );
 });
 
 test("offline markdown keeps the planner contract shape", () => {

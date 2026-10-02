@@ -22,14 +22,16 @@ import type {
   CloudflareScreenshotResult,
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
-  CompareRequest, CompareResponse,
+  CompareRequest,
+  CompareResponse,
   CraterWasmRenderRequest,
   CraterWasmRenderResult,
   DetectionSeriesQuery,
   DetectionSeriesResponse,
   ExecutionResultsQuery,
   ExecutionResultsResponse,
-  SmokeTestRequest, SmokeTestResponse,
+  SmokeTestRequest,
+  SmokeTestResponse,
   StatusResponse,
   HtmlSource,
   VisualDiffDisplaysResponse,
@@ -93,10 +95,7 @@ export class VrtClient {
     return this.post("/api/smoke-test", request);
   }
 
-  async smokeTestHtml(
-    html: string,
-    options?: { maxActions?: number; seed?: number },
-  ): Promise<SmokeTestResponse> {
+  async smokeTestHtml(html: string, options?: { maxActions?: number; seed?: number }): Promise<SmokeTestResponse> {
     return this.smokeTest({
       target: { html },
       mode: "random",
@@ -106,10 +105,7 @@ export class VrtClient {
     });
   }
 
-  async smokeTestUrl(
-    url: string,
-    options?: { maxActions?: number; seed?: number },
-  ): Promise<SmokeTestResponse> {
+  async smokeTestUrl(url: string, options?: { maxActions?: number; seed?: number }): Promise<SmokeTestResponse> {
     return this.smokeTest({
       target: { url },
       mode: "random",
@@ -131,9 +127,7 @@ export class VrtClient {
     return this.get(buildQueryPath("/api/detection-series", query));
   }
 
-  async componentStatusMatrix(
-    query: ComponentStatusMatrixQuery = {},
-  ): Promise<ComponentStatusMatrixResponse> {
+  async componentStatusMatrix(query: ComponentStatusMatrixQuery = {}): Promise<ComponentStatusMatrixResponse> {
     return this.get(buildQueryPath("/api/component-status-matrix", query));
   }
 
@@ -176,11 +170,16 @@ export class VrtClient {
 
   // ---- Reasoning Pipeline ----
 
-  async reason(request: import("./api-types.ts").ReasoningPipelineRequest): Promise<import("./api-types.ts").ReasoningPipelineResponse> {
+  async reason(
+    request: import("./api-types.ts").ReasoningPipelineRequest,
+  ): Promise<import("./api-types.ts").ReasoningPipelineResponse> {
     return this.post("/api/reason", request);
   }
 
-  async analyzeImage(heatmapBase64: string, textReport?: string): Promise<import("./api-types.ts").ReasoningPipelineResponse> {
+  async analyzeImage(
+    heatmapBase64: string,
+    textReport?: string,
+  ): Promise<import("./api-types.ts").ReasoningPipelineResponse> {
     return this.reason({ heatmapBase64, textReport, stages: "analyze" });
   }
 

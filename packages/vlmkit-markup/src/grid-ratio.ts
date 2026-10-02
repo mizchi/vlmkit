@@ -115,8 +115,7 @@ export function findGridSuggestions(
 
     const parentBaseline = baseline.find((b) => b.path === parent);
     const parentVariant = variantByPath.get(parent);
-    const frSuggestion = computeGridApproximateIntegerFr(baselineWidths, maxDenom)
-      || fallbackDecimalFr(baselineWidths);
+    const frSuggestion = computeGridApproximateIntegerFr(baselineWidths, maxDenom) || fallbackDecimalFr(baselineWidths);
     out.push({
       parentPath: parent,
       parentTag: parentBaseline?.tag ?? "",

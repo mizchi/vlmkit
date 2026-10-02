@@ -10,11 +10,7 @@ export function computeGridGcd(a: number, b: number): number {
 }
 
 export function computeGridAllEqual(widths: number[], tolerance: number): boolean {
-  const out = runMarkupCore([
-    "grid-all-equal",
-    encodeWidths(widths),
-    doubleArg(tolerance),
-  ]);
+  const out = runMarkupCore(["grid-all-equal", encodeWidths(widths), doubleArg(tolerance)]);
   return parseBool("grid-all-equal", out);
 }
 
@@ -30,18 +26,11 @@ export function computeGridArraysClose(a: number[], b: number[], tolerance: numb
 }
 
 export function computeGridRatiosToDecimal(widths: number[]): string {
-  return runMarkupCore([
-    "grid-ratios-to-decimal",
-    encodeWidths(widths),
-  ]);
+  return runMarkupCore(["grid-ratios-to-decimal", encodeWidths(widths)]);
 }
 
 export function computeGridApproximateIntegerFr(widths: number[], maxDenom: number): string {
-  return runMarkupCore([
-    "grid-approximate-integer-fr",
-    encodeWidths(widths),
-    intArg(maxDenom),
-  ]);
+  return runMarkupCore(["grid-approximate-integer-fr", encodeWidths(widths), intArg(maxDenom)]);
 }
 
 function encodeWidths(widths: number[]): string {

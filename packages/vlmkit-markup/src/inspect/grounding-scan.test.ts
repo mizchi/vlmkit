@@ -54,7 +54,10 @@ const UNSCALED = { resolution: "full" as const };
 test("a clean target becomes one action-map row with no risks", () => {
   const report = analyzeGroundingSamples(input({ targets: [target()] }), UNSCALED);
   assert.equal(report.issues.length, 0);
-  assert.deepEqual(report.targets.map((t) => t.id), ["t1"]);
+  assert.deepEqual(
+    report.targets.map((t) => t.id),
+    ["t1"],
+  );
   const row = report.targets[0]!;
   assert.deepEqual(row.point, { x: 160, y: 220 });
   assert.deepEqual(row.cssPoint, { x: 160, y: 220 });
@@ -63,10 +66,9 @@ test("a clean target becomes one action-map row with no risks", () => {
 });
 
 test("the click point is denominated in screenshot px, not CSS px", () => {
-  const report = analyzeGroundingSamples(
-    input({ targets: [target()] }),
-    { resolution: { maxWidth: 640, maxHeight: 480 } },
-  );
+  const report = analyzeGroundingSamples(input({ targets: [target()] }), {
+    resolution: { maxWidth: 640, maxHeight: 480 },
+  });
   // 640/1280 = 0.5 horizontally, 480/720 = 0.667 vertically — the smaller wins,
   // because the whole frame has to fit.
   assert.equal(report.frame.scale, 0.5);
@@ -113,12 +115,14 @@ test("a reachable point moves the map's coordinate and the message names both", 
   // point that reaches the target, and still reports the page as defective.
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        centreHit: false,
-        interceptedBy: "div.promo",
-        hitFraction: 0,
-        reachable: { x: 205, y: 220, room: 8, sampled: 400, clear: 44 },
-      })],
+      targets: [
+        target({
+          centreHit: false,
+          interceptedBy: "div.promo",
+          hitFraction: 0,
+          reachable: { x: 205, y: 220, room: 8, sampled: 400, clear: 44 },
+        }),
+      ],
     }),
     UNSCALED,
   );
@@ -144,11 +148,13 @@ test("a target with no reachable point says so, and says what has to move", () =
 test("the reachable point is scaled with everything else", () => {
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        centreHit: false,
-        interceptedBy: "div.promo",
-        reachable: { x: 205, y: 220, room: 8, sampled: 400, clear: 44 },
-      })],
+      targets: [
+        target({
+          centreHit: false,
+          interceptedBy: "div.promo",
+          reachable: { x: 205, y: 220, room: 8, sampled: 400, clear: 44 },
+        }),
+      ],
     }),
     { resolution: { maxWidth: 640, maxHeight: 480 } },
   );
@@ -163,11 +169,13 @@ test("a clipped target declares its recentred point and its aim budget", () => {
   // — clipping gets no equivalent margin number, just prose."
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        bbox: { x: 100, y: 700, width: 120, height: 40 },
-        clickPoint: { x: 160, y: 710 },
-        clipped: true,
-      })],
+      targets: [
+        target({
+          bbox: { x: 100, y: 700, width: 120, height: 40 },
+          clickPoint: { x: 160, y: 710 },
+          clipped: true,
+        }),
+      ],
     }),
     UNSCALED,
   );
@@ -183,10 +191,12 @@ test("an ordinary target is not labelled clipped by a rounding disagreement", ()
   // with 7px of room. The condition is a cut box, not a ±1 difference.
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        bbox: { x: 107, y: 7, width: 31, height: 14 },
-        clickPoint: { x: 122, y: 14 },
-      })],
+      targets: [
+        target({
+          bbox: { x: 107, y: 7, width: 31, height: 14 },
+          clickPoint: { x: 122, y: 14 },
+        }),
+      ],
     }),
     UNSCALED,
   );
@@ -198,11 +208,13 @@ test("a cut target's message says how to scroll it into view", () => {
   // the fold is why — which is exactly when the advice to scroll applies.
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        bbox: { x: 100, y: 715, width: 120, height: 40 },
-        clickPoint: { x: 160, y: 717 },
-        clipped: true,
-      })],
+      targets: [
+        target({
+          bbox: { x: 100, y: 715, width: 120, height: 40 },
+          clickPoint: { x: 160, y: 717 },
+          clipped: true,
+        }),
+      ],
     }),
     UNSCALED,
   );
@@ -221,19 +233,20 @@ test("a row its list cuts to a strip is measured on the strip, and the list is n
   // the only finding was `crowded-target` "0px from" the row above; it scrolled
   // again "to separate t8 from t7 above it". The row was not crowded — it was
   // barely on screen, which is `imprecise-target`, with the list as the cause.
-  const row = (n: number, y: number, painted?: { x: number; y: number; width: number; height: number }) => target({
-    selector: `#list > button:nth-of-type(${n})`,
-    visibleText: `Row ${n}`,
-    bbox: { x: 22, y, width: 298, height: 55 },
-    clickPoint: { x: 171, y: painted ? painted.y + painted.height / 2 : y + 27 },
-    ...(painted
-      ? {
-        painted,
-        clipped: true,
-        clippedBy: { selector: "#list", scrollable: true, dy: 53, dx: 0, wheelAt: { x: 171, y: 240 } },
-      }
-      : { painted: { x: 22, y, width: 298, height: 55 } }),
-  });
+  const row = (n: number, y: number, painted?: { x: number; y: number; width: number; height: number }) =>
+    target({
+      selector: `#list > button:nth-of-type(${n})`,
+      visibleText: `Row ${n}`,
+      bbox: { x: 22, y, width: 298, height: 55 },
+      clickPoint: { x: 171, y: painted ? painted.y + painted.height / 2 : y + 27 },
+      ...(painted
+        ? {
+            painted,
+            clipped: true,
+            clippedBy: { selector: "#list", scrollable: true, dy: 53, dx: 0, wheelAt: { x: 171, y: 240 } },
+          }
+        : { painted: { x: 22, y, width: 298, height: 55 } }),
+    });
   const report = analyzeGroundingSamples(
     input({ targets: [row(7, 314), row(8, 369, { x: 22, y: 369, width: 298, height: 2 })] }),
     { resolution: "medium" },
@@ -256,43 +269,60 @@ test("a target hidden by a scroll container is out of the frame, not occluded", 
   // row is not a finding at all — it is inventory with a scroll attached.
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        selector: "#list > button:nth-of-type(9)",
-        inFrame: false,
-        centreHit: false,
-        interceptedBy: "html",
-        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } },
-      })],
+      targets: [
+        target({
+          selector: "#list > button:nth-of-type(9)",
+          inFrame: false,
+          centreHit: false,
+          interceptedBy: "html",
+          clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } },
+        }),
+      ],
     }),
     UNSCALED,
   );
   assert.deepEqual(report.issues, [], "nothing here is a defect of the page");
-  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 332, dx: 0, wheelAt: { x: 180, y: 300 } });
+  assert.deepEqual(report.targets[0]!.clippedBy, {
+    selector: "#list",
+    scrollable: true,
+    dy: 332,
+    dx: 0,
+    wheelAt: { x: 180, y: 300 },
+  });
 });
 
 test("the scroll a caller needs is in screenshot px, like every other number", () => {
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        inFrame: false,
-        clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12, wheelAt: { x: 180, y: 300 } },
-      })],
+      targets: [
+        target({
+          inFrame: false,
+          clippedBy: { selector: "#list", scrollable: true, dy: 332, dx: -12, wheelAt: { x: 180, y: 300 } },
+        }),
+      ],
     }),
     { resolution: { maxWidth: 640, maxHeight: 480 } },
   );
-  assert.deepEqual(report.targets[0]!.clippedBy, { selector: "#list", scrollable: true, dy: 166, dx: -6, wheelAt: { x: 90, y: 150 } });
+  assert.deepEqual(report.targets[0]!.clippedBy, {
+    selector: "#list",
+    scrollable: true,
+    dy: 166,
+    dx: -6,
+    wheelAt: { x: 90, y: 150 },
+  });
 });
 
 test("the prose names the container, the count and the nearest scroll", () => {
   // The control arm, with no tool at all, wrote the spec for this block: "A
   // DOM-aware tool would have told me directly '12 tickets, scrolled to 4/12'
   // instead of me inferring clipping from pixels."
-  const hidden = (n: number, dy: number) => target({
-    selector: `#list > button:nth-of-type(${n})`,
-    visibleText: `Row ${n}`,
-    inFrame: false,
-    clippedBy: { selector: "#list", scrollable: true, dy, dx: 0, wheelAt: { x: 180, y: 300 } },
-  });
+  const hidden = (n: number, dy: number) =>
+    target({
+      selector: `#list > button:nth-of-type(${n})`,
+      visibleText: `Row ${n}`,
+      inFrame: false,
+      clippedBy: { selector: "#list", scrollable: true, dy, dx: 0, wheelAt: { x: 180, y: 300 } },
+    });
   const text = formatGroundingReport(
     analyzeGroundingSamples(input({ targets: [hidden(5, 44), hidden(6, 74), hidden(7, 105)] }), UNSCALED),
   );
@@ -318,10 +348,12 @@ test("a container that cannot scroll says the content is unreachable", () => {
   const text = formatGroundingReport(
     analyzeGroundingSamples(
       input({
-        targets: [target({
-          inFrame: false,
-          clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0, wheelAt: { x: 180, y: 300 } },
-        })],
+        targets: [
+          target({
+            inFrame: false,
+            clippedBy: { selector: "#locked", scrollable: false, dy: 35, dx: 0, wheelAt: { x: 180, y: 300 } },
+          }),
+        ],
       }),
       UNSCALED,
     ),
@@ -349,17 +381,22 @@ test("a label that forwards the click to its own control is not occlusion", () =
   // flagged every form on every page.
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        selector: "input#terms",
-        role: "checkbox",
-        centreHit: false,
-        interceptedBy: "label.terms",
-        forwardedByLabel: true,
-      })],
+      targets: [
+        target({
+          selector: "input#terms",
+          role: "checkbox",
+          centreHit: false,
+          interceptedBy: "label.terms",
+          forwardedByLabel: true,
+        }),
+      ],
     }),
     UNSCALED,
   );
-  assert.deepEqual(report.issues.filter((i) => i.kind === "occluded-target"), []);
+  assert.deepEqual(
+    report.issues.filter((i) => i.kind === "occluded-target"),
+    [],
+  );
 });
 
 test("duplicate labels in one frame are reported once, with the text that separates them", () => {
@@ -390,7 +427,13 @@ test("duplicate labels in one frame are reported once, with the text that separa
 
 test("duplicates with nothing around them to tell them apart say so", () => {
   const rows = [
-    target({ selector: "a:nth-of-type(1)", role: "link", visibleText: "More", name: "More", ancestorTexts: ["More More"] }),
+    target({
+      selector: "a:nth-of-type(1)",
+      role: "link",
+      visibleText: "More",
+      name: "More",
+      ancestorTexts: ["More More"],
+    }),
     target({
       selector: "a:nth-of-type(2)",
       role: "link",
@@ -422,7 +465,10 @@ test("different roles with the same label are not ambiguous", () => {
     }),
     UNSCALED,
   );
-  assert.deepEqual(report.issues.filter((i) => i.kind === "ambiguous-target"), []);
+  assert.deepEqual(
+    report.issues.filter((i) => i.kind === "ambiguous-target"),
+    [],
+  );
 });
 
 test("a box that paints nothing is unlabeled; an icon-only button is not", () => {
@@ -438,7 +484,10 @@ test("a box that paints nothing is unlabeled; an icon-only button is not", () =>
     input({ targets: [target({ visibleText: "", name: "Close dialog", hasGlyph: true })] }),
     UNSCALED,
   );
-  assert.deepEqual(icon.issues.filter((i) => i.kind === "unlabeled-target"), []);
+  assert.deepEqual(
+    icon.issues.filter((i) => i.kind === "unlabeled-target"),
+    [],
+  );
 });
 
 test("the precision floor is measured after the downscale, not in CSS px", () => {
@@ -447,7 +496,10 @@ test("the precision floor is measured after the downscale, not in CSS px", () =>
   // or not depending on what the model is actually shown.
   const small = () => target({ bbox: { x: 10, y: 10, width: 24, height: 24 }, clickPoint: { x: 22, y: 22 } });
   const wide = analyzeGroundingSamples(input({ targets: [small()] }), UNSCALED);
-  assert.deepEqual(wide.issues.filter((i) => i.kind === "imprecise-target"), []);
+  assert.deepEqual(
+    wide.issues.filter((i) => i.kind === "imprecise-target"),
+    [],
+  );
 
   const narrow = analyzeGroundingSamples(input({ targets: [small()] }), {
     resolution: { maxWidth: 375, maxHeight: 320 },
@@ -463,12 +515,21 @@ test("adjacent full-size buttons are not crowded; two tiny icons are", () => {
     input({
       targets: [
         target({ selector: "button.a", bbox: { x: 0, y: 0, width: 120, height: 40 }, clickPoint: { x: 60, y: 20 } }),
-        target({ selector: "button.b", bbox: { x: 120, y: 0, width: 120, height: 40 }, clickPoint: { x: 180, y: 20 }, visibleText: "Cancel", name: "Cancel" }),
+        target({
+          selector: "button.b",
+          bbox: { x: 120, y: 0, width: 120, height: 40 },
+          clickPoint: { x: 180, y: 20 },
+          visibleText: "Cancel",
+          name: "Cancel",
+        }),
       ],
     }),
     UNSCALED,
   );
-  assert.deepEqual(toolbar.issues.filter((i) => i.kind === "crowded-target"), []);
+  assert.deepEqual(
+    toolbar.issues.filter((i) => i.kind === "crowded-target"),
+    [],
+  );
 
   // 10px icons touching: the centre is 5px from the neighbour's box, under the
   // 6px default. They clear the precision floor (minSide 10) on purpose — the
@@ -476,8 +537,20 @@ test("adjacent full-size buttons are not crowded; two tiny icons are", () => {
   const icons = analyzeGroundingSamples(
     input({
       targets: [
-        target({ selector: "button.edit", visibleText: "", name: "Edit", bbox: { x: 0, y: 0, width: 10, height: 10 }, clickPoint: { x: 5, y: 5 } }),
-        target({ selector: "button.delete", visibleText: "", name: "Delete", bbox: { x: 10, y: 0, width: 10, height: 10 }, clickPoint: { x: 15, y: 5 } }),
+        target({
+          selector: "button.edit",
+          visibleText: "",
+          name: "Edit",
+          bbox: { x: 0, y: 0, width: 10, height: 10 },
+          clickPoint: { x: 5, y: 5 },
+        }),
+        target({
+          selector: "button.delete",
+          visibleText: "",
+          name: "Delete",
+          bbox: { x: 10, y: 0, width: 10, height: 10 },
+          clickPoint: { x: 15, y: 5 },
+        }),
       ],
     }),
     UNSCALED,
@@ -485,19 +558,23 @@ test("adjacent full-size buttons are not crowded; two tiny icons are", () => {
   const crowded = icons.issues.filter((i) => i.kind === "crowded-target");
   assert.equal(crowded.length, 2);
   assert.match(crowded[0]!.message, /button\.delete \(button "Delete"\)/);
-  assert.deepEqual(icons.issues.filter((i) => i.kind === "imprecise-target"), []);
+  assert.deepEqual(
+    icons.issues.filter((i) => i.kind === "imprecise-target"),
+    [],
+  );
 });
 
 test("a finding names the map row it is about, and the neighbour's row", () => {
   // v4: "plus a crowded-target warn: 'click point is 5px from
   // #list > button:nth-of-type(9)'" — filed under t8, the row about to be
   // clicked. The warning was t9's.
-  const row = (n: number, y: number, height: number) => target({
-    selector: `#list > button:nth-of-type(${n})`,
-    visibleText: `Row ${n}`,
-    bbox: { x: 0, y, width: 300, height },
-    clickPoint: { x: 150, y: y + height / 2 },
-  });
+  const row = (n: number, y: number, height: number) =>
+    target({
+      selector: `#list > button:nth-of-type(${n})`,
+      visibleText: `Row ${n}`,
+      bbox: { x: 0, y, width: 300, height },
+      clickPoint: { x: 150, y: y + height / 2 },
+    });
   const report = analyzeGroundingSamples(input({ targets: [row(8, 0, 56), row(9, 56, 8)] }), UNSCALED);
   const crowded = report.issues.find((i) => i.kind === "crowded-target")!;
   assert.equal(crowded.targetId, "t2");
@@ -509,13 +586,27 @@ test("a container enclosing the target is not a neighbour a miss lands on", () =
   const report = analyzeGroundingSamples(
     input({
       targets: [
-        target({ selector: "div.card", role: "generic", bbox: { x: 0, y: 0, width: 400, height: 200 }, clickPoint: { x: 200, y: 100 }, visibleText: "Card", name: "Card" }),
-        target({ selector: "button.cta", bbox: { x: 190, y: 90, width: 20, height: 20 }, clickPoint: { x: 200, y: 100 } }),
+        target({
+          selector: "div.card",
+          role: "generic",
+          bbox: { x: 0, y: 0, width: 400, height: 200 },
+          clickPoint: { x: 200, y: 100 },
+          visibleText: "Card",
+          name: "Card",
+        }),
+        target({
+          selector: "button.cta",
+          bbox: { x: 190, y: 90, width: 20, height: 20 },
+          clickPoint: { x: 200, y: 100 },
+        }),
       ],
     }),
     UNSCALED,
   );
-  assert.deepEqual(report.issues.filter((i) => i.kind === "crowded-target"), []);
+  assert.deepEqual(
+    report.issues.filter((i) => i.kind === "crowded-target"),
+    [],
+  );
 });
 
 test("visible text and accessible name must name the same thing, containment allowed", () => {
@@ -529,7 +620,10 @@ test("visible text and accessible name must name the same thing, containment all
     input({ targets: [target({ visibleText: "Save", name: "Save draft" })] }),
     UNSCALED,
   );
-  assert.deepEqual(contained.issues.filter((i) => i.kind === "label-mismatch"), []);
+  assert.deepEqual(
+    contained.issues.filter((i) => i.kind === "label-mismatch"),
+    [],
+  );
 });
 
 test("disabled and below-the-fold targets stay in the map and out of the findings", () => {
@@ -537,7 +631,12 @@ test("disabled and below-the-fold targets stay in the map and out of the finding
     input({
       targets: [
         target({ selector: "button.off", disabled: true, centreHit: false, interceptedBy: "div.veil" }),
-        target({ selector: "button.below", inFrame: false, bbox: { x: 100, y: 1400, width: 8, height: 8 }, clickPoint: { x: 104, y: 1404 } }),
+        target({
+          selector: "button.below",
+          inFrame: false,
+          bbox: { x: 100, y: 1400, width: 8, height: 8 },
+          clickPoint: { x: 104, y: 1404 },
+        }),
       ],
     }),
     UNSCALED,
@@ -552,11 +651,13 @@ test("a target clipped by the viewport is measured on the part that is visible",
   // resolvable at its full height.
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        bbox: { x: 100, y: -36, width: 120, height: 40 },
-        clickPoint: { x: 160, y: 2 },
-        clipped: true,
-      })],
+      targets: [
+        target({
+          bbox: { x: 100, y: -36, width: 120, height: 40 },
+          clickPoint: { x: 160, y: 2 },
+          clipped: true,
+        }),
+      ],
     }),
     UNSCALED,
   );
@@ -584,10 +685,7 @@ test("a target the frame contains quotes its own size and does not blame the fra
 });
 
 test("findDisambiguator picks the nearest level that separates every member", () => {
-  const rows = [
-    target({ ancestorTexts: ["Row", "ACME Corp"] }),
-    target({ ancestorTexts: ["Row", "Globex"] }),
-  ];
+  const rows = [target({ ancestorTexts: ["Row", "ACME Corp"] }), target({ ancestorTexts: ["Row", "Globex"] })];
   assert.deepEqual(findDisambiguator(rows), ["ACME Corp", "Globex"]);
   assert.equal(findDisambiguator([target({ ancestorTexts: ["Row"] }), target({ ancestorTexts: ["Row"] })]), undefined);
 });
@@ -618,16 +716,22 @@ test("identical labels are left to ambiguous-target, not lengthened", () => {
 test("the map row carries the lengthened label", () => {
   const row = (name: string, y: number) =>
     target({ name, visibleText: name, bbox: { x: 0, y, width: 300, height: 40 }, clickPoint: { x: 150, y: y + 20 } });
-  const report = analyzeGroundingSamples(input({
-    targets: [
-      row("Checkout webhook retries exhausted for region eu-west-1", 0),
-      row("Checkout webhook retries exhausted for region eu-central-1", 60),
+  const report = analyzeGroundingSamples(
+    input({
+      targets: [
+        row("Checkout webhook retries exhausted for region eu-west-1", 0),
+        row("Checkout webhook retries exhausted for region eu-central-1", 60),
+      ],
+    }),
+    UNSCALED,
+  );
+  assert.deepEqual(
+    report.targets.map((t) => t.label),
+    [
+      "Checkout webhook retries exhausted for region eu-west-1",
+      "Checkout webhook retries exhausted for region eu-central-1",
     ],
-  }), UNSCALED);
-  assert.deepEqual(report.targets.map((t) => t.label), [
-    "Checkout webhook retries exhausted for region eu-west-1",
-    "Checkout webhook retries exhausted for region eu-central-1",
-  ]);
+  );
 });
 
 test("the prose reports the frame, the map and the truncation", () => {
@@ -657,12 +761,14 @@ test("a lone target in the frame has no aim margin rather than a null one", () =
 test("the action map's risk tags honour rule settings, like the issue list does", () => {
   const report = analyzeGroundingSamples(
     input({
-      targets: [target({
-        bbox: { x: 10, y: 10, width: 6, height: 6 },
-        clickPoint: { x: 13, y: 13 },
-        visibleText: "Send",
-        name: "Submit application",
-      })],
+      targets: [
+        target({
+          bbox: { x: 10, y: 10, width: 6, height: 6 },
+          clickPoint: { x: 13, y: 13 },
+          visibleText: "Send",
+          name: "Submit application",
+        }),
+      ],
     }),
     UNSCALED,
   );
@@ -671,7 +777,11 @@ test("the action map's risk tags honour rule settings, like the issue list does"
   // formatter against a RuleView the runner never produces.
   const text = formatGroundingReport(report, ruleViewFrom({ "imprecise-target": "off" }));
   const mapRow = text.split("\n").find((line) => line.includes("button.primary"))!;
-  assert.doesNotMatch(mapRow, /imprecise-target/, "a tag for a rule turned off is the noise the RuleView exists to remove");
+  assert.doesNotMatch(
+    mapRow,
+    /imprecise-target/,
+    "a tag for a rule turned off is the noise the RuleView exists to remove",
+  );
   assert.match(mapRow, /\[label-mismatch\]/, "the surviving risk is still tagged");
   // …and the disclosure line still names it, so a turned-off rule is visible as
   // a decision rather than as an absence.
@@ -750,36 +860,68 @@ const groundable = join(REPO_ROOT, "fixtures/grounding/groundable.html");
 function screen(overrides: Partial<ScreenState> = {}): ScreenState {
   return { targets: [], controls: {}, texts: [], ...overrides };
 }
-const LOOK_PLAIN = { color: "rgb(0, 0, 0)", "background-color": "rgb(255, 255, 255)", "text-decoration-line": "none", opacity: "1", "font-weight": "400" };
+const LOOK_PLAIN = {
+  color: "rgb(0, 0, 0)",
+  "background-color": "rgb(255, 255, 255)",
+  "text-decoration-line": "none",
+  opacity: "1",
+  "font-weight": "400",
+};
 const click = { kind: "click" as const, at: { x: 10, y: 10 } };
 
 test("an archive click reads as the row restyled and the confirmation text, not as nothing", () => {
   // v4: "`t8` still lists as a plain actionable button, `"disabled": false` …
   // no archived flag anywhere in the report … I had to trust the screenshot."
-  const row = { selector: "#row-8", label: "Checkout … eu-west-1…", onScreen: true, box: { x: 0, y: 0, width: 300, height: 55 } };
-  const archive = { selector: "#archive", label: "Archive", onScreen: true, box: { x: 1110, y: 90, width: 30, height: 30 } };
+  const row = {
+    selector: "#row-8",
+    label: "Checkout … eu-west-1…",
+    onScreen: true,
+    box: { x: 0, y: 0, width: 300, height: 55 },
+  };
+  const archive = {
+    selector: "#archive",
+    label: "Archive",
+    onScreen: true,
+    box: { x: 1110, y: 90, width: 30, height: 30 },
+  };
   const before = screen({
     targets: [row, archive],
-    controls: { "#row-8": { states: ["current"], look: LOOK_PLAIN }, "#archive": { states: [], look: LOOK_PLAIN, hover: ["background-color"] } },
+    controls: {
+      "#row-8": { states: ["current"], look: LOOK_PLAIN },
+      "#archive": { states: [], look: LOOK_PLAIN, hover: ["background-color"] },
+    },
     texts: ["Checkout webhook retries exhausted for region eu-west-1", "Reply"],
   });
   const after = screen({
     targets: [row, archive],
     controls: {
-      "#row-8": { states: ["current"], look: { ...LOOK_PLAIN, color: "rgb(107, 114, 128)", "text-decoration-line": "line-through" } },
-      "#archive": { states: [], look: { ...LOOK_PLAIN, "background-color": "rgb(243, 244, 246)" }, hover: ["background-color"] },
+      "#row-8": {
+        states: ["current"],
+        look: { ...LOOK_PLAIN, color: "rgb(107, 114, 128)", "text-decoration-line": "line-through" },
+      },
+      "#archive": {
+        states: [],
+        look: { ...LOOK_PLAIN, "background-color": "rgb(243, 244, 246)" },
+        hover: ["background-color"],
+      },
     },
     texts: ["Checkout webhook retries exhausted for region eu-west-1", "Reply", "Archived."],
   });
-  const ids = new Map([["#row-8", "t8"], ["#archive", "t15"]]);
+  const ids = new Map([
+    ["#row-8", "t8"],
+    ["#archive", "t15"],
+  ]);
   const change = diffScreens(before, after, { kind: "click", at: { x: 560, y: 50 } }, (s) => ids.get(s), {
     before: { x: 170, y: 322 },
     after: { x: 1120, y: 100 },
   });
-  assert.deepEqual(change.restyled.map((c) => [c.targetId, c.properties, c.hoverOnly]), [
-    ["t8", ["color", "text-decoration-line"], undefined],
-    ["t15", ["background-color"], "entered"],
-  ]);
+  assert.deepEqual(
+    change.restyled.map((c) => [c.targetId, c.properties, c.hoverOnly]),
+    [
+      ["t8", ["color", "text-decoration-line"], undefined],
+      ["t15", ["background-color"], "entered"],
+    ],
+  );
   assert.deepEqual(change.textAdded, ["Archived."]);
   const text = formatScreenChange(change, () => "click (560,50)").join("\n");
   assert.match(text, /~ t8 "Checkout … eu-west-1…" changed color, text-decoration-line$/m);
@@ -791,10 +933,19 @@ test("a restyle under the pointer is only called hover when a :hover rule sets t
   // The first version went by pointer position alone and filed an archived
   // row's strike-through as "possibly just hover".
   const row = { selector: "#row", label: "Row", onScreen: true, box: { x: 0, y: 0, width: 100, height: 40 } };
-  const before = screen({ targets: [row], controls: { "#row": { states: [], look: LOOK_PLAIN, hover: ["background-color"] } } });
+  const before = screen({
+    targets: [row],
+    controls: { "#row": { states: [], look: LOOK_PLAIN, hover: ["background-color"] } },
+  });
   const after = screen({
     targets: [row],
-    controls: { "#row": { states: [], look: { ...LOOK_PLAIN, "text-decoration-line": "line-through" }, hover: ["background-color"] } },
+    controls: {
+      "#row": {
+        states: [],
+        look: { ...LOOK_PLAIN, "text-decoration-line": "line-through" },
+        hover: ["background-color"],
+      },
+    },
   });
   const change = diffScreens(before, after, click, undefined, { before: { x: 10, y: 10 }, after: { x: 500, y: 10 } });
   assert.equal(change.restyled[0]!.hoverOnly, undefined, "the pointer left, but no :hover rule strikes text through");
@@ -807,8 +958,14 @@ test("rows a scroll moved come and go by whether they are painted, not by existi
     screen({ targets: [t(1, false), t(2, true), t(3, true)], texts: ["Row 2", "Row 3"] }),
     { kind: "wheel", at: { x: 10, y: 10 }, dy: 40 },
   );
-  assert.deepEqual(change.appeared.map((c) => c.selector), ["#r3"]);
-  assert.deepEqual(change.disappeared.map((c) => c.selector), ["#r1"]);
+  assert.deepEqual(
+    change.appeared.map((c) => c.selector),
+    ["#r3"],
+  );
+  assert.deepEqual(
+    change.disappeared.map((c) => c.selector),
+    ["#r1"],
+  );
   assert.deepEqual(change.textAdded, ["Row 3"]);
   assert.deepEqual(change.textRemoved, ["Row 1"]);
 });
@@ -816,7 +973,11 @@ test("rows a scroll moved come and go by whether they are painted, not by existi
 test("text is compared as a multiset: a second copy of a title is new text", () => {
   // Opening a ticket paints its full title in the detail panel while the list
   // row still carries the same string.
-  const change = diffScreens(screen({ texts: ["Title", "Other"] }), screen({ texts: ["Title", "Other", "Title"] }), click);
+  const change = diffScreens(
+    screen({ texts: ["Title", "Other"] }),
+    screen({ texts: ["Title", "Other", "Title"] }),
+    click,
+  );
   assert.deepEqual(change.textAdded, ["Title"]);
   assert.deepEqual(change.textRemoved, []);
 });
@@ -827,7 +988,10 @@ test("E2E: every rule fires on the hostile fixture, on the element that causes i
 
   // The promo strip is over the CTA and takes its clicks. `#promo` has no role
   // and no handler, so nothing else on the page reports it.
-  assert.deepEqual(by("occluded-target").map((i) => i.selector), ["#checkout"]);
+  assert.deepEqual(
+    by("occluded-target").map((i) => i.selector),
+    ["#checkout"],
+  );
   assert.match(by("occluded-target")[0]!.message, /goes to #promo/);
 
   // One finding for the group of three, with the row text that separates them.
@@ -837,14 +1001,22 @@ test("E2E: every rule fires on the hostile fixture, on the element that causes i
 
   // `a.ghost` is sized and focusable and paints nothing; the 8px dismiss button
   // has a border and a background, so it is small rather than invisible.
-  assert.deepEqual(by("unlabeled-target").map((i) => i.selector), ["a.ghost"]);
+  assert.deepEqual(
+    by("unlabeled-target").map((i) => i.selector),
+    ["a.ghost"],
+  );
 
   assert.deepEqual(
-    by("imprecise-target").map((i) => i.selector).sort(),
+    by("imprecise-target")
+      .map((i) => i.selector)
+      .sort(),
     ["button.del", "button.dismiss", "button.edit"],
   );
   assert.ok(by("crowded-target").some((i) => /button\.edit.*button\.del/s.test(i.message)));
-  assert.deepEqual(by("label-mismatch").map((i) => i.selector), ["#send"]);
+  assert.deepEqual(
+    by("label-mismatch").map((i) => i.selector),
+    ["#send"],
+  );
 
   // And the action map is populated for every one of them, not just the findings.
   const map = report.targets.filter((t) => t.inFrame && !t.disabled);
@@ -860,7 +1032,10 @@ test("E2E: the groundable fixture reports nothing, and still yields a full map",
   // The same six buttons that clear the floor here are 36 CSS px tall, which is
   // the point of the pair: passing is a property of the markup, not of the gate
   // being lenient.
-  assert.ok(map.every((t) => t.minSide >= 10), map.map((t) => `${t.selector}=${t.minSide}`).join(", "));
+  assert.ok(
+    map.every((t) => t.minSide >= 10),
+    map.map((t) => `${t.selector}=${t.minSide}`).join(", "),
+  );
 });
 
 test("E2E: a partly covered button gets a point that reaches it, found by sweeping", { timeout: 180_000 }, async () => {
@@ -882,7 +1057,10 @@ test("E2E: a partly covered button gets a point that reaches it, found by sweepi
 test("E2E: --at answers in screenshot px and names the row it landed on", { timeout: 180_000 }, async () => {
   const report = await runGroundingScan({
     source: hostile,
-    at: [{ x: 92, y: 58 }, { x: 10_000, y: 5 }],
+    at: [
+      { x: 92, y: 58 },
+      { x: 10_000, y: 5 },
+    ],
   });
   assert.equal(report.probes!.length, 2);
   assert.equal(report.probes![0]!.hit, "#promo", "the covered CTA's centre goes to the ribbon");
@@ -893,66 +1071,83 @@ test("E2E: --at answers in screenshot px and names the row it landed on", { time
   assert.equal(plain.probes, undefined);
 });
 
-test("E2E: a probe says what a click would set off, not just that it is off the map", { timeout: 180_000 }, async () => {
-  const base = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html") });
-  const save = base.targets.find((t) => t.selector === "#save")!;
-  const cta = base.targets.find((t) => t.selector === "#cta")!;
-  const report = await runGroundingScan({
-    source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html"),
-    at: [
-      // On the button's own icon: `elementFromPoint` answers with the child, and
-      // the probe still has to say the click reaches the button.
-      { x: save.box.x + 5, y: save.point.y },
-      // On the veil over the CTA: not a target, and nothing above it is one.
-      cta.aimedOffCentre!.centre,
-      // Empty background.
-      { x: 2, y: 2 },
-    ],
-  });
-  assert.equal(report.probes![0]!.targetId, save.id, "a hit on the icon is a hit on the button");
-  assert.equal(report.probes![1]!.hit, "#veil");
-  assert.equal(report.probes![1]!.targetId, undefined);
-  // "'not a target' means 'not in the actionable list,' not 'safe to slip onto'"
-  // — so the absence of `wouldReach` is the claim, and it is a measured one.
-  assert.equal(report.probes![1]!.wouldReach, undefined, "nothing up to body declares itself interactive");
-  assert.equal(report.probes![2]!.targetId, undefined);
-});
+test(
+  "E2E: a probe says what a click would set off, not just that it is off the map",
+  { timeout: 180_000 },
+  async () => {
+    const base = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html") });
+    const save = base.targets.find((t) => t.selector === "#save")!;
+    const cta = base.targets.find((t) => t.selector === "#cta")!;
+    const report = await runGroundingScan({
+      source: join(REPO_ROOT, "fixtures/grounding/partly-covered.html"),
+      at: [
+        // On the button's own icon: `elementFromPoint` answers with the child, and
+        // the probe still has to say the click reaches the button.
+        { x: save.box.x + 5, y: save.point.y },
+        // On the veil over the CTA: not a target, and nothing above it is one.
+        cta.aimedOffCentre!.centre,
+        // Empty background.
+        { x: 2, y: 2 },
+      ],
+    });
+    assert.equal(report.probes![0]!.targetId, save.id, "a hit on the icon is a hit on the button");
+    assert.equal(report.probes![1]!.hit, "#veil");
+    assert.equal(report.probes![1]!.targetId, undefined);
+    // "'not a target' means 'not in the actionable list,' not 'safe to slip onto'"
+    // — so the absence of `wouldReach` is the claim, and it is a measured one.
+    assert.equal(report.probes![1]!.wouldReach, undefined, "nothing up to body declares itself interactive");
+    assert.equal(report.probes![2]!.targetId, undefined);
+  },
+);
 
-test("E2E: a row scrolled out of its list is reported with the scroll that reveals it", { timeout: 180_000 }, async () => {
-  // Two 90px lists of 40px rows: one scrolls, one does not. The fourth row of
-  // each is painted nowhere, and only one of them can be brought into view.
-  const report = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/scrolled-list.html") });
-  const row4 = report.targets.find((t) => t.selector === "#row-4")!;
-  assert.equal(row4.inFrame, false, "it is inside the viewport and painted nowhere");
-  assert.equal(row4.clippedBy?.selector, "#scroller");
-  assert.equal(row4.clippedBy?.scrollable, true);
-  assert.ok(row4.clippedBy!.dy > 0, "the list has to scroll down to reach it");
+test(
+  "E2E: a row scrolled out of its list is reported with the scroll that reveals it",
+  { timeout: 180_000 },
+  async () => {
+    // Two 90px lists of 40px rows: one scrolls, one does not. The fourth row of
+    // each is painted nowhere, and only one of them can be brought into view.
+    const report = await runGroundingScan({ source: join(REPO_ROOT, "fixtures/grounding/scrolled-list.html") });
+    const row4 = report.targets.find((t) => t.selector === "#row-4")!;
+    assert.equal(row4.inFrame, false, "it is inside the viewport and painted nowhere");
+    assert.equal(row4.clippedBy?.selector, "#scroller");
+    assert.equal(row4.clippedBy?.scrollable, true);
+    assert.ok(row4.clippedBy!.dy > 0, "the list has to scroll down to reach it");
 
-  const locked = report.targets.find((t) => t.selector === "#locked-4")!;
-  assert.equal(locked.clippedBy?.scrollable, false, "overflow:hidden cannot be scrolled to");
+    const locked = report.targets.find((t) => t.selector === "#locked-4")!;
+    assert.equal(locked.clippedBy?.scrollable, false, "overflow:hidden cannot be scrolled to");
 
-  // The rule that used to fire on all of these fires on none of them.
-  assert.deepEqual(report.issues.filter((i) => i.kind === "occluded-target"), []);
+    // The rule that used to fire on all of these fires on none of them.
+    assert.deepEqual(
+      report.issues.filter((i) => i.kind === "occluded-target"),
+      [],
+    );
 
-  // A row only half inside its list is still actionable, and its click point is
-  // in the half that is painted rather than at the box's centre.
-  const row3 = report.targets.find((t) => t.selector === "#row-3")!;
-  assert.equal(row3.inFrame, true);
-  assert.ok(row3.point.y < row3.box.y + row3.box.height / 2, "aimed into the visible part");
-});
+    // A row only half inside its list is still actionable, and its click point is
+    // in the half that is painted rather than at the box's centre.
+    const row3 = report.targets.find((t) => t.selector === "#row-3")!;
+    assert.equal(row3.inFrame, true);
+    assert.ok(row3.point.y < row3.box.y + row3.box.height / 2, "aimed into the visible part");
+  },
+);
 
 test("E2E: --after maps the screen a click leaves, not the first load", { timeout: 180_000 }, async () => {
   // v3: "it measures the page as first loaded only, so Reply/Archive/Delete never
   // appear anywhere in its output … even though they're the only way to finish".
   const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
   const first = await runGroundingScan({ source });
-  assert.deepEqual(first.targets.map((t) => t.label), ["Open ticket", "Refresh"]);
+  assert.deepEqual(
+    first.targets.map((t) => t.label),
+    ["Open ticket", "Refresh"],
+  );
   assert.equal(first.after, undefined, "no --after, no claim about one");
   assert.equal(first.changed, undefined);
 
   const open = first.targets[0]!;
   const after = await runGroundingScan({ source, after: [{ kind: "click", at: open.point }], at: [open.point] });
-  assert.deepEqual(after.targets.map((t) => t.label), ["Open ticket", "Refresh", "Archive", "Delete"]);
+  assert.deepEqual(
+    after.targets.map((t) => t.label),
+    ["Open ticket", "Refresh", "Archive", "Delete"],
+  );
   assert.deepEqual(after.after, [{ kind: "click", at: open.point }]);
   // --at is answered on the same screen the map describes.
   assert.equal(after.probes![0]!.targetId, open.id);
@@ -960,8 +1155,14 @@ test("E2E: --after maps the screen a click leaves, not the first load", { timeou
   // And the report says what that click did, in the map's ids.
   const changed = after.changed!;
   assert.equal(changed.landedOn?.targetId, open.id);
-  assert.deepEqual(changed.appeared.map((c) => c.label), ["Archive", "Delete"]);
-  assert.deepEqual(changed.restated.map((c) => [c.targetId, c.added]), [[open.id, ["expanded"]]]);
+  assert.deepEqual(
+    changed.appeared.map((c) => c.label),
+    ["Archive", "Delete"],
+  );
+  assert.deepEqual(
+    changed.restated.map((c) => [c.targetId, c.added]),
+    [[open.id, ["expanded"]]],
+  );
 });
 
 test("E2E: a click that changes nothing says where it went and that nothing showed", { timeout: 180_000 }, async () => {
@@ -979,7 +1180,10 @@ test("E2E: a click that changes nothing says where it went and that nothing show
   // A click on bare background lands on something that is not a control.
   const blank = await runGroundingScan({ source, after: [{ kind: "click", at: { x: 500, y: 300 } }] });
   assert.equal(blank.changed!.landedOn?.label, "");
-  assert.match(formatGroundingReport(blank), /the click went to \S+, which is not in the map — nothing up to <body> declares itself interactive/);
+  assert.match(
+    formatGroundingReport(blank),
+    /the click went to \S+, which is not in the map — nothing up to <body> declares itself interactive/,
+  );
 });
 
 test("E2E: the wheel the report prints is the wheel that reveals the row", { timeout: 180_000 }, async () => {
@@ -995,13 +1199,17 @@ test("E2E: the wheel the report prints is the wheel that reveals the row", { tim
   assert.equal(row4.clippedBy, undefined);
 });
 
-test("E2E: an --after point outside the frame is a usage error, not a click at the edge", { timeout: 180_000 }, async () => {
-  const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
-  await assert.rejects(
-    runGroundingScan({ source, after: [{ kind: "click", at: { x: 700, y: 10 } }] }),
-    /--after click \(700,10\): outside the 640x360 frame/,
-  );
-});
+test(
+  "E2E: an --after point outside the frame is a usage error, not a click at the edge",
+  { timeout: 180_000 },
+  async () => {
+    const source = join(REPO_ROOT, "fixtures/grounding/revealed-by-click.html");
+    await assert.rejects(
+      runGroundingScan({ source, after: [{ kind: "click", at: { x: 700, y: 10 } }] }),
+      /--after click \(700,10\): outside the 640x360 frame/,
+    );
+  },
+);
 
 test("E2E: --mark writes the overlay at the frame's own resolution", { timeout: 180_000 }, async () => {
   const out = join(mkdtempSync(join(tmpdir(), "vlmkit-grounding-")), "marked.png");

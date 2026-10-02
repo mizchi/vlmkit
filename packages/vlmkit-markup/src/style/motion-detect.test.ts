@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  analyzeMotionSamples,
-  parseCssTimeList,
-  runMotionDetection,
-} from "./motion-detect.ts";
+import { analyzeMotionSamples, parseCssTimeList, runMotionDetection } from "./motion-detect.ts";
 
 describe("parseCssTimeList", () => {
   it("parses comma-separated CSS time values to milliseconds", () => {
@@ -17,17 +13,19 @@ describe("analyzeMotionSamples", () => {
     const report = analyzeMotionSamples({
       source: "inline",
       cssText: ".card { animation: pulse 1s infinite; }",
-      samples: [{
-        selector: ".card",
-        tagName: "DIV",
-        animationName: "pulse",
-        animationDuration: "1s",
-        animationDelay: "0s",
-        animationPlayState: "running",
-        transitionProperty: "all",
-        transitionDuration: "0s",
-        transitionDelay: "0s",
-      }],
+      samples: [
+        {
+          selector: ".card",
+          tagName: "DIV",
+          animationName: "pulse",
+          animationDuration: "1s",
+          animationDelay: "0s",
+          animationPlayState: "running",
+          transitionProperty: "all",
+          transitionDuration: "0s",
+          transitionDelay: "0s",
+        },
+      ],
     });
 
     assert.equal(report.activeAnimationCount, 1);
@@ -40,22 +38,27 @@ describe("analyzeMotionSamples", () => {
     const report = analyzeMotionSamples({
       source: "inline",
       cssText: "@media (prefers-reduced-motion: reduce) { * { animation: none; } }",
-      samples: [{
-        selector: ".card",
-        tagName: "DIV",
-        animationName: "pulse",
-        animationDuration: "1s",
-        animationDelay: "0s",
-        animationPlayState: "paused",
-        transitionProperty: "opacity",
-        transitionDuration: "200ms",
-        transitionDelay: "0s",
-      }],
+      samples: [
+        {
+          selector: ".card",
+          tagName: "DIV",
+          animationName: "pulse",
+          animationDuration: "1s",
+          animationDelay: "0s",
+          animationPlayState: "paused",
+          transitionProperty: "opacity",
+          transitionDuration: "200ms",
+          transitionDelay: "0s",
+        },
+      ],
     });
 
     assert.equal(report.activeAnimationCount, 1);
     assert.equal(report.activeTransitionCount, 1);
-    assert.equal(report.issues.some((issue) => issue.kind === "missing-reduced-motion"), false);
+    assert.equal(
+      report.issues.some((issue) => issue.kind === "missing-reduced-motion"),
+      false,
+    );
   });
 });
 
@@ -88,21 +91,30 @@ describe("runMotionDetection", () => {
  * on the most common way this gate is invoked, every linked sheet was skipped.
  */
 describe("motion: absence of a rule in unread CSS", () => {
-  const animating = [{
-    selector: ".card",
-    tagName: "ARTICLE",
-    animationName: "rise",
-    animationDuration: "250ms",
-    animationDelay: "0s",
-    animationPlayState: "running",
-    transitionProperty: "none",
-    transitionDuration: "0s",
-    transitionDelay: "0s",
-  }];
+  const animating = [
+    {
+      selector: ".card",
+      tagName: "ARTICLE",
+      animationName: "rise",
+      animationDuration: "250ms",
+      animationDelay: "0s",
+      animationPlayState: "running",
+      transitionProperty: "none",
+      transitionDuration: "0s",
+      transitionDelay: "0s",
+    },
+  ];
 
   it("asserts the rule is missing only when every stylesheet was readable", () => {
-    const report = analyzeMotionSamples({ source: "p.html", cssText: ".card { animation: rise 250ms; }", samples: animating });
-    assert.deepEqual(report.issues.map((i) => i.kind), ["missing-reduced-motion", "running-animation"]);
+    const report = analyzeMotionSamples({
+      source: "p.html",
+      cssText: ".card { animation: rise 250ms; }",
+      samples: animating,
+    });
+    assert.deepEqual(
+      report.issues.map((i) => i.kind),
+      ["missing-reduced-motion", "running-animation"],
+    );
   });
 
   it("downgrades to unreadable-stylesheet when a sheet could not be read", () => {
@@ -142,13 +154,19 @@ describe("motion: a linked file:// stylesheet is read (real browser)", () => {
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-motion-"));
-    await writeFile(join(dir, "theme.css"), `
+    await writeFile(
+      join(dir, "theme.css"),
+      `
       @keyframes rise { from { opacity: 0; } to { opacity: 1; } }
       .card { width: 100px; height: 40px; background: #248; animation: rise 250ms; }
       @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
-    `);
-    await writeFile(join(dir, "page.html"), `<!doctype html><html><head><meta charset="utf-8">
-      <link rel="stylesheet" href="theme.css"></head><body><div class="card"></div></body></html>`);
+    `,
+    );
+    await writeFile(
+      join(dir, "page.html"),
+      `<!doctype html><html><head><meta charset="utf-8">
+      <link rel="stylesheet" href="theme.css"></head><body><div class="card"></div></body></html>`,
+    );
 
     const report = await runMotionDetection({ source: join(dir, "page.html") });
     assert.equal(report.hasReducedMotionRule, true, "the rule is in the linked sheet and must be found");

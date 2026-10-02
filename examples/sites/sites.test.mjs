@@ -66,15 +66,30 @@ describe("each judgment log", () => {
 
     it(`${section.id}: holds every gate output it names, and exactly the screens it keeps`, () => {
       const outputs = [...readOutputs(siteDir).keys()].sort();
-      assert.deepEqual(outputs, events.filter((e) => e.kind === "gate").map((g) => g.output).sort(), "one output per gate run");
+      assert.deepEqual(
+        outputs,
+        events
+          .filter((e) => e.kind === "gate")
+          .map((g) => g.output)
+          .sort(),
+        "one output per gate run",
+      );
       // A screen the log let go that is still in the database is 100 KB nobody publishes; a kept one
       // missing is a picture the log page promises and cannot show.
-      assert.deepEqual(storedScreens(siteDir), [...keptScreens(events)].sort(), "the screens in judgment.sqlite are the ones the log keeps");
+      assert.deepEqual(
+        storedScreens(siteDir),
+        [...keptScreens(events)].sort(),
+        "the screens in judgment.sqlite are the ones the log keeps",
+      );
     });
 
     it(`${section.id}: its committed JUDGMENT.md is what the log renders to`, () => {
       const { markdown } = renderSite(siteDir, { pageUrl: judgmentPageUrl(section.sourceDir) });
-      assert.equal(readFileSync(join(siteDir, "JUDGMENT.md"), "utf8"), markdown, "JUDGMENT.md is stale — run judge.mjs <site> render");
+      assert.equal(
+        readFileSync(join(siteDir, "JUDGMENT.md"), "utf8"),
+        markdown,
+        "JUDGMENT.md is stale — run judge.mjs <site> render",
+      );
     });
   }
 });

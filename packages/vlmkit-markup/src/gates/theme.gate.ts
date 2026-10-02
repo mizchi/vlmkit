@@ -63,8 +63,21 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to render in both schemes", positional: 0, required: true },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Screenshot output directory", defaultDescription: "./test-results/theme-parity" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to render in both schemes",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Screenshot output directory",
+      defaultDescription: "./test-results/theme-parity",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     {
       name: "threshold",
@@ -103,8 +116,8 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
       rule: "unthemed-component",
       severity: "warn",
       message:
-        `component #${u.rank} at ${u.bbox.left},${u.bbox.top} ${u.bbox.width}x${u.bbox.height}`
-        + ` keeps fill ${u.lightFill.hex} in both themes (delta ${u.fillDelta.toFixed(1)})`,
+        `component #${u.rank} at ${u.bbox.left},${u.bbox.top} ${u.bbox.width}x${u.bbox.height}` +
+        ` keeps fill ${u.lightFill.hex} in both themes (delta ${u.fillDelta.toFixed(1)})`,
       evidence: { bbox: u.bbox, lightFill: u.lightFill.hex, darkFill: u.darkFill.hex, fillDelta: u.fillDelta },
     }));
     if (report.themePixelDelta < THEME_INERT_DELTA) {
@@ -112,8 +125,8 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
         rule: "theme-inert",
         severity: "warn",
         message:
-          `only ${(report.themePixelDelta * 100).toFixed(1)}% of pixels changed between light and dark`
-          + ` — the page may have no prefers-color-scheme styles at all`,
+          `only ${(report.themePixelDelta * 100).toFixed(1)}% of pixels changed between light and dark` +
+          ` — the page may have no prefers-color-scheme styles at all`,
         evidence: { themePixelDelta: report.themePixelDelta },
       });
     }

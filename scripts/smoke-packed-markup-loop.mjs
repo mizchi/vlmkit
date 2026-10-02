@@ -167,48 +167,66 @@ async function main() {
     if (packedManifest.peerDependencies?.playwright !== ">=1.61 <2") {
       fail(`unexpected Playwright peer range: ${packedManifest.peerDependencies?.playwright ?? "missing"}`);
     }
-    if (packedManifest.peerDependencies?.["@playwright/test"] !== ">=1.61 <2"
-      || packedManifest.peerDependenciesMeta?.["@playwright/test"]?.optional !== true) {
+    if (
+      packedManifest.peerDependencies?.["@playwright/test"] !== ">=1.61 <2" ||
+      packedManifest.peerDependenciesMeta?.["@playwright/test"]?.optional !== true
+    ) {
       fail("@playwright/test must be an optional peer");
     }
 
     const rootTarballReference = `file:${relative(consumerDir, tarball)}`;
     const standaloneTarballReference = `file:${relative(standaloneConsumerDir, tarball)}`;
-    await writeFile(join(standaloneConsumerDir, "package.json"), `${JSON.stringify({
-      name: "vlmkit-packed-standalone-consumer",
-      private: true,
-      type: "module",
-      dependencies: { [rootManifest.name]: standaloneTarballReference },
-    }, null, 2)}\n`);
+    await writeFile(
+      join(standaloneConsumerDir, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "vlmkit-packed-standalone-consumer",
+          private: true,
+          type: "module",
+          dependencies: { [rootManifest.name]: standaloneTarballReference },
+        },
+        null,
+        2,
+      )}\n`,
+    );
     console.log("==> installing root tarball without a pre-existing Playwright");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: standaloneConsumerDir });
-    const standaloneInstalled = await realpath(join(
-      standaloneConsumerDir,
-      "node_modules",
-      ...rootManifest.name.split("/"),
-    ));
+    const standaloneInstalled = await realpath(
+      join(standaloneConsumerDir, "node_modules", ...rootManifest.name.split("/")),
+    );
     const standaloneRequire = createRequire(join(standaloneInstalled, "package.json"));
     const standalonePlaywright = standaloneRequire.resolve("playwright/package.json");
     if (!standalonePlaywright) fail("required Playwright peer was not installed for a standalone consumer");
 
-    await writeFile(join(consumerDir, "package.json"), `${JSON.stringify({
-      name: "vlmkit-packed-markup-loop-consumer",
-      private: true,
-      type: "module",
-      dependencies: {
-        "@playwright/test": consumerPlaywrightVersion,
-        [rootManifest.name]: rootTarballReference,
-      },
-    }, null, 2)}\n`);
+    await writeFile(
+      join(consumerDir, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "vlmkit-packed-markup-loop-consumer",
+          private: true,
+          type: "module",
+          dependencies: {
+            "@playwright/test": consumerPlaywrightVersion,
+            [rootManifest.name]: rootTarballReference,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
     await writeFile(join(consumerDir, "playwright.config.ts"), "export default {};\n");
-    await writeFile(join(consumerDir, "fixture.html"), "<style>@media (min-width: 640px) { body { color: red; } }</style>\n");
+    await writeFile(
+      join(consumerDir, "fixture.html"),
+      "<style>@media (min-width: 640px) { body { color: red; } }</style>\n",
+    );
     await writeFile(join(consumerDir, "before.html"), "<style>button { color: red; }</style><button>Save</button>\n");
     await writeFile(join(consumerDir, "after.html"), "<style>button { color: blue; }</style><button>Save</button>\n");
 
     console.log("==> installing root tarball in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });
     const lockfile = await readFile(join(consumerDir, "pnpm-lock.yaml"), "utf8");
-    if (!lockfile.includes(rootTarballReference)) fail(`lockfile does not resolve root package from ${rootTarballReference}`);
+    if (!lockfile.includes(rootTarballReference))
+      fail(`lockfile does not resolve root package from ${rootTarballReference}`);
     const installed = await realpath(join(consumerDir, "node_modules", ...rootManifest.name.split("/")));
     if (!installed.includes(".pnpm") || !installed.includes("file+")) {
       fail(`${rootManifest.name} did not resolve from the root tarball (${installed})`);
@@ -219,7 +237,7 @@ async function main() {
     const testManifestPath = projectRequire.resolve("@playwright/test/package.json");
     const testRequire = createRequire(testManifestPath);
     const projectPlaywrightManifestPath = testRequire.resolve("playwright/package.json");
-    if (await realpath(playwrightManifestPath) !== await realpath(projectPlaywrightManifestPath)) {
+    if ((await realpath(playwrightManifestPath)) !== (await realpath(projectPlaywrightManifestPath))) {
       const vlmkitVersion = JSON.parse(await readFile(playwrightManifestPath, "utf8")).version;
       const projectVersion = JSON.parse(await readFile(projectPlaywrightManifestPath, "utf8")).version;
       fail(`consumer and vlmkit resolved different Playwrights (${projectVersion} vs ${vlmkitVersion})`);
@@ -234,10 +252,29 @@ async function main() {
     const version = run(bin, ["--version"], { cwd: consumerDir });
     assertOutput(version, rootManifest.version, "vlmkit --version");
 
-    const compare = run(bin, ["diff", "html", "before.html", "after.html", "--output", "diff-output"], { cwd: consumerDir });
+    const compare = run(bin, ["diff", "html", "before.html", "after.html", "--output", "diff-output"], {
+      cwd: consumerDir,
+    });
     assertOutput(compare, "after", "bundled diff html");
 
-    run(bin, ["markup-loop", "init", "--topic", "checkout", "--title", "Checkout Smoke", "--base-url", "http://127.0.0.1:4173", "--provider", "openrouter", "--playwright-config", "playwright.config.ts"], { cwd: consumerDir });
+    run(
+      bin,
+      [
+        "markup-loop",
+        "init",
+        "--topic",
+        "checkout",
+        "--title",
+        "Checkout Smoke",
+        "--base-url",
+        "http://127.0.0.1:4173",
+        "--provider",
+        "openrouter",
+        "--playwright-config",
+        "playwright.config.ts",
+      ],
+      { cwd: consumerDir },
+    );
     for (const path of [
       ".vlmkit/markup-loop.json",
       ".vlmkit/markup-loop/AGENT.md",
@@ -245,7 +282,8 @@ async function main() {
       ".vlmkit/markup-loop/observations.json",
       ".vlmkit/markup-loop/_generation-rules.md",
       "tests/vlmkit/support/goto-app.ts",
-    ]) await assertFile(join(consumerDir, path));
+    ])
+      await assertFile(join(consumerDir, path));
 
     const config = JSON.parse(await readFile(join(consumerDir, ".vlmkit/markup-loop.json"), "utf8"));
     if (config.title !== "Checkout Smoke") fail("init did not preserve the configured title");

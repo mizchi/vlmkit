@@ -109,11 +109,12 @@ export function aggregateStability(
     });
   }
 
-  entries.sort((a, b) =>
-    b.falsePositiveRate - a.falsePositiveRate
-    || b.maxDiffRatio - a.maxDiffRatio
-    || a.label.localeCompare(b.label)
-    || a.viewport.localeCompare(b.viewport),
+  entries.sort(
+    (a, b) =>
+      b.falsePositiveRate - a.falsePositiveRate ||
+      b.maxDiffRatio - a.maxDiffRatio ||
+      a.label.localeCompare(b.label) ||
+      a.viewport.localeCompare(b.viewport),
   );
 
   return entries;
@@ -152,8 +153,8 @@ export function formatStabilitySummary(report: StabilityReport): string {
   lines.push(`Stability run: ${report.iterations} iterations over ${report.urls.length} URL(s)`);
   lines.push(
     `Overall FP rate: ${formatPct(report.overallFalsePositiveRate)} ` +
-    `(${report.totalPositives}/${report.totalComparisons} comparisons above ` +
-    `${formatPct(report.threshold)})`,
+      `(${report.totalPositives}/${report.totalComparisons} comparisons above ` +
+      `${formatPct(report.threshold)})`,
   );
   lines.push("");
   if (report.entries.length === 0) {
@@ -165,10 +166,10 @@ export function formatStabilitySummary(report: StabilityReport): string {
     const marker = e.positives === 0 ? "✓" : "✗";
     lines.push(
       `  ${marker} ${e.label} ${e.viewport}: ` +
-      `FP ${formatPct(e.falsePositiveRate)} ` +
-      `(${e.positives}/${e.comparisons}), ` +
-      `max ${formatPct(e.maxDiffRatio)}, ` +
-      `mean ${formatPct(e.meanDiffRatio)}`,
+        `FP ${formatPct(e.falsePositiveRate)} ` +
+        `(${e.positives}/${e.comparisons}), ` +
+        `max ${formatPct(e.maxDiffRatio)}, ` +
+        `mean ${formatPct(e.meanDiffRatio)}`,
     );
   }
   return lines.join("\n");
@@ -190,18 +191,18 @@ export function buildStabilityHistory(inputs: StabilityHistoryInput[]): Stabilit
       const previous = index > 0 ? sorted[index - 1] : undefined;
       return {
         ...run,
-        deltaFalsePositiveRate: previous
-          ? run.overallFalsePositiveRate - previous.overallFalsePositiveRate
-          : undefined,
+        deltaFalsePositiveRate: previous ? run.overallFalsePositiveRate - previous.overallFalsePositiveRate : undefined,
       };
     });
 
-  const best = runs.reduce<StabilityHistoryRun | undefined>((current, run) =>
-    !current || run.overallFalsePositiveRate < current.overallFalsePositiveRate ? run : current,
-  undefined);
-  const worst = runs.reduce<StabilityHistoryRun | undefined>((current, run) =>
-    !current || run.overallFalsePositiveRate > current.overallFalsePositiveRate ? run : current,
-  undefined);
+  const best = runs.reduce<StabilityHistoryRun | undefined>(
+    (current, run) => (!current || run.overallFalsePositiveRate < current.overallFalsePositiveRate ? run : current),
+    undefined,
+  );
+  const worst = runs.reduce<StabilityHistoryRun | undefined>(
+    (current, run) => (!current || run.overallFalsePositiveRate > current.overallFalsePositiveRate ? run : current),
+    undefined,
+  );
 
   return {
     runs,
@@ -227,7 +228,7 @@ export function formatStabilityHistorySummary(history: StabilityHistory): string
 
   lines.push(
     `Latest: ${formatPct(history.latest!.overallFalsePositiveRate)} ` +
-    `(${history.latest!.totalPositives}/${history.latest!.totalComparisons})`,
+      `(${history.latest!.totalPositives}/${history.latest!.totalComparisons})`,
   );
   lines.push(`Best: ${formatPct(history.best!.overallFalsePositiveRate)} (${history.best!.reportPath})`);
   lines.push(`Worst: ${formatPct(history.worst!.overallFalsePositiveRate)} (${history.worst!.reportPath})`);
@@ -237,8 +238,8 @@ export function formatStabilityHistorySummary(history: StabilityHistory): string
   for (const run of history.runs) {
     lines.push(
       `| ${run.timestamp} | ${formatPct(run.overallFalsePositiveRate)} | ` +
-      `${formatSignedPct(run.deltaFalsePositiveRate)} | ${run.totalPositives}/${run.totalComparisons} | ` +
-      `${run.urlCount} | ${run.iterations} | \`${run.reportPath}\` |`,
+        `${formatSignedPct(run.deltaFalsePositiveRate)} | ${run.totalPositives}/${run.totalComparisons} | ` +
+        `${run.urlCount} | ${run.iterations} | \`${run.reportPath}\` |`,
     );
   }
   return lines.join("\n");

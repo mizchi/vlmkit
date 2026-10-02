@@ -29,11 +29,7 @@ import {
   formatCopyCheckReport,
   runCopyCheck,
 } from "../inspect/copy-check.ts";
-import {
-  COPY_IMAGE_SKIPPED_RULES,
-  type CopyImageOptions,
-  runImageCopyCheck,
-} from "../inspect/copy-image.ts";
+import { COPY_IMAGE_SKIPPED_RULES, type CopyImageOptions, runImageCopyCheck } from "../inspect/copy-image.ts";
 import { TRANSCRIBE_PROMPT } from "../inspect/copy-target.ts";
 import {
   firstPositional,
@@ -63,8 +59,9 @@ const COPY_VALUE_FLAGS = ["--manifest", "--forbid", "--target", "--out", "--allo
 const NOT_IN_ELEMENTS_MODE: { flag: string; because: string }[] = [
   {
     flag: "--target",
-    because: "it crops a reference screenshot per rendered text block and reviews the crops"
-      + " (VLM or contact sheets); element-rect mode has no such comparison wired",
+    because:
+      "it crops a reference screenshot per rendered text block and reviews the crops" +
+      " (VLM or contact sheets); element-rect mode has no such comparison wired",
   },
   { flag: "--vlm", because: "it only drives --target's transcription" },
   { flag: "--storage-state", because: "nothing is navigated, so there is no session to restore" },
@@ -89,12 +86,15 @@ const NOT_IN_ELEMENTS_MODE: { flag: string; because: string }[] = [
 function allowInvisibleFrom(argv: readonly string[]): InvisibleReason[] | undefined {
   const raw = readFlag(argv, "allow-invisible");
   if (raw === undefined) return undefined;
-  const classes = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const classes = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const bad = classes.filter((c) => !(INVISIBLE_REASONS as readonly string[]).includes(c));
   if (classes.length === 0 || bad.length > 0) {
     throw new UsageError(
-      `--allow-invisible: unknown class(es) ${bad.map((b) => `"${b}"`).join(", ") || "(none given)"}.`
-      + ` Valid: ${INVISIBLE_REASONS.join(", ")}`,
+      `--allow-invisible: unknown class(es) ${bad.map((b) => `"${b}"`).join(", ") || "(none given)"}.` +
+        ` Valid: ${INVISIBLE_REASONS.join(", ")}`,
     );
   }
   return classes as InvisibleReason[];
@@ -169,8 +169,9 @@ worth what it rules out.`,
       id: "copy-forbidden",
       title: "Copy the forbid list says is gone is still on the page",
       severity: "suspect",
-      docs: "--forbid <file> is the manifest's mirror, for a claim that was edited out. Matched"
-        + " against the raw text and every revealed state, so hiding the line does not satisfy it.",
+      docs:
+        "--forbid <file> is the manifest's mirror, for a claim that was edited out. Matched" +
+        " against the raw text and every revealed state, so hiding the line does not satisfy it.",
     },
     {
       id: "copy-invisible",
@@ -182,8 +183,9 @@ worth what it rules out.`,
       id: "copy-truncated",
       title: "Drawn text runs past its clip rect, so it renders cut off",
       severity: "suspect",
-      docs: "--elements mode only: needs a text extent the renderer measured (`textMeasured`) and a"
-        + " `clip` rect. In the DOM, check integrity's text-clipped covers this.",
+      docs:
+        "--elements mode only: needs a text extent the renderer measured (`textMeasured`) and a" +
+        " `clip` rect. In the DOM, check integrity's text-clipped covers this.",
     },
     { id: "copy-image-mismatch", title: "Rendered copy differs from the target image", severity: "suspect" },
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
@@ -211,7 +213,12 @@ worth what it rules out.`,
       kind: "path",
       description: "Frame PNG for --elements mode; enables the ink check (text reported but never painted)",
     },
-    { name: "manifest", placeholder: "file", kind: "path", description: "Copy manifest (plain text / markdown; one required line per row)" },
+    {
+      name: "manifest",
+      placeholder: "file",
+      kind: "path",
+      description: "Copy manifest (plain text / markdown; one required line per row)",
+    },
     {
       name: "forbid",
       placeholder: "file",
@@ -223,11 +230,32 @@ worth what it rules out.`,
       kind: "string-list",
       description: `Reason classes to accept as satisfied (${INVISIBLE_REASONS.join(", ")})`,
     },
-    { name: "target", placeholder: "png", kind: "path", description: "Target screenshot to verify copy against (bbox-cropped per text block)" },
-    { name: "out", placeholder: "dir", kind: "path", description: "Sheet/worksheet output dir", defaultDescription: ".vlmkit-copy-review next to the source" },
-    { name: "vlm", placeholder: "model", kind: "string", description: "Transcribe crops with a VLM (optional model id); requires an API key" },
+    {
+      name: "target",
+      placeholder: "png",
+      kind: "path",
+      description: "Target screenshot to verify copy against (bbox-cropped per text block)",
+    },
+    {
+      name: "out",
+      placeholder: "dir",
+      kind: "path",
+      description: "Sheet/worksheet output dir",
+      defaultDescription: ".vlmkit-copy-review next to the source",
+    },
+    {
+      name: "vlm",
+      placeholder: "model",
+      kind: "string",
+      description: "Transcribe crops with a VLM (optional model id); requires an API key",
+    },
     { name: "no-states", kind: "boolean", description: "Skip the disclosure-state sweep (default-state text only)" },
-    { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    {
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
+      description: "Playwright storage state for pages behind a login",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -239,15 +267,15 @@ worth what it rules out.`,
     if (elements) {
       if (firstPositionalOrUndefined(positionalArgv, COPY_VALUE_FLAGS)) {
         throw new UsageError(
-          "check copy takes either a page source or --elements, not both. The two modes "
-          + "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
+          "check copy takes either a page source or --elements, not both. The two modes " +
+            "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
         );
       }
       for (const { flag, because } of NOT_IN_ELEMENTS_MODE) {
         if (argv.includes(flag)) {
           throw new UsageError(
-            `${flag} does not apply with --elements: ${because}.`
-            + " Drop it rather than have the run imply a check it did not perform.",
+            `${flag} does not apply with --elements: ${because}.` +
+              " Drop it rather than have the run imply a check it did not perform.",
           );
         }
       }

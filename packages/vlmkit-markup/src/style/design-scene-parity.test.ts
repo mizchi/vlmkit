@@ -52,21 +52,26 @@ describe("check design: DOM collector vs scene adapter on one page", () => {
     try {
       const tab = await browser.newPage({ viewport: { width: 800, height: 600 } });
       await tab.setContent(HTML);
-      const domInput = await tab.evaluate(buildDesignSampleScript()) as DesignPolicyInput;
-      assert.ok(domInput.samples.every((s) => !("signature" in s)), "the collector ships style facts, not signatures");
+      const domInput = (await tab.evaluate(buildDesignSampleScript())) as DesignPolicyInput;
+      assert.ok(
+        domInput.samples.every((s) => !("signature" in s)),
+        "the collector ships style facts, not signatures",
+      );
       const dom = judgeDesignPolicy(domInput);
-      const scene = judgeDesignPolicy(sceneToDesignPolicyInput(await tab.evaluate(COLLECT_SCENE) as SceneElement[]));
+      const scene = judgeDesignPolicy(sceneToDesignPolicyInput((await tab.evaluate(COLLECT_SCENE)) as SceneElement[]));
 
-      const roles = (r: typeof dom) => r.roles.map((x) => ({ role: x.role, instances: x.instances, signatures: x.signatures }));
+      const roles = (r: typeof dom) =>
+        r.roles.map((x) => ({ role: x.role, instances: x.instances, signatures: x.signatures }));
       assert.deepEqual(roles(scene), roles(dom));
       // The parts of a drift finding that do not name a page-specific selector: how many
       // styles the role renders, and the dominant style's full signature, spelled out.
-      const drift = (r: typeof dom) => r.findings
-        .filter((f) => f.kind === "component-drift")
-        .map((f) => [
-          /\d+ "[^"]+" elements render \d+ distinct styles/.exec(f.message)?.[0],
-          /Dominant style, used \d+x: [^.]*/.exec(f.message)?.[0],
-        ]);
+      const drift = (r: typeof dom) =>
+        r.findings
+          .filter((f) => f.kind === "component-drift")
+          .map((f) => [
+            /\d+ "[^"]+" elements render \d+ distinct styles/.exec(f.message)?.[0],
+            /Dominant style, used \d+x: [^.]*/.exec(f.message)?.[0],
+          ]);
       assert.equal(dom.verdict, "drift");
       assert.equal(scene.verdict, dom.verdict);
       assert.ok(drift(dom).length > 0 && drift(dom).every(([a, b]) => a && b), JSON.stringify(dom.findings));

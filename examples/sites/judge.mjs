@@ -26,15 +26,7 @@
  * The log is append-only and written only by this file. Editing it by hand defeats the point.
  */
 import { spawn } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -209,13 +201,27 @@ function append(siteDir, event, { outputs = {}, screens = {} } = {}) {
 /** Every gate output the log holds, by the path its gate event names. */
 export function readOutputs(siteDir) {
   if (!existsSync(logPaths(siteDir).db)) return new Map();
-  return withLog(siteDir, (db) => new Map(db.prepare("SELECT path, text FROM outputs").all().map((r) => [r.path, r.text])));
+  return withLog(
+    siteDir,
+    (db) =>
+      new Map(
+        db
+          .prepare("SELECT path, text FROM outputs")
+          .all()
+          .map((r) => [r.path, r.text]),
+      ),
+  );
 }
 
 /** The path of every screen the log holds. */
 export function storedScreens(siteDir) {
   if (!existsSync(logPaths(siteDir).db)) return [];
-  return withLog(siteDir, (db) => db.prepare("SELECT path FROM screens ORDER BY path").all().map((r) => r.path));
+  return withLog(siteDir, (db) =>
+    db
+      .prepare("SELECT path FROM screens ORDER BY path")
+      .all()
+      .map((r) => r.path),
+  );
 }
 
 /** One screen's WebP bytes, or null when the log does not hold it. */
@@ -553,7 +559,11 @@ async function cmdGate(siteDir, args) {
 
   const text = clean(result.output) + (result.timedOut ? `\n[judge] killed after ${timeoutMs}ms\n` : "");
   const output = `gates/${id}.txt`;
-  const verdict = text.split("\n").map((line) => line.trim()).find((line) => /^verdict:/i.test(line)) ?? null;
+  const verdict =
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => /^verdict:/i.test(line)) ?? null;
   const event = stamp(events, "gate", {
     cmd: ["vlmkit", ...args].map(shellQuote).join(" "),
     exit: result.code,
@@ -564,7 +574,9 @@ async function cmdGate(siteDir, args) {
   });
   append(siteDir, event, { outputs: { [output]: text } });
   process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
-  console.log(`[judge] ${id} recorded — exit ${result.code}, ${(ms / 1000).toFixed(1)}s, the whole output kept in judgment.sqlite`);
+  console.log(
+    `[judge] ${id} recorded — exit ${result.code}, ${(ms / 1000).toFixed(1)}s, the whole output kept in judgment.sqlite`,
+  );
   return result.code;
 }
 
@@ -690,7 +702,8 @@ async function settle(page) {
         new Promise((done) => {
           const read = () => {
             let sum = window.scrollX * 7 + window.scrollY;
-            for (const el of document.querySelectorAll("*")) if (el.scrollTop || el.scrollLeft) sum += el.scrollTop * 3 + el.scrollLeft;
+            for (const el of document.querySelectorAll("*"))
+              if (el.scrollTop || el.scrollLeft) sum += el.scrollTop * 3 + el.scrollLeft;
             return sum;
           };
           let last = read();
@@ -909,15 +922,22 @@ async function cmdShot(siteDir, argv) {
     });
     append(siteDir, event, { screens: images });
     exportScreens(siteDir, images);
-    const state = [options.dark && "dark", options.reducedMotion && "reduced motion", ...options.steps.map(describeStep)]
+    const state = [
+      options.dark && "dark",
+      options.reducedMotion && "reduced motion",
+      ...options.steps.map(describeStep),
+    ]
       .filter(Boolean)
       .join(", ");
     // In the header line, not only after the file list: a reader filtering for `[judge]` lines
     // missed the warning below and looked at a phone walk that never reached the footer.
-    const what = mode === "full"
-      ? `full page, ${tiles.length} screen(s) of ${pageHeight}px${cutShort ? `, STOPPED SHORT of the end (--max-tiles ${options.maxTiles})` : ""}`
-      : mode;
-    console.log(`[judge] ${id} — ${options.page} @ ${viewport.name} ${viewport.width}x${viewport.height}, ${what}${state ? ` (${state})` : ""}`);
+    const what =
+      mode === "full"
+        ? `full page, ${tiles.length} screen(s) of ${pageHeight}px${cutShort ? `, STOPPED SHORT of the end (--max-tiles ${options.maxTiles})` : ""}`
+        : mode;
+    console.log(
+      `[judge] ${id} — ${options.page} @ ${viewport.name} ${viewport.width}x${viewport.height}, ${what}${state ? ` (${state})` : ""}`,
+    );
     for (const tile of tiles) {
       const at = tile.scrollY === undefined ? "" : `  (scrollY ${tile.scrollY})`;
       console.log(`  ${join(logPaths(siteDir).dir, tile.file)}${at}`);
@@ -979,7 +999,12 @@ const WIDTH_CLASSES = Object.freeze([(w) => w >= 1024, (w) => w > 480 && w < 102
 export function keptShots(events) {
   const cut = events.findLastIndex((e) => e.kind === "done");
   const closed = events.slice(0, Math.max(cut, 0));
-  const kept = new Set(events.slice(cut + 1).filter((e) => e.kind === "shot").map((e) => e.id));
+  const kept = new Set(
+    events
+      .slice(cut + 1)
+      .filter((e) => e.kind === "shot")
+      .map((e) => e.id),
+  );
   for (const round of closed.filter((e) => e.kind === "round")) {
     const walks = closed.filter((e) => e.kind === "shot" && e.round === round.id && e.mode === "full");
     for (const fits of WIDTH_CLASSES) {
@@ -995,7 +1020,9 @@ export function keptShots(events) {
 /** The screens the log keeps, by the path its shots name them with. */
 export function keptScreens(events) {
   const kept = keptShots(events);
-  return events.filter((e) => e.kind === "shot" && kept.has(e.id)).flatMap((e) => e.tiles.map((t) => tileFile(events, t.file)));
+  return events
+    .filter((e) => e.kind === "shot" && kept.has(e.id))
+    .flatMap((e) => e.tiles.map((t) => tileFile(events, t.file)));
 }
 
 /** Drop the screens a closed round no longer keeps, and give their space back. How many went. */
@@ -1004,7 +1031,11 @@ function dropUnkept(siteDir) {
   return withLog(
     siteDir,
     (db) => {
-      const drop = db.prepare("SELECT path FROM screens").all().map((r) => r.path).filter((path) => !keep.has(path));
+      const drop = db
+        .prepare("SELECT path FROM screens")
+        .all()
+        .map((r) => r.path)
+        .filter((path) => !keep.has(path));
       if (!drop.length) return 0;
       db.exec("BEGIN");
       const remove = db.prepare("DELETE FROM screens WHERE path = ?");
@@ -1029,7 +1060,7 @@ export function checkLog(events) {
   const problems = [];
   if (!events.some((e) => e.kind === "init")) return ["the log was never initialised (init --title …)"];
   const rounds = events.filter((e) => e.kind === "round");
-  if (!rounds.length) return ["no round yet (round \"first draft\")"];
+  if (!rounds.length) return ['no round yet (round "first draft")'];
   const notesAbout = (id) => events.filter((e) => e.kind === "note" && e.about === id);
 
   for (const shot of events.filter((e) => e.kind === "shot")) {
@@ -1048,7 +1079,9 @@ export function checkLog(events) {
     const fixes = events.filter((e) => e.kind === "fix" && e.defect === defect.id);
     const closed = notesAbout(defect.id).some((note) => CLOSING_KINDS.has(note.noteKind));
     if (!fixes.length && !closed) {
-      problems.push(`${defect.id} is open — fix ${defect.id} …, or say why it stays: note --about ${defect.id} --kind accepted …`);
+      problems.push(
+        `${defect.id} is open — fix ${defect.id} …, or say why it stays: note --about ${defect.id} --kind accepted …`,
+      );
       continue;
     }
     if (fixes.length) {
@@ -1057,7 +1090,10 @@ export function checkLog(events) {
       const verified = events.some((e) => e.kind === "verify" && e.defect === defect.id && after(e));
       // A fix later found to be a misdiagnosis is closed by saying so, not by verifying it.
       const closedSince = notesAbout(defect.id).some((note) => CLOSING_KINDS.has(note.noteKind) && after(note));
-      if (!verified && !closedSince) problems.push(`${defect.id} was fixed (${lastFix.id}) and nothing checked it since — verify ${defect.id} --by <L#|G#>`);
+      if (!verified && !closedSince)
+        problems.push(
+          `${defect.id} was fixed (${lastFix.id}) and nothing checked it since — verify ${defect.id} --by <L#|G#>`,
+        );
     }
   }
 
@@ -1067,11 +1103,16 @@ export function checkLog(events) {
   // A walk the tile cap cut off is not a full page: it is the page minus its end, which is where a
   // footer change lives.
   const fullShots = inLast.filter((e) => e.kind === "shot" && e.mode === "full");
-  for (const [width, flag, fits] of [["desktop", "desktop", (w) => w >= 1024], ["phone", "mobile", (w) => w <= 480]]) {
+  for (const [width, flag, fits] of [
+    ["desktop", "desktop", (w) => w >= 1024],
+    ["phone", "mobile", (w) => w <= 480],
+  ]) {
     const atWidth = fullShots.filter((shot) => fits(shot.viewport.width));
     if (atWidth.some((shot) => !stoppedShort(shot))) continue;
     if (!atWidth.length) {
-      problems.push(`the last round (${last.id}) has no full-page shot at ${width} width — shot <page> --full --viewport ${flag}`);
+      problems.push(
+        `the last round (${last.id}) has no full-page shot at ${width} width — shot <page> --full --viewport ${flag}`,
+      );
       continue;
     }
     const short = atWidth.at(-1);
@@ -1100,8 +1141,8 @@ function cmdCheck(siteDir) {
   if (!problems.length) {
     console.log(
       "[judge] the log meets its done conditions — every screen looked at, every defect closed, the last round " +
-        "gated and shot at both widths. The brief's \"States to show\" are still yours to check.",
-    )
+        'gated and shot at both widths. The brief\'s "States to show" are still yours to check.',
+    );
     return 0;
   }
   console.log(`[judge] ${problems.length} thing(s) before this log can say done:`);
@@ -1171,9 +1212,7 @@ function defectRows(events) {
       const shot = source?.kind === "look" ? byId(events, source.shot) : null;
       const fixes = events.filter((e) => e.kind === "fix" && e.defect === defect.id);
       const verifies = events.filter((e) => e.kind === "verify" && e.defect === defect.id);
-      const closing = events.filter(
-        (e) => e.kind === "note" && e.about === defect.id && CLOSING_KINDS.has(e.noteKind),
-      );
+      const closing = events.filter((e) => e.kind === "note" && e.about === defect.id && CLOSING_KINDS.has(e.noteKind));
       return { defect, source, shot, fixes, verifies, closing };
     });
 }
@@ -1201,7 +1240,8 @@ const escapeHtml = (text) =>
 
 function shotCaption(shot) {
   const parts = [`${shot.viewport.width}×${shot.viewport.height}`];
-  if (shot.mode === "full") parts.push(`full page, ${shot.tiles.length} screen(s)${stoppedShort(shot) ? " — stopped before the end" : ""}`);
+  if (shot.mode === "full")
+    parts.push(`full page, ${shot.tiles.length} screen(s)${stoppedShort(shot) ? " — stopped before the end" : ""}`);
   else if (shot.mode === "element") parts.push(`element ${shot.element}`);
   if (shot.scale !== 1) parts.push(`@${shot.scale}x`);
   if (shot.dark) parts.push("dark");
@@ -1294,18 +1334,24 @@ export function renderHtml(events, { briefText = null, readOutput = () => "" } =
 
   const raised = (id) =>
     raisedFrom(id)
-      .map((d) => `<div class="raised"><span class="id">${d.id}</span> <b>defect</b>${d.where ? ` <code>${escapeHtml(d.where)}</code>` : ""}${para(d.text)}</div>`)
+      .map(
+        (d) =>
+          `<div class="raised"><span class="id">${d.id}</span> <b>defect</b>${d.where ? ` <code>${escapeHtml(d.where)}</code>` : ""}${para(d.text)}</div>`,
+      )
       .join("");
 
   const defectTable = rows.length
     ? `<div class="table-wrap"><table><thead><tr><th>Defect</th><th>Found by</th><th>What</th><th>Fix</th><th>Checked by</th></tr></thead><tbody>${rows
         .map(({ defect, source, shot, fixes, verifies, closing }) => {
-          const found = defect.by === "eye"
-            ? `<span class="chip eye">eye</span> <span class="id">${source?.id} on <a href="#${shot?.id}">${shot?.id}</a></span>`
-            : `<span class="chip gate">gate</span> <span class="id"><a href="#${source?.id}">${source?.id}</a></span>`;
+          const found =
+            defect.by === "eye"
+              ? `<span class="chip eye">eye</span> <span class="id">${source?.id} on <a href="#${shot?.id}">${shot?.id}</a></span>`
+              : `<span class="chip gate">gate</span> <span class="id"><a href="#${source?.id}">${source?.id}</a></span>`;
           const fix = fixes.length
             ? fixes.map((f) => para(f.text)).join("")
-            : closing.map((n) => `<p><span class="chip actor">${n.noteKind}</span> ${escapeHtml(n.text)}</p>`).join("") || "<p>—</p>";
+            : closing
+                .map((n) => `<p><span class="chip actor">${n.noteKind}</span> ${escapeHtml(n.text)}</p>`)
+                .join("") || "<p>—</p>";
           const checked = verifies.length ? verifies.map((v) => `<span class="id">${v.by}</span>`).join(", ") : "—";
           return `<tr id="${defect.id}"><td class="id" data-label="Defect">${defect.id}</td><td data-label="Found by">${found}</td><td data-label="What">${defect.where ? `<p><code>${escapeHtml(defect.where)}</code></p>` : ""}${para(defect.text)}</td><td data-label="Fix">${fix}</td><td data-label="Checked by">${checked}</td></tr>`;
         })
@@ -1323,11 +1369,17 @@ export function renderHtml(events, { briefText = null, readOutput = () => "" } =
         const tiles = kept.has(e.id)
           ? `<div class="tiles">${e.tiles
               .map((t) => ({ ...t, file: tileFile(events, t.file) }))
-              .map((t, i) => `<a href="${t.file}" title="screen ${i + 1}${t.scrollY === undefined ? "" : `, scrollY ${t.scrollY}`}"><img src="${t.file}" alt="${e.id} screen ${i + 1}" width="${t.w}" height="${t.h}" class="${t.h > t.w ? "tall" : "wide"}" loading="lazy"></a>`)
+              .map(
+                (t, i) =>
+                  `<a href="${t.file}" title="screen ${i + 1}${t.scrollY === undefined ? "" : `, scrollY ${t.scrollY}`}"><img src="${t.file}" alt="${e.id} screen ${i + 1}" width="${t.w}" height="${t.h}" class="${t.h > t.w ? "tall" : "wide"}" loading="lazy"></a>`,
+              )
               .join("")}</div>`
           : `<p class="id">${e.tiles.length} screen(s), looked at when taken; not kept once the round was done — a round keeps one full-page walk per width.</p>`;
         const looks = looksOf(e.id)
-          .map((l) => `<div class="look"><span class="id">${l.id}${l.tile ? ` · screen ${l.tile}` : ""}${l.round !== e.round ? ` · ${l.round}` : ""}</span> <span class="chip eye">saw</span>${para(l.text)}${raised(l.id)}</div>`)
+          .map(
+            (l) =>
+              `<div class="look"><span class="id">${l.id}${l.tile ? ` · screen ${l.tile}` : ""}${l.round !== e.round ? ` · ${l.round}` : ""}</span> <span class="chip eye">saw</span>${para(l.text)}${raised(l.id)}</div>`,
+          )
           .join("");
         const errors = e.errors.length ? `<p class="id">page errors: ${escapeHtml(e.errors.join(" | "))}</p>` : "";
         return `<article class="entry" id="${e.id}"><header><span class="id">${e.id}</span><h4>${escapeHtml(e.label ?? shotCaption(e))}</h4></header>${e.label ? `<p class="id">${escapeHtml(shotCaption(e))}</p>` : ""}${tiles}${errors}${looks}</article>`;
@@ -1353,7 +1405,9 @@ export function renderHtml(events, { briefText = null, readOutput = () => "" } =
         .filter((e) => e.round === round.id && !(e.kind === "look" && byId(events, e.shot)) && !(e.kind === "defect"))
         .map(entry)
         .join("");
-      const orphanLooks = events.filter((e) => e.kind === "look" && e.round === round.id && byId(events, e.shot)?.round !== round.id);
+      const orphanLooks = events.filter(
+        (e) => e.kind === "look" && e.round === round.id && byId(events, e.shot)?.round !== round.id,
+      );
       const lateLooks = orphanLooks.length
         ? `<p class="id">Also in this round: ${orphanLooks.map((l) => `${l.id} on <a href="#${l.shot}">${l.shot}</a>`).join(", ")}.</p>`
         : "";
@@ -1423,9 +1477,13 @@ export function renderMarkdown(events, { pageUrl = null } = {}) {
     out.push("| | found by | what | fix | checked by |", "|---|---|---|---|---|");
     for (const { defect, source, shot, fixes, verifies, closing } of rows) {
       const found = defect.by === "eye" ? `eye (${source?.id} on ${shot?.id})` : `gate (${source?.id})`;
-      const fix = fixes.length ? fixes.map((f) => f.text).join(" / ") : closing.map((n) => `${n.noteKind}: ${n.text}`).join(" / ") || "—";
+      const fix = fixes.length
+        ? fixes.map((f) => f.text).join(" / ")
+        : closing.map((n) => `${n.noteKind}: ${n.text}`).join(" / ") || "—";
       const what = `${defect.where ? `\`${defect.where}\` ` : ""}${defect.text}`;
-      out.push(`| ${defect.id} | ${found} | ${cell(what)} | ${cell(fix)} | ${verifies.map((v) => v.by).join(", ") || "—"} |`);
+      out.push(
+        `| ${defect.id} | ${found} | ${cell(what)} | ${cell(fix)} | ${verifies.map((v) => v.by).join(", ") || "—"} |`,
+      );
     }
     out.push("");
   }
@@ -1439,10 +1497,14 @@ export function renderMarkdown(events, { pageUrl = null } = {}) {
   for (const round of events.filter((e) => e.kind === "round")) {
     out.push(`### ${round.id} · ${round.title} (${round.actor})`, "");
     // As in the page: looks sit under the shot they are about, defects under what found them.
-    for (const e of events.filter((x) => x.round === round.id && x.kind !== "defect" && !(x.kind === "look" && byId(events, x.shot)))) {
+    for (const e of events.filter(
+      (x) => x.round === round.id && x.kind !== "defect" && !(x.kind === "look" && byId(events, x.shot)),
+    )) {
       if (e.kind === "gate") {
         const summary = gateSummary(e);
-        out.push(`- **${e.id}** \`${e.cmd}\` → exit ${e.exit}${summary ? ` — ${summary}` : ""}${pageUrl ? ` ([output](${pageUrl}#${e.id}))` : ""}`);
+        out.push(
+          `- **${e.id}** \`${e.cmd}\` → exit ${e.exit}${summary ? ` — ${summary}` : ""}${pageUrl ? ` ([output](${pageUrl}#${e.id}))` : ""}`,
+        );
         out.push(...raised(e.id, "  "));
       } else if (e.kind === "shot") {
         const screens = !kept.has(e.id) ? " (screens not kept)" : pageUrl ? ` ([screens](${pageUrl}#${e.id}))` : "";
@@ -1509,8 +1571,13 @@ async function cmdRender(siteDir) {
   const paths = logPaths(siteDir);
   writeFileSync(paths.md, markdown);
   exportJudgment(siteDir, html);
-  if (dropped) console.log(`[judge] ${dropped} screen(s) of finished rounds let go — each round keeps one full-page walk per width`);
-  console.log(`[judge] rendered ${relative(process.cwd(), paths.md)}, and ${relative(process.cwd(), paths.html)} with its screens`);
+  if (dropped)
+    console.log(
+      `[judge] ${dropped} screen(s) of finished rounds let go — each round keeps one full-page walk per width`,
+    );
+  console.log(
+    `[judge] rendered ${relative(process.cwd(), paths.md)}, and ${relative(process.cwd(), paths.html)} with its screens`,
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

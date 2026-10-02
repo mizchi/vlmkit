@@ -48,18 +48,31 @@ describe("applyRuleTiers", () => {
 
   it("drops the rows whose rule is off and counts them by rule", () => {
     const { shown, hiddenByRule } = partition({ "skip-row": "off" });
-    assert.deepEqual(shown.map((s) => s.row.id), [1]);
+    assert.deepEqual(
+      shown.map((s) => s.row.id),
+      [1],
+    );
     assert.deepEqual([...hiddenByRule], [["skip-row", 2]]);
   });
 
   it("carries the re-tuned severity on each surviving row", () => {
     const { shown } = partition({ trap: "info" });
-    assert.deepEqual(shown.map((s) => [s.row.id, s.tier]), [[1, "info"], [2, "warn"], [3, "warn"]]);
+    assert.deepEqual(
+      shown.map((s) => [s.row.id, s.tier]),
+      [
+        [1, "info"],
+        [2, "warn"],
+        [3, "warn"],
+      ],
+    );
   });
 
   it("with no settings, every row keeps its emitted severity and nothing is hidden", () => {
     const { shown, hiddenByRule } = applyRuleTiers(rows, (r) => ({ rule: r.kind, emitted: r.sev }));
-    assert.deepEqual(shown.map((s) => s.tier), ["suspect", "warn", "warn"]);
+    assert.deepEqual(
+      shown.map((s) => s.tier),
+      ["suspect", "warn", "warn"],
+    );
     assert.equal(hiddenByRule.size, 0);
   });
 });
@@ -70,7 +83,12 @@ describe("hiddenByRuleNote", () => {
   });
 
   it("names the total and the per-rule breakdown", () => {
-    const note = hiddenByRuleNote(new Map([["a", 2], ["b", 1]]));
+    const note = hiddenByRuleNote(
+      new Map([
+        ["a", 2],
+        ["b", 1],
+      ]),
+    );
     assert.equal(note, "3 finding(s) not shown — rule turned off (a x2, b x1)");
   });
 });

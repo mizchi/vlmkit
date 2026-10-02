@@ -13,7 +13,12 @@ export type CaseKind = "text" | "color" | "offset" | "none";
 export const CASE_KINDS: readonly CaseKind[] = ["text", "color", "offset", "none"];
 
 /** A box in CSS pixels of the captured page. */
-export interface CssBox { x1: number; y1: number; x2: number; y2: number }
+export interface CssBox {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
 
 export type Expected =
   | { kind: "text"; oldText: string; newText: string; oldToken: string; newToken: string }
@@ -71,9 +76,9 @@ export const OFFSET_TOLERANCE_PX = 0;
 
 export function buildPrompt(c: Pick<BenchCase, "page" | "deviceScaleFactor">): string {
   return [
-    `Image 0 is the baseline screenshot and Image 1 the current screenshot of the same web page. `
-      + `The page is ${c.page.width}x${c.page.height} CSS pixels, captured at ${c.deviceScaleFactor}x device pixel ratio. `
-      + `At most one element differs between them; it is possible that nothing does.`,
+    `Image 0 is the baseline screenshot and Image 1 the current screenshot of the same web page. ` +
+      `The page is ${c.page.width}x${c.page.height} CSS pixels, captured at ${c.deviceScaleFactor}x device pixel ratio. ` +
+      `At most one element differs between them; it is possible that nothing does.`,
     `Reply with one JSON object and nothing else:`,
     `{"changed": true|false, "box": [x1, y1, x2, y2], "kind": "text"|"color"|"position"|"other"|"none", "old": "...", "new": "..."}`,
     `- box: where the change is in Image 1, as 0-1000 of the image width and height, origin top-left. Omit it if nothing changed.`,
@@ -86,7 +91,9 @@ export function buildPrompt(c: Pick<BenchCase, "page" | "deviceScaleFactor">): s
 /** The first balanced JSON object in a reply, with code fences and prose around it tolerated. */
 export function parseAnswer(reply: string): ModelAnswer | null {
   for (let start = reply.indexOf("{"); start >= 0; start = reply.indexOf("{", start + 1)) {
-    let depth = 0, inString = false, escaped = false;
+    let depth = 0,
+      inString = false,
+      escaped = false;
     for (let i = start; i < reply.length; i++) {
       const ch = reply[i]!;
       if (inString) {
@@ -101,7 +108,9 @@ export function parseAnswer(reply: string): ModelAnswer | null {
         try {
           const value = JSON.parse(reply.slice(start, i + 1));
           if (value && typeof value === "object" && !Array.isArray(value)) return normalizeAnswer(value);
-        } catch { /* not this one; try the next brace */ }
+        } catch {
+          /* not this one; try the next brace */
+        }
         break;
       }
     }
@@ -128,7 +137,13 @@ const squash = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 export function parseHex(s: string | undefined): [number, number, number] | null {
   const m = s?.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{3})\b/i);
   if (!m) return null;
-  const h = m[1]!.length === 3 ? m[1]!.split("").map((c) => c + c).join("") : m[1]!;
+  const h =
+    m[1]!.length === 3
+      ? m[1]!
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : m[1]!;
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
 }
 
@@ -141,9 +156,13 @@ export function parseShift(s: string | undefined): { dx: number; dy: number } | 
   if (!s) return null;
   const nums = [...s.matchAll(/[-+]?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
   if (nums.length === 0) return null;
-  let dx = nums[0]!, dy = nums[1] ?? 0;
+  let dx = nums[0]!,
+    dy = nums[1] ?? 0;
   if (nums.length === 1 && /\bleft\b/i.test(s)) dx = -Math.abs(dx);
-  if (nums.length === 1 && /\b(up|down)\b/i.test(s)) { dy = /\bup\b/i.test(s) ? -Math.abs(dx) : Math.abs(dx); dx = 0; }
+  if (nums.length === 1 && /\b(up|down)\b/i.test(s)) {
+    dy = /\bup\b/i.test(s) ? -Math.abs(dx) : Math.abs(dx);
+    dx = 0;
+  }
   return { dx, dy };
 }
 
@@ -153,8 +172,12 @@ function located(c: BenchCase, a: ModelAnswer): boolean | null {
   const cx = ((x1 + x2) / 2 / 1000) * c.page.width;
   const cy = ((y1 + y2) / 2 / 1000) * c.page.height;
   const b = c.diffBox;
-  return cx >= b.x1 - LOCATE_SLACK_PX && cx <= b.x2 + LOCATE_SLACK_PX
-    && cy >= b.y1 - LOCATE_SLACK_PX && cy <= b.y2 + LOCATE_SLACK_PX;
+  return (
+    cx >= b.x1 - LOCATE_SLACK_PX &&
+    cx <= b.x2 + LOCATE_SLACK_PX &&
+    cy >= b.y1 - LOCATE_SLACK_PX &&
+    cy <= b.y2 + LOCATE_SLACK_PX
+  );
 }
 
 function valueRight(e: Expected, a: ModelAnswer): { ok: boolean; note?: string } {
@@ -172,7 +195,9 @@ function valueRight(e: Expected, a: ModelAnswer): { ok: boolean; note?: string }
       const want = parseHex(e.newColor)!;
       if (!got) return { ok: false, note: `no #rrggbb in "${a.new ?? ""}"` };
       const d = colorDistance(got, want);
-      return d <= COLOR_TOLERANCE ? { ok: true } : { ok: false, note: `read ${a.new}, expected ${e.newColor} (off by ${d})` };
+      return d <= COLOR_TOLERANCE
+        ? { ok: true }
+        : { ok: false, note: `read ${a.new}, expected ${e.newColor} (off by ${d})` };
     }
     case "offset": {
       const got = parseShift(a.new);
@@ -188,15 +213,30 @@ function valueRight(e: Expected, a: ModelAnswer): { ok: boolean; note?: string }
 export function scoreAnswer(c: BenchCase, reply: string): CaseScore {
   const a = parseAnswer(reply);
   if (!a || a.changed === undefined) {
-    return { parsed: false, detected: false, located: null, value: c.expected.kind === "none" ? null : false, correct: false, note: "no JSON answer with `changed`" };
+    return {
+      parsed: false,
+      detected: false,
+      located: null,
+      value: c.expected.kind === "none" ? null : false,
+      correct: false,
+      note: "no JSON answer with `changed`",
+    };
   }
   const planted = c.expected.kind !== "none";
   const detected = a.changed === planted;
   if (!planted) {
-    return { parsed: true, detected, located: null, value: null, correct: detected, ...(detected ? {} : { note: "reported a change where none was planted" }) };
+    return {
+      parsed: true,
+      detected,
+      located: null,
+      value: null,
+      correct: detected,
+      ...(detected ? {} : { note: "reported a change where none was planted" }),
+    };
   }
   const loc = located(c, a);
-  if (!detected) return { parsed: true, detected, located: loc, value: false, correct: false, note: "missed the change" };
+  if (!detected)
+    return { parsed: true, detected, located: loc, value: false, correct: false, note: "missed the change" };
   const v = valueRight(c.expected, a);
   return { parsed: true, detected, located: loc, value: v.ok, correct: v.ok, ...(v.note ? { note: v.note } : {}) };
 }
@@ -220,7 +260,10 @@ export function summarize(rows: readonly { case: BenchCase; score: CaseScore }[]
     if (score.correct) s.correct++;
     if (score.parsed) s.parsed++;
     if (score.detected) s.detected++;
-    if (score.located !== null) { s.locatable++; if (score.located) s.located++; }
+    if (score.located !== null) {
+      s.locatable++;
+      if (score.located) s.located++;
+    }
     byKind[c.expected.kind].cases++;
     if (score.correct) byKind[c.expected.kind].correct++;
   }
@@ -232,10 +275,14 @@ export function summarize(rows: readonly { case: BenchCase; score: CaseScore }[]
  * zoom arm got right that the single look got wrong, and the reverse. With n cases a raw
  * difference in accuracy hides whether zoom fixed some and broke others.
  */
-export function pairedFlips(single: readonly CaseScore[], zoom: readonly CaseScore[]): { fixed: number; broke: number; bothRight: number; bothWrong: number } {
+export function pairedFlips(
+  single: readonly CaseScore[],
+  zoom: readonly CaseScore[],
+): { fixed: number; broke: number; bothRight: number; bothWrong: number } {
   const out = { fixed: 0, broke: 0, bothRight: 0, bothWrong: 0 };
   for (let i = 0; i < Math.min(single.length, zoom.length); i++) {
-    const a = single[i]!.correct, b = zoom[i]!.correct;
+    const a = single[i]!.correct,
+      b = zoom[i]!.correct;
     if (!a && b) out.fixed++;
     else if (a && !b) out.broke++;
     else if (a && b) out.bothRight++;
@@ -272,9 +319,14 @@ export function oracleReply(c: BenchCase): string {
   const e = c.expected;
   if (e.kind === "none") return JSON.stringify({ changed: false, kind: "none" });
   const b = c.diffBox!;
-  const box = [b.x1 / c.page.width, b.y1 / c.page.height, b.x2 / c.page.width, b.y2 / c.page.height].map((v) => Math.round(v * 1000));
-  const body = e.kind === "text" ? { kind: "text", old: e.oldText, new: e.newText }
-    : e.kind === "color" ? { kind: "color", old: e.oldColor, new: e.newColor }
-    : { kind: "position", new: `${e.dx},${e.dy}` };
+  const box = [b.x1 / c.page.width, b.y1 / c.page.height, b.x2 / c.page.width, b.y2 / c.page.height].map((v) =>
+    Math.round(v * 1000),
+  );
+  const body =
+    e.kind === "text"
+      ? { kind: "text", old: e.oldText, new: e.newText }
+      : e.kind === "color"
+        ? { kind: "color", old: e.oldColor, new: e.newColor }
+        : { kind: "position", new: `${e.dx},${e.dy}` };
   return JSON.stringify({ changed: true, box, ...body });
 }

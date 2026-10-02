@@ -61,14 +61,37 @@ needing translations.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to stress", positional: 0, required: true },
-    { name: "inflate", placeholder: "n", kind: "number", description: "Word-length inflation factor", defaultDescription: "1.4" },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/i18n-stress" },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to stress",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "inflate",
+      placeholder: "n",
+      kind: "number",
+      description: "Word-length inflation factor",
+      defaultDescription: "1.4",
+    },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Output directory",
+      defaultDescription: "./test-results/i18n-stress",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const htmlPath = firstPositional(argv, "vlmkit stress i18n <html-or-url>", ["--inflate", "--output-dir", "--report"]);
+    const htmlPath = firstPositional(argv, "vlmkit stress i18n <html-or-url>", [
+      "--inflate",
+      "--output-dir",
+      "--report",
+    ]);
     const inflateFactor = readNumber(argv, "inflate", { min: 1 });
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
@@ -88,9 +111,9 @@ needing translations.`,
       rule: o.kind,
       severity: o.kind === "vertical-wrap" ? "warn" : "suspect",
       message:
-        `${o.kind} at ${report.inflateFactor}x text`
-        + ` — ${Math.round(o.before.width)}px -> ${Math.round(o.after.width)}px (scroll ${Math.round(o.after.scrollWidth)}px)`
-        + ` — "${o.text}"`,
+        `${o.kind} at ${report.inflateFactor}x text` +
+        ` — ${Math.round(o.before.width)}px -> ${Math.round(o.after.width)}px (scroll ${Math.round(o.after.scrollWidth)}px)` +
+        ` — "${o.text}"`,
       evidence: { path: o.path, tag: o.tag, before: o.before, after: o.after },
     })),
   format: formatI18nStressReport,
@@ -133,7 +156,14 @@ Available variants: ${ALL_VARIANTS.join(", ")}.`,
     },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to stress", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to stress",
+      positional: 0,
+      required: true,
+    },
     {
       name: "variants",
       placeholder: "list",
@@ -141,22 +171,42 @@ Available variants: ${ALL_VARIANTS.join(", ")}.`,
       description: `Comma-separated subset of ${ALL_VARIANTS.join(", ")}`,
       defaultDescription: "all",
     },
-    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pixel diff threshold", defaultDescription: "0.03" },
-    { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/media-variants" },
+    {
+      name: "threshold",
+      placeholder: "0..1",
+      kind: "number",
+      description: "Pixel diff threshold",
+      defaultDescription: "0.03",
+    },
+    {
+      name: "output-dir",
+      placeholder: "dir",
+      kind: "path",
+      description: "Output directory",
+      defaultDescription: "./test-results/media-variants",
+    },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit stress media <html-or-url>", ["--variants", "--threshold", "--output-dir", "--report"]);
+    const source = firstPositional(argv, "vlmkit stress media <html-or-url>", [
+      "--variants",
+      "--threshold",
+      "--output-dir",
+      "--report",
+    ]);
     const rawVariants = readFlag(argv, "variants");
     let variants: MediaVariant[] | undefined;
     if (rawVariants !== undefined) {
-      const requested = rawVariants.split(",").map((v) => v.trim()).filter(Boolean);
+      const requested = rawVariants
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
       const unknown = requested.filter((v) => !(ALL_VARIANTS as string[]).includes(v));
       if (requested.length === 0 || unknown.length > 0) {
         throw new UsageError(
-          `--variants: unknown ${unknown.map((u) => `"${u}"`).join(", ") || "(none given)"}.`
-          + ` Available: ${ALL_VARIANTS.join(", ")}`,
+          `--variants: unknown ${unknown.map((u) => `"${u}"`).join(", ") || "(none given)"}.` +
+            ` Available: ${ALL_VARIANTS.join(", ")}`,
         );
       }
       variants = requested as MediaVariant[];

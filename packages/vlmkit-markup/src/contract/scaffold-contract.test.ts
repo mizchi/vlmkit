@@ -1,10 +1,6 @@
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
-import {
-  mediaQueryForViewport,
-  scaffoldUiContract,
-  scaffoldUiContractScreen,
-} from "./scaffold-contract.ts";
+import { mediaQueryForViewport, scaffoldUiContract, scaffoldUiContractScreen } from "./scaffold-contract.ts";
 import type { UiContract, UiContractScreen } from "./ui-contract.ts";
 
 const VIEWPORTS = [
@@ -140,9 +136,7 @@ test("scrollport height policy emits max-height + overflow and filler for expect
 test("selector-based scrollports attach to the landmark the selector names", () => {
   // `contract introspect` records scrollports with a selector, no landmarkId.
   const screen = landingScreen();
-  screen.expectedScrollports = [
-    { id: "feed-scroll", selector: "#features", axis: "y", required: true },
-  ];
+  screen.expectedScrollports = [{ id: "feed-scroll", selector: "#features", axis: "y", required: true }];
   screen.landmarks[1].layout.height = { kind: "scrollport", max: 480 };
   const { html, warnings } = scaffoldUiContractScreen(screen);
   assert.match(html, /<main id="features"[^>]*data-scrollport="feed-scroll"/);
@@ -164,9 +158,7 @@ test("selector-based scrollports naming no landmark materialize as standalone sc
 test("responsive height override resets desktop scrollport constraints", () => {
   const screen = landingScreen();
   screen.landmarks[1].layout.height = { kind: "scrollport", max: 480 };
-  screen.landmarks[1].responsive = [
-    { viewport: "mobile", height: { kind: "content" } },
-  ];
+  screen.landmarks[1].responsive = [{ viewport: "mobile", height: { kind: "content" } }];
   const { html } = scaffoldUiContractScreen(screen);
   const media = html.match(/@media \(max-width: 375px\) \{(.*?)\n\}/s)?.[1] ?? "";
   assert.match(media, /max-height: none/);
@@ -176,9 +168,7 @@ test("responsive height override resets desktop scrollport constraints", () => {
 test("responsive fixed→content override resets the base height", () => {
   const screen = landingScreen();
   screen.landmarks[0].layout.height = { kind: "fixed", value: 420 };
-  screen.landmarks[0].responsive = [
-    { viewport: "mobile", height: { kind: "content", min: 200 } },
-  ];
+  screen.landmarks[0].responsive = [{ viewport: "mobile", height: { kind: "content", min: 200 } }];
   const { html } = scaffoldUiContractScreen(screen);
   const media = html.match(/@media \(max-width: 375px\) \{(.*?)\n\}/s)?.[1] ?? "";
   assert.match(media, /#hero \{[^}]*height: auto/s);
@@ -188,9 +178,7 @@ test("responsive fixed→content override resets the base height", () => {
 test("responsive scroll:false override resets base overflow", () => {
   const screen = landingScreen();
   screen.landmarks[2].layout.scroll = { x: true, y: false };
-  screen.landmarks[2].responsive = [
-    { viewport: "mobile", scroll: { x: false, y: false } },
-  ];
+  screen.landmarks[2].responsive = [{ viewport: "mobile", scroll: { x: false, y: false } }];
   const { html } = scaffoldUiContractScreen(screen);
   const media = html.match(/@media \(max-width: 375px\) \{(.*?)\n\}/s)?.[1] ?? "";
   assert.match(media, /#footer \{[^}]*overflow-x: visible/s);

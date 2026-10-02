@@ -1,10 +1,4 @@
-import type {
-  AgentContext,
-  VrtVerdict,
-  VrtDiff,
-  ChangeIntent,
-  QualityCheckResult,
-} from "@mizchi/vlmkit-core/types.ts";
+import type { AgentContext, VrtVerdict, VrtDiff, ChangeIntent, QualityCheckResult } from "@mizchi/vlmkit-core/types.ts";
 import type { LLMProvider } from "@mizchi/vlmkit-ai/intent.ts";
 import { buildReasoningPrompt } from "@mizchi/vlmkit-ai/intent.ts";
 
@@ -38,7 +32,7 @@ export async function runVerificationLoop(
   diffs: VrtDiff[],
   intent: ChangeIntent,
   qualityChecks: QualityCheckResult[],
-  config: Partial<AgentConfig> = {}
+  config: Partial<AgentConfig> = {},
 ): Promise<AgentContext> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const verdicts: VrtVerdict[] = [];
@@ -60,7 +54,7 @@ async function evaluateDiff(
   diff: VrtDiff,
   intent: ChangeIntent,
   qualityChecks: QualityCheckResult[],
-  config: AgentConfig
+  config: AgentConfig,
 ): Promise<VrtVerdict> {
   const snapshotId = diff.snapshot.testId;
 
@@ -87,9 +81,7 @@ async function evaluateDiff(
   }
 
   // Stage 3: Quality check failure + large diff -> reject
-  const failedChecks = qualityChecks.filter(
-    (c) => !c.passed && c.severity === "error"
-  );
+  const failedChecks = qualityChecks.filter((c) => !c.passed && c.severity === "error");
   if (failedChecks.length > 0 && diff.diffRatio > config.autoRejectThreshold) {
     return {
       snapshotId,
@@ -100,11 +92,7 @@ async function evaluateDiff(
   }
 
   // Stage 4: LLM reasoning (if available)
-  if (
-    config.llm &&
-    diff.diffRatio >= config.llmReasoningRange[0] &&
-    diff.diffRatio <= config.llmReasoningRange[1]
-  ) {
+  if (config.llm && diff.diffRatio >= config.llmReasoningRange[0] && diff.diffRatio <= config.llmReasoningRange[1]) {
     return await llmReasoning(diff, intent, config.llm);
   }
 
@@ -129,20 +117,13 @@ function matchIntent(diff: VrtDiff, intent: ChangeIntent) {
       .split("/")
       .pop()!;
 
-    if (
-      testTitle.includes(componentName) ||
-      testId.includes(componentName) ||
-      componentName.includes(testTitle)
-    ) {
+    if (testTitle.includes(componentName) || testId.includes(componentName) || componentName.includes(testTitle)) {
       return expectation;
     }
   }
 
   // Report visual changes during refactor/deps with low confidence
-  if (
-    (intent.changeType === "refactor" || intent.changeType === "deps") &&
-    diff.diffRatio > 0.01
-  ) {
+  if ((intent.changeType === "refactor" || intent.changeType === "deps") && diff.diffRatio > 0.01) {
     return {
       component: diff.snapshot.testTitle,
       description: `Unexpected visual change during ${intent.changeType}`,
@@ -153,11 +134,7 @@ function matchIntent(diff: VrtDiff, intent: ChangeIntent) {
   return null;
 }
 
-async function llmReasoning(
-  diff: VrtDiff,
-  intent: ChangeIntent,
-  llm: LLMProvider
-): Promise<VrtVerdict> {
+async function llmReasoning(diff: VrtDiff, intent: ChangeIntent, llm: LLMProvider): Promise<VrtVerdict> {
   const prompt = buildReasoningPrompt(diff, intent);
 
   try {
@@ -193,9 +170,7 @@ export function generateReport(ctx: AgentContext): string {
   lines.push(`## Change Intent`);
   lines.push(`- Summary: ${ctx.intent.summary}`);
   lines.push(`- Type: ${ctx.intent.changeType}`);
-  lines.push(
-    `- Expected visual changes: ${ctx.intent.expectedVisualChanges.length}`
-  );
+  lines.push(`- Expected visual changes: ${ctx.intent.expectedVisualChanges.length}`);
   lines.push("");
 
   // Summary counts

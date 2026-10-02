@@ -73,17 +73,14 @@ const DEFAULT_TOP_N = 8;
 const DEFAULT_RED_OVER = 60;
 const DEFAULT_MAX_REGION_FRACTION = 0.8;
 
-function buildHotMask(
-  data: Uint8Array,
-  width: number,
-  height: number,
-  redOver: number,
-): Uint8Array {
+function buildHotMask(data: Uint8Array, width: number, height: number, redOver: number): Uint8Array {
   const mask = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
-      const r = data[idx]!, g = data[idx + 1]!, b = data[idx + 2]!;
+      const r = data[idx]!,
+        g = data[idx + 1]!,
+        b = data[idx + 2]!;
       if (r - Math.max(g, b) >= redOver) {
         mask[y * width + x] = 1;
       }
@@ -103,7 +100,8 @@ function labelComponents(mask: Uint8Array, width: number, height: number): Heatm
     return x;
   };
   const union = (a: number, b: number): void => {
-    const ra = find(a), rb = find(b);
+    const ra = find(a),
+      rb = find(b);
     if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
   };
   let next = 1;
@@ -204,7 +202,9 @@ function sampleRegionColor(
   if (x1 <= x0 || y1 <= y0) return undefined;
   const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
   const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
-  const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+  const rs: number[] = [],
+    gs: number[] = [],
+    bs: number[] = [];
   for (let y = y0; y < y1; y += stepY) {
     for (let x = x0; x < x1; x += stepX) {
       const i = (y * sourceWidth + x) * 4;
@@ -215,9 +215,13 @@ function sampleRegionColor(
     }
   }
   if (rs.length === 0) return undefined;
-  rs.sort((a, b) => a - b); gs.sort((a, b) => a - b); bs.sort((a, b) => a - b);
+  rs.sort((a, b) => a - b);
+  gs.sort((a, b) => a - b);
+  bs.sort((a, b) => a - b);
   const mid = rs.length >> 1;
-  const r = rs[mid]!, g = gs[mid]!, b = bs[mid]!;
+  const r = rs[mid]!,
+    g = gs[mid]!,
+    b = bs[mid]!;
   return { r, g, b, hex: toHex(r, g, b) };
 }
 

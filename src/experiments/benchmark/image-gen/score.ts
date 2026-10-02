@@ -62,15 +62,18 @@ export function problems(ev: Evaluation, briefs: Brief[] = BRIEFS): string[] {
   for (const [id, hash] of Object.entries(ev.briefs)) {
     const brief = briefs.find((b) => b.id === id);
     if (!brief) out.push(`brief ${id} no longer exists`);
-    else if (briefHash(brief) !== hash) out.push(`brief ${id} changed since this evaluation (${hash} → ${briefHash(brief)}): re-run it`);
+    else if (briefHash(brief) !== hash)
+      out.push(`brief ${id} changed since this evaluation (${hash} → ${briefHash(brief)}): re-run it`);
   }
   for (const r of ev.runs.filter((r) => r.file)) {
     const s = ev.scores.find((s) => s.model === r.model && s.brief === r.brief);
     if (!s || s.verdict === null) out.push(`${r.model} × ${r.brief} is not scored`);
-    else if (s.verdict !== "pass" && !s.note.trim()) out.push(`${r.model} × ${r.brief} is ${s.verdict} with no note saying why`);
+    else if (s.verdict !== "pass" && !s.note.trim())
+      out.push(`${r.model} × ${r.brief} is ${s.verdict} with no note saying why`);
   }
   for (const s of ev.scores) {
-    if (!ev.runs.some((r) => r.file && r.model === s.model && r.brief === s.brief)) out.push(`score for ${s.model} × ${s.brief} has no image`);
+    if (!ev.runs.some((r) => r.file && r.model === s.model && r.brief === s.brief))
+      out.push(`score for ${s.model} × ${s.brief} has no image`);
   }
   return out;
 }
@@ -93,7 +96,9 @@ export function summarize(ev: Evaluation): Row[] {
   const rows = models.map((model): Row => {
     const runs = ev.runs.filter((r) => r.model === model);
     const ok = runs.filter((r) => r.file);
-    const verdicts = Object.fromEntries(Object.keys(ev.briefs).map((b) => [b, ev.scores.find((s) => s.model === model && s.brief === b)]));
+    const verdicts = Object.fromEntries(
+      Object.keys(ev.briefs).map((b) => [b, ev.scores.find((s) => s.model === model && s.brief === b)]),
+    );
     const scored = Object.values(verdicts).filter((s): s is Score => !!s?.verdict);
     const costs = ok.map((r) => r.costUsd).filter((c): c is number => typeof c === "number");
     return {
@@ -106,7 +111,10 @@ export function summarize(ev: Evaluation): Row[] {
       errors: runs.filter((r) => r.error).map((r) => `${r.brief}: ${r.error}`),
     };
   });
-  return rows.sort((a, b) => b.points - a.points || (a.cost?.[1] ?? Infinity) - (b.cost?.[1] ?? Infinity) || a.latencyMs[1] - b.latencyMs[1]);
+  return rows.sort(
+    (a, b) =>
+      b.points - a.points || (a.cost?.[1] ?? Infinity) - (b.cost?.[1] ?? Infinity) || a.latencyMs[1] - b.latencyMs[1],
+  );
 }
 
 const money = (r: [number, number] | null) => {

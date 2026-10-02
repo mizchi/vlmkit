@@ -29,7 +29,7 @@ describe("STYLE_SAMPLING_JS", () => {
     try {
       const tab = await browser.newPage();
       await tab.setContent(page);
-      const got = await tab.evaluate(`(() => {
+      const got = (await tab.evaluate(`(() => {
         ${STYLE_SAMPLING_JS}
         const q = (s) => document.querySelector(s);
         return {
@@ -37,7 +37,7 @@ describe("STYLE_SAMPLING_JS", () => {
           gone: visible(q("#gone")), clear: visible(q("#clear")), shown: visible(q("#shown")),
           len: px("14.25px"), none: px("auto"),
         };
-      })()`) as Record<string, unknown>;
+      })()`)) as Record<string, unknown>;
 
       // Three segments at most, the first class of each; an id ends the walk.
       assert.equal(got.link, "div.card>p.lead>a");

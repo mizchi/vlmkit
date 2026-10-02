@@ -76,7 +76,9 @@ describe("captureRoutes", () => {
     // commands that diff them: `ariaSnapshot` is a YAML string in one field, and a page that
     // silently degrades to it looks like a page whose whole a11y tree changed.
     const result = await captureRoutes({
-      baseUrl, routes: [{ name: "home", path: "/" }], outputDir: join(dir, "cdp"),
+      baseUrl,
+      routes: [{ name: "home", path: "/" }],
+      outputDir: join(dir, "cdp"),
     });
     const entry = result.captured[0]!;
     assert.equal(entry.a11ySource, "cdp");
@@ -92,7 +94,9 @@ describe("captureRoutes", () => {
     // `page.goto` does not throw on 404, so this used to produce a screenshot of the server's
     // error page, an a11y tree of it, and exit 0 — a baseline that then passes forever.
     const result = await captureRoutes({
-      baseUrl, routes: [{ name: "admin", path: "/nope" }], outputDir: join(dir, "notok"),
+      baseUrl,
+      routes: [{ name: "admin", path: "/nope" }],
+      outputDir: join(dir, "notok"),
     });
     assert.equal(result.failures.length, 0, "it did capture — the page exists, it is just a 404");
     assert.equal(result.notOk.length, 1);
@@ -101,7 +105,9 @@ describe("captureRoutes", () => {
 
   it("flags a page that renders nothing", { timeout: 120_000 }, async () => {
     const result = await captureRoutes({
-      baseUrl, routes: [{ name: "empty", path: "/empty" }], outputDir: join(dir, "blank"),
+      baseUrl,
+      routes: [{ name: "empty", path: "/empty" }],
+      outputDir: join(dir, "blank"),
     });
     assert.equal(result.blank.length, 1);
     assert.equal(result.blank[0]!.textLength, 0);
@@ -159,7 +165,10 @@ describe("captureRoutes", () => {
 
 describe("cdpNodesToTree", () => {
   const node = (id: string, role: string, name = "", childIds?: string[]) => ({
-    nodeId: id, role: { value: role }, name: { value: name }, ...(childIds ? { childIds } : {}),
+    nodeId: id,
+    role: { value: role },
+    name: { value: name },
+    ...(childIds ? { childIds } : {}),
   });
 
   it("builds a tree from the flat node list", () => {
@@ -175,32 +184,41 @@ describe("cdpNodesToTree", () => {
   });
 
   it("carries exactly the five properties the old spec carried", () => {
-    const tree = cdpNodesToTree([{
-      nodeId: "1", role: { value: "checkbox" }, name: { value: "Agree" },
-      properties: [
-        { name: "checked", value: { value: true } },
-        { name: "disabled", value: { value: false } },
-        { name: "expanded", value: { value: true } },
-        { name: "selected", value: { value: false } },
-        { name: "level", value: { value: 2 } },
-        // Not carried, deliberately: adding a property here would make every baseline captured
-        // by the old path report a semantic diff.
-        { name: "focusable", value: { value: true } },
-      ],
-    }]) as Record<string, unknown>;
+    const tree = cdpNodesToTree([
+      {
+        nodeId: "1",
+        role: { value: "checkbox" },
+        name: { value: "Agree" },
+        properties: [
+          { name: "checked", value: { value: true } },
+          { name: "disabled", value: { value: false } },
+          { name: "expanded", value: { value: true } },
+          { name: "selected", value: { value: false } },
+          { name: "level", value: { value: 2 } },
+          // Not carried, deliberately: adding a property here would make every baseline captured
+          // by the old path report a semantic diff.
+          { name: "focusable", value: { value: true } },
+        ],
+      },
+    ]) as Record<string, unknown>;
     assert.deepEqual(tree, {
-      role: "checkbox", name: "Agree", checked: true, disabled: false, expanded: true,
-      selected: false, level: 2,
+      role: "checkbox",
+      name: "Agree",
+      checked: true,
+      disabled: false,
+      expanded: true,
+      selected: false,
+      level: 2,
     });
   });
 
   it("survives a cycle in childIds", () => {
     // The spec had no guard: an id appearing under two parents, or a self-reference, recursed
     // until the stack gave out, and a hung capture is indistinguishable from a slow page.
-    const tree = cdpNodesToTree([
-      node("1", "RootWebArea", "", ["2"]),
-      node("2", "group", "", ["1", "2"]),
-    ]) as Record<string, unknown>;
+    const tree = cdpNodesToTree([node("1", "RootWebArea", "", ["2"]), node("2", "group", "", ["1", "2"])]) as Record<
+      string,
+      unknown
+    >;
     assert.equal(tree.role, "RootWebArea");
     const group = (tree.children as Record<string, unknown>[])[0]!;
     assert.equal(group.role, "group");

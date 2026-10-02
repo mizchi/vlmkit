@@ -16,8 +16,9 @@ const legacyScope = "@mizchi/" + "vrt-";
  * rather than just shortened: `readdir` throws ENOENT on a missing root, so this file failed
  * with a scandir error about a directory instead of reporting anything about imports.
  */
-const sourceRoots = (["src", "packages", "e2e"] as const)
-  .filter((root) => existsSync(new URL(`../../${root}`, import.meta.url)));
+const sourceRoots = (["src", "packages", "e2e"] as const).filter((root) =>
+  existsSync(new URL(`../../${root}`, import.meta.url)),
+);
 const ignoredDirectories = new Set(["node_modules", "dist", "_build"]);
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 
@@ -40,7 +41,7 @@ async function collectSourceFiles(dir: string): Promise<string[]> {
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (!ignoredDirectories.has(entry.name)) {
-        files.push(...await collectSourceFiles(join(dir, entry.name)));
+        files.push(...(await collectSourceFiles(join(dir, entry.name))));
       }
       continue;
     }

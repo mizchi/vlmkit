@@ -80,7 +80,10 @@ function callDirect(argv: readonly string[]): string {
   const api = createRequire(import.meta.url)(apiModule) as {
     run_markup_core: (command: string, encodedArgs: string) => unknown;
   };
-  const encoded = argv.slice(1).map((arg) => (arg === "" ? DIRECT_EMPTY_ARG : arg)).join("\t");
+  const encoded = argv
+    .slice(1)
+    .map((arg) => (arg === "" ? DIRECT_EMPTY_ARG : arg))
+    .join("\t");
   const result = api.run_markup_core(argv[0]!, encoded);
   if (typeof result === "object" && result !== null && "$tag" in result) {
     const tagged = result as { $tag: number; _0: unknown };
@@ -109,12 +112,41 @@ const SAMPLES: { label: string; argv: string[]; expect: (output: string) => void
     argv: [
       "component-goal-status",
       "landing",
-      "0.04", "0.01",
-      "0.02", "0.03", "0.05", "0.06",
-      "0", "0", "0", "0", "0", "0", "0",
-      "true", "true", "true", "false", "true",
-      "0", "false", "false", "null", "null", "0",
-      "false", "0", "0", "false", "0", "false", "false", "false", "0", "null", "null",
+      "0.04",
+      "0.01",
+      "0.02",
+      "0.03",
+      "0.05",
+      "0.06",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "true",
+      "true",
+      "true",
+      "false",
+      "true",
+      "0",
+      "false",
+      "false",
+      "null",
+      "null",
+      "0",
+      "false",
+      "0",
+      "0",
+      "false",
+      "0",
+      "false",
+      "false",
+      "false",
+      "0",
+      "null",
+      "null",
     ],
     expect: (output) =>
       assert.ok(["pass", "review", "fail"].includes(output), `unexpected verdict ${JSON.stringify(output)}`),
@@ -150,10 +182,10 @@ describe("markup-core positional dispatch", { timeout: 240_000 }, () => {
     assert.deepEqual(
       api,
       cli,
-      "the two positional dispatch tables have drifted."
-      + " A command in only one of them works until something falls back to the other backend,"
-      + " and then answers wrongly with no error. Prefer adding new logic to the JSON boundary"
-      + " (docs/design/moonbit-boundary.md), which has one dispatch by construction.",
+      "the two positional dispatch tables have drifted." +
+        " A command in only one of them works until something falls back to the other backend," +
+        " and then answers wrongly with no error. Prefer adding new logic to the JSON boundary" +
+        " (docs/design/moonbit-boundary.md), which has one dispatch by construction.",
     );
   });
 

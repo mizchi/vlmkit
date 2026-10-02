@@ -30,10 +30,7 @@ test("computeTrend: more passing targets or fewer residuals is an improvement", 
 });
 
 test("computeTrend: unchanged numbers are flat", () => {
-  assert.equal(
-    computeTrend({ targetsPassed: 0, residuals: 4 }, { targetsPassed: 0, residuals: 4 }).direction,
-    "flat",
-  );
+  assert.equal(computeTrend({ targetsPassed: 0, residuals: 4 }, { targetsPassed: 0, residuals: 4 }).direction, "flat");
 });
 
 function component(index: number, left: number, top: number, w: number, h: number, hex = "#e2e8f0"): PageComponent {
@@ -100,7 +97,7 @@ test("kickback reports mid-range IoU matches once, not as root causes", () => {
 });
 
 test("heightToleranceFor: floor of 8px, then 1% of the target height", () => {
-  assert.equal(heightToleranceFor(400), 8);   // 1% = 4 → floor wins
+  assert.equal(heightToleranceFor(400), 8); // 1% = 4 → floor wins
   assert.equal(heightToleranceFor(1335), 13); // r5 mobile: +8px passes
   assert.equal(heightToleranceFor(2905), 29); // S6 tablet: -615px fails by far
 });
@@ -110,7 +107,9 @@ test("pixelPresence: full presence when the bbox holds the fill; zero when it do
   const img = { data: new Uint8Array(10 * 10 * 4).fill(255), width: 10, height: 10 };
   for (let x = 2; x < 6; x++) {
     const i = (5 * 10 + x) * 4;
-    img.data[i] = 226; img.data[i + 1] = 232; img.data[i + 2] = 240;
+    img.data[i] = 226;
+    img.data[i + 1] = 232;
+    img.data[i + 2] = 240;
   }
   const line = { left: 2, top: 5, width: 4, height: 1, hex: "#e2e8f0" };
   assert.equal(pixelPresence(img, line), 1);
@@ -137,7 +136,9 @@ test("pixelPresence: a low-contrast fill is not 'present' on a bare background",
   for (let y = 2; y < 12; y++) {
     for (let x = 2; x < 12; x++) {
       const i = (y * 20 + x) * 4;
-      withCard.data[i] = 241; withCard.data[i + 1] = 241; withCard.data[i + 2] = 241;
+      withCard.data[i] = 241;
+      withCard.data[i + 1] = 241;
+      withCard.data[i + 2] = 241;
     }
   }
   assert.equal(pixelPresence(withCard, card, 25, [255, 255, 255]), 1);
@@ -184,11 +185,7 @@ test("kickback grouping caveat: big size delta with target fill present across t
   // S9-replay shape: whole-card target component (242px) matched against
   // an image-only current component (150px) — dSize reads "-92" but the
   // render already shows the fill over the full target box.
-  const card = match(
-    component(2, 44, 324, 380, 242, "#b45309"),
-    component(2, 44, 324, 380, 150, "#b45309"),
-    0.55,
-  );
+  const card = match(component(2, 44, 324, 380, 242, "#b45309"), component(2, 44, 324, 380, 150, "#b45309"), 0.55);
   const presence = (): number => 1; // both sides fully present
   const lines = kickbackForComposition("desktop", composition({ matches: [card] }), { presence });
   assert.match(lines[0]!, /size-delta caveat/);

@@ -26,14 +26,17 @@ test("parseFixProposals: bare array", () => {
 });
 
 test("parseFixProposals: fixes wrapper inside a json fence with prose around it", () => {
-  const text = 'Sure! Here is the fix:\n```json\n{"fixes": [{"selector": ".footer", "declarations": {"padding-top": "22px"}, "note": "gap"}]}\n```\nGood luck!';
+  const text =
+    'Sure! Here is the fix:\n```json\n{"fixes": [{"selector": ".footer", "declarations": {"padding-top": "22px"}, "note": "gap"}]}\n```\nGood luck!';
   const fixes = parseFixProposals(text);
   assert.equal(fixes.length, 1);
   assert.equal(fixes[0]!.note, "gap");
 });
 
 test("parseFixProposals: numbers coerce, junk entries drop, garbage yields []", () => {
-  const fixes = parseFixProposals('[{"selector": ".a", "declarations": {"z-index": 5}}, {"selector": "", "declarations": {"x": "1"}}, {"nope": true}]');
+  const fixes = parseFixProposals(
+    '[{"selector": ".a", "declarations": {"z-index": 5}}, {"selector": "", "declarations": {"x": "1"}}, {"nope": true}]',
+  );
   assert.equal(fixes.length, 1);
   assert.equal(fixes[0]!.declarations["z-index"], "5");
   assert.deepEqual(parseFixProposals("I cannot help with that."), []);
@@ -47,7 +50,10 @@ test("applyFixBlock inserts before </head> and removeFixBlock restores the origi
   const html = "<!doctype html><html><head><style>.a{color:red}</style></head><body><p>x</p></body></html>";
   const fixes: FixProposal[] = [{ selector: ".a", declarations: { color: "blue", "margin-top": "4px" } }];
   const patched = applyFixBlock(html, fixes, 1);
-  assert.match(patched, /<style data-vlmkit-autofix="1">[\s\S]*\.a \{\n {2}color: blue;\n {2}margin-top: 4px;\n\}[\s\S]*<\/style>\n<\/head>/);
+  assert.match(
+    patched,
+    /<style data-vlmkit-autofix="1">[\s\S]*\.a \{\n {2}color: blue;\n {2}margin-top: 4px;\n\}[\s\S]*<\/style>\n<\/head>/,
+  );
   assert.equal(removeFixBlock(patched, 1), html);
 });
 
@@ -137,23 +143,27 @@ test("E2E: fake LLM repairs an injected defect and the loop reaches DONE", { tim
   assert.match(readFileSync(report.workingFile, "utf8"), /data-vlmkit-autofix="1"/);
 });
 
-test("E2E: a destructive proposal is rolled back and the loop stops after two rollbacks", { timeout: 300_000 }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), "autofix-"));
-  const attempt = brokenCopy(dir);
-  const before = readFileSync(attempt, "utf8");
-  const report = await runMarkupAutofix({
-    attempt,
-    targets: [TARGET],
-    maxRounds: 4,
-    propose: async () => [{ selector: "body", declarations: { display: "none" }, note: "over-correction" }],
-  });
-  assert.equal(report.done, false);
-  assert.equal(report.stopReason, "consecutive-rollbacks");
-  assert.equal(report.rounds.length, 2);
-  assert.ok(report.rounds.every((r) => r.outcome === "rolled-back"));
-  // Rollback restored the working copy to the (still broken) input.
-  assert.equal(readFileSync(report.workingFile, "utf8"), before);
-});
+test(
+  "E2E: a destructive proposal is rolled back and the loop stops after two rollbacks",
+  { timeout: 300_000 },
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), "autofix-"));
+    const attempt = brokenCopy(dir);
+    const before = readFileSync(attempt, "utf8");
+    const report = await runMarkupAutofix({
+      attempt,
+      targets: [TARGET],
+      maxRounds: 4,
+      propose: async () => [{ selector: "body", declarations: { display: "none" }, note: "over-correction" }],
+    });
+    assert.equal(report.done, false);
+    assert.equal(report.stopReason, "consecutive-rollbacks");
+    assert.equal(report.rounds.length, 2);
+    assert.ok(report.rounds.every((r) => r.outcome === "rolled-back"));
+    // Rollback restored the working copy to the (still broken) input.
+    assert.equal(readFileSync(report.workingFile, "utf8"), before);
+  },
+);
 
 test("E2E: --in-place patches the attempt file itself", { timeout: 300_000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "autofix-"));

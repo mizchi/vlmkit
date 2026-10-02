@@ -3,11 +3,7 @@ import assert from "node:assert/strict";
 import { runVerificationLoop, generateReport } from "./agent.ts";
 import type { VrtDiff, ChangeIntent, QualityCheckResult } from "@mizchi/vlmkit-core/types.ts";
 
-function makeDiff(
-  testId: string,
-  diffRatio: number,
-  opts: Partial<VrtDiff> = {}
-): VrtDiff {
+function makeDiff(testId: string, diffRatio: number, opts: Partial<VrtDiff> = {}): VrtDiff {
   return {
     snapshot: {
       testId,
@@ -20,9 +16,7 @@ function makeDiff(
     diffPixels: Math.floor(diffRatio * 1000000),
     totalPixels: 1000000,
     diffRatio,
-    regions: [
-      { x: 0, y: 0, width: 100, height: 100, diffPixelCount: Math.floor(diffRatio * 1000000) },
-    ],
+    regions: [{ x: 0, y: 0, width: 100, height: 100, diffPixelCount: Math.floor(diffRatio * 1000000) }],
     ...opts,
   };
 }

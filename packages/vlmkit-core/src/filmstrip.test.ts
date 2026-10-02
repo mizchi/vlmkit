@@ -197,8 +197,7 @@ describe("filmstrip labels", () => {
 });
 
 describe("maxWidth 0 disables the cap", () => {
-  const frame = (w: number, h: number): PngData =>
-    ({ width: w, height: h, data: new Uint8Array(w * h * 4).fill(200) });
+  const frame = (w: number, h: number): PngData => ({ width: w, height: h, data: new Uint8Array(w * h * 4).fill(200) });
 
   it("does not solve for a scale that fits a zero-width sheet", () => {
     // `snapshot strip --max-width 0` documents 0 as "do not cap", and the CLI honoured it by

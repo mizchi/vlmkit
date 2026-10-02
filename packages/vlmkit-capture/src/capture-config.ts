@@ -70,9 +70,10 @@ export function parseCaptureConfig(raw: string): CaptureConfig {
   // nothing said so. An ignored input reported as accepted.
   const innerBaseUrl = pickCaptureKey(captureSection, "baseUrl");
   const baseUrlSource = innerBaseUrl ? innerBaseUrl.value : record.baseUrl;
-  const baseUrl = baseUrlSource == null
-    ? undefined
-    : parseNonEmptyString(baseUrlSource, "capture config baseUrl must be a non-empty string");
+  const baseUrl =
+    baseUrlSource == null
+      ? undefined
+      : parseNonEmptyString(baseUrlSource, "capture config baseUrl must be a non-empty string");
 
   return { baseUrl, routes };
 }
@@ -127,17 +128,15 @@ function parseCaptureRoute(entry: unknown, index: number): CaptureRoute {
   const path = parseNonEmptyString(pathValue, `capture config route at index ${index} must have a path`);
 
   const nameRaw = record.name ?? record.label;
-  const name = nameRaw === undefined
-    ? routeNameFromPath(path)
-    : parseNonEmptyString(nameRaw, `capture config route at index ${index} has an invalid name`);
+  const name =
+    nameRaw === undefined
+      ? routeNameFromPath(path)
+      : parseNonEmptyString(nameRaw, `capture config route at index ${index} has an invalid name`);
 
   const waitForRaw = record.waitFor ?? record.wait_for;
   const route: CaptureRoute = { name, path };
   if (waitForRaw !== undefined) {
-    route.waitFor = parseNonEmptyString(
-      waitForRaw,
-      `capture config route at index ${index} has an invalid waitFor`,
-    );
+    route.waitFor = parseNonEmptyString(waitForRaw, `capture config route at index ${index} has an invalid waitFor`);
   }
   return route;
 }
@@ -146,7 +145,10 @@ export function routeNameFromPath(path: string): string {
   const trimmed = path.split("?")[0]!.split("#")[0]!;
   const cleaned = trimmed.replace(/^\/+|\/+$/g, "");
   if (!cleaned) return "home";
-  const safe = cleaned.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
+  const safe = cleaned
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
   return safe || "home";
 }
 
@@ -201,11 +203,7 @@ export function resolveCaptureRoutes(options: LoadCaptureConfigOptions = {}): Ca
   };
 }
 
-function resolveConfigPath(
-  explicit: string | undefined,
-  fromEnv: string | undefined,
-  cwd: string,
-): string | undefined {
+function resolveConfigPath(explicit: string | undefined, fromEnv: string | undefined, cwd: string): string | undefined {
   const candidate = explicit ?? fromEnv;
   if (candidate && candidate.trim().length > 0) {
     const absolute = isAbsolute(candidate) ? candidate : resolve(cwd, candidate);

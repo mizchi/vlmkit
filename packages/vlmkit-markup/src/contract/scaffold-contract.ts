@@ -66,15 +66,10 @@ const ROLE_TAGS: Record<LandmarkRole, { tag: string; role?: string }> = {
   form: { tag: "form" },
 };
 
-const PLACEHOLDER_TEXT =
-  "Placeholder copy — replace during the decoration pass.";
+const PLACEHOLDER_TEXT = "Placeholder copy — replace during the decoration pass.";
 
 function esc(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function cssId(id: string): string {
@@ -134,10 +129,7 @@ function displayDecls(policy: UiDisplayPolicy): string[] {
       return decls;
     }
     case "grid": {
-      const decls = [
-        "display: grid",
-        `grid-template-columns: ${policy.columns.join(" ")}`,
-      ];
+      const decls = ["display: grid", `grid-template-columns: ${policy.columns.join(" ")}`];
       if (policy.rows.length > 0) {
         decls.push(`grid-template-rows: ${policy.rows.join(" ")}`);
       }
@@ -235,10 +227,7 @@ function responsiveDecls(rule: UiResponsiveRule, base: UiLayoutContract): string
  * rule targeting a narrower viewport compiles to `@media (max-width: W px)`,
  * a wider one to `@media (min-width: W px)`.
  */
-export function mediaQueryForViewport(
-  viewport: UiContractViewport,
-  viewports: UiContractViewport[],
-): string {
+export function mediaQueryForViewport(viewport: UiContractViewport, viewports: UiContractViewport[]): string {
   const widest = Math.max(...viewports.map((v) => v.width));
   return viewport.width < widest
     ? `@media (max-width: ${viewport.width}px)`
@@ -273,8 +262,7 @@ function scrollportTargetsLandmark(
   if (!scrollport.selector) return false;
   if (scrollport.selector === `#${domId}` || scrollport.selector === `#${landmark.id}`) return true;
   const attrValue = scrollport.selector.match(/^\[[^=\]]+="([^"]*)"\]$/)?.[1];
-  return attrValue !== undefined
-    && (attrValue === landmark.id || attrValue === domId || attrValue === landmark.name);
+  return attrValue !== undefined && (attrValue === landmark.id || attrValue === domId || attrValue === landmark.name);
 }
 
 /**
@@ -283,20 +271,18 @@ function scrollportTargetsLandmark(
  * so the scrolled state can still be exercised and a re-introspect
  * recovers the scrollport.
  */
-function materializeScrollport(
-  scrollport: UiExpectedScrollportContract,
-  ctx: RenderContext,
-): string {
+function materializeScrollport(scrollport: UiExpectedScrollportContract, ctx: RenderContext): string {
   const idMatch = scrollport.selector?.match(/^#([a-zA-Z][\w-]*)$/)?.[1];
   const attrMatch = scrollport.selector?.match(/^\[([a-zA-Z][\w-]*)(?:="([^"]*)")?\]$/);
   const attribute = attrMatch?.[1] ?? "data-scrollport";
   const value = attrMatch?.[2] ?? scrollport.name ?? scrollport.id;
   const axis = scrollport.axis ?? "y";
-  const style = axis === "x"
-    ? "max-width: 100%; overflow-x: auto"
-    : axis === "both"
-      ? "max-height: 240px; overflow: auto"
-      : "max-height: 240px; overflow-y: auto";
+  const style =
+    axis === "x"
+      ? "max-width: 100%; overflow-x: auto"
+      : axis === "both"
+        ? "max-height: 240px; overflow: auto"
+        : "max-height: 240px; overflow-y: auto";
   const fillers: string[] = [];
   if (axis === "x" || axis === "both") fillers.push(`<div class="scroll-filler-x" aria-hidden="true"></div>`);
   if (axis === "y" || axis === "both") fillers.push(`<div class="scroll-filler-y" aria-hidden="true"></div>`);
@@ -427,17 +413,27 @@ function stateCss(landmarkSelector: string, states: UiStateContract[], css: stri
     switch (state.kind) {
       case "hover":
         css.push(`/* contract state: ${state.id} */`);
-        css.push(`${target.split(", ").map((s) => `${s}:hover`).join(", ")} { filter: brightness(0.94); }`);
+        css.push(
+          `${target
+            .split(", ")
+            .map((s) => `${s}:hover`)
+            .join(", ")} { filter: brightness(0.94); }`,
+        );
         break;
       case "focus-visible":
         css.push(`/* contract state: ${state.id} */`);
         css.push(
-          `${target.split(", ").map((s) => `${s}:focus-visible`).join(", ")} { outline: 2px solid var(--color-accent, #2563eb); outline-offset: 2px; }`,
+          `${target
+            .split(", ")
+            .map((s) => `${s}:focus-visible`)
+            .join(", ")} { outline: 2px solid var(--color-accent, #2563eb); outline-offset: 2px; }`,
         );
         break;
       case "selected":
         css.push(`/* contract state: ${state.id} */`);
-        css.push(`${target}[aria-selected="true"], ${target}[data-selected="true"] { background: var(--color-accent-soft, #dbeafe); }`);
+        css.push(
+          `${target}[aria-selected="true"], ${target}[data-selected="true"] { background: var(--color-accent-soft, #dbeafe); }`,
+        );
         break;
       default:
         // Behavioral states (loading / error / playing / ...) need runtime
@@ -487,17 +483,12 @@ function renderLandmark(landmark: UiContractLandmark, ctx: RenderContext, depth:
   // A landmark with no explicit heading marker still gets a visible name so
   // the scaffold reads as a wireframe.
   const hasHeading = markers.some((m) => m.kind === "hero-title");
-  const rowContainer = landmark.layout.display.kind === "flex"
-    && landmark.layout.display.direction === "row";
+  const rowContainer = landmark.layout.display.kind === "flex" && landmark.layout.display.direction === "row";
   if (!hasHeading && landmark.role !== "navigation" && !rowContainer) {
     body.push(`<h2 class="scaffold-label">${esc(landmark.name)}</h2>`);
   }
   if (landmark.role === "navigation") {
-    body.push(
-      `<ul class="nav-list">`,
-      ...[1, 2, 3].map((n) => `  <li><a href="#">Nav link ${n}</a></li>`),
-      `</ul>`,
-    );
+    body.push(`<ul class="nav-list">`, ...[1, 2, 3].map((n) => `  <li><a href="#">Nav link ${n}</a></li>`), `</ul>`);
   }
   for (const slot of landmark.slots ?? []) body.push(renderSlot(slot, ctx));
   body.push(...renderContentPlaceholder(landmark));
@@ -513,9 +504,10 @@ function renderLandmark(landmark: UiContractLandmark, ctx: RenderContext, depth:
     ctx.claimedScrollports.add(scrollport.id);
     attrs.push(`data-scrollport="${esc(scrollport.id)}"`);
     // Guarantee measurable overflow on the declared axis.
-    const filler = scrollport.axis === "x"
-      ? `<div class="scroll-filler-x" aria-hidden="true"></div>`
-      : `<div class="scroll-filler-y" aria-hidden="true"></div>`;
+    const filler =
+      scrollport.axis === "x"
+        ? `<div class="scroll-filler-x" aria-hidden="true"></div>`
+        : `<div class="scroll-filler-y" aria-hidden="true"></div>`;
     body.push(filler);
   }
 
@@ -539,9 +531,7 @@ function screenWrapperCss(screen: UiContractScreen, roots: UiContractLandmark[])
     if (bannerArea) rows.push(`"${middle.map(() => bannerArea).join(" ") || bannerArea}"`);
     if (middle.length > 0) rows.push(`"${middle.join(" ")}"`);
     if (footerArea) rows.push(`"${middle.map(() => footerArea).join(" ") || footerArea}"`);
-    const columns = middle
-      .map((area) => (area === mainArea ? "1fr" : "minmax(200px, 280px)"))
-      .join(" ");
+    const columns = middle.map((area) => (area === mainArea ? "1fr" : "minmax(200px, 280px)")).join(" ");
     if (rows.length > 0 && has(mainArea)) {
       return `.screen {\n  display: grid;\n  grid-template-columns: ${columns || "1fr"};\n  grid-template-areas: ${rows.join(" ")};\n  min-height: 100vh;\n}`;
     }
@@ -610,10 +600,7 @@ body {
 .scroll-filler-x { width: 300vw; height: 1px; }
 .scaffold-scrollport { border: 1px dashed #cbd5e1; padding: 12px; }`;
 
-export function scaffoldUiContractScreen(
-  screen: UiContractScreen,
-  options: ScaffoldOptions = {},
-): ScaffoldedScreen {
+export function scaffoldUiContractScreen(screen: UiContractScreen, options: ScaffoldOptions = {}): ScaffoldedScreen {
   const childrenOf = new Map<string | undefined, UiContractLandmark[]>();
   for (const landmark of screen.landmarks) {
     const key = landmark.parentId;
@@ -647,9 +634,7 @@ export function scaffoldUiContractScreen(
     }
     // Scrollport evidence markers are covered by expectedScrollports below.
     if (marker.kind === "scrollport") continue;
-    const declaredOnLandmark = screen.landmarks.some((l) =>
-      (l.markers ?? []).some((m) => m.kind === marker.kind),
-    );
+    const declaredOnLandmark = screen.landmarks.some((l) => (l.markers ?? []).some((m) => m.kind === marker.kind));
     if (declaredOnLandmark) continue;
     if (!marker.attribute) {
       ctx.warnings.push(
@@ -674,12 +659,7 @@ export function scaffoldUiContractScreen(
     }
   }
 
-  const cssBlocks = [
-    BASE_CSS,
-    ...decorationCss(screen),
-    screenWrapperCss(screen, roots),
-    ...ctx.css,
-  ];
+  const cssBlocks = [BASE_CSS, ...decorationCss(screen), screenWrapperCss(screen, roots), ...ctx.css];
   for (const [query, rules] of ctx.mediaCss) {
     cssBlocks.push(`${query} {\n  ${rules.join("\n  ")}\n}`);
   }
@@ -705,10 +685,7 @@ ${bodyLines.join("\n")}
   return { screenId: screen.id, html, landmarkIds: ctx.landmarkIds, warnings: ctx.warnings };
 }
 
-export function scaffoldUiContract(
-  contract: UiContract,
-  options: ScaffoldOptions = {},
-): ScaffoldResult {
+export function scaffoldUiContract(contract: UiContract, options: ScaffoldOptions = {}): ScaffoldResult {
   // Validation runs on the MoonBit policy core; scaffolding must still work
   // where the moon toolchain is unavailable, so degrade to a note.
   let issues: { path: string; message: string }[] = [];
@@ -773,8 +750,9 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "contract-scaffold"
-  || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "contract-scaffold" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

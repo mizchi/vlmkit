@@ -16,9 +16,7 @@ export interface FlakerVrtReportAdapterArgs {
   cwd?: string;
 }
 
-export function parseFlakerVrtReportAdapterArgs(
-  args: string[],
-): FlakerVrtReportAdapterArgs {
+export function parseFlakerVrtReportAdapterArgs(args: string[]): FlakerVrtReportAdapterArgs {
   return {
     filePath: getArg(args, "file"),
     scenarioId: getArg(args, "scenario-id"),

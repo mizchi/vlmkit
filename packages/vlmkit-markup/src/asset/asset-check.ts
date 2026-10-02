@@ -123,10 +123,20 @@ export function analyzeAssetPng(png: PNG, options: AnalyzeAssetOptions): AssetCh
   } else {
     const opaque = ring.filter((i) => data[i + 3]! >= ALPHA_FLOOR);
     const mean = { r: 0, g: 0, b: 0 };
-    for (const i of opaque) { mean.r += data[i]!; mean.g += data[i + 1]!; mean.b += data[i + 2]!; }
-    mean.r /= opaque.length; mean.g /= opaque.length; mean.b /= opaque.length;
-    const spread = opaque.reduce((s, i) =>
-      s + Math.max(Math.abs(data[i]! - mean.r), Math.abs(data[i + 1]! - mean.g), Math.abs(data[i + 2]! - mean.b)), 0) / opaque.length;
+    for (const i of opaque) {
+      mean.r += data[i]!;
+      mean.g += data[i + 1]!;
+      mean.b += data[i + 2]!;
+    }
+    mean.r /= opaque.length;
+    mean.g /= opaque.length;
+    mean.b /= opaque.length;
+    const spread =
+      opaque.reduce(
+        (s, i) =>
+          s + Math.max(Math.abs(data[i]! - mean.r), Math.abs(data[i + 1]! - mean.g), Math.abs(data[i + 2]! - mean.b)),
+        0,
+      ) / opaque.length;
     const hex = (n: number) => Math.round(n).toString(16).padStart(2, "0");
     if (spread <= 12) {
       backgroundKind = "matte";
@@ -138,7 +148,10 @@ export function analyzeAssetPng(png: PNG, options: AnalyzeAssetOptions): AssetCh
 
   // --- occupancy + content bbox --------------------------------------------
   let occupied = 0;
-  let minX = width, minY = height, maxX = -1, maxY = -1;
+  let minX = width,
+    minY = height,
+    maxX = -1,
+    maxY = -1;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (data[at(x, y) + 3]! >= ALPHA_FLOOR) {
@@ -165,9 +178,12 @@ export function analyzeAssetPng(png: PNG, options: AnalyzeAssetOptions): AssetCh
           const i = at(x, y);
           if (data[i + 3]! < ALPHA_FLOOR) continue;
           if (
-            data[at(x - 1, y) + 3]! < ALPHA_FLOOR || data[at(x + 1, y) + 3]! < ALPHA_FLOOR ||
-            data[at(x, y - 1) + 3]! < ALPHA_FLOOR || data[at(x, y + 1) + 3]! < ALPHA_FLOOR
-          ) edgeIdx.push(i);
+            data[at(x - 1, y) + 3]! < ALPHA_FLOOR ||
+            data[at(x + 1, y) + 3]! < ALPHA_FLOOR ||
+            data[at(x, y - 1) + 3]! < ALPHA_FLOOR ||
+            data[at(x, y + 1) + 3]! < ALPHA_FLOOR
+          )
+            edgeIdx.push(i);
         }
       }
     } else {
@@ -213,9 +229,10 @@ export function analyzeAssetPng(png: PNG, options: AnalyzeAssetOptions): AssetCh
     issues.push({
       kind: "opaque-background",
       severity: "suspect",
-      message: backgroundKind === "matte"
-        ? `Expected a transparent background but the border ring is matted ${matteColor} — the sprite will show as a rectangle on the page. Regenerate with a transparent background (or cut it out).`
-        : `Expected a transparent background but the border ring is opaque and mixed (looks like a full scene, not a cut-out sprite).`,
+      message:
+        backgroundKind === "matte"
+          ? `Expected a transparent background but the border ring is matted ${matteColor} — the sprite will show as a rectangle on the page. Regenerate with a transparent background (or cut it out).`
+          : `Expected a transparent background but the border ring is opaque and mixed (looks like a full scene, not a cut-out sprite).`,
     });
   }
   if (occupancy < 0.05) {
@@ -271,7 +288,7 @@ export interface AssetCheckOptions {
 }
 
 export async function runAssetCheck(options: AssetCheckOptions): Promise<AssetCheckReport> {
-  const png = PNG.sync.read(await readFile(options.source) as Buffer);
+  const png = PNG.sync.read((await readFile(options.source)) as Buffer);
   // Accent colors matter for harmony (a sprite usually matches the page's
   // accents, not its background washes), and accents sit far down the share
   // ranking — the S19 page's oranges ranked 19th-22nd. Extract generously.
@@ -307,9 +324,14 @@ export function formatAssetCheckReport(report: AssetCheckReport, rules?: RuleVie
   lines.push(`status: ${status}`);
   lines.push(`size: ${report.width}x${report.height} (aspect ${report.aspect.toFixed(3)})`);
   lines.push(`background: ${report.backgroundKind}${report.matteColor ? ` (${report.matteColor})` : ""}`);
-  lines.push(`occupancy: ${(report.occupancy * 100).toFixed(1)}%${report.contentBox ? ` — content ${report.contentBox.w}x${report.contentBox.h} at (${report.contentBox.x},${report.contentBox.y})` : ""}`);
+  lines.push(
+    `occupancy: ${(report.occupancy * 100).toFixed(1)}%${report.contentBox ? ` — content ${report.contentBox.w}x${report.contentBox.h} at (${report.contentBox.x},${report.contentBox.y})` : ""}`,
+  );
   if (report.edgeContrast !== undefined) lines.push(`figure-ground contrast: ${report.edgeContrast.toFixed(2)}:1`);
-  if (report.paletteHarmony !== undefined) lines.push(`palette harmony: ${(report.paletteHarmony * 100).toFixed(0)}% of dominant colors near the page palette`);
+  if (report.paletteHarmony !== undefined)
+    lines.push(
+      `palette harmony: ${(report.paletteHarmony * 100).toFixed(0)}% of dominant colors near the page palette`,
+    );
   if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");

@@ -1,10 +1,6 @@
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
-import {
-  evaluateComponentGoal,
-  getComponentGoalProfile,
-  listComponentGoals,
-} from "./component-goal.ts";
+import { evaluateComponentGoal, getComponentGoalProfile, listComponentGoals } from "./component-goal.ts";
 
 test("app goal accepts practical AI mock convergence without pixel perfection", () => {
   const result = evaluateComponentGoal({
@@ -291,5 +287,14 @@ test("unknown goal falls back to app profile", () => {
 });
 
 test("goal list is stable for CLI help", () => {
-  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas", "expressive-menu"]);
+  assert.deepEqual(listComponentGoals(), [
+    "app",
+    "layout",
+    "pixel",
+    "draft",
+    "app-shell",
+    "landing",
+    "canvas",
+    "expressive-menu",
+  ]);
 });

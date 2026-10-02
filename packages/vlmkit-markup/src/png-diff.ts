@@ -246,19 +246,12 @@ async function resolveElements(
     return parseRegionElementsJson(await readFile(options.elementsJson, "utf-8"));
   }
   if (options.elementsHtml) {
-    return captureRegionElementsFromHtml(
-      options.elementsHtml,
-      options.elementsViewport ?? currentSize,
-    );
+    return captureRegionElementsFromHtml(options.elementsHtml, options.elementsViewport ?? currentSize);
   }
   return null;
 }
 
-function attachSelectorCandidates(
-  regions: DiffRegion[],
-  elements: RegionElementRect[],
-  limit = 1,
-): void {
+function attachSelectorCandidates(regions: DiffRegion[], elements: RegionElementRect[], limit = 1): void {
   for (const region of regions) {
     const matches = matchRegionBboxToElements(
       { left: region.x, top: region.y, width: region.width, height: region.height },
@@ -278,15 +271,15 @@ function attachSelectorCandidates(
       // JSON consumers see exactly the shape they saw before.
       ...(runnersUp.length > 0
         ? {
-          alternates: runnersUp.map((alternate) => ({
-            selector: alternate.selector,
-            confidence: alternate.confidence,
-            path: alternate.evidence.path,
-            tag: alternate.evidence.tag,
-            regionCoverage: alternate.evidence.regionCoverage,
-            elementCoverage: alternate.evidence.elementCoverage,
-          })),
-        }
+            alternates: runnersUp.map((alternate) => ({
+              selector: alternate.selector,
+              confidence: alternate.confidence,
+              path: alternate.evidence.path,
+              tag: alternate.evidence.tag,
+              regionCoverage: alternate.evidence.regionCoverage,
+              elementCoverage: alternate.evidence.elementCoverage,
+            })),
+          }
         : {}),
     };
   }
@@ -317,10 +310,7 @@ export async function runPngDiff(options: PngDiffCliOptions) {
     throw new Error("PNG diff requires both baseline and current screenshot paths");
   }
 
-  const [baselineBuf, currentBuf] = await Promise.all([
-    readFile(options.baselinePath),
-    readFile(options.currentPath),
-  ]);
+  const [baselineBuf, currentBuf] = await Promise.all([readFile(options.baselinePath), readFile(options.currentPath)]);
   const baselineSize = readPngDimensions(baselineBuf);
   const currentSize = readPngDimensions(currentBuf);
   const sizeDelta = {
@@ -424,10 +414,10 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
     console.log(`  current:  ${output.currentPath}`);
     console.log(
       `  size:     baseline ${output.baselineSize.width}x${output.baselineSize.height}` +
-      ` / current ${output.currentSize.width}x${output.currentSize.height}` +
-      (output.sizeDelta.width !== 0 || output.sizeDelta.height !== 0
-        ? ` (Δ ${formatSizeDelta(output.sizeDelta.width)}w ${formatSizeDelta(output.sizeDelta.height)}h)`
-        : ""),
+        ` / current ${output.currentSize.width}x${output.currentSize.height}` +
+        (output.sizeDelta.width !== 0 || output.sizeDelta.height !== 0
+          ? ` (Δ ${formatSizeDelta(output.sizeDelta.width)}w ${formatSizeDelta(output.sizeDelta.height)}h)`
+          : ""),
     );
     if (output.sizeDelta.height !== 0) {
       console.log(
@@ -435,8 +425,8 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       );
     }
     console.log(
-      `  diff:     ${(output.diffRatio * 100).toFixed(2)}% (${output.diffPixels} / ${output.totalPixels} px`
-      + `${output.mask ? " measured" : ""})`,
+      `  diff:     ${(output.diffRatio * 100).toFixed(2)}% (${output.diffPixels} / ${output.totalPixels} px` +
+        `${output.mask ? " measured" : ""})`,
     );
     // Printed immediately under the ratio, not in a footer and not only in
     // --json, following `formatIntegrityReport`'s coverage block: the dangerous
@@ -447,13 +437,14 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       const m = output.mask;
       const share = m.imagePixels > 0 ? (m.ignoredPixels / m.imagePixels) * 100 : 0;
       console.log(
-        `  ignored:  ${m.regions.length} region(s), ${m.ignoredPixels} px`
-        + ` (${share.toFixed(1)}% of the ${m.imagePixels} px compared area) — never measured`,
+        `  ignored:  ${m.regions.length} region(s), ${m.ignoredPixels} px` +
+          ` (${share.toFixed(1)}% of the ${m.imagePixels} px compared area) — never measured`,
       );
       for (const region of m.regions) {
-        const covered = region.pixels === 0
-          ? "0 px — outside the compared area, masks nothing"
-          : `${region.pixels} px, ${region.diffPixels} of them differed`;
+        const covered =
+          region.pixels === 0
+            ? "0 px — outside the compared area, masks nothing"
+            : `${region.pixels} px, ${region.diffPixels} of them differed`;
         console.log(`    (${region.x},${region.y}) ${region.width}x${region.height} — ${covered}`);
       }
       // Spell out the denominator. `totalPixels` also carries size-mismatch
@@ -461,22 +452,24 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       // term rather than print arithmetic that does not add up.
       const overflow = output.totalPixels - (m.imagePixels - m.ignoredPixels);
       console.log(
-        `    ${m.ignoredDiffPixels} diff px discarded; denominator`
-        + ` ${m.imagePixels} - ${m.ignoredPixels}`
-        + (overflow !== 0 ? ` + ${overflow} unmaskable size-mismatch px` : "")
-        + ` = ${output.totalPixels}`,
+        `    ${m.ignoredDiffPixels} diff px discarded; denominator` +
+          ` ${m.imagePixels} - ${m.ignoredPixels}` +
+          (overflow !== 0 ? ` + ${overflow} unmaskable size-mismatch px` : "") +
+          ` = ${output.totalPixels}`,
       );
     }
     console.log(`  regions:  ${output.regions.length}`);
     if (output.regions.length > 0) {
       for (const region of output.regions.slice(0, 15)) {
         const type = region.regionType ? ` [${region.regionType}]` : "";
-        const color = region.colorSample && region.colorSample.baseline.hex !== region.colorSample.current.hex
-          ? ` ${region.colorSample.baseline.hex} -> ${region.colorSample.current.hex}`
-          : "";
-        const shift = region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0)
-          ? ` shift(${region.shift.dx >= 0 ? "+" : ""}${region.shift.dx},${region.shift.dy >= 0 ? "+" : ""}${region.shift.dy})`
-          : "";
+        const color =
+          region.colorSample && region.colorSample.baseline.hex !== region.colorSample.current.hex
+            ? ` ${region.colorSample.baseline.hex} -> ${region.colorSample.current.hex}`
+            : "";
+        const shift =
+          region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0)
+            ? ` shift(${region.shift.dx >= 0 ? "+" : ""}${region.shift.dx},${region.shift.dy >= 0 ? "+" : ""}${region.shift.dy})`
+            : "";
         console.log(`    (${region.x},${region.y}) ${region.width}x${region.height}${type}${color}${shift}`);
       }
       if (output.regions.length > 15) {

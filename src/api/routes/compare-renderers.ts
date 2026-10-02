@@ -6,10 +6,7 @@ export interface CompareRenderersRouteOptions {
   resolveCraterAvailable?: () => Promise<boolean>;
 }
 
-export function registerCompareRenderersRoute(
-  app: Hono,
-  options: CompareRenderersRouteOptions = {},
-): void {
+export function registerCompareRenderersRoute(app: Hono, options: CompareRenderersRouteOptions = {}): void {
   app.post("/api/compare-renderers", async (c) => {
     const body = await c.req.json<{
       html: HtmlSource;
@@ -54,47 +51,50 @@ export function registerCompareRenderersRoute(
     // not running left a Chromium behind — inside the long-lived HTTP API process,
     // once per request, with nothing to reap it.
     await withBrowser(async (browser) => {
-    const crater = new CraterClient();
-    await crater.connect();
+      const crater = new CraterClient();
+      await crater.connect();
 
-    try {
-      for (const vp of viewports) {
-        const width = vp.width;
-        const height = vp.height ?? 900;
-        const label = vp.label ?? `${width}x${height}`;
+      try {
+        for (const vp of viewports) {
+          const width = vp.width;
+          const height = vp.height ?? 900;
+          const label = vp.label ?? `${width}x${height}`;
 
-        const chromiumPage = await browser.newPage({ viewport: { width, height } });
-        await chromiumPage.setContent(html, { waitUntil: "networkidle" });
-        const chromiumPath = join(tmpDir, `chromium-${label}.png`);
-        await chromiumPage.screenshot({ path: chromiumPath, fullPage: true });
-        await chromiumPage.close();
+          const chromiumPage = await browser.newPage({ viewport: { width, height } });
+          await chromiumPage.setContent(html, { waitUntil: "networkidle" });
+          const chromiumPath = join(tmpDir, `chromium-${label}.png`);
+          await chromiumPage.screenshot({ path: chromiumPath, fullPage: true });
+          await chromiumPage.close();
 
-        await crater.setViewport(width, height);
-        await crater.setContent(html);
-        const { png: craterPng } = await crater.capturePng();
-        const craterPath = join(tmpDir, `crater-${label}.png`);
-        await writeFile(craterPath, craterPng);
+          await crater.setViewport(width, height);
+          await crater.setContent(html);
+          const { png: craterPng } = await crater.capturePng();
+          const craterPath = join(tmpDir, `crater-${label}.png`);
+          await writeFile(craterPath, craterPng);
 
-        const crossDiff = await compareScreenshots({
-          testId: `cross-${label}`,
-          testTitle: `Chromium vs Crater ${label}`,
-          projectName: "renderer-compare",
-          screenshotPath: craterPath,
-          baselinePath: chromiumPath,
-          status: "changed",
-        }, { outputDir: tmpDir, threshold: body.threshold ?? 0.1 });
+          const crossDiff = await compareScreenshots(
+            {
+              testId: `cross-${label}`,
+              testTitle: `Chromium vs Crater ${label}`,
+              projectName: "renderer-compare",
+              screenshotPath: craterPath,
+              baselinePath: chromiumPath,
+              status: "changed",
+            },
+            { outputDir: tmpDir, threshold: body.threshold ?? 0.1 },
+          );
 
-        results.push({
-          viewport: { width, height, label },
-          chromiumDiffRatio: 0,
-          craterDiffRatio: crossDiff?.diffRatio ?? 0,
-          crossDiffRatio: crossDiff?.diffRatio ?? 0,
-          paintTreeChanges: 0,
-        });
+          results.push({
+            viewport: { width, height, label },
+            chromiumDiffRatio: 0,
+            craterDiffRatio: crossDiff?.diffRatio ?? 0,
+            crossDiffRatio: crossDiff?.diffRatio ?? 0,
+            paintTreeChanges: 0,
+          });
+        }
+      } finally {
+        await crater.close();
       }
-    } finally {
-      await crater.close();
-    }
     });
 
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});

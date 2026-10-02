@@ -25,7 +25,7 @@ export function crossValidate(
   testId: string,
   visualDiff: VisualSemanticDiff | undefined,
   a11yDiff: A11yDiff | undefined,
-  intent: ChangeIntent
+  intent: ChangeIntent,
 ): CrossValidationResult {
   const hasVisual = visualDiff && visualDiff.changes.length > 0;
   const hasA11y = a11yDiff && a11yDiff.changes.length > 0;
@@ -33,9 +33,7 @@ export function crossValidate(
 
   // A11y regression -> unconditional reject
   if (hasA11yRegression) {
-    const regressions = a11yDiff!.changes
-      .filter((c) => c.severity === "error")
-      .map((c) => c.description);
+    const regressions = a11yDiff!.changes.filter((c) => c.severity === "error").map((c) => c.description);
     return {
       testId,
       visualDiff,
@@ -153,10 +151,7 @@ export function crossValidate(
   throw new Error("Unreachable: all visual/a11y combinations are handled");
 }
 
-function matchesComponentIntent(
-  testId: string,
-  intent: ChangeIntent
-): boolean {
+function matchesComponentIntent(testId: string, intent: ChangeIntent): boolean {
   const testLower = testId.toLowerCase();
   return intent.affectedComponents.some((comp) => {
     const compName = comp
@@ -171,9 +166,7 @@ function matchesComponentIntent(
 /**
  * Generate quality checks from cross-validation results.
  */
-export function crossValidationToQualityChecks(
-  results: CrossValidationResult[]
-): QualityCheckResult[] {
+export function crossValidationToQualityChecks(results: CrossValidationResult[]): QualityCheckResult[] {
   const checks: QualityCheckResult[] = [];
 
   // A11y regression

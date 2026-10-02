@@ -265,10 +265,7 @@ function targetKey(sample: A11yTouchRawSample): string {
  * exported version spent an O(n²) boundary call per pair; `touchPolicy` crosses once, so
  * the reason is gone and so is the copy.
  */
-export function analyzeA11yTouch(
-  samples: readonly A11yTouchRawSample[],
-  level: WcagTouchLevel = "AA",
-): TouchAnalysis {
+export function analyzeA11yTouch(samples: readonly A11yTouchRawSample[], level: WcagTouchLevel = "AA"): TouchAnalysis {
   const byPath = new Map<string, A11yTouchRawSample>();
   for (const s of samples) {
     const key = targetKey(s);
@@ -340,7 +337,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    const samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
+    const samples = (await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT)) as A11yTouchRawSample[];
     const screenshotPath = join(outputDir, "page.png");
     await page.screenshot({ path: screenshotPath, fullPage: false });
     await page.close();
@@ -376,8 +373,14 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   await writeFile(reportPath, md);
 
   return {
-    source: options.source, level, required: analysis.required, viewport, screenshot: screenshotPath,
-    inspectedCount: analysis.inspectedCount, failures: kept, reportPath,
+    source: options.source,
+    level,
+    required: analysis.required,
+    viewport,
+    screenshot: screenshotPath,
+    inspectedCount: analysis.inspectedCount,
+    failures: kept,
+    reportPath,
     ...(analysis.wcagExempt.length > 0 ? { wcagExempt: analysis.wcagExempt } : {}),
     ...(exempted.length > 0 ? { exempted } : {}),
     ...(applied.unused.length > 0 ? { unusedAllow: applied.unused.map((r) => r.raw) } : {}),
@@ -400,8 +403,8 @@ export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): st
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y touch${RESET}`);
   lines.push(
-    `  ${DIM}source: ${report.source}  level: WCAG ${report.level}`
-    + ` (${report.required}×${report.required} min)${RESET}`,
+    `  ${DIM}source: ${report.source}  level: WCAG ${report.level}` +
+      ` (${report.required}×${report.required} min)${RESET}`,
   );
   lines.push(`  ${DIM}inspected ${report.inspectedCount} interactive element(s)${RESET}`);
   const tier = ruleTier(rules, "target-undersized", "suspect");
@@ -410,13 +413,19 @@ export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): st
     ? `${DIM}-${RESET}`
     : report.failures.length === 0
       ? `${GREEN}✓${RESET}`
-      : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+      : tier === "suspect"
+        ? `${RED}✗${RESET}`
+        : tier === "warn"
+          ? `${YELLOW}!${RESET}`
+          : `${DIM}i${RESET}`;
   lines.push(
-    `  ${icon} ${report.failures.length} undersized target(s)`
-    + (off
-      ? `${DIM} measured and NOT reported — target-undersized is off${RESET}`
-      : tier === "suspect" ? "" : `${DIM} [target-undersized re-tuned to ${tier}]${RESET}`)
-    + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
+    `  ${icon} ${report.failures.length} undersized target(s)` +
+      (off
+        ? `${DIM} measured and NOT reported — target-undersized is off${RESET}`
+        : tier === "suspect"
+          ? ""
+          : `${DIM} [target-undersized re-tuned to ${tier}]${RESET}`) +
+      `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
   );
   // The criterion's own exceptions, on their own line and never folded into the count
   // above. A reader has to be able to tell "nothing is undersized" from "seven are, and
@@ -430,8 +439,8 @@ export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): st
       ...(spacing > 0 ? [`${spacing} with clear spacing`] : []),
     ].join(", ");
     lines.push(
-      `  ${DIM}${report.wcagExempt.length} undersized target(s) excused by WCAG`
-      + ` ${report.level === "AA" ? "2.5.8" : "2.5.5"} itself (${which})${RESET}`,
+      `  ${DIM}${report.wcagExempt.length} undersized target(s) excused by WCAG` +
+        ` ${report.level === "AA" ? "2.5.8" : "2.5.5"} itself (${which})${RESET}`,
     );
   }
   const CONSOLE_ROWS = 5;
@@ -440,7 +449,9 @@ export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): st
   // turned the rule off still needs to know an exemption has outlived what it covered.
   for (const f of off ? [] : report.failures.slice(0, CONSOLE_ROWS)) {
     const cl = f.cluster ? " (clustered)" : "";
-    lines.push(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
+    lines.push(
+      `    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`,
+    );
   }
   // See a11y-contrast: an undisclosed cut makes a partial list look complete.
   if (!off && report.failures.length > CONSOLE_ROWS) {
@@ -450,14 +461,14 @@ export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): st
   // in this repo has. A reader has to be able to audit a colleague's judgement call.
   for (const e of report.exempted ?? []) {
     lines.push(
-      `    ${DIM}- ${e.finding.path} — ${Math.round(e.finding.bbox.width)}×${Math.round(e.finding.bbox.height)}:`
-      + ` user exemption (${e.rule}): ${e.reason}${RESET}`,
+      `    ${DIM}- ${e.finding.path} — ${Math.round(e.finding.bbox.width)}×${Math.round(e.finding.bbox.height)}:` +
+        ` user exemption (${e.rule}): ${e.reason}${RESET}`,
     );
   }
   if (report.unusedAllow?.length) {
     lines.push(
-      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:`
-      + ` ${report.unusedAllow.join(", ")}${RESET}`,
+      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:` +
+        ` ${report.unusedAllow.join(", ")}${RESET}`,
     );
     lines.push(`    ${DIM}Delete them: an exemption kept past what it covered only widens the blind spot.${RESET}`);
   }
@@ -472,23 +483,22 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
   lines.push(`Source: \`${r.source}\``);
   const criterion = r.level === "AA" ? "2.5.8 Target Size (Minimum)" : "2.5.5 Target Size (Enhanced)";
   lines.push(
-    `WCAG level: **${r.level}** (${criterion}) — every interactive element needs a shorter`
-    + ` side of at least ${r.required}px, unless one of the criterion's exceptions applies.`
-    + ` \`clustered\` annotates a finding (another below-floor target within 24px`
-    + ` center-to-center); it never causes one.`,
+    `WCAG level: **${r.level}** (${criterion}) — every interactive element needs a shorter` +
+      ` side of at least ${r.required}px, unless one of the criterion's exceptions applies.` +
+      ` \`clustered\` annotates a finding (another below-floor target within 24px` +
+      ` center-to-center); it never causes one.`,
   );
   lines.push("");
   lines.push(
-    "Two exceptions are decided from the page and applied below: **Inline** (the target is"
-    + " in a sentence, so the line-height sizes it — both levels) and **Spacing** (a 24px"
-    + " circle centered on the target clears every neighbour — AA only, since 2.5.5 has no"
-    + " spacing exception). The other three — Equivalent, User-agent control, Essential —"
-    + " need intent rather than measurement; declare those with"
-    + " `--allow \"<selector>;<reason>\"`.",
+    "Two exceptions are decided from the page and applied below: **Inline** (the target is" +
+      " in a sentence, so the line-height sizes it — both levels) and **Spacing** (a 24px" +
+      " circle centered on the target clears every neighbour — AA only, since 2.5.5 has no" +
+      " spacing exception). The other three — Equivalent, User-agent control, Essential —" +
+      " need intent rather than measurement; declare those with" +
+      ' `--allow "<selector>;<reason>"`.',
   );
   lines.push("");
-  lines.push(`Inspected **${r.inspectedCount}** interactive element(s).  ` +
-    `Screenshot: \`${r.screenshot}\``);
+  lines.push(`Inspected **${r.inspectedCount}** interactive element(s).  ` + `Screenshot: \`${r.screenshot}\``);
   lines.push("");
   if (r.wcagExempt?.length) {
     lines.push(`## ${r.wcagExempt.length} undersized target(s) excused by the criterion`);
@@ -512,30 +522,39 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
   }
   lines.push(`## ${r.failures.length} undersized target(s)`);
   lines.push("");
-  lines.push("Targets below the threshold are hard to tap on touchscreens and " +
-    "unreachable for users with motor impairments. Every row here is undersized AND " +
-    "unexcused: it is neither in a sentence nor (at AA) clear of its neighbours. The " +
-    "`cluster` flag says another below-floor target's center is within 24px.");
+  lines.push(
+    "Targets below the threshold are hard to tap on touchscreens and " +
+      "unreachable for users with motor impairments. Every row here is undersized AND " +
+      "unexcused: it is neither in a sentence nor (at AA) clear of its neighbours. The " +
+      "`cluster` flag says another below-floor target's center is within 24px.",
+  );
   lines.push("");
   lines.push("| Element | Text | Size | Min side | Need | Cluster |");
   lines.push("|---|---|---|---|---|---|");
   for (const f of r.failures.slice(0, 30)) {
     const sz = `${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}`;
-    lines.push(`| \`${f.path}\` | \`${f.text}\` | ${sz} | **${f.minSide}** | ${f.required} | ${f.cluster ? "yes" : "no"} |`);
+    lines.push(
+      `| \`${f.path}\` | \`${f.text}\` | ${sz} | **${f.minSide}** | ${f.required} | ${f.cluster ? "yes" : "no"} |`,
+    );
   }
-  if (r.failures.length > 30) lines.push(`\n_… ${r.failures.length - 30} more row(s) omitted; the JSON report has all of them._`);
+  if (r.failures.length > 30)
+    lines.push(`\n_… ${r.failures.length - 30} more row(s) omitted; the JSON report has all of them._`);
   if (r.failures.length > 30) lines.push(`| _…${r.failures.length - 30} more_ | | | | | |`);
   lines.push("");
   lines.push("## Suggested next step");
   lines.push("");
-  lines.push("1. For each failing row, expand the element's bbox to ≥ " +
-    `${r.failures[0]!.required}×${r.failures[0]!.required} px. Common fixes:`);
-  lines.push("   - Increase `padding`. A 12px padding on an icon-only button " +
-    "grows a 16×16 icon to 40×40 reach-bbox.");
-  lines.push("   - Set `min-width` / `min-height` explicitly: " +
-    `\`min-width: ${r.failures[0]!.required}px; min-height: ${r.failures[0]!.required}px;\`.`);
-  lines.push("   - For inline links, wrap them in a block with hit padding " +
-    "and use `display: inline-block`.");
+  lines.push(
+    "1. For each failing row, expand the element's bbox to ≥ " +
+      `${r.failures[0]!.required}×${r.failures[0]!.required} px. Common fixes:`,
+  );
+  lines.push(
+    "   - Increase `padding`. A 12px padding on an icon-only button " + "grows a 16×16 icon to 40×40 reach-bbox.",
+  );
+  lines.push(
+    "   - Set `min-width` / `min-height` explicitly: " +
+      `\`min-width: ${r.failures[0]!.required}px; min-height: ${r.failures[0]!.required}px;\`.`,
+  );
+  lines.push("   - For inline links, wrap them in a block with hit padding " + "and use `display: inline-block`.");
   lines.push("2. Re-run `vlmkit check a11y touch`. The failure list should empty out.");
   lines.push("");
   return lines.join("\n");

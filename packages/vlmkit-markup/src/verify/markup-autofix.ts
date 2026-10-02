@@ -40,12 +40,7 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import {
-  computeTrend,
-  runMarkupVerify,
-  type MarkupVerifyReport,
-  type VerifyTrendPoint,
-} from "./markup-verify.ts";
+import { computeTrend, runMarkupVerify, type MarkupVerifyReport, type VerifyTrendPoint } from "./markup-verify.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 // ---------------------------------------------------------------------------
@@ -101,8 +96,8 @@ export function parseFixProposals(text: string): FixProposal[] {
       const list = Array.isArray(parsed)
         ? parsed
         : parsed && typeof parsed === "object" && Array.isArray((parsed as { fixes?: unknown }).fixes)
-        ? (parsed as { fixes: unknown[] }).fixes
-        : null;
+          ? (parsed as { fixes: unknown[] }).fixes
+          : null;
       if (!list) continue;
       const fixes: FixProposal[] = [];
       for (const item of list) {
@@ -180,14 +175,38 @@ export function extractKickbackSelectors(kickback: string[]): string[] {
 }
 
 const COMPUTED_SUBSET = [
-  "display", "position", "top", "right", "bottom", "left",
-  "width", "height",
-  "margin-top", "margin-right", "margin-bottom", "margin-left",
-  "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "gap", "flex-direction", "align-items", "justify-content",
-  "font-size", "line-height", "font-weight", "letter-spacing",
-  "color", "background-color", "border-top-width", "border-bottom-width",
-  "overflow", "overflow-x", "z-index", "box-sizing",
+  "display",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "width",
+  "height",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "gap",
+  "flex-direction",
+  "align-items",
+  "justify-content",
+  "font-size",
+  "line-height",
+  "font-weight",
+  "letter-spacing",
+  "color",
+  "background-color",
+  "border-top-width",
+  "border-bottom-width",
+  "overflow",
+  "overflow-x",
+  "z-index",
+  "box-sizing",
 ];
 
 export async function captureComputedStyles(
@@ -222,17 +241,20 @@ export async function captureComputedStyles(
 export function extractStyleText(html: string): string {
   const matches = [...html.matchAll(/<style(?![^>]*data-vlmkit-autofix)[^>]*>([\s\S]*?)<\/style>/gi)];
   const text = matches.map((m) => m[1]!).join("\n");
-  return text.length > MAX_CSS_CONTEXT_CHARS
-    ? text.slice(0, MAX_CSS_CONTEXT_CHARS) + "\n/* ...truncated... */"
-    : text;
+  return text.length > MAX_CSS_CONTEXT_CHARS ? text.slice(0, MAX_CSS_CONTEXT_CHARS) + "\n/* ...truncated... */" : text;
 }
 
 export function buildFixPrompt(context: ProposeContext): string {
-  const styleLines = context.selectorStyles.map((s) =>
-    s.styles
-      ? `${s.selector}:\n${Object.entries(s.styles).filter(([, v]) => v).map(([p, v]) => `  ${p}: ${v}`).join("\n")}`
-      : `${s.selector}: (no matching element)`
-  ).join("\n\n");
+  const styleLines = context.selectorStyles
+    .map((s) =>
+      s.styles
+        ? `${s.selector}:\n${Object.entries(s.styles)
+            .filter(([, v]) => v)
+            .map(([p, v]) => `  ${p}: ${v}`)
+            .join("\n")}`
+        : `${s.selector}: (no matching element)`,
+    )
+    .join("\n\n");
   return `You are a CSS repair engine for a pixel-verified markup loop. A deterministic verifier compared the rendered attempt against a target screenshot (${context.targetSize.width}x${context.targetSize.height}; the attempt currently renders ${context.renderedHeight}px tall) and produced the residual list below. Propose the SMALLEST set of CSS override rules that fixes the FIRST problems in the list.
 
 Rules of the game:
@@ -295,10 +317,7 @@ export interface MarkupAutofixOptions {
 function verdictPoint(report: MarkupVerifyReport): VerifyTrendPoint {
   return {
     targetsPassed: report.targets.filter((t) => t.pass).length,
-    residuals: report.targets.reduce(
-      (sum, t) => sum + t.missingBlocking + t.extraBlocking + t.orderViolations,
-      0,
-    ),
+    residuals: report.targets.reduce((sum, t) => sum + t.missingBlocking + t.extraBlocking + t.orderViolations, 0),
   };
 }
 
@@ -309,9 +328,7 @@ function totalPixelDiff(report: MarkupVerifyReport): number {
 export async function runMarkupAutofix(options: MarkupAutofixOptions): Promise<AutofixReport> {
   const maxRounds = options.maxRounds ?? 4;
   const log = options.log ?? (() => {});
-  const workingFile = options.inPlace
-    ? options.attempt
-    : options.attempt.replace(/\.html?$/i, "") + ".autofix.html";
+  const workingFile = options.inPlace ? options.attempt : options.attempt.replace(/\.html?$/i, "") + ".autofix.html";
   if (!options.inPlace) copyFileSync(options.attempt, workingFile);
 
   const rounds: AutofixRound[] = [];
@@ -326,11 +343,10 @@ export async function runMarkupAutofix(options: MarkupAutofixOptions): Promise<A
     const selectors = extractKickbackSelectors(verify.kickback);
     const context: ProposeContext = {
       kickback: verify.kickback,
-      selectorStyles: await captureComputedStyles(
-        workingFile,
-        selectors,
-        { width: verify.targets[0]?.width ?? 1280, height: Math.min(verify.targets[0]?.height ?? 800, 4000) },
-      ),
+      selectorStyles: await captureComputedStyles(workingFile, selectors, {
+        width: verify.targets[0]?.width ?? 1280,
+        height: Math.min(verify.targets[0]?.height ?? 800, 4000),
+      }),
       css: extractStyleText(html),
       targetSize: { width: verify.targets[0]?.width ?? 1280, height: verify.targets[0]?.height ?? 0 },
       renderedHeight: verify.targets[0]?.renderedHeight ?? 0,
@@ -343,7 +359,13 @@ export async function runMarkupAutofix(options: MarkupAutofixOptions): Promise<A
       proposed = proposed.slice(0, MAX_RULES_PER_ROUND);
     }
     if (proposed.length === 0) {
-      rounds.push({ round, proposed, outcome: "no-proposal", pixelDiffBefore: pixelBefore, residualsBefore: before.residuals });
+      rounds.push({
+        round,
+        proposed,
+        outcome: "no-proposal",
+        pixelDiffBefore: pixelBefore,
+        residualsBefore: before.residuals,
+      });
       stopReason = "no-proposal";
       break;
     }
@@ -353,8 +375,7 @@ export async function runMarkupAutofix(options: MarkupAutofixOptions): Promise<A
     const after = verdictPoint(verifyAfter);
     const pixelAfter = totalPixelDiff(verifyAfter);
     const direction = computeTrend(before, after).direction;
-    const accept = direction === "improved"
-      || (direction === "flat" && pixelAfter < pixelBefore - 0.0005);
+    const accept = direction === "improved" || (direction === "flat" && pixelAfter < pixelBefore - 0.0005);
 
     rounds.push({
       round,
@@ -370,11 +391,15 @@ export async function runMarkupAutofix(options: MarkupAutofixOptions): Promise<A
     if (accept) {
       consecutiveRollbacks = 0;
       verify = verifyAfter;
-      log(`${GREEN}round ${round}: accepted${RESET} (${direction}, residuals ${before.residuals} -> ${after.residuals}, diff ${(pixelBefore * 100).toFixed(2)}% -> ${(pixelAfter * 100).toFixed(2)}%)`);
+      log(
+        `${GREEN}round ${round}: accepted${RESET} (${direction}, residuals ${before.residuals} -> ${after.residuals}, diff ${(pixelBefore * 100).toFixed(2)}% -> ${(pixelAfter * 100).toFixed(2)}%)`,
+      );
     } else {
       writeFileSync(workingFile, html);
       consecutiveRollbacks++;
-      log(`${RED}round ${round}: rolled back${RESET} (${direction}, residuals ${before.residuals} -> ${after.residuals}, diff ${(pixelBefore * 100).toFixed(2)}% -> ${(pixelAfter * 100).toFixed(2)}%)`);
+      log(
+        `${RED}round ${round}: rolled back${RESET} (${direction}, residuals ${before.residuals} -> ${after.residuals}, diff ${(pixelBefore * 100).toFixed(2)}% -> ${(pixelAfter * 100).toFixed(2)}%)`,
+      );
       if (consecutiveRollbacks >= 2) {
         stopReason = "consecutive-rollbacks";
         break;
@@ -416,14 +441,21 @@ export function formatAutofixReport(report: AutofixReport): string {
   if (report.workingFile !== report.attempt) lines.push(`${DIM}output:  ${report.workingFile}${RESET}`);
   lines.push("");
   for (const r of report.rounds) {
-    const head = r.outcome === "accepted"
-      ? `${GREEN}accepted${RESET}`
-      : r.outcome === "rolled-back"
-      ? `${RED}rolled back${RESET}`
-      : `${YELLOW}no proposal${RESET}`;
-    lines.push(`round ${r.round}: ${head}${r.trendDirection ? ` (${r.trendDirection})` : ""} — ${r.proposed.length} rule(s)`);
+    const head =
+      r.outcome === "accepted"
+        ? `${GREEN}accepted${RESET}`
+        : r.outcome === "rolled-back"
+          ? `${RED}rolled back${RESET}`
+          : `${YELLOW}no proposal${RESET}`;
+    lines.push(
+      `round ${r.round}: ${head}${r.trendDirection ? ` (${r.trendDirection})` : ""} — ${r.proposed.length} rule(s)`,
+    );
     for (const f of r.proposed) {
-      lines.push(`  ${DIM}${f.selector} { ${Object.entries(f.declarations).map(([p, v]) => `${p}: ${v}`).join("; ")} }${f.note ? ` — ${f.note}` : ""}${RESET}`);
+      lines.push(
+        `  ${DIM}${f.selector} { ${Object.entries(f.declarations)
+          .map(([p, v]) => `${p}: ${v}`)
+          .join("; ")} }${f.note ? ` — ${f.note}` : ""}${RESET}`,
+      );
     }
   }
   lines.push("");
@@ -504,7 +536,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const { createLLMProvider } = await import("@mizchi/vlmkit-ai/llm-client.ts");
   const llm = createLLMProvider({ throwIfMissing: false });
   if (!llm) {
-    console.error(`${RED}No LLM API key configured.${RESET} Set GEMINI_API_KEY / OPENROUTER_API_KEY / ANTHROPIC_API_KEY (see VLMKIT_LLM_PROVIDER), or use --dry-run to inspect the context pack.`);
+    console.error(
+      `${RED}No LLM API key configured.${RESET} Set GEMINI_API_KEY / OPENROUTER_API_KEY / ANTHROPIC_API_KEY (see VLMKIT_LLM_PROVIDER), or use --dry-run to inspect the context pack.`,
+    );
     process.exit(1);
   }
   const propose: ProposeFixes = async (context) => parseFixProposals(await llm.complete(buildFixPrompt(context)));
@@ -522,7 +556,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (!report.done) process.exit(1);
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-autofix" ||
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-autofix" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

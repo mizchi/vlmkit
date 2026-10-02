@@ -139,9 +139,7 @@ export interface SceneElement {
  */
 export function parseSceneElements(source: string | unknown): SceneElement[] {
   const parsed: unknown = typeof source === "string" ? JSON.parse(source) : source;
-  const rows = Array.isArray(parsed)
-    ? parsed
-    : (parsed as { elements?: unknown })?.elements;
+  const rows = Array.isArray(parsed) ? parsed : (parsed as { elements?: unknown })?.elements;
   if (!Array.isArray(rows)) {
     throw new UsageError("elements JSON must be an array or an object with an `elements` array");
   }
@@ -164,7 +162,10 @@ export function parseSceneElements(source: string | unknown): SceneElement[] {
     const element: SceneElement = {
       path,
       tag: str(record.tag) ?? "node",
-      top, left, width, height,
+      top,
+      left,
+      width,
+      height,
       ...(str(record.id) ? { id: str(record.id)! } : {}),
       ...(str(record.classes) ? { classes: str(record.classes)! } : {}),
       ...(str(record.text) !== undefined ? { text: str(record.text)! } : {}),
@@ -180,7 +181,9 @@ export function parseSceneElements(source: string | unknown): SceneElement[] {
       ...(pick("textShadow", "text_shadow") === true ? { textShadow: true } : {}),
       ...(record.disabled === true ? { disabled: true } : {}),
       ...(num(pick("fontSize", "font_size")) !== undefined ? { fontSize: num(pick("fontSize", "font_size"))! } : {}),
-      ...(num(pick("fontWeight", "font_weight")) !== undefined ? { fontWeight: num(pick("fontWeight", "font_weight"))! } : {}),
+      ...(num(pick("fontWeight", "font_weight")) !== undefined
+        ? { fontWeight: num(pick("fontWeight", "font_weight"))! }
+        : {}),
       ...(num(record.heading) !== undefined ? { heading: num(record.heading)! } : {}),
       ...(num(record.border) !== undefined ? { border: num(record.border)! } : {}),
       ...(num(record.radius) !== undefined ? { radius: num(record.radius)! } : {}),
@@ -195,8 +198,8 @@ export function parseSceneElements(source: string | unknown): SceneElement[] {
       const value = element[key];
       if (value !== undefined && parseColor(value) === null) {
         throw new UsageError(
-          `elements[${index}].${key} is "${value}", which is not a resolved colour — give rgb()/rgba()/#hex.`
-          + " Resolving oklch()/lab()/named colours is the renderer's job, so the judge never guesses a second answer.",
+          `elements[${index}].${key} is "${value}", which is not a resolved colour — give rgb()/rgba()/#hex.` +
+            " Resolving oklch()/lab()/named colours is the renderer's job, so the judge never guesses a second answer.",
         );
       }
     }
@@ -331,9 +334,7 @@ export function judgeSceneIntegrity(
 ): SceneIntegrityReport {
   const maxFindings = options.maxFindings ?? 12;
   const image = options.image;
-  const viewport = options.viewport
-    ?? image?.width
-    ?? Math.max(0, ...elements.map((e) => e.left + e.width));
+  const viewport = options.viewport ?? image?.width ?? Math.max(0, ...elements.map((e) => e.left + e.width));
 
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
@@ -359,9 +360,8 @@ export function judgeSceneIntegrity(
   if (withText.length < 2) {
     inertRules.push({
       rule: "text-collision",
-      reason: withText.length === 0
-        ? "no element carried `text`"
-        : "only one element carried `text`; a collision needs two",
+      reason:
+        withText.length === 0 ? "no element carried `text`" : "only one element carried `text`; a collision needs two",
     });
   } else {
     const collisions = findTextCollisions(withText.map(toTextBlock), viewport, { maxFindings });
@@ -418,7 +418,10 @@ export function judgeSceneIntegrity(
     }
   }
   if (protrusions.length === 0) {
-    inertRules.push({ rule: "container-protrusion", reason: "no element exceeded its nearest recorded ancestor's box" });
+    inertRules.push({
+      rule: "container-protrusion",
+      reason: "no element exceeded its nearest recorded ancestor's box",
+    });
   } else {
     const judged = judgeProtrusions(protrusions, viewport, maxFindings);
     findings.push(...judged.findings);
@@ -460,13 +463,15 @@ export function judgeSceneIntegrity(
     verdict: findings.some((f) => f.severity === "fail") ? "defects" : "clean",
     findings,
     exempted,
-    viewports: [{
-      width: image?.width ?? viewport,
-      height: image?.height ?? Math.max(0, ...elements.map((e) => e.top + e.height)),
-      components: elements.length,
-      inkRatio,
-      textBlocks: withText.length,
-    }],
+    viewports: [
+      {
+        width: image?.width ?? viewport,
+        height: image?.height ?? Math.max(0, ...elements.map((e) => e.top + e.height)),
+        components: elements.length,
+        inkRatio,
+        textBlocks: withText.length,
+      },
+    ],
     kickback: findings.map((f) => `${f.kind}${f.selector ? ` (${f.selector})` : ""}: ${f.message}`),
     skippedRules,
     inertRules,
@@ -503,18 +508,25 @@ export function sceneContrastCandidates(
     for (let node: SceneElement | undefined = element; node; node = nearestRecordedAncestor(node, byPath)) {
       opacity *= node.opacity ?? 1;
       if (opaque) continue;
-      if (node.backgroundImage) { image = true; break; }
+      if (node.backgroundImage) {
+        image = true;
+        break;
+      }
       const bg = node.background !== undefined ? parseColor(node.background) : null;
       if (bg && bg[3] > 0) backgrounds.push(bg);
       if (bg && bg[3] >= 1) opaque = true;
     }
-    if (image) { samples.push({ selector, text, composite: true }); continue; }
+    if (image) {
+      samples.push({ selector, text, composite: true });
+      continue;
+    }
     if (!opaque) {
       refused.push({
         kind: "low-contrast-text",
         viewport,
         selector,
-        reason: "no opaque `background` on this element or a recorded ancestor — a scene has no default canvas colour, so the contrast is not measured",
+        reason:
+          "no opaque `background` on this element or a recorded ancestor — a scene has no default canvas colour, so the contrast is not measured",
       });
       continue;
     }
@@ -550,11 +562,7 @@ export function sceneContrastCandidates(
 const COLLAPSE_MAX_HEIGHT = 4;
 const COLLAPSE_MIN_CHILD_HEIGHT = 24;
 
-function collectCollapse(
-  element: SceneElement,
-  ancestor: SceneElement,
-  into: Map<string, CollapseCandidate>,
-): void {
+function collectCollapse(element: SceneElement, ancestor: SceneElement, into: Map<string, CollapseCandidate>): void {
   if (ancestor.height > COLLAPSE_MAX_HEIGHT || ancestor.width <= 0) return;
   if (element.height < COLLAPSE_MIN_CHILD_HEIGHT) return;
   const existing = into.get(ancestor.path) ?? {
@@ -631,9 +639,9 @@ function protrusionAmount(
   child: SceneElement,
   parent: SceneElement,
 ): { amount: number; axis: "horizontal" | "vertical" } | null {
-  const right = (child.left + child.width) - (parent.left + parent.width);
+  const right = child.left + child.width - (parent.left + parent.width);
   const left = parent.left - child.left;
-  const bottom = (child.top + child.height) - (parent.top + parent.height);
+  const bottom = child.top + child.height - (parent.top + parent.height);
   const top = parent.top - child.top;
   const horizontal = Math.max(right, left);
   const vertical = Math.max(bottom, top);
@@ -781,7 +789,12 @@ export function sceneToColorRolesInput(
   viewport: { width: number; height: number },
 ): ColorRolesInput {
   const byPath = new Map(elements.map((element) => [element.path, element]));
-  const tally = { surfaces: new Map<string, ColorUse>(), ink: new Map<string, ColorUse>(), marks: new Map<string, ColorUse>(), interactive: new Map<string, ColorUse>() };
+  const tally = {
+    surfaces: new Map<string, ColorUse>(),
+    ink: new Map<string, ColorUse>(),
+    marks: new Map<string, ColorUse>(),
+    interactive: new Map<string, ColorUse>(),
+  };
   const add = (into: Map<string, ColorUse>, hex: string, area: number, sample: string): void => {
     const entry = into.get(hex) ?? { hex, area: 0, count: 0, samples: [] };
     entry.area += area;
@@ -812,7 +825,12 @@ export function sceneToColorRolesInput(
     }
     const border = parseColor(element.borderColor);
     if ((element.border ?? 0) > 0 && border && border[3] > 0.05) {
-      add(tally.marks, toHex(border), Math.round((element.border ?? 0) * 2 * (element.width + element.height)), element.path);
+      add(
+        tally.marks,
+        toHex(border),
+        Math.round((element.border ?? 0) * 2 * (element.width + element.height)),
+        element.path,
+      );
     }
     if (COLOR_ROLES.has(element.role ?? "") && element.color) {
       const ink = inkOf(element);
@@ -824,9 +842,10 @@ export function sceneToColorRolesInput(
       if (behind.kind !== "ok") {
         controlsSkipped.push({
           selector: element.path,
-          reason: behind.kind === "image"
-            ? "background-image behind the control"
-            : "no opaque background behind the control in the scene",
+          reason:
+            behind.kind === "image"
+              ? "background-image behind the control"
+              : "no opaque background behind the control in the scene",
         });
       } else {
         controls.push({
@@ -918,9 +937,8 @@ export function sceneToDesignPolicyInput(elements: readonly SceneElement[]): Des
   for (const element of elements) {
     if (element.width < 2 || element.height < 2) continue;
     const pad = element.padding;
-    const padding: [number, number, number, number] = pad === undefined
-      ? [0, 0, 0, 0]
-      : typeof pad === "number" ? [pad, pad, pad, pad] : pad;
+    const padding: [number, number, number, number] =
+      pad === undefined ? [0, 0, 0, 0] : typeof pad === "number" ? [pad, pad, pad, pad] : pad;
     padding.forEach((value, i) => {
       if (value > 0) spacing.push({ selector: element.path, property: `padding${SIDES[i]}`, value });
     });
@@ -972,9 +990,7 @@ function parseBox(value: unknown): { width: number; height: number } | undefined
   return width !== undefined && height !== undefined ? { width, height } : undefined;
 }
 
-function parseRect(
-  value: unknown,
-): { top: number; left: number; width: number; height: number } | undefined {
+function parseRect(value: unknown): { top: number; left: number; width: number; height: number } | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const record = value as Record<string, unknown>;
   const parts = ["top", "left", "width", "height"].map((key) => num(record[key]));
@@ -1075,7 +1091,9 @@ function camouflaged(element: SceneElement, byPath: ReadonlyMap<string, SceneEle
     if (node.backgroundImage) return false;
     const bg = parseColor(node.background);
     if (bg && bg[3] >= 0.9) {
-      return Math.max(Math.abs(fg[0] - bg[0]), Math.abs(fg[1] - bg[1]), Math.abs(fg[2] - bg[2])) <= CAMOUFLAGE_CHANNEL_DELTA;
+      return (
+        Math.max(Math.abs(fg[0] - bg[0]), Math.abs(fg[1] - bg[1]), Math.abs(fg[2] - bg[2])) <= CAMOUFLAGE_CHANNEL_DELTA
+      );
     }
   }
   return null;
@@ -1099,8 +1117,12 @@ export function sceneTextVisibility(
   const fg = parseColor(element.color);
   if (fg && fg[3] < COPY_UNSEEN_ALPHA) return "transparent";
   const clip = element.clip;
-  const w = clip ? Math.min(element.left + element.width, clip.left + clip.width) - Math.max(element.left, clip.left) : element.width;
-  const h = clip ? Math.min(element.top + element.height, clip.top + clip.height) - Math.max(element.top, clip.top) : element.height;
+  const w = clip
+    ? Math.min(element.left + element.width, clip.left + clip.width) - Math.max(element.left, clip.left)
+    : element.width;
+  const h = clip
+    ? Math.min(element.top + element.height, clip.top + clip.height) - Math.max(element.top, clip.top)
+    : element.height;
   if (Math.max(0, w) * Math.max(0, h) < COPY_MIN_AREA) return "visually-hidden";
   if (camouflaged(element, byPath) === true) return "camouflage";
   return null;
@@ -1178,7 +1200,7 @@ export function judgeSceneCopy(elements: readonly SceneElement[], options: Scene
         clippedX: cut.clippedX,
         clippedY: cut.clippedY,
         manifestLines: (manifestLines ?? []).filter((line) =>
-          normalizeWhitespace(text).includes(normalizeWhitespace(line))
+          normalizeWhitespace(text).includes(normalizeWhitespace(line)),
         ),
       });
     }
@@ -1205,16 +1227,18 @@ export function judgeSceneCopy(elements: readonly SceneElement[], options: Scene
   // strings".
   for (const cut of truncated) {
     const axis = cut.clippedX >= cut.clippedY ? `${cut.clippedX}px horizontally` : `${cut.clippedY}px vertically`;
-    const satisfied = cut.manifestLines.length > 0
-      ? ` It satisfies manifest line(s) ${cut.manifestLines.map((l) => `"${l}"`).join(", ")} on paper,`
-        + ` but the user cannot read all of it.`
-      : "";
+    const satisfied =
+      cut.manifestLines.length > 0
+        ? ` It satisfies manifest line(s) ${cut.manifestLines.map((l) => `"${l}"`).join(", ")} on paper,` +
+          ` but the user cannot read all of it.`
+        : "";
     judged.issues.push({
       kind: "copy-truncated",
       severity: "suspect",
-      message: `${cut.selector} draws "${cut.text}" but its measured text runs ${axis} past the clip rect,`
-        + ` so it renders cut off.${satisfied}`
-        + ` Shorten the string, widen the box, or shrink the type.`,
+      message:
+        `${cut.selector} draws "${cut.text}" but its measured text runs ${axis} past the clip rect,` +
+        ` so it renders cut off.${satisfied}` +
+        ` Shorten the string, widen the box, or shrink the type.`,
     });
   }
 
@@ -1229,7 +1253,8 @@ export function judgeSceneCopy(elements: readonly SceneElement[], options: Scene
   } else if (withText.length === 0) {
     inertRules.push({
       rule: "copy-missing",
-      reason: "no element carried `text`, so every manifest line reports missing for want of input rather than for a real absence",
+      reason:
+        "no element carried `text`, so every manifest line reports missing for want of input rather than for a real absence",
     });
   }
   if (withText.every((element) => !element.textMeasured || !element.clip)) {
@@ -1244,28 +1269,28 @@ export function judgeSceneCopy(elements: readonly SceneElement[], options: Scene
   const coverageNotes = [copyReasonCoverage(withText, byPath, options.ink !== undefined)];
   if (camouflageUnjudged > 0) {
     coverageNotes.push(
-      `${camouflageUnjudged} text element(s) carry a colour but nothing opaque behind them, so camouflage`
-      + " went unjudged for them: a scene has no default canvas colour to compare against.",
+      `${camouflageUnjudged} text element(s) carry a colour but nothing opaque behind them, so camouflage` +
+        " went unjudged for them: a scene has no default canvas colour to compare against.",
     );
   }
   if (!options.ink) {
     coverageNotes.push(
-      "No --image: text the engine reports but never actually painted (missing font, alpha 0,"
-      + " skipped draw call) cannot be detected. Pass the frame PNG to enable the ink check.",
+      "No --image: text the engine reports but never actually painted (missing font, alpha 0," +
+        " skipped draw call) cannot be detected. Pass the frame PNG to enable the ink check.",
     );
   } else {
     coverageNotes.push(`Ink checked in ${inkChecked} text bbox(es) against ${options.inkSource ?? "the frame"}.`);
     if (offFrame > 0) {
       coverageNotes.push(
-        `${offFrame} text element(s) lie outside the frame, so their ink went unchecked. Element`
-        + " rects carry no scroll or clip-chain data, so \"never drawn\" and \"scrolled out of this"
-        + " frame\" are indistinguishable and neither is reported.",
+        `${offFrame} text element(s) lie outside the frame, so their ink went unchecked. Element` +
+          ' rects carry no scroll or clip-chain data, so "never drawn" and "scrolled out of this' +
+          ' frame" are indistinguishable and neither is reported.',
       );
     }
   }
   coverageNotes.push(
-    "No disclosure-state sweep: opening <details> and clicking tabs needs a live page, so copy"
-    + " only reachable through an interaction is absent from this input, not hidden in it.",
+    "No disclosure-state sweep: opening <details> and clicking tabs needs a live page, so copy" +
+      " only reachable through an interaction is absent from this input, not hidden in it.",
   );
 
   return {
@@ -1299,11 +1324,17 @@ function copyReasonCoverage(
     { reason: "transparent", runs: hasColor, needs: "a text `color`" },
     { reason: "camouflage", runs: hasColor, needs: "a text `color` and a `background` behind it" },
     { reason: "unpainted", runs: ink, needs: "the frame's pixels, --image on the CLI" },
-    { reason: "unreachable", runs: false, needs: "a scroll extent and every ancestor's overflow clip, which element rects do not carry" },
+    {
+      reason: "unreachable",
+      runs: false,
+      needs: "a scroll extent and every ancestor's overflow clip, which element rects do not carry",
+    },
   ];
   const ran = classes.filter((c) => c.runs);
   const not = classes.filter((c) => !c.runs);
   // "7", not INVISIBLE_REASONS.length: `unknown` is the attribution fallback, not a class.
-  return `copy-invisible covers ${ran.length} of its 7 reason classes here: ${ran.map((c) => c.reason).join(", ")}.`
-    + (not.length > 0 ? ` Not evaluated: ${not.map((c) => `${c.reason} (needs ${c.needs})`).join("; ")}.` : "");
+  return (
+    `copy-invisible covers ${ran.length} of its 7 reason classes here: ${ran.map((c) => c.reason).join(", ")}.` +
+    (not.length > 0 ? ` Not evaluated: ${not.map((c) => `${c.reason} (needs ${c.needs})`).join("; ")}.` : "")
+  );
 }

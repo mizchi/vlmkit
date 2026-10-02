@@ -38,18 +38,20 @@ function createDiff(overrides: Partial<VrtDiff> = {}): VrtDiff {
 
 describe("applyApprovalsToAnalysisSignals", () => {
   it("should filter visual and paint tree signals by declaration context", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          selector: ".card",
-          property: "margin-left",
-          category: "spacing",
-          changeType: "geometry",
-          tolerance: { pixels: 40, ratio: 0.05, geometryDelta: 4 },
-          reason: "known spacing drift",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            selector: ".card",
+            property: "margin-left",
+            category: "spacing",
+            changeType: "geometry",
+            tolerance: { pixels: 40, ratio: 0.05, geometryDelta: 4 },
+            reason: "known spacing drift",
+          },
+        ],
+      }),
+    );
     const paintTreeChanges: PaintTreeChange[] = [
       {
         path: "root > div[0]",
@@ -72,17 +74,19 @@ describe("applyApprovalsToAnalysisSignals", () => {
   });
 
   it("should preserve signals in strict mode", () => {
-    const manifest = parseApprovalManifest(JSON.stringify({
-      rules: [
-        {
-          property: "background-color",
-          category: "visual",
-          changeType: "paint",
-          tolerance: { pixels: 100, ratio: 0.5, colorDelta: 20 },
-          reason: "known palette drift",
-        },
-      ],
-    }));
+    const manifest = parseApprovalManifest(
+      JSON.stringify({
+        rules: [
+          {
+            property: "background-color",
+            category: "visual",
+            changeType: "paint",
+            tolerance: { pixels: 100, ratio: 0.5, colorDelta: 20 },
+            reason: "known palette drift",
+          },
+        ],
+      }),
+    );
     const paintTreeChanges: PaintTreeChange[] = [
       {
         path: "root > div[0]",
@@ -110,11 +114,7 @@ describe("captureCraterForcedStateStyles", () => {
   it("captures forced hover styles keyed by the original selector", async () => {
     const calls: Array<{ selector: string; forcedStates: string[]; properties: string[] }> = [];
     const client = {
-      getComputedStylesWithState: async (
-        selector: string,
-        forcedStates: string[],
-        properties: string[],
-      ) => {
+      getComputedStylesWithState: async (selector: string, forcedStates: string[], properties: string[]) => {
         calls.push({ selector, forcedStates, properties });
         return {
           normal: { "text-decoration": "none" },
@@ -124,11 +124,7 @@ describe("captureCraterForcedStateStyles", () => {
       },
     };
 
-    const styles = await captureCraterForcedStateStyles(
-      client,
-      [".footer a:hover", ".plain a"],
-      ["text-decoration"],
-    );
+    const styles = await captureCraterForcedStateStyles(client, [".footer a:hover", ".plain a"], ["text-decoration"]);
 
     assert.deepEqual(calls, [
       { selector: ".footer a:hover", forcedStates: ["hover"], properties: ["text-decoration"] },
@@ -178,10 +174,13 @@ describe("analyzeVrtDiff", () => {
 describe("parseCssDeclarations", () => {
   it("reads each property of a one-line rule as its own declaration", () => {
     const decls = parseCssDeclarations(".card { color: red; padding: 4px; }");
-    assert.deepEqual(decls.map((d) => [d.selector, d.property, d.value]), [
-      [".card", "color", "red"],
-      [".card", "padding", "4px"],
-    ]);
+    assert.deepEqual(
+      decls.map((d) => [d.selector, d.property, d.value]),
+      [
+        [".card", "color", "red"],
+        [".card", "padding", "4px"],
+      ],
+    );
     assert.equal(decls[0]!.index, 0, "the line index is how every mutator finds it again");
   });
 
@@ -202,11 +201,14 @@ describe("parseCssDeclarations", () => {
       ".other { color: green; }",
     ].join("\n");
     const decls = parseCssDeclarations(css);
-    assert.deepEqual(decls.map((d) => [d.value, d.mediaCondition]), [
-      ["red", null],
-      ["blue", "(max-width: 600px)"],
-      ["green", null],
-    ]);
+    assert.deepEqual(
+      decls.map((d) => [d.value, d.mediaCondition]),
+      [
+        ["red", null],
+        ["blue", "(max-width: 600px)"],
+        ["green", null],
+      ],
+    );
   });
 
   it("keeps a var() value whole", () => {
@@ -223,8 +225,14 @@ describe("groupBySelector", () => {
     const css = ".card { color: red; padding: 4px; }\n.card { margin: 8px; }";
     const blocks = groupBySelector(parseCssDeclarations(css));
     assert.equal(blocks.length, 2);
-    assert.deepEqual(blocks.map((b) => b.declarations.length), [2, 1]);
-    assert.deepEqual(blocks.map((b) => b.index), [0, 1]);
+    assert.deepEqual(
+      blocks.map((b) => b.declarations.length),
+      [2, 1],
+    );
+    assert.deepEqual(
+      blocks.map((b) => b.index),
+      [0, 1],
+    );
   });
 });
 
@@ -257,7 +265,10 @@ describe("removeCssProperty", () => {
     const target = parseCssDeclarations(css).find((d) => d.property === "color")!;
     const out = removeCssProperty(css, target);
     assert.equal(out, ".card { border-color: red; }");
-    assert.deepEqual(parseCssDeclarations(out).map((d) => d.property), ["border-color"]);
+    assert.deepEqual(
+      parseCssDeclarations(out).map((d) => d.property),
+      ["border-color"],
+    );
   });
 
   it("does not match a value that is the head of a longer one", () => {
@@ -314,7 +325,10 @@ describe("applyCssFix", () => {
     assert.equal(out, ".card { color: red; padding: 4px; }");
     assert.deepEqual(
       parseCssDeclarations(out).map((d) => [d.property, d.value]),
-      [["color", "red"], ["padding", "4px"]],
+      [
+        ["color", "red"],
+        ["padding", "4px"],
+      ],
       "both declarations must survive, which is what concatenation destroyed",
     );
   });
@@ -326,7 +340,10 @@ describe("applyCssFix", () => {
     const emptied = removeCssProperty(css, parseCssDeclarations(css)[0]!);
     const out = applyCssFix(emptied, { selector: ".a", property: "color", value: "blue" });
     assert.equal(out, ".a { color: blue; }");
-    assert.deepEqual(parseCssDeclarations(out).map((d) => d.value), ["blue"]);
+    assert.deepEqual(
+      parseCssDeclarations(out).map((d) => d.value),
+      ["blue"],
+    );
   });
 
   it("returns the CSS untouched when no rule matches", () => {
@@ -338,7 +355,11 @@ describe("applyCssFix", () => {
     // Documented as-is rather than asserted as desirable: with the selector on two
     // lines the fix lands on the first, which is what the loop's rollback gate then
     // measures. Pinned so a change to it is deliberate.
-    const out = applyCssFix(".a { color: red; }\n.a { margin: 0; }", { selector: ".a", property: "padding", value: "4px" });
+    const out = applyCssFix(".a { color: red; }\n.a { margin: 0; }", {
+      selector: ".a",
+      property: "padding",
+      value: "4px",
+    });
     assert.equal(out, ".a { color: red; padding: 4px; }\n.a { margin: 0; }");
   });
 });
@@ -359,9 +380,15 @@ describe("seededRandom", () => {
     const a = seededRandom(11);
     const b = seededRandom(11);
     const first = Array.from({ length: 8 }, () => a());
-    assert.deepEqual(first, Array.from({ length: 8 }, () => b()));
+    assert.deepEqual(
+      first,
+      Array.from({ length: 8 }, () => b()),
+    );
     const other = seededRandom(12);
-    assert.notDeepEqual(first, Array.from({ length: 8 }, () => other()));
+    assert.notDeepEqual(
+      first,
+      Array.from({ length: 8 }, () => other()),
+    );
   });
 
   it("stays in [0, 1)", () => {

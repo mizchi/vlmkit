@@ -15,8 +15,14 @@ import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
-  parseCssDeclarations, removeCssProperty, extractCss, replaceCss,
-  seededRandom, groupBySelector, removeSelectorBlock, escapeRegex,
+  parseCssDeclarations,
+  removeCssProperty,
+  extractCss,
+  replaceCss,
+  seededRandom,
+  groupBySelector,
+  removeSelectorBlock,
+  escapeRegex,
   type CssDeclaration,
 } from "./css-challenge-core.ts";
 import { createReasoningPipeline } from "@mizchi/vlmkit-ai/reasoning-pipeline.ts";
@@ -42,7 +48,10 @@ export async function runCssFixLoop() {
   const fixturePath = getCssChallengeFixturePath(FIXTURE);
   const htmlRaw = await readFile(fixturePath, "utf-8");
   const originalCss = extractCss(htmlRaw);
-  if (!originalCss) { console.error("CSS not found"); process.exit(1); }
+  if (!originalCss) {
+    console.error("CSS not found");
+    process.exit(1);
+  }
 
   const declarations = parseCssDeclarations(originalCss);
   const blocks = groupBySelector(declarations);
@@ -105,10 +114,17 @@ export async function runCssFixLoop() {
     await loopPage.screenshot({ path: brokenPath, fullPage: true });
 
     // VRT diff
-    const diff = await compareScreenshots({
-      testId: `r${round}`, testTitle: `r${round}`, projectName: "fix-loop",
-      screenshotPath: brokenPath, baselinePath, status: "changed",
-    }, { outputDir: TMP });
+    const diff = await compareScreenshots(
+      {
+        testId: `r${round}`,
+        testTitle: `r${round}`,
+        projectName: "fix-loop",
+        screenshotPath: brokenPath,
+        baselinePath,
+        status: "changed",
+      },
+      { outputDir: TMP },
+    );
 
     const diffRatio = diff?.diffRatio ?? 0;
     console.log(`    Pixel diff: ${diffRatio === 0 ? GREEN + "0.0%" : (diffRatio * 100).toFixed(1) + "%"}${RESET}`);
@@ -139,27 +155,38 @@ export async function runCssFixLoop() {
       : (await readFile(brokenPath)).toString("base64");
 
     // Diff report with shift detection
-    const diffReport = await generateDiffReport({
-      testId: `r${round}`, testTitle: `r${round}`, projectName: "fix-loop",
-      screenshotPath: brokenPath, baselinePath, status: "changed",
-    }, { outputDir: TMP, detectShift: true, skipHeatmap: true });
+    const diffReport = await generateDiffReport(
+      {
+        testId: `r${round}`,
+        testTitle: `r${round}`,
+        projectName: "fix-loop",
+        screenshotPath: brokenPath,
+        baselinePath,
+        status: "changed",
+      },
+      { outputDir: TMP, detectShift: true, skipHeatmap: true },
+    );
 
     // Build rich text report: CSS text diff + selector list
     const currentDecls = parseCssDeclarations(currentCss);
     const originalDecls = parseCssDeclarations(originalCss);
-    const missingSelectors = [...new Set(originalDecls.map((d) => d.selector))]
-      .filter((s) => !currentDecls.some((d) => d.selector === s));
+    const missingSelectors = [...new Set(originalDecls.map((d) => d.selector))].filter(
+      (s) => !currentDecls.some((d) => d.selector === s),
+    );
     const cssDiffLines: string[] = [];
     for (const od of originalDecls) {
       const cd = currentDecls.find((d) => d.selector === od.selector && d.property === od.property);
       if (!cd) cssDiffLines.push(`MISSING: ${od.selector} { ${od.property}: ${od.value} }`);
-      else if (cd.value !== od.value) cssDiffLines.push(`CHANGED: ${od.selector} { ${od.property}: ${od.value} → ${cd.value} }`);
+      else if (cd.value !== od.value)
+        cssDiffLines.push(`CHANGED: ${od.selector} { ${od.property}: ${od.value} → ${cd.value} }`);
     }
     const textReport = [
       `Pixel diff: ${(diffRatio * 100).toFixed(1)}%. ${diff?.regions.length ?? 0} diff regions.`,
       missingSelectors.length > 0 ? `Missing CSS selectors: ${missingSelectors.join(", ")}` : "",
       cssDiffLines.length > 0 ? `CSS diff from baseline:\n${cssDiffLines.slice(0, 20).join("\n")}` : "",
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const { analysis, fix, escalated } = await pipeline.analyzeAndFix({
       heatmapBase64,
@@ -168,15 +195,19 @@ export async function runCssFixLoop() {
       cssDiff: cssDiffLines.join("\n"),
       highResHeatmapBase64: (await readFile(brokenPath)).toString("base64"),
       compactHeatmap: diffReport?.compact,
-      shiftInfo: diffReport ? {
-        globalShift: diffReport.globalShift,
-        shiftOnly: diffReport.shiftOnly,
-        compensatedDiffRatio: diffReport.compensatedDiffCount / diffReport.totalPixels,
-        contentChangeCount: diffReport.contentChangeCount,
-      } : undefined,
+      shiftInfo: diffReport
+        ? {
+            globalShift: diffReport.globalShift,
+            shiftOnly: diffReport.shiftOnly,
+            compensatedDiffRatio: diffReport.compensatedDiffCount / diffReport.totalPixels,
+            contentChangeCount: diffReport.contentChangeCount,
+          }
+        : undefined,
     });
 
-    console.log(`    VLM: ${analysis.changes.length} changes detected (${analysis.vlmLatencyMs}ms)${escalated ? ` ${YELLOW}[escalated]${RESET}` : ""}`);
+    console.log(
+      `    VLM: ${analysis.changes.length} changes detected (${analysis.vlmLatencyMs}ms)${escalated ? ` ${YELLOW}[escalated]${RESET}` : ""}`,
+    );
     for (const c of analysis.changes.slice(0, 5)) {
       console.log(`      ${DIM}${c.element} { ${c.property}: ${c.before} → ${c.after} }${RESET}`);
     }
@@ -185,10 +216,14 @@ export async function runCssFixLoop() {
     console.log(`    LLM: ${fix.fixes.length} fixes proposed (${fix.llmLatencyMs}ms, confidence: ${fix.confidence})`);
 
     // Filter fixes: prioritize MISSING selectors, only touch existing selectors if property was in original
-    const missingProps = new Set(cssDiffLines.filter((l) => l.startsWith("MISSING:")).map((l) => {
-      const m = l.match(/MISSING:\s*(.+?)\s*\{/);
-      return m ? m[1].trim() : "";
-    }));
+    const missingProps = new Set(
+      cssDiffLines
+        .filter((l) => l.startsWith("MISSING:"))
+        .map((l) => {
+          const m = l.match(/MISSING:\s*(.+?)\s*\{/);
+          return m ? m[1].trim() : "";
+        }),
+    );
     const validFixes = fix.fixes.filter((f) => {
       // Always allow fixes for missing selectors
       if (missingProps.has(f.selector)) return true;
@@ -247,15 +282,24 @@ export async function runCssFixLoop() {
     const candidatePath = join(TMP, `candidate-r${round}.png`);
     await loopPage.setContent(candidateHtml, { waitUntil: "networkidle" });
     await loopPage.screenshot({ path: candidatePath, fullPage: true });
-    const candidateDiff = await compareScreenshots({
-      testId: `candidate-r${round}`, testTitle: `candidate-r${round}`, projectName: "fix-loop",
-      screenshotPath: candidatePath, baselinePath, status: "changed",
-    }, { outputDir: TMP, skipHeatmap: true });
+    const candidateDiff = await compareScreenshots(
+      {
+        testId: `candidate-r${round}`,
+        testTitle: `candidate-r${round}`,
+        projectName: "fix-loop",
+        screenshotPath: candidatePath,
+        baselinePath,
+        status: "changed",
+      },
+      { outputDir: TMP, skipHeatmap: true },
+    );
     const candidateDiffRatio = candidateDiff?.diffRatio ?? 1;
 
     if (candidateDiffRatio < diffRatio) {
       // Fix improved things — accept
-      console.log(`    Applied: ${applied}/${validFixes.length} fixes → diff ${(diffRatio * 100).toFixed(1)}% → ${(candidateDiffRatio * 100).toFixed(1)}% ${GREEN}✓${RESET}`);
+      console.log(
+        `    Applied: ${applied}/${validFixes.length} fixes → diff ${(diffRatio * 100).toFixed(1)}% → ${(candidateDiffRatio * 100).toFixed(1)}% ${GREEN}✓${RESET}`,
+      );
       currentCss = candidateCss;
       if (candidateDiffRatio === 0) {
         console.log(`    ${GREEN}${BOLD}✓ PIXEL-PERFECT — Fix succeeded!${RESET}`);
@@ -266,15 +310,29 @@ export async function runCssFixLoop() {
       if (candidateDiffRatio < 0.005) {
         console.log(`    ${GREEN}✓ Near-perfect (< 0.5%)${RESET}`);
         fixed = true;
-        history.push({ round, diffRatio: candidateDiffRatio, changes: analysis.changes.length, fixes: applied, escalated });
+        history.push({
+          round,
+          diffRatio: candidateDiffRatio,
+          changes: analysis.changes.length,
+          fixes: applied,
+          escalated,
+        });
         break;
       }
     } else {
       // Fix made things worse or no change — rollback
-      console.log(`    Applied: ${applied}/${validFixes.length} fixes → diff ${(diffRatio * 100).toFixed(1)}% → ${(candidateDiffRatio * 100).toFixed(1)}% ${RED}✗ rollback${RESET}`);
+      console.log(
+        `    Applied: ${applied}/${validFixes.length} fixes → diff ${(diffRatio * 100).toFixed(1)}% → ${(candidateDiffRatio * 100).toFixed(1)}% ${RED}✗ rollback${RESET}`,
+      );
     }
 
-    history.push({ round, diffRatio: Math.min(diffRatio, candidateDiffRatio), changes: analysis.changes.length, fixes: applied, escalated });
+    history.push({
+      round,
+      diffRatio: Math.min(diffRatio, candidateDiffRatio),
+      changes: analysis.changes.length,
+      fixes: applied,
+      escalated,
+    });
   }
 
   await browser.close();
@@ -286,14 +344,20 @@ export async function runCssFixLoop() {
   console.log();
   console.log(`  ${DIM}Fixture:${RESET}  ${FIXTURE}`);
   console.log(`  ${DIM}Removed:${RESET}  ${removed.label}`);
-  console.log(`  ${DIM}Result:${RESET}   ${fixed ? GREEN + BOLD + "FIXED" : RED + BOLD + "NOT FIXED"}${RESET} (${round} round${round > 1 ? "s" : ""})`);
+  console.log(
+    `  ${DIM}Result:${RESET}   ${fixed ? GREEN + BOLD + "FIXED" : RED + BOLD + "NOT FIXED"}${RESET} (${round} round${round > 1 ? "s" : ""})`,
+  );
   console.log();
 
   if (history.length > 0) {
-    console.log(`  ${"Round".padEnd(8)} ${"Diff".padStart(8)} ${"Changes".padStart(10)} ${"Fixes".padStart(8)} ${"Escalated".padStart(10)}`);
+    console.log(
+      `  ${"Round".padEnd(8)} ${"Diff".padStart(8)} ${"Changes".padStart(10)} ${"Fixes".padStart(8)} ${"Escalated".padStart(10)}`,
+    );
     for (const h of history) {
       const diffStr = h.diffRatio === 0 ? `${GREEN}0.0%${RESET}` : `${(h.diffRatio * 100).toFixed(1)}%`;
-      console.log(`  ${String(h.round).padEnd(8)} ${diffStr.padStart(8)} ${String(h.changes).padStart(10)} ${String(h.fixes).padStart(8)} ${String(h.escalated).padStart(10)}`);
+      console.log(
+        `  ${String(h.round).padEnd(8)} ${diffStr.padStart(8)} ${String(h.changes).padStart(10)} ${String(h.fixes).padStart(8)} ${String(h.escalated).padStart(10)}`,
+      );
     }
   }
 
@@ -306,5 +370,8 @@ export async function runCssFixLoop() {
 // Guarded via the shared helper: the old suffix match could not tell
 // `fix-loop.ts` from another file ending in the same name.
 if (isCliEntry(import.meta.url, "fix-loop")) {
-  runCssFixLoop().catch((e) => { console.error(e); process.exitCode = 1; });
+  runCssFixLoop().catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  });
 }

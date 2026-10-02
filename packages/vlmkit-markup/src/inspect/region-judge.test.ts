@@ -48,7 +48,11 @@ test("buildPairImage stacks A above B with a gray separator", () => {
   // crop = 20+8 pad wide, 10+8 tall
   assert.equal(pair.width, 28);
   assert.equal(pair.height, 18 + 8 + 18);
-  const px = (x: number, y: number) => [pair.data[(y * pair.width + x) * 4], pair.data[(y * pair.width + x) * 4 + 1], pair.data[(y * pair.width + x) * 4 + 2]];
+  const px = (x: number, y: number) => [
+    pair.data[(y * pair.width + x) * 4],
+    pair.data[(y * pair.width + x) * 4 + 1],
+    pair.data[(y * pair.width + x) * 4 + 2],
+  ];
   assert.deepEqual(px(5, 5), [200, 0, 0]);
   assert.deepEqual(px(5, 18 + 3), [0x80, 0x80, 0x80]);
   assert.deepEqual(px(5, 18 + 8 + 5), [0, 0, 200]);

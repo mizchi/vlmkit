@@ -33,7 +33,12 @@ beforeAll(async () => {
     stdio: "ignore",
   });
   for (let attempt = 0; attempt < 60; attempt++) {
-    try { await fetch(`${BASE}/`); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
+    try {
+      await fetch(`${BASE}/`);
+      break;
+    } catch {
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
   browser = await chromium.launch();
 }, 120_000);
@@ -70,7 +75,11 @@ describe("the route to the playable demo", () => {
     await page.locator("[data-locale-toggle]").click();
     assert.match(await page.locator(".nav-demo").textContent(), /遊べるデモ\s*→/, "the arrow did not survive ja");
     await page.locator("[data-locale-toggle]").click();
-    assert.match(await page.locator(".nav-demo").textContent(), /Playable demo\s*→/, "the arrow did not survive the round trip");
+    assert.match(
+      await page.locator(".nav-demo").textContent(),
+      /Playable demo\s*→/,
+      "the arrow did not survive the round trip",
+    );
     await page.close();
   });
 

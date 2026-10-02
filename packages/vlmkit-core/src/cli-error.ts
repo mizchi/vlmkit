@@ -116,8 +116,10 @@ export function formatMissingPlaywrightBrowserError(
     // `playwright` is loaded (it threw the launch error) but we could not
     // resolve its manifest from here — a bundling accident rather than a user
     // error. Say what is missing without inventing a command that may be wrong.
-    return `error: Playwright has no ${engine} browser executable installed, and vlmkit could not resolve`
-      + ` its own playwright package to name the install command.`;
+    return (
+      `error: Playwright has no ${engine} browser executable installed, and vlmkit could not resolve` +
+      ` its own playwright package to name the install command.`
+    );
   }
   const missing = missingExecutablePath(message);
   const lines = [
@@ -147,9 +149,10 @@ export function formatMissingPlaywrightBrowserError(
 export function formatMissingPlaywrightModuleError(error: unknown): string | null {
   const err = error as { code?: string; message?: string };
   const message = String(err?.message ?? error);
-  const isModuleNotFound = err?.code === "ERR_MODULE_NOT_FOUND"
-    || /ERR_MODULE_NOT_FOUND/.test(message)
-    || /Cannot find (?:package|module)/i.test(message);
+  const isModuleNotFound =
+    err?.code === "ERR_MODULE_NOT_FOUND" ||
+    /ERR_MODULE_NOT_FOUND/.test(message) ||
+    /Cannot find (?:package|module)/i.test(message);
   if (!isModuleNotFound) return null;
   if (!/Cannot find (?:package|module) ['"]playwright['"]/i.test(message)) return null;
   const importer = message.match(/imported from\s+(\S+)/i)?.[1] ?? null;
@@ -233,9 +236,10 @@ export function formatCliError(e: unknown): string | null {
   if (err?.code === "EISDIR") {
     const argvDir = findDirectoryArg();
     const path = err.path ?? msg.match(/EISDIR:[^']*'([^']+)'/)?.[1] ?? argvDir ?? "?";
-    const hint = path === "?"
-      ? "       hint: pass the path to a specific .html file."
-      : `       hint: pass the path to a specific .html file inside it (e.g. ${path}/page.html).`;
+    const hint =
+      path === "?"
+        ? "       hint: pass the path to a specific .html file."
+        : `       hint: pass the path to a specific .html file inside it (e.g. ${path}/page.html).`;
     return `error: expected an HTML file, got a directory: ${path}\n${hint}`;
   }
   const missingBrowser = formatMissingPlaywrightBrowserError(e);
@@ -265,14 +269,12 @@ export function formatCliError(e: unknown): string | null {
   }
   // Playwright navigation failure (DNS / connection refused / unsafe port / SSL).
   if (
-    /net::ERR_NAME_NOT_RESOLVED/i.test(msg)
-    || /net::ERR_CONNECTION_REFUSED/i.test(msg)
-    || /net::ERR_UNSAFE_PORT/i.test(msg)
-    || /Cannot navigate to invalid URL/i.test(msg)
+    /net::ERR_NAME_NOT_RESOLVED/i.test(msg) ||
+    /net::ERR_CONNECTION_REFUSED/i.test(msg) ||
+    /net::ERR_UNSAFE_PORT/i.test(msg) ||
+    /Cannot navigate to invalid URL/i.test(msg)
   ) {
-    const url = msg.match(/Navigating to ([^,]+)/i)?.[1]
-      ?? msg.match(/(https?:\/\/[^\s"]+)/)?.[1]
-      ?? "the URL";
+    const url = msg.match(/Navigating to ([^,]+)/i)?.[1] ?? msg.match(/(https?:\/\/[^\s"]+)/)?.[1] ?? "the URL";
     let reason = "failed to load";
     if (/ERR_NAME_NOT_RESOLVED/i.test(msg)) reason = "host could not be resolved (check the URL)";
     else if (/ERR_CONNECTION_REFUSED/i.test(msg)) reason = "connection refused (is the server running?)";

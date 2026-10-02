@@ -54,7 +54,6 @@ function parseArgs(argv) {
   };
 }
 
-
 /**
  * The legal moves available right now, asked of the PAGE's rules so this file holds no second
  * copy of them — a solver with its own idea of the rules proves nothing about the game.
@@ -133,12 +132,12 @@ const LEGAL_MOVES = `(() => {
  */
 function scoreMove(m) {
   let s = 0;
-  if (m.uncovers) s += 100;                        // turning a card up is the scarce resource
+  if (m.uncovers) s += 100; // turning a card up is the scarce resource
   if (m.kind === "toFoundation" || m.kind === "wasteToFoundation") s += 40;
-  if (m.kind === "wasteToTableau") s += 25;        // drains the waste, which otherwise clogs
-  if (m.toEmpty && m.rank === 13) s += 30;         // a King into a hole is real progress
-  if (m.emptiesColumn && !m.toEmpty) s -= 60;      // moving a whole column off its slot rarely helps
-  s += m.runLength;                                // bigger runs first, tie-break
+  if (m.kind === "wasteToTableau") s += 25; // drains the waste, which otherwise clogs
+  if (m.toEmpty && m.rank === 13) s += 30; // a King into a hole is real progress
+  if (m.emptiesColumn && !m.toEmpty) s -= 60; // moving a whole column off its slot rarely helps
+  s += m.runLength; // bigger runs first, tie-break
   return s;
 }
 
@@ -163,8 +162,7 @@ function pickMove(moves) {
   return useful.slice().sort((a, b) => scoreMove(b) - scoreMove(a))[0];
 }
 
-const moveKey = (m) =>
-  `${m.from.zone}${m.from.index}:${m.from.cardIndex ?? ""}->${m.to.zone}${m.to.index}`;
+const moveKey = (m) => `${m.from.zone}${m.from.index}:${m.from.cardIndex ?? ""}->${m.to.zone}${m.to.index}`;
 
 /** A signature of the whole table, to detect a loop of legal-but-pointless moves. */
 const STATE_KEY = `(() => {
@@ -193,7 +191,9 @@ async function replaySolvedLine(browser, seed, options) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.message)));
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
 
   /*
    * `animate=0` by default so ~150 plies do not each wait out a 200ms tween, and `--animate` to
@@ -213,19 +213,19 @@ async function replaySolvedLine(browser, seed, options) {
     } else {
       const ok = options.gestures
         ? await playByGesture(page, step)
-        : await page.evaluate(
-            ([from, to]) => window.solitaire.commit(from, to),
-            [step.from, step.to],
-          );
+        : await page.evaluate(([from, to]) => window.solitaire.commit(from, to), [step.from, step.to]);
       if (!ok) {
         await page.close();
         return {
-          seed, outcome: "BROKEN", at: `ply ${ply} of a solved line`, errors,
+          seed,
+          outcome: "BROKEN",
+          at: `ply ${ply} of a solved line`,
+          errors,
           problems: [
-          `the search played ${step.from.zone}${step.from.index}:${step.from.cardIndex ?? ""}`
-          + ` -> ${step.to.zone}${step.to.index} and the page`
-          + `${options.gestures ? " did not apply it from a real drag" : " refused it"}`,
-        ],
+            `the search played ${step.from.zone}${step.from.index}:${step.from.cardIndex ?? ""}` +
+              ` -> ${step.to.zone}${step.to.index} and the page` +
+              `${options.gestures ? " did not apply it from a real drag" : " refused it"}`,
+          ],
         };
       }
     }
@@ -249,7 +249,8 @@ async function replaySolvedLine(browser, seed, options) {
   if (!final.won) problems.push(`the search's line ended and isWon() is false at ${final.placed}/52`);
   if (final.bannerHidden) problems.push("the game is won and the win banner is still hidden");
   if (final.bannerText.trim() !== "You win.") problems.push(`the banner reads "${final.bannerText}"`);
-  if (!/You win/.test(final.announced)) problems.push(`the win was not announced (live region says "${final.announced}")`);
+  if (!/You win/.test(final.announced))
+    problems.push(`the win was not announced (live region says "${final.announced}")`);
   // The cascade, only when it can exist. The rigged win test asserts this too; the point of
   // asserting it here is that this win was PLAYED, so the celebrate() path was reached the way a
   // player reaches it rather than by assigning a finished state.
@@ -263,14 +264,24 @@ async function replaySolvedLine(browser, seed, options) {
   }
 
   await page.close();
-  return { seed, outcome: "WON", placed: final.placed, moves: final.moves, plies: solution.line.length, nodes: solution.nodes, errors };
+  return {
+    seed,
+    outcome: "WON",
+    placed: final.placed,
+    moves: final.moves,
+    plies: solution.line.length,
+    nodes: solution.nodes,
+    errors,
+  };
 }
 
 async function playSeed(browser, seed, options) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.message)));
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
 
   await page.goto(`${PAGE_URL}?seed=${seed}&draw=${options.draw}&animate=0`);
   await page.waitForFunction(() => document.body.dataset.dealComplete === "true");
@@ -284,7 +295,10 @@ async function playSeed(browser, seed, options) {
   };
 
   const first = await audit("the opening deal");
-  if (first) { await page.close(); return first; }
+  if (first) {
+    await page.close();
+    return first;
+  }
 
   /*
    * `tried` holds "this exact move, from this exact table" — not just visited states.
@@ -310,8 +324,10 @@ async function playSeed(browser, seed, options) {
     // Progress is cards placed AND cards turned up: a run of moves that uncovers the tableau
     // without placing anything is progress, and the first version bailed on it.
     const progress = placed - faceDown;
-    if (progress > bestProgress) { bestProgress = progress; sinceProgress = 0; }
-    else if (sinceProgress++ > 80) break;
+    if (progress > bestProgress) {
+      bestProgress = progress;
+      sinceProgress = 0;
+    } else if (sinceProgress++ > 80) break;
 
     const key = await page.evaluate(STATE_KEY);
     const fresh = legal.filter((m) => !tried.has(`${key}|${moveKey(m)}`));
@@ -321,18 +337,20 @@ async function playSeed(browser, seed, options) {
     if (choice) {
       const ok = options.gestures
         ? await playByGesture(page, choice)
-        : await page.evaluate(
-            ([from, to]) => window.solitaire.commit(from, to),
-            [choice.from, choice.to],
-          );
+        : await page.evaluate(([from, to]) => window.solitaire.commit(from, to), [choice.from, choice.to]);
       if (options.trace) {
-        console.log(`    ${String(moves + 1).padStart(3)} ${choice.kind} ${moveKey(choice)}`
-          + `${choice.uncovers ? " (uncovers)" : ""} placed=${placed} faceDown=${faceDown}`);
+        console.log(
+          `    ${String(moves + 1).padStart(3)} ${choice.kind} ${moveKey(choice)}` +
+            `${choice.uncovers ? " (uncovers)" : ""} placed=${placed} faceDown=${faceDown}`,
+        );
       }
       if (!ok) {
         await page.close();
         return {
-          seed, outcome: "BROKEN", at: `move ${moves + 1}`, errors,
+          seed,
+          outcome: "BROKEN",
+          at: `move ${moves + 1}`,
+          errors,
           problems: [`the page listed ${moveKey(choice)} as legal and then refused it`],
         };
       }
@@ -351,7 +369,9 @@ async function playSeed(browser, seed, options) {
       await page.click("#stock");
       if (options.trace) {
         const w = await page.evaluate(() => window.solitaire.state.waste.at(-1)?.id ?? "(recycled)");
-        console.log(`    ${String(moves + 1).padStart(3)} draw -> ${w}  placed=${placed} faceDown=${faceDown} legal=${legal.length} fresh=${fresh.length}`);
+        console.log(
+          `    ${String(moves + 1).padStart(3)} draw -> ${w}  placed=${placed} faceDown=${faceDown} legal=${legal.length} fresh=${fresh.length}`,
+        );
       }
       moves++;
     } else {
@@ -359,7 +379,10 @@ async function playSeed(browser, seed, options) {
     }
 
     const problem = await audit(`move ${moves}`);
-    if (problem) { await page.close(); return problem; }
+    if (problem) {
+      await page.close();
+      return problem;
+    }
   }
 
   const final = await page.evaluate(() => ({
@@ -375,7 +398,10 @@ async function playSeed(browser, seed, options) {
   if (final.won && final.bannerHidden) {
     await page.close();
     return {
-      seed, outcome: "BROKEN", at: "the win", errors,
+      seed,
+      outcome: "BROKEN",
+      at: "the win",
+      errors,
       problems: ["every card is on a foundation and the win banner is still hidden"],
     };
   }
@@ -406,33 +432,40 @@ async function playSeed(browser, seed, options) {
  */
 async function playByGesture(page, choice) {
   const before = await page.evaluate(() => window.solitaire.state.moves);
-  const source = await page.evaluate(([from]) => {
-    const node = from.zone === "waste"
-      ? document.querySelectorAll("#waste .card")[document.querySelectorAll("#waste .card").length - 1]
-      : document.querySelectorAll("#tableau .slot")[from.index]?.querySelectorAll(".card")[from.cardIndex];
-    if (!node) return null;
-    node.setAttribute("data-play-source", "1");
-    const box = node.getBoundingClientRect();
-    // The strip this card actually exposes: from its own top down to the next card's top, or its
-    // full height when nothing covers it.
-    const next = node.nextElementSibling;
-    const covered = next ? next.getBoundingClientRect().top - box.top : box.height;
-    return { width: box.width, exposed: Math.max(6, Math.min(covered, box.height)) };
-  }, [choice.from]);
+  const source = await page.evaluate(
+    ([from]) => {
+      const node =
+        from.zone === "waste"
+          ? document.querySelectorAll("#waste .card")[document.querySelectorAll("#waste .card").length - 1]
+          : document.querySelectorAll("#tableau .slot")[from.index]?.querySelectorAll(".card")[from.cardIndex];
+      if (!node) return null;
+      node.setAttribute("data-play-source", "1");
+      const box = node.getBoundingClientRect();
+      // The strip this card actually exposes: from its own top down to the next card's top, or its
+      // full height when nothing covers it.
+      const next = node.nextElementSibling;
+      const covered = next ? next.getBoundingClientRect().top - box.top : box.height;
+      return { width: box.width, exposed: Math.max(6, Math.min(covered, box.height)) };
+    },
+    [choice.from],
+  );
   if (!source) return false;
 
-  const targetSelector = choice.to.zone === "foundation"
-    ? `#foundations .slot:nth-of-type(${choice.to.index + 1})`
-    : `#tableau .slot:nth-of-type(${choice.to.index + 1})`;
+  const targetSelector =
+    choice.to.zone === "foundation"
+      ? `#foundations .slot:nth-of-type(${choice.to.index + 1})`
+      : `#tableau .slot:nth-of-type(${choice.to.index + 1})`;
 
-  await page.dragAndDrop("[data-play-source]", targetSelector, {
-    // Half way down the exposed strip, horizontally centred — where a thumb would land.
-    sourcePosition: { x: Math.round(source.width / 2), y: Math.round(source.exposed / 2) },
-    // The top of the target pile: a tableau slot is as tall as a seven-card fan, and its centre
-    // is empty felt below the cards. That still hits the slot, but aiming at the card the run is
-    // being stacked on is what a player does and what the highlight follows.
-    targetPosition: { x: 26, y: 14 },
-  }).catch(() => {});
+  await page
+    .dragAndDrop("[data-play-source]", targetSelector, {
+      // Half way down the exposed strip, horizontally centred — where a thumb would land.
+      sourcePosition: { x: Math.round(source.width / 2), y: Math.round(source.exposed / 2) },
+      // The top of the target pile: a tableau slot is as tall as a seven-card fan, and its centre
+      // is empty felt below the cards. That still hits the slot, but aiming at the card the run is
+      // being stacked on is what a player does and what the highlight follows.
+      targetPosition: { x: 26, y: 14 },
+    })
+    .catch(() => {});
   await page.evaluate(() => {
     document.querySelectorAll("[data-play-source]").forEach((n) => n.removeAttribute("data-play-source"));
   });
@@ -448,12 +481,13 @@ for (const seed of options.seeds) {
     : await playSeed(browser, seed, options);
   results.push(result);
   if (options.verbose || result.outcome === "BROKEN") {
-    const detail = result.outcome === "BROKEN"
-      ? `at ${result.at}\n      ${result.problems.join("\n      ")}`
-      : result.outcome === "UNSOLVED"
-        ? `no line found (${result.reason}, ${result.nodes} nodes)`
-        : `${result.placed}/52 in ${result.moves} moves`
-          + (result.plies ? ` (searched line: ${result.plies} plies, ${result.nodes} nodes)` : "");
+    const detail =
+      result.outcome === "BROKEN"
+        ? `at ${result.at}\n      ${result.problems.join("\n      ")}`
+        : result.outcome === "UNSOLVED"
+          ? `no line found (${result.reason}, ${result.nodes} nodes)`
+          : `${result.placed}/52 in ${result.moves} moves` +
+            (result.plies ? ` (searched line: ${result.plies} plies, ${result.nodes} nodes)` : "");
     console.log(`  seed ${String(seed).padStart(3)}  ${result.outcome.padEnd(6)} ${detail}`);
   }
   if (result.errors?.length) console.log(`  seed ${seed} console errors: ${result.errors.join(" | ")}`);
@@ -463,8 +497,7 @@ await browser.close();
 const count = (outcome) => results.filter((r) => r.outcome === outcome).length;
 const won = count("WON");
 const broken = results.filter((r) => r.outcome === "BROKEN");
-const placedAvg = results.filter((r) => r.placed !== undefined)
-  .reduce((s, r, _, a) => s + r.placed / a.length, 0);
+const placedAvg = results.filter((r) => r.placed !== undefined).reduce((s, r, _, a) => s + r.placed / a.length, 0);
 
 console.log(`\n${results.length} seed(s), draw ${options.draw}${options.gestures ? ", real gestures" : ""}`);
 console.log(`  won    ${won}`);
@@ -499,6 +532,8 @@ if (won === 0) {
   // bug — so the exit code reflects the audit, which is what this mode actually tests. An earlier
   // version exited 1 here and made a working harness read as a broken game.
   console.log(`\nNo win, which is expected: the greedy player does not search. What this mode proves is`);
-  console.log(`the audit — ${results.reduce((n, r) => n + (r.moves ?? 0), 0)} moves with no lost card, no illegal stack, and no`);
+  console.log(
+    `the audit — ${results.reduce((n, r) => n + (r.moves ?? 0), 0)} moves with no lost card, no illegal stack, and no`,
+  );
   console.log(`DOM/state disagreement. For winnability, use --solve.`);
 }

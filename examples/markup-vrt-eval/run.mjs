@@ -9,15 +9,12 @@ import {
   renderOfflinePlanMarkdown,
 } from "./run-offline-fixtures.mjs";
 import { buildRepairContext, renderRepairContextMarkdown } from "./repair-context.mjs";
-import {
-  buildReport,
-  renderReportArtifacts,
-} from "./run-report.mjs";
+import { buildReport, renderReportArtifacts } from "./run-report.mjs";
 import { summarizeVlmRegionDiff } from "./run-utils.mjs";
 
 const root = process.cwd();
 const offline = process.env.MARKUP_EVAL_OFFLINE === "1";
-const provider = offline ? "offline" : process.env.PROVIDER ?? "anthropic";
+const provider = offline ? "offline" : (process.env.PROVIDER ?? "anthropic");
 const outRoot = ".vlmkit/markup-vrt-eval";
 const specRoot = `${outRoot}/specs`;
 const generatedRoot = `${outRoot}/generated`;
@@ -43,11 +40,7 @@ await mkdir(generatedRoot, { recursive: true });
 
 const steps = [];
 
-await timed("observe", [
-  "pnpm", "exec", "playwright", "test",
-  "--config", configPath,
-  observeTestPath,
-]);
+await timed("observe", ["pnpm", "exec", "playwright", "test", "--config", configPath, observeTestPath]);
 
 if (offline) {
   await timedTask("plan-offline", "write offline planner artifacts", async () => {
@@ -59,58 +52,92 @@ if (offline) {
     await writeFile(generatedTestPath, buildOfflineGeneratedTest("../../../examples/markup-vrt-eval/support/goto-app"));
   });
   await timed("generate-and-vrt-gate", [
-    "pnpm", "exec", "playwright", "test",
-    "--config", configPath,
+    "pnpm",
+    "exec",
+    "playwright",
+    "test",
+    "--config",
+    configPath,
     generatedTestPath,
     "--update-snapshots",
   ]);
 } else {
   await timed("plan", [
-    "pnpm", "exec", "vlmkit-plan",
-    "--title", "Release Queue VRT Smoke",
-    "--request-file", requestPath,
-    "--observations", observationsPath,
-    "--out", planPath,
-    "--structured-out", structuredPlanPath,
-    "--locator-inventory-out", locatorsPath,
-    "--scope", "smoke",
-    "--provider", provider,
-    "--max-attempts", "3",
+    "pnpm",
+    "exec",
+    "vlmkit-plan",
+    "--title",
+    "Release Queue VRT Smoke",
+    "--request-file",
+    requestPath,
+    "--observations",
+    observationsPath,
+    "--out",
+    planPath,
+    "--structured-out",
+    structuredPlanPath,
+    "--locator-inventory-out",
+    locatorsPath,
+    "--scope",
+    "smoke",
+    "--provider",
+    provider,
+    "--max-attempts",
+    "3",
   ]);
 
   await timed("generate-and-vrt-gate", [
-    "pnpm", "exec", "vlmkit-generate",
-    "--plan", planPath,
-    "--rules", rulesPath,
-    "--locator-inventory", locatorsPath,
-    "--helper-import", "../../../examples/markup-vrt-eval/support/goto-app",
-    "--out", generatedTestPath,
-    "--provider", provider,
-    "--max-attempts", "3",
+    "pnpm",
+    "exec",
+    "vlmkit-generate",
+    "--plan",
+    planPath,
+    "--rules",
+    rulesPath,
+    "--locator-inventory",
+    locatorsPath,
+    "--helper-import",
+    "../../../examples/markup-vrt-eval/support/goto-app",
+    "--out",
+    generatedTestPath,
+    "--provider",
+    provider,
+    "--max-attempts",
+    "3",
     "--overwrite",
-    "--gate-command", `pnpm exec playwright test --config ${configPath} {testFile} --update-snapshots`,
+    "--gate-command",
+    `pnpm exec playwright test --config ${configPath} {testFile} --update-snapshots`,
     "--runtime-gate",
-    "--playwright-config", configPath,
-    "--runtime-gate-runs", "2",
+    "--playwright-config",
+    configPath,
+    "--runtime-gate-runs",
+    "2",
   ]);
 }
 
 const stabilityRuns = [];
 for (let i = 1; i <= 2; i++) {
-  stabilityRuns.push(await timed(`stability-check-${i}`, [
-    "pnpm", "exec", "playwright", "test",
-    "--config", configPath,
-    generatedTestPath,
-  ]));
+  stabilityRuns.push(
+    await timed(`stability-check-${i}`, [
+      "pnpm",
+      "exec",
+      "playwright",
+      "test",
+      "--config",
+      configPath,
+      generatedTestPath,
+    ]),
+  );
 }
 
-const regression = await timed("visual-regression-check", [
-  "pnpm", "exec", "playwright", "test",
-  "--config", configPath,
-  generatedTestPath,
-], {
-  MARKUP_EVAL_VARIANT: "regression",
-}, { allowFailure: true });
+const regression = await timed(
+  "visual-regression-check",
+  ["pnpm", "exec", "playwright", "test", "--config", configPath, generatedTestPath],
+  {
+    MARKUP_EVAL_VARIANT: "regression",
+  },
+  { allowFailure: true },
+);
 
 const generatedSource = await readFile(generatedTestPath, "utf8");
 const requestMarkdown = await readFile(requestPath, "utf8");
@@ -119,8 +146,9 @@ const plan = await readFile(planPath, "utf8");
 const locators = JSON.parse(await readFile(locatorsPath, "utf8"));
 const visualContext = JSON.parse(await readFile(visualContextPath, "utf8"));
 const expectedChange = JSON.parse(await readFile(expectedChangePath, "utf8"));
-const visualRegressionDetected = regression.exitCode !== 0
-  && /toHaveScreenshot|Screenshot comparison|screenshot/i.test(`${regression.stdout}\n${regression.stderr}`);
+const visualRegressionDetected =
+  regression.exitCode !== 0 &&
+  /toHaveScreenshot|Screenshot comparison|screenshot/i.test(`${regression.stdout}\n${regression.stderr}`);
 const repairContext = await buildRepairContext({
   root,
   outputDir: `${outRoot}/test-results`,

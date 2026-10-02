@@ -93,8 +93,10 @@ function parseArgs(argv: string[]) {
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
     else if (a === "--allow-skipped") allowSkipped = true;
     else if (a === "--engines") {
-      engines = (argv[++i] ?? "").split(",").map((v) => v.trim()).filter((v) =>
-        ALL_ENGINES.includes(v as EngineName)) as EngineName[];
+      engines = (argv[++i] ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => ALL_ENGINES.includes(v as EngineName)) as EngineName[];
     } else positional.push(a);
   }
   return { positional, outputDir, report, engines, threshold, allowSkipped };
@@ -135,11 +137,13 @@ function parseArgs(argv: string[]) {
  * @param requested how many engines the run attempted — `options.engines` or all of them.
  * @param usable how many actually rendered.
  */
-export function parityShortfall(requested: number, usable: number):
+export function parityShortfall(
+  requested: number,
+  usable: number,
+):
   | null
   | { kind: "narrowed"; failsRun: false; message: string }
-  | { kind: "missing-engines"; failsRun: true; message: string }
-{
+  | { kind: "missing-engines"; failsRun: true; message: string } {
   if (usable >= 2) return null;
   if (requested < 2) {
     return {
@@ -198,7 +202,11 @@ async function captureWithEngine(
     // "Please install" — surface a clean instruction instead of
     // the full stack.
     if (/Executable doesn't exist|Please install|Failed to launch.*didn't exist/i.test(msg)) {
-      return { ok: false, reason: "not-installed", message: `${engine} not installed — run \`${engineInstallCommand(engine)}\`` };
+      return {
+        ok: false,
+        reason: "not-installed",
+        message: `${engine} not installed — run \`${engineInstallCommand(engine)}\``,
+      };
     }
     return { ok: false, reason: "error", message: msg };
   }
@@ -227,9 +235,7 @@ async function captureWithEngine(
   }
 }
 
-export async function runCrossBrowser(
-  options: CrossBrowserOptions,
-): Promise<CrossBrowserReport> {
+export async function runCrossBrowser(options: CrossBrowserOptions): Promise<CrossBrowserReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
@@ -326,7 +332,9 @@ export async function runCrossBrowser(
       // comparison happened" must never be mistaken for "compared and fine".
       console.log(`  ${DIM}${shortfall.message}.${RESET}`);
     } else {
-      console.log(`  ${YELLOW}!${RESET} ${shortfall.message}. Install missing engines with \`${engineInstallCommand("firefox", "webkit")}\`.`);
+      console.log(
+        `  ${YELLOW}!${RESET} ${shortfall.message}. Install missing engines with \`${engineInstallCommand("firefox", "webkit")}\`.`,
+      );
       // Non-zero so a CI matrix using this as a gate does not silently pass on an
       // under-configured runner; `--allow-skipped` is the opt-out.
       //
@@ -348,17 +356,21 @@ export async function runCrossBrowser(
       console.log(`  ${GREEN}✓${RESET} ${r.engine.padEnd(10)} ${DIM}(reference)${RESET}`);
     } else {
       const pct = (r.deltaRatio * 100).toFixed(2);
-      const icon = r.deltaRatio === 0 ? `${GREEN}✓${RESET}`
-        : r.deltaRatio < 0.01 ? `${YELLOW}~${RESET}`
-        : `${RED}✗${RESET}`;
-      console.log(`  ${icon} ${r.engine.padEnd(10)} Δ ${pct.padStart(6)}%  ${DIM}${r.heatmapRegions.length} region(s)${RESET}`);
+      const icon =
+        r.deltaRatio === 0 ? `${GREEN}✓${RESET}` : r.deltaRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
+      console.log(
+        `  ${icon} ${r.engine.padEnd(10)} Δ ${pct.padStart(6)}%  ${DIM}${r.heatmapRegions.length} region(s)${RESET}`,
+      );
     }
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
-    source: options.source, viewport, reference,
-    engines: engineResults, reportPath,
+    source: options.source,
+    viewport,
+    reference,
+    engines: engineResults,
+    reportPath,
   };
 }
 
@@ -374,7 +386,9 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
 
   const skipped = r.engines.filter((e) => e.status === "skipped");
   if (skipped.length > 0) {
-    lines.push(`⚠ **${skipped.length} engine(s) skipped** — install with \`${engineInstallCommand(...skipped.map((s) => s.engine))}\` to get full parity coverage.`);
+    lines.push(
+      `⚠ **${skipped.length} engine(s) skipped** — install with \`${engineInstallCommand(...skipped.map((s) => s.engine))}\` to get full parity coverage.`,
+    );
     lines.push("");
   }
   // `r.engines.length` is what was attempted, so one attempted row means one was wanted —
@@ -383,9 +397,11 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
   const shortfall = parityShortfall(r.engines.length, r.engines.filter((e) => e.status === "ok").length);
   if (shortfall) {
     const prefix = shortfall.kind === "narrowed" ? "" : "⚠ ";
-    lines.push(`${prefix}**No cross-engine comparison was performed** — ${shortfall.message}. `
-      + `The report below confirms the render succeeded where it ran, and says nothing about `
-      + `parity across browsers.`);
+    lines.push(
+      `${prefix}**No cross-engine comparison was performed** — ${shortfall.message}. ` +
+        `The report below confirms the render succeeded where it ran, and says nothing about ` +
+        `parity across browsers.`,
+    );
     lines.push("");
   }
 
@@ -395,9 +411,8 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
   lines.push("|---|---|---|---|---|");
   for (const e of r.engines) {
     if (e.status === "ok") {
-      const delta = e.engine === r.reference
-        ? "_(reference)_"
-        : `${(e.deltaRatio * 100).toFixed(2)}% (${e.deltaPixels} px)`;
+      const delta =
+        e.engine === r.reference ? "_(reference)_" : `${(e.deltaRatio * 100).toFixed(2)}% (${e.deltaPixels} px)`;
       const ua = e.userAgent ? `\`${e.userAgent.slice(0, 60)}…\`` : "—";
       lines.push(`| \`${e.engine}\` | ✓ ok | ${delta} | ${e.heatmapRegions.length} | ${ua} |`);
     } else if (e.status === "skipped") {
@@ -439,11 +454,17 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
     lines.push("For each divergent engine:");
     lines.push("1. Open both engines' screenshots side by side.");
     lines.push("2. Inspect the listed regions — common per-engine quirks:");
-    lines.push("   - **WebKit**: form controls (button, input, select) render with macOS native styles unless `appearance: none` is set.");
-    lines.push("   - **Firefox**: text rendering subpixel-shifts by 1-2px; sometimes whole text rows align differently.");
+    lines.push(
+      "   - **WebKit**: form controls (button, input, select) render with macOS native styles unless `appearance: none` is set.",
+    );
+    lines.push(
+      "   - **Firefox**: text rendering subpixel-shifts by 1-2px; sometimes whole text rows align differently.",
+    );
     lines.push("   - **Both**: `:has()`, `view-transition`, `@container` support varies by version.");
     lines.push("3. If a region is form-control: add `appearance: none` + explicit styles for buttons / inputs.");
-    lines.push("4. If a region is text: check `font-family` fallback ordering — WebKit may pick a different fallback than Chromium.");
+    lines.push(
+      "4. If a region is text: check `font-family` fallback ordering — WebKit may pick a different fallback than Chromium.",
+    );
   }
   if (skipped.length > 0) {
     lines.push("");
@@ -486,7 +507,9 @@ async function main(argv = process.argv.slice(2)) {
   });
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "cross-browser" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry =
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "cross-browser" ||
+  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

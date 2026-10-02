@@ -461,8 +461,7 @@ const ISSUE_MESSAGE: Record<
     `${label} shows no observable response to ${describeKey(e.key ?? "")} — no ARIA change, no layout change. Dead control, or its response is outside this probe.`,
   "no-focus-indicator": (label) =>
     `${label} paints NO visible focus indicator on keyboard focus (outline/box-shadow/border/background all unchanged) — keyboard users cannot see where they are.`,
-  "not-tab-reachable": (label) =>
-    `${label} was never reached by Tab — keyboard users cannot operate it.`,
+  "not-tab-reachable": (label) => `${label} was never reached by Tab — keyboard users cannot operate it.`,
   "popup-no-focus-move": (label, e) =>
     `${label} opens a ${e.popupRole} but keyboard focus stays on the trigger — the ${e.popupRole} pattern moves focus into the popup.`,
   "focus-escapes-trap": (label) =>
@@ -499,37 +498,39 @@ export function deriveInteractionIssues(map: InteractionMapResult): InteractionI
       focus_indicator: el.focusIndicator ?? undefined,
       activation: el.activation
         ? {
-          key: el.activation.key,
-          aria_delta_empty: Object.keys(el.activation.ariaDelta).length === 0,
-          aria_delta_has_expanded: "expanded" in el.activation.ariaDelta,
-          layout_changed: el.activation.layoutChanged,
-          live_region_changed: el.activation.liveRegionChanged === true,
-          // The rules ask "did focus move", not where to. `focusMovedTo` is a
-          // discovery index and 0 is a valid one, so this must compare to null
-          // rather than test truthiness.
-          focus_moved: el.activation.focusMovedTo !== null,
-          focus_moved_within: el.activation.focusMovedWithin === true,
-          broken_controls_id: el.activation.brokenControlsId,
-          popup_role: el.activation.popupRole,
-          focus_moved_into_popup: el.activation.focusMovedIntoPopup,
-          focus_trapped: el.activation.focusTrapped,
-          popup_arrow_cycles: el.activation.popupArrowCycles,
-          escape_closes: el.activation.escapeCloses,
-          focus_returns_to_opener: el.activation.focusReturnsToOpener,
-        }
+            key: el.activation.key,
+            aria_delta_empty: Object.keys(el.activation.ariaDelta).length === 0,
+            aria_delta_has_expanded: "expanded" in el.activation.ariaDelta,
+            layout_changed: el.activation.layoutChanged,
+            live_region_changed: el.activation.liveRegionChanged === true,
+            // The rules ask "did focus move", not where to. `focusMovedTo` is a
+            // discovery index and 0 is a valid one, so this must compare to null
+            // rather than test truthiness.
+            focus_moved: el.activation.focusMovedTo !== null,
+            focus_moved_within: el.activation.focusMovedWithin === true,
+            broken_controls_id: el.activation.brokenControlsId,
+            popup_role: el.activation.popupRole,
+            focus_moved_into_popup: el.activation.focusMovedIntoPopup,
+            focus_trapped: el.activation.focusTrapped,
+            popup_arrow_cycles: el.activation.popupArrowCycles,
+            escape_closes: el.activation.escapeCloses,
+            focus_returns_to_opener: el.activation.focusReturnsToOpener,
+          }
         : undefined,
     })),
   };
 
-  const raised = callMarkupCoreJson<{
-    kind: InteractionIssueKind;
-    severity: "warn" | "suspect";
-    /** Position in the array above — not `el.index`, which callers may reuse. */
-    element_position: number;
-    key?: string;
-    popup_role?: string;
-    broken_controls_id?: string;
-  }[]>("interaction-issues", payload);
+  const raised = callMarkupCoreJson<
+    {
+      kind: InteractionIssueKind;
+      severity: "warn" | "suspect";
+      /** Position in the array above — not `el.index`, which callers may reuse. */
+      element_position: number;
+      key?: string;
+      popup_role?: string;
+      broken_controls_id?: string;
+    }[]
+  >("interaction-issues", payload);
 
   return raised.map((issue) => {
     // By position. Keying on `el.index` looked equivalent and was not: the field is
@@ -595,10 +596,18 @@ export function compareInteractionMaps(
       const r = refs[i]!;
       const a = atts[i]!;
       if (r.tabReachable && !a.tabReachable) {
-        mismatches.push({ severity: "suspect", key, message: `${key}: reachable by Tab in the reference but NOT in the attempt.` });
+        mismatches.push({
+          severity: "suspect",
+          key,
+          message: `${key}: reachable by Tab in the reference but NOT in the attempt.`,
+        });
       }
       if (r.focusIndicator === true && a.focusIndicator === false) {
-        mismatches.push({ severity: "suspect", key, message: `${key}: the reference paints a focus indicator, the attempt does not.` });
+        mismatches.push({
+          severity: "suspect",
+          key,
+          message: `${key}: the reference paints a focus indicator, the attempt does not.`,
+        });
       }
       if (r.activation && a.activation) {
         const rDelta = JSON.stringify(r.activation.ariaDelta);
@@ -625,31 +634,71 @@ export function compareInteractionMaps(
           });
         }
         if (r.activation.escapeCloses === true && a.activation.escapeCloses === false) {
-          mismatches.push({ severity: "warn", key, message: `${key}: Escape closes the reference's popup but not the attempt's.` });
+          mismatches.push({
+            severity: "warn",
+            key,
+            message: `${key}: Escape closes the reference's popup but not the attempt's.`,
+          });
         }
         if (r.activation.focusMovedIntoPopup === true && a.activation.focusMovedIntoPopup === false) {
-          mismatches.push({ severity: "suspect", key, message: `${key}: opening moves focus into the popup in the reference but not in the attempt.` });
+          mismatches.push({
+            severity: "suspect",
+            key,
+            message: `${key}: opening moves focus into the popup in the reference but not in the attempt.`,
+          });
         }
         if (r.activation.focusTrapped === true && a.activation.focusTrapped === false) {
-          mismatches.push({ severity: "suspect", key, message: `${key}: the reference's modal dialog traps Tab focus; the attempt's does not.` });
+          mismatches.push({
+            severity: "suspect",
+            key,
+            message: `${key}: the reference's modal dialog traps Tab focus; the attempt's does not.`,
+          });
         }
         if (r.activation.focusReturnsToOpener === true && a.activation.focusReturnsToOpener === false) {
-          mismatches.push({ severity: "suspect", key, message: `${key}: Escape returns focus to the trigger in the reference but not in the attempt.` });
+          mismatches.push({
+            severity: "suspect",
+            key,
+            message: `${key}: Escape returns focus to the trigger in the reference but not in the attempt.`,
+          });
         }
         if (r.activation.popupArrowCycles === true && a.activation.popupArrowCycles === false) {
-          mismatches.push({ severity: "suspect", key, message: `${key}: arrow keys navigate the reference's popup items but not the attempt's.` });
+          mismatches.push({
+            severity: "suspect",
+            key,
+            message: `${key}: arrow keys navigate the reference's popup items but not the attempt's.`,
+          });
         }
         if (r.activation.liveRegionChanged === true && !a.activation.liveRegionChanged) {
-          mismatches.push({ severity: "suspect", key, message: `${key}: the reference announces this action through a live region; the attempt does not.` });
+          mismatches.push({
+            severity: "suspect",
+            key,
+            message: `${key}: the reference announces this action through a live region; the attempt does not.`,
+          });
         }
-        if (r.activation.focusMovedWithin === true && !a.activation.focusMovedWithin && JSON.stringify(a.activation.ariaDelta) === "{}") {
-          mismatches.push({ severity: "suspect", key, message: `${key}: arrow keys move focus within the reference's composite but produce no response in the attempt.` });
+        if (
+          r.activation.focusMovedWithin === true &&
+          !a.activation.focusMovedWithin &&
+          JSON.stringify(a.activation.ariaDelta) === "{}"
+        ) {
+          mismatches.push({
+            severity: "suspect",
+            key,
+            message: `${key}: arrow keys move focus within the reference's composite but produce no response in the attempt.`,
+          });
         }
-        if ((r.activation.focusMovedTo !== null) && (a.activation.focusMovedTo === null)) {
-          mismatches.push({ severity: "warn", key, message: `${key}: ${describeKey(r.activation.key)} moves focus in the reference (roving) but not in the attempt.` });
+        if (r.activation.focusMovedTo !== null && a.activation.focusMovedTo === null) {
+          mismatches.push({
+            severity: "warn",
+            key,
+            message: `${key}: ${describeKey(r.activation.key)} moves focus in the reference (roving) but not in the attempt.`,
+          });
         }
       } else if (r.activation && !a.activation) {
-        mismatches.push({ severity: "warn", key, message: `${key}: probed in the reference but not probeable in the attempt.` });
+        mismatches.push({
+          severity: "warn",
+          key,
+          message: `${key}: probed in the reference but not probeable in the attempt.`,
+        });
       }
     }
   }
@@ -708,7 +757,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
   return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     await gotoSource(page, options.source, options);
-    const discovered = await page.evaluate(DISCOVER_SCRIPT) as DiscoveredElement[];
+    const discovered = (await page.evaluate(DISCOVER_SCRIPT)) as DiscoveredElement[];
     const capped = Math.max(0, discovered.length - maxElements);
     const kept = discovered.slice(0, maxElements);
 
@@ -717,8 +766,11 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
     const seenStops = new Set<number>();
     for (let i = 0; i < Math.min(96, discovered.length * 3 + 8); i++) {
       await page.keyboard.press("Tab");
-      const sample = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as
-        { ix: number | null; direct: boolean; focusedStyle: string } | null;
+      const sample = (await page.evaluate(FOCUS_SAMPLE_SCRIPT)) as {
+        ix: number | null;
+        direct: boolean;
+        focusedStyle: string;
+      } | null;
       if (!sample || sample.ix === null) continue;
       if (seenStops.has(sample.ix)) break; // cycled
       seenStops.add(sample.ix);
@@ -741,7 +793,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
       if (key) {
         await gotoSource(page, options.source, options);
         await page.evaluate(DISCOVER_SCRIPT);
-        const before = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
+        const before = (await page.evaluate(ariaSnapshotScript(d.index))) as AriaSnapshot | null;
         if (before) {
           await page.evaluate(`
 (() => {
@@ -752,37 +804,58 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
   const inner = el.querySelector('[tabindex="0"]') || el.querySelector('[role="option"], [role="gridcell"], [tabindex]');
   if (inner) inner.focus();
 })()`);
-          const preFocus = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as { fingerprint: string } | null;
+          const preFocus = (await page.evaluate(FOCUS_SAMPLE_SCRIPT)) as { fingerprint: string } | null;
           await page.keyboard.press(key === " " ? "Space" : key);
           await page.waitForTimeout(settleMs);
-          const after = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
+          const after = (await page.evaluate(ariaSnapshotScript(d.index))) as AriaSnapshot | null;
           if (after) {
-            const focusSample = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as
-              { ix: number | null; fingerprint: string } | null;
+            const focusSample = (await page.evaluate(FOCUS_SAMPLE_SCRIPT)) as {
+              ix: number | null;
+              fingerprint: string;
+            } | null;
             const delta = ariaDelta(before, after);
-            const movedWithin = !!(preFocus && focusSample
-              && preFocus.fingerprint !== focusSample.fingerprint
-              && (focusSample.ix === null || focusSample.ix === d.index));
+            const movedWithin = !!(
+              preFocus &&
+              focusSample &&
+              preFocus.fingerprint !== focusSample.fingerprint &&
+              (focusSample.ix === null || focusSample.ix === d.index)
+            );
             activation = {
               key: key === " " ? "Space" : key,
               ariaDelta: delta,
               ...(before.liveText !== after.liveText ? { liveRegionChanged: true } : {}),
               ...(movedWithin ? { focusMovedWithin: true } : {}),
-              controlsBecameVisible: before.controls && after.controls
-                ? (!before.controls.visible && after.controls.visible ? true : before.controls.visible === after.controls.visible ? (after.controls.visible ? null : false) : false)
-                : null,
+              controlsBecameVisible:
+                before.controls && after.controls
+                  ? !before.controls.visible && after.controls.visible
+                    ? true
+                    : before.controls.visible === after.controls.visible
+                      ? after.controls.visible
+                        ? null
+                        : false
+                      : false
+                  : null,
               layoutChanged: before.layoutSignature !== after.layoutSignature,
-              focusMovedTo: focusSample?.ix !== undefined && focusSample?.ix !== null && focusSample.ix !== d.index ? focusSample.ix : null,
+              focusMovedTo:
+                focusSample?.ix !== undefined && focusSample?.ix !== null && focusSample.ix !== d.index
+                  ? focusSample.ix
+                  : null,
             };
             if (before.controls && !before.controls.exists) {
               activation.brokenControlsId = before.controls.id;
             }
-            const openedPopup = (d.hasPopup || d.role === "combobox")
-              && (delta["expanded"]?.[1] === "true" || activation.controlsBecameVisible === true || activation.layoutChanged);
+            const openedPopup =
+              (d.hasPopup || d.role === "combobox") &&
+              (delta["expanded"]?.[1] === "true" ||
+                activation.controlsBecameVisible === true ||
+                activation.layoutChanged);
             if (openedPopup) {
               // Identify the popup node and whether focus moved into it.
-              const popup = await page.evaluate(popupProbeScript(d.index)) as
-                { popupRole: string; modal: boolean; focusInside: boolean } | null;
+              const popup = (await page.evaluate(popupProbeScript(d.index))) as {
+                popupRole: string;
+                modal: boolean;
+                focusInside: boolean;
+              } | null;
               if (popup) {
                 activation.popupRole = popup.popupRole;
                 activation.focusMovedIntoPopup = popup.focusInside;
@@ -792,7 +865,11 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
                   let trapped = true;
                   for (let t = 0; t < 12; t++) {
                     await page.keyboard.press("Tab");
-                    const where = await page.evaluate(FOCUS_INSIDE_POPUP_SCRIPT) as "inside" | "outside" | "chrome" | null;
+                    const where = (await page.evaluate(FOCUS_INSIDE_POPUP_SCRIPT)) as
+                      | "inside"
+                      | "outside"
+                      | "chrome"
+                      | null;
                     if (where === "outside") {
                       trapped = false;
                       break;
@@ -802,25 +879,38 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
                   activation.focusTrapped = trapped;
                 }
                 if (popup.focusInside && (popup.popupRole === "menu" || popup.popupRole === "listbox")) {
-                  const beforeArrow = await page.evaluate(POPUP_ACTIVE_SCRIPT) as { inside: boolean; tag: string } | null;
+                  const beforeArrow = (await page.evaluate(POPUP_ACTIVE_SCRIPT)) as {
+                    inside: boolean;
+                    tag: string;
+                  } | null;
                   await page.keyboard.press("ArrowDown");
-                  const afterArrow = await page.evaluate(POPUP_ACTIVE_SCRIPT) as { inside: boolean; tag: string } | null;
-                  activation.popupArrowCycles = !!(beforeArrow && afterArrow && afterArrow.inside && afterArrow.tag !== beforeArrow.tag);
+                  const afterArrow = (await page.evaluate(POPUP_ACTIVE_SCRIPT)) as {
+                    inside: boolean;
+                    tag: string;
+                  } | null;
+                  activation.popupArrowCycles = !!(
+                    beforeArrow &&
+                    afterArrow &&
+                    afterArrow.inside &&
+                    afterArrow.tag !== beforeArrow.tag
+                  );
                 }
               }
               await page.keyboard.press("Escape");
               await page.waitForTimeout(settleMs);
               if (popup) {
-                const closedState = await page.evaluate(popupClosedScript(d.index)) as
-                  { closed: boolean; focusOnTrigger: boolean } | null;
+                const closedState = (await page.evaluate(popupClosedScript(d.index))) as {
+                  closed: boolean;
+                  focusOnTrigger: boolean;
+                } | null;
                 activation.escapeCloses = closedState?.closed ?? false;
                 if (closedState?.closed) {
                   activation.focusReturnsToOpener = closedState.focusOnTrigger;
                 }
               } else {
-                const closed = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
+                const closed = (await page.evaluate(ariaSnapshotScript(d.index))) as AriaSnapshot | null;
                 activation.escapeCloses = closed
-                  ? (closed.expanded !== "true" && (!closed.controls || !closed.controls.visible))
+                  ? closed.expanded !== "true" && (!closed.controls || !closed.controls.visible)
                   : false;
               }
             }
@@ -837,7 +927,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
         hasPopup: d.hasPopup,
         ...(d.declaresNoOp ? { declaresNoOp: true } : {}),
         tabReachable: tabReached.has(d.index),
-        focusIndicator: tabReached.has(d.index) ? tabReached.get(d.index) ?? null : null,
+        focusIndicator: tabReached.has(d.index) ? (tabReached.get(d.index) ?? null) : null,
         ...(activation ? { activation } : {}),
       });
     }
@@ -857,32 +947,39 @@ export function formatInteractionReport(
   lines.push(`${BOLD}${CYAN}vlmkit check interactions${RESET}`);
   lines.push(`${DIM}source: ${map.source}${RESET}`);
   lines.push("");
-  const suspects = issues.filter((i) => i.severity === "suspect").length
-    + (comparison ? comparison.missing.length + comparison.mismatches.filter((m) => m.severity === "suspect").length : 0);
+  const suspects =
+    issues.filter((i) => i.severity === "suspect").length +
+    (comparison ? comparison.missing.length + comparison.mismatches.filter((m) => m.severity === "suspect").length : 0);
   lines.push(`status: ${suspects === 0 ? `${GREEN}ok${RESET}` : `${RED}${suspects} suspect issue(s)${RESET}`}`);
-  lines.push(`interactive elements: ${map.elements.length}${map.capped > 0 ? ` ${YELLOW}(+${map.capped} beyond the cap — NOT probed)${RESET}` : ""}`);
+  lines.push(
+    `interactive elements: ${map.elements.length}${map.capped > 0 ? ` ${YELLOW}(+${map.capped} beyond the cap — NOT probed)${RESET}` : ""}`,
+  );
   lines.push("");
   for (const el of map.elements) {
     const focus = !el.tabReachable
       ? `${YELLOW}unreachable${RESET}`
       : el.focusIndicator === true
-      ? "focus✓"
-      : el.focusIndicator === null
-      ? "focus(interior)" // reached via a composite child; indicator unjudged
-      : `${YELLOW}no-indicator${RESET}`;
+        ? "focus✓"
+        : el.focusIndicator === null
+          ? "focus(interior)" // reached via a composite child; indicator unjudged
+          : `${YELLOW}no-indicator${RESET}`;
     let act = "";
     if (el.activation) {
-      const delta = Object.entries(el.activation.ariaDelta).map(([k, [b, a]]) => `${k} ${b} -> ${a}`).join(", ");
+      const delta = Object.entries(el.activation.ariaDelta)
+        .map(([k, [b, a]]) => `${k} ${b} -> ${a}`)
+        .join(", ");
       act = ` | ${el.activation.key}: ${delta || (el.activation.focusMovedWithin ? "focus moves within" : el.activation.layoutChanged ? "layout change" : el.activation.focusMovedTo !== null ? "focus moves" : "no response")}`;
       if (el.activation.liveRegionChanged) act += " | announces";
       if (el.activation.popupRole) {
         act += ` | opens ${el.activation.popupRole}${el.activation.focusMovedIntoPopup ? " (focus enters)" : ""}`;
         if (el.activation.focusTrapped !== undefined) act += el.activation.focusTrapped ? ", traps" : ", TRAP LEAKS";
-        if (el.activation.popupArrowCycles !== undefined) act += el.activation.popupArrowCycles ? ", arrows cycle" : ", arrows DEAD";
+        if (el.activation.popupArrowCycles !== undefined)
+          act += el.activation.popupArrowCycles ? ", arrows cycle" : ", arrows DEAD";
       }
       if (el.activation.escapeCloses !== undefined) {
         act += ` | Esc ${el.activation.escapeCloses ? "closes" : "stuck"}`;
-        if (el.activation.focusReturnsToOpener !== undefined) act += el.activation.focusReturnsToOpener ? "+returns focus" : ", focus LOST";
+        if (el.activation.focusReturnsToOpener !== undefined)
+          act += el.activation.focusReturnsToOpener ? "+returns focus" : ", focus LOST";
       }
     }
     lines.push(`  - [${el.role}] "${el.name}" ${focus}${act}`);
@@ -902,7 +999,9 @@ export function formatInteractionReport(
       lines.push(`  ${GREEN}interaction contract satisfied — same elements, same responses${RESET}`);
     }
     for (const m of comparison.missing) {
-      lines.push(`  ${RED}missing${RESET} [${m.role}] "${m.name}" — the reference has this interactive element, the attempt does not.`);
+      lines.push(
+        `  ${RED}missing${RESET} [${m.role}] "${m.name}" — the reference has this interactive element, the attempt does not.`,
+      );
     }
     for (const e of comparison.extra) {
       lines.push(`  ${YELLOW}extra${RESET} [${e.role}] "${e.name}" — not in the reference.`);

@@ -68,13 +68,19 @@ function state(overrides = {}) {
 describe("the deal", () => {
   it("puts 28 cards in the tableau as 1..7, one face up per pile", () => {
     const s = K.newGame(1);
-    assert.deepEqual(s.tableau.map((p) => p.length), [1, 2, 3, 4, 5, 6, 7]);
+    assert.deepEqual(
+      s.tableau.map((p) => p.length),
+      [1, 2, 3, 4, 5, 6, 7],
+    );
     for (const pile of s.tableau) {
       assert.equal(pile.filter((c) => c.faceUp).length, 1, "exactly one face-up card");
       assert.equal(pile[pile.length - 1].faceUp, true, "and it is the last one");
     }
     assert.equal(s.stock.length, 24, "52 - 28");
-    assert.equal(s.stock.every((c) => !c.faceUp), true);
+    assert.equal(
+      s.stock.every((c) => !c.faceUp),
+      true,
+    );
   });
 
   it("uses all 52 cards exactly once", () => {
@@ -87,9 +93,15 @@ describe("the deal", () => {
   });
 
   it("is a function of the seed, which is what makes a screenshot reproducible", () => {
-    const a = K.newGame(42).tableau.flat().map((c) => c.id);
-    const b = K.newGame(42).tableau.flat().map((c) => c.id);
-    const c = K.newGame(43).tableau.flat().map((c) => c.id);
+    const a = K.newGame(42)
+      .tableau.flat()
+      .map((c) => c.id);
+    const b = K.newGame(42)
+      .tableau.flat()
+      .map((c) => c.id);
+    const c = K.newGame(43)
+      .tableau.flat()
+      .map((c) => c.id);
     assert.deepEqual(a, b, "same seed, same deal");
     assert.notDeepEqual(a, c, "different seed, different deal");
   });
@@ -161,12 +173,19 @@ describe("applyMove", () => {
       tableau: [
         [card("diamonds", 5, false), card("spades", 10), card("hearts", 9)],
         [card("hearts", 11)],
-        [], [], [], [], [],
+        [],
+        [],
+        [],
+        [],
+        [],
       ],
     });
     const result = K.applyMove(s, { zone: "tableau", index: 0, cardIndex: 1 }, { zone: "tableau", index: 1 });
     assert.ok(result);
-    assert.deepEqual(result.moved.map((c) => c.id), ["spades-10", "hearts-9"]);
+    assert.deepEqual(
+      result.moved.map((c) => c.id),
+      ["spades-10", "hearts-9"],
+    );
     assert.equal(result.revealed.id, "diamonds-5", "the uncovered card turns over");
     assert.equal(s.tableau[0].length, 1);
     assert.equal(s.tableau[0][0].faceUp, true);
@@ -205,7 +224,10 @@ describe("applyMove", () => {
     const s = state({ waste: [card("clubs", 3), card("spades", 1)] });
     const result = K.applyMove(s, { zone: "waste", index: 0 }, { zone: "foundation", index: 0 });
     assert.ok(result);
-    assert.deepEqual(result.moved.map((c) => c.id), ["spades-1"]);
+    assert.deepEqual(
+      result.moved.map((c) => c.id),
+      ["spades-1"],
+    );
     assert.equal(s.waste.length, 1);
   });
 
@@ -218,11 +240,17 @@ describe("applyMove", () => {
 
 describe("the stock", () => {
   it("turns drawCount cards face up onto the waste", () => {
-    const s = state({ drawCount: 3, stock: [card("spades", 2, false), card("hearts", 3, false), card("clubs", 4, false), card("spades", 5, false)] });
+    const s = state({
+      drawCount: 3,
+      stock: [card("spades", 2, false), card("hearts", 3, false), card("clubs", 4, false), card("spades", 5, false)],
+    });
     const result = K.drawFromStock(s);
     assert.equal(result.drawn.length, 3);
     assert.equal(s.waste.length, 3);
-    assert.equal(s.waste.every((c) => c.faceUp), true);
+    assert.equal(
+      s.waste.every((c) => c.faceUp),
+      true,
+    );
     assert.equal(s.stock.length, 1);
   });
 
@@ -239,8 +267,14 @@ describe("the stock", () => {
     const result = K.drawFromStock(s);
     assert.equal(result.recycled, true);
     assert.equal(s.waste.length, 0);
-    assert.deepEqual(s.stock.map((c) => c.id), ["clubs-4", "hearts-3", "spades-2"]);
-    assert.equal(s.stock.every((c) => !c.faceUp), true);
+    assert.deepEqual(
+      s.stock.map((c) => c.id),
+      ["clubs-4", "hearts-3", "spades-2"],
+    );
+    assert.equal(
+      s.stock.every((c) => !c.faceUp),
+      true,
+    );
     // Drawing again deals them back in the original order.
     K.drawFromStock(s);
     assert.equal(K.topOf(s.waste).id, "spades-2");
@@ -260,7 +294,10 @@ describe("autoMoveTarget", () => {
       tableau: [[card("spades", 1)], [card("hearts", 2)], [], [], [], [], []],
       foundations: [[], [], [], []],
     });
-    assert.deepEqual(K.autoMoveTarget(s, { zone: "tableau", index: 0, cardIndex: 0 }), { zone: "foundation", index: 0 });
+    assert.deepEqual(K.autoMoveTarget(s, { zone: "tableau", index: 0, cardIndex: 0 }), {
+      zone: "foundation",
+      index: 0,
+    });
   });
 
   it("never offers a tableau destination, even a legal one", () => {
@@ -304,7 +341,10 @@ describe("winning", () => {
     });
     const moves = K.availableFoundationMoves(s);
     assert.equal(moves.length, 3, "two tableau aces and the waste ace");
-    assert.equal(moves.every((m) => m.to.zone === "foundation"), true);
+    assert.equal(
+      moves.every((m) => m.to.zone === "foundation"),
+      true,
+    );
     // Distinct foundations, so the round is applicable IN ORDER. The first version asked
     // `canMove` per source against the live state, so all three Aces came back pointing at
     // foundation 0 and the view silently dropped two of them.
@@ -324,7 +364,10 @@ describe("winning", () => {
     assert.equal(moves.length, 2);
     assert.equal(moves[0].to.index, moves[1].to.index, "both onto the same spades foundation");
     for (const move of moves) assert.ok(K.applyMove(s, move.from, move.to));
-    assert.deepEqual(s.foundations[moves[0].to.index].map((c) => c.id), ["spades-1", "spades-2"]);
+    assert.deepEqual(
+      s.foundations[moves[0].to.index].map((c) => c.id),
+      ["spades-1", "spades-2"],
+    );
   });
 
   it("ignores a face-down tableau top", () => {
@@ -353,8 +396,16 @@ describe("a full seeded game is playable to a real position", () => {
           assert.equal(c.suit, f[0].suit, "and one suit throughout");
         });
       }
-      assert.equal(s.waste.every((c) => c.faceUp), true, `step ${step}: the waste is face up`);
-      assert.equal(s.stock.every((c) => !c.faceUp), true, `step ${step}: the stock is face down`);
+      assert.equal(
+        s.waste.every((c) => c.faceUp),
+        true,
+        `step ${step}: the waste is face up`,
+      );
+      assert.equal(
+        s.stock.every((c) => !c.faceUp),
+        true,
+        `step ${step}: the stock is face down`,
+      );
     }
   });
 });

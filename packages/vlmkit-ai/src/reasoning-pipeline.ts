@@ -99,13 +99,15 @@ export interface ReasoningPipeline {
   suggestFix(report: StructuredDiffReport, cssSource: string, cssDiff?: string): Promise<FixSuggestion>;
 
   /** Run Stage 1 + 2 sequentially. Auto-escalates resolution if needed */
-  analyzeAndFix(options: AnalyzeOptions & {
-    cssSource: string;
-    /** CSS text diff (MISSING/CHANGED lines. Passed directly to Stage 2) */
-    cssDiff?: string;
-    /** High-resolution image for escalation (used by adaptive resolution) */
-    highResHeatmapBase64?: string;
-  }): Promise<{ analysis: StructuredDiffReport; fix: FixSuggestion; escalated: boolean }>;
+  analyzeAndFix(
+    options: AnalyzeOptions & {
+      cssSource: string;
+      /** CSS text diff (MISSING/CHANGED lines. Passed directly to Stage 2) */
+      cssDiff?: string;
+      /** High-resolution image for escalation (used by adaptive resolution) */
+      highResHeatmapBase64?: string;
+    },
+  ): Promise<{ analysis: StructuredDiffReport; fix: FixSuggestion; escalated: boolean }>;
 
   vlmModel: string;
   llmModel: string;
@@ -185,7 +187,9 @@ function parseStage1Response(raw: string): { changes: VisualChange[]; summary: s
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
 
-    const changeMatch = trimmed.match(/^CHANGE:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(low|medium|high)/i);
+    const changeMatch = trimmed.match(
+      /^CHANGE:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(low|medium|high)/i,
+    );
     if (changeMatch) {
       const key = `${changeMatch[1].trim()}|${changeMatch[2].trim()}`;
       if (seen.has(key)) continue; // deduplicate
@@ -201,16 +205,25 @@ function parseStage1Response(raw: string): { changes: VisualChange[]; summary: s
     }
 
     const summaryMatch = trimmed.match(/^SUMMARY:\s*(.+)/i);
-    if (summaryMatch) { summary = summaryMatch[1].trim(); continue; }
+    if (summaryMatch) {
+      summary = summaryMatch[1].trim();
+      continue;
+    }
 
     const regressionMatch = trimmed.match(/^REGRESSION:\s*(yes|no)/i);
-    if (regressionMatch) { regression = regressionMatch[1].toLowerCase() === "yes"; }
+    if (regressionMatch) {
+      regression = regressionMatch[1].toLowerCase() === "yes";
+    }
   }
 
   return { changes, summary, regression };
 }
 
-function parseStage2Response(raw: string): { fixes: CssFix[]; explanation: string; confidence: FixSuggestion["confidence"] } {
+function parseStage2Response(raw: string): {
+  fixes: CssFix[];
+  explanation: string;
+  confidence: FixSuggestion["confidence"];
+} {
   const fixes: CssFix[] = [];
   let explanation = "";
   let confidence: FixSuggestion["confidence"] = "medium";
@@ -230,10 +243,15 @@ function parseStage2Response(raw: string): { fixes: CssFix[]; explanation: strin
     }
 
     const explMatch = trimmed.match(/^EXPLANATION:\s*(.+)/i);
-    if (explMatch) { explanation = explMatch[1].trim(); continue; }
+    if (explMatch) {
+      explanation = explMatch[1].trim();
+      continue;
+    }
 
     const confMatch = trimmed.match(/^CONFIDENCE:\s*(high|medium|low)/i);
-    if (confMatch) { confidence = confMatch[1].toLowerCase() as FixSuggestion["confidence"]; }
+    if (confMatch) {
+      confidence = confMatch[1].toLowerCase() as FixSuggestion["confidence"];
+    }
   }
 
   return { fixes, explanation, confidence };
@@ -292,10 +310,9 @@ export function createReasoningPipeline(config?: PipelineConfig): ReasoningPipel
       if (!vlmClient) {
         // Fallback: use LLM with text-only report
         if (!llmClient) throw new Error("No VLM or LLM available");
-        const resp = await llmClient.completeWithImages(
-          options.textReport ?? "No visual data available",
-          { maxTokens: 1024 },
-        );
+        const resp = await llmClient.completeWithImages(options.textReport ?? "No visual data available", {
+          maxTokens: 1024,
+        });
         const parsed = parseStage1Response(resp.content);
         return {
           ...parsed,

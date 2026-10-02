@@ -56,11 +56,7 @@ export interface CraterWasmRenderResult {
 }
 
 export interface CraterWasmModule {
-  renderHtmlToJsonForWpt(
-    html: string,
-    width: number,
-    height: number,
-  ): string | Promise<string>;
+  renderHtmlToJsonForWpt(html: string, width: number, height: number): string | Promise<string>;
 }
 
 export interface CraterWasmLayoutBackend {
@@ -74,9 +70,7 @@ export interface LoadCraterWasmModuleOptions {
   cwd?: string;
 }
 
-export function createCraterWasmLayoutBackend(
-  module: CraterWasmModule,
-): CraterWasmLayoutBackend {
+export function createCraterWasmLayoutBackend(module: CraterWasmModule): CraterWasmLayoutBackend {
   assertCraterWasmModule(module);
   return {
     kind: "crater-wasm-layout",
@@ -86,11 +80,7 @@ export function createCraterWasmLayoutBackend(
       }
       const viewport = normalizeViewport(request.viewport);
       const started = Date.now();
-      const rawJson = await module.renderHtmlToJsonForWpt(
-        request.html,
-        viewport.width,
-        viewport.height,
-      );
+      const rawJson = await module.renderHtmlToJsonForWpt(request.html, viewport.width, viewport.height);
       if (typeof rawJson !== "string") {
         throw new Error("Crater WASM renderHtmlToJsonForWpt must return a JSON string");
       }
@@ -107,12 +97,8 @@ export function createCraterWasmLayoutBackend(
   };
 }
 
-export async function loadCraterWasmModule(
-  options: LoadCraterWasmModuleOptions = {},
-): Promise<CraterWasmModule> {
-  const modulePath = options.modulePath
-    ?? options.env?.[CRATER_WASM_MODULE_ENV]
-    ?? options.env?.CRATER_WASM_MODULE;
+export async function loadCraterWasmModule(options: LoadCraterWasmModuleOptions = {}): Promise<CraterWasmModule> {
+  const modulePath = options.modulePath ?? options.env?.[CRATER_WASM_MODULE_ENV] ?? options.env?.CRATER_WASM_MODULE;
   if (!modulePath) {
     throw new Error(`${CRATER_WASM_MODULE_ENV} is required to load the Crater WASM backend`);
   }

@@ -247,7 +247,7 @@ export interface AnimationEvalReport {
     times: number[];
     /** Row order, top to bottom. Empty for an animated strip, which has no rows. */
     rowSelectors: string[];
-  width: number;
+    width: number;
     height: number;
     /** True when this is an animated PNG of the whole page rather than a cropped still sheet. */
     animated?: boolean;
@@ -320,7 +320,6 @@ interface RgbaFrame {
   data: Uint8Array;
 }
 
-
 /**
  * Pixel delta between two same-size RGBA frames: count, ratio, and the
  * bounding box of every pixel whose any channel moved more than tolerance.
@@ -330,14 +329,17 @@ export function frameDelta(a: RgbaFrame, b: RgbaFrame, tolerance = 8): FrameDelt
     throw new Error(`frameDelta: size mismatch ${a.width}x${a.height} vs ${b.width}x${b.height}`);
   }
   let changed = 0;
-  let minX = a.width, minY = a.height, maxX = -1, maxY = -1;
+  let minX = a.width,
+    minY = a.height,
+    maxX = -1,
+    maxY = -1;
   for (let y = 0; y < a.height; y++) {
     for (let x = 0; x < a.width; x++) {
       const i = (y * a.width + x) * 4;
       if (
-        Math.abs(a.data[i]! - b.data[i]!) > tolerance
-        || Math.abs(a.data[i + 1]! - b.data[i + 1]!) > tolerance
-        || Math.abs(a.data[i + 2]! - b.data[i + 2]!) > tolerance
+        Math.abs(a.data[i]! - b.data[i]!) > tolerance ||
+        Math.abs(a.data[i + 1]! - b.data[i + 1]!) > tolerance ||
+        Math.abs(a.data[i + 2]! - b.data[i + 2]!) > tolerance
       ) {
         changed++;
         if (x < minX) minX = x;
@@ -351,9 +353,7 @@ export function frameDelta(a: RgbaFrame, b: RgbaFrame, tolerance = 8): FrameDelt
   return {
     changedPixels: changed,
     ratio: total > 0 ? changed / total : 0,
-    bbox: changed > 0
-      ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
-      : null,
+    bbox: changed > 0 ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 } : null,
   };
 }
 
@@ -418,17 +418,19 @@ export function deriveAnimationIssues(
     if (anim.seekIneffective) {
       // Instead of no-visible-effect, not as well: whether this animation moved pixels is the
       // one thing these frames cannot say, so neither "dead" nor "visible" is reported for it.
-      const why = anim.seekIneffective.reason === "readback"
-        ? `after a seek the animation ${anim.seekIneffective.detail} — the page cancelled or replaced it, so the gate was moving an object nothing renders`
-        : `seeking back to its first sample did not reproduce that frame (${anim.seekIneffective.detail}) — something other than this animation's time drives those pixels`;
+      const why =
+        anim.seekIneffective.reason === "readback"
+          ? `after a seek the animation ${anim.seekIneffective.detail} — the page cancelled or replaced it, so the gate was moving an object nothing renders`
+          : `seeking back to its first sample did not reproduce that frame (${anim.seekIneffective.detail}) — something other than this animation's time drives those pixels`;
       issues.push({
         kind: "seek-ineffective",
         severity: "suspect",
         selector: anim.selector,
-        message: `${anim.selector} animation \`${anim.name}\`: ${why}.`
-          + ` Its frame deltas are not measurements of the animation, so it is reported neither visible nor dead.`
-          + ` Look for script that restarts or re-creates it (toggling \`animation\` / a class on a timer, a framework re-render),`
-          + ` or a rAF / canvas ticker painting the same region.`,
+        message:
+          `${anim.selector} animation \`${anim.name}\`: ${why}.` +
+          ` Its frame deltas are not measurements of the animation, so it is reported neither visible nor dead.` +
+          ` Look for script that restarts or re-creates it (toggling \`animation\` / a class on a timer, a framework re-render),` +
+          ` or a rAF / canvas ticker painting the same region.`,
       });
       continue;
     }
@@ -454,11 +456,12 @@ export function deriveAnimationIssues(
       // mentions the CSS-level option (bound the iteration count), which is what I
       // did." The page-side fix goes first now; the harness ones stay for the case
       // where the animation is meant to run forever.
-      message: `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.`
-        + ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).`
-        + ` If it is meant to run forever, the capture side has to absorb it instead:`
-        + ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)`
-        + ` or pause animations before screenshots.`,
+      message:
+        `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.` +
+        ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).` +
+        ` If it is meant to run forever, the capture side has to absorb it instead:` +
+        ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)` +
+        ` or pause animations before screenshots.`,
     });
   }
 
@@ -468,10 +471,11 @@ export function deriveAnimationIssues(
     issues.push({
       kind: "clock-motion-unsettled",
       severity: "warn",
-      message: `Script-driven motion at (${b.x},${b.y}) ${b.width}x${b.height} is still changing at ${clock.windowMs}ms of virtual time`
-        + ` — a requestAnimationFrame / timer loop that never stops, so the page never settles.`
-        + ` Stop the loop once its work is done, and check \`matchMedia("(prefers-reduced-motion: reduce)")\` in the script;`
-        + ` if it is meant to run forever, mask the region in captures.`,
+      message:
+        `Script-driven motion at (${b.x},${b.y}) ${b.width}x${b.height} is still changing at ${clock.windowMs}ms of virtual time` +
+        ` — a requestAnimationFrame / timer loop that never stops, so the page never settles.` +
+        ` Stop the loop once its work is done, and check \`matchMedia("(prefers-reduced-motion: reduce)")\` in the script;` +
+        ` if it is meant to run forever, mask the region in captures.`,
     });
   } else if (clock?.visible && clock.settledAtMs !== null && clock.settledAtMs > settleThreshold) {
     issues.push({
@@ -496,8 +500,8 @@ export function deriveAnimationIssues(
       kind: "uncontrolled-motion",
       severity: "warn",
       message: input.virtualTime
-        // With the clock held, script timing is ruled out — what is left is what no clock reaches.
-        ? `The page moved between two back-to-back captures with every WAAPI animation AND the page clock held (${m.changedPixels}px${where}) — video, an animated image, a worker, or something else no page clock drives. Per-animation frame deltas overlapping this region may be contaminated, and the page never settles for VRT. Mask the region for capture.`
+        ? // With the clock held, script timing is ruled out — what is left is what no clock reaches.
+          `The page moved between two back-to-back captures with every WAAPI animation AND the page clock held (${m.changedPixels}px${where}) — video, an animated image, a worker, or something else no page clock drives. Per-animation frame deltas overlapping this region may be contaminated, and the page never settles for VRT. Mask the region for capture.`
         : `The page moved between two back-to-back captures with every WAAPI animation held still (${m.changedPixels}px${where}) — a rAF/JS-driven animation, video, or GIF the Web Animations API cannot enumerate or pause. Per-animation frame deltas overlapping this region may be contaminated (a dead animation can read as visible), the page never settles for VRT, and reduced-motion emulation does not affect it. Re-run with \`--virtual-time\` to hold rAF / timer-driven motion and measure it; mask what still moves.`,
     });
   }
@@ -513,13 +517,17 @@ export function deriveAnimationIssues(
       // (`h1:nth-of-type(1)`, 'e.g.') for a page-wide problem, and never says what would
       // satisfy it — I guessed a global media query." The guess was right; it should not
       // have been a guess.
-      message: `${input.reducedMotion.remainingCount} animation(s) still run under \`prefers-reduced-motion: reduce\` emulation: `
-        + `${input.reducedMotion.remaining.slice(0, 4).map((r) => `${r.selector} \`${r.name}\` ${Math.round(r.durationMs)}ms`).join(", ")}`
-        + `${input.reducedMotion.remaining.length > 4 ? `, and ${input.reducedMotion.remaining.length - 4} more` : ""}`
-        + ` — motion is not reduced for users who requested it.`
-        + ` Add \`@media (prefers-reduced-motion: reduce)\` and either set \`animation: none\` on them`
-        + ` or shorten each duration below ${durationFloor}ms.`
-        + (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
+      message:
+        `${input.reducedMotion.remainingCount} animation(s) still run under \`prefers-reduced-motion: reduce\` emulation: ` +
+        `${input.reducedMotion.remaining
+          .slice(0, 4)
+          .map((r) => `${r.selector} \`${r.name}\` ${Math.round(r.durationMs)}ms`)
+          .join(", ")}` +
+        `${input.reducedMotion.remaining.length > 4 ? `, and ${input.reducedMotion.remaining.length - 4} more` : ""}` +
+        ` — motion is not reduced for users who requested it.` +
+        ` Add \`@media (prefers-reduced-motion: reduce)\` and either set \`animation: none\` on them` +
+        ` or shorten each duration below ${durationFloor}ms.` +
+        (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
           ? ` For the script-driven motion, read \`matchMedia("(prefers-reduced-motion: reduce)")\` and skip or shorten the loop.`
           : ""),
     });
@@ -706,10 +714,11 @@ function pngFromBuffer(buffer: Buffer): RgbaFrame {
  * animation of a multi-name shorthand.
  */
 async function collectAnimations(page: import("playwright").Page): Promise<AnimationTimingSample[]> {
-  const live = await page.evaluate(COLLECT_ANIMATIONS_SCRIPT) as AnimationTimingSample[];
-  const started = await page.evaluate(
-    "window.__vlmkitStarted || []",
-  ) as Omit<AnimationTimingSample, "index" | "playState" | "currentTimeMs">[];
+  const live = (await page.evaluate(COLLECT_ANIMATIONS_SCRIPT)) as AnimationTimingSample[];
+  const started = (await page.evaluate("window.__vlmkitStarted || []")) as Omit<
+    AnimationTimingSample,
+    "index" | "playState" | "currentTimeMs"
+  >[];
   const seen = new Set(live.map((t) => `${t.selector}\u0000${t.name}`));
   const finished: AnimationTimingSample[] = [];
   for (const record of started) {
@@ -729,7 +738,8 @@ async function collectAnimations(page: import("playwright").Page): Promise<Anima
 
 async function advanceClock(page: import("playwright").Page, timeMs: number): Promise<void> {
   await page.evaluate(
-    (t) => (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(t),
+    (t) =>
+      (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(t),
     timeMs,
   );
 }
@@ -760,9 +770,9 @@ async function sampleClock(
     if (delta.changedPixels >= minChangedPixels) motionBbox = unionBbox(motionBbox, delta.bbox);
     previous = frame;
   }
-  const errors = await page.evaluate(
-    () => [...((window as unknown as { __vlmkitClock: { errors: string[] } }).__vlmkitClock.errors)],
-  );
+  const errors = await page.evaluate(() => [
+    ...(window as unknown as { __vlmkitClock: { errors: string[] } }).__vlmkitClock.errors,
+  ]);
   return {
     windowMs,
     times,
@@ -784,9 +794,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   // Navigate local files via their file: URL so relative stylesheets,
   // scripts, and images resolve — setContent would give the document an
   // about:blank base URL and evaluate an unstyled page.
-  const pageUrl = options.html !== undefined
-    ? undefined
-    : sourceToUrl(options.source);
+  const pageUrl = options.html !== undefined ? undefined : sourceToUrl(options.source);
   // Both passes (normal + reduced-motion emulation) go through this, so
   // --timeout / --wait-until / --har apply to both. Loading the two under
   // different rules would make the reduced-motion comparison meaningless.
@@ -853,7 +861,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           if (anim.playState === "idle") return "had gone idle (cancelled)";
           if (!document.getAnimations().includes(anim)) return "was no longer on the page";
           const now = typeof anim.currentTime === "number" ? anim.currentTime : Number.NaN;
-          if (!(Math.abs(now - (t as number)) <= 1)) return `reported currentTime ${Number.isNaN(now) ? "null" : Math.round(now)}ms instead of ${Math.round(t as number)}ms`;
+          if (!(Math.abs(now - (t as number)) <= 1))
+            return `reported currentTime ${Number.isNaN(now) ? "null" : Math.round(now)}ms instead of ${Math.round(t as number)}ms`;
           return null;
         },
         [index, timeMs] as const,
@@ -940,11 +949,14 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       // Replay: the first sample again, compared inside the motion region only — the rest of the
       // page may move on its own (that is `uncontrolled-motion`'s finding, not this one's). Only
       // when the animation moved something; with no region there is nothing to reproduce.
-      let seekIneffective: SeekIneffective | undefined = readback ? { reason: "readback", detail: readback } : undefined;
+      let seekIneffective: SeekIneffective | undefined = readback
+        ? { reason: "readback", detail: readback }
+        : undefined;
       if (!seekIneffective && firstSample && motionBbox && samples > 1) {
         const replayReadback = await seek(timing.index, firstSample.timeMs);
         const again = await shot(`anim-${timing.index}-replay`);
-        const region = (f: RgbaFrame) => cropRegion(f, motionBbox!.x, motionBbox!.y, motionBbox!.width, motionBbox!.height);
+        const region = (f: RgbaFrame) =>
+          cropRegion(f, motionBbox!.x, motionBbox!.y, motionBbox!.width, motionBbox!.height);
         const replay = frameDelta(region(firstSample.frame), region(again), tolerance);
         if (replayReadback) seekIneffective = { reason: "readback", detail: replayReadback };
         else if (replay.changedPixels >= minChangedPixels) {
@@ -956,9 +968,13 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           // mutually different frames count.
           await seek(timing.index, firstSample.timeMs);
           const third = await shot(`anim-${timing.index}-replay-2`);
-          const differs = (a: RgbaFrame, b: RgbaFrame) => frameDelta(region(a), region(b), tolerance).changedPixels >= minChangedPixels;
+          const differs = (a: RgbaFrame, b: RgbaFrame) =>
+            frameDelta(region(a), region(b), tolerance).changedPixels >= minChangedPixels;
           if (differs(firstSample.frame, third) && differs(again, third)) {
-            seekIneffective = { reason: "replay", detail: `${replay.changedPixels}px differed at ${Math.round(firstSample.timeMs)}ms, and again on a second replay` };
+            seekIneffective = {
+              reason: "replay",
+              detail: `${replay.changedPixels}px differed at ${Math.round(firstSample.timeMs)}ms, and again on a second replay`,
+            };
           }
         }
       }
@@ -1011,20 +1027,25 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       // the reported selector string: `stableSelector` emits whatever is unique
       // (`article:nth-of-type(1)` for one card, `article.card.card--featured` for
       // another), so string matching would hit some rows and miss their siblings.
-      const matched = wanted === undefined ? null : new Set(await page.evaluate((selector) => {
-        const anims = (window as unknown as { __vlmkitAnims?: Animation[] }).__vlmkitAnims ?? [];
-        const hits: number[] = [];
-        anims.forEach((anim, index) => {
-          const target = (anim.effect as KeyframeEffect | null)?.target as Element | null;
-          if (target && target.matches(selector)) hits.push(index);
-        });
-        return hits;
-      }, wanted));
+      const matched =
+        wanted === undefined
+          ? null
+          : new Set(
+              await page.evaluate((selector) => {
+                const anims = (window as unknown as { __vlmkitAnims?: Animation[] }).__vlmkitAnims ?? [];
+                const hits: number[] = [];
+                anims.forEach((anim, index) => {
+                  const target = (anim.effect as KeyframeEffect | null)?.target as Element | null;
+                  if (target && target.matches(selector)) hits.push(index);
+                });
+                return hits;
+              }, wanted),
+            );
       const rows = evaluated.filter((a) => a.motionBbox && (matched === null || matched.has(a.index)));
       if (matched !== null && rows.length === 0) {
         throw new UsageError(
-          `--strip-selector \`${wanted}\` matched no animated element.`
-          + ` Animated elements on this page: ${evaluated.map((a) => a.selector).join(", ")}`,
+          `--strip-selector \`${wanted}\` matched no animated element.` +
+            ` Animated elements on this page: ${evaluated.map((a) => a.selector).join(", ")}`,
         );
       }
       // When anything finite runs, the window is when the last of those ends — not
@@ -1053,8 +1074,9 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       const finiteEnds = rows
         .filter((a) => a.iterations !== null)
         .map((a) => a.delayMs + a.durationMs * (a.iterations ?? 1));
-      const windowMs = options.stripWindowMs
-        ?? (finiteEnds.length > 0
+      const windowMs =
+        options.stripWindowMs ??
+        (finiteEnds.length > 0
           ? Math.max(1, ...finiteEnds)
           : Math.max(1, ...rows.map((a) => a.delayMs + a.durationMs)));
       const times = Array.from({ length: samples }, (_, i) => Math.round((windowMs * (i + 1)) / samples));
@@ -1067,9 +1089,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         // at its delay while it has not begun — which is what makes the stagger show.
         for (const anim of evaluated) {
           if (anim.index < 0) continue;
-          const end = anim.iterations === null
-            ? timeMs
-            : Math.min(timeMs, anim.delayMs + anim.durationMs * anim.iterations - 1);
+          const end =
+            anim.iterations === null ? timeMs : Math.min(timeMs, anim.delayMs + anim.durationMs * anim.iterations - 1);
           await seek(anim.index, Math.max(anim.delayMs, end));
         }
         columns.push(await shot(`t-${timeMs}ms`));
@@ -1082,9 +1103,9 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         // are side by side is lost from the sheet".
         if (imageFormatForPath(options.stripPath) === "webp") {
           throw new UsageError(
-            "--strip-animated writes APNG, so --strip cannot be a .webp path.\n"
-            + "  Animated WebP needs libwebp's animation encoder, which the optional\n"
-            + "  `@jsquash/webp` does not expose. Use a .png name.",
+            "--strip-animated writes APNG, so --strip cannot be a .webp path.\n" +
+              "  Animated WebP needs libwebp's animation encoder, which the optional\n" +
+              "  `@jsquash/webp` does not expose. Use a .png name.",
           );
         }
         // The same downscale the sheet would apply, through the same helper — two
@@ -1116,56 +1137,57 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           animated: true,
         };
       } else {
-      // Crop each row out of those shared frames. Every cell in a row shares ONE
-      // rect: cropping per cell would re-centre the element and subtract the motion
-      // the row exists to show, the same reason `composeFilmstrip` aligns top-left.
-      // Row-major, so `columns: samples` puts one animation per row.
-      const cells = rows.flatMap((anim) => {
-        const bbox = anim.motionBbox!;
-        return columns.map((frame) => cropRegion(
-          frame,
-          Math.max(0, bbox.x - PAD),
-          Math.max(0, bbox.y - PAD),
-          bbox.width + PAD * 2,
-          bbox.height + PAD * 2,
-        ));
-      });
+        // Crop each row out of those shared frames. Every cell in a row shares ONE
+        // rect: cropping per cell would re-centre the element and subtract the motion
+        // the row exists to show, the same reason `composeFilmstrip` aligns top-left.
+        // Row-major, so `columns: samples` puts one animation per row.
+        const cells = rows.flatMap((anim) => {
+          const bbox = anim.motionBbox!;
+          return columns.map((frame) =>
+            cropRegion(
+              frame,
+              Math.max(0, bbox.x - PAD),
+              Math.max(0, bbox.y - PAD),
+              bbox.width + PAD * 2,
+              bbox.height + PAD * 2,
+            ),
+          );
+        });
 
-      // Labels in the image, because the terminal does not travel with it. v1 found
-      // this ("no labels at all — no row selector, no time per cell; that data is
-      // terminal-only") and v4's evidence agent named it the one thing left to change:
-      // "this artifact is *not* a baseline — it is an attachment whose whole job is to
-      // be read by a human out of context." Column labels are the shared-clock times,
-      // which is the axis the whole sheet is read along.
-      const sheet = composeFilmstrip(cells, {
-        columns: samples,
-        maxWidth: options.stripMaxWidth ?? 1600,
-        columnLabels: times.map((t) => `${t}ms`),
-        rowLabels: rows.map((anim) => `${anim.selector} ${anim.name}`),
-      });
-      await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
-      // `--strip strip.webp` encodes WebP; the extension is the whole switch.
-      if (imageFormatForPath(options.stripPath) === "webp") {
-        await writeFile(resolve(options.stripPath), await encodeWebp(sheet));
-      } else {
-        await encodePng(resolve(options.stripPath), sheet);
-      }
-      strip = {
-        path: resolve(options.stripPath),
-        columns: sheet.layout.columns,
-        rows: sheet.layout.rows,
-        // Counted by reason, not lumped together. `omitted: evaluated.length -
-        // rows.length` called a row dropped by `--strip-selector` a no-visible-effect,
-        // which is a false statement of the same kind this whole line exists to avoid.
-        omitted: evaluated.filter((a) => !a.motionBbox
-          && (matched === null || matched.has(a.index))).length,
-        outOfScope: matched === null ? 0 : evaluated.filter((a) => !matched.has(a.index)).length,
-        windowMs,
-        times,
-        rowSelectors: rows.map((a) => a.selector),
-        width: sheet.width,
-        height: sheet.height,
-      };
+        // Labels in the image, because the terminal does not travel with it. v1 found
+        // this ("no labels at all — no row selector, no time per cell; that data is
+        // terminal-only") and v4's evidence agent named it the one thing left to change:
+        // "this artifact is *not* a baseline — it is an attachment whose whole job is to
+        // be read by a human out of context." Column labels are the shared-clock times,
+        // which is the axis the whole sheet is read along.
+        const sheet = composeFilmstrip(cells, {
+          columns: samples,
+          maxWidth: options.stripMaxWidth ?? 1600,
+          columnLabels: times.map((t) => `${t}ms`),
+          rowLabels: rows.map((anim) => `${anim.selector} ${anim.name}`),
+        });
+        await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
+        // `--strip strip.webp` encodes WebP; the extension is the whole switch.
+        if (imageFormatForPath(options.stripPath) === "webp") {
+          await writeFile(resolve(options.stripPath), await encodeWebp(sheet));
+        } else {
+          await encodePng(resolve(options.stripPath), sheet);
+        }
+        strip = {
+          path: resolve(options.stripPath),
+          columns: sheet.layout.columns,
+          rows: sheet.layout.rows,
+          // Counted by reason, not lumped together. `omitted: evaluated.length -
+          // rows.length` called a row dropped by `--strip-selector` a no-visible-effect,
+          // which is a false statement of the same kind this whole line exists to avoid.
+          omitted: evaluated.filter((a) => !a.motionBbox && (matched === null || matched.has(a.index))).length,
+          outOfScope: matched === null ? 0 : evaluated.filter((a) => !matched.has(a.index)).length,
+          windowMs,
+          times,
+          rowSelectors: rows.map((a) => a.selector),
+          width: sheet.width,
+          height: sheet.height,
+        };
       }
     }
 
@@ -1188,7 +1210,16 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       let rmClock: ClockMotion | undefined;
       if (options.virtualTime) {
         const rmShot = async () => pngFromBuffer(await rmPage.screenshot({ animations: "allow" }));
-        rmClock = await sampleClock(rmPage, await rmShot(), rmShot, clockWindowMs, clockSamples, tolerance, minChangedPixels, "rm-clock");
+        rmClock = await sampleClock(
+          rmPage,
+          await rmShot(),
+          rmShot,
+          clockWindowMs,
+          clockSamples,
+          tolerance,
+          minChangedPixels,
+          "rm-clock",
+        );
       }
       await rmPage.close();
       // Not `playState === "running"`. The question here is not "is it moving at
@@ -1262,10 +1293,14 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   const lines: string[] = [];
   const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check animation${RESET}`);
-  lines.push(`${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${report.virtualTime ? ", page clock held (--virtual-time)" : ""}${RESET}`);
+  lines.push(
+    `${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${report.virtualTime ? ", page clock held (--virtual-time)" : ""}${RESET}`,
+  );
   lines.push("");
   lines.push(`status: ${status}`);
-  lines.push(`animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`);
+  lines.push(
+    `animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`,
+  );
   // The status block reads like the most important part of the output, so a line in
   // it that carries no rule id sends the reader hunting. A dogfood agent: "`settle:
   // never` and `reduced-motion: …` are status lines, not findings. They read like the
@@ -1278,13 +1313,13 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   // points the reader at a rule that, with the rule off, is no longer reporting anything. The
   // number stays — it was measured — but nothing claims a rule is carrying it.
   const firedKinds = new Set(shown.map((entry) => entry.row.kind));
-  const ruleTag = (kind: AnimationEvalIssueKind) => firedKinds.has(kind) ? ` ${DIM}[${kind}]${RESET}` : "";
+  const ruleTag = (kind: AnimationEvalIssueKind) => (firedKinds.has(kind) ? ` ${DIM}[${kind}]${RESET}` : "");
   if (report.settleMs === null) {
     lines.push(
-      `settle: never (infinite animation)`
-      + (firedKinds.has("infinite-animation")
-        ? ` ${DIM}[infinite-animation]${RESET}`
-        : ` ${DIM}(no rule covers this — \`long-settle\` needs a settle time to compare)${RESET}`),
+      `settle: never (infinite animation)` +
+        (firedKinds.has("infinite-animation")
+          ? ` ${DIM}[infinite-animation]${RESET}`
+          : ` ${DIM}(no rule covers this — \`long-settle\` needs a settle time to compare)${RESET}`),
     );
   } else {
     lines.push(`settle: ${Math.round(report.settleMs)}ms${ruleTag("long-settle")}`);
@@ -1299,11 +1334,15 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   if (report.uncontrolledMotion) {
     const m = report.uncontrolledMotion;
     const where = m.bbox ? ` at (${m.bbox.x},${m.bbox.y}) ${m.bbox.width}x${m.bbox.height}` : "";
-    lines.push(`uncontrolled motion: ${m.changedPixels}px${where} (rAF / video / GIF — frame deltas may be contaminated)${ruleTag("uncontrolled-motion")}`);
+    lines.push(
+      `uncontrolled motion: ${m.changedPixels}px${where} (rAF / video / GIF — frame deltas may be contaminated)${ruleTag("uncontrolled-motion")}`,
+    );
   }
   if (report.clockMotion) {
     const c = report.clockMotion;
-    const where = c.motionBbox ? ` at (${c.motionBbox.x},${c.motionBbox.y}) ${c.motionBbox.width}x${c.motionBbox.height}` : "";
+    const where = c.motionBbox
+      ? ` at (${c.motionBbox.x},${c.motionBbox.y}) ${c.motionBbox.width}x${c.motionBbox.height}`
+      : "";
     lines.push(
       !c.visible
         ? `script-driven motion: none in ${c.windowMs}ms of virtual time`
@@ -1311,7 +1350,8 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
           ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
           : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
     );
-    if (c.errors.length > 0) lines.push(`${DIM}  page callbacks threw while the clock advanced: ${c.errors.join(" | ")}${RESET}`);
+    if (c.errors.length > 0)
+      lines.push(`${DIM}  page callbacks threw while the clock advanced: ${c.errors.join(" | ")}${RESET}`);
   }
   if (report.evaluated.length > 0) {
     lines.push("");
@@ -1322,7 +1362,9 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
         : "none";
       const visibility = anim.seekIneffective
         ? `${RED}not measured (seek ineffective)${RESET}`
-        : anim.visible ? `${GREEN}visible${RESET}` : `${RED}no visible effect${RESET}`;
+        : anim.visible
+          ? `${GREEN}visible${RESET}`
+          : `${RED}no visible effect${RESET}`;
       const osc = computeOscillation(anim);
       // The leg annotation is what makes "1.2s per leg" briefs mechanically
       // checkable — duration alone hides a 2x frequency difference between
@@ -1364,9 +1406,9 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     // The omission is named, not silent: a dogfood agent got a strip of 1 animation
     // out of 5 with "no finding, no warning, no hint" and called that the real bug.
     lines.push(
-      `Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s)`
-      + `${s.omitted > 0 ? `; ${s.omitted} omitted as no-visible-effect` : ""}`
-      + `${s.outOfScope > 0 ? `; ${s.outOfScope} outside --strip-selector` : ""})`,
+      `Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s)` +
+        `${s.omitted > 0 ? `; ${s.omitted} omitted as no-visible-effect` : ""}` +
+        `${s.outOfScope > 0 ? `; ${s.outOfScope} outside --strip-selector` : ""})`,
     );
     // A caption, because the image carries no text and the same agent said so:
     // "no labels at all — no row selector, no time per cell; that data is
@@ -1374,9 +1416,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     // make the output depend on font rendering, which is the class of
     // platform-dependent pixel this toolkit exists to catch. So it is emitted in the
     // form a reviewer actually needs it: next to the image, ready to paste.
-    lines.push(`${DIM}  caption: columns are ${s.times.map((ms) => `${ms}ms`).join(" / ")}`
-      + ` on the page timeline (window ${s.windowMs}ms, one shared clock);`
-      + ` rows top to bottom are ${s.rowSelectors.join(", ")}${RESET}`);
+    lines.push(
+      `${DIM}  caption: columns are ${s.times.map((ms) => `${ms}ms`).join(" / ")}` +
+        ` on the page timeline (window ${s.windowMs}ms, one shared clock);` +
+        ` rows top to bottom are ${s.rowSelectors.join(", ")}${RESET}`,
+    );
   }
   return lines.join("\n");
 }

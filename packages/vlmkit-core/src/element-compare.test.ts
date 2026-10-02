@@ -87,11 +87,11 @@ describe("diff elements usage errors", () => {
   const CLI = resolve(fileURLToPath(import.meta.url), "..", "..", "..", "..", "src", "cli", "vlmkit.ts");
 
   it("prints one line and no stack trace when --selectors is missing", () => {
-    const r = spawnSync(
-      process.execPath,
-      ["--experimental-strip-types", CLI, "diff", "elements", "a.html", "b.html"],
-      { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" }, timeout: 60_000 },
-    );
+    const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, "diff", "elements", "a.html", "b.html"], {
+      encoding: "utf-8",
+      env: { ...process.env, NO_COLOR: "1" },
+      timeout: 60_000,
+    });
     const output = `${r.stdout ?? ""}${r.stderr ?? ""}`;
     assert.equal(r.status, 1);
     assert.match(output, /error: --selectors is required/);

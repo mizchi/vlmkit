@@ -116,8 +116,9 @@ export async function captureRoutes(options: RouteCaptureOptions): Promise<Route
             // the capture — the screenshot of the page WITHOUT it is the evidence. Recorded now
             // rather than discarded, because "the wait never matched" and "the page is fine"
             // used to print the same line.
-            await page.waitForSelector(route.waitFor, { timeout: 10_000 })
-              .catch(() => { waitForTimedOut = true; });
+            await page.waitForSelector(route.waitFor, { timeout: 10_000 }).catch(() => {
+              waitForTimedOut = true;
+            });
           }
           await page.waitForTimeout(settleMs);
 
@@ -128,9 +129,20 @@ export async function captureRoutes(options: RouteCaptureOptions): Promise<Route
           const a11yPath = join(options.outputDir, `${route.name}.a11y.json`);
           await writeFile(a11yPath, JSON.stringify(tree, null, 2));
 
-          const textLength = (await page.locator("body").innerText().catch(() => "")).length;
+          const textLength = (
+            await page
+              .locator("body")
+              .innerText()
+              .catch(() => "")
+          ).length;
           captured.push({
-            name: route.name, url, screenshotPath, a11yPath, a11ySource: source, textLength, status,
+            name: route.name,
+            url,
+            screenshotPath,
+            a11yPath,
+            a11ySource: source,
+            textLength,
+            status,
             ...(waitForTimedOut ? { waitForTimedOut } : {}),
           });
         } catch (err) {
@@ -171,7 +183,7 @@ async function collectA11yTree(
   try {
     const client = await page.context().newCDPSession(page);
     try {
-      const result = await client.send("Accessibility.getFullAXTree") as { nodes: CdpAxNode[] };
+      const result = (await client.send("Accessibility.getFullAXTree")) as { nodes: CdpAxNode[] };
       return { tree: cdpNodesToTree(result.nodes), source: "cdp" };
     } finally {
       await client.detach().catch(() => {});

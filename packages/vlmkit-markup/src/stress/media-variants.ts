@@ -46,13 +46,7 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type MediaVariant = "forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200";
 
-export const ALL_VARIANTS: MediaVariant[] = [
-  "forced-colors",
-  "reduced-motion",
-  "print",
-  "rtl",
-  "zoom-200",
-];
+export const ALL_VARIANTS: MediaVariant[] = ["forced-colors", "reduced-motion", "print", "rtl", "zoom-200"];
 
 export interface MediaVariantsOptions extends PageLoadOptions {
   source: string;
@@ -81,7 +75,6 @@ export interface MediaVariantsReport {
   variants: VariantResult[];
   reportPath: string;
 }
-
 
 /**
  * Always navigate. The file branch used to `setContent` the read bytes, which
@@ -119,9 +112,7 @@ async function readAllStylesheets(page: Page): Promise<string> {
   }
 }
 
-export async function runMediaVariants(
-  options: MediaVariantsOptions,
-): Promise<MediaVariantsReport> {
+export async function runMediaVariants(options: MediaVariantsOptions): Promise<MediaVariantsReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
@@ -151,9 +142,7 @@ export async function runMediaVariants(
     for (const variant of variants) {
       const screenshotPath = join(outputDir, `${variant}.png`);
       const page = await browser.newPage({
-        viewport: variant === "zoom-200"
-          ? { width: viewport.width / 2, height: viewport.height / 2 }
-          : viewport,
+        viewport: variant === "zoom-200" ? { width: viewport.width / 2, height: viewport.height / 2 } : viewport,
       });
       // Hoisted so the per-variant verdict switch can see it below.
       let zoomOverflow: { scrollWidth: number; clientWidth: number } | undefined;
@@ -170,7 +159,9 @@ export async function runMediaVariants(
         }
         await loadPage(page, options.source, options);
         if (variant === "rtl") {
-          await page.evaluate(() => { document.documentElement.dir = "rtl"; });
+          await page.evaluate(() => {
+            document.documentElement.dir = "rtl";
+          });
           await page.waitForLoadState("networkidle").catch(() => {});
         } else if (variant === "zoom-200") {
           // CSS zoom: 2 is the closest standard approximation of
@@ -237,7 +228,8 @@ export async function runMediaVariants(
             note = "Stylesheet declares `forced-color-adjust: none` — author opted out of high-contrast accommodation.";
           } else if (deltaRatio < 0.005) {
             verdict = "suspect";
-            note = "Page barely changed under forced-colors emulation — verify text + background colors flip under high-contrast or use `Canvas` / `CanvasText` system colors.";
+            note =
+              "Page barely changed under forced-colors emulation — verify text + background colors flip under high-contrast or use `Canvas` / `CanvasText` system colors.";
           } else {
             note = `Page responds to forced-colors emulation (Δ ${(deltaRatio * 100).toFixed(1)}%).`;
           }
@@ -262,7 +254,8 @@ export async function runMediaVariants(
             note = "Page has no animation / transition declarations — reduced-motion accommodation not needed.";
           } else {
             verdict = "suspect";
-            note = "Stylesheet declares animation / transition / @keyframes but no `@media (prefers-reduced-motion: reduce)` rule — motion is not suppressed for users with vestibular disorders.";
+            note =
+              "Stylesheet declares animation / transition / @keyframes but no `@media (prefers-reduced-motion: reduce)` rule — motion is not suppressed for users with vestibular disorders.";
           }
           break;
         }
@@ -289,7 +282,8 @@ export async function runMediaVariants(
           // delta on small pages: scan stylesheet text for
           // margin-left / margin-right / padding-left / padding-right
           // / text-align: left|right / left: / right: declarations.
-          const physicalRe = /(margin|padding)-(left|right)\s*:|text-align\s*:\s*(left|right)\b|\b(left|right)\s*:\s*[^;]/gi;
+          const physicalRe =
+            /(margin|padding)-(left|right)\s*:|text-align\s*:\s*(left|right)\b|\b(left|right)\s*:\s*[^;]/gi;
           const matches = allCss.match(physicalRe) ?? [];
           const physicalCount = matches.length;
           if (physicalCount >= 2) {
@@ -300,7 +294,8 @@ export async function runMediaVariants(
             note = `Stylesheet has 1 physical property use — review whether this should be logical for RTL.`;
           } else if (deltaRatio < 0.005) {
             verdict = "suspect";
-            note = "Layout barely flipped under `dir=rtl` — page likely uses physical properties or has no horizontal layout to flip.";
+            note =
+              "Layout barely flipped under `dir=rtl` — page likely uses physical properties or has no horizontal layout to flip.";
           } else {
             note = `Layout responds to RTL (Δ ${(deltaRatio * 100).toFixed(1)}%, ${physicalCount} physical-prop uses).`;
           }
@@ -324,8 +319,13 @@ export async function runMediaVariants(
       }
 
       variantResults.push({
-        variant, screenshotPath, deltaRatio, deltaPixels, totalPixels,
-        verdict, note,
+        variant,
+        screenshotPath,
+        deltaRatio,
+        deltaPixels,
+        totalPixels,
+        verdict,
+        note,
       });
     }
   });
@@ -340,8 +340,11 @@ export async function runMediaVariants(
   await writeFile(reportPath, md);
 
   return {
-    source: options.source, viewport, defaultScreenshot,
-    variants: variantResults, reportPath,
+    source: options.source,
+    viewport,
+    defaultScreenshot,
+    variants: variantResults,
+    reportPath,
   };
 }
 
@@ -361,22 +364,35 @@ export function formatMediaVariantsReport(report: MediaVariantsReport, rules?: R
   const tierOf = (verdict: MediaVariantsReport["variants"][number]["verdict"]) =>
     verdict === "suspect"
       ? ruleTier(rules, "variant-broken", "suspect")
-      : verdict === "warn" ? ruleTier(rules, "variant-ignored", "warn") : undefined;
+      : verdict === "warn"
+        ? ruleTier(rules, "variant-ignored", "warn")
+        : undefined;
   const silenced = new Map<string, number>();
   for (const v of report.variants) {
     const tier = tierOf(v.verdict);
-    if (tier === "off") silenced.set(v.verdict === "suspect" ? "variant-broken" : "variant-ignored",
-      (silenced.get(v.verdict === "suspect" ? "variant-broken" : "variant-ignored") ?? 0) + 1);
-    const icon = v.verdict === "ok"
-      ? `${GREEN}✓${RESET}`
-      : v.verdict === "skip" || tier === "off"
-        ? `${DIM}-${RESET}`
-        : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
-    lines.push(`  ${icon} ${v.variant.padEnd(16)} Δ ${(v.deltaRatio * 100).toFixed(2).padStart(6)}%  ${DIM}${v.note}${RESET}`);
+    if (tier === "off")
+      silenced.set(
+        v.verdict === "suspect" ? "variant-broken" : "variant-ignored",
+        (silenced.get(v.verdict === "suspect" ? "variant-broken" : "variant-ignored") ?? 0) + 1,
+      );
+    const icon =
+      v.verdict === "ok"
+        ? `${GREEN}✓${RESET}`
+        : v.verdict === "skip" || tier === "off"
+          ? `${DIM}-${RESET}`
+          : tier === "suspect"
+            ? `${RED}✗${RESET}`
+            : tier === "warn"
+              ? `${YELLOW}!${RESET}`
+              : `${DIM}i${RESET}`;
+    lines.push(
+      `  ${icon} ${v.variant.padEnd(16)} Δ ${(v.deltaRatio * 100).toFixed(2).padStart(6)}%  ${DIM}${v.note}${RESET}`,
+    );
   }
   const note = hiddenByRuleNote(silenced);
   // Reworded from the shared "not shown": the rows ARE shown here, with a neutral marker.
-  if (note) lines.push(`  ${DIM}${note.replace("not shown — rule turned off", "no longer graded — rule turned off")}${RESET}`);
+  if (note)
+    lines.push(`  ${DIM}${note.replace("not shown — rule turned off", "no longer graded — rule turned off")}${RESET}`);
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
 }
@@ -387,18 +403,17 @@ function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
   lines.push("");
   lines.push(`Source: \`${r.source}\` at ${r.viewport.width}×${r.viewport.height}`);
   lines.push("");
-  lines.push("Each row renders the page under a different user-preference setting " +
-    "and diffs against the default. The **Verdict** column applies a heuristic " +
-    "per variant — `suspect` means the page didn't respond to the variant when " +
-    "it likely should have.");
+  lines.push(
+    "Each row renders the page under a different user-preference setting " +
+      "and diffs against the default. The **Verdict** column applies a heuristic " +
+      "per variant — `suspect` means the page didn't respond to the variant when " +
+      "it likely should have.",
+  );
   lines.push("");
   lines.push("| Variant | Δ vs default | Verdict | Note |");
   lines.push("|---|---|---|---|");
   for (const v of r.variants) {
-    const verdictIcon = v.verdict === "ok" ? "✓"
-      : v.verdict === "warn" ? "⚠"
-      : v.verdict === "suspect" ? "✗"
-      : "—";
+    const verdictIcon = v.verdict === "ok" ? "✓" : v.verdict === "warn" ? "⚠" : v.verdict === "suspect" ? "✗" : "—";
     lines.push(`| \`${v.variant}\` | ${(v.deltaRatio * 100).toFixed(2)}% | ${verdictIcon} ${v.verdict} | ${v.note} |`);
   }
   lines.push("");
@@ -414,8 +429,7 @@ function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
   const suspects = r.variants.filter((v) => v.verdict === "suspect");
   const warns = r.variants.filter((v) => v.verdict === "warn");
   if (suspects.length === 0 && warns.length === 0) {
-    lines.push("All variants responded as expected. Page handles common user " +
-      "preferences gracefully.");
+    lines.push("All variants responded as expected. Page handles common user " + "preferences gracefully.");
   } else {
     if (suspects.length > 0) {
       lines.push(`**${suspects.length} variant(s) flagged as suspect** — the page didn't adapt:`);
@@ -426,7 +440,9 @@ function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
       lines.push("");
     }
     if (warns.length > 0) {
-      lines.push(`${warns.length} warning(s) — review the listed variants and either confirm intended behavior or add the relevant CSS:`);
+      lines.push(
+        `${warns.length} warning(s) — review the listed variants and either confirm intended behavior or add the relevant CSS:`,
+      );
       lines.push("");
       for (const v of warns) {
         lines.push(`- \`${v.variant}\`: ${v.note}`);
@@ -434,11 +450,19 @@ function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
       lines.push("");
     }
     lines.push("Quick patches by variant:");
-    lines.push("  - `forced-colors`: set `forced-color-adjust: auto` on themed elements; use `CanvasText` / `LinkText` system colors.");
-    lines.push("  - `reduced-motion`: wrap animations in `@media (prefers-reduced-motion: no-preference) { /* keyframes */ }` or override with `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none; transition: none; } }`.");
+    lines.push(
+      "  - `forced-colors`: set `forced-color-adjust: auto` on themed elements; use `CanvasText` / `LinkText` system colors.",
+    );
+    lines.push(
+      "  - `reduced-motion`: wrap animations in `@media (prefers-reduced-motion: no-preference) { /* keyframes */ }` or override with `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none; transition: none; } }`.",
+    );
     lines.push("  - `print`: add `@media print { .no-print { display: none; } body { background: white; } }`.");
-    lines.push("  - `rtl`: replace `margin-left` / `padding-right` / `text-align: left` with `margin-inline-start` / `padding-inline-end` / `text-align: start`.");
-    lines.push("  - `zoom-200`: avoid fixed `width` on text containers; use `max-width` + `min-width: 0`; allow text wrapping.");
+    lines.push(
+      "  - `rtl`: replace `margin-left` / `padding-right` / `text-align: left` with `margin-inline-start` / `padding-inline-end` / `text-align: start`.",
+    );
+    lines.push(
+      "  - `zoom-200`: avoid fixed `width` on text containers; use `max-width` + `min-width: 0`; allow text wrapping.",
+    );
   }
   lines.push("");
   return lines.join("\n");

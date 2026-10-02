@@ -11,14 +11,19 @@ function synth(
   const data = new Uint8Array(width * height * 4);
   // Background: tinted gray (resized baseline, low alpha) — not "hot".
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = 180; data[i + 1] = 180; data[i + 2] = 180; data[i + 3] = 255;
+    data[i] = 180;
+    data[i + 1] = 180;
+    data[i + 2] = 180;
+    data[i + 3] = 255;
   }
   // Hot rectangles: pixelmatch's bright red.
   for (const r of hotRects) {
     for (let y = r.top; y < r.top + r.h; y++) {
       for (let x = r.left; x < r.left + r.w; x++) {
         const i = (y * width + x) * 4;
-        data[i] = 255; data[i + 1] = 60; data[i + 2] = 60;
+        data[i] = 255;
+        data[i + 1] = 60;
+        data[i + 2] = 60;
       }
     }
   }
@@ -50,8 +55,8 @@ describe("findHeatmapRegionsFromRgba", () => {
 
   it("filters below minArea", () => {
     const data = synth(200, 200, [
-      { left: 10, top: 10, w: 30, h: 30 },     // 900
-      { left: 120, top: 120, w: 5, h: 5 },     // 25 — below default 80
+      { left: 10, top: 10, w: 30, h: 30 }, // 900
+      { left: 120, top: 120, w: 5, h: 5 }, // 25 — below default 80
     ]);
     const regions = findHeatmapRegionsFromRgba(data, 200, 200);
     assert.equal(regions.length, 1);

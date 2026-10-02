@@ -33,16 +33,31 @@ describe("scan a11y → check a11y tree on a Flutter-shaped page", () => {
     assert.ok(tree.nodes.some((n) => (n.actions ?? []).includes("scroll")));
 
     const report = await runCheckA11yTree({ source: out });
-    assert.deepEqual(report.unlabelled.map((f) => f.role), ["textfield"]);
+    assert.deepEqual(
+      report.unlabelled.map((f) => f.role),
+      ["textfield"],
+    );
     assert.equal(report.unreachable.length, 1);
     assert.equal(report.unreachable[0]!.first.name, "log 3");
     assert.equal(report.unreachable[0]!.count, 4);
-    assert.deepEqual(report.contrast!.failures.map((f) => f.name), ["Seed hint"]);
+    assert.deepEqual(
+      report.contrast!.failures.map((f) => f.name),
+      ["Seed hint"],
+    );
     assert.ok(report.contrast!.failures[0]!.ratio < 2.5, String(report.contrast!.failures[0]!.ratio));
     assert.ok(report.contrast!.skipped.some((s) => s.name === "Next" && s.reason === "disabled"));
-    assert.deepEqual(report.touch.failures.map((f) => f.text), ["Info"]);
-    assert.deepEqual(report.touch.wcagExempt.map((f) => f.text), ["Help"]); // alone: 2.5.8's spacing exception
-    assert.deepEqual(report.touch.enclosed.map((e) => e.name), ["Place here"]);
+    assert.deepEqual(
+      report.touch.failures.map((f) => f.text),
+      ["Info"],
+    );
+    assert.deepEqual(
+      report.touch.wcagExempt.map((f) => f.text),
+      ["Help"],
+    ); // alone: 2.5.8's spacing exception
+    assert.deepEqual(
+      report.touch.enclosed.map((e) => e.name),
+      ["Place here"],
+    );
   }, 60000);
 
   it("--click taps by exact name and names what is tappable when it misses", async () => {
@@ -55,13 +70,21 @@ describe("scan a11y → check a11y tree on a Flutter-shaped page", () => {
 
   it("a tree that never builds is written, and says it holds nothing", async () => {
     const dir = tmp();
-    const scan = await runScanA11y({ source: `file://${FIXTURE}?semantics=off`, out: join(dir, "a.json"), timeout: 3000 });
+    const scan = await runScanA11y({
+      source: `file://${FIXTURE}?semantics=off`,
+      out: join(dir, "a.json"),
+      timeout: 3000,
+    });
     assert.deepEqual(scan.counts, { nodes: 0, named: 0, interactive: 0 });
   }, 60000);
 
   it("refuses a page that is not Flutter, pointing at the DOM gates", async () => {
     await assert.rejects(
-      runScanA11y({ source: join(ROOT, "fixtures/composition/composed.html"), out: join(tmp(), "a.json"), timeout: 3000 }),
+      runScanA11y({
+        source: join(ROOT, "fixtures/composition/composed.html"),
+        out: join(tmp(), "a.json"),
+        timeout: 3000,
+      }),
       /not a Flutter web app.*check a11y touch/,
     );
   }, 60000);
@@ -69,9 +92,23 @@ describe("scan a11y → check a11y tree on a Flutter-shaped page", () => {
 
 describe("flutterWebNodes", () => {
   const raw = (over: Partial<FlutterWebRawNode>): FlutterWebRawNode => ({
-    path: "n1", tag: "flt-semantics", role: null, ariaLabel: null, text: "", value: null,
-    rect: { left: 0, top: 0, width: 10, height: 10 }, headingLevel: null, tappable: false, scrolls: false,
-    disabled: false, checked: null, selected: null, expanded: null, hidden: false, focused: false, ...over,
+    path: "n1",
+    tag: "flt-semantics",
+    role: null,
+    ariaLabel: null,
+    text: "",
+    value: null,
+    rect: { left: 0, top: 0, width: 10, height: 10 },
+    headingLevel: null,
+    tappable: false,
+    scrolls: false,
+    disabled: false,
+    checked: null,
+    selected: null,
+    expanded: null,
+    hidden: false,
+    focused: false,
+    ...over,
   });
 
   it("maps Flutter's DOM onto the contract's roles", () => {
@@ -86,10 +123,20 @@ describe("flutterWebNodes", () => {
       raw({ role: "img", ariaLabel: "logo" }),
       raw({ tappable: true, scrolls: true }),
     ]);
-    assert.deepEqual(nodes.map((n) => [n.role, n.name ?? null]), [
-      ["heading", "OFCP"], ["button", "Standard"], ["dialog", null], ["text", "Alert"], ["group", null],
-      ["textfield", "Seed (integer)"], ["textfield", null], ["image", "logo"], ["group", null],
-    ]);
+    assert.deepEqual(
+      nodes.map((n) => [n.role, n.name ?? null]),
+      [
+        ["heading", "OFCP"],
+        ["button", "Standard"],
+        ["dialog", null],
+        ["text", "Alert"],
+        ["group", null],
+        ["textfield", "Seed (integer)"],
+        ["textfield", null],
+        ["image", "logo"],
+        ["group", null],
+      ],
+    );
     assert.deepEqual(nodes[1]!.states, { selected: true });
     assert.deepEqual(nodes[5]!.actions, undefined); // a disabled field cannot take text
     assert.deepEqual([nodes[6]!.value, nodes[6]!.actions], ["42", ["setText"]]);
@@ -117,7 +164,10 @@ describe("importUiautomatorDump", () => {
     assert.equal(tree.scale, 3);
     assert.deepEqual(tree.viewport, { width: 360, height: 800 }); // the root's bounds, not the footer's
     const [root, title, field, icon, go, list, row, footer] = tree.nodes;
-    assert.deepEqual([root!.path, title!.path, row!.path], ["FrameLayout[0]", "FrameLayout[0]>TextView[0]", "FrameLayout[0]>RecyclerView[4]>TextView[0]"]);
+    assert.deepEqual(
+      [root!.path, title!.path, row!.path],
+      ["FrameLayout[0]", "FrameLayout[0]>TextView[0]", "FrameLayout[0]>RecyclerView[4]>TextView[0]"],
+    );
     assert.deepEqual([title!.role, title!.name], ["text", "Sign in"]);
     assert.deepEqual([field!.role, field!.name, field!.value], ["textfield", "Email", "me@example.com"]);
     assert.deepEqual(field!.rect, { left: 14, top: 66.7, width: 332, height: 46.7 });
@@ -139,13 +189,22 @@ describe("importUiautomatorDump", () => {
     const frame = join(dir, "frame.png");
     const data = new Uint8Array(1080 * 2400 * 4).fill(255);
     await encodePng(frame, { width: 1080, height: 2400, data });
-    await assert.rejects(runScanA11y({ source: xml, out: join(dir, "a.json") }), /needs --density.*adb shell wm density/);
+    await assert.rejects(
+      runScanA11y({ source: xml, out: join(dir, "a.json") }),
+      /needs --density.*adb shell wm density/,
+    );
     const scan = await runScanA11y({ source: xml, out: join(dir, "a.json"), density: 480, frame });
     assert.equal(scan.platform, "android");
     const report = await runCheckA11yTree({ source: join(dir, "a.json") });
     assert.equal(report.frame, frame);
-    assert.deepEqual(report.unlabelled.map((f) => f.path), ["FrameLayout[0]>ImageButton[2]"]);
-    assert.deepEqual(report.unreachable.map((f) => f.first.name), ["Footer"]);
+    assert.deepEqual(
+      report.unlabelled.map((f) => f.path),
+      ["FrameLayout[0]>ImageButton[2]"],
+    );
+    assert.deepEqual(
+      report.unreachable.map((f) => f.first.name),
+      ["Footer"],
+    );
     assert.deepEqual(report.touch.failures, []); // 80px at 3x is 26.7dp: over the 24dp floor
   });
 });

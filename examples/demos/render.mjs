@@ -58,9 +58,10 @@ export function renderDemo(demo, result, neighbours = {}) {
   const figures = zoomPair
     ? `${figure(images[0])}\n      <div class="pair">\n${figure(images[1])}\n${figure(images[2])}\n      </div>`
     : images.map((img) => figure(img)).join("\n");
-  const commands = demo.special === "zoom"
-    ? `import { prepareZoomSource, zoomInto } from "@mizchi/vlmkit-ai/zoom.ts";\n// or the whole loop, with any provider's model:\n// analyzeWithZoom(model, [{ png: baseline, label: "Baseline" }, { png: current, label: "Current" }], "What changed?", { maxZooms: 4 })`
-    : [result?.command, result?.thenCommand].filter(Boolean).join("\n");
+  const commands =
+    demo.special === "zoom"
+      ? `import { prepareZoomSource, zoomInto } from "@mizchi/vlmkit-ai/zoom.ts";\n// or the whole loop, with any provider's model:\n// analyzeWithZoom(model, [{ png: baseline, label: "Baseline" }, { png: current, label: "Current" }], "What changed?", { maxZooms: 4 })`
+      : [result?.command, result?.thenCommand].filter(Boolean).join("\n");
   const outputs = [
     { cmd: result?.command, out: result?.output, exit: result?.exit },
     ...(result?.thenOutput ? [{ cmd: result.thenCommand, out: result.thenOutput, exit: result.thenExit }] : []),
@@ -111,16 +112,19 @@ ${result?.report ? `    <details><summary>The markdown report it wrote</summary>
 }
 
 export function renderIndex(results) {
-  const cards = (group) => DEMOS.filter((d) => d.group === group.id).map((d) => {
-    const thumb = figuresOf(d, results[d.id])[0];
-    return `      <li class="card">
+  const cards = (group) =>
+    DEMOS.filter((d) => d.group === group.id)
+      .map((d) => {
+        const thumb = figuresOf(d, results[d.id])[0];
+        return `      <li class="card">
         <a href="./${d.id}/">
           ${thumb ? `<img src="./${d.id}/${thumb.file}"${thumb.width ? ` width="${thumb.width}" height="${thumb.height}"` : ""} alt="" loading="lazy" />` : ""}
           <span class="command"><code>${esc(d.command)}</code></span>
           <strong>${esc(d.title)}</strong>
         </a>
       </li>`;
-  }).join("\n");
+      })
+      .join("\n");
   return `${head("vlmkit demos", "Every vlmkit feature on a page with a known defect: the command, the screenshots, and the whole output.", "./demos.css")}
 <body>
 <header class="bar"><a href="../">vlmkit</a><span>Demos</span></header>
@@ -130,13 +134,15 @@ export function renderIndex(results) {
   <pre class="cmd"><code>npm install -D @mizchi/vlmkit
 npx playwright install chromium
 npx vlmkit check integrity http://localhost:3000/</code></pre>
-${GROUPS.map((g) => `  <section>
+${GROUPS.map(
+  (g) => `  <section>
     <h2><img class="icon" src="../icons/${g.icon}.webp" width="28" height="28" alt="" /> ${esc(g.title)}</h2>
     <p>${prose(g.blurb)}</p>
     <ul class="cards">
 ${cards(g)}
     </ul>
-  </section>`).join("\n")}
+  </section>`,
+).join("\n")}
   <p class="more">Whole sites built by agents, each with the log of how it was judged: <a href="../sites/">demo sites</a>. A playable card game used as a drag-and-drop target: <a href="../solitaire/">solitaire</a>.</p>
 </main>
 <footer class="foot"><a href="../">vlmkit</a> · <a href="${REPO_URL}">GitHub</a> · regenerate with <code>node --experimental-strip-types examples/demos/capture.mjs</code></footer>
@@ -156,18 +162,14 @@ export const README_END = "<!-- demos:end -->";
 export function renderReadmeBlock(dir = here) {
   const rows = DEMOS.map((d) => {
     const thumb = figuresOf(d, readResult(d.id, dir))[0];
-    const img = thumb ? `<a href="${PAGES}${d.id}/"><img src="examples/demos/${d.id}/${thumb.file}" width="220" alt="" /></a>` : "";
+    const img = thumb
+      ? `<a href="${PAGES}${d.id}/"><img src="examples/demos/${d.id}/${thumb.file}" width="220" alt="" /></a>`
+      : "";
     const group = GROUPS.find((g) => g.id === d.group);
     const icon = `<img src="docs/assets/icons/${group.icon}.webp" width="20" height="20" alt="${esc(group.title)}" />`;
     return `| ${img} | ${icon} [${d.title}](${PAGES}${d.id}/) | \`${d.command.replace(/\|/g, "\\|")}\` |`;
   });
-  return [
-    README_START,
-    "| | Demo | Command |",
-    "|---|---|---|",
-    ...rows,
-    README_END,
-  ].join("\n");
+  return [README_START, "| | Demo | Command |", "|---|---|---|", ...rows, README_END].join("\n");
 }
 
 export function writeReadme(readmePath = resolve(here, "../../README.md")) {

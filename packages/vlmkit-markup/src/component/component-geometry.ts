@@ -108,10 +108,12 @@ export function buildGeometryProfiles(
       const variantS = axis === "width" ? entry.variantSpread.width : entry.variantSpread.height;
       let interpretation: string;
       if (baselineS > variantS) {
-        interpretation = `baseline component ${axis} varies by ${baselineS}px across viewports; variant only by ${variantS}px ` +
+        interpretation =
+          `baseline component ${axis} varies by ${baselineS}px across viewports; variant only by ${variantS}px ` +
           `→ variant likely missing a responsive rule (max-width, fluid sizing, or @media-gated dimension)`;
       } else {
-        interpretation = `variant component ${axis} varies by ${variantS}px across viewports; baseline only by ${baselineS}px ` +
+        interpretation =
+          `variant component ${axis} varies by ${variantS}px across viewports; baseline only by ${baselineS}px ` +
           `→ variant is over-flexing (probably needs a fixed max-width or grid template)`;
       }
       entry.responsiveMismatch = {

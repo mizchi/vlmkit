@@ -71,7 +71,7 @@ export const UI_CONTRACT_PATTERNS = [
   "mixed",
 ] as const;
 
-export type UiContractPattern = typeof UI_CONTRACT_PATTERNS[number];
+export type UiContractPattern = (typeof UI_CONTRACT_PATTERNS)[number];
 
 export const UI_CONTRACT_GOALS = [
   "app",
@@ -84,7 +84,7 @@ export const UI_CONTRACT_GOALS = [
   "expressive-menu",
 ] as const;
 
-export type UiContractGoal = typeof UI_CONTRACT_GOALS[number];
+export type UiContractGoal = (typeof UI_CONTRACT_GOALS)[number];
 
 export type LandmarkRole =
   | "banner"
@@ -212,20 +212,9 @@ export interface UiExpectedScrollportContract {
   landmarkId?: string;
 }
 
-export type UiCompositionStyle =
-  | "regular"
-  | "asymmetric"
-  | "poster"
-  | "collage"
-  | "radial"
-  | "layered";
+export type UiCompositionStyle = "regular" | "asymmetric" | "poster" | "collage" | "radial" | "layered";
 
-export type UiCompositionAxis =
-  | "orthogonal"
-  | "diagonal"
-  | "radial"
-  | "freeform"
-  | "layered";
+export type UiCompositionAxis = "orthogonal" | "diagonal" | "radial" | "freeform" | "layered";
 
 export interface UiCompositionContract {
   style: UiCompositionStyle;
@@ -236,12 +225,7 @@ export interface UiCompositionContract {
   contrast?: UiContrastContract;
 }
 
-export type UiCompositionLayerRole =
-  | "background"
-  | "content"
-  | "accent"
-  | "foreground"
-  | "scrim";
+export type UiCompositionLayerRole = "background" | "content" | "accent" | "foreground" | "scrim";
 
 export interface UiCompositionLayer {
   id: string;
@@ -252,14 +236,7 @@ export interface UiCompositionLayer {
   transform?: string;
 }
 
-export type UiCompositionShapeKind =
-  | "slash-panel"
-  | "sticker"
-  | "burst"
-  | "cutout"
-  | "mask"
-  | "frame"
-  | "ribbon";
+export type UiCompositionShapeKind = "slash-panel" | "sticker" | "burst" | "cutout" | "mask" | "frame" | "ribbon";
 
 export interface UiCompositionShape {
   id: string;
@@ -284,13 +261,7 @@ export interface UiContrastContract {
   textOverAccent?: boolean;
 }
 
-export type UiSlotKind =
-  | "content"
-  | "media"
-  | "control"
-  | "list"
-  | "canvas"
-  | "adornment";
+export type UiSlotKind = "content" | "media" | "control" | "list" | "canvas" | "adornment";
 
 export interface UiSlotContract {
   id: string;
@@ -495,14 +466,10 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
         role: lm.role as string,
         name: lm.name.trim(),
         parentIdPresent: Boolean(lm.parentId),
-        parentKnown:
-          !lm.parentId ||
-          screen.landmarks.some((candidate) => candidate.id === lm.parentId),
+        parentKnown: !lm.parentId || screen.landmarks.some((candidate) => candidate.id === lm.parentId),
       });
       for (const issueId of landmarkIssueIds) {
-        issues.push(
-          uiContractLandmarkIssue(issueId, lmPath, lm.role as string),
-        );
+        issues.push(uiContractLandmarkIssue(issueId, lmPath, lm.role as string));
       }
       validateSlots(lm.slots, `${lmPath}.slots`, issues);
       validateRepeat(lm.repeat, `${lmPath}.repeat`, issues);
@@ -512,13 +479,7 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
       validateContent(lm.content, `${lmPath}.content`, issues);
       validateDecoration(lm.decoration, `${lmPath}.decoration`, issues);
       validateAssets(lm.assets, `${lmPath}.assets`, issues);
-      validateLayoutPolicy(
-        lm.layout.width,
-        lm.layout.height,
-        lm.layout.display,
-        `${lmPath}.layout`,
-        issues,
-      );
+      validateLayoutPolicy(lm.layout.width, lm.layout.height, lm.layout.display, `${lmPath}.layout`, issues);
       for (let ri = 0; ri < (lm.responsive?.length ?? 0); ri++) {
         const rule = lm.responsive![ri]!;
         const rulePath = `${lmPath}.responsive[${ri}]`;
@@ -536,19 +497,14 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
   return issues;
 }
 
-function uiContractVersionIssue(
-  issueId: MarkupCoreUiContractVersionIssueId,
-): UiContractIssue {
+function uiContractVersionIssue(issueId: MarkupCoreUiContractVersionIssueId): UiContractIssue {
   switch (issueId) {
     case "contract-version-unsupported":
       return { path: "version", message: "unsupported UI contract version" };
   }
 }
 
-function uiContractScreenIssue(
-  issueId: MarkupCoreUiContractScreenIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractScreenIssue(issueId: MarkupCoreUiContractScreenIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "screen-id-required":
       return { path: `${path}.id`, message: "screen id is required" };
@@ -561,10 +517,7 @@ function uiContractScreenIssue(
   }
 }
 
-function uiContractViewportIssue(
-  issueId: MarkupCoreUiContractViewportIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractViewportIssue(issueId: MarkupCoreUiContractViewportIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "viewport-label-required":
       return { path: `${path}.label`, message: "viewport label is required" };
@@ -613,11 +566,7 @@ function uiContractResponsiveRuleIssue(
   }
 }
 
-function validateMarkers(
-  markers: UiMarkerContract[] | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateMarkers(markers: UiMarkerContract[] | undefined, path: string, issues: UiContractIssue[]): void {
   for (let i = 0; i < (markers?.length ?? 0); i++) {
     const marker = markers![i]!;
     const markerPath = `${path}[${i}]`;
@@ -634,10 +583,7 @@ function validateMarkers(
   }
 }
 
-function uiContractMarkerIssue(
-  issueId: MarkupCoreUiContractMarkerIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractMarkerIssue(issueId: MarkupCoreUiContractMarkerIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "marker-kind-unknown":
       return { path: `${path}.kind`, message: "unknown marker kind" };
@@ -646,21 +592,13 @@ function uiContractMarkerIssue(
   }
 }
 
-function validateStates(
-  states: UiStateContract[] | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateStates(states: UiStateContract[] | undefined, path: string, issues: UiContractIssue[]): void {
   for (let i = 0; i < (states?.length ?? 0); i++) {
     validateStateContract(states![i]!, `${path}[${i}]`, issues);
   }
 }
 
-function validateStateContract(
-  state: UiStateContract,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateStateContract(state: UiStateContract, path: string, issues: UiContractIssue[]): void {
   const issueIds = computeUiContractStateIssueIds({
     id: state.id,
     kind: state.kind,
@@ -732,10 +670,7 @@ function validateExpectedScrollports(
   }
 }
 
-function uiContractStateIssue(
-  issueId: MarkupCoreUiContractStateIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractStateIssue(issueId: MarkupCoreUiContractStateIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "state-id-required":
       return { path: `${path}.id`, message: "state id is required" };
@@ -778,11 +713,7 @@ function uiContractExpectedScrollportIssue(
   }
 }
 
-function validateSlots(
-  slots: UiSlotContract[] | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateSlots(slots: UiSlotContract[] | undefined, path: string, issues: UiContractIssue[]): void {
   for (let i = 0; i < (slots?.length ?? 0); i++) {
     const slot = slots![i]!;
     const slotPath = `${path}[${i}]`;
@@ -793,21 +724,14 @@ function validateSlots(
   }
 }
 
-function uiContractSlotIssue(
-  issueId: MarkupCoreUiContractSlotIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractSlotIssue(issueId: MarkupCoreUiContractSlotIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "slot-id-required":
       return { path: `${path}.id`, message: "slot id is required" };
   }
 }
 
-function validateRepeat(
-  repeat: UiRepeatContract | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateRepeat(repeat: UiRepeatContract | undefined, path: string, issues: UiContractIssue[]): void {
   if (!repeat) return;
   validateOptionalRange(repeat.minItems, repeat.maxItems, path, issues);
 }
@@ -905,10 +829,7 @@ function validateComposition(
   }
 }
 
-function uiContractCompositionIssue(
-  issueId: MarkupCoreUiContractCompositionIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractCompositionIssue(issueId: MarkupCoreUiContractCompositionIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "composition-style-unknown":
       return { path: `${path}.style`, message: "unknown composition style" };
@@ -995,11 +916,7 @@ function uiContractCompositionContrastPaletteIssue(
   }
 }
 
-function validateContent(
-  content: UiContentContract | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateContent(content: UiContentContract | undefined, path: string, issues: UiContractIssue[]): void {
   if (!content) return;
   if (content.items) {
     validateOptionalRange(content.items.min, content.items.max, `${path}.items`, issues);
@@ -1021,20 +938,14 @@ function validateContent(
   }
 }
 
-function uiContractContentItemsIssue(
-  issueId: MarkupCoreUiContractContentItemsIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractContentItemsIssue(issueId: MarkupCoreUiContractContentItemsIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "content-items-exact-non-negative":
       return { path: `${path}.exact`, message: "exact must be non-negative" };
   }
 }
 
-function uiContractContentTextIssue(
-  issueId: MarkupCoreUiContractContentTextIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractContentTextIssue(issueId: MarkupCoreUiContractContentTextIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "content-text-row-count-non-negative":
       return { path: `${path}.rowCount`, message: "rowCount must be non-negative" };
@@ -1053,10 +964,7 @@ function validateOptionalRange(
   }
 }
 
-function uiContractRangeIssue(
-  issueId: MarkupCoreUiContractRangeIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractRangeIssue(issueId: MarkupCoreUiContractRangeIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "range-min-non-negative":
       return { path: `${path}.min`, message: "min must be non-negative" };
@@ -1142,11 +1050,7 @@ function uiContractDecorationMediaIssue(
   }
 }
 
-function validateAssets(
-  assets: UiAssetContract[] | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateAssets(assets: UiAssetContract[] | undefined, path: string, issues: UiContractIssue[]): void {
   for (let i = 0; i < (assets?.length ?? 0); i++) {
     const asset = assets![i]!;
     const assetPath = `${path}[${i}]`;
@@ -1157,21 +1061,14 @@ function validateAssets(
   }
 }
 
-function uiContractAssetIssue(
-  issueId: MarkupCoreUiContractAssetIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractAssetIssue(issueId: MarkupCoreUiContractAssetIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "asset-id-required":
       return { path: `${path}.id`, message: "asset id is required" };
   }
 }
 
-function validateCanvas(
-  canvas: UiCanvasContract | undefined,
-  path: string,
-  issues: UiContractIssue[],
-): void {
+function validateCanvas(canvas: UiCanvasContract | undefined, path: string, issues: UiContractIssue[]): void {
   if (!canvas) return;
   const issueIds = computeUiContractCanvasIssueIds({
     hasStateHook: Boolean(canvas.stateHook),
@@ -1198,41 +1095,31 @@ function validateCanvas(
   }
 }
 
-function uiContractCanvasIssue(
-  issueId: MarkupCoreUiContractCanvasIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractCanvasIssue(issueId: MarkupCoreUiContractCanvasIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "canvas-state-hook-required":
-      return { path: `${path}.stateHook`, message: "canvas stateHook is required when requiredStateFields are declared" };
+      return {
+        path: `${path}.stateHook`,
+        message: "canvas stateHook is required when requiredStateFields are declared",
+      };
   }
 }
 
-function uiContractCanvasInputIssue(
-  issueId: MarkupCoreUiContractCanvasInputIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractCanvasInputIssue(issueId: MarkupCoreUiContractCanvasInputIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "canvas-input-action-required":
       return { path: `${path}.action`, message: "canvas input action is required" };
   }
 }
 
-function uiContractCanvasHudIssue(
-  issueId: MarkupCoreUiContractCanvasHudIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractCanvasHudIssue(issueId: MarkupCoreUiContractCanvasHudIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "canvas-hud-id-required":
       return { path: `${path}.id`, message: "canvas HUD id is required" };
   }
 }
 
-function validatePatternEvidence(
-  screen: UiContractScreen,
-  screenPath: string,
-  issues: UiContractIssue[],
-): void {
+function validatePatternEvidence(screen: UiContractScreen, screenPath: string, issues: UiContractIssue[]): void {
   const markerKinds = collectMarkers(screen).map((marker) => marker.kind);
   const requiredStateKinds = [
     ...(screen.states ?? []).filter((state) => state.required).map((state) => state.kind),
@@ -1263,11 +1150,20 @@ function uiContractPatternEvidenceIssue(
     case "landing-marker-media-slot":
       return { path: `${screenPath}.markers`, message: "landing contracts should include media-slot marker evidence" };
     case "landing-marker-next-section":
-      return { path: `${screenPath}.markers`, message: "landing contracts should include next-section marker evidence" };
+      return {
+        path: `${screenPath}.markers`,
+        message: "landing contracts should include next-section marker evidence",
+      };
     case "app-shell-marker-scrollport":
-      return { path: `${screenPath}.markers`, message: "app-shell contracts should include scrollport marker evidence" };
+      return {
+        path: `${screenPath}.markers`,
+        message: "app-shell contracts should include scrollport marker evidence",
+      };
     case "app-shell-expected-scrollports":
-      return { path: `${screenPath}.expectedScrollports`, message: "app-shell contracts should declare expectedScrollports" };
+      return {
+        path: `${screenPath}.expectedScrollports`,
+        message: "app-shell contracts should declare expectedScrollports",
+      };
     case "app-shell-state-selected":
       return { path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a selected state" };
     case "app-shell-state-scrolled":
@@ -1275,35 +1171,62 @@ function uiContractPatternEvidenceIssue(
     case "canvas-state-hook":
       return { path: `${screenPath}.canvas.stateHook`, message: "canvas contracts should include a stateHook" };
     case "canvas-state-field-mode":
-      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include mode state field" };
+      return {
+        path: `${screenPath}.canvas.requiredStateFields`,
+        message: "canvas contracts should include mode state field",
+      };
     case "canvas-state-field-frame":
-      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include frame state field" };
+      return {
+        path: `${screenPath}.canvas.requiredStateFields`,
+        message: "canvas contracts should include frame state field",
+      };
     case "canvas-state-field-playerX":
-      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include playerX state field" };
+      return {
+        path: `${screenPath}.canvas.requiredStateFields`,
+        message: "canvas contracts should include playerX state field",
+      };
     case "canvas-state-field-playerY":
-      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include playerY state field" };
+      return {
+        path: `${screenPath}.canvas.requiredStateFields`,
+        message: "canvas contracts should include playerY state field",
+      };
     case "canvas-state-field-score":
-      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include score state field" };
+      return {
+        path: `${screenPath}.canvas.requiredStateFields`,
+        message: "canvas contracts should include score state field",
+      };
     case "canvas-state-field-assetsReady":
-      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include assetsReady state field" };
+      return {
+        path: `${screenPath}.canvas.requiredStateFields`,
+        message: "canvas contracts should include assetsReady state field",
+      };
     case "expressive-menu-composition":
-      return { path: `${screenPath}.composition`, message: "expressive-menu contracts should include composition metadata" };
+      return {
+        path: `${screenPath}.composition`,
+        message: "expressive-menu contracts should include composition metadata",
+      };
     case "expressive-menu-state-evidence":
-      return { path: `${screenPath}.states`, message: "expressive-menu contracts should include selected or focus-visible state evidence" };
+      return {
+        path: `${screenPath}.states`,
+        message: "expressive-menu contracts should include selected or focus-visible state evidence",
+      };
     case "expressive-menu-required-selected":
-      return { path: `${screenPath}.requiredStates`, message: "expressive-menu contracts should require selected state" };
+      return {
+        path: `${screenPath}.requiredStates`,
+        message: "expressive-menu contracts should require selected state",
+      };
     case "expressive-menu-required-hover":
       return { path: `${screenPath}.requiredStates`, message: "expressive-menu contracts should require hover state" };
     case "expressive-menu-required-focus-visible":
-      return { path: `${screenPath}.requiredStates`, message: "expressive-menu contracts should require focus-visible state" };
+      return {
+        path: `${screenPath}.requiredStates`,
+        message: "expressive-menu contracts should require focus-visible state",
+      };
   }
 }
 
 function collectMarkers(screen: UiContractScreen): UiMarkerContract[] {
-  return [
-    ...(screen.markers ?? []),
-    ...screen.landmarks.flatMap((landmark) => landmark.markers ?? []),
-  ];
+  return [...(screen.markers ?? []), ...screen.landmarks.flatMap((landmark) => landmark.markers ?? [])];
 }
 
 function validateLayoutPolicy(
@@ -1330,10 +1253,7 @@ function validateLayoutPolicy(
   }
 }
 
-function uiContractLayoutIssue(
-  issueId: MarkupCoreUiContractLayoutIssueId,
-  path: string,
-): UiContractIssue {
+function uiContractLayoutIssue(issueId: MarkupCoreUiContractLayoutIssueId, path: string): UiContractIssue {
   switch (issueId) {
     case "layout-width-fluid-bounds":
       return { path: `${path}.width`, message: "fluid width must declare min or max" };
@@ -1356,7 +1276,9 @@ export function summarizeUiContractLandmark(landmark: UiContractLandmark): strin
     summarizeHeight(landmark.layout.height),
     summarizeScroll(landmark.layout.scroll),
     summarizeDisplay(landmark.layout.display),
-  ].filter(Boolean).join(", ");
+  ]
+    .filter(Boolean)
+    .join(", ");
   return `${landmark.role} "${landmark.name}": ${details}`;
 }
 

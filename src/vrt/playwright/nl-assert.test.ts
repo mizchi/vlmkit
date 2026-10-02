@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  captureNlAssertImage,
-  nlAssert,
-  NlAssertError,
-  type NlAssertReviewer,
-} from "./nl-assert.ts";
+import { captureNlAssertImage, nlAssert, NlAssertError, type NlAssertReviewer } from "./nl-assert.ts";
 
 describe("captureNlAssertImage", () => {
   it("uses an explicit screenshot when supplied", async () => {
@@ -38,7 +33,7 @@ describe("captureNlAssertImage", () => {
       },
     });
 
-    assert.deepEqual([...image as Buffer], [...Buffer.from("page")]);
+    assert.deepEqual([...(image as Buffer)], [...Buffer.from("page")]);
     assert.deepEqual(calls, [{ fullPage: true }]);
   });
 });
@@ -64,11 +59,13 @@ describe("nlAssert", () => {
     });
 
     assert.equal(result.pass, true);
-    assert.deepEqual(reviewerCalls, [{
-      assertion: "Primary button is visible",
-      image: screenshot,
-      metadata: { viewport: "desktop" },
-    }]);
+    assert.deepEqual(reviewerCalls, [
+      {
+        assertion: "Primary button is visible",
+        image: screenshot,
+        metadata: { viewport: "desktop" },
+      },
+    ]);
   });
 
   it("throws NlAssertError when the reviewer rejects the assertion", async () => {

@@ -3,11 +3,7 @@ import { describe, it } from "vite-plus/test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  framesFromPaths,
-  renderFlipbookHtml,
-  writeFlipbook,
-} from "./flipbook.ts";
+import { framesFromPaths, renderFlipbookHtml, writeFlipbook } from "./flipbook.ts";
 
 // 1x1 transparent PNG
 const PNG_BYTES = Buffer.from(
@@ -34,20 +30,21 @@ describe("renderFlipbookHtml", () => {
   });
 
   it("respects custom delayMs/autoplay/loop options", () => {
-    const html = renderFlipbookHtml(
-      [{ dataUrl: "data:image/png;base64,a", label: "f1" }],
-      { title: "t", delayMs: 1500, autoplay: false, loop: false },
-    );
+    const html = renderFlipbookHtml([{ dataUrl: "data:image/png;base64,a", label: "f1" }], {
+      title: "t",
+      delayMs: 1500,
+      autoplay: false,
+      loop: false,
+    });
     assert.match(html, /delayMs: 1500/);
     assert.match(html, /autoplay: false/);
     assert.match(html, /loop: false/);
   });
 
   it("escapes title HTML to prevent injection", () => {
-    const html = renderFlipbookHtml(
-      [{ dataUrl: "data:image/png;base64,a", label: "f1" }],
-      { title: "<script>alert(1)</script>" },
-    );
+    const html = renderFlipbookHtml([{ dataUrl: "data:image/png;base64,a", label: "f1" }], {
+      title: "<script>alert(1)</script>",
+    });
     assert.match(html, /&lt;script&gt;/);
     // Page <script> tag must still be present for the player itself.
     assert.match(html, /const frames =/);
@@ -77,17 +74,17 @@ describe("writeFlipbook", () => {
   });
 
   it("throws on empty frame list", async () => {
-    await assert.rejects(
-      () => writeFlipbook("/tmp/never.html", [], { title: "x" }),
-      /zero frames/,
-    );
+    await assert.rejects(() => writeFlipbook("/tmp/never.html", [], { title: "x" }), /zero frames/);
   });
 });
 
 describe("framesFromPaths", () => {
   it("derives label from basename when not provided", () => {
     const frames = framesFromPaths(["/a/round-0.png", "/a/round-1.png"]);
-    assert.deepEqual(frames.map((f) => f.label), ["round-0", "round-1"]);
+    assert.deepEqual(
+      frames.map((f) => f.label),
+      ["round-0", "round-1"],
+    );
   });
 
   it("honors explicit labels", () => {
