@@ -357,8 +357,9 @@ the budget.
 
 ## Second reference run: an IR judged by its writers (anim-ir v1–v24)
 
-`vlmkit-anim` (the `explanatory-animation` skill, since moved to
-[mizchi/explainer](https://github.com/mizchi/explainer)) was built with this
+`vlmkit-anim` (the `explanatory-animation` skill; moved to
+[mizchi/explainer](https://github.com/mizchi/explainer) and deleted there on 2026-10-02, so the
+paths below are in explainer's git history only) was built with this
 loop from its first day: 24 rounds over six days, 86 writer attempts
 (`a`…`qb`), reports `docs/reports/2026-09-0{4..9}-anim-ir-v*.md` (still in this
 repository), fixture `packages/vlmkit-anim/fixtures/anim-scenario/` in explainer. The tool under test is a **format** an agent

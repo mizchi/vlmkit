@@ -187,7 +187,7 @@ No provider model has run it yet.
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
-code (mermaid; D2 and vlmkit-anim in mizchi/explainer), because only a code-drawn figure can be checked against the code.
+code (mermaid; D2 in mizchi/explainer), because only a code-drawn figure can be checked against the code.
 Claude has no image generation of its own. What code draws badly (an illustration, a concept picture,
 a page that has to look like a page) is generated: Codex uses its own imagegen; anyone with
 `OPENROUTER_API_KEY` uses `createImageGenClient()` from `@mizchi/vlmkit-ai/image-gen-client.ts`, whose
@@ -288,9 +288,10 @@ them, not to re-learn:
 - **A replay mismatch is not enough.** A capture can land before the compositor applies a seek: one
   replay flagged a pure-CSS `alternate infinite` badge in 2 runs of 30. Only three mutually
   different frames count (0 of 50 after; a rAF ticker over the element still fires every run).
-- **`vlmkit-anim`'s runtime needs the clock.** Its master clock is a rAF loop that rewrites every
-  animation's `currentTime` each frame, so on the wall clock every seek is overwritten and every
-  animation is `seek-ineffective` — correctly. `vlmkit-anim eval` holds the clock by default.
+- **A page that drives its own animations from a rAF loop needs the clock.** The (since deleted)
+  `vlmkit-anim` runtime rewrote every animation's `currentTime` each frame, so on the wall clock
+  every seek was overwritten and every animation read `seek-ineffective` — correctly. Use
+  `--virtual-time` for such a page.
 - **Mid-motion contrast is judged at full opacity only.** Without that, six of the eight
   dogfood-animation pages flipped to `defects` on their entrance fades; a fade at 40% is the
   animation. Text at full opacity whose background has not arrived is still held (`background-late.html`).
@@ -379,24 +380,25 @@ In this sandbox Chromium cannot verify the egress proxy's CA, so a live site is 
 HAR recorded through Node (`NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt NODE_USE_ENV_PROXY=1`)
 with `--har` — never by turning TLS verification off.
 
-## Explanatory animations and diagrams: moved to mizchi/explainer
+## Explanatory figures: mizchi/explainer; `vlmkit-anim` is gone
 
-`vlmkit-anim` (`@mizchi/vlmkit-anim`), its writing guide (`anim-ir.md`), its scenario fixtures and the
-`explain-with-anim` / `explanatory-animation` / `d2-diagram` / `d2-slides` skills live in
-[mizchi/explainer](https://github.com/mizchi/explainer) since 2026-10-02, which builds, tests and
-develops the package. The rounds that shaped them stay here as history:
-`docs/reports/2026-09-0{4..9}-anim-ir-v*.md`, `docs/reports/2026-09-14-d2-diagram-v{1,2}.md`.
+The `d2-diagram` / `d2-slides` skills live in [mizchi/explainer](https://github.com/mizchi/explainer)
+since 2026-10-02. `vlmkit-anim` (`@mizchi/vlmkit-anim`) went there with the `explain-with-anim` /
+`explanatory-animation` skills and was then **deleted** (explainer 0.5.0; deprecated on npm):
+explainer's figures are Mermaid / D2 text held to fact sheets, and nothing is animated. The rounds
+that shaped it stay here as history only — `docs/reports/2026-09-0{4..9}-anim-ir-v*.md`,
+`docs/reports/2026-09-14-d2-diagram-v{1,2}.md` — and describe a tool that no longer exists.
 
-`@mizchi/vlmkit-anim` is **deprecated on npm** and this repository depends on it for nothing. The
-README's workspace map is drawn by a local script, and the `pr-visual` change-map workflow went to
-explainer with it:
+This repository depends on it for nothing. The README's workspace map is drawn by a local script
+(the `pr-visual` change-map workflow was removed with the package):
 
 ```bash
 node scripts/workspace-map.mjs --write      # regenerate the README's mermaid map; tests/readme-workspace-map.test.mjs holds it to the manifests
 ```
 
-The shared frame-sampled evaluator, `@mizchi/vlmkit-animation-eval`, stays here: it is
-`check animation`'s measurement, and `vlmkit-anim eval` loads it as an optional peer.
+The frame-sampled evaluator, `@mizchi/vlmkit-animation-eval`, stays here: it is
+`check animation`'s measurement (it was split out so `vlmkit-anim eval` could share it; that consumer
+is gone, the package boundary stays).
 
 **In this repository, explain concepts with mermaid.** Animated reviews read badly: a GIF or a
 contact sheet has to be played or scanned to get what one static figure says, and it cannot be
@@ -763,7 +765,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
-| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `vlmkit-anim eval`. Depends on core + Playwright only; the first evaluation tool split out so the animation tool can share it without the rest of vlmkit. |
+| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `check integrity --timeline`'s clock. Depends on core + Playwright only; split out for the (since deleted) `vlmkit-anim eval`, and kept as the first evaluation tool usable without the rest of vlmkit. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |

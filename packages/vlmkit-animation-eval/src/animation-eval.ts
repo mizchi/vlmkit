@@ -25,10 +25,9 @@
  * Usage:
  *   vlmkit check animation <html-or-url>
  *   vlmkit check animation <html-or-url> --json --frames out/frames
- *   vlmkit-anim eval <page.html>          (the same report from the animation tool)
  *
- * Lives in its own package (`@mizchi/vlmkit-animation-eval`) so the animation
- * authoring tool can depend on the measurement without the rest of vlmkit.
+ * Lives in its own package (`@mizchi/vlmkit-animation-eval`) so a caller can
+ * depend on the measurement without the rest of vlmkit.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";

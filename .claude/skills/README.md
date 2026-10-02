@@ -73,9 +73,9 @@ which skill the user wants.
 | Comparison and monitoring | Two renders or repeated runs must be compared | [`vrt-markup-synth`](./vrt-markup-synth/), [`vrt-visual-diff`](./vrt-visual-diff/), [`vrt-regression-watch`](./vrt-regression-watch/), [`vrt-migration-eval`](./vrt-migration-eval/) | Produce deterministic authoring signals, explain visual deltas, detect regressions over time, and evaluate framework/CSS migrations |
 | Evaluation and hardening | You are measuring the repair system or the agent-facing tool itself | [`vrt-css-fix-loop`](./vrt-css-fix-loop/), [`agent-validation-loop`](./agent-validation-loop/) | Benchmark VLM+LLM CSS recovery on known fixtures and improve tool ergonomics with fresh-agent validation loops |
 
-Explanation and figures (`explain-with-anim`, `explanatory-animation`, `d2-diagram`,
-`d2-slides`) moved to [mizchi/explainer](https://github.com/mizchi/explainer) with the
-`vlmkit-anim` package.
+Explanation and figures (`d2-diagram`, `d2-slides`) moved to
+[mizchi/explainer](https://github.com/mizchi/explainer). The `vlmkit-anim` package and its two
+animation skills went with them and were then deleted.
 
 ## Selection rules
 
