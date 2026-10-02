@@ -27,7 +27,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../..");
 const BINS = {
   vlmkit: join(repoRoot, "dist/vlmkit.mjs"),
-  "vlmkit-anim": join(repoRoot, "packages/vlmkit-anim/dist/cli.mjs"),
 };
 const WEBP_QUALITY = 0.8;
 const MARK_STYLE = "outline: 3px solid #e5484d !important; outline-offset: 2px !important;";

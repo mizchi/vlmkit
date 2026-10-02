@@ -187,7 +187,7 @@ No provider model has run it yet.
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
-code (mermaid, D2, vlmkit-anim), because only a code-drawn figure can be checked against the code.
+code (mermaid; D2 and vlmkit-anim in mizchi/explainer), because only a code-drawn figure can be checked against the code.
 Claude has no image generation of its own. What code draws badly (an illustration, a concept picture,
 a page that has to look like a page) is generated: Codex uses its own imagegen; anyone with
 `OPENROUTER_API_KEY` uses `createImageGenClient()` from `@mizchi/vlmkit-ai/image-gen-client.ts`, whose
@@ -379,176 +379,31 @@ In this sandbox Chromium cannot verify the egress proxy's CA, so a live site is 
 HAR recorded through Node (`NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt NODE_USE_ENV_PROXY=1`)
 with `--har` — never by turning TLS verification off.
 
-## Explanatory animations (`vlmkit-anim`) and their evaluation loop
+## Explanatory animations and diagrams: moved to mizchi/explainer
+
+`vlmkit-anim` (`@mizchi/vlmkit-anim`), its writing guide (`anim-ir.md`), its scenario fixtures and the
+`explain-with-anim` / `explanatory-animation` / `d2-diagram` / `d2-slides` skills live in
+[mizchi/explainer](https://github.com/mizchi/explainer) since 2026-10-02, which builds, tests and
+publishes the package (`vlmkit-anim-v*` tags). The rounds that shaped them stay here as history:
+`docs/reports/2026-09-0{4..9}-anim-ir-v*.md`, `docs/reports/2026-09-14-d2-diagram-v{1,2}.md`.
+
+This repository still installs `@mizchi/vlmkit-anim` **from npm** for two things, and nothing else
+may depend on it:
 
 ```bash
-vlmkit-anim schema --kind sort                      # the writing guide for one kind (docs/anim-ir.md has all nineteen)
-vlmkit-anim schema --kind modules                   # the still-figure preset: a module map (modules / deps / groups), layered, cycle-checked
-vlmkit-anim schema --kind annotations               # the six ops every kind shares (value / callout / snapshot / group / text / relate) and each kind's anchors
-vlmkit-anim check scene.json                        # validate → compile → semantic checks → stats; exit 1 on ✗
-vlmkit-anim check scene.ts                          # same, for a module whose default export is `scene.<kind>({…})` (typed authoring)
-vlmkit-anim explain scene.json                      # narration as a numbered list
-vlmkit-anim render scene.json --step 4 --out f.svg  # one frame, headless and deterministic
-vlmkit-anim still scene.json --out map.svg          # the figure: final frame, no caption, cropped to what is drawn (.png needs playwright)
-vlmkit-anim html scene.json --out page.html         # <vlm-anim> runtime inline; `vlmkit check animation page.html` works on it
-vlmkit-anim video scene.json --out demo.gif --width 480   # GIF encoded in-process; .mp4/.webm run ffmpeg or leave frames + the command
-vlmkit-anim eval page.html                          # the shared frame-sampled evaluator on an emitted page (same report as `vlmkit check animation`)
-vlmkit-anim check scene.json --expect facts.json    # …and the figure against its facts (modules, deps "a->b", forbidden, highlighted in the final frame, group members) — a green check on a wrong picture was v13's finding
-vlmkit-anim check walk.json --expect facts.json     # …a graph's visit order and path, a state machine's transitions / end state, a distributed scene's messages and lost ones (v18)
-vlmkit-anim facts packages/x/src --depth 1 --out x.expect.json   # a fact sheet from a directory's import graph: a map drawn by hand from the code is checked against the code
-vlmkit-anim diff before.json after.json --out change.svg --expect diff.json   # two module maps as one figure: added in accent, removed dashed grey; the change checked against a diff sheet (v22)
-vlmkit-anim import mermaid docs/page.md --out scene.json   # a flowchart / graph, sequenceDiagram or stateDiagram-v2 the repo already has, as a scene; says what it dropped (v23; `@mizchi/vlmkit-anim/remark` embeds ```vlm-anim fences)
-vlmkit-anim layout scene.json                       # texts on texts / under boxes / past the edge / lines through texts, per step, from the timeline (also warnings in `check`)
-vlmkit-anim why scene.json [--about id]             # the compiler's account of a modules / diagram picture: the pair of boxes that set each canvas axis, rows vs bands and their share, what put each box on its layer, which box an edge bent round (v24)
-vlmkit-anim review scene.json --out dir [--model M | --answers a.json]   # contact sheet + review brief for a vision model or an agent; scores its JSON against `layout`
-vlmkit-anim repo --out docs/diagrams --name vlmkit-architecture   # the workspace drawn layer by layer (pnpm anim:diagrams regenerates docs/diagrams/)
-vlmkit-anim pr --base origin/main --out .vlmkit-anim/pr           # the change map of a branch: one beat per commit, areas + import edges + counts; <name>.md is paste-ready
-vlmkit-anim pr --base origin/main --mermaid                       # the same map as Markdown: a mermaid flowchart of areas + a commit table; no browser (`repo --mermaid` for the workspace)
+pnpm exec vlmkit-anim repo --mermaid        # the README's workspace map; tests/readme-workspace-map.test.mjs holds it to the manifests
+pnpm exec vlmkit-anim pr --base origin/main --mermaid   # what the pr-visual workflow posts on every same-repo PR
+pnpm anim:diagrams                          # regenerates docs/diagrams/ with the installed binary
 ```
 
-The `pr-visual` workflow runs `vlmkit-anim pr --mermaid` on every same-repo pull request and keeps
-one comment on the PR up to date with the result — the shape of a change before the diff.
+The shared frame-sampled evaluator, `@mizchi/vlmkit-animation-eval`, stays here: it is
+`check animation`'s measurement, and `vlmkit-anim eval` loads it as an optional peer.
 
 **In this repository, explain concepts with mermaid.** Animated reviews read badly: a GIF or a
 contact sheet has to be played or scanned to get what one static figure says, and it cannot be
 diffed or edited in review. So a PR description, a design doc, a report or a reply that needs a
 figure carries a ```` ```mermaid ```` block (flowchart / sequenceDiagram / stateDiagram-v2) that
-GitHub renders inline — the README's workspace map is one, generated by `vlmkit-anim repo --mermaid`
-and held to the manifests by a test. `vlmkit-anim` stays the product it is (the skills below ship
-to users); it is just not how this repo explains itself. Use it here only when the question is
-about the animation tool itself.
-
-`vlmkit-anim` is a **standalone binary** (`@mizchi/vlmkit-anim`), not a `vlmkit`
-subcommand. Its only workspace tie is the **evaluation** package
-`@mizchi/vlmkit-animation-eval` (an optional peer, loaded by `vlmkit-anim eval`):
-the frame-sampled measurement behind `vlmkit check animation` lives there, so the
-animation tool and the gate share one evaluator without the tool depending on
-vlmkit's capture, diff or gate plumbing. Sample outputs (one GIF and one contact
-sheet per fixture) are committed under `packages/vlmkit-anim/samples/`; regenerate
-with `pnpm anim:samples` after changing a compiler. In this repo run it as
-`pnpm exec vlmkit-anim …` (resolves to `dist/`, so `pnpm --filter @mizchi/vlmkit-anim build`
-after editing `src/`) or, without a build, `node --experimental-strip-types packages/vlmkit-anim/src/cli.ts …`.
-
-Two skills, routed from `skills/vlmkit/SKILL.md` like the markup workflows: `explain-with-anim`
-(`.claude/skills/explain-with-anim/`) is for answering a question — "how does this work", "how is
-this structured", "what does this PR change" — with a figure drawn from the code (`facts` / `repo` /
-`pr`), checked, and a narration that walks `explain`'s beats; `explanatory-animation`
-(`.claude/skills/explanatory-animation/`) is how a scene is written and checked. It points at
-`docs/anim-ir.md` as the one page to read and says how to read `check`'s canvas and crossing lines,
-`--expect`, `why` and `import mermaid`'s dropped list.
-
-A third skill in the same class, `d2-diagram` (`.claude/skills/d2-diagram/`), is for a diagram whose
-deliverable is D2 text laid out by TALA (D2's whiteboard-style engine, open source and bundled since D2 0.9)
-and read in the terminal: `d2 --layout=tala x.d2 x.txt` renders the layout as box drawing, `--ascii-mode
-standard` as plain ASCII for a README or PR, `.svg` / `.png` for docs. Pass the flag: the in-file
-`layout-engine: tala` was honoured for SVG and not for `.txt` on the build measured. A D2 diagram is a
-drawing — nothing checks it against the code — so a map that must be true is `explanatory-animation`'s, or
-is drawn from `vlmkit-anim facts`' sheet.
-
-```bash
-d2 layout                                                   # must list `tala (bundled)` — the gate, not the version string
-d2 fmt --check x.d2 && d2 validate x.d2                     # formatted (in place without --check) and syntactically valid
-node .claude/skills/d2-diagram/assets/d2-facts.mjs x.d2 [--expect x.facts.json]   # what the picture DRAWS, held to a sheet
-LC_ALL=C.UTF-8 wc -L x.txt                                  # columns; in the C locale wc -L undercounts and awk reports BYTES
-```
-
-`d2-facts.mjs` is the check D2 does not have, and it is the one thing to reach for before trusting a D2
-figure: d2 writes every shape's and every connection's fully-qualified id (plus geometry and labels) into
-the SVG, so the drawn picture is readable back — missing / reversed / invented edges, container membership,
-a sequence diagram's message order, sibling overlaps, the width, and above all **a name drawn twice**.
-That last one is D2's sharpest trap: a reference to an id that is not in scope *creates a new shape* rather
-than failing, so `gateway -> orders` written at the root when both live in containers silently adds two
-more boxes. Reach out of a container with a full path (`_.outside.stripe`, not `_.stripe`). The evaluation
-round that found this — three of four fresh writers factually correct, the fourth green with four phantom
-boxes — is `fixtures/d2-scenario/` and `docs/reports/2026-09-14-d2-diagram-v1.md`, which also records the
-measured width levers (they are not monotone; the fullest container's own `direction` is the first lever)
-and what the terminal render silently drops (every connection style, `sql_table` constraint badges, `<<`).
-
-A fourth, `d2-slides` (`.claude/skills/d2-slides/`), turns one Markdown file into a slide deck whose figures
-TALA lays out: prose in Markdown, a ```d2 fence per figure, and
-`node .claude/skills/d2-slides/assets/build-deck.mjs deck.md --out dist` emits a self-contained
-`index.html` (1280x720 frames, keyboard nav, overview, `#/4` deep links), a stacked `print.html`, each figure
-as `slide-NN.svg`, and `copy.txt`. The deck is a page, which is the point — `vlmkit check integrity` on both
-views, `check copy --manifest` and `check a11y contrast` on `print.html` (one slide is on screen at a time, so
-the deck view only ever shows the gates its first slide). Those gates found three real defects in the template
-while it was being written: a 1280px stage centred as a grid item painted nothing at 375px, a percentage
-height inside a padded frame clipped 114px on every slide, and a centred split layout cut long bullets off at
-both ends. Worked example and the gate runs: `examples/d2-slides/`.
-
-That loop is itself gated, in two halves, because the halves need different machines. `tests/d2-slides.test.mjs`
-runs in the ordinary suite with `D2` pointed at a stub that echoes a fixed SVG, and checks everything the builder
-decides before a figure is drawn — slide splitting (a `---` inside a fence is not a separator), layout choice, the
-manifest taken from the *render*, the overflow warning naming the slide, a figure that fails to compile — plus that
-`examples/d2-slides/built/` still matches its `deck.md`. The `d2-slides` workflow installs `d2` pinned at `v0.9.0`,
-rebuilds the example, compares every byte with the committed build, runs the four gates, and then breaks the deck
-twice to prove they still fail: an extra manifest line must report `copy-missing`, and `--stage-h: 260px` must
-report `clipped-content`. Regenerate the committed build with `pnpm deck:example` — it is byte-reproducible for a
-given `d2` (each figure carries `--salt=sN`), which is what makes the byte comparison possible at all.
-
-`docs/reports/2026-09-14-d2-diagram-v2.md` is the round with the sheet in the writer's hands: no wrong
-picture in four attempts and the small model down from 14 errors to 0 in two rounds, so the failures moved
-to what a sheet cannot reach. The three that matter when reading a D2 figure: a `top` / `left` pin can push
-shapes off the ascii canvas, which reads as a **narrower** render (`d2` exits 0 on the fragment, and
-`d2-facts` now errors on it — re-read the render after any pin); a width budget can simply be unreachable
-without one (five `sql_table`s bottomed out at 113 columns, so split the file or say the number in the
-prose); and `_` is one level and only valid inside a container (`_.outside.stripe` from inside `cluster`,
-`invalid underscore` at the root), which is why cross-container connections go at the root with full paths.
-
-The IR is judged on two things, measured by fresh subagents rather than by
-reading the code: **an agent gets it right from `docs/anim-ir.md` alone**, and
-**intent is readable when someone edits the file later**. Scenario fixture:
-`fixtures/anim-scenario/` (briefs, a re-edit task, per-agent attempts).
-Procedure is the `agent-validation-loop` skill; prompt the agent with one brief
-and the guide, forbid `packages/vlmkit-anim/` and other attempts, and record
-first-attempt ✗ count, rounds to green, scene bytes, and its friction verbatim.
-Reports: `docs/reports/2026-09-04-anim-ir-v*.md` (v1–v8, structures) and
-`docs/reports/2026-09-05-anim-ir-v{9,10}.md` (concept introductions; the coordinate-fallback
-count is the expressiveness metric — 3 of 8 scenes before the annotation layer and `compose`, 1 of 7 after),
-`docs/reports/2026-09-05-anim-ir-v11.md` (re-edits of annotated scenes: every readout and relation followed
-the data change; the round's defects were layout, fixed in the compiler, not in the writer's hands),
-`docs/reports/2026-09-05-anim-ir-v12.md` (the frames measured two ways — `layout` geometry and vision readers on
-the contact sheet — and compared; annotations now place themselves off other text),
-`docs/reports/2026-09-06-anim-ir-v13.md` (the first still-figure round: five module maps, all green and all with lines
-through labels the geometry could not see; `layout` now reports `crossed`, and the module layout, edge routing,
-container labels, annotation placement and arcs were reworked until the five scenes went from 91 crossings to 2),
-`docs/reports/2026-09-06-anim-ir-v14.md` (the figure against its facts: `check --expect facts.json` names v13's two
-green-but-wrong pictures in one line each; four writers with fact sheets were four green, and the sheet caught one
-wrong final highlight on the first run), `docs/reports/2026-09-07-anim-ir-v15.md` (labels in Japanese: a CJK glyph
-is one em and every width estimate had said 0.6, so `layout`'s green was a lie on Japanese figures; measured against
-Chromium, fixed in one module; the state-machine compiler learned the diagram's edge routing when a writer's only
-fix for a transition through a state was to reorder the list), `docs/reports/2026-09-08-anim-ir-v16.md` (a still's
-own vocabulary: `tone` on modules and dependencies, `"style": "implements"`, `relate` `"style": "equals"` — the two
-asks the v13 writers left open, drawn by two writers on a brief that needs all three), `docs/reports/2026-09-08-anim-ir-v17.md`
-(where an annotation lands: the canvas grows on the side the writer asked for — left and above included, the picture
-shifts — and a callout's pointer goes round labelled boxes; three writers record asked side against landed side), `docs/reports/2026-09-08-anim-ir-v18.md`
-(fact sheets for the walked kinds — a graph's visit order and path, a state machine's transitions and end state, a
-distributed scene's messages and lost ones — and `vlmkit-anim facts` writing one from a directory's import graph; the
-four writers' sheets all matched, and every further round was a compiler defect the round fixed: the token on a short
-label, a 35px circle of four states, labels on states, a distance label under an edge), `docs/reports/2026-09-08-anim-ir-v19.md`
-(two kinds — `flowchart` with decision diamonds, labelled ways out, a walked path and loops round the outside, and `gantt`
-with bars on a unit axis, dependencies, a cursor, cascading slips — both flowchart writers green on the first write; the
-gantt writer's five rounds were one callout that a moving cursor label walked under, fixed in the compiler), `docs/reports/2026-09-09-anim-ir-v20.md`
-(the last two shapes on the list — `sequence` with activation bars and `loop` / `alt` frames, and groups inside groups with `parent` —
-three writers green on the first write; the round's two compiler defects were found on the fixtures, a nested box running into its
-neighbour and an activation bar cutting a frame's tag in two, which `layout` had not counted because a 10px bar covers little area;
-it counts now), `docs/reports/2026-09-09-anim-ir-v21.md` (a still figure read back: `review --still` hands a vision reader the figure
-and scores its reading against the facts the scene draws — read / missed / invented / reversed / misplaced, one fidelity number; nine
-figures read before and after, four findings the geometry could not see fixed in the compilers — containers crossing, a label at a
-bottom corner read as a caption, forbidden arrows filed as highlights, fans out of one corner — and one ceiling named: at 26 arrows
-on 11 boxes a map reads back at 0.5–0.8 whatever the routing), `docs/reports/2026-09-09-anim-ir-v22.md` (the diff figure: `vlmkit-anim diff
-before.json after.json` draws two module maps as one still — added in accent, removed dashed grey, a legend — and prints the change as facts
-checked against a diff sheet with `--expect`; two writers green on the first write, a reader read the change back at fidelity 0.83 and
-mistook which arrow an edge label belonged to), `docs/reports/2026-09-09-anim-ir-v23.md` (scenes in Markdown and mermaid as scenes: a
-dependency-free remark plugin turns ```vlm-anim fences into the runtime or a still, and `import mermaid` reads flowchart / graph,
-sequenceDiagram and stateDiagram-v2 into scenes naming what it dropped; the sequence import matched its fact sheet with no edit, the
-22-node pipeline was faithful and laid out at 2989px, and the three compiler defects under that one warning — a canvas guessed from
-counts, a parent's children spread evenly through one band, a detour routed through the box — were fixed until the import as-is is a
-clean 1751px figure; a 32-node graph at 13277px names the next layout change, band widths by content, and the first case for `why`),
-`docs/reports/2026-09-09-anim-ir-v24.md` (`vlmkit-anim why`: the compiler's account of a modules / diagram picture — the pair of boxes that
-set each canvas axis, rows vs bands and their share, what put each box on its layer, which box an edge bent round — and bands sized by their
-fullest layer's boxes (13277px → 8882px on the 32-node graph); two writers read the banding cause off `why` before their first edit and
-brought the graph to 1805px and 1806px, both asking for the cause in `check`'s warning itself, which it now carries; the module map's own
-count-based canvas guess was replaced by the shared estimator after a kind switch moved a writer's canvas from 986px to 1806px).
+GitHub renders inline.
 
 ## Design quality: the three gates, and which sees what
 
@@ -910,7 +765,6 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
 | `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `vlmkit-anim eval`. Depends on core + Playwright only; the first evaluation tool split out so the animation tool can share it without the rest of vlmkit. |
-| `packages/vlmkit-anim/` | **Explanatory animation IR** (`vlmkit-anim`): Scene IR (sort / array / stack / queue / list / state-machine / heap / tree / distributed / matrix / graph / chart / flowchart / gantt / sequence / diagram / modules / vector) → Timeline IR → `<vlm-anim>` runtime (SVG + Web Animations) and headless SVG frames. Writing guide `docs/anim-ir.md`; design `docs/design/anim-ir.md`. Every JSON block in the guide is compiled by `docs.test.ts` — edit the guide and the examples together. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
@@ -933,7 +787,7 @@ There are **three** publication routes and still only those **two** copies. The 
 ## Releasing to npm (`.github/workflows/publish.yml`)
 
 ```bash
-node scripts/publish-npm.mjs --dry-run      # pack all 11 public packages, npm publish --dry-run; no credential needed
+node scripts/publish-npm.mjs --dry-run      # pack all 10 public packages, npm publish --dry-run; no credential needed
 git tag v0.23.0 && git push origin v0.23.0  # the release: publish.yml runs the script with --tag
 ```
 
@@ -956,8 +810,6 @@ case at 0.23.0.
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
-| `docs/anim-ir.md` | **Writing guide for `vlmkit-anim`**: the eighteen scene kinds (seventeen structures + `compose`), the annotation ops every kind shares, the timeline layer, embedding. The one page an agent reads before producing a scene |
-| `docs/design/anim-ir.md` | Why two layers, why SVG + WAAPI over Remotion, what the semantic checks read back from frames, the evaluation criteria (intent readable on re-edit; correct from little context) |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
 | `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 34 gates + 210 rules, behavior changes, what is deliberately not a gate |

@@ -20,11 +20,7 @@ const specializedSkills = [
   "agent-validation-loop",
   "auto-markup",
   "component-vrt",
-  "d2-diagram",
-  "d2-slides",
   "dynamic-markup",
-  "explain-with-anim",
-  "explanatory-animation",
   "markup-assist",
   "markup-decompose",
   "mock-markup",
@@ -614,4 +610,20 @@ test("the dogfood gate covers every locale and theme before Pages deploys", asyn
       < workflow.indexOf("Build the Pages artifact"),
     "the solitaire gates must block artifact creation",
   );
+});
+
+test("the feature-gallery link counts the demos the gallery has", async () => {
+  // It said "Fifteen" for a gallery of 14 after the vlmkit-anim demo moved to mizchi/explainer —
+  // found by eye in R8 (D38). The count is derived from the manifest, as the workflow count is.
+  const { DEMOS } = await import("../demos/demos.mjs");
+  const { messages } = await import("./content.js");
+  const words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+  const word = words[DEMOS.length];
+  assert.ok(word, `no word for ${DEMOS.length} demos`);
+  const html = await read("index.html");
+  const en = new RegExp(`^${word} features, one defect each$`, "i");
+  assert.match(html.match(/data-i18n="demo\.features">([^<]+)</)?.[1] ?? "", en);
+  assert.match(messages.en["demo.features"], en);
+  assert.ok(messages.ja["demo.features"].startsWith(`${DEMOS.length}の機能`), messages.ja["demo.features"]);
 });

@@ -1,6 +1,6 @@
 {
   "name": "vlmkit",
-  "description": "Deterministic frontend quality gates as one automatic agent skill: verify markup, build it from a screenshot, generate Playwright tests, or draw a checked figure.",
+  "description": "Deterministic frontend quality gates as one automatic agent skill: verify markup, build it from a screenshot or generate Playwright tests.",
   "owner": {
     "name": "mizchi",
     "url": "https://github.com/mizchi"
@@ -11,7 +11,7 @@
       "source": "./skills/vlmkit",
       "strict": false,
       "displayName": "vlmkit",
-      "description": "Automatic frontend quality router. Describe the outcome — implement this mock, check this page, audit its design and colour, check a Flutter or Android app's accessibility, turn these criteria into tests, explain how this works — and it picks one of 17 bundled workflows and runs its deterministic gates to green. No API key: the gates are Playwright + pixel math, and the agent's own vision is the only VLM.",
+      "description": "Automatic frontend quality router. Describe the outcome — implement this mock, check this page, audit its design and colour, check a Flutter or Android app's accessibility, turn these criteria into tests — and it picks one of 13 bundled workflows and runs its deterministic gates to green. No API key: the gates are Playwright + pixel math, and the agent's own vision is the only VLM.",
       "author": { "name": "mizchi", "url": "https://github.com/mizchi" },
       "homepage": "https://mizchi.github.io/vlmkit/",
       "repository": "https://github.com/mizchi/vlmkit",
@@ -26,8 +26,7 @@
         "wcag",
         "html",
         "css",
-        "design-system",
-        "diagram"
+        "design-system"
       ]
     }
   ]

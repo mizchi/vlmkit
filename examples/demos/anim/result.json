@@ -1,9 +1,0 @@
-{
-  "exit": 0,
-  "output": "✓ graph-dijkstra.json (graph): 0 error(s), 0 warning(s)\n  8400ms · 15 steps (14 captioned) · 24 nodes · 28 tracks / 115 keyframes\n  scene 363 B (minified) → timeline 10850 B (×29.9)\n  next: vlmkit-anim explain packages/vlmkit-anim/fixtures/graph-dijkstra.json · vlmkit-anim render packages/vlmkit-anim/fixtures/graph-dijkstra.json --step N · vlmkit-anim html packages/vlmkit-anim/fixtures/graph-dijkstra.json --out page.html\n",
-  "images": [],
-  "thenExit": 1,
-  "thenOutput": "✗ edges[5].to: unknown node \"F\"\n    → did you mean \"A\"? known nodes: \"A\", \"B\", \"C\", \"D\", \"E\"\n✗ 1 error(s): fix these before the semantic checks can run\n",
-  "command": "vlmkit-anim check packages/vlmkit-anim/fixtures/graph-dijkstra.json",
-  "thenCommand": "vlmkit-anim check examples/demos/anim/broken.json"
-}

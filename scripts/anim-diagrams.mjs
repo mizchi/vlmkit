@@ -10,16 +10,18 @@
  *
  * Change maps of pull requests are not committed here: the `pr-visual`
  * workflow draws them per PR and posts them on the PR.
+ *
+ * `vlmkit-anim` is a devDependency from npm: it is developed in mizchi/explainer since 0.24.
  */
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const cli = join(repoRoot, "packages", "vlmkit-anim", "src", "cli.ts");
+const cli = join(repoRoot, "node_modules", "@mizchi", "vlmkit-anim", "dist", "cli.mjs");
 const out = join(repoRoot, "docs", "diagrams");
 
-execFileSync(process.execPath, ["--experimental-strip-types", cli, "repo", "--root", repoRoot, "--out", out, "--name", "vlmkit-architecture", "--title", "vlmkit — the workspace and its dependencies"], {
+execFileSync(process.execPath, [cli, "repo", "--root", repoRoot, "--out", out, "--name", "vlmkit-architecture", "--title", "vlmkit — the workspace and its dependencies"], {
   cwd: repoRoot,
   stdio: "inherit",
   env: { ...process.env, NO_COLOR: "1" },

@@ -48,7 +48,8 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
           TITLE: "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
         run: |
-          node --experimental-strip-types packages/vlmkit-anim/src/cli.ts pr --mermaid \
+          # From npm: vlmkit-anim is developed in mizchi/explainer since 0.24.
+          pnpm exec vlmkit-anim pr --mermaid \
             --base "$BASE" --head "$HEAD" --title "$TITLE" --name "change-map" --out .vlmkit-anim/pr
 
       - name: Keep one comment on the PR up to date

@@ -62,8 +62,7 @@ repository's own test fixtures, so each command works from a clone after `pnpm b
 | <a href="https://mizchi.github.io/vlmkit/demos/tokens/"><img src="examples/demos/tokens/shot-1.webp" width="220" alt="" /></a> | <img src="docs/assets/icons/layout-grid.webp" width="20" height="20" alt="Does it look designed?" /> [Spacing and radii off the design scale](https://mizchi.github.io/vlmkit/demos/tokens/) | `check tokens` |
 | <a href="https://mizchi.github.io/vlmkit/demos/diff/"><img src="examples/demos/diff/evidence-1.webp" width="220" alt="" /></a> | <img src="docs/assets/icons/compare.webp" width="20" height="20" alt="What changed?" /> [A header that grew 48px and pushed everything down](https://mizchi.github.io/vlmkit/demos/diff/) | `diff html` |
 | <a href="https://mizchi.github.io/vlmkit/demos/i18n/"><img src="examples/demos/i18n/shot-1.webp" width="220" alt="" /></a> | <img src="docs/assets/icons/compare.webp" width="20" height="20" alt="What changed?" /> [Buttons that overflow when the copy gets longer](https://mizchi.github.io/vlmkit/demos/i18n/) | `stress i18n` |
-| <a href="https://mizchi.github.io/vlmkit/demos/zoom/"><img src="examples/demos/zoom/view.webp" width="220" alt="" /></a> | <img src="docs/assets/icons/zoom.webp" width="20" height="20" alt="Vision models and figures" /> [Letting a vision model zoom into the original](https://mizchi.github.io/vlmkit/demos/zoom/) | `@mizchi/vlmkit-ai/zoom.ts` |
-| <a href="https://mizchi.github.io/vlmkit/demos/anim/"><img src="examples/demos/anim/graph-dijkstra.gif" width="220" alt="" /></a> | <img src="docs/assets/icons/zoom.webp" width="20" height="20" alt="Vision models and figures" /> [An algorithm as a checked animation](https://mizchi.github.io/vlmkit/demos/anim/) | `vlmkit-anim check` |
+| <a href="https://mizchi.github.io/vlmkit/demos/zoom/"><img src="examples/demos/zoom/view.webp" width="220" alt="" /></a> | <img src="docs/assets/icons/zoom.webp" width="20" height="20" alt="Vision models" /> [Letting a vision model zoom into the original](https://mizchi.github.io/vlmkit/demos/zoom/) | `@mizchi/vlmkit-ai/zoom.ts` |
 <!-- demos:end -->
 
 Six whole sites built by agents, each beside the log of how it was judged, are at
@@ -128,14 +127,15 @@ no skill-selection step in the normal workflow. On first use, the agent detects
 the repository's package manager, reuses or adds `@mizchi/vlmkit` locally, and
 installs Chromium only if a selected gate reports it missing.
 
-All three installers expose one visible `vlmkit` skill. The 17 specialized
+All three installers expose one visible `vlmkit` skill. The 13 specialized
 workflows are internal resources bundled under that entry, so the agent selects
-them without adding 17 separate skills or copying the vlmkit source repository.
+them without adding 13 separate skills or copying the vlmkit source repository.
 
-See the [agent skill catalog](./.claude/skills/README.md) for all 17
+See the [agent skill catalog](./.claude/skills/README.md) for all 13
 specialized skills, grouped by general verification, UI creation, test
-generation, comparison and monitoring, evaluation and hardening, and
-explanation and figures.
+generation, comparison and monitoring, and evaluation and hardening.
+Explanation and figures (animations, D2 diagrams and slides, `vlmkit-anim`)
+live in [mizchi/explainer](https://github.com/mizchi/explainer).
 
 ## When to use what
 
@@ -165,25 +165,24 @@ Task-routing recipes and done-condition sets:
 ```mermaid
 flowchart BT
   subgraph L0["layer 0"]
-    p8["judge"]
+    p7["judge"]
   end
   subgraph L1["layer 1"]
-    p5["core"]
+    p4["core"]
   end
   subgraph L2["layer 2"]
     p1["ai"]
-    p3["animation-eval"]
-    p4["capture"]
+    p2["animation-eval"]
+    p3["capture"]
   end
   subgraph L3["layer 3"]
-    p2["anim"]
-    p6["generate"]
-    p7["heal"]
-    p9["markup"]
-    p11["plan"]
+    p5["generate"]
+    p6["heal"]
+    p8["markup"]
+    p10["plan"]
   end
   subgraph L4["layer 4"]
-    p10["mcp"]
+    p9["mcp"]
   end
   subgraph L5["layer 5"]
     p0["vlmkit (cli)"]
@@ -198,28 +197,25 @@ flowchart BT
   p0 --> p8
   p0 --> p9
   p0 --> p10
-  p0 --> p11
-  p1 --> p5
-  p2 --> p1
-  p2 --> p3
-  p3 --> p5
-  p4 --> p5
-  p5 --> p8
+  p1 --> p4
+  p2 --> p4
+  p3 --> p4
+  p4 --> p7
+  p5 --> p1
   p6 --> p1
-  p7 --> p1
-  p7 --> p4
-  p7 --> p5
-  p9 --> p1
-  p9 --> p3
+  p6 --> p3
+  p6 --> p4
+  p8 --> p1
+  p8 --> p2
+  p8 --> p3
+  p8 --> p4
+  p8 --> p7
   p9 --> p4
-  p9 --> p5
   p9 --> p8
-  p10 --> p5
-  p10 --> p9
-  p11 --> p1
+  p10 --> p1
 ```
 
-Twelve packages, layer by layer from `judge` (no dependencies) to the CLI; an arrow points from a
+Eleven packages, layer by layer from `judge` (no dependencies) to the CLI; an arrow points from a
 package to one it depends on. Generated from the manifests by `vlmkit-anim repo --mermaid`, and a
 test fails when this block drifts from them. Every pull request gets the same treatment: the
 `pr-visual` workflow runs `vlmkit-anim pr --mermaid` and keeps one comment on the PR with the
@@ -235,7 +231,6 @@ change map — the areas it touched, the imports between them, and the commits a
 | <img src="docs/assets/icons/target.webp" width="24" height="24" alt="" /> | [Markup loop project](./examples/markup-loop-project/) | A minimal standalone project that reproduces the drop-in markup loop |
 | <img src="docs/assets/icons/clipboard.webp" width="24" height="24" alt="" /> | [Markup VRT eval](./examples/markup-vrt-eval/) | A dogfood harness that measures the Playwright workflow while a new screen is built |
 | <img src="docs/assets/icons/puzzle.webp" width="24" height="24" alt="" /> | [Gate plugin](./examples/gate-plugin/) | A project that adds two gates of its own through `vlmkit.config.json` |
-| <img src="docs/assets/icons/slides.webp" width="24" height="24" alt="" /> | [D2 slides](./examples/d2-slides/) | A slide deck from one Markdown file, figures laid out by TALA and checked by the gates |
 | <img src="docs/assets/icons/card.webp" width="24" height="24" alt="" /> | [Solitaire](./examples/solitaire/) | Klondike in plain HTML/CSS/JS, the drag-and-drop and animation dogfood target |
 | <img src="docs/assets/icons/page-check.webp" width="24" height="24" alt="" /> | [Intro page](./examples/vlmkit-intro-page/) | The dependency-free landing page, verified with vlmkit's own loop |
 

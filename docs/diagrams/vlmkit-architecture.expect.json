@@ -3,7 +3,6 @@
   "modules": [
     "vlmkit (cli)",
     "ai",
-    "anim",
     "animation-eval",
     "capture",
     "core",
@@ -16,7 +15,6 @@
   ],
   "deps": [
     "vlmkit (cli)->ai",
-    "vlmkit (cli)->anim",
     "vlmkit (cli)->animation-eval",
     "vlmkit (cli)->capture",
     "vlmkit (cli)->core",
@@ -27,8 +25,6 @@
     "vlmkit (cli)->mcp",
     "vlmkit (cli)->plan",
     "ai->core",
-    "anim->ai",
-    "anim->animation-eval",
     "animation-eval->core",
     "capture->core",
     "core->judge",

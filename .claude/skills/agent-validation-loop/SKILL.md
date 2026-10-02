@@ -357,16 +357,17 @@ the budget.
 
 ## Second reference run: an IR judged by its writers (anim-ir v1–v24)
 
-`vlmkit-anim` (the `explanatory-animation` skill) was built with this loop
-from its first day: 24 rounds over six days, 86 writer attempts (`a`…`qb`),
-reports `docs/reports/2026-09-0{4..9}-anim-ir-v*.md`, fixture
-`fixtures/anim-scenario/`. The tool under test is a **format** an agent
+`vlmkit-anim` (the `explanatory-animation` skill, since moved to
+[mizchi/explainer](https://github.com/mizchi/explainer)) was built with this
+loop from its first day: 24 rounds over six days, 86 writer attempts
+(`a`…`qb`), reports `docs/reports/2026-09-0{4..9}-anim-ir-v*.md` (still in this
+repository), fixture `packages/vlmkit-anim/fixtures/anim-scenario/` in explainer. The tool under test is a **format** an agent
 writes, not a signal it reads, and that changed five things about the loop.
 They are worth copying whenever the deliverable is "an agent gets it right
 from the docs alone".
 
 - **The docs are the only input.** Each writer gets one brief and one guide
-  (`docs/anim-ir.md`) and is forbidden the package source, other attempts,
+  (`packages/vlmkit-anim/docs/anim-ir.md` in explainer) and is forbidden the package source, other attempts,
   the reports and the CHANGELOG — by path, in the prompt. A writer who reads
   the compiler is measuring their own reading, not the guide. Every JSON
   block in the guide is compiled by a test, so the guide cannot drift from

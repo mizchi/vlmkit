@@ -78,14 +78,12 @@
     "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "anim:samples": "node scripts/anim-samples.mjs",
-    "anim:diagrams": "node scripts/anim-diagrams.mjs",
-    "deck:example": "node .claude/skills/d2-slides/assets/build-deck.mjs examples/d2-slides/deck.md --out examples/d2-slides/built"
+    "anim:diagrams": "node scripts/anim-diagrams.mjs"
   },
   "devDependencies": {
     "@jsquash/webp": "^1.5.0",
     "@mizchi/vlmkit-ai": "workspace:*",
-    "@mizchi/vlmkit-anim": "workspace:*",
+    "@mizchi/vlmkit-anim": "^0.23.2",
     "@mizchi/vlmkit-animation-eval": "workspace:*",
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",

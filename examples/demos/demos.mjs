@@ -10,7 +10,7 @@
  *
  * Fields:
  * - `page`      the page under test, repo-relative. Published as `<id>/page.html`.
- * - `run`       argv after the binary (`bin`: "vlmkit" by default, or "vlmkit-anim"); `{out}` is a
+ * - `run`       argv after the binary (`vlmkit`); `{out}` is a
  *               scratch directory for whatever the command writes. Shown on the page as written.
  * - `extras`    further files published beside the page ({ from, as }), e.g. a copy manifest; one
  *               with a `caption` is also shown as a figure.
@@ -31,7 +31,7 @@ export const GROUPS = Object.freeze([
   { id: "readable", icon: "contrast", title: "Can everyone read it?", blurb: "Contrast measured on rendered pixels, including apps with no DOM at all." },
   { id: "design", icon: "layout-grid", title: "Does it look designed?", blurb: "Proximity, colour roles and a spacing scale. These report inconsistency, never taste." },
   { id: "change", icon: "compare", title: "What changed?", blurb: "Two versions of a page, or one page under a longer language." },
-  { id: "vision", icon: "zoom", title: "Vision models and figures", blurb: "Letting a VLM zoom into the original, and figures that are checked against what they claim." },
+  { id: "vision", icon: "zoom", title: "Vision models", blurb: "Letting a VLM zoom into the original, from any provider." },
 ]);
 
 export const DEMOS = Object.freeze([
@@ -212,22 +212,6 @@ export const DEMOS = Object.freeze([
     lead: "A full-page 2x capture of a dashboard is shown to a model at a little under its CSS size, and one table header moved 2px. The zoom tool lets the model name a box and get it back cropped from the full-resolution original and magnified, from any provider's model.",
     look: "In the view the model is sent, the shift is under two pixels. In the zoom it is plain: CUSTOMER starts level with \"Alice Johnson\" in the baseline and left of it in the current image. In the agent-mode accuracy bench, zoom scored 58/58 against 48/58 for one look, and the whole gain was exact values like this one.",
     fix: "Turn zoom on when the answer is a measurement (a shift in pixels, a colour value), not just to notice a change.",
-    shots: [],
-  },
-  {
-    id: "anim",
-    group: "vision",
-    title: "An algorithm as a checked animation",
-    command: "vlmkit-anim check",
-    bin: "vlmkit-anim",
-    page: "packages/vlmkit-anim/fixtures/graph-dijkstra.json",
-    pageAs: "scene.json",
-    extras: [{ from: "examples/demos/anim/broken.json", as: "broken.json" }, { from: "packages/vlmkit-anim/samples/graph-dijkstra.gif", as: "graph-dijkstra.gif", caption: "The committed GIF of this scene, rendered in-process by `vlmkit-anim video` (`pnpm anim:samples`)." }],
-    run: ["check", "packages/vlmkit-anim/fixtures/graph-dijkstra.json"],
-    then: ["check", "examples/demos/anim/broken.json"],
-    lead: "One JSON scene (a kind plus intent, never coordinates) compiles to SVG and Web Animations, a GIF, or a still. `check` validates it, runs semantic checks on the frames, and reports layout problems.",
-    look: "The scene is Dijkstra on five nodes: 363 bytes of intent that compile to a 10,850-byte timeline of 15 steps. The second run is the same scene with its last edge pointed at a node F that does not exist (`broken.json`): `check` exits 1, names the field, and suggests the known nodes.",
-    fix: "In the broken copy, point `edges[5].to` back at `E`.",
     shots: [],
   },
 ]);

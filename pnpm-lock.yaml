@@ -37,8 +37,8 @@ importers:
         specifier: workspace:*
         version: link:packages/vlmkit-ai
       '@mizchi/vlmkit-anim':
-        specifier: workspace:*
-        version: link:packages/vlmkit-anim
+        specifier: ^0.23.2
+        version: 0.23.2(@mizchi/vlmkit-ai@packages+vlmkit-ai)(@mizchi/vlmkit-animation-eval@packages+vlmkit-animation-eval)(playwright@1.63.0)
       '@mizchi/vlmkit-animation-eval':
         specifier: workspace:*
         version: link:packages/vlmkit-animation-eval
@@ -105,24 +105,6 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
-      pngjs:
-        specifier: ^7.0.0
-        version: 7.0.0
-
-  packages/vlmkit-anim:
-    dependencies:
-      '@mizchi/vlmkit-ai':
-        specifier: workspace:*
-        version: link:../vlmkit-ai
-      '@mizchi/vlmkit-animation-eval':
-        specifier: workspace:*
-        version: link:../vlmkit-animation-eval
-      gifenc:
-        specifier: ^1.0.3
-        version: 1.0.3
-      playwright:
-        specifier: '>=1.61 <2'
-        version: 1.63.0
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
@@ -480,6 +462,22 @@ packages:
 
   '@jsquash/webp@1.5.0':
     resolution: {integrity: sha512-KggLoj2MnRSfIqTeKe1EmbljTX2vuV7mh79k89PCL1pyqiDULcPM1L47twxXt0hkb68F70bXiL31MxsuoZtKFw==}
+
+  '@mizchi/vlmkit-anim@0.23.2':
+    resolution: {integrity: sha512-to6Y3+rcGx/Dawjbx8jEhDxzkCx+1x4LxOAVMlPRpjn0iyZ4TAibKgWL8APmKHHBi8IclUr6uSSPYdKFo7djOQ==}
+    engines: {node: '>=24'}
+    hasBin: true
+    peerDependencies:
+      '@mizchi/vlmkit-ai': 0.23.2
+      '@mizchi/vlmkit-animation-eval': 0.23.2
+      playwright: '>=1.61 <2'
+    peerDependenciesMeta:
+      '@mizchi/vlmkit-ai':
+        optional: true
+      '@mizchi/vlmkit-animation-eval':
+        optional: true
+      playwright:
+        optional: true
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
@@ -1759,6 +1757,15 @@ snapshots:
   '@jsquash/webp@1.5.0':
     dependencies:
       wasm-feature-detect: 1.8.0
+
+  '@mizchi/vlmkit-anim@0.23.2(@mizchi/vlmkit-ai@packages+vlmkit-ai)(@mizchi/vlmkit-animation-eval@packages+vlmkit-animation-eval)(playwright@1.63.0)':
+    dependencies:
+      gifenc: 1.0.3
+      pngjs: 7.0.0
+    optionalDependencies:
+      '@mizchi/vlmkit-ai': link:packages/vlmkit-ai
+      '@mizchi/vlmkit-animation-eval': link:packages/vlmkit-animation-eval
+      playwright: 1.63.0
 
   '@modelcontextprotocol/sdk@1.30.0(zod@3.25.76)':
     dependencies:

@@ -15,11 +15,6 @@
       "hidden": true
     },
     {
-      "id": "anim",
-      "label": "anim",
-      "hidden": true
-    },
-    {
       "id": "animation-eval",
       "label": "animation-eval",
       "hidden": true
@@ -73,11 +68,6 @@
     },
     {
       "from": "vlmkit (cli)",
-      "to": "anim",
-      "hidden": true
-    },
-    {
-      "from": "vlmkit (cli)",
       "to": "animation-eval",
       "hidden": true
     },
@@ -124,16 +114,6 @@
     {
       "from": "ai",
       "to": "core",
-      "hidden": true
-    },
-    {
-      "from": "anim",
-      "to": "ai",
-      "hidden": true
-    },
-    {
-      "from": "anim",
-      "to": "animation-eval",
       "hidden": true
     },
     {
@@ -293,7 +273,6 @@
     },
     {
       "show": [
-        "anim",
         "generate",
         "heal",
         "markup",
@@ -303,25 +282,23 @@
     },
     {
       "highlight": [
-        "anim",
         "generate",
         "heal",
         "markup",
         "plan"
       ],
-      "caption": "anim → ai, animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core, judge; plan → ai"
+      "caption": "generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core, judge; plan → ai"
     },
     {
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 10
+        "text": 9
       },
       "ms": 0
     },
     {
       "unhighlight": [
-        "anim",
         "generate",
         "heal",
         "markup",
@@ -345,7 +322,7 @@
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 11
+        "text": 10
       },
       "ms": 0
     },
@@ -365,13 +342,13 @@
       "highlight": [
         "vlmkit (cli)"
       ],
-      "caption": "vlmkit (cli) → ai, anim, animation-eval, capture, core, generate, heal, judge, markup, mcp, plan"
+      "caption": "vlmkit (cli) → ai, animation-eval, capture, core, generate, heal, judge, markup, mcp, plan"
     },
     {
       "value": {
         "id": "n",
         "label": "packages so far",
-        "text": 12
+        "text": 11
       },
       "ms": 0
     },
@@ -382,7 +359,7 @@
       "ms": 0
     },
     {
-      "note": "12 packages, 29 workspace dependencies, 6 layers deep"
+      "note": "11 packages, 26 workspace dependencies, 6 layers deep"
     }
   ]
 }

@@ -49,7 +49,6 @@ export const ICONS = Object.freeze([
   { id: "bell-off", glyph: "a bell with a diagonal slash through it", usedFor: "README: audit what has been silenced" },
   { id: "plug", glyph: "an electric plug whose cable ends in a small square chip", usedFor: "README: wire into agents / pipelines" },
   { id: "puzzle", glyph: "a single jigsaw puzzle piece", usedFor: "examples/gate-plugin" },
-  { id: "slides", glyph: "a presentation screen on a tripod stand, showing a small bar chart", usedFor: "examples/d2-slides" },
   { id: "gallery", glyph: "a grid of four square thumbnails, two by two", usedFor: "examples/demos" },
   { id: "clipboard", glyph: "a clipboard holding a list of three check marks", usedFor: "examples/markup-vrt-eval" },
   { id: "card", glyph: "a playing card showing a single spade", usedFor: "examples/solitaire" },

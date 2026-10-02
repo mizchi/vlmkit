@@ -1,6 +1,6 @@
 ---
 name: vlmkit
-description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, design consistency, colour or contrast, accessibility (including an app whose UI is not the DOM: Flutter web, Android, a canvas renderer), Playwright/VRT, or a visual regression — and whenever they ask to explain, walk through, animate, illustrate or diagram how something works, or to draw a module, dependency or architecture map, or a D2 / TALA diagram that shows in the terminal, or slides / a deck / a presentation. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
+description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, design consistency, colour or contrast, accessibility (including an app whose UI is not the DOM: Flutter web, Android, a canvas renderer), Playwright/VRT, or a visual regression. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
 ---
 
 # vlmkit — Skill Router and CLI Guide
@@ -106,10 +106,10 @@ second only when the task genuinely crosses boundaries.
 | Evaluate a framework/CSS/build migration | `./workflows/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
 | Benchmark known CSS repair challenges | `./workflows/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
 | Harden an agent-facing CLI, SDK, or harness | `./workflows/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
-| Answer "how does this work / how is it structured / what does this change" with a figure drawn from the code and a narration that walks it | `./workflows/explain-with-anim/SKILL.md` | Choose the picture from the question, ground it in `facts` / `repo` / `pr`, check it, deliver SVG or GIF with beat-by-beat prose |
-| Write an animation or still figure as the deliverable: an algorithm, protocol or architecture; a module / dependency map; a mermaid import | `./workflows/explanatory-animation/SKILL.md` | Write one checked `vlmkit-anim` scene, hold it to its facts and layout, emit a page, GIF or cropped figure (separate binary: `@mizchi/vlmkit-anim`) |
-| Slides, a deck, a talk, a presentation, a review walkthrough | `./workflows/d2-slides/SKILL.md` | Write one Markdown file with a ```d2 fence per figure, build a self-contained HTML deck laid out by TALA (keyboard nav, overview, print to PDF), and check it with `check integrity` / `check copy --manifest` / `check a11y contrast` (separate binary: `d2`) |
-| A D2 diagram: an architecture, data model or call flow as editable text, laid out by TALA, previewed in the terminal or pasted as ASCII in a README or PR | `./workflows/d2-diagram/SKILL.md` | Write the `.d2`, `fmt --check` / `validate`, hold the drawn boxes and arrows to a fact sheet (`d2-facts.mjs --expect`), render `.txt` (box drawing or plain ASCII) and SVG / PNG with `--layout=tala`, fix the text to a fitting, readable render (separate binary: `d2`) |
+
+Explaining or drawing how something works (animations, module maps, D2 diagrams, slide decks)
+is not this router's: those skills and `@mizchi/vlmkit-anim` live in
+[mizchi/explainer](https://github.com/mizchi/explainer).
 
 The human-facing catalog, direct install commands, and category rationale are
 in the [vlmkit skill catalog](https://github.com/mizchi/vlmkit/tree/main/.claude/skills).
@@ -330,7 +330,6 @@ This repository is a pnpm workspace. See `.claude/CLAUDE.md` § Package Layout f
 │   ├── vlmkit-generate/       # Plan → Playwright spec (diagnostics-driven retries)
 │   ├── vlmkit-heal/           # Failing-test heal loop (model escalation + budget)
 │   ├── vlmkit-mcp/            # MCP server exposing the gates
-│   ├── vlmkit-anim/           # `vlmkit-anim`: explanatory animations and checked still figures
 │   └── vlmkit-animation-eval/ # Frame-sampled animation evaluator shared with `check animation`
 ├── src/
 │   ├── cli/                   # `vlmkit` CLI entry + router + commands

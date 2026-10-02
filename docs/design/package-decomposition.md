@@ -43,7 +43,7 @@ named corresponds to one layer:
 | Browser as a computer | collectors (`COLLECT_*`), phase 2 | DOM → snapshot. Strings with no imports, run by whatever driver there is |
 | Driver | `@mizchi/vlmkit-capture` + core's Playwright half, phase 3 | open / settle / evaluate / screenshot behind one interface |
 | Generation loop + eval datasets | `vlmkit-markup` (what remains), `heal`, `generate`, `plan` | agents converge markup against the gates |
-| Diagrams for explanation | `vlmkit-anim` (+ d2 skills), phase 5 | separate library |
+| Diagrams for explanation | `vlmkit-anim` (+ d2 skills), phase 5 — done, in mizchi/explainer | separate library |
 
 How one check runs across those layers once phase 2 is done — two sources, one judge:
 
@@ -333,12 +333,16 @@ moving any files, so a dataset entry can be judged by name.
 
 ## Phase 5: diagrams out
 
-`vlmkit-anim` already has **zero** static imports of other workspace packages.
-It reaches `animation-eval` and `ai` only through optional peers and dynamic
-import. Moving it to its own repository is a repo move: `docs/anim-ir.md`,
-`fixtures/anim-scenario/`, the `explain-with-anim` / `explanatory-animation` /
-`d2-*` skills, the `pr-visual` workflow. The shared evaluator
-(`vlmkit-animation-eval`) stays here as the thing both depend on.
+**Done (2026-10-02).** `vlmkit-anim` had **zero** static imports of other
+workspace packages (it reaches `animation-eval` and `ai` only through optional
+peers and dynamic import), so it moved as a repo move: the package,
+`docs/anim-ir.md`, `fixtures/anim-scenario/` and the `explain-with-anim` /
+`explanatory-animation` / `d2-*` skills now live in
+[mizchi/explainer](https://github.com/mizchi/explainer), which publishes
+`@mizchi/vlmkit-anim`. This repository installs it from npm for two things: the
+README's workspace map (`tests/readme-workspace-map.test.mjs`) and the
+`pr-visual` workflow. The shared evaluator (`vlmkit-animation-eval`) stays here
+as the thing both depend on.
 
 ## What did not change, and what to watch
 

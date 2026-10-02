@@ -78,21 +78,16 @@ const FLAG = /--[a-z][a-z0-9-]{2,}/g;
  */
 const DOCUMENTED_AS_ABSENT = new Set([
   "--capture-spec",
-  // `d2-diagram`'s install line: "the installer; it rejects the obsolete --tala
-  // flag". A flag named in order to warn the reader off it belongs here and not
-  // in THIRD_PARTY_FLAGS — filing it as d2's failed the "is the exemption still
-  // earned" check correctly, because no doc line runs `d2 --tala`.
-  "--tala",
 ]);
 
 /**
  * Flags of a binary the docs tell the reader to run that is NOT vlmkit.
  *
  * The skill catalog in `docs/configuration.md` shows each skill's entry workflow as it is
- * actually typed, and two skills drive their own binary: `d2-diagram` runs `d2`
- * (`d2 --layout=tala x.d2 x.txt`, `--ascii-mode standard`). Those flags exist — in d2, whose
- * source this repository does not contain — so the existence check has nothing to look at and
- * reports a working command as a phantom.
+ * actually typed. A skill that drove its own binary (`d2-diagram` ran `d2 --layout=tala`, until
+ * the d2 skills moved to mizchi/explainer) typed flags that exist in that binary, whose source
+ * this repository does not contain — so the existence check has nothing to look at and
+ * reports a working command as a phantom. No such skill is here now, so the map is empty.
  *
  * Keyed to the owning binary rather than pattern-matched, for the same reason as
  * `DOCUMENTED_AS_ABSENT`: enumerating a handful is cheaper than teaching the scanner which
@@ -100,15 +95,7 @@ const DOCUMENTED_AS_ABSENT = new Set([
  * going stale in either direction — an entry whose doc line is gone must be deleted, and if
  * vlmkit ever grows a `--layout` of its own the entry must go so the check gets it back.
  */
-const THIRD_PARTY_FLAGS = new Map([
-  ["--layout", "d2"],
-  ["--ascii-mode", "d2"],
-  // Named once the `d2-diagram` skill came under this check: the skill tells the
-  // reader to type it at `d2`, whose source this repository does not contain.
-  // `--tala-seeds` needed no entry — `d2-facts.mjs` passes it, and the skill
-  // assets are swept — which is the distinction this map is for.
-  ["--stdout-format", "d2"],
-]);
+const THIRD_PARTY_FLAGS = new Map([]);
 
 function documentedFlags() {
   const found = new Map();
@@ -149,10 +136,9 @@ function knownFlags({ skillAssets = true } = {}) {
     // Only paths that exist: `e2e/` was here until the capture spec was retired, and grep
     // exits 2 (not 1) on a missing path, so the helper above rethrows and all three tests in
     // this file fail with a message about nothing.
-    // `.claude/skills` is in here because a skill ships its own scripts —
-    // `d2-facts.mjs` takes `--from-svg`, `--expect`, `--seeds`, `build-deck.mjs`
-    // takes `--out`, `--salt` — and a skill documenting its OWN flag read as a
-    // phantom until this path was swept. Six false positives, all real flags.
+    // `.claude/skills` is in here because a skill can ship its own scripts, and
+    // a skill documenting its OWN flag read as a phantom until this path was
+    // swept (the d2 skills, since moved out, had six such flags).
     ...["src", "packages", "worker", "Taskfile.pkl", "justfile", ".github"]
       .concat(skillAssets ? [".claude/skills"] : [])
       .filter((p) => existsSync(join(repoRoot, p))),
@@ -306,11 +292,9 @@ describe("flags in the reference docs", () => {
     // entry has to go, which puts the flag back under the existence check.
     const texts = REFERENCE_DOCS.map((doc) => [doc, readFileSync(join(repoRoot, doc), "utf8")]);
     // vlmkit's OWN source, without the skill assets. A skill script that shells
-    // out to d2 necessarily types d2's flags — `d2-facts.mjs` builds
-    // `--layout=${layout}` and `--tala-seeds=${seeds}` — so sweeping the skills
-    // for this particular question reports all three d2 exemptions as vlmkit
-    // flags and demands they be dropped. The exemption means "not vlmkit's",
-    // and a skill's helper is not vlmkit.
+    // out to another binary necessarily types that binary's flags, so sweeping
+    // the skills for this question would report its exemptions as vlmkit flags.
+    // The exemption means "not vlmkit's", and a skill's helper is not vlmkit.
     const vlmkitOwn = knownFlags({ skillAssets: false });
     for (const [flag, binary] of THIRD_PARTY_FLAGS) {
       const onItsBinarysLine = texts.some(([, text]) =>

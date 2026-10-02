@@ -7,15 +7,15 @@
 ![steps](./vlmkit-architecture.sheet.png)
 
 ```
-vlmkit — the workspace and its dependencies — 9 steps, 5460ms, 45 nodes
+vlmkit — the workspace and its dependencies — 9 steps, 5460ms, 41 nodes
  1. [    0ms] vlmkit — the workspace and its dependencies
  2. [  350ms] judge: depends on nothing else in the workspace · packages so far = 1
  3. [ 1050ms] core → judge · packages so far = 2
  4. [ 1750ms] ai → core; animation-eval → core; capture → core · packages so far = 5
- 5. [ 2450ms] anim → ai, animation-eval; generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core, judge; plan → ai · packages so far = 10
- 6. [ 3150ms] mcp → core, markup · packages so far = 11
- 7. [ 3850ms] vlmkit (cli) → ai, anim, animation-eval, capture, core, generate, heal, judge, markup, mcp, plan · packages so far = 12
- 8. [ 4550ms] 12 packages, 29 workspace dependencies, 6 layers deep
+ 5. [ 2450ms] generate → ai; heal → ai, capture, core; markup → ai, animation-eval, capture, core, judge; plan → ai · packages so far = 9
+ 6. [ 3150ms] mcp → core, markup · packages so far = 10
+ 7. [ 3850ms] vlmkit (cli) → ai, animation-eval, capture, core, generate, heal, judge, markup, mcp, plan · packages so far = 11
+ 8. [ 4550ms] 11 packages, 26 workspace dependencies, 6 layers deep
  9. [ 5250ms] (end)
 ```
 
