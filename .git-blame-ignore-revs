@@ -1,0 +1,6 @@
+# Commits that `git blame` should look through: mechanical rewrites that change how code
+# looks, not what it does. GitHub's blame view reads this file automatically; locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# First repository-wide `vp fmt` (Oxfmt) over TS/JS, 640 files (#191).
+15f8c91b8c1d283bd4c1fe758dc71ef355af9668
