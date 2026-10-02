@@ -16,7 +16,6 @@ for options.
 | `vlmkit build` | `component`, `page` |
 | `vlmkit verify` | `markup`, `flow` |
 | `vlmkit contract` | `introspect`, `validate`, `scaffold` |
-| `vlmkit-anim` (separate binary, `@mizchi/vlmkit-anim`) | Explanatory animations and checked still figures. Moved to [mizchi/explainer](https://github.com/mizchi/explainer) in 0.24; this repository installs it from npm only for the README's workspace map and the `pr-visual` workflow. `check animation`'s evaluator (`@mizchi/vlmkit-animation-eval`) stays here |
 | `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |

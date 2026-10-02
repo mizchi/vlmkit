@@ -134,7 +134,7 @@ them without adding 13 separate skills or copying the vlmkit source repository.
 See the [agent skill catalog](./.claude/skills/README.md) for all 13
 specialized skills, grouped by general verification, UI creation, test
 generation, comparison and monitoring, and evaluation and hardening.
-Explanation and figures (animations, D2 diagrams and slides, `vlmkit-anim`)
+Explanation and figures (animations, D2 diagrams and slides)
 live in [mizchi/explainer](https://github.com/mizchi/explainer).
 
 ## When to use what
@@ -216,10 +216,8 @@ flowchart BT
 ```
 
 Eleven packages, layer by layer from `judge` (no dependencies) to the CLI; an arrow points from a
-package to one it depends on. Generated from the manifests by `vlmkit-anim repo --mermaid`, and a
-test fails when this block drifts from them. Every pull request gets the same treatment: the
-`pr-visual` workflow runs `vlmkit-anim pr --mermaid` and keeps one comment on the PR with the
-change map — the areas it touched, the imports between them, and the commits as a table.
+package to one it depends on. Generated from the manifests by `scripts/workspace-map.mjs`,
+and a test fails when this block drifts from them.
 
 ## Examples
 

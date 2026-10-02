@@ -36,9 +36,6 @@ importers:
       '@mizchi/vlmkit-ai':
         specifier: workspace:*
         version: link:packages/vlmkit-ai
-      '@mizchi/vlmkit-anim':
-        specifier: ^0.23.2
-        version: 0.23.2(@mizchi/vlmkit-ai@packages+vlmkit-ai)(@mizchi/vlmkit-animation-eval@packages+vlmkit-animation-eval)(playwright@1.63.0)
       '@mizchi/vlmkit-animation-eval':
         specifier: workspace:*
         version: link:packages/vlmkit-animation-eval
@@ -462,22 +459,6 @@ packages:
 
   '@jsquash/webp@1.5.0':
     resolution: {integrity: sha512-KggLoj2MnRSfIqTeKe1EmbljTX2vuV7mh79k89PCL1pyqiDULcPM1L47twxXt0hkb68F70bXiL31MxsuoZtKFw==}
-
-  '@mizchi/vlmkit-anim@0.23.2':
-    resolution: {integrity: sha512-to6Y3+rcGx/Dawjbx8jEhDxzkCx+1x4LxOAVMlPRpjn0iyZ4TAibKgWL8APmKHHBi8IclUr6uSSPYdKFo7djOQ==}
-    engines: {node: '>=24'}
-    hasBin: true
-    peerDependencies:
-      '@mizchi/vlmkit-ai': 0.23.2
-      '@mizchi/vlmkit-animation-eval': 0.23.2
-      playwright: '>=1.61 <2'
-    peerDependenciesMeta:
-      '@mizchi/vlmkit-ai':
-        optional: true
-      '@mizchi/vlmkit-animation-eval':
-        optional: true
-      playwright:
-        optional: true
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
@@ -994,9 +975,6 @@ packages:
 
   get-tsconfig@4.13.7:
     resolution: {integrity: sha512-7tN6rFgBlMgpBML5j8typ92BKFi2sFQvIdpAqLA2beia5avZDrMs0FLZiM5etShWq5irVyGcGMEA1jcDaK7A/Q==}
-
-  gifenc@1.0.3:
-    resolution: {integrity: sha512-xdr6AdrfGBcfzncONUOlXMBuc5wJDtOueE3c5rdG0oNgtINLD+f2iFZltrBRZYzACRbKr+mSVU/x98zv2u3jmw==}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -1758,15 +1736,6 @@ snapshots:
     dependencies:
       wasm-feature-detect: 1.8.0
 
-  '@mizchi/vlmkit-anim@0.23.2(@mizchi/vlmkit-ai@packages+vlmkit-ai)(@mizchi/vlmkit-animation-eval@packages+vlmkit-animation-eval)(playwright@1.63.0)':
-    dependencies:
-      gifenc: 1.0.3
-      pngjs: 7.0.0
-    optionalDependencies:
-      '@mizchi/vlmkit-ai': link:packages/vlmkit-ai
-      '@mizchi/vlmkit-animation-eval': link:packages/vlmkit-animation-eval
-      playwright: 1.63.0
-
   '@modelcontextprotocol/sdk@1.30.0(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.12(hono@4.12.10)
@@ -2245,8 +2214,6 @@ snapshots:
   get-tsconfig@4.13.7:
     dependencies:
       resolve-pkg-maps: 1.0.0
-
-  gifenc@1.0.3: {}
 
   gopd@1.2.0: {}
 

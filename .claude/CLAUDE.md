@@ -384,16 +384,15 @@ with `--har` — never by turning TLS verification off.
 `vlmkit-anim` (`@mizchi/vlmkit-anim`), its writing guide (`anim-ir.md`), its scenario fixtures and the
 `explain-with-anim` / `explanatory-animation` / `d2-diagram` / `d2-slides` skills live in
 [mizchi/explainer](https://github.com/mizchi/explainer) since 2026-10-02, which builds, tests and
-publishes the package (`vlmkit-anim-v*` tags). The rounds that shaped them stay here as history:
+develops the package. The rounds that shaped them stay here as history:
 `docs/reports/2026-09-0{4..9}-anim-ir-v*.md`, `docs/reports/2026-09-14-d2-diagram-v{1,2}.md`.
 
-This repository still installs `@mizchi/vlmkit-anim` **from npm** for two things, and nothing else
-may depend on it:
+`@mizchi/vlmkit-anim` is **deprecated on npm** and this repository depends on it for nothing. The
+README's workspace map is drawn by a local script, and the `pr-visual` change-map workflow went to
+explainer with it:
 
 ```bash
-pnpm exec vlmkit-anim repo --mermaid        # the README's workspace map; tests/readme-workspace-map.test.mjs holds it to the manifests
-pnpm exec vlmkit-anim pr --base origin/main --mermaid   # what the pr-visual workflow posts on every same-repo PR
-pnpm anim:diagrams                          # regenerates docs/diagrams/ with the installed binary
+node scripts/workspace-map.mjs --write      # regenerate the README's mermaid map; tests/readme-workspace-map.test.mjs holds it to the manifests
 ```
 
 The shared frame-sampled evaluator, `@mizchi/vlmkit-animation-eval`, stays here: it is

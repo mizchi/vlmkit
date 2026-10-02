@@ -339,9 +339,9 @@ peers and dynamic import), so it moved as a repo move: the package,
 `docs/anim-ir.md`, `fixtures/anim-scenario/` and the `explain-with-anim` /
 `explanatory-animation` / `d2-*` skills now live in
 [mizchi/explainer](https://github.com/mizchi/explainer), which publishes
-`@mizchi/vlmkit-anim`. This repository installs it from npm for two things: the
-README's workspace map (`tests/readme-workspace-map.test.mjs`) and the
-`pr-visual` workflow. The shared evaluator (`vlmkit-animation-eval`) stays here
+`@mizchi/vlmkit-anim` (since deprecated on npm). This repository depends on it
+for nothing: the README's workspace map is drawn by `scripts/workspace-map.mjs`,
+and the `pr-visual` workflow moved to explainer. The shared evaluator (`vlmkit-animation-eval`) stays here
 as the thing both depend on.
 
 ## What did not change, and what to watch
