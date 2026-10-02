@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-judge",
-  "version": "0.23.1",
+  "version": "0.23.2",
   "description": "Pure, browser-independent judges for vlmkit: composition, colour roles and design-policy rules over a plain geometry/style snapshot. No Playwright, no DOM, no Node built-ins.",
   "license": "MIT",
   "author": "mizchi",

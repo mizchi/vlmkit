@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.23.2 — 2026-10-02
+
+- Add `check animation --virtual-time`: the page clock (`requestAnimationFrame`, `performance.now`, `Date`,
+  `setTimeout`, `setInterval`) is held from document start and advanced by the evaluator, so script-driven motion
+  (rAF loops, GSAP tickers, canvas, timer carousels) is measured — where it moves and when it settles — instead
+  of reported as `uncontrolled-motion`, and the reduced-motion pass covers it. New rule `clock-motion-unsettled`.
+  A page can draw on demand by listening for `vlmkit:seek`.
+- Add `seek-ineffective` to `check animation`: an animation the page cancelled or re-created, or whose replayed
+  sample does not reproduce, is reported as not measured instead of `visible` or `no-visible-effect`.
+- `vlmkit-anim eval` holds the page clock by default (`--real-clock` opts out): its runtime's rAF master clock
+  overwrote every seek on the wall clock.
+- Add `check integrity --timeline` / `--timeline-at`: the layout judges run at instants of the page's motion with
+  the clock and animations held, tiered by persistence — held for two instants and 200ms keeps its severity, a
+  single glimpse is `info`. `tierByPersistence` is exported from `@mizchi/vlmkit-judge/persistence.ts`.
+
 ## 0.23.1 — 2026-10-01
 
 - Route image generation through OpenRouter's Images API in `@mizchi/vlmkit-ai`'s `createImageGenClient()`:
