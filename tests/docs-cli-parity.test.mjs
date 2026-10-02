@@ -204,7 +204,9 @@ async function declaredVerbs() {
   const registry = await loadGateRegistry({ builtinsOnly: true });
   const source = readFileSync(join(repoRoot, "src/cli/cli.ts"), "utf8");
   const verbs = new Set(
-    [...source.matchAll(/cli\.command\(`?"?\$?\{?([a-z][a-z0-9-]*)/g)]
+    // `\s*` between `cli` and `.command`: the formatter breaks every chained call onto its own
+    // line (`cli\n    .command("snapshot …")`), and a pattern without it found none of them.
+    [...source.matchAll(/cli\s*\.command\(`?"?\$?\{?([a-z][a-z0-9-]*)/g)]
       .map((m) => m[1])
       // `cli.command(`${groupName} [...args]`)` — the template's own identifier, not a verb.
       .filter((v) => v !== "group"),
