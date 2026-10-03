@@ -7,12 +7,10 @@ any pixels at all, when the page settles, whether `prefers-reduced-motion`
 is honoured behaviourally, and whether something outside the Web Animations
 API (rAF, video, GIF) is moving the page on its own.
 
-It is the measurement behind two commands that live in different tools:
-
-- `vlmkit check animation page.html` — the gate, with rule settings, `--json`,
-  `--strip` filmstrips and the run ledger (package `@mizchi/vlmkit-markup`).
-- `vlmkit-anim eval page.html` — the same report from the animation authoring
-  tool, on the pages it emits (package `@mizchi/vlmkit-anim`).
+It is the measurement behind `vlmkit check animation page.html` — the gate,
+with rule settings, `--json`, `--strip` filmstrips and the run ledger (package
+`@mizchi/vlmkit-markup`) — and its clock holds `check integrity --timeline`.
+Use it directly to get the same report without the rest of vlmkit.
 
 ```ts
 import { runAnimationEval, formatAnimationEvalReport } from "@mizchi/vlmkit-animation-eval";

@@ -107,9 +107,8 @@ second only when the task genuinely crosses boundaries.
 | Benchmark known CSS repair challenges | `./workflows/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
 | Harden an agent-facing CLI, SDK, or harness | `./workflows/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
 
-Explaining or drawing how something works (animations, module maps, D2 diagrams, slide decks)
-is not this router's: those skills and `@mizchi/vlmkit-anim` live in
-[mizchi/explainer](https://github.com/mizchi/explainer).
+Explaining or drawing how something works (module maps, D2 diagrams, slide decks) is not this
+router's: those skills live in [mizchi/explainer](https://github.com/mizchi/explainer).
 
 The human-facing catalog, direct install commands, and category rationale are
 in the [vlmkit skill catalog](https://github.com/mizchi/vlmkit/tree/main/.claude/skills).
