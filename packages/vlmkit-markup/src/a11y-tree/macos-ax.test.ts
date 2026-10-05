@@ -48,7 +48,29 @@ function settingsWindow(): AxDump {
     },
     // Laid out past the window's bottom edge with nothing to scroll it into view.
     { role: "AXStaticText", value: "Hidden log", frame: at(20, 420, 100, 20) },
-    { role: "AXScrollBar", frame: at(466, 260, 14, 80), actions: ["AXIncrement", "AXDecrement"] },
+    // As macOS 15 reported an overlay scroller: its parts are AXButtons, two of them 0x0.
+    {
+      role: "AXScrollBar",
+      frame: at(466, 260, 14, 80),
+      actions: ["AXIncrement", "AXDecrement"],
+      children: [
+        { role: "AXValueIndicator", frame: at(467, 263, 12, 20) },
+        { role: "AXButton", subrole: "AXIncrementArrow", frame: at(467, 261, 0, 0), actions: ["AXPress"] },
+        { role: "AXButton", subrole: "AXDecrementArrow", frame: at(467, 261, 0, 0), actions: ["AXPress"] },
+        { role: "AXButton", subrole: "AXIncrementPage", frame: at(467, 283, 12, 56), actions: ["AXPress"] },
+        { role: "AXButton", subrole: "AXDecrementPage", frame: at(467, 261, 12, 2), actions: ["AXPress"] },
+      ],
+    },
+    // The title-bar buttons: no title, no description, named only by their role description.
+    {
+      role: "AXButton",
+      subrole: "AXCloseButton",
+      roleDescription: "close button",
+      frame: at(6, 6, 16, 16),
+      actions: ["AXPress"],
+    },
+    // Reported, but with no size: on screen nowhere.
+    { role: "AXButton", frame: at(300, 20, 0, 0), actions: ["AXPress"] },
   ];
   return {
     format: AX_DUMP_FORMAT,
@@ -102,6 +124,18 @@ describe("importAxDump", () => {
     assert.deepEqual(byPath.get("window[0]>scrollbar[0]")!.actions, ["increment", "decrement"]);
   });
 
+  it("names title-bar buttons by their role description, as VoiceOver does", () => {
+    assert.equal(byPath.get("window[0]>button[5]")!.name, "close button");
+  });
+
+  it("drops scroll-bar parts and empty frames: neither is a control a user can hit", () => {
+    assert.deepEqual(
+      tree.nodes.filter((n) => n.path.startsWith("window[0]>scrollbar[0]>")).map((n) => n.role),
+      ["valueindicator"],
+    );
+    assert.ok(!byPath.has("window[0]>button[6]"));
+  });
+
   it("drops elements with no frame but keeps their children, under the full path", () => {
     assert.ok(!byPath.has("window[0]>scrollarea[0]>group[0]"));
     assert.ok(byPath.has("window[0]>scrollarea[0]>group[0]>statictext[0]"));
@@ -151,7 +185,7 @@ describe("scan a11y <dump.ax.json> → check a11y tree", () => {
     );
     assert.deepEqual(
       report.touch.wcagExempt.map((f) => f.text),
-      ["Help"],
+      ["Help", "close button"],
     );
   });
 

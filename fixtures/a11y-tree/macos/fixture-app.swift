@@ -10,7 +10,10 @@
 //   contrast-below-aa    "Seed hint", #cccccc on white
 //   unreachable-content  "Hidden log", laid out below the window with nothing to scroll it into view
 // Intact neighbours: "Start", a labelled image button ("Settings gear"), "Help" (small but alone),
-// "Remember me", a field named by its placeholder, a scroll view whose rows are past its edge.
+// "Remember me", a field named by its placeholder, a scroll view whose rows are past its edge,
+// and the window's own title-bar buttons and scroll bar, which must not read as unlabelled.
+// Not planted, and reported: the "Search" placeholder, AppKit's default placeholder colour
+// (1.83:1 on macOS 15), fails 1.4.3.
 import AppKit
 
 final class Flipped: NSView {
@@ -75,7 +78,10 @@ let info = NSButton(title: "", target: nil, action: nil)
 info.isBordered = false
 info.image = glyph()
 info.imageScaling = .scaleProportionallyDown
-info.frame = NSRect(x: 172, y: 65, width: 14, height: 14)
+// Right against the unlabelled button. Measured on macOS 15: a rounded NSButton's AX frame is
+// its bezel (28x22 for a 40x32 view), so at x 172 "Info" sat 7pt clear and passed 2.5.8's
+// spacing exception.
+info.frame = NSRect(x: 164, y: 65, width: 14, height: 14)
 info.setAccessibilityLabel("Info")
 root.addSubview(info)
 

@@ -38,11 +38,20 @@ check("unlabelled-control: the image-only button", () =>
 check("unlabelled-control: the plain text field", () =>
   assert.ok(report.unlabelled.some((u) => u.role === "textfield")),
 );
+check("platform chrome is not unlabelled: title-bar buttons, scroll-bar parts", () =>
+  assert.deepEqual(
+    report.unlabelled.map((u) => u.role).sort(),
+    ["button", "textfield"],
+  ),
+);
 check("named controls are not unlabelled (Start, Settings gear, Search, Remember me)", () => {
   for (const name of ["Start", "Settings gear", "Search", "Remember me"])
     assert.ok(tree.nodes.some((n) => n.name === name), `${name} is in the tree with its name`);
 });
 check("target-undersized: Info", () => assert.ok(names(report.touch.failures, "text").includes("Info")));
+check("target-undersized: nothing but Info fails", () =>
+  assert.deepEqual(names(report.touch.failures, "text"), ["Info"]),
+);
 check("target-undersized: Help is spacing-exempt, not a failure", () =>
   assert.ok(!names(report.touch.failures, "text").includes("Help")),
 );
@@ -55,6 +64,9 @@ check("unreachable-content: rows inside the scroll view are reachable", () =>
 check("frame captured (Screen Recording allowed on the runner)", () => assert.ok(report.contrast, "no frame"));
 if (report.contrast) {
   check("contrast-below-aa: Seed hint", () => assert.ok(names(report.contrast.failures).includes("Seed hint")));
+  check("contrast: only Seed hint and the Search placeholder (AppKit's default colour) fail", () =>
+    assert.deepEqual(names(report.contrast.failures).sort(), ["Search", "Seed hint"]),
+  );
   check("contrast: black text passes (Settings, Row 1)", () => {
     for (const name of ["Settings", "Row 1"]) assert.ok(!names(report.contrast.failures).includes(name), name);
   });

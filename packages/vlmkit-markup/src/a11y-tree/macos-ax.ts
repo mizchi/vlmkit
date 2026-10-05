@@ -146,8 +146,27 @@ const ACTIONS: Record<string, string> = {
 
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
+/**
+ * The title-bar buttons carry no title or description: VoiceOver announces their role
+ * description ("close button"). Measured on macOS 15: without this, every window's three
+ * traffic lights read as unlabelled controls.
+ */
+const NAMED_BY_ROLE_DESCRIPTION = new Set(["AXCloseButton", "AXMinimizeButton", "AXZoomButton", "AXFullScreenButton"]);
+
+/**
+ * A scroll bar's arrows and page regions, which AppKit exposes as AXButton children of the
+ * AXScrollBar. They are parts of one control, not controls of their own: measured on macOS 15,
+ * an overlay scroller reported two 0x0 arrows, a 15x2 page region and a 15x66 one, each an
+ * unnamed, undersized "button".
+ */
+const SCROLLER_PARTS = new Set(["AXIncrementArrow", "AXDecrementArrow", "AXIncrementPage", "AXDecrementPage"]);
+
 function nameOf(element: AxElement, role: string): string {
-  const own = text(element.title) || text(element.description) || text(element.titleElement);
+  const own =
+    text(element.title) ||
+    text(element.description) ||
+    text(element.titleElement) ||
+    (element.subrole && NAMED_BY_ROLE_DESCRIPTION.has(element.subrole) ? text(element.roleDescription) : "");
   if (role === "textfield") return own || text(element.placeholder);
   if (role === "text" || role === "heading") return text(element.value) || own;
   return own;
@@ -197,8 +216,11 @@ export function importAxDump(source: string | unknown, options: AxImportOptions 
     const n = siblings.get(label) ?? 0;
     siblings.set(label, n + 1);
     const path = `${parentPath ? `${parentPath}>` : ""}${label}[${n}]`;
-    // An element with no frame announces nothing a judge can place; its children may still.
-    if (isFrame(element.frame)) {
+    // An element with no frame, or an empty one, is nothing a judge can place or a user can hit;
+    // its children may still be. Scroll-bar parts belong to their scroll bar.
+    const box = isFrame(element.frame) && element.frame.width > 0 && element.frame.height > 0 ? element.frame : null;
+    const part = element.subrole !== undefined && SCROLLER_PARTS.has(element.subrole);
+    if (box && !part) {
       const name = nameOf(element, role);
       const operable = element.actions ?? [];
       const actions = [
@@ -225,10 +247,10 @@ export function importAxDump(source: string | unknown, options: AxImportOptions 
         ...(name ? { name } : {}),
         ...(value ? { value } : {}),
         rect: {
-          left: round(element.frame.x - win.x),
-          top: round(element.frame.y - win.y),
-          width: round(element.frame.width),
-          height: round(element.frame.height),
+          left: round(box.x - win.x),
+          top: round(box.y - win.y),
+          width: round(box.width),
+          height: round(box.height),
         },
         ...(Object.keys(states).length > 0 ? { states } : {}),
         ...(actions.length > 0 ? { actions: [...new Set(actions)] } : {}),
