@@ -473,8 +473,8 @@ export function measurePixelContrast(tree: A11yTree, frame: RgbaFrame): PixelCon
       skipped.push({ path: node.path, name, reason: "disabled" });
       continue;
     }
-    // Measured on macOS 15: a title-bar close button named "close button" read as red text on
-    // grey at 2.9:1. Its name is announced, never drawn.
+    // Measured on macOS 15: the title-bar close button, named "close button", read as red text
+    // (rgb 224,61,53) on white at 4.29:1 — a failure for a glyph-free disc. Announced, never drawn.
     if (node.nameDrawn === false) {
       skipped.push({ path: node.path, name, reason: "label-only" });
       continue;
