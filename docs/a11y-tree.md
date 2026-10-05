@@ -157,8 +157,9 @@ The first runs are why the mapping looks the way it does:
   4.29:1. That is why the contrast check skips names that are not drawn (`nameDrawn`).
 - **AppKit's default placeholder colour fails 1.4.3.** "Search" measures `rgb(191, 191, 191)` on
   white, 1.83:1. It was not planted, and it is reported: placeholder text is text.
-- The planted 1.6:1 label (`#cccccc`) fails, and black body text passes. Contrast is measured on
-  the Retina capture with the tree in points (`scale` 2 from the frame's width).
+- The planted 1.6:1 label (`#cccccc`) fails at exactly its colours (`rgb(204, 204, 204)` on
+  white), and black body text passes. So the capture and the tree, which is in points with the
+  scale taken from the frame's width, line up.
 
 ## The rules
 
