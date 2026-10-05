@@ -128,6 +128,15 @@ describe("importAxDump", () => {
     assert.equal(byPath.get("window[0]>button[5]")!.name, "close button");
   });
 
+  it("marks a name that is announced but not drawn, so contrast does not read an icon as text", () => {
+    assert.equal(byPath.get("window[0]>button[5]")!.nameDrawn, false); // role description
+    assert.equal(named("Info").nameDrawn, false); // AXDescription on an icon button
+    assert.equal(named("Name").nameDrawn, false); // a separate label view's text
+    assert.equal(named("Start").nameDrawn, undefined); // its title is on the button
+    assert.equal(named("Settings").nameDrawn, undefined); // static text
+    assert.equal(named("Password").nameDrawn, undefined); // the placeholder is drawn in the field
+  });
+
   it("drops scroll-bar parts and empty frames: neither is a control a user can hit", () => {
     assert.deepEqual(
       tree.nodes.filter((n) => n.path.startsWith("window[0]>scrollbar[0]>")).map((n) => n.role),

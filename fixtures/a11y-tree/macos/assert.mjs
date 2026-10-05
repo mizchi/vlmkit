@@ -49,8 +49,10 @@ check("named controls are not unlabelled (Start, Settings gear, Search, Remember
     assert.ok(tree.nodes.some((n) => n.name === name), `${name} is in the tree with its name`);
 });
 check("target-undersized: Info", () => assert.ok(names(report.touch.failures, "text").includes("Info")));
-check("target-undersized: nothing but Info fails", () =>
-  assert.deepEqual(names(report.touch.failures, "text"), ["Info"]),
+// The unlabelled image button's bezel is 28x22, and with Info against it the spacing exception
+// no longer holds for it either: two failures, one of them unnamed.
+check("target-undersized: Info and the image button it crowds, nothing else", () =>
+  assert.deepEqual(names(report.touch.failures, "text").sort(), ["", "Info"]),
 );
 check("target-undersized: Help is spacing-exempt, not a failure", () =>
   assert.ok(!names(report.touch.failures, "text").includes("Help")),
@@ -60,6 +62,9 @@ check("unreachable-content: Hidden log", () =>
 );
 check("unreachable-content: rows inside the scroll view are reachable", () =>
   assert.ok(!report.unreachable.some((u) => /^Row /.test(u.first.name ?? ""))),
+);
+check("contrast skips names that are not drawn (title-bar buttons, icon buttons)", () =>
+  assert.ok(report.contrast?.skipped.some((k) => k.name === "close button" && k.reason === "label-only")),
 );
 check("frame captured (Screen Recording allowed on the runner)", () => assert.ok(report.contrast, "no frame"));
 if (report.contrast) {

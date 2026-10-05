@@ -161,15 +161,25 @@ const NAMED_BY_ROLE_DESCRIPTION = new Set(["AXCloseButton", "AXMinimizeButton", 
  */
 const SCROLLER_PARTS = new Set(["AXIncrementArrow", "AXDecrementArrow", "AXIncrementPage", "AXDecrementPage"]);
 
-function nameOf(element: AxElement, role: string): string {
-  const own =
-    text(element.title) ||
+/**
+ * The name, and whether it is painted inside the element's rect. A title, a static text's value
+ * and a field's placeholder are drawn there. A description, a linked label view's text and a
+ * role description are announced but drawn elsewhere or nowhere, so contrast skips them.
+ */
+function nameOf(element: AxElement, role: string): { name: string; drawn: boolean } {
+  if (role === "text" || role === "heading") {
+    const value = text(element.value);
+    if (value) return { name: value, drawn: true };
+  }
+  const title = text(element.title);
+  if (title) return { name: title, drawn: true };
+  const label =
     text(element.description) ||
     text(element.titleElement) ||
     (element.subrole && NAMED_BY_ROLE_DESCRIPTION.has(element.subrole) ? text(element.roleDescription) : "");
-  if (role === "textfield") return own || text(element.placeholder);
-  if (role === "text" || role === "heading") return text(element.value) || own;
-  return own;
+  if (label) return { name: label, drawn: false };
+  if (role === "textfield" && text(element.placeholder)) return { name: text(element.placeholder), drawn: true };
+  return { name: "", drawn: true };
 }
 
 const CHECKABLE = new Set(["checkbox", "radio", "switch", "tab"]);
@@ -221,7 +231,7 @@ export function importAxDump(source: string | unknown, options: AxImportOptions 
     const box = isFrame(element.frame) && element.frame.width > 0 && element.frame.height > 0 ? element.frame : null;
     const part = element.subrole !== undefined && SCROLLER_PARTS.has(element.subrole);
     if (box && !part) {
-      const name = nameOf(element, role);
+      const { name, drawn } = nameOf(element, role);
       const operable = element.actions ?? [];
       const actions = [
         ...operable.map((a) => ACTIONS[a] ?? a.replace(/^AX/, "").replace(/^./, (c) => c.toLowerCase())),
@@ -245,6 +255,7 @@ export function importAxDump(source: string | unknown, options: AxImportOptions 
         path,
         role,
         ...(name ? { name } : {}),
+        ...(name && !drawn ? { nameDrawn: false } : {}),
         ...(value ? { value } : {}),
         rect: {
           left: round(box.x - win.x),
