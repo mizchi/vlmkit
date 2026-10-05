@@ -75,6 +75,7 @@ vlmkit scan a11y a11y.ax.json --out again.json                  # re-import the 
 | `states` | `disabled focused checked selected expanded hidden`. |
 | `actions` | `tap longPress scroll focus setText`, or anything else the platform reports. `scroll` on a node, or `role: scrollview`, makes everything inside it reachable. |
 | `textSize`, `fontWeight` | Optional. When absent, contrast measures the text height from the frame. |
+| `nameDrawn` | Optional. `false` when the name is announced but not painted in the rect: an icon button's accessibility label, a separate label view's text, a role description. Contrast then skips the node (`label-only`), since there is no text there to measure. |
 
 **The collector resolves, the judge decides.** A collector maps its platform's roles and units
 onto these fields and reports facts. It never reports a verdict, such as a contrast ratio. A
@@ -118,12 +119,46 @@ How the AX facts map onto the contract (`packages/vlmkit-markup/src/a11y-tree/ma
 | `states` | `AXEnabled` false → disabled; `AXFocused`; `AXValue` 0/1 of a check box, radio, switch or tab → checked; `AXSelected`; `AXExpanded`; `AXHidden` |
 | `actions` | `AXPress` → tap, `AXShowMenu` → showMenu, `AXIncrement` / `AXDecrement`; a settable `AXFocused` → focus; an enabled text field → setText |
 
-An element with no position or size is left out and its children are kept, under its path.
-Paths read like the Android ones: `window[0]>group[1]>button[2]`, indexed per role among siblings.
+An element with no position, or with a zero width or height, is left out, and its children are
+kept under its path. So are the parts of a scroll bar (`AXIncrementArrow` / `AXDecrementArrow` /
+`AXIncrementPage` / `AXDecrementPage`), which belong to the scroll bar rather than standing as
+controls of their own. Paths read like the Android ones: `window[0]>group[1]>button[2]`, indexed
+per role among siblings.
+
+A title, a static text's value and a field's placeholder are drawn inside the element. A
+description, a linked label's text and a role description are not, so they set
+`nameDrawn: false`. The window's own close, minimize and zoom buttons carry no title or
+description, so they are named by their role description ("close button"), which is what
+VoiceOver reads.
 
 The raw dump (`vlmkit-ax-dump/1`) is written beside the tree as `<out>.ax.json`. It holds the
 attributes as AX returned them. That way a mapping can be questioned, or a tree re-imported, on a
 machine with no Mac.
+
+### Measured on macOS 15
+
+`.github/workflows/macos-ax.yml` runs the collector on GitHub's hosted `macos-15` runner
+(macOS 15.7, Swift 6.1). The runner grants both permissions. The target is an AppKit window
+(`fixtures/a11y-tree/macos/fixture-app.swift`) with one planted defect per rule and an intact
+neighbour for each. `assert.mjs` requires every planted defect to be reported and every intact
+neighbour to stay silent; then the saved dump is re-imported and must produce the identical tree.
+The first runs are why the mapping looks the way it does:
+
+- **An AX frame is the control's bezel, not its view.** A 40x32 rounded `NSButton` reports
+  28x22, and a 14x14 borderless one reports 16x16. Target size is judged on what the user sees,
+  so this is the right input. It does mean a planted "too close" defect has to be placed by its
+  AX frame: placed by its view frame, "Info" sat 7pt clear of its neighbour and correctly passed
+  2.5.8's spacing exception.
+- **An overlay scroll bar exposes its parts as buttons.** Two of them are 0x0, plus a 15x2 and a
+  15x66 page region. Before they were dropped, they produced 4 unlabelled and 3 undersized false
+  findings.
+- **The title-bar buttons have only a role description.** Read as names, they fixed 3 unlabelled
+  findings. Then contrast read the close button's red disc, `rgb(224, 61, 53)` on white, as text at
+  4.29:1. That is why the contrast check skips names that are not drawn (`nameDrawn`).
+- **AppKit's default placeholder colour fails 1.4.3.** "Search" measures `rgb(191, 191, 191)` on
+  white, 1.83:1. It was not planted, and it is reported: placeholder text is text.
+- The planted 1.6:1 label (`#cccccc`) fails, and black body text passes. Contrast is measured on
+  the Retina capture with the tree in points (`scale` 2 from the frame's width).
 
 ## The rules
 
