@@ -1,0 +1,83 @@
+name: macOS AX collector
+
+# `vlmkit scan a11y --app` reads a real app's window through the macOS Accessibility API, in a
+# Swift collector that cannot be compiled or run anywhere else. The unit tests cover the half
+# that maps a dump onto vlmkit-a11y/1 on Linux; this job covers the half that makes the dump.
+#
+# It compiles an AppKit fixture window with one planted defect per `check a11y tree` rule
+# (fixtures/a11y-tree/macos/fixture-app.swift), collects it through the CLI, and holds the
+# result to those defects (assert.mjs): each one reported, each intact neighbour silent. Then it
+# re-imports the saved dump and requires the identical tree. The tree, dump and frame are
+# uploaded, so the capture can be looked at.
+#
+# On push rather than pull_request: a branch push runs it before any PR exists, and a
+# workflow_dispatch trigger only works once the workflow is on the default branch.
+on:
+  push:
+    paths:
+      - "packages/vlmkit-markup/src/a11y-tree/**"
+      - "packages/vlmkit-markup/src/gates/a11y-tree.gate.ts"
+      - "packages/vlmkit-judge/src/a11y-tree.ts"
+      - "fixtures/a11y-tree/macos/**"
+      - ".github/workflows/macos-ax.yml"
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - run: pnpm build:packages
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcrun swiftc --version
+
+      - name: Launch the fixture window
+        run: |
+          xcrun swiftc -O fixtures/a11y-tree/macos/fixture-app.swift -o "$RUNNER_TEMP/vlmkit-ax-fixture"
+          "$RUNNER_TEMP/vlmkit-ax-fixture" &
+          echo $! > "$RUNNER_TEMP/fixture.pid"
+          sleep 3
+
+      - name: Collect (scan a11y --app)
+        run: |
+          mkdir -p out
+          node --experimental-strip-types src/cli/vlmkit.ts scan a11y --app "$(cat "$RUNNER_TEMP/fixture.pid")" --out out/a11y.json
+
+      - name: Judge (check a11y tree)
+        # The fixture is built to fail this gate; assert.mjs decides whether it failed correctly.
+        run: node --experimental-strip-types src/cli/vlmkit.ts check a11y tree out/a11y.json || true
+
+      - name: Hold to the planted defects
+        run: node fixtures/a11y-tree/macos/assert.mjs out/a11y.json
+
+      - name: Re-import the saved dump
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts scan a11y out/a11y.ax.json --out out/reimported.json
+          diff out/a11y.json out/reimported.json && echo "re-imported tree is identical"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-ax
+          path: out/

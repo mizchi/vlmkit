@@ -3,12 +3,17 @@
  * collected once, then judged with no browser. Measurement lives in `../a11y-tree/`, the
  * judging in `@mizchi/vlmkit-judge/a11y-tree.ts`.
  */
-import { readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { hasFlag, readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding, RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
-import { firstPositional, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
+import {
+  firstPositional,
+  firstPositionalOrUndefined,
+  optionalInt,
+  viewportFlag,
+} from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { parseSelectorAllowRules } from "@mizchi/vlmkit-judge/allow.ts";
@@ -25,13 +30,25 @@ const semanticsEmpty = (report: ScanA11yReport): string | null =>
     ? `the tree holds ${report.counts.nodes} node(s) and none has a name — every gate reading it would measure nothing and pass.`
     : null;
 
-function formatScanA11y(report: ScanA11yReport, rules?: RuleView): string {
-  const issues = [
+const truncatedMessage = (report: ScanA11yReport): string | null =>
+  report.truncated
+    ? `the collector stopped at its node limit after ${report.counts.nodes} node(s); the rest of the window was not judged. Raise --max-nodes or pick a smaller window.`
+    : null;
+
+function scanIssues(report: ScanA11yReport) {
+  return [
     ...(report.redirect ? [{ kind: "redirected", severity: "suspect" as const, message: report.redirect }] : []),
     ...(semanticsEmpty(report)
       ? [{ kind: "semantics-empty", severity: "suspect" as const, message: semanticsEmpty(report)! }]
       : []),
+    ...(truncatedMessage(report)
+      ? [{ kind: "tree-truncated", severity: "suspect" as const, message: truncatedMessage(report)! }]
+      : []),
   ];
+}
+
+function formatScanA11y(report: ScanA11yReport, rules?: RuleView): string {
+  const issues = scanIssues(report);
   const { shown, note } = tierIssues(issues, rules);
   return [
     "",
@@ -39,7 +56,10 @@ function formatScanA11y(report: ScanA11yReport, rules?: RuleView): string {
     `${DIM}source: ${report.source}${report.clicks.length ? ` → ${report.clicks.map((c) => JSON.stringify(c)).join(" → ")}` : ""}${RESET}`,
     "",
     `tree:  ${report.out}  (${report.viewport.width}x${report.viewport.height})`,
-    `frame: ${report.frame ?? `${DIM}none — contrast will not be measured (pass --frame)${RESET}`}`,
+    `frame: ${report.frame ?? `${DIM}none — contrast will not be measured (${report.frameError ?? "pass --frame"})${RESET}`}`,
+    ...(report.dump
+      ? [`dump:  ${report.dump}  ${DIM}(the raw AX facts; re-import with vlmkit scan a11y <dump>)${RESET}`]
+      : []),
     `  ${report.counts.nodes} node(s), ${report.counts.named} named, ${report.counts.interactive} operable`,
     ...shown.map(
       ({ row, tier }) =>
@@ -56,7 +76,7 @@ function formatScanA11y(report: ScanA11yReport, rules?: RuleView): string {
 export const a11yScanGate = defineGate<ScanA11yReport, ScanA11yOptions>({
   id: "scan.a11y",
   command: ["scan", "a11y"],
-  title: "Accessibility tree snapshot (Flutter web, Android)",
+  title: "Accessibility tree snapshot (Flutter web, Android, macOS)",
   summary: "Write a platform's accessibility tree and its frame for check a11y tree",
   category: "correctness",
   usage: `Collects an accessibility tree as vlmkit-a11y/1 JSON plus the frame it was
@@ -75,8 +95,18 @@ painted into, from a platform with no DOM to read paint from:
     vlmkit scan a11y ui.xml --density $(adb shell wm density | grep -o '[0-9]*$') --frame frame.png --out a11y.json
   Bounds become dp, the unit WCAG's target floors mean on Android.
 
-Any other platform (macOS AX, Windows UIA, iOS, a Flutter desktop semantics
-dump) writes the same JSON with its own tool — docs/a11y-tree.md has the
+  macOS (a running app's window, through the Accessibility API)
+    vlmkit scan a11y --app TextEdit --out a11y.json
+    vlmkit scan a11y --app com.apple.Notes --window "Notes" --click "New Note" --out notes.json
+    vlmkit scan a11y a11y.ax.json --out a11y.json      # re-import a saved dump, on any OS
+  Compiles a small Swift collector once (Xcode Command Line Tools), reads the
+  window's AXUIElement tree in points and captures the window. The terminal
+  needs Accessibility permission, and Screen Recording for the frame (without
+  it there is no frame and contrast is not measured). The raw dump is kept
+  beside the tree as <out>.ax.json.
+
+Any other platform (Windows UIA, iOS, a Flutter desktop semantics dump)
+writes the same JSON with its own tool — docs/a11y-tree.md has the
 contract. Then: vlmkit check a11y tree a11y.json`,
   rules: [
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
@@ -86,15 +116,44 @@ contract. Then: vlmkit check a11y tree a11y.json`,
       severity: "suspect",
       docs: "Flutter builds its tree only when asked; a build with semantics disabled, or a screen captured before it booted, reads as an empty page that passes every rule.",
     },
+    {
+      id: "tree-truncated",
+      title: "The collector stopped at its node limit, so part of the window was not read",
+      severity: "suspect",
+    },
   ],
   inputs: [
     {
       name: "source",
-      placeholder: "url|page.html|dump.xml",
+      placeholder: "url|page.html|dump.xml|dump.ax.json",
       kind: "path-or-url",
-      description: "Flutter web page, or a uiautomator dump",
+      description: "Flutter web page, a uiautomator dump, or a saved macOS AX dump (omit with --app)",
       positional: 0,
-      required: true,
+    },
+    {
+      name: "app",
+      placeholder: "name|bundle-id|pid",
+      kind: "string",
+      description: "macOS: collect from this running app's window through the Accessibility API",
+    },
+    {
+      name: "window",
+      placeholder: "title",
+      kind: "string",
+      description: "macOS: the window whose title contains this",
+      defaultDescription: "the focused window",
+    },
+    {
+      name: "max-nodes",
+      placeholder: "n",
+      kind: "number",
+      description: "macOS: stop reading the tree after this many elements",
+      defaultDescription: "4000",
+    },
+    {
+      name: "prompt",
+      kind: "boolean",
+      description: "macOS: ask for the Accessibility permission when it is missing",
     },
     {
       name: "out",
@@ -107,8 +166,8 @@ contract. Then: vlmkit check a11y tree a11y.json`,
       name: "frame",
       placeholder: "frame.png",
       kind: "path",
-      description: "Page: where to write the screenshot. Dump: the screenshot taken with it",
-      defaultDescription: "page: beside --out",
+      description: "Page / --app: where to write the screenshot. Dump: the screenshot taken with it",
+      defaultDescription: "page / --app: beside --out",
     },
     {
       name: "viewport",
@@ -122,7 +181,7 @@ contract. Then: vlmkit check a11y tree a11y.json`,
       placeholder: "name",
       kind: "string",
       repeatable: true,
-      description: "Tap a node by its exact accessible name before collecting (page)",
+      description: "Tap (page) or press (--app) a node by its exact accessible name before collecting",
     },
     {
       name: "locale",
@@ -146,7 +205,7 @@ contract. Then: vlmkit check a11y tree a11y.json`,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit scan a11y <url|page.html|dump.xml> [--out a11y.json]", [
+    const positional = firstPositionalOrUndefined(argv, [
       "--out",
       "--frame",
       "--viewport",
@@ -154,7 +213,20 @@ contract. Then: vlmkit check a11y tree a11y.json`,
       "--density",
       "--locale",
       "--storage-state",
+      "--app",
+      "--window",
+      "--max-nodes",
     ]);
+    const app = readFlag(argv, "app");
+    if (app && positional)
+      throw new UsageError(`give a source or --app, not both (got ${JSON.stringify(positional)} and --app ${app}).`);
+    if (!app && !positional)
+      throw new UsageError(
+        "missing required argument. Usage: vlmkit scan a11y <url|page.html|dump.xml|dump.ax.json> [--out a11y.json] | vlmkit scan a11y --app <name> [--out a11y.json]",
+      );
+    const source = positional ?? "";
+    const window = readFlag(argv, "window");
+    const maxNodes = optionalInt(argv, "max-nodes", { min: 1 });
     const densityRaw = readFlag(argv, "density");
     const density = densityRaw === undefined ? undefined : Number(densityRaw);
     if (density !== undefined && !(density > 0))
@@ -166,6 +238,10 @@ contract. Then: vlmkit check a11y tree a11y.json`,
     const locale = readFlag(argv, "locale");
     return {
       source,
+      ...(app ? { app } : {}),
+      ...(window ? { window } : {}),
+      ...(maxNodes ? { maxNodes } : {}),
+      ...(hasFlag(argv, "prompt") ? { prompt: true } : {}),
       out: readFlag(argv, "out") ?? DEFAULT_A11Y_TREE,
       ...(locale ? { locale } : {}),
       ...(frame ? { frame } : {}),
@@ -177,12 +253,8 @@ contract. Then: vlmkit check a11y tree a11y.json`,
     };
   },
   run: (options) => runScanA11y(options),
-  findings: (report): Finding[] => [
-    ...(report.redirect ? [{ rule: "redirected", severity: "suspect" as const, message: report.redirect }] : []),
-    ...(semanticsEmpty(report)
-      ? [{ rule: "semantics-empty", severity: "suspect" as const, message: semanticsEmpty(report)! }]
-      : []),
-  ],
+  findings: (report): Finding[] =>
+    scanIssues(report).map((i) => ({ rule: i.kind, severity: i.severity, message: i.message })),
   format: formatScanA11y,
   headline: (report) =>
     `${report.platform} tree ${report.out}: ${report.counts.nodes} node(s), ${report.counts.named} named, ${report.counts.interactive} operable`,
