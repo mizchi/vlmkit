@@ -14,7 +14,9 @@
  * Security → Accessibility); `--prompt` asks macOS to show the request.
  *
  * Written with String.raw: Swift's `\(…)` interpolation must reach swiftc with its
- * backslash. The source therefore holds no backtick and no dollar-brace.
+ * backslash. The source therefore holds no backtick and no dollar-brace. Long messages are
+ * built in typed steps, never one `+` chain: swiftc 6 gave up type-checking a five-term
+ * concatenation of optionals ("unable to type-check this expression in reasonable time").
  */
 export const AX_DUMP_SWIFT = String.raw`
 import AppKit
@@ -191,8 +193,9 @@ func pickWindow(_ app: AXUIElement, _ title: String?) -> AXUIElement? {
 }
 
 func names(_ el: AXUIElement) -> [String] {
-  return [string(el, kAXTitleAttribute), string(el, kAXDescriptionAttribute), titleElementText(el),
-    (plainValue(el) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)].compactMap { $0 }
+  let value: String? = (plainValue(el) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+  let all: [String?] = [string(el, kAXTitleAttribute), string(el, kAXDescriptionAttribute), titleElementText(el), value]
+  return all.compactMap { $0 }
 }
 
 func findPressable(_ el: AXUIElement, _ name: String, _ depth: Int) -> AXUIElement? {
@@ -223,8 +226,9 @@ func windowId(_ pid: pid_t, _ bounds: CGRect) -> CGWindowID? {
       let r = CGRect(dictionaryRepresentation: b),
       let id = (w[kCGWindowNumber as String] as? NSNumber)?.uint32Value
     else { continue }
-    let d = abs(r.minX - bounds.minX) + abs(r.minY - bounds.minY) + abs(r.width - bounds.width)
-      + abs(r.height - bounds.height)
+    let dx: CGFloat = abs(r.minX - bounds.minX) + abs(r.minY - bounds.minY)
+    let dw: CGFloat = abs(r.width - bounds.width) + abs(r.height - bounds.height)
+    let d: CGFloat = dx + dw
     if best == nil || d < best!.distance { best = (id, d) }
   }
   return best?.id
@@ -258,9 +262,10 @@ if !AXIsProcessTrustedWithOptions([trustKey: options.prompt] as CFDictionary) {
 }
 
 guard let running = findApp(query) else {
-  let regular = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+  let regular: [String] = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
     .compactMap { $0.localizedName }
-  fail("no running app matches " + query + ". Running apps: " + regular.joined(separator: ", "))
+  let list: String = regular.joined(separator: ", ")
+  fail("no running app matches \(query). Running apps: \(list)")
 }
 let pid = running.processIdentifier
 let app = AXUIElementCreateApplication(pid)
@@ -274,9 +279,11 @@ while window == nil && Date() < deadline {
   window = pickWindow(app, options.window)
 }
 guard var win = window else {
-  let titles = windows(app).map { string($0, kAXTitleAttribute) ?? "(untitled)" }
-  fail("no window" + (options.window.map { " titled like " + $0 } ?? "") + " in " + (running.localizedName ?? query)
-    + ". Windows: " + (titles.isEmpty ? "(none)" : titles.joined(separator: ", ")))
+  let titles: [String] = windows(app).map { string($0, kAXTitleAttribute) ?? "(untitled)" }
+  let wanted: String = options.window.map { " titled like \($0)" } ?? ""
+  let appName: String = running.localizedName ?? query
+  let found: String = titles.isEmpty ? "(none)" : titles.joined(separator: ", ")
+  fail("no window\(wanted) in \(appName). Windows: \(found)")
 }
 
 var pressed: [String] = []
@@ -284,8 +291,8 @@ for name in options.clicks {
   guard let target = findPressable(win, name, 0) else {
     var available: [String] = []
     pressableNames(win, 0, &available)
-    fail("--click " + name + ": no pressable element has that exact title or description. Pressable here: "
-      + (available.isEmpty ? "(none)" : available.joined(separator: ", ")))
+    let here: String = available.isEmpty ? "(none)" : available.joined(separator: ", ")
+    fail("--click \(name): no pressable element has that exact title or description. Pressable here: \(here)")
   }
   AXUIElementPerformAction(target, kAXPressAction as CFString)
   pressed.append(name)
@@ -297,12 +304,11 @@ guard let winFrame = frame(win) else { fail("the window reports no position and 
 let walker = Walker(options)
 guard let root = walker.walk(win, 0) else { fail("the window reports no accessibility element") }
 
-var dump: [String: Any] = [
-  "format": "vlmkit-ax-dump/1",
-  "app": ["name": running.localizedName ?? "", "bundleId": running.bundleIdentifier ?? "", "pid": Int(pid)],
-  "window": ["title": string(win, kAXTitleAttribute) ?? "", "frame": json(winFrame)],
-  "root": root,
+let appInfo: [String: Any] = [
+  "name": running.localizedName ?? "", "bundleId": running.bundleIdentifier ?? "", "pid": Int(pid),
 ]
+let windowInfo: [String: Any] = ["title": string(win, kAXTitleAttribute) ?? "", "frame": json(winFrame)]
+var dump: [String: Any] = ["format": "vlmkit-ax-dump/1", "app": appInfo, "window": windowInfo, "root": root]
 if walker.truncated { dump["truncated"] = true }
 if !pressed.isEmpty { dump["pressed"] = pressed }
 if let path = options.frame {
