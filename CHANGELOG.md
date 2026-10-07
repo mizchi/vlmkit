@@ -3,18 +3,6 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## Unreleased
-
-- Add `scan a11y --app <name|bundle id|pid>` (macOS): reads one window of a running app through the Accessibility
-  API and captures it, writing a `vlmkit-a11y/1` tree in points for `check a11y tree`, plus the raw AX dump
-  (`<out>.ax.json`), which `scan a11y <dump.ax.json>` re-imports on any OS. `--window`, `--click` (AXPress by
-  name), `--max-nodes`, `--prompt`. Needs the Xcode Command Line Tools (a Swift collector is compiled once and
-  cached) and, for the terminal, Accessibility permission, plus Screen Recording for the frame. New rule
-  `tree-truncated`.
-- `vlmkit-a11y/1` nodes take `nameDrawn: false` for a name that is announced but not painted (an icon
-  button's label, a role description); `check a11y tree` skips them for contrast as `label-only`.
-- CI: `macos-ax.yml` runs the collector on a hosted macOS runner against an AppKit fixture with planted defects.
-
 ## 0.23.2 — 2026-10-02
 
 - Add `check animation --virtual-time`: the page clock (`requestAnimationFrame`, `performance.now`, `Date`,
