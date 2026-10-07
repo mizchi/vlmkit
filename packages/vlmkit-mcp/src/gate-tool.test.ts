@@ -202,7 +202,8 @@ describe("required-ness follows `required`, not `positional`", () => {
       }
     }
     // `check integrity`, `check copy`, `check color`, `check design` and `check composition` are the intended exceptions — each
-    // takes element rects (a scene) via `--elements` instead of a page. Anything else
+    // takes element rects (a scene) via `--elements` instead of a page — and `scan a11y`, which
+    // takes a running macOS app via `--app` instead of a page or dump. Anything else
     // appearing here means a gate is relying on the removed shortcut and its MCP schema just
     // went optional.
     assert.deepEqual(
@@ -213,6 +214,7 @@ describe("required-ness follows `required`, not `positional`", () => {
         "check copy :: source",
         "check design :: source",
         "check integrity :: source",
+        "scan a11y :: source",
       ],
       "a positional-0 input without `required: true` is now OPTIONAL in the MCP schema — " +
         "add `required: true` unless it is genuinely optional",
