@@ -357,6 +357,8 @@ mutants). Round: `docs/reports/2026-09-26-responsive-pbt-v1.md`.
 ```bash
 vlmkit scan a11y https://example.com/flutter-app/ --click Practice --out a11y.json   # Flutter web
 vlmkit scan a11y ui.xml --density 420 --frame frame.png --out a11y.json            # Android uiautomator dump
+vlmkit scan a11y --app TextEdit --out a11y.json                                    # macOS window via AX (on a Mac)
+vlmkit scan a11y a11y.ax.json --out a11y.json                                      # re-import a saved AX dump, any OS
 vlmkit check a11y tree a11y.json      # unlabelled-control / unreachable-content / contrast-below-aa / target-undersized
 ```
 
@@ -375,6 +377,21 @@ Three things measured there, not to re-learn:
   held 14px red card labels to 3:1 and passed them at 3.68:1.
 - `scan a11y` pins `--locale en-US`: a Flutter build with no locale throws in `Intl.Locale`
   before its first frame, and the page reads as not-Flutter.
+
+**macOS (`--app`)** compiles a Swift collector (`macos-ax-dump.swift.ts`, a string so it survives
+`vp pack`) once with `swiftc`, walks one window's `AXUIElement` tree in points and captures the
+window; `macos-ax.ts` maps the dump, and is the only half Linux tests reach. The other half is
+`.github/workflows/macos-ax.yml` on a hosted `macos-15` runner, which grants Accessibility and
+Screen Recording: an AppKit fixture with planted defects, collected, judged and re-imported.
+Read its log through the MCP `get_job_logs` (the built-in `gh` cannot fetch logs). Measured
+there, not to re-learn:
+
+- An AX frame is the bezel (40x32 `NSButton` → 28x22), so plant geometry by AX frames.
+- Overlay scroll bars expose arrows/pages as `AXButton`s (two 0x0): dropped as scroller parts.
+- Title-bar buttons have only `AXRoleDescription`; named by it, contrast read the red close disc
+  as text (4.29:1) — hence `nameDrawn: false` for names that are announced, not painted.
+- swiftc 6 timed out type-checking a five-term `+` chain of optionals; build strings in steps.
+- AppKit's default placeholder colour is 1.83:1 on white: a real 1.4.3 failure, left reported.
 
 In this sandbox Chromium cannot verify the egress proxy's CA, so a live site is replayed from a
 HAR recorded through Node (`NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt NODE_USE_ENV_PROXY=1`)
@@ -841,7 +858,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 34 gates + 210 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 34 gates + 211 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

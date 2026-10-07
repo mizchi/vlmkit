@@ -96,6 +96,13 @@ export interface A11yNode {
   actions?: string[];
   /** Declared text size in viewport units, when the platform reports it. Else it is measured. */
   textSize?: number;
+  /**
+   * `false` when the name is not painted in the node's rect: an accessibility label on an icon
+   * button (macOS `AXDescription`), a separate label view's text, a role description. There is
+   * then no text there for contrast to measure; the node is skipped as `label-only`. Absent
+   * means the name is drawn, which is what every collector before macOS reported.
+   */
+  nameDrawn?: boolean;
   /** Declared font weight, 100-900, when reported. */
   fontWeight?: number;
 }
@@ -324,7 +331,7 @@ export interface PixelContrastSample {
 export interface PixelContrastSkip {
   path: string;
   name: string;
-  reason: "disabled" | "outside-frame" | "no-ink";
+  reason: "disabled" | "outside-frame" | "no-ink" | "label-only";
 }
 
 export interface PixelContrastReport {
@@ -464,6 +471,12 @@ export function measurePixelContrast(tree: A11yTree, frame: RgbaFrame): PixelCon
     const name = named(node);
     if (node.states?.disabled === true) {
       skipped.push({ path: node.path, name, reason: "disabled" });
+      continue;
+    }
+    // Measured on macOS 15: the title-bar close button, named "close button", read as red text
+    // (rgb 224,61,53) on white at 4.29:1 — a failure for a glyph-free disc. Announced, never drawn.
+    if (node.nameDrawn === false) {
+      skipped.push({ path: node.path, name, reason: "label-only" });
       continue;
     }
     const x0 = Math.max(0, Math.round(node.rect.left * scale));

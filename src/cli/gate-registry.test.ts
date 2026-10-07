@@ -241,8 +241,10 @@ describe("composed built-in registry", () => {
     // 209 → 210: `check animation` / `clock-motion-unsettled` (warn), with `--virtual-time`:
     //       the page clock held and driven by the gate, so a rAF / timer loop that never
     //       stops is measured as one instead of being `uncontrolled-motion`.
+    // 210 → 211: `scan a11y` / `tree-truncated` (suspect) — the macOS AX collector stopped at
+    //       its node limit, so part of the window was never read and every rule passed it.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 210);
+    assert.equal(total, 211);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

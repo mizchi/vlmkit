@@ -2,13 +2,15 @@
  * `vlmkit scan a11y`: write a platform's accessibility tree and its frame as a
  * `vlmkit-a11y/1` file, for `vlmkit check a11y tree` to judge.
  *
- * Two collectors today, chosen by the source:
+ * Three collectors today, chosen by the source:
  *
  * - a page (URL or HTML file) → the Flutter web collector (`flutter-web.ts`), in a browser;
- * - a `.xml` file → the Android `uiautomator dump` importer (`uiautomator.ts`), no browser.
+ * - a `.xml` file → the Android `uiautomator dump` importer (`uiautomator.ts`), no browser;
+ * - `--app <name>` → the macOS AX collector (`macos-ax-collector.ts`), on a Mac, which also
+ *   keeps its raw dump beside the tree; a saved `.ax.json` dump is imported anywhere.
  *
- * Anything else — macOS AX, Windows UI Automation, iOS, a Flutter desktop app's semantics
- * dump — writes the same JSON with its own tool; nothing downstream knows which wrote it.
+ * Anything else — Windows UI Automation, iOS, a Flutter desktop app's semantics dump —
+ * writes the same JSON with its own tool; nothing downstream knows which wrote it.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, relative, resolve } from "node:path";
@@ -29,18 +31,28 @@ import {
   type FlutterWebRawNode,
 } from "./flutter-web.ts";
 import { importUiautomatorDump } from "./uiautomator.ts";
+import { collectMacosAx } from "./macos-ax-collector.ts";
+import { importAxDump, type AxDump } from "./macos-ax.ts";
 
 /** Where `scan a11y` writes when `--out` is not given. */
 export const DEFAULT_A11Y_TREE = ".vlmkit/a11y.json";
 
 export interface ScanA11yOptions extends PageLoadOptions {
-  /** A page (Flutter web), or a uiautomator dump (`.xml`). */
+  /** A page (Flutter web), a uiautomator dump (`.xml`) or a macOS AX dump (`.ax.json`). Ignored with `app`. */
   source: string;
+  /** macOS: collect from this running app (name, bundle id or pid) instead of a source. */
+  app?: string;
+  /** macOS: the window whose title contains this; default the focused one. */
+  window?: string;
+  /** macOS: stop reading the tree after this many elements. */
+  maxNodes?: number;
+  /** macOS: ask for the Accessibility permission when it is missing. */
+  prompt?: boolean;
   out: string;
   /** Frame PNG: written for a page, read (as given) for a dump. */
   frame?: string;
   viewport?: { width: number; height: number };
-  /** Tap these by accessible name, in order, before collecting (a page only). */
+  /** Tap (page) or press (macOS) these by accessible name, in order, before collecting. */
   clicks?: string[];
   /** Device dpi, for a uiautomator dump. */
   density?: number;
@@ -54,6 +66,12 @@ export interface ScanA11yReport {
   platform: string;
   out: string;
   frame: string | null;
+  /** Why there is no frame, when the collector said (macOS: no Screen Recording permission). */
+  frameError: string | null;
+  /** macOS: the raw AX dump written beside the tree. */
+  dump: string | null;
+  /** The collector stopped at its node limit. */
+  truncated: boolean;
   viewport: { width: number; height: number };
   redirect: string | null;
   clicks: string[];
@@ -61,6 +79,8 @@ export interface ScanA11yReport {
 }
 
 const isDump = (source: string) => extname(source).toLowerCase() === ".xml";
+const isAxDump = (source: string) => source.toLowerCase().endsWith(".ax.json");
+const stem = (path: string) => path.slice(0, path.length - extname(path).length);
 
 /** The semantics tree is built asynchronously; it is ready when its size stops changing. */
 async function waitForSemantics(
@@ -154,7 +174,39 @@ export async function runScanA11y(options: ScanA11yOptions): Promise<ScanA11yRep
   let tree: A11yTree;
   let redirect: string | null = null;
   let frame: string | null;
-  if (isDump(options.source)) {
+  let frameError: string | null = null;
+  let dumpPath: string | null = null;
+  let truncated = false;
+  if (options.app) {
+    frame = resolve(options.frame ?? `${stem(out)}.png`);
+    await mkdir(dirname(frame), { recursive: true });
+    const dump = await collectMacosAx({
+      app: options.app,
+      ...(options.window ? { window: options.window } : {}),
+      ...(options.clicks?.length ? { clicks: options.clicks } : {}),
+      framePath: frame,
+      ...(options.maxNodes ? { maxNodes: options.maxNodes } : {}),
+      ...(options.prompt ? { prompt: true } : {}),
+    });
+    if (!dump.frame) frame = null;
+    frameError = dump.frameError ?? null;
+    truncated = dump.truncated === true;
+    // The raw facts, so a tree can be re-imported (or a mapping questioned) without the Mac.
+    dumpPath = `${stem(out)}.ax.json`;
+    const saved: AxDump = {
+      ...dump,
+      ...(frame ? { frame: relative(dirname(dumpPath), frame) || basename(frame) } : {}),
+    };
+    await mkdir(dirname(dumpPath), { recursive: true });
+    await writeFile(dumpPath, JSON.stringify(saved, null, 1) + "\n");
+    tree = importAxDump(dump, frame ? { frame: relative(dirname(out), frame) || basename(frame) } : {});
+  } else if (isAxDump(options.source)) {
+    const dump = JSON.parse(await readFile(options.source, "utf8")) as AxDump;
+    frame = options.frame ? resolve(options.frame) : dump.frame ? resolve(dirname(options.source), dump.frame) : null;
+    frameError = frame ? null : (dump.frameError ?? null);
+    truncated = dump.truncated === true;
+    tree = importAxDump(dump, frame ? { frame: relative(dirname(out), frame) || basename(frame) } : {});
+  } else if (isDump(options.source)) {
     if (options.density === undefined) {
       throw new UsageError(
         "a uiautomator dump needs --density: its bounds are device pixels and target sizes are judged in dp." +
@@ -167,7 +219,7 @@ export async function runScanA11y(options: ScanA11yOptions): Promise<ScanA11yRep
       ...(frame ? { frame: relative(dirname(out), frame) } : {}),
     });
   } else {
-    frame = resolve(options.frame ?? `${out.slice(0, out.length - extname(out).length)}.png`);
+    frame = resolve(options.frame ?? `${stem(out)}.png`);
     const captured = await captureFlutterWeb(options, frame);
     tree = { ...captured.tree, frame: relative(dirname(out), frame) || basename(frame) };
     redirect = captured.redirect;
@@ -175,10 +227,13 @@ export async function runScanA11y(options: ScanA11yOptions): Promise<ScanA11yRep
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(tree, null, 1) + "\n");
   return {
-    source: options.source,
+    source: options.app ? `app ${options.app}` : options.source,
     platform: tree.platform ?? "unknown",
     out: options.out,
     frame,
+    frameError,
+    dump: dumpPath,
+    truncated,
     viewport: tree.viewport,
     redirect,
     clicks: options.clicks ?? [],

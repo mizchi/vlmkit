@@ -1,6 +1,6 @@
 ---
 name: vlmkit
-description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, design consistency, colour or contrast, accessibility (including an app whose UI is not the DOM: Flutter web, Android, a canvas renderer), Playwright/VRT, or a visual regression. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
+description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, design consistency, colour or contrast, accessibility (including an app whose UI is not the DOM: Flutter web, Android, a native macOS app, a canvas renderer), Playwright/VRT, or a visual regression. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
 ---
 
 # vlmkit — Skill Router and CLI Guide
@@ -93,7 +93,7 @@ second only when the task genuinely crosses boundaries.
 | Task shape | Primary skill | Capability |
 |---|---|---|
 | Edited HTML/CSS; no reference design | `./workflows/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
-| Accessibility of an app whose UI is not the DOM (Flutter web, Android, a game or WebGPU renderer) | `./workflows/markup-assist/SKILL.md` ("The UI is not the DOM") | `scan a11y` → `check a11y tree`, contrast read from the frame's pixels; `--elements` for a renderer that lists what it drew |
+| Accessibility of an app whose UI is not the DOM (Flutter web, Android, a native macOS app, a game or WebGPU renderer) | `./workflows/markup-assist/SKILL.md` ("The UI is not the DOM") | `scan a11y` → `check a11y tree`, contrast read from the frame's pixels; `--elements` for a renderer that lists what it drew |
 | Raw mock, retina export, or screenshot with no reference HTML | `./workflows/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
 | Target screenshot or UI Contract IR | `./workflows/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
 | Responsive, scroll, interaction, or animation behavior | `./workflows/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |

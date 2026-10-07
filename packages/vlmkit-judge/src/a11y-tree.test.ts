@@ -182,6 +182,24 @@ describe("measurePixelContrast", () => {
     assert.equal(report.samples[0]!.textSizeFrom, "measured");
   });
 
+  it("skips a node whose name is announced but not drawn (nameDrawn: false) as label-only", () => {
+    // A red disc on grey, like macOS's title-bar close button: its name is a role description.
+    const f = frame(100, 40, [0xe0, 0xe0, 0xe0], [{ rect: [10, 10, 16, 16], color: [0xff, 0x5f, 0x57] }]);
+    const t = tree(
+      [
+        node("w[0]>button[0]", "button", "close button", [5, 5, 26, 26], { nameDrawn: false }),
+        node("w[0]>button[1]", "button", "OK", [50, 5, 26, 26]),
+      ],
+      { viewport: { width: 100, height: 40 } },
+    );
+    const report = measurePixelContrast(t, f);
+    assert.deepEqual(report.skipped, [
+      { path: "w[0]>button[0]", name: "close button", reason: "label-only" },
+      { path: "w[0]>button[1]", name: "OK", reason: "no-ink" }, // a drawn name is still looked for
+    ]);
+    assert.deepEqual(report.failures, []);
+  });
+
   it("gives large text 3:1 — from the declared size, or from the inked line height, scaled", () => {
     // #949494 on white is 3.03:1: under 4.5, over 3.
     const grey = [0x94, 0x94, 0x94];

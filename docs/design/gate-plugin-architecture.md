@@ -376,7 +376,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 34 gates (210 tunable rules)
+## The 34 gates (211 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -387,7 +387,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `check a11y contrast` | 1 | markup |
 | `check a11y touch` | 1 | markup |
 | `check a11y focus` | 3 | markup |
-| `scan a11y` | 2 | markup |
+| `scan a11y` | 3 | markup |
 | `check a11y tree` | 4 | markup |
 | `check breakpoints` | 5 | markup |
 | `check responsive` | 10 | markup |<!-- 7 integrity layout judges at generated viewports + text-starved, untested-media-feature, redirected -->
