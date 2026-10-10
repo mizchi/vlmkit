@@ -241,13 +241,14 @@ test("advanceTo(t) has run exactly floor(t * 60 / 1000) frames: frame n is at (n
   // so advanceTo(100) ran 5 frames, and 500 and 2000 (on --timeline's default grid) each one short.
   const browser = await chromium.launch();
   try {
-    const ticker = await htmlPage(`<script>window.ran = 0; (function tick() { window.ran++; requestAnimationFrame(tick); })();</script>`);
+    const ticker = await htmlPage(
+      `<script>window.ran = 0; (function tick() { window.ran++; requestAnimationFrame(tick); })();</script>`,
+    );
     const page = await browser.newPage();
     await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
     await page.goto(`file://${ticker}`);
     const misses = await page.evaluate(async () => {
-      const clock = (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } })
-        .__vlmkitClock;
+      const clock = (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock;
       const ran = () => (window as unknown as { ran: number }).ran - 1; // the first call is not a frame
       const out: string[] = [];
       for (let k = 1; k <= 3600; k++) {
@@ -262,8 +263,7 @@ test("advanceTo(t) has run exactly floor(t * 60 / 1000) frames: frame n is at (n
     await page2.addInitScript(VIRTUAL_CLOCK_SCRIPT);
     await page2.goto(`file://${ticker}`);
     const gridMisses = await page2.evaluate(async () => {
-      const clock = (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } })
-        .__vlmkitClock;
+      const clock = (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock;
       const out: string[] = [];
       for (let t = 50; t <= 12000; t += 50) {
         await clock.advanceTo(t);
