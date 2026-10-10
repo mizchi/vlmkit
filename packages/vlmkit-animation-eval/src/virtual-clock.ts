@@ -28,13 +28,16 @@
  */
 export const VIRTUAL_CLOCK_SCRIPT = `(() => {
   if (window.__vlmkitClock) return;
-  const FRAME_MS = 1000 / 60;
   const nativePerfNow = performance.now.bind(performance);
   const NativeDate = Date;
   // Virtual 0 is document start; Date keeps the real wall-clock date at that instant.
   const epochAtZero = NativeDate.now() - nativePerfNow();
   let now = 0;
-  let lastFrame = 0;
+  // Frames are counted, not accumulated: frame n is at (n * 1000) / 60. Adding 1000/60 per frame
+  // drifts above the boundary (frame 6 summed to 100.00000000000001), so advanceTo(100) ran 5
+  // frames, not 6 — and 500 and 2000, on the --timeline default grid, each missed one.
+  let frames = 0;
+  const frameTime = (n) => (n * 1000) / 60;
   let seq = 0;
   let rafQueue = [];
   const timers = new Map();
@@ -96,7 +99,7 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
     let guard = 0;
     while (guard++ < 100000) {
       const timer = nextTimer();
-      const frameAt = lastFrame + FRAME_MS;
+      const frameAt = frameTime(frames + 1);
       const timerAt = timer ? timer[1].due : Infinity;
       const at = Math.min(frameAt, timerAt);
       if (at > target) break;
@@ -107,7 +110,7 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
         else timers.delete(id);
         invoke(entry.callback, entry.args || []);
       } else {
-        lastFrame = frameAt;
+        frames += 1;
         const queue = rafQueue;
         rafQueue = [];
         for (const entry of queue) invoke(entry.callback, [now]);
@@ -170,21 +173,29 @@ export const HOLD_TIMELINE_SCRIPT = `(() => {
     hold(anim);
     return anim;
   };
-  window.__vlmkitSeekTimeline = (t) => {
-    // Late arrivals first: anything running that the events missed (an animation already in
-    // its active phase when the listeners attached) is held at the instant it is found.
+  // Late arrivals: anything the events missed is held at the instant it is found. A CSS animation
+  // still in its delay has fired no animationstart, so both readers sweep: the list read after
+  // advanceTo(0) holds everything that exists then. One a script starts later is held by the seek
+  // that first finds it.
+  const collectLate = () => {
     if (document.getAnimations) for (const anim of document.getAnimations()) hold(anim);
+  };
+  window.__vlmkitSeekTimeline = (t) => {
+    collectLate();
     for (const h of held) {
       try { h.anim.currentTime = Math.max(0, t - h.startAt); } catch {}
     }
   };
-  window.__vlmkitTimelineAnimations = () => held.map((h) => {
-    let timing = {};
-    try { timing = h.anim.effect && h.anim.effect.getComputedTiming ? h.anim.effect.getComputedTiming() : {}; } catch {}
-    return {
-      startMs: h.startAt + (timing.delay || 0),
-      durationMs: typeof timing.duration === "number" ? timing.duration : 0,
-      iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
-    };
-  });
+  window.__vlmkitTimelineAnimations = () => {
+    collectLate();
+    return held.map((h) => {
+      let timing = {};
+      try { timing = h.anim.effect && h.anim.effect.getComputedTiming ? h.anim.effect.getComputedTiming() : {}; } catch {}
+      return {
+        startMs: h.startAt + (timing.delay || 0),
+        durationMs: typeof timing.duration === "number" ? timing.duration : 0,
+        iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
+      };
+    });
+  };
 })()`;
