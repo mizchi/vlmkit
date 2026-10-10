@@ -303,6 +303,13 @@ them, not to re-learn:
   wall-clock settled sweep as "rest": that sweep caught a rAF card mid-motion and called it resting.
 - **Load with the clock held must not wait on page timers.** `settlePage`'s animation wait races a
   page `setTimeout` that never fires; both paths call `settlePage(page, 0, 0)`.
+- **Count frames, never sum them.** Frame n is at `(n * 1000) / 60`. Summing `1000 / 60` drifted
+  above the boundary (frame 6 summed to 100.00000000000001), so `advanceTo(100)` ran 5 frames and
+  500 / 2000 ms — on `--timeline`'s default grid — each ran one short.
+- **The held list is swept, not only event-fed.** `animationstart` has not fired when the list is
+  first read after `advanceTo(0)`, so `__vlmkitTimelineAnimations()` returned an empty list on a
+  page of three CSS animations and `--timeline` picked its instants from the coarse grid alone.
+  Both readers now sweep `document.getAnimations()` first.
 - The contrast collector resolves background from **ancestors only**: white text over a dark
   *sibling* reads as invisible at rest, with or without the timeline.
 

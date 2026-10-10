@@ -13,7 +13,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import { clockSettledAt, deriveAnimationIssues, runAnimationEval } from "./animation-eval.ts";
-import { VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
+import { HOLD_TIMELINE_SCRIPT, VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
+
+async function htmlPage(body: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-clock-"));
+  const path = join(dir, "page.html");
+  await writeFile(path, `<!doctype html><html><head><meta charset="utf-8"></head><body>${body}</body></html>`);
+  return path;
+}
 
 async function scriptPage(script: string, extraCss = ""): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-clock-"));
@@ -228,3 +235,80 @@ test(
     assert.equal(held.evaluated[0]?.visible, true);
   },
 );
+
+test("advanceTo(t) has run exactly floor(t * 60 / 1000) frames: frame n is at (n * 1000) / 60, not a running sum", async () => {
+  // Summing 1000/60 per frame drifted above the boundary: frame 6 summed to 100.00000000000001,
+  // so advanceTo(100) ran 5 frames, and 500 and 2000 (on --timeline's default grid) each one short.
+  const browser = await chromium.launch();
+  try {
+    const ticker = await htmlPage(`<script>window.ran = 0; (function tick() { window.ran++; requestAnimationFrame(tick); })();</script>`);
+    const page = await browser.newPage();
+    await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
+    await page.goto(`file://${ticker}`);
+    const misses = await page.evaluate(async () => {
+      const clock = (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } })
+        .__vlmkitClock;
+      const ran = () => (window as unknown as { ran: number }).ran - 1; // the first call is not a frame
+      const out: string[] = [];
+      for (let k = 1; k <= 3600; k++) {
+        await clock.advanceTo((k * 1000) / 60);
+        if (ran() !== k) out.push(`frame ${k}: ran ${ran()}`);
+      }
+      return out;
+    });
+    assert.deepEqual(misses.slice(0, 5), []);
+
+    const page2 = await browser.newPage();
+    await page2.addInitScript(VIRTUAL_CLOCK_SCRIPT);
+    await page2.goto(`file://${ticker}`);
+    const gridMisses = await page2.evaluate(async () => {
+      const clock = (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } })
+        .__vlmkitClock;
+      const out: string[] = [];
+      for (let t = 50; t <= 12000; t += 50) {
+        await clock.advanceTo(t);
+        const ran = (window as unknown as { ran: number }).ran - 1;
+        if (ran !== Math.floor((t * 60) / 1000)) out.push(`${t}ms: ran ${ran}`);
+      }
+      return out;
+    });
+    assert.deepEqual(gridMisses.slice(0, 5), []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("__vlmkitTimelineAnimations lists every animation before the first seek, delayed CSS ones included", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
+    await page.addInitScript(HOLD_TIMELINE_SCRIPT);
+    const cards = await htmlPage(`<style>
+      @keyframes slide { from { transform: translateX(0); } to { transform: translateX(200px); } }
+      .card { width: 40px; height: 40px; background: #2255cc; animation: slide 300ms linear both; }
+    </style>
+    <div class="card"></div>
+    <div class="card" style="animation-delay: 400ms"></div>
+    <div class="card" style="animation-delay: 800ms"></div>`);
+    await page.goto(`file://${cards}`);
+    const listed = await page.evaluate(async () => {
+      const w = window as unknown as {
+        __vlmkitClock: { advanceTo(ms: number): Promise<number> };
+        __vlmkitTimelineAnimations(): { startMs: number; durationMs: number }[];
+      };
+      await w.__vlmkitClock.advanceTo(0);
+      return w.__vlmkitTimelineAnimations().map((a) => [Math.round(a.startMs), a.durationMs]);
+    });
+    assert.deepEqual(
+      listed.sort((a, b) => a[0]! - b[0]!),
+      [
+        [0, 300],
+        [400, 300],
+        [800, 300],
+      ],
+    );
+  } finally {
+    await browser.close();
+  }
+});
