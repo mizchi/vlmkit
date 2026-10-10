@@ -236,7 +236,7 @@ test(
   },
 );
 
-test("advanceTo(t) has run exactly floor(t * 60 / 1000) frames: frame n is at (n * 1000) / 60, not a running sum", async () => {
+test("advanceTo((n * 1000) / 60) has run exactly n frames, and floor(t * 60 / 1000) on a 50ms grid", async () => {
   // Summing 1000/60 per frame drifted above the boundary: frame 6 summed to 100.00000000000001,
   // so advanceTo(100) ran 5 frames, and 500 and 2000 (on --timeline's default grid) each one short.
   const browser = await chromium.launch();

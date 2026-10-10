@@ -306,15 +306,20 @@ them, not to re-learn:
 - **Count frames, never sum them.** Frame n is at `(n * 1000) / 60`. Summing `1000 / 60` drifted
   above the boundary (frame 6 summed to 100.00000000000001), so `advanceTo(100)` ran 5 frames and
   500 / 2000 ms — on `--timeline`'s default grid — each ran one short.
-- **The held list is swept, not only event-fed.** `animationstart` has not fired when the list is
-  first read after `advanceTo(0)`, so `__vlmkitTimelineAnimations()` returned an empty list on a
-  page of three CSS animations and `--timeline` picked its instants from the coarse grid alone.
-  Both readers now sweep `document.getAnimations()` first.
+- **The held list is swept, not only event-fed.** `animationstart` fires when a CSS animation's
+  delay ends in real time, so the list `--timeline` reads after load held only the animations whose
+  delay had already passed. Which ones depended on load speed: solitaire's glimpses varied run to
+  run (7 to 10) and are 10 every run now, and the rest instant could land before a delayed card
+  finished. Both readers now sweep `document.getAnimations()`, which includes animations still in
+  their delay.
+- **Rest is past the animations the instants sampled, not every listed one.** An exit that begins
+  after the last instant (a toast dismissed at 10s) put rest past it, and the label the toast
+  covered, still, for 10s read as "absent once it stops" (`fixtures/integrity-timeline/late-exit.html`).
 - The contrast collector resolves background from **ancestors only**: white text over a dark
   *sibling* reads as invisible at rest, with or without the timeline.
 
 Fixtures: `fixtures/integrity-timeline/` (held, transient, clean, at-rest, script, fade-in,
-background-late). On the 21 animated pages of the repo `--timeline` changes no verdict and adds no
+background-late, late-exit). On the 21 animated pages of the repo `--timeline` changes no verdict and adds no
 held finding (8 transient glimpses, 7 of them the solitaire deal). Round:
 `docs/reports/2026-10-01-hyperframes-motion-v1.md`.
 

@@ -173,8 +173,10 @@ export const HOLD_TIMELINE_SCRIPT = `(() => {
     hold(anim);
     return anim;
   };
-  // Late arrivals: anything the events missed is held at the instant it is found. Both readers
-  // sweep, so the list a caller picks instants from is the list a seek moves.
+  // Late arrivals: anything the events missed is held at the instant it is found. A CSS animation
+  // still in its delay has fired no animationstart, so both readers sweep: the list read after
+  // advanceTo(0) holds everything that exists then. One a script starts later is held by the seek
+  // that first finds it.
   const collectLate = () => {
     if (document.getAnimations) for (const anim of document.getAnimations()) hold(anim);
   };

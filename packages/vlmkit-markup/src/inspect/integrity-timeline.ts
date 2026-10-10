@@ -182,8 +182,12 @@ export async function sampleIntegrityTimeline(
         findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12),
       });
     }
+    // Rest is past the end of every finite animation that moved the page the instants sampled.
+    // One that has not begun by the last instant did not: a toast dismissed at 10s would put rest
+    // past its exit, and a label it covered, still, for 10s would read as gone once the page stops.
+    const lastInstant = Math.max(0, ...instants);
     const finiteEnds = held
-      .filter((a) => a.iterations !== null)
+      .filter((a) => a.iterations !== null && a.startMs <= lastInstant)
       .map((a) => a.startMs + a.durationMs * (a.iterations ?? 1));
     const restMs = Math.max(2000, ...instants, ...finiteEnds) + 1;
     await advance(restMs);

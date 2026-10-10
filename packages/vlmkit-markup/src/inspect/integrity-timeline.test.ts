@@ -5,7 +5,8 @@
  * between 45% and 55%, `clean.html` moves below it, `at-rest.html` ends on it, and
  * `script.html` does the held motion from a rAF loop instead of CSS. Two more for contrast:
  * `fade-in.html` (text fading in — the animation, not a defect) and `background-late.html`
- * (white text at full opacity whose dark background arrives at 480-800ms).
+ * (white text at full opacity whose dark background arrives at 480-800ms). `late-exit.html`
+ * covers the label with a toast that stays still until it is dismissed at 10s.
  */
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
@@ -58,6 +59,21 @@ test("a defect the page ends in is the settled run's, not repeated per instant",
   assert.doesNotMatch(occluded[0]!.message, /While the page moves/);
   assert.equal(report.timeline?.held, 0);
 });
+
+test(
+  "a toast that covers the label until 10s is a resting defect, not one that is gone once the page stops",
+  { timeout: 120_000 },
+  async () => {
+    // The exit begins after every sampled instant, so it did not move the page that was sampled.
+    // Taking its end as the rest instant put rest at 10301ms with the toast gone, and the
+    // settled run's finding read as motion that clears.
+    const report = await run("late-exit");
+    const occluded = report.findings.filter((x) => x.kind === "occluded-text");
+    assert.equal(occluded.length, 1, JSON.stringify(report.findings.map((x) => [x.kind, x.message])));
+    assert.doesNotMatch(occluded[0]!.message, /While the page moves|absent once it stops/);
+    assert.equal(occluded[0]!.severity, "fail");
+  },
+);
 
 test(
   "script-driven motion: the wall-clock sweep's mid-motion reading is re-tiered by the held timeline",
