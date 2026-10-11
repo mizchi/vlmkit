@@ -45,6 +45,7 @@ nothing — failing on a suspect is the default.
 | Sticky/fixed/snap actually behave | `vlmkit check scroll page.html` |
 | Animations visibly run, settle, respect reduced-motion | `vlmkit check animation page.html` (`--virtual-time` when motion is script-driven: rAF, GSAP, canvas, a timer carousel) |
 | Does anything break WHILE the page moves? (a card sliding over a label, text on a background that has not arrived yet) | `vlmkit check integrity page.html --timeline` — held across instants keeps its severity, a one-instant glimpse is info |
+| SEE the motion: the page at chosen instants, or what an action set moving, as numbered frames to read in order | `vlmkit check animation page.html --at 0..600/100 --frames out/f` (clock held); a `frames` step in an `inspect interact` sequence after the action; `vlmkit snapshot strip --manifest out/f/frames.json` makes one sheet — then Read it |
 | Everything keyboard-operable, ARIA states transition | `vlmkit check interactions page.html` |
 | Clickable `<div>`s / pointer-only controls | `vlmkit scan handlers page.html` |
 | Drag and drop wired but unfireable (a `dragstart` source that is not draggable, a `drop` target with no `dragover`) | `vlmkit scan handlers page.html` |

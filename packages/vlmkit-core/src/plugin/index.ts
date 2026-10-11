@@ -141,6 +141,7 @@ export {
 export {
   firstPositional,
   firstPositionalOrUndefined,
+  instantList,
   numberList,
   numberListFloat,
   optionalInt,

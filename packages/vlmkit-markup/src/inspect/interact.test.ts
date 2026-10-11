@@ -3,6 +3,7 @@ import { describe, it } from "vite-plus/test";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PNG } from "pngjs";
 import { formatInteractReport, runInteract, runInteractCli, type Sequence } from "./interact.ts";
 
 /**
@@ -223,7 +224,7 @@ describe("runInteract", () => {
     const seq = sequence("no-snapshot", [{ action: "click", selector: ".btn-primary" }]);
     await assert.rejects(
       () => runInteract({ source: fixture, sequencePath: seq, outputDir: join(dir, "out-nosnap") }),
-      /at least one `snapshot` step/,
+      /at least one `snapshot` or `frames` step/,
     );
   });
 
@@ -340,6 +341,159 @@ describe("formatInteractReport", () => {
     assert.match(
       plain(formatInteractReport(report, { healAll: true, selectorStepCount: 1 })),
       /heal-all: \d+ strong \+ \d+ weak suggestion\(s\) across 1 selector step\(s\)/,
+    );
+  });
+});
+
+/**
+ * `frames` steps: the motion an action starts, as a `vlmkit-frames/1` sequence. The fixture's
+ * drawer closes with a 220ms linear transform transition and hides itself on `transitionend`
+ * (the docs D17 shape); a timer shows a toast 250ms after the key, fading in over 100ms.
+ */
+describe("runInteract frames steps", () => {
+  const drawer = join(dir, "drawer.html");
+  writeFileSync(
+    drawer,
+    `<!doctype html><meta charset="utf-8"><style>
+  body { margin: 0; background: #fff; }
+  #drawer { position: fixed; left: 0; top: 0; width: 200px; height: 100%; background: #2255cc; transition: transform 220ms linear; }
+  #drawer.closed { transform: translateX(-200px); }
+  #marker { position: fixed; left: 400px; top: 20px; width: 60px; height: 60px; background: #e0a000; display: none; }
+  #toast { position: fixed; left: 400px; top: 200px; width: 120px; height: 40px; background: #119944; animation: pop 100ms linear 1 both; }
+  @keyframes pop { from { opacity: 0; } to { opacity: 1; } }
+</style>
+<div id="drawer"></div><div id="marker"></div>
+<script>
+  const drawer = document.getElementById("drawer");
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    drawer.classList.add("closed");
+    setTimeout(() => { const t = document.createElement("div"); t.id = "toast"; document.body.append(t); }, 250);
+  });
+  drawer.addEventListener("transitionend", () => { drawer.hidden = true; document.getElementById("marker").style.display = "block"; });
+</script>`,
+  );
+  const viewport = { width: 640, height: 400 };
+  const blueWidth = (file: string) => {
+    const png = PNG.sync.read(readFileSync(file));
+    let x = 0;
+    while (x < png.width && png.data[(300 * png.width + x) * 4 + 2]! > 150 && png.data[(300 * png.width + x) * 4]! < 80)
+      x++;
+    return x;
+  };
+  const pixel = (file: string, x: number, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    const i = (y * png.width + x) * 4;
+    return [png.data[i], png.data[i + 1], png.data[i + 2]];
+  };
+
+  it("seeks the transition an action started to each offset after it", async () => {
+    const out = join(dir, "out-frames");
+    const report = await runInteract({
+      source: drawer,
+      sequencePath: sequence(
+        "frames",
+        [
+          { action: "snapshot", name: "open" },
+          { action: "press", key: "Escape" },
+          { action: "frames", name: "close", at: "0..400/50" },
+          { action: "snapshot", name: "closed" },
+        ],
+        viewport,
+      ),
+      outputDir: out,
+    });
+    assert.equal(report.motion, "held");
+    const [seq] = report.frameSequences;
+    assert.equal(seq?.name, "close");
+    assert.deepEqual(seq?.offsets, [0, 50, 100, 150, 200, 250, 300, 350, 400]);
+    assert.deepEqual(seq?.actionsBefore, [{ action: "press", key: "Escape" }]);
+    // translateX(-200px * t / 220): the drawer's visible width is 200 - that, frame by frame —
+    // to the pixel, give or take the antialiased edge. A frame one 60fps tick late is 15px off.
+    const widths = seq!.files.slice(0, 5).map(blueWidth);
+    [0, 50, 100, 150, 200].forEach((t, i) => {
+      const expected = 200 - (200 * t) / 220;
+      assert.ok(
+        Math.abs(widths[i]! - expected) <= 1,
+        `at ${t}ms: ${widths[i]}px visible, expected ${expected.toFixed(1)}`,
+      );
+    });
+    // Seeking the paused transition past its end fires transitionend: the page's own handler ran.
+    assert.deepEqual(pixel(seq!.files[4]!, 410, 30), [255, 255, 255], "no marker before the end");
+    assert.deepEqual(pixel(seq!.files[5]!, 410, 30), [0xe0, 0xa0, 0x00], "transitionend has fired by 250ms");
+    // The toast is the timer's, on the real clock: not there at 0, fully in by 400ms (its timer is
+    // 250ms after the key and its fade 100ms; the 0ms frame is shot a few ms after the key).
+    assert.deepEqual(pixel(seq!.files[8]!, 410, 210), [0x11, 0x99, 0x44]);
+    assert.deepEqual(pixel(seq!.files[0]!, 410, 210), [255, 255, 255], "not before its timer");
+
+    const manifest = JSON.parse(readFileSync(join(out, "close", "frames.json"), "utf8"));
+    assert.equal(manifest.format, "vlmkit-frames/1");
+    assert.equal(manifest.source.clock, "wall");
+    assert.equal(manifest.source.step, "close");
+    assert.equal(manifest.frames.length, 9);
+    for (const f of manifest.frames) {
+      assert.ok(f.shotMs >= f.atMs, `frame at ${f.atMs}ms shot at ${f.shotMs}ms: never before its offset`);
+    }
+    // The snapshots are the page at rest either side of the motion.
+    assert.equal(blueWidth(report.snapshots[0]!.screenshotPath), 200);
+    assert.equal(blueWidth(report.snapshots[1]!.screenshotPath), 0);
+    const md = readFileSync(report.reportPath, "utf8");
+    assert.match(md, /## Frame sequences/);
+    assert.match(md, /\*\*close\*\* — 9 frame\(s\) at 0 \/ 50 \/ .* \/ 400ms after press "Escape"/);
+    assert.match(plain(formatInteractReport(report)), /frames "close": 9 at 0\/50\/100/);
+  });
+
+  it("everyMs / forMs default to 50ms over 500ms, and a frames-only sequence is enough", async () => {
+    const report = await runInteract({
+      source: drawer,
+      sequencePath: sequence(
+        "frames-default",
+        [
+          { action: "press", key: "Escape" },
+          { action: "frames", name: "close" },
+        ],
+        viewport,
+      ),
+      outputDir: join(dir, "out-frames-default"),
+    });
+    assert.equal(report.snapshots.length, 0);
+    assert.equal(report.frameSequences[0]?.count, 11);
+  });
+
+  it("a sequence without frames steps still switches motion off", async () => {
+    const report = await runInteract({
+      source: drawer,
+      sequencePath: sequence(
+        "frames-none",
+        [
+          { action: "snapshot", name: "open" },
+          { action: "press", key: "Escape" },
+          { action: "snapshot", name: "closed" },
+        ],
+        viewport,
+      ),
+      outputDir: join(dir, "out-frames-none"),
+    });
+    assert.equal(report.motion, "disabled");
+    assert.deepEqual(report.frameSequences, []);
+    // `transition: none`: the class lands at once, no transitionend, so the drawer is moved, not hidden.
+    assert.equal(blueWidth(report.snapshots[1]!.screenshotPath), 0);
+  });
+
+  it("checks frames steps before any browser starts", async () => {
+    const run = (steps: Sequence["steps"]) =>
+      runInteract({ source: drawer, sequencePath: sequence("frames-bad", steps), outputDir: join(dir, "out-bad") });
+    await assert.rejects(run([{ action: "frames", name: "" }]), /needs a "name"/);
+    await assert.rejects(run([{ action: "frames", name: "a", at: "0..1s", everyMs: 10 }]), /not both/);
+    await assert.rejects(run([{ action: "frames", name: "a", at: "0..1s" }]), /needs a step/);
+    await assert.rejects(run([{ action: "frames", name: "a", at: [] }]), /lists no offsets/);
+    await assert.rejects(run([{ action: "frames", name: "a", everyMs: 0 }]), /"everyMs" must be > 0/);
+    await assert.rejects(
+      run([
+        { action: "frames", name: "a b" },
+        { action: "frames", name: "a_b" },
+      ]),
+      /distinct name/,
     );
   });
 });

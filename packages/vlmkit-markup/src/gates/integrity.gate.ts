@@ -34,12 +34,21 @@ import {
   type IntegrityImageReport,
   runImageIntegrityCheck,
 } from "../inspect/integrity-image.ts";
+import { resolve } from "node:path";
 import {
   firstPositional,
   firstPositionalOrUndefined,
+  instantList,
   numberList,
   optionalInt,
 } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { formatInstant } from "@mizchi/vlmkit-judge/frames.ts";
+
+/**
+ * This gate's own flags that take a value, so the value is not read as the page source:
+ * `--timeline-at 0,150 page.html` read `0,150` as the page before these were listed.
+ */
+const VALUE_FLAGS = ["--timeline-at", "--frames"];
 
 /** Heights the CLI has always paired with its default sweep widths. */
 const VIEWPORT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
@@ -65,7 +74,9 @@ also has is left to the ordinary run. One HELD across consecutive instants is
 reported at its rule's severity ("While the page moves ..."); one seen at a
 single instant is listed as transient and carries no weight. Instants default to
 each animation's start, middle and end plus 0/250/500/1000/2000ms;
---timeline-at 0,150,300 names them.
+--timeline-at 0,150,300 names them (also 1.5s, 00:01.500, 6f for frame 6 of the
+60fps clock, or a range 0..1s/100ms). --frames <dir> writes the page at each
+instant and at rest as numbered PNGs plus frames.json, one directory per width.
 
 ${ALLOW_HELP}`,
   rules: [
@@ -142,8 +153,15 @@ ${ALLOW_HELP}`,
       name: "timeline-at",
       placeholder: "ms,ms,...",
       kind: "number-list",
-      description: "The instants of page time --timeline judges at",
+      description: "The instants of page time --timeline judges at (ms; on the CLI also 1.5s, 6f, 0..1s/100ms)",
       defaultDescription: "each animation's start/middle/end + 0,250,500,1000,2000",
+    },
+    {
+      name: "frames",
+      placeholder: "dir",
+      kind: "path",
+      description:
+        "With --timeline: write the page at each instant and at rest as numbered PNGs + frames.json (vlmkit-frames/1), into <dir>/<width>/",
     },
     // Spread, not re-declared. Hand-written copies of these three drifted from the
     // fragment: v5's CI agent found the `--wait-until` hint present on `check copy`
@@ -158,7 +176,7 @@ ${ALLOW_HELP}`,
       // Image mode. Deliberately mutually exclusive with a page source rather than
       // "source wins" or "both are measured": the two paths evaluate different rule sets,
       // so a run that quietly picked one would make its verdict ambiguous.
-      if (firstPositionalOrUndefined(argv)) {
+      if (firstPositionalOrUndefined(argv, VALUE_FLAGS)) {
         throw new UsageError(
           "check integrity takes either a page source or --elements, not both. The two modes " +
             "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
@@ -180,6 +198,7 @@ ${ALLOW_HELP}`,
     const source = firstPositional(
       argv,
       "vlmkit check integrity <html-or-url> | --elements <elements.json> [--image <frame.png>]",
+      VALUE_FLAGS,
     );
     const widths = numberList(argv, "viewports");
     if (widths && widths.some((w) => w <= 0)) {
@@ -194,11 +213,12 @@ ${ALLOW_HELP}`,
     // Parsed before the browser starts, so a typo in an exemption fails in
     // milliseconds instead of after a three-viewport sweep.
     const allow = parseAllowRules(readAll(argv, "allow"));
-    const timelineAt = numberList(argv, "timeline-at");
-    if (timelineAt && timelineAt.some((t) => t < 0 || !Number.isFinite(t))) {
-      throw new UsageError("--timeline-at takes instants in ms of page time, e.g. --timeline-at 0,150,300");
-    }
+    const timelineAt = instantList(argv, "timeline-at");
     const timeline = argv.includes("--timeline") || (timelineAt !== undefined && timelineAt.length > 0);
+    const frames = readFlag(argv, "frames");
+    if (frames !== undefined && !timeline) {
+      throw new UsageError("--frames captures the instants --timeline judges: add --timeline or --timeline-at.");
+    }
     return {
       source,
       ...(widths && widths.length > 0
@@ -210,7 +230,14 @@ ${ALLOW_HELP}`,
       ...(storageState ? { storageState } : {}),
       ...(har ? { har } : {}),
       ...(allow.length > 0 ? { allow } : {}),
-      ...(timeline ? { timeline: timelineAt && timelineAt.length > 0 ? { at: timelineAt } : {} } : {}),
+      ...(timeline
+        ? {
+            timeline: {
+              ...(timelineAt && timelineAt.length > 0 ? { at: timelineAt } : {}),
+              ...(frames ? { frames: resolve(frames) } : {}),
+            },
+          }
+        : {}),
     };
   },
   run: (options) => (options.imageMode ? runImageIntegrityCheck(options.imageMode) : runIntegrityCheck(options)),
@@ -230,7 +257,7 @@ ${ALLOW_HELP}`,
     ...(report.timeline?.transient ?? []).map(({ finding, seenAtMs, run }) => ({
       rule: finding.kind,
       severity: "info" as const,
-      message: `Only at ${seenAtMs.join("/")}ms of page time (transient): ${finding.message}`,
+      message: `Only at ${seenAtMs.map(formatInstant).join("/")}ms of page time (transient): ${finding.message}`,
       ...(finding.selector ? { selector: finding.selector } : {}),
       viewport: finding.viewport,
       evidence: { ...(finding.evidence ?? {}), timeline: { seenAtMs, run } },

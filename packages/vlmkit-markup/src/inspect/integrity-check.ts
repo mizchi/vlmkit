@@ -22,6 +22,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
 import { analyzeScrollSamples, COLLECT_SCROLL_SCRIPT, type ScrollScanInput } from "./scroll-scan.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { formatInstant } from "@mizchi/vlmkit-judge/frames.ts";
 import { tierByPersistence } from "@mizchi/vlmkit-judge/persistence.ts";
 import { sampleIntegrityTimeline } from "./integrity-timeline.ts";
 import {
@@ -659,9 +660,10 @@ export interface IntegrityOptions {
   allow?: readonly IntegrityAllowRule[];
   /**
    * Also judge the page across its motion (`integrity-timeline.ts`): at `at` (ms of page time)
-   * or, when that is empty, at each animation's start / middle / end plus a coarse grid.
+   * or, when that is empty, at each animation's start / middle / end plus a coarse grid. With
+   * `frames`, each instant is also captured into `<frames>/<width>/` as a `vlmkit-frames/1` sequence.
    */
-  timeline?: { at?: readonly number[] };
+  timeline?: { at?: readonly number[]; frames?: string };
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -693,6 +695,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   const timelineInstants: IntegrityTimeline["instants"] = [];
   const timelineTransient: IntegrityTimelineRow[] = [];
   let timelineHeld = 0;
+  const timelineFrames: NonNullable<IntegrityTimeline["frames"]> = [];
   // key -> the retained finding, so a repeat at a narrower width records its
   // width instead of being dropped without trace.
   const seen = new Map<string, IntegrityFinding>();
@@ -971,12 +974,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       const perViewport: { rows: ReturnType<typeof tierByPersistence<IntegrityFinding>> }[] = [];
       const restingAnywhere = new Set<string>(exemptedKeys);
       for (const viewport of viewports) {
-        const { samples, rest } = await sampleIntegrityTimeline(
+        const { samples, rest, frames } = await sampleIntegrityTimeline(
           browser,
           url,
           viewport,
           {
             ...(options.timeline.at ? { at: options.timeline.at } : {}),
+            ...(options.timeline.frames ? { frames: options.timeline.frames } : {}),
             ...(options.storageState ? { storageState: options.storageState } : {}),
             ...(options.har ? { har: options.har } : {}),
             ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
@@ -986,6 +990,10 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
           collectors,
         );
         timelineInstants.push({ viewport: viewport.width, atMs: samples.map((sample) => sample.atMs) });
+        if (frames) {
+          const { dir, manifest, count, unstable } = frames;
+          timelineFrames.push({ viewport: viewport.width, dir, manifest, count, unstable });
+        }
         const keyed = samples.map((sample) => ({
           atMs: sample.atMs,
           findings: sample.findings.map((f) => ({ key: dedupeKey(f), finding: f })),
@@ -1013,7 +1021,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
             push([
               {
                 ...row.finding,
-                message: `While the page moves (held ${row.run.fromMs}-${row.run.toMs}ms of page time, ${row.run.samples} instants; absent once it stops${note}): ${row.finding.message}`,
+                message: `While the page moves (held ${formatInstant(row.run.fromMs)}-${formatInstant(row.run.toMs)}ms of page time, ${row.run.samples} instants; absent once it stops${note}): ${row.finding.message}`,
                 evidence: { ...(row.finding.evidence ?? {}), timeline },
               },
             ]);
@@ -1070,6 +1078,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
             instants: timelineInstants,
             held: timelineHeld,
             transient: timelineTransient.filter((row) => keptTransient.has(row.finding)),
+            ...(timelineFrames.length > 0 ? { frames: timelineFrames } : {}),
           },
         }
       : {}),
@@ -1217,19 +1226,27 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
     // The instants are the reading instruction: "held" means held across consecutive ones, so
     // a reader needs to know how far apart they were.
     lines.push(
-      `Timeline: ${t.instants.map((i) => `${i.viewport}px at ${i.atMs.join("/")}ms`).join("; ")}` +
+      `Timeline: ${t.instants.map((i) => `${i.viewport}px at ${i.atMs.map(formatInstant).join("/")}ms`).join("; ")}` +
         ` (page time, clock and animations held) — ${t.held} held finding(s) above, ${t.transient.length} transient`,
     );
     for (const row of t.transient.slice(0, 10)) {
       const f = row.finding;
       lines.push(
-        `  ${DIM}- [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}, only at ${row.seenAtMs.join("/")}ms: ${f.message}${RESET}`,
+        `  ${DIM}- [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}, only at ${row.seenAtMs.map(formatInstant).join("/")}ms: ${f.message}${RESET}`,
       );
     }
     if (t.transient.length > 10) lines.push(`  ${DIM}… ${t.transient.length - 10} more transient${RESET}`);
     if (t.transient.length > 0) {
       lines.push(
         `${DIM}  Transient = seen at no two consecutive instants: a glimpse mid-motion, reported without weight.${RESET}`,
+      );
+    }
+    for (const f of t.frames ?? []) {
+      lines.push(
+        `Frames (${f.viewport}px): ${f.count} written to ${f.dir}, manifest ${f.manifest}` +
+          (f.unstable > 0
+            ? ` — ${YELLOW}${f.unstable} never captured the same twice (motion nothing holds)${RESET}`
+            : ""),
       );
     }
   }

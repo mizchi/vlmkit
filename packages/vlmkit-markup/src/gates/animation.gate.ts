@@ -17,7 +17,8 @@ import {
   formatAnimationEvalReport,
   runAnimationEval,
 } from "@mizchi/vlmkit-animation-eval/animation-eval.ts";
-import { firstPositional, optionalInt, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { firstPositional, instantList, optionalInt, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOptions>({
   id: "check.animation",
@@ -36,7 +37,16 @@ and plays in a browser or a GitHub comment. Needs no extra dependency.
 
 \`--strip out.png\` (or \`.webp\`) writes the sampled frames as ONE image, a row per
 animation, cropped to the motion each one produced — the form to paste into a
-review. \`--frames dir\` writes them as separate files instead.
+review.
+
+\`--frames dir\` writes the whole page at instants of its own time, as numbered
+PNGs (0000-t000000.png, 0001-t000150.png, ...) plus frames.json (vlmkit-frames/1),
+which \`snapshot strip --manifest\` turns into a sheet or an animated PNG. The
+page clock and every animation are held for them, with or without
+\`--virtual-time\`. \`--at\` picks the instants, for --frames and for the strip's
+columns: \`--at 0,150,300\`, \`--at 0..1s/100ms\`, \`--at 1.5s\`, \`--at 6f\` (frame
+6 of the 60fps clock). Without it, frames are taken at each animation's start,
+middle and end plus 0/250/500/1000/2000ms.
 
 \`--virtual-time\` holds the page clock — requestAnimationFrame, performance.now,
 Date, setTimeout, setInterval — from document start and advances it itself, so
@@ -99,7 +109,17 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       name: "frames",
       placeholder: "dir",
       kind: "path",
-      description: "Write each sampled frame PNG into this directory",
+      description:
+        "Write the whole page at each instant (--at) as numbered PNGs + frames.json (vlmkit-frames/1), clock and animations held",
+    },
+    {
+      name: "at",
+      placeholder: "instants",
+      kind: "number-list",
+      description:
+        "Instants of page time for --frames and the strip's columns (ms; on the CLI also 1.5s, 6f, 0..1s/100ms)",
+      defaultDescription:
+        "frames: each animation's start/middle/end + 0,250,500,1000,2000; strip: its window split evenly",
     },
     {
       name: "strip",
@@ -166,6 +186,7 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       "--strip-window",
       "--strip-selector",
       "--clock-window",
+      "--at",
     ]);
     const samples = optionalInt(argv, "samples", { min: 1 });
     const maxAnimations = optionalInt(argv, "max-animations", { min: 1 });
@@ -178,6 +199,16 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
     const stripAnimated = hasFlag(argv, "strip-animated");
     const virtualTime = hasFlag(argv, "virtual-time");
     const clockWindowMs = optionalInt(argv, "clock-window", { min: 1 });
+    const at = instantList(argv, "at");
+    if (at !== undefined) {
+      if (at.length === 0) throw new UsageError("--at names no instant, e.g. --at 0,150,300");
+      if (!framesDir && !stripPath) {
+        throw new UsageError("--at picks the instants for --frames and --strip; add one of them.");
+      }
+      if (stripWindowMs !== undefined) {
+        throw new UsageError("--at names the strip's columns, so --strip-window has nothing left to set.");
+      }
+    }
     const viewport = viewportFlag(argv);
     return {
       source,
@@ -186,6 +217,7 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       ...(maxAnimations !== undefined ? { maxAnimations } : {}),
       ...(settleThresholdMs !== undefined ? { settleThresholdMs } : {}),
       ...(framesDir ? { framesDir } : {}),
+      ...(at ? { at } : {}),
       ...(stripPath ? { stripPath } : {}),
       ...(stripAnimated ? { stripAnimated } : {}),
       ...(virtualTime ? { virtualTime } : {}),

@@ -11,6 +11,7 @@
  *
  * Pure: samples in, tiered rows out. The caller chooses the instants and the key.
  */
+import { thinEvenly } from "./frames.ts";
 
 export interface PersistenceSample<F> {
   /** The instant judged, in ms of page time. */
@@ -108,12 +109,9 @@ export function timelineInstants(
       if (t >= 0 && t <= cap) set.add(Math.round(t));
     }
   }
-  let instants = [...set].sort((a, b) => a - b);
-  if (instants.length > max) {
-    // Evenly thinned, keeping both ends: the first and last instants are the motion's bounds.
-    const step = (instants.length - 1) / (max - 1);
-    instants = Array.from({ length: max }, (_, i) => instants[Math.round(i * step)]!);
-    instants = [...new Set(instants)];
-  }
-  return instants;
+  // Evenly thinned, keeping both ends: the first and last instants are the motion's bounds.
+  return thinEvenly(
+    [...set].sort((a, b) => a - b),
+    max,
+  );
 }

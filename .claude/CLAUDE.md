@@ -323,6 +323,52 @@ background-late, late-exit). On the 21 animated pages of the repo `--timeline` c
 held finding (8 transient glimpses, 7 of them the solitaire deal). Round:
 `docs/reports/2026-10-01-hyperframes-motion-v1.md`.
 
+## Frames: the page at chosen instants (`vlmkit-frames/1`)
+
+```bash
+vlmkit check animation page.html --at 0..600/100 --frames out/f      # whole page per instant, clock held
+vlmkit check integrity page.html --timeline-at 0,250,500 --frames out/tl   # each judged instant + rest, per width
+vlmkit inspect interact page.html --sequence s.json   # { "action": "frames", "name": "close", "at": "0..400/50" } after an action
+vlmkit snapshot strip --manifest out/f/frames.json [--animated] [--max-frames 6]
+```
+
+One format for every numbered capture: `NNNN-t<ms>.png` (position zero-padded, so a glob is in
+order) plus `frames.json` — `{format, source: {tool, url, viewport, deviceScaleFactor, browser,
+clock: held|wall}, frames: [{n, file, atMs, stable, label?, shotMs?}]}`. The pure half is
+`@mizchi/vlmkit-judge/frames.ts` (names, `parseInstants`, `thinEvenly`, `playbackDelays`,
+`parseFramesManifest`); the capture half is `@mizchi/vlmkit-animation-eval/frames-capture.ts`
+(`openHeldTimeline`, `captureStable`, `frameWriter`), which `check integrity --timeline` now
+runs on too — one copy of the hold / advance / seek loop. Measured building it, not to re-learn:
+
+- **One time grammar, `parseInstants`.** `numberList`'s `parseInt` read `--timeline-at 1.5s` as
+  1ms. Bare numbers are ms; `s`, `ms`, `f` (60fps frames), `mm:ss.sss` and `a..b/step`. A range
+  is `start + i * step` (in frames when written in frames), never a running sum — the same drift
+  the held clock had.
+- **A gate's value flags must be listed for `firstPositional`.** `check integrity --timeline-at
+  0,150 page.html` read `0,150` as the page. List every new value flag.
+- **A capture is two shots that agree** (at most three). A seek can be photographed before the
+  compositor applies it; three that never agree are `stable: false` (video, animated image,
+  worker), written anyway and counted, never passed off as the instant.
+- **`check animation --frames` no longer writes the evaluation's internal captures** (`rest`,
+  `anim-0-25`, `t-150ms`: each on its own clock, in an order no glob sorted). It captures the
+  whole page per instant on a fresh held page; `--at` also names the strip's columns, which the
+  2026-08-10 dogfood agent had looked for.
+- **`inspect interact` holds motion only when a `frames` step asks.** Without one it still
+  switches every animation off, byte for byte as before. With one, each animation is held as it
+  begins and a snapshot shows all of them at rest. Offset 0 is two rendering updates after the
+  action returns, and the sweep runs there, because a CSS animation in its delay has fired no
+  `animationstart`. A timer's work is on the real clock (`shotMs`), and no frame is shot before
+  the page has lived that long.
+- **Seeking a paused CSS transition past its end fires `transitionend`** (Chromium 141). Measured on a drawer
+  that hides itself on it: the handler runs between frames. Each frame's drawer edge is exact to
+  the antialiased pixel's coverage (0.55 at 50ms of a 220ms slide).
+- **`setContent` runs no init script**, so the held clock needs a navigated page (`--frames` on
+  inline HTML is refused). `interact` injects the hold after load for that reason, and sweeps
+  up what is already running.
+
+Not built yet, in the order the research put them: a storyboard over a lossless sequence (no VLM
+verdict), `check flash`, and external video files through a decoder the user supplies.
+
 ## Responsive layout as a property-based test (`check responsive`)
 
 ```bash

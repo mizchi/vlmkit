@@ -586,13 +586,13 @@ test(
   "runAnimationEval: a delayed animation has not started at an instant inside its delay",
   { timeout: 120_000 },
   async () => {
-    // The behavioural half. At t=100ms the undelayed element is mid-fade and the one
-    // with a 200ms delay has not moved at all — which is the difference the sheet has
-    // to be able to show, and could not when each row ran on its own clock.
+    // The behavioural half. At t=100ms the undelayed element is mid-slide and the one with a
+    // 200ms delay has not moved at all — which is the difference the sheet has to be able to
+    // show, and could not when each row ran on its own clock. `--at` names the strip's columns
+    // and the frames' instants, so both are asked for the same two.
     const { mkdtemp, readFile } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
-    const { cropRegion, measureChangeMagnitude } = await import("@mizchi/vlmkit-core/png-utils.ts");
     const { PNG } = await import("pngjs");
 
     const source = await animPage(
@@ -604,29 +604,65 @@ test(
     const report = await runAnimationEval({
       source,
       samples: 4,
-      stripWindowMs: 400,
+      at: [100, 400],
       stripPath: join(dir, "strip.png"),
-      framesDir: dir,
+      framesDir: join(dir, "frames"),
+      skipReducedMotion: true,
     });
+    assert.deepEqual(report.strip?.times, [100, 400]);
+    assert.equal(report.strip?.columns, 2);
 
-    const decode = async (name: string) => {
-      const png = PNG.sync.read(await readFile(join(dir, name)));
-      return { width: png.width, height: png.height, data: new Uint8Array(png.data) };
+    const frame = async (name: string) => PNG.sync.read(await readFile(join(dir, "frames", name)));
+    const blue = (png: InstanceType<typeof PNG>, x: number, y: number) => {
+      const i = (y * png.width + x) * 4;
+      return png.data[i]! < 80 && png.data[i + 2]! > 150;
     };
-    const early = await decode("t-100ms.png");
-    const late = await decode("t-400ms.png");
-    const delayed = report.evaluated.find((a) => a.selector === "#b");
-    assert.ok(delayed?.motionBbox, "the delayed animation must still be evaluated");
-    const box = delayed.motionBbox;
-    const region = (frame: Awaited<ReturnType<typeof decode>>) =>
-      cropRegion(frame, box.x, box.y, box.width, box.height);
-    const moved = measureChangeMagnitude(region(early), region(late));
-    assert.ok(
-      moved.changedFraction > 0.05,
-      `the delayed element must look different at 100ms and 400ms, got ${moved.changedFraction}`,
-    );
+    // body padding 20px; #a at y 20-80, #b at y 80-140; both 120px wide; slide is 0 -> 300px.
+    const at100 = await frame("0000-t000100.png");
+    assert.ok(blue(at100, 175, 50) && !blue(at100, 25, 50), "#a is 150px along at 100ms (linear, 200ms)");
+    assert.ok(blue(at100, 25, 110), "#b, 100ms into its 200ms delay, has not moved");
+    const at400 = await frame("0001-t000400.png");
+    assert.ok(blue(at400, 325, 110) && !blue(at400, 25, 110), "#b has finished its slide by 400ms");
   },
 );
+
+test("runAnimationEval: --frames writes a vlmkit-frames/1 sequence", { timeout: 120_000 }, async () => {
+  const { mkdtemp, readdir, readFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { parseFramesManifest } = await import("@mizchi/vlmkit-judge/frames.ts");
+
+  const source = await animPage("#a { animation: slide 400ms linear 1 forwards; }");
+  const dir = join(await mkdtemp(join(tmpdir(), "vlmkit-frames-")), "frames");
+  const report = await runAnimationEval({ source, framesDir: dir, skipReducedMotion: true });
+  // No --at: each animation's start, middle and end (0, 200, 399) plus the coarse grid.
+  assert.deepEqual(report.frames?.instants, [0, 200, 250, 399, 500, 1000, 2000]);
+  const manifest = parseFramesManifest(await readFile(join(dir, "frames.json"), "utf8"));
+  assert.equal(manifest.source.tool, "check animation");
+  assert.equal(manifest.source.clock, "held");
+  assert.deepEqual(manifest.source.viewport, { width: 1280, height: 720 });
+  assert.equal(manifest.source.deviceScaleFactor, 1);
+  assert.match(manifest.source.browser ?? "", /^chromium \d+\./);
+  assert.deepEqual(
+    manifest.frames.map((f) => [f.n, f.file, f.atMs, f.stable]),
+    report.frames!.instants.map((t, n) => [
+      n,
+      `${String(n).padStart(4, "0")}-t${String(t).padStart(6, "0")}.png`,
+      t,
+      true,
+    ]),
+  );
+  // Sorted by name is sorted by time, which is the point of the names.
+  const files = (await readdir(dir)).filter((f) => f.endsWith(".png"));
+  assert.deepEqual(
+    files.sort(),
+    manifest.frames.map((f) => f.file),
+  );
+  assert.deepEqual(
+    report.framePaths,
+    manifest.frames.map((f) => join(dir, f.file)),
+  );
+});
 
 /**
  * The strip's default window follows the finite animations, and its rows can be
