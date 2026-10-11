@@ -1450,30 +1450,30 @@ before it set moving, into `<output-dir>/close/`:
   { "action": "snapshot", "name": "closed" } ] }
 ```
 
-Without a `frames` step, `inspect interact` switches every transition and
-animation off, as it always has. With one, the page keeps its motion. A snapshot,
-and the action a `frames` step records, start from a page at rest: whatever is
-moving, or due to start within a second, is finished with `finish()` — so
-`finished` promises resolve, end events fire, and a stage the page chains from one
-is finished too — until nothing more starts, and an infinite animation (or a loop
-that has restarted itself five times) is paused at 0. Anything scheduled further
-out, such as a toast's auto-dismiss, is left for its time, and one the page paused,
-cancelled or set to rate 0 is left alone. Before any other action only the endless
-ones are paused, so a click on a target that bounces forever lands, and a click
-inside a menu an earlier click opened waits for it the way Playwright always does.
-Only the action right before a `frames` step is held: every animation it starts —
-including in open shadow roots, at its own `playbackRate` and direction — is
-paused as it begins and seeked to each offset, finished (not paused) once an offset
-is past its end, and finished afterwards. A stage the page chains on one of those
-ends is timed from that end, one end at a time. Scroll-driven animations follow the
-scroll and are never held. Offset 0 is two rendering updates after the action
-returns; one a timer starts later sits at the real time it began, and no frame is
-shot before the page has lived that long. The clock is epoch time, so a navigation
-(a link, a reload, a redirect) keeps the offsets, and the new document's motion is
-held from then on; the report says when it happened, and counts held animations
-the page cancelled or retargeted mid-window. Not held: CSS inside an iframe (its
-frames read unstable), and an infinite CSS animation paused at 0 ignores the page's
-own `animation-play-state` from then on.
+`inspect interact` switches every transition and animation off for its run, as it
+always has, and a `frames` step changes nothing about that run: the snapshots,
+transitions and step failures are the same with it as without it. Each `frames`
+step is recorded afterwards on a page of its own. The steps before it replay with
+motion off, then motion goes on — removing `animation: none` restarts every CSS
+animation, so what is moving, or due to start within a second, is finished with
+`finish()` (so `finished` promises resolve, end events fire, and a stage chained on
+one is finished too), and an infinite animation or a self-restarting loop is paused
+at 0. Then the recorded action runs, and every animation it starts — including in
+open shadow roots, at its own `playbackRate` and direction — is paused as it begins
+and seeked to each offset, finished (not paused) once an offset is past its end. A
+stage the page chains on one of those ends, from an end event, an `onfinish` or a
+`finished` promise, is timed from that end, one end at a time. Scroll-driven
+animations follow the scroll and are never held; one that was already running when
+the action was armed (an exit in its delay) keeps its real time. Offset 0 is two
+rendering updates after the action returns; one a timer starts later sits at the
+real time it began, and no frame is shot before the page has lived that long. The
+clock is epoch time, so a navigation (a link, a reload, a redirect) keeps the
+offsets, and the new document's motion is held from then on; the report says when
+it happened, and counts held animations the page cancelled or retargeted
+mid-window. The steps before a frames step therefore run twice — a URL source with
+server state sees their requests twice. Not held: CSS inside an iframe (its frames
+read unstable), and an infinite CSS animation paused at 0 ignores the page's own
+`animation-play-state` from then on.
 Measured on a drawer with a 220ms linear slide that sets `hidden` on
 `transitionend`: at 0 / 50 / 100 / 150 / 200ms its solid width is 200 / 154 / 109 /
 63 / 18px and the antialiased edge pixel is 0.55 / 0.09 / 0.64 / 0.19 covered —

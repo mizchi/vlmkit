@@ -359,43 +359,47 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   `anim-0-25`, `t-150ms`: each on its own clock, in an order no glob sorted). It captures the
   uncropped viewport per instant on a fresh held page; `--at` also names the strip's columns, which the
   2026-08-10 dogfood agent had looked for.
-- **`inspect interact` holds only the action a `frames` step records.** Without a `frames` step
-  it still switches every animation off, byte for byte as before. Three review rounds found the
-  ways a held page broke; each fixed one is a test, 27 in all, in `interact.test.ts`'s last three
-  `describe`s, and each fails on the version before its fix. The design that survived: motion
-  runs live. A snapshot (and the action a `frames` step records) starts from a page at rest —
-  what is moving, or due to start within 1s, is `finish()`ed (never seeked to its end: paused
-  there, `finished` never resolves) until nothing more starts; an infinite animation, or a loop
-  that has restarted itself 5 times, is paused at 0. Any other action only gets the endless ones
-  paused — a bouncing target is never "stable" to click — because finishing everything before
-  every action ran a toast's 4s auto-dismiss early and the Undo the next step clicked was gone.
-  Only the action right before a `frames` step is armed. Measured on Chromium 141, not to re-learn:
+- **`inspect interact` records a `frames` step on a page of its own.** The main run — snapshots,
+  transitions, step failures, the report — is the motion-off run a sequence without frames steps
+  gets, byte for byte; a frames step is skipped there. Then each frames step gets its own page:
+  the steps before it replay with motion off, motion goes on (removing `animation: none` restarts
+  every CSS animation), what that restarted is landed, and the recorded action runs with every
+  animation it starts held. Not to re-learn: three versions landed motion on the main run, and
+  four review rounds kept finding pages each policy broke — holding everything froze a menu an
+  earlier click opened; finishing everything before each action ran a toast's 4s auto-dismiss
+  early; finishing nothing timed out a click on a 7s attention-seeker and on a self-restarting
+  pulse. No landing policy matches motion-off for every page, so the main run gets none. The
+  cost: the steps before each frames step run twice (a URL source with server state sees their
+  requests twice). The 34 tests in `interact.test.ts`'s last four `describe`s cover what the
+  rounds found. Inside the window, measured on Chromium 141:
+  - Land by `finish()` (paused at its end, `finished` never resolves), only what is moving or due
+    within 1s; an infinite animation, or a loop finished 5 times in one landing, is paused at 0;
+    one the page paused, cancelled or set to rate 0 is the page's.
   - `document.getAnimations()` leaves out shadow roots, and `animationstart` / `transitionrun`
-    are not composed: walk open shadow roots, or a component's `el.animate()` stays paused.
-  - A scroll-driven animation's `endTime` is a percentage (`CSSUnitValue`); pausing it froze a
-    progress bar for good. Hold only `DocumentTimeline` animations.
-  - Once paused through the API, a CSS animation outlives its `animation-name`: a finished stage
-    whose class the page swapped kept its fill. Cancel one whose name its element no longer lists
-    — compared escaped too: computed style serialises `slide:in` as `slide\:in`.
-  - Setting `currentTime` on a cancelled (`idle`) animation revives it; a rate-0 one is the page's.
-  - Position by `playbackRate` and direction (`reverse()` toggles), take over one the page resumes
-    after it was held, hold `el.animate()` a microtask later (a scrubber the page pauses at once
-    is the page's), and take its start as `now - currentTime` (`animationstart` fires after the
-    delay).
-  - A stage chained on a held animation's end is timed from THAT end. Ends are taken one at a
-    time, earliest first (with two ends in one window, the later stage was timed from the earlier
-    end), and the origin goes only to what begins while that end event is dispatched (CSS) or in
-    the task that finished it (a `finished` promise). Given to anything held before the next seek,
-    an unrelated timer's slide took a fade's end as its start.
-  - Time is `timeOrigin + now`, and every evaluate, `ensureHold` included, survives up to 5
-    navigations (`liveEval`): a click that left on a timer destroyed the context mid-settle, and a
-    splash page that forwards itself did it twice. The document is checked again after each frame
-    is shot, so one that commits during the shot is reported.
-  Offset 0 is two rendering updates after the action returns. A timer's work is on the real clock
-  (`shotMs`, read just before the shot that is kept), no frame is shot before the page has lived
-  that long, and a held animation the page cancels or retargets mid-window is counted and named.
-  Left as limits: an infinite CSS animation paused at 0 ignores the page's `animation-play-state`
-  from then on, and CSS inside an iframe is not held (its frames read unstable).
+    are not composed: walk open shadow roots.
+  - A scroll-driven animation's `endTime` is a percentage (`CSSUnitValue`); hold only
+    `DocumentTimeline` animations.
+  - Once paused through the API, a CSS animation outlives its `animation-name`: cancel one whose
+    name its element no longer lists — compared escaped too (`slide:in` serialises as `slide\:in`).
+  - Setting `currentTime` on a cancelled (`idle`) animation revives it.
+  - Position by `playbackRate` and direction; take over one the page resumes or reverses after it
+    was held; hold `el.animate()` a microtask later (a scrubber paused at once is the page's);
+    take its start as `now - currentTime` (`animationstart` fires after the delay); and leave
+    what was already running when armed (a toast's exit in its delay) at its real time.
+  - A stage chained on a held animation's end is timed from THAT end: ends one at a time,
+    earliest first, each used once (a pulse restarted on its own end matched its first stage);
+    the origin goes to what begins while the end event — or a Web Animation's `finish`, listened
+    to from creation, before the page's `onfinish` — is dispatched, and is swept in the task
+    after, since a class added there (or in a `finished` promise, or behind `stopPropagation`)
+    becomes an animation only when style is computed. More than 16 ends before one offset are
+    finished together.
+  - Time is `timeOrigin + now`; every evaluate survives up to 5 navigations, and the document is
+    checked again after each frame is shot.
+  Offset 0 is two rendering updates after the action returns; a timer's work is on the real clock
+  (`shotMs`, read just before the shot that is kept); a held animation the page cancels or
+  retargets mid-window is counted and named. Left as limits: CSS inside an iframe is not held
+  (its frames read unstable), and an infinite CSS animation paused at 0 ignores the page's
+  `animation-play-state` from then on.
 - **Seeking a paused CSS transition past its end fires `transitionend`** (Chromium 141). Measured on a drawer
   that hides itself on it: the handler runs between frames. Each frame's drawer edge is right to
   within 0.01 of the antialiased pixel's coverage (0.55 at 50ms of a 220ms slide, where 154.55px is due).

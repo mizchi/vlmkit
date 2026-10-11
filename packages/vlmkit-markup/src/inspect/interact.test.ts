@@ -403,7 +403,6 @@ describe("runInteract frames steps", () => {
       ),
       outputDir: out,
     });
-    assert.equal(report.motion, "live");
     const [seq] = report.frameSequences;
     assert.equal(seq?.name, "close");
     assert.deepEqual(seq?.offsets, [0, 50, 100, 150, 200, 250, 300, 350, 400]);
@@ -474,7 +473,6 @@ describe("runInteract frames steps", () => {
       ),
       outputDir: join(dir, "out-frames-none"),
     });
-    assert.equal(report.motion, "disabled");
     assert.deepEqual(report.frameSequences, []);
     // `transition: none`: the class lands at once, no transitionend, so the drawer is moved, not hidden.
     assert.equal(blueWidth(report.snapshots[1]!.screenshotPath), 0);
@@ -562,7 +560,7 @@ describe("runInteract with frames steps leaves the page's own motion logic worki
     assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 300, 180), [0xff, 0xcc, 0x00], "the click landed");
   });
 
-  it("a Web Animation's finished promise resolves, at a snapshot and inside a frames window", async () => {
+  it("a Web Animation's finished promise resolves once a frame is past its end", async () => {
     // `el.animate(...).finished.then(hide)`: rested by a seek it stayed paused at its end, so the
     // dialog never closed.
     const source = page(
@@ -571,12 +569,6 @@ describe("runInteract with frames steps leaves the page's own motion logic worki
        <div id="d"></div><button id="cl" style="position:fixed;left:200px;top:0">close</button>
        <script>cl.onclick=()=>d.animate([{opacity:1},{opacity:0}],200).finished.then(()=>d.hidden=true);</script>`,
     );
-    const snap = await run(source, "finished-snap", [
-      { action: "click", selector: "#cl" },
-      { action: "snapshot", name: "s" },
-      ...tail,
-    ]);
-    assert.deepEqual(rgb(snap.snapshots[0]!.screenshotPath, 50, 50), [255, 255, 255]);
     const frames = await run(source, "finished-frames", [
       { action: "click", selector: "#cl" },
       { action: "frames", name: "f", at: [0, 100, 300] },
@@ -587,44 +579,38 @@ describe("runInteract with frames steps leaves the page's own motion logic worki
   });
 
   it("an animation the page cancelled stays cancelled", async () => {
+    // Setting currentTime on a cancelled (idle) animation revives it, fill and all.
     const source = page(
       "cancel",
       `<style>#b{width:100px;height:100px;background:#0000ff}</style><div id="b"></div>
-       <button id="a">a</button><button id="c">c</button>
-       <script>let an; a.onclick=()=>{an=b.animate([{background:"red"}],{duration:200,fill:"forwards"})}; c.onclick=()=>an.cancel();</script>`,
+       <button id="a">a</button>
+       <script>a.onclick=()=>{const an=b.animate([{background:"red"}],{duration:400,fill:"forwards"}); setTimeout(()=>an.cancel(),150)};</script>`,
     );
     const report = await run(source, "cancel", [
       { action: "click", selector: "#a" },
-      { action: "snapshot", name: "s1" },
-      { action: "click", selector: "#c" },
-      { action: "snapshot", name: "s2" },
-      ...tail,
+      { action: "frames", name: "f", at: [0, 300] },
     ]);
-    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 50, 50), [255, 0, 0]);
-    assert.deepEqual(rgb(report.snapshots[1]!.screenshotPath, 50, 50), [0, 0, 255], "not revived by the next snapshot");
+    const seq = report.frameSequences[0]!;
+    assert.deepEqual(rgb(seq.files[1]!, 50, 50), [0, 0, 255], "not revived by the next seek");
+    assert.ok(seq.cancelled >= 1);
   });
 
-  it("a stage the page starts on the previous one's animationend is finished before the snapshot", async () => {
+  it("landing the page finishes a stage the page chains on the previous one's animationend", async () => {
+    // Motion goes on for a frames step by removing `animation: none`, which restarts both stages:
+    // landing finishes the first, lets the page start the second, and finishes that too.
     const source = page(
       "chain",
       `<style>#k{width:100px;height:100px;background:#0000ff}
        @keyframes mv{to{margin-left:200px}} @keyframes rd{to{background:#ff0000}}
        .s1{animation:mv 300ms forwards} .s1.s2{animation:mv 300ms forwards, rd 300ms forwards}</style>
-       <div id="k"></div><button id="go">go</button>
-       <script>go.onclick=()=>k.classList.add("s1"); k.addEventListener("animationend",(e)=>{if(e.animationName==="mv")k.classList.add("s2")});</script>`,
+       <div id="k" class="s1"></div>
+       <script>k.addEventListener("animationend",(e)=>{if(e.animationName==="mv")k.classList.add("s2")});</script>`,
     );
     const report = await run(source, "chain", [
-      { action: "click", selector: "#go" },
-      { action: "snapshot", name: "s1" },
-      { action: "snapshot", name: "s2" },
-      ...tail,
+      { action: "press", key: "x" },
+      { action: "frames", name: "f", at: [0] },
     ]);
-    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 250, 50), [255, 0, 0], "both stages at rest");
-    assert.equal(
-      report.transitions[0]!.diffPixels,
-      0,
-      "two snapshots with no action between them are the same picture",
-    );
+    assert.deepEqual(rgb(report.frameSequences[0]!.files[0]!, 250, 50), [255, 0, 0], "both stages at rest");
   });
 
   it("an animation the page itself paused is left where the page put it", async () => {
@@ -632,8 +618,11 @@ describe("runInteract with frames steps leaves the page's own motion logic worki
       "paused",
       `<style>@keyframes grow{to{width:200px}} #r{height:50px;width:0;background:#ff0000;animation:grow 1s linear forwards paused}</style><div id="r"></div>`,
     );
-    const report = await run(source, "paused", [{ action: "snapshot", name: "s" }, ...tail]);
-    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 100, 25), [255, 255, 255]);
+    const report = await run(source, "paused", [
+      { action: "press", key: "x" },
+      { action: "frames", name: "f", at: [0] },
+    ]);
+    assert.deepEqual(rgb(report.frameSequences[0]!.files[0]!, 100, 25), [255, 255, 255]);
   });
 
   it("an Animation the page replays is held and seeked like a new one", async () => {
@@ -759,7 +748,7 @@ describe("runInteract frames steps on harder pages", () => {
       `got ${got.join(",")}, want ${want.join(",")}`,
     );
 
-  it("a component's own el.animate() in a shadow root is finished, and its finished handler runs", async () => {
+  it("a component's own el.animate() in a shadow root is held, and finished past its end", async () => {
     const source = page(
       "shadow-waapi",
       `<x-panel></x-panel><script>
@@ -773,12 +762,11 @@ describe("runInteract frames steps on harder pages", () => {
     );
     const report = await run(source, "shadow-waapi", [
       { action: "click", selector: "x-panel >> #c" },
-      { action: "frames", name: "f", at: [0, 100] },
-      { action: "wait", ms: 200 },
-      { action: "snapshot", name: "s" },
+      { action: "frames", name: "f", at: [0, 200, 500] },
     ]);
-    assert.deepEqual(report.stepFailures, []);
-    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 50, 50), [0xff, 0xcc, 0x00]);
+    const [f0, f200, f500] = report.frameSequences[0]!.files;
+    near([runWidth(f0!, 50, blue), runWidth(f200!, 50, blue)], [300, 150]);
+    assert.deepEqual(rgb(f500!, 50, 50), [0xff, 0xcc, 0x00], "its finished handler ran");
   });
 
   it("a CSS transition in a shadow root is held and seeked", async () => {
@@ -809,14 +797,12 @@ describe("runInteract frames steps on harder pages", () => {
       `<style>@keyframes grow{to{width:200px}} #bar{position:fixed;top:0;left:0;height:20px;width:0;background:#00a000;animation:grow linear both;animation-timeline:scroll(root)}</style>
        <div id="bar"></div><div style="height:2000px"></div>`,
     );
-    // A snapshot before the scroll settles the page; pausing the bar there froze it at 0.
+    // Landing the page before the scroll paused the bar there, at 0, for good.
     const report = await run(source, "scroll-timeline", [
-      { action: "snapshot", name: "top" },
       { action: "scroll", y: 1800 },
-      { action: "snapshot", name: "s" },
-      ...tail,
+      { action: "frames", name: "f", at: [0] },
     ]);
-    assert.deepEqual(rgb(report.snapshots[1]!.screenshotPath, 150, 10), [0, 0xa0, 0], "the bar is full at the bottom");
+    assert.deepEqual(rgb(report.frameSequences[0]!.files[0]!, 150, 10), [0, 0xa0, 0], "the bar is full at the bottom");
   });
 
   it("reverse() and playbackRate are positioned at the animation's own rate", async () => {
@@ -918,19 +904,14 @@ describe("runInteract frames steps on harder pages", () => {
     assert.match(readFileSync(report.reportPath, "utf8"), /cancelled or replaced by the page mid-window/);
   });
 
-  it("a loop that restarts itself from its own end is paused at its start for a snapshot", async () => {
+  it("a loop that restarts itself from its own end is paused at its start when the page is landed", async () => {
     const source = page(
       "loop",
       `<div id="p" style="height:100px;background:#2255cc"></div>
        <script>const a=p.animate([{width:"400px"},{width:"0px"}],{duration:2000}); a.onfinish=()=>a.play();</script>`,
     );
-    const report = await run(source, "loop", [
-      { action: "snapshot", name: "s1" },
-      { action: "snapshot", name: "s2" },
-      ...tail,
-    ]);
-    near([runWidth(report.snapshots[0]!.screenshotPath, 50, blue)], [400]);
-    assert.equal(report.transitions[0]!.diffPixels, 0);
+    const report = await run(source, "loop", [...tail]);
+    near([runWidth(report.frameSequences[0]!.files[0]!, 50, blue)], [400]);
   });
 
   it("a frames-only sequence's report does not claim snapshots or visible change", async () => {
@@ -1129,23 +1110,20 @@ describe("runInteract frames steps: landing and chains", () => {
       [0, 100, 200, 300, 400],
     );
     assert.equal(report.frameSequences[0]!.cancelled, 0);
-    near([blueRun(report.snapshots[0]!.screenshotPath, 30)], [400]);
   });
 
-  it("a pulse the page repeats three times on purpose reaches its done state", async () => {
+  it("a pulse the page repeats three times on purpose reaches its done state when the page is landed", async () => {
     const source = page(
       "thrice",
-      `<div id="p" style="width:100px;height:50px;background:#888"></div><button id="b" style="position:fixed;left:450px;top:150px">b</button>
-       <script>b.onclick=()=>{let n=0; const a=p.animate([{opacity:1},{opacity:.3}],{duration:150});
-         a.onfinish=()=>{ if(++n<3) a.play(); else document.body.style.background="#00a000"; };}</script>`,
+      `<div id="p" style="width:100px;height:50px;background:#888"></div>
+       <script>let n=0; const a=p.animate([{opacity:1},{opacity:.3}],{duration:1000});
+         a.onfinish=()=>{ if(++n<3) a.play(); else document.body.style.background="#00a000"; };</script>`,
     );
     const report = await run(source, "thrice", [
-      { action: "click", selector: "#b" },
-      { action: "snapshot", name: "s" },
       { action: "press", key: "x" },
       { action: "frames", name: "f", at: [0] },
     ]);
-    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 300, 100), [0, 0xa0, 0]);
+    assert.deepEqual(rgb(report.frameSequences[0]!.files[0]!, 300, 100), [0, 0xa0, 0]);
   });
 
   it("an animation the page holds still at rate 0 is left where the page put it", async () => {
@@ -1202,5 +1180,166 @@ describe("runInteract frames steps: landing and chains", () => {
     } finally {
       server.close();
     }
+  });
+});
+
+/**
+ * The fourth review round: chains the page builds from an end by every route, and a frames step
+ * recorded on a page of its own, so the snapshots never change because one is there.
+ */
+describe("runInteract frames steps: chains and the main run", () => {
+  const page = (name: string, body: string) => {
+    const file = join(dir, `${name}.html`);
+    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#fff}</style>${body}`);
+    return file;
+  };
+  const rgb = (file: string, x: number, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    const i = (y * png.width + x) * 4;
+    return [png.data[i], png.data[i + 1], png.data[i + 2]];
+  };
+  const blueRun = (file: string, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    let x = 0;
+    while (x < png.width && png.data[(y * png.width + x) * 4]! < 80 && png.data[(y * png.width + x) * 4 + 2]! > 150)
+      x++;
+    return x;
+  };
+  const run = (source: string, name: string, steps: Sequence["steps"]) =>
+    runInteract({
+      source,
+      sequencePath: sequence(name, steps, { width: 500, height: 200 }),
+      outputDir: join(dir, `out4-${name}`),
+    });
+  const near = (got: number[], want: number[], tolerance = 3) =>
+    assert.ok(
+      got.length === want.length && got.every((g, i) => Math.abs(g - want[i]!) <= tolerance),
+      `got ${got.join(",")}, want ${want.join(",")}`,
+    );
+  const slide = `@keyframes sl{from{width:0}to{width:400px}} #k{width:0;height:60px;background:#2255cc} #k.s2{animation:sl 400ms linear forwards}`;
+  const chain = [
+    { action: "click", selector: "#b" },
+    { action: "frames", name: "f", at: [300, 400, 500, 600] },
+  ] as Sequence["steps"];
+  const button = `<button id="b" style="position:fixed;left:450px;top:150px">b</button>`;
+
+  it("a stage chained in a handler that stops propagation is timed from the end", async () => {
+    const source = page(
+      "chain-stop",
+      `<style>@keyframes st{to{opacity:.9}} ${slide} #k.s1{animation:st 250ms forwards}</style><div id="k"></div>${button}
+       <script>b.onclick=()=>k.classList.add("s1"); k.addEventListener("animationend",(e)=>{e.stopPropagation(); if(e.animationName==="st"){k.classList.remove("s1");k.classList.add("s2")}});</script>`,
+    );
+    near(
+      (await run(source, "chain-stop", chain)).frameSequences[0]!.files.map((f) => blueRun(f, 50)),
+      [50, 150, 250, 350],
+    );
+  });
+
+  it("a CSS stage chained on a Web Animation's finished promise is timed from its end", async () => {
+    const source = page(
+      "chain-promise",
+      `<style>${slide}</style><div id="k"></div>${button}
+       <script>b.onclick=()=>k.animate([{opacity:1},{opacity:.9}],{duration:250}).finished.then(()=>k.classList.add("s2"));</script>`,
+    );
+    near(
+      (await run(source, "chain-promise", chain)).frameSequences[0]!.files.map((f) => blueRun(f, 50)),
+      [50, 150, 250, 350],
+    );
+  });
+
+  it("a stage started in a Web Animation's onfinish is timed from its end", async () => {
+    const source = page(
+      "chain-onfinish",
+      `<div id="k" style="width:0;height:60px;background:#2255cc"></div>${button}
+       <script>b.onclick=()=>{const a=k.animate([{opacity:1},{opacity:.9}],{duration:250});
+         a.onfinish=()=>k.animate([{width:"0px"},{width:"400px"}],{duration:400,fill:"forwards"});};</script>`,
+    );
+    near(
+      (await run(source, "chain-onfinish", chain)).frameSequences[0]!.files.map((f) => blueRun(f, 50)),
+      [50, 150, 250, 350],
+    );
+  });
+
+  it("a pulse the page restarts on its own end is timed from each end, not the first", async () => {
+    const source = page(
+      "restart-chain",
+      `<style>@keyframes pu{to{opacity:.8}} #k{width:200px;height:60px;background:#2255cc} #k.on{animation:pu 100ms}</style><div id="k"></div>${button}
+       <script>let n=0; b.onclick=()=>k.classList.add("on");
+       k.addEventListener("animationend",()=>{k.classList.remove("on"); if(++n<3){void k.offsetWidth; k.classList.add("on")} else document.body.style.background="#00a000"});</script>`,
+    );
+    const report = await run(source, "restart-chain", [
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "f", at: [50, 150, 250, 350] },
+    ]);
+    const done = report.frameSequences[0]!.files.map((f) => rgb(f, 300, 100).join(",") === "0,160,0");
+    assert.deepEqual(done, [false, false, false, true], "three 100ms pulses end at 300ms");
+  });
+
+  it("every end before an offset is finished, however many there are", async () => {
+    const items = Array.from(
+      { length: 12 },
+      (_, i) => `<div class="it" style="animation-delay:${i * 50}ms"></div>`,
+    ).join("");
+    const source = page(
+      "stagger",
+      `<style>@keyframes gr{from{width:100px}to{width:400px}} .it{width:100px;height:10px;background:#2255cc;margin-bottom:2px} .go .it{animation:gr 300ms linear}</style>
+       <div id="w">${items}</div>${button}<script>b.onclick=()=>w.classList.add("go")</script>`,
+    );
+    const report = await run(source, "stagger", [
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "f", at: [1000] },
+    ]);
+    const file = report.frameSequences[0]!.files[0]!;
+    // Every item back at its own width (no fill) — none held 0.05ms short of its last keyframe.
+    near(
+      Array.from({ length: 12 }, (_, i) => blueRun(file, i * 12 + 5)),
+      Array(12).fill(100),
+      1,
+    );
+  });
+
+  it("an animation already waiting when the action is armed keeps its real time", async () => {
+    // Its 1.5s delay restarts when motion goes on, which is before the action: rewound to offset 0
+    // it read 100px at 1600ms; at its real time it is 150px or more in.
+    const source = page(
+      "waiting",
+      `<style>@keyframes gr{from{width:0}to{width:400px}} #k{width:0;height:60px;background:#2255cc;animation:gr 400ms linear 1500ms forwards}</style><div id="k"></div>`,
+    );
+    const report = await run(source, "waiting", [
+      { action: "press", key: "x" },
+      { action: "frames", name: "f", at: [0, 1600] },
+    ]);
+    const [at0, at1600] = report.frameSequences[0]!.files.map((f) => blueRun(f, 30));
+    assert.equal(at0, 0);
+    assert.ok(at1600! >= 140, `at 1600ms: ${at1600}px`);
+  });
+
+  it("the snapshots are the same with a frames step as without one", async () => {
+    // A 7.2s attention-seeker on the click target: a landing policy that left finite motion running
+    // timed this click out, one that finished everything ran a toast's exit early. With the frames
+    // step on its own page, no policy touches the run the snapshots come from.
+    const source = page(
+      "main-run",
+      `<style>@keyframes b{to{transform:translateX(200px)}} #cta{margin:40px} #cta.shake{animation:b 600ms linear 12}
+       #panel{display:none;width:100px;height:40px;background:#00a000} #panel.on{display:block}</style>
+       <button id="start">start</button><button id="cta">go</button><div id="panel"></div><button id="k">k</button>
+       <script>start.onclick=()=>cta.classList.add("shake"); cta.onclick=()=>panel.classList.add("on")</script>`,
+    );
+    const steps: Sequence["steps"] = [
+      { action: "click", selector: "#start" },
+      { action: "click", selector: "#cta" },
+      { action: "snapshot", name: "s" },
+    ];
+    const without = await run(source, "main-run-without", steps);
+    const withFrames = await run(source, "main-run-with", [
+      ...steps,
+      { action: "click", selector: "#k" },
+      { action: "frames", name: "f", at: [0] },
+    ]);
+    assert.deepEqual(withFrames.stepFailures, without.stepFailures);
+    assert.ok(
+      readFileSync(withFrames.snapshots[0]!.screenshotPath).equals(readFileSync(without.snapshots[0]!.screenshotPath)),
+      "byte-identical snapshot",
+    );
   });
 });
