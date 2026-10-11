@@ -1021,3 +1021,186 @@ describe("runInteract frames steps on harder pages", () => {
     });
   });
 });
+
+/** The third review round: what landing the page must not time-travel, and chains with two ends. */
+describe("runInteract frames steps: landing and chains", () => {
+  const page = (name: string, body: string) => {
+    const file = join(dir, `${name}.html`);
+    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#fff}</style>${body}`);
+    return file;
+  };
+  const rgb = (file: string, x: number, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    const i = (y * png.width + x) * 4;
+    return [png.data[i], png.data[i + 1], png.data[i + 2]];
+  };
+  const blueRun = (file: string, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    let x = 0;
+    while (x < png.width && png.data[(y * png.width + x) * 4]! < 80 && png.data[(y * png.width + x) * 4 + 2]! > 150)
+      x++;
+    return x;
+  };
+  const run = (source: string, name: string, steps: Sequence["steps"]) =>
+    runInteract({
+      source,
+      sequencePath: sequence(name, steps, { width: 500, height: 200 }),
+      outputDir: join(dir, `out3-${name}`),
+    });
+  const near = (got: number[], want: number[], tolerance = 3) =>
+    assert.ok(
+      got.length === want.length && got.every((g, i) => Math.abs(g - want[i]!) <= tolerance),
+      `got ${got.join(",")}, want ${want.join(",")}`,
+    );
+
+  it("a toast's auto-dismiss scheduled seconds out is not run early, so its Undo can still be clicked", async () => {
+    const source = page(
+      "toast",
+      `<style>@keyframes tin{from{opacity:0}} @keyframes tout{to{opacity:0}}
+       #t{display:none;position:fixed;left:0;top:0;width:200px;height:60px;background:#333} #t.on{display:block;animation:tin 200ms,tout 200ms 4s forwards}</style>
+       <button id="del" style="position:fixed;left:300px;top:0">del</button><div id="t"><button id="undo">undo</button></div>
+       <button id="other" style="position:fixed;left:300px;top:100px">o</button>
+       <script>del.onclick=()=>t.classList.add("on"); t.addEventListener("animationend",(e)=>{if(e.animationName==="tout")t.remove()});
+       undo.onclick=()=>document.body.style.background="#00a000";</script>`,
+    );
+    const report = await run(source, "toast", [
+      { action: "click", selector: "#del" },
+      { action: "click", selector: "#undo" },
+      { action: "snapshot", name: "s" },
+      { action: "click", selector: "#other" },
+      { action: "frames", name: "f", at: [0] },
+    ]);
+    assert.deepEqual(report.stepFailures, []);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 400, 180), [0, 0xa0, 0]);
+  });
+
+  it("a timer's animation is not timed from an unrelated fade's end", async () => {
+    const source = page(
+      "leak",
+      `<style>@keyframes f{to{opacity:.4}} @keyframes sl{from{width:0}to{width:400px}}
+       #a{width:50px;height:20px;background:#999} #a.go{animation:f 100ms forwards}
+       #s{width:0;height:60px;background:#2255cc} #s.go{animation:sl 400ms linear forwards}</style>
+       <div id="a"></div><div id="s"></div><button id="b" style="position:fixed;left:450px;top:150px">b</button>
+       <script>b.onclick=()=>{a.classList.add("go"); setTimeout(()=>s.classList.add("go"),200)}</script>`,
+    );
+    const report = await run(source, "leak", [
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "f", at: [150, 350] },
+    ]);
+    // The timer fires ~170-200ms after offset 0 (it is real time), so at 350 the slide is
+    // 150-180ms in. Timed from the fade's end (100) it read 250.
+    const at350 = blueRun(report.frameSequences[0]!.files[1]!, 50);
+    assert.ok(at350 >= 130 && at350 <= 220, `slide at 350ms: ${at350}px`);
+  });
+
+  it("a stage chained on the later of two ends is timed from that end", async () => {
+    const source = page(
+      "two-ends",
+      `<style>@keyframes f{to{opacity:.4}} @keyframes st{to{opacity:.9}} @keyframes sl{from{width:0}to{width:400px}}
+       #a{width:50px;height:20px;background:#999} #a.go{animation:f 100ms forwards}
+       #k{width:0;height:60px;background:#2255cc} #k.s1{animation:st 250ms forwards} #k.s2{animation:sl 400ms linear forwards}</style>
+       <div id="a"></div><div id="k"></div><button id="b" style="position:fixed;left:450px;top:150px">b</button>
+       <script>b.onclick=()=>{a.classList.add("go"); k.classList.add("s1")};
+       k.addEventListener("animationend",(e)=>{if(e.animationName==="st"){k.classList.remove("s1");k.classList.add("s2")}});</script>`,
+    );
+    const report = await run(source, "two-ends", [
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "f", at: [300, 400, 500, 600] },
+    ]);
+    near(
+      report.frameSequences[0]!.files.map((f) => blueRun(f, 50)),
+      [50, 150, 250, 350],
+    );
+  });
+
+  it("an animation whose keyframes name CSS has to escape is not mistaken for a removed one", async () => {
+    const source = page(
+      "escaped",
+      `<style>@keyframes slide\\:in{from{width:0}to{width:400px}} #e{width:0;height:60px;background:#2255cc} #e.go{animation:slide\\:in 400ms linear forwards}</style>
+       <div id="e"></div><button id="b" style="position:fixed;left:450px;top:150px">b</button><script>b.onclick=()=>e.classList.add("go")</script>`,
+    );
+    const report = await run(source, "escaped", [
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "f", at: "0..400/100" },
+      { action: "snapshot", name: "s" },
+    ]);
+    near(
+      report.frameSequences[0]!.files.map((f) => blueRun(f, 30)),
+      [0, 100, 200, 300, 400],
+    );
+    assert.equal(report.frameSequences[0]!.cancelled, 0);
+    near([blueRun(report.snapshots[0]!.screenshotPath, 30)], [400]);
+  });
+
+  it("a pulse the page repeats three times on purpose reaches its done state", async () => {
+    const source = page(
+      "thrice",
+      `<div id="p" style="width:100px;height:50px;background:#888"></div><button id="b" style="position:fixed;left:450px;top:150px">b</button>
+       <script>b.onclick=()=>{let n=0; const a=p.animate([{opacity:1},{opacity:.3}],{duration:150});
+         a.onfinish=()=>{ if(++n<3) a.play(); else document.body.style.background="#00a000"; };}</script>`,
+    );
+    const report = await run(source, "thrice", [
+      { action: "click", selector: "#b" },
+      { action: "snapshot", name: "s" },
+      { action: "press", key: "x" },
+      { action: "frames", name: "f", at: [0] },
+    ]);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 300, 100), [0, 0xa0, 0]);
+  });
+
+  it("an animation the page holds still at rate 0 is left where the page put it", async () => {
+    const source = page(
+      "rate0",
+      `<div id="p" style="width:400px;height:60px;background:#2255cc"></div><button id="b" style="position:fixed;left:450px;top:150px">b</button>
+       <script>b.onclick=()=>{const a=p.animate([{width:"0px"},{width:"400px"}],{duration:400,fill:"both"}); a.playbackRate=0; a.currentTime=100;}</script>`,
+    );
+    const report = await run(source, "rate0", [
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "f", at: "0..400/200" },
+      { action: "snapshot", name: "s" },
+    ]);
+    near(
+      report.frameSequences[0]!.files.map((f) => blueRun(f, 30)),
+      [100, 100, 100],
+    );
+    near([blueRun(report.snapshots[0]!.screenshotPath, 30)], [100]);
+  });
+
+  it("a splash page that forwards itself does not take the run down", async () => {
+    const { createServer } = await import("node:http");
+    const pages: Record<string, string> = {
+      "/a.html": `<!doctype html><a id="go" href="/b.html">b</a>`,
+      "/b.html": `<!doctype html><p>splash</p><script>setTimeout(()=>location.replace("/c.html"),0)</script>`,
+      "/c.html": `<!doctype html><style>@keyframes in{from{width:0}to{width:400px}} #e{height:60px;background:#2255cc;width:400px;animation:in 300ms linear}</style><div id="e"></div><button id="x">x</button>`,
+    };
+    const server = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(pages[req.url ?? ""] ?? "");
+    });
+    await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+    try {
+      const { port } = server.address() as { port: number };
+      for (const steps of [
+        [
+          { action: "click", selector: "#go" },
+          { action: "frames", name: "f", at: "0..400/100" },
+        ],
+        [
+          { action: "click", selector: "#go" },
+          { action: "snapshot", name: "s" },
+          { action: "press", key: "x" },
+          { action: "frames", name: "f", at: [0] },
+        ],
+      ] as Sequence["steps"][]) {
+        const report = await runInteract({
+          source: `http://127.0.0.1:${port}/a.html`,
+          sequencePath: sequence("splash", steps),
+          outputDir: join(dir, "out3-splash"),
+        });
+        assert.equal(report.frameSequences.length, 1);
+      }
+    } finally {
+      server.close();
+    }
+  });
+});

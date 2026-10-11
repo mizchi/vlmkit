@@ -38,10 +38,11 @@
  *
  * writes `<output-dir>/drawer-close/0000-t000000.png … 0008-t000400.png` and a
  * `frames.json` (`vlmkit-frames/1`). With a `frames` step the page keeps its
- * motion (`INTERACTION_HOLD_SCRIPT`), and every action and every snapshot starts
- * from a settled page: what runs is finished — `finish()`, so `finished`
+ * motion (`INTERACTION_HOLD_SCRIPT`). A snapshot starts from a page at rest: what is
+ * moving or due within a second is finished — `finish()`, so `finished`
  * promises, end events and what the page chains from them all run — and an
- * infinite animation is paused at 0. Only the action right before a `frames` step is held:
+ * infinite animation is paused at 0; before any other action only the endless
+ * ones are paused. Only the action right before a `frames` step is held:
  * every animation it starts is paused as it begins and seeked to each offset,
  * and finished the same way afterwards. CSS and Web Animations are therefore
  * exact at every offset; anything a script moves runs on the real clock and is
@@ -383,64 +384,72 @@ async function executeStep(page: Page, step: SequenceAction): Promise<void> {
 
 /**
  * The page side of motion when a sequence has `frames` steps: animations run on their own,
- * `settle()` finishes them, and while armed every animation that begins is paused and recorded.
+ * `settle()` lands them, and while armed every animation that begins is paused and recorded.
  *
  * Not `HOLD_TIMELINE_SCRIPT`, which holds everything from document start for a page on the held
- * clock. Two review rounds measured what this has to get right on a page running for real; each
- * case is a test in `interact.test.ts`:
+ * clock. Three review rounds measured what this has to get right on a page running for real
+ * (Chromium 141); each case is a test in `interact.test.ts`:
  *
- * - Rest by `finish()`, never by setting `currentTime`: paused at its end a Web Animation is not
+ * - Land by `finish()`, never by setting `currentTime`: paused at its end a Web Animation is not
  *   finished, so `finished.then(hide)` never ran. A cancelled one (`idle`) is skipped — setting
- *   its `currentTime` revives it — and so is one the page paused itself.
- * - Hold only what runs on the document timeline. A scroll-driven animation's `endTime` is a
- *   percentage; pausing it froze a reading-progress bar for good.
- * - Look in open shadow roots too: `document.getAnimations()` leaves them out, so a component's
- *   own `el.animate()` stayed paused forever.
- * - Position by the animation's own rate and direction (`reverse()`, `playbackRate`), and take
- *   over one the page resumes or reverses after it was held.
- * - Hold `el.animate()` a microtask later, so an animation the page creates and pauses at once (a
- *   scrubber) is the page's.
+ *   its `currentTime` revives it — and so is one the page paused or set to rate 0.
+ * - Land only what is moving or due within a second: finishing a toast's 4s auto-dismiss early
+ *   removed the Undo button the next step clicked. Before an ordinary action, only stop what never
+ *   ends (an infinite or self-restarting animation), which is what keeps a target from being stable.
+ * - Hold only what runs on the document timeline: a scroll-driven animation's `endTime` is a
+ *   percentage, and pausing it froze a reading-progress bar for good.
+ * - Look in open shadow roots: `document.getAnimations()` leaves them out.
+ * - Position by the animation's own rate and direction, take over one the page resumes or
+ *   reverses after it was held, and hold `el.animate()` a microtask later (a scrubber the page
+ *   pauses at once is the page's).
+ * - A stage the page chains on a held animation's end is timed from THAT end: one end at a time,
+ *   and the origin is given only to what begins while its end event is dispatched (CSS) or in
+ *   the task that finished it (a `finished` promise). Given more widely, a timer's unrelated
+ *   slide took the previous fade's end as its start.
+ * - Once paused through the API, a CSS animation outlives its `animation-name` (a swapped stage
+ *   kept its fill): cancel one whose name, escaped as CSS serialises it, its element no longer lists.
  * - Time is epoch ms (`timeOrigin + now`), so offsets stay on one clock across a navigation.
  */
 export const INTERACTION_HOLD_SCRIPT = `(() => {
   if (window.__vlmkitInteract) return;
   const now = () => performance.timeOrigin + performance.now();
   const docId = String(now()) + Math.random();
+  const DUE_MS = 1000;
+  const LOOP_FINISHES = 5;
   let armed = false;
-  let cascadeOrigin = null;
   let entries = new Map();
   let cancelled = new Set();
   const ours = new WeakSet();
+  const endAt = new WeakMap();
+  // The origin a chained stage gets: set while an end event of a held animation is dispatched,
+  // or for the task in which seek finished one (its finished promise's handlers run there).
+  let chainOrigin = null;
   const timeBased = (anim) =>
     typeof DocumentTimeline !== "undefined" && anim.timeline instanceof DocumentTimeline;
-  const endOf = (anim) => {
-    try {
-      const end = anim.effect ? anim.effect.getComputedTiming().endTime : Infinity;
-      return typeof end === "number" ? end : Infinity;
-    } catch { return Infinity; }
+  const timing = (anim) => {
+    try { return anim.effect ? anim.effect.getComputedTiming() : null; } catch { return null; }
   };
-  // The document's animations and those of every open shadow root in it.
+  const endOf = (anim) => {
+    const t = timing(anim);
+    return t && typeof t.endTime === "number" ? t.endTime : Infinity;
+  };
   const all = () => {
     const out = document.getAnimations ? document.getAnimations() : [];
     const walk = (root) => {
       for (const el of root.querySelectorAll("*")) {
-        if (el.shadowRoot) {
-          out.push(...el.shadowRoot.getAnimations());
-          walk(el.shadowRoot);
-        }
+        if (el.shadowRoot) { out.push(...el.shadowRoot.getAnimations()); walk(el.shadowRoot); }
       }
     };
     walk(document);
     return [...new Set(out)];
   };
-  // Record when the animation would have been at its start, at its own rate, and pause it.
   const hold = (anim) => {
-    if (!armed || !anim || !timeBased(anim) || anim.playState !== "running") return;
-    const rate = anim.playbackRate || 1;
+    if (!armed || !anim || !timeBased(anim) || anim.playState !== "running" || !anim.playbackRate) return;
+    const rate = anim.playbackRate;
     const end = endOf(anim);
     const current = typeof anim.currentTime === "number" ? anim.currentTime : 0;
     const from = rate > 0 ? 0 : Number.isFinite(end) ? end : current;
-    const origin = cascadeOrigin !== null ? cascadeOrigin : now() - (current - from) / rate;
+    const origin = chainOrigin !== null ? chainOrigin : now() - (current - from) / rate;
     entries.set(anim, { origin, rate, from, end });
     ours.add(anim);
     try { anim.pause(); } catch {}
@@ -457,19 +466,37 @@ export const INTERACTION_HOLD_SCRIPT = `(() => {
     queueMicrotask(() => hold(anim));
     return anim;
   };
-  // What no event announces: a CSS animation still in its delay, one in a shadow root, one the
-  // page replays, resumes or reverses after it was held (it is running again).
   const sweep = () => { if (armed) for (const anim of all()) hold(anim); };
-  // Once paused through the API, a CSS animation outlives its animation-name: measured in
-  // Chromium 141, a page that swapped a finished stage's class for the next stage's kept the old
-  // stage's fill applied. So one whose name its element no longer lists is cancelled here, as CSS
-  // would have — quietly when it had finished, since that is the page moving on, not cancelling.
+  // An end event of an animation seek finished: what its handlers start is timed from its end.
+  // Cleared after the dispatch (window, bubbling) and, should the page stop propagation, by a
+  // task right after it.
+  const onEnd = (event) => {
+    if (!armed || !event.target || !event.target.getAnimations) return;
+    const name = event.animationName || event.propertyName;
+    for (const [anim] of entries) {
+      const effectTarget = anim.effect && anim.effect.target;
+      if (effectTarget !== event.target || !endAt.has(anim)) continue;
+      if (name && anim.animationName !== name && anim.transitionProperty !== name) continue;
+      chainOrigin = endAt.get(anim);
+      setTimeout(() => { chainOrigin = null; }, 0);
+      return;
+    }
+  };
+  const afterEnd = () => { if (chainOrigin !== null) { sweep(); chainOrigin = null; } };
+  for (const type of ["animationend", "transitionend"]) {
+    document.addEventListener(type, onEnd, true);
+    window.addEventListener(type, afterEnd, false);
+  }
+  // Once paused through the API a CSS animation outlives its animation-name; cancel it as CSS
+  // would — quietly when it had finished, since that is the page moving on, not cancelling.
   const quiet = new WeakSet();
   const nameGone = (anim) => {
     if (typeof anim.animationName !== "string" || !anim.effect || !anim.effect.target) return false;
     try {
-      const listed = getComputedStyle(anim.effect.target, anim.effect.pseudoElement || null).animationName;
-      return !listed.split(",").map((n) => n.trim()).includes(anim.animationName);
+      const listed = getComputedStyle(anim.effect.target, anim.effect.pseudoElement || null)
+        .animationName.split(",").map((n) => n.trim());
+      const escaped = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(anim.animationName) : anim.animationName;
+      return !listed.includes(anim.animationName) && !listed.includes(escaped);
     } catch { return false; }
   };
   const reconcile = (anims) => {
@@ -479,8 +506,6 @@ export const INTERACTION_HOLD_SCRIPT = `(() => {
       try { anim.cancel(); } catch {}
     }
   };
-  // Finishes within one settle, per animation — per element and name for a CSS animation, which
-  // the page restarts as a new object — to tell a loop that restarts itself from a chain's stage.
   let finishes = new WeakMap();
   const finishCount = (anim) => {
     const css = typeof anim.animationName === "string" && anim.effect && anim.effect.target;
@@ -495,59 +520,73 @@ export const INTERACTION_HOLD_SCRIPT = `(() => {
     now,
     get armed() { return armed; },
     arm() { entries = new Map(); cancelled = new Set(); armed = true; return docId; },
-    disarm() { armed = false; },
+    disarm() { armed = false; chainOrigin = null; },
     sweep,
-    // Every held animation at offset t (ms after the anchor, epoch). One past its end is
-    // finished, so what the page chains from it runs, and what begins next is timed from that
-    // end — set here, before any frame can dispatch the end event — for the caller to let the
-    // chain begin and seek again. The earliest such end is returned.
+    // Every held animation at offset t. Ends before t are taken one at a time, earliest first:
+    // the animations ending then are finished (so what the page chains from them runs, timed
+    // from that end), and those ending later are held just short of their end until the caller
+    // seeks again. Returns that end, or null when no held animation ends before t.
     seek(t, anchor) {
       sweep();
-      cascadeOrigin = null;
       reconcile([...entries.keys()]);
-      let passedEnd = null;
+      const spans = [];
       for (const [anim, e] of entries) {
         const state = anim.playState;
         if (state === "idle") { if (!quiet.has(anim)) cancelled.add(anim); continue; }
         if (state === "finished") continue;
         const begin = Math.max(0, e.origin - anchor);
-        const local = Math.max(0, t - begin);
         const span = Number.isFinite(e.end) ? (e.rate > 0 ? e.end - e.from : e.from) / Math.abs(e.rate) : Infinity;
+        spans.push({ anim, e, begin, ends: begin + span });
+      }
+      const crossed = spans.filter((s) => s.ends <= t);
+      const next = crossed.length > 0 ? Math.min(...crossed.map((s) => s.ends)) : null;
+      for (const s of spans) {
+        const at = next !== null && s.ends > next + 0.5 ? Math.min(t, s.ends - 0.001) : t;
+        const local = Math.max(0, (next !== null && s.ends <= next + 0.5 ? s.ends : at) - s.begin);
         try {
-          if (local >= span) {
-            anim.finish();
-            ours.delete(anim);
-            const ended = begin + span;
-            if (passedEnd === null || ended < passedEnd) passedEnd = ended;
+          if (next !== null && s.ends <= next + 0.5) {
+            endAt.set(s.anim, anchor + s.ends);
+            chainOrigin = anchor + s.ends;
+            s.anim.finish();
+            ours.delete(s.anim);
           } else {
-            anim.currentTime = e.from + local * e.rate;
+            s.anim.currentTime = s.e.from + local * s.e.rate;
           }
         } catch {}
       }
-      if (passedEnd !== null) cascadeOrigin = anchor + passedEnd;
-      return { passedEnd, cancelled: cancelled.size };
+      if (next !== null) setTimeout(() => { chainOrigin = null; }, 0);
+      return { passedEnd: next, cancelled: cancelled.size };
     },
-    // Every running animation, and every one this script paused: a finite one finished (its
-    // promise resolves, its end events fire), an infinite one paused at 0. One that restarts
-    // itself after being finished twice in one settle is a loop, and is paused at 0 too.
+    // Land the page. "rest" (a snapshot, the action a frames step records): finish what is moving
+    // or due to start within DUE_MS, pause what never ends at 0. "unblock" (any other action):
+    // only pause what never ends, which is what keeps a target from being stable. A loop that
+    // restarts itself is treated as never ending once it has been finished LOOP_FINISHES times.
     // Returns how many it finished; the caller lets what they chain begin and settles again.
-    settle(round) {
+    settle(round, mode) {
       if (round === 0) finishes = new WeakMap();
       let finished = 0;
       reconcile(all().filter((anim) => ours.has(anim) || anim.playState === "finished"));
       for (const anim of all()) {
         const state = anim.playState;
-        if (!timeBased(anim) || state === "idle" || state === "finished") continue;
+        if (!timeBased(anim) || state === "idle" || state === "finished" || !anim.playbackRate) continue;
         if (state === "paused" && !ours.has(anim)) continue;
-        const end = endOf(anim);
+        const t = timing(anim);
+        const end = t && typeof t.endTime === "number" ? t.endTime : Infinity;
         const times = finishCount(anim);
-        if (Number.isFinite(end) && anim.playbackRate !== 0 && times.count < 2) {
-          try { anim.finish(); finished++; } catch {}
-          times.add();
-          ours.delete(anim);
-        } else if (state !== "paused" || anim.currentTime !== 0) {
-          try { anim.pause(); anim.currentTime = 0; ours.add(anim); } catch {}
+        const endless = !Number.isFinite(end) || times.count >= LOOP_FINISHES;
+        if (endless) {
+          if (state !== "paused" || anim.currentTime !== 0) {
+            try { anim.pause(); anim.currentTime = 0; ours.add(anim); } catch {}
+          }
+          continue;
         }
+        if (mode !== "rest") continue;
+        const local = t && typeof t.localTime === "number" ? t.localTime : 0;
+        const waiting = t && typeof t.delay === "number" && local < t.delay ? (t.delay - local) / Math.abs(anim.playbackRate) : 0;
+        if (waiting > DUE_MS && !ours.has(anim)) continue;
+        try { anim.finish(); finished++; } catch {}
+        times.add();
+        ours.delete(anim);
       }
       return finished;
     },
@@ -562,36 +601,49 @@ interface InteractApi {
   disarm(): void;
   sweep(): void;
   seek(t: number, anchor: number): { passedEnd: number | null; cancelled: number };
-  settle(round: number): number;
+  settle(round: number, mode: "rest" | "unblock"): number;
 }
 // Inlined at each call: a function handed to `page.evaluate` runs in the page, where nothing from
 // this module exists.
 type InteractWindow = Window & { __vlmkitInteract?: InteractApi };
 
+const NAVIGATED =
+  /Execution context was destroyed|navigat|Cannot find context|Target page, context or browser has been closed/i;
+
 /**
  * The script on the current document. It is also an init script, so a navigation brings it
  * along; a page loaded with `setContent` gets it here, and so does one the init script missed.
+ * A page that forwards itself while this runs is waited out, a few times at most.
  */
 async function ensureHold(page: Page): Promise<void> {
-  if (!(await page.evaluate(() => Boolean((window as unknown as InteractWindow).__vlmkitInteract)))) {
-    await page.evaluate(INTERACTION_HOLD_SCRIPT);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      if (!(await page.evaluate(() => Boolean((window as unknown as InteractWindow).__vlmkitInteract)))) {
+        await page.evaluate(INTERACTION_HOLD_SCRIPT);
+      }
+      return;
+    } catch (error) {
+      if (attempt >= 4 || !NAVIGATED.test(String(error))) throw error;
+      await page.waitForLoadState("load").catch(() => {});
+    }
   }
 }
 
 /**
  * `page.evaluate` that survives the page navigating under it: a click that leaves on a timer
- * destroyed the context mid-settle and took the whole run down. Waits for the new document,
- * puts the script on it, and runs once more.
+ * destroyed the context mid-settle and took the whole run down, and a splash page that forwards
+ * itself does it twice. Waits for the new document, puts the script on it, runs again — a few
+ * times at most.
  */
 async function liveEval<R, A>(page: Page, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> {
-  const run = () => page.evaluate(fn as (arg: unknown) => R | Promise<R>, arg as unknown);
-  try {
-    return await run();
-  } catch (error) {
-    if (!/Execution context was destroyed|navigat|Cannot find context/i.test(String(error))) throw error;
-    await page.waitForLoadState("load").catch(() => {});
-    await ensureHold(page);
-    return await run();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await page.evaluate(fn as (arg: unknown) => R | Promise<R>, arg as unknown);
+    } catch (error) {
+      if (attempt >= 4 || !NAVIGATED.test(String(error))) throw error;
+      await page.waitForLoadState("load").catch(() => {});
+      await ensureHold(page);
+    }
   }
 }
 
@@ -604,16 +656,16 @@ const twoFrames = (page: Page) =>
   );
 
 /**
- * Finish what is running until nothing more starts: a stage the page begins on the previous
- * one's `animationend` is finished too, rather than caught at its first frame. Bounded.
+ * Land the page until nothing more starts: a stage the page begins on the previous one's
+ * `animationend` is finished too, rather than caught at its first frame. Bounded.
  */
-async function settleMotion(page: Page): Promise<void> {
+async function settleMotion(page: Page, mode: "rest" | "unblock"): Promise<void> {
   await ensureHold(page);
   for (let round = 0; round < 10; round++) {
     const finished = await liveEval(
       page,
-      (r) => (window as unknown as InteractWindow).__vlmkitInteract!.settle(r),
-      round,
+      ([r, m]) => (window as unknown as InteractWindow).__vlmkitInteract!.settle(r, m),
+      [round, mode] as const,
     );
     await twoFrames(page);
     if (finished === 0) return;
@@ -627,8 +679,8 @@ async function settleMotion(page: Page): Promise<void> {
  * begins in the update after it, which is also when its events fire. Every animation that has
  * begun by then is at its start at offset 0; one a timer starts later sits at the real time it
  * began. Before each frame the page has lived at least that long, so a timer due by then has run.
- * When a held animation ends before the offset, what the page chains from it is let begin, timed
- * from that end, and everything is seeked again — at most 5 links per frame.
+ * Held animations that end before the offset are taken one end at a time, what the page chains
+ * on each let begin from it — at most 8 ends per frame.
  */
 async function recordFrames(
   page: Page,
@@ -663,10 +715,8 @@ async function recordFrames(
   let cancelled = 0;
   const writer = await frameWriter(options.dir, options.source);
   const clock = () => liveEval(page, (a) => (window as unknown as InteractWindow).__vlmkitInteract!.now() - a, anchor);
-  for (const atMs of options.offsets) {
-    const elapsed = await clock();
-    if (elapsed < atMs) await page.waitForTimeout(Math.ceil(atMs - elapsed));
-    // A new document (a link, a reload): arm it, so its motion is held on the same clock.
+  // A new document (a link, a reload, a redirect): armed, so its motion is held on the same clock.
+  const checkDocument = async (atMs: number) => {
     const doc = await liveEval(
       page,
       () => {
@@ -680,19 +730,25 @@ async function recordFrames(
       docId = doc;
       navigatedAtMs ??= atMs;
     }
-    let result = await liveEval(page, ([t, a]) => (window as unknown as InteractWindow).__vlmkitInteract!.seek(t, a), [
-      atMs,
-      anchor,
-    ] as const);
-    for (let link = 0; link < 5 && result.passedEnd !== null; link++) {
-      await twoFrames(page);
-      result = await liveEval(page, ([t, a]) => (window as unknown as InteractWindow).__vlmkitInteract!.seek(t, a), [
+  };
+  for (const atMs of options.offsets) {
+    const elapsed = await clock();
+    if (elapsed < atMs) await page.waitForTimeout(Math.ceil(atMs - elapsed));
+    await checkDocument(atMs);
+    const seek = () =>
+      liveEval(page, ([t, a]) => (window as unknown as InteractWindow).__vlmkitInteract!.seek(t, a), [
         atMs,
         anchor,
       ] as const);
+    let result = await seek();
+    for (let link = 0; link < 8 && result.passedEnd !== null; link++) {
+      await twoFrames(page);
+      result = await seek();
     }
     cancelled = Math.max(cancelled, result.cancelled);
     const { png, stable, at } = await captureStable(page, { clock });
+    // A document that committed while this frame was shot: say so from this offset on.
+    await checkDocument(atMs);
     await writer.add(png, { atMs, stable, shotMs: Math.round(at ?? 0) });
   }
   return { ...(await writer.finish()), ...(navigatedAtMs !== undefined ? { navigatedAtMs } : {}), cancelled };
@@ -765,14 +821,14 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
         content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
       });
     } else {
-      await settleMotion(page);
+      await settleMotion(page, "rest");
     }
     const facts = motion === "live" ? await frameSourceFacts(page) : undefined;
 
     for (let stepIndex = 0; stepIndex < sequence.steps.length; stepIndex++) {
       const step = sequence.steps[stepIndex]!;
       if (step.action === "snapshot") {
-        if (motion === "live") await settleMotion(page);
+        if (motion === "live") await settleMotion(page, "rest");
         const safeName = step.name.replace(/[^a-z0-9._-]+/gi, "_");
         const screenshotPath = join(outputDir, `${safeName}.png`);
         await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -806,14 +862,16 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
         });
         // Nothing more is held; what the action started is finished like everything else.
         await liveEval(page, () => (window as unknown as InteractWindow).__vlmkitInteract!.disarm(), undefined);
-        await settleMotion(page);
+        await settleMotion(page, "rest");
       } else {
-        // Every action starts from a settled page — a menu an earlier click opened is open, a
-        // bouncing target is still — as it does with motion disabled. The one a frames step
-        // records is armed: every animation that begins from here is held.
+        // Before an ordinary action, only what never ends is stopped — a target that bounces
+        // forever is never "stable" to click — and what is moving finishes on its own, as a user
+        // would see it. The action a frames step records starts from a page at rest instead, so
+        // the frames hold only what it starts; every animation that begins from here is held.
         if (motion === "live") {
-          await settleMotion(page);
-          if (sequence.steps[stepIndex + 1]?.action === "frames") {
+          const recorded = sequence.steps[stepIndex + 1]?.action === "frames";
+          await settleMotion(page, recorded ? "rest" : "unblock");
+          if (recorded) {
             armedDoc = await liveEval(
               page,
               () => (window as unknown as InteractWindow).__vlmkitInteract!.arm(),
@@ -974,7 +1032,7 @@ export function formatInteractReport(
   );
   lines.push(
     `  ${DIM}captured ${report.snapshots.length} snapshot(s), ${report.transitions.length} transition(s)` +
-      `${report.frameSequences && report.frameSequences.length > 0 ? `, ${report.frameSequences.length} frame sequence(s); motion kept, settled before each step` : ""}${RESET}`,
+      `${report.frameSequences && report.frameSequences.length > 0 ? `, ${report.frameSequences.length} frame sequence(s); motion kept, landed before each snapshot` : ""}${RESET}`,
   );
   for (const f of report.stepFailures) {
     lines.push(`  ${YELLOW}step ${f.stepIndex} failed (${summarizeAction(f.action)}): ${f.message}${RESET}`);
@@ -1048,8 +1106,8 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
   lines.push("");
   if (r.motion === "live") {
     lines.push(
-      "Motion was kept, not disabled, because the sequence has `frames` steps. Before each action " +
-        "and each snapshot every running animation was finished (an infinite one paused at 0), so a " +
+      "Motion was kept, not disabled, because the sequence has `frames` steps. Before each snapshot " +
+        "what was moving (or due within a second) was finished and anything endless paused at 0, so a " +
         "snapshot is the page at rest; the action before each `frames` step had its animations held.",
     );
     lines.push("");
@@ -1267,7 +1325,7 @@ export async function runInteractCli(cliArgs: readonly string[], options: { cwd?
     console.log(
       "                   // ... + frames.json (vlmkit-frames/1). With one, motion is kept instead of disabled,",
     );
-    console.log("                   // and each action and snapshot first finishes what is running.");
+    console.log("                   // and each snapshot first finishes what is moving.");
     console.log("  click | hover    { selector: string }");
     console.log("  focus | blur     { selector: string }");
     console.log('  press            { selector?: string, key: string }   // e.g. "Enter", "Escape", "Tab"');

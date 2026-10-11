@@ -360,29 +360,37 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   uncropped viewport per instant on a fresh held page; `--at` also names the strip's columns, which the
   2026-08-10 dogfood agent had looked for.
 - **`inspect interact` holds only the action a `frames` step records.** Without a `frames` step
-  it still switches every animation off, byte for byte as before. Two review rounds found the ways
-  a held page broke; each fixed one is a test, 20 in all, in `interact.test.ts`'s last two
-  `describe`s, and each fails on the version before its fix. The design that survived: motion runs
-  live; before every action and every snapshot the page is settled — what runs is `finish()`ed
-  (never seeked to its end: paused there, `finished` never resolves) until nothing more starts, an
-  infinite one is paused at 0, and a self-restarting loop (finished twice in one settle) too —
-  so a bouncing target is clickable and a menu an earlier click opened is open; only the action
-  right before a `frames` step is armed. Measured on Chromium 141, not to re-learn:
+  it still switches every animation off, byte for byte as before. Three review rounds found the
+  ways a held page broke; each fixed one is a test, 27 in all, in `interact.test.ts`'s last three
+  `describe`s, and each fails on the version before its fix. The design that survived: motion
+  runs live. A snapshot (and the action a `frames` step records) starts from a page at rest —
+  what is moving, or due to start within 1s, is `finish()`ed (never seeked to its end: paused
+  there, `finished` never resolves) until nothing more starts; an infinite animation, or a loop
+  that has restarted itself 5 times, is paused at 0. Any other action only gets the endless ones
+  paused — a bouncing target is never "stable" to click — because finishing everything before
+  every action ran a toast's 4s auto-dismiss early and the Undo the next step clicked was gone.
+  Only the action right before a `frames` step is armed. Measured on Chromium 141, not to re-learn:
   - `document.getAnimations()` leaves out shadow roots, and `animationstart` / `transitionrun`
     are not composed: walk open shadow roots, or a component's `el.animate()` stays paused.
   - A scroll-driven animation's `endTime` is a percentage (`CSSUnitValue`); pausing it froze a
     progress bar for good. Hold only `DocumentTimeline` animations.
   - Once paused through the API, a CSS animation outlives its `animation-name`: a finished stage
-    whose class the page swapped kept its fill. Cancel one whose name its element no longer lists.
-  - Setting `currentTime` on a cancelled (`idle`) animation revives it.
+    whose class the page swapped kept its fill. Cancel one whose name its element no longer lists
+    — compared escaped too: computed style serialises `slide:in` as `slide\:in`.
+  - Setting `currentTime` on a cancelled (`idle`) animation revives it; a rate-0 one is the page's.
   - Position by `playbackRate` and direction (`reverse()` toggles), take over one the page resumes
     after it was held, hold `el.animate()` a microtask later (a scrubber the page pauses at once
     is the page's), and take its start as `now - currentTime` (`animationstart` fires after the
     delay).
-  - A stage chained on a held animation's end is timed from that end: `seek` sets the origin in
-    the page before any frame can dispatch the end event (set from Node, the event won the race).
-  - Time is `timeOrigin + now`, and every evaluate survives a navigation (`liveEval`): a click
-    that left on a timer destroyed the context mid-settle and took the run down.
+  - A stage chained on a held animation's end is timed from THAT end. Ends are taken one at a
+    time, earliest first (with two ends in one window, the later stage was timed from the earlier
+    end), and the origin goes only to what begins while that end event is dispatched (CSS) or in
+    the task that finished it (a `finished` promise). Given to anything held before the next seek,
+    an unrelated timer's slide took a fade's end as its start.
+  - Time is `timeOrigin + now`, and every evaluate, `ensureHold` included, survives up to 5
+    navigations (`liveEval`): a click that left on a timer destroyed the context mid-settle, and a
+    splash page that forwards itself did it twice. The document is checked again after each frame
+    is shot, so one that commits during the shot is reported.
   Offset 0 is two rendering updates after the action returns. A timer's work is on the real clock
   (`shotMs`, read just before the shot that is kept), no frame is shot before the page has lived
   that long, and a held animation the page cancels or retargets mid-window is counted and named.
