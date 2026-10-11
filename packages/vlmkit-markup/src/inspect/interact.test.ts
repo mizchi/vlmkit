@@ -718,3 +718,306 @@ describe("runInteract with frames steps leaves the page's own motion logic worki
     }
   });
 });
+
+/** The second review round: shadow roots, scroll timelines, rates, loops, navigations. */
+describe("runInteract frames steps on harder pages", () => {
+  const page = (name: string, body: string) => {
+    const file = join(dir, `${name}.html`);
+    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#fff}</style>${body}`);
+    return file;
+  };
+  const rgb = (file: string, x: number, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    const i = (y * png.width + x) * 4;
+    return [png.data[i], png.data[i + 1], png.data[i + 2]];
+  };
+  /** Width of the run of `color`-ish pixels from x=0 on row y. */
+  const runWidth = (file: string, y: number, isColor: (r: number, g: number, b: number) => boolean) => {
+    const png = PNG.sync.read(readFileSync(file));
+    let x = 0;
+    while (
+      x < png.width &&
+      isColor(
+        png.data[(y * png.width + x) * 4]!,
+        png.data[(y * png.width + x) * 4 + 1]!,
+        png.data[(y * png.width + x) * 4 + 2]!,
+      )
+    )
+      x++;
+    return x;
+  };
+  const blue = (r: number, _g: number, b: number) => r < 80 && b > 150;
+  const run = (source: string, name: string, steps: Sequence["steps"], viewport = { width: 500, height: 200 }) =>
+    runInteract({ source, sequencePath: sequence(name, steps, viewport), outputDir: join(dir, `out2-${name}`) });
+  const tail: Sequence["steps"] = [
+    { action: "press", key: "x" },
+    { action: "frames", name: "f", at: [0] },
+  ];
+  const near = (got: number[], want: number[], tolerance = 2) =>
+    assert.ok(
+      got.length === want.length && got.every((g, i) => Math.abs(g - want[i]!) <= tolerance),
+      `got ${got.join(",")}, want ${want.join(",")}`,
+    );
+
+  it("a component's own el.animate() in a shadow root is finished, and its finished handler runs", async () => {
+    const source = page(
+      "shadow-waapi",
+      `<x-panel></x-panel><script>
+       customElements.define("x-panel", class extends HTMLElement { constructor() { super();
+         const root = this.attachShadow({ mode: "open" });
+         root.innerHTML = '<button id="c" style="position:fixed;left:400px;top:0">c</button><div id="p" style="width:300px;height:100px;background:#2255cc"></div>';
+         const p = root.getElementById("p");
+         root.getElementById("c").onclick = () => p.animate([{ width: "300px" }, { width: "0px" }], { duration: 400 })
+           .finished.then(() => { p.hidden = true; document.body.style.background = "#ffcc00"; });
+       } });</script>`,
+    );
+    const report = await run(source, "shadow-waapi", [
+      { action: "click", selector: "x-panel >> #c" },
+      { action: "frames", name: "f", at: [0, 100] },
+      { action: "wait", ms: 200 },
+      { action: "snapshot", name: "s" },
+    ]);
+    assert.deepEqual(report.stepFailures, []);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 50, 50), [0xff, 0xcc, 0x00]);
+  });
+
+  it("a CSS transition in a shadow root is held and seeked", async () => {
+    const source = page(
+      "shadow-css",
+      `<x-drawer></x-drawer><script>
+       customElements.define("x-drawer", class extends HTMLElement { constructor() { super();
+         const root = this.attachShadow({ mode: "open" });
+         root.innerHTML = '<style>#d{width:0;height:100px;background:#2255cc;transition:width 400ms linear}#d.open{width:400px}</style><button id="o" style="position:fixed;left:450px;top:150px">o</button><div id="d"></div>';
+         root.getElementById("o").onclick = () => root.getElementById("d").classList.add("open");
+       } });</script>`,
+    );
+    const report = await run(source, "shadow-css", [
+      { action: "click", selector: "x-drawer >> #o" },
+      { action: "frames", name: "f", at: "0..400/100" },
+    ]);
+    const seq = report.frameSequences[0]!;
+    near(
+      seq.files.map((f) => runWidth(f, 50, blue)),
+      [0, 100, 200, 300, 400],
+    );
+    assert.equal(seq.unstable, 0);
+  });
+
+  it("a scroll-driven animation is not paused, so it follows the scroll", async () => {
+    const source = page(
+      "scroll-timeline",
+      `<style>@keyframes grow{to{width:200px}} #bar{position:fixed;top:0;left:0;height:20px;width:0;background:#00a000;animation:grow linear both;animation-timeline:scroll(root)}</style>
+       <div id="bar"></div><div style="height:2000px"></div>`,
+    );
+    // A snapshot before the scroll settles the page; pausing the bar there froze it at 0.
+    const report = await run(source, "scroll-timeline", [
+      { action: "snapshot", name: "top" },
+      { action: "scroll", y: 1800 },
+      { action: "snapshot", name: "s" },
+      ...tail,
+    ]);
+    assert.deepEqual(rgb(report.snapshots[1]!.screenshotPath, 150, 10), [0, 0xa0, 0], "the bar is full at the bottom");
+  });
+
+  it("reverse() and playbackRate are positioned at the animation's own rate", async () => {
+    const source = page(
+      "rates",
+      `<div id="p" style="width:0;height:100px;background:#2255cc"></div>
+       <button id="op" style="position:fixed;left:450px;top:120px">o</button><button id="cl" style="position:fixed;left:450px;top:150px">c</button><button id="fast" style="position:fixed;left:400px;top:150px">f</button>
+       <script>let a; op.onclick=()=>{a=p.animate([{width:"0px"},{width:"200px"}],{duration:400,fill:"both"})};
+       cl.onclick=()=>a.reverse(); fast.onclick=()=>{const b=p.animate([{width:"0px"},{width:"200px"}],{duration:400,fill:"both"}); b.playbackRate=2;};</script>`,
+    );
+    const reversed = await run(source, "rates-reverse", [
+      { action: "click", selector: "#op" },
+      { action: "snapshot", name: "open" },
+      { action: "click", selector: "#cl" },
+      { action: "frames", name: "close", at: "0..400/100" },
+    ]);
+    near(
+      reversed.frameSequences[0]!.files.map((f) => runWidth(f, 50, blue)),
+      [200, 150, 100, 50, 0],
+    );
+    const fast = await run(source, "rates-fast", [
+      { action: "click", selector: "#fast" },
+      { action: "frames", name: "f", at: "0..400/100" },
+    ]);
+    near(
+      fast.frameSequences[0]!.files.map((f) => runWidth(f, 50, blue)),
+      [0, 100, 200, 200, 200],
+    );
+  });
+
+  it("an earlier click on a target that bounces forever still lands", async () => {
+    const source = page(
+      "bounce",
+      `<style>@keyframes b{0%,100%{transform:translateY(0)}50%{transform:translateY(-25px)}} #cta{margin:60px;animation:b 1s infinite}
+       #panel{display:none;width:100px;height:40px;background:#00a000} #panel.on{display:block}</style>
+       <button id="cta">go</button><div id="panel"></div><button id="k">k</button>
+       <script>cta.onclick=()=>panel.classList.add("on")</script>`,
+    );
+    const report = await run(source, "bounce", [
+      { action: "click", selector: "#cta" },
+      { action: "snapshot", name: "s" },
+      { action: "click", selector: "#k" },
+      { action: "frames", name: "f", at: [0] },
+    ]);
+    assert.deepEqual(report.stepFailures, []);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 50, 160), [0, 0xa0, 0], "the panel the click opens");
+  });
+
+  it("an animation the recorded action creates and pauses at once is the page's: not seeked, not finished", async () => {
+    const source = page(
+      "scrubber",
+      `<div id="p" style="width:400px;height:100px;background:#2255cc"></div><button id="mk" style="position:fixed;left:450px;top:150px">m</button>
+       <script>mk.onclick=()=>{const a=p.animate([{width:"0px"},{width:"400px"}],{duration:400,fill:"both"}); a.pause(); a.currentTime=100;}</script>`,
+    );
+    const report = await run(source, "scrubber", [
+      { action: "click", selector: "#mk" },
+      { action: "frames", name: "f", at: "0..400/200" },
+      { action: "snapshot", name: "s" },
+    ]);
+    near(
+      report.frameSequences[0]!.files.map((f) => runWidth(f, 50, blue)),
+      [100, 100, 100],
+    );
+    near([runWidth(report.snapshots[0]!.screenshotPath, 50, blue)], [100]);
+  });
+
+  it("a stage the page chains on a held animation's end starts at that end", async () => {
+    const source = page(
+      "chain-held",
+      `<style>@keyframes a1{to{opacity:.5}} @keyframes sl{from{width:0}to{width:400px}}
+       #k{width:0;height:100px;background:#2255cc} #k.s1{width:0;animation:a1 250ms linear forwards} #k.s2{animation:sl 400ms linear forwards}</style>
+       <div id="k"></div><button id="go" style="position:fixed;left:450px;top:150px">g</button>
+       <script>go.onclick=()=>k.classList.add("s1"); k.addEventListener("animationend",(e)=>{if(e.animationName==="a1"){k.classList.remove("s1");k.classList.add("s2")}});</script>`,
+    );
+    const report = await run(source, "chain-held", [
+      { action: "click", selector: "#go" },
+      { action: "frames", name: "f", at: [300, 400, 500, 600] },
+    ]);
+    // Stage two starts at 250ms: 50 / 150 / 250 / 350ms into its 400ms slide.
+    near(
+      report.frameSequences[0]!.files.map((f) => runWidth(f, 50, blue)),
+      [50, 150, 250, 350],
+      3,
+    );
+  });
+
+  it("says so when the page cancels or retargets a held animation mid-window", async () => {
+    const source = page(
+      "retarget",
+      `<style>#t{width:0;height:100px;background:#2255cc;transition:width 400ms linear} #t.on{width:400px}</style>
+       <div id="t"></div><button id="o" style="position:fixed;left:450px;top:150px">o</button>
+       <script>o.onclick=()=>{t.classList.add("on"); setTimeout(()=>t.classList.remove("on"),200)}</script>`,
+    );
+    const report = await run(source, "retarget", [
+      { action: "click", selector: "#o" },
+      { action: "frames", name: "f", at: "0..600/100" },
+    ]);
+    assert.ok(report.frameSequences[0]!.cancelled >= 1, "the retargeted transition is counted");
+    assert.match(readFileSync(report.reportPath, "utf8"), /cancelled or replaced by the page mid-window/);
+  });
+
+  it("a loop that restarts itself from its own end is paused at its start for a snapshot", async () => {
+    const source = page(
+      "loop",
+      `<div id="p" style="height:100px;background:#2255cc"></div>
+       <script>const a=p.animate([{width:"400px"},{width:"0px"}],{duration:2000}); a.onfinish=()=>a.play();</script>`,
+    );
+    const report = await run(source, "loop", [
+      { action: "snapshot", name: "s1" },
+      { action: "snapshot", name: "s2" },
+      ...tail,
+    ]);
+    near([runWidth(report.snapshots[0]!.screenshotPath, 50, blue)], [400]);
+    assert.equal(report.transitions[0]!.diffPixels, 0);
+  });
+
+  it("a frames-only sequence's report does not claim snapshots or visible change", async () => {
+    const report = await run(page("nothing", "<p>x</p>"), "frames-only-report", [
+      { action: "click", selector: "#nope" },
+      { action: "frames", name: "f", at: [0] },
+    ]);
+    const md = readFileSync(report.reportPath, "utf8");
+    assert.doesNotMatch(md, /only one snapshot|Every action produced visible change/);
+    assert.match(md, /No snapshot steps/);
+  });
+
+  describe("navigations", () => {
+    const pages: Record<string, string> = {
+      "/a.html": `<!doctype html><body style="margin:0"><a id="link" href="/b.html">b</a>
+        <button id="later" onclick="setTimeout(()=>location.href='/b.html',120)">later</button></body>`,
+      "/b.html": `<!doctype html><style>body{margin:0}@keyframes in{from{width:0}to{width:400px}} #e{height:100px;background:#2255cc;width:400px;animation:in 400ms linear}</style><div id="e"></div><button id="x">x</button>`,
+    };
+    const serve = async () => {
+      const { createServer } = await import("node:http");
+      const server = createServer((req, res) => {
+        // b.html arrives 150ms late, so a navigation lands in the middle of whatever runs.
+        setTimeout(
+          () => {
+            res.writeHead(200, { "content-type": "text/html" });
+            res.end(pages[req.url ?? ""] ?? "");
+          },
+          req.url === "/b.html" ? 150 : 0,
+        );
+      });
+      await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+      return {
+        server,
+        url: (path: string) => `http://127.0.0.1:${(server.address() as { port: number }).port}${path}`,
+      };
+    };
+
+    it("a navigation in the middle of a frames window neither aborts the run nor bends its clock", async () => {
+      const { server, url } = await serve();
+      try {
+        const report = await runInteract({
+          source: url("/a.html"),
+          sequencePath: sequence("nav-mid", [
+            { action: "click", selector: "#later" },
+            { action: "frames", name: "f", at: "0..600/50" },
+            { action: "snapshot", name: "after" },
+          ]),
+          outputDir: join(dir, "out2-nav-mid"),
+        });
+        const seq = report.frameSequences[0]!;
+        assert.equal(seq.count, 13);
+        assert.notEqual(seq.navigatedAtMs, undefined);
+        const manifest = JSON.parse(readFileSync(seq.manifest, "utf8"));
+        for (const f of manifest.frames) assert.ok(f.shotMs >= f.atMs, `frame at ${f.atMs}ms shot at ${f.shotMs}ms`);
+        assert.equal(report.snapshots.length, 1);
+      } finally {
+        server.close();
+      }
+    });
+
+    it("the next page's entrance after a recorded link click is held, on the same clock", async () => {
+      const { server, url } = await serve();
+      try {
+        const report = await runInteract({
+          source: url("/a.html"),
+          sequencePath: sequence("nav-link", [
+            { action: "click", selector: "#link" },
+            { action: "frames", name: "f", at: "0..800/100" },
+          ]),
+          outputDir: join(dir, "out2-nav-link"),
+        });
+        const seq = report.frameSequences[0]!;
+        assert.equal(seq.navigatedAtMs, 0, "the action itself navigated");
+        assert.equal(seq.unstable, 0, "held, not running on the real clock");
+        const widths = seq.files.map((f) => runWidth(f, 50, blue));
+        assert.ok(
+          widths.every((w, i) => i === 0 || w >= widths[i - 1]!),
+          `never backwards: ${widths.join(",")}`,
+        );
+        assert.equal(widths.at(-1), 400);
+        assert.ok(
+          widths.some((w) => w > 0 && w < 400),
+          `the entrance is caught mid-way: ${widths.join(",")}`,
+        );
+      } finally {
+        server.close();
+      }
+    });
+  });
+});

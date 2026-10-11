@@ -1451,19 +1451,25 @@ before it set moving, into `<output-dir>/close/`:
 ```
 
 Without a `frames` step, `inspect interact` switches every transition and
-animation off, as it always has. With one, the page keeps its motion and it runs
-as it would for a user, so a later click inside a menu an earlier one opened still
-lands. Before each snapshot every running animation is finished — with `finish()`,
-so `finished` promises resolve, end events fire, and a stage the page chains from
-one is finished too — and an infinite one is paused at 0; one the page paused or
-cancelled itself is left alone. Only the action right before a `frames` step is
-held: the page is settled first, then every animation that action starts is paused
-as it begins and seeked to each offset (finished, not paused, once an offset is past
-its end), and finished afterwards. Offset 0 is two rendering updates after the
-action returns, when what it started has begun; one a timer starts later sits at the
+animation off, as it always has. With one, the page keeps its motion, and every
+action and every snapshot starts from a settled page: whatever is running is
+finished with `finish()` — so `finished` promises resolve, end events fire, and a
+stage the page chains from one is finished too — until nothing more starts; an
+infinite animation (or a loop that restarts itself) is paused at 0; one the page
+paused or cancelled itself is left alone. So a click inside a menu an earlier click
+opened lands, and so does a click on a target that bounces forever. Only the action
+right before a `frames` step is held: every animation it starts — including in
+open shadow roots, at its own `playbackRate` and direction — is paused as it begins
+and seeked to each offset, finished (not paused) once an offset is past its end,
+and finished afterwards. A stage the page chains on that end is timed from it.
+Scroll-driven animations follow the scroll and are never held. Offset 0 is two
+rendering updates after the action returns; one a timer starts later sits at the
 real time it began, and no frame is shot before the page has lived that long. The
-first document gets the script after load (`setContent` runs no init script);
-every later one, after a link or a reload, gets it as an init script.
+clock is epoch time, so a navigation (a link, a reload) keeps the offsets, and the
+new document's motion is held from then on; the report says when it happened, and
+counts held animations the page cancelled or retargeted mid-window. Not held: CSS
+inside an iframe (its frames read unstable), and an infinite CSS animation paused
+at 0 ignores the page's own `animation-play-state` from then on.
 Measured on a drawer with a 220ms linear slide that sets `hidden` on
 `transitionend`: at 0 / 50 / 100 / 150 / 200ms its solid width is 200 / 154 / 109 /
 63 / 18px and the antialiased edge pixel is 0.55 / 0.09 / 0.64 / 0.19 covered —

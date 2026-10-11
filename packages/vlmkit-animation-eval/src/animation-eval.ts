@@ -1471,7 +1471,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     // form a reviewer actually needs it: next to the image, ready to paste.
     lines.push(
       `${DIM}  caption: columns are ${s.times.map((ms) => `${formatInstant(ms)}ms`).join(" / ")}` +
-        ` on the page timeline (window ${s.windowMs}ms, one shared clock);` +
+        ` on the page timeline (window ${formatInstant(s.windowMs)}ms, one shared clock);` +
         ` rows top to bottom are ${s.rowSelectors.join(", ")}${RESET}`,
     );
   }

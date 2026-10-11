@@ -346,10 +346,12 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   the held clock had.
 - **A gate's value flags must be listed for `firstPositional`.** `check integrity --timeline-at
   0,150 page.html` read `0,150` as the page. List every new value flag.
-- **Ranges and decimals are snapped.** `0 + 5 * (1000 / 60)` is one ulp below frame 5's time
-  and `16.15 * 1000` is 16149.999999999998; both made the held clock stop a frame early. A value
-  within 1e-6ms of a whole ms or a frame boundary is put on it, and a range stepped in frames
-  from a start on a frame (bare `0` included) is computed in frames.
+- **Ranges and decimals are snapped.** `0 + 5 * frameTimeMs(5)` (the 5th value of `0..1s/5f`) is
+  416.66666666666663, one ulp below frame 25, and `16.15 * 1000` is 16149.999999999998; both made
+  the held clock stop a frame early. (`5 * (1000 / 60)` lands one ulp *above* frame 5, which runs
+  the frame but made `0..10f/1f,5f` two instants.) A value within 1e-6ms of a whole ms or a frame
+  boundary is put on it, and a range stepped in frames from a start on a frame (bare `0`
+  included) is computed in frames.
 - **A capture is two shots that agree** (at most three). A seek can be photographed before the
   compositor applies it; three that never agree are `stable: false` (video, animated image,
   worker), written anyway and counted, never passed off as the instant.
@@ -358,19 +360,34 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   uncropped viewport per instant on a fresh held page; `--at` also names the strip's columns, which the
   2026-08-10 dogfood agent had looked for.
 - **`inspect interact` holds only the action a `frames` step records.** Without a `frames` step
-  it still switches every animation off, byte for byte as before. The first version held every
-  animation from load and rested them by setting `currentTime`, and a review found eight ways
-  that broke the page (each now a test in `interact.test.ts`): a click inside a menu an earlier
-  click opened timed out (frozen at its first frame); `el.animate().finished.then(hide)` never
-  resolved (paused at its end is not finished); a seek revived an animation the page had
-  `cancel()`ed; a stage chained on `animationend` was caught at its first frame; an animation
-  the page paused on purpose was moved to its end; a replayed `Animation` ran unheld; a delayed
-  one's delay was counted twice (`animationstart` fires after it — take `startAt` as
-  `now - currentTime`); and a navigation lost the script. So: motion runs live, a snapshot
-  `finish()`es what is running until nothing more starts, and only the recorded action is armed.
-  Offset 0 is two rendering updates after it returns. A timer's work is on the real clock
-  (`shotMs`, read just before the shot that is kept), and no frame is shot before the page has
-  lived that long.
+  it still switches every animation off, byte for byte as before. Two review rounds found the ways
+  a held page broke; each fixed one is a test, 20 in all, in `interact.test.ts`'s last two
+  `describe`s, and each fails on the version before its fix. The design that survived: motion runs
+  live; before every action and every snapshot the page is settled — what runs is `finish()`ed
+  (never seeked to its end: paused there, `finished` never resolves) until nothing more starts, an
+  infinite one is paused at 0, and a self-restarting loop (finished twice in one settle) too —
+  so a bouncing target is clickable and a menu an earlier click opened is open; only the action
+  right before a `frames` step is armed. Measured on Chromium 141, not to re-learn:
+  - `document.getAnimations()` leaves out shadow roots, and `animationstart` / `transitionrun`
+    are not composed: walk open shadow roots, or a component's `el.animate()` stays paused.
+  - A scroll-driven animation's `endTime` is a percentage (`CSSUnitValue`); pausing it froze a
+    progress bar for good. Hold only `DocumentTimeline` animations.
+  - Once paused through the API, a CSS animation outlives its `animation-name`: a finished stage
+    whose class the page swapped kept its fill. Cancel one whose name its element no longer lists.
+  - Setting `currentTime` on a cancelled (`idle`) animation revives it.
+  - Position by `playbackRate` and direction (`reverse()` toggles), take over one the page resumes
+    after it was held, hold `el.animate()` a microtask later (a scrubber the page pauses at once
+    is the page's), and take its start as `now - currentTime` (`animationstart` fires after the
+    delay).
+  - A stage chained on a held animation's end is timed from that end: `seek` sets the origin in
+    the page before any frame can dispatch the end event (set from Node, the event won the race).
+  - Time is `timeOrigin + now`, and every evaluate survives a navigation (`liveEval`): a click
+    that left on a timer destroyed the context mid-settle and took the run down.
+  Offset 0 is two rendering updates after the action returns. A timer's work is on the real clock
+  (`shotMs`, read just before the shot that is kept), no frame is shot before the page has lived
+  that long, and a held animation the page cancels or retargets mid-window is counted and named.
+  Left as limits: an infinite CSS animation paused at 0 ignores the page's `animation-play-state`
+  from then on, and CSS inside an iframe is not held (its frames read unstable).
 - **Seeking a paused CSS transition past its end fires `transitionend`** (Chromium 141). Measured on a drawer
   that hides itself on it: the handler runs between frames. Each frame's drawer edge is right to
   within 0.01 of the antialiased pixel's coverage (0.55 at 50ms of a 220ms slide, where 154.55px is due).
@@ -852,7 +869,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
-| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `check integrity --timeline`'s clock. Depends on core + Playwright only; split out for the (since deleted) `vlmkit-anim eval`, and kept as the first evaluation tool usable without the rest of vlmkit. |
+| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `check integrity --timeline`'s clock. Depends on core, judge (pure: the frame format and the timeline instants) and Playwright; split out for the (since deleted) `vlmkit-anim eval`, and kept as the first evaluation tool usable without the rest of vlmkit. Also the frames half: `frames-capture.ts`. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
