@@ -51,6 +51,30 @@ test("parseInstants: a range in frames is computed in frames, so each value is e
   assert.equal(got[6], 100);
 });
 
+test("parseInstants: a range stepped in frames from a bare start is computed in frames", () => {
+  // `0` is frame 0, so `0..1s/5f` is frames 0, 5, 10 … and not 0 + i * 83.333…, whose 5th value
+  // (416.66666666666663) sits below frame 25 — the held clock would run 24 frames for it.
+  parseInstants("0..1s/5f", "--at").forEach((ms, i) => assert.equal(ms, frameTimeMs(5 * i), `value ${i}`));
+  assert.equal(parseInstants("0..10f/1f,5f,10f", "--at").length, 11, "the same frame written two ways is one instant");
+  assert.equal(parseInstants("0..1s/1f", "--at")[15], 250);
+});
+
+test("parseInstants: decimal seconds land on the whole ms they name", () => {
+  // 16.15 * 1000 is 16149.999999999998: before frame 969, and before a timer due at 16150.
+  assert.deepEqual(parseInstants("16.15s", "--at"), [16150]);
+  assert.deepEqual(parseInstants("00:16.150", "--at"), [16150]);
+  assert.deepEqual(parseInstants("16150,16.15s,00:16.150", "--at"), [16150]);
+  assert.deepEqual(parseInstants("1.001s,32.05s", "--at"), [1001, 32050]);
+  for (let ms = 0; ms <= 60_000; ms += 50) {
+    assert.deepEqual(parseInstants(`${ms / 1000}s`, "--at"), [ms], `${ms / 1000}s`);
+  }
+});
+
+test("parseInstants: a step too small to move the value is refused, not looped on", () => {
+  assert.throws(() => parseInstants("1000000..1000001/0.0000000000000000001", "--at"), /zero step/);
+  assert.throws(() => parseInstants("1000000..1000001/0.000001", "--at"), /more than 1000 instants/);
+});
+
 test("parseInstants: refuses what is not a time, naming the flag", () => {
   for (const bad of ["abc", "-100", "1.5f", "00:61", "1:60:00", "10px", "1..2", "5..1/1", "0..1s/0"]) {
     assert.throws(() => parseInstants(bad, "--timeline-at"), /--timeline-at/, bad);
@@ -118,7 +142,16 @@ test("parseFramesManifest: reads a manifest and refuses a broken one", () => {
     () => parseFramesManifest(JSON.stringify({ ...good, frames: [{ n: 0, file: "a.png" }] })),
     /numeric "atMs"/,
   );
-  for (const file of ["../a.png", "/etc/a.png", "x/../../a.png"]) {
+  for (const file of [
+    "../a.png",
+    "/etc/a.png",
+    "x/../../a.png",
+    "C:/a.png",
+    "D:\\a.png",
+    "\\\\host\\share\\a.png",
+    "\\a.png",
+    "x\\..\\..\\a.png",
+  ]) {
     assert.throws(
       () => parseFramesManifest(JSON.stringify({ ...good, frames: [{ n: 0, file, atMs: 0, stable: true }] })),
       /outside the manifest's directory/,

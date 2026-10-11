@@ -611,6 +611,7 @@ test(
     });
     assert.deepEqual(report.strip?.times, [100, 400]);
     assert.equal(report.strip?.columns, 2);
+    assert.equal(report.strip?.windowMs, 400, "the window is the span --at covers, not the animations' end");
 
     const frame = async (name: string) => PNG.sync.read(await readFile(join(dir, "frames", name)));
     const blue = (png: InstanceType<typeof PNG>, x: number, y: number) => {

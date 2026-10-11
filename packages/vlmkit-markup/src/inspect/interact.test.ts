@@ -403,11 +403,11 @@ describe("runInteract frames steps", () => {
       ),
       outputDir: out,
     });
-    assert.equal(report.motion, "held");
+    assert.equal(report.motion, "live");
     const [seq] = report.frameSequences;
     assert.equal(seq?.name, "close");
     assert.deepEqual(seq?.offsets, [0, 50, 100, 150, 200, 250, 300, 350, 400]);
-    assert.deepEqual(seq?.actionsBefore, [{ action: "press", key: "Escape" }]);
+    assert.deepEqual(seq?.action, { action: "press", key: "Escape" });
     // translateX(-200px * t / 220): the drawer's visible width is 200 - that, frame by frame —
     // to the pixel, give or take the antialiased edge. A frame one 60fps tick late is 15px off.
     const widths = seq!.files.slice(0, 5).map(blueWidth);
@@ -483,17 +483,238 @@ describe("runInteract frames steps", () => {
   it("checks frames steps before any browser starts", async () => {
     const run = (steps: Sequence["steps"]) =>
       runInteract({ source: drawer, sequencePath: sequence("frames-bad", steps), outputDir: join(dir, "out-bad") });
-    await assert.rejects(run([{ action: "frames", name: "" }]), /needs a "name"/);
-    await assert.rejects(run([{ action: "frames", name: "a", at: "0..1s", everyMs: 10 }]), /not both/);
-    await assert.rejects(run([{ action: "frames", name: "a", at: "0..1s" }]), /needs a step/);
-    await assert.rejects(run([{ action: "frames", name: "a", at: [] }]), /lists no offsets/);
-    await assert.rejects(run([{ action: "frames", name: "a", everyMs: 0 }]), /"everyMs" must be > 0/);
+    const key = { action: "press", key: "x" } as const;
+    await assert.rejects(run([key, { action: "frames", name: "" }]), /needs a "name"/);
+    await assert.rejects(run([key, { action: "frames", name: "a", at: "0..1s", everyMs: 10 }]), /not both/);
+    await assert.rejects(run([key, { action: "frames", name: "a", at: "0..1s" }]), /needs a step/);
+    await assert.rejects(run([key, { action: "frames", name: "a", at: [] }]), /lists no offsets/);
+    await assert.rejects(run([key, { action: "frames", name: "a", everyMs: 0 }]), /"everyMs" must be > 0/);
+    const many = Array.from({ length: 1001 }, (_, i) => i);
+    await assert.rejects(run([key, { action: "frames", name: "a", at: many }]), /more than 1000 offsets/);
+    // One directory per name: case-folded, and never one the run writes anything else to.
+    await assert.rejects(
+      run([key, { action: "frames", name: "Open" }, key, { action: "frames", name: "open" }]),
+      /already uses/,
+    );
+    await assert.rejects(
+      run([{ action: "snapshot", name: "s" }, key, { action: "frames", name: "s.png" }]),
+      /already uses/,
+    );
+    await assert.rejects(run([key, { action: "frames", name: "report.md" }]), /already uses/);
+    for (const name of ["..", ".", "  "]) {
+      await assert.rejects(run([key, { action: "frames", name }]), /names no directory|needs a "name"/, name);
+    }
+    // It records the action right before it.
+    await assert.rejects(run([{ action: "frames", name: "a" }]), /records the action right before it/);
     await assert.rejects(
       run([
-        { action: "frames", name: "a b" },
-        { action: "frames", name: "a_b" },
+        { action: "snapshot", name: "s" },
+        { action: "frames", name: "a" },
       ]),
-      /distinct name/,
+      /is a snapshot step/,
     );
+  });
+});
+
+/**
+ * The page behaviours a `frames` step must not change, each from the round that reviewed the
+ * first version (which held every animation from load and rested by setting `currentTime`).
+ */
+describe("runInteract with frames steps leaves the page's own motion logic working", () => {
+  const page = (name: string, body: string) => {
+    const file = join(dir, `${name}.html`);
+    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#fff}</style>${body}`);
+    return file;
+  };
+  const rgb = (file: string, x: number, y: number) => {
+    const png = PNG.sync.read(readFileSync(file));
+    const i = (y * png.width + x) * 4;
+    return [png.data[i], png.data[i + 1], png.data[i + 2]];
+  };
+  const run = (source: string, name: string, steps: Sequence["steps"]) =>
+    runInteract({
+      source,
+      sequencePath: sequence(name, steps, { width: 400, height: 200 }),
+      outputDir: join(dir, `out-${name}`),
+    });
+  const tail: Sequence["steps"] = [
+    { action: "press", key: "x" },
+    { action: "frames", name: "f", at: [0] },
+  ];
+
+  it("a later action can use what an earlier action set moving", async () => {
+    // A menu sliding in over 300ms holds the next click's target. Held from its first frame, the
+    // click inside it timed out.
+    const source = page(
+      "menu",
+      `<style>#m{position:fixed;left:0;top:40px;width:200px;height:100px;background:#2255cc;transform:translateX(-300px);transition:transform 300ms}
+       #m.open{transform:none} #item{margin:20px}</style>
+       <button id="op">menu</button><div id="m"><button id="item">item</button></div>
+       <script>op.onclick=()=>m.classList.add("open"); item.onclick=()=>document.body.style.background="#ffcc00";</script>`,
+    );
+    const report = await run(source, "menu", [
+      { action: "click", selector: "#op" },
+      { action: "click", selector: "#item" },
+      { action: "snapshot", name: "s" },
+      ...tail,
+    ]);
+    assert.deepEqual(report.stepFailures, []);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 300, 180), [0xff, 0xcc, 0x00], "the click landed");
+  });
+
+  it("a Web Animation's finished promise resolves, at a snapshot and inside a frames window", async () => {
+    // `el.animate(...).finished.then(hide)`: rested by a seek it stayed paused at its end, so the
+    // dialog never closed.
+    const source = page(
+      "finished",
+      `<style>#d{position:fixed;left:0;top:0;width:100px;height:100px;background:#00a000}</style>
+       <div id="d"></div><button id="cl" style="position:fixed;left:200px;top:0">close</button>
+       <script>cl.onclick=()=>d.animate([{opacity:1},{opacity:0}],200).finished.then(()=>d.hidden=true);</script>`,
+    );
+    const snap = await run(source, "finished-snap", [
+      { action: "click", selector: "#cl" },
+      { action: "snapshot", name: "s" },
+      ...tail,
+    ]);
+    assert.deepEqual(rgb(snap.snapshots[0]!.screenshotPath, 50, 50), [255, 255, 255]);
+    const frames = await run(source, "finished-frames", [
+      { action: "click", selector: "#cl" },
+      { action: "frames", name: "f", at: [0, 100, 300] },
+    ]);
+    const files = frames.frameSequences[0]!.files;
+    assert.deepEqual(rgb(files[0]!, 50, 50), [0, 0xa0, 0], "opaque at 0");
+    assert.deepEqual(rgb(files[2]!, 50, 50), [255, 255, 255], "hidden once past its end, by the page's own handler");
+  });
+
+  it("an animation the page cancelled stays cancelled", async () => {
+    const source = page(
+      "cancel",
+      `<style>#b{width:100px;height:100px;background:#0000ff}</style><div id="b"></div>
+       <button id="a">a</button><button id="c">c</button>
+       <script>let an; a.onclick=()=>{an=b.animate([{background:"red"}],{duration:200,fill:"forwards"})}; c.onclick=()=>an.cancel();</script>`,
+    );
+    const report = await run(source, "cancel", [
+      { action: "click", selector: "#a" },
+      { action: "snapshot", name: "s1" },
+      { action: "click", selector: "#c" },
+      { action: "snapshot", name: "s2" },
+      ...tail,
+    ]);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 50, 50), [255, 0, 0]);
+    assert.deepEqual(rgb(report.snapshots[1]!.screenshotPath, 50, 50), [0, 0, 255], "not revived by the next snapshot");
+  });
+
+  it("a stage the page starts on the previous one's animationend is finished before the snapshot", async () => {
+    const source = page(
+      "chain",
+      `<style>#k{width:100px;height:100px;background:#0000ff}
+       @keyframes mv{to{margin-left:200px}} @keyframes rd{to{background:#ff0000}}
+       .s1{animation:mv 300ms forwards} .s1.s2{animation:mv 300ms forwards, rd 300ms forwards}</style>
+       <div id="k"></div><button id="go">go</button>
+       <script>go.onclick=()=>k.classList.add("s1"); k.addEventListener("animationend",(e)=>{if(e.animationName==="mv")k.classList.add("s2")});</script>`,
+    );
+    const report = await run(source, "chain", [
+      { action: "click", selector: "#go" },
+      { action: "snapshot", name: "s1" },
+      { action: "snapshot", name: "s2" },
+      ...tail,
+    ]);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 250, 50), [255, 0, 0], "both stages at rest");
+    assert.equal(
+      report.transitions[0]!.diffPixels,
+      0,
+      "two snapshots with no action between them are the same picture",
+    );
+  });
+
+  it("an animation the page itself paused is left where the page put it", async () => {
+    const source = page(
+      "paused",
+      `<style>@keyframes grow{to{width:200px}} #r{height:50px;width:0;background:#ff0000;animation:grow 1s linear forwards paused}</style><div id="r"></div>`,
+    );
+    const report = await run(source, "paused", [{ action: "snapshot", name: "s" }, ...tail]);
+    assert.deepEqual(rgb(report.snapshots[0]!.screenshotPath, 100, 25), [255, 255, 255]);
+  });
+
+  it("an Animation the page replays is held and seeked like a new one", async () => {
+    const source = page(
+      "replay",
+      `<style>#p{position:fixed;left:0;top:0;width:200px;height:100px;background:#2255cc}</style><div id="p"></div><button id="t" style="position:fixed;top:150px">t</button>
+       <script>const a=p.animate([{transform:"translateX(-200px)"},{transform:"none"}],{duration:400,fill:"both"}); a.pause();
+       t.onclick=()=>{a.currentTime=0;a.play();};</script>`,
+    );
+    const report = await run(source, "replay", [
+      { action: "snapshot", name: "load" },
+      { action: "click", selector: "#t" },
+      { action: "frames", name: "open", at: "0..400/100" },
+    ]);
+    const seq = report.frameSequences[0]!;
+    const width = (file: string) => {
+      const png = PNG.sync.read(readFileSync(file));
+      let x = 0;
+      while (x < png.width && png.data[(50 * png.width + x) * 4]! < 80) x++;
+      return x;
+    };
+    seq.files.forEach((f, i) => assert.ok(Math.abs(width(f) - 50 * i) <= 1, `at ${100 * i}ms: ${width(f)}px`));
+    assert.equal(seq.unstable, 0);
+  });
+
+  it("an animation a timer starts with a delay sits at the real time it began, the delay counted once", async () => {
+    const source = page(
+      "delay",
+      `<style>@keyframes sl{to{margin-left:400px}} #q{width:20px;height:20px;background:#ff0000} #q.go{animation:sl 400ms linear 300ms forwards}</style>
+       <div id="q"></div><script>document.addEventListener("keydown",()=>setTimeout(()=>q.classList.add("go"),100));</script>`,
+    );
+    const report = await run(source, "delay", [
+      { action: "press", key: "Escape" },
+      { action: "frames", name: "d", at: [0, 650, 1000] },
+    ]);
+    const left = (file: string) => {
+      const png = PNG.sync.read(readFileSync(file));
+      let x = 0;
+      while (
+        x < png.width &&
+        !(png.data[(10 * png.width + x) * 4]! > 200 && png.data[(10 * png.width + x) * 4 + 1]! < 80)
+      )
+        x++;
+      return x;
+    };
+    const [, mid, end] = report.frameSequences[0]!.files.map(left);
+    // Begun ~70-100ms after offset 0 (the timer is real time), so 650ms is ~250-280ms into the slide.
+    assert.ok(mid! >= 200 && mid! <= 340, `650ms: ${mid}px`);
+    assert.equal(end, 400, "finished by 1000ms");
+  });
+
+  it("survives a navigation", async () => {
+    const { createServer } = await import("node:http");
+    const pages: Record<string, string> = {
+      "/a.html": `<!doctype html><a id="go" href="/b.html">b</a>`,
+      "/b.html": `<!doctype html><style>@keyframes f{from{opacity:0}} p{animation:f 200ms}</style><p>b</p><button id="x">x</button>`,
+    };
+    const server = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(pages[req.url ?? ""] ?? "");
+    });
+    await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+    try {
+      const { port } = server.address() as { port: number };
+      const report = await runInteract({
+        source: `http://127.0.0.1:${port}/a.html`,
+        sequencePath: sequence("nav", [
+          { action: "snapshot", name: "a" },
+          { action: "click", selector: "#go" },
+          { action: "waitForSelector", selector: "p" },
+          { action: "snapshot", name: "b" },
+          { action: "click", selector: "#x" },
+          { action: "frames", name: "f", at: [0, 100] },
+        ]),
+        outputDir: join(dir, "out-nav"),
+      });
+      assert.deepEqual(report.stepFailures, []);
+      assert.equal(report.snapshots.length, 2);
+      assert.equal(report.frameSequences[0]?.count, 2);
+    } finally {
+      server.close();
+    }
   });
 });

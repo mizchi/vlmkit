@@ -1275,9 +1275,9 @@ element needs to be legible.
 Frames are composited **in the order given**, and a glob expands
 lexicographically — so `anim-0-100.png` lands before `anim-0-20.png` and the strip
 reads backwards. The command detects that and prints the numeric order it would
-have used; zero-pad the names or list them explicitly. Every sequence vlmkit
-writes is zero-padded (`0000-t000000.png`), and `--manifest` takes the order from
-`frames.json` instead of the shell.
+have used; zero-pad the names or list them explicitly. Every `vlmkit-frames/1`
+sequence is zero-padded (`0000-t000000.png`), and `--manifest` takes the order
+from `frames.json` instead of the shell.
 
 Frames of different sizes are placed top-left inside a uniform cell, never
 centred: a `translateX` strip is read by comparing where the element sits from
@@ -1389,7 +1389,7 @@ zero-padded, so a glob is in sequence order — and a `frames.json` saying what
 each one shows.
 
 ```bash
-# The whole page at instants of its own time; clock and animations held
+# The viewport, uncropped, at instants of the page's own time; clock and animations held
 vlmkit check animation page.html --at 0..600/100 --frames out/anim
 # What each instant --timeline judged looked like, and the rest instant; one directory per width
 vlmkit check integrity page.html --timeline-at 0,250,500 --frames out/tl     # out/tl/1280/, out/tl/768/, …
@@ -1404,7 +1404,10 @@ held 60fps clock, 100ms) and ranges `0..1s/100ms` (the end is included when a
 step lands on it). `--timeline-at` reads the same grammar; before it did,
 `Number.parseInt` read `1.5s` as 1ms. A range is computed as `start + i * step`,
 never by adding the step up — summed, `1000 / 60` drifts above a frame boundary
-and the held clock runs a frame short. More than 1000 instants is refused.
+and the held clock runs a frame short — and in frames when its step is in frames
+and its start is on one (`0..1s/5f`). A value within 1e-6ms of a whole ms or a
+frame boundary is put on it, so `16.15s` is 16150 and not 16149.999999999998.
+More than 1000 instants (or offsets) is refused.
 
 ```json
 { "format": "vlmkit-frames/1",
@@ -1436,8 +1439,8 @@ and the held clock runs a frame short. More than 1000 instants is refused.
 
 **After an action — `inspect interact` `frames` steps.** A sequence step
 `{ "action": "frames", "name": "close", "at": "0..400/50" }` (or `"everyMs": 50,
-"forMs": 400`; the default is every 50ms over 500ms) records what the actions since
-the previous snapshot or `frames` step set moving, into `<output-dir>/close/`:
+"forMs": 400`; the default is every 50ms over 500ms) records what the action right
+before it set moving, into `<output-dir>/close/`:
 
 ```json
 { "viewport": { "width": 1280, "height": 720 }, "steps": [
@@ -1448,17 +1451,24 @@ the previous snapshot or `frames` step set moving, into `<output-dir>/close/`:
 ```
 
 Without a `frames` step, `inspect interact` switches every transition and
-animation off, as it always has. With one, the page keeps its motion: each
-animation is held as it begins, a snapshot shows every one at rest (a finite one
-past its end, an infinite one at 0), and the `frames` step seeks the ones its
-actions started to each offset. Offset 0 is two rendering updates after the last
-action returns, when what it started has begun; one a timer starts later sits at
-the real time it began, and no frame is shot before the page has lived that long.
+animation off, as it always has. With one, the page keeps its motion and it runs
+as it would for a user, so a later click inside a menu an earlier one opened still
+lands. Before each snapshot every running animation is finished — with `finish()`,
+so `finished` promises resolve, end events fire, and a stage the page chains from
+one is finished too — and an infinite one is paused at 0; one the page paused or
+cancelled itself is left alone. Only the action right before a `frames` step is
+held: the page is settled first, then every animation that action starts is paused
+as it begins and seeked to each offset (finished, not paused, once an offset is past
+its end), and finished afterwards. Offset 0 is two rendering updates after the
+action returns, when what it started has begun; one a timer starts later sits at the
+real time it began, and no frame is shot before the page has lived that long. The
+first document gets the script after load (`setContent` runs no init script);
+every later one, after a link or a reload, gets it as an init script.
 Measured on a drawer with a 220ms linear slide that sets `hidden` on
 `transitionend`: at 0 / 50 / 100 / 150 / 200ms its solid width is 200 / 154 / 109 /
-63 / 18px and the antialiased edge pixel is 0.55 / 0.09 / 0.64 / 0.18 covered —
-exactly `200 - 200t/220` — and seeking the paused transition past its end fires
-`transitionend`, so the page's own handler runs between frames.
+63 / 18px and the antialiased edge pixel is 0.55 / 0.09 / 0.64 / 0.19 covered —
+within 0.01 of `200 - 200t/220` — and seeking the paused transition past its end
+fires `transitionend`, so the page's own handler runs between frames.
 
 #### Visualizing the VRT process — flipbooks + video
 

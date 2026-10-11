@@ -89,6 +89,19 @@ interface ParsedTime {
 
 const TIME_HELP = "a time is 1500, 1500ms, 1.5s, 00:01.500 or 6f (60fps frames); a range is 0..1s/100ms";
 
+/**
+ * Within a hair of a whole ms or of a 60fps frame boundary, exactly on it. Decimal seconds are
+ * binary fractions: `16.15 * 1000` is 16149.999999999998, which the held clock compares as
+ * "before frame 969" and a timer due at 16150 as "not yet". And `0 + 5 * (1000 / 60)` is one ulp
+ * off `frameTimeMs(5)`, so the same frame written two ways would be two instants.
+ */
+function snap(ms: number): number {
+  const whole = Math.round(ms);
+  if (Math.abs(ms - whole) < 1e-6) return whole;
+  const frame = Math.round((ms * 60) / 1000);
+  return Math.abs(ms - frameTimeMs(frame)) < 1e-6 ? frameTimeMs(frame) : ms;
+}
+
 function parseTime(token: string, flag: string): ParsedTime {
   const unit = token.match(/^(\d+(?:\.\d+)?)(ms|s|f)?$/);
   if (unit) {
@@ -97,7 +110,10 @@ function parseTime(token: string, flag: string): ParsedTime {
       if (!Number.isInteger(value)) throw new UsageError(`${flag}: "${token}" is not a whole frame. ${TIME_HELP}`);
       return { ms: frameTimeMs(value), frames: value };
     }
-    return { ms: unit[2] === "s" ? value * 1000 : value };
+    const ms = snap(unit[2] === "s" ? value * 1000 : value);
+    // A whole frame (0 included) counts as written in frames, so `0..1s/5f` is computed in frames.
+    const frame = (ms * 60) / 1000;
+    return Number.isInteger(frame) ? { ms, frames: frame } : { ms };
   }
   // mm:ss(.sss) or hh:mm:ss(.sss), the form a video player shows.
   const clock = token.match(/^(?:(\d+):)?(\d+):(\d{2}(?:\.\d+)?)$/);
@@ -106,7 +122,9 @@ function parseTime(token: string, flag: string): ParsedTime {
     if (seconds >= 60 || (clock[1] !== undefined && minutes >= 60)) {
       throw new UsageError(`${flag}: "${token}" is not a time of day. ${TIME_HELP}`);
     }
-    return { ms: ((hours * 60 + minutes) * 60 + seconds) * 1000 };
+    const ms = snap(((hours * 60 + minutes) * 60 + seconds) * 1000);
+    const frame = (ms * 60) / 1000;
+    return Number.isInteger(frame) ? { ms, frames: frame } : { ms };
   }
   throw new UsageError(`${flag}: "${token}" is not a time. ${TIME_HELP}`);
 }
@@ -114,11 +132,13 @@ function parseTime(token: string, flag: string): ParsedTime {
 /**
  * Parse a list of instants: `0,150,300`, `0,1.5s`, `00:00.250`, `6f`, and ranges `0..1s/100ms`
  * (the end is included when a step lands on it). Sorted, deduplicated, in ms; fractional ms are
- * kept, so `1f` is 16.666…ms and not 16 or 17.
+ * kept, so `1f` is 16.666…ms and not 16 or 17. A value within 1e-6ms of a whole ms or of a frame
+ * boundary is put exactly on it.
  *
  * A range's values are computed as `start + i * step`, never by adding the step up: summing
  * `1000 / 60` drifted above a frame boundary, and the held clock then ran one frame short. A range
- * written in frames is computed in frames for the same reason.
+ * whose step is in frames and whose start is on a frame (`0..1s/5f`, `6f..60f/6f`) is computed in
+ * frames for the same reason.
  *
  * `flag` names the flag in the error, e.g. `--timeline-at`.
  */
@@ -146,11 +166,13 @@ export function parseInstants(raw: string, flag: string, options: { max?: number
     const [from, to, step] = [parseTime(range[1]!, flag), parseTime(range[2]!, flag), parseTime(range[3], flag)];
     if (step.ms <= 0) throw new UsageError(`${flag}: the range "${token}" has a zero step.`);
     if (to.ms < from.ms) throw new UsageError(`${flag}: the range "${token}" ends before it starts.`);
-    const inFrames = from.frames !== undefined && step.frames !== undefined;
+    const inFrames = from.frames !== undefined && step.frames !== undefined && Number.isInteger(step.frames);
     for (let i = 0; ; i++) {
-      const ms = inFrames ? frameTimeMs(from.frames! + i * step.frames!) : from.ms + i * step.ms;
-      // A hair of slack, so 0..0.3s/0.1s reaches 300 although 3 * 100 is computed exactly anyway.
+      const ms = snap(inFrames ? frameTimeMs(from.frames! + i * step.frames!) : from.ms + i * step.ms);
       if (ms > to.ms + 1e-9) break;
+      // Counted by step as well as by distinct value: a step below the float resolution at the
+      // start (1000000..1000001/1e-19) adds the same value forever and the set never grows.
+      if (i >= max) throw new UsageError(`${flag}: more than ${max} instants. Use a larger step or a shorter range.`);
       add(ms);
     }
   }
@@ -205,8 +227,9 @@ export function parseFramesManifest(text: string): FramesManifest {
     ) {
       throw new UsageError(`frames manifest: frame ${i} needs a "file" and a numeric "atMs".`);
     }
-    // A path that leaves the manifest's directory is not one of its frames.
-    if (frame.file.startsWith("/") || frame.file.split(/[\\/]/).includes("..")) {
+    // A path that leaves the manifest's directory is not one of its frames: `..`, a root (`/`,
+    // `\\`), a drive (`C:`) or a UNC share, on either separator.
+    if (/^[\\/]|^[A-Za-z]:/.test(frame.file) || frame.file.split(/[\\/]/).includes("..")) {
       throw new UsageError(`frames manifest: frame ${i}'s file "${frame.file}" is outside the manifest's directory.`);
     }
   });

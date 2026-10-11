@@ -162,7 +162,7 @@ Evaluates every authored animation by rendered frames:
   an animated image or a worker.
 - **To look at the motion yourself**, ask for frames rather than guessing
   from the strip's even columns: `--at 0..600/100 --frames out/f` writes the
-  whole page at each instant with the clock held (`0000-t000000.png` …, plus
+  viewport, uncropped, at each instant with the clock held (`0000-t000000.png` …, plus
   `frames.json`); `vlmkit snapshot strip --manifest out/f/frames.json` puts
   them in one image labelled with their times. Read it.
 - **Defects that exist only mid-motion** are `check integrity`'s, not this

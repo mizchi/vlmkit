@@ -326,7 +326,7 @@ held finding (8 transient glimpses, 7 of them the solitaire deal). Round:
 ## Frames: the page at chosen instants (`vlmkit-frames/1`)
 
 ```bash
-vlmkit check animation page.html --at 0..600/100 --frames out/f      # whole page per instant, clock held
+vlmkit check animation page.html --at 0..600/100 --frames out/f      # the viewport per instant, clock held
 vlmkit check integrity page.html --timeline-at 0,250,500 --frames out/tl   # each judged instant + rest, per width
 vlmkit inspect interact page.html --sequence s.json   # { "action": "frames", "name": "close", "at": "0..400/50" } after an action
 vlmkit snapshot strip --manifest out/f/frames.json [--animated] [--max-frames 6]
@@ -346,25 +346,37 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   the held clock had.
 - **A gate's value flags must be listed for `firstPositional`.** `check integrity --timeline-at
   0,150 page.html` read `0,150` as the page. List every new value flag.
+- **Ranges and decimals are snapped.** `0 + 5 * (1000 / 60)` is one ulp below frame 5's time
+  and `16.15 * 1000` is 16149.999999999998; both made the held clock stop a frame early. A value
+  within 1e-6ms of a whole ms or a frame boundary is put on it, and a range stepped in frames
+  from a start on a frame (bare `0` included) is computed in frames.
 - **A capture is two shots that agree** (at most three). A seek can be photographed before the
   compositor applies it; three that never agree are `stable: false` (video, animated image,
   worker), written anyway and counted, never passed off as the instant.
 - **`check animation --frames` no longer writes the evaluation's internal captures** (`rest`,
   `anim-0-25`, `t-150ms`: each on its own clock, in an order no glob sorted). It captures the
-  whole page per instant on a fresh held page; `--at` also names the strip's columns, which the
+  uncropped viewport per instant on a fresh held page; `--at` also names the strip's columns, which the
   2026-08-10 dogfood agent had looked for.
-- **`inspect interact` holds motion only when a `frames` step asks.** Without one it still
-  switches every animation off, byte for byte as before. With one, each animation is held as it
-  begins and a snapshot shows all of them at rest. Offset 0 is two rendering updates after the
-  action returns, and the sweep runs there, because a CSS animation in its delay has fired no
-  `animationstart`. A timer's work is on the real clock (`shotMs`), and no frame is shot before
-  the page has lived that long.
+- **`inspect interact` holds only the action a `frames` step records.** Without a `frames` step
+  it still switches every animation off, byte for byte as before. The first version held every
+  animation from load and rested them by setting `currentTime`, and a review found eight ways
+  that broke the page (each now a test in `interact.test.ts`): a click inside a menu an earlier
+  click opened timed out (frozen at its first frame); `el.animate().finished.then(hide)` never
+  resolved (paused at its end is not finished); a seek revived an animation the page had
+  `cancel()`ed; a stage chained on `animationend` was caught at its first frame; an animation
+  the page paused on purpose was moved to its end; a replayed `Animation` ran unheld; a delayed
+  one's delay was counted twice (`animationstart` fires after it — take `startAt` as
+  `now - currentTime`); and a navigation lost the script. So: motion runs live, a snapshot
+  `finish()`es what is running until nothing more starts, and only the recorded action is armed.
+  Offset 0 is two rendering updates after it returns. A timer's work is on the real clock
+  (`shotMs`, read just before the shot that is kept), and no frame is shot before the page has
+  lived that long.
 - **Seeking a paused CSS transition past its end fires `transitionend`** (Chromium 141). Measured on a drawer
-  that hides itself on it: the handler runs between frames. Each frame's drawer edge is exact to
-  the antialiased pixel's coverage (0.55 at 50ms of a 220ms slide).
+  that hides itself on it: the handler runs between frames. Each frame's drawer edge is right to
+  within 0.01 of the antialiased pixel's coverage (0.55 at 50ms of a 220ms slide, where 154.55px is due).
 - **`setContent` runs no init script**, so the held clock needs a navigated page (`--frames` on
-  inline HTML is refused). `interact` injects the hold after load for that reason, and sweeps
-  up what is already running.
+  inline HTML is refused). `interact` injects its script after load for that reason, and also
+  registers it as an init script so the document after a link or a reload has it.
 
 Not built yet, in the order the research put them: a storyboard over a lossless sequence (no VLM
 verdict), `check flash`, and external video files through a decoder the user supplies.

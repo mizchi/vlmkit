@@ -36,6 +36,17 @@ test("captureStable: three shots that never agree are written as unstable, the l
   assert.equal(stub.taken(), 3, "at most three");
 });
 
+test("captureStable: with a clock, `at` is when the returned picture was first on screen", async () => {
+  const readings = [10, 20, 30];
+  const agreeing = pageShooting(["early", "b", "b"]);
+  let i = 0;
+  const clock = async () => readings[i++]!;
+  assert.equal((await captureStable(agreeing.page, { clock })).at, 20, "the first of the agreeing pair");
+  i = 0;
+  const moving = pageShooting(["a", "b", "c"]);
+  assert.deepEqual(await captureStable(moving.page, { clock }), { png: Buffer.from("c"), stable: false, at: 30 });
+});
+
 test("frameWriter: numbered files, a manifest, and a previous run's frames cleared first", async () => {
   const dir = await mkdtemp(join(tmpdir(), "vlmkit-frame-writer-"));
   // A longer earlier run, and a file of the user's that is not a frame.

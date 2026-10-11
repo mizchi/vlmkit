@@ -96,15 +96,27 @@ export async function openHeldTimeline(page: Page, url: string, options: PageLoa
 /**
  * Screenshot until two consecutive shots are byte-identical, at most `maxShots` (default 3).
  * `stable: false` = they never agreed; the last shot is returned.
+ *
+ * `clock`, when given, is read just before each shot, and `at` is its reading for the picture
+ * returned — the first of an agreeing pair (the page showed it from then), or the last shot when
+ * none agreed. A reading taken before the call would be early by every shot it took.
  */
-export async function captureStable(page: Page, maxShots = 3): Promise<{ png: Buffer; stable: boolean }> {
-  let previous = await page.screenshot({ animations: "allow" });
-  for (let shot = 1; shot < Math.max(2, maxShots); shot++) {
-    const next = await page.screenshot({ animations: "allow" });
-    if (next.equals(previous)) return { png: next, stable: true };
+export async function captureStable(
+  page: Page,
+  options: { maxShots?: number; clock?: () => Promise<number> } = {},
+): Promise<{ png: Buffer; stable: boolean; at?: number }> {
+  const shoot = async () => {
+    const at = options.clock ? await options.clock() : undefined;
+    return { at, png: await page.screenshot({ animations: "allow" }) };
+  };
+  const stamp = (at: number | undefined) => (at === undefined ? {} : { at });
+  let previous = await shoot();
+  for (let shot = 1; shot < Math.max(2, options.maxShots ?? 3); shot++) {
+    const next = await shoot();
+    if (next.png.equals(previous.png)) return { png: next.png, stable: true, ...stamp(previous.at) };
     previous = next;
   }
-  return { png: previous, stable: false };
+  return { png: previous.png, stable: false, ...stamp(previous.at) };
 }
 
 /** What a sequence's writer reports once it is done. */
@@ -167,7 +179,7 @@ export async function frameWriter(dir: string, source: FramesSource) {
 }
 
 /**
- * The whole page at each instant of its own time, as a sequence: `openHeldTimeline`, then for
+ * The viewport, uncropped, at each instant of its own time, as a sequence: `openHeldTimeline`, then for
  * each instant `at` + `captureStable`. `instants` defaults to `defaultTimelineInstants`.
  */
 export async function captureTimelineFrames(

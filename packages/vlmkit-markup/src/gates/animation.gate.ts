@@ -39,7 +39,7 @@ and plays in a browser or a GitHub comment. Needs no extra dependency.
 animation, cropped to the motion each one produced — the form to paste into a
 review.
 
-\`--frames dir\` writes the whole page at instants of its own time, as numbered
+\`--frames dir\` writes the viewport, uncropped, at instants of the page's own time, as numbered
 PNGs (0000-t000000.png, 0001-t000150.png, ...) plus frames.json (vlmkit-frames/1),
 which \`snapshot strip --manifest\` turns into a sheet or an animated PNG. The
 page clock and every animation are held for them, with or without
@@ -110,7 +110,7 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       placeholder: "dir",
       kind: "path",
       description:
-        "Write the whole page at each instant (--at) as numbered PNGs + frames.json (vlmkit-frames/1), clock and animations held",
+        "Write the viewport, uncropped, at each instant (--at) as numbered PNGs + frames.json (vlmkit-frames/1), clock and animations held",
     },
     {
       name: "at",

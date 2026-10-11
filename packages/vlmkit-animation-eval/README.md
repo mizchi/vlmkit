@@ -30,4 +30,10 @@ exported on its own as `VIRTUAL_CLOCK_SCRIPT` (`virtual-clock.ts`).
 
 `playwright` is a required peer: the whole job is driving a browser. Depends
 on `@mizchi/vlmkit-core` for page loading, browser launch and PNG utilities,
-and on nothing else in the workspace.
+and on `@mizchi/vlmkit-judge` (pure, no dependencies of its own) for the frame
+format and the instants a timeline is sampled at.
+
+`frames-capture.ts` is the frames half: the page at chosen instants of its own
+time (`captureTimelineFrames`), written as `vlmkit-frames/1` — numbered PNGs
+plus a `frames.json` — which `check animation --frames` and
+`check integrity --timeline --frames` both write.

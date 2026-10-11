@@ -234,7 +234,7 @@ export interface AnimationEvalReport {
   /** The frame files `--frames` wrote, in sequence order. */
   framePaths?: string[];
   /**
-   * `--frames`: the whole page at each instant of its own time, clock and animations held, as a
+   * `--frames`: the viewport, uncropped, at each instant of its own time, clock and animations held, as a
    * `vlmkit-frames/1` sequence (numbered PNGs + `frames.json`).
    */
   frames?: { dir: string; manifest: string; count: number; unstable: number; instants: number[] };
@@ -287,7 +287,7 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   /** Virtual-time span to sample script-driven motion over (default 2000ms). */
   clockWindowMs?: number;
   /**
-   * Write the whole page at each instant (`at`, else each animation's start / middle / end plus a
+   * Write the viewport, uncropped, at each instant (`at`, else each animation's start / middle / end plus a
    * coarse grid) into this directory as a `vlmkit-frames/1` sequence. Captured on a page of its
    * own with the clock held, so script-driven motion is at the instant too, `virtualTime` or not.
    */
@@ -1090,7 +1090,9 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       const finiteEnds = rows
         .filter((a) => a.iterations !== null)
         .map((a) => a.delayMs + a.durationMs * (a.iterations ?? 1));
+      // `--at` names the columns, so the window is the span they cover.
       const windowMs =
+        (options.at && options.at.length > 0 ? Math.max(...options.at) : undefined) ??
         options.stripWindowMs ??
         (finiteEnds.length > 0
           ? Math.max(1, ...finiteEnds)
