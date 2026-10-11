@@ -115,6 +115,9 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
+      '@mizchi/vlmkit-judge':
+        specifier: workspace:*
+        version: link:../vlmkit-judge
       playwright:
         specifier: '>=1.61 <2'
         version: 1.63.0

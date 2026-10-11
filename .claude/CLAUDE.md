@@ -323,6 +323,96 @@ background-late, late-exit). On the 21 animated pages of the repo `--timeline` c
 held finding (8 transient glimpses, 7 of them the solitaire deal). Round:
 `docs/reports/2026-10-01-hyperframes-motion-v1.md`.
 
+## Frames: the page at chosen instants (`vlmkit-frames/1`)
+
+```bash
+vlmkit check animation page.html --at 0..600/100 --frames out/f      # the viewport per instant, clock held
+vlmkit check integrity page.html --timeline-at 0,250,500 --frames out/tl   # each judged instant + rest, per width
+vlmkit inspect interact page.html --sequence s.json   # { "action": "frames", "name": "close", "at": "0..400/50" } after an action
+vlmkit snapshot strip --manifest out/f/frames.json [--animated] [--max-frames 6]
+```
+
+One format for every numbered capture: `NNNN-t<ms>.png` (position zero-padded, so a glob is in
+order) plus `frames.json` — `{format, source: {tool, url, viewport, deviceScaleFactor, browser,
+clock: held|wall}, frames: [{n, file, atMs, stable, label?, shotMs?}]}`. The pure half is
+`@mizchi/vlmkit-judge/frames.ts` (names, `parseInstants`, `thinEvenly`, `playbackDelays`,
+`parseFramesManifest`); the capture half is `@mizchi/vlmkit-animation-eval/frames-capture.ts`
+(`openHeldTimeline`, `captureStable`, `frameWriter`), which `check integrity --timeline` now
+runs on too — one copy of the hold / advance / seek loop. Measured building it, not to re-learn:
+
+- **One time grammar, `parseInstants`.** `numberList`'s `parseInt` read `--timeline-at 1.5s` as
+  1ms. Bare numbers are ms; `s`, `ms`, `f` (60fps frames), `mm:ss.sss` and `a..b/step`. A range
+  is `start + i * step` (in frames when written in frames), never a running sum — the same drift
+  the held clock had.
+- **A gate's value flags must be listed for `firstPositional`.** `check integrity --timeline-at
+  0,150 page.html` read `0,150` as the page. List every new value flag.
+- **Ranges and decimals are snapped.** `0 + 5 * frameTimeMs(5)` (the 5th value of `0..1s/5f`) is
+  416.66666666666663, one ulp below frame 25, and `16.15 * 1000` is 16149.999999999998; both made
+  the held clock stop a frame early. (`5 * (1000 / 60)` lands one ulp *above* frame 5, which runs
+  the frame but made `0..10f/1f,5f` two instants.) A value within 1e-6ms of a whole ms or a frame
+  boundary is put on it, and a range stepped in frames from a start on a frame (bare `0`
+  included) is computed in frames.
+- **A capture is two shots that agree** (at most three). A seek can be photographed before the
+  compositor applies it; three that never agree are `stable: false` (video, animated image,
+  worker), written anyway and counted, never passed off as the instant.
+- **`check animation --frames` no longer writes the evaluation's internal captures** (`rest`,
+  `anim-0-25`, `t-150ms`: each on its own clock, in an order no glob sorted). It captures the
+  uncropped viewport per instant on a fresh held page; `--at` also names the strip's columns, which the
+  2026-08-10 dogfood agent had looked for.
+- **`inspect interact` records a `frames` step on a page of its own.** The main run — snapshots,
+  transitions, step failures, the report — is the motion-off run a sequence without frames steps
+  gets, byte for byte; a frames step is skipped there. Then each frames step gets its own page:
+  the steps before it replay with motion off, motion goes on (removing `animation: none` restarts
+  every CSS animation), what that restarted is landed, and the recorded action runs with every
+  animation it starts held. Not to re-learn: three versions landed motion on the main run, and
+  four review rounds kept finding pages each policy broke — holding everything froze a menu an
+  earlier click opened; finishing everything before each action ran a toast's 4s auto-dismiss
+  early; finishing nothing timed out a click on a 7s attention-seeker and on a self-restarting
+  pulse. No landing policy matches motion-off for every page, so the main run gets none. The
+  cost: the steps before each frames step run twice (a URL source with server state sees their
+  requests twice). The 37 tests in the five `describe`s that follow `runInteract frames steps` in
+  `interact.test.ts` cover what the rounds found. Inside the window, measured on Chromium 141:
+  - Land by `finish()` (paused at its end, `finished` never resolves), only what is moving or due
+    within 1s; an infinite animation, or a loop finished 5 times in one landing, is paused at 0;
+    one the page paused, cancelled or set to rate 0 is the page's.
+  - `document.getAnimations()` leaves out shadow roots, and `animationstart` / `transitionrun`
+    are not composed: walk open shadow roots.
+  - A scroll-driven animation's `endTime` is a percentage (`CSSUnitValue`); hold only
+    `DocumentTimeline` animations.
+  - Once paused through the API, a CSS animation outlives its `animation-name`: cancel one whose
+    name its element no longer lists — compared escaped too (`slide:in` serialises as `slide\:in`).
+  - Setting `currentTime` on a cancelled (`idle`) animation revives it.
+  - Position by `playbackRate` and direction; take over one the page resumes or reverses after it
+    was held; hold `el.animate()` a microtask later (a scrubber paused at once is the page's);
+    take its start as `now - currentTime` (`animationstart` fires after the delay); and leave
+    what was already running when armed (a toast's exit in its delay) at its real time.
+  - A stage chained on a held animation's end is timed from THAT end: ends one at a time,
+    earliest first, each used once (a pulse restarted on its own end matched its first stage);
+    the origin goes to what begins while the end event — or a Web Animation's `finish`, listened
+    to from creation, before the page's `onfinish` — is dispatched, and is swept in the task
+    after, since a class added there (or in a `finished` promise, or behind `stopPropagation`)
+    becomes an animation only when style is computed. More than 16 ends before one offset are
+    finished together.
+  - Time is `timeOrigin + now`; every evaluate survives up to 5 navigations, and the document is
+    checked again after each frame is shot. A page that closes itself is not a navigation: the
+    step stops, what was shot keeps its `frames.json`, and the run's report is still written.
+  - Every wait on rendering is bounded (250ms): a page that stubs `requestAnimationFrame` hung the
+    run forever.
+  Offset 0 is two rendering updates after the action returns; a timer's work is on the real clock
+  (`shotMs`, read just before the shot that is kept); a held animation the page cancels or
+  retargets mid-window is counted and named. Left as limits: CSS inside an iframe is not held
+  (its frames read unstable), and an infinite CSS animation paused at 0 ignores the page's
+  `animation-play-state` from then on.
+- **Seeking a paused CSS transition past its end fires `transitionend`** (Chromium 141). Measured on a drawer
+  that hides itself on it: the handler runs between frames. Each frame's drawer edge is right to
+  within 0.01 of the antialiased pixel's coverage (0.55 at 50ms of a 220ms slide, where 154.55px is due).
+- **`setContent` runs no init script**, so the held clock needs a navigated page (`--frames` on
+  inline HTML is refused). `interact` injects its script after load for that reason, and also
+  registers it as an init script so the document after a link or a reload has it.
+
+Not built yet, in the order the research put them: a storyboard over a lossless sequence (no VLM
+verdict), `check flash`, and external video files through a decoder the user supplies.
+
 ## Responsive layout as a property-based test (`check responsive`)
 
 ```bash
@@ -794,7 +884,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
-| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `check integrity --timeline`'s clock. Depends on core + Playwright only; split out for the (since deleted) `vlmkit-anim eval`, and kept as the first evaluation tool usable without the rest of vlmkit. |
+| `packages/vlmkit-animation-eval/` | **Frame-sampled animation evaluator** (`runAnimationEval`): the measurement behind `vlmkit check animation` and `check integrity --timeline`'s clock. Depends on core, judge (pure: the frame format and the timeline instants) and Playwright; split out for the (since deleted) `vlmkit-anim eval`, and kept as the first evaluation tool usable without the rest of vlmkit. Also the frames half: `frames-capture.ts`. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |

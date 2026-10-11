@@ -24,14 +24,14 @@
  *
  * Usage:
  *   vlmkit check animation <html-or-url>
- *   vlmkit check animation <html-or-url> --json --frames out/frames
+ *   vlmkit check animation <html-or-url> --json --frames out/frames --at 0..600/100
  *
  * Lives in its own package (`@mizchi/vlmkit-animation-eval`) so a caller can
  * depend on the measurement without the rest of vlmkit.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -44,6 +44,8 @@ import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
 import { applyHar, settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { formatInstant, playbackDelays } from "@mizchi/vlmkit-judge/frames.ts";
+import { captureTimelineFrames } from "./frames-capture.ts";
 import { VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
 
 export interface AnimationTimingSample {
@@ -229,8 +231,13 @@ export interface AnimationEvalReport {
   /** Script-driven motion sampled on the virtual clock. Present only with `--virtual-time`. */
   clockMotion?: ClockMotion;
   issues: AnimationEvalIssue[];
-  /** Written sample frames (when --frames was passed). */
+  /** The frame files `--frames` wrote, in sequence order. */
   framePaths?: string[];
+  /**
+   * `--frames`: the viewport, uncropped, at each instant of its own time, clock and animations held, as a
+   * `vlmkit-frames/1` sequence (numbered PNGs + `frames.json`).
+   */
+  frames?: { dir: string; manifest: string; count: number; unstable: number; instants: number[] };
   /** Written when `stripPath` was given: one image holding every sampled frame. */
   strip?: {
     path: string;
@@ -279,8 +286,17 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   virtualTime?: boolean;
   /** Virtual-time span to sample script-driven motion over (default 2000ms). */
   clockWindowMs?: number;
-  /** Write each sampled frame PNG into this directory. */
+  /**
+   * Write the viewport, uncropped, at each instant (`at`, else each animation's start / middle / end plus a
+   * coarse grid) into this directory as a `vlmkit-frames/1` sequence. Captured on a page of its
+   * own with the clock held, so script-driven motion is at the instant too, `virtualTime` or not.
+   */
   framesDir?: string;
+  /**
+   * Instants of page time, in ms: the frames `framesDir` writes and the strip's columns. Without
+   * it the strip's columns divide its window evenly.
+   */
+  at?: readonly number[];
   /**
    * Composite every sampled frame into ONE image at this path, one row per
    * animation. `--frames` writes N files a reader has to open in order; this
@@ -821,6 +837,12 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     if (options.virtualTime) await advanceClock(p, 0);
   };
 
+  if (options.framesDir && pageUrl === undefined) {
+    // Init scripts do not run for `setContent`, and the held clock is one.
+    throw new UsageError("--frames needs the page as a file or URL to load, not inline HTML.");
+  }
+  const framePaths: string[] = [];
+
   return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     await loadPage(page);
@@ -868,17 +890,12 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       );
     };
 
-    const framePaths: string[] = [];
-    if (options.framesDir) await mkdir(options.framesDir, { recursive: true });
-    const shot = async (label: string): Promise<RgbaFrame> => {
-      const buffer = await page.screenshot({ animations: "allow" });
-      if (options.framesDir) {
-        const path = join(options.framesDir, `${label}.png`);
-        await writeFile(path, buffer);
-        framePaths.push(path);
-      }
-      return pngFromBuffer(buffer);
-    };
+    // The label names a capture in a debugger; it no longer names a file. `--frames` used to
+    // write every one of these (rest, anim-0-25, anim-0-replay, clock-250ms, t-150ms), in an
+    // order no glob sorted and on clocks that were not one timeline. The frames are a sequence
+    // of their own now, taken after this pass (`captureTimelineFrames`).
+    const shot = async (_label: string): Promise<RgbaFrame> =>
+      pngFromBuffer(await page.screenshot({ animations: "allow" }));
 
     // Rest pose as the shared baseline: running finite animations seeked past
     // their end (their settled appearance — fill:none falls back to natural
@@ -1073,12 +1090,18 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       const finiteEnds = rows
         .filter((a) => a.iterations !== null)
         .map((a) => a.delayMs + a.durationMs * (a.iterations ?? 1));
+      // `--at` names the columns, so the window is the span they cover.
       const windowMs =
+        (options.at && options.at.length > 0 ? Math.max(...options.at) : undefined) ??
         options.stripWindowMs ??
         (finiteEnds.length > 0
           ? Math.max(1, ...finiteEnds)
           : Math.max(1, ...rows.map((a) => a.delayMs + a.durationMs)));
-      const times = Array.from({ length: samples }, (_, i) => Math.round((windowMs * (i + 1)) / samples));
+      // `--at` names the columns: the 2026-08-10 dogfood agent looked for exactly that flag.
+      const times =
+        options.at && options.at.length > 0
+          ? [...options.at]
+          : Array.from({ length: samples }, (_, i) => Math.round((windowMs * (i + 1)) / samples));
 
       const PAD = 8;
       const columns: RgbaFrame[] = [];
@@ -1115,9 +1138,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         // Delays from the sampled instants, not a uniform value: these columns sit at 0 / 150 /
         // 400ms on the page timeline, and playing them evenly misrepresents when the motion
         // happened. The last frame holds for the average of the gaps before it.
-        const gaps = times.slice(1).map((t, i) => t - times[i]!);
-        const holdMs = gaps.length > 0 ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 200;
-        const bytes = encodeApng(played, { delaysMs: [...gaps, holdMs], delayMs: holdMs });
+        const delaysMs = playbackDelays(times);
+        const bytes = encodeApng(played, { delaysMs, delayMs: delaysMs.at(-1)! });
         await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
         await writeFile(resolve(options.stripPath), bytes);
         strip = {
@@ -1160,9 +1182,9 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         // be read by a human out of context." Column labels are the shared-clock times,
         // which is the axis the whole sheet is read along.
         const sheet = composeFilmstrip(cells, {
-          columns: samples,
+          columns: times.length,
           maxWidth: options.stripMaxWidth ?? 1600,
-          columnLabels: times.map((t) => `${t}ms`),
+          columnLabels: times.map((t) => `${formatInstant(t)}ms`),
           rowLabels: rows.map((anim) => `${anim.selector} ${anim.name}`),
         });
         await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
@@ -1191,6 +1213,28 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     }
 
     await page.close();
+
+    // The page at chosen instants, on a page of its own: this one's clock (when held) has run
+    // through the clock window and every animation here is at rest, so neither is at instant 0.
+    let frames: AnimationEvalReport["frames"];
+    if (options.framesDir) {
+      const framesPage = await browser.newPage({ viewport });
+      try {
+        const written = await captureTimelineFrames(framesPage, pageUrl!, {
+          ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
+          ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
+          ...(options.har ? { har: options.har } : {}),
+          dir: resolve(options.framesDir),
+          tool: "check animation",
+          ...(options.at ? { instants: options.at } : {}),
+        });
+        const { dir, manifest, count, unstable, instants } = written;
+        frames = { dir, manifest, count, unstable, instants };
+        framePaths.push(...written.files);
+      } finally {
+        await framesPage.close();
+      }
+    }
 
     // Behavioral reduced-motion pass: emulate and re-render, then count the
     // animations that still run with a non-trivial duration. Duration-zero
@@ -1283,6 +1327,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       ...(clockMotion ? { clockMotion } : {}),
       issues,
       ...(framePaths.length > 0 ? { framePaths } : {}),
+      ...(frames ? { frames } : {}),
       ...(strip ? { strip } : {}),
     };
   });
@@ -1393,9 +1438,18 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     lines.push("");
     lines.push(`${DIM}${note}${RESET}`);
   }
-  if (report.framePaths && report.framePaths.length > 0) {
+  if (report.frames) {
+    const f = report.frames;
     lines.push("");
-    lines.push(`Frames: ${report.framePaths.length} written`);
+    lines.push(
+      `Frames: ${f.count} written to ${f.dir} at ${f.instants.map(formatInstant).join("/")}ms of page time` +
+        ` (clock and animations held), manifest ${f.manifest}`,
+    );
+    if (f.unstable > 0) {
+      lines.push(
+        `${YELLOW}  ${f.unstable} frame(s) never captured the same twice: something moves that the clock does not hold (video, animated image, worker)${RESET}`,
+      );
+    }
   }
   if (report.strip) {
     const s = report.strip;
@@ -1416,8 +1470,8 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     // platform-dependent pixel this toolkit exists to catch. So it is emitted in the
     // form a reviewer actually needs it: next to the image, ready to paste.
     lines.push(
-      `${DIM}  caption: columns are ${s.times.map((ms) => `${ms}ms`).join(" / ")}` +
-        ` on the page timeline (window ${s.windowMs}ms, one shared clock);` +
+      `${DIM}  caption: columns are ${s.times.map((ms) => `${formatInstant(ms)}ms`).join(" / ")}` +
+        ` on the page timeline (window ${formatInstant(s.windowMs)}ms, one shared clock);` +
         ` rows top to bottom are ${s.rowSelectors.join(", ")}${RESET}`,
     );
   }

@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",
+    "@mizchi/vlmkit-judge": "workspace:*",
     "pngjs": "^7.0.0"
   },
   "peerDependencies": {

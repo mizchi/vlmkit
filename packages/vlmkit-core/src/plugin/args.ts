@@ -18,6 +18,7 @@
 
 import { createHash } from "node:crypto";
 import { basename, join, resolve } from "node:path";
+import { parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
 import { readFlag, readInt, readPositionals } from "../arg-reader.ts";
 import { UsageError } from "../cli-error.ts";
 
@@ -112,6 +113,17 @@ export function numberList(argv: readonly string[], name: string): number[] | un
       return n;
     });
   return values;
+}
+
+/**
+ * `--at 0,150,1.5s,0..1s/100ms` → instants in ms, sorted and deduplicated. Absent flag →
+ * `undefined`. The grammar is `parseInstants` (`@mizchi/vlmkit-judge/frames.ts`): bare numbers
+ * are ms, and `s`, `ms`, `f` (60fps frames), `mm:ss.sss` and ranges are accepted. Not
+ * `numberList`, whose `parseInt` read `1.5s` as 1 ms.
+ */
+export function instantList(argv: readonly string[], name: string): number[] | undefined {
+  const raw = readFlag(argv, name);
+  return raw === undefined ? undefined : parseInstants(raw, `--${name}`);
 }
 
 /**

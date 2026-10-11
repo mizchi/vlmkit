@@ -1022,7 +1022,7 @@ vlmkit contract scaffold   ui.contract.json --out dir/
 vlmkit heal selector <html|url> ".broken-selector"
 
 # Scripted / exploratory interaction.
-vlmkit inspect interact <html|url> --sequence <path.json>
+vlmkit inspect interact <html|url> --sequence <path.json>   # a "frames" step records what an action set moving
 vlmkit inspect explore  <html|url>             # Auto-discover declared actions and diff each
 vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke test
 
@@ -1249,8 +1249,13 @@ vlmkit snapshot strip round-0.png round-1.png round-2.png --out rounds.png
 vlmkit snapshot strip frames/*.png --columns 4 --max-width 1200 --out sheet.png
 
 # The other answer: one file that actually plays (animated PNG)
-vlmkit snapshot strip frames/anim-*.png --animated --delay 120 --out anim.png
+vlmkit snapshot strip shots/*.png --animated --delay 120 --out anim.png
 vlmkit check animation page.html --strip anim.png --strip-animated
+
+# A frames.json (see "Frames at chosen instants" below): labels and delays from its times
+vlmkit snapshot strip --manifest out/f/frames.json --out sheet.png
+vlmkit snapshot strip --manifest out/f/frames.json --animated --out anim.png
+vlmkit snapshot strip --manifest out/f/frames.json --max-frames 6 --out sheet.png   # evenly thinned, ends kept
 ```
 
 `--animated` writes **APNG**, not animated WebP: `@jsquash/webp` wraps libwebp's
@@ -1270,7 +1275,9 @@ element needs to be legible.
 Frames are composited **in the order given**, and a glob expands
 lexicographically — so `anim-0-100.png` lands before `anim-0-20.png` and the strip
 reads backwards. The command detects that and prints the numeric order it would
-have used; zero-pad the names or list them explicitly.
+have used; zero-pad the names or list them explicitly. Every `vlmkit-frames/1`
+sequence is zero-padded (`0000-t000000.png`), and `--manifest` takes the order
+from `frames.json` instead of the shell.
 
 Frames of different sizes are placed top-left inside a uniform cell, never
 centred: a `translateX` strip is read by comparing where the element sits from
@@ -1292,8 +1299,8 @@ from 1448x422 to 890x232 and made each row show only its own element.
 **Columns are shared instants on the page timeline**, not each animation's own
 0→1 progress. That is what makes a stagger visible: three cards with 0/60/120ms
 delays read as a diagonal cascade rather than as three identical rows. The window
-defaults to one iteration of the slowest animation, and `--strip-window <ms>` narrows
-it to the part under review:
+defaults to when the last finite animation the sheet shows ends, and `--strip-window <ms>`
+narrows it to the part under review (or `--at` names the columns outright):
 
 ```bash
 vlmkit check animation page.html --samples 6 --strip-window 380 --strip cards.png
@@ -1373,6 +1380,105 @@ at all — it is MoonBit, which this repo already builds — but its `encode_web
 emits a valid VP8L stream (verified: decodes to 1526x492 in Chromium) that is
 **6.6x larger than the PNG it replaces**, i.e. 29x libwebp. A correct minimal
 encoder, not a competitive one.
+
+#### Frames at chosen instants — `--frames`, `--at`, `frames.json`
+
+Three commands write the page at instants you choose as one kind of numbered
+sequence, `vlmkit-frames/1`: PNGs named `NNNN-t<ms>.png` — the position
+zero-padded, so a glob is in sequence order — and a `frames.json` saying what
+each one shows.
+
+```bash
+# The viewport, uncropped, at instants of the page's own time; clock and animations held
+vlmkit check animation page.html --at 0..600/100 --frames out/anim
+# What each instant --timeline judged looked like, and the rest instant; one directory per width
+vlmkit check integrity page.html --timeline-at 0,250,500 --frames out/tl     # out/tl/1280/, out/tl/768/, …
+# After an action: a "frames" step in the sequence (below)
+vlmkit inspect interact page.html --sequence drawer.json --output-dir out/drawer
+# Any of them as one image, labelled with the time each frame shows
+vlmkit snapshot strip --manifest out/anim/frames.json --out anim-sheet.png
+```
+
+Instants are ms when bare, and also `1.5s`, `00:01.500`, `6f` (frame 6 of the
+held 60fps clock, 100ms) and ranges `0..1s/100ms` (the end is included when a
+step lands on it). `--timeline-at` reads the same grammar; before it did,
+`Number.parseInt` read `1.5s` as 1ms. A range is computed as `start + i * step`,
+never by adding the step up — summed, `1000 / 60` drifts above a frame boundary
+and the held clock runs a frame short — and in frames when its step is in frames
+and its start is on one (`0..1s/5f`). A value within 1e-6ms of a whole ms or a
+frame boundary is put on it, so `16.15s` is 16150 and not 16149.999999999998.
+More than 1000 instants (or offsets) is refused.
+
+```json
+{ "format": "vlmkit-frames/1",
+  "source": { "tool": "check animation", "url": "file:///…/page.html",
+              "viewport": { "width": 1280, "height": 720 }, "deviceScaleFactor": 1,
+              "browser": "chromium 141.0.7390.37", "clock": "held" },
+  "frames": [ { "n": 0, "file": "0000-t000000.png", "atMs": 0, "stable": true },
+              { "n": 1, "file": "0001-t000100.png", "atMs": 100, "stable": true } ] }
+```
+
+- **`n`** is 0-based: the image index a model is given when the files are passed in order.
+- **`clock: "held"`** (`check animation`, `check integrity`): page time.
+  `requestAnimationFrame`, timers, `Date` and every animation move only when the
+  capture advances them. `check animation --frames` holds the clock whether or not
+  `--virtual-time` is set, on a page of its own after the evaluation. Its old
+  `--frames` output (`rest.png`, `anim-0-25.png`, `t-150ms.png`, …: the evaluation's
+  internal captures, each on its own clock) is gone.
+- **`clock: "wall"`** (`inspect interact`): ms after the action, in real time.
+  CSS and Web Animations are held and seeked to the offset, so their frames are
+  exact; scripts run on the real clock, and `shotMs` says when the frame was shot.
+- **`stable: false`**: two consecutive captures never agreed in three tries, so
+  something moves that nothing holds (a `<video>`, an animated image, a worker).
+  The frame is written anyway, as one moment of that motion. Agreeing twice also
+  covers a capture that lands before a seek is applied, which `check animation`
+  measured in 2 runs of 30.
+- A directory holds **one sequence**: frame files and a `frames.json` left by a
+  previous run are removed first; nothing else in it is touched.
+- `browser` and `deviceScaleFactor` are recorded because the pixels depend on them.
+
+**After an action — `inspect interact` `frames` steps.** A sequence step
+`{ "action": "frames", "name": "close", "at": "0..400/50" }` (or `"everyMs": 50,
+"forMs": 400`; the default is every 50ms over 500ms) records what the action right
+before it set moving, into `<output-dir>/close/`:
+
+```json
+{ "viewport": { "width": 1280, "height": 720 }, "steps": [
+  { "action": "snapshot", "name": "open" },
+  { "action": "press", "key": "Escape" },
+  { "action": "frames", "name": "close", "at": "0..400/50" },
+  { "action": "snapshot", "name": "closed" } ] }
+```
+
+`inspect interact` switches every transition and animation off for its run, as it
+always has, and a `frames` step changes nothing about that run: the snapshots,
+transitions and step failures are the same with it as without it. Each `frames`
+step is recorded afterwards on a page of its own. The steps before it replay with
+motion off, then motion goes on — removing `animation: none` restarts every CSS
+animation, so what is moving, or due to start within a second, is finished with
+`finish()` (so `finished` promises resolve, end events fire, and a stage chained on
+one is finished too), and an infinite animation or a self-restarting loop is paused
+at 0. Then the recorded action runs, and every animation it starts — including in
+open shadow roots, at its own `playbackRate` and direction — is paused as it begins
+and seeked to each offset, finished (not paused) once an offset is past its end. A
+stage the page chains on one of those ends, from an end event, an `onfinish` or a
+`finished` promise, is timed from that end, one end at a time. Scroll-driven
+animations follow the scroll and are never held; one that was already running when
+the action was armed (an exit in its delay) keeps its real time. Offset 0 is two
+rendering updates after the action returns; one a timer starts later sits at the
+real time it began, and no frame is shot before the page has lived that long. The
+clock is epoch time, so a navigation (a link, a reload, a redirect) keeps the
+offsets, and the new document's motion is held from then on; the report says when
+it happened, and counts held animations the page cancelled or retargeted
+mid-window. The steps before a frames step therefore run twice — a URL source with
+server state sees their requests twice. Not held: CSS inside an iframe (its frames
+read unstable), and an infinite CSS animation paused at 0 ignores the page's own
+`animation-play-state` from then on.
+Measured on a drawer with a 220ms linear slide that sets `hidden` on
+`transitionend`: at 0 / 50 / 100 / 150 / 200ms its solid width is 200 / 154 / 109 /
+63 / 18px and the antialiased edge pixel is 0.55 / 0.09 / 0.64 / 0.19 covered —
+within 0.01 of `200 - 200t/220` — and seeking the paused transition past its end
+fires `transitionend`, so the page's own handler runs between frames.
 
 #### Visualizing the VRT process — flipbooks + video
 

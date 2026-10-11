@@ -21,11 +21,17 @@
  * are about the page rather than a moment of it, and near-misalignment, which a moving
  * element trips by definition.
  */
+import { join } from "node:path";
 import type { Browser, Page } from "playwright";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
-import { applyHar, settlePage } from "@mizchi/vlmkit-core/page-open.ts";
-import { HOLD_TIMELINE_SCRIPT, VIRTUAL_CLOCK_SCRIPT } from "@mizchi/vlmkit-animation-eval/virtual-clock.ts";
-import { timelineInstants } from "@mizchi/vlmkit-judge/persistence.ts";
+import {
+  captureStable,
+  defaultTimelineInstants,
+  frameSourceFacts,
+  frameWriter,
+  openHeldTimeline,
+  type FramesWritten,
+} from "@mizchi/vlmkit-animation-eval/frames-capture.ts";
 import {
   findOccludedText,
   findTextCollisions,
@@ -44,9 +50,6 @@ import {
 } from "@mizchi/vlmkit-judge/integrity.ts";
 import { analyzeScrollSamples, COLLECT_SCROLL_SCRIPT, type ScrollScanInput } from "./scroll-scan.ts";
 
-/** Instants added to the animation-derived ones, so script-driven motion is sampled too. */
-const COARSE_GRID_MS = [0, 250, 500, 1000, 2000];
-
 export interface TimelineSample {
   atMs: number;
   findings: IntegrityFinding[];
@@ -60,6 +63,8 @@ export interface TimelineSweep {
    * last instant asked for — `--timeline-at 0,250,500` ends mid-motion on purpose.
    */
   rest: TimelineSample;
+  /** With `frames`: the page at each instant and at rest, as a `vlmkit-frames/1` sequence. */
+  frames?: FramesWritten;
 }
 
 /**
@@ -125,7 +130,9 @@ export async function judgeIntegrityInstant(
 
 /**
  * Load the page with its clock and animations held, pick the instants (the caller's, or each
- * finite animation's start / middle / end plus a coarse grid), and judge each one.
+ * finite animation's start / middle / end plus a coarse grid), and judge each one. With
+ * `frames`, each instant is also captured into `<frames>/<width>/`, the frame showing what was
+ * judged.
  */
 export async function sampleIntegrityTimeline(
   browser: Browser,
@@ -138,50 +145,40 @@ export async function sampleIntegrityTimeline(
     timeout?: number;
     waitUntil?: "domcontentloaded" | "load" | "networkidle";
     maxFindings?: number;
+    frames?: string;
   },
   collectors: Parameters<typeof judgeIntegrityInstant>[2],
 ): Promise<TimelineSweep> {
   const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
   try {
-    await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
-    await page.addInitScript(HOLD_TIMELINE_SCRIPT);
-    await applyHar(page, options.har);
-    await page.goto(url, { waitUntil: options.waitUntil ?? "networkidle", timeout: options.timeout ?? 30000 });
-    // Network idle and fonts only: the settle's animation and trailing waits run on the page's
-    // own timers, which the held clock never fires.
-    await settlePage(page, 0, 0);
-    const advance = (t: number) =>
-      page.evaluate(
-        (ms) =>
-          (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(
-            ms,
-          ),
-        t,
-      );
-    await advance(0);
-    const held = await page.evaluate(() =>
-      (
-        window as unknown as {
-          __vlmkitTimelineAnimations(): { startMs: number; durationMs: number; iterations: number | null }[];
-        }
-      ).__vlmkitTimelineAnimations(),
-    );
+    const timeline = await openHeldTimeline(page, url, options);
+    const held = await timeline.animations();
     const instants =
       options.at && options.at.length > 0
         ? [...new Set(options.at)].sort((a, b) => a - b)
-        : [...new Set([...timelineInstants(held), ...COARSE_GRID_MS])].sort((a, b) => a - b);
-    const samples: TimelineSample[] = [];
-    for (const atMs of instants) {
-      await advance(atMs);
-      await page.evaluate(
-        (t) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(t),
-        atMs,
-      );
-      samples.push({
+        : defaultTimelineInstants(held);
+    const writer = options.frames
+      ? await frameWriter(join(options.frames, String(viewport.width)), {
+          tool: "check integrity --timeline",
+          url,
+          viewport,
+          ...(await frameSourceFacts(page)),
+          clock: "held",
+        })
+      : undefined;
+    const judgeAt = async (atMs: number, label?: string): Promise<TimelineSample> => {
+      await timeline.at(atMs);
+      if (writer) {
+        const { png, stable } = await captureStable(page);
+        await writer.add(png, { atMs, stable, ...(label ? { label } : {}) });
+      }
+      return {
         atMs,
         findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12),
-      });
-    }
+      };
+    };
+    const samples: TimelineSample[] = [];
+    for (const atMs of instants) samples.push(await judgeAt(atMs));
     // Rest is past the end of every finite animation that moved the page the instants sampled.
     // One that has not begun by the last instant did not: a toast dismissed at 10s would put rest
     // past its exit, and a label it covered, still, for 10s would read as gone once the page stops.
@@ -190,16 +187,8 @@ export async function sampleIntegrityTimeline(
       .filter((a) => a.iterations !== null && a.startMs <= lastInstant)
       .map((a) => a.startMs + a.durationMs * (a.iterations ?? 1));
     const restMs = Math.max(2000, ...instants, ...finiteEnds) + 1;
-    await advance(restMs);
-    await page.evaluate(
-      (t) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(t),
-      restMs,
-    );
-    const rest = {
-      atMs: restMs,
-      findings: await judgeIntegrityInstant(page, viewport.width, collectors, options.maxFindings ?? 12),
-    };
-    return { samples, rest };
+    const rest = await judgeAt(restMs, "rest");
+    return { samples, rest, ...(writer ? { frames: await writer.finish() } : {}) };
   } finally {
     await page.close();
   }

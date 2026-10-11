@@ -132,6 +132,11 @@ export interface IntegrityTimeline {
   held: number;
   /** Seen at no two consecutive instants: a glimpse no user dwells on. */
   transient: IntegrityTimelineRow[];
+  /**
+   * With `--frames`: per width, the page at each instant judged and at rest, written as a
+   * `vlmkit-frames/1` sequence (`frames.ts`).
+   */
+  frames?: { viewport: number; dir: string; manifest: string; count: number; unstable: number }[];
 }
 
 export interface IntegrityTimelineRow {

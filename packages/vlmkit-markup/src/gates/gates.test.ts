@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
 import { describe, it } from "vite-plus/test";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { createGateRegistry } from "@mizchi/vlmkit-core/plugin/registry.ts";
@@ -176,6 +177,38 @@ describe("gate argument parsing", () => {
       /needs a reason/,
     );
     assert.throws(() => gateFor("check integrity").parse(["page.html", "--allow", "no-such-kind;why"], ctx));
+  });
+
+  it("check integrity reads --timeline-at as instants, wherever the page source sits", () => {
+    const parse = (argv: string[]) =>
+      gateFor("check integrity").parse(argv, ctx) as { source: string; timeline?: { at?: number[]; frames?: string } };
+    // `parseInt` read 1.5s as 1 ms; the instant grammar reads it as 1500.
+    assert.deepEqual(parse(["page.html", "--timeline-at", "0,1.5s,6f"]).timeline, { at: [0, 100, 1500] });
+    assert.deepEqual(parse(["page.html", "--timeline-at", "0..300/100"]).timeline?.at, [0, 100, 200, 300]);
+    // The flag's value used to be read as the page: this returned source "0,150".
+    assert.equal(parse(["--timeline-at", "0,150", "page.html"]).source, "page.html");
+    assert.equal(parse(["--timeline", "--frames", "out", "page.html"]).source, "page.html");
+    assert.throws(() => parse(["page.html", "--timeline-at", "soon"]), /--timeline-at: "soon" is not a time/);
+  });
+
+  it("check integrity --frames needs the timeline and resolves its directory", () => {
+    const parsed = gateFor("check integrity").parse(["page.html", "--timeline", "--frames", "out/tl"], ctx) as {
+      timeline: { frames: string };
+    };
+    assert.equal(parsed.timeline.frames, resolve("out/tl"));
+    assert.throws(() => gateFor("check integrity").parse(["page.html", "--frames", "out"], ctx), /add --timeline/);
+  });
+
+  it("check animation --at names instants for --frames or --strip, and only then", () => {
+    const parse = (argv: string[]) => gateFor("check animation").parse(argv, ctx) as { source: string; at?: number[] };
+    assert.deepEqual(parse(["--at", "0..1s/250ms", "page.html", "--frames", "out"]).at, [0, 250, 500, 750, 1000]);
+    assert.equal(parse(["--at", "0,150", "page.html", "--strip", "s.png"]).source, "page.html");
+    assert.throws(() => parse(["page.html", "--at", "0,150"]), /add one of them/);
+    assert.throws(
+      () => parse(["page.html", "--at", "0,150", "--strip", "s.png", "--strip-window", "400"]),
+      /--strip-window/,
+    );
+    assert.throws(() => parse(["page.html", "--at", ",", "--frames", "out"]), /names no instant/);
   });
 
   /**

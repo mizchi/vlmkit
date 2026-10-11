@@ -143,3 +143,42 @@ test(
     assert.match(report.findings.find((x) => x.kind === "occluded-text")!.message, /held 250-500ms/);
   },
 );
+
+test("--frames writes the page at each instant judged and at rest, per width", { timeout: 120_000 }, async () => {
+  const { mkdtemp, readFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { PNG } = await import("pngjs");
+  const { parseFramesManifest } = await import("@mizchi/vlmkit-judge/frames.ts");
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-tl-frames-"));
+  const report = await runIntegrityCheck({
+    source: fixture("held"),
+    viewports: [{ width: 1280, height: 800 }],
+    timeline: { at: [0, 250], frames: dir },
+  });
+  const [written] = report.timeline?.frames ?? [];
+  assert.equal(written?.viewport, 1280);
+  assert.equal(written?.count, 3);
+  const manifest = parseFramesManifest(await readFile(join(dir, "1280", "frames.json"), "utf8"));
+  assert.equal(manifest.source.tool, "check integrity --timeline");
+  // Rest is past 2s and past the card's 1s animation: 2001.
+  assert.deepEqual(
+    manifest.frames.map((f) => [f.file, f.atMs, f.label ?? null, f.stable]),
+    [
+      ["0000-t000000.png", 0, null, true],
+      ["0001-t000250.png", 250, null, true],
+      ["0002-t002001.png", 2001, "rest", true],
+    ],
+  );
+  // The card (220px wide from x=24, y 40-120) at its keyframes: 0, then 330px along, then 720px.
+  const blueAt = async (file: string, x: number) => {
+    const png = PNG.sync.read(await readFile(join(dir, "1280", file)));
+    const i = (100 * png.width + x) * 4;
+    return png.data[i]! < 80 && png.data[i + 2]! > 150;
+  };
+  assert.deepEqual(
+    await Promise.all(["0000-t000000.png", "0001-t000250.png", "0002-t002001.png"].map((f) => blueAt(f, 100))),
+    [true, false, false],
+  );
+  assert.equal(await blueAt("0001-t000250.png", 400), true, "over the label at 250ms: what was judged held");
+  assert.equal(await blueAt("0002-t002001.png", 800), true);
+});

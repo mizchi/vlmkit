@@ -15,10 +15,14 @@
  * a glob expands sorted, but `frame-2.png` sorts before `frame-10.png`, which is
  * the one thing that silently scrambles a numbered sequence. Zero-pad, or list
  * them explicitly.
+ *
+ * Or pass `--manifest frames.json` (`vlmkit-frames/1`, written by `check animation --frames`,
+ * `check integrity --timeline --frames` and `inspect interact`'s `frames` steps): the order,
+ * the cell labels and an animation's per-frame delays then come from the times the frames show.
  */
 import { existsSync } from "node:fs";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
@@ -26,12 +30,14 @@ import { decodePng, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
 import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { formatInstant, parseFramesManifest, playbackDelays, thinEvenly } from "@mizchi/vlmkit-judge/frames.ts";
 
 function usage(): string {
   return [
     "Usage:",
     "  vlmkit snapshot strip <frame1.png> [frame2.png ...] [--out strip.png] [--columns N] [--gap px] [--scale N] [--max-width px]",
     "  vlmkit snapshot strip <frame1.png> [frame2.png ...] --animated [--delay ms] [--loops N] [--out anim.png]",
+    "  vlmkit snapshot strip --manifest frames.json [--max-frames N] [--animated] [--out strip.png]",
     "",
     "Options:",
     "  --out <file>        Output PNG (default strip.png)",
@@ -46,6 +52,9 @@ function usage(): string {
     "  --animated          Write an animated PNG that plays the frames instead of a still sheet",
     "  --delay <ms>        Per-frame delay for --animated (default 200)",
     "  --loops <n>         Loop count for --animated; 0 = forever (default 0)",
+    "  --manifest <file>   A frames.json (vlmkit-frames/1) instead of frame paths: frames in its order,",
+    "                      labelled with the time each shows; --animated plays the real gaps",
+    "  --max-frames <n>    With --manifest: at most n frames, evenly spaced, first and last kept",
     "",
     "  A `.webp` output extension encodes WebP (needs the optional @jsquash/webp).",
     "  --animated writes APNG, which needs no extra dependency and plays in browsers and",
@@ -54,10 +63,12 @@ function usage(): string {
     "  encoder this repo does not ship (see packages/vlmkit-core/src/apng.ts).",
     "",
     "Examples:",
-    "  vlmkit snapshot strip frames/anim-*.png --out strip.png",
+    "  vlmkit snapshot strip --manifest out/frames/frames.json --out strip.png",
+    "  vlmkit snapshot strip --manifest out/frames/frames.json --animated --out anim.png",
+    "  vlmkit snapshot strip out/frames/*.png --out strip.png        # zero-padded names: the glob is in order",
     "  vlmkit snapshot strip round-0.png round-1.png round-2.png --columns 3 --out rounds.png",
     "  vlmkit snapshot strip f-0.png f-1.png --label 0ms --label 250ms --out strip.png",
-    "  vlmkit snapshot strip frames/anim-*.png --animated --delay 120 --out anim.png",
+    "  vlmkit snapshot strip shots/*.png --animated --delay 120 --out anim.png",
   ].join("\n");
 }
 
@@ -81,6 +92,9 @@ interface StripArgs {
   animated?: boolean;
   delayMs?: number;
   loops?: number;
+  /** A `vlmkit-frames/1` manifest to read the frames from, instead of `paths`. */
+  manifest?: string;
+  maxFrames?: number;
 }
 
 function readNumber(argv: string[], index: number, flag: string): number {
@@ -106,6 +120,8 @@ function parseArgs(argv: string[]): StripArgs {
   let animated = false;
   let delayMs: number | undefined;
   let loops: number | undefined;
+  let manifest: string | undefined;
+  let maxFrames: number | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -147,6 +163,15 @@ function parseArgs(argv: string[]): StripArgs {
       case "--loops":
         loops = readNumber(argv, ++i, "--loops");
         break;
+      case "--manifest":
+        manifest = argv[++i];
+        if (!manifest || manifest.startsWith("-")) throw new UsageError("--manifest expects a frames.json path");
+        break;
+      case "--max-frames":
+        maxFrames = readNumber(argv, ++i, "--max-frames");
+        if (maxFrames < 1 || !Number.isInteger(maxFrames))
+          throw new UsageError("--max-frames expects a whole number >= 1");
+        break;
       case "-h":
       case "--help":
         console.log(usage());
@@ -157,7 +182,13 @@ function parseArgs(argv: string[]): StripArgs {
         paths.push(arg);
     }
   }
-  if (paths.length === 0) throw new UsageError(`no frames given.\n\n${usage()}`);
+  if (manifest !== undefined && paths.length > 0) {
+    throw new UsageError("--manifest lists the frames: give it or frame paths, not both.");
+  }
+  if (maxFrames !== undefined && manifest === undefined) {
+    throw new UsageError("--max-frames thins a --manifest sequence; with paths, pass the ones you want.");
+  }
+  if (paths.length === 0 && manifest === undefined) throw new UsageError(`no frames given.\n\n${usage()}`);
   return {
     paths,
     out,
@@ -172,6 +203,27 @@ function parseArgs(argv: string[]): StripArgs {
     ...(animated ? { animated } : {}),
     ...(delayMs !== undefined ? { delayMs } : {}),
     ...(loops !== undefined ? { loops } : {}),
+    ...(manifest !== undefined ? { manifest } : {}),
+    ...(maxFrames !== undefined ? { maxFrames } : {}),
+  };
+}
+
+/**
+ * The frames a `vlmkit-frames/1` manifest lists, as paths beside it, each with a label of the
+ * time it shows (and its own label: `250ms`, `2001ms rest`), thinned to `maxFrames`.
+ */
+export async function framesFromManifest(
+  manifestPath: string,
+  maxFrames?: number,
+): Promise<{ paths: string[]; labels: string[]; atMs: number[]; unstable: number }> {
+  const manifest = parseFramesManifest(await readFile(resolve(manifestPath), "utf8"));
+  const frames = maxFrames === undefined ? manifest.frames : thinEvenly(manifest.frames, maxFrames);
+  const dir = dirname(resolve(manifestPath));
+  return {
+    paths: frames.map((f) => resolve(dir, f.file)),
+    labels: frames.map((f) => `${formatInstant(f.atMs)}ms${f.label ? ` ${f.label}` : ""}`),
+    atMs: frames.map((f) => f.atMs),
+    unstable: frames.filter((f) => f.stable === false).length,
   };
 }
 
@@ -210,13 +262,27 @@ export function numericOrder(paths: readonly string[]): string[] | null {
 
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
+  // From a manifest: its order, a label per frame unless the caller wrote their own, and the
+  // delays its times give unless --delay asked for an even beat.
+  let timedDelays: number[] | undefined;
+  if (parsed.manifest !== undefined) {
+    const fromManifest = await framesFromManifest(parsed.manifest, parsed.maxFrames);
+    parsed.paths = fromManifest.paths;
+    if (parsed.labels.length === 0) parsed.labels = fromManifest.labels;
+    if (parsed.delayMs === undefined) timedDelays = playbackDelays(fromManifest.atMs);
+    if (fromManifest.unstable > 0) {
+      console.log(
+        `${YELLOW}Note: ${fromManifest.unstable} frame(s) never captured the same twice — motion the capture did not hold.${RESET}`,
+      );
+    }
+  }
 
   const missing = parsed.paths.filter((p) => !existsSync(p));
   if (missing.length > 0) {
     throw new UsageError(`frame(s) not found: ${missing.join(", ")}`);
   }
 
-  const reordered = numericOrder(parsed.paths);
+  const reordered = parsed.manifest === undefined ? numericOrder(parsed.paths) : null;
   if (reordered) {
     console.log();
     console.log(`${YELLOW}Note: these filenames do not sort in numeric order.${RESET}`);
@@ -253,15 +319,17 @@ async function main(): Promise<void> {
     }
     const bytes = encodeApng(frames, {
       ...(parsed.delayMs !== undefined ? { delayMs: parsed.delayMs } : {}),
+      ...(timedDelays ? { delaysMs: timedDelays, delayMs: timedDelays.at(-1)! } : {}),
       ...(parsed.loops !== undefined ? { loops: parsed.loops } : {}),
     });
     await mkdir(dirname(resolve(parsed.out)), { recursive: true });
     await writeFile(resolve(parsed.out), bytes);
     const delay = parsed.delayMs ?? 200;
+    const loopMs = timedDelays ? timedDelays.reduce((a, b) => a + b, 0) : frames.length * delay;
     console.log();
     console.log(`${BOLD}${CYAN}Animated strip${RESET}`);
     console.log(
-      `  ${DIM}Frames: ${frames.length} at ${delay}ms each (${((frames.length * delay) / 1000).toFixed(1)}s per loop)${RESET}`,
+      `  ${DIM}Frames: ${frames.length} ${timedDelays ? "at the gaps between the times they show" : `at ${delay}ms each`} (${(loopMs / 1000).toFixed(1)}s per loop)${RESET}`,
     );
     console.log(`  ${DIM}Canvas: ${frames[0]!.width}x${frames[0]!.height} apng${RESET}`);
     console.log(
