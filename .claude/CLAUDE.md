@@ -370,8 +370,8 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   early; finishing nothing timed out a click on a 7s attention-seeker and on a self-restarting
   pulse. No landing policy matches motion-off for every page, so the main run gets none. The
   cost: the steps before each frames step run twice (a URL source with server state sees their
-  requests twice). The 34 tests in `interact.test.ts`'s last four `describe`s cover what the
-  rounds found. Inside the window, measured on Chromium 141:
+  requests twice). The 37 tests in the five `describe`s that follow `runInteract frames steps` in
+  `interact.test.ts` cover what the rounds found. Inside the window, measured on Chromium 141:
   - Land by `finish()` (paused at its end, `finished` never resolves), only what is moving or due
     within 1s; an infinite animation, or a loop finished 5 times in one landing, is paused at 0;
     one the page paused, cancelled or set to rate 0 is the page's.
