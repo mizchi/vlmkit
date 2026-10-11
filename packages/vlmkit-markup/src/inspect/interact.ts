@@ -195,6 +195,11 @@ export interface FrameSequenceEntry extends FramesWritten {
   action: SequenceAction;
   /** The recorded action threw on the frames step's own page; the frames show what it left. */
   actionError?: string;
+  /**
+   * The step stopped early — the page closed itself, say. `count` frames were written, and
+   * `frames.json` lists them; with none, `manifest` is empty.
+   */
+  error?: string;
   /** The page loaded a new document during the window: the first offset it was seen at. */
   navigatedAtMs?: number;
   /**
@@ -626,8 +631,9 @@ interface InteractApi {
 // this module exists.
 type InteractWindow = Window & { __vlmkitInteract?: InteractApi };
 
-const NAVIGATED =
-  /Execution context was destroyed|navigat|Cannot find context|Target page, context or browser has been closed/i;
+// Not "Target page ... has been closed": a page that closed itself (window.close()) will not come
+// back, and retrying it as a navigation only delayed the failure.
+const NAVIGATED = /Execution context was destroyed|navigat|Cannot find context/i;
 
 /**
  * The script on the current document. It is also an init script, so a navigation brings it
@@ -666,11 +672,23 @@ async function liveEval<R, A>(page: Page, fn: (arg: A) => R | Promise<R>, arg: A
   }
 }
 
-/** Two rendering updates: end events dispatch, and what the page starts from them begins. */
+/**
+ * Two rendering updates: end events dispatch, and what the page starts from them begins. At most
+ * 250ms: a page that stubs `requestAnimationFrame` (a paused game loop) hung the run forever.
+ */
 const twoFrames = (page: Page) =>
   liveEval(
     page,
-    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+    () =>
+      new Promise<void>((done) => {
+        const fallback = setTimeout(done, 250);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            clearTimeout(fallback);
+            done();
+          }),
+        );
+      }),
     undefined,
   );
 
@@ -704,28 +722,32 @@ async function settleMotion(page: Page): Promise<void> {
 async function recordFrames(
   page: Page,
   options: { dir: string; armedDoc: string; offsets: readonly number[]; source: FramesSource },
-): Promise<FramesWritten & { navigatedAtMs?: number; cancelled: number }> {
+): Promise<FramesWritten & { navigatedAtMs?: number; cancelled: number; error?: string }> {
   await ensureHold(page);
   const start = await liveEval(
     page,
     () =>
-      new Promise<{ anchor: number; docId: string }>((done) =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            const hold = (window as unknown as InteractWindow).__vlmkitInteract;
-            try {
-              // Swept now, not at the first frame: a CSS animation in its delay has fired no
-              // animationstart yet.
-              hold?.sweep();
-            } finally {
-              done({
-                anchor: hold ? hold.now() : performance.timeOrigin + performance.now(),
-                docId: hold?.docId ?? "",
-              });
-            }
-          }),
-        ),
-      ),
+      new Promise<{ anchor: number; docId: string }>((resolve) => {
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          const hold = (window as unknown as InteractWindow).__vlmkitInteract;
+          try {
+            // Swept now, not at the first frame: a CSS animation in its delay has fired no
+            // animationstart yet.
+            hold?.sweep();
+          } finally {
+            resolve({
+              anchor: hold ? hold.now() : performance.timeOrigin + performance.now(),
+              docId: hold?.docId ?? "",
+            });
+          }
+        };
+        // Bounded like twoFrames: a page whose rAF never fires gets its anchor at 250ms.
+        setTimeout(done, 250);
+        requestAnimationFrame(() => requestAnimationFrame(done));
+      }),
     undefined,
   );
   const { anchor } = start;
@@ -750,7 +772,24 @@ async function recordFrames(
       navigatedAtMs ??= atMs;
     }
   };
+  let error: string | undefined;
   for (const atMs of options.offsets) {
+    try {
+      await frameAt(atMs);
+    } catch (thrown) {
+      // The page closed itself, or something else ended the window: keep what was shot.
+      error = firstLine(thrown);
+      break;
+    }
+  }
+  return {
+    ...(await writer.finish()),
+    ...(navigatedAtMs !== undefined ? { navigatedAtMs } : {}),
+    cancelled,
+    ...(error !== undefined ? { error } : {}),
+  };
+
+  async function frameAt(atMs: number): Promise<void> {
     const elapsed = await clock();
     if (elapsed < atMs) await page.waitForTimeout(Math.ceil(atMs - elapsed));
     await checkDocument(atMs);
@@ -768,12 +807,13 @@ async function recordFrames(
     }
     cancelled = Math.max(cancelled, result.cancelled);
     const { png, stable, at } = await captureStable(page, { clock });
+    await writer.add(png, { atMs, stable, shotMs: Math.round(at ?? 0) });
     // A document that committed while this frame was shot: say so from this offset on.
     await checkDocument(atMs);
-    await writer.add(png, { atMs, stable, shotMs: Math.round(at ?? 0) });
   }
-  return { ...(await writer.finish()), ...(navigatedAtMs !== undefined ? { navigatedAtMs } : {}), cancelled };
 }
+
+const firstLine = (thrown: unknown) => String(thrown instanceof Error ? thrown.message : thrown).split("\n")[0]!;
 
 const MOTION_OFF_CSS = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
 
@@ -810,6 +850,8 @@ async function recordFramesStep(
     dir: string;
   },
 ): Promise<FrameSequenceEntry> {
+  const action = options.steps[options.index - 1]!;
+  const entry = { name: options.name, stepIndex: options.index, offsets: [...options.offsets], action };
   const page = await browser.newPage({ viewport: options.viewport });
   try {
     // On every document from the start, so a navigation in the window keeps it. Inert until armed.
@@ -833,12 +875,11 @@ async function recordFramesStep(
       () => (window as unknown as InteractWindow).__vlmkitInteract!.arm(),
       undefined,
     );
-    const action = options.steps[options.index - 1]!;
     let actionError: string | undefined;
     try {
       await executeStep(page, action);
     } catch (error) {
-      actionError = String(error instanceof Error ? error.message : error).split("\n")[0]!;
+      actionError = firstLine(error);
     }
     const written = await recordFrames(page, {
       dir: options.dir,
@@ -853,16 +894,22 @@ async function recordFramesStep(
         step: options.name,
       },
     });
+    return { ...written, ...entry, ...(actionError !== undefined ? { actionError } : {}) };
+  } catch (error) {
+    // Before the window opened (a step before it closed the page, say): no frames, and the run
+    // still writes its report.
     return {
-      ...written,
-      name: options.name,
-      stepIndex: options.index,
-      offsets: [...options.offsets],
-      action,
-      ...(actionError !== undefined ? { actionError } : {}),
+      ...entry,
+      dir: options.dir,
+      manifest: "",
+      count: 0,
+      unstable: 0,
+      files: [],
+      cancelled: 0,
+      error: firstLine(error),
     };
   } finally {
-    await page.close();
+    await page.close().catch(() => {});
   }
 }
 
@@ -879,7 +926,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
   const snapshotSteps = sequence.steps.filter((s) => s.action === "snapshot");
   const framesSteps = sequence.steps.flatMap((s, i) => (s.action === "frames" ? [{ step: s, index: i }] : []));
   if (snapshotSteps.length === 0 && framesSteps.length === 0) {
-    throw new Error("Sequence must contain at least one `snapshot` or `frames` step.");
+    throw new Error("Sequence must contain at least one `snapshot` step.");
   }
   // Offsets, names and placement checked before the browser starts: a typo fails in milliseconds.
   const offsetsByStep = new Map(framesSteps.map(({ step, index }) => [index, framesOffsets(step, index)]));
@@ -1119,7 +1166,7 @@ export function formatInteractReport(
   for (const f of report.frameSequences ?? []) {
     lines.push(
       `  ${CYAN}▸${RESET} frames "${f.name}": ${f.count} at ${f.offsets.map(formatInstant).join("/")}ms after` +
-        ` ${summarizeAction(f.action)}  ${DIM}${f.manifest}${RESET}`,
+        ` ${summarizeAction(f.action)}  ${DIM}${f.manifest || "no frames written"}${RESET}`,
     );
     for (const note of frameSequenceNotes(f)) lines.push(`    ${YELLOW}${note}${RESET}`);
   }
@@ -1143,6 +1190,7 @@ export function formatInteractReport(
 function frameSequenceNotes(f: FrameSequenceEntry): string[] {
   return [
     ...(f.actionError !== undefined ? [`the action threw on the frames step's own page: ${f.actionError}`] : []),
+    ...(f.error !== undefined ? [`the frames step stopped after ${f.count} frame(s): ${f.error}`] : []),
     ...(f.unstable > 0
       ? [
           `${f.unstable} frame(s) never captured the same twice: something moved that the step did not hold (script-driven motion on the real clock, or CSS in an iframe)`,
@@ -1188,7 +1236,7 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
     for (const f of r.frameSequences) {
       const after = summarizeAction(f.action);
       lines.push(
-        `- **${f.name}** — ${f.count} frame(s) at ${f.offsets.map(formatInstant).join(" / ")}ms after ${after}: \`${f.manifest}\``,
+        `- **${f.name}** — ${f.count} frame(s) at ${f.offsets.map(formatInstant).join(" / ")}ms after ${after}: ${f.manifest ? `\`${f.manifest}\`` : "_no frames written_"}`,
       );
       for (const note of frameSequenceNotes(f)) lines.push(`  - ${note}`);
     }
@@ -1328,8 +1376,8 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
         "element, and confirm the action is supposed to be visible (e.g., `click` on a " +
         "submit button without server response will show no visible change in static HTML).",
     );
-  } else if (r.transitions.length === 0) {
-    lines.push("No two snapshots to compare, so no action was measured for visible change.");
+  } else if (r.snapshots.length === 0) {
+    lines.push("No snapshot to compare, so no action was measured for visible change.");
   } else {
     lines.push(
       "Every action produced visible change. If a transition surfaces an " +

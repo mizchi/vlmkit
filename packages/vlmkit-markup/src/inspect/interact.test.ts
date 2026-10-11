@@ -224,7 +224,7 @@ describe("runInteract", () => {
     const seq = sequence("no-snapshot", [{ action: "click", selector: ".btn-primary" }]);
     await assert.rejects(
       () => runInteract({ source: fixture, sequencePath: seq, outputDir: join(dir, "out-nosnap") }),
-      /at least one `snapshot` or `frames` step/,
+      /at least one `snapshot` step/,
     );
   });
 
@@ -1340,6 +1340,94 @@ describe("runInteract frames steps: chains and the main run", () => {
     assert.ok(
       readFileSync(withFrames.snapshots[0]!.screenshotPath).equals(readFileSync(without.snapshots[0]!.screenshotPath)),
       "byte-identical snapshot",
+    );
+  });
+});
+
+/** The blocker review: a frames step never takes the run's report down with it, nor hangs it. */
+describe("runInteract frames steps: containment", () => {
+  const page = (name: string, body: string) => {
+    const file = join(dir, `${name}.html`);
+    writeFileSync(file, `<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#fff}</style>${body}`);
+    return file;
+  };
+  const run = (source: string, name: string, steps: Sequence["steps"]) =>
+    runInteract({
+      source,
+      sequencePath: sequence(name, steps, { width: 400, height: 200 }),
+      outputDir: join(dir, `out5-${name}`),
+    });
+
+  it("a page that closes itself in the recorded action, or before it, leaves the report written", async () => {
+    const source = page(
+      "closes",
+      `<button id="closewin" onclick="window.close()">close</button><button id="later" onclick="setTimeout(()=>window.close(),250)">later</button>`,
+    );
+    for (const [name, steps] of [
+      [
+        "closes-now",
+        [
+          { action: "snapshot", name: "a" },
+          { action: "click", selector: "#closewin" },
+          { action: "frames", name: "x", everyMs: 100, forMs: 200 },
+        ],
+      ],
+      [
+        "closes-before",
+        [
+          { action: "snapshot", name: "a" },
+          { action: "click", selector: "#closewin" },
+          { action: "press", key: "x" },
+          { action: "frames", name: "x", at: [0] },
+        ],
+      ],
+      [
+        "closes-mid",
+        [
+          { action: "click", selector: "#later" },
+          { action: "frames", name: "x", everyMs: 100, forMs: 600 },
+        ],
+      ],
+    ] as [string, Sequence["steps"]][]) {
+      const report = await run(source, name, steps);
+      assert.ok(readFileSync(report.reportPath, "utf8").length > 0, `${name}: report written`);
+      const seq = report.frameSequences[0]!;
+      assert.match(seq.error ?? "", /closed/, `${name}: ${seq.error}`);
+      if (seq.count > 0) {
+        // What was shot before the close is listed, file for file.
+        const manifest = JSON.parse(readFileSync(seq.manifest, "utf8"));
+        assert.deepEqual(
+          manifest.frames.map((f: { file: string }) => join(seq.dir, f.file)),
+          seq.files,
+        );
+      }
+    }
+  });
+
+  it("a page whose requestAnimationFrame never fires does not hang the run", { timeout: 60_000 }, async () => {
+    const source = page(
+      "no-raf",
+      `<style>#d{width:200px;height:60px;background:#2255cc;transition:width 200ms linear} #d.c{width:0}</style><div id="d"></div>
+       <button id="b">b</button><script>window.requestAnimationFrame=function(){return 0}; b.onclick=()=>d.classList.add("c")</script>`,
+    );
+    const report = await run(source, "no-raf", [
+      { action: "snapshot", name: "a" },
+      { action: "click", selector: "#b" },
+      { action: "frames", name: "x", everyMs: 100, forMs: 300 },
+    ]);
+    assert.equal(report.frameSequences[0]?.count, 4);
+  });
+
+  it("a sequence without frames steps reads as it did: one snapshot, and no snapshot at all", async () => {
+    const source = page("plain", `<button id="b" onclick="document.body.style.background='#00a000'">b</button>`);
+    const one = await run(source, "plain-one", [
+      { action: "click", selector: "#b" },
+      { action: "snapshot", name: "s" },
+    ]);
+    assert.match(readFileSync(one.reportPath, "utf8"), /Every action produced visible change/);
+    await assert.rejects(
+      run(source, "plain-none", [{ action: "click", selector: "#b" }]),
+      /at least one `snapshot` step\./,
     );
   });
 });

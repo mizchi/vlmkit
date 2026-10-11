@@ -394,7 +394,10 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
     becomes an animation only when style is computed. More than 16 ends before one offset are
     finished together.
   - Time is `timeOrigin + now`; every evaluate survives up to 5 navigations, and the document is
-    checked again after each frame is shot.
+    checked again after each frame is shot. A page that closes itself is not a navigation: the
+    step stops, what was shot keeps its `frames.json`, and the run's report is still written.
+  - Every wait on rendering is bounded (250ms): a page that stubs `requestAnimationFrame` hung the
+    run forever.
   Offset 0 is two rendering updates after the action returns; a timer's work is on the real clock
   (`shotMs`, read just before the shot that is kept); a held animation the page cancels or
   retargets mid-window is counted and named. Left as limits: CSS inside an iframe is not held
