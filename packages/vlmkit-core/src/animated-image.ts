@@ -1,7 +1,16 @@
 /**
- * Whether an image file animates, from its bytes: a GIF with more than one image, a PNG with an
- * `acTL` chunk before its first `IDAT` (APNG), a WebP whose `VP8X` header sets the animation flag,
- * or an AVIF whose `ftyp` names the image-sequence brand `avis`.
+ * Whether an image file animates, from its bytes: a GIF with more than one image, a PNG whose
+ * `acTL` (before its first `IDAT`) declares two or more frames and that holds two `fcTL` frame
+ * controls (APNG), a WebP whose `VP8X` header sets the animation flag and that holds two `ANMF`
+ * frames, or an AVIF whose `ftyp` names the image-sequence brand `avis`.
+ *
+ * An APNG or WebP header is a promise, not the frames: a file whose header says animated and that
+ * holds one frame shows one picture and never moves, and reading the header alone called it
+ * animated. So the frames are counted. The caller may hand over only the first bytes of a large
+ * file (`check flash` reads at most 8MB); when the bytes end before the chunk list does, the
+ * header is all there is and it is believed. An image wrongly called animated is a region the
+ * report says it did not judge; one wrongly called still is pixels moving on the browser's clock,
+ * counted as if the held clock had put them there.
  *
  * An animated image runs on the browser's own clock, which nothing a page's script sees can hold
  * (`requestAnimationFrame`, timers and the animation timeline are what the held clock replaces), so
@@ -23,6 +32,10 @@ const ascii = (bytes: Uint8Array, at: number, length: number): string =>
 
 const u32 = (bytes: Uint8Array, at: number): number =>
   ((bytes[at]! << 24) | (bytes[at + 1]! << 16) | (bytes[at + 2]! << 8) | bytes[at + 3]!) >>> 0;
+
+/** RIFF sizes are little-endian. */
+const u32le = (bytes: Uint8Array, at: number): number =>
+  ((bytes[at + 3]! << 24) | (bytes[at + 2]! << 16) | (bytes[at + 1]! << 8) | bytes[at]!) >>> 0;
 
 /** A GIF animates when it holds a second image descriptor. Malformed tails count what was read. */
 function gifAnimated(bytes: Uint8Array): boolean {
@@ -58,23 +71,49 @@ function gifAnimated(bytes: Uint8Array): boolean {
   return false;
 }
 
-/** An APNG declares its frame count in `acTL`, which must come before the first `IDAT`. */
+/**
+ * An APNG declares its frame count in `acTL`, which must come before the first `IDAT`, and each
+ * frame has an `fcTL`: the first may sit before the `IDAT` (the default image is frame 0) and the
+ * rest after it, so the whole chunk list is walked.
+ */
 function pngAnimated(bytes: Uint8Array): boolean {
   let at = 8;
+  let declared = 0;
+  let controls = 0;
   while (at + 8 <= bytes.length) {
     const length = u32(bytes, at);
     const type = ascii(bytes, at + 4, 4);
-    if (type === "IDAT" || type === "IEND") return false;
-    if (type === "acTL") return at + 12 <= bytes.length && u32(bytes, at + 8) > 1;
+    if (type === "IEND") return false;
+    if (type === "IDAT" && declared < 2) return false;
+    if (type === "acTL" && declared === 0) {
+      if (at + 12 > bytes.length) return false;
+      declared = u32(bytes, at + 8);
+      if (declared < 2) return false;
+    }
+    if (type === "fcTL" && declared >= 2 && ++controls >= 2) return true;
     at += 12 + length;
   }
-  return false;
+  // Cut off before IEND: an acTL of two or more frames is the only word on the rest.
+  return declared >= 2;
 }
 
-/** A WebP animates when its extended header (`VP8X`) sets the animation flag (bit 1). */
+/**
+ * A WebP animates when its extended header (`VP8X`) sets the animation flag (bit 1) and two
+ * `ANMF` frames follow. The chunk list ends where the RIFF size says the file does.
+ */
 function webpAnimated(bytes: Uint8Array): boolean {
   if (ascii(bytes, 12, 4) !== "VP8X") return false;
-  return ((bytes[20] ?? 0) & 0x02) !== 0;
+  if (((bytes[20] ?? 0) & 0x02) === 0) return false;
+  const end = 8 + u32le(bytes, 4);
+  let frames = 0;
+  for (let at = 12; at < end;) {
+    // Cut off inside the chunk list: the flag is the only word on the rest.
+    if (at + 8 > bytes.length) return true;
+    if (ascii(bytes, at, 4) === "ANMF" && ++frames >= 2) return true;
+    const size = u32le(bytes, at + 4);
+    at += 8 + size + (size & 1); // a chunk's payload is padded to an even length
+  }
+  return false;
 }
 
 /** An AVIF sequence names `avis` as its major or a compatible brand. */

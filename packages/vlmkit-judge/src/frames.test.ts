@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
+import { UsageError } from "./errors.ts";
 import {
   FRAMES_FORMAT,
   frameFileName,
@@ -158,4 +159,81 @@ test("parseFramesManifest: reads a manifest and refuses a broken one", () => {
       file,
     );
   }
+});
+
+const manifestWith = (source: Record<string, unknown>) =>
+  JSON.stringify({
+    format: FRAMES_FORMAT,
+    source: {
+      tool: "check flash",
+      url: "file:///x.html",
+      viewport: { width: 10, height: 10 },
+      deviceScaleFactor: 1,
+      clock: "held",
+      ...source,
+    },
+    frames: [{ n: 0, file: "0000-t000000.png", atMs: 0, stable: true }],
+  });
+
+/** Throws a UsageError (not a TypeError) whose message names `field`. */
+const refusesNaming = (source: Record<string, unknown>, field: string) =>
+  assert.throws(
+    () => parseFramesManifest(manifestWith(source)),
+    (error: unknown) => error instanceof UsageError && error.message.includes(`"${field}"`),
+    `${JSON.stringify(source)} names ${field}`,
+  );
+
+test("parseFramesManifest: reads what check flash writes back, every reason and its sweep", () => {
+  const rect = { x: 0, y: 4.5, width: 32, height: 0.5 };
+  const unmeasured = [
+    { reason: "video", rect, path: "main>video" },
+    { reason: "animated-image", rect },
+    { reason: "unreadable-image", rect, path: "img.hero" },
+    { reason: "uncontrolled", rect },
+  ];
+  const sweep = { still: false, windowMs: 3000, windowFrom: "animations", truncated: false };
+  const got = parseFramesManifest(manifestWith({ unmeasured, sweep }));
+  assert.deepEqual(got.source.unmeasured, unmeasured);
+  assert.deepEqual(got.source.sweep, sweep);
+  for (const windowFrom of ["option", "animations", "default", "still"]) {
+    parseFramesManifest(manifestWith({ sweep: { ...sweep, windowFrom } }));
+  }
+  assert.equal(parseFramesManifest(manifestWith({ unmeasured: [] })).source.unmeasured?.length, 0);
+  assert.equal(parseFramesManifest(manifestWith({})).source.sweep, undefined, "both are optional");
+});
+
+test("parseFramesManifest: a malformed unmeasured region is a UsageError naming the field", () => {
+  // Read back unchecked before: `check flash` then crashed with a raw TypeError mid-count.
+  const rect = { x: 0, y: 0, width: 10, height: 10 };
+  refusesNaming({ unmeasured: { reason: "video", rect } }, "source.unmeasured");
+  refusesNaming({ unmeasured: null }, "source.unmeasured");
+  refusesNaming({ unmeasured: [null] }, "source.unmeasured[0]");
+  refusesNaming({ unmeasured: [{ reason: "video", rect }, "video"] }, "source.unmeasured[1]");
+  refusesNaming({ unmeasured: [{ reason: "gif", rect }] }, "source.unmeasured[0].reason");
+  refusesNaming({ unmeasured: [{ rect }] }, "source.unmeasured[0].reason");
+  refusesNaming({ unmeasured: [{ reason: "video" }] }, "source.unmeasured[0].rect");
+  refusesNaming({ unmeasured: [{ reason: "video", rect: [0, 0, 10, 10] }] }, "source.unmeasured[0].rect");
+  refusesNaming({ unmeasured: [{ reason: "video", rect: { ...rect, x: -1 } }] }, "source.unmeasured[0].rect.x");
+  refusesNaming({ unmeasured: [{ reason: "video", rect: { ...rect, y: "0" } }] }, "source.unmeasured[0].rect.y");
+  refusesNaming({ unmeasured: [{ reason: "video", rect: { ...rect, width: 0 } }] }, "source.unmeasured[0].rect.width");
+  refusesNaming(
+    { unmeasured: [{ reason: "video", rect: { ...rect, height: null } }] },
+    "source.unmeasured[0].rect.height",
+  );
+  refusesNaming({ unmeasured: [{ reason: "video", rect, path: 3 }] }, "source.unmeasured[0].path");
+  assert.throws(
+    () => parseFramesManifest(manifestWith({ unmeasured: [{ reason: "gif", rect }] })),
+    /"gif"; it is one of video, animated-image, unreadable-image, uncontrolled/,
+  );
+});
+
+test("parseFramesManifest: a malformed sweep is a UsageError naming the field", () => {
+  const sweep = { still: false, windowMs: 3000, windowFrom: "default", truncated: true };
+  refusesNaming({ sweep: [] }, "source.sweep");
+  refusesNaming({ sweep: "3000" }, "source.sweep");
+  refusesNaming({ sweep: { ...sweep, still: "no" } }, "source.sweep.still");
+  refusesNaming({ sweep: { ...sweep, windowMs: -1 } }, "source.sweep.windowMs");
+  refusesNaming({ sweep: { ...sweep, windowMs: "3s" } }, "source.sweep.windowMs");
+  refusesNaming({ sweep: { ...sweep, windowFrom: "manifest" } }, "source.sweep.windowFrom");
+  refusesNaming({ sweep: { still: false, windowMs: 0, windowFrom: "still" } }, "source.sweep.truncated");
 });
