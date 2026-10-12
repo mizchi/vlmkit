@@ -1598,7 +1598,7 @@ each SVG's own timeline, and pages that draw on `vlmkit:seek`. A page that
 navigates during the sweep is followed onto the new document.
 
 The window defaults to each finite animation's end; for one that repeats
-forever, a second past its start and two periods more; for timers pending at
+forever, one period past its start and a second more; for timers pending at
 load, two seconds past the latest; at least 3s when something repeats or runs by
 script; between 2s and 10s (`--window` takes 1s to 60s). A page where nothing
 can move under the held clock is one frame, unless `--window` is given. `--strip`

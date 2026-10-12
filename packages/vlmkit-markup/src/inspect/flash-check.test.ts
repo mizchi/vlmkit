@@ -175,9 +175,9 @@ describe("check flash: the window", () => {
     assert.equal(ms([{ startMs: 1000, durationMs: 2000, iterations: 2 }], false), 5000);
     assert.equal(ms([{ startMs: 0, durationMs: 250, iterations: null }], false), 3000);
   });
-  test("what repeats forever is seen a second past its start, and two periods more", () => {
-    assert.equal(ms([{ startMs: 2508.3, durationMs: 250, iterations: null }], false), 4100);
-    assert.equal(ms([{ startMs: 0, durationMs: 1500, iterations: null }], false), 4000);
+  test("what repeats forever is swept one period past its start and a second more: every second of its cycle", () => {
+    assert.equal(ms([{ startMs: 2508.3, durationMs: 250, iterations: null }], false), 3800);
+    assert.equal(ms([{ startMs: 0, durationMs: 4000, iterations: null }], false), 5000);
   });
   test("a timer pending at load is followed two seconds past it", () => {
     assert.equal(ms([], true, 2500), 4500);

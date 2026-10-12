@@ -336,8 +336,9 @@ const attributionJs = (fromMs: number, toMs: number, box: Box) => `(() => {
 })()`;
 
 /**
- * The window to sweep: each finite animation's end; for one that repeats forever, a second past
- * its start and two periods more (a strobe that begins late is still seen flashing for a second);
+ * The window to sweep: each finite animation's end; for one that repeats forever, one period past
+ * its start and a second more, which holds every one-second window of its cycle (a strobe that
+ * begins late is seen flashing for a second, and a 4s ticker loop is not swept for 9s);
  * for timers still pending at load, two seconds past the latest; and 3s at least for what repeats
  * or runs by script. Capped at 10s, and `truncated` says when the page asked for more.
  */
@@ -348,7 +349,7 @@ export function chooseWindow(
 ): { windowMs: number; truncated: boolean } {
   let ms = MIN_WINDOW_MS;
   for (const a of held) {
-    if (a.iterations === null) ms = Math.max(ms, SCRIPT_WINDOW_MS, a.startMs + WINDOW_MS + 2 * a.durationMs);
+    if (a.iterations === null) ms = Math.max(ms, SCRIPT_WINDOW_MS, a.startMs + a.durationMs + WINDOW_MS);
     else ms = Math.max(ms, a.startMs + a.durationMs * a.iterations);
   }
   if (scripted) ms = Math.max(ms, SCRIPT_WINDOW_MS);
