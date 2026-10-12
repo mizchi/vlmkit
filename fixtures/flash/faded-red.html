@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <title>check flash: faded-red</title>
-    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport red pulse fading black ↔ #a00000 at 4 Hz: ΔL 0.075 never makes a general transition, but every rise into the red does, though its first frame is not yet saturated. -->
-    <style>html,body{margin:0;overflow:hidden;background:#000}#f{position:fixed;inset:0;background:#000;animation:r 125ms 8.3ms infinite alternate linear}@keyframes r{from{background:#000}to{background:#a00000}}</style>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport red pulse at 4 Hz, resting at black 50ms and fading to #a00000 and back over 75ms each way: ΔL 0.075 never makes a general transition, but every rise into the red does, though its first frames are not yet saturated. -->
+    <style>html,body{margin:0;overflow:hidden;background:#000}#f{position:fixed;inset:0;background:#000;animation:r 250ms 8.3ms infinite linear}@keyframes r{0%,20%{background:#000}50%{background:#a00000}80%,100%{background:#000}}</style>
   </head>
   <body>
     <div id="f"></div>

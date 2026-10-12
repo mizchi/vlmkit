@@ -282,8 +282,11 @@ Three ideas from HyperFrames (heygen-com/hyperframes), adapted. `virtual-clock.t
 one 60fps frame at a time with timers in order; `HOLD_TIMELINE_SCRIPT` pauses every animation as it
 begins and seeks them all to one page time. `--timeline` runs integrity's layout judges at each
 instant and tiers by persistence (`tierByPersistence`, `@mizchi/vlmkit-judge/persistence.ts`).
-`seek-ineffective` (suspect) says when an animation's frames do not measure it. Measured building
-them, not to re-learn:
+`seek-ineffective` (suspect) says when an animation's frames do not measure it. Since `check flash`
+the hold also covers iframes, open shadow roots, SMIL, `playbackRate`, animations the page paused or
+cancelled (left to the page, never revived), nested zero-delay timers (clamped to 4ms past six levels,
+as Chromium 141 does) and a page that navigates mid-sweep (`navigations()`); `held-timeline.test.ts`
+plants each. Measured building them, not to re-learn:
 
 - **A replay mismatch is not enough.** A capture can land before the compositor applies a seek: one
   replay flagged a pure-CSS `alternate infinite` badge in 2 runs of 30. Only three mutually
