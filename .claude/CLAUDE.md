@@ -410,8 +410,43 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   inline HTML is refused). `interact` injects its script after load for that reason, and also
   registers it as an init script so the document after a link or a reload has it.
 
-Not built yet, in the order the research put them: a storyboard over a lossless sequence (no VLM
-verdict), `check flash`, and external video files through a decoder the user supplies.
+### What a sequence shows happening (`snapshot storyboard`)
+
+```bash
+vlmkit check animation page.html --at 0..1s/1f --frames out/f && vlmkit snapshot storyboard out/f/frames.json
+# → out/f/storyboard/: story.json, SUMMARY.md, sheet.png (box outlined), narrate/BRIEF.md (+ keyframes, crops)
+```
+
+States and events from the pixels alone, relative to an anchor (the first frame of the still span):
+**glitch** one frame off and back; **transient** back within 5000ms whatever it held (a toast is
+one); **change** not back, ending at the first 100ms of byte-identical frames (the next anchor);
+**drift** a change no step of which crosses the floor (a channel moving by more than 8). Pure half
+`@mizchi/vlmkit-judge/storyboard.ts` (`buildStoryboard`, `storyboardSummary`, `storyboardBrief`);
+CLI `src/cli/commands/storyboard-cli.ts` (an artifact command on the SPECS path, exits 0, no verdict:
+the brief is for the agent's own vision and nothing reads its answer back). Measured building it,
+not to re-learn:
+
+- **Anchor-relative, never merge-then-split.** k blinks are k events and their gaps none; a fade is
+  compared with the anchor, so it accumulates until it shows, and `movedAfter` names the last frame
+  byte-identical to the state. A random-plant property test (glitches, sliding transients, changes,
+  5000 seeds once, 200 kept) holds every event to the frames and box it was planted on.
+- **Durations need the same epsilon as instants.** Frame 10 minus frame 4 is 99.99999999999999, so a
+  seven-frame 100ms hold never settled and the change ran on into the next event.
+- **A fixture's motion must not return by symmetry.** A two-tone square turned 12° a frame equals
+  itself after 180°, so the "spinner" read as transients; the planted one is asymmetric, 7° a frame.
+- **What nothing holds swallows the sequence.** A video or an unheld spinner makes every frame differ
+  and one change never settles; `--ignore x,y,w,h` (the frames' pixels) takes its box out, and the
+  never-settling event's box is the one to pass.
+- **The sheet holds cells, not frames.** The layout is solved on sizes alone and each cell is decoded
+  and shrunk before the next, and segmentation decodes through a byte-bounded cache: every frame of a
+  1000-frame 2x capture at once would be 15GB.
+
+Known answers: `fixtures/storyboard/planted.html?kind=…` (static, glitch, blinks, toast, slide, fade,
+spinner), each required back on its frames in `storyboard-cli.test.ts`.
+
+Not built yet, in the order the research put them: `check flash` (WCAG 2.3.1, on page-clock
+sequences), and external video files through a decoder the user supplies — then a noise floor for
+lossy storyboards, which this one deliberately does not have.
 
 ## Responsive layout as a property-based test (`check responsive`)
 
@@ -876,7 +911,7 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. Plan for the rest of the split: `docs/design/package-decomposition.md`. |
+| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
 | `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 32 of the 34 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |

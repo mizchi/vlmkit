@@ -23,6 +23,8 @@ report.verdict; // "composed" | "unbalanced" | "not-judged"
 | `color.ts` | `parseColor`, `contrastRatio`, `compositeBackground`, `measureTextContrast`, … | contrast rules on any snapshot; held to the page's own script by `contrast-parity.test.ts` |
 | `copy.ts` | `analyzeCopy` — placeholder scan, manifest / forbid list, invisible-reason attribution; `parseCopyManifest`, `INVISIBLE_REASONS` | `vlmkit check copy`, on a page or a scene |
 | `allow.ts` | `parseSelectorAllowRules`, `selectorAllowFilter` — the `--allow "<selector>;<reason>"` form | every style gate |
+| `frames.ts` | `vlmkit-frames/1` — `parseFramesManifest`, `parseInstants` (`1.5s`, `6f`, `0..1s/100ms`), `frameFileName`, `thinEvenly`, `playbackDelays` | `--frames` on `check animation` / `check integrity`, `inspect interact`, `snapshot strip --manifest` |
+| `storyboard.ts` | `buildStoryboard` — a frame sequence's states and its glitch / transient / change / drift events, from the pixels; `storyboardSummary`, `storyboardBrief` | `vlmkit snapshot storyboard` |
 | `errors.ts` | `UsageError` | re-exported by `@mizchi/vlmkit-core/cli-error.ts` |
 
 The browser half — the in-page collectors that produce these snapshots, and the

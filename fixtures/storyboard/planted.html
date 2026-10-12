@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Storyboard planted events</title>
+    <!--
+      Known answers for `snapshot storyboard`, captured on the held clock (`check animation --at
+      0..1s/1f --frames`, or `captureTimelineFrames`). Every event is timed by the rAF timestamp
+      (frame n is at n * 1000 / 60 ms) or by a timer, both of which the held clock runs exactly, so
+      which frames show it is known before the capture:
+
+        ?kind=static                         nothing moves                      0 events
+        ?kind=glitch&at=30                   the box on frame 30 only           1 glitch, frame 30
+        ?kind=blinks&k=3&on=2&off=1&start=20 k runs of `on` frames, `off` apart k events of `on` frames
+        ?kind=toast                          a toast from 300 to 700 ms (timers) 1 transient, frames 18-41
+        ?kind=slide                          a panel in from frame 12 to 30      1 change, settled at 30
+        ?kind=fade                           6% black over frames 10-55          1 drift, no step over 1
+        ?kind=spinner                        a spinner turning every frame       ends in motion, unless ignored
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 320px;
+        height: 200px;
+        overflow: hidden;
+        background: #fff;
+        font: 14px/1.2 sans-serif;
+      }
+      #box {
+        position: absolute;
+        left: 40px;
+        top: 40px;
+        width: 60px;
+        height: 30px;
+        background: #111;
+        visibility: hidden;
+      }
+      #toast {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        width: 110px;
+        height: 28px;
+        background: #1f2937;
+        display: none;
+      }
+      #panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 120px;
+        height: 200px;
+        background: #2563eb;
+        transform: translateX(-120px);
+      }
+      #fade {
+        position: absolute;
+        left: 160px;
+        top: 90px;
+        width: 100px;
+        height: 50px;
+        background: #000;
+        opacity: 0;
+      }
+      #spinner {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        width: 24px;
+        height: 24px;
+        /* No rotational symmetry, and 7 degrees a frame: no frame of the first 360 is the first. */
+        background: conic-gradient(#111 0 25%, #ddd 0);
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="box"></div>
+    <div id="toast"></div>
+    <div id="panel"></div>
+    <div id="fade"></div>
+    <div id="spinner"></div>
+    <script>
+      const q = new URLSearchParams(location.search);
+      const kind = q.get("kind") || "static";
+      const num = (name, fallback) => Number(q.get(name) ?? fallback);
+      const $ = (id) => document.getElementById(id);
+      const frameOf = (ts) => Math.round((ts * 60) / 1000);
+
+      if (kind === "toast") {
+        setTimeout(() => ($("toast").style.display = "block"), 300);
+        setTimeout(() => ($("toast").style.display = "none"), 700);
+      }
+      if (kind === "spinner") $("spinner").style.display = "block";
+
+      function render(n) {
+        if (kind === "glitch") {
+          $("box").style.visibility = n === num("at", 30) ? "visible" : "hidden";
+        } else if (kind === "blinks") {
+          const k = num("k", 3);
+          const on = num("on", 2);
+          const off = num("off", 1);
+          const i = n - num("start", 20);
+          const shown = i >= 0 && Math.floor(i / (on + off)) < k && i % (on + off) < on;
+          $("box").style.visibility = shown ? "visible" : "hidden";
+        } else if (kind === "slide") {
+          const p = Math.min(1, Math.max(0, (n - 12) / 18));
+          $("panel").style.transform = `translateX(${-120 + 120 * (1 - (1 - p) ** 2)}px)`;
+        } else if (kind === "fade") {
+          const p = Math.min(1, Math.max(0, (n - 10) / 45));
+          $("fade").style.opacity = String(0.06 * p);
+        } else if (kind === "spinner") {
+          $("spinner").style.transform = `rotate(${n * 7}deg)`;
+        }
+      }
+      render(0);
+      requestAnimationFrame(function tick(ts) {
+        render(frameOf(ts));
+        requestAnimationFrame(tick);
+      });
+    </script>
+  </body>
+</html>

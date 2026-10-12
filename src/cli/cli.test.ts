@@ -179,6 +179,12 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 
+  it("`vlmkit snapshot storyboard` routes to storyboard-cli", () => {
+    const r = runVrt(["snapshot", "storyboard", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit snapshot storyboard <frames\.json>/);
+  });
+
   it("`vlmkit snapshot record-har` routes to record-har-cli", () => {
     // `--har` was the documented reproducibility answer with no way to produce one;
     // v5's CI agent wrote its own recorder to finish the task it was given.

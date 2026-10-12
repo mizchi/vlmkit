@@ -1441,10 +1441,16 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   if (report.frames) {
     const f = report.frames;
     lines.push("");
+    // Every instant up to a dozen; past that a range, which is what the 61 of `--at 0..1s/1f` were.
+    const at =
+      f.instants.length <= 12
+        ? f.instants.map(formatInstant).join("/")
+        : `${formatInstant(f.instants[0]!)}–${formatInstant(f.instants.at(-1)!)}`;
     lines.push(
-      `Frames: ${f.count} written to ${f.dir} at ${f.instants.map(formatInstant).join("/")}ms of page time` +
+      `Frames: ${f.count} written to ${f.dir} at ${at}ms of page time` +
         ` (clock and animations held), manifest ${f.manifest}`,
     );
+    lines.push(`${DIM}  What they show happening: vlmkit snapshot storyboard ${f.manifest}${RESET}`);
     if (f.unstable > 0) {
       lines.push(
         `${YELLOW}  ${f.unstable} frame(s) never captured the same twice: something moves that the clock does not hold (video, animated image, worker)${RESET}`,

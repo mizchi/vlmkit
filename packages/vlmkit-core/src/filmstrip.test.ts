@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import { composeFilmstrip, filmstripLayout } from "./filmstrip.ts";
+import { boxOnSheet, composeFilmstrip, filmstripLayout, strokeOutside } from "./filmstrip.ts";
 import type { PngData } from "./png-utils.ts";
 
 /** A solid frame, so a composited pixel's origin is unambiguous. */
@@ -212,5 +212,69 @@ describe("maxWidth 0 disables the cap", () => {
     const capped = composeFilmstrip([frame(916, 393), frame(916, 393)], { columns: 2, maxWidth: 900 });
     assert.ok(capped.layout.scale > 1);
     assert.ok(capped.width <= 900, `expected <=900px, got ${capped.width}px`);
+  });
+});
+
+describe("cell labels and box outlines (storyboard rows)", () => {
+  it("reserves a band above every cell, below the row label, and draws each cell's own text", () => {
+    const frames = Array.from({ length: 4 }, () => solid(40, 10, RED));
+    const sheet = composeFilmstrip(frames, {
+      columns: 2,
+      gap: 0,
+      padding: 0,
+      rowLabels: ["E1", "E2"],
+      cellLabels: ["before 0ms", "first 17ms", "", "back 33ms"],
+      labelColor: [0, 255, 0],
+    });
+    const { rowLabelBand, cellLabelBand, cell } = sheet.layout;
+    assert.ok(cellLabelBand > 0);
+    assert.equal(sheet.layout.positions[0]!.y, rowLabelBand + cellLabelBand);
+    assert.equal(sheet.layout.positions[2]!.y, (rowLabelBand + cellLabelBand) * 2 + cell.height);
+    assert.equal(sheet.height, (cell.height + rowLabelBand + cellLabelBand) * 2);
+    const inkIn = (x0: number, y0: number, w: number, h: number) => {
+      let n = 0;
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (pixel(sheet, x, y)[1] === 255) n++;
+      return n;
+    };
+    const y2 = sheet.layout.positions[2]!.y - cellLabelBand;
+    assert.equal(inkIn(0, y2, cell.width, cellLabelBand), 0, "an empty label leaves its band blank");
+    assert.ok(inkIn(cell.width, y2, cell.width, cellLabelBand) > 0);
+  });
+
+  it("no cell labels, no band: a sheet without them is unchanged", () => {
+    const frames = [solid(6, 6, RED), solid(6, 6, BLUE)];
+    const a = composeFilmstrip(frames, { gap: 0, padding: 0 });
+    const b = composeFilmstrip(frames, { gap: 0, padding: 0, cellLabels: ["", ""] });
+    assert.equal(b.layout.cellLabelBand, 0);
+    assert.deepEqual(b.data, a.data);
+  });
+
+  it("maps a box through the cell's scale and outlines it outside, clipped to the cell", () => {
+    const frames = [solid(100, 50, RED), solid(100, 50, RED)];
+    const sheet = composeFilmstrip(frames, { gap: 4, padding: 2, scale: 2 });
+    const onSheet = boxOnSheet(sheet.layout, 1, frames[1]!, { x: 10, y: 10, width: 20, height: 10 });
+    assert.deepEqual(onSheet, {
+      x: sheet.layout.positions[1]!.x + 5,
+      y: sheet.layout.positions[1]!.y + 5,
+      width: 10,
+      height: 5,
+    });
+    const cellBox = { ...sheet.layout.positions[1]!, ...sheet.layout.cell };
+    strokeOutside(sheet, onSheet, [0, 255, 0], 2, cellBox);
+    assert.deepEqual(pixel(sheet, onSheet.x - 1, onSheet.y), [0, 255, 0, 255], "left side, just outside");
+    assert.notDeepEqual(pixel(sheet, onSheet.x, onSheet.y), [0, 255, 0, 255], "the box itself stays visible");
+    // A box at the frame's top-left corner: the sides that would leave the cell run along its
+    // inside edge instead, and nothing is drawn in the gap.
+    const corner = boxOnSheet(sheet.layout, 1, frames[1]!, { x: 0, y: 0, width: 4, height: 4 });
+    strokeOutside(sheet, corner, [0, 0, 0], 2, cellBox);
+    assert.notDeepEqual(pixel(sheet, corner.x - 1, corner.y), [0, 0, 0, 255], "the gap left of the cell is untouched");
+    assert.deepEqual(pixel(sheet, corner.x, corner.y + 1), [0, 0, 0, 255], "the left side, inside the cell");
+    assert.deepEqual(
+      pixel(sheet, corner.x + corner.width, corner.y + 1),
+      [0, 0, 0, 255],
+      "the right side, outside the box",
+    );
+    // A box narrower than a sheet pixel keeps one.
+    assert.equal(boxOnSheet(sheet.layout, 0, frames[0]!, { x: 51, y: 0, width: 1, height: 1 }).width, 1);
   });
 });

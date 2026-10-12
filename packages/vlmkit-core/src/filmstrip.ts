@@ -60,6 +60,12 @@ export interface FilmstripOptions {
    * enough for one would dominate a sheet of 200px cells.
    */
   rowLabels?: readonly string[];
+  /**
+   * One label per cell, in input order, drawn in a band above that cell (below its row's label).
+   * For a sheet whose cells are not one instant per column — a storyboard row of one event's
+   * keyframes — each cell says its own time. Empty strings leave a cell unlabelled.
+   */
+  cellLabels?: readonly string[];
   /** Integer pixel size of one font unit. Default 2, i.e. 10x14 glyphs. */
   labelScale?: number;
   /** Label ink, RGB. Default near-white, for the default grey sheet. */
@@ -84,6 +90,8 @@ export interface FilmstripLayout {
   columnLabelBand: number;
   /** Height reserved above each row for its label; 0 when there are none. */
   rowLabelBand: number;
+  /** Height reserved above each cell for its own label; 0 when there are none. */
+  cellLabelBand: number;
 }
 
 const DEFAULT_BACKGROUND = [96, 96, 96] as const;
@@ -158,15 +166,17 @@ export function filmstripLayout(frames: readonly PngData[], options: FilmstripOp
   const band = textHeight(labelScale) + LABEL_PAD;
   const columnLabelBand = options.columnLabels && options.columnLabels.length > 0 ? band : 0;
   const rowLabelBand = options.rowLabels && options.rowLabels.length > 0 ? band : 0;
+  const cellLabelBand = options.cellLabels && options.cellLabels.some((l) => l.length > 0) ? band : 0;
+  const above = rowLabelBand + cellLabelBand;
 
   const positions = frames.map((_, i) => {
     const row = Math.floor(i / columns);
     return {
       x: padding + (i % columns) * (cell.width + gap),
-      y: padding + columnLabelBand + row * (cell.height + gap + rowLabelBand) + rowLabelBand,
+      y: padding + columnLabelBand + row * (cell.height + gap + above) + above,
     };
   });
-  return { cell, columns, rows, positions, scale, columnLabelBand, rowLabelBand };
+  return { cell, columns, rows, positions, scale, columnLabelBand, rowLabelBand, cellLabelBand };
 }
 
 /**
@@ -212,7 +222,7 @@ export function composeFilmstrip(
   const height =
     padding * 2 +
     layout.columnLabelBand +
-    layout.rows * (layout.cell.height + layout.rowLabelBand) +
+    layout.rows * (layout.cell.height + layout.rowLabelBand + layout.cellLabelBand) +
     gap * (layout.rows - 1);
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < data.length; i += 4) {
@@ -265,10 +275,72 @@ export function composeFilmstrip(
     //
     const rowWidth = width - padding * 2;
     options.rowLabels!.slice(0, layout.rows).forEach((label, row) => {
-      const y = padding + layout.columnLabelBand + row * (layout.cell.height + gap + layout.rowLabelBand);
+      const y =
+        padding +
+        layout.columnLabelBand +
+        row * (layout.cell.height + gap + layout.rowLabelBand + layout.cellLabelBand);
       drawText(sheet, fitText(label, rowWidth, labelScale), padding, y, ink, labelScale);
+    });
+  }
+  if (layout.cellLabelBand > 0) {
+    options.cellLabels!.slice(0, frames.length).forEach((label, index) => {
+      const { x, y } = layout.positions[index]!;
+      drawText(sheet, fitText(label, layout.cell.width, labelScale), x, y - layout.cellLabelBand, ink, labelScale);
     });
   }
 
   return { width, height, data, layout };
+}
+
+/**
+ * Where a box in frame `index`'s own pixels lands on the sheet, through the same scale the cell
+ * was drawn at: the first and last sheet pixel the box's first and last frame pixel map to.
+ */
+export function boxOnSheet(
+  layout: FilmstripLayout,
+  index: number,
+  frame: { width: number; height: number },
+  box: { x: number; y: number; width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const { x: ox, y: oy } = layout.positions[index]!;
+  const sw = Math.max(1, Math.round(frame.width / layout.scale));
+  const sh = Math.max(1, Math.round(frame.height / layout.scale));
+  // `scalePngData` reads source pixel floor(x * W / sw) for sheet pixel x, so source pixel X is
+  // drawn at sheet pixels ceil(X * sw / W) .. ceil((X + 1) * sw / W) - 1; a box narrower than one
+  // sheet pixel keeps one.
+  const x0 = Math.min(sw - 1, Math.ceil((box.x * sw) / frame.width));
+  const y0 = Math.min(sh - 1, Math.ceil((box.y * sh) / frame.height));
+  const x1 = Math.max(x0, Math.ceil(((box.x + box.width) * sw) / frame.width) - 1);
+  const y1 = Math.max(y0, Math.ceil(((box.y + box.height) * sh) / frame.height) - 1);
+  return { x: ox + x0, y: oy + y0, width: Math.min(sw - 1, x1) - x0 + 1, height: Math.min(sh - 1, y1) - y0 + 1 };
+}
+
+/**
+ * A rectangle's outline drawn just OUTSIDE `box`, `thickness` px wide, so the pixels the box marks
+ * stay visible. The outline never leaves `clip` (the cell): a side that would fall outside it is
+ * drawn along the inside of the cell's edge instead, over the box's outermost pixels, so a box at
+ * the frame's edge still has four sides rather than running into the next cell or losing one.
+ */
+export function strokeOutside(
+  target: { width: number; height: number; data: Uint8Array },
+  box: { x: number; y: number; width: number; height: number },
+  rgb: readonly [number, number, number],
+  thickness: number,
+  clip: { x: number; y: number; width: number; height: number },
+): void {
+  const x0 = Math.max(clip.x, box.x - thickness);
+  const y0 = Math.max(clip.y, box.y - thickness);
+  const x1 = Math.min(clip.x + clip.width - 1, box.x + box.width - 1 + thickness);
+  const y1 = Math.min(clip.y + clip.height - 1, box.y + box.height - 1 + thickness);
+  for (let y = Math.max(0, y0); y <= Math.min(target.height - 1, y1); y++) {
+    for (let x = Math.max(0, x0); x <= Math.min(target.width - 1, x1); x++) {
+      const band = x < x0 + thickness || x > x1 - thickness || y < y0 + thickness || y > y1 - thickness;
+      if (!band) continue;
+      const i = (y * target.width + x) * 4;
+      target.data[i] = rgb[0];
+      target.data[i + 1] = rgb[1];
+      target.data[i + 2] = rgb[2];
+      target.data[i + 3] = 255;
+    }
+  }
 }
