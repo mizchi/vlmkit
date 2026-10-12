@@ -374,6 +374,12 @@ export interface FlashTrackResult {
   peak: { transitions: number; frame: number; x: number; y: number };
   /** Failing windows that follow one another with no passing one between them, as runs. */
   runs: FlashRun[];
+  /**
+   * The largest area in any field of the flashing pixels together with the unknown ones, over the
+   * windows the measured pixels alone did not fail (0 without `unknown`). Over the limit, a pass
+   * cannot be had.
+   */
+  withUnknown: number;
 }
 
 /** Consecutive failing windows: what a motion re-count takes as one stretch. */
@@ -386,6 +392,8 @@ export interface FlashRun {
   field: Box;
   /** Every flashing pixel of every window in the run, with their fields, as one box. */
   region: Box;
+  /** Each failing window of the run: where it ended, its area and its field. */
+  windows: Array<{ frame: number; area: number; field: Box }>;
 }
 
 export interface FlashJudgeOptions {
@@ -394,6 +402,12 @@ export interface FlashJudgeOptions {
   height: number;
   field?: { width: number; height: number };
   areaLimit?: number;
+  /**
+   * Pixels nothing measured (a video, an animated image): they may flash in step with whatever
+   * does, so each window that flashes at all is also measured with them counted as flashing
+   * (`withUnknown`). Frame-sized, 1 = unknown.
+   */
+  unknown?: Uint8Array;
 }
 
 /** The ring of a pixel's last transition frames, per track. */
@@ -440,25 +454,40 @@ export function createFlashJudge(options: FlashJudgeOptions) {
   const au = new Float32Array(n);
   const av = new Float32Array(n);
   const asat = new Uint8Array(n);
+  // A move of more than 0.2 with no saturated end still moves the anchor, but the state it left is
+  // kept: a fade toward red crosses from black to an unsaturated red first, and the saturated red
+  // it reaches next is the transition, measured from where the fade began.
+  const fu = new Float32Array(n);
+  const fv = new Float32Array(n);
+  const pend = new Uint8Array(n);
   const tracks = { general: new Transitions(n), red: new Transitions(n) };
-  const results: Record<FlashTrack, FlashTrackResult> = {
-    general: {
-      failing: [],
-      failingWindows: 0,
-      worst: null,
-      largestBelow: 0,
-      peak: { transitions: 0, frame: 0, x: 0, y: 0 },
-      runs: [],
-    },
-    red: {
-      failing: [],
-      failingWindows: 0,
-      worst: null,
-      largestBelow: 0,
-      peak: { transitions: 0, frame: 0, x: 0, y: 0 },
-      runs: [],
-    },
-  };
+  const empty = (): FlashTrackResult => ({
+    failing: [],
+    failingWindows: 0,
+    worst: null,
+    largestBelow: 0,
+    peak: { transitions: 0, frame: 0, x: 0, y: 0 },
+    runs: [],
+    withUnknown: 0,
+  });
+  const results: Record<FlashTrack, FlashTrackResult> = { general: empty(), red: empty() };
+  const unknown = options.unknown;
+  if (unknown && unknown.length !== n) throw new Error(`flash judge: unknown mask of ${unknown.length}, expected ${n}`);
+  let ux0 = width;
+  let uy0 = height;
+  let ux1 = -1;
+  let uy1 = -1;
+  if (unknown) {
+    for (let p = 0; p < n; p++) {
+      if (!unknown[p]) continue;
+      const y = (p / width) | 0;
+      const x = p - y * width;
+      if (x < ux0) ux0 = x;
+      if (x > ux1) ux1 = x;
+      if (y < uy0) uy0 = y;
+      if (y > uy1) uy1 = y;
+    }
+  }
   /** Whether a track's last evaluation failed, so the next failing one extends its run. */
   const inRun: Record<FlashTrack, boolean> = { general: false, red: false };
   let prev: FlashFrame | null = null;
@@ -561,11 +590,10 @@ export function createFlashJudge(options: FlashJudgeOptions) {
       return;
     }
     const maskBox: Box = { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
-    // Closing stays inside the box, so a box no bigger than the limit cannot exceed it.
-    if (maskBox.width * maskBox.height <= limit) {
+    // Closing stays inside the box, so a box no larger than an area already reported can change no
+    // number: not the verdict (it is under the limit), not the largest area, not the worst window.
+    if (maskBox.width * maskBox.height <= res.largestBelow && !unknown) {
       inRun[track] = false;
-      res.largestBelow = Math.max(res.largestBelow, count);
-      if (!res.worst || count > res.worst.area) res.worst = describe(t, k, mask, maskBox, maskBox, count, true);
       return;
     }
     const closed = closeMask(mask, width, height, x0, y0, x1, y1);
@@ -581,36 +609,54 @@ export function createFlashJudge(options: FlashJudgeOptions) {
           run.area = best.area;
           run.field = best.field;
         }
+        run.windows.push({ frame: k, area: best.area, field: best.field });
       } else {
-        res.runs.push({ from: k, to: k, area: best.area, field: best.field, region });
+        res.runs.push({
+          from: k,
+          to: k,
+          area: best.area,
+          field: best.field,
+          region,
+          windows: [{ frame: k, area: best.area, field: best.field }],
+        });
       }
       inRun[track] = true;
       const last = res.failing[res.failing.length - 1];
       const larger = !res.worst || best.area > res.worst.area;
-      if (!last || larger || times[k]! - last.atMs >= WINDOW_MS - EPS) {
-        const ev = describe(t, k, closed, best.field, maskBox, best.area, false);
-        res.failing.push(ev);
-        if (larger) res.worst = ev;
+      const tie = !!res.worst && best.area === res.worst.area;
+      if (!last || larger || tie || times[k]! - last.atMs >= WINDOW_MS - EPS) {
+        const ev = describe(t, k, closed, best.field, maskBox, best.area);
+        // Of windows over the same area, the worst is the one with the most transitions in it.
+        const more = tie && ev.maxTransitions > res.worst!.maxTransitions;
+        if (!last || larger || more || times[k]! - last.atMs >= WINDOW_MS - EPS) res.failing.push(ev);
+        if (larger || more) res.worst = ev;
       }
-    } else {
-      inRun[track] = false;
-      res.largestBelow = Math.max(res.largestBelow, best.area);
-      if (!res.worst || best.area > res.worst.area)
-        res.worst = describe(t, k, closed, best.field, maskBox, best.area, false);
+      return;
+    }
+    inRun[track] = false;
+    res.largestBelow = Math.max(res.largestBelow, best.area);
+    if (!res.worst || best.area > res.worst.area) res.worst = describe(t, k, closed, best.field, maskBox, best.area);
+    if (unknown && ux1 >= 0) {
+      // The flashing pixels with the unknown ones: could they together exceed the limit?
+      const union = new Uint8Array(n);
+      for (let p = 0; p < n; p++) union[p] = closed[p]! | unknown[p]!;
+      const bx0 = Math.min(x0, ux0);
+      const by0 = Math.min(y0, uy0);
+      const bx1 = Math.max(x1, ux1);
+      const by1 = Math.max(y1, uy1);
+      res.withUnknown = Math.max(res.withUnknown, bestField(union, width, height, fw, fh, bx0, by0, bx1, by1).area);
     }
   };
 
-  /** An evaluation's box and peak count inside its field. `small`: the field is the mask's box. */
+  /** An evaluation's box and peak count inside its field. */
   const describe = (
     t: Transitions,
     k: number,
     mask: Uint8Array,
-    field: Box,
+    f: Box,
     maskBox: Box,
     area: number,
-    small: boolean,
   ): FlashEvaluation => {
-    const f = small ? fieldAround(field, width, height, fw, fh) : field;
     let bx0 = width;
     let by0 = height;
     let bx1 = -1;
@@ -692,6 +738,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
           au[p] = u[p]!;
           av[p] = v[p]!;
           asat[p] = sat[p]!;
+          pend[p] = 0;
           continue;
         }
         const du = u[p]! - au[p]!;
@@ -700,12 +747,26 @@ export function createFlashJudge(options: FlashJudgeOptions) {
           if (asat[p] || sat[p]) {
             transition("red", p, index);
             red = true;
+            pend[p] = 0;
+          } else {
+            fu[p] = au[p]!;
+            fv[p] = av[p]!;
+            pend[p] = 1;
           }
           au[p] = u[p]!;
           av[p] = v[p]!;
           asat[p] = sat[p]!;
         } else if (sat[p]) {
           asat[p] = 1;
+          if (pend[p]) {
+            const eu = u[p]! - fu[p]!;
+            const ev = v[p]! - fv[p]!;
+            if (eu * eu + ev * ev > RED_UV_STEP * RED_UV_STEP) {
+              transition("red", p, index);
+              red = true;
+              pend[p] = 0;
+            }
+          }
         }
       }
       prev = frame;
@@ -731,13 +792,6 @@ function boxUnion(a: Box, b: Box): Box {
     width: Math.max(a.x + a.width, b.x + b.width) - x,
     height: Math.max(a.y + a.height, b.y + b.height) - y,
   };
-}
-
-/** A field-sized box placed over `box` (clamped into the frame), for a flash smaller than a field. */
-function fieldAround(box: Box, width: number, height: number, fw: number, fh: number): Box {
-  const x = Math.max(0, Math.min(width - fw, box.x + Math.floor((box.width - fw) / 2)));
-  const y = Math.max(0, Math.min(height - fh, box.y + Math.floor((box.height - fh) / 2)));
-  return { x, y, width: fw, height: fh };
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   TRANSITIONS_KEPT,
   type FlashFrame,
 } from "./flash.ts";
-import { classifyFlash, pickRuns, type FlashSequence } from "./flash-motion.ts";
+import { classifyFlash, runSpans, type FlashSequence } from "./flash-motion.ts";
 import { frameTimeMs } from "./frames.ts";
 import { createRng } from "./pbt.ts";
 
@@ -183,6 +183,45 @@ describe("flash judge: the general track's known answers", () => {
     assert.equal(result.general.peak.transitions, 2);
   });
 
+  test("an area under the limit is measured as one over it is: closed, inside its field", () => {
+    // A 147x147 1px dither: half its pixels change; odd-sized, all four corners are set, so closed it is the whole 21,609 px².
+    const dither = (k: number) => (x: number, y: number) =>
+      x >= 20 && x < 167 && y >= 20 && y < 167 && !phase(k, 4) && (x + y) % 2 === 0 ? BLACK : WHITE;
+    const { result } = sequence(W, H, 90, dither, (k) => (phase(k, 4) ? 1 : 0));
+    assert.equal(result.general.failing.length, 0);
+    assert.equal(result.general.worst!.area, 147 * 147);
+    assert.equal(result.general.largestBelow, 147 * 147);
+  });
+
+  test("the worst window's field holds what flashes, even when the flashes are far apart", () => {
+    const w = 800;
+    const blinkers = (k: number) => (x: number, y: number) =>
+      (x < 20 || x >= 780) && y >= 100 && y < 120 && phase(k, 4) ? WHITE : BLACK;
+    const { result } = sequence(w, H, 90, blinkers, (k) => (phase(k, 4) ? 1 : 0));
+    const worst = result.general.worst!;
+    assert.equal(worst.area, 400);
+    assert.ok(worst.maxTransitions >= 7);
+    assert.ok(worst.bbox.width > 0);
+  });
+
+  test("of windows over the same area, the worst is the one with the most transitions", () => {
+    const { result } = sequence(W, H, 90, strobe(BLACK, WHITE, 4), twoState(4));
+    assert.equal(result.general.worst!.maxTransitions, 8);
+  });
+
+  test("pixels nothing measured count as flashing beside what does: together over the limit is no pass", () => {
+    const unknown = new Uint8Array(W * H);
+    for (let y = 0; y < 150; y++) for (let x = 150; x < 300; x++) unknown[y * W + x] = 1;
+    const judge = createFlashJudge({ width: W, height: H, unknown });
+    const paint = boxStrobe(0, 0, 140, 140, 4);
+    const frames = [flashFrame(rgba(W, H, paint(0)), W, H), flashFrame(rgba(W, H, paint(8)), W, H)];
+    for (let k = 0; k < 90; k++) judge.push(k, frameTimeMs(k), frames[phase(k, 4) ? 1 : 0]!);
+    const r = judge.result().general;
+    assert.equal(r.failing.length, 0);
+    assert.equal(r.largestBelow, 140 * 140);
+    assert.equal(r.withUnknown, 140 * 140 + 150 * 150 - 0);
+  });
+
   test("a static frame never evaluates", () => {
     const { result } = sequence(
       W,
@@ -242,6 +281,20 @@ describe("flash judge: the red track", () => {
       assert.equal(result.red.peak.transitions, 0, `${a} ↔ ${b}`);
       assert.equal(result.general.peak.transitions, 0, `${a} ↔ ${b}`);
     }
+  });
+
+  test("a red pulse that fades in and out (black ↔ #a00000) fails red: the fade's first frame is not yet saturated", () => {
+    // Linear in sRGB over 3 frames each way at ~4.6 Hz: black, #350000, #6a0000, #a00000, #6a0000, #350000.
+    const ramp = [0, 0x35, 0x6a, 0xa0, 0x6a, 0x35];
+    const { result } = sequence(
+      W,
+      H,
+      120,
+      (k) => () => [ramp[(k + 1) % ramp.length]!, 0, 0],
+      (k) => (k + 1) % ramp.length,
+    );
+    assert.ok(result.red.failing.length > 0, JSON.stringify(result.red.peak));
+    assert.equal(result.general.failing.length, 0, "the luminance step is under 0.1");
   });
 
   test("red against white, slowly, passes", () => {
@@ -360,7 +413,7 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
     assert.ok(result.general.failing.length > 0, "per-pixel counting alone reports it");
     assert.equal(general!.classification, "motion");
     assert.equal(general!.reason, "explained");
-    assert.ok(general!.segments.every((s) => s.residualArea <= AREA_LIMIT_CSS2));
+    assert.ok(general!.segments.every((s) => (s.residualArea ?? 0) <= AREA_LIMIT_CSS2));
     assert.deepEqual(general!.segments[0]!.velocity, { x: -300, y: 0 });
   });
 
@@ -413,12 +466,27 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
   });
 
   test("a light strobe (ΔL 0.1, darker 0.7) behind scrolling text is a flash: the step is small, not motion", () => {
-    // sRGB 218 is L 0.701, 232 is L 0.807: about the smallest general transition near white.
+    // sRGB 218 is L 0.701, 232 is L 0.807: about the smallest general transition near white. The
+    // text is 60% ink, so the field's mean steps 0.04 and only the tracked content can tell. It
+    // moves 2px a frame: content carries the history it gathered in view, and at 5px a frame
+    // through a 400px frame no content is in view long enough for a field of it to hold seven.
     const { general } = judged(
       90,
-      (k) => (x, y) => (ink[y * TW + ((x + 5 * k) % TW)] ? grey(0x60) : phase(k, 4) ? grey(232) : grey(218)),
+      (k) => (x, y) => (ink[y * TW + ((x + 2 * k) % TW)] ? grey(0x60) : phase(k, 4) ? grey(232) : grey(218)),
     );
     assert.equal(general!.classification, "flash");
+    assert.equal(general!.reason, "residual");
+  });
+
+  test("a background pulsing smoothly at 4 Hz behind scrolling text is a flash: small steps add up on the content", () => {
+    // sRGB 192 ↔ 224 (L 0.53 ↔ 0.75) as a sine: no frame's step is near 0.1, and the field's
+    // mean moves less than 0.1 under 60% ink.
+    const { general } = judged(90, (k) => {
+      const bg = Math.round(208 + 16 * Math.sin((2 * Math.PI * 4 * frameTimeMs(k)) / 1000));
+      return (x, y) => (ink[y * TW + ((x + 2 * k) % TW)] ? grey(0x60) : grey(bg));
+    });
+    assert.equal(general!.classification, "flash");
+    assert.equal(general!.reason, "residual");
   });
 
   test("a box whose fill toggles while it drifts slowly is a flash", () => {
@@ -437,8 +505,35 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
     assert.equal(general!.classification, "flash");
   });
 
-  test("stripes scrolling by half their period each frame are a flash", () => {
-    const { general } = judged(60, (k) => (x) => (Math.floor((x + 20 * k) / 40) % 2 === 0 ? BLACK : WHITE));
+  test("stripes scrolling by half their period each frame are a flash: counterphase has no direction", () => {
+    // 20px stripes, a 40px period, 20px a frame: each frame is the last one inverted.
+    const { general } = judged(60, (k) => (x) => (Math.floor((x + 20 * k) / 20) % 2 === 0 ? BLACK : WHITE));
+    assert.equal(general!.classification, "flash");
+  });
+
+  test("8px stripes inverting at 10 Hz are a flash: a half-period shift matches both ways and has no direction", () => {
+    const { general } = judged(
+      60,
+      (k) => (x) => ((Math.floor(x / 8) + (phase(k, 10) ? 1 : 0)) % 2 === 0 ? BLACK : WHITE),
+    );
+    assert.equal(general!.classification, "flash");
+  });
+
+  test("a textured panel teleporting 40px back and forth at 5 Hz while it drifts is a flash", () => {
+    const { general } = judged(90, (k) => (x, y) => at(x + (phase(k, 5) ? 40 : 0) + k, y));
+    assert.equal(general!.classification, "flash");
+  });
+
+  test("a textured panel shaking 20px back and forth at 5 Hz is a flash: each jump is short, but it reverses", () => {
+    const { general } = judged(90, (k) => (x, y) => at(x + (phase(k, 5) ? 20 : 0), y));
+    assert.equal(general!.classification, "flash");
+  });
+
+  test("texture moving 6px a frame that inverts at 4 Hz is a flash: the motion is real, so is the step", () => {
+    const { general } = judged(90, (k) => (x, y) => {
+      const c = at(x + 6 * k, y);
+      return phase(k, 4) ? (c === BLACK ? WHITE : BLACK) : c;
+    });
     assert.equal(general!.classification, "flash");
   });
 
@@ -450,20 +545,17 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
     assert.equal(general!.classification, "flash");
   });
 
-  test("runs: the four largest are re-counted, in frame order", () => {
+  test("runs are re-counted whole, from a second and a lead before each, merged where they meet", () => {
     const box = { x: 0, y: 0, width: 1, height: 1 };
-    const run = (from: number, area: number) => ({ from, to: from + 10, area, field: box, region: box });
-    const picked = pickRuns([
-      run(60, 30_000),
-      run(80, 40_000),
-      run(130, 25_000),
-      run(200, 22_000),
-      run(260, 23_000),
-      run(330, 24_000),
-    ]);
+    const run = (from: number, to: number) => ({ from, to, area: 30_000, field: box, region: box, windows: [] });
+    const times = Array.from({ length: 600 }, (_, k) => frameTimeMs(k));
+    const spans = runSpans(times, [run(200, 260), run(80, 120), run(300, 590)]);
     assert.deepEqual(
-      picked.map((p) => p.from),
-      [60, 80, 130, 330],
+      spans.map((s) => [s.k0, s.k1, s.runs.length]),
+      [
+        [5, 120, 1],
+        [125, 590, 2],
+      ],
     );
   });
 });
