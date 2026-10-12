@@ -410,8 +410,64 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
   inline HTML is refused). `interact` injects its script after load for that reason, and also
   registers it as an init script so the document after a link or a reload has it.
 
-Not built yet, in the order the research put them: a storyboard over a lossless sequence (no VLM
-verdict), `check flash`, and external video files through a decoder the user supplies.
+### What a sequence shows happening (`snapshot storyboard`)
+
+```bash
+vlmkit check animation page.html --at 0..1s/1f --frames out/f   # exits 1 on a suspect, frames written all the same
+vlmkit snapshot storyboard out/f/frames.json
+# → out/f/storyboard/: story.json, SUMMARY.md, sheet.png (box outlined), narrate/BRIEF.md (+ keyframes, crops)
+```
+
+States and events from the pixels alone, relative to an anchor (the frame of the state the page is in):
+**glitch** one frame off and back; **transient** back within 5000ms whatever it held (a toast is
+one); **change** not back, ending at the first 100ms of byte-identical frames — the next state, whose frame
+is the anchor from then on (an earlier state's own frame when the hold is within its floor);
+**drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8). Pure half
+`@mizchi/vlmkit-judge/storyboard.ts` (`buildStoryboard`, `storyboardSummary`, `storyboardBrief`);
+CLI `src/cli/commands/storyboard-cli.ts` (an artifact command on the SPECS path, exits 0, no verdict:
+the brief is for the agent's own vision and nothing reads its answer back). Measured building it,
+not to re-learn:
+
+- **Anchor-relative, never merge-then-split.** k blinks are k events and their gaps none; a fade is
+  compared with the anchor, so it accumulates until it shows, and `movedAfter` names the last frame
+  of the visit in which the event's own box was still byte-identical to the state. A random-plant property test (glitches, sliding transients, changes,
+  5000 seeds once, 200 kept) holds every event to the frames and box it was planted on.
+- **Durations need the same epsilon as instants.** Frame 10 minus frame 4 is 99.99999999999999, so a
+  seven-frame 100ms hold never settled and the change ran on into the next event.
+- **A fixture's motion must not return by symmetry.** A two-tone square turned 12° a frame equals
+  itself after 180°, so the "spinner" read as transients; the planted one is asymmetric, 7° a frame.
+- **What nothing holds swallows the sequence.** A video or an unheld spinner makes every frame differ
+  and one change never settles; `--ignore x,y,w,h` (the frames' pixels) takes its box out, and the
+  never-settling event's box is the one to pass.
+- **The sheet holds cells, not frames.** The layout is solved on sizes alone and each cell is decoded
+  and shrunk before the next, and segmentation decodes through a byte-bounded cache: every frame of a
+  1000-frame 2x capture at once would be 15GB.
+- **The anchor is the state's frame, on a return too.** Anchored on the hold it landed in, a hold
+  within the floor of S0 was S0 once and a new state the next time, and a later fade measured from
+  the hold called "identical to S0" a frame that was not. (Within the floor is not transitive, so
+  equal bytes can still carry two ids; that is not claimed away.)
+- **`movedAfter` is the event's own pixels.** The last frame of the visit in which they were exactly
+  the state's, found inside the event's box. Tracked across the frame, a fade elsewhere, or a
+  residue a toast left within the floor, gave an unrelated glitch a "moving since" seconds early.
+  The search decodes nothing when a frame's changed pixels miss the box, and a repeated box resumes
+  its last search: without both, a blink repeating over a pixel held a level off the anchor cost
+  49927 decodes for 3000 frames.
+- **Drift is judged inside the event's box.** Measured across the frame, a sub-floor wiggle beside a
+  fade made the fade a change (step 14 between two frames each within the floor of the anchor).
+- **Step before anchor on the 5s look-ahead.** The window is 300 frames at 60fps and the cache a few
+  dozen; computing the anchor-independent step first lets a re-scan after a change answer identical
+  frames without decoding (5247 decodes → 1174 for a 1000-frame, 16-change sequence through a
+  36-frame cache; a test holds 450 for 400 frames, 1534 without it).
+- **The outline is never over the box.** A 1px top bar at the frame's edge was hidden under its own
+  clamped outline; it now sits outside the box, in 2px of the cell's gap. `boxOnSheet` inverts
+  `scalePngData`'s float sampling (`105 * (1440 / 175)` is 863.99…), not the exact ratio.
+
+Known answers: `fixtures/storyboard/planted.html?kind=…` (static, glitch, blinks, toast, slide, fade,
+spinner), each required back on its frames in `storyboard-cli.test.ts`.
+
+Not built yet, in the order the research put them: `check flash` (WCAG 2.3.1, on page-clock
+sequences), and external video files through a decoder the user supplies — then a noise floor for
+lossy storyboards, which this one deliberately does not have.
 
 ## Responsive layout as a property-based test (`check responsive`)
 
@@ -876,7 +932,7 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. Plan for the rest of the split: `docs/design/package-decomposition.md`. |
+| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
 | `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 32 of the 34 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
@@ -924,7 +980,7 @@ before changing it:
 
 Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all. **Editing a `packages/*/src` file and then running the CLI shows the OLD behavior**: `@mizchi/vlmkit-*` resolves through `exports` to `dist/*.mjs`, so `pnpm build` has to run in between (and never pipe its output to `head` — SIGPIPE leaves a half-deleted `dist/`).
 
-The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.
+The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. The module file is `moon.mod`, not `moon.mod.json`: CI installs the latest `moon`, and a release between 2026-10-11 and 2026-10-12 refuses the JSON form (`moon fmt` migrates it, but also reformats every `.mbt`; take only the `moon.mod` it writes). If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.
 
 **After editing anything under `.claude/skills/`, run `pnpm sync:skills`.** The content lives there once and is copied into two installer packages (`skills/vlmkit/workflows/`, `.apm/skills/vlmkit/`); `tests/skill-package.test.mjs` fails if the three drift, and hand-editing a copy is the wrong repair.
 

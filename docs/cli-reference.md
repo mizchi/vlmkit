@@ -1480,6 +1480,72 @@ Measured on a drawer with a 220ms linear slide that sets `hidden` on
 within 0.01 of `200 - 200t/220` — and seeking the paused transition past its end
 fires `transitionend`, so the page's own handler runs between frames.
 
+#### What a sequence shows happening — `snapshot storyboard`
+
+```bash
+vlmkit check animation page.html --at 0..1s/1f --frames out/f   # every frame of the first second
+vlmkit snapshot storyboard out/f/frames.json                     # → out/f/storyboard/
+vlmkit snapshot storyboard out/f/frames.json --ignore 960,40,320,180 --out story   # a video in that box
+```
+
+Reads any `vlmkit-frames/1` sequence and says, from the pixels alone, where the
+frames hold still, where they depart from what they held, for how long, over
+which box, and whether they come back. It writes four things:
+
+| File | What it is |
+|---|---|
+| `story.json` | `vlmkit-storyboard/1`: the sequence's states, its events and a timeline, each event with its frames, times, box and keyframes (`@mizchi/vlmkit-judge/storyboard.ts`) |
+| `SUMMARY.md` | the same as tables; every cell is a measurement, and the same frames give the same bytes |
+| `sheet.png` | one row per event: its keyframes, each labelled with the time it shows, and the event's box outlined in magenta — the box the table prints, nothing else |
+| `narrate/BRIEF.md` | the keyframes and a magnified crop of each event's box, for your own vision to say what each change *is*; nothing reads the answer back |
+
+The rules, relative to an anchor — the frame of the state the page is in (frame 0, then the first
+frame of each hold a change settles in, and an earlier state's own frame when the page returns to it):
+
+| Kind | Rule |
+|---|---|
+| glitch | one frame differs from the anchor, and the next is back |
+| transient | more than one frame, back within 5000ms of the first — whatever it held in between, so a toast that slides in, stays and leaves is one |
+| change | not back within 5000ms; ends at the first 100ms of byte-identical frames, which is the next state — a new one, or an earlier one it is within the floor of — whose frame is the anchor from then on |
+| drift | a change no frame-to-frame step of which, inside its box, moves a channel by more than 8 — a fade too slow to see from one frame to the next |
+
+A pixel differs when one of its channels moves by more than 8 of 255; the anchor,
+not the previous frame, is what a frame is compared with, so a sub-floor fade
+accumulates until it shows (and `movedAfter` names the last frame of the visit in
+which the event's own pixels were still exactly the state's). k blinks
+are k events and the frames between them none. A state a change lands back in
+(within the floor of its frame) is the first such state, visited again, and its
+frame is the anchor again. Within the floor is not transitive, so equal bytes can
+still carry two ids: a picture reached with no event keeps the state it drifted from. Times are intervals between
+two frames: an event *began* after the last frame that showed the state and by
+the first that did not.
+
+What it does not do: name what changed — that is the brief's — or pass a verdict.
+It is an artifact command, not a gate, and exits 0; a narrative gate stays off
+until a bench shows narration adds something the table does not. Limits:
+
+- **Lossless input only.** vlmkit's own captures, two shots that agree; a decoded
+  video would need a noise floor this does not have.
+- **What nothing holds never settles.** A `<video>`, an animated image or a
+  spinner the clock does not drive makes every frame differ, and one change
+  swallows the rest of the sequence. `--ignore x,y,w,h` (the frames' pixels,
+  repeatable) leaves that box out of every comparison; the never-settling event's
+  own box is the one to pass.
+- **No hold by the last frame is all it says.** A change whose last frame differs
+  from the one before it is reported as reaching no hold (`noHold` in story.json),
+  not as moving: on a
+  sparse sequence (`check integrity --timeline --frames` ends on a rest instant
+  two seconds on) the page may well have been still by then.
+- **Sampling bounds what is seen.** At `0..1s/100ms` an event shorter than 100ms
+  can fall between frames, and a glitch is one frame of the sequence, not one
+  rendered frame; `SUMMARY.md` says so. On the wall clock (`inspect interact`) a
+  script is wherever it was when each frame was shot.
+
+Self-check: `fixtures/storyboard/planted.html` plants each kind on the held clock
+(a glitch on frame 30, blink trains, a toast on timers, an eased slide, a 6% fade,
+a spinner), and `storyboard-cli.test.ts` requires every one back on the frames it
+was planted on.
+
 #### Visualizing the VRT process — flipbooks + video
 
 The VRT process can be saved as a self-contained HTML "flipbook" (PNGs

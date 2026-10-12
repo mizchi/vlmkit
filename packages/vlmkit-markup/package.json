@@ -23,7 +23,7 @@
   "files": [
     "dist/**",
     "_build/js/debug/build/markup-core-api/markup-core-api.js",
-    "moon.mod.json",
+    "moon.mod",
     "markup-core/**/*.mbt",
     "markup-core/moon.pkg",
     "markup-core-api/**/*.mbt",

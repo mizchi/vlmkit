@@ -164,7 +164,11 @@ Evaluates every authored animation by rendered frames:
   from the strip's even columns: `--at 0..600/100 --frames out/f` writes the
   viewport, uncropped, at each instant with the clock held (`0000-t000000.png` …, plus
   `frames.json`); `vlmkit snapshot strip --manifest out/f/frames.json` puts
-  them in one image labelled with their times. Read it.
+  them in one image labelled with their times. Read it. `vlmkit snapshot
+  storyboard out/f/frames.json` measures what they show happening — a
+  one-frame glitch, a transient that comes back, a change and where it settles,
+  each timed between two frames with its box — and `--at 0..1s/1f` gives it
+  every frame to read.
 - **Defects that exist only mid-motion** are `check integrity`'s, not this
   gate's: `vlmkit check integrity page.html --timeline` judges the layout at
   instants of the entrance with the clock and animations held. A finding held

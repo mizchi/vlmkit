@@ -191,6 +191,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Sticky sticks / fixed holds / snap lands | `vlmkit check scroll page.html` |
 | Animations visibly animate, settle, respect reduced-motion | `vlmkit check animation page.html` (declared-CSS view: `check motion`) |
 | The page at chosen instants of its motion, as numbered frames (`NNNN-t<ms>.png` + `frames.json`) | `vlmkit check animation page.html --at 0..600/100 --frames out/f`; after an action, a `frames` step in `inspect interact`; one sheet: `vlmkit snapshot strip --manifest out/f/frames.json` |
+| What a frame sequence shows happening: glitches, transients, changes and where they settle, each timed and boxed from the pixels | `vlmkit snapshot storyboard out/f/frames.json` (`SUMMARY.md`, `sheet.png`, `narrate/BRIEF.md` for your own vision; no verdict, exits 0) |
 | Keyboard-operable controls: probe every interactive element, map ARIA state transitions | `vlmkit check interactions page.html` (`--reference ref.html` turns it into a behavioral contract) |
 | Every wired event callback + pointer-only-control detection (clickable `<div>`s) | `vlmkit scan handlers page.html` |
 | Drag and drop: a `dragstart` source that is not draggable, a `drop` target with no `dragover` — both are handlers that can never fire | `vlmkit scan handlers page.html` (same gate; see `fixtures/handlers/drag-and-drop.html`) |

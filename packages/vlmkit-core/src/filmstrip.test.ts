@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import { composeFilmstrip, filmstripLayout } from "./filmstrip.ts";
+import { boxOnSheet, composeFilmstrip, filmstripLayout, scalePngData, strokeOutside } from "./filmstrip.ts";
 import type { PngData } from "./png-utils.ts";
 
 /** A solid frame, so a composited pixel's origin is unambiguous. */
@@ -212,5 +212,191 @@ describe("maxWidth 0 disables the cap", () => {
     const capped = composeFilmstrip([frame(916, 393), frame(916, 393)], { columns: 2, maxWidth: 900 });
     assert.ok(capped.layout.scale > 1);
     assert.ok(capped.width <= 900, `expected <=900px, got ${capped.width}px`);
+  });
+});
+
+describe("cell labels and box outlines (storyboard rows)", () => {
+  it("reserves a band above every cell, below the row label, and draws each cell's own text", () => {
+    const frames = Array.from({ length: 4 }, () => solid(40, 10, RED));
+    const sheet = composeFilmstrip(frames, {
+      columns: 2,
+      gap: 0,
+      padding: 0,
+      rowLabels: ["E1", "E2"],
+      cellLabels: ["0ms before", "17ms first", "", "33ms back"],
+      labelColor: [0, 255, 0],
+    });
+    const { rowLabelBand, cellLabelBand, cell } = sheet.layout;
+    assert.ok(cellLabelBand > 0);
+    assert.equal(sheet.layout.positions[0]!.y, rowLabelBand + cellLabelBand);
+    assert.equal(sheet.layout.positions[2]!.y, (rowLabelBand + cellLabelBand) * 2 + cell.height);
+    assert.equal(sheet.height, (cell.height + rowLabelBand + cellLabelBand) * 2);
+    const inkIn = (x0: number, y0: number, w: number, h: number) => {
+      let n = 0;
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (pixel(sheet, x, y)[1] === 255) n++;
+      return n;
+    };
+    for (const p of sheet.layout.positions)
+      assert.equal(inkIn(p.x, p.y, cell.width, cell.height), 0, "no label ink on a frame");
+    const row2 = sheet.layout.positions[2]!.y - cellLabelBand - rowLabelBand;
+    assert.ok(inkIn(0, row2, sheet.width, rowLabelBand) > 0, "row 2's label sits in the band above its cell labels");
+    const y2 = sheet.layout.positions[2]!.y - cellLabelBand;
+    assert.equal(inkIn(0, y2, cell.width, cellLabelBand), 0, "an empty label leaves its band blank");
+    assert.ok(inkIn(cell.width, y2, cell.width, cellLabelBand) > 0);
+  });
+
+  it("no cell labels, no band: a sheet without them is unchanged", () => {
+    const frames = [solid(6, 6, RED), solid(6, 6, BLUE)];
+    const a = composeFilmstrip(frames, { gap: 0, padding: 0 });
+    const b = composeFilmstrip(frames, { gap: 0, padding: 0, cellLabels: ["", ""] });
+    assert.equal(b.layout.cellLabelBand, 0);
+    assert.deepEqual(b.data, a.data);
+  });
+
+  /** The sheet rows (or columns) scalePngData fills from source indices in [start, start + length). */
+  const shown = (start: number, length: number, srcLen: number, scale: number) => {
+    const dstLen = Math.max(1, Math.round(srcLen / scale));
+    const hits: number[] = [];
+    for (let i = 0; i < dstLen; i++) {
+      const src = Math.min(Math.floor(i * (srcLen / dstLen)), srcLen - 1);
+      if (src >= start && src < start + length) hits.push(i);
+    }
+    return hits;
+  };
+
+  it("maps a box onto exactly the sheet pixels that show it, at fractional scales and every edge", () => {
+    for (const [w, h, scale] of [
+      [320, 200, 1.25],
+      [1280, 720, 4.25],
+      [2560, 1440, 8.25],
+      [100, 50, 2.75],
+    ] as const) {
+      const layout = filmstripLayout([{ width: w, height: h, data: new Uint8Array(0) }], { scale, gap: 0, padding: 0 });
+      for (let k = 0; k < 200; k++) {
+        const bx = (k * 37) % w;
+        const by = (k * 53) % h;
+        const box = { x: bx, y: by, width: 1 + ((k * 11) % (w - bx)), height: 1 + ((k * 7) % (h - by)) };
+        const got = boxOnSheet(layout, 0, { width: w, height: h }, box);
+        const xs = shown(box.x, box.width, w, layout.scale);
+        const ys = shown(box.y, box.height, h, layout.scale);
+        if (xs.length > 0)
+          assert.deepEqual([got.x, got.x + got.width - 1], [xs[0], xs.at(-1)], `${w} x ${JSON.stringify(box)}`);
+        else assert.equal(got.width, 1, "a box between two sheet pixels keeps one");
+        if (ys.length > 0)
+          assert.deepEqual([got.y, got.y + got.height - 1], [ys[0], ys.at(-1)], `${h} y ${JSON.stringify(box)}`);
+        else assert.equal(got.height, 1);
+      }
+    }
+  });
+
+  it("the mapped box is where scalePngData actually draws the box's pixels", () => {
+    type B = { x: number; y: number; width: number; height: number };
+    const swept = (w: number, h: number): B[] =>
+      Array.from({ length: 40 }, (_, k) => ({
+        x: (k * 37) % (w - 20),
+        y: (k * 53) % (h - 20),
+        width: 1 + ((k * 11) % 19),
+        height: 1 + ((k * 7) % 19),
+      }));
+    const cases: [number, number, number, B[]][] = [
+      [320, 200, 1.25, swept(320, 200)],
+      [1280, 720, 4.25, swept(1280, 720)],
+      [100, 50, 2.75, swept(100, 50)],
+      // Where float and exact sampling part: 105 * (1440 / 175) is 863.99…, so sheet row 105 shows
+      // source row 863. A sampler "fixed" to the exact ratio moves the box off its outline.
+      [
+        2560,
+        1440,
+        8.25,
+        [
+          { x: 100, y: 840, width: 50, height: 24 },
+          { x: 100, y: 856, width: 50, height: 24 },
+        ],
+      ],
+    ];
+    for (const [w, h, scale, boxes] of cases) {
+      for (const box of boxes) {
+        // The frame white, the box black: the scaled frame's black pixels are the truth.
+        const frame = solid(w, h, [255, 255, 255]);
+        for (let y = box.y; y < box.y + box.height; y++)
+          frame.data.fill(0, (y * w + box.x) * 4, (y * w + box.x + box.width) * 4);
+        const layout = filmstripLayout([frame], { scale, gap: 0, padding: 0 });
+        const scaled = scalePngData(frame, layout.scale);
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (let y = 0; y < scaled.height; y++) {
+          for (let x = 0; x < scaled.width; x++) {
+            if (scaled.data[(y * scaled.width + x) * 4] !== 0) continue;
+            xs.push(x);
+            ys.push(y);
+          }
+        }
+        if (xs.length === 0) continue; // fell between sheet pixels: the other test covers it
+        const got = boxOnSheet(layout, 0, frame, box);
+        assert.deepEqual(
+          [got.x, got.y, got.x + got.width - 1, got.y + got.height - 1],
+          [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)],
+          `${w}x${h} at ${scale}: ${JSON.stringify(box)}`,
+        );
+      }
+    }
+  });
+
+  it("inverts the float sampling, not the exact ratio: 105 * (1440 / 175) is 863.99…", () => {
+    const layout = filmstripLayout([{ width: 2560, height: 1440, data: new Uint8Array(0) }], { scale: 8.25 });
+    const rows = (y: number, height: number) => {
+      const b = boxOnSheet(layout, 0, { width: 2560, height: 1440 }, { x: 0, y, width: 10, height });
+      const top = b.y - layout.positions[0]!.y;
+      return [top, top + b.height - 1];
+    };
+    assert.deepEqual(rows(840, 24), [103, 105], "row 102 shows 839, row 105 shows 863");
+    // No sheet row shows source rows 864-871; the one showing 863 stands in.
+    assert.deepEqual(rows(864, 8), [105, 105]);
+  });
+
+  it("outlines outside the box and never over it; a clip grown into the gap keeps an edge box's four sides", () => {
+    const frames = [solid(100, 50, RED), solid(100, 50, RED)];
+    const sheet = composeFilmstrip(frames, { gap: 8, padding: 8, scale: 2 });
+    const cell = { ...sheet.layout.positions[1]!, ...sheet.layout.cell };
+    const grown = { x: cell.x - 2, y: cell.y - 2, width: cell.width + 4, height: cell.height + 4 };
+    const inner = boxOnSheet(sheet.layout, 1, frames[1]!, { x: 10, y: 10, width: 20, height: 10 });
+    assert.deepEqual(inner, { x: cell.x + 5, y: cell.y + 5, width: 10, height: 5 });
+    strokeOutside(sheet, inner, [0, 255, 0], 2, grown);
+    const GREEN = [0, 255, 0, 255];
+    assert.deepEqual(pixel(sheet, inner.x - 1, inner.y), GREEN, "left");
+    assert.deepEqual(pixel(sheet, inner.x + inner.width, inner.y), GREEN, "right");
+    assert.deepEqual(pixel(sheet, inner.x, inner.y - 1), GREEN, "top");
+    assert.deepEqual(pixel(sheet, inner.x, inner.y + inner.height), GREEN, "bottom");
+    assert.deepEqual(pixel(sheet, inner.x - 2, inner.y), GREEN, "two pixels wide: the second left");
+    assert.deepEqual(pixel(sheet, inner.x, inner.y - 2), GREEN, "the second above");
+    assert.deepEqual(pixel(sheet, inner.x + inner.width + 1, inner.y), GREEN, "the second right");
+    assert.deepEqual(pixel(sheet, inner.x, inner.y + inner.height + 1), GREEN, "the second below");
+    assert.deepEqual(pixel(sheet, inner.x - 3, inner.y), [255, 0, 0, 255], "and no more");
+    for (let y = inner.y; y < inner.y + inner.height; y++) {
+      for (let x = inner.x; x < inner.x + inner.width; x++) assert.deepEqual(pixel(sheet, x, y), [255, 0, 0, 255]);
+    }
+    // A one-pixel bar along the frame's top edge: its outline's top side is in the gap above the
+    // cell, and the bar itself is still there to see.
+    const bar = boxOnSheet(sheet.layout, 1, frames[1]!, { x: 0, y: 0, width: 100, height: 1 });
+    strokeOutside(sheet, bar, [0, 0, 255], 2, grown);
+    assert.deepEqual(pixel(sheet, bar.x + 3, bar.y), [255, 0, 0, 255], "the bar is not painted over");
+    assert.deepEqual(pixel(sheet, bar.x + 3, bar.y - 1), [0, 0, 255, 255], "its top side, in the gap");
+    assert.deepEqual(pixel(sheet, bar.x + 3, bar.y + 1), [0, 0, 255, 255], "its bottom side, in the cell");
+    // Clipped to the cell itself, an edge bar loses its outer side to the clip, and is still not
+    // painted over (an earlier version drew that side along the cell's inside edge, on the bar).
+    const tight = composeFilmstrip(frames, { gap: 8, padding: 8, scale: 2 });
+    const tightCell = { ...tight.layout.positions[1]!, ...tight.layout.cell };
+    const edge = boxOnSheet(tight.layout, 1, frames[1]!, { x: 0, y: 0, width: 100, height: 1 });
+    strokeOutside(tight, edge, [0, 0, 255], 2, tightCell);
+    for (let x = edge.x; x < edge.x + edge.width; x++)
+      assert.deepEqual(pixel(tight, x, edge.y), [255, 0, 0, 255], `bar ${x}`);
+    assert.deepEqual(
+      pixel(tight, edge.x + 3, edge.y - 1),
+      [96, 96, 96, 255],
+      "nothing outside the clip, though within 2px of the box",
+    );
+    assert.deepEqual(pixel(tight, edge.x + 3, edge.y + 1), [0, 0, 255, 255], "the bottom side, inside");
+    // A box narrower than a sheet pixel keeps one.
+    assert.equal(boxOnSheet(sheet.layout, 0, frames[0]!, { x: 51, y: 0, width: 1, height: 1 }).width, 1);
   });
 });
