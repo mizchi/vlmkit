@@ -15,7 +15,7 @@
  */
 import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Page } from "playwright";
+import type { Frame, Page } from "playwright";
 import { applyHar, settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { navigationOptions, type PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import {
@@ -37,10 +37,60 @@ export interface HeldAnimationTiming {
 }
 
 export interface HeldTimeline {
-  /** Every animation held so far, timed on the page clock. */
+  /** Every animation held so far in the main frame, timed on the sweep's clock. */
   animations(): Promise<HeldAnimationTiming[]>;
-  /** Advance the clock to `t` ms of page time and seek every held animation there. */
+  /** Advance the clock to `t` ms of page time and seek every held animation there, in every frame. */
   at(t: number): Promise<void>;
+  /** How many times the page has moved to a new document since it was opened. */
+  navigations(): number;
+}
+
+/** More navigations than this during one sweep and `at` throws. */
+export const MAX_SWEEP_NAVIGATIONS = 5;
+/** How long a document the page navigates to may take to commit and to load; and a frame to answer. */
+const NAVIGATION_WAIT_MS = 10_000;
+// Not "Target page ... has been closed": a page that closed itself is not coming back.
+const NAVIGATED = /Execution context was destroyed|navigat|Cannot find context/i;
+
+type HeldWindow = Window & {
+  __vlmkitClock?: { advanceTo(ms: number): Promise<number>; takeLeftAt?(): number | null };
+  __vlmkitSeekTimeline?(t: number): void;
+  __vlmkitTimelineAnimations?(): HeldAnimationTiming[];
+};
+
+type FrameStep = { fresh: true } | { noClock: true } | { leftAt: number | null };
+
+/**
+ * One instant in one frame, run in the page: the clock advanced to `ms`, every held animation
+ * seeked there, and the page time the document began to leave at, if it did. `origin` is the
+ * `performance.timeOrigin` of the document the sweep has been putting at its instants: another
+ * one answers `fresh` before anything is advanced (a navigation that committed between two
+ * instants), since advancing it to the old document's time would start it late.
+ */
+const stepFrame = async ({ ms, origin }: { ms: number; origin: number | null }): Promise<FrameStep> => {
+  if (origin !== null && performance.timeOrigin !== origin) return { fresh: true };
+  const w = window as unknown as HeldWindow;
+  if (!w.__vlmkitClock) return { noClock: true };
+  await w.__vlmkitClock.advanceTo(ms);
+  if (w.__vlmkitSeekTimeline) w.__vlmkitSeekTimeline(ms);
+  return { leftAt: w.__vlmkitClock.takeLeftAt ? w.__vlmkitClock.takeLeftAt() : null };
+};
+
+/** `promise`, or undefined once `ms` have passed. */
+function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(undefined), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** Instants added to the animation-derived ones, so script-driven motion is sampled too. */
@@ -58,8 +108,20 @@ export function defaultTimelineInstants(held: readonly HeldAnimationTiming[]): n
 /**
  * Load `url` into `page` with the page clock held from document start (`VIRTUAL_CLOCK_SCRIPT`)
  * and every animation held from the instant it begins (`HOLD_TIMELINE_SCRIPT`), and run the
- * zero-delay work queued during load at virtual 0. Init scripts do not run for `setContent`, so
- * the page has to be navigated to.
+ * zero-delay work queued during load at virtual 0, with everything held by then put at 0. Init
+ * scripts do not run for `setContent`, so the page has to be navigated to.
+ *
+ * Every frame of the page is advanced and seeked at each instant: init scripts run in every
+ * frame, so each iframe has a clock of its own, and before this one held only the main frame's
+ * (an iframe's rAF loop and CSS animations sat at 0 for the whole sweep). A frame that detaches,
+ * has no clock, or does not answer within 10s is skipped; `animations()` lists the main frame.
+ *
+ * A page may navigate during the sweep (a splash that forwards itself, a timer that follows a
+ * link): the new document's clock starts at 0, and the page time it began at becomes its offset
+ * — at `t` it is advanced to `t - offset`. That time is read from the old document's
+ * `beforeunload` (`takeLeftAt`) when the step that navigated returned; when the old document was
+ * destroyed under the step instead, it is the instant being reached, late by at most that step.
+ * More than `MAX_SWEEP_NAVIGATIONS` navigations throw.
  */
 export async function openHeldTimeline(page: Page, url: string, options: PageLoadOptions = {}): Promise<HeldTimeline> {
   await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
@@ -69,27 +131,127 @@ export async function openHeldTimeline(page: Page, url: string, options: PageLoa
   // Network idle and fonts only: the settle's animation and trailing waits run on the page's
   // own timers, which the held clock never fires.
   await settlePage(page, 0, 0);
-  const advance = (t: number) =>
-    page.evaluate(
-      (ms) =>
-        (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(
-          ms,
-        ),
-      t,
-    );
-  await advance(0);
-  return {
-    animations: () =>
-      page.evaluate(() =>
-        (window as unknown as { __vlmkitTimelineAnimations(): HeldAnimationTiming[] }).__vlmkitTimelineAnimations(),
-      ),
-    at: async (t) => {
-      await advance(t);
-      await page.evaluate(
-        (ms) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(ms),
-        t,
+
+  let offset = 0;
+  let navigations = 0;
+  // The document being swept: its timeOrigin (null until read), whether it has been put at its
+  // own 0 yet, and the instant it was last put at.
+  let origin: number | null = null;
+  let opened = false;
+  let lastAt = 0;
+  // A frame that did not answer within the wait is not waited on again.
+  const stalled = new WeakSet<Frame>();
+
+  type Outcome = { kind: "ok" } | { kind: "left"; at: number } | { kind: "fresh" } | { kind: "destroyed" };
+  // The main frame first, and its answer decides; then every other frame at once. Not all of them
+  // together: when the main frame answers fresh, a new document's iframes would already have been
+  // advanced to the old document's time, and a held clock does not go back.
+  const put = async (target: number): Promise<Outcome> => {
+    try {
+      if (origin === null) origin = await page.evaluate(() => performance.timeOrigin);
+      const ms = target - offset;
+      const main = page.mainFrame();
+      const step = await main.evaluate(stepFrame, { ms, origin });
+      if ("fresh" in step) return { kind: "fresh" };
+      if ("noClock" in step) throw new Error(`openHeldTimeline: the page has no held clock (${page.url()})`);
+      lastAt = target;
+      await Promise.all(
+        page
+          .frames()
+          .filter((frame) => frame !== main && !stalled.has(frame))
+          .map(async (frame) => {
+            try {
+              const answered = await within(frame.evaluate(stepFrame, { ms, origin: null }), NAVIGATION_WAIT_MS);
+              if (answered === undefined) stalled.add(frame);
+            } catch {
+              // Detached, or between documents: its next instant reaches it.
+            }
+          }),
       );
+      return step.leftAt === null ? { kind: "ok" } : { kind: "left", at: offset + step.leftAt };
+    } catch (error) {
+      if (!NAVIGATED.test(String(error))) throw error;
+      return { kind: "destroyed" };
+    }
+  };
+
+  // Did a navigation the page began commit? A 204, a download or a cancelled beforeunload never does.
+  const committed = async (): Promise<boolean> => {
+    const deadline = Date.now() + NAVIGATION_WAIT_MS;
+    while (Date.now() < deadline) {
+      try {
+        const now = await within(
+          page.evaluate(() => performance.timeOrigin),
+          deadline - Date.now(),
+        );
+        if (now !== undefined && now !== origin) return true;
+      } catch (error) {
+        if (!NAVIGATED.test(String(error))) throw error;
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return false;
+  };
+
+  const navigated = async (at: number) => {
+    navigations += 1;
+    if (navigations > MAX_SWEEP_NAVIGATIONS) {
+      throw new Error(`page navigated more than ${MAX_SWEEP_NAVIGATIONS} times during the sweep`);
+    }
+    offset = at;
+    lastAt = at;
+    origin = null;
+    opened = false;
+    await page.waitForLoadState("load", { timeout: NAVIGATION_WAIT_MS }).catch(() => {});
+    await settlePage(page, 0, 0);
+  };
+
+  const at = async (t: number): Promise<void> => {
+    for (;;) {
+      // A new document is put at its own 0 first, so what it began during its load is held there.
+      const opening = !opened;
+      const target = opening ? offset : t;
+      const outcome = await put(target);
+      if (outcome.kind === "fresh") {
+        await navigated(lastAt);
+        continue;
+      }
+      if (outcome.kind === "destroyed") {
+        await navigated(target);
+        continue;
+      }
+      if (outcome.kind === "left" && (await committed())) {
+        await navigated(outcome.at);
+        continue;
+      }
+      opened = true;
+      if (!opening || target === t) return;
+    }
+  };
+
+  await at(0);
+  return {
+    animations: async () => {
+      for (;;) {
+        try {
+          const listed = await page.evaluate(
+            (o) =>
+              performance.timeOrigin === o
+                ? ((window as unknown as HeldWindow).__vlmkitTimelineAnimations?.() ?? [])
+                : null,
+            origin,
+          );
+          if (listed) return listed.map((a) => ({ ...a, startMs: a.startMs + offset }));
+        } catch (error) {
+          if (!NAVIGATED.test(String(error))) throw error;
+        }
+        // The page moved to another document since the last instant: open it where the sweep is.
+        await at(lastAt);
+      }
     },
+    at,
+    navigations: () => navigations,
   };
 }
 

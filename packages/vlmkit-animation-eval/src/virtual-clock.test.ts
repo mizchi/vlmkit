@@ -278,6 +278,113 @@ test("advanceTo((n * 1000) / 60) has run exactly n frames, and floor(t * 60 / 10
   }
 });
 
+type ClockWindow = Window & {
+  __vlmkitClock: {
+    advanceTo(ms: number): Promise<number>;
+    pending(): {
+      timers: number;
+      frames: number;
+      intervals: number;
+      seekListeners: number;
+      latestTimerMs: number | null;
+    };
+  };
+};
+
+test("pending(): timers, frames, intervals, the latest one-shot's due time and the vlmkit:seek listeners", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
+    const path = await htmlPage(`<script>
+      setInterval(() => {}, 100);
+      setInterval(() => {}, 250);
+      setTimeout(() => {}, 300);
+      setTimeout(() => {}, 1200);
+      requestAnimationFrame(() => {});
+      const draw = () => {};
+      addEventListener("vlmkit:seek", draw);
+      addEventListener("vlmkit:seek", draw);
+      addEventListener("vlmkit:seek", draw, true);
+      window.addEventListener("vlmkit:seek", draw, { capture: true });
+      const gone = () => {};
+      addEventListener("vlmkit:seek", gone);
+      removeEventListener("vlmkit:seek", gone);
+      const aborted = new AbortController();
+      addEventListener("vlmkit:seek", () => {}, { signal: aborted.signal });
+      aborted.abort();
+      addEventListener("vlmkit:seek", () => {}, { signal: AbortSignal.abort() });
+      addEventListener("vlmkit:seek", () => {}, { once: true });
+      addEventListener("click", draw);
+    </script>`);
+    await page.goto(`file://${path}`);
+    const read = () => page.evaluate(() => (window as unknown as ClockWindow).__vlmkitClock.pending());
+    const advance = (ms: number) =>
+      page.evaluate((t) => (window as unknown as ClockWindow).__vlmkitClock.advanceTo(t), ms);
+    // draw twice over (bubble, capture) as the DOM keeps it, and the once listener.
+    assert.deepEqual(await read(), { timers: 4, frames: 1, intervals: 2, seekListeners: 3, latestTimerMs: 1200 });
+    await advance(500);
+    assert.deepEqual(
+      await read(),
+      { timers: 3, frames: 0, intervals: 2, seekListeners: 2, latestTimerMs: 1200 },
+      "the once listener ran at the seek and is gone",
+    );
+    await advance(1500);
+    assert.deepEqual(await read(), { timers: 2, frames: 0, intervals: 2, seekListeners: 2, latestTimerMs: null });
+  } finally {
+    await browser.close();
+  }
+});
+
+test("nested zero-delay timers are clamped to 4ms as Chromium does, so a setTimeout(f, 0) loop lets frames run", async () => {
+  // Chromium 141 on the real clock: six nested setTimeout(f, 0) ran at once and every later one
+  // ~4ms after the last; setInterval(f, 0) the same. Unclamped, the loop below was a timer due
+  // now at every step, so advanceTo spun to its step guard each frame and rAF never ran.
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
+    const path = await htmlPage(`<script>
+      window.spins = []; window.repeats = []; window.ticks = 0;
+      (function spin() { spins.push(performance.now()); setTimeout(spin, 0); })();
+      setInterval(() => repeats.push(performance.now()), 0);
+      (function tick() { ticks++; requestAnimationFrame(tick); })();
+    </script>`);
+    await page.goto(`file://${path}`);
+    const run = await page.evaluate(async () => {
+      const w = window as unknown as ClockWindow & { spins: number[]; repeats: number[]; ticks: number };
+      const perFrame: number[] = [];
+      const ticks: number[] = [];
+      for (let k = 1; k <= 60; k++) {
+        const before = w.spins.length;
+        await w.__vlmkitClock.advanceTo((k * 1000) / 60);
+        perFrame.push(w.spins.length - before);
+        ticks.push(w.ticks - 1);
+      }
+      return {
+        perFrame,
+        ticks,
+        spins: w.spins.slice(0, 9),
+        repeats: w.repeats.slice(0, 8),
+        totalSpins: w.spins.length,
+        totalRepeats: w.repeats.length,
+      };
+    });
+    assert.deepEqual(run.spins, [0, 0, 0, 0, 0, 0, 0, 4, 8], "the first call, six nested at 0, then 4ms apart");
+    assert.deepEqual(run.repeats, [0, 0, 0, 0, 0, 0, 4, 8]);
+    assert.deepEqual(
+      run.ticks,
+      Array.from({ length: 60 }, (_, i) => i + 1),
+      "rAF ran once a frame",
+    );
+    assert.equal(run.totalSpins, 1 + 6 + 250);
+    assert.equal(run.totalRepeats, 6 + 250);
+    assert.ok(Math.max(...run.perFrame) <= 10, `steps per frame: ${run.perFrame.join(",")}`);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("__vlmkitTimelineAnimations lists every animation before the first seek, delayed CSS ones included", async () => {
   const browser = await chromium.launch();
   try {
