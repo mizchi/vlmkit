@@ -29,6 +29,16 @@ describe("check flash: arguments", () => {
     assert.throws(() => parse(["page.html", "--window", "0"]), UsageError);
   });
 
+  it("refuses a window under a second (no failure fits in it) and over a minute", () => {
+    assert.throws(() => parse(["page.html", "--window", "999"]), /1s to 60s/);
+    assert.throws(() => parse(["page.html", "--window", "61s"]), /1s to 60s/);
+    assert.equal(parse(["page.html", "--window", "1s"]).windowMs, 1000);
+  });
+
+  it("refuses an empty viewport (a 0-wide page is never shot)", () => {
+    assert.throws(() => parse(["page.html", "--viewport", "0x300"]), /at least 1x1/);
+  });
+
   it("judges a frames.json as it was captured: no page flags", () => {
     assert.deepEqual(parse(["out/frames.json"]), { source: "out/frames.json" });
     assert.throws(() => parse(["out/frames.json", "--window", "3s"]), UsageError);
@@ -41,6 +51,7 @@ const track = (over: Partial<FlashTrackReport>): FlashTrackReport => ({
   worst: null,
   peakTransitions: 0,
   largestBelowCss2: 0,
+  withUnknownCss2: 0,
   failingWindows: 0,
   runs: 0,
   ...over,
@@ -72,7 +83,9 @@ const report = (over: Partial<FlashReport>): FlashReport =>
       still: false,
       windowMs: 1500,
       windowFrom: "option",
+      truncated: false,
       unstableFrames: 0,
+      navigations: 0,
     },
     general: track({}),
     red: track({}),
@@ -105,7 +118,6 @@ describe("check flash: findings", () => {
               region: worst.field,
               fieldTransitions: 0,
               residualArea: 0,
-              regionTransitions: 0,
               explainedShare: 0.96,
               velocity: { x: -300, y: 0 },
             },
@@ -154,5 +166,37 @@ describe("check flash: findings", () => {
       gappy.map((f) => f.rule),
       ["flash-undersampled"],
     );
+    const cut = findingsOf(report({ sampling: { ...report({}).sampling, truncated: true, windowMs: 10_000 } }));
+    assert.deepEqual(
+      cut.map((f) => f.rule),
+      ["flash-undersampled"],
+    );
+    assert.match(cut[0]!.message, /first 10\.0s only/);
+  });
+
+  it("names an element only when it covers half the flashing pixels' box", () => {
+    const named = (cover: number) =>
+      findingsOf(
+        report({
+          general: track({
+            verdict: "fail",
+            classification: "flash",
+            worst,
+            animations: [
+              { path: "div#strobe", name: "k", properties: ["background"], cover },
+              { path: "div#spinner", name: "spin", properties: ["transform"], cover: 0.02 },
+            ],
+          }),
+        }),
+      )[0]!.selector;
+    assert.equal(named(0.9), "div#strobe");
+    assert.equal(named(0.3), undefined, "a bystander in the field is not the finding");
+  });
+
+  it("an image whose bytes could not be read is reported as one that may animate", () => {
+    const f = findingsOf(
+      report({ unmeasured: [{ reason: "unreadable-image", rect: { x: 0, y: 0, width: 32, height: 32 } }] }),
+    );
+    assert.match(f[0]!.message, /could not be read \(it may animate\)/);
   });
 });

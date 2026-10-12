@@ -1571,28 +1571,44 @@ pixel (device pixels averaged in linear light):
 | failure | the flashing pixels, closed 3x3 (a dither counts as its region), exceed 21,824 CSS px² inside some 341x256 field, slid over every position (G176; the Understanding text's 87,296 is the whole field) |
 
 Per-pixel counting is literal: scrolling text "flashes" at every pixel it crosses.
-So each failing run is re-counted with motion compensated (16x16 block matching,
-quarter-pixel, either direction) and is a flash only when one of three tests
-still fails: the field's mean colour strobes, the residual still flashes, or the
-unexplained transitions over the limit alternate more than six times a second (a
-strobing layer behind moving text). Otherwise it is `motion-flicker` (warn).
+So each failing run is re-counted, whole, with motion compensated, and is a flash
+when either test still fails: a failing field's mean colour strobes (whatever
+moves in front of it), or the flicker left after each pixel's state is carried
+along its 16x16 block's motion (matched to a quarter or third of a pixel, either
+direction) still exceeds the limit. Motion is trusted only when nothing else
+explains the block as well: not a level change in place, not a pattern moved by
+half its period (it matches both ways: counterphase), not a jump of more than
+24px beyond how the content was moving, not a block reversing more than six
+times a second. Otherwise it is `motion-flicker` (warn).
 
 | Rule | Severity | Fires when |
 |---|---|---|
 | `general-flash` | suspect | the general track fails, not explained by motion |
 | `red-flash` | suspect | the red track fails, not explained by motion |
 | `motion-flicker` | warn | per-pixel flicker over the limit that motion explains (the solitaire deal, a carousel, a ticker) |
-| `flash-unmeasured` | suspect / info | a `<video>` (paused at load), an animated image (GIF / APNG / WebP / AVIF, sniffed), or pixels that change with the clock held; suspect when they cover more than the limit in one field, which makes the verdict "not judgeable" |
-| `flash-unjudgeable` | suspect | a saved sequence where no 1s window holds 7 frames |
-| `flash-undersampled` | warn | a pass on a saved sequence that is not every 60fps frame of its span |
+| `flash-unmeasured` | suspect / info | a `<video>` (paused at load, and searched for again during the sweep), an animated image (GIF / APNG / WebP / AVIF, sniffed from its frames, wherever it is drawn: `<img>`, a CSS background, mask, border image, list marker, pseudo-element content, SVG `<image>`, inside shadow roots), an image whose bytes could not be read, or pixels that change with the clock held; suspect when they — alone, or with what flashes beside them — cover more than the limit in one field, which makes the verdict "not judgeable" |
+| `flash-unjudgeable` | suspect | a sequence where no 1s window holds 7 frames |
+| `flash-undersampled` | warn | a pass on a sequence that is not every frame of its span (a saved sequence thinned, or a live sweep with frames that never held still), or one cut at the 10s cap |
 
-The window defaults to each finite animation's end, at least 3s when something
-repeats forever or runs by script, between 2s and 10s; a page where nothing can
-move under the held clock is one frame. `--strip` is always one still PNG — an
-animation of a failing window would itself strobe for whoever opens it. A pass
-is "no flash measured under these criteria", not a certification. Not judged:
-WCAG's 0.1° exception for fine balanced patterns (such patterns are reported), a
-page's own video, states reached by interaction, absolute luminance (HDR).
+What the held clock holds: `requestAnimationFrame`, timers (nested zero-delay
+ones at 4ms, as browsers clamp them), `Date`, `performance.now`, every CSS and
+Web Animation (at its own playback rate, never one the page paused or
+cancelled), inside open shadow roots and in every frame of the page, SMIL on
+each SVG's own timeline, and pages that draw on `vlmkit:seek`. A page that
+navigates during the sweep is followed onto the new document.
+
+The window defaults to each finite animation's end; for one that repeats
+forever, a second past its start and two periods more; for timers pending at
+load, two seconds past the latest; at least 3s when something repeats or runs by
+script; between 2s and 10s (`--window` takes 1s to 60s). A page where nothing
+can move under the held clock is one frame, unless `--window` is given. `--strip`
+is always one still PNG of the track that carries the verdict — an animation of
+a failing window would itself strobe for whoever opens it — and says so when
+nothing flashed. A pass is "no flash measured under these criteria", not a
+certification. Not judged: WCAG's 0.1° exception for fine balanced patterns
+(such patterns are reported), a page's own video, states reached by interaction,
+absolute luminance (HDR), moving-pattern hazards (a grating moving less than half
+its period a frame reads as motion).
 
 #### Visualizing the VRT process — flipbooks + video
 

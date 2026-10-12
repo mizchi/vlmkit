@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: playback-rate</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A 2 Hz el.animate() strobe the page plays at playbackRate 2: seeked at its own rate it is 4 Hz, 8 transitions a second. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#f{position:fixed;inset:0;background:#fff}</style>
+  </head>
+  <body>
+    <div id="f"></div>
+    <script>
+      const a = document.getElementById("f").animate(
+        [
+          { offset: 0, background: "#000", easing: "steps(1, end)" },
+          { offset: 0.5, background: "#fff", easing: "steps(1, end)" },
+          { offset: 1, background: "#fff" },
+        ],
+        { duration: 500, delay: 16.6, iterations: Infinity },
+      );
+      a.playbackRate = 2;
+    </script>
+  </body>
+</html>

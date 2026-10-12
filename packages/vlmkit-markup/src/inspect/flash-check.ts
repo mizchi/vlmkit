@@ -82,6 +82,14 @@ export const MIN_WINDOW_MS = 2000;
 export const SCRIPT_WINDOW_MS = 3000;
 /** ...and never more than this. */
 export const MAX_WINDOW_MS = 10_000;
+/** One screenshot never takes this long; a page that hangs the compositor is an error, not a wait. */
+const SHOT_TIMEOUT_MS = 15_000;
+/** Real-time gaps between the probe shots for what the held clock does not hold: no common period. */
+const PROBE_GAPS_MS = [37, 53, 80, 120, 170, 240, 300];
+/** Every this many frames, a shot that differs is taken again 50ms later (`shoot`'s `verify`). */
+const VERIFY_EVERY = 10;
+/** Every this many frames, the page is searched again for media added since load. */
+const MEDIA_EVERY = 30;
 
 export interface FlashCheckOptions extends PageLoadOptions {
   /** A page (html file or URL), or a `frames.json` to judge again. */
@@ -103,6 +111,8 @@ export interface FlashAttribution {
   /** `animation-name`, `transition-property`, or an `el.animate()` id. */
   name: string;
   properties: string[];
+  /** Share of the flashing pixels' box the element covers, 0..1. */
+  cover: number;
 }
 
 export interface FlashWorst {
@@ -134,11 +144,13 @@ export interface FlashTrackReport {
   verdict: "fail" | "pass" | "not-judgeable";
   /** Present when per-pixel counting failed: what the re-count made of it. */
   classification?: "flash" | "motion";
-  reason?: "field" | "residual" | "region" | "explained";
+  reason?: "field" | "residual" | "budget" | "explained";
   worst: FlashWorst | null;
   /** The most transitions any pixel had in any window (16 means 16 or more). */
   peakTransitions: number;
   largestBelowCss2: number;
+  /** The most flashing area together with the unmeasured pixels in one field, where the measured alone passed. */
+  withUnknownCss2: number;
   failingWindows: number;
   runs: number;
   motion?: MotionSegment[];
@@ -184,7 +196,11 @@ export interface FlashReport {
     still: boolean;
     windowMs: number;
     windowFrom: "option" | "animations" | "default" | "still" | "manifest";
+    /** The window the page asked for was longer than the 10s cap: its end was not swept. */
+    truncated: boolean;
     unstableFrames: number;
+    /** Times the page navigated during the sweep; the frames after are the new document's. */
+    navigations: number;
   };
   general: FlashTrackReport;
   red: FlashTrackReport;
@@ -193,6 +209,8 @@ export interface FlashReport {
   unmeasuredAreaCss2: number;
   framesManifest?: string;
   strip?: string;
+  /** Why `--strip` wrote nothing. */
+  stripSkipped?: string;
   timingMs: { capture: number; judge: number; classify: number };
 }
 
@@ -208,6 +226,13 @@ export const MEDIA_HOLD_SCRIPT = `(() => {
   document.addEventListener("playing", stop, true);
 })()`;
 
+/**
+ * Everything on the page the held clock does not drive: each `<video>`, and each image, wherever
+ * it is drawn from — `<img>`, `input[type=image]`, SVG `<image>`, and every CSS image property of
+ * an element and its `::before` / `::after` (backgrounds, border images, list markers, masks,
+ * `content`) — including inside open shadow roots. Images are sniffed for animation from their
+ * bytes afterwards; this only finds them.
+ */
 const MEDIA_JS = `(() => {
   ${STYLE_SAMPLING_JS}
   const vw = innerWidth;
@@ -219,36 +244,71 @@ const MEDIA_JS = `(() => {
     return { x: Math.floor(x), y: Math.floor(y), width: Math.ceil(x2) - Math.floor(x), height: Math.ceil(y2) - Math.floor(y) };
   };
   const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+  const URL_RE = /url\\(\\s*(?:"([^"]*)"|'([^']*)'|([^)\\s]*))\\s*\\)/g;
+  const urls = (value) => {
+    const out = [];
+    if (!value || value === "none") return out;
+    for (const m of value.matchAll(URL_RE)) {
+      const raw = m[1] ?? m[2] ?? m[3] ?? "";
+      if (!raw) continue;
+      try { out.push(new URL(raw, document.baseURI).href); } catch {}
+    }
+    return out;
+  };
+  const CSS_IMAGES = ["background-image", "border-image-source", "list-style-image", "mask-image", "-webkit-mask-image", "content"];
   const out = [];
-  for (const el of document.querySelectorAll("video")) {
-    if (!shown(el)) continue;
+  const seen = new Set();
+  const add = (kind, el, src) => {
     const rect = clip(el.getBoundingClientRect());
-    if (rect) out.push({ kind: "video", path: path(el), rect });
-  }
-  for (const el of document.images) {
-    if (!shown(el) || !el.currentSrc) continue;
-    const rect = clip(el.getBoundingClientRect());
-    if (rect) out.push({ kind: "image", path: path(el), rect, src: el.currentSrc });
-  }
+    if (!rect) return;
+    const p = path(el);
+    const key = kind + "|" + p + "|" + (src || "");
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(src ? { kind, path: p, rect, src } : { kind, path: p, rect });
+  };
+  const visit = (root) => {
+    for (const el of root.querySelectorAll("*")) {
+      if (el.shadowRoot) visit(el.shadowRoot);
+      if (!shown(el)) continue;
+      const tag = el.localName;
+      if (tag === "video") { add("video", el); continue; }
+      if (tag === "img" && el.currentSrc) add("image", el, el.currentSrc);
+      if (tag === "input" && el.type === "image" && el.src) add("image", el, el.src);
+      if (tag === "image" && el.namespaceURI === "http://www.w3.org/2000/svg") {
+        const href = el.href && el.href.baseVal ? el.href.baseVal : el.getAttribute("href") || el.getAttribute("xlink:href");
+        if (href) { try { add("image", el, new URL(href, document.baseURI).href); } catch {} }
+      }
+      for (const pseudo of [null, "::before", "::after"]) {
+        const cs = getComputedStyle(el, pseudo);
+        if (pseudo && (cs.content === "none" || cs.content === "normal") && cs.backgroundImage === "none") continue;
+        for (const prop of CSS_IMAGES) for (const src of urls(cs.getPropertyValue(prop))) add("image", el, src);
+      }
+    }
+  };
+  visit(document);
   return out;
 })()`;
 
 /**
- * What animated over `field` during (fromMs, toMs]: every held animation whose active time meets
- * the window and whose element, seeked to the window's middle, meets the field. Read from the held
- * list, not `document.getAnimations()`: by the end of a sweep a deal's animations have finished,
- * and a page that removes the class on `animationend` has cancelled them.
+ * What animated over the flashing pixels during (fromMs, toMs]: every held animation whose active
+ * time meets the window and whose element, seeked to the window's middle, meets `box` (the
+ * flashing pixels' box, not the whole field: a spinner elsewhere in the field is a bystander),
+ * with the share of the box it covers. Read from the held list, not `document.getAnimations()`:
+ * by the end of a sweep a deal's animations have finished, and a page that removes the class on
+ * `animationend` has cancelled them.
  */
-const attributionJs = (fromMs: number, toMs: number, field: Box) => `(() => {
+const attributionJs = (fromMs: number, toMs: number, box: Box) => `(() => {
   ${STYLE_SAMPLING_JS}
   const fromMs = ${JSON.stringify(fromMs)};
   const toMs = ${JSON.stringify(toMs)};
-  const field = ${JSON.stringify(field)};
+  const box = ${JSON.stringify(box)};
   if (window.__vlmkitSeekTimeline) window.__vlmkitSeekTimeline((fromMs + toMs) / 2);
   const held = (window.__vlmkitTimeline || []).map((h) => ({ anim: h.anim, startAt: h.startAt }));
   const out = [];
   const seen = new Set();
   const skip = new Set(["offset", "easing", "composite", "computedOffset"]);
+  const area = box.width * box.height;
   for (const { anim, startAt } of held) {
     const el = anim.effect && anim.effect.target;
     if (!el || !el.getBoundingClientRect) continue;
@@ -258,7 +318,9 @@ const attributionJs = (fromMs: number, toMs: number, field: Box) => `(() => {
     const end = typeof timing.activeDuration === "number" ? start + timing.activeDuration : Infinity;
     if (!(start < toMs && end > fromMs)) continue;
     const r = el.getBoundingClientRect();
-    if (r.right <= field.x || r.left >= field.x + field.width || r.bottom <= field.y || r.top >= field.y + field.height) continue;
+    const w = Math.min(r.right, box.x + box.width) - Math.max(r.left, box.x);
+    const h = Math.min(r.bottom, box.y + box.height) - Math.max(r.top, box.y);
+    if (!(w > 0 && h > 0)) continue;
     let properties = [];
     try {
       properties = [...new Set(anim.effect.getKeyframes().flatMap((k) => Object.keys(k).filter((p) => !skip.has(p))))];
@@ -267,21 +329,32 @@ const attributionJs = (fromMs: number, toMs: number, field: Box) => `(() => {
     const key = path(el) + "|" + name;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ path: path(el), name, properties });
-    if (out.length >= 8) break;
+    out.push({ path: path(el), name, properties, cover: area > 0 ? Math.round(((w * h) / area) * 1000) / 1000 : 0 });
   }
-  return out;
+  out.sort((a, b) => b.cover - a.cover);
+  return out.slice(0, 8);
 })()`;
 
-/** The window to sweep: each finite animation's end, and longer for what never ends or runs by script. */
-export function chooseWindow(held: readonly HeldAnimationTiming[], scripted: boolean): number {
+/**
+ * The window to sweep: each finite animation's end; for one that repeats forever, a second past
+ * its start and two periods more (a strobe that begins late is still seen flashing for a second);
+ * for timers still pending at load, two seconds past the latest; and 3s at least for what repeats
+ * or runs by script. Capped at 10s, and `truncated` says when the page asked for more.
+ */
+export function chooseWindow(
+  held: readonly HeldAnimationTiming[],
+  scripted: boolean,
+  latestTimerMs: number | null = null,
+): { windowMs: number; truncated: boolean } {
   let ms = MIN_WINDOW_MS;
   for (const a of held) {
-    if (a.iterations === null) ms = Math.max(ms, SCRIPT_WINDOW_MS, a.startMs + a.durationMs);
+    if (a.iterations === null) ms = Math.max(ms, SCRIPT_WINDOW_MS, a.startMs + WINDOW_MS + 2 * a.durationMs);
     else ms = Math.max(ms, a.startMs + a.durationMs * a.iterations);
   }
   if (scripted) ms = Math.max(ms, SCRIPT_WINDOW_MS);
-  return Math.min(MAX_WINDOW_MS, Math.ceil(ms / 100) * 100);
+  if (latestTimerMs !== null) ms = Math.max(ms, latestTimerMs + 2 * WINDOW_MS);
+  const rounded = Math.ceil(ms / 100) * 100;
+  return { windowMs: Math.min(MAX_WINDOW_MS, rounded), truncated: rounded > MAX_WINDOW_MS };
 }
 
 const decode = (buffer: Uint8Array): PngData => decodePngBuffer(buffer);
@@ -319,14 +392,23 @@ const scaleBox = (b: Box, s: number): Box => {
  * instant: what a capture that lands before the compositor applies a seek returns is the frame
  * before, unchanged. A shot equal to it is taken again until two agree, at most three; three that
  * never agree are something moving that nothing here holds, and where they differed is returned
- * (device px).
+ * (device px). With `verify`, a shot that differs is taken again 50ms later as well: something
+ * that moves in real time makes every frame differ, so without a second look every one of them
+ * would be taken as page time.
  */
 async function shoot(
   take: () => Promise<Buffer>,
   before: Buffer | null,
+  verify = false,
 ): Promise<{ png: Buffer; stable: boolean; moved: Box | null }> {
   const first = await take();
-  if (before && !first.equals(before)) return { png: first, stable: true, moved: null };
+  if (before && !first.equals(before)) {
+    if (!verify) return { png: first, stable: true, moved: null };
+    await new Promise((r) => setTimeout(r, 50));
+    const again = await take();
+    if (again.equals(first)) return { png: first, stable: true, moved: null };
+    return { png: again, stable: false, moved: differs(first, again) };
+  }
   let previous = first;
   for (let shot = 1; shot < 3; shot++) {
     const next = await take();
@@ -337,7 +419,10 @@ async function shoot(
   return { png: previous, stable: false, moved: null };
 }
 
-/** Frames counted as they come: masked, at CSS resolution, into the judge; their block sums kept. */
+/**
+ * Frames counted as they come: masked, at CSS resolution, into the judge; their block sums kept.
+ * The masked pixels are the judge's unknown ones, so what flashes beside them is measured with them.
+ */
 function frameCounter(cssPerPx: number, masks: readonly Box[]) {
   let judge: ReturnType<typeof createFlashJudge> | null = null;
   const blocks: Array<FrameBlocks | undefined> = [];
@@ -347,7 +432,7 @@ function frameCounter(cssPerPx: number, masks: readonly Box[]) {
       const frame = toFlashFrame(png, cssPerPx, masks);
       if (!judge) {
         size = { width: frame.width, height: frame.height };
-        judge = createFlashJudge(size);
+        judge = createFlashJudge({ ...size, ...(masks.length > 0 ? { unknown: maskOf(masks, size) } : {}) });
       }
       judge.push(k, atMs, frame);
       blocks[k] = frame.blocks;
@@ -369,20 +454,39 @@ async function screenshotter(page: Page): Promise<() => Promise<Buffer>> {
   await page
     .addStyleTag({ content: "*, *::before, *::after { caret-color: transparent !important; }" })
     .catch(() => undefined);
+  const bounded = <T>(work: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`check flash: a screenshot took more than ${SHOT_TIMEOUT_MS}ms`)),
+        SHOT_TIMEOUT_MS,
+      );
+    });
+    return Promise.race([work, late]).finally(() => clearTimeout(timer));
+  };
   try {
     const cdp = await page.context().newCDPSession(page);
     return async () =>
       Buffer.from(
-        ((await cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true })) as { data: string })
-          .data,
+        (
+          (await bounded(cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true }))) as {
+            data: string;
+          }
+        ).data,
         "base64",
       );
   } catch {
-    return () => page.screenshot({ animations: "allow" });
+    return () => bounded(page.screenshot({ animations: "allow" }));
   }
 }
 
-async function imageBytes(page: Page, src: string): Promise<Uint8Array | null> {
+/**
+ * An image's bytes (the first 8MB), `"missing"` when there are none to draw (a 404, a missing
+ * file: nothing is drawn, so nothing animates), or null when they could not be read — which says
+ * nothing about whether it animates. Same-origin and CORS images are read by the page; others by
+ * the browser context's own request, which no page policy blocks.
+ */
+async function imageBytes(page: Page, src: string): Promise<Uint8Array | "missing" | null> {
   try {
     if (src.startsWith("data:")) {
       const comma = src.indexOf(",");
@@ -390,10 +494,18 @@ async function imageBytes(page: Page, src: string): Promise<Uint8Array | null> {
       const body = src.slice(comma + 1);
       return meta.endsWith(";base64") ? Buffer.from(body, "base64") : Buffer.from(decodeURIComponent(body), "latin1");
     }
-    if (src.startsWith("file:")) return await readFile(fileURLToPath(src));
+    if (src.startsWith("file:")) {
+      try {
+        return (await readFile(fileURLToPath(src))).subarray(0, 8 << 20);
+      } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : null;
+      }
+    }
+    if (src.startsWith("blob:")) return null;
     const b64 = await page.evaluate(async (url) => {
       try {
         const response = await fetch(url);
+        if (response.status === 404 || response.status === 410) return "missing";
         if (!response.ok) return null;
         const bytes = new Uint8Array(await response.arrayBuffer()).subarray(0, 8 << 20);
         let s = "";
@@ -403,7 +515,12 @@ async function imageBytes(page: Page, src: string): Promise<Uint8Array | null> {
         return null;
       }
     }, src);
-    return b64 === null ? null : Buffer.from(b64, "base64");
+    if (b64 === "missing") return "missing";
+    if (b64 !== null) return Buffer.from(b64, "base64");
+    const response = await page.context().request.get(src, { timeout: 10_000 });
+    if (response.status() === 404 || response.status() === 410) return "missing";
+    if (!response.ok()) return null;
+    return (await response.body()).subarray(0, 8 << 20);
   } catch {
     return null;
   }
@@ -417,8 +534,19 @@ interface Captured {
   cssPerPx: number;
   windowMs: number;
   windowFrom: FlashReport["sampling"]["windowFrom"];
+  truncated: boolean;
   still: boolean;
+  navigations: number;
   url: string;
+}
+
+/** What the held clock had queued once the page loaded (`VIRTUAL_CLOCK_SCRIPT`'s `pending()`). */
+interface ClockPending {
+  timers: number;
+  frames: number;
+  intervals?: number;
+  seekListeners?: number;
+  latestTimerMs?: number | null;
 }
 
 /** Load, find what cannot be held, and shoot every 60fps frame of the window into `dir`. */
@@ -432,43 +560,64 @@ async function sweepPage(
   const timeline = await openHeldTimeline(page, url, options);
   await timeline.at(0);
   const held = await timeline.animations();
-  const pending = await page.evaluate(() =>
-    (window as unknown as { __vlmkitClock: { pending(): { timers: number; frames: number } } }).__vlmkitClock.pending(),
-  );
-  const scripted = pending.timers > 0 || pending.frames > 0;
+  const pending = (await page.evaluate(() =>
+    (window as unknown as { __vlmkitClock: { pending(): unknown } }).__vlmkitClock.pending(),
+  )) as ClockPending;
+  // A page that draws only when told the time (`vlmkit:seek`) moves under the held clock too.
+  const scripted = pending.timers > 0 || pending.frames > 0 || (pending.seekListeners ?? 0) > 0;
   const take = await screenshotter(page);
-  const still = held.length === 0 && !scripted;
+  // Nothing can move under the held clock, so one frame is all there is — unless a window was
+  // asked for, or the page has frames of its own (each holds its own clock and animations).
+  const framed = page.frames().length > 1;
+  const still = held.length === 0 && !scripted && !framed && options.windowMs === undefined;
   const facts = await frameSourceFacts(page);
   const dpr = facts.deviceScaleFactor;
 
-  // What the held clock does not hold.
+  // What the held clock does not hold: media, found at load and again during the sweep (a page
+  // can add a video at any time), and an image whose bytes cannot be read is not assumed still.
   const unmeasured: UnmeasuredRegion[] = [];
-  const media = (await page.evaluate(MEDIA_JS)) as Array<{
-    kind: "video" | "image";
-    path: string;
-    rect: Box;
-    src?: string;
-  }>;
-  for (const m of media) {
-    if (m.kind === "video") {
-      unmeasured.push({ reason: "video", rect: m.rect, path: m.path });
-      continue;
+  const known = new Set<string>();
+  const animatedBySrc = new Map<string, boolean | null>();
+  const findMedia = async () => {
+    let media: Array<{ kind: "video" | "image"; path: string; rect: Box; src?: string }>;
+    try {
+      media = (await page.evaluate(MEDIA_JS)) as typeof media;
+    } catch {
+      return;
     }
-    const bytes = await imageBytes(page, m.src!);
-    if (bytes && sniffImageAnimation(bytes).animated)
-      unmeasured.push({ reason: "animated-image", rect: m.rect, path: m.path });
-  }
-  // Pixels that change while nothing is advanced: three shots a beat apart in real time.
+    for (const m of media) {
+      const key = `${m.kind}|${m.path}|${m.src ?? ""}`;
+      if (known.has(key)) continue;
+      known.add(key);
+      if (m.kind === "video") {
+        unmeasured.push({ reason: "video", rect: m.rect, path: m.path });
+        continue;
+      }
+      let animated = animatedBySrc.get(m.src!);
+      if (animated === undefined) {
+        const bytes = await imageBytes(page, m.src!);
+        animated = bytes === "missing" ? false : bytes ? sniffImageAnimation(bytes).animated : null;
+        animatedBySrc.set(m.src!, animated);
+      }
+      if (animated === null) unmeasured.push({ reason: "unreadable-image", rect: m.rect, path: m.path });
+      else if (animated) unmeasured.push({ reason: "animated-image", rect: m.rect, path: m.path });
+    }
+  };
+  await findMedia();
+  // Pixels that change while nothing is advanced: shots a beat apart in real time, at gaps with
+  // no common period over about a second, so a strobe of any one rate cannot land in step with them.
   let probe = await take();
-  for (let i = 0; i < 2; i++) {
-    await new Promise((r) => setTimeout(r, 150));
+  for (const gap of PROBE_GAPS_MS) {
+    await new Promise((r) => setTimeout(r, gap));
     const next = await take();
     const moved = differs(probe, next);
     if (moved) unmeasured.push({ reason: "uncontrolled", rect: scaleBox(moved, dpr) });
     probe = next;
   }
 
-  const windowMs = still ? 0 : (options.windowMs ?? chooseWindow(held, scripted));
+  const chosen = chooseWindow(held, scripted, pending.latestTimerMs ?? null);
+  const windowMs = still ? 0 : (options.windowMs ?? chosen.windowMs);
+  const truncated = !still && options.windowMs === undefined && chosen.truncated;
   const windowFrom: Captured["windowFrom"] = still
     ? "still"
     : options.windowMs !== undefined
@@ -497,42 +646,91 @@ async function sweepPage(
   for (let k = 0; k <= last; k++) {
     const atMs = frameTimeMs(k);
     if (k > 0) await timeline.at(atMs);
-    const shot = await shoot(take, previous);
+    const shot = await shoot(take, previous, k > 0 && k % VERIFY_EVERY === 0);
     previous = shot.png;
     if (shot.moved) unmeasured.push({ reason: "uncontrolled", rect: scaleBox(shot.moved, dpr) });
     files.push(await writer.add(shot.png, { atMs, stable: shot.stable }));
     times.push(atMs);
     counter.add(k, atMs, decodePngPixels(shot.png));
+    if (k > 0 && k % MEDIA_EVERY === 0) await findMedia();
   }
+  await findMedia();
   const written = await writer.finish();
   const merged = mergeUncontrolled(unmeasured);
   const counted =
     JSON.stringify(merged) === JSON.stringify(before) ? counter.finish() : countFiles(files, times, dpr, merged);
   const manifest = JSON.parse(await readFile(written.manifest, "utf8")) as FramesManifest;
-  if (merged.length > 0) {
-    manifest.source.unmeasured = merged;
-    await writeFile(written.manifest, `${JSON.stringify(manifest, null, 2)}\n`);
-  }
-  return { dir, manifest, files, times, cssPerPx: dpr, windowMs, windowFrom, still, url, unmeasured: merged, counted };
+  // What the sweep decided, so the saved sequence is judged again the same way.
+  manifest.source.sweep = {
+    still,
+    windowMs,
+    windowFrom: windowFrom as "option" | "animations" | "default" | "still",
+    truncated,
+  };
+  if (merged.length > 0) manifest.source.unmeasured = merged;
+  await writeFile(written.manifest, `${JSON.stringify(manifest, null, 2)}\n`);
+  return {
+    dir,
+    manifest,
+    files,
+    times,
+    cssPerPx: dpr,
+    windowMs,
+    windowFrom,
+    truncated,
+    still,
+    navigations: timeline.navigations(),
+    url,
+    unmeasured: merged,
+    counted,
+  };
 }
 
-/** Every `uncontrolled` box as one (they are one unheld thing seen at different moments), media kept apart. */
-function mergeUncontrolled(regions: readonly UnmeasuredRegion[]): UnmeasuredRegion[] {
+/**
+ * `uncontrolled` boxes that touch (within 8px) as one — one unheld thing seen at different moments —
+ * and boxes apart kept apart: two small spinners at opposite corners are two small regions, not
+ * one viewport-wide one. Media regions are kept as they are.
+ */
+export function mergeUncontrolled(regions: readonly UnmeasuredRegion[]): UnmeasuredRegion[] {
   const out = regions.filter((r) => r.reason !== "uncontrolled");
-  const loose = regions.filter((r) => r.reason === "uncontrolled");
-  if (loose.length === 0) return out;
-  let box = loose[0]!.rect;
-  for (const r of loose.slice(1)) {
-    const x = Math.min(box.x, r.rect.x);
-    const y = Math.min(box.y, r.rect.y);
-    box = {
-      x,
-      y,
-      width: Math.max(box.x + box.width, r.rect.x + r.rect.width) - x,
-      height: Math.max(box.y + box.height, r.rect.y + r.rect.height) - y,
-    };
+  let boxes = regions.filter((r) => r.reason === "uncontrolled").map((r) => r.rect);
+  const near = (a: Box, b: Box) =>
+    a.x - 8 < b.x + b.width && b.x - 8 < a.x + a.width && a.y - 8 < b.y + b.height && b.y - 8 < a.y + a.height;
+  for (let merged = true; merged;) {
+    merged = false;
+    for (let i = 0; i < boxes.length && !merged; i++) {
+      for (let j = i + 1; j < boxes.length && !merged; j++) {
+        if (!near(boxes[i]!, boxes[j]!)) continue;
+        const a = boxes[i]!;
+        const b = boxes[j]!;
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        const union = {
+          x,
+          y,
+          width: Math.max(a.x + a.width, b.x + b.width) - x,
+          height: Math.max(a.y + a.height, b.y + b.height) - y,
+        };
+        boxes = [...boxes.filter((_, k) => k !== i && k !== j), union];
+        merged = true;
+      }
+    }
   }
-  return [...out, { reason: "uncontrolled", rect: box }];
+  boxes.sort((a, b) => a.y - b.y || a.x - b.x);
+  return [...out, ...boxes.map((rect) => ({ reason: "uncontrolled" as const, rect }))];
+}
+
+/** CSS-px boxes as a frame-sized mask, 1 inside any. */
+function maskOf(boxes: readonly Box[], size: { width: number; height: number }): Uint8Array {
+  const mask = new Uint8Array(size.width * size.height);
+  for (const b of boxes) {
+    const x0 = Math.max(0, b.x);
+    const x1 = Math.min(size.width, b.x + b.width);
+    for (let y = Math.max(0, b.y); y < Math.min(size.height, b.y + b.height); y++) {
+      if (x1 > x0) mask.fill(1, y * size.width + x0, y * size.width + x1);
+    }
+  }
+  return mask;
 }
 
 /** A decoded frame with its unmeasured pixels painted out, at CSS resolution. */
@@ -701,6 +899,7 @@ const trackOf = (
   worst: worstOf(result.worst, times, maxGapMs, fieldArea),
   peakTransitions: result.peak.transitions,
   largestBelowCss2: result.largestBelow,
+  withUnknownCss2: result.withUnknown,
   failingWindows: result.failingWindows,
   runs: result.runs.length,
 });
@@ -748,7 +947,9 @@ function judge(
       r.motion = verdict.segments;
       if (verdict.classification === "flash") r.verdict = "fail";
     }
-    if (r.verdict !== "fail" && (!judgeable || unmeasuredAreaCss2 > AREA_LIMIT_CSS2)) r.verdict = "not-judgeable";
+    // What was not measured, alone or with what flashed beside it, could be over the limit: no pass.
+    const unknown = unmeasuredAreaCss2 > AREA_LIMIT_CSS2 || r.withUnknownCss2 > AREA_LIMIT_CSS2;
+    if (r.verdict !== "fail" && (!judgeable || unknown)) r.verdict = "not-judgeable";
     tracks[track] = r;
   }
   return { ...tracks, judgeable, maxGapMs, unmeasuredAreaCss2, classifyMs: performance.now() - t0 };
@@ -763,20 +964,36 @@ export function manifestComplete(manifest: FramesManifest): boolean {
   return frames.every((f, i) => Math.abs(f.atMs - frameTimeMs(n0 + i)) < 1e-6);
 }
 
+/** The track whose window the strip shows: a failing one, else one motion excused, else any that flashed. */
+function stripTrack(report: Pick<FlashReport, "general" | "red">): FlashTrackReport | null {
+  const tracks = [report.general, report.red].filter((t) => t.worst);
+  return (
+    tracks.find((t) => t.verdict === "fail") ?? tracks.find((t) => t.classification === "motion") ?? tracks[0] ?? null
+  );
+}
+
+const NO_STRIP = "nothing flashed more than three times in any second, so there is no window to show";
+
 export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashReport> {
   if (options.stripPath && !/\.png$/i.test(options.stripPath)) {
     throw new UsageError("--strip writes one still PNG (never an animation of a failing window): name it .png");
   }
   if (/\.json$/i.test(options.source)) return judgeManifest(options);
-  if (options.windowMs !== undefined && (options.windowMs < 1 || options.windowMs > 60_000)) {
-    throw new UsageError("--window is the page time to sweep, 1 to 60000 ms");
+  if (options.windowMs !== undefined && (options.windowMs < WINDOW_MS || options.windowMs > 60_000)) {
+    throw new UsageError(
+      "--window is the page time to sweep, 1000 to 60000 ms: a failure is more than six transitions within one second",
+    );
   }
   const viewport = options.viewport ?? DEFAULT_FLASH_VIEWPORT;
+  if (!(viewport.width >= 1 && viewport.height >= 1)) {
+    throw new UsageError(`--viewport must be at least 1x1 (got ${viewport.width}x${viewport.height})`);
+  }
   const run = async (browser: Browser) => {
     const keep = options.framesDir ? resolve(options.framesDir) : null;
     const dir = keep ?? (await mkdtemp(join(tmpdir(), "vlmkit-flash-")));
-    const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+    let page: Page | null = null;
     try {
+      page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
       const t0 = performance.now();
       const captured = await sweepPage(page, options, dir);
       const capture = performance.now() - t0;
@@ -785,13 +1002,17 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
       const judged = judge(captured.counted, captured.files, captured.times, captured.cssPerPx, captured.unmeasured, {
         still: captured.still,
       });
-      // What animated over each failing (or motion-excused) field, at its worst instant.
+      // What animated over each failing (or motion-excused) track's flashing pixels, at its worst instant.
       for (const track of ["general", "red"] as const) {
         const r = judged[track];
         if (!r.worst || r.classification === undefined) continue;
-        r.animations = (await page.evaluate(
-          attributionJs(r.worst.fromMs, r.worst.toMs, r.worst.field),
-        )) as FlashAttribution[];
+        try {
+          r.animations = (await page.evaluate(
+            attributionJs(r.worst.fromMs, r.worst.toMs, r.worst.bbox),
+          )) as FlashAttribution[];
+        } catch {
+          // A page that navigated away has no held list to read.
+        }
       }
       const report: FlashReport = {
         format: FLASH_FORMAT,
@@ -814,7 +1035,9 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
           still: captured.still,
           windowMs: captured.windowMs,
           windowFrom: captured.windowFrom,
+          truncated: captured.truncated,
           unstableFrames,
+          navigations: captured.navigations,
         },
         general: judged.general,
         red: judged.red,
@@ -824,14 +1047,16 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
         // Counting runs inside the capture loop, so its time is in `capture`.
         timingMs: { capture: Math.round(capture), judge: 0, classify: Math.round(judged.classifyMs) },
       };
-      const worst = report.general.worst ?? report.red.worst;
-      if (options.stripPath && worst) {
-        writeStrip(resolve(options.stripPath), captured.files, captured.times, worst, captured.cssPerPx);
-        report.strip = resolve(options.stripPath);
+      if (options.stripPath) {
+        const worst = stripTrack(report)?.worst;
+        if (worst) {
+          writeStrip(resolve(options.stripPath), captured.files, captured.times, worst, captured.cssPerPx);
+          report.strip = resolve(options.stripPath);
+        } else report.stripSkipped = NO_STRIP;
       }
       return report;
     } finally {
-      await page.close();
+      await page?.close().catch(() => undefined);
       if (!keep) await rm(dir, { recursive: true, force: true });
     }
   };
@@ -858,7 +1083,11 @@ async function judgeManifest(options: FlashCheckOptions): Promise<FlashReport> {
   const cssPerPx = manifest.source.deviceScaleFactor || 1;
   const unmeasured = manifest.source.unmeasured ?? [];
   const complete = manifestComplete(manifest);
-  const still = manifest.source.tool === "check flash" && manifest.frames.length === 1 && complete;
+  // The sweep's own decisions when it wrote them; an older manifest's still page is inferred.
+  const sweep = manifest.source.sweep;
+  const still = sweep
+    ? sweep.still
+    : manifest.source.tool === "check flash" && manifest.frames.length === 1 && complete;
   const t0 = performance.now();
   const counted = countFiles(files, times, cssPerPx, unmeasured);
   const countMs = performance.now() - t0;
@@ -882,9 +1111,11 @@ async function judgeManifest(options: FlashCheckOptions): Promise<FlashReport> {
       complete,
       judgeable: judged.judgeable,
       still,
-      windowMs: times[times.length - 1]! - times[0]!,
+      windowMs: sweep ? sweep.windowMs : times[times.length - 1]! - times[0]!,
       windowFrom: "manifest",
+      truncated: sweep?.truncated ?? false,
       unstableFrames: manifest.frames.filter((f) => !f.stable).length,
+      navigations: 0,
     },
     general: judged.general,
     red: judged.red,
@@ -892,10 +1123,12 @@ async function judgeManifest(options: FlashCheckOptions): Promise<FlashReport> {
     unmeasuredAreaCss2: judged.unmeasuredAreaCss2,
     timingMs: { capture: 0, judge: Math.round(countMs), classify: Math.round(judged.classifyMs) },
   };
-  const worst = report.general.worst ?? report.red.worst;
-  if (options.stripPath && worst) {
-    writeStrip(resolve(options.stripPath), files, times, worst, cssPerPx);
-    report.strip = resolve(options.stripPath);
+  if (options.stripPath) {
+    const worst = stripTrack(report)?.worst;
+    if (worst) {
+      writeStrip(resolve(options.stripPath), files, times, worst, cssPerPx);
+      report.strip = resolve(options.stripPath);
+    } else report.stripSkipped = NO_STRIP;
   }
   return report;
 }
@@ -910,7 +1143,7 @@ export const flashRate = (transitions: number): string =>
 function trackLine(name: string, t: FlashTrackReport): string {
   const w = t.worst;
   if (t.verdict === "fail" && w) {
-    return `${name} FAIL ${flashRate(t.peakTransitions)} flashes/s at its worst, over ${pct(w.fieldShare)} of a field`;
+    return `${name} FAIL ${flashRate(w.transitions)} flashes/s at its worst, over ${pct(w.fieldShare)} of a field`;
   }
   if (t.verdict === "not-judgeable") return `${name} NOT JUDGEABLE`;
   if (t.classification === "motion") return `${name} pass (motion flicker)`;
@@ -945,11 +1178,24 @@ function describeTrack(name: "general" | "red", t: FlashTrackReport, limit: numb
   }
   if (t.largestBelowCss2 > 0)
     lines.push(`  largest flashing area under the limit: ${t.largestBelowCss2.toLocaleString("en-US")} CSS px²`);
-  for (const seg of t.motion ?? []) {
-    const v = seg.velocity ? `, moving ${Math.hypot(seg.velocity.x, seg.velocity.y).toFixed(0)} px/s` : "";
+  if (t.withUnknownCss2 > limit)
     lines.push(
-      `  re-counted ${secs(seg.fromMs + 1000)}–${secs(seg.toMs)}: field mean ${seg.fieldTransitions} transitions, ${seg.residualArea.toLocaleString("en-US")} px² left after motion compensation, ${seg.regionTransitions} region transitions, ${pct(seg.explainedShare)} of steps explained${v}`,
+      `  with the unmeasured pixels beside it: ${t.withUnknownCss2.toLocaleString("en-US")} CSS px² in one field, over the limit, so no pass`,
     );
+  for (const seg of t.motion ?? []) {
+    const span = `${secs(seg.fromMs + 1000)}–${secs(seg.toMs)}`;
+    if (seg.skipped) {
+      lines.push(`  ${span} not re-counted: past the re-count's frame budget, so not excused`);
+    } else if (seg.residualArea === null) {
+      lines.push(
+        `  re-counted ${span}: a failing field's mean colour makes ${seg.fieldTransitions} transitions in a second — a strobe, whatever moves in front of it`,
+      );
+    } else {
+      const v = seg.velocity ? `, moving ${Math.hypot(seg.velocity.x, seg.velocity.y).toFixed(0)} px/s` : "";
+      lines.push(
+        `  re-counted ${span}: field mean ${seg.fieldTransitions} transitions; ${seg.residualArea.toLocaleString("en-US")} CSS px² still flashing after motion compensation, ${pct(seg.explainedShare ?? 0)} of changed steps explained${v}`,
+      );
+    }
   }
   for (const a of t.animations ?? [])
     lines.push(`  over it: ${a.path}${a.name ? ` (${a.name})` : ""} animating ${a.properties.join(", ") || "?"}`);
@@ -961,7 +1207,7 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
   const lines = [
     `check flash: ${report.source.path}`,
     flashHeadline(report),
-    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : "incomplete"}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})`,
+    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : "incomplete"}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
     ...describeTrack("general", report.general, report.criteria.areaLimitCss2, rules),
     ...describeTrack("red", report.red, report.criteria.areaLimitCss2, rules),
   ];
@@ -977,6 +1223,7 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
   }
   if (report.framesManifest) lines.push(`frames: ${report.framesManifest}`);
   if (report.strip) lines.push(`strip: ${report.strip}`);
+  if (report.stripSkipped) lines.push(`strip: not written — ${report.stripSkipped}`);
   lines.push('A pass is "no flash measured under these criteria", not a certification.');
   return lines.join("\n");
 }

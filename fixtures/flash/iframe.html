@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: iframe</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): The 4 Hz strobe inside an iframe: every frame of the page is held and advanced, not only the top one. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style>
+  </head>
+  <body>
+    <iframe src="parts/strobe-frame.html" title="strobe"></iframe>
+  </body>
+</html>

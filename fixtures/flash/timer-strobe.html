@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: timer-strobe</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport 4 Hz strobe a timer starts 2.5s in: the window reaches two seconds past the latest timer pending at load. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#f{position:fixed;inset:0;background:#fff}#f.on{animation:k 250ms 8.3ms infinite}@keyframes k{0%{background:#000;animation-timing-function:steps(1,end)}50%{background:#fff;animation-timing-function:steps(1,end)}100%{background:#fff}}</style>
+  </head>
+  <body>
+    <div id="f"></div>
+    <script>setTimeout(() => document.getElementById("f").classList.add("on"), 2500);</script>
+  </body>
+</html>

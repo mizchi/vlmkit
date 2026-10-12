@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: revive</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A highlight replayed on every update: every 250ms a class runs a 100ms black flash over the white viewport and is removed on animationend. Each replay is a new animation, so the cancelled one must not be revived by a seek: 8 transitions a second. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#f{position:fixed;inset:0;background:#fff}#f.hl{animation:hl 100ms}@keyframes hl{0%,100%{background:#000}}</style>
+  </head>
+  <body>
+    <div id="f"></div>
+    <script>
+      const f = document.getElementById("f");
+      f.addEventListener("animationend", () => f.classList.remove("hl"));
+      setInterval(() => f.classList.add("hl"), 250);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: smil</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport SVG rect whose fill a SMIL animate switches black/white every 125ms: SMIL runs on the SVG's own timeline, which is paused and seeked with the page. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}svg{position:fixed;inset:0;width:100%;height:100%}</style>
+  </head>
+  <body>
+    <svg viewBox="0 0 400 300" preserveAspectRatio="none"><rect width="400" height="300" fill="#000"><animate attributeName="fill" values="#000;#fff" dur="250ms" begin="8.3ms" repeatCount="indefinite" calcMode="discrete" /></rect></svg>
+  </body>
+</html>

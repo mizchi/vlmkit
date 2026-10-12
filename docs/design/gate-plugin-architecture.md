@@ -382,8 +382,8 @@ else, and making them its first consumer is the only way to keep that honest.
 |---|---|---|
 | `check integrity` | 19 | markup |
 | `check layout` | 12 | markup |
-| `check copy` | 6 | markup |
-| `check interactions` | 36 | markup |<!-- 15 of its own + the 21 shared HANDLER_SURFACE_RULES it emits under --handlers -->
+| `check copy` | 7 | markup |
+| `check interactions` | 39 | markup |<!-- 15 of its own + the 24 shared HANDLER_SURFACE_RULES it emits under --handlers -->
 | `check a11y contrast` | 1 | markup |
 | `check a11y touch` | 1 | markup |
 | `check a11y focus` | 3 | markup |
@@ -394,7 +394,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `check scroll` | 4 | markup |
 | `scan scroll` | 4 | markup |
 | `scan style` | 1 | markup |
-| `scan handlers` | 21 | markup |
+| `scan handlers` | 24 | markup |
 | `check grounding` | 7 | markup |
 | `check motion` | 3 | markup |
 | `check animation` | 7 | markup |

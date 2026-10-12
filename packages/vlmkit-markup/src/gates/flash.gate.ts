@@ -29,8 +29,18 @@ const where = (t: FlashTrackReport) => {
   );
 };
 
-const selectorOf = (t: FlashTrackReport): { selector?: string } =>
-  t.animations && t.animations.length === 1 ? { selector: t.animations[0]!.path } : {};
+/** The finding's selector: the element covering at least half of the flashing pixels' box, if one does. */
+const selectorOf = (t: FlashTrackReport): { selector?: string } => {
+  const top = (t.animations ?? []).find((a) => a.cover >= 0.5);
+  return top ? { selector: top.path } : {};
+};
+
+const UNMEASURED: Record<string, string> = {
+  video: "<video> paused",
+  "animated-image": "animated image",
+  "unreadable-image": "image whose bytes could not be read (it may animate)",
+  uncontrolled: "pixels changing with the clock held",
+};
 
 function findings(report: FlashReport): Finding[] {
   const out: Finding[] = [];
@@ -71,13 +81,19 @@ function findings(report: FlashReport): Finding[] {
       severity: "warn",
       message: `pass on an incomplete sequence (largest gap ${s.maxGapMs.toFixed(1)}ms${s.unstableFrames ? `, ${s.unstableFrames} unstable frame(s)` : ""}): a state shorter than the gap can be missed, so the pass is not backed`,
     });
+  } else if (s.truncated && report.general.verdict === "pass" && report.red.verdict === "pass") {
+    out.push({
+      rule: "flash-undersampled",
+      severity: "warn",
+      message: `pass on the first ${(s.windowMs / 1000).toFixed(1)}s only: the page's motion runs past the 10s cap, and what comes after it was not swept (--window up to 60s sweeps more)`,
+    });
   }
   for (const u of report.unmeasured) {
     const large = report.unmeasuredAreaCss2 > report.criteria.areaLimitCss2;
     out.push({
       rule: "flash-unmeasured",
       severity: large ? "suspect" : "info",
-      message: `${u.reason === "video" ? "<video> paused" : u.reason === "animated-image" ? "animated image" : "pixels changing with the clock held"}, ${u.rect.width}x${u.rect.height} at (${u.rect.x},${u.rect.y}): not judged${large ? `; ${report.unmeasuredAreaCss2.toLocaleString("en-US")} CSS px² of one field unmeasured, over the 21,824 limit, so no pass is possible` : ""}`,
+      message: `${UNMEASURED[u.reason] ?? u.reason}, ${u.rect.width}x${u.rect.height} at (${u.rect.x},${u.rect.y}): not judged${large ? `; ${report.unmeasuredAreaCss2.toLocaleString("en-US")} CSS px² of one field unmeasured, over the 21,824 limit, so no pass is possible` : ""}`,
       ...(u.path ? { selector: u.path } : {}),
       evidence: { ...u },
     });
@@ -108,12 +124,15 @@ compensated: what a block match reproduces is not counted. Flicker motion
 explains is \`motion-flicker\` (warn); a field whose mean colour strobes is a
 flash whatever moves in front of it.
 
-A \`<video>\` is paused, an animated image runs on the browser's own clock, and
-pixels that change between two shots of one held instant are not judged: they
-are reported, and over the limit in one field they make the verdict "not
-judgeable", never a pass.
+A \`<video>\` is paused, an animated image (an \`<img>\`, a CSS background, a
+mask, a pseudo-element's content) runs on the browser's own clock, an image whose
+bytes cannot be read may animate, and pixels that change between two shots of
+one held instant are not judged: they are reported, and when they — alone, or
+with what flashes beside them — cover more than the limit in one field, the
+verdict is "not judgeable", never a pass.
 
-\`--window ms\` (default from the page's animations, 2-10s) sets the span swept;
+\`--window ms\` (default from the page's animations and timers, 2-10s; 1-60s when
+given) sets the span swept;
 \`--frames dir\` keeps the frames and their vlmkit-frames/1 manifest, and
 \`check flash dir/frames.json\` judges them again with no browser. \`--strip
 out.png\` writes ONE still image of the worst window — never an animation: a
@@ -200,10 +219,16 @@ A pass is "no flash measured under these criteria", not a certification.`,
       if (parsed.length !== 1 || parsed[0]! <= 0)
         throw new UsageError("--window takes one span, e.g. --window 5000 or --window 5s");
       windowMs = parsed[0]!;
+      if (windowMs < 1000 || windowMs > 60_000)
+        throw new UsageError(
+          "--window is 1s to 60s of page time: a failure is more than six transitions within one second",
+        );
     }
     const framesDir = readFlag(argv, "frames");
     const stripPath = readFlag(argv, "strip");
     const viewport = viewportFlag(argv);
+    if (viewport && (viewport.width < 1 || viewport.height < 1))
+      throw new UsageError(`--viewport must be at least 1x1 (got ${viewport.width}x${viewport.height})`);
     const fromFrames = /\.json$/i.test(source);
     if (fromFrames && (windowMs !== undefined || framesDir || viewport)) {
       throw new UsageError(

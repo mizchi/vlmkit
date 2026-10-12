@@ -1,5 +1,5 @@
 {
-  "about": "Known answers for `check flash` on fixtures/flash/*.html, at the viewport and window below. Areas are CSS px² inside the worst 341x256 field; 87,296 is the whole field, 21,824 the limit.",
+  "about": "Known answers for `check flash` on fixtures/flash/*.html, at the viewport and window below (a page's own \"windowMs\": \"default\" lets the sweep choose, as a still page needs). Areas are CSS px² inside the worst 341x256 field; 87,296 is the whole field, 21,824 the limit.",
   "viewport": { "width": 400, "height": 300 },
   "windowMs": 1500,
   "pages": {
@@ -15,8 +15,21 @@
     "scroll-text": { "general": "pass", "red": "pass", "classification": "motion" },
     "testbed-div": { "general": "pass", "red": "pass", "peakTransitions": 4 },
     "quadrants": { "general": "pass", "red": "pass", "peakTransitions": 2 },
-    "still": { "general": "pass", "red": "pass", "still": true },
-    "video": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["video"] },
-    "animated-gif": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["animated-image"] }
+    "still": { "general": "pass", "red": "pass", "still": true, "windowMs": "default" },
+    "video": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["video"], "windowMs": "default" },
+    "animated-gif": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["animated-image"], "windowMs": "default" },
+    "late-strobe": { "general": "fail", "red": "pass", "classification": "flash", "windowMs": "default" },
+    "timer-strobe": { "general": "fail", "red": "pass", "classification": "flash", "windowMs": "default" },
+    "iframe": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296 },
+    "shadow": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296 },
+    "smil": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296 },
+    "playback-rate": { "general": "fail", "red": "pass", "classification": "flash", "peakTransitions": 8 },
+    "page-paused": { "general": "pass", "red": "pass", "peakTransitions": 0 },
+    "revive": { "general": "fail", "red": "pass", "classification": "flash" },
+    "teleport-drift": { "general": "fail", "red": "pass", "classification": "flash" },
+    "faded-red": { "general": "pass", "red": "fail", "redClassification": "flash" },
+    "background-gif": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["animated-image"], "windowMs": "default" },
+    "late-video": { "general": "not-judgeable", "red": "not-judgeable", "unmeasured": ["video"] },
+    "navigate": { "general": "pass", "red": "pass", "navigations": 1 }
   }
 }
