@@ -5,10 +5,11 @@
  * *is* — that is left to whoever looks at the keyframes it picks (`storyboardBrief`).
  *
  * Segmentation is relative to an anchor: the frame of the state the page is in — frame 0 for the
- * first, the first frame of the hold a change settled in for each new one, and on a return to an
- * earlier state that state's own frame, so one picture is one state wherever it recurs. A
+ * first, the first frame of the hold a change settled in for each new one, and, when a change
+ * lands within the floor of an earlier state's frame, the first such state's own frame again. A
  * deviation runs from the first frame that differs from the anchor to the first frame that
- * matches it again.
+ * matches it again. (Within the floor is not transitive, so equal bytes can still carry two ids:
+ * a picture reached with no event keeps the state it drifted from.)
  *
  * - **glitch**: the deviation lasts one frame and comes back.
  * - **transient**: it lasts more than one frame and comes back within `TRANSIENT_MS` of its first
@@ -174,8 +175,9 @@ export interface StoryEvent {
   /** The last frame that still showed `from`: the event began after it. */
   before: FrameRef;
   /**
-   * The last frame byte-identical to `from`'s frame, when it is earlier than `before`: pixels were
-   * already moving below the floor from just after it (a fade that had not yet shown).
+   * The last frame whose pixels inside the event's box were byte-identical to `from`'s frame, when
+   * it is earlier than `before`: the event's own pixels were already moving below the floor from
+   * just after it (a fade that had not yet shown). Movement elsewhere does not count.
    */
   movedAfter?: FrameRef;
   /** The first frame that differs from `from` by more than the floor. */
@@ -197,7 +199,7 @@ export interface StoryEvent {
    * after is not in the sequence: on a sparse one (a rest instant two seconds on) the page may well
    * have been still by then.
    */
-  endedInMotion?: true;
+  noHold?: true;
   /**
    * change / drift: how long after `first` the sequence went on, up to `TRANSIENT_MS`: a return
    * later than this is not in the sequence. Below `TRANSIENT_MS` only when the sequence ended first.
@@ -210,9 +212,10 @@ export interface StoryEvent {
   /** Every pixel any of its frames moved over the floor from `from`'s frame, as one box. */
   box: Box;
   /**
-   * The largest channel delta between two consecutive frames, inside its box, from `movedAfter` (or
-   * the step into it) to its last frame: how visible one frame's step of it was. Movement elsewhere
-   * on the page does not count, so a sub-floor wiggle beside a fade cannot make the fade a change.
+   * The largest channel delta between two consecutive frames, inside its box, to its last frame,
+   * from `movedAfter` — or from the frame the visit's previous event came back at, when that is
+   * later — or else from the step into it: how visible one frame's step of it was. Movement
+   * elsewhere on the page does not count, so a sub-floor wiggle beside a fade cannot make it a change.
    */
   maxStepDelta: number;
   /** Its frames whose capture never agreed: motion the capture did not hold. */
@@ -405,22 +408,47 @@ export function buildStoryboard(
     return max;
   };
 
-  let lastIdentical = 0;
+  /** Frame m's pixels inside `box` (ignored ones aside) are the anchor's, byte for byte. */
+  const sameInBox = (m: number, box: Box): boolean => {
+    if (m === anchor || vsAnchor(m).identical) return true;
+    const a = words(pixels.pixels(anchor));
+    const b = words(pixels.pixels(m));
+    for (let y = box.y; y < box.y + box.height; y++) {
+      for (let p = y * width + box.x, end = p + box.width; p < end; p++) {
+        if (a[p] !== b[p] && (mask === null || mask[p] !== 1)) return false;
+      }
+    }
+    return true;
+  };
+  /**
+   * Where an event's own pixels last showed the state exactly: the last frame of this visit before
+   * `s` that is byte-identical to the anchor inside `box`, or -1. Inside the box, not across the
+   * frame: a fade elsewhere, or a residue another event left within the floor, is not this event's.
+   */
+  const lastSameInBox = (s: number, box: Box): number => {
+    for (let m = s - 1; m >= visitStart; m--) if (sameInBox(m, box)) return m;
+    return -1;
+  };
+  /** `movedAfter` when its pixels moved below the floor first, and where the steps are counted from. */
+  const leadIn = (s: number, box: Box) => {
+    const same = lastSameInBox(s, box);
+    return {
+      movedAfter: same >= 0 && same < s - 1 ? ref(same) : undefined,
+      // From there, but never from inside an earlier event of the visit; the step into it always.
+      stepFrom: same >= 0 ? Math.max(same, spanStart) : s - 1,
+    };
+  };
+
+  let visitStart = 0;
   let j = 1;
   while (j < count) {
     const d = vsAnchor(j);
     if (d.over === 0) {
-      if (d.identical) lastIdentical = j;
       j++;
       continue;
     }
     const s = j;
     timeline.push({ state, from: ref(spanStart), to: ref(s - 1) });
-    // `lastIdentical` is the last frame byte-identical to the anchor, wherever it is: a return to a
-    // frame merely within the floor leaves it alone, since what was moving below the floor may have
-    // been moving all along. The steps are counted from it, but never from inside an earlier event.
-    const movedAfter = lastIdentical >= 0 && lastIdentical < s - 1 ? ref(lastIdentical) : undefined;
-    const stepFrom = lastIdentical >= 0 ? Math.max(lastIdentical, spanStart) : s - 1;
     const id = `E${events.length + 1}`;
 
     let back = -1;
@@ -437,6 +465,7 @@ export function buildStoryboard(
     if (back !== -1) {
       const frames = back - s;
       const m = measure(s, back - 1);
+      const { movedAfter, stepFrom } = leadIn(s, m.box);
       events.push({
         id,
         kind: frames === 1 ? "glitch" : "transient",
@@ -453,7 +482,6 @@ export function buildStoryboard(
       });
       timeline.push({ event: id, from: ref(s), to: ref(back - 1) });
       spanStart = back;
-      if (vsAnchor(back).identical) lastIdentical = back;
       j = back + 1;
       continue;
     }
@@ -461,6 +489,7 @@ export function buildStoryboard(
     const settled = settleFrom(s);
     const end = settled === -1 ? count - 1 : settled;
     const m = measure(s, end);
+    const { movedAfter, stepFrom } = leadIn(s, m.box);
     const maxStepDelta = stepMax(stepFrom, end, m.box);
     const watchedMs = Math.min(transientMs, entries[count - 1]!.atMs - entries[s]!.atMs);
     const event: StoryEvent = {
@@ -476,7 +505,7 @@ export function buildStoryboard(
       maxStepDelta,
     };
     if (settled === -1) {
-      events.push({ ...event, last: ref(count - 1), endedInMotion: true });
+      events.push({ ...event, last: ref(count - 1), noHold: true });
       timeline.push({ event: id, from: ref(s), to: ref(count - 1) });
       spanStart = -1;
       break;
@@ -486,11 +515,11 @@ export function buildStoryboard(
     timeline.push({ event: id, from: ref(s), to: ref(settled) });
     state = to;
     // The anchor is the state's own frame, on a return to an earlier state too: anchored on the
-    // hold instead, a picture within the floor of S0's frame was S0 once and a new state the next
+    // hold instead, a hold within the floor of S0's frame was S0 once and a new state the next
     // time, and a fade measured from the hold called "identical to S0" a frame that was not.
     reanchor(states.find((st) => st.id === to)!.frame.n);
     spanStart = settled;
-    lastIdentical = vsAnchor(settled).identical ? settled : -1;
+    visitStart = settled;
     j = settled + 1;
   }
   if (spanStart !== -1) timeline.push({ state, from: ref(spanStart), to: ref(count - 1) });
@@ -637,10 +666,10 @@ export function storyboardSummary(
   for (const e of story.events) {
     if (e.movedAfter) {
       notes.push(
-        `${e.id}: pixels were already moving below the floor after ${ms(e.movedAfter.atMs)} ms, the last frame identical to ${e.from}.`,
+        `${e.id}: its pixels were already moving below the floor after ${ms(e.movedAfter.atMs)} ms, the last frame in which they were exactly ${e.from}'s.`,
       );
     }
-    if (e.endedInMotion) {
+    if (e.noHold) {
       notes.push(
         `${e.id} reached no hold: the last frame (${ms(f.toMs)} ms) differs from the one before it, and what came after is not in the sequence.`,
       );
@@ -650,7 +679,7 @@ export function storyboardSummary(
         `${e.id}: the hold it settled in is the sequence's last ${ms(f.toMs - e.settled.atMs)} ms, shorter than ${ms(r.settleMs)} ms; it may still have been moving.`,
       );
     }
-    if (!e.endedInMotion && e.watchedMs !== undefined && e.watchedMs < r.transientMs - EPSILON_MS) {
+    if (!e.noHold && e.watchedMs !== undefined && e.watchedMs < r.transientMs - EPSILON_MS) {
       notes.push(
         `${e.id}: only ${ms(e.watchedMs)} ms followed its first frame; a return later than that is not in the sequence.`,
       );
@@ -710,7 +739,7 @@ export function storyboardBrief(
     const span = e.back ? `${e.frames} frame${e.frames === 1 ? "" : "s"}` : `${e.frames} frames to a hold`;
     lines.push(
       "",
-      `## ${e.id} — ${e.kind}, ${e.from} → ${e.to ?? "?"}, first at ${ms(e.first.atMs)} ms, ${e.endedInMotion ? "no hold by the last frame" : span}, box ${boxText(e.box)} px`,
+      `## ${e.id} — ${e.kind}, ${e.from} → ${e.to ?? "?"}, first at ${ms(e.first.atMs)} ms, ${e.noHold ? "no hold by the last frame" : span}, box ${boxText(e.box)} px`,
       "",
     );
     for (const img of images.get(e.id) ?? []) {

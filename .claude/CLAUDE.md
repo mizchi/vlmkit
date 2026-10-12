@@ -420,7 +420,8 @@ vlmkit snapshot storyboard out/f/frames.json
 
 States and events from the pixels alone, relative to an anchor (the frame of the state the page is in):
 **glitch** one frame off and back; **transient** back within 5000ms whatever it held (a toast is
-one); **change** not back, ending at the first 100ms of byte-identical frames (the next anchor);
+one); **change** not back, ending at the first 100ms of byte-identical frames — the next state, whose frame
+is the anchor from then on (an earlier state's own frame when the hold is within its floor);
 **drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8). Pure half
 `@mizchi/vlmkit-judge/storyboard.ts` (`buildStoryboard`, `storyboardSummary`, `storyboardBrief`);
 CLI `src/cli/commands/storyboard-cli.ts` (an artifact command on the SPECS path, exits 0, no verdict:
@@ -441,15 +442,19 @@ not to re-learn:
 - **The sheet holds cells, not frames.** The layout is solved on sizes alone and each cell is decoded
   and shrunk before the next, and segmentation decodes through a byte-bounded cache: every frame of a
   1000-frame 2x capture at once would be 15GB.
-- **The anchor is the state's frame, on a return too.** Anchored on the hold it landed in, a picture
+- **The anchor is the state's frame, on a return too.** Anchored on the hold it landed in, a hold
   within the floor of S0 was S0 once and a new state the next time, and a later fade measured from
-  the hold called "identical to S0" a frame that was not. A return to a frame merely within the
-  floor keeps `lastIdentical` (what moved below the floor may have moved all along).
+  the hold called "identical to S0" a frame that was not. (Within the floor is not transitive, so
+  equal bytes can still carry two ids; that is not claimed away.)
+- **`movedAfter` is the event's own pixels.** The last frame of the visit in which they were exactly
+  the state's, found inside the event's box. Tracked across the frame, a fade elsewhere, or a
+  residue a toast left within the floor, gave an unrelated glitch a "moving since" seconds early.
 - **Drift is judged inside the event's box.** Measured across the frame, a sub-floor wiggle beside a
   fade made the fade a change (step 14 between two frames each within the floor of the anchor).
 - **Step before anchor on the 5s look-ahead.** The window is 300 frames at 60fps and the cache a few
   dozen; computing the anchor-independent step first lets a re-scan after a change answer identical
-  frames without decoding (5247 decodes → 1159 on a 1000-frame, 16-change sequence).
+  frames without decoding (5247 decodes → 1174 for a 1000-frame, 16-change sequence through a
+  36-frame cache; a test holds 450 for 400 frames, 1534 without it).
 - **The outline is never over the box.** A 1px top bar at the frame's edge was hidden under its own
   clamped outline; it now sits outside the box, in 2px of the cell's gap. `boxOnSheet` inverts
   `scalePngData`'s float sampling (`105 * (1440 / 175)` is 863.99…), not the exact ratio.

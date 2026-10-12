@@ -9,7 +9,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import { captureTimelineFrames } from "@mizchi/vlmkit-animation-eval/frames-capture.ts";
 import { FRAMES_FORMAT, frameFileName, frameTimeMs, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
-import type { Box, StoryEvent } from "@mizchi/vlmkit-judge/storyboard.ts";
+import { eventKeyframes, type Box, type StoryEvent } from "@mizchi/vlmkit-judge/storyboard.ts";
 import { boxOnSheet } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { framesOnDisk, parseArgs, writeStoryboard, type StoryboardWritten } from "./storyboard-cli.ts";
 
@@ -35,10 +35,20 @@ describe("snapshot storyboard args", () => {
   test("refuses what it cannot read, naming the flag", () => {
     assert.throws(() => parseArgs([]), /no frames\.json given/);
     assert.throws(() => parseArgs(["a.json", "b.json"]), /one frames\.json at a time/);
-    for (const bad of ["1,2,3", "1,2,0,4", "-1,0,2,2", "a,b,c,d", "1.5,0,2,2", ",,4,4", "0x10,0,4,4", "1e1,0,4,4"]) {
+    for (const bad of [
+      "1,2,3",
+      "1,2,0,4",
+      "-1,0,2,2",
+      "a,b,c,d",
+      "1.5,0,2,2",
+      ",,4,4",
+      "0x10,0,4,4",
+      "1e1,0,4,4",
+      `0,0,4,${"1".repeat(310)}`,
+    ]) {
       assert.throws(() => parseArgs(["f.json", "--ignore", bad]), /--ignore expects/, bad);
     }
-    for (const bad of ["0", "1e1", "0x10", "", "2.5"]) {
+    for (const bad of ["0", "1e1", "0x10", "", "2.5", "1".repeat(310)]) {
       assert.throws(() => parseArgs(["f.json", "--max-events", bad]), /--max-events/, bad);
     }
     assert.throws(() => parseArgs(["f.json", "--frobnicate"]), /unknown option/);
@@ -171,9 +181,19 @@ describe("writeStoryboard", () => {
     ];
     const MAGENTA = [255, 0, 255];
     const frameSize = { width: 32, height: 24 };
+    // What each slot must show, from the story's own events, not from the code that drew the sheet:
+    // row r is event r's keyframes, padded to the widest row.
+    const expected = w.story.events.flatMap((e) => {
+      const keys = eventKeyframes(e).map((k) => ({ n: k.frame.n, box: e.box }));
+      return [...keys, ...Array.from({ length: w.sheet.layout.columns - keys.length }, () => null)];
+    });
+    assert.deepEqual(
+      w.sheet.cells.map((c) => (c ? { n: c.n, box: c.box } : null)),
+      expected,
+    );
     let outlined = 0;
-    w.sheet.cells.forEach((cell, i) => {
-      if (!cell?.box) return;
+    expected.forEach((cell, i) => {
+      if (!cell) return;
       outlined++;
       const b = boxOnSheet(w.sheet.layout, i, frameSize, cell.box);
       const p = w.sheet.layout.positions[i]!;
@@ -192,6 +212,11 @@ describe("writeStoryboard", () => {
     assert.equal(outlined, 5, "the glitch's three keyframes and the change's two");
     for (const [id, images] of w.images) {
       const event = w.story.events.find((e) => e.id === id)!;
+      assert.deepEqual(
+        images.map((img) => [img.atMs, img.roles]),
+        eventKeyframes(event).map((k) => [k.frame.atMs, k.roles]),
+        `${id}: one picture per keyframe`,
+      );
       for (const img of images) {
         const n = manifestFrame(w, img.atMs);
         assert.deepEqual(
@@ -200,6 +225,17 @@ describe("writeStoryboard", () => {
           img.file,
         );
         const c = img.crop!;
+        // The documented crop: the box and a margin of a quarter of its longer side, at least 8px,
+        // inside the frame.
+        const margin = Math.max(8, Math.round(Math.max(event.box.width, event.box.height) / 4));
+        const x0 = Math.max(0, event.box.x - margin);
+        const y0 = Math.max(0, event.box.y - margin);
+        assert.deepEqual(c.box, {
+          x: x0,
+          y: y0,
+          width: Math.min(32, event.box.x + event.box.width + margin) - x0,
+          height: Math.min(24, event.box.y + event.box.height + margin) - y0,
+        });
         const crop = PNG.sync.read(await readFile(join(w.outDir, "narrate", c.file)));
         assert.deepEqual([crop.width, crop.height], [c.box.width * c.zoom, c.box.height * c.zoom], c.file);
         assert.ok(
@@ -330,7 +366,7 @@ describe("snapshot storyboard: planted events on the held clock", () => {
   test("a spinner turning every frame never settles, and ignoring its box leaves nothing", async () => {
     const moving = await storyOf("kind=spinner");
     assert.deepEqual(
-      moving.story.events.map((e) => [e.kind, e.before.n, e.first.n, e.last?.n, e.endedInMotion]),
+      moving.story.events.map((e) => [e.kind, e.before.n, e.first.n, e.last?.n, e.noHold]),
       [["change", 0, 1, 60, true]],
     );
     const box = moving.story.events[0]!.box;

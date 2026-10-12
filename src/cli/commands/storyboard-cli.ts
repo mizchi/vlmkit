@@ -85,13 +85,17 @@ export interface StoryboardArgs {
   json: boolean;
 }
 
-/** Digits only: `Number` reads "" as 0 and takes `0x10` and `1e1`, a box nobody typed. */
-const WHOLE = /^\d+$/;
+/**
+ * A whole number as typed: digits only — `Number` reads "" as 0 and takes `0x10` and `1e1` — and
+ * small enough to be one (310 digits are `Infinity`, which story.json writes as null).
+ */
+const whole = (raw: string | undefined): number | null =>
+  raw !== undefined && /^\d+$/.test(raw) && Number.isSafeInteger(Number(raw)) ? Number(raw) : null;
 
 function parseBox(raw: string | undefined): Box {
   const parts = (raw ?? "").split(",").map((p) => p.trim());
-  const nums = parts.map(Number);
-  if (parts.length !== 4 || parts.some((p) => !WHOLE.test(p)) || nums.some((n, i) => i >= 2 && n < 1)) {
+  const nums = parts.map(whole);
+  if (parts.length !== 4 || nums.some((n, i) => n === null || (i >= 2 && n < 1))) {
     throw new UsageError(
       `--ignore expects x,y,width,height in whole pixels (width and height at least 1), got "${raw ?? ""}"`,
     );
@@ -119,8 +123,8 @@ export function parseArgs(argv: string[]): StoryboardArgs {
         break;
       case "--max-events": {
         const raw = argv[++i];
-        maxEvents = WHOLE.test(raw ?? "") ? Number(raw) : Number.NaN;
-        if (!(maxEvents >= 1)) {
+        maxEvents = whole(raw) ?? 0;
+        if (maxEvents < 1) {
           throw new UsageError(`--max-events expects a whole number >= 1, got "${raw ?? ""}"`);
         }
         break;

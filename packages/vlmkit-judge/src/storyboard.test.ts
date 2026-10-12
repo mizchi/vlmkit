@@ -217,7 +217,7 @@ describe("buildStoryboard: the planted cases", () => {
     const frames = [...repeat(blank, 5), ...Array.from({ length: 10 }, (_, i) => frame([{ ...dot, x: i * 2 }]))];
     const s = story(frames);
     assert.equal(s.events.length, 1);
-    assert.equal(s.events[0]!.endedInMotion, true);
+    assert.equal(s.events[0]!.noHold, true);
     assert.equal(s.events[0]!.to, undefined);
     assert.equal(s.events[0]!.frames, 10);
     assert.deepEqual(s.timeline.at(-1), {
@@ -231,7 +231,7 @@ describe("buildStoryboard: the planted cases", () => {
     const video = (i: number): Paint => ({ x: 30, y: 0, w: 10, h: 10, rgb: [i * 12, 0, 0] });
     const frames = Array.from({ length: 20 }, (_, i) => frame([video(i), ...(i === 12 ? [dot] : [])]));
     const unmasked = story(frames);
-    assert.equal(unmasked.events[0]!.endedInMotion, true, "the video swallows the sequence");
+    assert.equal(unmasked.events[0]!.noHold, true, "the video swallows the sequence");
     const masked = story(frames, {}, [{ x: 30, y: 0, width: 10, height: 10 }]);
     assert.deepEqual(
       masked.events.map((e) => [e.kind, e.first.n]),
@@ -323,7 +323,7 @@ describe("buildStoryboard: the boundaries", () => {
     const s = sequence([...repeat(moved(0), 5), moved(2), ...repeat(moved(4), 3)]);
     const b = buildStoryboard(s.entries, s.pixels);
     assert.deepEqual(
-      b.events.map((e) => [e.kind, e.settled?.n, e.to, e.endedInMotion]),
+      b.events.map((e) => [e.kind, e.settled?.n, e.to, e.noHold]),
       [["change", 6, "S1", undefined]],
     );
     const md = storyboardSummary(
@@ -362,7 +362,7 @@ describe("buildStoryboard: the boundaries", () => {
     );
   });
 
-  test("a fade keeps its movedAfter through a glitch elsewhere that comes back within the floor", () => {
+  test("a fade keeps its movedAfter through a glitch elsewhere, which has none of its own", () => {
     const elsewhere: Paint = { x: 30, y: 20, w: 3, h: 3, rgb: [0, 0, 0] };
     const frames = repeat(blank, 5);
     for (let i = 1; i <= 20; i++) frames.push(frame([level(255 - i), ...(frames.length === 7 ? [elsewhere] : [])]));
@@ -370,7 +370,7 @@ describe("buildStoryboard: the boundaries", () => {
     assert.deepEqual(
       story(frames).events.map((e) => [e.kind, e.first.n, e.back?.n, e.settled?.n, e.movedAfter?.n, e.maxStepDelta]),
       [
-        ["glitch", 7, 8, undefined, 4, 255],
+        ["glitch", 7, 8, undefined, undefined, 255],
         ["drift", 13, undefined, 24, 4, 1],
       ],
     );
@@ -386,7 +386,8 @@ describe("buildStoryboard: the boundaries", () => {
     frames.push(...repeat(frames.at(-1)!, 10));
     assert.deepEqual(
       story(frames).events.map((e) => [e.kind, e.movedAfter?.n, e.maxStepDelta]),
-      [["drift", 4, 1]],
+      // Frame 6 is the last in which the fade's own pixels were still S0's: the wiggle is not them.
+      [["drift", 6, 1]],
     );
     const own = [
       ...repeat(frame([], grey), 5),
@@ -400,7 +401,7 @@ describe("buildStoryboard: the boundaries", () => {
     );
   });
 
-  test("a picture is one state wherever it recurs: a return within the floor is anchored on the state's frame", () => {
+  test("a change into the floor of an earlier state's frame is that state, anchored on its frame", () => {
     const at = (v: number, n: number) => repeat(frame([level(v)]), n);
     const s = story([...at(100, 5), ...at(200, 60), ...at(106, 60), ...at(112, 60), ...at(200, 60), ...at(112, 10)], {
       gapMs: 100,
@@ -428,12 +429,97 @@ describe("buildStoryboard: the boundaries", () => {
     assert.equal(s.events[2]!.movedAfter, undefined);
   });
 
-  test("an ignored box that is not on whole pixels covers every pixel it touches", () => {
-    const mask = ignoreMask(8, 4, [{ x: 0, y: 0.5, width: 2, height: 1 }])!;
+  test("a glitch on a fade's own pixels: the fade's steps are counted from after the glitch came back", () => {
+    const frames = repeat(blank, 5);
+    for (let f = 5; f <= 24; f++) frames.push(frame([level(f === 7 ? 0 : 255 - (f - 4))]));
+    frames.push(...repeat(frames.at(-1)!, 10));
     assert.deepEqual(
-      [...mask.keys()].filter((i) => mask[i] === 1),
-      [0, 1, 8, 9],
+      story(frames).events.map((e) => [e.kind, e.first.n, e.back?.n, e.settled?.n, e.movedAfter?.n, e.maxStepDelta]),
+      [
+        ["glitch", 7, 8, undefined, 4, 253],
+        ["drift", 13, undefined, 24, 4, 1],
+      ],
     );
+  });
+
+  test("movedAfter is the event's own pixels: a residue another event left elsewhere is not it", () => {
+    const toast: Paint = { x: 0, y: 0, w: 4, h: 4, rgb: [0, 0, 0] };
+    const residue: Paint = { ...toast, rgb: [252, 252, 252] };
+    const glitch: Paint = { x: 30, y: 0, w: 4, h: 4, rgb: [0, 0, 0] };
+    const frames = [...repeat(blank, 10), ...repeat(frame([toast]), 5), ...repeat(frame([residue]), 25)];
+    frames.push(frame([residue, glitch]), ...repeat(frame([residue]), 20));
+    assert.deepEqual(
+      story(frames, { gapMs: 100 }).events.map((e) => [e.kind, e.first.n, e.movedAfter?.n]),
+      [
+        ["transient", 10, undefined],
+        ["glitch", 40, undefined],
+      ],
+    );
+  });
+
+  test("a step on the box's last column or row counts; an ignored pixel inside the box does not", () => {
+    const region: Paint = { x: 5, y: 6, w: 4, h: 3, rgb: [0, 0, 0] };
+    const fade = (dip?: Paint) => {
+      const frames = repeat(blank, 5);
+      for (let f = 5; f <= 24; f++) {
+        const v = 255 - (f - 4);
+        frames.push(
+          frame([
+            { ...region, rgb: [v, v, v] },
+            ...(dip && f === 15 ? [{ ...dip, rgb: [v - 20, v - 20, v - 20] as Rgb }] : []),
+          ]),
+        );
+      }
+      frames.push(...repeat(frames.at(-1)!, 10));
+      return frames;
+    };
+    const kindOf = (frames: Uint8Array[], ignore: Box[] = []) =>
+      story(frames, {}, ignore).events.map((e) => [e.kind, e.maxStepDelta]);
+    assert.deepEqual(kindOf(fade()), [["drift", 1]]);
+    assert.deepEqual(kindOf(fade({ x: 8, y: 6, w: 1, h: 3, rgb: [0, 0, 0] })), [["change", 21]], "the last column");
+    assert.deepEqual(kindOf(fade({ x: 5, y: 8, w: 4, h: 1, rgb: [0, 0, 0] })), [["change", 21]], "the last row");
+    // A pixel inside the fade, ignored, flickering black and white every frame.
+    const flicker = fade().map((f, i) => {
+      const g = f.slice();
+      const at = (7 * W + 6) * 4;
+      g.fill(i % 2 === 0 ? 0 : 255, at, at + 3);
+      return g;
+    });
+    assert.deepEqual(kindOf(flicker, [{ x: 6, y: 7, width: 1, height: 1 }]), [["drift", 1]]);
+  });
+
+  test("an ignored box that is not on whole pixels covers every pixel it touches", () => {
+    const on = (mask: Uint8Array) => [...mask.keys()].filter((i) => mask[i] === 1);
+    // Both near edges round down and both far edges up: a 1x1 box at (0.5, 0.5) touches four pixels.
+    assert.deepEqual(on(ignoreMask(8, 4, [{ x: 0.5, y: 0.5, width: 1, height: 1 }])!), [0, 1, 8, 9]);
+    assert.deepEqual(on(ignoreMask(8, 4, [{ x: 0, y: 0.5, width: 2, height: 1 }])!), [0, 1, 8, 9]);
+  });
+
+  test("after a change, the 5s look-ahead is re-scanned without decoding its still frames again", () => {
+    // 400 frames at 60fps, a mark moving to a new place every 60 frames and never back: six changes,
+    // each scanning 300 frames ahead. Read through an 8-frame cache, as the CLI reads files.
+    const frames = Array.from({ length: 400 }, (_, i) => frame([{ ...dot, x: Math.floor(i / 60) * 5 }]));
+    const cache = new Map<number, Uint8Array>();
+    let decoded = 0;
+    const pixels = {
+      width: W,
+      height: H,
+      pixels: (i: number) => {
+        const hit = cache.get(i);
+        if (hit) {
+          cache.delete(i);
+          cache.set(i, hit);
+          return hit;
+        }
+        decoded++;
+        cache.set(i, frames[i]!);
+        if (cache.size > 8) cache.delete(cache.keys().next().value!);
+        return frames[i]!;
+      },
+    };
+    const entries = frames.map((_, n) => ({ n, atMs: frameTimeMs(n), stable: true }));
+    assert.equal(buildStoryboard(entries, pixels).events.length, 6);
+    assert.ok(decoded < 500, `${decoded} decodes for 400 frames`);
   });
 
   test("the summary notes only what happened", () => {
@@ -674,7 +760,7 @@ S0 0–33.33 · E1 50 · S0 66.67–316.67 · E2 333.33–383.33 · S1 383.33–
 
 ## Notes
 
-- E2: pixels were already moving below the floor after 183.33 ms, the last frame identical to S0.
+- E2: its pixels were already moving below the floor after 183.33 ms, the last frame in which they were exactly S0's.
 - E2: only 250 ms followed its first frame; a return later than that is not in the sequence.
 - E3: the hold it settled in is the sequence's last 33.33 ms, shorter than 100 ms; it may still have been moving.
 - E3: only 50 ms followed its first frame; a return later than that is not in the sequence.
