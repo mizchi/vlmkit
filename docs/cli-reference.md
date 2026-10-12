@@ -683,7 +683,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-34 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+35 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
@@ -1034,6 +1034,10 @@ vlmkit check animation <html|url>              # Frame-sampled animation evaluat
                                                # report motion bbox, settle time, infinite animations (VRT
                                                # mask hints), behavioral prefers-reduced-motion parity, and
                                                # uncontrolled motion (rAF/video/GIF) that WAAPI can't pause
+vlmkit check flash <html|url|frames.json>      # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
+                                               # the held clock, per-pixel transitions (ΔL ≥ 0.1, darker
+                                               # < 0.8; saturated red), >6 in 1s over >21,824 CSS px² of a
+                                               # 341x256 field fails; motion re-counted (motion-flicker)
 vlmkit check breakpoints <html|url>            # Boundary quickcheck: render at B-1/B/B+1 per discovered
                                                # breakpoint and verify each discrete style property at B
                                                # matches a neighbor — catches off-by-one media queries
@@ -1545,6 +1549,50 @@ Self-check: `fixtures/storyboard/planted.html` plants each kind on the held cloc
 (a glitch on frame 30, blink trains, a toast on timers, an eased slide, a 6% fade,
 a spinner), and `storyboard-cli.test.ts` requires every one back on the frames it
 was planted on.
+
+#### Flashing — `check flash` (WCAG 2.3.1)
+
+```bash
+vlmkit check flash page.html                         # every 60fps frame of 2-10s of page time, 1280x720
+vlmkit check flash page.html --window 5s --viewport 1920x1080
+vlmkit check flash page.html --frames out/flash --strip worst.png   # keep the frames; one STILL sheet of the worst window
+vlmkit check flash out/flash/frames.json             # judge the saved frames again, no browser
+```
+
+The page is loaded with its clock and every animation held, then shot at every
+frame of a 60Hz display (frame n at `n * 1000 / 60` ms of page time). At each CSS
+pixel (device pixels averaged in linear light):
+
+| Measured | Rule |
+|---|---|
+| general transition | relative luminance moves ≥ 0.1 between a peak and a valley, the darker state < 0.80 |
+| red transition | u′v′ moves > 0.2 to or from a saturated red: R/(R+G+B) ≥ 0.8 on linear channels, and (R − G − B) > 20/320 (IRIS's floor; without it `#000`↔`#010000` is a full-field red flash) |
+| flashing pixel | more than 6 transitions in a window (t − 1s, t]; exactly 3 flashes a second passes |
+| failure | the flashing pixels, closed 3x3 (a dither counts as its region), exceed 21,824 CSS px² inside some 341x256 field, slid over every position (G176; the Understanding text's 87,296 is the whole field) |
+
+Per-pixel counting is literal: scrolling text "flashes" at every pixel it crosses.
+So each failing run is re-counted with motion compensated (16x16 block matching,
+quarter-pixel, either direction) and is a flash only when one of three tests
+still fails: the field's mean colour strobes, the residual still flashes, or the
+unexplained transitions over the limit alternate more than six times a second (a
+strobing layer behind moving text). Otherwise it is `motion-flicker` (warn).
+
+| Rule | Severity | Fires when |
+|---|---|---|
+| `general-flash` | suspect | the general track fails, not explained by motion |
+| `red-flash` | suspect | the red track fails, not explained by motion |
+| `motion-flicker` | warn | per-pixel flicker over the limit that motion explains (the solitaire deal, a carousel, a ticker) |
+| `flash-unmeasured` | suspect / info | a `<video>` (paused at load), an animated image (GIF / APNG / WebP / AVIF, sniffed), or pixels that change with the clock held; suspect when they cover more than the limit in one field, which makes the verdict "not judgeable" |
+| `flash-unjudgeable` | suspect | a saved sequence where no 1s window holds 7 frames |
+| `flash-undersampled` | warn | a pass on a saved sequence that is not every 60fps frame of its span |
+
+The window defaults to each finite animation's end, at least 3s when something
+repeats forever or runs by script, between 2s and 10s; a page where nothing can
+move under the held clock is one frame. `--strip` is always one still PNG — an
+animation of a failing window would itself strobe for whoever opens it. A pass
+is "no flash measured under these criteria", not a certification. Not judged:
+WCAG's 0.1° exception for fine balanced patterns (such patterns are reported), a
+page's own video, states reached by interaction, absolute luminance (HDR).
 
 #### Visualizing the VRT process — flipbooks + video
 

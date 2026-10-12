@@ -34,7 +34,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 34);
+    assert.equal(r.list().length, 35);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -243,8 +243,13 @@ describe("composed built-in registry", () => {
     //       stops is measured as one instead of being `uncontrolled-motion`.
     // 210 → 211: `scan a11y` / `tree-truncated` (suspect) — the macOS AX collector stopped at
     //       its node limit, so part of the window was never read and every rule passed it.
+    // 211 → 217: `check flash`, WCAG 2.3.1 over the page's own time: `general-flash` and
+    //       `red-flash` (suspect), `motion-flicker` (warn) for per-pixel flicker motion
+    //       explains, and three that say when a verdict cannot be had — `flash-unmeasured`
+    //       (media and pixels the held clock cannot hold), `flash-unjudgeable` and
+    //       `flash-undersampled` (a saved sequence too sparse to fail, or to back a pass).
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 211);
+    assert.equal(total, 217);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -284,6 +289,7 @@ describe("composed built-in registry", () => {
       "check.drift.component",
       "check.drift.pages",
       "check.equivalence",
+      "check.flash",
       "check.grounding",
       "check.integrity",
       "check.interactions",

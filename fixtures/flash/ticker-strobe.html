@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: ticker-strobe</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport strobe at 5 Hz behind grey text scrolling 300px/s: the strobe is a flash whatever moves in front of it. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#bg{position:fixed;inset:0;background:#000;animation:k 200ms 8.3ms infinite}@keyframes k{0%{background:#000;animation-timing-function:steps(1,end)}50%{background:#fff;animation-timing-function:steps(1,end)}100%{background:#fff}}#t{position:absolute;left:0;top:0;width:6000px;font:bold 28px/34px sans-serif;color:#808080;animation:s 4000ms linear infinite}@keyframes s{from{transform:translateX(0)}to{transform:translateX(-1200px)}}</style>
+  </head>
+  <body>
+    <div id="bg"></div><div id="t">BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher - BREAKING NEWS - markets open higher -</div>
+  </body>
+</html>

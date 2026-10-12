@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: scale-strobe</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A white panel snapped between scale(1) and scale(0) at 5 Hz: animated by transform alone, and a flash. -->
+    <style>html,body{margin:0;overflow:hidden;background:#000}#f{position:fixed;inset:0;background:#fff;animation:z 200ms 8.3ms infinite}@keyframes z{0%{transform:scale(1);animation-timing-function:steps(1,end)}50%{transform:scale(0);animation-timing-function:steps(1,end)}100%{transform:scale(0)}}</style>
+  </head>
+  <body>
+    <div id="f"></div>
+  </body>
+</html>

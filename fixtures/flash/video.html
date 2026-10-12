@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: video</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A <video> covering the viewport: paused at load and not judged, and it covers more than the limit, so no pass is possible. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}video{display:block;width:400px;height:300px;background:#000}</style>
+  </head>
+  <body>
+    <video muted autoplay></video>
+  </body>
+</html>

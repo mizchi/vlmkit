@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: quadrants</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): Four quadrants lit in turn, each once a second: four flashes a second in the viewport, but never more than one at any place. -->
+    <style>html,body{margin:0;overflow:hidden;background:#000}.q{position:fixed;width:50%;height:50%;background:#000;animation:q 1000ms 8.3ms infinite both}@keyframes q{0%{background:#fff;animation-timing-function:steps(1,end)}12.5%{background:#000;animation-timing-function:steps(1,end)}100%{background:#000}}</style>
+  </head>
+  <body>
+    <div class="q" style="left:0;top:0;animation-delay:8.3ms"></div><div class="q" style="left:50%;top:0;animation-delay:258.3ms"></div><div class="q" style="left:0;top:50%;animation-delay:508.3ms"></div><div class="q" style="left:50%;top:50%;animation-delay:758.3ms"></div>
+  </body>
+</html>

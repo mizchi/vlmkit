@@ -55,13 +55,19 @@ export function blendColor(base: Rgb, over: Rgba): [number, number, number] {
   return [base[0] * (1 - a) + over[0] * a, base[1] * (1 - a) + over[1] * a, base[2] * (1 - a) + over[2] * a];
 }
 
+/**
+ * One sRGB channel (0-255) as linear light, 0-1: the curve relative luminance is built on. WCAG 2.x
+ * writes the break at 0.03928 and sRGB at 0.04045; on 8-bit values they choose the same branch
+ * (10/255 is below both, 11/255 above both), which a test holds for all 256.
+ */
+export function srgbChannelToLinear(v: number): number {
+  v /= 255;
+  return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+
 /** WCAG 2.x relative luminance of an opaque sRGB colour. */
 export function relativeLuminance(c: Rgb): number {
-  const channel = (v: number) => {
-    v /= 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
+  return 0.2126 * srgbChannelToLinear(c[0]) + 0.7152 * srgbChannelToLinear(c[1]) + 0.0722 * srgbChannelToLinear(c[2]);
 }
 
 /**

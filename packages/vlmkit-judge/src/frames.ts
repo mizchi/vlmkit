@@ -64,6 +64,21 @@ export interface FramesSource {
   clock: "held" | "wall";
   /** `inspect interact`: the `frames` step this sequence records. */
   step?: string;
+  /**
+   * Regions, in CSS px, whose pixels the capture could not hold to the sequence's clock: a
+   * `<video>` it paused, an animated image, pixels that changed while nothing was advanced.
+   * `check flash` writes it and leaves those pixels out of its count when it reads the sequence
+   * back, so judging the saved frames gives the same answer as judging the page did.
+   */
+  unmeasured?: UnmeasuredRegion[];
+}
+
+export interface UnmeasuredRegion {
+  /** `video`: paused at load. `animated-image`: runs on the browser's clock. `uncontrolled`: changed with the clock held. */
+  reason: "video" | "animated-image" | "uncontrolled";
+  rect: { x: number; y: number; width: number; height: number };
+  /** The element, as the style gates print it, when one is known. */
+  path?: string;
 }
 
 export interface FramesManifest {

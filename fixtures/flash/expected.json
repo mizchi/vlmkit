@@ -1,0 +1,22 @@
+{
+  "about": "Known answers for `check flash` on fixtures/flash/*.html, at the viewport and window below. Areas are CSS px² inside the worst 341x256 field; 87,296 is the whole field, 21,824 the limit.",
+  "viewport": { "width": 400, "height": 300 },
+  "windowMs": 1500,
+  "pages": {
+    "strobe-4hz": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296, "peakTransitions": 8 },
+    "strobe-3hz": { "general": "pass", "red": "pass", "peakTransitions": 6 },
+    "box-148": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 21904 },
+    "box-144": { "general": "pass", "red": "pass", "largestBelowCss2": 21312 },
+    "red-grey": { "general": "pass", "red": "fail", "redClassification": "flash", "redAreaCss2": 87296 },
+    "raf-5hz": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296 },
+    "interval": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296 },
+    "scale-strobe": { "general": "fail", "red": "pass", "classification": "flash", "areaCss2": 87296 },
+    "ticker-strobe": { "general": "fail", "red": "pass", "classification": "flash", "reason": "field" },
+    "scroll-text": { "general": "pass", "red": "pass", "classification": "motion" },
+    "testbed-div": { "general": "pass", "red": "pass", "peakTransitions": 4 },
+    "quadrants": { "general": "pass", "red": "pass", "peakTransitions": 2 },
+    "still": { "general": "pass", "red": "pass", "still": true },
+    "video": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["video"] },
+    "animated-gif": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["animated-image"] }
+  }
+}

@@ -1,6 +1,6 @@
 # Gate plugin architecture — core runner + rule definitions
 
-Status: **landed**. All 34 gates are registry-driven; the MCP tools,
+Status: **landed**. All 35 gates are registry-driven; the MCP tools,
 `verify markup`'s folded-in gates and `vlmkit gates` validation all read from
 the registry.
 Date: 2026-08-05.
@@ -228,7 +228,7 @@ runner detects that, and it appends a disclaimer ("The report above was rendered
 before those settings were applied…") rather than letting the two halves disagree
 silently.
 
-**All 34 gates render their settings themselves** — the last 16 landed together.
+**All 35 gates render their settings themselves** — the last 16 landed together.
 `src/cli/gate-registry.test.ts` asserts the aware list by name and the blind list as
 empty, so a gate added tomorrow with a one-parameter formatter fails there and gets
 named rather than silently restarting the backlog. The disclaimer branch stays live
@@ -376,7 +376,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 34 gates (211 tunable rules)
+## The 35 gates (217 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -398,6 +398,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `check grounding` | 7 | markup |
 | `check motion` | 3 | markup |
 | `check animation` | 7 | markup |
+| `check flash` | 6 | markup |
 | `stress i18n` | 3 | markup |
 | `stress media` | 2 | markup |
 | `check tokens` | 2 | markup |

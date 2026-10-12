@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: strobe-4hz</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport black/white strobe, 4 flashes a second (CSS steps): 8 transitions in a second. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#f{position:fixed;inset:0;background:#000;animation:k 250ms 8.3ms infinite}@keyframes k{0%{background:#000;animation-timing-function:steps(1,end)}50%{background:#fff;animation-timing-function:steps(1,end)}100%{background:#fff}}</style>
+  </head>
+  <body>
+    <div id="f"></div>
+  </body>
+</html>

@@ -25,6 +25,8 @@ report.verdict; // "composed" | "unbalanced" | "not-judged"
 | `allow.ts` | `parseSelectorAllowRules`, `selectorAllowFilter` — the `--allow "<selector>;<reason>"` form | every style gate |
 | `frames.ts` | `vlmkit-frames/1` — `parseFramesManifest`, `parseInstants` (`1.5s`, `6f`, `0..1s/100ms`), `frameFileName`, `thinEvenly`, `playbackDelays` | `--frames` on `check animation` / `check integrity`, `inspect interact`, `snapshot strip --manifest` |
 | `storyboard.ts` | `buildStoryboard` — a frame sequence's states and its glitch / transient / change / drift events, from the pixels; `storyboardSummary`, `storyboardBrief` | `vlmkit snapshot storyboard` |
+| `flash.ts` | `createFlashJudge` — WCAG 2.3.1 per-pixel transitions (general and saturated-red), 1s windows, the 21,824 CSS px² limit in a sliding 341x256 field; `flashFrame` (RGBA → CSS-px luminance / u′v′), `closeMask`, `bestField` | `vlmkit check flash` |
+| `flash-motion.ts` | `classifyFlash` — a failing run re-counted with block motion compensated: field mean, residual, region tests | `vlmkit check flash` (`motion-flicker`) |
 | `errors.ts` | `UsageError` | re-exported by `@mizchi/vlmkit-core/cli-error.ts` |
 
 The browser half — the in-page collectors that produce these snapshots, and the

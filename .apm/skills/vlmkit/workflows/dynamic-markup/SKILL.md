@@ -184,6 +184,26 @@ Evaluates every authored animation by rendered frames:
   dead, because its frames do not measure it. Fix the restart, not the
   keyframes.
 
+### B3b. `check flash attempt.html` — before any strobe, hit flash or loading blink ships
+
+WCAG 2.3.1 is Level A and applies whatever motion preference the user has set,
+so a reduced-motion opt-out does not satisfy it. The gate shoots every 60fps
+frame of 2-10s of page time on the held clock (CSS, Web Animations, rAF, timers)
+and counts transitions at each pixel:
+
+- **`general-flash` / `red-flash` (suspect)** — more than three flashes a
+  second over more than 21,824 CSS px² of a 341x256 field. Slow it to three a
+  second or fewer, shrink it under the limit, or drop the contrast below ΔL 0.1.
+  Exactly three a second passes.
+- **`motion-flicker` (warn)** — scrolling text, a carousel or a card deal
+  flickers at every pixel it crosses; the re-count with motion compensated
+  explains it. Expected for authored motion; not a flash.
+- **`flash-unmeasured`** — a `<video>` (paused, not judged) or an animated
+  image covering more than the limit makes the verdict "not judgeable", never a
+  pass. Judge the media file itself some other way.
+- `--strip worst.png` is one still image of the worst window. Never make an
+  animated preview of a failing window: it would strobe for whoever opens it.
+
 ### B4. `check motion attempt.html`
 
 Declaration-level cross-check: the reduced-motion *rule* exists in the

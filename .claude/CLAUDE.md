@@ -465,9 +465,62 @@ not to re-learn:
 Known answers: `fixtures/storyboard/planted.html?kind=…` (static, glitch, blinks, toast, slide, fade,
 spinner), each required back on its frames in `storyboard-cli.test.ts`.
 
-Not built yet, in the order the research put them: `check flash` (WCAG 2.3.1, on page-clock
-sequences), and external video files through a decoder the user supplies — then a noise floor for
-lossy storyboards, which this one deliberately does not have.
+Not built yet, in the order the research put them: external video files through a decoder the user
+supplies — then a noise floor for lossy storyboards, which this one deliberately does not have.
+(`check flash`, the first in that list, is below.)
+
+## Flashing (`check flash`, WCAG 2.3.1)
+
+```bash
+vlmkit check flash page.html                         # every 60fps frame of 2-10s of page time, held clock, 1280x720
+vlmkit check flash page.html --frames out/flash --strip worst.png   # keep the frames; ONE still sheet of the worst window
+vlmkit check flash out/flash/frames.json             # the saved frames judged again, no browser, same answer
+```
+
+Pure half: `@mizchi/vlmkit-judge/flash.ts` (per-pixel zig-zag, ΔL ≥ 0.1 with the darker state
+< 0.8; red: u′v′ > 0.2 with a saturated-red end; > 6 transitions in (t − 1s, t]; the flashing pixels
+closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) and `flash-motion.ts`
+(`classifyFlash`). Browser half: `packages/vlmkit-markup/src/inspect/flash-check.ts`. Known answers:
+`fixtures/flash/` + `expected.json`. Measured building it, not to re-learn:
+
+- **The limit is 21,824 (G176: 25% of the field), not 87,296** — the Understanding text's number is the
+  whole field. The solitaire deal's per-pixel area, 31,862, sits between the two.
+- **Red needs a magnitude floor.** R/(R+G+B) has none, and black takes the white point, so
+  `#000`↔`#010000` was a full-field red flash. IRIS's (R − G − B)·320 > 20 on linear channels.
+- **Per-pixel counting is literal, so a failing run is re-counted with motion compensated.** Scrolling
+  text fails per pixel; the deal fails per pixel. DOM attribution must never excuse anything: a
+  `scale(1)↔scale(0)` strobe, a teleport and a background toggle on a slowly translating box are
+  transform-only animations and real flashes. Only pixels decide (block matching); the animations are
+  named, never trusted.
+- **Three tests, any one fails it.** The field's mean colour strobes (a ticker over a full-screen
+  strobe); the residual still flashes; or the unexplained transitions over the limit alternate > 6
+  times a second. The third exists because a strobing background behind 60%-ink scrolling text
+  reaches no one pixel whole — every text crossing restarts the pixel, and the falling step lands
+  between ink and background, which the 3x3 envelope accepts as an antialiased blend. A block that
+  moved AND shifted level (its mean compensated step one-signed) counts its stepping pixels.
+- **What may establish motion is narrow.** Texture (spread ≥ 0.03), a nonzero displacement, mean
+  residual ≤ 0.04 AND under half of not moving (a level change adds to both, so a strobe in place cannot
+  pass); never a block that returns to what it was within 1/3s (teleports, inverting or half-period
+  stripes); a plain block only by a moving neighbour's motion. 0.04, not 0.03: a card fading in as it
+  flies changes ~0.025 a frame on top of its rotation, and the deal's residual was 16,807 px² at 0.03.
+- **Sub-pixel motion blurs one way only.** A layer at a half-pixel offset renders blurred, at a whole
+  one sharp; interpolating the blurred frame never gives the sharp one. Blocks are matched in
+  gamma-encoded luminance, to a quarter pixel, both ways (prev from cur too).
+- **What the held clock cannot hold is reported, never passed.** A `<video>` is paused at load, an
+  animated image (GIF/APNG/WebP/AVIF, sniffed in `@mizchi/vlmkit-core/animated-image.ts`) runs on the
+  browser's clock, and three probe shots 150ms apart catch the rest; their pixels are left out, and over
+  the limit in one field the verdict is `not-judgeable`. The probe is real time, so an animated image's
+  `uncontrolled` row can come and go between runs; its `animated-image` row cannot.
+- **Capture cost was the gate's cost.** pngjs's decode took 19 of 24s of judging 181 frames; a decoder
+  for RGB/RGBA rows (`@mizchi/vlmkit-core/png-decode.ts`) plus CDP `captureScreenshot` with
+  `optimizeForSpeed` (rows filtered "up" only) halved capture (93 → 40ms) and decode. A frame that
+  differs from the previous one is taken in one shot; an equal one is shot again (a stale capture is the
+  previous frame). The field test reads per-frame 16px block sums, so it decodes nothing.
+- **The strip is one still PNG, always.** An animation of a failing window would strobe for whoever
+  opens the review.
+- **The per-pixel record keeps 16 transitions**, so a peak of 16 reads "8+ flashes/s".
+- Not judged, said so in the output: WCAG's 0.1° exception for fine balanced patterns (a 2px
+  inverting checkerboard is reported), a page's own video, states behind interaction, HDR.
 
 ## Responsive layout as a property-based test (`check responsive`)
 
@@ -932,10 +985,10 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
+| `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`); `flash.ts` and `flash-motion.ts` are WCAG 2.3.1's arithmetic over one (`check flash`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 32 of the 34 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 33 of the 35 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -1016,7 +1069,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 34 gates + 211 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 217 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |
