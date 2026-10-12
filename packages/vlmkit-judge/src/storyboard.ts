@@ -68,6 +68,8 @@ export interface FrameDelta {
   over: number;
   /** Their bounding box; null when there are none. */
   box: Box | null;
+  /** The bounding box of every pixel that differs at all; null when the frames are identical. */
+  changed: Box | null;
   /** The largest channel delta of any pixel, 0-255. */
   maxDelta: number;
 }
@@ -89,10 +91,14 @@ export function ignoreMask(width: number, height: number, boxes: readonly Box[])
   return mask;
 }
 
-/** A 32-bit view for the equal-word fast path; copied when the bytes are not 4-aligned. */
+/**
+ * A 32-bit view for the equal-word fast path, over a copy when the bytes are not 4-aligned. The
+ * copy is `new Uint8Array(bytes)`, never `bytes.slice()`: a Node Buffer is a Uint8Array whose
+ * `slice` is a view, and a view of the whole pool from offset 0 compared every frame as the same.
+ */
 function words(bytes: Uint8Array): Uint32Array {
   if (bytes.byteOffset % 4 === 0) return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
-  return new Uint32Array(bytes.slice().buffer);
+  return new Uint32Array(new Uint8Array(bytes).buffer, 0, bytes.byteLength >> 2);
 }
 
 /** How `b` differs from `a`, pixel by pixel. */
@@ -118,9 +124,19 @@ export function frameDelta(
   let y0 = height;
   let x1 = -1;
   let y1 = -1;
+  let cx0 = width;
+  let cy0 = height;
+  let cx1 = -1;
+  let cy1 = -1;
   for (let p = 0; p < size; p++) {
     if (wa[p] === wb[p] || (mask !== null && mask[p] === 1)) continue;
     identical = false;
+    const py = (p / width) | 0;
+    const px = p - py * width;
+    if (px < cx0) cx0 = px;
+    if (px > cx1) cx1 = px;
+    if (py < cy0) cy0 = py;
+    if (py > cy1) cy1 = py;
     const i = p << 2;
     const d = Math.max(
       Math.abs(a[i]! - b[i]!),
@@ -131,15 +147,14 @@ export function frameDelta(
     if (d > maxDelta) maxDelta = d;
     if (d <= floor) continue;
     over++;
-    const y = (p / width) | 0;
-    const x = p - y * width;
-    if (x < x0) x0 = x;
-    if (x > x1) x1 = x;
-    if (y < y0) y0 = y;
-    if (y > y1) y1 = y;
+    if (px < x0) x0 = px;
+    if (px > x1) x1 = px;
+    if (py < y0) y0 = py;
+    if (py > y1) y1 = py;
   }
   const box = over === 0 ? null : { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
-  return { identical, over, box, maxDelta };
+  const changed = identical ? null : { x: cx0, y: cy0, width: cx1 - cx0 + 1, height: cy1 - cy0 + 1 };
+  return { identical, over, box, changed, maxDelta };
 }
 
 /** The smallest box holding both; either may be null. */
@@ -175,9 +190,11 @@ export interface StoryEvent {
   /** The last frame that still showed `from`: the event began after it. */
   before: FrameRef;
   /**
-   * The last frame whose pixels inside the event's box were byte-identical to `from`'s frame, when
-   * it is earlier than `before`: the event's own pixels were already moving below the floor from
-   * just after it (a fade that had not yet shown). Movement elsewhere does not count.
+   * The last frame of this visit (from the frame the page entered `from`) whose pixels inside the
+   * event's box were byte-identical to `from`'s frame, when it is earlier than `before`. After it
+   * those pixels were no longer exactly the state's: moving below the floor (a fade that had not
+   * yet shown), or moved by an earlier event of the visit that left them within the floor.
+   * Movement elsewhere does not count.
    */
   movedAfter?: FrameRef;
   /** The first frame that differs from `from` by more than the floor. */
@@ -212,10 +229,11 @@ export interface StoryEvent {
   /** Every pixel any of its frames moved over the floor from `from`'s frame, as one box. */
   box: Box;
   /**
-   * The largest channel delta between two consecutive frames, inside its box, to its last frame,
-   * from `movedAfter` — or from the frame the visit's previous event came back at, when that is
-   * later — or else from the step into it: how visible one frame's step of it was. Movement
-   * elsewhere on the page does not count, so a sub-floor wiggle beside a fade cannot make it a change.
+   * The largest channel delta between two consecutive frames, inside its box, over the steps from
+   * `movedAfter` — or from the frame the visit's previous event came back at, when that is later —
+   * or else from the step into it, to the first frame back (glitch, transient) or its last frame
+   * (change, drift): how visible one frame's step of it was. Movement elsewhere on the page does
+   * not count, so a sub-floor wiggle beside a fade cannot make it a change.
    */
   maxStepDelta: number;
   /** Its frames whose capture never agreed: motion the capture did not hold. */
@@ -324,7 +342,7 @@ export function buildStoryboard(
     const prior = vs[j - 1];
     const d =
       j === anchor
-        ? { identical: true, over: 0, box: null, maxDelta: 0 }
+        ? { identical: true, over: 0, box: null, changed: null, maxDelta: 0 }
         : prior && steps[j]?.identical
           ? prior
           : delta(anchor, j);
@@ -382,13 +400,16 @@ export function buildStoryboard(
     }
     return { box: box!, peak: { ...ref(peak), over: vsAnchor(peak).over }, unstable };
   };
+  const meets = (a: Box, b: Box) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
   /** The largest channel delta inside `box` between consecutive frames over the steps (from, to]. */
   const stepMax = (from: number, to: number, box: Box): number => {
     let max = 0;
     for (let m = from + 1; m <= to; m++) {
       const st = step(m);
-      // Inside the box a step is never larger than across the frame.
-      if (st.identical || st.maxDelta <= max) continue;
+      // Inside the box a step is never larger than across the frame, and one whose changed pixels
+      // miss the box is nothing inside it.
+      if (st.identical || st.maxDelta <= max || !meets(st.changed!, box)) continue;
       const a = pixels.pixels(m - 1);
       const b = pixels.pixels(m);
       for (let y = box.y; y < box.y + box.height; y++) {
@@ -408,9 +429,14 @@ export function buildStoryboard(
     return max;
   };
 
-  /** Frame m's pixels inside `box` (ignored ones aside) are the anchor's, byte for byte. */
+  /**
+   * Frame m's pixels inside `box` (ignored ones aside) are the anchor's, byte for byte. Answered
+   * from the comparison already made when what differed misses the box; decoded only when it meets it.
+   */
   const sameInBox = (m: number, box: Box): boolean => {
-    if (m === anchor || vsAnchor(m).identical) return true;
+    if (m === anchor) return true;
+    const changed = vsAnchor(m).changed;
+    if (changed === null || !meets(changed, box)) return true;
     const a = words(pixels.pixels(anchor));
     const b = words(pixels.pixels(m));
     for (let y = box.y; y < box.y + box.height; y++) {
@@ -426,8 +452,25 @@ export function buildStoryboard(
    * frame: a fade elsewhere, or a residue another event left within the floor, is not this event's.
    */
   const lastSameInBox = (s: number, box: Box): number => {
-    for (let m = s - 1; m >= visitStart; m--) if (sameInBox(m, box)) return m;
-    return -1;
+    // Events of a visit come in order, so a box searched before resumes where that search began:
+    // frames below it are answered. Without this, a blink repeating over a pixel held a level off
+    // the anchor re-decoded the whole visit for every blink (49927 decodes for 3000 frames).
+    const key = `${box.x},${box.y},${box.width},${box.height}`;
+    const known = searched.get(key);
+    let result = -1;
+    // A frame byte-identical to the one after it has that one's answer: no decode for a hold.
+    let next: boolean | undefined;
+    for (let m = s - 1; m >= (known ? known.upTo : visitStart); m--) {
+      const same = next !== undefined && steps[m + 1]?.identical ? next : sameInBox(m, box);
+      if (same) {
+        result = m;
+        break;
+      }
+      next = same;
+    }
+    if (result === -1 && known) result = known.result;
+    searched.set(key, { upTo: s, result });
+    return result;
   };
   /** `movedAfter` when its pixels moved below the floor first, and where the steps are counted from. */
   const leadIn = (s: number, box: Box) => {
@@ -440,8 +483,11 @@ export function buildStoryboard(
   };
 
   let visitStart = 0;
+  let searched = new Map<string, { upTo: number; result: number }>();
   let j = 1;
   while (j < count) {
+    // The step too, while both frames are fresh: a later search back over a hold reads it.
+    step(j);
     const d = vsAnchor(j);
     if (d.over === 0) {
       j++;
@@ -520,6 +566,7 @@ export function buildStoryboard(
     reanchor(states.find((st) => st.id === to)!.frame.n);
     spanStart = settled;
     visitStart = settled;
+    searched = new Map();
     j = settled + 1;
   }
   if (spanStart !== -1) timeline.push({ state, from: ref(spanStart), to: ref(count - 1) });
@@ -665,8 +712,21 @@ export function storyboardSummary(
   }
   for (const e of story.events) {
     if (e.movedAfter) {
+      // What happened to them after is either a sub-floor motion or an earlier event on them.
+      const after = e.movedAfter.n;
+      const by = story.events.filter(
+        (x) =>
+          x.first.n > after &&
+          x.first.n < e.first.n &&
+          x.box.x < e.box.x + e.box.width &&
+          e.box.x < x.box.x + x.box.width &&
+          x.box.y < e.box.y + e.box.height &&
+          e.box.y < x.box.y + x.box.height,
+      );
       notes.push(
-        `${e.id}: its pixels were already moving below the floor after ${ms(e.movedAfter.atMs)} ms, the last frame in which they were exactly ${e.from}'s.`,
+        by.length > 0
+          ? `${e.id}: its pixels were last exactly ${e.from}'s at ${ms(e.movedAfter.atMs)} ms, before ${by.map((x) => x.id).join(", ")} moved them.`
+          : `${e.id}: its pixels were last exactly ${e.from}'s at ${ms(e.movedAfter.atMs)} ms, and moved below the floor until it showed.`,
       );
     }
     if (e.noHold) {

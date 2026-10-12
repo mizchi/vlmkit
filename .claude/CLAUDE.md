@@ -430,7 +430,7 @@ not to re-learn:
 
 - **Anchor-relative, never merge-then-split.** k blinks are k events and their gaps none; a fade is
   compared with the anchor, so it accumulates until it shows, and `movedAfter` names the last frame
-  byte-identical to the state. A random-plant property test (glitches, sliding transients, changes,
+  of the visit in which the event's own box was still byte-identical to the state. A random-plant property test (glitches, sliding transients, changes,
   5000 seeds once, 200 kept) holds every event to the frames and box it was planted on.
 - **Durations need the same epsilon as instants.** Frame 10 minus frame 4 is 99.99999999999999, so a
   seven-frame 100ms hold never settled and the change ran on into the next event.
@@ -449,6 +449,9 @@ not to re-learn:
 - **`movedAfter` is the event's own pixels.** The last frame of the visit in which they were exactly
   the state's, found inside the event's box. Tracked across the frame, a fade elsewhere, or a
   residue a toast left within the floor, gave an unrelated glitch a "moving since" seconds early.
+  The search decodes nothing when a frame's changed pixels miss the box, and a repeated box resumes
+  its last search: without both, a blink repeating over a pixel held a level off the anchor cost
+  49927 decodes for 3000 frames.
 - **Drift is judged inside the event's box.** Measured across the frame, a sub-floor wiggle beside a
   fade made the fade a change (step 14 between two frames each within the floor of the anchor).
 - **Step before anchor on the 5s look-ahead.** The window is 300 frames at 60fps and the cache a few
@@ -977,7 +980,7 @@ before changing it:
 
 Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all. **Editing a `packages/*/src` file and then running the CLI shows the OLD behavior**: `@mizchi/vlmkit-*` resolves through `exports` to `dist/*.mjs`, so `pnpm build` has to run in between (and never pipe its output to `head` — SIGPIPE leaves a half-deleted `dist/`).
 
-The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. The module file is `moon.mod`, not `moon.mod.json`: CI installs the latest `moon`, and the release of 2026-10-12 refuses the JSON form (`moon fmt` migrates it, but also reformats every `.mbt`; take only the `moon.mod` it writes). If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.
+The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. The module file is `moon.mod`, not `moon.mod.json`: CI installs the latest `moon`, and a release between 2026-10-11 and 2026-10-12 refuses the JSON form (`moon fmt` migrates it, but also reformats every `.mbt`; take only the `moon.mod` it writes). If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.
 
 **After editing anything under `.claude/skills/`, run `pnpm sync:skills`.** The content lives there once and is copied into two installer packages (`skills/vlmkit/workflows/`, `.apm/skills/vlmkit/`); `tests/skill-package.test.mjs` fails if the three drift, and hand-editing a copy is the wrong repair.
 

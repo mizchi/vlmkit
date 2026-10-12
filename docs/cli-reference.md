@@ -1511,8 +1511,8 @@ frame of each hold a change settles in, and an earlier state's own frame when th
 
 A pixel differs when one of its channels moves by more than 8 of 255; the anchor,
 not the previous frame, is what a frame is compared with, so a sub-floor fade
-accumulates until it shows (and `movedAfter` names the last frame in which the
-event's own pixels were still exactly the state's). k blinks
+accumulates until it shows (and `movedAfter` names the last frame of the visit in
+which the event's own pixels were still exactly the state's). k blinks
 are k events and the frames between them none. A state a change lands back in
 (within the floor of its frame) is the first such state, visited again, and its
 frame is the anchor again. Within the floor is not transitive, so equal bytes can

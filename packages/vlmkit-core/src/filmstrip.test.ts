@@ -290,18 +290,32 @@ describe("cell labels and box outlines (storyboard rows)", () => {
   });
 
   it("the mapped box is where scalePngData actually draws the box's pixels", () => {
-    for (const [w, h, scale] of [
-      [320, 200, 1.25],
-      [1280, 720, 4.25],
-      [100, 50, 2.75],
-    ] as const) {
-      for (let k = 0; k < 40; k++) {
-        const box = {
-          x: (k * 37) % (w - 20),
-          y: (k * 53) % (h - 20),
-          width: 1 + ((k * 11) % 19),
-          height: 1 + ((k * 7) % 19),
-        };
+    type B = { x: number; y: number; width: number; height: number };
+    const swept = (w: number, h: number): B[] =>
+      Array.from({ length: 40 }, (_, k) => ({
+        x: (k * 37) % (w - 20),
+        y: (k * 53) % (h - 20),
+        width: 1 + ((k * 11) % 19),
+        height: 1 + ((k * 7) % 19),
+      }));
+    const cases: [number, number, number, B[]][] = [
+      [320, 200, 1.25, swept(320, 200)],
+      [1280, 720, 4.25, swept(1280, 720)],
+      [100, 50, 2.75, swept(100, 50)],
+      // Where float and exact sampling part: 105 * (1440 / 175) is 863.99…, so sheet row 105 shows
+      // source row 863. A sampler "fixed" to the exact ratio moves the box off its outline.
+      [
+        2560,
+        1440,
+        8.25,
+        [
+          { x: 100, y: 840, width: 50, height: 24 },
+          { x: 100, y: 856, width: 50, height: 24 },
+        ],
+      ],
+    ];
+    for (const [w, h, scale, boxes] of cases) {
+      for (const box of boxes) {
         // The frame white, the box black: the scaled frame's black pixels are the truth.
         const frame = solid(w, h, [255, 255, 255]);
         for (let y = box.y; y < box.y + box.height; y++)
@@ -353,7 +367,11 @@ describe("cell labels and box outlines (storyboard rows)", () => {
     assert.deepEqual(pixel(sheet, inner.x + inner.width, inner.y), GREEN, "right");
     assert.deepEqual(pixel(sheet, inner.x, inner.y - 1), GREEN, "top");
     assert.deepEqual(pixel(sheet, inner.x, inner.y + inner.height), GREEN, "bottom");
-    assert.deepEqual(pixel(sheet, inner.x - 3, inner.y), [255, 0, 0, 255], "two pixels wide, no more");
+    assert.deepEqual(pixel(sheet, inner.x - 2, inner.y), GREEN, "two pixels wide: the second left");
+    assert.deepEqual(pixel(sheet, inner.x, inner.y - 2), GREEN, "the second above");
+    assert.deepEqual(pixel(sheet, inner.x + inner.width + 1, inner.y), GREEN, "the second right");
+    assert.deepEqual(pixel(sheet, inner.x, inner.y + inner.height + 1), GREEN, "the second below");
+    assert.deepEqual(pixel(sheet, inner.x - 3, inner.y), [255, 0, 0, 255], "and no more");
     for (let y = inner.y; y < inner.y + inner.height; y++) {
       for (let x = inner.x; x < inner.x + inner.width; x++) assert.deepEqual(pixel(sheet, x, y), [255, 0, 0, 255]);
     }

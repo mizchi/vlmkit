@@ -67,14 +67,27 @@ const repeat = (f: Uint8Array, n: number) => Array.from({ length: n }, () => f);
 
 describe("frameDelta", () => {
   test("identical frames, and a change above and below the floor", () => {
-    assert.deepEqual(frameDelta(blank, blank, W, H), { identical: true, over: 0, box: null, maxDelta: 0 });
+    assert.deepEqual(frameDelta(blank, blank, W, H), {
+      identical: true,
+      over: 0,
+      box: null,
+      changed: null,
+      maxDelta: 0,
+    });
     const faint = frame([{ ...dot, rgb: [255 - CHANNEL_FLOOR, 255, 255] }]);
-    assert.deepEqual(frameDelta(blank, faint, W, H), { identical: false, over: 0, box: null, maxDelta: 8 });
+    assert.deepEqual(frameDelta(blank, faint, W, H), {
+      identical: false,
+      over: 0,
+      box: null,
+      changed: { x: 5, y: 6, width: 4, height: 3 },
+      maxDelta: 8,
+    });
     const shown = frame([{ ...dot, rgb: [255 - CHANNEL_FLOOR - 1, 255, 255] }]);
     assert.deepEqual(frameDelta(blank, shown, W, H), {
       identical: false,
       over: 12,
       box: { x: 5, y: 6, width: 4, height: 3 },
+      changed: { x: 5, y: 6, width: 4, height: 3 },
       maxDelta: 9,
     });
   });
@@ -83,6 +96,17 @@ describe("frameDelta", () => {
     const mask = new Uint8Array(W * H);
     for (let y = 6; y < 9; y++) mask.fill(1, y * W + 5, y * W + 9);
     assert.equal(frameDelta(blank, frame([dot]), W, H, { mask }).identical, true);
+  });
+
+  test("a Node Buffer at an odd offset is copied, not viewed from the start of its pool", () => {
+    // Buffer#slice is a view, so a copy made with it read the pool from offset 0 for every frame.
+    const pool = Buffer.alloc(W * H * 4 * 2 + 2);
+    const a = pool.subarray(1, 1 + W * H * 4);
+    const b = pool.subarray(2 + W * H * 4, 2 + W * H * 8);
+    a.set(blank);
+    b.set(frame([dot]));
+    assert.equal(frameDelta(a, b, W, H).over, 12);
+    assert.equal(frameDelta(a, a, W, H).identical, true);
   });
 
   test("bytes that are not 4-aligned are compared all the same", () => {
@@ -254,10 +278,31 @@ describe("buildStoryboard: the planted cases", () => {
     assert.throws(() => buildStoryboard(s.entries, s.pixels), /time order/);
   });
 
-  test("a still page is read once per frame against the anchor, not once per pair", () => {
-    const s = sequence(repeat(blank, 50));
-    buildStoryboard(s.entries, s.pixels);
-    assert.ok(s.reads() <= 2 * 49, `${s.reads()} reads`);
+  test("a still page is decoded once per frame through a small cache", () => {
+    const frames = repeat(blank, 50).map((f) => f.slice());
+    const cache = new Map<number, Uint8Array>();
+    let decoded = 0;
+    const pixels = {
+      width: W,
+      height: H,
+      pixels: (i: number) => {
+        const hit = cache.get(i);
+        if (hit) {
+          cache.delete(i);
+          cache.set(i, hit);
+          return hit;
+        }
+        decoded++;
+        cache.set(i, frames[i]!);
+        if (cache.size > 8) cache.delete(cache.keys().next().value!);
+        return frames[i]!;
+      },
+    };
+    buildStoryboard(
+      frames.map((_, n) => ({ n, atMs: frameTimeMs(n), stable: true })),
+      pixels,
+    );
+    assert.equal(decoded, 50);
   });
 });
 
@@ -522,6 +567,146 @@ describe("buildStoryboard: the boundaries", () => {
     assert.ok(decoded < 500, `${decoded} decodes for 400 frames`);
   });
 
+  test("movedAfter: an ignored pixel inside the box never counts, and the box's last row and column do", () => {
+    const wiggle: Paint = { x: 30, y: 20, w: 1, h: 1, rgb: [250, 250, 250] };
+    const region: Paint = { x: 5, y: 6, w: 4, h: 3, rgb: [0, 0, 0] };
+    // A fade on the region from frame 5; a sub-floor wiggle elsewhere from frame 1, so no frame
+    // after 0 is identical across the frame; and the given paint from frame `from`.
+    const fade = (extra: (f: number) => Paint[]) => {
+      const frames = [blank];
+      for (let f = 1; f <= 30; f++) {
+        const v = f >= 5 ? Math.max(235, 255 - (f - 4)) : 255;
+        // The extra paint under the fade, so the fade covers it once it starts.
+        frames.push(frame([wiggle, ...extra(f), ...(f >= 5 ? [{ ...region, rgb: [v, v, v] as Rgb }] : [])]));
+      }
+      frames.push(...repeat(frames.at(-1)!, 10));
+      return frames;
+    };
+    // The ignored pixel is painted over the fade, black on every frame from 1.
+    const ignoredFrames = fade(() => []).map((f, i) => {
+      if (i === 0) return f;
+      const g = f.slice();
+      g.fill(0, (7 * W + 6) * 4, (7 * W + 6) * 4 + 3);
+      return g;
+    });
+    const ignored = ignoredFrames;
+    assert.deepEqual(
+      story(ignored, {}, [{ x: 6, y: 7, width: 1, height: 1 }]).events.map((e) => e.movedAfter?.n),
+      [4],
+    );
+    // Two more wiggles on either side of the box, so what changed spans it and its bytes are compared.
+    const spanning = ignoredFrames.map((f, i) => {
+      if (i === 0) return f;
+      const g = f.slice();
+      for (const [x, y] of [
+        [3, 5],
+        [10, 10],
+      ] as const)
+        g.fill(250, (y * W + x) * 4, (y * W + x) * 4 + 3);
+      return g;
+    });
+    assert.deepEqual(
+      story(spanning, {}, [{ x: 6, y: 7, width: 1, height: 1 }]).events.map((e) => e.movedAfter?.n),
+      [4],
+    );
+    const lastRow = fade((f) => (f >= 2 ? [{ x: 5, y: 8, w: 4, h: 1, rgb: [254, 254, 254] }] : []));
+    assert.deepEqual(
+      story(lastRow).events.map((e) => e.movedAfter?.n),
+      [1],
+    );
+    const lastColumn = fade((f) => (f >= 2 ? [{ x: 8, y: 6, w: 1, h: 3, rgb: [254, 254, 254] }] : []));
+    assert.deepEqual(
+      story(lastColumn).events.map((e) => e.movedAfter?.n),
+      [1],
+    );
+  });
+
+  test("a note says what happened to an event's pixels after they were last the state's", () => {
+    const toast: Paint = { x: 0, y: 0, w: 4, h: 4, rgb: [0, 0, 0] };
+    // A toast leaves a residue within the floor; a second toast on the same pixels follows.
+    const residue = frame([{ ...toast, rgb: [252, 252, 252] }]);
+    const s = sequence(
+      [
+        ...repeat(blank, 10),
+        ...repeat(frame([toast]), 5),
+        ...repeat(residue, 10),
+        ...repeat(frame([toast]), 5),
+        ...repeat(residue, 5),
+      ],
+      {
+        gapMs: 100,
+      },
+    );
+    const b = buildStoryboard(s.entries, s.pixels);
+    assert.deepEqual(
+      b.events.map((e) => [e.id, e.kind, e.movedAfter?.n]),
+      [
+        ["E1", "transient", undefined],
+        ["E2", "transient", 9],
+      ],
+    );
+    const md = storyboardSummary(
+      b,
+      { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" },
+      s.entries,
+    );
+    assert.match(md, /E2: its pixels were last exactly S0's at 900 ms, before E1 moved them\./);
+    assert.doesNotMatch(md, /E2: .*moved below the floor/);
+  });
+
+  test("a blink repeating over a pixel held a level off the anchor does not re-decode the visit for every blink", () => {
+    // 600 frames: frame 0 white, then one pixel inside the blink's box at 254 for good (and, in the
+    // second run, another far outside it), and a 3-frame blink every 50 frames.
+    const blinkBox: Paint = { x: 20, y: 10, w: 6, h: 6, rgb: [0, 0, 0] };
+    const build = (outside: boolean, inside = true) =>
+      Array.from({ length: 600 }, (_, i) =>
+        i === 0
+          ? blank
+          : frame([
+              ...(inside ? [{ x: 21, y: 11, w: 1, h: 1, rgb: [254, 254, 254] as Rgb }] : []),
+              ...(outside ? [{ x: 39, y: 29, w: 1, h: 1, rgb: [i % 2 ? 250 : 252, 250, 250] as Rgb }] : []),
+              ...(i % 50 >= 10 && i % 50 < 13 ? [blinkBox] : []),
+            ]),
+      );
+    for (const [outside, inside, bound] of [
+      // Between blinks the frames are a hold: its answer is carried, not decoded again.
+      [false, true, 1.3],
+      // Every frame differs from the last: each is decoded once more, for the search, and no more.
+      [true, true, 2.5],
+      // Noise only outside the box: no back-search frame needs decoding at all.
+      [true, false, 1.2],
+    ] as const) {
+      const frames = build(outside, inside);
+      const cache = new Map<number, Uint8Array>();
+      let decoded = 0;
+      const pixels = {
+        width: W,
+        height: H,
+        pixels: (i: number) => {
+          const hit = cache.get(i);
+          if (hit) {
+            cache.delete(i);
+            cache.set(i, hit);
+            return hit;
+          }
+          decoded++;
+          cache.set(i, frames[i]!);
+          if (cache.size > 8) cache.delete(cache.keys().next().value!);
+          return frames[i]!;
+        },
+      };
+      const entries = frames.map((_, n) => ({ n, atMs: frameTimeMs(n), stable: true }));
+      const events = buildStoryboard(entries, pixels).events;
+      assert.equal(events.length, 12, `outside ${outside}`);
+      assert.ok(
+        events.every((e) => e.movedAfter?.n === (inside ? 0 : undefined)),
+        `outside ${outside} inside ${inside}`,
+      );
+      // Linear: about two decodes a frame at most. Re-searching the visit for every blink was ~seven.
+      assert.ok(decoded < bound * 600, `${decoded} decodes for 600 frames (outside ${outside}, inside ${inside})`);
+    }
+  });
+
   test("the summary notes only what happened", () => {
     const frames = repeat(blank, 8);
     frames[3] = frame([dot]);
@@ -760,7 +945,7 @@ S0 0–33.33 · E1 50 · S0 66.67–316.67 · E2 333.33–383.33 · S1 383.33–
 
 ## Notes
 
-- E2: its pixels were already moving below the floor after 183.33 ms, the last frame in which they were exactly S0's.
+- E2: its pixels were last exactly S0's at 183.33 ms, and moved below the floor until it showed.
 - E2: only 250 ms followed its first frame; a return later than that is not in the sequence.
 - E3: the hold it settled in is the sequence's last 33.33 ms, shorter than 100 ms; it may still have been moving.
 - E3: only 50 ms followed its first frame; a return later than that is not in the sequence.
