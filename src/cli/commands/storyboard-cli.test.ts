@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { cp, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,7 +10,11 @@ import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import { captureTimelineFrames } from "@mizchi/vlmkit-animation-eval/frames-capture.ts";
 import { FRAMES_FORMAT, frameFileName, frameTimeMs, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
 import type { Box, StoryEvent } from "@mizchi/vlmkit-judge/storyboard.ts";
-import { framesOnDisk, parseArgs, writeStoryboard } from "./storyboard-cli.ts";
+import { boxOnSheet } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { framesOnDisk, parseArgs, writeStoryboard, type StoryboardWritten } from "./storyboard-cli.ts";
+
+/** The position of the manifest frame at `atMs`. */
+const manifestFrame = (w: StoryboardWritten, atMs: number) => w.manifest.frames.findIndex((f) => f.atMs === atMs);
 
 describe("snapshot storyboard args", () => {
   test("a manifest, boxes to ignore and a cap", () => {
@@ -30,10 +35,12 @@ describe("snapshot storyboard args", () => {
   test("refuses what it cannot read, naming the flag", () => {
     assert.throws(() => parseArgs([]), /no frames\.json given/);
     assert.throws(() => parseArgs(["a.json", "b.json"]), /one frames\.json at a time/);
-    for (const bad of ["1,2,3", "1,2,0,4", "-1,0,2,2", "a,b,c,d", "1.5,0,2,2"]) {
+    for (const bad of ["1,2,3", "1,2,0,4", "-1,0,2,2", "a,b,c,d", "1.5,0,2,2", ",,4,4", "0x10,0,4,4", "1e1,0,4,4"]) {
       assert.throws(() => parseArgs(["f.json", "--ignore", bad]), /--ignore expects/, bad);
     }
-    assert.throws(() => parseArgs(["f.json", "--max-events", "0"]), /--max-events/);
+    for (const bad of ["0", "1e1", "0x10", "", "2.5"]) {
+      assert.throws(() => parseArgs(["f.json", "--max-events", bad]), /--max-events/, bad);
+    }
     assert.throws(() => parseArgs(["f.json", "--frobnicate"]), /unknown option/);
   });
 });
@@ -115,7 +122,7 @@ describe("writeStoryboard", () => {
     assert.equal(json.events[1].keyframes.at(-1).file, frameFileName(12, frameTimeMs(12)));
   });
 
-  test("the frame cache decodes a still sequence once per frame", async () => {
+  test("the frame cache holds eight at the least, and evicts the least recently used", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-cache-"));
     await writeSequence(
       dir,
@@ -126,6 +133,93 @@ describe("writeStoryboard", () => {
     for (let i = 0; i < 12; i++) px.pixels(i);
     for (let i = 4; i < 12; i++) px.pixels(i);
     assert.equal(px.decoded(), 12, "the last eight are still cached at the minimum capacity");
+    px.pixels(4); // the oldest, used again: now the newest
+    px.pixels(0); // evicted, so decoded again; this evicts 5, not 4
+    assert.equal(px.decoded(), 13);
+    px.pixels(4);
+    assert.equal(px.decoded(), 13, "4 was used recently and stays");
+    px.pixels(5);
+    assert.equal(px.decoded(), 14, "5 was the least recently used");
+  });
+
+  test("a frame that is not a PNG is named, not a pngjs stack", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-corrupt-"));
+    const manifest = await writeSequence(dir, [undefined, undefined, undefined]);
+    const file = join(dir, frameFileName(2, frameTimeMs(2)));
+    await writeFile(file, (await readFile(file)).subarray(0, 60));
+    await assert.rejects(
+      writeStoryboard(manifest),
+      (e: Error) => e.name === "UsageError" && /frame 2 \(.*\) is not a readable PNG/.test(e.message),
+    );
+  });
+
+  test("the sheet shows each keyframe, the box outlined around it and never over it; the brief's files are the frames", async () => {
+    const boxes: (Box | undefined)[] = Array.from({ length: 30 }, () => undefined);
+    boxes[5] = { x: 0, y: 0, width: 32, height: 1 }; // a one-pixel bar along the top edge
+    for (let n = 12; n < 30; n++) boxes[n] = { x: 10, y: 8, width: 6, height: 5 };
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-sheet-"));
+    const manifest = await writeSequence(dir, boxes);
+    const w = await writeStoryboard(manifest);
+    assert.equal(w.sheet.layout.scale, 1, "small frames: the sheet is at full size, so cells are the frames' pixels");
+    const sheet = PNG.sync.read(await readFile(w.files.sheet));
+    const at = (x: number, y: number) => [
+      ...sheet.data.subarray((y * sheet.width + x) * 4, (y * sheet.width + x) * 4 + 3),
+    ];
+    const frameAt = (n: number) => PNG.sync.read(readFileSync(join(dir, frameFileName(n, frameTimeMs(n)))));
+    const rgb = (png: PNG, x: number, y: number) => [
+      ...png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 3),
+    ];
+    const MAGENTA = [255, 0, 255];
+    const frameSize = { width: 32, height: 24 };
+    let outlined = 0;
+    w.sheet.cells.forEach((cell, i) => {
+      if (!cell?.box) return;
+      outlined++;
+      const b = boxOnSheet(w.sheet.layout, i, frameSize, cell.box);
+      const p = w.sheet.layout.positions[i]!;
+      const frame = frameAt(cell.n);
+      for (let y = b.y; y < b.y + b.height; y++) {
+        for (let x = b.x; x < b.x + b.width; x++)
+          assert.deepEqual(at(x, y), rgb(frame, x - p.x, y - p.y), `cell ${i} ${x},${y}`);
+      }
+      // A cell away from the box shows its frame too: the keyframe, not some other frame.
+      assert.deepEqual(at(p.x + 31, p.y + 23), rgb(frame, 31, 23), `cell ${i} corner`);
+      assert.deepEqual(at(b.x - 1, b.y), MAGENTA, `cell ${i} left`);
+      assert.deepEqual(at(b.x + b.width, b.y), MAGENTA, `cell ${i} right`);
+      assert.deepEqual(at(b.x, b.y - 1), MAGENTA, `cell ${i} top (the edge bar's is in the gap)`);
+      assert.deepEqual(at(b.x, b.y + b.height), MAGENTA, `cell ${i} bottom`);
+    });
+    assert.equal(outlined, 5, "the glitch's three keyframes and the change's two");
+    for (const [id, images] of w.images) {
+      const event = w.story.events.find((e) => e.id === id)!;
+      for (const img of images) {
+        const n = manifestFrame(w, img.atMs);
+        assert.deepEqual(
+          await readFile(join(w.outDir, "narrate", img.file)),
+          await readFile(join(dir, frameFileName(n, frameTimeMs(n)))),
+          img.file,
+        );
+        const c = img.crop!;
+        const crop = PNG.sync.read(await readFile(join(w.outDir, "narrate", c.file)));
+        assert.deepEqual([crop.width, crop.height], [c.box.width * c.zoom, c.box.height * c.zoom], c.file);
+        assert.ok(
+          c.box.x <= event.box.x && c.box.x + c.box.width >= event.box.x + event.box.width,
+          "the crop holds the box",
+        );
+        const frame = frameAt(n);
+        for (const [x, y] of [
+          [0, 0],
+          [c.box.width - 1, c.box.height - 1],
+          [event.box.x - c.box.x, event.box.y - c.box.y],
+        ] as const) {
+          assert.deepEqual(
+            rgb(crop, x * c.zoom, y * c.zoom),
+            rgb(frame, c.box.x + x, c.box.y + y),
+            `${c.file} ${x},${y}`,
+          );
+        }
+      }
+    }
   });
 });
 
@@ -202,6 +296,11 @@ describe("snapshot storyboard: planted events on the held clock", () => {
   test("a toast shown by timers from 300 to 700 ms: one transient, frames 18-41", async () => {
     const { story } = await storyOf("kind=toast");
     assert.deepEqual(story.events.map(brief), [{ kind: "transient", first: 18, back: 42 }]);
+    assert.equal(
+      story.events[0]!.peak.n,
+      18,
+      "a toast covers the same pixels on every frame: the earliest is the peak",
+    );
     assert.deepEqual(story.events[0]!.box, { x: 198, y: 160, width: 110, height: 28 });
   });
 
@@ -219,17 +318,21 @@ describe("snapshot storyboard: planted events on the held clock", () => {
     const { story } = await storyOf("kind=fade");
     assert.equal(story.events.length, 1, JSON.stringify(story.events.map(brief)));
     const e = story.events[0]!;
-    assert.equal(e.kind, "drift");
-    assert.ok(e.maxStepDelta <= 8, `largest step ${e.maxStepDelta}`);
-    assert.ok(e.movedAfter && e.movedAfter.n < e.first.n, JSON.stringify(e.movedAfter));
-    assert.ok(e.settled && e.settled.n > e.first.n && e.settled.n <= 55, JSON.stringify(e.settled));
+    // Opacity 0.06 * p of black is drawn in 8-bit alpha: still 0 at frame 11, 9 (over the floor)
+    // first at frame 35, and 15 for good from frame 53, two frames before p reaches 1.
+    assert.deepEqual(
+      [e.kind, e.movedAfter?.n, e.before.n, e.first.n, e.settled?.n, e.maxStepDelta],
+      ["drift", 11, 34, 35, 53, 1],
+    );
     assert.deepEqual(e.box, { x: 160, y: 90, width: 100, height: 50 });
   });
 
   test("a spinner turning every frame never settles, and ignoring its box leaves nothing", async () => {
     const moving = await storyOf("kind=spinner");
-    assert.equal(moving.story.events.length, 1);
-    assert.equal(moving.story.events[0]!.endedInMotion, true);
+    assert.deepEqual(
+      moving.story.events.map((e) => [e.kind, e.before.n, e.first.n, e.last?.n, e.endedInMotion]),
+      [["change", 0, 1, 60, true]],
+    );
     const box = moving.story.events[0]!.box;
     const ignored = await storyOf("kind=spinner", { ignore: [box] });
     assert.deepEqual(ignored.story.events, []);

@@ -7,6 +7,7 @@ import {
   CHANNEL_FLOOR,
   eventKeyframes,
   frameDelta,
+  ignoreMask,
   storyboardBrief,
   storyboardSummary,
   type Box,
@@ -109,6 +110,7 @@ describe("buildStoryboard: the planted cases", () => {
     const [e, ...rest] = story(frames).events;
     assert.equal(rest.length, 0);
     assert.equal(e!.kind, "glitch");
+    assert.equal(e!.movedAfter, undefined, "nothing moved below the floor first");
     assert.deepEqual([e!.before.n, e!.first.n, e!.last!.n, e!.back!.n], [9, 10, 10, 11]);
     assert.equal(e!.frames, 1);
     assert.deepEqual(e!.box, { x: 5, y: 6, width: 4, height: 3 });
@@ -259,6 +261,223 @@ describe("buildStoryboard: the planted cases", () => {
   });
 });
 
+describe("buildStoryboard: the boundaries", () => {
+  const level = (v: number, at: Paint = dot): Paint => ({ ...at, rgb: [v, v, v] });
+  const grey: Rgb = [128, 128, 128];
+
+  test("the 5000ms window is measured from the first frame, and its end is inclusive", () => {
+    const on = frame([dot]);
+    const back = (onFrames: number) => [...repeat(blank, 248), ...repeat(on, onFrames), ...repeat(blank, 12)];
+    // frame 548 - frame 248 is 5000.000000000001ms: on the bound, so back in time.
+    assert.deepEqual(
+      story(back(300)).events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 248, 548]],
+    );
+    assert.deepEqual(
+      story(back(301)).events.map((e) => [e.kind, e.from, e.to]),
+      [
+        ["change", "S0", "S1"],
+        ["change", "S1", "S0"],
+      ],
+    );
+    // At 100ms: away for 50 frames is back 5000ms after the first frame, 5100ms after `before`.
+    const sparse = story([...repeat(blank, 5), ...repeat(on, 50), ...repeat(blank, 5)], { gapMs: 100 });
+    assert.deepEqual(
+      sparse.events.map((e) => [e.kind, e.back?.n]),
+      [["transient", 55]],
+    );
+  });
+
+  test("a hold under 100ms does not settle a change, and one of 100ms does", () => {
+    const moved = (x: number) => frame([{ ...dot, x }]);
+    // 60fps: a six-frame plateau is 83.33ms.
+    const a = story([...repeat(moved(0), 5), moved(2), ...repeat(moved(4), 6), moved(6), ...repeat(moved(8), 10)]);
+    assert.deepEqual(
+      a.events.map((e) => [e.kind, e.first.n, e.settled?.n, e.frames]),
+      [["change", 5, 13, 9]],
+    );
+    // 10ms apart: a 90ms plateau runs on; a 100ms hold settles, and the next move is a new event.
+    const b = story(
+      [
+        ...repeat(moved(0), 5),
+        moved(2),
+        ...repeat(moved(4), 10),
+        moved(6),
+        ...repeat(moved(8), 11),
+        moved(10),
+        ...repeat(moved(12), 12),
+      ],
+      { gapMs: 10 },
+    );
+    assert.deepEqual(
+      b.events.map((e) => [e.first.n, e.settled?.n]),
+      [
+        [5, 17],
+        [28, 29],
+      ],
+    );
+  });
+
+  test("a hold that reaches the last frame settles a change, and says how short it was", () => {
+    const moved = (x: number) => frame([{ ...dot, x }]);
+    const s = sequence([...repeat(moved(0), 5), moved(2), ...repeat(moved(4), 3)]);
+    const b = buildStoryboard(s.entries, s.pixels);
+    assert.deepEqual(
+      b.events.map((e) => [e.kind, e.settled?.n, e.to, e.endedInMotion]),
+      [["change", 6, "S1", undefined]],
+    );
+    const md = storyboardSummary(
+      b,
+      { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" },
+      s.entries,
+    );
+    assert.match(md, /E1: the hold it settled in is the sequence's last 33\.33 ms, shorter than 100 ms/);
+  });
+
+  test("drift and change meet at the floor: steps of 8 drift, steps of 9 change", () => {
+    const fade = (step: number) => [
+      ...repeat(blank, 5),
+      ...Array.from({ length: 10 }, (_, i) => frame([level(255 - step * (i + 1))])),
+      ...repeat(frame([level(255 - step * 10)]), 10),
+    ];
+    const by8 = story(fade(8)).events;
+    assert.deepEqual(
+      by8.map((e) => [e.kind, e.first.n, e.before.n, e.movedAfter?.n, e.maxStepDelta]),
+      [["drift", 6, 5, 4, 8]],
+    );
+    const by9 = story(fade(9)).events;
+    assert.deepEqual(
+      by9.map((e) => [e.kind, e.first.n, e.movedAfter, e.maxStepDelta]),
+      [["change", 5, undefined, 9]],
+    );
+    // A creep below the floor, then a jump: a change, and the jump is its step.
+    const creep = [
+      ...repeat(blank, 5),
+      ...Array.from({ length: 7 }, (_, i) => frame([level(254 - i)])),
+      ...repeat(frame([level(0)]), 10),
+    ];
+    assert.deepEqual(
+      story(creep).events.map((e) => [e.kind, e.first.n, e.movedAfter?.n, e.maxStepDelta]),
+      [["change", 12, 4, 248]],
+    );
+  });
+
+  test("a fade keeps its movedAfter through a glitch elsewhere that comes back within the floor", () => {
+    const elsewhere: Paint = { x: 30, y: 20, w: 3, h: 3, rgb: [0, 0, 0] };
+    const frames = repeat(blank, 5);
+    for (let i = 1; i <= 20; i++) frames.push(frame([level(255 - i), ...(frames.length === 7 ? [elsewhere] : [])]));
+    frames.push(...repeat(frames.at(-1)!, 10));
+    assert.deepEqual(
+      story(frames).events.map((e) => [e.kind, e.first.n, e.back?.n, e.settled?.n, e.movedAfter?.n, e.maxStepDelta]),
+      [
+        ["glitch", 7, 8, undefined, 4, 255],
+        ["drift", 13, undefined, 24, 4, 1],
+      ],
+    );
+  });
+
+  test("a wiggle below the floor elsewhere does not make a fade a change; a jump on its own pixels does", () => {
+    const side: Paint = { x: 30, y: 20, w: 2, h: 2, rgb: grey };
+    const frames = repeat(frame([], grey), 5);
+    frames.push(frame([{ ...side, rgb: [135, 135, 135] }], grey));
+    const wiggled = { ...side, rgb: [121, 121, 121] as Rgb };
+    frames.push(frame([wiggled], grey));
+    for (let i = 1; i <= 15; i++) frames.push(frame([wiggled, level(128 + i)], grey));
+    frames.push(...repeat(frames.at(-1)!, 10));
+    assert.deepEqual(
+      story(frames).events.map((e) => [e.kind, e.movedAfter?.n, e.maxStepDelta]),
+      [["drift", 4, 1]],
+    );
+    const own = [
+      ...repeat(frame([], grey), 5),
+      frame([level(121)], grey),
+      frame([level(135)], grey),
+      ...repeat(frame([level(137)], grey), 10),
+    ];
+    assert.deepEqual(
+      story(own).events.map((e) => [e.kind, e.first.n, e.movedAfter?.n, e.maxStepDelta]),
+      [["change", 7, 4, 14]],
+    );
+  });
+
+  test("a picture is one state wherever it recurs: a return within the floor is anchored on the state's frame", () => {
+    const at = (v: number, n: number) => repeat(frame([level(v)]), n);
+    const s = story([...at(100, 5), ...at(200, 60), ...at(106, 60), ...at(112, 60), ...at(200, 60), ...at(112, 10)], {
+      gapMs: 100,
+    });
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.from, e.to, e.first.n, e.settled?.n]),
+      [
+        ["change", "S0", "S1", 5, 5],
+        ["change", "S1", "S0", 65, 65],
+        ["drift", "S0", "S2", 125, 125],
+        ["change", "S2", "S1", 185, 185],
+        ["change", "S1", "S2", 245, 245],
+      ],
+    );
+    assert.deepEqual(
+      s.states.map((st) => [st.id, st.frame.n, st.visits]),
+      [
+        ["S0", 0, 2],
+        ["S1", 5, 2],
+        ["S2", 125, 2],
+      ],
+    );
+    // 106 is within the floor of S0's frame but not identical to it: no frame after the return
+    // is "identical to S0", so the drift at 125 names none.
+    assert.equal(s.events[2]!.movedAfter, undefined);
+  });
+
+  test("an ignored box that is not on whole pixels covers every pixel it touches", () => {
+    const mask = ignoreMask(8, 4, [{ x: 0, y: 0.5, width: 2, height: 1 }])!;
+    assert.deepEqual(
+      [...mask.keys()].filter((i) => mask[i] === 1),
+      [0, 1, 8, 9],
+    );
+  });
+
+  test("the summary notes only what happened", () => {
+    const frames = repeat(blank, 8);
+    frames[3] = frame([dot]);
+    const s = sequence(frames);
+    const md = storyboardSummary(
+      buildStoryboard(s.entries, s.pixels),
+      { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" },
+      s.entries,
+    );
+    assert.doesNotMatch(md, /## Notes/, "a plain glitch on every frame of a held clock needs none");
+  });
+});
+
+describe("storyboardSummary: one sequence, every section, byte for byte", () => {
+  test("a glitch, a drift and a change that settles in the last frames", () => {
+    const moved = (x: number) => frame([{ ...dot, x, rgb: [0, 0, 0] }]);
+    const faint = (v: number): Paint => ({ x: 20, y: 18, w: 6, h: 4, rgb: [v, v, v] });
+    const frames = repeat(moved(5), 12);
+    frames[3] = frame([
+      { ...dot, x: 5 },
+      { x: 30, y: 2, w: 4, h: 4, rgb: [200, 0, 0] },
+    ]);
+    for (let i = 1; i <= 12; i++) frames.push(frame([{ ...dot, x: 5 }, faint(255 - i)]));
+    frames.push(...repeat(frames.at(-1)!, 8));
+    frames.push(frame([{ ...dot, x: 7 }, faint(243)]), ...repeat(frame([{ ...dot, x: 9 }, faint(243)]), 3));
+    const s = sequence(frames);
+    const md = storyboardSummary(
+      buildStoryboard(s.entries, s.pixels),
+      {
+        tool: "check animation",
+        url: "file:///page.html",
+        viewport: { width: W, height: H },
+        deviceScaleFactor: 1,
+        browser: "chromium 141",
+        clock: "held",
+      },
+      s.entries,
+    );
+    assert.equal(md, GOLDEN_SUMMARY);
+  });
+});
+
 describe("eventKeyframes", () => {
   test("a glitch is before, the frame, and back; coinciding roles are one keyframe", () => {
     const frames = repeat(blank, 8);
@@ -349,9 +568,17 @@ describe("buildStoryboard: planted at random", () => {
         first: e.first.n,
         ...(e.back ? { back: e.back.n } : {}),
         ...(e.settled ? { settled: e.settled.n } : {}),
+        ...(e.movedAfter ? { movedAfter: e.movedAfter.n } : {}),
+        peak: e.peak.n,
         box: e.box,
       }));
-      assert.deepEqual(got, planted, `seed ${seed}`);
+      // Every planted frame covers the same number of pixels, so the peak is the earliest: the
+      // first. Nothing moves below the floor, so no event has a movedAfter.
+      assert.deepEqual(
+        got,
+        planted.map((p) => ({ ...p, peak: p.first })),
+        `seed ${seed}`,
+      );
     }
   });
 
@@ -414,3 +641,41 @@ describe("storyboardSummary", () => {
     );
   });
 });
+
+/** Read by eye once (every value checked against the frames above), then pinned. */
+const GOLDEN_SUMMARY = `# Storyboard
+
+check animation · file:///page.html · 40x30 viewport at 1x · chromium 141 · held clock
+
+36 frames of 40x30 px from 0 to 583.33 ms, every 60 fps frame.
+A pixel differs when one of its channels moves by more than 8 of 255. A departure from the state that comes back within 5000 ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first 100 ms of identical frames (a drift when no step between two frames, inside its box, crosses the floor).
+
+## Events
+
+| Event | Kind | Began (ms) | Ended (ms) | Frames | Box (px) | Peak | States |
+|---|---|---|---|---|---|---|---|
+| E1 | glitch | 33.33 – 50 | 50 – 66.67 | 1 | 30,2 4x4 | 16 px at 50 | S0 → S0 |
+| E2 | drift | 316.67 – 333.33 | 366.67 – 383.33 | 4 | 20,18 6x4 | 24 px at 333.33 | S0 → S1 |
+| E3 | change | 516.67 – 533.33 | 533.33 – 550 | 2 | 5,6 8x3 | 24 px at 550 | S1 → S2 |
+
+Began: between the last frame that showed the state and the first that did not. Ended: between the last frame that differed and the first back (glitch, transient), or between the last frame that moved and the first of the hold (change, drift). Box: every pixel the event moved over the floor, in the frames' pixels.
+
+## States
+
+| State | Frame | Visits |
+|---|---|---|
+| S0 | 0 ms (n 0) | 1 |
+| S1 | 383.33 ms (n 23) | 1 |
+| S2 | 550 ms (n 33) | 1 |
+
+## Timeline
+
+S0 0–33.33 · E1 50 · S0 66.67–316.67 · E2 333.33–383.33 · S1 383.33–516.67 · E3 533.33–550 · S2 550–583.33
+
+## Notes
+
+- E2: pixels were already moving below the floor after 183.33 ms, the last frame identical to S0.
+- E2: only 250 ms followed its first frame; a return later than that is not in the sequence.
+- E3: the hold it settled in is the sequence's last 33.33 ms, shorter than 100 ms; it may still have been moving.
+- E3: only 50 ms followed its first frame; a return later than that is not in the sequence.
+`;

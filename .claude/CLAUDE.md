@@ -413,14 +413,15 @@ runs on too — one copy of the hold / advance / seek loop. Measured building it
 ### What a sequence shows happening (`snapshot storyboard`)
 
 ```bash
-vlmkit check animation page.html --at 0..1s/1f --frames out/f && vlmkit snapshot storyboard out/f/frames.json
+vlmkit check animation page.html --at 0..1s/1f --frames out/f   # exits 1 on a suspect, frames written all the same
+vlmkit snapshot storyboard out/f/frames.json
 # → out/f/storyboard/: story.json, SUMMARY.md, sheet.png (box outlined), narrate/BRIEF.md (+ keyframes, crops)
 ```
 
-States and events from the pixels alone, relative to an anchor (the first frame of the still span):
+States and events from the pixels alone, relative to an anchor (the frame of the state the page is in):
 **glitch** one frame off and back; **transient** back within 5000ms whatever it held (a toast is
 one); **change** not back, ending at the first 100ms of byte-identical frames (the next anchor);
-**drift** a change no step of which crosses the floor (a channel moving by more than 8). Pure half
+**drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8). Pure half
 `@mizchi/vlmkit-judge/storyboard.ts` (`buildStoryboard`, `storyboardSummary`, `storyboardBrief`);
 CLI `src/cli/commands/storyboard-cli.ts` (an artifact command on the SPECS path, exits 0, no verdict:
 the brief is for the agent's own vision and nothing reads its answer back). Measured building it,
@@ -440,6 +441,18 @@ not to re-learn:
 - **The sheet holds cells, not frames.** The layout is solved on sizes alone and each cell is decoded
   and shrunk before the next, and segmentation decodes through a byte-bounded cache: every frame of a
   1000-frame 2x capture at once would be 15GB.
+- **The anchor is the state's frame, on a return too.** Anchored on the hold it landed in, a picture
+  within the floor of S0 was S0 once and a new state the next time, and a later fade measured from
+  the hold called "identical to S0" a frame that was not. A return to a frame merely within the
+  floor keeps `lastIdentical` (what moved below the floor may have moved all along).
+- **Drift is judged inside the event's box.** Measured across the frame, a sub-floor wiggle beside a
+  fade made the fade a change (step 14 between two frames each within the floor of the anchor).
+- **Step before anchor on the 5s look-ahead.** The window is 300 frames at 60fps and the cache a few
+  dozen; computing the anchor-independent step first lets a re-scan after a change answer identical
+  frames without decoding (5247 decodes → 1159 on a 1000-frame, 16-change sequence).
+- **The outline is never over the box.** A 1px top bar at the frame's edge was hidden under its own
+  clamped outline; it now sits outside the box, in 2px of the cell's gap. `boxOnSheet` inverts
+  `scalePngData`'s float sampling (`105 * (1440 / 175)` is 863.99…), not the exact ratio.
 
 Known answers: `fixtures/storyboard/planted.html?kind=…` (static, glitch, blinks, toast, slide, fade,
 spinner), each required back on its frames in `storyboard-cli.test.ts`.

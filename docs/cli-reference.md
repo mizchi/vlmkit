@@ -1499,20 +1499,22 @@ which box, and whether they come back. It writes four things:
 | `sheet.png` | one row per event: its keyframes, each labelled with the time it shows, and the event's box outlined in magenta — the box the table prints, nothing else |
 | `narrate/BRIEF.md` | the keyframes and a magnified crop of each event's box, for your own vision to say what each change *is*; nothing reads the answer back |
 
-The rules, relative to an anchor (the first frame of the still span the page is in):
+The rules, relative to an anchor — the frame of the state the page is in (frame 0, then the first
+frame of each hold a change settles in, and an earlier state's own frame when the page returns to it):
 
 | Kind | Rule |
 |---|---|
 | glitch | one frame differs from the anchor, and the next is back |
 | transient | more than one frame, back within 5000ms of the first — whatever it held in between, so a toast that slides in, stays and leaves is one |
-| change | not back within 5000ms; ends at the first 100ms of byte-identical frames, which is the next state (the anchor from then on) |
-| drift | a change no frame-to-frame step of which moves a channel by more than 8 — a fade too slow to see from one frame to the next |
+| change | not back within 5000ms; ends at the first 100ms of byte-identical frames, which is the next state — a new one, or an earlier one it is within the floor of — whose frame is the anchor from then on |
+| drift | a change no frame-to-frame step of which, inside its box, moves a channel by more than 8 — a fade too slow to see from one frame to the next |
 
 A pixel differs when one of its channels moves by more than 8 of 255; the anchor,
 not the previous frame, is what a frame is compared with, so a sub-floor fade
 accumulates until it shows (and `movedAfter` says when it really began). k blinks
 are k events and the frames between them none. A state a change lands back in
-(within the floor) is the same state, visited again. Times are intervals between
+(within the floor) is the same state, visited again, and its frame is the anchor
+again — so one picture is one state wherever it recurs. Times are intervals between
 two frames: an event *began* after the last frame that showed the state and by
 the first that did not.
 
@@ -1527,6 +1529,10 @@ until a bench shows narration adds something the table does not. Limits:
   swallows the rest of the sequence. `--ignore x,y,w,h` (the frames' pixels,
   repeatable) leaves that box out of every comparison; the never-settling event's
   own box is the one to pass.
+- **No hold by the last frame is all it says.** A change whose last frame differs
+  from the one before it is reported as reaching no hold, not as moving: on a
+  sparse sequence (`check integrity --timeline --frames` ends on a rest instant
+  two seconds on) the page may well have been still by then.
 - **Sampling bounds what is seen.** At `0..1s/100ms` an event shorter than 100ms
   can fall between frames, and a glitch is one frame of the sequence, not one
   rendered frame; `SUMMARY.md` says so. On the wall clock (`inspect interact`) a

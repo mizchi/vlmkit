@@ -4,7 +4,9 @@
  * back. Every time, count and box here is read from the pixels. Nothing here says what a change
  * *is* — that is left to whoever looks at the keyframes it picks (`storyboardBrief`).
  *
- * Segmentation is relative to an anchor: the first frame of the still span the page is in. A
+ * Segmentation is relative to an anchor: the frame of the state the page is in — frame 0 for the
+ * first, the first frame of the hold a change settled in for each new one, and on a return to an
+ * earlier state that state's own frame, so one picture is one state wherever it recurs. A
  * deviation runs from the first frame that differs from the anchor to the first frame that
  * matches it again.
  *
@@ -12,9 +14,10 @@
  * - **transient**: it lasts more than one frame and comes back within `TRANSIENT_MS` of its first
  *   frame, whatever it held in between (a toast that slides in, stays and leaves is one).
  * - **change**: it does not come back within that window. It ends at the first hold of
- *   `SETTLE_MS` (frames byte-identical to each other), which becomes the next anchor.
- * - **drift**: a change no frame-to-frame step of which crosses the floor, a fade too slow to see
- *   from one frame to the next.
+ *   `SETTLE_MS` (frames byte-identical to each other): the next state, a new one or an earlier
+ *   one it is within the floor of, whose frame is the anchor from then on.
+ * - **drift**: a change no frame-to-frame step of which, inside its box, crosses the floor — a
+ *   fade too slow to see from one frame to the next.
  *
  * So k blinks are k events, and the frames between them, back at the anchor, are none. A merge-
  * then-split segmentation was rejected in the design round: two 100ms blinks merged into one span
@@ -68,15 +71,18 @@ export interface FrameDelta {
   maxDelta: number;
 }
 
-/** One byte per pixel, 1 inside any of `boxes`: pixels no comparison looks at. */
+/**
+ * One byte per pixel, 1 inside any of `boxes`: pixels no comparison looks at. A box that does not
+ * sit on whole pixels covers every pixel it touches.
+ */
 export function ignoreMask(width: number, height: number, boxes: readonly Box[]): Uint8Array | null {
   if (boxes.length === 0) return null;
   const mask = new Uint8Array(width * height);
   for (const b of boxes) {
-    const x0 = Math.max(0, b.x);
-    const y0 = Math.max(0, b.y);
-    const x1 = Math.min(width, b.x + b.width);
-    const y1 = Math.min(height, b.y + b.height);
+    const x0 = Math.max(0, Math.floor(b.x));
+    const y0 = Math.max(0, Math.floor(b.y));
+    const x1 = Math.min(width, Math.ceil(b.x + b.width));
+    const y1 = Math.min(height, Math.ceil(b.y + b.height));
     for (let y = y0; y < y1; y++) mask.fill(1, y * width + x0, y * width + Math.max(x0, x1));
   }
   return mask;
@@ -174,7 +180,10 @@ export interface StoryEvent {
   movedAfter?: FrameRef;
   /** The first frame that differs from `from` by more than the floor. */
   first: FrameRef;
-  /** glitch / transient: the last frame that differed. */
+  /**
+   * glitch / transient: the last frame that differed. A change that never reached a hold: the
+   * sequence's last frame, which is all there is to see of where it was going.
+   */
   last?: FrameRef;
   /** glitch / transient: the first frame within the floor of `from` again. */
   back?: FrameRef;
@@ -183,7 +192,11 @@ export interface StoryEvent {
    * stopped after the frame before it.
    */
   settled?: FrameRef;
-  /** change / drift: the last frame was reached without a hold. */
+  /**
+   * change / drift: no hold by the last frame — it differs from the frame before it. What came
+   * after is not in the sequence: on a sparse one (a rest instant two seconds on) the page may well
+   * have been still by then.
+   */
   endedInMotion?: true;
   /**
    * change / drift: how long after `first` the sequence went on, up to `TRANSIENT_MS`: a return
@@ -196,7 +209,11 @@ export interface StoryEvent {
   peak: FrameRef & { over: number };
   /** Every pixel any of its frames moved over the floor from `from`'s frame, as one box. */
   box: Box;
-  /** The largest channel delta between two consecutive frames inside it, the step into it included. */
+  /**
+   * The largest channel delta between two consecutive frames, inside its box, from `movedAfter` (or
+   * the step into it) to its last frame: how visible one frame's step of it was. Movement elsewhere
+   * on the page does not count, so a sub-floor wiggle beside a fade cannot make the fade a change.
+   */
   maxStepDelta: number;
   /** Its frames whose capture never agreed: motion the capture did not hold. */
   unstable: number;
@@ -205,7 +222,10 @@ export interface StoryEvent {
 export interface StoryState {
   /** `S0` is frame 0's; a change that lands within the floor of an earlier state's frame is that state. */
   id: string;
-  /** The frame the state was first settled in, which every comparison against it uses. */
+  /**
+   * The frame the state was first settled in. Every comparison against the state uses it, on every
+   * visit: it is the anchor while the page is in the state.
+   */
   frame: FrameRef;
   /** How many times the sequence was in it: a change back to it is another visit. */
   visits: number;
@@ -359,10 +379,29 @@ export function buildStoryboard(
     }
     return { box: box!, peak: { ...ref(peak), over: vsAnchor(peak).over }, unstable };
   };
-  /** The largest channel delta between consecutive frames over the steps (from, to]. */
-  const stepMax = (from: number, to: number): number => {
+  /** The largest channel delta inside `box` between consecutive frames over the steps (from, to]. */
+  const stepMax = (from: number, to: number, box: Box): number => {
     let max = 0;
-    for (let m = from + 1; m <= to; m++) max = Math.max(max, step(m).maxDelta);
+    for (let m = from + 1; m <= to; m++) {
+      const st = step(m);
+      // Inside the box a step is never larger than across the frame.
+      if (st.identical || st.maxDelta <= max) continue;
+      const a = pixels.pixels(m - 1);
+      const b = pixels.pixels(m);
+      for (let y = box.y; y < box.y + box.height; y++) {
+        for (let p = y * width + box.x, end = p + box.width; p < end; p++) {
+          if (mask !== null && mask[p] === 1) continue;
+          const i = p << 2;
+          const d = Math.max(
+            Math.abs(a[i]! - b[i]!),
+            Math.abs(a[i + 1]! - b[i + 1]!),
+            Math.abs(a[i + 2]! - b[i + 2]!),
+            Math.abs(a[i + 3]! - b[i + 3]!),
+          );
+          if (d > max) max = d;
+        }
+      }
+    }
     return max;
   };
 
@@ -377,12 +416,19 @@ export function buildStoryboard(
     }
     const s = j;
     timeline.push({ state, from: ref(spanStart), to: ref(s - 1) });
-    const movedAfter = lastIdentical >= spanStart && lastIdentical < s - 1 ? ref(lastIdentical) : undefined;
-    const stepFrom = lastIdentical >= spanStart ? lastIdentical : s - 1;
+    // `lastIdentical` is the last frame byte-identical to the anchor, wherever it is: a return to a
+    // frame merely within the floor leaves it alone, since what was moving below the floor may have
+    // been moving all along. The steps are counted from it, but never from inside an earlier event.
+    const movedAfter = lastIdentical >= 0 && lastIdentical < s - 1 ? ref(lastIdentical) : undefined;
+    const stepFrom = lastIdentical >= 0 ? Math.max(lastIdentical, spanStart) : s - 1;
     const id = `E${events.length + 1}`;
 
     let back = -1;
     for (let m = s + 1; m < count && entries[m]!.atMs - entries[s]!.atMs <= transientMs + EPSILON_MS; m++) {
+      // The step first: it does not depend on the anchor, so when this window is scanned again
+      // after a change re-anchors, a frame identical to the one before it is answered without
+      // decoding either — the cache holds a few dozen frames and the window is 300 at 60fps.
+      step(m);
       if (vsAnchor(m).over === 0) {
         back = m;
         break;
@@ -390,6 +436,7 @@ export function buildStoryboard(
     }
     if (back !== -1) {
       const frames = back - s;
+      const m = measure(s, back - 1);
       events.push({
         id,
         kind: frames === 1 ? "glitch" : "transient",
@@ -401,12 +448,12 @@ export function buildStoryboard(
         last: ref(back - 1),
         back: ref(back),
         frames,
-        ...measure(s, back - 1),
-        maxStepDelta: stepMax(stepFrom, back),
+        ...m,
+        maxStepDelta: stepMax(stepFrom, back, m.box),
       });
       timeline.push({ event: id, from: ref(s), to: ref(back - 1) });
       spanStart = back;
-      lastIdentical = vsAnchor(back).identical ? back : -1;
+      if (vsAnchor(back).identical) lastIdentical = back;
       j = back + 1;
       continue;
     }
@@ -414,7 +461,7 @@ export function buildStoryboard(
     const settled = settleFrom(s);
     const end = settled === -1 ? count - 1 : settled;
     const m = measure(s, end);
-    const maxStepDelta = stepMax(stepFrom, end);
+    const maxStepDelta = stepMax(stepFrom, end, m.box);
     const watchedMs = Math.min(transientMs, entries[count - 1]!.atMs - entries[s]!.atMs);
     const event: StoryEvent = {
       id,
@@ -429,7 +476,7 @@ export function buildStoryboard(
       maxStepDelta,
     };
     if (settled === -1) {
-      events.push({ ...event, endedInMotion: true });
+      events.push({ ...event, last: ref(count - 1), endedInMotion: true });
       timeline.push({ event: id, from: ref(s), to: ref(count - 1) });
       spanStart = -1;
       break;
@@ -438,9 +485,12 @@ export function buildStoryboard(
     events.push({ ...event, to, settled: ref(settled) });
     timeline.push({ event: id, from: ref(s), to: ref(settled) });
     state = to;
-    reanchor(settled);
+    // The anchor is the state's own frame, on a return to an earlier state too: anchored on the
+    // hold instead, a picture within the floor of S0's frame was S0 once and a new state the next
+    // time, and a fade measured from the hold called "identical to S0" a frame that was not.
+    reanchor(states.find((st) => st.id === to)!.frame.n);
     spanStart = settled;
-    lastIdentical = settled;
+    lastIdentical = vsAnchor(settled).identical ? settled : -1;
     j = settled + 1;
   }
   if (spanStart !== -1) timeline.push({ state, from: ref(spanStart), to: ref(count - 1) });
@@ -504,7 +554,7 @@ export function endedText(e: StoryEvent, entries: readonly Pick<FrameEntry, "atM
     const stillAfter = e.settled.n > 0 ? entries[e.settled.n - 1]!.atMs : e.settled.atMs;
     return `${ms(stillAfter)} – ${ms(e.settled.atMs)}`;
   }
-  return "in motion at the last frame";
+  return "no hold by the last frame";
 }
 
 function samplingText(story: Storyboard): string {
@@ -541,7 +591,7 @@ export function storyboardSummary(
     sourceLine(source),
     "",
     `${f.count} frame${f.count === 1 ? "" : "s"} of ${f.width}x${f.height} px from ${ms(f.fromMs)} to ${ms(f.toMs)} ms, ${samplingText(story)}.`,
-    `A pixel differs when one of its channels moves by more than ${r.channelFloor} of 255. A departure from the state that comes back within ${ms(r.transientMs)} ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first ${ms(r.settleMs)} ms of identical frames (a drift when no step between two frames crosses the floor).`,
+    `A pixel differs when one of its channels moves by more than ${r.channelFloor} of 255. A departure from the state that comes back within ${ms(r.transientMs)} ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first ${ms(r.settleMs)} ms of identical frames (a drift when no step between two frames, inside its box, crosses the floor).`,
     ...(r.ignore.length > 0 ? [`Not compared: ${r.ignore.map(boxText).join("; ")} px.`] : []),
     "",
     "## Events",
@@ -591,7 +641,9 @@ export function storyboardSummary(
       );
     }
     if (e.endedInMotion) {
-      notes.push(`${e.id} never held still: the sequence ended in motion (last frame ${ms(f.toMs)} ms).`);
+      notes.push(
+        `${e.id} reached no hold: the last frame (${ms(f.toMs)} ms) differs from the one before it, and what came after is not in the sequence.`,
+      );
     }
     if (e.settled && f.toMs - e.settled.atMs < r.settleMs - EPSILON_MS) {
       notes.push(
@@ -658,7 +710,7 @@ export function storyboardBrief(
     const span = e.back ? `${e.frames} frame${e.frames === 1 ? "" : "s"}` : `${e.frames} frames to a hold`;
     lines.push(
       "",
-      `## ${e.id} — ${e.kind}, ${e.from} → ${e.to ?? "?"}, first at ${ms(e.first.atMs)} ms, ${e.endedInMotion ? "still moving at the last frame" : span}, box ${boxText(e.box)} px`,
+      `## ${e.id} — ${e.kind}, ${e.from} → ${e.to ?? "?"}, first at ${ms(e.first.atMs)} ms, ${e.endedInMotion ? "no hold by the last frame" : span}, box ${boxText(e.box)} px`,
       "",
     );
     for (const img of images.get(e.id) ?? []) {

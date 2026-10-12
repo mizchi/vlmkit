@@ -29,6 +29,7 @@ import {
   filmstripLayout,
   scalePngData,
   strokeOutside,
+  type FilmstripLayout,
 } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { cropRegion, encodePng, type PngData } from "@mizchi/vlmkit-core/png-utils.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -55,7 +56,7 @@ function usage(): string {
     "  glitch     one frame off the state, then back",
     "  transient  more than one frame off, back within 5000 ms (whatever it held in between)",
     "  change     not back within 5000 ms; ends at the first 100 ms of identical frames (the next state)",
-    "  drift      a change no frame-to-frame step of which moves a channel by more than 8 of 255",
+    "  drift      a change no frame-to-frame step of which, inside its box, moves a channel by more than 8 of 255",
     "",
     "Writes story.json, SUMMARY.md, sheet.png and narrate/BRIEF.md (keyframes and a magnified crop",
     "of each event's box, for your own vision to say what changed). Exits 0: it reports, it does not judge.",
@@ -84,10 +85,13 @@ export interface StoryboardArgs {
   json: boolean;
 }
 
+/** Digits only: `Number` reads "" as 0 and takes `0x10` and `1e1`, a box nobody typed. */
+const WHOLE = /^\d+$/;
+
 function parseBox(raw: string | undefined): Box {
   const parts = (raw ?? "").split(",").map((p) => p.trim());
   const nums = parts.map(Number);
-  if (parts.length !== 4 || nums.some((n, i) => !Number.isInteger(n) || n < 0 || (i >= 2 && n < 1))) {
+  if (parts.length !== 4 || parts.some((p) => !WHOLE.test(p)) || nums.some((n, i) => i >= 2 && n < 1)) {
     throw new UsageError(
       `--ignore expects x,y,width,height in whole pixels (width and height at least 1), got "${raw ?? ""}"`,
     );
@@ -115,8 +119,8 @@ export function parseArgs(argv: string[]): StoryboardArgs {
         break;
       case "--max-events": {
         const raw = argv[++i];
-        maxEvents = Number(raw);
-        if (!Number.isInteger(maxEvents) || maxEvents < 1) {
+        maxEvents = WHOLE.test(raw ?? "") ? Number(raw) : Number.NaN;
+        if (!(maxEvents >= 1)) {
           throw new UsageError(`--max-events expects a whole number >= 1, got "${raw ?? ""}"`);
         }
         break;
@@ -150,9 +154,11 @@ function decode(path: string): PngData {
 }
 
 /**
- * The frames, decoded on demand and kept in a cache bounded by bytes. The segmentation reads them
- * in order and goes back at most `TRANSIENT_MS` after a change, so a few dozen decoded frames
- * serve a sequence of a thousand; holding every frame of a 1000-frame 2x capture would be 15 GB.
+ * The frames, decoded on demand and kept in a least-recently-used cache bounded by bytes: holding
+ * every frame of a 1000-frame 2x capture would be 15 GB. The segmentation reads them in order and,
+ * after a change, goes back over up to `TRANSIENT_MS` of them (300 at 60fps) — more than the cache
+ * holds, so what serves that look-back is the storyboard's own record of which frames are
+ * identical to the one before, which needs no pixels the second time.
  */
 export function framesOnDisk(
   paths: readonly string[],
@@ -162,7 +168,11 @@ export function framesOnDisk(
   const read = (i: number): PngData => {
     const path = paths[i]!;
     if (!existsSync(path)) throw new UsageError(`frame ${i} not found: ${path}`);
-    return decode(path);
+    try {
+      return decode(path);
+    } catch (error) {
+      throw new UsageError(`frame ${i} (${path}) is not a readable PNG: ${(error as Error).message}`);
+    }
   };
   const first = read(0);
   const { width, height } = first;
@@ -195,6 +205,8 @@ export function framesOnDisk(
 }
 
 const MAGENTA = [255, 0, 255] as const;
+/** Outline width in sheet pixels: within the 3px a label band leaves under its text. */
+const OUTLINE = 2;
 const COLUMNS = 5;
 
 /** The event's box with a margin, inside the frame. */
@@ -235,7 +247,8 @@ function rowLabel(e: StoryEvent): string {
   return `${e.id} ${e.kind} ${e.from}>${e.to ?? "?"} ${plural(e.frames, "frame")} box ${boxText(e.box)}`;
 }
 
-const cellLabel = (roles: readonly string[], atMs: number) => `${roles.join("+")} ${formatInstant(atMs)}ms`;
+/** The time first: a label too long for its cell is cut from the end, and the time is what it is for. */
+const cellLabel = (roles: readonly string[], atMs: number) => `${formatInstant(atMs)}ms ${roles.join("+")}`;
 
 /** Files this command writes, so a re-run replaces them and nothing else in the directory. */
 const OWN_NARRATE_FILE = /^E\d+-\d+-[a-z+]+(-crop)?\.png$/;
@@ -259,6 +272,10 @@ export interface StoryboardWritten {
   /** The story.json object: the storyboard, its source, and each event's keyframes with their files. */
   json: Record<string, unknown>;
   shown: number;
+  /** Where each cell of sheet.png is and which frame and box it shows (null: a blank cell). */
+  sheet: { layout: FilmstripLayout; cells: ({ n: number; label: string; box?: Box } | null)[] };
+  /** The brief's pictures per event, files relative to narrate/. */
+  images: Map<string, BriefImage[]>;
 }
 
 /** Segment `manifestPath`'s sequence and write the four outputs. */
@@ -343,10 +360,18 @@ export async function writeStoryboard(
     c === null ? blank : scalePngData({ ...frameSize, data: pixels.pixels(c.n) }, virtual.scale),
   );
   const sheet = composeFilmstrip(cells, { ...layoutOptions, maxWidth: 0 });
+  // The outline may use 2px of the gap around its cell (8px between cells and around the sheet, 3px
+  // under a label band), so a box at the frame's edge keeps all four sides and none is drawn over it.
   slots.forEach((c, i) => {
     if (!c?.box) return;
-    const cell = { ...virtual.positions[i]!, ...virtual.cell };
-    strokeOutside(sheet, boxOnSheet(virtual, i, frameSize, c.box), MAGENTA, 2, cell);
+    const p = virtual.positions[i]!;
+    const clip = {
+      x: p.x - OUTLINE,
+      y: p.y - OUTLINE,
+      width: virtual.cell.width + 2 * OUTLINE,
+      height: virtual.cell.height + 2 * OUTLINE,
+    };
+    strokeOutside(sheet, boxOnSheet(virtual, i, frameSize, c.box), MAGENTA, OUTLINE, clip);
   });
   await encodePng(files.sheet, sheet);
 
@@ -372,7 +397,16 @@ export async function writeStoryboard(
   }
   await writeFile(files.brief, storyboardBrief(story, images, shown.length));
 
-  return { story, manifest, outDir, files, json, shown: shown.length };
+  return {
+    story,
+    manifest,
+    outDir,
+    files,
+    json,
+    shown: shown.length,
+    sheet: { layout: virtual, cells: slots },
+    images,
+  };
 }
 
 function eventLine(e: StoryEvent): string {
@@ -384,7 +418,7 @@ function eventLine(e: StoryEvent): string {
   }
   if (e.settled)
     return `${e.id} ${e.kind} ${e.from} → ${e.to} from ${at}ms, settled ${formatInstant(e.settled.atMs)}ms`;
-  return `${e.id} ${e.kind} from ${at}ms, still moving at the last frame`;
+  return `${e.id} ${e.kind} from ${at}ms, no hold by the last frame`;
 }
 
 async function main(): Promise<void> {

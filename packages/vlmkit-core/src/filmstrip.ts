@@ -99,6 +99,15 @@ const DEFAULT_LABEL_COLOR = [240, 240, 240] as const;
 /** Breathing room under a label band, so ink does not touch the frame below it. */
 const LABEL_PAD = 3;
 
+/**
+ * The source pixel a scaled pixel `i` shows, along one axis of `srcLen` scaled to `dstLen`. In
+ * floating point, as it always was: `105 * (1440 / 175)` is 863.9999999999999, so row 105 shows
+ * source row 863, not the 864 exact arithmetic gives. `boxOnSheet` inverts this, not the ideal.
+ */
+export function sourceIndex(i: number, srcLen: number, dstLen: number): number {
+  return Math.min(Math.floor(i * (srcLen / dstLen)), srcLen - 1);
+}
+
 /** Nearest-neighbour, matching `image-resize.ts`: hard edges stay legible small. */
 /**
  * Exported for the animated-strip path, which downscales the same frames the sheet would and must
@@ -109,12 +118,10 @@ export function scalePngData(src: PngData, factor: number): PngData {
   const width = Math.max(1, Math.round(src.width / factor));
   const height = Math.max(1, Math.round(src.height / factor));
   const data = new Uint8Array(width * height * 4);
-  const xRatio = src.width / width;
-  const yRatio = src.height / height;
   for (let y = 0; y < height; y++) {
-    const srcY = Math.min(Math.floor(y * yRatio), src.height - 1);
+    const srcY = sourceIndex(y, src.height, height);
     for (let x = 0; x < width; x++) {
-      const srcX = Math.min(Math.floor(x * xRatio), src.width - 1);
+      const srcX = sourceIndex(x, src.width, width);
       const si = (srcY * src.width + srcX) * 4;
       const di = (y * width + x) * 4;
       data[di] = src.data[si]!;
@@ -293,8 +300,10 @@ export function composeFilmstrip(
 }
 
 /**
- * Where a box in frame `index`'s own pixels lands on the sheet, through the same scale the cell
- * was drawn at: the first and last sheet pixel the box's first and last frame pixel map to.
+ * Where a box in frame `index`'s own pixels lands on the sheet: the first and last sheet pixel,
+ * on each axis, that `scalePngData` fills from a source pixel inside the box. Nearest-neighbour
+ * skips source pixels when it shrinks, so a box can fall between two sheet pixels; it then keeps
+ * the one showing the source pixel just before it.
  */
 export function boxOnSheet(
   layout: FilmstripLayout,
@@ -303,23 +312,31 @@ export function boxOnSheet(
   box: { x: number; y: number; width: number; height: number },
 ): { x: number; y: number; width: number; height: number } {
   const { x: ox, y: oy } = layout.positions[index]!;
-  const sw = Math.max(1, Math.round(frame.width / layout.scale));
-  const sh = Math.max(1, Math.round(frame.height / layout.scale));
-  // `scalePngData` reads source pixel floor(x * W / sw) for sheet pixel x, so source pixel X is
-  // drawn at sheet pixels ceil(X * sw / W) .. ceil((X + 1) * sw / W) - 1; a box narrower than one
-  // sheet pixel keeps one.
-  const x0 = Math.min(sw - 1, Math.ceil((box.x * sw) / frame.width));
-  const y0 = Math.min(sh - 1, Math.ceil((box.y * sh) / frame.height));
-  const x1 = Math.max(x0, Math.ceil(((box.x + box.width) * sw) / frame.width) - 1);
-  const y1 = Math.max(y0, Math.ceil(((box.y + box.height) * sh) / frame.height) - 1);
-  return { x: ox + x0, y: oy + y0, width: Math.min(sw - 1, x1) - x0 + 1, height: Math.min(sh - 1, y1) - y0 + 1 };
+  const span = (start: number, length: number, srcLen: number) => {
+    const dstLen = Math.max(1, Math.round(srcLen / layout.scale));
+    let first = -1;
+    let last = -1;
+    let below = 0;
+    for (let i = 0; i < dstLen; i++) {
+      const src = sourceIndex(i, srcLen, dstLen);
+      if (src < start) below = i;
+      else if (src < start + length) {
+        if (first === -1) first = i;
+        last = i;
+      }
+    }
+    return first === -1 ? { at: below, length: 1 } : { at: first, length: last - first + 1 };
+  };
+  const x = span(box.x, box.width, frame.width);
+  const y = span(box.y, box.height, frame.height);
+  return { x: ox + x.at, y: oy + y.at, width: x.length, height: y.length };
 }
 
 /**
- * A rectangle's outline drawn just OUTSIDE `box`, `thickness` px wide, so the pixels the box marks
- * stay visible. The outline never leaves `clip` (the cell): a side that would fall outside it is
- * drawn along the inside of the cell's edge instead, over the box's outermost pixels, so a box at
- * the frame's edge still has four sides rather than running into the next cell or losing one.
+ * A rectangle's outline drawn just OUTSIDE `box`, `thickness` px wide, never over it, so the
+ * pixels the box marks stay visible however thin it is. Nothing is drawn outside `clip`: a caller
+ * outlining a box inside a sheet cell passes the cell grown by `thickness` into the gap around it,
+ * so a box at the frame's edge keeps its outer side in the gap instead of losing it.
  */
 export function strokeOutside(
   target: { width: number; height: number; data: Uint8Array },
@@ -328,14 +345,13 @@ export function strokeOutside(
   thickness: number,
   clip: { x: number; y: number; width: number; height: number },
 ): void {
-  const x0 = Math.max(clip.x, box.x - thickness);
-  const y0 = Math.max(clip.y, box.y - thickness);
-  const x1 = Math.min(clip.x + clip.width - 1, box.x + box.width - 1 + thickness);
-  const y1 = Math.min(clip.y + clip.height - 1, box.y + box.height - 1 + thickness);
-  for (let y = Math.max(0, y0); y <= Math.min(target.height - 1, y1); y++) {
-    for (let x = Math.max(0, x0); x <= Math.min(target.width - 1, x1); x++) {
-      const band = x < x0 + thickness || x > x1 - thickness || y < y0 + thickness || y > y1 - thickness;
-      if (!band) continue;
+  const x0 = Math.max(0, clip.x, box.x - thickness);
+  const y0 = Math.max(0, clip.y, box.y - thickness);
+  const x1 = Math.min(target.width - 1, clip.x + clip.width - 1, box.x + box.width - 1 + thickness);
+  const y1 = Math.min(target.height - 1, clip.y + clip.height - 1, box.y + box.height - 1 + thickness);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height) continue;
       const i = (y * target.width + x) * 4;
       target.data[i] = rgb[0];
       target.data[i + 1] = rgb[1];
