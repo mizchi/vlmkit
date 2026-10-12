@@ -2,8 +2,9 @@
 
 2026-10-12. `vlmkit check flash` is the first gate that judges a frame sequence: every 60fps frame of
 2-10s of page time, shot on the held clock, counted per pixel, and re-counted with motion compensated
-where that fails. This round is what it measures, the known answers it was built against, what the
-critiques of the design changed, and what it costs.
+where that fails. This round is what it measures, the known answers it was built against, what an
+adversarial review of the first version found (50 findings, every one confirmed) and what changed for
+each, and what it costs.
 
 ## Why
 
@@ -28,6 +29,11 @@ Linearisation is color.ts's: 0.03928 and 0.04045 pick the same branch for every 
 Black takes the D65 white point. WCAG's 0.1° exception for fine balanced patterns is not applied, so a
 2px inverting checkerboard is reported; the output says so.
 
+A red move with no saturated end leaves its starting point pending, and a later saturated frame that is
+more than 0.2 from it counts the transition. Without that, a red pulse fading in from black lost every
+transition into the red, because its first frame is a dark red that is not yet saturated, and the anchor
+moved onto it (review blocker).
+
 ## Known answers
 
 Synthetic (`packages/vlmkit-judge/src/flash.test.ts`, 400x300 frames at 60fps, no browser):
@@ -39,114 +45,193 @@ Synthetic (`packages/vlmkit-judge/src/flash.test.ts`, 400x300 frames at 60fps, n
 | grey `#aaa`↔`#bababa` (ΔL 0.089) / `#aaa`↔`#bdbdbd` (0.107) | pass / fail |
 | `#ededed`↔`#fff` at 10 Hz (darker 0.847) | pass, 0 transitions |
 | red `#f00`↔`#7f7f7f` / red↔black | general pass, red fail / both fail |
+| a red pulse fading black → `#350000` → … → `#a00000` and back | red fail (the pending start) |
 | `#000`↔`#010000`, `#000`↔`#020000`, `#010000`↔`#000100`, `#050000`↔`#050505` | pass: below the red floor |
-| 1px dither turning white over 200x200 | 39,998 (the region, minus the two corners its pattern leaves open), fail |
+| 1px dither turning white over 200x200 / over 147x147 | 39,998 / 21,609 (the region, closed), fail |
+| two 20x20 blinkers at opposite edges of an 800px frame | 400, in a field that holds one of them (not an empty field between them) |
+| 140x140 strobe beside a 150x150 unmeasured square | not passable: 42,100 together |
 | 2px inverting checkerboard | 87,296, fail (no 0.1° exception) |
 | four quadrants lit in turn, once a second each | pass, 2 transitions |
 
-On the page (`fixtures/flash/`, `expected.json`, 400x300, a 1.5s window; `flash-check.test.ts`):
-`strobe-4hz`, `box-148`, `raf-5hz` (a rAF loop), `interval` (a 125ms `setInterval`), `scale-strobe`
-(`transform: scale(1)↔scale(0)`) and `ticker-strobe` fail general; `red-grey` fails red only;
-`strobe-3hz`, `box-144`, `testbed-div` (the testbed's 250x250 red/white every 250ms: 4 changes, 2
-flashes, a second) and `quadrants` pass; `scroll-text` is motion flicker; `still` is one frame;
-`video` and `animated-gif` are not judgeable. The saved frames of `strobe-4hz` judged again give the
-live answer; every other frame of them still fails; one frame in twelve is not judgeable.
+On the page (`fixtures/flash/`, `expected.json`, 400x300, a 1.5s window unless the page's own default
+is the point; `flash-check.test.ts`), 28 pages:
+
+| Pages | Answer |
+|---|---|
+| `strobe-4hz`, `box-148`, `raf-5hz` (a rAF loop), `interval` (a 125ms `setInterval`), `scale-strobe` (`transform: scale(1)↔scale(0)`), `ticker-strobe` (field), `teleport-drift` | general fail |
+| `late-strobe` (begins 2.5s in), `timer-strobe` (a timer starts it 2.5s in) | general fail, on the window the page asks for |
+| `iframe`, `shadow`, `smil`, `playback-rate` (2 Hz at rate 2), `revive` (a highlight replayed every 250ms) | general fail: each was a pass, or not judgeable, before the held clock held it |
+| `red-grey`, `faded-red` | red fail only |
+| `strobe-3hz`, `box-144`, `testbed-div` (the testbed's 250x250 red/white every 250ms: 2 flashes a second), `quadrants`, `page-paused` (the page holds it) | pass |
+| `scroll-text` | motion flicker |
+| `navigate` (leaves for another page 500ms in) | pass, 1 navigation followed |
+| `still` | one frame |
+| `video`, `animated-gif`, `background-gif` (the GIF as a CSS background), `late-video` (added 1s in) | not judgeable |
+
+The saved frames of `strobe-4hz` judged again give the live answer; every other frame of them still
+fails; one frame in twelve is not judgeable.
 
 ## Motion, told apart
 
 Per-pixel counting is literal: every moving high-contrast detail flickers at each pixel it crosses.
-Measured at 1280x720:
+So a failing run is re-counted — whole, from a second and a quarter before its first failing window
+— and two tests decide; either one failing is a flash:
+
+1. **The field's mean.** Each failing field's mean colour, from per-frame 16px block sums, judged as
+   one pixel. Nothing that only moves changes a field's mean seven times a second.
+2. **The tracked residual.** Each pixel's state — its zig-zag leg and its last transitions — is carried
+   along its 16x16 block's motion and stepped only by what the moved previous frame does not
+   reproduce (the range of the one to four pixels the motion brings it from). Where no motion is
+   trusted, the state stays put and takes the whole step, and moves on with the content when its
+   motion is trusted again.
+
+Measured at 1280x720, default window, after every fix below:
 
 | Page | Per pixel | Re-counted |
 |---|---|---|
-| scrolling text, 300px/s | fail 55,716 | motion: 1,706 left, every step explained |
-| carousel slide (1024px in 300ms, eased) | fail 80,453 | motion: 5,910 left, 91% explained |
-| solitaire deal (cards flying, turning, fading in from 0.2) | fail 31,862 | motion: 10,825 left; `div#tableau>div.slot>div.card (deal-in) animating opacity, transform` |
-| `scale(1)↔scale(0)` steps at 5 Hz | fail 87,296 | flash (field mean) |
+| scrolling text, 300px/s | fail 56,505 | motion: 26 left, 99% of changed steps explained, 300 px/s |
+| carousel slide (1024px in 300ms, eased, resting) | fail 80,453 | motion: 1,606 left, 68% explained |
+| solitaire deal (cards flying, turning, fading in from 0.2) | fail 31,862 | motion: 13,187 left, 6% explained — the translucent cards are two layers no translation matches, and what is left stays where it was stepped |
+| `scale(1)↔scale(0)` steps at 5 Hz | fail 87,296 | flash |
 | 300x300 box teleporting 560px at 5 Hz | fail 76,800 | flash |
 | background toggled every 125ms on a box translating 4px/s | fail 87,296 | flash |
-| full-screen strobe at 4 / 5 / 10 Hz behind a ticker at 300px/s | fail 87,296 | flash (field mean) |
-| 40px stripes inverting at 10 Hz | fail 87,296 | flash (residual) |
+| full-screen strobe at 4 / 5 / 10 Hz behind a ticker at 300px/s | fail 87,296 | flash (at 4 Hz: the field's mean, 8 transitions in a second) |
+| 40px stripes inverting at 10 Hz | fail 87,296 | flash (residual: 87,296, no step explained) |
 
-Synthetic cases hold the rest: 2.5px/frame antialiased text (motion), a textured panel teleporting
-40px (flash: it returns), stripes scrolling half their period a frame (flash), a strobe beside
-scrolling text (flash), and a light strobe (ΔL 0.106, darker 0.70) behind 60%-ink scrolling text
-(flash, by the region test — see below).
+Synthetic cases (400x300) hold the rest: text scrolling 5px and 2.5px a frame (antialiased) and an
+eased carousel are motion; a textured teleport, stripes moved by half their period, a strobe beside
+scrolling text, a light strobe (ΔL 0.106) and a smooth 4 Hz pulse behind 60%-ink scrolling text, a
+40px teleport while drifting, a 20px shake, 8px stripes inverting and a texture that inverts as it moves
+6px a frame are all flashes.
 
-What the critiques of the design changed, each measured:
+What may establish motion is narrow, because every excuse is a way to pass a strobe. A block's
+displacement must reproduce it (texture, mean residual ≤ 0.04 in encoded luminance and under half of
+not moving, on the part of the block whose source is in the frame), and is refused when a level change
+in place explains it as well, when the opposite displacement matches too (no direction), when it
+jumps more than 24px beyond how the content was moving, and when the block reverses more than six
+times within a second. DOM attribution decides nothing: the three transform-only strobes above are
+real flashes, so animations are only named.
 
-- **DOM attribution decides nothing.** The design excused a candidate when every animation over it
-  animated only `transform`. The three transform-only strobes above are real flashes, so animations
-  are only named; block matching on pixels decides.
-- **The field's mean is a test of its own.** A 1-D shift estimate is mean-subtracted, so a uniform
-  strobe cancelled out of it and a ticker over a full-screen strobe read as motion.
-- **A third test: region transitions.** With 60% ink, text crosses each background pixel between the
-  strobe's steps and restarts it, and the falling step (0.807 → 0.701) lies between ink and background,
-  which the 3x3 envelope accepts as a blend: the light strobe read as motion. Each frame now collects,
-  by direction, the transitions motion does not account for — unexplained ones, and every stepping
-  pixel of a block that moved AND shifted level — and seven alternating ones over the limit in a
-  second fail.
-- **Sub-pixel motion blurs one way.** At 2.5px a frame every other frame is blurred; interpolating a
-  blurred frame never gives the sharp one, and only 50% of steps were explained. Blocks are matched in
-  gamma-encoded luminance, to a quarter pixel, in both directions: 93%.
-- **A run, not a window.** Re-counting only the first failing window excused the textured teleport:
-  its first jump is a real one-off move, and 6 transitions are left. Each run of failing windows is
-  re-counted for up to 2s of window ends.
-- **The match limit is 0.04, not 0.03,** because a card fading in as it flies changes ~0.025 a frame on
-  top of its rotation: the deal's residual was 16,807 of the 21,824 limit at 0.03, a margin a newer
-  Chromium could erase; 10,825 at 0.04, 8,458 at 0.05. Every strobe above still fails at 0.04.
+### What the review changed, each measured
+
+The first version's re-count was a 3x3 envelope test per window, a return test, and a "region" test.
+The review found ten holes in it, all confirmed; the tracker replaced all three tests.
+
+- **Small steps never added up.** An explained step reset the pixel, so a smooth pulse behind moving
+  text passed. Carried state adds them: the 4 Hz sine behind scrolling text now fails.
+- **Only 2s of a run, and four runs, were re-counted.** A strobe that began later in a run of motion
+  flicker was excused. Whole runs now, merged where they meet, up to 1200 frames; past that a run is a
+  flash (`budget`), never excused.
+- **The return test was the only guard, and drift defeated it.** A teleport that also drifts never
+  returns to the same pixels. The gates above replaced it: a 40px teleport while drifting, a 20px
+  shake, and counterphase stripes all fail; a texture that inverts while it moves 6px a frame fails.
+- **The frame's edge leaked.** A block whose source is partly outside the frame never matched, took the
+  whole step, and the tracker carried those transitions across the frame: 61,757 px² left on a pure
+  scroll. Blocks are now matched on the part of them whose source is in the frame (at least half): 0.
+- **A carousel's entering band.** Content arriving faster than a block's width has no source in the
+  frame, and its neighbours failed the jump test because the block it came from had no motion. The jump
+  is now also judged against this block's own last motion, and content replaced under motion — what
+  was at a pixel moved on by trusted motion, and what is there now moves on by the next frame's — starts
+  a history of its own.
+- **A stock is not its cards.** Steps a state takes in place belong to the place: the solitaire stock
+  sees card after card appear on it, and each card that left carried the stock's transitions along its
+  flight — 23,341 px², a flash. A state that motion takes on keeps only the last step it took in place:
+  13,187. (A separate location layer for untrusted steps was tried and lost the drifting teleport: at a
+  fixed place its returns no longer line up.)
+- **A sum stopped at the best ties.** The coarse search left its sum at 0 once an exact match was found,
+  so every later offset tied and the shortest, (0, 0), won: a carousel frame moving 64px was unmatched.
+- **The reversal gate came too late.** Applied as it went, a shake was untrusted only after seven
+  excused reversals, and the window ended before seven raw steps more. It is decided over the span now,
+  from the jump before a cluster's first reversal; the re-count runs again only when it untrusts
+  anything.
+- **The reported velocity** is the trusted blocks' median only when half of all blocks that moved agree
+  with it (it read 4091 px/s for a 300px/s ticker).
+
+Known to read as flash although the eye would track it (the safe direction): two layers moving
+differently inside one block (text over a patterned background, parallax), rotation of detailed
+content, fine detail moving off the quarter- and third-pixel grid. Known to read as motion: a grating
+moving less than half its period a frame, however fast (moving-pattern hazards are ISO 9241-391's).
+And entering content has no history, so a strobe behind content that crosses the view in under about
+1.75s is counted only on what has been in view a second; the synthetic light strobe scrolls 2px a
+frame through 400px for that reason.
+
+## What the held clock cannot hold, and what it now does
+
+The review's sweep findings were about what the held clock missed. Each now holds, with a fixture:
+
+| Was | Now |
+|---|---|
+| an iframe frozen at virtual 0 (a flashing iframe passed, complete, nothing unmeasured) | every frame of the page advanced and seeked |
+| CSS animations in shadow roots not held (a web-component strobe: not judgeable) | open shadow roots swept and listened to |
+| SMIL on its own timeline (a 5 Hz `<animate>` passed as still) | each SVG paused and put at the page time |
+| seeks at rate 1 (a 2 Hz animation at rate 2 passed) | `(t − start) · playbackRate` |
+| an animation the page paused moved by the seek | the page's, left alone |
+| a seek revived a cancelled animation (a replayed highlight never replayed: pass) | cancelled, never seeked again |
+| a `setTimeout(f, 0)` loop spun the clock's guard every frame | nested timers clamped to 4ms, as Chromium does |
+| a navigation crashed the gate | followed onto the new document, up to five |
+| one period of a delayed infinite strobe swept | one period past its start and a second more; two seconds past the latest pending timer; truncation at 10s reported |
+| the one-frame `still` shortcut taken with `--window`, or with `vlmkit:seek` listeners | never then, nor with iframes or timers |
+| animated images only as `<img>` with page-fetchable bytes | every CSS image property, both pseudo-elements, SVG `<image>`, shadow roots; cross-origin bytes through the context's request; unreadable bytes are unmeasured, a missing image is not |
+| APNG / WebP trusted from the header | frames counted |
+| media found once, before the sweep | searched for again every 30 frames and at the end |
+| three probe shots 150ms apart (aliased with a 6.7 Hz strobe) | seven gaps with no common period over a second |
+| every changed frame taken in one shot (real-time motion counted as page time: a false fail) | every 10th shot again 50ms later |
+| two small unheld regions merged into one viewport-wide mask | merged only where they touch |
+| unmeasured and measured flashing never added | judged together (`withUnknown`): no pass when together they exceed the limit |
+
+Their pixels are left out of the count, written into the manifest (`source.unmeasured`, with the
+sweep's own decisions in `source.sweep`) so a re-judge masks the same, and when they cover more than
+the limit in one field — alone or with what flashes beside them — the verdict is `not-judgeable` with
+`flash-unmeasured` as a suspect, never a pass.
 
 ## The repository's own pages
 
 The 21 pages the design's corpus named (six dogfood-animation pages, solitaire, the landing page, the
-six sites, seven integrity-timeline fixtures), 1280x720, default window:
+six sites, seven integrity-timeline fixtures), 1280x720, default window, after every fix above:
 
 | Pages | Window | Result |
 |---|---|---|
-| dogfood-animation: page, agents a / c / e / g, agent-b's probe | 2-3.7s from their animations | pass; at most 75 CSS px² flashing |
-| solitaire | 2s | **motion flicker** (warn): 31,862 per pixel, 10,825 left after compensation, the deal named |
-| landing page; kanban, shop, docs, magazine, checkout | — | **still**: nothing can move under the held clock at load (their motion is behind interaction), one frame each, 1.3-1.5s |
+| dogfood-animation: page, agents a / c / e / g, agent-b's probe | 2-3.7s from their animations | pass; at most 85 CSS px² flashing |
+| solitaire | 2s | **motion flicker** (warn): 31,862 per pixel, 13,187 left after compensation; the deal's cards named, none covering half the flashing box, so no selector |
+| landing page; kanban, shop, docs, magazine, checkout | — | **still**: nothing can move under the held clock at load (their motion is behind interaction), one frame each, 2.6-3.3s |
 | dashboard | 3s (its script) | pass, nothing flashing |
-| integrity-timeline: at-rest, background-late, clean, fade-in, held, transient | 2s | pass; at most 3,028 (at-rest) |
-| integrity-timeline: script | 3s | pass; 783 |
+| integrity-timeline: at-rest, background-late, clean, fade-in, held, transient | 2s | pass; at most 3,051 (at-rest) |
+| integrity-timeline: script | 3s | pass; 1,130 |
 
-20 pass with nothing over the limit, the deal is the one motion flicker, and nothing is a flash: the
-false-positive bound the design asked for, with the deal resolved the way its critique required (by
-pixels, not by its animation's properties). 6 of the 21 pages are one frame. The 15 that moved took
-14-36s each.
-
-## What the held clock cannot hold
-
-A `<video>` is paused at load; an animated image (GIF with a second image, APNG with `acTL` before
-`IDAT`, WebP with the VP8X animation flag, AVIF with the `avis` brand) runs on the browser's clock; and
-three probe shots 150ms apart in real time catch what else moves with the clock held. Their pixels are
-painted out of every frame, written into the manifest (`source.unmeasured`) so a re-judge masks the
-same, and when they cover more than the limit in one field the verdict is `not-judgeable` with
-`flash-unmeasured` as a suspect — never a pass. The probe is real time, so an animated image's
-`uncontrolled` row can come and go between runs; the `animated-image` row cannot.
+20 pass with nothing over the limit, the deal is the one motion flicker, and nothing is a flash — the
+same verdicts as before the review, which is the point of re-running it: every hole the review closed
+was closed without a false positive on the repository's own pages. 6 of the 21 are one frame. The 15
+that moved took 16-45s each.
 
 ## Cost
 
 | | |
 |---|---|
-| capture, 1280x720 | ~40ms a shot with `optimizeForSpeed` (93ms through `page.screenshot`); unchanged frames are shot twice |
-| decode | ~17ms (pngjs's was 19 of 24s for 181 frames) |
-| 3s window, nothing failing | 20-26s |
-| 3s window, a full-field strobe | ~25s; the field test decides it in 0.05s |
-| 2s window, the solitaire deal | ~36s, 11s of it the motion re-count |
-| 4s window, full-screen scrolling text | ~65s, 22s re-count |
-| 1.5s window at 400x300 (the fixtures) | 4-8s |
+| capture, 1280x720 | ~40ms a shot with `optimizeForSpeed`; an unchanged frame is shot twice, and every 10th changed frame again 50ms later |
+| the real-time probe | ~1s on every page |
+| a still page | 2.6-3.3s |
+| 2-3s window, nothing failing | 16-28s |
+| 3s window, a full-field strobe | ~28s; the field test decides in under 0.1s |
+| 2s window, the solitaire deal | ~43s, 16s of it the re-count |
+| 3s window, the carousel | ~63s, 32s re-count |
+| 5s window, full-screen scrolling text | ~95s, 40s re-count |
+| the 28 fixtures at 400x300, 1.5s | 5-7s each |
 
-That makes it one of the expensive gates. `--window` and `--viewport` are the levers; a page where
-nothing can move under the held clock is one frame (1-1.5s).
+The re-count costs more than the first version's did (the scroll: 22s over a 4s window then, 40s over
+5s now; the deal: 11s then, 16s now). Most of what it costs is decoding each frame
+a second time (a frame's luminance is 7MB at 1280x720, so the frames of a sweep are not kept) and the
+per-pixel state it carries; blocks moving alike are copied as one run per row, which took the copying
+from 16s to 3s on the scroll. `--window` and `--viewport` are the levers.
 
 ## Limits
 
 - A pass is "no flash measured under these criteria", not a certification.
-- A flash that moves between places inside one field (two spots lit alternately) passes per pixel; the
-  region test catches it only where it is part of a failing run.
+- A flash that moves between places inside one field (two spots lit alternately) passes per pixel.
+- A red pulse that never reaches black (dark red ↔ red) changes no chromaticity, and is not a red flash
+  under WCAG 2.2's working definition; under IRIS's (R − G − B) delta it would be.
 - States behind interaction are not reached; a page's own video is not judged; absolute luminance
-  (HDR) is not measured.
+  (HDR) is not measured; closed shadow roots are not held; a `vlmkit:seek` listener added other than on
+  `window` is not counted.
 - A saved sequence's pass is only as good as its sampling: `flash-undersampled` when it is not every
-  60fps frame, `flash-unjudgeable` when no second holds 7 frames. Sampling only removes transitions,
-  so a failure on it stands.
+  60fps frame or was cut at the cap, `flash-unjudgeable` when no second holds 7 frames. Sampling only
+  removes transitions, so a failure on it stands.
