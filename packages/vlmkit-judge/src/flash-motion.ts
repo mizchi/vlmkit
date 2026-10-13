@@ -92,6 +92,7 @@ import {
   type FlashRun,
   type FlashTrack,
 } from "./flash.ts";
+import { srgbChannelToLinear } from "./color.ts";
 import type { Box } from "./storyboard.ts";
 
 /** Block side, in CSS px. */
@@ -1117,10 +1118,10 @@ function encode(L: number): number {
 }
 
 const DECODE_STEPS = 4096;
-const DECODE = Float64Array.from({ length: DECODE_STEPS + 2 }, (_, i) => {
-  const e = Math.min(1, i / DECODE_STEPS);
-  return e <= 0.04045 ? e / 12.92 : Math.pow((e + 0.055) / 1.055, 2.4);
-});
+// color.ts's linearisation, the one definition of it (tests/contrast-single-definition.test.mjs).
+const DECODE = Float64Array.from({ length: DECODE_STEPS + 2 }, (_, i) =>
+  srgbChannelToLinear(Math.min(1, i / DECODE_STEPS) * 255),
+);
 /** `encode` undone, from a table: it runs for every pixel that moves by part of a pixel. */
 function decode(e: number): number {
   const t = Math.min(1, Math.max(0, e)) * DECODE_STEPS;
