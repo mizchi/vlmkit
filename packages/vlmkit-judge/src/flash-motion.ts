@@ -11,19 +11,36 @@
  *    second; a strobe does, whatever moves in front of it.
  * 2. **The tracked residual.** Each pixel's state — its luminance (or u′v′), the zig-zag's leg and
  *    its last transitions — is carried along the motion of its 16x16 block from frame to frame,
- *    and only the part of a step the moved previous frame does not reproduce is added to it: the
- *    range of the one pixel the motion brings it from (two to four between pixels, so a sub-pixel
- *    edge is a mixture of them). An eye tracking the content sees exactly that. Where no motion is
- *    trusted, the state stays put and takes the whole step, and moves on with the content when its
- *    motion is trusted again. The re-count is judged as the first one was (closing, field, limit).
+ *    and only the part of a step the motion does not reproduce is added to it. For a whole-pixel
+ *    displacement that is the step against the pixel the motion brings it from. Between pixels
+ *    there are two predictions, the two the matcher tries: the previous frame resampled at the
+ *    displacement (forward), and the source pixels resampled from this frame (backward: a layer
+ *    at a half-pixel offset is rendered blurred and at a whole one sharp, and only the sharp frame,
+ *    resampled, gives the blurred one), bilinear in encoded luminance, or for red in linear XYZ. A
+ *    step either reproduces within 0.01 of luminance (0.02 of u′v′) is explained; the rest is
+ *    counted as the prediction that fits better leaves it, since the forward residual of a frame
+ *    that sharpens is mostly the sharpening. Never the range of the source pixels: beside ink, a
+ *    strobe's step toward the darker level lands inside it, and a light strobe behind text moving
+ *    2.5px a frame was explained. Each state also knows where in its pixel its content is, so
+ *    content moving 2.5px a frame keeps its state rather than sliding half a pixel a frame along
+ *    it. An eye tracking the content sees exactly that. Where no motion is trusted, the state
+ *    stays put and takes the whole step, and moves on with the content when its motion is
+ *    trusted again. The re-count is judged as the first one was (closing, field, limit).
  *
  * Two things a state does not take along: steps it took in place, before the last one (a stock
  * that card after card appears on is the stock's history, not the card's that leaves it), and a
  * history at all where content is replaced under motion — what was at a pixel moved on by trusted
  * motion and what is there now moves on by the next frame's, as at the frame's edge while a slide
- * enters. Content that enters the view starts with no history, so a strobe behind content that
- * crosses the view in under about a second and three quarters is counted only on what has been in
- * view a second.
+ * enters. The steps taken in place stay with the place: beside the content state, each screen
+ * pixel keeps a ring of its own that never moves, holding every step taken there in place when the
+ * content that took it moves on, and a level step taken under content that travels on (a block
+ * untrusted between two frames that are trusted). A pixel flashes when its content does or its
+ * place does — a strobe box that text scrolls through, text that steps across a strobe now and
+ * then — and only motion trusted at some point feeds the place: steps taken under motion untrusted
+ * throughout (the translucent cards of a deal) already stay where they were taken. Content that
+ * enters the view starts with no history, so a strobe behind content that crosses the view in under
+ * about a second and three quarters is counted only on what has been in view a second, or on what
+ * the place keeps.
  *
  * What may establish motion is narrow, because every excuse is a way to pass a strobe. A block's
  * displacement must reproduce it (texture, mean residual ≤ 0.04 in encoded luminance, under half
@@ -37,8 +54,10 @@
  * - **it jumps from rest**: more than 24px a frame further than the content was moving, judged
  *   against the block it came from and against this block a frame ago — a teleport, stripes
  *   inverting, a gradient strobing as it slides (its level step matches a shift);
- * - **it reverses** more than six times within a second: a shake, untrusted over the whole cluster
- *   (from the jump before its first reversal), not from the seventh on.
+ * - **it reverses** — turns a quarter turn or more from its own last motion, both displacements at
+ *   least 2px — more than six times within a second: a shake (around a square path, every jump is
+ *   a quarter turn), untrusted over the whole cluster (from the jump before its first reversal),
+ *   not from the seventh on.
  *
  * DOM attribution plays no part: a `scale(0)` strobe and a teleport are transform animations.
  *
@@ -47,7 +66,10 @@
  * translucent cards of a deal), rotation of detailed content, fine detail moving at a speed off the
  * quarter- and third-pixel grid. Known to read as motion: a grating moving less than half its
  * period a frame, however fast (it is seen to move; moving-pattern hazards are ISO 9241-391's, not
- * measured here).
+ * measured here); a shake that turns by less than a quarter turn a frame, as a smooth orbit does;
+ * a strobe behind content that hides each pixel at more than about one step in eight, which
+ * flashes there fewer times than the strobe does (text at one mark per 240 px² over a 4 Hz box
+ * read 16,522 of its 32,000 px²).
  */
 import {
   AREA_LIMIT_CSS2,
@@ -61,6 +83,7 @@ import {
   RED_UV_STEP,
   meanFlashFrame,
   meanFromBlocks,
+  WHITE_UV,
   WINDOW_MS,
   type FlashFrame,
   type FrameBlocks,
@@ -87,6 +110,10 @@ const MATCH_GAIN = 0.5;
 const FRACTIONS = [-0.5, -1 / 3, -0.25, 0, 0.25, 1 / 3, 0.5];
 /** A reversal needs both displacements at least this long, in px. */
 const REVERSAL_PX = 2;
+/** A sub-pixel prediction reproduces a pixel within this much relative luminance... */
+const PREDICT_L = 0.01;
+/** ... or, on the red track, within this much u′v′. */
+const PREDICT_UV = 0.02;
 /** A block's own last motion counts for a reversal when it is at most this old. */
 const REVERSAL_MS = 200;
 /** Distinct failing fields whose mean is judged per span. */
@@ -271,8 +298,10 @@ function recountSpan(
   // again where it untrusts anything; frames are decoded a second time only then.
   const kEnd = Math.min(k1 + 1, times.length - 1);
   const motions: BlockMotion[] = [];
-  let previous: BlockMotion | null = k0 > 0 ? blockMotion(encoded, times, k0, region, null, history) : null;
+  const intoFirst: BlockMotion | null = k0 > 0 ? blockMotion(encoded, times, k0, region, null, history) : null;
+  let previous = intoFirst;
   const motionAt = (k: number): BlockMotion | null => {
+    if (k === k0) return intoFirst;
     if (k > kEnd) return null;
     while (motions.length < k - k0) {
       previous = blockMotion(encoded, times, k0 + 1 + motions.length, region, previous, history);
@@ -281,14 +310,15 @@ function recountSpan(
     return motions[k - k0 - 1]!;
   };
   const count = () => {
-    const tracker = createTracker(track, region, first, times, limit, field);
+    const tracker = createTracker(track, region, first, times, limit, field, searchBox);
     const vx: number[] = [];
     const vy: number[] = [];
     let moved = 0;
     for (let k = k0 + 1; k <= k1; k++) {
       const motion = motionAt(k)!;
       const next = motionAt(k + 1);
-      tracker.step(k, seq.frame(k - 1), seq.frame(k), motion, next);
+      const before = motionAt(k - 1);
+      tracker.step(k, seq.frame(k - 1), seq.frame(k), encoded.at(k - 1).e, encoded.at(k).e, before, motion, next);
       moved += motion.moved;
       for (let b = 0; b < motion.trusted.length; b++) {
         if (!motion.trusted[b]) continue;
@@ -381,10 +411,12 @@ function createTracker(
   times: readonly number[],
   limit: number,
   field: { width: number; height: number },
+  sb: Box,
 ) {
   const W = region.width;
   const H = region.height;
   const n = W * H;
+  const SW = sb.width;
   const fw = Math.min(field.width, W);
   const fh = Math.min(field.height, H);
   const general = track === "general";
@@ -410,12 +442,15 @@ function createTracker(
     head: new Uint8Array(n),
     count: new Uint8Array(n),
     dwell: new Uint8Array(n),
+    // Where the content the state tracks is, relative to its pixel, in px (about ±0.5).
+    ox: new Float32Array(n),
+    oy: new Float32Array(n),
   });
   type State = ReturnType<typeof make>;
   const columns = (s: State) =>
     general
-      ? [s.V, s.A, s.E, s.dir, s.counted, s.head, s.count, s.dwell]
-      : [s.U, s.Q, s.au, s.av, s.asat, s.fu, s.fv, s.pend, s.head, s.count, s.dwell];
+      ? [s.V, s.A, s.E, s.dir, s.counted, s.head, s.count, s.dwell, s.ox, s.oy]
+      : [s.U, s.Q, s.au, s.av, s.asat, s.fu, s.fv, s.pend, s.head, s.count, s.dwell, s.ox, s.oy];
   let st = make();
   let nx = make();
   let stCols = columns(st);
@@ -457,6 +492,43 @@ function createTracker(
     return out;
   };
   let carriedNext: { of: BlockMotion; mask: Uint8Array } | null = null;
+  /**
+   * The place ring, beside the content state and never moved: the last RING transition frames
+   * each screen pixel took in place, kept there when the content that took them moves on — every
+   * in-place step a gather carries off (below), and a level step taken under content that
+   * travels on (`step`). A pixel flashes when its content's ring does, or when its place does
+   * (`placeFlashes`: the ring and the steps the state there now took in place). A place layer
+   * that replaced the content state lost a teleport while drifting; this one only adds to it.
+   */
+  const placeRing = new Uint16Array(n * RING);
+  const placeHead = new Uint8Array(n);
+  const placeCount = new Uint8Array(n);
+  let placed = false;
+  /** Frame k onto p's place ring, in time order and once: a trimmed step is older than the frame. */
+  const place = (p: number, k: number) => {
+    const o = p * RING;
+    const c = placeCount[p]!;
+    const h = placeHead[p]!;
+    placed = true;
+    if (c === 0 || placeRing[o + ((h - 1 + RING) % RING)]! < k) {
+      placeRing[o + h] = k;
+      placeHead[p] = (h + 1) % RING;
+      if (c < RING) placeCount[p] = c + 1;
+      return;
+    }
+    const all: number[] = [];
+    for (let i = 0; i < c; i++) {
+      const f = placeRing[o + ((h - c + i + RING * 2) % RING)]!;
+      if (f === k) return;
+      all.push(f);
+    }
+    all.push(k);
+    all.sort((a, b) => a - b);
+    const keep = all.slice(-RING);
+    for (let i = 0; i < keep.length; i++) placeRing[o + i] = keep[i]!;
+    placeCount[p] = keep.length;
+    placeHead[p] = keep.length % RING;
+  };
 
   /** `len` pixels of state from `from` (in `st`) to `to` (in `nx`). */
   const copyRun = (to: number, from: number, len: number) => {
@@ -466,7 +538,12 @@ function createTracker(
   /**
    * `copyRun` for content trusted motion takes on. Steps made in place belong to the place: a
    * stock sees card after card appear on it, and the card that leaves takes only the step that
-   * showed it, not those of the cards before it.
+   * showed it, not those of the cards before it. Every one of them goes onto the place ring of the
+   * pixel it was taken at, the one the content takes included. Lost, text stepping 4px every 15
+   * frames over a 6 Hz strobe read as motion with residual 0; with only the steps the content
+   * leaves (two of every three), 5,313; with all of them, and those of the state now there, the
+   * screen pixels that showed background through three of the four dwells in a second flash
+   * (27,232).
    */
   const gatherRun = (to: number, from: number, len: number) => {
     copyRun(to, from, len);
@@ -474,16 +551,20 @@ function createTracker(
       const d = nx.dwell[p]!;
       if (d === 0) continue;
       nx.dwell[p] = 0;
-      if (d === 1) continue;
       const c = nx.count[p]!;
       const o = p * RING;
       const h = nx.head[p]!;
+      const src = from + (p - to);
+      for (let i = c - d; i < c; i++) {
+        place(src, nx.ring[o + ((h - c + i + RING * 2) % RING)]!);
+      }
+      if (d === 1) continue;
       const newest = nx.ring[o + ((h - 1 + RING) % RING)]!;
       const kept = c - d + 1;
       // The oldest c − d stay, in order, then the newest.
       const old: number[] = [];
       for (let i = 0; i < c - d; i++) old.push(nx.ring[o + ((h - c + i + RING * 2) % RING)]!);
-      for (let i = 0; i < old.length; i++) nx.ring[o + i] = old[i]!;
+      for (let i = 0; i < c - d; i++) nx.ring[o + i] = old[i]!;
       nx.ring[o + kept - 1] = newest;
       nx.count[p] = kept;
       nx.head[p] = kept % RING;
@@ -503,6 +584,8 @@ function createTracker(
     nx.head[to] = 0;
     nx.count[to] = 0;
     nx.dwell[to] = 0;
+    nx.ox[to] = 0;
+    nx.oy[to] = 0;
   };
   const push = (p: number, k: number) => {
     nx.ring[p * RING + nx.head[p]!] = k;
@@ -597,14 +680,140 @@ function createTracker(
     nx.Q[p] = nx.Q[p]! + rv;
     return stepRed(p, nx.U[p]!, nx.Q[p]!, sat);
   };
-  /** The part of `now` the source range [lo, hi] does not hold: 0 inside, the distance outside. */
-  const outside = (now: number, lo: number, hi: number) => (now < lo ? now - lo : now > hi ? now - hi : 0);
+  // A sub-pixel prediction, bilinear at a position in frame coordinates, clamped to the search box
+  // (which holds every source the search can name, and every pixel beside the region).
+  const sx0 = sb.x;
+  const sy0 = sb.y;
+  const sx1 = sb.x + sb.width - 1;
+  const sy1 = sb.y + sb.height - 1;
+  /** Encoded luminance `e` (over the search box), bilinear at (px, py). */
+  const sampleE = (e: Float32Array, px: number, py: number): number => {
+    const ix = Math.floor(px);
+    const iy = Math.floor(py);
+    const ax = px - ix;
+    const ay = py - iy;
+    const xa = Math.min(sx1, Math.max(sx0, ix)) - sx0;
+    const xb = Math.min(sx1, Math.max(sx0, ix + 1)) - sx0;
+    const ya = (Math.min(sy1, Math.max(sy0, iy)) - sy0) * SW;
+    const yb = (Math.min(sy1, Math.max(sy0, iy + 1)) - sy0) * SW;
+    return (1 - ay) * ((1 - ax) * e[ya + xa]! + ax * e[ya + xb]!) + ay * ((1 - ax) * e[yb + xa]! + ax * e[yb + xb]!);
+  };
+  // The red track's prediction is of light: linear XYZ, bilinear, back to u′v′.
+  let pX = 0;
+  let pY = 0;
+  let pZ = 0;
+  const addXyz = (f: FlashFrame, q: number, w: number) => {
+    const L = f.lum[q]!;
+    const v = f.v[q]!;
+    if (w === 0 || L <= 0 || v <= 0) return;
+    const u = f.u[q]!;
+    pX += (w * L * 9 * u) / (4 * v);
+    pY += w * L;
+    pZ += (w * L * (12 - 3 * u - 20 * v)) / (4 * v);
+  };
+  /** `f` bilinear in linear XYZ at (px, py), as u′v′ in pu, pv. */
+  let pu = 0;
+  let pv = 0;
+  // The backward prediction's step (`step`'s `backward`).
+  let backL = 0;
+  let backU = 0;
+  let backV = 0;
+  let backErr = 0;
+  const tolerance = general ? PREDICT_L : PREDICT_UV;
+  const sampleUv = (f: FlashFrame, px: number, py: number) => {
+    const ix = Math.floor(px);
+    const iy = Math.floor(py);
+    const ax = px - ix;
+    const ay = py - iy;
+    const xa = Math.min(sx1, Math.max(sx0, ix));
+    const xb = Math.min(sx1, Math.max(sx0, ix + 1));
+    const ya = Math.min(sy1, Math.max(sy0, iy)) * f.width;
+    const yb = Math.min(sy1, Math.max(sy0, iy + 1)) * f.width;
+    pX = pY = pZ = 0;
+    addXyz(f, ya + xa, (1 - ax) * (1 - ay));
+    addXyz(f, ya + xb, ax * (1 - ay));
+    addXyz(f, yb + xa, (1 - ax) * ay);
+    addXyz(f, yb + xb, ax * ay);
+    const d = pX + 15 * pY + 3 * pZ;
+    if (d < 1e-12) {
+      pu = WHITE_UV[0];
+      pv = WHITE_UV[1];
+    } else {
+      pu = (4 * pX) / d;
+      pv = (9 * pY) / d;
+    }
+  };
 
   return {
-    step(k: number, prev: FlashFrame, cur: FlashFrame, motion: BlockMotion, next: BlockMotion | null): void {
+    step(
+      k: number,
+      prev: FlashFrame,
+      cur: FlashFrame,
+      ePrev: Float32Array,
+      eCur: Float32Array,
+      before: BlockMotion | null,
+      motion: BlockMotion,
+      next: BlockMotion | null,
+    ): void {
       let any = false;
+      placed = false;
       const FW = cur.width;
       const FH = cur.height;
+      /**
+       * The backward prediction (prev from cur, as the matcher also tries) at the source pixels of
+       * frame pixel g, whose source is (sx, sy): a layer at a half-pixel offset is rendered blurred
+       * and at a whole one sharp, and only the sharp frame, resampled, gives the blurred one.
+       * Whether it reproduces every source pixel; and in `backL` (or `backU`, `backV`) the step at
+       * g that would make it, by least squares over their weights: the step as the sharper frame
+       * shows it, where the forward residual carries the sharpening as well.
+       */
+      const backward = (g: number, sx: number, sy: number, ddx: number, ddy: number): boolean => {
+        const ix = Math.floor(sx);
+        const iy = Math.floor(sy);
+        const ax = sx - ix;
+        const ay = sy - iy;
+        let fits = true;
+        backErr = 0;
+        let num = 0;
+        let numV = 0;
+        let den = 0;
+        for (let j = 0; j <= 1; j++) {
+          const wy = j === 0 ? 1 - ay : ay;
+          if (wy === 0) continue;
+          const qy = Math.min(FH - 1, Math.max(0, iy + j));
+          for (let i = 0; i <= 1; i++) {
+            const wx = i === 0 ? 1 - ax : ax;
+            if (wx === 0) continue;
+            const w = wx * wy;
+            const qx = Math.min(FW - 1, Math.max(0, ix + i));
+            const q = qy * FW + qx;
+            let e: number;
+            if (general) {
+              const pb = sampleE(eCur, qx + ddx, qy + ddy);
+              e = Math.abs(prev.lum[q]! - decode(pb));
+              num += w * (ePrev[(qy - sy0) * SW + qx - sx0]! - pb);
+            } else {
+              sampleUv(cur, qx + ddx, qy + ddy);
+              const eu = prev.u[q]! - pu;
+              const ev = prev.v[q]! - pv;
+              e = Math.hypot(eu, ev);
+              num += w * eu;
+              numV += w * ev;
+            }
+            if (e > tolerance) fits = false;
+            if (e > backErr) backErr = e;
+            den += w * w;
+          }
+        }
+        if (general) {
+          const gy = Math.floor(g / FW);
+          backL = cur.lum[g]! - decode(eCur[(gy - sy0) * SW + g - gy * FW - sx0]! + num / den);
+        } else {
+          backU = -num / den;
+          backV = -numV / den;
+        }
+        return fits;
+      };
       // Content that left a pixel by trusted motion, and content that leaves it by the next frame's.
       const leaving = carriedNext?.of === motion ? carriedNext.mask : carried(motion);
       const arriving = next ? carried(next) : null;
@@ -653,82 +862,117 @@ function createTracker(
                   push(p, k);
                   if (nx.dwell[p]! < RING) nx.dwell[p]!++;
                   any = true;
+                  // A level step under content that travels on, trusted the frame before and the
+                  // frame after: the content takes the step out of a strobing box it crosses in
+                  // under a second, so the place keeps it too. Never every step taken in place:
+                  // the deal's translucent flights, untrusted throughout, then read as a flash
+                  // (26,390).
+                  const b2 = by * motion.cols + ((x / MOTION_BLOCK) | 0);
+                  if (before?.trusted[b2] && next?.trusted[b2]) place(p, k);
                 }
               }
             }
             continue;
           }
-          const ox = Math.round(-ddx);
-          const oy = Math.round(-ddy);
+          const nox = Math.round(-ddx);
+          const noy = Math.round(-ddy);
           const whole = Number.isInteger(ddx) && Number.isInteger(ddy);
           for (let y = y0; y < y1; y++) {
-            const ty = y + oy;
             const row = (region.y + y) * FW + region.x;
-            // The pixels whose source lies in the region take its state; the rest arrive from
-            // outside it and are new to the count.
-            const xa = ty < 0 || ty >= H ? x1 : Math.max(x0, -ox);
-            const xb = ty < 0 || ty >= H ? x1 : Math.min(x1, W - ox);
-            for (let x = x0; x < x1; x++) {
-              if (x >= xa && x < xb) continue;
-              const g = row + x;
-              fresh(y * W + x, cur.lum[g]!, cur.u[g]!, cur.v[g]!, cur.sat[g]!);
-            }
-            if (xb <= xa) continue;
-            gatherRun(y * W + xa, ty * W + xa + ox, xb - xa);
             const sy = region.y + y - ddy;
             const ya = Math.max(0, Math.floor(sy));
-            const yb = Math.min(FH - 1, Math.ceil(sy));
-            for (let x = xa; x < xb; x++) {
-              const g = row + x;
-              const p = y * W + x;
-              const moved = differs(g);
-              if (moved) changed++;
-              // The source's pixels: one when the motion is whole, the two to four it falls between otherwise.
-              let rl = 0;
-              let ru = 0;
-              let rv = 0;
-              if (whole) {
-                const q = ya * FW + region.x + x - ddx;
-                if (general) rl = cur.lum[g]! - prev.lum[q]!;
-                else {
-                  ru = cur.u[g]! - prev.u[q]!;
-                  rv = cur.v[g]! - prev.v[q]!;
-                }
-              } else {
-                const sx = region.x + x - ddx;
-                const xs = Math.max(0, Math.floor(sx));
-                const xe = Math.min(FW - 1, Math.ceil(sx));
-                let lo = Infinity;
-                let hi = -Infinity;
-                let vlo = Infinity;
-                let vhi = -Infinity;
-                for (let yy = ya; yy <= yb; yy++) {
-                  for (let xx = xs; xx <= xe; xx++) {
-                    const q = yy * FW + xx;
-                    const a = general ? prev.lum[q]! : prev.u[q]!;
-                    if (a < lo) lo = a;
-                    if (a > hi) hi = a;
-                    if (!general) {
-                      const c = prev.v[q]!;
-                      if (c < vlo) vlo = c;
-                      if (c > vhi) vhi = c;
+            /** Each pixel of [xs, xe) after it took its state: step it by what the motion does not explain. */
+            const settle = (xs: number, xe: number) => {
+              for (let x = xs; x < xe; x++) {
+                const g = row + x;
+                const p = y * W + x;
+                const moved = differs(g);
+                if (moved) changed++;
+                let rl = 0;
+                let ru = 0;
+                let rv = 0;
+                if (whole) {
+                  const q = ya * FW + region.x + x - ddx;
+                  if (general) rl = cur.lum[g]! - prev.lum[q]!;
+                  else {
+                    ru = cur.u[g]! - prev.u[q]!;
+                    rv = cur.v[g]! - prev.v[q]!;
+                  }
+                } else {
+                  // Between pixels, the step is what neither prediction reproduces: the source
+                  // resampled (forward), or the source pixels resampled from this frame (backward).
+                  // Not the range of the source pixels: beside ink, a strobe's step toward the
+                  // darker level lands inside it, and a light strobe behind text moving 2.5px a
+                  // frame was explained.
+                  // What neither reproduces is the smaller of the two residuals.
+                  const sx = region.x + x - ddx;
+                  if (general) {
+                    rl = cur.lum[g]! - decode(sampleE(ePrev, sx, sy));
+                    if (Math.abs(rl) <= PREDICT_L || backward(g, sx, sy, ddx, ddy)) rl = 0;
+                    else if (backErr + PREDICT_L < Math.abs(rl)) rl = backL;
+                  } else {
+                    sampleUv(prev, sx, sy);
+                    ru = cur.u[g]! - pu;
+                    rv = cur.v[g]! - pv;
+                    if (Math.hypot(ru, rv) <= PREDICT_UV || backward(g, sx, sy, ddx, ddy)) ru = rv = 0;
+                    else if (backErr + PREDICT_UV < Math.hypot(ru, rv)) {
+                      ru = backU;
+                      rv = backV;
                     }
                   }
                 }
-                if (general) rl = outside(cur.lum[g]!, lo, hi);
-                else {
-                  ru = outside(cur.u[g]!, lo, hi);
-                  rv = outside(cur.v[g]!, vlo, vhi);
+                if (general ? rl === 0 : ru === 0 && rv === 0) {
+                  if (moved) explained++;
+                  if (!general && cur.sat[g] && !nx.asat[p]) nx.asat[p] = 1;
+                  continue;
+                }
+                if (stepBy(p, rl, ru, rv, cur.sat[g]!)) {
+                  push(p, k);
+                  any = true;
                 }
               }
-              if (general ? rl === 0 : ru === 0 && rv === 0) {
-                if (moved) explained++;
-                if (!general && cur.sat[g] && !nx.asat[p]) nx.asat[p] = 1;
+            };
+            // Each pixel takes the state whose content the motion brings to it: the source pixel
+            // nearest the displacement, moved by where in that pixel its content sits. Rounding
+            // the displacement alone slid every state half a pixel a frame along content moving
+            // 2.5px a frame (Math.round rounds every .5 up), off the content it was counting.
+            // Pixels whose source lies outside the region arrive from outside it and are new.
+            let start = -1;
+            let rox = 0;
+            let roy = 0;
+            for (let x = x0; x <= x1; x++) {
+              let ox = 0;
+              let oy = 0;
+              let inside = false;
+              if (x < x1) {
+                const nsx = x + nox;
+                const nsy = y + noy;
+                if (nsx >= 0 && nsx < W && nsy >= 0 && nsy < H) {
+                  const ns = nsy * W + nsx;
+                  ox = Math.round(-ddx - st.ox[ns]!);
+                  oy = Math.round(-ddy - st.oy[ns]!);
+                  inside = x + ox >= 0 && x + ox < W && y + oy >= 0 && y + oy < H;
+                }
+              }
+              if (start >= 0 && (!inside || ox !== rox || oy !== roy)) {
+                gatherRun(y * W + start, (y + roy) * W + start + rox, x - start);
+                for (let p = y * W + start; p < y * W + x; p++) {
+                  nx.ox[p] = nx.ox[p]! + rox + ddx;
+                  nx.oy[p] = nx.oy[p]! + roy + ddy;
+                }
+                settle(start, x);
+                start = -1;
+              }
+              if (x === x1) break;
+              if (!inside) {
+                const g = row + x;
+                fresh(y * W + x, cur.lum[g]!, cur.u[g]!, cur.v[g]!, cur.sat[g]!);
                 continue;
               }
-              if (stepBy(p, rl, ru, rv, cur.sat[g]!)) {
-                push(p, k);
-                any = true;
+              if (start < 0) {
+                start = x;
+                rox = ox;
+                roy = oy;
               }
             }
           }
@@ -740,12 +984,42 @@ function createTracker(
       const swapCols = stCols;
       stCols = nxCols;
       nxCols = swapCols;
-      if (any) evaluate(k);
+      if (any || placed) evaluate(k);
     },
     result() {
       return { failing, worstArea, explainedShare: changed === 0 ? 0 : explained / changed };
     },
   };
+
+  /**
+   * Whether the steps taken at screen pixel p hold `back` after `from`: its place ring, and the
+   * steps the state there now took in place, which reach the ring only when it leaves.
+   */
+  function placeFlashes(p: number, from: number, back: number): boolean {
+    const c = placeCount[p]!;
+    const d = st.dwell[p]!;
+    if (c + d < back) return false;
+    const o = p * RING;
+    let i = 0;
+    let j = 0;
+    let m = 0;
+    while (i < c || j < d) {
+      const a = i < c ? placeRing[o + ((placeHead[p]! - 1 - i + RING * 2) % RING)]! : -1;
+      const b = j < d ? st.ring[o + ((st.head[p]! - 1 - j + RING * 2) % RING)]! : -1;
+      let f: number;
+      if (a >= b) {
+        f = a;
+        i++;
+        if (a === b) j++;
+      } else {
+        f = b;
+        j++;
+      }
+      if (times[f]! <= from) return false;
+      if (++m >= back) return true;
+    }
+    return false;
+  }
 
   function evaluate(k: number) {
     const mask = new Uint8Array(n);
@@ -756,8 +1030,9 @@ function createTracker(
     const from = times[k]! - WINDOW_MS + EPS;
     const back = MAX_TRANSITIONS + 1;
     for (let p = 0; p < n; p++) {
-      if (st.count[p]! < back) continue;
-      if (times[st.ring[p * RING + ((st.head[p]! - back + RING * 2) % RING)]!]! <= from) continue;
+      const content =
+        st.count[p]! >= back && times[st.ring[p * RING + ((st.head[p]! - back + RING * 2) % RING)]!]! > from;
+      if (!content && !placeFlashes(p, from, back)) continue;
       mask[p] = 1;
       const y = (p / W) | 0;
       const x = p - y * W;
@@ -823,6 +1098,18 @@ export function cropFlashFrame(frame: FlashFrame, box: Box): FlashFrame {
 /** sRGB-encoded relative luminance: a grey's channel value / 255. */
 function encode(L: number): number {
   return L <= 0.0031308 ? 12.92 * L : 1.055 * Math.pow(L, 1 / 2.4) - 0.055;
+}
+
+const DECODE_STEPS = 4096;
+const DECODE = Float64Array.from({ length: DECODE_STEPS + 2 }, (_, i) => {
+  const e = Math.min(1, i / DECODE_STEPS);
+  return e <= 0.04045 ? e / 12.92 : Math.pow((e + 0.055) / 1.055, 2.4);
+});
+/** `encode` undone, from a table: it runs for every pixel that moves by part of a pixel. */
+function decode(e: number): number {
+  const t = Math.min(1, Math.max(0, e)) * DECODE_STEPS;
+  const i = Math.floor(t);
+  return DECODE[i]! + (DECODE[i + 1]! - DECODE[i]!) * (t - i);
 }
 
 interface Encoded {
@@ -1082,7 +1369,8 @@ function blockMotion(
     if (lk >= 0 && times[k]! - times[lk]! <= REVERSAL_MS + EPS) {
       const lx = history.lastDx[b]!;
       const ly = history.lastDy[b]!;
-      if (ddx * lx + ddy * ly < 0 && Math.hypot(ddx, ddy) > REVERSAL_PX && Math.hypot(lx, ly) > REVERSAL_PX) {
+      // A quarter turn or more: a shake around a square path turns 90° at every jump.
+      if (ddx * lx + ddy * ly <= 0 && Math.hypot(ddx, ddy) >= REVERSAL_PX && Math.hypot(lx, ly) >= REVERSAL_PX) {
         history.reversals[b]!.push(times[k]!);
       }
     }

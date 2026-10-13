@@ -379,11 +379,11 @@ describe("closeMask and bestField", () => {
   });
 });
 
-/** Dark marks on white, at random, with no period: something to read as it moves. */
-function texture(seed: number, w: number, h: number): Uint8Array {
+/** Dark marks on white, at random, with no period: something to read as it moves. One mark per `per` px². */
+function texture(seed: number, w: number, h: number, per = 60): Uint8Array {
   const rng = createRng(seed).next;
   const ink = new Uint8Array(w * h);
-  for (let i = 0; i < (w * h) / 60; i++) {
+  for (let i = 0; i < (w * h) / per; i++) {
     const x0 = Math.floor(rng() * w);
     const y0 = Math.floor(rng() * h);
     const mw = 2 + Math.floor(rng() * 6);
@@ -400,8 +400,8 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
   const ink = texture(7, TW, H);
   const at = (x: number, y: number) => (ink[y * TW + (((x % TW) + TW) % TW)] ? BLACK : WHITE);
 
-  const judged = (frames: number, paint: (k: number) => (x: number, y: number) => Rgb) => {
-    const { seq, result } = sequence(W, H, frames, paint);
+  const judged = (frames: number, paint: (k: number) => (x: number, y: number) => Rgb, w = W, h = H) => {
+    const { seq, result } = sequence(w, h, frames, paint);
     return {
       result,
       general: result.general.runs.length > 0 ? classifyFlash(seq, "general", result.general.runs) : null,
@@ -487,6 +487,109 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
     });
     assert.equal(general!.classification, "flash");
     assert.equal(general!.reason, "residual");
+  });
+
+  /** Box-filtered over the part of a pixel the content has moved, as a renderer blends an edge. */
+  const subpixel = (speed: number, bg: (k: number) => number) => (k: number) => {
+    const s = speed * k;
+    const i = Math.floor(s);
+    const f = s - i;
+    const b = bg(k);
+    return (x: number, y: number) => {
+      const a = ink[y * TW + ((x + i) % TW)] ? 0x60 : b;
+      const c = ink[y * TW + ((x + i + 1) % TW)] ? 0x60 : b;
+      return grey(Math.round(a * (1 - f) + c * f));
+    };
+  };
+
+  for (const [speed, w] of [
+    [2.5, 600],
+    [1.5, W],
+  ] as const) {
+    test(`the light strobe behind text moving ${speed}px a frame (antialiased) is a flash: a step toward the darker level is not motion because ink is beside it`, () => {
+      // Under the range of the two source pixels, a blended pixel's step toward the darker level
+      // lay inside [ink, background] and was explained: residual 1,553 at 2.5px, 1,631 at 1.5px.
+      // Against the predictions, 24,451 and 24,165. 600px wide at 2.5px a frame: through 400px
+      // only content left of x = 250 has been in view a second, and it reads 20,001.
+      const { general } = judged(
+        90,
+        subpixel(speed, (k) => (phase(k, 4) ? 232 : 218)),
+        w,
+      );
+      assert.equal(general!.classification, "flash");
+      assert.equal(general!.reason, "residual");
+    });
+  }
+
+  test("the smooth 4 Hz pulse behind text moving 2.5px a frame (antialiased) is a flash", () => {
+    // Residual 1,555 under the range of the source pixels, 27,468 against the predictions.
+    const { general } = judged(
+      90,
+      subpixel(2.5, (k) => Math.round(208 + 16 * Math.sin((2 * Math.PI * 4 * frameTimeMs(k)) / 1000))),
+    );
+    assert.equal(general!.classification, "flash");
+    assert.equal(general!.reason, "residual");
+  });
+
+  test("a light strobe at 6 Hz behind text that steps 4px every 15 frames is a flash: the steps it took in place stay with the place", () => {
+    // Each step moves the content and its history with it, trimmed to the step that showed it:
+    // the in-place transitions before it were lost, and the residual was 0. The place keeps
+    // them: 27,232.
+    const toggles = (k: number) => k > 0 && phase(k, 6) !== phase(k - 1, 6);
+    const moves: number[] = [];
+    for (let k = 15; k < 120; k += 15) {
+      let m = k;
+      while (toggles(m)) m++;
+      moves.push(m);
+    }
+    const { general } = judged(120, (k) => {
+      const o = 4 * moves.filter((m) => m <= k).length;
+      return (x, y) => (ink[y * TW + ((x + o) % TW)] ? grey(0x60) : phase(k, 6) ? grey(232) : grey(218));
+    });
+    assert.equal(general!.classification, "flash");
+    assert.equal(general!.reason, "residual");
+  });
+
+  test("a stationary strobe box that text scrolls through at 4px a frame is a flash: the place flashes, not the text", () => {
+    // 160x200 (32,000 px²) of background 149 ↔ 203 at 4 Hz behind sparse text. Each strobe step
+    // was taken by the text in front of it and carried out of the box, and no text is in the box
+    // long enough to hold seven: residual 1,874. The place now keeps them: 23,920. With two and a
+    // half times the ink (one mark per 240 px²) each pixel of the box is behind ink at about one
+    // step in five, seven of a second's eight hold at about half of them, and it reads 16,522:
+    // per pixel, what the ink hides did not flash there.
+    const w = 700;
+    const h = 260;
+    const tw = 4000;
+    const sparse = texture(7, tw, h, 600);
+    const { general } = judged(
+      120,
+      (k) => (x, y) => {
+        if (sparse[y * tw + ((x + 4 * k) % tw)]) return grey(140);
+        return x >= 270 && x < 430 && y >= 30 && y < 230 && phase(k, 4) ? grey(203) : grey(149);
+      },
+      w,
+      h,
+    );
+    assert.equal(general!.classification, "flash");
+    assert.equal(general!.reason, "residual");
+  });
+
+  test("a textured panel shaking around a 20px square at 16 jumps a second is a flash: a quarter turn is a reversal", () => {
+    // Each jump turns 90° from the last, and the gate counted only turns past it: motion,
+    // residual 0. Counted, the shake is untrusted throughout: 81,116.
+    const th = 600;
+    const tall = texture(7, TW, th);
+    const path = [
+      [0, 0],
+      [20, 0],
+      [20, 20],
+      [0, 20],
+    ] as const;
+    const { general } = judged(90, (k) => {
+      const [ox, oy] = path[Math.floor(((frameTimeMs(k) + 1000 / 120) * 16) / 1000) % 4]!;
+      return (x, y) => (tall[(y + oy + 50) * TW + x + ox + 50] ? BLACK : WHITE);
+    });
+    assert.equal(general!.classification, "flash");
   });
 
   test("a box whose fill toggles while it drifts slowly is a flash", () => {
