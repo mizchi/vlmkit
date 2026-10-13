@@ -34,9 +34,11 @@
  * enters. The steps taken in place stay with the place: beside the content state, each screen
  * pixel keeps a ring of its own that never moves, holding every step taken there in place when the
  * content that took it moves on, and a level step taken under content that travels on (a block
- * untrusted between two frames that are trusted). A pixel flashes when its content does or its
- * place does — a strobe box that text scrolls through, text that steps across a strobe now and
- * then — and only motion trusted at some point feeds the place: steps taken under motion untrusted
+ * untrusted between two frames that are trusted). The content's flashing and the places' flashing
+ * are two areas, each closed and measured in its best field, and either over the limit fails it —
+ * a strobe box that text scrolls through, text that steps across a strobe now and then. (Measured
+ * as one area, the deal's stock and its flying cards came within 3,688 px² of the limit.) Only
+ * motion trusted at some point feeds the place: steps taken under motion untrusted
  * throughout (the translucent cards of a deal) already stay where they were taken. Content that
  * enters the view starts with no history, so a strobe behind content that crosses the view in under
  * about a second and three quarters is counted only on what has been in view a second, or on what
@@ -1022,31 +1024,45 @@ function createTracker(
   }
 
   function evaluate(k: number) {
-    const mask = new Uint8Array(n);
-    let x0 = W;
-    let y0 = H;
-    let x1 = -1;
-    let y1 = -1;
     const from = times[k]! - WINDOW_MS + EPS;
     const back = MAX_TRANSITIONS + 1;
+    // Two frames of reference, two areas: what flashes on the content as it moves, and what
+    // flashes at a place on the screen. Measured together, the solitaire deal's stock (a place)
+    // and its cards (content) made one area a newer renderer could tip over the limit.
+    const content = new Uint8Array(n);
+    const place = new Uint8Array(n);
+    const cb = [W, H, -1, -1];
+    const pb = [W, H, -1, -1];
+    const grow = (b: number[], x: number, y: number) => {
+      if (x < b[0]!) b[0] = x;
+      if (y < b[1]!) b[1] = y;
+      if (x > b[2]!) b[2] = x;
+      if (y > b[3]!) b[3] = y;
+    };
     for (let p = 0; p < n; p++) {
-      const content =
-        st.count[p]! >= back && times[st.ring[p * RING + ((st.head[p]! - back + RING * 2) % RING)]!]! > from;
-      if (!content && !placeFlashes(p, from, back)) continue;
-      mask[p] = 1;
       const y = (p / W) | 0;
       const x = p - y * W;
-      if (x < x0) x0 = x;
-      if (x > x1) x1 = x;
-      if (y < y0) y0 = y;
-      if (y > y1) y1 = y;
+      if (st.count[p]! >= back && times[st.ring[p * RING + ((st.head[p]! - back + RING * 2) % RING)]!]! > from) {
+        content[p] = 1;
+        grow(cb, x, y);
+      }
+      if (placeFlashes(p, from, back)) {
+        place[p] = 1;
+        grow(pb, x, y);
+      }
     }
-    if (x1 < 0) return;
-    if ((x1 - x0 + 1) * (y1 - y0 + 1) <= worstArea) return;
-    const closed = closeMask(mask, W, H, x0, y0, x1, y1);
-    const area = bestField(closed, W, H, fw, fh, x0, y0, x1, y1).area;
-    worstArea = Math.max(worstArea, area);
-    if (area > limit) failing = true;
+    for (const [mask, b] of [
+      [content, cb],
+      [place, pb],
+    ] as const) {
+      const [x0, y0, x1, y1] = b as number[];
+      if (x1! < 0) continue;
+      if ((x1! - x0! + 1) * (y1! - y0! + 1) <= worstArea) continue;
+      const closed = closeMask(mask, W, H, x0!, y0!, x1!, y1!);
+      const area = bestField(closed, W, H, fw, fh, x0!, y0!, x1!, y1!).area;
+      worstArea = Math.max(worstArea, area);
+      if (area > limit) failing = true;
+    }
   }
 }
 
