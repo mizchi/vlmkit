@@ -87,16 +87,16 @@ So a failing run is re-counted — whole, from a second and a quarter before its
    trusted, the state stays put and takes the whole step, and moves on with the content when its
    motion is trusted again.
 
-Measured at 1280x720, default window, after every fix below:
+Measured at 1280x720, default window, after both reviews' fixes:
 
 | Page | Per pixel | Re-counted |
 |---|---|---|
-| scrolling text, 300px/s | fail 56,505 | motion: 26 left, 99% of changed steps explained, 300 px/s |
-| carousel slide (1024px in 300ms, eased, resting) | fail 80,453 | motion: 1,606 left, 68% explained |
+| scrolling text, 300px/s | fail 56,505 | motion: 876 left, 99% of changed steps explained, 300 px/s |
+| carousel slide (1024px in 300ms, eased, resting) | fail 80,453 | motion: 3,875 left, 66% explained |
 | solitaire deal (cards flying, turning, fading in from 0.2) | fail 31,862 | motion: 15,825 left, 9% explained — the translucent cards are two layers no translation matches, and what is left stays where it was stepped |
-| `scale(1)↔scale(0)` steps at 5 Hz | fail 87,296 | flash |
-| 300x300 box teleporting 560px at 5 Hz | fail 76,800 | flash |
-| background toggled every 125ms on a box translating 4px/s | fail 87,296 | flash |
+| `scale(1)↔scale(0)` steps at 5 Hz | fail 87,296 | flash (the field's mean, 10 transitions in a second) |
+| 300x300 box teleporting 560px at 5 Hz | fail 76,800 | flash (the field's mean, 10) |
+| background toggled every 125ms on a box translating 4px/s | fail 87,296 | flash (the field's mean, 8) |
 | full-screen strobe at 4 / 5 / 10 Hz behind a ticker at 300px/s | fail 87,296 | flash (at 4 Hz: the field's mean, 8 transitions in a second) |
 | 40px stripes inverting at 10 Hz | fail 87,296 | flash (residual: 87,296, no step explained) |
 
@@ -240,13 +240,14 @@ The 15 that moved took 16-52s each.
 | a still page | 2.6-3.3s |
 | 2-3s window, nothing failing | 16-28s |
 | 3s window, a full-field strobe | ~28s; the field test decides in under 0.1s |
-| 2s window, the solitaire deal | ~43s, 16s of it the re-count |
-| 3s window, the carousel | ~63s, 32s re-count |
-| 5s window, full-screen scrolling text | ~95s, 40s re-count |
-| the 28 fixtures at 400x300, 1.5s | 5-7s each |
+| 2s window, the solitaire deal | ~52s, 24s of it the re-count |
+| 3s window, the carousel | ~67s, 36s re-count |
+| 5s window, full-screen scrolling text | ~113s, 53s re-count |
+| the 38 fixtures at 400x300, 1.5s | 5-7s each |
 
-The re-count costs more than the first version's did (the scroll: 22s over a 4s window then, 40s over
-5s now; the deal: 11s then, 16s now). Most of what it costs is decoding each frame
+The re-count costs more than the first version's did (the scroll: 22s over a 4s window then, 53s over
+5s now; the deal: 11s then, 24s now): the predictions between pixels and the place ring cost about a
+third more than the first review's tracker. Most of what it costs is decoding each frame
 a second time (a frame's luminance is 7MB at 1280x720, so the frames of a sweep are not kept) and the
 per-pixel state it carries; blocks moving alike are copied as one run per row, which took the copying
 from 16s to 3s on the scroll. `--window` and `--viewport` are the levers.
