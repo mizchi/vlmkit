@@ -8,9 +8,10 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser, type Frame, type Page } from "playwright";
 import { afterAll, beforeAll, test } from "vite-plus/test";
 import { openHeldTimeline, type HeldTimeline } from "./frames-capture.ts";
+import { HOLD_TIMELINE_SCRIPT, VIRTUAL_CLOCK_SCRIPT } from "./virtual-clock.ts";
 
 let browser: Browser;
 beforeAll(async () => {
@@ -47,7 +48,7 @@ const shiftOf = (page: Page, selector: string) =>
     return transform === "none" ? 0 : new DOMMatrixReadOnly(transform).m41;
   }, selector);
 
-test("a held animation runs at its own playbackRate; one at rate 0 or below is the page's", async () => {
+test("a held animation runs at its own playbackRate, backwards too; one at rate 0 is the page's", async () => {
   const { page, timeline } = await held(
     doc(`<div id="a" class="box"></div><div id="b" class="box"></div><div id="c" class="box"></div>
     <script>${SLIDE_JS}
@@ -67,7 +68,9 @@ test("a held animation runs at its own playbackRate; one at rate 0 or below is t
       const anims = (window as unknown as { anims: Record<string, Animation> }).anims;
       return Object.fromEntries(Object.entries(anims).map(([k, a]) => [k, a.currentTime]));
     });
-    assert.deepEqual(at, { fast: 500, still: 0, back: 800 });
+    // back: set to 800 and reversed at page time 0, so 250ms later it is at 550. Before, the hold
+    // left a negative rate alone, and its own pause froze it at 800.
+    assert.deepEqual(at, { fast: 500, still: 0, back: 550 });
     const listed = await timeline.animations();
     assert.deepEqual(listed[0], { startMs: 0, durationMs: 500, iterations: 1 }, "listed on the page's clock");
   } finally {
@@ -278,6 +281,296 @@ test("a page that keeps navigating is refused with a clear error after five navi
   try {
     const url = await site({ "loop.html": doc(`<script>setTimeout(() => location.reload(), 0);</script>`) });
     await assert.rejects(openHeldTimeline(page, url), /page navigated more than 5 times during the sweep/);
+  } finally {
+    await page.close();
+  }
+});
+
+const FADE_JS = `const fade = [{ opacity: 0.2 }, { opacity: 1 }];`;
+type Win = Window & Record<string, unknown>;
+
+test("a seek past a held animation's end finishes it: finished and onfinish run once, and what they start begins at that end", async () => {
+  // Before, a held animation was only ever paused and had its currentTime written, so its finished
+  // promise never resolved and its finish event never fired: none of the next stages below existed.
+  const { page, timeline } = await held(
+    doc(
+      `<div id="a" class="box"></div><div id="b" class="box"></div><div id="c" class="box"></div><div id="d" class="box"></div>
+    <script>${SLIDE_JS} ${FADE_JS}
+      window.log = [];
+      (async () => {
+        await a.animate(fade, { duration: 300 }).finished;
+        log.push("a finished");
+        window.second = a.animate(slide, { duration: 1000, iterations: Infinity });
+      })();
+      window.intro = b.animate(fade, { duration: 300 });
+      intro.onfinish = () => {
+        log.push("b onfinish");
+        window.third = b.animate(slide, { duration: 1000, iterations: Infinity });
+      };
+      // Two stages that both end before one coarse instant: the second is started at the first's
+      // end and ended at its own (400), and what follows it begins there.
+      (async () => {
+        await d.animate(fade, { duration: 300 }).finished;
+        await d.animate(fade, { duration: 100 }).finished;
+        window.chained = d.animate(slide, { duration: 1000, iterations: Infinity });
+      })();
+      c.addEventListener("animationend", () => log.push("c animationend"));
+      c.getAnimations()[0].finished.then(() => log.push("c finished"));
+    </script>`,
+      `#c { animation: slide 300ms linear 2 both; }`,
+    ),
+  );
+  try {
+    const read = () =>
+      page.evaluate(() => {
+        const w = window as unknown as Win;
+        const time = (name: string) => (w[name] ? (w[name] as Animation).currentTime : null);
+        return {
+          second: time("second"),
+          third: time("third"),
+          chained: time("chained"),
+          intro: [(w.intro as Animation).playState, (w.intro as Animation).currentTime],
+          log: [...(w.log as string[])].sort(),
+        };
+      });
+    await timeline.at(250);
+    assert.deepEqual(await read(), { second: null, third: null, chained: null, intro: ["paused", 250], log: [] });
+    // A coarse step past the end: the next stages begin at 300 (the intro's end), not at 500.
+    await timeline.at(500);
+    assert.deepEqual(await read(), {
+      second: 200,
+      third: 200,
+      chained: 100,
+      intro: ["finished", 300],
+      log: ["a finished", "b onfinish"],
+    });
+    for (const t of [700, 1000, 1200]) await timeline.at(t);
+    assert.deepEqual(await read(), {
+      second: 900,
+      third: 900,
+      chained: 800,
+      intro: ["finished", 300],
+      // The CSS animation's end is the phase change, once; finish() on it adds no second animationend.
+      log: ["a finished", "b onfinish", "c animationend", "c finished"],
+    });
+    const listed = await timeline.animations();
+    assert.deepEqual(
+      listed.filter((a) => a.iterations === null).map((a) => a.startMs),
+      [300, 300, 400],
+      "listed from the ends they began at",
+    );
+    // check flash attributes a window by seeking back to its middle: the ended intro is paused and
+    // put back there, not left to run on the real clock.
+    await page.evaluate(() =>
+      (window as unknown as { __vlmkitSeekTimeline(t: number): number }).__vlmkitSeekTimeline(150),
+    );
+    await page.waitForTimeout(150);
+    const back = await page.evaluate(() => {
+      const intro = (window as unknown as Win).intro as Animation;
+      return [intro.playState, intro.currentTime];
+    });
+    assert.deepEqual(back, ["paused", 150]);
+  } finally {
+    await page.close();
+  }
+});
+
+test("an iframe inserted later starts at its own 0 where it is first seen, and again when it navigates", async () => {
+  // Before, every frame was advanced to the main document's time, so an iframe inserted at 1000ms
+  // ran its first second in one step: all ten toggles of its interval at once.
+  const page = await browser.newPage();
+  try {
+    const url = await site({
+      "main.html": doc(`<script>setTimeout(() => {
+        const frame = document.createElement("iframe");
+        frame.src = "child.html";
+        document.body.appendChild(frame);
+      }, 1000);</script>`),
+      "child.html": doc(`<script>window.toggles = 0; setInterval(() => toggles++, 100);
+        setTimeout(() => { location.href = "child2.html"; }, 500);</script>`),
+      "child2.html": doc(`<script>window.toggles = 0; setInterval(() => toggles++, 100);</script>`),
+    });
+    const timeline = await openHeldTimeline(page, url);
+    const seen: { t: number; doc: string; now: number; toggles: number }[] = [];
+    for (let k = 0; k <= 150; k++) {
+      const t = (k * 1000) / 60;
+      await timeline.at(t);
+      const child = page.frames().find((f) => f !== page.mainFrame());
+      if (!child) continue;
+      const state = await child
+        .evaluate(() => ({
+          doc: location.pathname.split("/").pop() ?? "",
+          now: performance.now(),
+          toggles: (window as unknown as { toggles?: number }).toggles ?? -1,
+        }))
+        .catch(() => null);
+      if (state && state.toggles >= 0) seen.push({ t, ...state });
+    }
+    for (const name of ["child.html", "child2.html"]) {
+      const runs = seen.filter((s) => s.doc === name);
+      assert.ok(runs.length > 10, `${name} was seen (${runs.length})`);
+      // The read after an instant can find a document that committed since it, before any instant
+      // has put it at its 0: the last of its leading zeros is the instant that did.
+      const zeros = runs.filter((s) => s.now === 0);
+      assert.ok(zeros.length >= 1 && zeros.length <= 2, `${name} at 0 at ${zeros.map((s) => s.t).join(", ")}`);
+      const begun = zeros[zeros.length - 1]!;
+      assert.ok(begun.t >= 1000 && begun.toggles === 0, `${name} begins at its own 0 (${JSON.stringify(begun)})`);
+      // From then on it is stepped with the sweep: its time is the sweep's less the instant it began.
+      const drift = runs.filter((s) => s.t >= begun.t && Math.abs(s.now - (s.t - begun.t)) > 1e-6);
+      assert.deepEqual(drift, [], `${name} stepped with the sweep`);
+      const later = runs.find((s) => s.now >= 300)!;
+      assert.equal(later.toggles, 3, `${name} toggled three times in its first 300ms`);
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+test("an animation found finished while the clock is at 0 ran out during load, and is held from 0", async () => {
+  // A declarative shadow root's animationstart is not composed, and a page can stop one before the
+  // document hears it: either animation is found by the first sweep, after the real time load
+  // took. Before, both were left frozen at their ends. (A long task at load does not do it on
+  // Chromium 141: the start time resolves after the task.) One the page finished itself stays the
+  // page's.
+  const inner = `<style>${SLIDE_CSS} .in { animation: slide 100ms linear 4 both; }</style><div class="in box"></div>`;
+  const page = await browser.newPage();
+  try {
+    await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
+    await page.addInitScript(HOLD_TIMELINE_SCRIPT);
+    await page.goto(
+      await site({
+        "page.html": doc(
+          `<div id="host"><template shadowrootmode="open">${inner}</template></div>
+          <div id="long" class="box"></div><div id="done" class="box"></div>
+          <script>${SLIDE_JS}
+            window.done = document.getElementById("done").animate(slide, { duration: 300, fill: "forwards" });
+            done.finish();
+            window.addEventListener("animationstart", (event) => event.stopPropagation(), true);
+          </script>`,
+          `#long { animation: slide 100ms linear 4 both; }`,
+        ),
+      }),
+    );
+    // More real time than the 400ms the animations last, before the first sweep finds them.
+    await page.waitForTimeout(600);
+    const at = (t: number) =>
+      page.evaluate(async (ms) => {
+        const w = window as unknown as {
+          __vlmkitClock: { advanceTo(ms: number): Promise<number> };
+          __vlmkitSeekTimeline(t: number): number;
+          done: Animation;
+        };
+        await w.__vlmkitClock.advanceTo(ms);
+        w.__vlmkitSeekTimeline(ms);
+        const one = (a: Animation) => [a.playState, a.currentTime];
+        return {
+          shadow: one(document.getElementById("host")!.shadowRoot!.querySelector(".in")!.getAnimations()[0]!),
+          long: one(document.getElementById("long")!.getAnimations()[0]!),
+          done: one(w.done),
+        };
+      }, t);
+    assert.deepEqual(await at(0), { shadow: ["paused", 0], long: ["paused", 0], done: ["finished", 300] });
+    assert.deepEqual(await at(250), { shadow: ["paused", 250], long: ["paused", 250], done: ["finished", 300] });
+    assert.deepEqual(await at(500), { shadow: ["finished", 400], long: ["finished", 400], done: ["finished", 300] });
+  } finally {
+    await page.close();
+  }
+});
+
+test("a negative playbackRate is held: set and reversed, reverse(), updatePlaybackRate()", async () => {
+  // Before, the hold left a rate below 0 alone, but its own pause had already frozen it.
+  const { page, timeline } = await held(
+    doc(`<div id="a" class="box"></div><div id="b" class="box"></div><div id="c" class="box"></div>
+    <script>${SLIDE_JS}
+      const set = a.animate(slide, { duration: 200, iterations: 10 });
+      set.currentTime = 2000;
+      set.playbackRate = -1;
+      const rev = b.animate(slide, { duration: 200, iterations: 10 });
+      rev.reverse();
+      const upd = c.animate(slide, { duration: 1000, fill: "both" });
+      upd.currentTime = 600;
+      upd.updatePlaybackRate(-0.5);
+      window.anims = { set, rev, upd };
+    </script>`),
+  );
+  try {
+    const read = () =>
+      page.evaluate(() => {
+        const anims = (window as unknown as { anims: Record<string, Animation> }).anims;
+        return Object.fromEntries(Object.entries(anims).map(([k, a]) => [k, [a.playState, a.currentTime]]));
+      });
+    await timeline.at(500);
+    assert.deepEqual(await read(), { set: ["paused", 1500], rev: ["paused", 1500], upd: ["paused", 350] });
+    await page.waitForTimeout(100);
+    assert.deepEqual(await read(), { set: ["paused", 1500], rev: ["paused", 1500], upd: ["paused", 350] }, "held");
+    await timeline.at(2500);
+    assert.deepEqual(await read(), { set: ["finished", 0], rev: ["finished", 0], upd: ["finished", 0] });
+    assert.deepEqual((await timeline.animations()).slice(0, 2), [
+      { startMs: 0, durationMs: 200, iterations: 10 },
+      { startMs: 0, durationMs: 200, iterations: 10 },
+    ]);
+  } finally {
+    await page.close();
+  }
+});
+
+test("animations() and pending() read every frame, each on the sweep's clock", async () => {
+  // Before, both read the main frame only (pending() was the caller's page.evaluate): check flash
+  // chose its window without a delayed strobe inside an iframe, or the iframe's timers.
+  const page = await browser.newPage();
+  try {
+    const url = await site({
+      "main.html": doc(`<iframe src="child.html" width="200" height="60"></iframe>
+        <script>setTimeout(() => {}, 700);
+          setTimeout(() => {
+            const frame = document.createElement("iframe");
+            frame.src = "late.html";
+            document.body.appendChild(frame);
+          }, 1000);</script>`),
+      "child.html": doc(
+        `<div class="box" style="animation: slide 200ms linear 2500ms infinite"></div>
+        <script>setTimeout(() => {}, 1200); setInterval(() => {}, 100);</script>`,
+      ),
+      "late.html": doc(
+        `<div class="box" style="animation: slide 300ms linear 200ms both"></div><script>setTimeout(() => {}, 800);</script>`,
+      ),
+    });
+    const timeline = await openHeldTimeline(page, url);
+    assert.deepEqual(await timeline.animations(), [{ startMs: 2500, durationMs: 200, iterations: null }]);
+    assert.deepEqual(await timeline.pending(), {
+      timers: 4,
+      frames: 0,
+      intervals: 1,
+      seekListeners: 0,
+      latestTimerMs: 1200,
+    });
+    await timeline.at(1000);
+    let late: Frame | undefined;
+    for (let i = 0; i < 200 && !late; i++) {
+      late = page.frames().find((f) => f.url().endsWith("late.html"));
+      if (!late) await page.waitForTimeout(10);
+    }
+    assert.ok(late, "late.html attached");
+    await late.waitForLoadState("load");
+    await timeline.at(1100);
+    // It begins at the instant it was first seen: the 1000ms step that inserted it when its file
+    // committed within that step, else 1100.
+    const begun = 1100 - (await late.evaluate(() => performance.now()));
+    assert.ok(begun === 1000 || begun === 1100, `late.html began at ${begun}`);
+    assert.deepEqual(
+      (await timeline.animations()).sort((a, b) => a.startMs - b.startMs),
+      [
+        { startMs: begun + 200, durationMs: 300, iterations: 1 },
+        { startMs: 2500, durationMs: 200, iterations: null },
+      ],
+    );
+    assert.deepEqual(await timeline.pending(), {
+      timers: 3,
+      frames: 0,
+      intervals: 1,
+      seekListeners: 0,
+      latestTimerMs: begun + 800,
+    });
   } finally {
     await page.close();
   }
