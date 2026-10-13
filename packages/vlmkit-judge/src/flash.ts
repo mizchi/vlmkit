@@ -58,6 +58,15 @@ export const RED_UV_STEP = 0.2;
 export const RED_FLOOR = 20 / 320;
 /** Black has no chromaticity; it takes the D65 white point. */
 export const WHITE_UV = [0.1978, 0.4683] as const;
+/**
+ * At or below this luminance a colour is black for its chromaticity, and takes the white point too.
+ * A lossy codec decodes black as (1,0,0)-ish, which has red's own chromaticity, so the move to
+ * red was no u′v′ step at all: a 148x148 red/black strobe passed at crf 35 and 45 (measured, 16,385
+ * and 153 CSS px² where the lossless file has 21,904). Anything this dark is far under the red
+ * floor, so it can only be the other end of a red transition. 0.0002 already restored both; this
+ * is (15,0,0) red, (3,3,3) grey.
+ */
+export const BLACK_BELOW_Y = 0.001;
 
 /** Transition times kept per pixel: a window's count is reported up to this many (7 is all a verdict needs). */
 export const TRANSITIONS_KEPT = 16;
@@ -252,7 +261,7 @@ function writePixel(out: FlashFrame, p: number, r: number, g: number, b: number)
   const Y = 0.2126729 * r + 0.7151522 * g + 0.072175 * b;
   const Z = 0.0193339 * r + 0.119192 * g + 0.9503041 * b;
   const d = X + 15 * Y + 3 * Z;
-  if (d < 1e-12) {
+  if (d < 1e-12 || Y <= BLACK_BELOW_Y) {
     out.u[p] = WHITE_UV[0];
     out.v[p] = WHITE_UV[1];
   } else {

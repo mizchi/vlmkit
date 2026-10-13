@@ -103,7 +103,15 @@ export interface FlashCheckOptions extends PageLoadOptions {
    */
   video?: Pick<
     ScanVideoOptions,
-    "selection" | "displayWidth" | "maxFrames" | "stream" | "ffmpeg" | "ffprobe" | "colorMatrix" | "colorRange"
+    | "selection"
+    | "displayWidth"
+    | "maxFrames"
+    | "stream"
+    | "ffmpeg"
+    | "ffprobe"
+    | "colorMatrix"
+    | "colorRange"
+    | "background"
   >;
   viewport?: { width: number; height: number };
   /** Page source: the span of page time swept, in ms. */
@@ -227,6 +235,11 @@ export interface FlashReport {
   strip?: string;
   /** Why `--strip` wrote nothing. */
   stripSkipped?: string;
+  /**
+   * A recording whose codec or chroma subsampling moves what is measured (measured: ±3% of the area
+   * of an edge, a keyframe cadence that pumps): what that makes of this verdict.
+   */
+  lossy?: string[];
   timingMs: { capture: number; judge: number; classify: number };
 }
 
@@ -1083,7 +1096,7 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
   if (isVideoFile(options.source)) return judgeVideo(options);
   if (options.video) {
     throw new UsageError(
-      "--display-width, --from, --to, --stream, --max-frames, --color-matrix, --color-range, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …)",
+      "--display-width, --from, --to, --stream, --max-frames, --color-matrix, --color-range, --background, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …)",
     );
   }
   if (options.windowMs !== undefined && (options.windowMs < WINDOW_MS || options.windowMs > 60_000)) {
@@ -1265,6 +1278,10 @@ async function judgeManifest(
     unmeasuredAreaCss2: judged.unmeasuredAreaCss2,
     timingMs: { capture: 0, judge: Math.round(countMs), classify: Math.round(judged.classifyMs) },
   };
+  if (video) {
+    const lossy = lossyNotes(video, manifest, report);
+    if (lossy.length > 0) report.lossy = lossy;
+  }
   if (options.stripPath) {
     const worst = stripTrack(report)?.worst;
     if (worst) {
@@ -1273,6 +1290,53 @@ async function judgeManifest(
     } else report.stripSkipped = NO_STRIP;
   }
   return report;
+}
+
+/** Within this share of the area limit, a lossy or chroma-subsampled recording does not decide the verdict. */
+const LOSSY_NEAR = 0.05;
+/** More keyframes a second than this, and a lossy codec's re-quantization at each can itself flicker. */
+const PUMPING_KEYFRAMES_PER_S = 3;
+
+/**
+ * What a lossy or chroma-subsampled recording does to this verdict, measured (scan-video-v1):
+ * 4:2:0 alone took the 1px rim off a red/black box's area (21,904 → 21,316 CSS px², fail →
+ * pass) and lossy ringing grew a black/white one (+3.3% at crf 45), so an area within 5% of the
+ * limit is not decisive; and a two-frame GOP at crf 45 made dense static text fail on its own,
+ * so more than 3 keyframes a second is said to be able to pump.
+ */
+function lossyNotes(
+  video: FramesVideo,
+  manifest: FramesManifest,
+  report: Pick<FlashReport, "general" | "red" | "criteria">,
+): string[] {
+  const subsampled = video.pixelFormat !== undefined && /^yuv(j)?4[12][01]/.test(video.pixelFormat);
+  if (video.lossless && !subsampled) return [];
+  const why = video.lossless ? `chroma subsampled (${video.pixelFormat})` : `${video.codec}, lossy`;
+  const limit = report.criteria.areaLimitCss2;
+  const out: string[] = [];
+  for (const [name, t] of [
+    ["general", report.general],
+    ["red", report.red],
+  ] as const) {
+    const area = t.worst?.areaCss2 ?? t.largestBelowCss2;
+    if (area > 0 && Math.abs(area - limit) <= limit * LOSSY_NEAR) {
+      out.push(
+        `${name}: ${area.toLocaleString("en-US")} CSS px² is within 5% of the 21,824 limit, and the recording is ${why}: codec and subsampling move an edge's area by a few percent either way, so this ${t.verdict} is not decisive`,
+      );
+    }
+  }
+  const failing = report.general.verdict === "fail" || report.red.verdict === "fail";
+  if (!video.lossless && failing) {
+    const frames = manifest.frames;
+    const span = (frames[frames.length - 1]!.atMs - frames[0]!.atMs) / 1000;
+    const keys = frames.filter((f) => f.key).length;
+    if (span >= 1 && keys / span > PUMPING_KEYFRAMES_PER_S) {
+      out.push(
+        `${(keys / span).toFixed(1)} keyframes a second in a lossy stream: each re-quantizes the picture, and at that cadence the codec can itself flicker fine detail (a two-frame GOP made static text fail at crf 45)`,
+      );
+    }
+  }
+  return out;
 }
 
 const pct = (share: number) => `${Math.round(share * 1000) / 10}%`;
@@ -1352,7 +1416,7 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
     flashHeadline(report),
     ...(v
       ? [
-          `recording: ${v.codec}${v.decoder === "import" ? "" : v.lossless ? " (lossless)" : " (lossy)"} decoded by ${v.decoder}, shown at ${report.source.viewport.width}x${report.source.viewport.height} CSS px (${Number(report.source.cssPerPx.toFixed(4))} frame px per CSS px: --display-width sets it)${v.color?.assumed.length ? `; ${v.color.assumed.join(" and ")} not tagged, assumed ${v.color.matrix} ${v.color.range === "tv" ? "limited" : "full"} (--color-matrix / --color-range override)` : ""}${v.fieldOrder ? `; interlaced (${v.fieldOrder}), judged per frame, not per field` : ""}`,
+          `recording: ${v.codec}${v.decoder === "import" ? "" : v.lossless ? " (lossless)" : " (lossy)"} decoded by ${v.decoder}, shown at ${report.source.viewport.width}x${report.source.viewport.height} CSS px (${Number(report.source.cssPerPx.toFixed(4))} frame px per CSS px: --display-width sets it)${v.color?.assumed.length ? `; ${v.color.assumed.join(" and ")} not tagged, assumed ${v.color.matrix} ${v.color.range === "tv" ? "limited" : "full"} (--color-matrix / --color-range override)` : ""}`,
           ...(v.timing === "browser" && v.loop
             ? [
                 `recording: timed as a browser plays it (a frame of 10ms or less is held 100ms), looped ${v.loop.passes} pass(es) of ${v.loop.passMs}ms (plays ${v.loop.plays === null ? "forever" : `${v.loop.plays} time(s)`})`,
@@ -1361,7 +1425,13 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
           ...(v.hidden
             ? [`recording: ${v.hidden} decoded frame(s) never on screen (sharing a timestamp with the next) left out`]
             : []),
-          ...(v.color?.notes ?? []).map((n) => `recording: ${n}`),
+          ...(v.notes ?? []).map((n) => `recording: ${n}`),
+          ...(v.decodeErrors?.length
+            ? [
+                `recording: the decoder reported errors (judged on what it decoded): ${v.decodeErrors.slice(0, 3).join(" | ")}`,
+              ]
+            : []),
+          ...(report.lossy ?? []).map((n) => `recording: ${n}`),
         ]
       : []),
     `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : "incomplete"}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,

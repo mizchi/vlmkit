@@ -133,16 +133,25 @@ describe("scanVideo with the user's ffmpeg", () => {
     for (const f of at.manifest.frames) assert.equal(frameNumber(join(dir, "at", f.file)), f.index);
   });
 
-  test("a recording that starts late keeps its own spacing, from 0", async () => {
+  test("a recording that starts late is on its own timeline, as a browser's currentTime counts it", async () => {
+    // Measured in Chromium: a video that starts 1.25s in shows its first frame until then, and frame
+    // k at 1250 + 33.3k ms — so --from / --to / --at name the instants a player shows.
     const src = numbered("late-src.mp4", { frames: 12 });
     const file = join(dir, "late.mp4");
     ffmpeg("-itsoffset", "1.25", "-i", src, "-c", "copy", file);
-    const r = await scanVideo({ file, out: join(dir, "late"), selection: { kind: "span", fromMs: 100, toMs: 200 } });
+    const r = await scanVideo({ file, out: join(dir, "late"), selection: { kind: "span", fromMs: 1350, toMs: 1450 } });
     assert.deepEqual(
       r.manifest.frames.map((f) => f.index),
       [3, 4, 5, 6],
     );
+    assert.ok(Math.abs(r.manifest.frames[0]!.atMs - 1350) < 1e-6);
     for (const f of r.manifest.frames) assert.equal(frameNumber(join(dir, "late", f.file)), f.index);
+    const before = await scanVideo({ file, out: join(dir, "late-at"), selection: { kind: "at", atMs: [0, 1000] } });
+    assert.deepEqual(
+      before.manifest.frames.map((f) => f.index),
+      [0],
+      "before its first frame begins, a player shows the first frame",
+    );
   });
 
   test("variable frame durations are read from the stream, not a rate", async () => {
@@ -371,5 +380,98 @@ describe("scanVideo: an animated GIF / APNG plays as a browser plays it", () => 
     assert.equal(r.manifest.source.video?.codec, "apng");
     assert.deepEqual(r.manifest.source.video?.loop, { plays: null, passFrames: 2, passMs: 200, passes: 6 });
     assert.equal(r.manifest.frames[1]!.atMs, 100);
+  });
+});
+
+describe("scanVideo: what a stream's properties change", () => {
+  test("non-square pixels are resampled square, nearest, so a colour edge stays exact", async () => {
+    const file = join(dir, "sar.mkv");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=blue:s=64x48:r=10:d=0.2,format=rgb24,drawbox=x=0:y=0:w=16:h=16:color=red:t=fill,setsar=2/1",
+      // RGB, so the only resampling is the square-pixel one (4:2:0 chroma blends a colour edge by itself).
+      "-c:v",
+      "ffv1",
+      "-pix_fmt",
+      "bgr0",
+      file,
+    );
+    const r = await scanVideo({ file, out: join(dir, "sar") });
+    assert.equal(r.manifest.source.video?.sampleAspect, "2:1");
+    const px = decodePngPixels(readFileSync(join(dir, "sar", r.manifest.frames[0]!.file)));
+    assert.deepEqual([px.width, px.height], [128, 48]);
+    const at = (x: number, y: number) => [...px.data.subarray((y * px.width + x) * 3, (y * px.width + x) * 3 + 3)];
+    // The red box is now 32 px wide; its edge is red, then blue, nothing blended between.
+    assert.ok(at(31, 5)[0]! > 240 && at(31, 5)[2]! < 15, `31,5 = ${at(31, 5)}`);
+    assert.ok(at(32, 5)[0]! < 15 && at(32, 5)[2]! > 240, `32,5 = ${at(32, 5)}`);
+  });
+
+  test("transparent pixels are composited, never dropped to show what is under them", async () => {
+    // Fully transparent everywhere, the colour under the alpha toggling black / white each frame.
+    const file = join(dir, "hidden.mov");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=32x32:r=10:d=1,format=rgba,geq=r='255*mod(N\\,2)':g='255*mod(N\\,2)':b='255*mod(N\\,2)':a=0",
+      "-c:v",
+      "qtrle",
+      file,
+    );
+    for (const background of ["white", "black"] as const) {
+      const r = await scanVideo({ file, out: join(dir, `hidden-${background}`), background });
+      assert.equal(r.manifest.source.video?.background, background);
+      const levels = new Set(
+        r.manifest.frames.map((f) => decodePngPixels(readFileSync(join(dir, `hidden-${background}`, f.file))).data[0]),
+      );
+      assert.deepEqual([...levels], [background === "white" ? 255 : 0], "every frame is the background");
+    }
+  });
+
+  test("an interlaced stream is split into its fields: a field-rate strobe is in the sequence", async () => {
+    // 50 fields a second alternating black / white, woven into 25 interlaced frames: each frame is a
+    // still comb, identical every frame, so judged as frames nothing ever changes.
+    const file = join(dir, "fields.mp4");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x48:r=50:d=1,geq=lum='255*mod(N\\,2)':cb=128:cr=128,tinterlace=mode=interleave_top,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      file,
+    );
+    const r = await scanVideo({ file, out: join(dir, "fields") });
+    assert.equal(r.manifest.source.video?.fields, true);
+    assert.equal(r.manifest.frames.length, 2 * r.manifest.frames.filter((f) => f.index! % 2 === 0).length);
+    const levels = r.manifest.frames
+      .slice(0, 6)
+      .map((f) => decodePngPixels(readFileSync(join(dir, "fields", f.file))).data[0]! > 128);
+    assert.deepEqual(levels, [false, true, false, true, false, true], "fields alternate");
+    const gaps = r.manifest.frames.slice(1, 5).map((f, i) => Math.round(f.atMs - r.manifest.frames[i]!.atMs));
+    assert.deepEqual(gaps, [20, 20, 20, 20], "at twice the frame rate");
+  });
+
+  test("a truncated file decodes what it holds and says the decoder reported errors", async () => {
+    // The index (faststart) says 75 frames; the data for half of them is gone. Measured: ffmpeg and
+    // ffprobe both decode 36 and exit 0, saying so only on stderr.
+    const whole = join(dir, "whole.mp4");
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240:r=25:d=3", "-c:v", "libx264", "-movflags", "+faststart", whole);
+    const bytes = readFileSync(whole);
+    const cut = join(dir, "cut.mp4");
+    writeFileSync(cut, bytes.subarray(0, Math.floor(bytes.length / 2)));
+    const r = await scanVideo({ file: cut, out: join(dir, "cut") });
+    assert.ok(r.manifest.frames.length > 0 && r.manifest.frames.length < 75, `${r.manifest.frames.length} frames`);
+    assert.ok((r.manifest.source.video?.decodeErrors?.length ?? 0) > 0, "the decoder's errors are kept");
+    const clean = await scanVideo({ file: whole, out: join(dir, "whole") });
+    assert.equal(clean.manifest.source.video?.decodeErrors, undefined, "and a whole file has none");
   });
 });

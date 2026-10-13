@@ -142,8 +142,17 @@ export interface FramesVideo {
     transfer?: string;
     primaries?: string;
     assumed: string[];
-    notes?: string[];
   };
+  /** The stream's pixel format (`yuv420p`: chroma at half resolution, so a 1px colour edge is not exact). */
+  pixelFormat?: string;
+  /** Interlaced: each frame was split into its two fields, the sequence at twice the frame rate. */
+  fields?: boolean;
+  /** Transparent pixels were composited over this colour (the page behind them is not known). */
+  background?: "white" | "black";
+  /** What the decoding did not do or could not vouch for, for the reader. */
+  notes?: string[];
+  /** The decoder's own error lines (a truncated file decodes what it holds and exits 0). */
+  decodeErrors?: string[];
   /** Degrees the frames were turned to stand upright, from the stream's display matrix. */
   rotation?: number;
   /** A sample aspect ratio other than 1:1, resampled to square pixels (`2:1` doubled each row). */

@@ -264,6 +264,19 @@ describe("flash judge: the red track", () => {
     assert.ok(result.red.failing.length > 0);
   });
 
+  test("red against a lossy codec's near-black (1,0,0) / (3,1,0) still fails red: near-black is black", () => {
+    // A codec decodes black as (1,0,0)-ish, which has red's own chromaticity: read as a colour,
+    // the move to red is no u′v′ step, and a 148x148 strobe passed at crf 35 (measured).
+    for (const dark of [
+      [1, 0, 0],
+      [3, 1, 0],
+      [12, 0, 0],
+    ] as const) {
+      const { result } = sequence(W, H, 90, strobe([253, 0, 0], dark, 4), twoState(4));
+      assert.ok(result.red.failing.length > 0, `${dark} ↔ red`);
+    }
+  });
+
   test("near-black tints are below the red floor and pass", () => {
     for (const [a, b] of [
       [BLACK, [1, 0, 0]],

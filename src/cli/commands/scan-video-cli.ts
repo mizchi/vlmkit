@@ -29,7 +29,7 @@ function usage(): string {
   return [
     "Usage:",
     "  vlmkit scan video <recording> [--out dir] [--from t] [--to t] [--at list] [--display-width px]",
-    "                    [--max-frames n] [--stream index] [--color-matrix m] [--color-range r]",
+    "                    [--max-frames n] [--stream index] [--color-matrix m] [--color-range r] [--background c]",
     "                    [--ffmpeg path] [--ffprobe path] [--json]",
     "  vlmkit scan video <frames-dir> (--pts file | --fps rate) [--display-width px] [--lossless] [--json]",
     "",
@@ -50,6 +50,7 @@ function usage(): string {
     "  --color-matrix <m>     The YUV matrix to convert with: bt601, bt709, bt2020, … (default the",
     "                         stream's tag, else bt601 — what ffmpeg, Chromium's VP9 and recorders assume)",
     "  --color-range <r>      tv (limited) or pc (full); default the stream's tag, else tv",
+    "  --background <c>       white or black: what transparent pixels are composited over (default white)",
     "  --ffmpeg <path>        Your ffmpeg (default VLMKIT_FFMPEG, else ffmpeg on PATH)",
     "  --ffprobe <path>       Your ffprobe (default VLMKIT_FFPROBE, else beside --ffmpeg, else on PATH)",
     "  --pts <file>           With a directory: one timestamp in seconds per frame, in order",
@@ -73,6 +74,7 @@ export interface ScanVideoArgs {
   source: string;
   colorMatrix?: string;
   colorRange?: "tv" | "pc";
+  background?: "white" | "black";
   out?: string;
   selection: VideoSelection;
   displayWidth?: number;
@@ -155,6 +157,12 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
         out.colorRange = range;
         break;
       }
+      case "--background": {
+        const bg = value(argv, ++i, arg, "white or black");
+        if (bg !== "white" && bg !== "black") throw new UsageError(`--background is white or black, got ${bg}`);
+        out.background = bg;
+        break;
+      }
       case "--ffmpeg":
         out.ffmpeg = value(argv, ++i, arg, "the path to your ffmpeg");
         break;
@@ -219,6 +227,7 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
       [out.stream !== undefined, "--stream"],
       [out.ffmpeg !== undefined || out.ffprobe !== undefined, "--ffmpeg / --ffprobe"],
       [out.colorMatrix !== undefined || out.colorRange !== undefined, "--color-matrix / --color-range"],
+      [out.background !== undefined, "--background"],
     ] as const) {
       if (given)
         throw new UsageError(
@@ -277,6 +286,7 @@ async function main(): Promise<void> {
       ...(args.ffprobe !== undefined ? { ffprobe: args.ffprobe } : {}),
       ...(args.colorMatrix !== undefined ? { colorMatrix: args.colorMatrix } : {}),
       ...(args.colorRange !== undefined ? { colorRange: args.colorRange } : {}),
+      ...(args.background !== undefined ? { background: args.background } : {}),
     });
     ({ manifestPath, manifest } = result);
   }
@@ -306,7 +316,12 @@ async function main(): Promise<void> {
     console.log(
       `  ${DIM}color: ${c.matrix === "rgb" ? "stored as RGB" : `${c.matrix} matrix, ${c.range === "tv" ? "limited" : "full"} range`}${RESET}${assumed}`,
     );
-    for (const note of c.notes ?? []) console.log(`  ${YELLOW}${note}${RESET}`);
+  }
+  for (const note of v.notes ?? []) console.log(`  ${YELLOW}${note}${RESET}`);
+  if (v.decodeErrors?.length) {
+    console.log(
+      `  ${YELLOW}the decoder reported ${v.decodeErrors.length} error line${v.decodeErrors.length === 1 ? "" : "s"} (a damaged or truncated file decodes what it holds): ${v.decodeErrors.slice(0, 3).join(" | ")}${RESET}`,
+    );
   }
   if (v.timing === "browser" && v.loop) {
     const plays = v.loop.plays === null ? "forever" : `${v.loop.plays} time${v.loop.plays === 1 ? "" : "s"}`;
@@ -321,11 +336,6 @@ async function main(): Promise<void> {
   }
   if (v.rotation) console.log(`  ${DIM}turned ${v.rotation}° upright, as the stream's display matrix says${RESET}`);
   if (v.sampleAspect) console.log(`  ${DIM}pixels ${v.sampleAspect}, resampled to square${RESET}`);
-  if (v.fieldOrder) {
-    console.log(
-      `  ${YELLOW}interlaced (${v.fieldOrder}): decoded as frames, not fields — a field-rate flicker is not resolved${RESET}`,
-    );
-  }
   console.log(`  ${GREEN}${rel(manifestPath)}${RESET}`);
   console.log(
     `  ${DIM}next: vlmkit check flash ${rel(manifestPath)} · vlmkit snapshot strip --manifest ${rel(manifestPath)}${RESET}`,

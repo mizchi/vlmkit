@@ -36,6 +36,7 @@ import {
   chooseFrames,
   colorPlan,
   displayGeometry,
+  filterChain,
   imageTimeline,
   LOSSLESS_CODECS,
   parseFrameTable,
@@ -195,6 +196,8 @@ export interface ScanVideoOptions extends DecoderPaths {
   colorMatrix?: string;
   /** The range to convert with, over the stream's tag or the limited default. */
   colorRange?: "tv" | "pc";
+  /** What transparent pixels are composited over (default white, a browser's default page). */
+  background?: "white" | "black";
 }
 
 export interface ScanVideoResult {
@@ -241,6 +244,14 @@ const label = (instants: readonly number[] | undefined, atMs: number): string | 
     : `at ${instants.map(fmt).join(", ")}`;
 };
 
+/** Lines of the decoder's stderr that say a frame was lost or damaged (it exits 0 on a truncated file). */
+const DECODE_ERROR =
+  /partial file|decoding error|error while decoding|invalid nal unit|corrupt|concealing|missing reference|invalid data found|truncat|end of file/i;
+
+const decodeErrors = (lines: readonly string[]): string[] => [
+  ...new Set(lines.filter((l) => DECODE_ERROR.test(l) && !l.includes("showinfo")).map((l) => l.trim())),
+];
+
 /**
  * Decode `file` with the user's ffmpeg into `out` (`NNNN-t<ms>.png` + `frames.json`). Refuses
  * (UsageError) a file with no video stream, an HDR one, one that decodes to frames of more than one
@@ -269,7 +280,9 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     "json",
     asInput(file),
   ]).catch((e) => spawnFailure(e, decoder.ffprobe, "ffprobe"));
-  if (probed.code !== 0) throw new UsageError(`${decoder.ffprobe} cannot read ${shown}: ${reason(probed.stderr)}`);
+  if (probed.code !== 0) {
+    throw new UsageError(`${decoder.ffprobe} cannot read ${shown} as a video container: ${reason(probed.stderr)}`);
+  }
   const stream = pickVideoStream(probed.stdout, shown, options.stream);
   const plan = colorPlan(stream, shown, {
     ...(options.colorMatrix !== undefined ? { matrix: options.colorMatrix } : {}),
@@ -281,7 +294,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     "-select_streams",
     String(stream.index),
     "-show_entries",
-    "frame=best_effort_timestamp,pts,key_frame",
+    "frame=best_effort_timestamp,pts,key_frame,interlaced_frame",
     "-of",
     "json",
     asInput(file),
@@ -293,10 +306,35 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     );
   }
   const probedFrames = parseFrameTable(table.stdout, shown);
+  const notes = [...plan.notes];
+  // Interlaced by the stream's word or the frames' own (a stream can say "tb" over frames that are tff).
+  const interlaced = stream.fieldOrder !== undefined || probedFrames.slice(0, 30).some((f) => f.interlaced);
   // A GIF / APNG plays as a browser plays it (its own delays, clamped, looped); a video as stamped.
   const image = stream.codec === "gif" || stream.codec === "apng" ? imageTiming(readFileSync(file)) : null;
-  const timeline =
-    (image ? imageTimeline(probedFrames, image) : null) ?? videoTimeline(probedFrames, stream.timeBase, shown);
+  const imageLine = image ? imageTimeline(probedFrames, image) : null;
+  if (image && !imageLine) {
+    notes.push(
+      `the file's own frame delays (${image.storedMs.length} frames) do not match the ${probedFrames.length} frames decoded: the decoder's timing is used, not the browser's, and the animation is not looped`,
+    );
+  }
+  const timeline = imageLine ?? videoTimeline(probedFrames, stream.timeBase, shown, { fields: interlaced });
+  if (timeline.fields) {
+    notes.push(
+      `interlaced${stream.fieldOrder ? ` (${stream.fieldOrder})` : ""}: each frame split into its two fields, line-doubled, at twice the frame rate (woven, a field-rate flicker is a still comb)`,
+    );
+  }
+  if (stream.rotation !== undefined && stream.rotation % 90 !== 0) {
+    notes.push(`rotated by ${stream.rotation}°, not a quarter turn: ffmpeg turns it with black corners`);
+  }
+  if (probedFrames.length === 1 && !image) {
+    notes.push(`stream #${stream.index} decodes to one frame: a still or a cover track (--stream picks another)`);
+  }
+  const background = options.background ?? "white";
+  if (stream.alpha) {
+    notes.push(
+      `transparent pixels composited over ${background} (--background): the page behind them is not known, and dropping alpha shows whatever colour sits under them`,
+    );
+  }
   const rows = timeline.rows;
   const asked = options.selection ?? { kind: "all" };
   const chosen = chooseFrames(rows, asked);
@@ -312,7 +350,9 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     );
   }
   // The decoded frames the chosen ones are: each decoded once, however many times it is shown.
-  const needed = [...new Set(chosen.map((f) => f.decoded ?? f.index))].sort((a, b) => a - b);
+  const decodedOf = (f: { decoded?: number; index: number }) => f.decoded ?? f.index;
+  const needed = [...new Set(chosen.map(decodedOf))].sort((a, b) => a - b);
+  const perFrame = timeline.fields ? 2 : 1;
   const probeMs = performance.now() - t0;
 
   const outDir = resolve(options.out ?? defaultFramesDir(file));
@@ -321,21 +361,16 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   const work = await mkdtemp(join(outDir, ".scan-video-"));
   const t1 = performance.now();
   try {
-    const chain = [
-      selectExpression(needed, probedFrames.length),
-      // Square pixels: the frames contract has one scale for both axes.
-      stream.sampleAspect ? "scale=w=trunc(iw*sar/2)*2:h=ih,setsar=1" : null,
-      plan.scale ? `scale=${plan.scale}` : null,
-      "format=rgb24",
-      // No cICP / cHRM / gAMA chunk: the bytes are sRGB, and a browser that colour-manages a
-      // tagged PNG shows grey 808080 as 8c8c8c (measured), so a strip or a crop would lie.
-      "setparams=color_primaries=unknown:color_trc=unknown:colorspace=unknown",
-      "showinfo",
-    ]
-      .filter(Boolean)
-      .join(",");
+    const chain = filterChain({
+      select: selectExpression(needed, probedFrames.length),
+      fields: timeline.fields === true,
+      color: plan,
+      ...(stream.alpha ? { alpha: { background } } : {}),
+      sampleAspect: stream.sampleAspect !== undefined,
+    });
     const written: ShowinfoFrame[] = [];
     let showTimeBase: { num: number; den: number } | null = null;
+    const stderrAll: string[] = [];
     const decoded = await run(
       decoder.ffmpeg,
       [
@@ -344,7 +379,12 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         "-nostats",
         "-loglevel",
         "info",
+        // For every scaler ffmpeg inserts itself (an RGB source's conversion), the same rounding.
+        "-sws_flags",
+        "accurate_rnd+full_chroma_int",
         "-copyts",
+        // libvpx decodes a WebM's alpha; ffmpeg's own VP8/VP9 decoders drop it.
+        ...(stream.alpha === "libvpx" || stream.alpha === "libvpx-vp9" ? ["-c:v", stream.alpha] : []),
         "-i",
         asInput(file),
         "-map",
@@ -358,8 +398,11 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         chain,
         "-c:v",
         "png",
+        // Unfiltered rows read 3-7x faster than sub/up/paeth; level 1 writes twice as fast as 6.
         "-pred",
         "none",
+        "-compression_level",
+        "1",
         "-start_number",
         "0",
         "-f",
@@ -367,6 +410,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         join(work, "%06d.png").replace(/%(?!06d\.png$)/g, "%%"),
       ],
       (line) => {
+        stderrAll.push(line);
         const parsed = parseShowinfoLine(line);
         if (!parsed) return;
         if ("timeBase" in parsed) showTimeBase ??= parsed.timeBase;
@@ -374,12 +418,18 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
       },
     ).catch((e) => spawnFailure(e, decoder.ffmpeg, "ffmpeg"));
     if (decoded.code !== 0) {
-      throw new UsageError(`${decoder.ffmpeg} cannot decode ${shown} (${stream.codec}): ${reason(decoded.stderr)}`);
+      const why = reason(decoded.stderr);
+      throw new UsageError(
+        /Unknown decoder|Decoder .* not found/i.test(why) && stream.alpha?.startsWith("libvpx")
+          ? `${shown}: its alpha decodes only with libvpx, which this ffmpeg lacks (${why}); use an ffmpeg built with libvpx`
+          : `${decoder.ffmpeg} cannot decode ${shown} (${stream.codec}): ${why}`,
+      );
     }
     checkWritten(
       written,
       showTimeBase,
       needed.map((d) => probedFrames[d]!),
+      perFrame,
       stream,
       shown,
     );
@@ -391,16 +441,18 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
           "a frame sequence has one size. Scale it to one first: ffmpeg -i in -vf scale=W:H out.mkv",
       );
     }
-    // Each decoded file moves to its last use and is copied to the ones before it.
-    const decodedFile = new Map(needed.map((d, k) => [d, join(work, `${String(k).padStart(6, "0")}.png`)]));
-    const lastUse = new Map<number, number>();
-    chosen.forEach((f, n) => lastUse.set(f.decoded ?? f.index, n));
+    // Each decoded file (a frame, or one of its fields) moves to its last use and is copied before.
+    const position = new Map(needed.map((d, k) => [d, k]));
+    const workFile = (f: { decoded?: number; index: number; field?: 0 | 1 }) =>
+      join(work, `${String(position.get(decodedOf(f))! * perFrame + (f.field ?? 0)).padStart(6, "0")}.png`);
+    const lastUse = new Map<string, number>();
+    chosen.forEach((f, n) => lastUse.set(workFile(f), n));
     const frames: FrameEntry[] = [];
     for (const [n, f] of chosen.entries()) {
       const name = frameFileName(n, f.atMs);
-      const d = f.decoded ?? f.index;
-      if (lastUse.get(d) === n) await rename(decodedFile.get(d)!, join(outDir, name));
-      else await copyFile(decodedFile.get(d)!, join(outDir, name));
+      const from = workFile(f);
+      if (lastUse.get(from) === n) await rename(from, join(outDir, name));
+      else await copyFile(from, join(outDir, name));
       const l = label(f.instants, f.atMs);
       frames.push({
         n,
@@ -412,6 +464,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         ...(l ? { label: l } : {}),
       });
     }
+    const errors = decodeErrors([...table.stderr, ...stderrAll]);
     const video: FramesVideo = {
       file: shown,
       decoder: decoder.name,
@@ -420,12 +473,17 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
       streamFrames: rows.length,
       selection,
       color: plan.color,
+      pixelFormat: stream.pixelFormat,
       ...(timeline.hidden ? { hidden: timeline.hidden } : {}),
       ...(timeline.timing ? { timing: timeline.timing } : {}),
       ...(timeline.loop ? { loop: timeline.loop } : {}),
+      ...(timeline.fields ? { fields: true } : {}),
+      ...(stream.alpha ? { background } : {}),
       ...(stream.rotation ? { rotation: stream.rotation } : {}),
       ...(stream.sampleAspect ? { sampleAspect: stream.sampleAspect } : {}),
       ...(stream.fieldOrder ? { fieldOrder: stream.fieldOrder } : {}),
+      ...(notes.length ? { notes } : {}),
+      ...(errors.length ? { decodeErrors: errors.slice(0, 20) } : {}),
     };
     const manifest: FramesManifest = {
       format: FRAMES_FORMAT,
@@ -456,30 +514,33 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
 /**
  * The frames ffmpeg wrote are the ones the table chose: as many, and each at its timestamp. With
  * `-copyts` showinfo's pts is the decoder's own `best_effort_timestamp`, so a selection one frame
- * off is caught even on a constant rate, where the spacing alone would agree.
+ * off is caught even on a constant rate, where the spacing alone would agree. An interlaced frame
+ * is written as its two fields: the first at the frame's time, the second after it.
  */
 function checkWritten(
   written: readonly ShowinfoFrame[],
   timeBase: { num: number; den: number } | null,
   expected: readonly ProbedFrame[],
+  perFrame: number,
   stream: VideoStream,
   shown: string,
 ): void {
-  if (written.length !== expected.length) {
+  if (written.length !== expected.length * perFrame) {
     throw new Error(
-      `${shown}: ffmpeg wrote ${written.length} frames where ffprobe's table chose ${expected.length}; the two decoders disagree about the stream`,
+      `${shown}: ffmpeg wrote ${written.length} ${perFrame === 2 ? "fields" : "frames"} where ffprobe's table chose ${expected.length * perFrame}; the two decoders disagree about the stream`,
     );
   }
   if (!timeBase) throw new Error(`${shown}: ffmpeg's showinfo printed no time base, so its frames cannot be checked`);
   const tb = stream.timeBase;
   // Half the coarser tick: the two sides may count in different time bases.
   const tolerance = Math.max(tb.num / tb.den, timeBase.num / timeBase.den) / 2 + 1e-9;
-  for (const [k, f] of written.entries()) {
+  for (const [k, want] of expected.entries()) {
+    const f = written[k * perFrame]!;
     const got = (f.pts * timeBase.num) / timeBase.den;
-    const want = (expected[k]!.ticks * tb.num) / tb.den;
-    if (Math.abs(got - want) > tolerance) {
+    const at = (want.ticks * tb.num) / tb.den;
+    if (Math.abs(got - at) > tolerance) {
       throw new Error(
-        `${shown}: frame ${k} ffmpeg wrote is at ${got.toFixed(6)}s where ffprobe's table has decoded frame ${expected[k]!.index} at ${want.toFixed(6)}s; the two decoders disagree`,
+        `${shown}: frame ${k} ffmpeg wrote is at ${got.toFixed(6)}s where ffprobe's table has decoded frame ${want.index} at ${at.toFixed(6)}s; the two decoders disagree`,
       );
     }
   }
@@ -573,11 +634,12 @@ export async function importFrames(
       );
     }
   }
-  const t0 = seconds[0]!;
+  // The stream's own timeline, as scanVideo keeps it (moved to 0 only when it would start before).
+  const origin = Math.min(0, seconds[0]! * 1000);
   const frames: FrameEntry[] = names.map((file, n) => ({
     n,
     file,
-    atMs: (seconds[n]! - t0) * 1000,
+    atMs: seconds[n]! * 1000 - origin,
     stable: true,
     index: n,
   }));

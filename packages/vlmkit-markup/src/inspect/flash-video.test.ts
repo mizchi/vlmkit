@@ -190,6 +190,63 @@ describe("check flash on a recording", () => {
     assert.deepEqual(verdicts(once), ["pass", "pass"]);
   });
 
+  test("an interlaced recording strobing at field rate fails: its fields are judged, not the woven frames", async () => {
+    const file = join(dir, "fields.mp4");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=50:d=1.5,geq=lum='255*mod(N\\,2)':cb=128:cr=128,tinterlace=mode=interleave_top,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.source.video?.fields, true);
+    assert.equal(r.general.verdict, "fail");
+  });
+
+  test("a lossy red box just over the limit still fails red, and says it is not decisive", async () => {
+    // 148x148 red / black at 5 Hz, crf 35: black decodes as (1,0,0)-ish, red's own chromaticity.
+    // Before near-black was black, the red track measured 16,385 CSS px² and passed.
+    const file = join(dir, "red148.mp4");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=640x360:r=30:d=2,format=rgb24,drawbox=x=100:y=100:w=148:h=148:color=red:t=fill:enable='lt(mod(n\\,6)\\,3)'",
+      "-c:v",
+      "libx264",
+      "-crf",
+      "35",
+      "-g",
+      "30",
+      "-pix_fmt",
+      "yuv420p",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.red.verdict, "fail");
+    assert.ok(
+      r.lossy?.some((n) => n.startsWith("red:") && /not decisive/.test(n)),
+      `lossy notes: ${JSON.stringify(r.lossy)}`,
+    );
+  });
+
   test("page-only flags are refused for a recording, recording flags for a page", async () => {
     await assert.rejects(
       runFlashCheck({ source: join(dir, "fast.mp4"), windowMs: 3000 }),

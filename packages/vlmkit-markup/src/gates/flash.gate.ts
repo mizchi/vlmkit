@@ -52,10 +52,11 @@ function findings(report: FlashReport): Finding[] {
   ] as const) {
     const t = report[track];
     if (t.verdict === "fail" && t.worst) {
+      const nearLimit = report.lossy?.some((n) => n.startsWith(`${track}:`));
       out.push({
         rule,
         severity: "suspect",
-        message: `${label} flashing: ${where(t)}`,
+        message: `${label} flashing: ${where(t)}${nearLimit ? "; a lossy or subsampled recording within 5% of the limit: not decisive" : ""}`,
         ...selectorOf(t),
         evidence: { track, worst: t.worst, reason: t.reason, motion: t.motion, animations: t.animations },
       });
@@ -145,6 +146,10 @@ function videoFlags(argv: readonly string[]): FlashCheckOptions["video"] | undef
   if (colorMatrix !== undefined && !COLOR_MATRICES.includes(colorMatrix)) {
     throw new UsageError(`--color-matrix is one of ${COLOR_MATRICES.join(", ")} (got ${colorMatrix})`);
   }
+  const background = readFlag(argv, "background");
+  if (background !== undefined && background !== "white" && background !== "black") {
+    throw new UsageError(`--background is white or black, got ${background}`);
+  }
   const colorRange = readFlag(argv, "color-range");
   if (colorRange !== undefined && colorRange !== "tv" && colorRange !== "pc") {
     throw new UsageError(`--color-range is tv (limited) or pc (full), got ${colorRange}`);
@@ -162,6 +167,7 @@ function videoFlags(argv: readonly string[]): FlashCheckOptions["video"] | undef
     ...(ffprobe !== undefined ? { ffprobe } : {}),
     ...(colorMatrix !== undefined ? { colorMatrix } : {}),
     ...(colorRange !== undefined ? { colorRange: colorRange as "tv" | "pc" } : {}),
+    ...(background !== undefined ? { background: background as "white" | "black" } : {}),
   };
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -300,6 +306,13 @@ A pass is "no flash measured under these criteria", not a certification.`,
       defaultDescription: "the stream's tag, else bt601",
     },
     {
+      name: "background",
+      placeholder: "white|black",
+      kind: "string",
+      description: "Recording: what transparent pixels are composited over",
+      defaultDescription: "white",
+    },
+    {
       name: "color-range",
       placeholder: "tv|pc",
       kind: "string",
@@ -336,6 +349,7 @@ A pass is "no flash measured under these criteria", not a certification.`,
       "--ffprobe",
       "--color-matrix",
       "--color-range",
+      "--background",
       ...PAGE_LOAD_VALUE_FLAGS,
     ]);
     const rawWindow = readFlag(argv, "window");
@@ -364,7 +378,7 @@ A pass is "no flash measured under these criteria", not a certification.`,
     const video = videoFlags(argv);
     if (video && !isVideoFile(source)) {
       throw new UsageError(
-        `--display-width, --from, --to, --max-frames, --stream, --color-matrix, --color-range, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …), not ${source}`,
+        `--display-width, --from, --to, --max-frames, --stream, --color-matrix, --color-range, --background, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …), not ${source}`,
       );
     }
     if (isVideoFile(source) && (windowMs !== undefined || viewport)) {
