@@ -68,6 +68,7 @@ import {
 } from "@mizchi/vlmkit-judge/flash.ts";
 import { classifyFlash, type MotionSegment } from "@mizchi/vlmkit-judge/flash-motion.ts";
 import {
+  formatInstant,
   frameTimeMs,
   parseFramesManifest,
   type FramesClock,
@@ -1515,7 +1516,7 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
           ...(report.lossy ?? []).map((n) => `recording: ${n}`),
         ]
       : []),
-    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : `incomplete${s.partial ? ` (${s.partial})` : ""}`}${s.judgedFromMs !== undefined ? `; windows judged from ${secs(s.judgedFromMs)}, the second before decoded as their history` : ""}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
+    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : `incomplete${s.partial ? ` (${s.partial})` : ""}`}${s.judgedFromMs !== undefined ? `; windows judged from ${secs(s.judgedFromMs)}, the second before decoded as their history` : ""}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${formatInstant(s.windowMs)}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
     ...describeTrack("general", report.general, report.criteria.areaLimitCss2, rules),
     ...describeTrack("red", report.red, report.criteria.areaLimitCss2, rules),
   ];

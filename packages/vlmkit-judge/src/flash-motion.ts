@@ -66,9 +66,11 @@
  * Known to read as flash although the eye would track it (the safe direction): two layers moving
  * differently inside one block (text over a patterned or photographic background, parallax, the
  * translucent cards of a deal), rotation of detailed content, fine detail moving at a speed off the
- * quarter- and third-pixel grid. Known to read as motion: a grating moving less than half its
- * period a frame, however fast (it is seen to move; moving-pattern hazards are ISO 9241-391's, not
- * measured here); a shake that turns by less than a quarter turn a frame, as a smooth orbit does;
+ * quarter- and third-pixel grid, and a grating whose bars are as wide as a block (16px bars moving
+ * 4px a frame: a block inside a bar is flat, with no texture to match, so its flips stay counted;
+ * measured while loading recordings, scan-video-v1). Known to read as motion: a grating of bars
+ * narrower than a block moving less than half its period a frame (8px bars at 2px a frame), however
+ * fast (it is seen to move; moving-pattern hazards are ISO 9241-391's, not measured here); a shake that turns by less than a quarter turn a frame, as a smooth orbit does;
  * a strobe behind content that hides each pixel at more than about one step in eight, which
  * flashes there fewer times than the strobe does (text at one mark per 240 px² over a 4 Hz box
  * read 16,522 of its 32,000 px²).
