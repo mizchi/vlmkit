@@ -22,7 +22,7 @@
  * flipbook of a failing window is itself a strobe for whoever opens the review.
  */
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -225,6 +225,10 @@ export interface FlashReport {
     unstableFrames: number;
     /** Times the page navigated during the sweep; the frames after are the new document's. */
     navigations: number;
+    /** A recording's frames that are not all of it: why a pass on them is not backed. */
+    partial?: string;
+    /** A span decoded with its second of history: the windows judged end from here. */
+    judgedFromMs?: number;
   };
   general: FlashTrackReport;
   red: FlashTrackReport;
@@ -465,7 +469,7 @@ async function shoot(
  * Frames counted as they come: masked, at CSS resolution, into the judge; their block sums kept.
  * The masked pixels are the judge's unknown ones, so what flashes beside them is measured with them.
  */
-function frameCounter(cssPerPx: number, masks: readonly Box[]) {
+function frameCounter(cssPerPx: number, masks: readonly Box[], judgeFromMs?: number) {
   let judge: ReturnType<typeof createFlashJudge> | null = null;
   const blocks: Array<FrameBlocks | undefined> = [];
   let size = { width: 0, height: 0 };
@@ -474,7 +478,11 @@ function frameCounter(cssPerPx: number, masks: readonly Box[]) {
       const frame = toFlashFrame(png, cssPerPx, masks);
       if (!judge) {
         size = { width: frame.width, height: frame.height };
-        judge = createFlashJudge({ ...size, ...(masks.length > 0 ? { unknown: maskOf(masks, size) } : {}) });
+        judge = createFlashJudge({
+          ...size,
+          ...(masks.length > 0 ? { unknown: maskOf(masks, size) } : {}),
+          ...(judgeFromMs !== undefined ? { judgeFromMs } : {}),
+        });
       }
       judge.push(k, atMs, frame);
       blocks[k] = frame.blocks;
@@ -859,10 +867,12 @@ function countFiles(
   times: readonly number[],
   cssPerPx: number,
   unmeasured: readonly UnmeasuredRegion[],
+  judgeFromMs?: number,
 ): Counted {
   const counter = frameCounter(
     cssPerPx,
     unmeasured.map((u) => u.rect),
+    judgeFromMs,
   );
   files.forEach((file, k) => counter.add(k, times[k]!, decodePngPixels(readFileSync(file))));
   return counter.finish();
@@ -1070,12 +1080,68 @@ function judge(
 export function manifestComplete(manifest: FramesManifest): boolean {
   const frames = manifest.frames;
   if (frames.some((f) => !f.stable)) return false;
-  if (manifest.source.clock === "stream") {
-    return frames.every((f, i) => f.index !== undefined && f.index === frames[0]!.index! + i);
-  }
+  if (manifest.source.clock === "stream") return streamCoverage(manifest).complete;
   if (manifest.source.clock !== "held") return false;
   const n0 = Math.round((frames[0]!.atMs * 60) / 1000);
   return frames.every((f, i) => Math.abs(f.atMs - frameTimeMs(n0 + i)) < 1e-6);
+}
+
+export interface StreamCoverage {
+  /** Every frame of the recording between the first window judged and the last frame is here. */
+  complete: boolean;
+  /** The whole recording: under 7 frames in every second, nothing can fail, so a pass is real. */
+  whole: boolean;
+  /** A span decoded with its second of history: judge only the windows ending inside it. */
+  judgeFromMs?: number;
+  /** Why it is not complete, for the reader. */
+  partial?: string;
+}
+
+/**
+ * What a stream-clock sequence covers. Its frames are the recording's whole content only when
+ * they are every frame the recording shows (consecutive indices, from the first to the last); a
+ * span cut out of it misses the second before it, which a window ending in its first second
+ * needs — unless it was decoded with that second (`leadInMs`), as `check flash rec.mp4 --from`
+ * does. An import without `--every-frame` vouches for nothing: another tool may have thinned it.
+ */
+export function streamCoverage(manifest: FramesManifest): StreamCoverage {
+  const frames = manifest.frames;
+  const video = manifest.source.video;
+  const consecutive =
+    frames.every((f) => f.stable) && frames.every((f, i) => f.index !== undefined && f.index === frames[0]!.index! + i);
+  if (!consecutive) {
+    return { complete: false, whole: false, partial: "frames of the recording are left out between the ones here" };
+  }
+  if (video?.decoder === "import" && video.streamFrames === undefined) {
+    return {
+      complete: false,
+      whole: false,
+      partial: "imported frames another tool wrote, not marked as every frame (scan video <dir> --every-frame)",
+    };
+  }
+  const first = frames[0]!.index!;
+  const last = frames[frames.length - 1]!.index!;
+  const whole = first === 0 && video?.streamFrames !== undefined && last === video.streamFrames - 1;
+  const selection = video?.selection;
+  // A span asked for with its second of history: only the windows from the frame on screen at its
+  // start are judged, whether or not that history reached back to the first frame.
+  let judgeFromMs: number | undefined;
+  if (selection?.kind === "span" && selection.leadInMs !== undefined) {
+    let from = frames[0]!.atMs;
+    for (const f of frames) if (f.atMs <= selection.fromMs + 1e-6) from = f.atMs;
+    if (from > frames[0]!.atMs) judgeFromMs = from;
+  }
+  const at = judgeFromMs !== undefined ? { judgeFromMs } : {};
+  if (whole) return { complete: true, whole: true, ...at };
+  if (selection?.kind === "span" && (selection.leadInMs ?? 0) >= WINDOW_MS - 1e-6) {
+    return { complete: true, whole: false, ...at };
+  }
+  if (first === 0) return { complete: true, whole: false, ...at };
+  return {
+    complete: false,
+    whole: false,
+    partial: `the frames begin ${Number(frames[0]!.atMs.toFixed(1))}ms into the recording with no second before them, so a window ending in their first second is missing its start (check flash on the recording with --from decodes it)`,
+  };
 }
 
 /** The track whose window the strip shows: a failing one, else one motion excused, else any that flashed. */
@@ -1094,6 +1160,14 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
   }
   if (/\.json$/i.test(options.source)) return judgeManifest(options);
   if (isVideoFile(options.source)) return judgeVideo(options);
+  if (existsSync(options.source) && statSync(options.source).isDirectory()) {
+    // A frames directory (scan video's <recording>.frames/): its frames.json, not a file listing in Chromium.
+    const manifest = join(options.source, "frames.json");
+    if (existsSync(manifest)) return judgeManifest({ ...options, source: manifest });
+    throw new UsageError(
+      `${options.source} is a directory with no frames.json: to judge frames another tool wrote, import them first (vlmkit scan video ${options.source} --pts <file> --every-frame)`,
+    );
+  }
   if (options.video) {
     throw new UsageError(
       "--display-width, --from, --to, --stream, --max-frames, --color-matrix, --color-range, --background, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …)",
@@ -1185,7 +1259,7 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
 
 /**
  * Decode a recording with the user's own ffmpeg (`scanVideo`) and judge its frames as a saved
- * sequence: `check flash rec.mp4` is `scan video rec.mp4` then `check flash rec.frames/frames.json`,
+ * sequence: `check flash rec.mp4` is `scan video rec.mp4` then `check flash rec.mp4.frames/frames.json`,
  * the same answer either way.
  */
 async function judgeVideo(options: FlashCheckOptions): Promise<FlashReport> {
@@ -1198,7 +1272,10 @@ async function judgeVideo(options: FlashCheckOptions): Promise<FlashReport> {
   const dir = keep ?? (await mkdtemp(join(tmpdir(), "vlmkit-flash-video-")));
   try {
     const t0 = performance.now();
-    const scanned = await scanVideo({ file: options.source, out: dir, ...options.video });
+    // A span is decoded with the second before it: a window ending at its start needs that history.
+    const video = options.video ?? {};
+    const selection = video.selection?.kind === "span" ? { ...video.selection, leadInMs: WINDOW_MS } : video.selection;
+    const scanned = await scanVideo({ file: options.source, out: dir, ...video, ...(selection ? { selection } : {}) });
     const decodeMs = performance.now() - t0;
     const report = await judgeManifest(
       { ...options, source: scanned.manifestPath },
@@ -1235,15 +1312,16 @@ async function judgeManifest(
   const cssPerPx = manifest.source.deviceScaleFactor || 1;
   const unmeasured = manifest.source.unmeasured ?? [];
   const complete = manifestComplete(manifest);
+  const coverage = manifest.source.clock === "stream" ? streamCoverage(manifest) : null;
   // The sweep's own decisions when it wrote them; an older manifest's still page is inferred.
   const sweep = manifest.source.sweep;
   const still = sweep
     ? sweep.still
     : manifest.source.tool === "check flash" && manifest.frames.length === 1 && complete;
   const t0 = performance.now();
-  const counted = countFiles(files, times, cssPerPx, unmeasured);
+  const counted = countFiles(files, times, cssPerPx, unmeasured, coverage?.judgeFromMs);
   const countMs = performance.now() - t0;
-  const wholeStream = manifest.source.clock === "stream" && complete;
+  const wholeStream = coverage?.whole === true;
   const judged = judge(counted, files, times, cssPerPx, unmeasured, { still, wholeStream });
   const video = manifest.source.video;
   const report: FlashReport = {
@@ -1252,7 +1330,8 @@ async function judgeManifest(
       kind: as?.kind ?? "frames",
       path: as?.path ?? options.source,
       url: manifest.source.url,
-      viewport: manifest.source.viewport,
+      // A manifest another tool wrote may leave it out: the frames' own size at its scale.
+      viewport: manifest.source.viewport ?? { width: counted.width, height: counted.height },
       cssPerPx,
       clock: manifest.source.clock,
       ...(as === null || as.keep ? { manifest: path } : {}),
@@ -1271,6 +1350,8 @@ async function judgeManifest(
       truncated: sweep?.truncated ?? false,
       unstableFrames: manifest.frames.filter((f) => !f.stable).length,
       navigations: 0,
+      ...(coverage?.partial ? { partial: coverage.partial } : {}),
+      ...(coverage?.judgeFromMs !== undefined ? { judgedFromMs: coverage.judgeFromMs } : {}),
     },
     general: judged.general,
     red: judged.red,
@@ -1434,7 +1515,7 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
           ...(report.lossy ?? []).map((n) => `recording: ${n}`),
         ]
       : []),
-    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : "incomplete"}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
+    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : `incomplete${s.partial ? ` (${s.partial})` : ""}`}${s.judgedFromMs !== undefined ? `; windows judged from ${secs(s.judgedFromMs)}, the second before decoded as their history` : ""}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
     ...describeTrack("general", report.general, report.criteria.areaLimitCss2, rules),
     ...describeTrack("red", report.red, report.criteria.areaLimitCss2, rules),
   ];

@@ -31,7 +31,7 @@ function usage(): string {
     "  vlmkit scan video <recording> [--out dir] [--from t] [--to t] [--at list] [--display-width px]",
     "                    [--max-frames n] [--stream index] [--color-matrix m] [--color-range r] [--background c]",
     "                    [--ffmpeg path] [--ffprobe path] [--json]",
-    "  vlmkit scan video <frames-dir> (--pts file | --fps rate) [--display-width px] [--lossless] [--json]",
+    "  vlmkit scan video <frames-dir> (--pts file | --fps rate) [--every-frame] [--lossless] [--display-width px] [--json]",
     "",
     "Decodes a recording (mp4, webm, mov, mkv, gif, …) into numbered PNGs and a frames.json",
     "(vlmkit-frames/1) giving each frame its presentation time, with YOUR ffmpeg and ffprobe:",
@@ -39,7 +39,7 @@ function usage(): string {
     "snapshot storyboard (lossless recordings only).",
     "",
     "Options:",
-    "  --out <dir>            Where to write (default: <name>.frames/ beside the recording)",
+    "  --out <dir>            Where to write (default: <recording>.frames/ beside it, e.g. rec.mp4.frames/)",
     "  --from <t>, --to <t>   Only the frames on screen during that span (1.5s, 1500, 00:01.500)",
     "  --at <list>            Only the frame on screen at each instant (0,250,1s or 0..2s/100ms)",
     "  --display-width <px>   The width the video plays at, in CSS px: check flash measures its field",
@@ -56,15 +56,17 @@ function usage(): string {
     "  --pts <file>           With a directory: one timestamp in seconds per frame, in order",
     "  --fps <rate>           With a directory: a constant frame rate instead of --pts",
     "  --lossless             With a directory: the frames are exactly what was recorded",
+    "  --every-frame          With a directory: it holds every frame the recording shows (the recipe's",
+    "                         passthrough writes them all); without it a pass on them is not backed",
     "  --json                 Print frames.json to stdout",
     "",
     "Another decoder works too — write every frame and its time, then import them:",
     "  ffmpeg -i rec.mp4 -fps_mode passthrough frames/%06d.png",
     "  ffprobe -v error -select_streams v:0 -show_entries frame=best_effort_timestamp_time -of csv=p=0 rec.mp4 > frames/pts.txt",
-    "  vlmkit scan video frames --pts frames/pts.txt",
+    "  vlmkit scan video frames --pts frames/pts.txt --every-frame",
     "",
     "Examples:",
-    "  vlmkit scan video rec.mp4 && vlmkit check flash rec.frames/frames.json",
+    "  vlmkit scan video rec.mp4 && vlmkit check flash rec.mp4.frames/frames.json",
     "  vlmkit scan video rec.mp4 --from 10s --to 20s --display-width 1280",
     "  vlmkit scan video rec.webm --at 0..3s/250ms --out keyframes && vlmkit snapshot strip --manifest keyframes/frames.json",
   ].join("\n");
@@ -85,6 +87,7 @@ export interface ScanVideoArgs {
   pts?: string;
   fps?: number;
   lossless: boolean;
+  everyFrame: boolean;
   json: boolean;
 }
 
@@ -115,6 +118,7 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
   let to: number | undefined;
   let at: number[] | undefined;
   let lossless = false;
+  let everyFrame = false;
   let json = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -186,6 +190,9 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
       case "--lossless":
         lossless = true;
         break;
+      case "--every-frame":
+        everyFrame = true;
+        break;
       case "--json":
         json = true;
         break;
@@ -234,10 +241,12 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
           `${flag} is for decoding a recording; a directory's frames.json is written beside its frames`,
         );
     }
-  } else if (lossless) {
-    throw new UsageError("--lossless is for imported frames: a decoded recording's codec says whether it is lossless");
+  } else if (lossless || everyFrame) {
+    throw new UsageError(
+      `${lossless ? "--lossless" : "--every-frame"} is for imported frames: a decoded recording's codec and frame table say that`,
+    );
   }
-  return { source, ...out, selection, lossless, json };
+  return { source, ...out, selection, lossless, everyFrame, json };
 }
 
 const rel = (p: string) => {
@@ -273,6 +282,7 @@ async function main(): Promise<void> {
       ...(args.fps !== undefined ? { fps: args.fps } : {}),
       ...(args.displayWidth !== undefined ? { displayWidth: args.displayWidth } : {}),
       lossless: args.lossless,
+      everyFrame: args.everyFrame,
     }));
   } else {
     result = await scanVideo({

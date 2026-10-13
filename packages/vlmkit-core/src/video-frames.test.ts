@@ -8,6 +8,7 @@ import {
   filterChain,
   frameAt,
   imageTimeline,
+  parseShowinfoLine,
   pickVideoStream,
   videoTimeline,
   type FrameRow,
@@ -219,5 +220,43 @@ test("filterChain: the measured order of every step", () => {
     filterChain({ select: null, fields: false, color, alpha: { background: "black" }, sampleAspect: false }).includes(
       "format=rgba,premultiply=inplace=1,format=rgb24",
     ),
+  );
+});
+
+test("colorPlan: a matrix tagged but not convertible is refused, not called untagged", () => {
+  const stream = {
+    index: 0,
+    codec: "h264",
+    pixelFormat: "yuv420p",
+    width: 64,
+    height: 48,
+    timeBase: { num: 1, den: 1000 },
+    colorSpace: "ycgco",
+  };
+  assert.throws(() => colorPlan(stream, "a.mp4"), /tagged with the ycgco matrix.*--color-matrix/);
+  assert.equal(colorPlan(stream, "a.mp4", { matrix: "bt709" }).color.matrix, "bt709");
+  assert.throws(
+    () => colorPlan({ ...stream, colorSpace: undefined, colorTransfer: "smpte2084" } as never, "a.mp4"),
+    /HDR \(transfer smpte2084\)/,
+  );
+});
+
+test("displayGeometry: a side over the judge's limit is refused, with how to say how wide it plays", () => {
+  assert.throws(() => displayGeometry({ width: 100, height: 100 }, 100_000_000), /at most 4096 a side/);
+  assert.throws(() => displayGeometry({ width: 7680, height: 4320 }), /--display-width/);
+  assert.deepEqual(displayGeometry({ width: 7680, height: 4320 }, 1920).viewport, { width: 1920, height: 1080 });
+});
+
+test("parseShowinfoLine: only showinfo's own lines, whatever a recording's metadata says", () => {
+  assert.equal(parseShowinfoLine("    comment         : showinfo n: 0 pts: 0 s:64x48"), null);
+  assert.equal(parseShowinfoLine("  title: see showinfo: config in time_base: 1/1"), null);
+  assert.deepEqual(parseShowinfoLine("[Parsed_showinfo_3 @ 0x55aa] config in time_base: 1/15360, frame_rate: 30/1"), {
+    timeBase: { num: 1, den: 15360 },
+  });
+  assert.deepEqual(
+    parseShowinfoLine(
+      "[Parsed_showinfo_3 @ 000001F2A3B4C5D0] n:  12 pts:2000033 pts_time:2000.03 duration:  512 fmt:rgb24 sar:1/1 s:64x48 i:P iskey:0 type:B",
+    ),
+    { frame: { n: 12, pts: 2000033, width: 64, height: 48, key: false } },
   );
 });

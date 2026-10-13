@@ -39,7 +39,7 @@ const selectorOf = (t: FlashTrackReport): { selector?: string } => {
 
 const UNMEASURED: Record<string, string> = {
   video: "<video> paused (its file can be judged: vlmkit check flash <file>)",
-  "animated-image": "animated image",
+  "animated-image": "animated image (its file can be judged: vlmkit check flash <file>.gif)",
   "unreadable-image": "image whose bytes could not be read (it may animate)",
   uncontrolled: "pixels changing with the clock held",
 };
@@ -82,7 +82,9 @@ function findings(report: FlashReport): Finding[] {
     out.push({
       rule: "flash-undersampled",
       severity: "warn",
-      message: `pass on an incomplete sequence (largest gap ${s.maxGapMs.toFixed(1)}ms${s.unstableFrames ? `, ${s.unstableFrames} unstable frame(s)` : ""}): a state shorter than the gap can be missed, so the pass is not backed`,
+      message: s.partial
+        ? `pass on part of a recording: ${s.partial}, so the pass is not backed`
+        : `pass on an incomplete sequence (largest gap ${s.maxGapMs.toFixed(1)}ms${s.unstableFrames ? `, ${s.unstableFrames} unstable frame(s)` : ""}): a state shorter than the gap can be missed, so the pass is not backed`,
     });
   } else if (s.truncated && report.general.verdict === "pass" && report.red.verdict === "pass") {
     out.push({

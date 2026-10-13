@@ -458,7 +458,7 @@ async function main(): Promise<void> {
   console.log();
   console.log(`${BOLD}${CYAN}Storyboard${RESET}`);
   console.log(
-    `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame ? ", every 60 fps frame" : ""}${RESET}`,
+    `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame && written.manifest.source.clock !== "stream" ? ", every 60 fps frame" : ""}${RESET}`,
   );
   if (story.events.length === 0) {
     console.log(`  No events: every frame is within the floor of frame 0.`);

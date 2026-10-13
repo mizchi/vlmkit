@@ -8,14 +8,31 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, copyFileSync, chmodSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
 import { parseFramesManifest } from "@mizchi/vlmkit-judge/frames.ts";
 import { decodePngPixels } from "./png-decode.ts";
-import { findDecoder, importFrames, isVideoFile, parsePtsFile, scanVideo } from "./video-decode.ts";
+import {
+  defaultFramesDir,
+  findDecoder,
+  importFrames,
+  isVideoFile,
+  onPath,
+  parsePtsFile,
+  scanVideo,
+} from "./video-decode.ts";
 
 let dir: string;
 
@@ -71,6 +88,8 @@ test("isVideoFile: by extension, never a URL", () => {
   assert.equal(isVideoFile("page.html"), false);
   assert.equal(isVideoFile("frames.json"), false);
   assert.equal(isVideoFile("https://example.com/rec.mp4"), false);
+  assert.equal(isVideoFile("player.html?clip=intro.gif"), false, "a page's query is not its extension");
+  assert.equal(isVideoFile("p.html#a.mp4"), false);
 });
 
 test("parsePtsFile: seconds per line, ffprobe's trailing commas, N/A named", () => {
@@ -271,13 +290,21 @@ describe("scanVideo with the user's ffmpeg", () => {
     const real = execFileSync("sh", ["-c", "command -v ffmpeg"]).toString().trim();
     copyFileSync(real, join(bin, "ffmpeg"));
     chmodSync(join(bin, "ffmpeg"), 0o755);
-    const found = await findDecoder({ ffmpeg: join(bin, "ffmpeg"), env: {} });
-    assert.equal(found.ffprobe, "ffprobe");
+    const env = { PATH: process.env.PATH };
+    const found = await findDecoder({ ffmpeg: join(bin, "ffmpeg"), env });
+    // Bare names are resolved on PATH (never the working directory) and spawned by path.
+    assert.match(found.ffprobe, /[\\/]ffprobe$/);
     assert.match(found.name, /^ffmpeg \S+/);
     await assert.rejects(
-      findDecoder({ ffprobe: join(dir, "nope", "ffprobe"), env: {} }),
+      findDecoder({ ffprobe: join(dir, "nope", "ffprobe"), env }),
       (e: unknown) => e instanceof UsageError && /ffprobe not found/.test((e as Error).message),
     );
+    await assert.rejects(
+      findDecoder({ env: { PATH: join(dir, "nope") } }),
+      (e: unknown) => e instanceof UsageError && /ffmpeg not found on PATH/.test((e as Error).message),
+    );
+    // An empty variable is unset, not a binary named "".
+    assert.match((await findDecoder({ env: { ...env, VLMKIT_FFMPEG: "" } })).ffmpeg, /[\\/]ffmpeg$/);
   });
 
   test("a re-run replaces its own frames and leaves other files", async () => {
@@ -353,16 +380,42 @@ describe("scanVideo: an animated GIF / APNG plays as a browser plays it", () => 
     const r = await scanVideo({ file: blink("loop.gif", 10, 0), out: join(dir, "loop-gif") });
     const v = r.manifest.source.video!;
     assert.equal(v.timing, "browser");
-    assert.deepEqual(v.loop, { plays: null, passFrames: 2, passMs: 200, passes: 6 });
+    // A pass is 200ms; up to the frame on screen at 1200ms.
+    assert.deepEqual(v.loop, { plays: null, passFrames: 2, passMs: 200, passes: 7 });
     assert.deepEqual(
       r.manifest.frames.map((f) => f.atMs),
-      [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100],
+      [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
     );
     // Every pass shows the same two pictures (the palette keeps white as 252).
     const light = r.manifest.frames.map(
       (f) => decodePngPixels(readFileSync(join(dir, "loop-gif", f.file))).data[0]! > 128,
     );
-    assert.deepEqual(light, [false, true, false, true, false, true, false, true, false, true, false, true]);
+    assert.deepEqual(light, [false, true, false, true, false, true, false, true, false, true, false, true, false]);
+  });
+
+  test("an instant or a span past the written passes is the frame the loop is on then", async () => {
+    const file = blink("loop-at.gif", 10, 0);
+    const at = await scanVideo({
+      file,
+      out: join(dir, "loop-at"),
+      selection: { kind: "at", atMs: [5050, 5150, 5250] },
+    });
+    const light = (f: { file: string }) => decodePngPixels(readFileSync(join(dir, "loop-at", f.file))).data[0]! > 128;
+    // 5050ms is 50ms into a pass (black), 5150 the second frame (white), 5250 black again.
+    assert.deepEqual(
+      at.manifest.frames.map((f) => [f.atMs, light(f)]),
+      [
+        [5000, false],
+        [5100, true],
+        [5200, false],
+      ],
+    );
+    const span = await scanVideo({
+      file,
+      out: join(dir, "loop-span"),
+      selection: { kind: "span", fromMs: 5000, toMs: 5300 },
+    });
+    assert.equal(span.manifest.frames.length, 4, "a span of a GIF that never stops is not 'after its last frame'");
   });
 
   test("a frame of 10ms or less is held 100ms, as Chromium holds it; a GIF that plays once is one pass", async () => {
@@ -378,7 +431,7 @@ describe("scanVideo: an animated GIF / APNG plays as a browser plays it", () => 
   test("an APNG loops and is clamped the same way", async () => {
     const r = await scanVideo({ file: blink("loop.apng", 100, 0), out: join(dir, "loop-apng") });
     assert.equal(r.manifest.source.video?.codec, "apng");
-    assert.deepEqual(r.manifest.source.video?.loop, { plays: null, passFrames: 2, passMs: 200, passes: 6 });
+    assert.deepEqual(r.manifest.source.video?.loop, { plays: null, passFrames: 2, passMs: 200, passes: 7 });
     assert.equal(r.manifest.frames[1]!.atMs, 100);
   });
 });
@@ -473,5 +526,227 @@ describe("scanVideo: what a stream's properties change", () => {
     assert.ok((r.manifest.source.video?.decodeErrors?.length ?? 0) > 0, "the decoder's errors are kept");
     const clean = await scanVideo({ file: whole, out: join(dir, "whole") });
     assert.equal(clean.manifest.source.video?.decodeErrors, undefined, "and a whole file has none");
+  });
+});
+
+describe("scanVideo: what review found, held", () => {
+  test("its output directory: the recording in it is never deleted, a failed re-scan keeps the last good one, another tool's is refused", async () => {
+    const out = join(dir, "keep");
+    const good = numbered("keep.mp4", { frames: 5 });
+    await scanVideo({ file: good, out });
+    // A recording that changes size mid-stream (two MPEG-TS joined) is refused: the previous frames stay.
+    const a = join(dir, "size-a.ts");
+    const b = join(dir, "size-b.ts");
+    ffmpeg("-f", "lavfi", "-i", "color=c=black:s=64x48:r=25:d=0.4", "-c:v", "libx264", "-f", "mpegts", a);
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=gray:s=96x64:r=25:d=0.4",
+      "-c:v",
+      "libx264",
+      "-output_ts_offset",
+      "0.5",
+      "-f",
+      "mpegts",
+      b,
+    );
+    const both = join(dir, "size-both.ts");
+    writeFileSync(both, Buffer.concat([readFileSync(a), readFileSync(b)]));
+    await assert.rejects(
+      scanVideo({ file: both, out }),
+      /changes size mid-stream \(64x48, then 96x64 at decoded frame 10\)/,
+    );
+    assert.equal(parseFramesManifest(readFileSync(join(out, "frames.json"), "utf8")).frames.length, 5);
+    // A recording named like a frame, inside the directory it is scanned into, survives.
+    const inside = join(dir, "inside");
+    mkdirSync(inside, { recursive: true });
+    const named = join(inside, "0000-t000000.png");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=16x16:r=10:d=0.2[a];color=c=white:s=16x16:r=10:d=0.2[b];[a][b]concat=n=2:v=1",
+      "-plays",
+      "0",
+      "-f",
+      "apng",
+      named,
+    );
+    await scanVideo({ file: named, out: inside });
+    assert.ok(existsSync(named), "the recording is still there");
+    const other = join(dir, "other");
+    mkdirSync(other, { recursive: true });
+    writeFileSync(
+      join(other, "frames.json"),
+      JSON.stringify({ format: "vlmkit-frames/1", source: { tool: "check flash" }, frames: [] }),
+    );
+    await assert.rejects(scanVideo({ file: good, out: other }), /holds another sequence \(check flash\)/);
+  });
+
+  test("a span of a recording that changes pixel format mid-stream: select counts decoded frames through the change", async () => {
+    const a = join(dir, "fmt-a.mkv");
+    const b = join(dir, "fmt-b.mkv");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x48:r=10:d=1,format=yuv420p,geq=lum='16+7*N':cb=128:cr=128",
+      "-c:v",
+      "libx264",
+      a,
+    );
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x48:r=10:d=1,format=yuv444p,geq=lum='86+7*N':cb=128:cr=128",
+      "-c:v",
+      "libx264",
+      "-output_ts_offset",
+      "1",
+      b,
+    );
+    const both = join(dir, "fmt-both.mkv");
+    writeFileSync(join(dir, "fmt.ffconcat"), `ffconcat version 1.0\nfile '${a}'\nfile '${b}'\n`);
+    ffmpeg("-f", "concat", "-safe", "0", "-i", join(dir, "fmt.ffconcat"), "-c", "copy", both);
+    const r = await scanVideo({
+      file: both,
+      out: join(dir, "fmt"),
+      selection: { kind: "span", fromMs: 500, toMs: 1500 },
+    });
+    assert.deepEqual(
+      r.manifest.frames.map((f) => f.index),
+      [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    );
+    for (const f of r.manifest.frames) assert.equal(frameNumber(join(dir, "fmt", f.file)), f.index);
+  });
+
+  test("an ffmpeg older than 5.1 is refused by name, before it fails on every file", async () => {
+    const fake = join(dir, "old-ffmpeg");
+    writeFileSync(fake, "#!/bin/sh\necho 'ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021'\n");
+    chmodSync(fake, 0o755);
+    await assert.rejects(
+      findDecoder({ ffmpeg: fake }),
+      /ffmpeg 4\.4\.2-0ubuntu0\.22\.04\.1 is too old: scan video needs 5\.1 or later/,
+    );
+  });
+
+  test("a GIF whose images ffmpeg merges (no graphic control extension) is refused, not judged on fewer frames", async () => {
+    // The two-image GIF of the flash fixtures, its graphic control extensions cut out.
+    const gif = Buffer.from(
+      "R0lGODlhAgACAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAgACAAACBARBEAUAIfkEAAoAAAAsAAAAAAIAAgAAAgQMwzAFADs=",
+      "base64",
+    );
+    const parts: Buffer[] = [];
+    let at = 0;
+    for (;;) {
+      const gce = gif.indexOf(Buffer.from([0x21, 0xf9, 0x04]), at);
+      if (gce < 0) break;
+      parts.push(gif.subarray(at, gce));
+      at = gce + 8;
+    }
+    parts.push(gif.subarray(at));
+    const file = join(dir, "nogce.gif");
+    writeFileSync(file, Buffer.concat(parts));
+    await assert.rejects(scanVideo({ file, out: join(dir, "nogce") }), /decoded 1 of the 2 images a browser shows/);
+  });
+
+  test("ffmpeg told to colour its log, or a recording whose metadata reads like showinfo, decodes the same", async () => {
+    const file = numbered("meta.mkv", {
+      frames: 6,
+      codec: ["-c:v", "ffv1"],
+      extra: [
+        "-metadata",
+        "comment=showinfo n: 0 pts: 0 s:64x48",
+        "-metadata",
+        "title=see showinfo: config in time_base: 1/1",
+      ],
+    });
+    const before = process.env.AV_LOG_FORCE_COLOR;
+    process.env.AV_LOG_FORCE_COLOR = "1";
+    try {
+      const r = await scanVideo({ file, out: join(dir, "meta") });
+      assert.equal(r.manifest.frames.length, 6);
+    } finally {
+      if (before === undefined) delete process.env.AV_LOG_FORCE_COLOR;
+      else process.env.AV_LOG_FORCE_COLOR = before;
+    }
+  });
+
+  test("import: frames that share a time are hidden as scan video hides them; out-of-range times refused", async () => {
+    const frames = join(dir, "imp-dup");
+    mkdirSync(frames, { recursive: true });
+    for (let i = 0; i < 4; i++) {
+      ffmpeg(
+        "-f",
+        "lavfi",
+        "-i",
+        `color=c=0x${(i * 60).toString(16).padStart(2, "0").repeat(3)}:s=8x8:d=0.04`,
+        "-frames:v",
+        "1",
+        join(frames, `${String(i).padStart(6, "0")}.png`),
+      );
+    }
+    writeFileSync(join(frames, "pts.txt"), "0\n0\n0.1\n0.2\n");
+    const r = await importFrames({ dir: frames, pts: join(frames, "pts.txt") });
+    assert.equal(r.manifest.source.video?.hidden, 1);
+    assert.deepEqual(
+      r.manifest.frames.map((f) => [f.file, f.atMs]),
+      [
+        ["000001.png", 0],
+        ["000002.png", 100],
+        ["000003.png", 200],
+      ],
+    );
+    assert.throws(() => parsePtsFile("0\n1e400\n", "big.txt"), /big\.txt:2/);
+  });
+
+  test("non-square pixels below 1:1 are expanded, as Chromium plays them, never shrunk; full range stays full", async () => {
+    const tall = join(dir, "sar-half.mkv");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x32:r=10:d=0.2,format=rgb24,drawbox=x=0:y=0:w=1:h=32:color=white:t=fill,setsar=1/2",
+      "-c:v",
+      "ffv1",
+      "-pix_fmt",
+      "bgr0",
+      tall,
+    );
+    const r = await scanVideo({ file: tall, out: join(dir, "sar-half") });
+    const px = decodePngPixels(readFileSync(join(dir, "sar-half", r.manifest.frames[0]!.file)));
+    assert.deepEqual([px.width, px.height], [64, 64]);
+    assert.equal(px.data[0], 255, "the 1px white column is still white, not averaged away");
+    const full = join(dir, "sar-full.mkv");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x32:r=10:d=0.3,drawbox=x=32:y=0:w=32:h=32:c=white:t=fill",
+      "-vf",
+      "scale=out_range=pc:out_color_matrix=bt709,format=yuv420p,setsar=2",
+      "-color_range",
+      "pc",
+      "-colorspace",
+      "bt709",
+      "-c:v",
+      "ffv1",
+      full,
+    );
+    const f = await scanVideo({ file: full, out: join(dir, "sar-full") });
+    const fp = decodePngPixels(readFileSync(join(dir, "sar-full", f.manifest.frames[0]!.file)));
+    assert.deepEqual([fp.data[0], fp.data[(fp.width - 1) * 3]], [0, 255], "black 0 and white 255, not 16 and 235");
+  });
+
+  test("the default output keeps the recording's extension, and bare names are found on PATH, not in the working directory", async () => {
+    assert.ok(defaultFramesDir(join(dir, "clip.mp4")).endsWith("clip.mp4.frames"));
+    assert.notEqual(defaultFramesDir("clip.mp4"), defaultFramesDir("clip.webm"));
+    const bin = join(dir, "pathbin");
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, "ffmpeg.EXE"), "");
+    assert.equal(onPath("ffmpeg", { PATH: `.;${bin}`, PATHEXT: ".EXE" }, "win32"), join(bin, "ffmpeg.EXE"));
+    assert.equal(onPath("ffmpeg", { PATH: "." }, "linux"), null, "the working directory is never searched");
   });
 });

@@ -32,8 +32,8 @@ const u16le = (bytes: Uint8Array, at: number): number => bytes[at]! | (bytes[at 
 
 /**
  * A GIF's frames: one per image descriptor, its delay from the graphic control extension before it
- * (none: 0). Plays: once with no NETSCAPE2.0 block, forever when its loop count is 0, else loop
- * count + 1 (the first play and the repeats).
+ * (none: 0). Plays: once with no NETSCAPE2.0 (or ANIMEXTS1.0) block, forever when its loop count
+ * is 0, else loop count + 1 (the first play and the repeats).
  */
 function gifTiming(bytes: Uint8Array): ImageTiming {
   let at = 13;
@@ -62,7 +62,12 @@ function gifTiming(bytes: Uint8Array): ImageTiming {
       const blocks = subBlocks();
       if (label === 0xf9 && blocks[0] && blocks[0].length >= 4) {
         pendingDelay = u16le(blocks[0], 1) * 10;
-      } else if (label === 0xff && blocks[0] && ascii(blocks[0], 0, 11) === "NETSCAPE2.0") {
+      } else if (
+        label === 0xff &&
+        blocks[0] &&
+        // Chromium reads ANIMEXTS1.0 as the same loop block (measured: loop 0 plays forever).
+        (ascii(blocks[0], 0, 11) === "NETSCAPE2.0" || ascii(blocks[0], 0, 11) === "ANIMEXTS1.0")
+      ) {
         const data = blocks[1];
         if (data && data.length >= 3 && data[0] === 1) {
           const loops = u16le(data, 1);
@@ -84,7 +89,10 @@ function gifTiming(bytes: Uint8Array): ImageTiming {
   return { format: "gif", storedMs, plays };
 }
 
-/** An APNG's frames: one per `fcTL`, delay_num / delay_den seconds (a 0 denominator is 100). Plays: `acTL`'s num_plays, 0 forever. */
+/**
+ * An APNG's frames: one per `fcTL`, delay_num / delay_den seconds (a 0 denominator is 100) in
+ * whole ms, as Chromium holds it. Plays: `acTL`'s num_plays, 0 forever.
+ */
 function apngTiming(bytes: Uint8Array): ImageTiming | null {
   let at = 8;
   let plays: number | null | undefined;
@@ -101,7 +109,8 @@ function apngTiming(bytes: Uint8Array): ImageTiming | null {
     if (type === "fcTL" && length >= 26) {
       const num = u16(bytes, data + 20);
       const den = u16(bytes, data + 22) || 100;
-      storedMs.push((num * 1000) / den);
+      // Chromium holds a frame for its delay in whole ms, and clamps that integer: 1/95s is 10ms.
+      storedMs.push(Math.floor((num * 1000) / den));
     }
     at += 12 + length;
   }

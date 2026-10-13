@@ -11,7 +11,7 @@ import { browserDelayMs, type ImageTiming } from "./image-timing.ts";
 /**
  * Codecs whose decoded frames are what was encoded, bit for bit (modulo a chroma subsampling the
  * encoder chose). Anything else is treated as lossy: x264 at `-qp 0` is lossless too, but nothing
- * in the stream says so, so it is not claimed.
+ * in the stream says so, so it is not claimed. (Apple's rpza is a 4x4 vector quantizer: lossy.)
  */
 export const LOSSLESS_CODECS: ReadonlySet<string> = new Set([
   "png",
@@ -26,7 +26,6 @@ export const LOSSLESS_CODECS: ReadonlySet<string> = new Set([
   "qtrle",
   "rawvideo",
   "zmbv",
-  "rpza",
   "msrle",
   "bmp",
   "tiff",
@@ -85,7 +84,8 @@ export function chooseFrames(rows: readonly FrameRow[], selection: VideoSelectio
         `--from ${selection.fromMs}ms is after the recording's last frame (${Number(last.atMs.toFixed(3))}ms)`,
       );
     }
-    return rows.slice(frameAt(rows, selection.fromMs), frameAt(rows, selection.toMs) + 1).map((r) => ({ ...r }));
+    const from = frameAt(rows, Math.max(0, selection.fromMs - (selection.leadInMs ?? 0)));
+    return rows.slice(from, frameAt(rows, selection.toMs) + 1).map((r) => ({ ...r }));
   }
   const byFrame = new Map<number, number[]>();
   for (const t of selection.atMs) {
@@ -94,6 +94,9 @@ export function chooseFrames(rows: readonly FrameRow[], selection: VideoSelectio
   }
   return [...byFrame.entries()].sort((a, b) => a[0] - b[0]).map(([k, instants]) => ({ ...rows[k]!, instants }));
 }
+
+/** The largest side a recording is judged at, in CSS px: the judge keeps several arrays per CSS px. */
+export const MAX_DISPLAY_PX = 4096;
 
 /**
  * How big the frames are shown, as the frames contract states it: the viewport in CSS px and the
@@ -106,16 +109,24 @@ export function displayGeometry(
   displayWidth?: number,
 ): { viewport: { width: number; height: number }; deviceScaleFactor: number } {
   if (displayWidth === undefined) {
+    if (frame.width > MAX_DISPLAY_PX || frame.height > MAX_DISPLAY_PX) {
+      throw new UsageError(
+        `the frames are ${frame.width}x${frame.height}, and one frame pixel per CSS px is over the ${MAX_DISPLAY_PX} a side the judge takes: say how wide it plays, e.g. --display-width 1920`,
+      );
+    }
     return { viewport: { width: frame.width, height: frame.height }, deviceScaleFactor: 1 };
   }
   if (!(Number.isFinite(displayWidth) && displayWidth >= 1)) {
     throw new UsageError(`--display-width is the width the video plays at, in CSS px (got ${displayWidth})`);
   }
   const deviceScaleFactor = frame.width / displayWidth;
-  return {
-    viewport: { width: displayWidth, height: Math.max(1, Math.round(frame.height / deviceScaleFactor)) },
-    deviceScaleFactor,
-  };
+  const viewport = { width: displayWidth, height: Math.max(1, Math.round(frame.height / deviceScaleFactor)) };
+  if (viewport.width > MAX_DISPLAY_PX || viewport.height > MAX_DISPLAY_PX) {
+    throw new UsageError(
+      `--display-width ${displayWidth} shows the video at ${viewport.width}x${viewport.height} CSS px; the judge works per CSS px and takes at most ${MAX_DISPLAY_PX} a side`,
+    );
+  }
+  return { viewport, deviceScaleFactor };
 }
 
 /** What ffprobe says about the one video stream that is decoded. */
@@ -270,16 +281,27 @@ export interface ProbedFrame {
   key: boolean;
   /** The decoder marked it interlaced (two fields woven into one frame). */
   interlaced?: boolean;
+  /** Its decoded size, before rotation. */
+  width?: number;
+  height?: number;
 }
 
 /**
- * `ffprobe -show_entries frame=best_effort_timestamp,key_frame,interlaced_frame -of json`: every decoded frame, in
- * the order the decoder outputs them, which is the order they are shown. A frame without a
- * timestamp cannot be placed and is refused, as is one that does not come after the one before.
+ * `ffprobe -show_entries frame=best_effort_timestamp,key_frame,interlaced_frame -of json`: every
+ * decoded frame, in the order the decoder outputs them, which is the order they are shown. A frame
+ * without a timestamp cannot be placed and is refused; the order is checked by `videoTimeline`
+ * (a timestamp that goes back is refused, an equal one hides the frame before it).
  */
 export function parseFrameTable(framesJson: string, file: string): ProbedFrame[] {
   let parsed: {
-    frames?: { best_effort_timestamp?: number; pts?: number; key_frame?: number; interlaced_frame?: number }[];
+    frames?: {
+      best_effort_timestamp?: number;
+      pts?: number;
+      key_frame?: number;
+      interlaced_frame?: number;
+      width?: number;
+      height?: number;
+    }[];
   };
   try {
     parsed = JSON.parse(framesJson);
@@ -293,10 +315,16 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
     if (typeof ticks !== "number" || !Number.isFinite(ticks)) {
       throw new UsageError(
         `${file}: decoded frame ${index} has no timestamp, so when it is shown is not known (a raw elementary stream carries none). ` +
-          `Put it in a container at its rate first, e.g. ffmpeg -r 30 -i ${file} -c copy timed.mkv`,
+          `Re-encode it losslessly at its rate first (a copy cannot give reordered frames a time), e.g. ffmpeg -r 30 -i ${file} -c:v ffv1 timed.mkv`,
       );
     }
-    return { index, ticks, key: f.key_frame === 1, ...(f.interlaced_frame === 1 ? { interlaced: true } : {}) };
+    return {
+      index,
+      ticks,
+      key: f.key_frame === 1,
+      ...(f.interlaced_frame === 1 ? { interlaced: true } : {}),
+      ...(f.width && f.height ? { width: f.width, height: f.height } : {}),
+    };
   });
 }
 
@@ -358,29 +386,50 @@ export function videoTimeline(
   return { rows, hidden, ...(fields ? { fields: true } : {}) };
 }
 
+/** Rows a looping image is unrolled to at most: past that, an instant is too far into the loop to write out. */
+export const MAX_LOOP_ROWS = 100_000;
+
 /**
  * The frames an animated GIF / APNG shows in a browser: each held for its stored delay, or 100ms
  * when that is 10ms or less (Chromium 141 and 149, measured), and the animation repeated as the
- * browser repeats it — as many passes as it plays, at most enough to cover one pass and one second
- * more, since every one-second window of a loop is then in the sequence. Null when the file's own
- * frame count is not the decoder's (then the decoder's timing stands).
+ * browser repeats it, as long as it plays. Unrolled up to `untilMs` — by default one pass and a
+ * second more, which holds every one-second window of a loop — so an instant or a span further on
+ * is the frame the loop has reached there, never the last one written. Null when the file's own
+ * frame count is not the decoder's.
  */
-export function imageTimeline(decoded: readonly ProbedFrame[], timing: ImageTiming): StreamTimeline | null {
+export function imageTimeline(
+  decoded: readonly ProbedFrame[],
+  timing: ImageTiming,
+  untilMs?: number,
+): StreamTimeline | null {
   const n = decoded.length;
   if (timing.storedMs.length !== n || n === 0) return null;
   const delays = timing.storedMs.map(browserDelayMs);
   const passMs = delays.reduce((a, b) => a + b, 0);
-  const cover = n > 1 ? 1 + Math.ceil(1000 / passMs) : 1;
-  const passes = timing.plays === null ? cover : Math.max(1, Math.min(timing.plays, cover));
+  const until = n > 1 ? Math.max(untilMs ?? 0, passMs + 1000) : 0;
+  const plays = timing.plays ?? Number.POSITIVE_INFINITY;
   const rows: FrameRow[] = [];
-  for (let p = 0; p < passes; p++) {
-    let at = p * passMs;
+  let at = 0;
+  for (let p = 0; p < plays; p++) {
     for (let k = 0; k < n; k++) {
+      // Stop at the first frame that begins past `until`, once every frame has been shown once.
+      if (rows.length >= n && at > until) break;
+      if (rows.length >= MAX_LOOP_ROWS) {
+        throw new UsageError(
+          `an instant ${Math.round(until)}ms into a looping image is more than ${MAX_LOOP_ROWS} of its frames away; the loop repeats every ${Math.round(passMs)}ms, so ask for one within its first passes`,
+        );
+      }
       rows.push({ index: rows.length, atMs: at, key: decoded[k]!.key, decoded: decoded[k]!.index });
       at += delays[k]!;
     }
+    if (rows.length >= n && at > until) break;
   }
-  return { rows, hidden: 0, timing: "browser", loop: { plays: timing.plays, passFrames: n, passMs, passes } };
+  return {
+    rows,
+    hidden: 0,
+    timing: "browser",
+    loop: { plays: timing.plays, passFrames: n, passMs, passes: Math.ceil(rows.length / n) },
+  };
 }
 
 /** One `showinfo` line: the frame the filter graph handed on, as written. */
@@ -392,17 +441,21 @@ export interface ShowinfoFrame {
   key?: boolean;
 }
 
-const SHOWINFO_FRAME = /\bn:\s*(\d+)\s+pts:\s*(-?\d+)\b.*?\bs:(\d+)x(\d+)(?:.*?\biskey:([01]))?/;
-const SHOWINFO_CONFIG = /\bconfig in time_base:\s*(\d+)\/(\d+)/;
+/** showinfo's own prefix: a recording's metadata printed at info level must not read as a frame. */
+// The pointer is printed with %p: `0x55…` on glibc, bare uppercase hex on Windows.
+const SHOWINFO_LINE = /^\[Parsed_showinfo_\d+ @ (?:0x)?[0-9a-fA-F]+\] (.*)$/;
+const SHOWINFO_FRAME = /^n:\s*(\d+)\s+pts:\s*(-?\d+)\b.*?\bs:(\d+)x(\d+)(?:.*?\biskey:([01]))?/;
+const SHOWINFO_CONFIG = /^config in time_base:\s*(\d+)\/(\d+)/;
 
 /** A line of ffmpeg's stderr: a showinfo frame, the time base showinfo counts in, or neither. */
 export function parseShowinfoLine(
   line: string,
 ): { frame: ShowinfoFrame } | { timeBase: { num: number; den: number } } | null {
-  if (!line.includes("showinfo")) return null;
-  const config = line.match(SHOWINFO_CONFIG);
+  const body = line.match(SHOWINFO_LINE)?.[1];
+  if (body === undefined) return null;
+  const config = body.match(SHOWINFO_CONFIG);
   if (config) return { timeBase: { num: Number(config[1]), den: Number(config[2]) } };
-  const m = line.match(SHOWINFO_FRAME);
+  const m = body.match(SHOWINFO_FRAME);
   if (!m) return null;
   return {
     frame: {
@@ -488,6 +541,11 @@ export function colorPlan(
     return { scale: "", color: { matrix: "rgb", range: "pc", ...extra, assumed: [] }, notes };
   }
   const assumed: string[] = [];
+  if (!override.matrix && stream.colorSpace && !MATRIX_FOR[stream.colorSpace] && stream.colorSpace !== "gbr") {
+    throw new UsageError(
+      `${file} is tagged with the ${stream.colorSpace} matrix, which this conversion cannot apply: say which to read it with, --color-matrix ${COLOR_MATRICES.join(" | ")}`,
+    );
+  }
   let matrix = override.matrix ?? (stream.colorSpace ? MATRIX_FOR[stream.colorSpace] : undefined);
   if (!matrix) {
     matrix = "bt601";

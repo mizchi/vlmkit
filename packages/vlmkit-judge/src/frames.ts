@@ -44,8 +44,10 @@ export interface FrameEntry {
   /** Wall clock only: when the frame was actually shot, in ms after the sequence's anchor. */
   shotMs?: number;
   /**
-   * Stream clock only: the frame's position among the frames the recording decodes to, from 0.
-   * Consecutive frames whose indices are consecutive leave nothing of the recording out.
+   * Stream clock only: the frame's position among the frames the recording shows, from 0 — a
+   * decoded frame hidden behind a successor with its timestamp is not counted, an interlaced
+   * frame's two fields are two, and every pass of a looped GIF / APNG counts. Consecutive frames
+   * whose indices are consecutive leave nothing of the recording out.
    */
   index?: number;
   /** Stream clock only: the decoder marked the frame a keyframe (where a lossy codec re-quantizes). */
@@ -100,8 +102,13 @@ export type FramesClock = "held" | "wall" | "stream";
 /** How `scan video` chose its frames from the recording. */
 export type VideoSelection =
   | { kind: "all" }
-  /** The frames on screen at some moment of [fromMs, toMs]: the one showing at `fromMs` through the one at `toMs`. */
-  | { kind: "span"; fromMs: number; toMs: number }
+  /**
+   * The frames on screen at some moment of [fromMs, toMs]: the one showing at `fromMs` through the
+   * one at `toMs`. `leadInMs`: the frames of that much time before `fromMs` are in the sequence too,
+   * as the history a one-second window ending at `fromMs` needs (`check flash` judges only the
+   * windows that end inside the span).
+   */
+  | { kind: "span"; fromMs: number; toMs: number; leadInMs?: number }
   /** The frame on screen at each instant (the last one that began at or before it). */
   | { kind: "at"; atMs: number[] };
 
@@ -118,7 +125,11 @@ export interface FramesVideo {
    * most of all across a keyframe, and comparing them byte for byte is comparing the codec.
    */
   lossless: boolean;
-  /** Frames the recording shows (a looped GIF / APNG: every pass written), when it was read to its end. */
+  /**
+   * Frames the recording shows (a looped GIF / APNG: as far as it was written), when it was read to
+   * its end. An import has it only when told the directory holds every frame (`--every-frame`):
+   * without it, nothing says another tool did not thin them.
+   */
   streamFrames?: number;
   /** Decoded frames never on screen: each shared its timestamp with the next, which replaced it at once. */
   hidden?: number;
@@ -359,6 +370,16 @@ export function parseFramesManifest(text: string): FramesManifest {
   if (source.unmeasured !== undefined) checkUnmeasured(source.unmeasured);
   if (source.sweep !== undefined) checkSweep(source.sweep);
   if (source.clock !== undefined) oneOf("source.clock", source.clock, FRAMES_CLOCKS);
+  // Read by every judge of the frames; a malformed one crashed check flash's report mid-format.
+  if (source.viewport !== undefined) {
+    const vp = source.viewport as unknown;
+    if (!isObject(vp) || !finite(vp.width) || !finite(vp.height) || vp.width <= 0 || vp.height <= 0) {
+      refuse("source.viewport", "must be { width, height } in CSS px, both > 0");
+    }
+  }
+  if (source.deviceScaleFactor !== undefined && (!finite(source.deviceScaleFactor) || source.deviceScaleFactor <= 0)) {
+    refuse("source.deviceScaleFactor", "must be a finite number > 0");
+  }
   if (source.video !== undefined) checkVideo(source.video);
   if (source.clock === "stream") {
     // What `check flash` reads to decide the sequence leaves nothing out: unchecked, a missing
@@ -432,6 +453,9 @@ function checkVideo(video: unknown): void {
   if (!isObject(selection)) refuse("source.video.selection", "must be an object");
   oneOf("source.video.selection.kind", selection.kind, ["all", "span", "at"]);
   if (selection.kind === "span") {
+    if (selection.leadInMs !== undefined && (!finite(selection.leadInMs) || (selection.leadInMs as number) < 0)) {
+      refuse("source.video.selection.leadInMs", "must be a finite number >= 0");
+    }
     for (const key of ["fromMs", "toMs"]) {
       if (!finite(selection[key]) || (selection[key] as number) < 0) {
         refuse(`source.video.selection.${key}`, "must be a finite number >= 0");

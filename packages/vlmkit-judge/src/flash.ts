@@ -417,6 +417,12 @@ export interface FlashJudgeOptions {
    * (`withUnknown`). Frame-sized, 1 = unknown.
    */
   unknown?: Uint8Array;
+  /**
+   * Judge only the windows (t − 1s, t] that end at or after this instant. The frames before it are
+   * still counted, as the second of history the first such window needs: a span cut out of a
+   * recording is judged with the second before it decoded, and nothing that ended before it.
+   */
+  judgeFromMs?: number;
 }
 
 /** The ring of a pixel's last transition frames, per track. */
@@ -452,6 +458,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
   const fw = Math.min(options.field?.width ?? FIELD_CSS.width, width);
   const fh = Math.min(options.field?.height ?? FIELD_CSS.height, height);
   const limit = options.areaLimit ?? AREA_LIMIT_CSS2;
+  const judgeFrom = options.judgeFromMs;
   const times: number[] = [];
 
   // General track: leg start (A) and extreme (E), direction, whether the leg was counted.
@@ -558,6 +565,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
   const transition = (track: FlashTrack, p: number, k: number) => {
     const t = tracks[track];
     t.push(p, k);
+    if (judgeFrom !== undefined && times[k]! < judgeFrom - EPS) return;
     const peak = results[track].peak;
     let raised = false;
     while (peak.transitions < t.count[p]! && times[k]! - times[t.at(p, peak.transitions + 1)]! < WINDOW_MS - EPS) {
@@ -779,6 +787,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
         }
       }
       prev = frame;
+      if (judgeFrom !== undefined && times[index]! < judgeFrom - EPS) return;
       if (general) evaluate("general", index);
       if (red) evaluate("red", index);
     },

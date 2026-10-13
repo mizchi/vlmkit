@@ -27,8 +27,9 @@
  * "Differs" is a channel moving by more than `CHANNEL_FLOOR` (8 of 255) in at least one pixel.
  * The input is lossless — the held clock's captures, two shots that agree — so a still page is
  * byte-identical frame to frame and the floor only has to absorb a sub-floor fade, which the
- * anchor (not the previous frame) accumulates until it shows. No lossy source is accepted, so
- * there is no noise ladder here; a decoded video needs one before it can come in.
+ * anchor (not the previous frame) accumulates until it shows. There is no noise ladder: frames
+ * decoded from a lossy codec are refused unless asked for (`--lossy`), and then segmented without
+ * one, their keyframe-aligned events named.
  */
 import { formatInstant, frameTimeMs, type FrameEntry, type FramesSource } from "./frames.ts";
 import { UsageError } from "./errors.ts";
@@ -633,10 +634,11 @@ export function endedText(e: StoryEvent, entries: readonly Pick<FrameEntry, "atM
   return "no hold by the last frame";
 }
 
-function samplingText(story: Storyboard): string {
+function samplingText(story: Storyboard, source: FramesSource): string {
   const s = story.frames.sampling;
   if (story.frames.count === 1) return "1 frame";
-  if (s.everyFrame) return "every 60 fps frame";
+  // On the stream clock 16.67ms gaps are the recording's rate (or a thinning of it), not the held clock.
+  if (s.everyFrame && source.clock !== "stream") return "every 60 fps frame";
   return s.minGapMs === s.maxGapMs ? `every ${ms(s.minGapMs)} ms` : `${ms(s.minGapMs)} to ${ms(s.maxGapMs)} ms apart`;
 }
 
@@ -666,7 +668,7 @@ export function storyboardSummary(
     "",
     sourceLine(source),
     "",
-    `${f.count} frame${f.count === 1 ? "" : "s"} of ${f.width}x${f.height} px from ${ms(f.fromMs)} to ${ms(f.toMs)} ms, ${samplingText(story)}.`,
+    `${f.count} frame${f.count === 1 ? "" : "s"} of ${f.width}x${f.height} px from ${ms(f.fromMs)} to ${ms(f.toMs)} ms, ${samplingText(story, source)}.`,
     `A pixel differs when one of its channels moves by more than ${r.channelFloor} of 255. A departure from the state that comes back within ${ms(r.transientMs)} ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first ${ms(r.settleMs)} ms of identical frames (a drift when no step between two frames, inside its box, crosses the floor).`,
     ...(r.ignore.length > 0 ? [`Not compared: ${r.ignore.map(boxText).join("; ")} px.`] : []),
     "",
@@ -749,7 +751,9 @@ export function storyboardSummary(
   const video = source.video;
   // On the stream clock, consecutive indices are every frame the recording holds between them.
   const wholeStream =
-    source.clock === "stream" && entries.every((e, i) => i === 0 || e.index === entries[i - 1]!.index! + 1);
+    source.clock === "stream" &&
+    !(video?.decoder === "import" && video.streamFrames === undefined) &&
+    entries.every((e, i) => i === 0 || e.index === entries[i - 1]!.index! + 1);
   if (video && !video.lossless) {
     const onKey = story.events.filter((e) => entries[e.first.n]?.key === true).map((e) => e.id);
     notes.push(
@@ -758,9 +762,9 @@ export function storyboardSummary(
   }
   if (wholeStream && f.count > 1) {
     notes.push(
-      `Every frame the recording holds from n ${entries[0]!.index} to n ${entries[entries.length - 1]!.index}, up to ${ms(f.sampling.maxGapMs)} ms apart: a glitch is one recorded frame, and what the recorder did not capture is not here.`,
+      `Every frame the recording holds from its frame ${entries[0]!.index} to its frame ${entries[entries.length - 1]!.index} (frames.json \`index\`), up to ${ms(f.sampling.maxGapMs)} ms apart: a glitch is one recorded frame, and what the recorder did not capture is not here.`,
     );
-  } else if (f.count > 1 && !f.sampling.everyFrame) {
+  } else if (f.count > 1 && (source.clock === "stream" || !f.sampling.everyFrame)) {
     notes.push(
       `Frames up to ${ms(f.sampling.maxGapMs)} ms apart: something shorter than a gap can fall between two frames and not appear, and a glitch is one frame of the sequence, not one rendered frame.`,
     );

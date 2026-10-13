@@ -110,15 +110,10 @@ describe("check flash on a recording", () => {
 
   test("judging the recording is judging scan video's frames.json", async () => {
     const file = strobe("same.mp4", { hz: 5, fps: 25, seconds: 1.6 });
-    const direct = await runFlashCheck({
-      source: file,
-      video: { selection: { kind: "span", fromMs: 200, toMs: 1400 } },
-    });
-    const scanned = await scanVideo({
-      file,
-      out: join(dir, "same"),
-      selection: { kind: "span", fromMs: 200, toMs: 1400 },
-    });
+    // A span through check flash is decoded with the second before it, so scan video is asked the same.
+    const span = { kind: "span" as const, fromMs: 1200, toMs: 1500 };
+    const direct = await runFlashCheck({ source: file, video: { selection: span } });
+    const scanned = await scanVideo({ file, out: join(dir, "same"), selection: { ...span, leadInMs: 1000 } });
     const again = await runFlashCheck({ source: scanned.manifestPath });
     const strip = (r: FlashReport) => ({
       ...r,
@@ -245,6 +240,119 @@ describe("check flash on a recording", () => {
       r.lossy?.some((n) => n.startsWith("red:") && /not decisive/.test(n)),
       `lossy notes: ${JSON.stringify(r.lossy)}`,
     );
+  });
+
+  test("a span is judged with the second before it: a strobe inside the span fails however short the span", async () => {
+    // A 4 flashes/s strobe on screen from 0.5s to 1.5s only, in a 3s recording.
+    const file = join(dir, "burst.mkv");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=24:d=3,geq=lum='if(between(N\\,12\\,35)*mod(floor((N-12)/3)+1\\,2)\\,235\\,16)':cb=128:cr=128",
+      "-c:v",
+      "ffv1",
+      file,
+    ]);
+    assert.equal((await runFlashCheck({ source: file })).general.verdict, "fail");
+    for (const [fromMs, toMs] of [
+      [1000, 3000],
+      [1000, 1700],
+      [1400, 1400],
+    ]) {
+      const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs, toMs } } });
+      assert.equal(r.general.verdict, "fail", `--from ${fromMs} --to ${toMs}`);
+      assert.ok(r.sampling.judgedFromMs !== undefined && r.sampling.judgedFromMs <= fromMs);
+    }
+    // After the strobe stops, its last window has passed: nothing ends inside a span from 2.6s.
+    assert.equal(
+      (await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs: 2600, toMs: 3000 } } })).general
+        .verdict,
+      "pass",
+    );
+    // The same span written by scan video without that second is not backed.
+    const cut = await scanVideo({
+      file,
+      out: join(dir, "burst-cut"),
+      selection: { kind: "span", fromMs: 2600, toMs: 3000 },
+    });
+    const partial = await runFlashCheck({ source: cut.manifestPath });
+    assert.equal(partial.sampling.complete, false);
+    assert.match(partial.sampling.partial ?? "", /no second before them/);
+  });
+
+  test("an import is complete only when it says it holds every frame", async () => {
+    const file = strobe("thin.mkv", { hz: 7.5, fps: 30, seconds: 3, codec: ["-c:v", "ffv1"] });
+    const thin = join(dir, "thin");
+    execFileSync("mkdir", ["-p", thin]);
+    // Another tool's export at 5 fps: a 15-frame strobe reads as 5 frames a second of nothing.
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      file,
+      "-vf",
+      "fps=5",
+      join(thin, "%06d.png"),
+    ]);
+    const { importFrames } = await import("@mizchi/vlmkit-core/video-decode.ts");
+    const imported = await importFrames({ dir: thin, fps: 5 });
+    const r = await runFlashCheck({ source: imported.manifestPath });
+    assert.notEqual(r.general.verdict, "pass", "not a pass: nothing vouches that these are all the frames");
+    const vouched = await importFrames({ dir: thin, fps: 5, everyFrame: true });
+    assert.equal((await runFlashCheck({ source: vouched.manifestPath })).sampling.complete, true);
+  });
+
+  test("a frames directory is judged by its frames.json, never as a page", async () => {
+    const file = strobe("dir.mp4", { hz: 5, fps: 30 });
+    const scanned = await scanVideo({ file });
+    const r = await runFlashCheck({ source: join(scanned.manifestPath, "..") });
+    assert.equal(r.general.verdict, "fail");
+    await assert.rejects(runFlashCheck({ source: dir }), /no frames\.json/);
+  });
+
+  test("an animated PNG under its own .png extension is a recording, a still PNG is not", async () => {
+    const file = join(dir, "blink.png");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=10:d=0.1[a];color=c=white:s=320x240:r=10:d=0.1[b];[a][b]concat=n=2:v=1",
+      "-plays",
+      "0",
+      "-f",
+      "apng",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.source.kind, "video");
+    assert.equal(r.general.verdict, "fail");
+    const { isVideoFile } = await import("@mizchi/vlmkit-core/video-decode.ts");
+    const still = join(dir, "still.png");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:s=8x8",
+      "-frames:v",
+      "1",
+      still,
+    ]);
+    assert.equal(isVideoFile(still), false);
   });
 
   test("page-only flags are refused for a recording, recording flags for a page", async () => {

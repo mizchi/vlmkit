@@ -1621,11 +1621,11 @@ its period a frame reads as motion).
 #### Recordings — `scan video` (your own decoder)
 
 ```bash
-vlmkit scan video rec.mp4                            # every frame → rec.frames/NNNN-t<ms>.png + frames.json
+vlmkit scan video rec.mp4                            # every frame → rec.mp4.frames/NNNN-t<ms>.png + frames.json
 vlmkit scan video rec.mp4 --from 10s --to 20s        # the frames on screen during that span
 vlmkit scan video rec.webm --at 0..3s/250ms --out k  # the frame on screen at each instant
-vlmkit check flash rec.mp4 --display-width 1280      # = scan video, then check flash rec.frames/frames.json
-vlmkit snapshot strip --manifest rec.frames/frames.json --max-frames 8 --out sheet.png
+vlmkit check flash rec.mp4 --display-width 1280      # = scan video, then check flash rec.mp4.frames/frames.json
+vlmkit snapshot strip --manifest rec.mp4.frames/frames.json --max-frames 8 --out sheet.png
 vlmkit scan video frames/ --pts frames/pts.txt       # frames another decoder wrote, with their times
 ```
 

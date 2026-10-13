@@ -31,6 +31,7 @@ describe("scan video args", () => {
       source: "rec.mp4",
       selection: { kind: "all" },
       lossless: false,
+      everyFrame: false,
       json: false,
     });
     assert.deepEqual(parseArgs(["rec.mp4", "--from", "1.5s", "--to", "00:02.250"]).selection, {
@@ -143,6 +144,6 @@ describe("scan video → snapshot storyboard", () => {
       ],
     );
     const summary = execFileSync("cat", [files.summary]).toString();
-    assert.match(summary, /Every frame the recording holds from n 0 to n 29/);
+    assert.match(summary, /Every frame the recording holds from its frame 0 to its frame 29/);
   });
 });

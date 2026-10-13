@@ -37,3 +37,18 @@ test("imageTiming: an APNG's delays and plays; a still PNG and a video are not a
 test("browserDelayMs: 10ms or less is held 100ms", () => {
   assert.deepEqual([0, 1, 10, 11, 20, 100].map(browserDelayMs), [100, 100, 100, 11, 20, 100]);
 });
+
+test("imageTiming: ANIMEXTS1.0 is a loop block too (Chromium loops it), and APNG delays are whole ms", () => {
+  const renamed = Buffer.from(TWO_FRAMES);
+  renamed.write("ANIMEXTS1.0", renamed.indexOf(Buffer.from("NETSCAPE2.0", "latin1")), "latin1");
+  assert.equal(imageTiming(renamed)?.plays, null);
+  // 1/95s is 10.53ms; Chromium holds the integer 10, which it clamps to 100. The first fcTL's
+  // delay is rewritten to 1/95 (the sniffer reads no CRC).
+  const apng = Buffer.from(encodeApng([frame(0), frame(255)], { delaysMs: [100, 500], loops: 0 }));
+  const fctl = apng.indexOf(Buffer.from("fcTL", "latin1")) + 4;
+  apng.writeUInt16BE(1, fctl + 20);
+  apng.writeUInt16BE(95, fctl + 22);
+  const stored = imageTiming(apng)!.storedMs;
+  assert.ok(stored[0]! <= 10, `stored ${stored[0]}`);
+  assert.equal(browserDelayMs(stored[0]!), 100);
+});

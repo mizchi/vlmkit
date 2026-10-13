@@ -583,9 +583,9 @@ closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) an
 ## Recordings through the user's own decoder (`scan video`)
 
 ```bash
-vlmkit scan video rec.mp4                         # every frame → rec.frames/NNNN-t<ms>.png + frames.json (stream clock)
+vlmkit scan video rec.mp4                         # every frame → rec.mp4.frames/NNNN-t<ms>.png + frames.json (stream clock)
 vlmkit scan video rec.mp4 --from 10s --to 20s     # frames on screen during the span; --at 0..3s/250ms: the one at each instant
-vlmkit check flash rec.mp4 --display-width 1280   # the same as scan video, then check flash rec.frames/frames.json
+vlmkit check flash rec.mp4 --display-width 1280   # the same as scan video, then check flash rec.mp4.frames/frames.json
 vlmkit scan video frames/ --pts frames/pts.txt    # frames another decoder wrote (or --fps 30)
 ```
 
