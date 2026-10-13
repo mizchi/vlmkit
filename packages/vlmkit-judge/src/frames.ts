@@ -52,6 +52,8 @@ export interface FrameEntry {
   index?: number;
   /** Stream clock only: the decoder marked the frame a keyframe (where a lossy codec re-quantizes). */
   key?: boolean;
+  /** Stream clock only: which field of an interlaced frame this is (0 first in time), line-doubled. */
+  field?: 0 | 1;
 }
 
 export interface FramesSource {
@@ -168,6 +170,10 @@ export interface FramesVideo {
   notes?: string[];
   /** The decoder's own error lines (a truncated file decodes what it holds and exits 0). */
   decodeErrors?: string[];
+  /** The demuxer reported corrupt or lost packets: frames may be missing between the ones here. */
+  damaged?: boolean;
+  /** The decoded stream's index in the file (`-map 0:<stream>`, `-select_streams <stream>`). */
+  stream?: number;
   /** Degrees the frames were turned to stand upright, from the stream's display matrix. */
   rotation?: number;
   /** A sample aspect ratio other than 1:1, resampled to square pixels (`2:1` doubled each row). */
@@ -396,6 +402,8 @@ export function parseFramesManifest(text: string): FramesManifest {
         refuse(`frames[${i}].index`, `must be greater than frame ${i - 1}'s`);
       }
       if (frame.key !== undefined && typeof frame.key !== "boolean") refuse(`frames[${i}].key`, "must be a boolean");
+      if (frame.field !== undefined && frame.field !== 0 && frame.field !== 1)
+        refuse(`frames[${i}].field`, "must be 0 or 1");
     });
   }
   return manifest as FramesManifest;

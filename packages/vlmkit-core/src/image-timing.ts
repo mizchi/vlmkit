@@ -20,7 +20,7 @@ export interface ImageTiming {
   /** An APNG's `acTL` num_frames: the frames a browser plays, whatever number of `fcTL` follow. */
   declaredFrames?: number;
   /** A GIF's logical screen and each image's place and compositing, which ffmpeg composites otherwise than a browser. */
-  gif?: { screen: { width: number; height: number }; images: GifImage[] };
+  gif?: { screen: { width: number; height: number }; globalTable: boolean; images: GifImage[] };
 }
 
 export interface GifImage {
@@ -117,37 +117,49 @@ function gifTiming(bytes: Uint8Array): ImageTiming {
       break;
     }
   }
-  return { format: "gif", storedMs, plays, gif: { screen, images } };
+  return { format: "gif", storedMs, plays, gif: { screen, globalTable: (lsd & 0x80) !== 0, images } };
 }
 
 /**
  * Where ffmpeg 6.1's GIF decoder composites otherwise than Chromium (measured,
- * `docs/reports/2026-10-13-scan-video-v1.md`), or null: a frame disposed to background with no
- * transparent index is filled with the logical screen's opaque background colour where a browser
- * clears it to transparent (the page shows through), so the next frame differs wherever it does not
- * paint opaquely over that rect; the canvas around a first image that does not cover the logical
- * screen is that colour too; and a first image larger than the logical screen grows a browser's
- * canvas, where ffmpeg crops it. Frame 0 of every pass is drawn on a cleared canvas in both.
+ * `docs/reports/2026-10-13-scan-video-v1.md`), or null. ffmpeg's background is the global colour
+ * table's background entry, opaque, wherever a browser leaves the canvas transparent — but only
+ * when the GIF has a global table and the image it fills under has no transparent index; otherwise
+ * it fills with its transparent colour, as a browser does (measured: those decode pixel for pixel
+ * as Chromium shows them). So refused: a first image larger than the logical screen (a browser grows
+ * the canvas, ffmpeg crops); one that does not cover it, opaque, under a global table; a frame
+ * disposed to background, opaque, under a global table, that the next image does not paint over
+ * opaquely; and one restored to previous where what is restored holds that fill (ffmpeg saved it,
+ * a browser restores the cleared canvas). Frame 0 of every pass is drawn on a cleared canvas in both.
  */
 export function gifCompositingProblem(timing: ImageTiming): string | null {
   const gif = timing.gif;
   if (!gif || gif.images.length === 0) return null;
-  const { screen, images } = gif;
+  const { screen, images, globalTable } = gif;
   const first = images[0]!;
   if (first.x + first.width > screen.width || first.y + first.height > screen.height) {
     return `its first image (${first.width}x${first.height} at ${first.x},${first.y}) reaches past the ${screen.width}x${screen.height} logical screen: a browser grows the canvas to it, ffmpeg crops it`;
   }
-  if (first.x > 0 || first.y > 0 || first.width < screen.width || first.height < screen.height) {
-    return `its first image (${first.width}x${first.height} at ${first.x},${first.y}) does not cover the ${screen.width}x${screen.height} logical screen: a browser leaves the rest transparent, ffmpeg paints it the background colour`;
+  if (!globalTable) return null;
+  const covered = first.x === 0 && first.y === 0 && first.width >= screen.width && first.height >= screen.height;
+  if (!covered && !first.transparent) {
+    return `its first image (${first.width}x${first.height} at ${first.x},${first.y}) does not cover the ${screen.width}x${screen.height} logical screen and has no transparent colour: a browser leaves the rest transparent, ffmpeg paints it the background colour`;
   }
+  const paintsOver = (b: GifImage, a: GifImage) =>
+    !b.transparent && b.x <= a.x && b.y <= a.y && b.x + b.width >= a.x + a.width && b.y + b.height >= a.y + a.height;
+  // Whether ffmpeg's canvas under image i holds its opaque background fill: the keyframe's, under an
+  // opaque first image, or an earlier opaque frame's disposal to background.
+  let filled = !first.transparent;
   for (let i = 0; i + 1 < images.length; i++) {
     const a = images[i]!;
     const b = images[i + 1]!;
-    if (a.disposal !== 2 || a.transparent) continue;
-    const covers = b.x <= a.x && b.y <= a.y && b.x + b.width >= a.x + a.width && b.y + b.height >= a.y + a.height;
-    if (!covers || b.transparent) {
-      return `image ${i} is disposed to background with no transparent colour, and image ${i + 1} does not paint over all of it: a browser clears it to transparent, ffmpeg fills it with the background colour`;
+    if (a.disposal === 2 && !a.transparent && !paintsOver(b, a)) {
+      return `image ${i} is disposed to background with no transparent colour, and image ${i + 1} does not paint over all of it opaquely: a browser clears it to transparent, ffmpeg fills it with the background colour`;
     }
+    if (a.disposal === 3 && filled && !paintsOver(b, a)) {
+      return `image ${i} is restored to the canvas before it, which ffmpeg filled with the background colour, and image ${i + 1} does not paint over all of it opaquely: a browser restores a transparent canvas`;
+    }
+    if (a.disposal === 2 && !a.transparent) filled = true;
   }
   return null;
 }

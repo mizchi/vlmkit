@@ -724,3 +724,49 @@ describe("judgeFromMs: only the windows ending at or after it", () => {
     assert.equal(r.peak.transitions, 0);
   });
 });
+
+describe("margins: how far a verdict is from one transition either way", () => {
+  // A full field alternating `n` times at 10fps from 1.0s, then still, 400x300.
+  const run = (n: number, fps = 10) => {
+    const w = 400;
+    const h = 300;
+    const judge = createFlashJudge({ width: w, height: h, margins: true });
+    const black = flashFrame(
+      rgba(w, h, () => [0, 0, 0]),
+      w,
+      h,
+    );
+    const white = flashFrame(
+      rgba(w, h, () => [255, 255, 255]),
+      w,
+      h,
+    );
+    const step = 1000 / fps;
+    for (let k = 0; k < 4 * fps; k++) {
+      const i = k - fps; // transitions at frames fps .. fps + n - 1
+      judge.push(
+        k,
+        k * step,
+        i >= 0 && i < n && i % 2 === 0 ? white : i >= 0 && i < n ? black : i >= n && n % 2 === 1 ? white : black,
+      );
+    }
+    return judge.result().general;
+  };
+  test("six transitions over the field is a pass one transition from failing", () => {
+    const r = run(6);
+    assert.equal(r.failingWindows, 0);
+    assert.ok(r.margins!.below > AREA_LIMIT_CSS2);
+  });
+  test("seven is a fail one transition from passing; nine has two to spare", () => {
+    const seven = run(7);
+    assert.ok(seven.failingWindows > 0);
+    assert.ok(seven.margins!.above <= AREA_LIMIT_CSS2);
+    const nine = run(9);
+    assert.ok(nine.margins!.above > AREA_LIMIT_CSS2);
+  });
+  test("at 6 frames a second no window can hold a seventh transition: nothing below to reach", () => {
+    const r = run(6, 6);
+    assert.equal(r.failingWindows, 0);
+    assert.equal(r.margins!.below, 0);
+  });
+});

@@ -203,6 +203,34 @@ four were duplicates of another. All are fixed, each held by a test:
 | The "not decisive" note missed nv12, 4:2:2 and other subsampled formats | `chromaSubsampled` reads the layout |
 | Stale comments (fieldOrder "decoded as frames", `atMs` "from the first frame", colour "notes"), the CLAUDE.md grating clause, the storyboard line in the help, BLACK_BELOW_Y's (15,0,0) | Corrected |
 
+## What the third look found
+
+Five verifiers re-ran every second-round reproduction against the fixed code and attacked the fixes;
+a skeptic re-ran each new claim from scratch. 34 of the 39 were fixed, 5 only partly, and 20 new
+defects were confirmed (three more were reported and not yet confirmed). All are fixed, each held by
+a test except the held-last-frame case, which needs a hand-edited MP4:
+
+| Finding | Fix |
+|---|---|
+| An APNG with ~2 KB of metadata before its first frame (XMP, iTXt, eXIf) was probed by ffmpeg as a still PNG, decoded to one frame and passed; Chromium plays it as a 5 Hz strobe | Decoded with `-f apng` whenever `acTL` declares more than one frame |
+| Fields split by the tag came out in reverse: `separatefields` reads each frame's flag, and utvideo / ffvhuff / magicyuv / v410 flag nothing (a tt ramp failed) | `setfield` to the tag's order before the split |
+| The motion re-count starts 250ms before a run, cold: a still field stepping 0 → 0.06 → 0.12 before a strobe read "motion flicker" at 0% explained | A re-count that explains no step never excuses the run |
+| The span start was snapped to the frame on screen at `--from`: in a 3s hold its window ended before the hold, a false fail | The start asked for is judged; the judge already handled a start between frames |
+| `report.history` was decided by the peak count: a small region strobing ten times hid a large one at seven, both ways | Decided by area (`margins`: the best field one transition short and one to spare); a window with no seventh frame never counts as one short (a 6fps span had been told to re-judge) |
+| `gifCompositingProblem` refused GIFs ffmpeg composites as Chromium does (a transparent first image, local tables only): two real strobes were refused | Refused only with a global table and an opaque image, as ffmpeg fills only then (measured pixel for pixel) |
+| Restore-to-previous brought ffmpeg's opaque fill back (a false pass) | Refused where what is restored holds that fill |
+| The refusal's recipe imported one pass as `--every-frame`: the false pass again | `scan video <dir> --loop <plays\|forever>` repeats it; the recipe's pts end with the pass's end |
+| The grey luma path converted range before its own scale: full range compressed (a false pass), untagged never expanded, `--color-range tv` a no-op | `scale=in_range=R:out_range=R` before the step to YUV; any grey tagged limited or given a range is luma |
+| Still fine detail in frames flagged interlaced (a text slide, PsF) twitters at field rate once split, a false fail nothing said | A fail that a frame-at-a-time count does not repeat is said not to be decisive (`fieldDetail`); the woven frames cannot tell it from a field-rate strobe |
+| HEVC field pictures (one field per decoded frame) were split again: half height, areas halved (a false pass) | Detected (flagged, top and bottom alternating) and line-doubled |
+| FFV1 v3 frames say progressive, but a tt tag split them (a false fail) | FFV1 counts as a flagging codec |
+| A dropped packet is said only at warning level: a TS missing a white blip passed as complete | Corrupt-packet warnings kept; the recording is `damaged` and its pass not backed |
+| The recording guard missed a symlink elsewhere to a frame-named file, and a `.scan-video-*` name | Checked as given and as it resolves, against every name scan video writes or clears |
+| Pid liveness alone judged staleness: a run in another PID namespace, or a second scan in the same process, deleted live frames | A host + PID-namespace identity in the lock and temp names (another identity's goes only after a day), and the directories this process holds |
+| A B-frame MP4 whose last frame is held to its stated end read "may be cut short" and refused `--from` there | The stream's stated end is where its last frame is on screen until; the note says either reading |
+| `--from` after a finite GIF's last pass was refused | Its last frame stays on screen |
+| The help's recipe named `v:0` (can be a cover track) and backed false passes on interlaced and looping input | It names the stream scan video judges (`source.video.stream`) and says what it does not hold for; a test runs it on a cover-first mkv |
+
 ## Cost (this sandbox, 4 cores)
 
 - `scan video`, 10s 720p H.264: 3.4s for flat UI-like content (6 MB of PNGs) and 4.6s for `testsrc2` (77 MB).
@@ -217,5 +245,6 @@ four were duplicates of another. All are fixed, each held by a test:
 - A 1D grating whose bars are a 16px block wide or more, moving across, reads as flash even losslessly. A block inside a bar is flat, so nothing matches its motion. This was found here and is in the motion re-count; the docs that claimed such gratings read as motion now say which do.
 - A recording's area depends on how wide it plays (`--display-width`); one frame pixel per CSS px is only the default.
 - A span is counted from 3 seconds of history, not the whole past. A pixel in one slow change through all of them can count one transition differently from the whole recording, and a verdict that one transition decides says so.
-- A GIF that ffmpeg composites otherwise than a browser is refused, not judged. The recipe writes it through ImageMagick, one pass, without the loop's seam.
+- An interlaced recording whose fail is carried only by the two fields of single frames is reported as not decisive: still 1px detail split into fields and a field-rate strobe are the same woven frames.
+- A GIF that ffmpeg composites otherwise than a browser is refused, not judged. The recipe writes it through ImageMagick and imports it with `--loop`; ImageMagick was not installed here, so the recipe's two commands were run by hand-written equivalents only.
 - A storyboard of a lossy recording has no noise floor yet. That is the next item in the research's order.

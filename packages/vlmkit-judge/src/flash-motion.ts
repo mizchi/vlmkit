@@ -220,6 +220,11 @@ export function classifyFlash(
     // One span left flashing decides the track, so the re-count stops there.
     if (r.fieldFails) return { classification: "flash", reason: "field", segments };
     if (r.residualFails) return { classification: "flash", reason: "residual", segments };
+    // A re-count that explained no step by motion re-counted the same steps from a colder start (it
+    // begins MOTION_LEAD_MS before the run): fewer transitions there are its own lost history, not
+    // motion. Measured: a still field stepping 0 → 0.06 → 0.12 before a strobe lost its first
+    // transition and read "motion flicker" at 0% explained.
+    if (r.segment.explainedShare === 0) return { classification: "flash", reason: "residual", segments };
   }
   return { classification: "motion", reason: "explained", segments };
 }

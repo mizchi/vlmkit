@@ -31,7 +31,8 @@ function usage(): string {
     "  vlmkit scan video <recording> [--out dir] [--from t] [--to t] [--at list] [--display-width px]",
     "                    [--max-frames n] [--stream index] [--color-matrix m] [--color-range r] [--background c]",
     "                    [--ffmpeg path] [--ffprobe path] [--json]",
-    "  vlmkit scan video <frames-dir> (--pts file | --fps rate) [--every-frame] [--lossless] [--display-width px] [--json]",
+    "  vlmkit scan video <frames-dir> (--pts file | --fps rate) [--every-frame] [--lossless] [--loop plays|forever]",
+    "                    [--display-width px] [--json]",
     "",
     "Decodes a recording (mp4, webm, mov, mkv, gif, …) into numbered PNGs and a frames.json",
     "(vlmkit-frames/1) giving each frame its presentation time, with YOUR ffmpeg and ffprobe:",
@@ -59,13 +60,19 @@ function usage(): string {
     "  --lossless             With a directory: the frames are exactly what was recorded",
     "  --every-frame          With a directory: it holds every frame the recording shows (the recipe's",
     "                         passthrough writes them all); without it a pass on them is not backed",
+    "  --loop <n|forever>     With a directory: the frames are one pass of a looping GIF / APNG, played",
+    "                         n times or forever; --pts then ends with one more line, the pass's end",
     "  --json                 Print frames.json to stdout",
     "",
-    "Another decoder works too — write every frame and its time, then import them (both name the",
-    "same stream, v:0; left to itself ffmpeg writes the largest, and its times would be another's):",
-    "  ffmpeg -i rec.mp4 -map 0:v:0 -fps_mode passthrough frames/%06d.png",
-    "  ffprobe -v error -select_streams v:0 -show_entries frame=best_effort_timestamp_time -of csv=p=0 rec.mp4 > frames/pts.txt",
+    "Another decoder works too, for progressive video that does not loop — write every frame and its",
+    "time, then import them. Both halves name one stream <i>, the one scan video judges (its index is",
+    "source.video.stream: vlmkit scan video rec.mp4 --at 0 --json); v:0 can be a one-frame cover track:",
+    "  ffmpeg -i rec.mp4 -map 0:<i> -fps_mode passthrough frames/%06d.png",
+    "  ffprobe -v error -select_streams <i> -show_entries frame=best_effort_timestamp_time -of csv=p=0 rec.mp4 > frames/pts.txt",
     "  vlmkit scan video frames --pts frames/pts.txt --every-frame",
+    "Plain ffmpeg writes interlaced frames woven and a GIF / APNG as one pass, and --every-frame would",
+    "then vouch for frames that miss a field-rate or looped flash: scan those directly (an animation",
+    "composited by another tool: --loop).",
     "",
     "Examples:",
     "  vlmkit scan video rec.mp4 && vlmkit check flash rec.mp4.frames/frames.json",
@@ -90,6 +97,8 @@ export interface ScanVideoArgs {
   fps?: number;
   lossless: boolean;
   everyFrame: boolean;
+  /** Imported frames are one pass of a loop: plays, null forever. */
+  loop?: number | null;
   json: boolean;
 }
 
@@ -195,6 +204,11 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
       case "--every-frame":
         everyFrame = true;
         break;
+      case "--loop": {
+        const raw = value(argv, ++i, arg, "how many times the animation plays, or forever");
+        out.loop = raw === "forever" ? null : whole(raw, arg, 1);
+        break;
+      }
       case "--json":
         json = true;
         break;
@@ -244,9 +258,9 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
           `${flag} is for decoding a recording; a directory's frames.json is written beside its frames`,
         );
     }
-  } else if (lossless || everyFrame) {
+  } else if (lossless || everyFrame || out.loop !== undefined) {
     throw new UsageError(
-      `${lossless ? "--lossless" : "--every-frame"} is for imported frames: a decoded recording's codec and frame table say that`,
+      `${lossless ? "--lossless" : everyFrame ? "--every-frame" : "--loop"} is for imported frames: a decoded recording's codec and frame table say that`,
     );
   }
   return { source, ...out, selection, lossless, everyFrame, json };
@@ -286,6 +300,7 @@ async function main(): Promise<void> {
       ...(args.displayWidth !== undefined ? { displayWidth: args.displayWidth } : {}),
       lossless: args.lossless,
       everyFrame: args.everyFrame,
+      ...(args.loop !== undefined ? { loop: args.loop } : {}),
     }));
   } else {
     result = await scanVideo({

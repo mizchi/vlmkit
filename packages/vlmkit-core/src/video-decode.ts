@@ -25,10 +25,12 @@ import {
   existsSync,
   openSync,
   readFileSync,
+  readlinkSync,
   readSync,
   realpathSync,
   statSync,
 } from "node:fs";
+import { hostname } from "node:os";
 import { copyFile, mkdir, mkdtemp, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -117,6 +119,14 @@ export function isVideoFile(path: string): boolean {
  * the spec puts `acTL` before the first `IDAT`, so a frame of any size before the second `fcTL`
  * does not hide it. Null for a still PNG or anything that is not a PNG.
  */
+const apngDeclaredFramesSafe = (file: string): number | null => {
+  try {
+    return apngDeclaredFrames(file);
+  } catch {
+    return null;
+  }
+};
+
 export function apngDeclaredFrames(file: string): number | null {
   const fd = openSync(file, "r");
   try {
@@ -420,8 +430,11 @@ async function clearPrevious(dir: string, keep: string): Promise<void> {
 }
 
 const LOCK = ".scan-video.lock";
+/** A lock or temporary directory whose owner cannot be seen is taken as abandoned only this old. */
+export const STALE_UNKNOWN_MS = 24 * 3600 * 1000;
 
-const alive = (pid: number): boolean => {
+/** Whether pid is a process this one can see. */
+export const alive = (pid: number): boolean => {
   try {
     process.kill(pid, 0);
     return true;
@@ -429,6 +442,26 @@ const alive = (pid: number): boolean => {
     return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 };
+
+/**
+ * Which pids `alive` can judge: this host and PID namespace. A pid from a container sharing the
+ * directory, or from `unshare`, reads as dead here (measured: a sandboxed run removed a live
+ * one's frames), so an owner of another identity is never taken as gone by its pid.
+ */
+export function processIdentity(): string {
+  let ns = "";
+  try {
+    ns = readlinkSync("/proc/self/ns/pid");
+  } catch {
+    // not Linux
+  }
+  let h = 0x811c9dc5;
+  for (const c of `${hostname()}|${ns}`) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}
+
+/** The output directories this process is scanning into now: a second scan here is refused, not let in. */
+const heldLocks = new Set<string>();
 
 /**
  * Make `outDir` this scan's: a directory (refused when the path is a file), not another tool's
@@ -450,38 +483,63 @@ async function claimOut(outDir: string, file: string, shown: string): Promise<{ 
     }
     throw error;
   }
-  const name = basename(file);
-  if (
-    realpathSync(dirname(file)) === realpathSync(outDir) &&
-    (OWN_FRAME.test(name) || name === "frames.json" || name === LOCK)
-  ) {
+  // The recording as given and as it resolves (a symlink elsewhere to a frame-named file in outDir).
+  const out = realpathSync(outDir);
+  for (const path of [file, realpathSync(file)]) {
+    const name = basename(path);
+    if (
+      realpathSync(dirname(path)) === out &&
+      (OWN_FRAME.test(name) || name === "frames.json" || name === LOCK || WORK_DIR.test(name))
+    ) {
+      throw new UsageError(
+        `${shown} is ${path === file ? "" : `a link to ${path}, `}named like a file scan video writes or clears in ${outDir} (${name}): it would be replaced. Rename it, or give --out another directory`,
+      );
+    }
+  }
+  const lockPath = join(out, LOCK);
+  if (heldLocks.has(lockPath)) {
     throw new UsageError(
-      `${shown} is named like a frame scan video writes into ${outDir} (${name}): it would be replaced. Rename it, or give --out another directory`,
+      `another scan in this process is writing into ${outDir}: wait for it, or give --out another directory`,
     );
   }
-  const lockPath = join(outDir, LOCK);
+  const id = processIdentity();
   for (let attempt = 0; ; attempt++) {
     try {
-      await writeFile(lockPath, `${process.pid}\n`, { flag: "wx" });
+      await writeFile(lockPath, `${JSON.stringify({ pid: process.pid, id })}\n`, { flag: "wx" });
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST" || attempt > 0) throw error;
-      const owner = Number.parseInt(readFileSync(lockPath, "utf8"), 10);
-      if (Number.isSafeInteger(owner) && owner !== process.pid && alive(owner)) {
+      let owner: { pid?: unknown; id?: unknown } = {};
+      try {
+        owner = JSON.parse(readFileSync(lockPath, "utf8")) as typeof owner;
+      } catch {
+        // unreadable: judged by its age below
+      }
+      const pid = typeof owner.pid === "number" ? owner.pid : Number.NaN;
+      const ours = owner.id === id;
+      const old = Date.now() - statSync(lockPath).mtimeMs > STALE_UNKNOWN_MS;
+      if (ours ? pid !== process.pid && alive(pid) : !old) {
         throw new UsageError(
-          `another scan (pid ${owner}) is writing into ${outDir}: wait for it, or give --out another directory`,
+          ours
+            ? `another scan (pid ${pid}) is writing into ${outDir}: wait for it, or give --out another directory`
+            : `a scan from another host or container may be writing into ${outDir} (${lockPath}): wait for it, or remove that file if none runs`,
         );
       }
       await rm(lockPath, { force: true });
     }
   }
+  heldLocks.add(lockPath);
+  const release = async () => {
+    heldLocks.delete(lockPath);
+    await rm(lockPath, { force: true });
+  };
   try {
     await prepareOut(outDir);
   } catch (error) {
-    await rm(lockPath, { force: true });
+    await release();
     throw error;
   }
-  return { release: () => rm(lockPath, { force: true }) };
+  return { release };
 }
 
 /** The `select` expression for the decoded frames kept (sorted): runs of consecutive indices become `between`. */
@@ -515,14 +573,20 @@ const label = (instants: readonly number[] | undefined, atMs: number): string | 
 export function decodeErrors(lines: readonly string[]): string[] {
   const out = new Set<string>();
   for (const line of lines) {
-    const m = line.match(/^(?:\[([^\]]*?) @ (?:0x)?[0-9a-fA-F]+\] )?\[(error|fatal|panic)\] (.*)$/);
+    const m = line.match(/^(?:\[([^\]]*?) @ (?:0x)?[0-9a-fA-F]+\] )?\[(warning|error|fatal|panic)\] (.*)$/);
     if (!m) continue;
     const context = m[1] ?? "";
     if (/^(png|image2|out#|Parsed_|auto_scale|swscaler|graph )/.test(context) || /showinfo/.test(context)) continue;
+    // A demuxer that drops a whole packet says so only as a warning (`Packet corrupt`, `corrupt
+    // input packet`): the frame is gone and nothing at error level says it.
+    if (m[2] === "warning" && !CORRUPT_PACKET.test(m[3]!)) continue;
     out.add(`${context ? `${context}: ` : ""}${m[3]!.trim()}`);
   }
   return [...out];
 }
+
+/** A lost or damaged packet: frames may be missing between the ones decoded. */
+export const CORRUPT_PACKET = /packet corrupt|corrupt (input )?packet|corrupt decoded frame/i;
 
 /**
  * Decode `file` with the user's ffmpeg into `out` (`NNNN-t<ms>.png` + `frames.json`). Refuses
@@ -554,6 +618,10 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   }
   const decoder = await findDecoder(options);
   const t0 = performance.now();
+  // An APNG is read as one: ffmpeg's probe gives up on it once ~2 KB of metadata comes before the
+  // first frame, and its PNG reader decodes one still (measured: a 3 KB XMP chunk made a 5 Hz
+  // strobe a single frame that passed).
+  const demuxer = (apngDeclaredFramesSafe(file) ?? 0) > 1 ? ["-f", "apng"] : [];
   const probed = await run(decoder.ffprobe, [
     "-v",
     "error",
@@ -561,6 +629,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     "-show_format",
     "-of",
     "json",
+    ...demuxer,
     asInput(file),
   ]).catch((e) => spawnFailure(e, decoder.ffprobe, "ffprobe"));
   if (probed.code !== 0) {
@@ -577,9 +646,10 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     "-select_streams",
     String(stream.index),
     "-show_entries",
-    "frame=best_effort_timestamp,pts,duration,key_frame,interlaced_frame,width,height",
+    "frame=best_effort_timestamp,pts,duration,key_frame,interlaced_frame,top_field_first,width,height",
     "-of",
     "json",
+    ...demuxer,
     asInput(file),
   ]).catch((e) => spawnFailure(e, decoder.ffprobe, "ffprobe"));
   if (table.code !== 0) {
@@ -619,10 +689,13 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         : undefined;
   // Composited as a browser composites it, or another decoder writes the frames: ImageMagick's
   // coalesce clears a disposed frame to transparent, as a browser does, and flattens it on the page.
-  const importRecipe =
-    `Write every image composited as a browser shows it and import them: magick ${shown} -coalesce -background white -alpha remove frames/%06d.png; ` +
-    `magick identify -format "%T\\n" ${shown} | awk '{printf "%.3f\\n", t/1000; d=$1*10; t+=(d<=10?100:d)}' > frames/pts.txt; ` +
-    "vlmkit scan video frames --pts frames/pts.txt --lossless --every-frame (one pass: the loop's seam is not in it)";
+  // The timestamps are each frame's start with the browser's clamp, then the pass's end, so the
+  // import repeats the loop as a browser does (`--loop`).
+  const importRecipe = image
+    ? `Write every image composited as a browser shows it and import them: magick ${shown} -coalesce -background white -alpha remove frames/%06d.png; ` +
+      `magick identify -format "%T\\n" ${shown} | awk '{printf "%.3f\\n", t/1000; d=$1*10; t+=(d<=10?100:d)} END {printf "%.3f\\n", t/1000}' > frames/pts.txt; ` +
+      `vlmkit scan video frames --pts frames/pts.txt --lossless --every-frame --loop ${image.plays === null ? "forever" : image.plays}`
+    : "";
   const compositing = image ? gifCompositingProblem(image) : null;
   if (compositing) throw new UsageError(`${shown}: ${compositing}. ${importRecipe}`);
   const imageLine = image ? imageTimeline(probedFrames, image, until) : null;
@@ -668,12 +741,19 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   }
   const rows = timeline.rows;
   // A span with no end, or one past the end, is recorded as far as the recording goes.
-  const endMs = image ? until! : recordingEndMs(rows, timeline.endMs);
+  // Where the stream says it ends: a last frame held to then is on screen until then (an MP4 with
+  // B-frames gives the hold to a frame in decode order, so the frames alone end early).
+  const statedEnd =
+    !image && stream.durationMs !== undefined && (stream.startMs ?? 0) >= 0
+      ? (stream.startMs ?? 0) + stream.durationMs
+      : undefined;
+  const framesEnd = recordingEndMs(rows, timeline.endMs);
+  const endMs = image ? until! : Math.max(framesEnd, statedEnd ?? 0);
   const spanEnd = (toMs: number | undefined, fromMs: number) =>
     Math.max(fromMs, Math.min(toMs ?? Number.POSITIVE_INFINITY, endMs));
   const request: SelectionRequest =
     asked.kind === "span" && image && asked.toMs === undefined ? { ...asked, toMs: until! } : asked;
-  const chosen = chooseFrames(rows, request, timeline.endMs);
+  const chosen = chooseFrames(rows, request, image ? timeline.endMs : endMs);
   const selection: VideoSelection =
     asked.kind === "span"
       ? {
@@ -720,6 +800,8 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         filterChain({
           select: selectExpression(g.decoded, probedFrames.length),
           fields: g.split,
+          ...(g.split && fieldPlan?.order ? { fieldOrder: fieldPlan.order } : {}),
+          ...(!g.split && fieldPlan?.lineDouble ? { lineDouble: true } : {}),
           ...(rotate.length > 0 ? { rotate } : {}),
           color: plan,
           ...(stream.alpha ? { alpha: { background } } : {}),
@@ -763,6 +845,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         "-reinit_filter",
         "0",
         ...(rotate.length > 0 ? ["-autorotate", "0"] : []),
+        ...demuxer,
         "-i",
         asInput(file),
         ...outputs,
@@ -830,17 +913,18 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         stable: true,
         index: f.index,
         key: f.key,
+        ...(f.field !== undefined ? { field: f.field } : {}),
         ...(l ? { label: l } : {}),
       });
     }
     const errors = [...new Set([...table.stderr.map((l) => l.trim()).filter(Boolean), ...decodeErrors(stderrAll)])];
-    // The last frame's own duration when the stream gives it: a recording that ends on a long-held
-    // frame is not short of its stated length.
-    const lastEnd = endMs;
+    const damaged = errors.some((l) => CORRUPT_PACKET.test(l));
+    // Frames that end well before the stream's stated end: cut short, or a last frame held to the end
+    // (which the frames alone cannot tell apart; a span may reach the stated end either way).
     const gap = rows.length > 1 ? rows[rows.length - 1]!.atMs - rows[rows.length - 2]!.atMs : 0;
-    if (!image && stream.durationMs !== undefined && lastEnd < stream.durationMs - Math.max(500, 2 * gap)) {
+    if (statedEnd !== undefined && framesEnd < statedEnd - Math.max(500, 2 * gap)) {
       notes.push(
-        `the stream says it lasts ${Number((stream.durationMs / 1000).toFixed(3))}s and its frames end at ${Number((lastEnd / 1000).toFixed(3))}s: the file may be cut short`,
+        `the stream says it runs to ${Number((statedEnd / 1000).toFixed(3))}s and its frames end at ${Number((framesEnd / 1000).toFixed(3))}s: the file may be cut short, or its last frame is held to the end`,
       );
     }
     const video: FramesVideo = {
@@ -862,6 +946,8 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
       ...(stream.fieldOrder ? { fieldOrder: stream.fieldOrder } : {}),
       ...(notes.length ? { notes } : {}),
       ...(errors.length ? { decodeErrors: errors.slice(0, 20) } : {}),
+      ...(damaged ? { damaged: true } : {}),
+      stream: stream.index,
     };
     const manifest: FramesManifest = {
       format: FRAMES_FORMAT,
@@ -902,6 +988,9 @@ const FRAME_FLAGGED_CODECS = new Set([
   "dvvideo",
   "prores",
   "dnxhd",
+  // FFV1 v3 codes each frame's structure (ps): frames read progressive under a tt tag are said
+  // progressive. v1 frames follow the container, so they read flagged and are split frame by frame.
+  "ffv1",
 ]);
 
 /**
@@ -914,8 +1003,23 @@ const FRAME_FLAGGED_CODECS = new Set([
 function fieldSplit(
   frames: readonly ProbedFrame[],
   stream: VideoStream,
-): { split?: (f: ProbedFrame) => boolean; note?: string } {
+): { split?: (f: ProbedFrame) => boolean; order?: "tff" | "bff"; lineDouble?: boolean; note?: string } {
   const flagged = frames.filter((f) => f.interlaced).length;
+  // HEVC field pictures: the decoder hands each field over as its own half-height frame, flagged
+  // interlaced, top and bottom alternating. Split, each one instant became two pseudo-fields and
+  // every area was halved (a 30,000 px² box passed at 15,200); each is line-doubled instead.
+  const interlacedFrames = frames.filter((f) => f.interlaced);
+  if (
+    stream.codec === "hevc" &&
+    interlacedFrames.length === frames.length &&
+    interlacedFrames.length > 1 &&
+    interlacedFrames.every((f, i) => i === 0 || f.topFieldFirst !== interlacedFrames[i - 1]!.topFieldFirst)
+  ) {
+    return {
+      lineDouble: true,
+      note: "HEVC field pictures: each decoded frame is one field, line-doubled to the picture's height, at the field rate",
+    };
+  }
   const order = stream.fieldOrder ? ` (${stream.fieldOrder})` : "";
   const how =
     "split into its two fields, line-doubled, at twice the frame rate (woven, a field-rate flicker is a still comb)";
@@ -932,9 +1036,11 @@ function fieldSplit(
       note: `the stream is tagged ${stream.fieldOrder}, but ${stream.codec} decodes every frame as progressive: not split`,
     };
   }
+  // Read as ffmpeg's raw decoder reads the tag: tt and tb top field first, bb and bt bottom.
   return {
     split: () => true,
-    note: `interlaced${order} by the stream's tag (${stream.codec} frames carry no flag of their own): each frame ${how}`,
+    order: stream.fieldOrder === "bb" || stream.fieldOrder === "bt" ? "bff" : "tff",
+    note: `interlaced${order} by the stream's tag (${stream.codec} frames carry no flag of their own): each frame ${how}, ${stream.fieldOrder === "bb" || stream.fieldOrder === "bt" ? "bottom" : "top"} field first as tagged`,
   };
 }
 
@@ -989,6 +1095,13 @@ export interface ImportFramesOptions {
    * sequence is not claimed complete and a pass on it is not backed.
    */
   everyFrame?: boolean;
+  /**
+   * The frames are one pass of an animation that loops (a GIF / APNG another tool composited):
+   * how many times it plays, `null` forever. The timestamp file then ends with one more line, the
+   * pass's end, and the pass is repeated as a browser repeats it — to one pass and a second more
+   * for a loop that never ends. One pass alone holds none of the windows across the seam.
+   */
+  loop?: number | null;
 }
 
 /** A PNG's size from its IHDR, without decoding it. */
@@ -1063,15 +1176,23 @@ export async function importFrames(
     const ptsPath = isAbsolute(options.pts) ? options.pts : resolve(options.pts);
     if (!existsSync(ptsPath)) throw new UsageError(`no such timestamp file: ${options.pts}`);
     seconds = parsePtsFile(readFileSync(ptsPath, "utf8"), options.pts);
-    if (seconds.length !== names.length) {
+    const want = names.length + (options.loop !== undefined ? 1 : 0);
+    if (seconds.length !== want) {
       throw new UsageError(
-        `${options.pts} holds ${seconds.length} timestamps for ${names.length} PNGs in ${options.dir}: one per frame, in order`,
+        `${options.pts} holds ${seconds.length} timestamps for ${names.length} PNGs in ${options.dir}: one per frame, in order` +
+          (options.loop !== undefined ? ", then the end of the pass (--loop)" : ""),
       );
     }
   } else {
     const fps = options.fps!;
     if (!(Number.isFinite(fps) && fps > 0)) throw new UsageError(`--fps is frames a second, above 0 (got ${fps})`);
     seconds = names.map((_, i) => i / fps);
+    if (options.loop !== undefined) seconds.push(names.length / fps);
+  }
+  // A loop's pass ends at its last line; the frames are the lines before it.
+  const passEnd = options.loop !== undefined ? seconds.pop()! : undefined;
+  if (passEnd !== undefined && !(passEnd > seconds[seconds.length - 1]!)) {
+    throw new UsageError(`the pass's end (${passEnd}s, the timestamp file's last line) must come after its last frame`);
   }
   // The rule scanVideo keeps: a frame whose time the next one shares is never on screen (only the
   // later is); a time that goes back is refused. The recipe's passthrough writes such frames too.
@@ -1098,11 +1219,33 @@ export async function importFrames(
   }
   // The stream's own timeline, as scanVideo keeps it (moved to 0 only when it would start before).
   const origin = Math.min(0, seconds[shown[0]!]! * 1000);
-  const frames: FrameEntry[] = shown.map((i, n) => {
+  const once = shown.map((i) => {
     const atMs = seconds[i]! * 1000 - origin;
     if (!Number.isFinite(atMs)) throw new UsageError(`${names[i]}'s timestamp ${seconds[i]}s is out of range`);
-    return { n, file: names[i]!, atMs, stable: true, index: n };
+    return { file: names[i]!, atMs };
   });
+  // A loop repeated as imageTimeline repeats a GIF: its plays, or one pass and a second more.
+  let loop: FramesVideo["loop"] | undefined;
+  let played = once;
+  if (passEnd !== undefined) {
+    const passMs = passEnd * 1000 - origin - once[0]!.atMs;
+    const plays = options.loop ?? null;
+    if (plays !== null && !(Number.isSafeInteger(plays) && plays >= 1)) {
+      throw new UsageError(`--loop is how many times the animation plays, 1 or more, or forever (got ${plays})`);
+    }
+    const passes = plays ?? Math.ceil((passMs + WINDOW_MS) / passMs) + 1;
+    if (passes * once.length > MAX_SCAN_FRAMES) {
+      throw new UsageError(
+        `${options.dir}: ${passes} passes of ${once.length} frames is over ${MAX_SCAN_FRAMES} frames`,
+      );
+    }
+    played = [];
+    for (let p = 0; p < passes; p++) {
+      for (const f of once) played.push({ file: f.file, atMs: f.atMs + p * passMs });
+    }
+    loop = { plays, passFrames: once.length, passMs, passes };
+  }
+  const frames: FrameEntry[] = played.map((f, n) => ({ n, file: f.file, atMs: f.atMs, stable: true, index: n }));
   const manifest: FramesManifest = {
     format: FRAMES_FORMAT,
     source: {
@@ -1118,6 +1261,7 @@ export async function importFrames(
         ...(options.everyFrame ? { streamFrames: frames.length } : {}),
         selection: { kind: "all" },
         ...(hidden ? { hidden } : {}),
+        ...(loop ? { loop } : {}),
       },
     },
     frames,

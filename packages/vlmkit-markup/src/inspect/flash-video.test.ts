@@ -7,11 +7,11 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
-import { scanVideo } from "@mizchi/vlmkit-core/video-decode.ts";
+import { processIdentity, scanVideo } from "@mizchi/vlmkit-core/video-decode.ts";
 import { chromaSubsampled, runFlashCheck, SPAN_HISTORY_MS, type FlashReport } from "./flash-check.ts";
 
 let dir: string;
@@ -401,7 +401,7 @@ describe("check flash on a recording", () => {
     const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs: 5200, toMs: 6000 } } });
     assert.equal(r.general.verdict, "pass");
     assert.equal(r.general.peakTransitions, 6);
-    assert.match(r.history ?? "", /general: decided by one transition.*3\.000s of history/);
+    assert.match(r.history ?? "", /general: decided by one transition.*3\.0\d\ds of history/);
     assert.equal(SPAN_HISTORY_MS, 3000);
     // From the start, the history is the whole recording's: nothing to say.
     const early = await runFlashCheck({
@@ -444,9 +444,204 @@ describe("check flash on a recording", () => {
   });
 
   test("an interrupted run's temporary frames are removed by the next one", async () => {
-    const stale = join(tmpdir(), "vlmkit-flash-video-999999999-left");
+    const stale = join(tmpdir(), `vlmkit-flash-video-999999999-${processIdentity()}-left`);
+    // Another identity's (a container sharing the directory): its pid says nothing here, so it stays.
+    const foreign = join(tmpdir(), "vlmkit-flash-video-999999999-00000000-left");
+    mkdirSync(foreign, { recursive: true });
     mkdirSync(join(stale, ".scan-video-x"), { recursive: true });
     await runFlashCheck({ source: strobe("sweep.mp4", { hz: 1, fps: 30, seconds: 1 }) });
     assert.equal(existsSync(stale), false);
+    assert.equal(existsSync(foreign), true);
+    rmSync(foreign, { recursive: true, force: true });
+  });
+
+  /** A 400x300 grey recording at 10fps whose relative luminance per frame is `lum(N)` (an ffmpeg expression of N). */
+  const grey = (name: string, expr: string, seconds: number, rate = 10) => {
+    const file = join(dir, name);
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=black:s=400x300:r=${rate}:d=${seconds},format=rgb24,geq=r='${expr}':g='${expr}':b='${expr}'`,
+      "-c:v",
+      "png",
+      "-pix_fmt",
+      "rgb24",
+      file,
+    ]);
+    return file;
+  };
+
+  test("a still field that steps up before it strobes is a flash: a re-count that explains nothing excuses nothing", async () => {
+    // Y 0 to 3.0s, 0.06 to 4.4s, 0.122 at 4.5s, then 0/0.122 alternating at 4.6-5.1s.
+    const file = grey(
+      "step2.mkv",
+      "if(lt(N\\,30)\\,0\\,if(lt(N\\,45)\\,70\\,if(gt(N\\,51)\\,98\\,if(mod(N\\,2)\\,98\\,0))))",
+      7,
+    );
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.general.verdict, "fail");
+    assert.equal(r.general.classification, "flash");
+  });
+
+  test("a span inside a held frame judges the windows ending in it, not the second before the hold", async () => {
+    const file = join(dir, "hold.mkv");
+    const e = "if(between(N\\,20\\,30)*mod(N\\,2)\\,255\\,0)";
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=black:s=320x240:r=10:d=3.2,format=rgb24,geq=r='${e}':g='${e}':b='${e}',setpts='if(lte(N\\,30)\\,N*0.1\\,6.0)/TB'`,
+      "-fps_mode",
+      "passthrough",
+      "-c:v",
+      "png",
+      "-pix_fmt",
+      "rgb24",
+      file,
+    ]);
+    assert.equal((await runFlashCheck({ source: file })).general.verdict, "fail");
+    const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs: 4010, toMs: 6000 } } });
+    assert.equal(r.general.verdict, "pass");
+    assert.equal(r.sampling.judgedFromMs, 4010);
+  });
+
+  test("still fine detail in frames flagged interlaced fails only between their fields, and says it is not decisive", async () => {
+    const file = join(dir, "psf.mp4");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=25:d=2,geq=lum='16+219*mod(Y\\,2)':cb=128:cr=128,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-pix_fmt",
+      "yuv444p",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.general.verdict, "fail");
+    assert.match((r.fieldDetail ?? []).join(" "), /general: fails only between the two fields.*not decisive/);
+    // A real field-rate strobe changes between frames too, judged at frame rate or not: no such note.
+    const strobeFile = join(dir, "il-strobe-frames.mp4");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=25:d=2,geq=lum='16+219*mod(N\\,2)':cb=128:cr=128,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-pix_fmt",
+      "yuv444p",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      strobeFile,
+    ]);
+    const s2 = await runFlashCheck({ source: strobeFile });
+    assert.equal(s2.general.verdict, "fail");
+    assert.equal(s2.fieldDetail, undefined);
+  });
+
+  test("a recording the demuxer reports packets lost from is not complete: its pass is not backed", async () => {
+    const file = join(dir, "blips.ts");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=25:d=3,format=yuv420p",
+      "-vf",
+      "geq=lum='if(eq(N\\,26)+eq(N\\,30)+eq(N\\,34)+eq(N\\,38)\\,235\\,16)':cb=128:cr=128",
+      "-c:v",
+      "mpeg2video",
+      "-g",
+      "1",
+      "-q:v",
+      "2",
+      file,
+    ]);
+    const ts = readFileSync(file);
+    const keep: Buffer[] = [];
+    let starts = -1;
+    for (let at = 0; at + 188 <= ts.length; at += 188) {
+      const pid = ((ts[at + 1]! & 0x1f) << 8) | ts[at + 2]!;
+      if (pid === 0x100 && ts[at + 1]! & 0x40) starts++;
+      if (pid === 0x100 && starts === 30) continue;
+      keep.push(ts.subarray(at, at + 188));
+    }
+    const dropped = join(dir, "blips-drop.ts");
+    writeFileSync(dropped, Buffer.concat(keep));
+    assert.equal((await runFlashCheck({ source: file })).general.verdict, "fail");
+    // The lost blip leaves six transitions: a pass, which the gate says is not backed (flash-undersampled).
+    const r = await runFlashCheck({ source: dropped });
+    assert.equal(r.sampling.complete, false);
+    assert.match(r.sampling.partial ?? "", /corrupt or lost packets/);
+  });
+
+  test("one pass of a looping animation imported with --loop is judged over its loop", async () => {
+    const frames = join(dir, "loop-import");
+    mkdirSync(frames, { recursive: true });
+    for (const [i, v] of [0, 255].entries()) {
+      execFileSync("ffmpeg", [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        `color=c=0x${v.toString(16).padStart(2, "0").repeat(3)}:s=200x200:d=0.1`,
+        "-frames:v",
+        "1",
+        join(frames, `00000${i}.png`),
+      ]);
+    }
+    writeFileSync(join(frames, "pts.txt"), "0.000\n0.100\n0.200\n");
+    const { importFrames } = await import("@mizchi/vlmkit-core/video-decode.ts");
+    const once = await importFrames({
+      dir: frames,
+      pts: join(frames, "pts.txt"),
+      lossless: true,
+      everyFrame: true,
+      loop: null,
+    });
+    const r = await runFlashCheck({ source: once.manifestPath });
+    assert.equal(r.general.verdict, "fail");
+  });
+
+  test("a span of a 6fps recording is never 'decided by one transition': no window can hold a seventh", async () => {
+    const file = strobe("six-note.mkv", { hz: 3, fps: 6, seconds: 6, codec: ["-c:v", "ffv1"] });
+    const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs: 4000, toMs: 5000 } } });
+    assert.equal(r.general.verdict, "pass");
+    assert.equal(r.history, undefined);
   });
 });

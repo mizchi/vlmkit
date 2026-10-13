@@ -283,17 +283,25 @@ test("filterChain: the measured order of every step", () => {
 test("colorPlan: a YUV codec's grey frames are luma, limited unless tagged; a grey PNG is its own levels", () => {
   const gray = { index: 0, codec: "av1", pixelFormat: "gray", width: 8, height: 8, timeBase: { num: 1, den: 1000 } };
   const luma = colorPlan(gray, "a.webm");
-  assert.equal(luma.before, "format=yuv444p");
+  // The range is kept across the step to YUV (left to itself the scaler reads grey as full).
+  assert.equal(luma.before, "scale=in_range=tv:out_range=tv,format=yuv444p");
   assert.match(luma.scale, /in_range=tv/);
   assert.deepEqual(luma.color.assumed, ["range"]);
   assert.match(colorPlan({ ...gray, colorRange: "pc" }, "a.webm").scale, /in_range=pc/);
   assert.match(colorPlan(gray, "a.webm", { range: "pc" }).scale, /in_range=pc/);
-  assert.equal(colorPlan({ ...gray, pixelFormat: "gray10le" }, "a.webm").before, "format=yuv444p16le");
+  assert.equal(
+    colorPlan({ ...gray, pixelFormat: "gray10le" }, "a.webm").before,
+    "scale=in_range=tv:out_range=tv,format=yuv444p16le",
+  );
   const png = colorPlan({ ...gray, codec: "png" }, "a.png");
   assert.equal(png.scale, "");
   assert.equal(png.color.matrix, "rgb");
+  // Any codec's grey tagged limited, or told its range, is luma too (a lossless ffv1 copy of a mono AV1).
+  assert.equal(colorPlan({ ...gray, codec: "ffv1", colorRange: "tv" }, "a.mkv").color.matrix, "gray");
+  assert.equal(colorPlan({ ...gray, codec: "ffv1" }, "a.mkv", { range: "tv" }).color.matrix, "gray");
+  assert.equal(colorPlan({ ...gray, codec: "ffv1" }, "a.mkv").color.matrix, "rgb");
   const chain = filterChain({ select: null, fields: false, color: luma, sampleAspect: false });
-  assert.ok(chain.startsWith("format=yuv444p,scale=in_color_matrix=bt601:in_range=tv"));
+  assert.ok(chain.startsWith("scale=in_range=tv:out_range=tv,format=yuv444p,scale=in_color_matrix=bt601:in_range=tv"));
 });
 
 test("colorPlan: a matrix tagged but not convertible is refused, not called untagged", () => {

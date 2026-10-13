@@ -197,6 +197,8 @@ export interface VideoStream {
   displayMatrix?: number[];
   /** How long the stream says it lasts (its own duration, or Matroska's DURATION tag), in ms. */
   durationMs?: number;
+  /** When the stream says it starts, in ms (its `start_time`). */
+  startMs?: number;
   container?: string;
   /**
    * The stream carries transparency: a pixel format with alpha, or a VP8/VP9 WebM whose
@@ -221,6 +223,7 @@ interface ProbeStream {
   color_primaries?: string;
   field_order?: string;
   duration?: string;
+  start_time?: string;
   disposition?: { attached_pic?: number; default?: number };
   tags?: Record<string, string>;
   side_data_list?: { side_data_type?: string; rotation?: number; displaymatrix?: string }[];
@@ -338,6 +341,9 @@ export function pickVideoStream(probeJson: string, file: string, wanted?: number
     ...(rotation ? { rotation } : {}),
     ...(displayMatrix ? { displayMatrix } : {}),
     ...(Number.isFinite(seconds) && seconds > 0 ? { durationMs: seconds * 1000 } : {}),
+    ...(stream.start_time !== undefined && Number.isFinite(Number(stream.start_time))
+      ? { startMs: Number(stream.start_time) * 1000 }
+      : {}),
     ...(probe.format?.format_name ? { container: probe.format.format_name } : {}),
     ...(alpha ? { alpha } : {}),
   };
@@ -351,6 +357,8 @@ export interface ProbedFrame {
   key: boolean;
   /** The decoder marked it interlaced (two fields woven into one frame). */
   interlaced?: boolean;
+  /** Its top field is the first in time (the decoder's flag; meaningful when interlaced). */
+  topFieldFirst?: boolean;
   /** Its decoded size, before rotation. */
   width?: number;
   height?: number;
@@ -373,6 +381,7 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
       pkt_duration?: number;
       key_frame?: number;
       interlaced_frame?: number;
+      top_field_first?: number;
       width?: number;
       height?: number;
     }[];
@@ -397,6 +406,7 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
       ticks,
       key: f.key_frame === 1,
       ...(f.interlaced_frame === 1 ? { interlaced: true } : {}),
+      ...(f.top_field_first === 1 ? { topFieldFirst: true } : {}),
       ...(f.width && f.height ? { width: f.width, height: f.height } : {}),
       ...((f.duration ?? f.pkt_duration ?? 0) > 0 ? { durationTicks: (f.duration ?? f.pkt_duration)! } : {}),
     };
@@ -523,6 +533,8 @@ export function imageTimeline(
     hidden: 0,
     timing: "browser",
     loop: { plays: timing.plays, passFrames: n, passMs, passes: Math.ceil(rows.length / n) },
+    // An animation that stops keeps its last frame on screen.
+    ...(timing.plays !== null ? { endMs: Number.POSITIVE_INFINITY } : {}),
   };
 }
 
@@ -650,7 +662,11 @@ export function colorPlan(
     ...(stream.colorTransfer ? { transfer: stream.colorTransfer } : {}),
     ...(stream.colorPrimaries ? { primaries: stream.colorPrimaries } : {}),
   };
-  const lumaOnly = /^gray/.test(stream.pixelFormat) && LUMA_GRAY_CODECS.has(stream.codec);
+  // A grey stream any codec tags limited, or one told its range, is luma too (a lossless ffv1 copy of
+  // a mono AV1 keeps the tv tag, and read as its own levels it was never expanded).
+  const lumaOnly =
+    /^gray/.test(stream.pixelFormat) &&
+    (LUMA_GRAY_CODECS.has(stream.codec) || stream.colorRange === "tv" || override.range !== undefined);
   if (lumaOnly) {
     const assumedRange: string[] = [];
     let range: "tv" | "pc";
@@ -661,7 +677,9 @@ export function colorPlan(
       assumedRange.push("range");
     }
     return {
-      before: /^gray$/.test(stream.pixelFormat) ? "format=yuv444p" : "format=yuv444p16le",
+      // The range kept across the step to YUV: left to itself, the scaler ffmpeg inserts for
+      // `format` reads grey as full and writes YUV as limited (a pc stream came out 150/172 → 145/164).
+      before: `scale=in_range=${range}:out_range=${range},${/^gray$/.test(stream.pixelFormat) ? "format=yuv444p" : "format=yuv444p16le"}`,
       scale: `in_color_matrix=bt601:in_range=${range}:flags=accurate_rnd+full_chroma_int`,
       color: { matrix: "gray", range, ...extra, assumed: assumedRange },
       notes,
@@ -707,6 +725,14 @@ export interface FilterPlan {
   select: string | null;
   /** Split each frame into its two fields, each line-doubled back to the frame's height. */
   fields: boolean;
+  /**
+   * The fields' order, written onto the frames before the split, when the stream's tag decides it:
+   * `separatefields` reads each frame's own flag, and a codec that flags nothing says bottom first
+   * (measured: a tt-tagged utvideo ramp came out 97 0 162 134 …, its fields reversed).
+   */
+  fieldOrder?: "tff" | "bff";
+  /** Each frame is one field (HEVC field pictures): line-double it to the picture's height, never split it. */
+  lineDouble?: boolean;
   /** Turn the frames (after the field split), for a decode that runs with `-autorotate 0`. */
   rotate?: readonly string[];
   /** The showinfo instance's name, so two graphs in one run are told apart. */
@@ -738,7 +764,16 @@ export function filterChain(plan: FilterPlan): string {
     : [];
   return [
     plan.select,
-    ...(plan.fields ? ["separatefields", "scale=w=iw:h=ih*2:flags=neighbor", "setsar=r=sar/2:max=10000"] : []),
+    ...(plan.fields
+      ? [
+          ...(plan.fieldOrder ? [`setfield=${plan.fieldOrder}`] : []),
+          "separatefields",
+          "scale=w=iw:h=ih*2:flags=neighbor",
+          "setsar=r=sar/2:max=10000",
+        ]
+      : plan.lineDouble
+        ? ["scale=w=iw:h=ih*2:flags=neighbor", "setsar=r=sar/2:max=10000"]
+        : []),
     ...(plan.rotate ?? []),
     plan.color.before ?? null,
     plan.color.scale ? `scale=${plan.color.scale}` : null,

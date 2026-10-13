@@ -63,10 +63,12 @@ function findings(report: FlashReport): Finding[] {
     const t = report[track];
     if (t.verdict === "fail" && t.worst) {
       const nearLimit = report.lossy?.some((n) => n.startsWith(`${track}:`));
+      const fieldsOnly = report.fieldDetail?.some((n) => n.startsWith(`${track}:`));
+      const byOne = (report.history?.split(":")[0]?.split(" and ") ?? []).includes(track);
       out.push({
         rule,
         severity: "suspect",
-        message: `${label} flashing: ${where(t)}${nearLimit ? "; a lossy or subsampled recording within 5% of the limit: not decisive" : ""}`,
+        message: `${label} flashing: ${where(t)}${nearLimit ? "; a lossy or subsampled recording within 5% of the limit: not decisive" : ""}${fieldsOnly ? "; only between the fields of the same frames (fine detail or a field-rate flicker): not decisive" : ""}${byOne ? "; one transition decides it on a span counted from partial history: judge the whole recording" : ""}`,
         ...selectorOf(t),
         evidence: { track, worst: t.worst, reason: t.reason, motion: t.motion, animations: t.animations },
       });

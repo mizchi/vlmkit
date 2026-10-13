@@ -102,3 +102,53 @@ test("gifCompositingProblem: where ffmpeg paints the background colour and a bro
   );
   assert.equal(gifCompositingProblem(imageTiming(TWO_FRAMES)!), null);
 });
+
+test("gifCompositingProblem: only where ffmpeg paints its opaque background, which needs a global table and no transparent colour", () => {
+  const palette = [
+    [0, 0, 0],
+    [255, 255, 255],
+  ] as const;
+  const at = (
+    frames: Parameters<typeof encodeGif>[0]["frames"],
+    extra: Partial<Parameters<typeof encodeGif>[0]> = {},
+  ) => gifCompositingProblem(imageTiming(encodeGif({ width: 20, height: 20, palette, loop: 0, frames, ...extra }))!);
+  // A first image smaller than the screen that has a transparent colour: ffmpeg fills transparent too.
+  assert.equal(at([{ pixels: 0, width: 10, height: 10, transparent: 1 }, { pixels: 1 }]), null);
+  // Local colour tables only: ffmpeg's background is its transparent colour, as a browser's is.
+  assert.equal(
+    at(
+      [
+        { pixels: 0, disposal: 2 },
+        { pixels: 1, width: 1, height: 1 },
+      ],
+      { localTables: true },
+    ),
+    null,
+  );
+  assert.equal(at([{ pixels: 1, width: 1, height: 1 }, { pixels: 0 }], { localTables: true }), null);
+  // Restore to previous: what ffmpeg restores under an opaque first frame is its background fill.
+  assert.match(
+    at([
+      { pixels: 0, disposal: 3 },
+      { pixels: 0, width: 1, height: 1 },
+    ])!,
+    /restored to the canvas before it/,
+  );
+  assert.match(
+    at([
+      { pixels: 0, disposal: 2 },
+      { pixels: 0, disposal: 3, delayCs: 2 },
+      { pixels: 0, width: 1, height: 1 },
+    ])!,
+    /image 0 is disposed to background|image 1 is restored/,
+  );
+  // …and nothing to restore when the first frame is transparent-capable, or the next paints over all of it.
+  assert.equal(
+    at([
+      { pixels: 0, disposal: 3, transparent: 1 },
+      { pixels: 0, width: 1, height: 1 },
+    ]),
+    null,
+  );
+  assert.equal(at([{ pixels: 0, disposal: 3 }, { pixels: 1 }]), null);
+});

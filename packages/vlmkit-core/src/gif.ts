@@ -36,6 +36,8 @@ export interface GifOptions {
   loop?: number;
   /** The logical screen's pixel aspect byte (0: none). */
   aspectByte?: number;
+  /** Give each image the palette as a local colour table and write no global one. */
+  localTables?: boolean;
   frames: readonly GifFrame[];
 }
 
@@ -81,14 +83,15 @@ export function encodeGif(options: GifOptions): Uint8Array {
   while (1 << bits < palette.length) bits++;
   const table: number[] = [];
   for (let i = 0; i < 1 << bits; i++) table.push(...(palette[i] ?? [0, 0, 0]));
+  const local = options.localTables === true;
   const out: number[] = [
     ...Array.from("GIF89a", (c) => c.charCodeAt(0)),
     ...u16(width),
     ...u16(height),
-    0x80 | ((bits - 1) << 4) | (bits - 1),
+    local ? 0 : 0x80 | ((bits - 1) << 4) | (bits - 1),
     options.background ?? 0,
     options.aspectByte ?? 0,
-    ...table,
+    ...(local ? [] : table),
   ];
   if (options.loop !== undefined) {
     out.push(0x21, 0xff, 11, ...Array.from("NETSCAPE2.0", (c) => c.charCodeAt(0)), 3, 1, ...u16(options.loop), 0);
@@ -102,7 +105,7 @@ export function encodeGif(options: GifOptions): Uint8Array {
     const y = f.y ?? 0;
     const w = f.width ?? width;
     const h = f.height ?? height;
-    out.push(0x2c, ...u16(x), ...u16(y), ...u16(w), ...u16(h), 0);
+    out.push(0x2c, ...u16(x), ...u16(y), ...u16(w), ...u16(h), local ? 0x80 | (bits - 1) : 0, ...(local ? table : []));
     const paint = f.pixels;
     const px = Array.from({ length: w * h }, (_, i) =>
       typeof paint === "number" ? paint : paint(i % w, Math.floor(i / w)),
