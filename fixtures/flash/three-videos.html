@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: three-videos</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): Three 120x90 videos side by side, one style path for all three: told apart by element, together 32,400 CSS px² in one field, so the verdict cannot be a pass. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}.grid{display:flex;gap:4px}.grid video{display:block;width:120px;height:90px;background:#000}</style>
+  </head>
+  <body>
+    <div class="grid"><video muted></video><video muted></video><video muted></video></div>
+  </body>
+</html>

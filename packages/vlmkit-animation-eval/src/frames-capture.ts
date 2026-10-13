@@ -15,7 +15,7 @@
  */
 import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Page } from "playwright";
+import type { Frame, Page } from "playwright";
 import { applyHar, settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { navigationOptions, type PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import {
@@ -36,11 +36,129 @@ export interface HeldAnimationTiming {
   iterations: number | null;
 }
 
+/** What the held clocks still have to run (`VIRTUAL_CLOCK_SCRIPT`'s `pending()`), over every frame. */
+export interface HeldPending {
+  /** Timers still to fire. */
+  timers: number;
+  /** Queued `requestAnimationFrame` callbacks. */
+  frames: number;
+  /** How many of the timers repeat. */
+  intervals: number;
+  /** The pages' `vlmkit:seek` listeners on their windows. */
+  seekListeners: number;
+  /** The latest one-shot timer's due time on the sweep's clock, or null when there is none. */
+  latestTimerMs: number | null;
+}
+
 export interface HeldTimeline {
-  /** Every animation held so far, timed on the page clock. */
+  /** Every animation held so far in every frame, timed on the sweep's clock. */
   animations(): Promise<HeldAnimationTiming[]>;
-  /** Advance the clock to `t` ms of page time and seek every held animation there. */
+  /** What every frame's held clock still has to run, summed; the latest one-shot on the sweep's clock. */
+  pending(): Promise<HeldPending>;
+  /** Advance the clock to `t` ms of page time and seek every held animation there, in every frame. */
   at(t: number): Promise<void>;
+  /** How many times the page has moved to a new document since it was opened. */
+  navigations(): number;
+}
+
+/** More navigations than this during one sweep and `at` throws. */
+export const MAX_SWEEP_NAVIGATIONS = 5;
+/** How long a document the page navigates to may take to commit and to load; and a frame to answer. */
+const NAVIGATION_WAIT_MS = 10_000;
+// Not "Target page ... has been closed": a page that closed itself is not coming back.
+const NAVIGATED = /Execution context was destroyed|navigat|Cannot find context/i;
+
+type ClockPending = Omit<HeldPending, "intervals" | "seekListeners"> & { intervals?: number; seekListeners?: number };
+
+type HeldWindow = Window & {
+  __vlmkitClock?: {
+    advanceTo(ms: number): Promise<number>;
+    takeLeftAt?(): number | null;
+    pending?(): ClockPending;
+    rendered?(maxMs?: number): Promise<boolean>;
+  };
+  __vlmkitSeekTimeline?(t: number): number | void;
+  __vlmkitTimelineAnimations?(): HeldAnimationTiming[];
+};
+
+/**
+ * A frame's document as the sweep keeps it: its `performance.timeOrigin`, and the sweep instant
+ * its own time 0 is at. At sweep instant `t` it is put at `t - offset` of its own time.
+ */
+type FrameClock = { origin: number; offset: number };
+
+type FrameStep = { fresh: true } | { noClock: true } | { clock: FrameClock; leftAt: number | null };
+
+/**
+ * One instant in one frame, run in the page: the clock advanced to `target - offset`, every held
+ * animation seeked there, and the page time the document began to leave at, if it did. `known` is
+ * the frame's document as the sweep last put it. In the main frame another document answers
+ * `fresh` before anything is advanced (a navigation that committed between two instants), since
+ * advancing it to the old document's time would start it late; the caller then decides its offset.
+ * In any other frame a document not seen before (an iframe inserted or navigated since) begins at
+ * this instant: its offset is `target`, so it is put at its own 0, and its first seconds are not
+ * run in one step.
+ *
+ * A seek that ended an animation is followed by the browser's next rendering, where its finish
+ * event is dispatched (its finished promise resolved within the seek), then seeked again: what the
+ * page starts there can end before the instant too. At most 16 such stages in one instant.
+ */
+const stepFrame = async ({
+  target,
+  known,
+  main,
+}: {
+  target: number;
+  known: FrameClock | null;
+  main: boolean;
+}): Promise<FrameStep> => {
+  const origin = performance.timeOrigin;
+  if (main && known !== null && known.origin !== origin) return { fresh: true };
+  const w = window as unknown as HeldWindow;
+  const clock = w.__vlmkitClock;
+  if (!clock) return { noClock: true };
+  const offset = known !== null && known.origin === origin ? known.offset : target;
+  const ms = target - offset;
+  await clock.advanceTo(ms);
+  const seek = () => Number(w.__vlmkitSeekTimeline ? w.__vlmkitSeekTimeline(ms) : 0) || 0;
+  for (let ended = seek(), round = 0; ended > 0 && round < 16; round++) {
+    if (clock.rendered) await clock.rendered();
+    ended = seek();
+  }
+  return { clock: { origin, offset }, leftAt: clock.takeLeftAt ? clock.takeLeftAt() : null };
+};
+
+type FrameRead =
+  | { fresh: true }
+  | { unknown: true }
+  | { animations: HeldAnimationTiming[]; pending: ClockPending | null };
+
+/** A frame's held list and pending work, when its document is the one `known` describes. */
+const readFrame = ({ known, main }: { known: FrameClock | null; main: boolean }): FrameRead | null => {
+  if (known === null || known.origin !== performance.timeOrigin) return main ? { fresh: true } : { unknown: true };
+  const w = window as unknown as HeldWindow;
+  if (!w.__vlmkitClock) return null;
+  return {
+    animations: w.__vlmkitTimelineAnimations ? w.__vlmkitTimelineAnimations() : [],
+    pending: w.__vlmkitClock.pending ? w.__vlmkitClock.pending() : null,
+  };
+};
+
+/** `promise`, or undefined once `ms` have passed. */
+function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(undefined), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** Instants added to the animation-derived ones, so script-driven motion is sampled too. */
@@ -58,8 +176,25 @@ export function defaultTimelineInstants(held: readonly HeldAnimationTiming[]): n
 /**
  * Load `url` into `page` with the page clock held from document start (`VIRTUAL_CLOCK_SCRIPT`)
  * and every animation held from the instant it begins (`HOLD_TIMELINE_SCRIPT`), and run the
- * zero-delay work queued during load at virtual 0. Init scripts do not run for `setContent`, so
- * the page has to be navigated to.
+ * zero-delay work queued during load at virtual 0, with everything held by then put at 0. Init
+ * scripts do not run for `setContent`, so the page has to be navigated to.
+ *
+ * Every frame of the page is advanced and seeked at each instant: init scripts run in every
+ * frame, so each iframe has a clock of its own, and before this one held only the main frame's
+ * (an iframe's rAF loop and CSS animations sat at 0 for the whole sweep). Each frame's document
+ * keeps its own offset: the sweep instant it was first seen at, so an iframe inserted at 1000ms
+ * starts at its own 0 there instead of being advanced 1000ms in one step (which ran a strobe's
+ * every toggle at once), and one that navigates starts again at the instant its new document is
+ * first seen. A frame that detaches, has no clock, or does not answer within 10s is skipped.
+ * `animations()` and `pending()` read every frame, each on the sweep's clock; a document they find
+ * that no instant has reached yet is put at its own 0 first, at the sweep's present instant.
+ *
+ * A page may navigate during the sweep (a splash that forwards itself, a timer that follows a
+ * link): the new document's clock starts at 0, and the page time it began at becomes its offset
+ * — at `t` it is advanced to `t - offset`. That time is read from the old document's
+ * `beforeunload` (`takeLeftAt`) when the step that navigated returned; when the old document was
+ * destroyed under the step instead, it is the instant being reached, late by at most that step.
+ * More than `MAX_SWEEP_NAVIGATIONS` navigations throw.
  */
 export async function openHeldTimeline(page: Page, url: string, options: PageLoadOptions = {}): Promise<HeldTimeline> {
   await page.addInitScript(VIRTUAL_CLOCK_SCRIPT);
@@ -69,27 +204,181 @@ export async function openHeldTimeline(page: Page, url: string, options: PageLoa
   // Network idle and fonts only: the settle's animation and trailing waits run on the page's
   // own timers, which the held clock never fires.
   await settlePage(page, 0, 0);
-  const advance = (t: number) =>
-    page.evaluate(
-      (ms) =>
-        (window as unknown as { __vlmkitClock: { advanceTo(ms: number): Promise<number> } }).__vlmkitClock.advanceTo(
-          ms,
-        ),
-      t,
-    );
-  await advance(0);
-  return {
-    animations: () =>
-      page.evaluate(() =>
-        (window as unknown as { __vlmkitTimelineAnimations(): HeldAnimationTiming[] }).__vlmkitTimelineAnimations(),
-      ),
-    at: async (t) => {
-      await advance(t);
-      await page.evaluate(
-        (ms) => (window as unknown as { __vlmkitSeekTimeline(t: number): void }).__vlmkitSeekTimeline(ms),
-        t,
+
+  let offset = 0;
+  let navigations = 0;
+  // The document being swept: its timeOrigin (null until read), whether it has been put at its
+  // own 0 yet, and the instant it was last put at.
+  let origin: number | null = null;
+  let opened = false;
+  let lastAt = 0;
+  // A frame that did not answer within the wait is not waited on again.
+  const stalled = new WeakSet<Frame>();
+  // Every other frame's document as the sweep last put it; a new document resets it.
+  const clocks = new WeakMap<Frame, FrameClock>();
+  const others = () => page.frames().filter((frame) => frame !== page.mainFrame() && !stalled.has(frame));
+
+  /** Put one frame that is not the main one at sweep instant `target`; its clock, if it answered. */
+  const stepOther = async (frame: Frame, target: number): Promise<FrameClock | undefined> => {
+    try {
+      const answered = await within(
+        frame.evaluate(stepFrame, { target, known: clocks.get(frame) ?? null, main: false }),
+        NAVIGATION_WAIT_MS,
       );
+      if (answered === undefined) stalled.add(frame);
+      else if ("clock" in answered) {
+        clocks.set(frame, answered.clock);
+        return answered.clock;
+      }
+    } catch {
+      // Detached, or between documents: its next instant reaches it.
+    }
+    return undefined;
+  };
+
+  type Outcome = { kind: "ok" } | { kind: "left"; at: number } | { kind: "fresh" } | { kind: "destroyed" };
+  // The main frame first, and its answer decides; then every other frame at once. Not all of them
+  // together: when the main frame answers fresh, a new document's iframes would already have been
+  // advanced to the old document's time, and a held clock does not go back.
+  const put = async (target: number): Promise<Outcome> => {
+    try {
+      if (origin === null) origin = await page.evaluate(() => performance.timeOrigin);
+      const step = await page.mainFrame().evaluate(stepFrame, { target, known: { origin, offset }, main: true });
+      if ("fresh" in step) return { kind: "fresh" };
+      if ("noClock" in step) throw new Error(`openHeldTimeline: the page has no held clock (${page.url()})`);
+      lastAt = target;
+      await Promise.all(others().map((frame) => stepOther(frame, target)));
+      return step.leftAt === null ? { kind: "ok" } : { kind: "left", at: offset + step.leftAt };
+    } catch (error) {
+      if (!NAVIGATED.test(String(error))) throw error;
+      return { kind: "destroyed" };
+    }
+  };
+
+  // Did a navigation the page began commit? A 204, a download or a cancelled beforeunload never does.
+  const committed = async (): Promise<boolean> => {
+    const deadline = Date.now() + NAVIGATION_WAIT_MS;
+    while (Date.now() < deadline) {
+      try {
+        const now = await within(
+          page.evaluate(() => performance.timeOrigin),
+          deadline - Date.now(),
+        );
+        if (now !== undefined && now !== origin) return true;
+      } catch (error) {
+        if (!NAVIGATED.test(String(error))) throw error;
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return false;
+  };
+
+  const navigated = async (at: number) => {
+    navigations += 1;
+    if (navigations > MAX_SWEEP_NAVIGATIONS) {
+      throw new Error(`page navigated more than ${MAX_SWEEP_NAVIGATIONS} times during the sweep`);
+    }
+    offset = at;
+    lastAt = at;
+    origin = null;
+    opened = false;
+    await page.waitForLoadState("load", { timeout: NAVIGATION_WAIT_MS }).catch(() => {});
+    await settlePage(page, 0, 0);
+  };
+
+  const at = async (t: number): Promise<void> => {
+    for (;;) {
+      // A new document is put at its own 0 first, so what it began during its load is held there.
+      const opening = !opened;
+      const target = opening ? offset : t;
+      const outcome = await put(target);
+      if (outcome.kind === "fresh") {
+        await navigated(lastAt);
+        continue;
+      }
+      if (outcome.kind === "destroyed") {
+        await navigated(target);
+        continue;
+      }
+      if (outcome.kind === "left" && (await committed())) {
+        await navigated(outcome.at);
+        continue;
+      }
+      opened = true;
+      if (!opening || target === t) return;
+    }
+  };
+
+  type Read = { offset: number; animations: HeldAnimationTiming[]; pending: ClockPending | null };
+  /** One frame that is not the main one, read; a document no instant has reached yet is put at its 0 first. */
+  const readOther = async (frame: Frame): Promise<Read | null> => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let read: FrameRead | null | undefined;
+      try {
+        read = await within(
+          frame.evaluate(readFrame, { known: clocks.get(frame) ?? null, main: false }),
+          NAVIGATION_WAIT_MS,
+        );
+      } catch {
+        return null;
+      }
+      if (read === undefined) stalled.add(frame);
+      if (!read || "fresh" in read) return null;
+      if ("unknown" in read) {
+        // It appeared since the last instant: at its own 0 now, where the sweep is.
+        if (!(await stepOther(frame, lastAt))) return null;
+        continue;
+      }
+      return { offset: clocks.get(frame)!.offset, ...read };
+    }
+    return null;
+  };
+  /** Every frame's held list and pending work, the main frame first, each with its offset. */
+  const readAll = async (): Promise<Read[]> => {
+    for (;;) {
+      let main: FrameRead | null = { fresh: true };
+      try {
+        main = await page
+          .mainFrame()
+          .evaluate(readFrame, { known: origin === null ? null : { origin, offset }, main: true });
+      } catch (error) {
+        if (!NAVIGATED.test(String(error))) throw error;
+      }
+      if (main && ("fresh" in main || "unknown" in main)) {
+        // The page moved to another document since the last instant: open it where the sweep is.
+        await at(lastAt);
+        continue;
+      }
+      const rest = await Promise.all(others().map(readOther));
+      return [
+        { offset, animations: main?.animations ?? [], pending: main?.pending ?? null },
+        ...rest.filter((r): r is Read => r !== null),
+      ];
+    }
+  };
+
+  await at(0);
+  return {
+    animations: async () =>
+      (await readAll()).flatMap((r) => r.animations.map((a) => ({ ...a, startMs: a.startMs + r.offset }))),
+    pending: async () => {
+      const total: HeldPending = { timers: 0, frames: 0, intervals: 0, seekListeners: 0, latestTimerMs: null };
+      for (const { offset: frameOffset, pending } of await readAll()) {
+        if (!pending) continue;
+        total.timers += pending.timers;
+        total.frames += pending.frames;
+        total.intervals += pending.intervals ?? 0;
+        total.seekListeners += pending.seekListeners ?? 0;
+        if (pending.latestTimerMs !== null && pending.latestTimerMs !== undefined) {
+          const due = pending.latestTimerMs + frameOffset;
+          total.latestTimerMs = total.latestTimerMs === null ? due : Math.max(total.latestTimerMs, due);
+        }
+      }
+      return total;
     },
+    at,
+    navigations: () => navigations,
   };
 }
 

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: shadow</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): The 4 Hz strobe inside an open shadow root: animations there are held too (document.getAnimations() leaves them out). -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}</style>
+  </head>
+  <body>
+    <strobe-box></strobe-box>
+    <script>
+      customElements.define("strobe-box", class extends HTMLElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: "open" }).innerHTML = `<style>#f{position:fixed;inset:0;background:#000;animation:k 250ms 8.3ms infinite}@keyframes k{0%{background:#000;animation-timing-function:steps(1,end)}50%{background:#fff;animation-timing-function:steps(1,end)}100%{background:#fff}}</style><div id="f"></div>`;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: teleport-drift</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): Dense text jumping 40px back and forth at 5 Hz while the whole of it drifts 60px a second: each jump is undone, so it is a flash however it drifts. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#d{position:fixed;inset:-40px;animation:d 3000ms linear infinite}#t{font:14px/16px monospace;color:#000;word-break:break-all;animation:j 200ms 8.3ms infinite}@keyframes d{from{transform:translateX(0)}to{transform:translateX(180px)}}@keyframes j{0%{transform:translateX(0);animation-timing-function:steps(1,end)}50%{transform:translateX(40px);animation-timing-function:steps(1,end)}100%{transform:translateX(40px)}}</style>
+  </head>
+  <body>
+    <div id="d"><div id="t"></div></div>
+    <script>document.getElementById("t").textContent = "WMQ#@8%&B0XKZH".repeat(160);</script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: svg-percent</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A static inline-SVG background whose data: URL holds raw percent signs (width='100%'): read as the URL standard reads it, it is a still image, and the page passes. -->
+    <style>html,body{margin:0;overflow:hidden}body{background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'><rect width='100%' height='100%' fill='%23dddddd'/></svg>")}</style>
+  </head>
+  <body>
+    <p>still</p>
+  </body>
+</html>

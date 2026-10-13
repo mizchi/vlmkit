@@ -64,7 +64,48 @@ export interface FramesSource {
   clock: "held" | "wall";
   /** `inspect interact`: the `frames` step this sequence records. */
   step?: string;
+  /**
+   * Regions, in CSS px, whose pixels the capture could not hold to the sequence's clock: a
+   * `<video>` it paused, an animated image or one whose bytes could not be read, pixels that
+   * changed while nothing was advanced. `check flash` writes it and leaves those pixels out of
+   * its count when it reads the sequence back, so judging the saved frames gives the same answer
+   * as judging the page did.
+   */
+  unmeasured?: UnmeasuredRegion[];
+  /**
+   * `check flash`: what its sweep decided, so a saved sequence is judged again the same way.
+   * `still`: nothing on the page was held or scheduled, so one frame is the whole sequence.
+   * `windowMs`: the page time swept. `windowFrom`: where that came from, the `option` given, the
+   * held `animations`' own lengths, the `default` for a page that only schedules timers or frames,
+   * or `still`. `truncated`: the window was cut at the sweep's cap, shorter than the motion it was
+   * chosen for.
+   */
+  sweep?: FramesSweep;
 }
+
+export interface FramesSweep {
+  still: boolean;
+  windowMs: number;
+  windowFrom: "option" | "animations" | "default" | "still";
+  truncated: boolean;
+}
+
+export interface UnmeasuredRegion {
+  /**
+   * `video`: paused at load. `animated-image`: runs on the browser's clock. `unreadable-image`:
+   * an image whose bytes could not be read, so whether it animates is not known. `uncontrolled`:
+   * changed with the clock held.
+   */
+  reason: UnmeasuredReason;
+  rect: { x: number; y: number; width: number; height: number };
+  /** The element, as the style gates print it, when one is known. */
+  path?: string;
+}
+
+export type UnmeasuredReason = "video" | "animated-image" | "unreadable-image" | "uncontrolled";
+
+const UNMEASURED_REASONS: readonly UnmeasuredReason[] = ["video", "animated-image", "unreadable-image", "uncontrolled"];
+const SWEEP_WINDOW_FROM: readonly FramesSweep["windowFrom"][] = ["option", "animations", "default", "still"];
 
 export interface FramesManifest {
   format: typeof FRAMES_FORMAT;
@@ -233,5 +274,50 @@ export function parseFramesManifest(text: string): FramesManifest {
       throw new UsageError(`frames manifest: frame ${i}'s file "${frame.file}" is outside the manifest's directory.`);
     }
   });
+  // What `check flash` reads back. Unchecked, a malformed region crashed it with a raw TypeError
+  // halfway through the count instead of naming the field.
+  const source = (manifest.source ?? {}) as Partial<FramesSource>;
+  if (source.unmeasured !== undefined) checkUnmeasured(source.unmeasured);
+  if (source.sweep !== undefined) checkSweep(source.sweep);
   return manifest as FramesManifest;
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+function refuse(field: string, what: string): never {
+  throw new UsageError(`frames manifest: "${field}" ${what}.`);
+}
+
+function oneOf(field: string, value: unknown, allowed: readonly string[]): void {
+  if (!allowed.includes(value as string))
+    refuse(field, `is ${JSON.stringify(value)}; it is one of ${allowed.join(", ")}`);
+}
+
+function checkUnmeasured(unmeasured: unknown): void {
+  if (!Array.isArray(unmeasured)) refuse("source.unmeasured", "must be an array");
+  unmeasured.forEach((region: unknown, i) => {
+    const field = `source.unmeasured[${i}]`;
+    if (!isObject(region)) refuse(field, "must be an object");
+    oneOf(`${field}.reason`, region.reason, UNMEASURED_REASONS);
+    const rect = region.rect;
+    if (!isObject(rect)) refuse(`${field}.rect`, "must be an object");
+    for (const key of ["x", "y"]) {
+      if (!finite(rect[key]) || rect[key] < 0) refuse(`${field}.rect.${key}`, "must be a finite number >= 0");
+    }
+    for (const key of ["width", "height"]) {
+      if (!finite(rect[key]) || rect[key] <= 0) refuse(`${field}.rect.${key}`, "must be a finite number > 0");
+    }
+    if (region.path !== undefined && typeof region.path !== "string") refuse(`${field}.path`, "must be a string");
+  });
+}
+
+function checkSweep(sweep: unknown): void {
+  if (!isObject(sweep)) refuse("source.sweep", "must be an object");
+  if (typeof sweep.still !== "boolean") refuse("source.sweep.still", "must be a boolean");
+  if (!finite(sweep.windowMs) || sweep.windowMs < 0) refuse("source.sweep.windowMs", "must be a finite number >= 0");
+  oneOf("source.sweep.windowFrom", sweep.windowFrom, SWEEP_WINDOW_FROM);
+  if (typeof sweep.truncated !== "boolean") refuse("source.sweep.truncated", "must be a boolean");
 }

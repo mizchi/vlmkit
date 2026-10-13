@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: background-gif</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): The two-frame GIF of animated-gif, as a 300x200 CSS background: an animated image wherever it is drawn from is reported, never judged. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#g{width:300px;height:200px;background:url(data:image/gif;base64,R0lGODlhAgACAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAgACAAACBARBEAUAIfkEAAoAAAAsAAAAAAIAAgAAAgQMwzAFADs=) 0 0/300px 200px;image-rendering:pixelated}</style>
+  </head>
+  <body>
+    <div id="g"></div>
+  </body>
+</html>

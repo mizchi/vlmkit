@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: faded-red</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A full-viewport red pulse at 4 Hz, resting at black 50ms and fading to #a00000 and back over 75ms each way: ΔL 0.075 never makes a general transition, but every rise into the red does, though its first frames are not yet saturated. -->
+    <style>html,body{margin:0;overflow:hidden;background:#000}#f{position:fixed;inset:0;background:#000;animation:r 250ms 8.3ms infinite linear}@keyframes r{0%,20%{background:#000}50%{background:#a00000}80%,100%{background:#000}}</style>
+  </head>
+  <body>
+    <div id="f"></div>
+  </body>
+</html>

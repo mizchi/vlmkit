@@ -35,6 +35,7 @@ import { copyGate } from "./copy.gate.ts";
 import { designGate } from "./design.gate.ts";
 import { driftComponentGate, driftPagesGate } from "./drift.gate.ts";
 import { equivalenceGate } from "./equivalence.gate.ts";
+import { flashGate } from "./flash.gate.ts";
 import { groundingGate } from "./grounding.gate.ts";
 import { handlersGate } from "./handlers.gate.ts";
 import { integrityGate } from "./integrity.gate.ts";
@@ -67,6 +68,7 @@ export {
   driftComponentGate,
   driftPagesGate,
   equivalenceGate,
+  flashGate,
   groundingGate,
   handlersGate,
   i18nStressGate,
@@ -112,6 +114,7 @@ export const markupGatesPlugin = definePlugin({
     groundingGate,
     motionGate,
     animationGate,
+    flashGate,
     i18nStressGate,
     mediaVariantsGate,
     // Decoration and consistency.

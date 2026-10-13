@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: late-video</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A <video> added 1s in, over the whole viewport: media is searched for again during the sweep, so it is reported and the verdict cannot be a pass. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}video{position:fixed;inset:0;width:100%;height:100%;background:#000}</style>
+  </head>
+  <body>
+    <script>setTimeout(() => document.body.appendChild(document.createElement("video")), 1000);</script>
+  </body>
+</html>

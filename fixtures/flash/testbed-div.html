@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: testbed-div</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): The a11y testbed's 2.3.1 case: a 250x250 div toggled red/white every 250ms. That is 4 changes, 2 flashes, a second: a pass, whatever the testbed's label says. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#d{width:250px;height:250px;background:red}</style>
+  </head>
+  <body>
+    <div id="d"></div><script>const d=document.getElementById("d");let on=false;setInterval(()=>{on=!on;d.style.background=on?"white":"red"},250);</script>
+  </body>
+</html>

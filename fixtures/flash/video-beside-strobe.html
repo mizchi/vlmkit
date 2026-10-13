@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: video-beside-strobe</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A 150x100 video beside a 140x140 box strobing at 4 Hz, in one field: 15,000 and 19,600 CSS px², each under the limit, 34,600 together, so the general track cannot pass. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}video{position:fixed;left:0;top:0;width:150px;height:100px;background:#000}#f{position:fixed;left:160px;top:0;width:140px;height:140px;background:#fff;animation:k 250ms 8.3ms infinite}@keyframes k{0%{background:#000;animation-timing-function:steps(1,end)}50%{background:#fff;animation-timing-function:steps(1,end)}100%{background:#fff}}</style>
+  </head>
+  <body>
+    <video muted></video><div id="f"></div>
+  </body>
+</html>

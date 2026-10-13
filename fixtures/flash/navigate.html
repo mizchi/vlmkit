@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: navigate</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A page that navigates to still.html 500ms in: the sweep continues on the new document instead of failing. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}</style>
+  </head>
+  <body>
+    <p>leaving</p>
+    <script>setTimeout(() => { location.href = "still.html"; }, 500);</script>
+  </body>
+</html>

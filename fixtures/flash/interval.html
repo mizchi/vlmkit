@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: interval</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A setInterval toggle every 125ms: 8 transitions a second. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#f{position:fixed;inset:0;background:#000}</style>
+  </head>
+  <body>
+    <div id="f"></div><script>const f=document.getElementById("f");let on=false;setInterval(()=>{on=!on;f.style.background=on?"#fff":"#000"},125);</script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: box-144</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A 144x148 box strobing at 4 Hz: 21,312 CSS px², under the limit. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}#b{position:absolute;left:41px;top:43px;width:144px;height:148px;background:#000;animation:k 250ms 8.3ms infinite}@keyframes k{0%{background:#000;animation-timing-function:steps(1,end)}50%{background:#fff;animation-timing-function:steps(1,end)}100%{background:#fff}}</style>
+  </head>
+  <body>
+    <div id="b"></div>
+  </body>
+</html>
