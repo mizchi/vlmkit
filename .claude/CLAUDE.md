@@ -522,7 +522,7 @@ closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) an
   reversal is a quarter turn or more (dot ≤ 0): a shake around a square path never reversed past 90°.
 - **A state carries only what is the content's.** Steps a state took in place before its last one stay
   with the place: a stock that card after card appears on filled every card's ring, and the deal read
-  flash at 23,341 px²; trimmed, 13,187. Content replaced under motion — what was at a pixel moved on by
+  flash at 23,341 px²; trimmed, 13,187 (15,825 with the place ring below). Content replaced under motion — what was at a pixel moved on by
   trusted motion and what is there now moves on by the next frame's — starts fresh: a slide's entering
   band. A separate location layer for untrusted steps was tried and lost a teleport while drifting: at
   a fixed place, its returns no longer line up; on the drifting content they do.

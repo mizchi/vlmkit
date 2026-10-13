@@ -93,7 +93,7 @@ Measured at 1280x720, default window, after every fix below:
 |---|---|---|
 | scrolling text, 300px/s | fail 56,505 | motion: 26 left, 99% of changed steps explained, 300 px/s |
 | carousel slide (1024px in 300ms, eased, resting) | fail 80,453 | motion: 1,606 left, 68% explained |
-| solitaire deal (cards flying, turning, fading in from 0.2) | fail 31,862 | motion: 13,187 left, 6% explained — the translucent cards are two layers no translation matches, and what is left stays where it was stepped |
+| solitaire deal (cards flying, turning, fading in from 0.2) | fail 31,862 | motion: 15,825 left, 9% explained — the translucent cards are two layers no translation matches, and what is left stays where it was stepped |
 | `scale(1)↔scale(0)` steps at 5 Hz | fail 87,296 | flash |
 | 300x300 box teleporting 560px at 5 Hz | fail 76,800 | flash |
 | background toggled every 125ms on a box translating 4px/s | fail 87,296 | flash |
@@ -141,7 +141,8 @@ The review found ten holes in it, all confirmed; the tracker replaced all three 
   sees card after card appear on it, and each card that left carried the stock's transitions along its
   flight — 23,341 px², a flash. A state that motion takes on keeps only the last step it took in place:
   13,187. (A separate location layer for untrusted steps was tried and lost the drifting teleport: at a
-  fixed place its returns no longer line up.)
+  fixed place its returns no longer line up. The second review's place ring keeps the trimmed steps at
+  the stock, measured as an area of its own: 15,825.)
 - **A sum stopped at the best ties.** The coarse search left its sum at 0 once an exact match was found,
   so every later offset tied and the shortest, (0, 0), won: a carousel frame moving 64px was unmatched.
 - **The reversal gate came too late.** Applied as it went, a shake was untrusted only after seven
@@ -214,21 +215,21 @@ and 17 reproduced on the branch.
 ## The repository's own pages
 
 The 21 pages the design's corpus named (six dogfood-animation pages, solitaire, the landing page, the
-six sites, seven integrity-timeline fixtures), 1280x720, default window, after every fix above:
+six sites, seven integrity-timeline fixtures), 1280x720, default window, after both reviews' fixes:
 
 | Pages | Window | Result |
 |---|---|---|
 | dogfood-animation: page, agents a / c / e / g, agent-b's probe | 2-3.7s from their animations | pass; at most 85 CSS px² flashing |
-| solitaire | 2s | **motion flicker** (warn): 31,862 per pixel, 13,187 left after compensation; the deal's cards named, none covering half the flashing box, so no selector |
+| solitaire | 2s | **motion flicker** (warn): 31,862 per pixel, 15,825 left after compensation (13,187 after the first review, before the place ring); the deal's cards named, none covering half the flashing box, so no selector |
 | landing page; kanban, shop, docs, magazine, checkout | — | **still**: nothing can move under the held clock at load (their motion is behind interaction), one frame each, 2.6-3.3s |
 | dashboard | 3s (its script) | pass, nothing flashing |
 | integrity-timeline: at-rest, background-late, clean, fade-in, held, transient | 2s | pass; at most 3,051 (at-rest) |
 | integrity-timeline: script | 3s | pass; 1,130 |
 
 20 pass with nothing over the limit, the deal is the one motion flicker, and nothing is a flash — the
-same verdicts as before the review, which is the point of re-running it: every hole the review closed
-was closed without a false positive on the repository's own pages. 6 of the 21 are one frame. The 15
-that moved took 16-45s each.
+same verdicts as before either review, which is the point of re-running it: every hole the reviews
+closed was closed without a false positive on the repository's own pages. 6 of the 21 are one frame.
+The 15 that moved took 16-52s each.
 
 ## Cost
 
