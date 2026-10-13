@@ -657,7 +657,7 @@ function sourceLine(source: FramesSource): string {
 export function storyboardSummary(
   story: Storyboard,
   source: FramesSource,
-  entries: readonly Pick<FrameEntry, "atMs">[],
+  entries: readonly Pick<FrameEntry, "atMs" | "index" | "key">[],
 ): string {
   const f = story.frames;
   const r = story.rules;
@@ -746,7 +746,21 @@ export function storyboardSummary(
     }
     if (e.unstable > 0) notes.push(`${e.id}: ${e.unstable} of its frames never captured the same twice.`);
   }
-  if (f.count > 1 && !f.sampling.everyFrame) {
+  const video = source.video;
+  // On the stream clock, consecutive indices are every frame the recording holds between them.
+  const wholeStream =
+    source.clock === "stream" && entries.every((e, i) => i === 0 || e.index === entries[i - 1]!.index! + 1);
+  if (video && !video.lossless) {
+    const onKey = story.events.filter((e) => entries[e.first.n]?.key === true).map((e) => e.id);
+    notes.push(
+      `Decoded from ${video.decoder === "import" ? "frames not marked lossless" : `${video.codec}, a lossy codec`} (read with --lossy): an event can be codec noise rather than a change on screen${onKey.length > 0 ? `; ${onKey.join(", ")} ${onKey.length === 1 ? "begins" : "begin"} on a keyframe, where the codec re-quantizes the whole picture` : ""}.`,
+    );
+  }
+  if (wholeStream && f.count > 1) {
+    notes.push(
+      `Every frame the recording holds from n ${entries[0]!.index} to n ${entries[entries.length - 1]!.index}, up to ${ms(f.sampling.maxGapMs)} ms apart: a glitch is one recorded frame, and what the recorder did not capture is not here.`,
+    );
+  } else if (f.count > 1 && !f.sampling.everyFrame) {
     notes.push(
       `Frames up to ${ms(f.sampling.maxGapMs)} ms apart: something shorter than a gap can fall between two frames and not appear, and a glitch is one frame of the sequence, not one rendered frame.`,
     );

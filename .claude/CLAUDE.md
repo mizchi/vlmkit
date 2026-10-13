@@ -470,9 +470,10 @@ not to re-learn:
 Known answers: `fixtures/storyboard/planted.html?kind=…` (static, glitch, blinks, toast, slide, fade,
 spinner), each required back on its frames in `storyboard-cli.test.ts`.
 
-Not built yet, in the order the research put them: external video files through a decoder the user
-supplies — then a noise floor for lossy storyboards, which this one deliberately does not have.
-(`check flash`, the first in that list, is below.)
+Not built yet, in the order the research put them: a noise floor for lossy storyboards, which this
+one deliberately does not have (until then it refuses a lossy recording without `--lossy`).
+(`check flash` and external recordings through the user's own decoder, `scan video`, the first two in
+that list, are below.)
 
 ## Flashing (`check flash`, WCAG 2.3.1)
 
@@ -578,6 +579,70 @@ closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) an
 - **The per-pixel record keeps 16 transitions**, so a peak of 16 reads "8+ flashes/s".
 - Not judged, said so in the output: WCAG's 0.1° exception for fine balanced patterns (a 2px
   inverting checkerboard is reported), a page's own video, states behind interaction, HDR.
+
+## Recordings through the user's own decoder (`scan video`)
+
+```bash
+vlmkit scan video rec.mp4                         # every frame → rec.frames/NNNN-t<ms>.png + frames.json (stream clock)
+vlmkit scan video rec.mp4 --from 10s --to 20s     # frames on screen during the span; --at 0..3s/250ms: the one at each instant
+vlmkit check flash rec.mp4 --display-width 1280   # the same as scan video, then check flash rec.frames/frames.json
+vlmkit scan video frames/ --pts frames/pts.txt    # frames another decoder wrote (or --fps 30)
+```
+
+vlmkit ships, depends on and downloads **no decoder** (ffmpeg-static is GPL and 80 MB; Playwright's
+private ffmpeg decodes VP8/MJPEG only). `@mizchi/vlmkit-core/video-decode.ts` spawns the user's ffmpeg
+and ffprobe (`--ffmpeg`, `VLMKIT_FFMPEG`, PATH; ffprobe beside ffmpeg) with arguments, never a shell;
+`video-frames.ts` is the pure half (probe JSON, frame table, timelines, colour, showinfo) and
+`image-timing.ts` reads GIF / APNG delays and loop counts from the bytes. Tests need ffmpeg on PATH,
+as the user would; CI installs it (`unit-tests.yml`), and without it they fail naming it, not skip.
+The frames are `vlmkit-frames/1` on `clock: "stream"`: `atMs` is presentation time from the first
+frame, `index` the position among the frames the recording shows, `source.video` how it was decoded.
+Measured with ffmpeg 6.1.1, not to re-learn (`docs/reports/2026-10-13-scan-video-v1.md`):
+
+- **ffprobe's decoded frame list is ffmpeg's output, one to one, with `-copyts` and `-fps_mode
+  passthrough`** — 15 inputs: B-frames, VFR mp4/mkv, an edit-list cut (90 packets, 75 frames), mpegts,
+  a mid-GOP start, VP8's hidden alt-ref (91 packets, 90 frames), VP9 superframes, GIF, APNG. Packet
+  counts and `nb_frames` are not frame counts. Without `-fps_mode` image2 goes CFR and duplicates and
+  drops; `vfr`/`cfr` drop frames that share a pts; output-side `-frames:v` / `-t` make showinfo print
+  frames that are never written. Without `-copyts` every timestamp is shifted by the *format*
+  start_time, which is not the first shown frame's (a mid-GOP mpegts started at 0.5s). So the table
+  is ffprobe's `best_effort_timestamp` in integer ticks, frames are chosen by index (`select`), and
+  every written frame is checked against it through showinfo's integer pts — a selection one frame off
+  fails even on a constant rate, where spacing alone agrees. Never `pts_time` (`%.6g`: 10ms steps past
+  1000s), never frame durations (missing on VFR mp4, 0 in showinfo, 1ms on every mkv frame), never
+  `-ss` (it takes the frame after a time, a player shows the one before).
+- **Frames that share a timestamp are real** (0, 0, 0, 33ms in an mkv). Only the last is ever on screen;
+  the others are dropped and counted (`video.hidden`). Timestamps that go back are refused. A raw
+  elementary stream has none at all (ffmpeg makes them up): refused, with the remux that gives them.
+- **Untagged colour is BT.601 limited** — ffmpeg's default at every size, Chromium's for VP9 at every
+  size, and what ffmpeg's encoder and Playwright's recordVideo write. Chrome guesses BT.709 for untagged
+  H.264 from 720 lines up, which misreads ffmpeg's own default 720p output by 39 levels, so it is not
+  copied; the assumption is recorded and `--color-matrix` / `--color-range` override it. It decides
+  verdicts: an untagged BT.709 `#00ff00`/`#00d700` strobe passes read as BT.601 (green clips, ΔL 0.229
+  → 0.019) and fails read as BT.709 (`flash-video.test.ts`). VP9 always carries its range bit, so only
+  its matrix is ever assumed. Tagged matrix and range: ffmpeg 6.1's own conversion already honours them.
+- **`scale=…:flags=accurate_rnd+full_chroma_int`**: ±1 level (0 on 10-bit); the default errs 2-3, and
+  `accurate_rnd` alone is worse than the default (808080 → 7e7e7e). `format=rgb24` always: a 10-bit
+  source otherwise writes 16-bit PNGs.
+- **Strip the PNG colour chunks** (`setparams=…=unknown`). ffmpeg copies the stream's tags into cICP /
+  cHRM / gAMA and Chromium colour-manages them: grey 808080 showed as 8c8c8c, a SMPTE-170M frame shifted
+  63 levels. vlmkit's decoder reads the bytes, so the judge was right and every strip, crop and sheet a
+  person or model looked at was wrong.
+- **HDR is refused**: ffmpeg passes PQ / HLG code values through as SDR, no tone map, no gamut map.
+- **A GIF / APNG is timed and looped as a browser plays it**, not as ffmpeg decodes it. Chromium 141 and
+  149 hold any frame of 10ms or less for 100ms; ffmpeg gives a GIF's 1cs frame 10ms and an APNG's 0 delay
+  1/15s, and its demuxer delay options changed nothing. ffmpeg decodes one pass; a browser loops. A
+  two-frame black/white GIF looping at 100ms is five flashes a second on screen and one transition in
+  one decoded pass, so it is written for one pass and a second more (every one-second window of a loop),
+  as many passes as it plays, each decoded frame decoded once and copied.
+- **A recording's frames are its whole content**, so `check flash` counts consecutive indices as
+  complete: a pass on 25fps is a real pass, and under 7fps nothing can fail (not "unjudgeable").
+  `check flash rec.mp4` and `scan video` + `check flash frames.json` give the same report (a test holds
+  it). The area is CSS px: `--display-width` (a 160x120 strobe passes at its size, fails at 320 wide).
+- **`snapshot storyboard` refuses a lossy recording without `--lossy`**: it compares pixels exactly and
+  has no noise floor; with `--lossy` SUMMARY.md names the events that begin on a keyframe. A lossless
+  one (ffv1, png, qtrle) is segmented like any capture: a planted glitch and transient come back on
+  their frames.
 
 ## Responsive layout as a property-based test (`check responsive`)
 

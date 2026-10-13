@@ -34,6 +34,7 @@ import type { PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { sniffImageAnimation } from "@mizchi/vlmkit-core/animated-image.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { decodePngBuffer, decodePngPixels, type PngPixels } from "@mizchi/vlmkit-core/png-decode.ts";
+import { isVideoFile, scanVideo, type ScanVideoOptions } from "@mizchi/vlmkit-core/video-decode.ts";
 import type { PngData } from "@mizchi/vlmkit-core/png-utils.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -69,7 +70,9 @@ import { classifyFlash, type MotionSegment } from "@mizchi/vlmkit-judge/flash-mo
 import {
   frameTimeMs,
   parseFramesManifest,
+  type FramesClock,
   type FramesManifest,
+  type FramesVideo,
   type UnmeasuredRegion,
 } from "@mizchi/vlmkit-judge/frames.ts";
 import type { Box } from "@mizchi/vlmkit-judge/storyboard.ts";
@@ -92,8 +95,16 @@ const VERIFY_EVERY = 10;
 const MEDIA_EVERY = 30;
 
 export interface FlashCheckOptions extends PageLoadOptions {
-  /** A page (html file or URL), or a `frames.json` to judge again. */
+  /** A page (html file or URL), a `frames.json` to judge again, or a recording (`isVideoFile`). */
   source: string;
+  /**
+   * Recording source: how it is decoded (with the user's own ffmpeg, `scanVideo`) and how big it is
+   * shown. `framesDir` keeps the decoded frames; without it they go to a temporary directory.
+   */
+  video?: Pick<
+    ScanVideoOptions,
+    "selection" | "displayWidth" | "maxFrames" | "stream" | "ffmpeg" | "ffprobe" | "colorMatrix" | "colorRange"
+  >;
   viewport?: { width: number; height: number };
   /** Page source: the span of page time swept, in ms. */
   windowMs?: number;
@@ -160,13 +171,15 @@ export interface FlashTrackReport {
 export interface FlashReport {
   format: typeof FLASH_FORMAT;
   source: {
-    kind: "page" | "frames";
+    kind: "page" | "frames" | "video";
     path: string;
     url?: string;
     viewport: { width: number; height: number };
     cssPerPx: number;
-    clock: "held" | "wall";
+    clock: FramesClock;
     manifest?: string;
+    /** A recording's decoding: codec, decoder, colour, which frames. */
+    video?: FramesVideo;
   };
   /** Every number the verdict rests on, printed so a reader sees each assumption. */
   criteria: {
@@ -188,7 +201,10 @@ export interface FlashReport {
     frames: number;
     spanMs: number;
     maxGapMs: number;
-    /** Every frame of the span is present (a held-clock 60fps sequence, every capture stable). */
+    /**
+     * Every frame of the span is present: a held-clock 60fps sequence, every capture stable, or a
+     * recording's frames with none of the stream's left out between the first and the last.
+     */
     complete: boolean;
     /** Some one-second window holds the 7 frames a failure needs. */
     judgeable: boolean;
@@ -987,7 +1003,7 @@ function judge(
   times: readonly number[],
   cssPerPx: number,
   unmeasured: readonly UnmeasuredRegion[],
-  sampling: { still: boolean },
+  sampling: { still: boolean; wholeStream?: boolean },
 ): {
   general: FlashTrackReport;
   red: FlashTrackReport;
@@ -1006,8 +1022,9 @@ function judge(
     counted.blocks,
   );
   const maxGapMs = times.slice(1).reduce((m, t, i) => Math.max(m, t - times[i]!), 0);
-  // A failure needs 7 transitions inside one window, so 7 frames inside one.
-  let judgeable = sampling.still;
+  // A failure needs 7 transitions inside one window, so 7 frames inside one. A recording with
+  // fewer frames than that in every second cannot show a failure at all: its pass is real.
+  let judgeable = sampling.still || sampling.wholeStream === true;
   for (let k = MAX_TRANSITIONS; k < times.length && !judgeable; k++) {
     if (times[k]! - times[k - MAX_TRANSITIONS]! < WINDOW_MS - 1e-6) judgeable = true;
   }
@@ -1031,11 +1048,19 @@ function judge(
   return { ...tracks, judgeable, maxGapMs, unmeasuredAreaCss2, classifyMs: performance.now() - t0 };
 }
 
-/** Whether a saved sequence is every 60fps frame of its span on the held clock, each shot stable. */
+/**
+ * Whether a saved sequence is every frame of its span, each shot stable: every 60fps frame on the
+ * held clock, or on the stream clock every frame the recording decodes to between the first and the
+ * last kept (consecutive indices). A recording's frames are its whole content, so nothing happened
+ * between two consecutive ones that a display could have shown.
+ */
 export function manifestComplete(manifest: FramesManifest): boolean {
-  if (manifest.source.clock !== "held") return false;
   const frames = manifest.frames;
   if (frames.some((f) => !f.stable)) return false;
+  if (manifest.source.clock === "stream") {
+    return frames.every((f, i) => f.index !== undefined && f.index === frames[0]!.index! + i);
+  }
+  if (manifest.source.clock !== "held") return false;
   const n0 = Math.round((frames[0]!.atMs * 60) / 1000);
   return frames.every((f, i) => Math.abs(f.atMs - frameTimeMs(n0 + i)) < 1e-6);
 }
@@ -1055,6 +1080,12 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
     throw new UsageError("--strip writes one still PNG (never an animation of a failing window): name it .png");
   }
   if (/\.json$/i.test(options.source)) return judgeManifest(options);
+  if (isVideoFile(options.source)) return judgeVideo(options);
+  if (options.video) {
+    throw new UsageError(
+      "--display-width, --from, --to, --stream, --max-frames, --color-matrix, --color-range, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …)",
+    );
+  }
   if (options.windowMs !== undefined && (options.windowMs < WINDOW_MS || options.windowMs > 60_000)) {
     throw new UsageError(
       "--window is the page time to sweep, 1000 to 60000 ms: a failure is more than six transitions within one second",
@@ -1139,8 +1170,40 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
   return options.browser ? run(options.browser) : withBrowser(run);
 }
 
+/**
+ * Decode a recording with the user's own ffmpeg (`scanVideo`) and judge its frames as a saved
+ * sequence: `check flash rec.mp4` is `scan video rec.mp4` then `check flash rec.frames/frames.json`,
+ * the same answer either way.
+ */
+async function judgeVideo(options: FlashCheckOptions): Promise<FlashReport> {
+  if (options.windowMs !== undefined || options.viewport) {
+    throw new UsageError(
+      "a recording is judged over its own frames: --window and --viewport are for a page (--from / --to choose a span, --display-width how big it plays)",
+    );
+  }
+  const keep = options.framesDir ? resolve(options.framesDir) : null;
+  const dir = keep ?? (await mkdtemp(join(tmpdir(), "vlmkit-flash-video-")));
+  try {
+    const t0 = performance.now();
+    const scanned = await scanVideo({ file: options.source, out: dir, ...options.video });
+    const decodeMs = performance.now() - t0;
+    const report = await judgeManifest(
+      { ...options, source: scanned.manifestPath },
+      { kind: "video", path: options.source, keep: keep !== null },
+    );
+    report.timingMs.capture = Math.round(decodeMs);
+    if (keep) report.framesManifest = scanned.manifestPath;
+    return report;
+  } finally {
+    if (!keep) await rm(dir, { recursive: true, force: true });
+  }
+}
+
 /** Judge a saved `frames.json` again, no browser. */
-async function judgeManifest(options: FlashCheckOptions): Promise<FlashReport> {
+async function judgeManifest(
+  options: FlashCheckOptions,
+  as: { kind: "video"; path: string; keep: boolean } | null = null,
+): Promise<FlashReport> {
   const path = resolve(options.source);
   let text: string;
   try {
@@ -1167,17 +1230,20 @@ async function judgeManifest(options: FlashCheckOptions): Promise<FlashReport> {
   const t0 = performance.now();
   const counted = countFiles(files, times, cssPerPx, unmeasured);
   const countMs = performance.now() - t0;
-  const judged = judge(counted, files, times, cssPerPx, unmeasured, { still });
+  const wholeStream = manifest.source.clock === "stream" && complete;
+  const judged = judge(counted, files, times, cssPerPx, unmeasured, { still, wholeStream });
+  const video = manifest.source.video;
   const report: FlashReport = {
     format: FLASH_FORMAT,
     source: {
-      kind: "frames",
-      path: options.source,
+      kind: as?.kind ?? "frames",
+      path: as?.path ?? options.source,
       url: manifest.source.url,
       viewport: manifest.source.viewport,
       cssPerPx,
       clock: manifest.source.clock,
-      manifest: path,
+      ...(as === null || as.keep ? { manifest: path } : {}),
+      ...(video ? { video } : {}),
     },
     criteria: criteria(),
     sampling: {
@@ -1230,7 +1296,7 @@ export function flashHeadline(report: FlashReport): string {
   const s = report.sampling;
   const sampling = s.still
     ? "still: nothing moves under the held clock"
-    : `${s.frames} frames over ${(s.spanMs / 1000).toFixed(1)}s${s.complete ? " @60fps, complete" : ", incomplete"}`;
+    : `${s.frames} frames over ${(s.spanMs / 1000).toFixed(1)}s${s.complete ? (report.source.clock === "stream" ? ", every recorded frame" : " @60fps, complete") : ", incomplete"}`;
   return `${trackLine("general", report.general)} | ${trackLine("red", report.red)} | ${sampling}`;
 }
 
@@ -1280,9 +1346,24 @@ function describeTrack(name: "general" | "red", t: FlashTrackReport, limit: numb
 
 export function formatFlashReport(report: FlashReport, rules?: RuleView): string {
   const s = report.sampling;
+  const v = report.source.video;
   const lines = [
     `check flash: ${report.source.path}`,
     flashHeadline(report),
+    ...(v
+      ? [
+          `recording: ${v.codec}${v.decoder === "import" ? "" : v.lossless ? " (lossless)" : " (lossy)"} decoded by ${v.decoder}, shown at ${report.source.viewport.width}x${report.source.viewport.height} CSS px (${Number(report.source.cssPerPx.toFixed(4))} frame px per CSS px: --display-width sets it)${v.color?.assumed.length ? `; ${v.color.assumed.join(" and ")} not tagged, assumed ${v.color.matrix} ${v.color.range === "tv" ? "limited" : "full"} (--color-matrix / --color-range override)` : ""}${v.fieldOrder ? `; interlaced (${v.fieldOrder}), judged per frame, not per field` : ""}`,
+          ...(v.timing === "browser" && v.loop
+            ? [
+                `recording: timed as a browser plays it (a frame of 10ms or less is held 100ms), looped ${v.loop.passes} pass(es) of ${v.loop.passMs}ms (plays ${v.loop.plays === null ? "forever" : `${v.loop.plays} time(s)`})`,
+              ]
+            : []),
+          ...(v.hidden
+            ? [`recording: ${v.hidden} decoded frame(s) never on screen (sharing a timestamp with the next) left out`]
+            : []),
+          ...(v.color?.notes ?? []).map((n) => `recording: ${n}`),
+        ]
+      : []),
     `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : "incomplete"}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${s.windowMs}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
     ...describeTrack("general", report.general, report.criteria.areaLimitCss2, rules),
     ...describeTrack("red", report.red, report.criteria.areaLimitCss2, rules),

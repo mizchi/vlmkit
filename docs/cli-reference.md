@@ -1034,10 +1034,12 @@ vlmkit check animation <html|url>              # Frame-sampled animation evaluat
                                                # report motion bbox, settle time, infinite animations (VRT
                                                # mask hints), behavioral prefers-reduced-motion parity, and
                                                # uncontrolled motion (rAF/video/GIF) that WAAPI can't pause
-vlmkit check flash <html|url|frames.json>      # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
+vlmkit check flash <html|url|frames.json|video>  # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
                                                # the held clock, per-pixel transitions (ΔL ≥ 0.1, darker
                                                # < 0.8; saturated red), >6 in 1s over >21,824 CSS px² of a
-                                               # 341x256 field fails; motion re-counted (motion-flicker)
+                                               # 341x256 field fails; motion re-counted (motion-flicker).
+                                               # A recording (mp4/webm/mov/mkv/gif) is decoded with YOUR
+                                               # ffmpeg and every frame judged at its own time
 vlmkit check breakpoints <html|url>            # Boundary quickcheck: render at B-1/B/B+1 per discovered
                                                # breakpoint and verify each discrete style property at B
                                                # matches a neighbor — catches off-by-one media queries
@@ -1611,9 +1613,91 @@ is always one still PNG of the track that carries the verdict — an animation o
 a failing window would itself strobe for whoever opens it — and says so when
 nothing flashed. A pass is "no flash measured under these criteria", not a
 certification. Not judged: WCAG's 0.1° exception for fine balanced patterns
-(such patterns are reported), a page's own video, states reached by interaction,
+(such patterns are reported), a page's own video (its file is: `check flash
+rec.mp4`, below), states reached by interaction,
 absolute luminance (HDR), moving-pattern hazards (a grating moving less than half
 its period a frame reads as motion).
+
+#### Recordings — `scan video` (your own decoder)
+
+```bash
+vlmkit scan video rec.mp4                            # every frame → rec.frames/NNNN-t<ms>.png + frames.json
+vlmkit scan video rec.mp4 --from 10s --to 20s        # the frames on screen during that span
+vlmkit scan video rec.webm --at 0..3s/250ms --out k  # the frame on screen at each instant
+vlmkit check flash rec.mp4 --display-width 1280      # = scan video, then check flash rec.frames/frames.json
+vlmkit snapshot strip --manifest rec.frames/frames.json --max-frames 8 --out sheet.png
+vlmkit scan video frames/ --pts frames/pts.txt       # frames another decoder wrote, with their times
+```
+
+vlmkit ships, depends on and downloads **no video decoder**: the ffmpeg builds on
+npm are GPL and pull an 80 MB binary, and Playwright's private one decodes VP8 and
+MJPEG only. `scan video` runs **your** ffmpeg and ffprobe — `--ffmpeg` /
+`--ffprobe`, else `VLMKIT_FFMPEG` / `VLMKIT_FFPROBE`, else the ffprobe beside a
+given ffmpeg, else both on `PATH` — as separate processes with arguments, never a
+shell, and says how to install them when they are missing. Any other decoder
+works through the import form: numbered PNGs (named so they sort in order) plus
+one timestamp in seconds per line, or `--fps` for a constant rate.
+
+The frames are a `vlmkit-frames/1` sequence on the **stream clock**: `atMs` is each
+frame's presentation time from the recording's first frame, a frame is shown
+until the next one's `atMs`, and `index` is its position among the frames the
+recording decodes to (`key` marks keyframes). The frames are the recording's
+whole content, so `check flash` treats every frame of a span as complete — a
+pass on a 25fps recording is a real pass, and one under 7fps cannot fail at all —
+while `--at` leaves gaps and a pass on it is undersampled.
+
+```json
+{ "format": "vlmkit-frames/1",
+  "source": { "tool": "scan video", "url": "file:///…/rec.mp4",
+              "viewport": { "width": 1280, "height": 720 }, "deviceScaleFactor": 1.5,
+              "browser": "ffmpeg 6.1.1", "clock": "stream",
+              "video": { "file": "rec.mp4", "decoder": "ffmpeg 6.1.1", "codec": "h264", "lossless": false,
+                         "streamFrames": 300, "selection": { "kind": "all" },
+                         "color": { "matrix": "bt709", "range": "tv", "transfer": "bt709",
+                                    "primaries": "bt709", "assumed": [] } } },
+  "frames": [ { "n": 0, "file": "0000-t000000.png", "atMs": 0, "stable": true, "index": 0, "key": true },
+              { "n": 1, "file": "0001-t000033.png", "atMs": 33.36666666666667, "stable": true, "index": 1, "key": false } ] }
+```
+
+What is measured rather than trusted:
+
+- **Which frames.** The frame table is ffprobe's decoded frames
+  (`best_effort_timestamp`, which ffmpeg itself gives a decoded frame as its
+  pts). ffmpeg writes the chosen ones by their index (`select`), with `-copyts`,
+  and every frame it writes is checked against the table through `showinfo`:
+  the same count and the same timestamp, so a selection one frame off fails even
+  on a constant rate. `-ss` is never used: it takes the frame after a time where
+  a player shows the one before it. `--from` / `--to` keep every frame on screen
+  at some moment of the span; `--at` keeps the frame on screen at each instant
+  (the last one that began at or before it).
+- **Colour.** A tagged matrix and range are used as tagged. Untagged is read as
+  BT.601 limited — ffmpeg's own default at every size, Chromium's for VP9 at
+  every size, and what ffmpeg's encoder and Playwright's recordVideo write — and
+  said to be assumed; `--color-matrix` / `--color-range` override it. It matters
+  to a verdict: an untagged BT.709 `#00ff00`/`#00d700` strobe passes read as
+  BT.601 (the green clips, ΔL 0.229 → 0.019) and fails read as BT.709. The
+  conversion rounds with `accurate_rnd+full_chroma_int` (±1 level; the default
+  errs by 2-3), always writes 8-bit RGB, and strips the PNG colour chunks
+  ffmpeg would copy from the stream (cICP / cHRM / gAMA), because a browser
+  colour-manages them and showed grey `808080` as `8c8c8c`.
+- **Size.** One frame pixel is one CSS pixel unless `--display-width` says how
+  wide the video plays; `check flash` measures its 341x256 field and 21,824 px²
+  limit in those CSS px, so a 160x120 strobe passes at its own size and fails
+  played at 320px wide. Rotation is applied (ffmpeg's autorotate) and recorded,
+  non-square pixels are resampled square, interlacing is recorded (frames are
+  judged as frames, not fields).
+- **Refused, never black frames**: no video stream (cover art is not one), an HDR
+  transfer (PQ / HLG: ffmpeg passes the code values through as SDR; tone-map to
+  the SDR version you publish first), a stream that changes size, frames without
+  timestamps or out of order, anything the decoder cannot read, and more frames
+  than `--max-frames` (3600 by default, at most 9999: the files are numbered in
+  four digits).
+
+`snapshot storyboard` compares pixels exactly and has no noise floor yet, so it
+refuses frames from a lossy codec (`lossless: false`) unless given `--lossy`, and
+then names the events that begin on a keyframe. A lossless recording (ffv1, png,
+qtrle, …) is segmented like any capture: a planted one-frame glitch and a
+four-frame transient come back on their frames.
 
 #### Visualizing the VRT process — flipbooks + video
 

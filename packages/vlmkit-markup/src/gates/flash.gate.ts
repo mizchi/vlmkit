@@ -8,7 +8,9 @@ import { defineGate, type Finding } from "@mizchi/vlmkit-core/plugin/contract.ts
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { firstPositional, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
+import { parseInstants, type VideoSelection } from "@mizchi/vlmkit-judge/frames.ts";
+import { isVideoFile, MAX_SCAN_FRAMES } from "@mizchi/vlmkit-core/video-decode.ts";
+import { COLOR_MATRICES } from "@mizchi/vlmkit-core/video-frames.ts";
 import {
   flashHeadline,
   flashRate,
@@ -36,7 +38,7 @@ const selectorOf = (t: FlashTrackReport): { selector?: string } => {
 };
 
 const UNMEASURED: Record<string, string> = {
-  video: "<video> paused",
+  video: "<video> paused (its file can be judged: vlmkit check flash <file>)",
   "animated-image": "animated image",
   "unreadable-image": "image whose bytes could not be read (it may animate)",
   uncontrolled: "pixels changing with the clock held",
@@ -104,6 +106,66 @@ function findings(report: FlashReport): Finding[] {
   return out;
 }
 
+/** One time in the frames' grammar (1500, 1.5s, 00:01.500). */
+function oneTime(argv: readonly string[], flag: string): number | undefined {
+  const raw = readFlag(argv, flag);
+  if (raw === undefined) return undefined;
+  const parsed = parseInstants(raw, `--${flag}`);
+  if (parsed.length !== 1) throw new UsageError(`--${flag} takes one time, e.g. --${flag} 1.5s`);
+  return parsed[0]!;
+}
+
+function wholeFlag(
+  argv: readonly string[],
+  flag: string,
+  min: number,
+  max = Number.MAX_SAFE_INTEGER,
+): number | undefined {
+  const raw = readFlag(argv, flag);
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/.test(raw) || Number(raw) < min || Number(raw) > max) {
+    throw new UsageError(
+      `--${flag} expects a whole number from ${min}${max < Number.MAX_SAFE_INTEGER ? ` to ${max}` : ""}, got "${raw}"`,
+    );
+  }
+  return Number(raw);
+}
+
+/** The recording flags, or undefined when none is given. */
+function videoFlags(argv: readonly string[]): FlashCheckOptions["video"] | undefined {
+  const from = oneTime(argv, "from");
+  const to = oneTime(argv, "to");
+  if (from !== undefined && to !== undefined && to < from) throw new UsageError("--to is before --from");
+  const displayWidth = wholeFlag(argv, "display-width", 1);
+  const maxFrames = wholeFlag(argv, "max-frames", 1, MAX_SCAN_FRAMES);
+  const stream = wholeFlag(argv, "stream", 0);
+  const ffmpeg = readFlag(argv, "ffmpeg");
+  const ffprobe = readFlag(argv, "ffprobe");
+  const colorMatrix = readFlag(argv, "color-matrix");
+  if (colorMatrix !== undefined && !COLOR_MATRICES.includes(colorMatrix)) {
+    throw new UsageError(`--color-matrix is one of ${COLOR_MATRICES.join(", ")} (got ${colorMatrix})`);
+  }
+  const colorRange = readFlag(argv, "color-range");
+  if (colorRange !== undefined && colorRange !== "tv" && colorRange !== "pc") {
+    throw new UsageError(`--color-range is tv (limited) or pc (full), got ${colorRange}`);
+  }
+  const selection: VideoSelection | undefined =
+    from !== undefined || to !== undefined
+      ? { kind: "span", fromMs: from ?? 0, toMs: to ?? Number.MAX_SAFE_INTEGER }
+      : undefined;
+  const out = {
+    ...(selection ? { selection } : {}),
+    ...(displayWidth !== undefined ? { displayWidth } : {}),
+    ...(maxFrames !== undefined ? { maxFrames } : {}),
+    ...(stream !== undefined ? { stream } : {}),
+    ...(ffmpeg !== undefined ? { ffmpeg } : {}),
+    ...(ffprobe !== undefined ? { ffprobe } : {}),
+    ...(colorMatrix !== undefined ? { colorMatrix } : {}),
+    ...(colorRange !== undefined ? { colorRange: colorRange as "tv" | "pc" } : {}),
+  };
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export const flashGate = defineGate<FlashReport, FlashCheckOptions>({
   id: "check.flash",
   command: ["check", "flash"],
@@ -133,6 +195,13 @@ bytes cannot be read may animate, and pixels that change between two shots of
 one held instant are not judged: they are reported, and when they — alone, or
 with what flashes beside them — cover more than the limit in one field, the
 verdict is "not judgeable", never a pass.
+
+A recording (mp4, webm, mov, mkv, gif, …) is decoded with YOUR ffmpeg and
+ffprobe (vlmkit ships no decoder; --ffmpeg or VLMKIT_FFMPEG point at them) and
+every frame it holds is judged at its own presentation time — the same as
+\`vlmkit scan video\` then \`check flash <dir>/frames.json\`. Its area is in CSS
+px: one frame pixel per CSS px unless \`--display-width px\` says how wide it
+plays; \`--from\` / \`--to\` judge a span.
 
 \`--window ms\` (default from the page's animations and timers, 2-10s; 1-60s when
 given) sets the span swept;
@@ -180,9 +249,9 @@ A pass is "no flash measured under these criteria", not a certification.`,
   inputs: [
     {
       name: "source",
-      placeholder: "html-or-url-or-frames.json",
+      placeholder: "html-or-url-or-frames.json-or-video",
       kind: "path-or-url",
-      description: "Page to check, or a frames.json (vlmkit-frames/1) to judge again",
+      description: "Page to check, a frames.json (vlmkit-frames/1) to judge again, or a recording",
       positional: 0,
       required: true,
     },
@@ -206,13 +275,67 @@ A pass is "no flash measured under these criteria", not a certification.`,
       kind: "path",
       description: "One still image of the worst window's transitions, cropped to its field",
     },
+    {
+      name: "display-width",
+      placeholder: "px",
+      kind: "string",
+      description: "Recording: the width it plays at, in CSS px",
+      defaultDescription: "one frame pixel per CSS px",
+    },
+    { name: "from", placeholder: "t", kind: "string", description: "Recording: judge from this time (1.5s, 1500)" },
+    { name: "to", placeholder: "t", kind: "string", description: "Recording: judge up to this time" },
+    {
+      name: "max-frames",
+      placeholder: "n",
+      kind: "string",
+      description: "Recording: refuse more frames than this",
+      defaultDescription: "3600",
+    },
+    { name: "stream", placeholder: "index", kind: "string", description: "Recording: which video stream" },
+    {
+      name: "color-matrix",
+      placeholder: "m",
+      kind: "string",
+      description: "Recording: the YUV matrix (bt601, bt709, bt2020, …)",
+      defaultDescription: "the stream's tag, else bt601",
+    },
+    {
+      name: "color-range",
+      placeholder: "tv|pc",
+      kind: "string",
+      description: "Recording: limited (tv) or full (pc) range",
+      defaultDescription: "the stream's tag, else tv",
+    },
+    {
+      name: "ffmpeg",
+      placeholder: "path",
+      kind: "path",
+      description: "Recording: your ffmpeg",
+      defaultDescription: "VLMKIT_FFMPEG, else ffmpeg on PATH",
+    },
+    {
+      name: "ffprobe",
+      placeholder: "path",
+      kind: "path",
+      description: "Recording: your ffprobe",
+      defaultDescription: "VLMKIT_FFPROBE, else beside --ffmpeg, else on PATH",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check flash <html-or-url | frames.json>", [
+    const source = firstPositional(argv, "vlmkit check flash <html-or-url | frames.json | recording>", [
       "--window",
       "--frames",
       "--strip",
+      "--display-width",
+      "--from",
+      "--to",
+      "--max-frames",
+      "--stream",
+      "--ffmpeg",
+      "--ffprobe",
+      "--color-matrix",
+      "--color-range",
       ...PAGE_LOAD_VALUE_FLAGS,
     ]);
     const rawWindow = readFlag(argv, "window");
@@ -238,8 +361,20 @@ A pass is "no flash measured under these criteria", not a certification.`,
         "a frames.json is judged as it was captured: --window, --frames and --viewport are for a page",
       );
     }
+    const video = videoFlags(argv);
+    if (video && !isVideoFile(source)) {
+      throw new UsageError(
+        `--display-width, --from, --to, --max-frames, --stream, --color-matrix, --color-range, --ffmpeg and --ffprobe are for a recording (mp4, webm, mov, mkv, gif, …), not ${source}`,
+      );
+    }
+    if (isVideoFile(source) && (windowMs !== undefined || viewport)) {
+      throw new UsageError(
+        "a recording is judged over its own frames: --window and --viewport are for a page (--from / --to choose a span, --display-width how wide it plays)",
+      );
+    }
     return {
       source,
+      ...(video ? { video } : {}),
       ...(windowMs !== undefined ? { windowMs } : {}),
       ...(framesDir ? { framesDir } : {}),
       ...(stripPath ? { stripPath } : {}),
