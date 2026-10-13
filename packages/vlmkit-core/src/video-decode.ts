@@ -18,11 +18,22 @@
  * - Every frame is the same size, or the recording is refused.
  */
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  accessSync,
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  openSync,
+  readFileSync,
+  readSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import { copyFile, mkdir, mkdtemp, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
+import { WINDOW_MS } from "@mizchi/vlmkit-judge/flash.ts";
 import {
   FRAMES_FORMAT,
   frameFileName,
@@ -31,7 +42,7 @@ import {
   type FramesVideo,
   type VideoSelection,
 } from "@mizchi/vlmkit-judge/frames.ts";
-import { imageTiming } from "./image-timing.ts";
+import { browserDelayMs, gifCompositingProblem, imageTiming } from "./image-timing.ts";
 import {
   chooseFrames,
   colorPlan,
@@ -42,8 +53,11 @@ import {
   parseFrameTable,
   parseShowinfoLine,
   pickVideoStream,
+  recordingEndMs,
+  rotationFilters,
   videoTimeline,
   type ProbedFrame,
+  type SelectionRequest,
   type ShowinfoFrame,
   type VideoStream,
 } from "./video-frames.ts";
@@ -92,11 +106,34 @@ export function isVideoFile(path: string): boolean {
   if (VIDEO_EXTENSIONS.has(ext)) return true;
   if (ext !== ".png" || !existsSync(file)) return false;
   try {
-    const head = readFileSync(file).subarray(0, 1 << 20);
-    const timing = imageTiming(head);
-    return timing?.format === "apng" && timing.storedMs.length > 1;
+    return (apngDeclaredFrames(file) ?? 0) > 1;
   } catch {
     return false;
+  }
+}
+
+/**
+ * An APNG's `acTL` num_frames, read by walking chunk headers (each body seeked over, not read):
+ * the spec puts `acTL` before the first `IDAT`, so a frame of any size before the second `fcTL`
+ * does not hide it. Null for a still PNG or anything that is not a PNG.
+ */
+export function apngDeclaredFrames(file: string): number | null {
+  const fd = openSync(file, "r");
+  try {
+    const head = Buffer.alloc(8);
+    const read = (at: number, length: number) => readSync(fd, head, 0, length, at) === length;
+    if (!read(0, 8) || head.readUInt32BE(0) !== 0x89504e47 || head.readUInt32BE(4) !== 0x0d0a1a0a) return null;
+    let at = 8;
+    for (let chunks = 0; chunks < 100_000 && read(at, 8); chunks++) {
+      const length = head.readUInt32BE(0);
+      const type = head.toString("latin1", 4, 8);
+      if (type === "acTL") return length >= 8 && read(at + 8, 4) ? head.readUInt32BE(0) : null;
+      if (type === "IDAT" || type === "IEND") return null;
+      at += 12 + length;
+    }
+    return null;
+  } finally {
+    closeSync(fd);
   }
 }
 
@@ -124,18 +161,26 @@ interface RunResult {
 /** ffmpeg colours its log when told to (`AV_LOG_FORCE_COLOR`); the escapes split a showinfo line. */
 const ANSI = /\x1b\[[0-9;]*m/g;
 
-/** The decoders still running, killed if vlmkit is: an orphaned ffmpeg kept writing gigabytes. */
+/**
+ * The decoders still running, killed if vlmkit is: an orphaned ffmpeg kept writing gigabytes. The
+ * listeners are there only while one runs: a listener takes away a signal's default action, and a
+ * judge that holds the event loop for a minute then ignored Ctrl-C for that minute (measured).
+ */
 const children = new Set<ReturnType<typeof spawn>>();
-let reaping = false;
-function reapOnSignal(): void {
-  if (reaping) return;
-  reaping = true;
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-    process.once(signal, () => {
-      for (const child of children) child.kill("SIGKILL");
-      process.kill(process.pid, signal);
-    });
-  }
+const SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+const onSignal = (signal: NodeJS.Signals) => {
+  for (const child of children) child.kill("SIGKILL");
+  children.clear();
+  for (const s of SIGNALS) process.removeListener(s, onSignal);
+  process.kill(process.pid, signal);
+};
+function track(child: ReturnType<typeof spawn>): void {
+  if (children.size === 0) for (const s of SIGNALS) process.on(s, onSignal);
+  children.add(child);
+}
+function untrack(child: ReturnType<typeof spawn>): void {
+  if (!children.delete(child)) return;
+  if (children.size === 0) for (const s of SIGNALS) process.removeListener(s, onSignal);
 }
 
 /** Run a binary with arguments (no shell); stderr is handed over line by line as it comes. */
@@ -145,8 +190,7 @@ function run(bin: string, args: readonly string[], onLine?: (line: string) => vo
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, AV_LOG_FORCE_NOCOLOR: "1" },
     });
-    children.add(child);
-    reapOnSignal();
+    track(child);
     const out: Buffer[] = [];
     const tail: string[] = [];
     let partial = "";
@@ -164,11 +208,11 @@ function run(bin: string, args: readonly string[], onLine?: (line: string) => vo
       for (const l of lines) line(l);
     });
     child.on("error", (error) => {
-      children.delete(child);
+      untrack(child);
       reject(error);
     });
     child.on("close", (code) => {
-      children.delete(child);
+      untrack(child);
       if (partial) line(partial);
       resolvePromise({ code, stdout: Buffer.concat(out).toString("utf8"), stderr: tail });
     });
@@ -186,6 +230,11 @@ function spawnFailure(error: unknown, bin: string, role: string): never {
   const code = (error as NodeJS.ErrnoException).code;
   if (code === "ENOENT") throw new UsageError(`${role} not found ("${bin}"). ${NO_DECODER}`);
   if (code === "EACCES") throw new UsageError(`${role} "${bin}" is not executable. ${NO_DECODER}`);
+  // Node refuses to spawn a .bat / .cmd without a shell, and this never uses one.
+  if (code === "EINVAL")
+    throw new UsageError(
+      `${role} "${bin}" cannot be run without a shell (a .bat or .cmd shim?): point at the .exe. ${NO_DECODER}`,
+    );
   throw error;
 }
 
@@ -193,23 +242,32 @@ const isPath = (bin: string) => bin.includes("/") || bin.includes("\\");
 
 /**
  * A bare name resolved on PATH, never in the working directory: Windows' own search tries the
- * current directory first, so an `ffmpeg.exe` dropped beside a folder of recordings would run.
+ * current directory first, so an `ffmpeg.exe` dropped beside a folder of recordings would run. Only
+ * absolute entries are searched (`.`, `./`, `bin` are the working directory), and only what a spawn
+ * without a shell can run: on POSIX an executable file (a non-executable one is skipped, as execvp
+ * skips it), on Windows the `.com` / `.exe` libuv runs (not an extensionless npm shim, not a
+ * `.bat`), with a quoted entry unquoted. The path returned is absolute, so nothing searches again.
  */
 export function onPath(
   name: string,
   env: Record<string, string | undefined>,
   platform = process.platform,
 ): string | null {
-  const sep = platform === "win32" ? ";" : ":";
-  const exts = platform === "win32" ? ["", ...(env.PATHEXT ?? ".EXE;.COM").split(";").filter(Boolean)] : [""];
-  for (const dir of (env.PATH ?? env.Path ?? "").split(sep)) {
-    if (!dir || dir === ".") continue;
+  const win = platform === "win32";
+  const sep = win ? ";" : ":";
+  const exts = win ? (/\.[^.\\/]+$/.test(name) ? [""] : [".com", ".exe"]) : [""];
+  const absolute = win ? win32.isAbsolute : posix.isAbsolute;
+  for (const raw of (env.PATH ?? env.Path ?? "").split(sep)) {
+    const dir = win ? raw.replace(/^"(.*)"$/, "$1") : raw;
+    if (!dir || !absolute(dir)) continue;
     for (const ext of exts) {
       const candidate = join(dir, name + ext);
       try {
-        if (statSync(candidate).isFile()) return candidate;
+        if (!statSync(candidate).isFile()) continue;
+        if (!win) accessSync(candidate, fsConstants.X_OK);
+        return candidate;
       } catch {
-        // not here
+        // not here, or not runnable
       }
     }
   }
@@ -282,6 +340,7 @@ export async function findDecoder(paths: DecoderPaths = {}): Promise<Decoder> {
 /** The decoder's own words for why it failed: its last lines that are not progress noise. */
 const reason = (stderr: readonly string[]): string =>
   stderr
+    .map((l) => l.replace(/^(\[[^\]]* @ [^\]]*\] )?\[(info|warning|error|fatal|panic|verbose)\] /, "$1"))
     .filter((l) => l.trim() && !/showinfo|^\s*(frame=|Stream mapping|Press \[q\])/.test(l))
     .slice(-4)
     .join(" | ")
@@ -295,11 +354,11 @@ export interface ScanVideoOptions extends DecoderPaths {
   file: string;
   /** Where frames and `frames.json` go; default `<recording>.frames/` beside it (`rec.mp4.frames/`). */
   out?: string;
-  selection?: VideoSelection;
+  selection?: SelectionRequest;
   /** The width the video plays at, in CSS px; default its own width (one frame pixel per CSS px). */
   displayWidth?: number;
   maxFrames?: number;
-  /** A video stream's index in the file; default the first that is not cover art. */
+  /** A video stream's index in the file; default the one marked default, else the largest, never cover art. */
   stream?: number;
   /** The YUV matrix to convert with, over the stream's tag or the BT.601 default (`COLOR_MATRICES`). */
   colorMatrix?: string;
@@ -352,10 +411,77 @@ async function prepareOut(dir: string): Promise<void> {
 
 /** Once the new frames are decoded and checked: the previous scan's frames and manifest, never the recording. */
 async function clearPrevious(dir: string, keep: string): Promise<void> {
+  const kept = realpathSync(keep);
   for (const name of await readdir(dir)) {
     const path = join(dir, name);
-    if (path !== keep && (OWN_FRAME.test(name) || name === "frames.json")) await unlink(path);
+    if (!(OWN_FRAME.test(name) || name === "frames.json")) continue;
+    if (realpathSync(path) !== kept) await unlink(path);
   }
+}
+
+const LOCK = ".scan-video.lock";
+
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+};
+
+/**
+ * Make `outDir` this scan's: a directory (refused when the path is a file), not another tool's
+ * sequence, not the place a frame's name would land on the recording itself (renamed over it,
+ * measured: an APNG named `0000-t000000.png` scanned into its own directory became frame 0), and
+ * not another live scan's — a lock file names the scan writing there, and one whose process is
+ * gone is taken over, with the work directories it left.
+ */
+async function claimOut(outDir: string, file: string, shown: string): Promise<{ release(): Promise<void> }> {
+  try {
+    if (existsSync(outDir) && !statSync(outDir).isDirectory())
+      throw new UsageError(`--out ${outDir} is a file, not a directory`);
+    await mkdir(outDir, { recursive: true });
+  } catch (error) {
+    if (error instanceof UsageError) throw error;
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "EEXIST" || code === "ENOTDIR" || code === "EACCES") {
+      throw new UsageError(`cannot make the frames directory ${outDir} (${code}): give --out a directory`);
+    }
+    throw error;
+  }
+  const name = basename(file);
+  if (
+    realpathSync(dirname(file)) === realpathSync(outDir) &&
+    (OWN_FRAME.test(name) || name === "frames.json" || name === LOCK)
+  ) {
+    throw new UsageError(
+      `${shown} is named like a frame scan video writes into ${outDir} (${name}): it would be replaced. Rename it, or give --out another directory`,
+    );
+  }
+  const lockPath = join(outDir, LOCK);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await writeFile(lockPath, `${process.pid}\n`, { flag: "wx" });
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST" || attempt > 0) throw error;
+      const owner = Number.parseInt(readFileSync(lockPath, "utf8"), 10);
+      if (Number.isSafeInteger(owner) && owner !== process.pid && alive(owner)) {
+        throw new UsageError(
+          `another scan (pid ${owner}) is writing into ${outDir}: wait for it, or give --out another directory`,
+        );
+      }
+      await rm(lockPath, { force: true });
+    }
+  }
+  try {
+    await prepareOut(outDir);
+  } catch (error) {
+    await rm(lockPath, { force: true });
+    throw error;
+  }
+  return { release: () => rm(lockPath, { force: true }) };
 }
 
 /** The `select` expression for the decoded frames kept (sorted): runs of consecutive indices become `between`. */
@@ -379,13 +505,24 @@ const label = (instants: readonly number[] | undefined, atMs: number): string | 
     : `at ${instants.map(fmt).join(", ")}`;
 };
 
-/** Lines of the decoder's stderr that say a frame was lost or damaged (it exits 0 on a truncated file). */
-const DECODE_ERROR =
-  /partial file|decoding error|error while decoding|invalid nal unit|corrupt|concealing|missing reference|invalid data found|truncat|end of file/i;
-
-const decodeErrors = (lines: readonly string[]): string[] => [
-  ...new Set(lines.filter((l) => DECODE_ERROR.test(l) && !l.includes("showinfo")).map((l) => l.trim())),
-];
+/**
+ * The lines ffmpeg logged at error level or worse (`-loglevel level+info` tags each line), from the
+ * input's side — the demuxer and the decoder — not the PNG writer's: it exits 0 on a truncated
+ * file. By level, not by wording: Matroska says `File ended prematurely` and HEVC `The cu_qp_delta
+ * 80 is outside the valid range`, which no keyword list held, and a title with "corrupt" in it is
+ * metadata at info level.
+ */
+export function decodeErrors(lines: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const line of lines) {
+    const m = line.match(/^(?:\[([^\]]*?) @ (?:0x)?[0-9a-fA-F]+\] )?\[(error|fatal|panic)\] (.*)$/);
+    if (!m) continue;
+    const context = m[1] ?? "";
+    if (/^(png|image2|out#|Parsed_|auto_scale|swscaler|graph )/.test(context) || /showinfo/.test(context)) continue;
+    out.add(`${context ? `${context}: ` : ""}${m[3]!.trim()}`);
+  }
+  return [...out];
+}
 
 /**
  * Decode `file` with the user's ffmpeg into `out` (`NNNN-t<ms>.png` + `frames.json`). Refuses
@@ -399,6 +536,17 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   if (!existsSync(file)) throw new UsageError(`no such recording: ${shown}`);
   if ((await stat(file)).isDirectory()) {
     throw new UsageError(`${shown} is a directory: to read frames another decoder wrote, give --pts or --fps`);
+  }
+  // Where the frames go is checked before anything is decoded: a file there is a typo, not a decode.
+  const outDir = resolve(options.out ?? defaultFramesDir(file));
+  for (let dir = outDir; ; dir = dirname(dir)) {
+    if (existsSync(dir)) {
+      if (!statSync(dir).isDirectory()) {
+        throw new UsageError(`the frames directory ${outDir} cannot be made: ${dir} is a file. Give --out a directory`);
+      }
+      break;
+    }
+    if (dirname(dir) === dir) break;
   }
   const maxFrames = options.maxFrames ?? DEFAULT_MAX_FRAMES;
   if (!(Number.isSafeInteger(maxFrames) && maxFrames >= 1 && maxFrames <= MAX_SCAN_FRAMES)) {
@@ -429,7 +577,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     "-select_streams",
     String(stream.index),
     "-show_entries",
-    "frame=best_effort_timestamp,pts,key_frame,interlaced_frame,width,height",
+    "frame=best_effort_timestamp,pts,duration,key_frame,interlaced_frame,width,height",
     "-of",
     "json",
     asInput(file),
@@ -454,14 +602,29 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     );
   }
   const notes = [...plan.notes];
-  // Interlaced by the stream's word or the frames' own (a stream can say "tb" over frames that are tff).
-  const interlaced = stream.fieldOrder !== undefined || probedFrames.slice(0, 30).some((f) => f.interlaced);
+  // A GIF's aspect byte and a PNG's pHYs reach ffprobe as a sample aspect ratio, which no browser
+  // applies: an image is laid out at its pixel size (measured: naturalWidth unchanged).
+  const sampleAspect = stream.codec === "gif" || stream.codec === "apng" ? undefined : stream.sampleAspect;
   // A GIF / APNG plays as a browser plays it (its own delays, clamped, looped); a video as stamped.
   const image = stream.codec === "gif" || stream.codec === "apng" ? imageTiming(readFileSync(file)) : null;
-  const asked = options.selection ?? { kind: "all" };
+  const asked: SelectionRequest = options.selection ?? { kind: "all" };
   // A looping image is unrolled as far as the selection reaches, so an instant past one pass is
-  // the frame the loop is on then.
-  const until = asked.kind === "span" ? asked.toMs : asked.kind === "at" ? Math.max(...asked.atMs) : undefined;
+  // the frame the loop is on then; a span with no end, a pass and a second past its start.
+  const passMs = image ? image.storedMs.map(browserDelayMs).reduce((a, b) => a + b, 0) : 0;
+  const until =
+    asked.kind === "span"
+      ? (asked.toMs ?? asked.fromMs + passMs + WINDOW_MS)
+      : asked.kind === "at"
+        ? Math.max(...asked.atMs)
+        : undefined;
+  // Composited as a browser composites it, or another decoder writes the frames: ImageMagick's
+  // coalesce clears a disposed frame to transparent, as a browser does, and flattens it on the page.
+  const importRecipe =
+    `Write every image composited as a browser shows it and import them: magick ${shown} -coalesce -background white -alpha remove frames/%06d.png; ` +
+    `magick identify -format "%T\\n" ${shown} | awk '{printf "%.3f\\n", t/1000; d=$1*10; t+=(d<=10?100:d)}' > frames/pts.txt; ` +
+    "vlmkit scan video frames --pts frames/pts.txt --lossless --every-frame (one pass: the loop's seam is not in it)";
+  const compositing = image ? gifCompositingProblem(image) : null;
+  if (compositing) throw new UsageError(`${shown}: ${compositing}. ${importRecipe}`);
   const imageLine = image ? imageTimeline(probedFrames, image, until) : null;
   if (image && !imageLine) {
     // ffmpeg's GIF demuxer folds an image with no graphic control extension into the one before,
@@ -469,15 +632,26 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     // with no GCE strobes at 5 Hz in Chromium and decoded to one frame). Fewer frames than the
     // browser shows can only miss a flash, so there is nothing sound to judge.
     throw new UsageError(
-      `${shown}: ffmpeg decoded ${probedFrames.length} of the ${image.storedMs.length} images a browser shows (a GIF image with no graphic control extension is merged into the one before). ` +
-        "Write every image another way and import them, e.g. magick " +
-        `${shown} -coalesce frames/%06d.png, with one delay per line in seconds: vlmkit scan video frames --pts delays.txt`,
+      image.format === "apng"
+        ? `${shown}: its acTL declares ${image.declaredFrames} frame(s), it holds ${image.storedMs.length} fcTL and ffmpeg decoded ${probedFrames.length}: which a browser plays is not known. Re-save it with one tool (e.g. apngasm) and scan that`
+        : `${shown}: ffmpeg decoded ${probedFrames.length} of the ${image.storedMs.length} images a browser shows (a GIF image with no graphic control extension is merged into the one before). ${importRecipe}`,
     );
   }
-  const timeline = imageLine ?? videoTimeline(probedFrames, stream.timeBase, shown, { fields: interlaced });
-  if (timeline.fields) {
+  if (image?.declaredFrames !== undefined && image.declaredFrames < probedFrames.length) {
     notes.push(
-      `interlaced${stream.fieldOrder ? ` (${stream.fieldOrder})` : ""}: each frame split into its two fields, line-doubled, at twice the frame rate (woven, a field-rate flicker is a still comb)`,
+      `its acTL declares ${image.declaredFrames} of the ${probedFrames.length} frames it holds: a browser plays the ${image.declaredFrames} declared, and so does this`,
+    );
+  }
+  const fieldPlan = image ? null : fieldSplit(probedFrames, stream);
+  if (fieldPlan?.note) notes.push(fieldPlan.note);
+  const split = fieldPlan?.split;
+  const timeline = imageLine ?? videoTimeline(probedFrames, stream.timeBase, shown, split ? { split } : {});
+  // An interlaced frame is split before it is turned, so the chain turns it, not ffmpeg's autorotate.
+  const rotate = timeline.fields ? rotationFilters(stream) : [];
+  if (rotate === null) {
+    throw new UsageError(
+      `${shown} is interlaced and turned by ${stream.rotation}°, not a quarter turn: its fields cannot be split before it is turned. ` +
+        `Scan it unturned (ffmpeg -display_rotation 0 -i ${shown} -c copy unturned.mkv) or deinterlace it first`,
     );
   }
   if (stream.rotation !== undefined && stream.rotation % 90 !== 0) {
@@ -493,11 +667,21 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     );
   }
   const rows = timeline.rows;
-  const chosen = chooseFrames(rows, asked);
-  // An open-ended span is recorded as far as the recording goes.
+  // A span with no end, or one past the end, is recorded as far as the recording goes.
+  const endMs = image ? until! : recordingEndMs(rows, timeline.endMs);
+  const spanEnd = (toMs: number | undefined, fromMs: number) =>
+    Math.max(fromMs, Math.min(toMs ?? Number.POSITIVE_INFINITY, endMs));
+  const request: SelectionRequest =
+    asked.kind === "span" && image && asked.toMs === undefined ? { ...asked, toMs: until! } : asked;
+  const chosen = chooseFrames(rows, request, timeline.endMs);
   const selection: VideoSelection =
-    asked.kind === "span" && asked.toMs > rows[rows.length - 1]!.atMs
-      ? { ...asked, toMs: rows[rows.length - 1]!.atMs }
+    asked.kind === "span"
+      ? {
+          kind: "span",
+          fromMs: asked.fromMs,
+          toMs: spanEnd(asked.toMs, asked.fromMs),
+          ...(asked.leadInMs !== undefined ? { leadInMs: asked.leadInMs } : {}),
+        }
       : asked;
   if (chosen.length > maxFrames) {
     throw new UsageError(
@@ -508,45 +692,23 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   // The decoded frames the chosen ones are: each decoded once, however many times it is shown.
   const decodedOf = (f: { decoded?: number; index: number }) => f.decoded ?? f.index;
   const needed = [...new Set(chosen.map(decodedOf))].sort((a, b) => a - b);
-  const perFrame = timeline.fields ? 2 : 1;
+  const isSplit = (d: number) => timeline.fields === true && split?.(probedFrames[d]!) === true;
+  // One graph per kind of frame, in one decode: interlaced frames split into fields, the rest whole.
+  const graphs = [
+    { name: "fields", split: true, decoded: needed.filter(isSplit) },
+    { name: "frames", split: false, decoded: needed.filter((d) => !isSplit(d)) },
+  ].filter((g) => g.decoded.length > 0);
   const probeMs = performance.now() - t0;
 
-  const outDir = resolve(options.out ?? defaultFramesDir(file));
-  await mkdir(outDir, { recursive: true });
-  await prepareOut(outDir);
-  const work = await mkdtemp(join(outDir, ".scan-video-"));
+  const lock = await claimOut(outDir, file, shown);
+  let work = "";
   const t1 = performance.now();
   try {
-    const chain = filterChain({
-      select: selectExpression(needed, probedFrames.length),
-      fields: timeline.fields === true,
-      color: plan,
-      ...(stream.alpha ? { alpha: { background } } : {}),
-      sampleAspect: stream.sampleAspect !== undefined,
-    });
-    const written: ShowinfoFrame[] = [];
-    let showTimeBase: { num: number; den: number } | null = null;
-    const stderrAll: string[] = [];
-    const decoded = await run(
-      decoder.ffmpeg,
-      [
-        "-hide_banner",
-        "-nostdin",
-        "-nostats",
-        "-loglevel",
-        "info",
-        // For every scaler ffmpeg inserts itself (an RGB source's conversion), the same rounding.
-        "-sws_flags",
-        "accurate_rnd+full_chroma_int",
-        "-copyts",
-        // libvpx decodes a WebM's alpha; ffmpeg's own VP8/VP9 decoders drop it.
-        ...(stream.alpha === "libvpx" || stream.alpha === "libvpx-vp9" ? ["-c:v", stream.alpha] : []),
-        // One filter graph for the whole stream: rebuilt on a size or format change, `select`'s n
-        // restarted at 0 and picked other frames (measured).
-        "-reinit_filter",
-        "0",
-        "-i",
-        asInput(file),
+    work = await mkdtemp(join(outDir, ".scan-video-"));
+    const outputs: string[] = [];
+    for (const g of graphs) {
+      await mkdir(join(work, g.name));
+      outputs.push(
         "-map",
         `0:${stream.index}`,
         "-an",
@@ -555,7 +717,15 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         "-fps_mode",
         "passthrough",
         "-vf",
-        chain,
+        filterChain({
+          select: selectExpression(g.decoded, probedFrames.length),
+          fields: g.split,
+          ...(rotate.length > 0 ? { rotate } : {}),
+          color: plan,
+          ...(stream.alpha ? { alpha: { background } } : {}),
+          sampleAspect: sampleAspect !== undefined,
+          name: g.name,
+        }),
         "-c:v",
         "png",
         // Unfiltered rows read 3-7x faster than sub/up/paeth; level 1 writes twice as fast as 6.
@@ -567,14 +737,44 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         "0",
         "-f",
         "image2",
-        join(work, "%06d.png").replace(/%(?!06d\.png$)/g, "%%"),
+        join(work, g.name, "%06d.png").replace(/%(?!06d\.png$)/g, "%%"),
+      );
+    }
+    const written = new Map<string, ShowinfoFrame[]>(graphs.map((g) => [g.name, []]));
+    const showTimeBase = new Map<string, { num: number; den: number }>();
+    const stderrAll: string[] = [];
+    const decoded = await run(
+      decoder.ffmpeg,
+      [
+        "-hide_banner",
+        "-nostdin",
+        "-nostats",
+        // Each line carries its level, so the decoder's errors are told from its metadata.
+        "-loglevel",
+        "level+info",
+        // For every scaler ffmpeg inserts itself (an RGB source's conversion), the same rounding.
+        "-sws_flags",
+        "accurate_rnd+full_chroma_int",
+        "-copyts",
+        // libvpx decodes a WebM's alpha; ffmpeg's own VP8/VP9 decoders drop it.
+        ...(stream.alpha === "libvpx" || stream.alpha === "libvpx-vp9" ? ["-c:v", stream.alpha] : []),
+        // One filter graph for the whole stream: rebuilt on a size or format change, `select`'s n
+        // restarted at 0 and picked other frames (measured).
+        "-reinit_filter",
+        "0",
+        ...(rotate.length > 0 ? ["-autorotate", "0"] : []),
+        "-i",
+        asInput(file),
+        ...outputs,
       ],
       (line) => {
         stderrAll.push(line);
         const parsed = parseShowinfoLine(line);
         if (!parsed) return;
-        if ("timeBase" in parsed) showTimeBase ??= parsed.timeBase;
-        else written.push(parsed.frame);
+        const name = ("timeBase" in parsed ? parsed.instance : parsed.frame.instance) ?? graphs[0]!.name;
+        if ("timeBase" in parsed) {
+          if (!showTimeBase.has(name)) showTimeBase.set(name, parsed.timeBase);
+        } else written.get(name)?.push(parsed.frame);
       },
     ).catch((e) => spawnFailure(e, decoder.ffmpeg, "ffmpeg"));
     if (decoded.code !== 0) {
@@ -585,29 +785,35 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
           : `${decoder.ffmpeg} cannot decode ${shown} (${stream.codec}): ${why}`,
       );
     }
-    checkWritten(
-      written,
-      showTimeBase,
-      needed.map((d) => probedFrames[d]!),
-      perFrame,
-      stream,
-      shown,
-    );
-    const size = { width: written[0]!.width, height: written[0]!.height };
-    const oddAt = written.findIndex((f) => f.width !== size.width || f.height !== size.height);
-    if (oddAt >= 0) {
-      const odd = written[oddAt]!;
+    for (const g of graphs) {
+      checkWritten(
+        written.get(g.name)!,
+        showTimeBase.get(g.name) ?? null,
+        g.decoded.map((d) => probedFrames[d]!),
+        g.split ? 2 : 1,
+        stream,
+        shown,
+      );
+    }
+    const all = graphs.flatMap((g) => written.get(g.name)!);
+    const size = { width: all[0]!.width, height: all[0]!.height };
+    const odd = all.find((f) => f.width !== size.width || f.height !== size.height);
+    if (odd) {
       throw new UsageError(
-        `${shown} changes size mid-stream (${size.width}x${size.height}, then ${odd.width}x${odd.height} at decoded frame ${needed[Math.floor(oddAt / perFrame)]}): ` +
+        `${shown} changes size mid-stream (${size.width}x${size.height}, then ${odd.width}x${odd.height}): ` +
           "a frame sequence has one size. Scale it to one first: ffmpeg -i in -vf scale=W:H out.mkv",
       );
     }
     const geometry = displayGeometry(size, options.displayWidth);
     await clearPrevious(outDir, file);
     // Each decoded file (a frame, or one of its fields) moves to its last use and is copied before.
-    const position = new Map(needed.map((d, k) => [d, k]));
-    const workFile = (f: { decoded?: number; index: number; field?: 0 | 1 }) =>
-      join(work, `${String(position.get(decodedOf(f))! * perFrame + (f.field ?? 0)).padStart(6, "0")}.png`);
+    const position = new Map(graphs.flatMap((g) => g.decoded.map((d, k) => [d, k] as const)));
+    const workFile = (f: { decoded?: number; index: number; field?: 0 | 1 }) => {
+      const d = decodedOf(f);
+      const fields = isSplit(d);
+      const at = position.get(d)! * (fields ? 2 : 1) + (f.field ?? 0);
+      return join(work, fields ? "fields" : "frames", `${String(at).padStart(6, "0")}.png`);
+    };
     const lastUse = new Map<string, number>();
     chosen.forEach((f, n) => lastUse.set(workFile(f), n));
     const frames: FrameEntry[] = [];
@@ -627,7 +833,16 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         ...(l ? { label: l } : {}),
       });
     }
-    const errors = decodeErrors([...table.stderr, ...stderrAll]);
+    const errors = [...new Set([...table.stderr.map((l) => l.trim()).filter(Boolean), ...decodeErrors(stderrAll)])];
+    // The last frame's own duration when the stream gives it: a recording that ends on a long-held
+    // frame is not short of its stated length.
+    const lastEnd = endMs;
+    const gap = rows.length > 1 ? rows[rows.length - 1]!.atMs - rows[rows.length - 2]!.atMs : 0;
+    if (!image && stream.durationMs !== undefined && lastEnd < stream.durationMs - Math.max(500, 2 * gap)) {
+      notes.push(
+        `the stream says it lasts ${Number((stream.durationMs / 1000).toFixed(3))}s and its frames end at ${Number((lastEnd / 1000).toFixed(3))}s: the file may be cut short`,
+      );
+    }
     const video: FramesVideo = {
       file: shown,
       decoder: decoder.name,
@@ -643,7 +858,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
       ...(timeline.fields ? { fields: true } : {}),
       ...(stream.alpha ? { background } : {}),
       ...(stream.rotation ? { rotation: stream.rotation } : {}),
-      ...(stream.sampleAspect ? { sampleAspect: stream.sampleAspect } : {}),
+      ...(sampleAspect ? { sampleAspect } : {}),
       ...(stream.fieldOrder ? { fieldOrder: stream.fieldOrder } : {}),
       ...(notes.length ? { notes } : {}),
       ...(errors.length ? { decodeErrors: errors.slice(0, 20) } : {}),
@@ -670,8 +885,57 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
       timingMs: { probe: Math.round(probeMs), decode: Math.round(performance.now() - t1) },
     };
   } finally {
-    await rm(work, { recursive: true, force: true });
+    if (work) await rm(work, { recursive: true, force: true });
+    await lock.release();
   }
+}
+
+/** Codecs whose decoder flags each frame interlaced or progressive (0 is said, not left unsaid). */
+const FRAME_FLAGGED_CODECS = new Set([
+  "h264",
+  "hevc",
+  "mpeg2video",
+  "mpeg1video",
+  "mpeg4",
+  "vc1",
+  "wmv3",
+  "dvvideo",
+  "prores",
+  "dnxhd",
+]);
+
+/**
+ * Which decoded frames are two fields. The frames' own flag decides, per frame: a stream can start
+ * progressive and turn interlaced (a broadcast capture: 50 woven frames read as one still comb),
+ * and a container's field-order tag can sit over frames coded progressive (split, every 1px row
+ * of detail strobed at field rate). Only a codec whose frames carry no flag at all is split by the
+ * stream's tag.
+ */
+function fieldSplit(
+  frames: readonly ProbedFrame[],
+  stream: VideoStream,
+): { split?: (f: ProbedFrame) => boolean; note?: string } {
+  const flagged = frames.filter((f) => f.interlaced).length;
+  const order = stream.fieldOrder ? ` (${stream.fieldOrder})` : "";
+  const how =
+    "split into its two fields, line-doubled, at twice the frame rate (woven, a field-rate flicker is a still comb)";
+  if (flagged === frames.length) return { split: () => true, note: `interlaced${order}: each frame ${how}` };
+  if (flagged > 0) {
+    return {
+      split: (f) => f.interlaced === true,
+      note: `${flagged} of ${frames.length} frames flagged interlaced: each ${how}; the progressive ones are one frame each`,
+    };
+  }
+  if (!stream.fieldOrder) return {};
+  if (FRAME_FLAGGED_CODECS.has(stream.codec)) {
+    return {
+      note: `the stream is tagged ${stream.fieldOrder}, but ${stream.codec} decodes every frame as progressive: not split`,
+    };
+  }
+  return {
+    split: () => true,
+    note: `interlaced${order} by the stream's tag (${stream.codec} frames carry no flag of their own): each frame ${how}`,
+  };
 }
 
 /**
@@ -764,6 +1028,28 @@ export async function importFrames(
     throw new UsageError(
       "frames another decoder wrote need their times: give --pts <file> or --fps <rate>, one of them",
     );
+  }
+  // An import writes frames.json beside the frames: never over a sequence it did not write, which
+  // a later decode into the directory would then take for its own and clear.
+  const existing = join(dir, "frames.json");
+  if (existsSync(existing)) {
+    let source: { tool?: unknown; video?: { decoder?: unknown } } | undefined;
+    try {
+      source = (JSON.parse(readFileSync(existing, "utf8")) as { source?: typeof source }).source;
+    } catch {
+      source = undefined;
+    }
+    if (source?.tool !== "scan video" || source.video?.decoder !== "import") {
+      const what =
+        typeof source?.tool !== "string"
+          ? "a frames.json scan video did not write"
+          : source.tool === "scan video"
+            ? "a recording scan video decoded"
+            : source.tool;
+      throw new UsageError(
+        `${options.dir} already holds a sequence (${what}); importing would replace its frames.json. Import a directory of the decoder's own frames`,
+      );
+    }
   }
   const names = (await readdir(dir))
     .filter((n) => /\.png$/i.test(n))

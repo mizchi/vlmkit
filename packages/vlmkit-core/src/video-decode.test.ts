@@ -14,8 +14,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,8 +26,12 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
 import { parseFramesManifest } from "@mizchi/vlmkit-judge/frames.ts";
+import { encodeApng } from "./apng.ts";
+import { encodeGif } from "./gif.ts";
 import { decodePngPixels } from "./png-decode.ts";
 import {
+  apngDeclaredFrames,
+  decodeErrors,
   defaultFramesDir,
   findDecoder,
   importFrames,
@@ -573,8 +580,19 @@ describe("scanVideo: what review found, held", () => {
       "apng",
       named,
     );
-    await scanVideo({ file: named, out: inside });
-    assert.ok(existsSync(named), "the recording is still there");
+    const bytes = readFileSync(named);
+    // Its frame 0 would be renamed over it: refused before anything is written, also through a symlink.
+    await assert.rejects(scanVideo({ file: named, out: inside }), /named like a frame scan video writes/);
+    const link = join(dir, "inside-link");
+    symlinkSync(inside, link);
+    await assert.rejects(scanVideo({ file: named, out: link }), /named like a frame scan video writes/);
+    assert.deepEqual(readFileSync(named), bytes, "the recording is byte for byte what it was");
+    assert.deepEqual(readdirSync(inside), ["0000-t000000.png"]);
+    // Named otherwise, it is scanned into its own directory and left as it was.
+    const renamed = join(inside, "anim.png");
+    renameSync(named, renamed);
+    await scanVideo({ file: renamed, out: inside });
+    assert.deepEqual(readFileSync(renamed), bytes);
     const other = join(dir, "other");
     mkdirSync(other, { recursive: true });
     writeFileSync(
@@ -745,8 +763,413 @@ describe("scanVideo: what review found, held", () => {
     assert.notEqual(defaultFramesDir("clip.mp4"), defaultFramesDir("clip.webm"));
     const bin = join(dir, "pathbin");
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, "ffmpeg.EXE"), "");
-    assert.equal(onPath("ffmpeg", { PATH: `.;${bin}`, PATHEXT: ".EXE" }, "win32"), join(bin, "ffmpeg.EXE"));
+    writeFileSync(join(bin, "ffmpeg.exe"), "");
+    assert.equal(onPath("ffmpeg", { PATH: `.;${bin}` }, "win32"), join(bin, "ffmpeg.exe"));
     assert.equal(onPath("ffmpeg", { PATH: "." }, "linux"), null, "the working directory is never searched");
+    // Windows: a quoted entry is unquoted; an npm shim (no extension) and a .cmd are not what a
+    // spawn without a shell runs, so the search goes on to the .exe.
+    const shim = join(dir, "pathshim");
+    mkdirSync(shim, { recursive: true });
+    writeFileSync(join(shim, "ffmpeg"), "");
+    writeFileSync(join(shim, "ffmpeg.cmd"), "");
+    assert.equal(onPath("ffmpeg", { Path: `${shim};"${bin}"` }, "win32"), join(bin, "ffmpeg.exe"));
+    // POSIX: `./`, `./.` and relative entries are the working directory; a file that is not
+    // executable is skipped, as execvp skips it.
+    const posix = join(dir, "pathposix");
+    const plain = join(dir, "pathplain");
+    mkdirSync(posix, { recursive: true });
+    mkdirSync(plain, { recursive: true });
+    writeFileSync(join(posix, "ffmpeg"), "#!/bin/sh\n");
+    chmodSync(join(posix, "ffmpeg"), 0o755);
+    writeFileSync(join(plain, "ffmpeg"), "notes\n");
+    chmodSync(join(plain, "ffmpeg"), 0o644);
+    for (const rel of ["./", "./.", "bin"]) {
+      assert.equal(onPath("ffmpeg", { PATH: `${rel}:${posix}` }, "linux"), join(posix, "ffmpeg"), rel);
+    }
+    assert.equal(onPath("ffmpeg", { PATH: `${plain}:${posix}` }, "linux"), join(posix, "ffmpeg"));
   });
 });
+
+/** The CRC a PNG chunk carries: over its type and data. */
+function pngCrc(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (const b of bytes) {
+    c ^= b;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** A PNG chunk, with its length and CRC. */
+function pngChunk(type: string, data: Uint8Array): Buffer {
+  const out = Buffer.alloc(12 + data.length);
+  out.writeUInt32BE(data.length, 0);
+  out.write(type, 4, "latin1");
+  Buffer.from(data).copy(out, 8);
+  out.writeUInt32BE(pngCrc(out.subarray(4, 8 + data.length)), 8 + data.length);
+  return out;
+}
+
+const level = (width: number, height: number, v: number) => ({
+  width,
+  height,
+  data: new Uint8Array(width * height * 4).map((_, i) => (i % 4 === 3 ? 255 : v)),
+});
+
+/** The centre pixel's red channel of a written frame. */
+const centre = (png: string): number => {
+  const px = decodePngPixels(readFileSync(png));
+  return px.data[((px.height >> 1) * px.width + (px.width >> 1)) * px.channels]!;
+};
+
+describe("scanVideo: what the second review found, held", () => {
+  test("decodeErrors: by level, from the input's side — never the metadata, never the PNG writer", () => {
+    assert.deepEqual(
+      decodeErrors([
+        "[info] Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'file:/rec/corrupt-cases/clean.mp4':",
+        "[info]     title           : Truncated ending (director's cut)",
+        "[matroska,webm @ 0x55d7] [error] File ended prematurely",
+        "[hevc @ 0x5575] [error] The cu_qp_delta 80 is outside the valid range [-26, 25].",
+        "[hevc @ 0x5575] [warning] Error parsing NAL unit #0.",
+        "[png @ 0x1] [error] something about the output",
+        "[showinfo@frames @ 0x2] [info] n: 0 pts: 0 s:64x48",
+      ]),
+      ["matroska,webm: File ended prematurely", "hevc: The cu_qp_delta 80 is outside the valid range [-26, 25]."],
+    );
+  });
+
+  test("a truncated WebM keeps the demuxer's error; a clean file named and titled like damage has none", async () => {
+    const whole = join(dir, "r2-whole.webm");
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=160x120:r=25:d=2", "-c:v", "libvpx-vp9", "-b:v", "300k", whole);
+    const cut = join(dir, "r2-cut.webm");
+    const bytes = readFileSync(whole);
+    writeFileSync(cut, bytes.subarray(0, bytes.length >> 1));
+    const truncated = await scanVideo({ file: cut, out: join(dir, "r2-cut.frames") });
+    assert.ok(
+      truncated.manifest.source.video!.decodeErrors?.some((l) => /File ended prematurely/.test(l)),
+      JSON.stringify(truncated.manifest.source.video!.decodeErrors),
+    );
+    assert.ok(truncated.manifest.source.video!.notes?.some((n) => /says it lasts 2s .* may be cut short/.test(n)));
+    mkdirSync(join(dir, "corrupt-cases"), { recursive: true });
+    const clean = join(dir, "corrupt-cases", "truncated-end-of-file.mp4");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=s=64x48:r=25:d=0.4",
+      "-c:v",
+      "libx264",
+      "-metadata",
+      "title=Truncated ending (director's cut), corrupt partial file",
+      clean,
+    );
+    const ok = await scanVideo({ file: clean, out: join(dir, "r2-clean.frames") });
+    assert.equal(ok.manifest.source.video!.decodeErrors, undefined);
+  });
+
+  test("the signal listeners are there only while a decoder runs", async () => {
+    const before = SIGNALS.map((s) => process.listenerCount(s));
+    await scanVideo({ file: numbered("r2-sig.mp4", { frames: 3 }), out: join(dir, "r2-sig.frames") });
+    assert.deepEqual(
+      SIGNALS.map((s) => process.listenerCount(s)),
+      before,
+    );
+  });
+
+  test("the output directory: a file there is refused before decoding; another live scan's lock is refused, a dead one's taken over", async () => {
+    const rec = numbered("r2-out.mp4", { frames: 3 });
+    const file = join(dir, "r2-a-file");
+    writeFileSync(file, "x");
+    await assert.rejects(
+      scanVideo({ file: rec, out: file, ffmpeg: join(dir, "no-such-ffmpeg") }),
+      /r2-a-file is a file/,
+      "checked before the decoder is even looked for",
+    );
+    await assert.rejects(scanVideo({ file: rec, out: join(file, "x") }), /is a file/);
+    const out = join(dir, "r2-locked");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, ".scan-video.lock"), `${process.ppid}\n`);
+    await assert.rejects(scanVideo({ file: rec, out }), /another scan \(pid \d+\) is writing into/);
+    writeFileSync(join(out, ".scan-video.lock"), "999999999\n");
+    mkdirSync(join(out, ".scan-video-stale"), { recursive: true });
+    await scanVideo({ file: rec, out });
+    assert.deepEqual(readdirSync(out).sort(), [
+      "0000-t000000.png",
+      "0001-t000033.png",
+      "0002-t000067.png",
+      "frames.json",
+    ]);
+  });
+
+  test("an import never writes over a sequence it did not write", async () => {
+    const held = join(dir, "r2-held");
+    mkdirSync(held, { recursive: true });
+    writeFileSync(join(held, "0000-t000000.png"), encodeApng([level(4, 4, 0)]));
+    writeFileSync(
+      join(held, "frames.json"),
+      JSON.stringify({ format: "vlmkit-frames/1", source: { tool: "check flash" }, frames: [] }),
+    );
+    await assert.rejects(importFrames({ dir: held, fps: 60 }), /already holds a sequence \(check flash\)/);
+    const decoded = join(dir, "r2-decoded");
+    await scanVideo({ file: numbered("r2-dec.mp4", { frames: 3 }), out: decoded });
+    await assert.rejects(importFrames({ dir: decoded, fps: 30 }), /a recording scan video decoded/);
+  });
+
+  test("a GIF ffmpeg composites otherwise than a browser is refused, with how to write it as a browser shows it", async () => {
+    const palette = [
+      [0, 0, 0],
+      [255, 255, 255],
+    ] as const;
+    const disposed = join(dir, "r2-disposed.gif");
+    writeFileSync(
+      disposed,
+      encodeGif({
+        width: 40,
+        height: 40,
+        palette,
+        loop: 0,
+        frames: [
+          { pixels: 0, disposal: 2 },
+          { pixels: 1, width: 1, height: 1 },
+        ],
+      }),
+    );
+    await assert.rejects(
+      scanVideo({ file: disposed, out: join(dir, "r2-disposed.frames") }),
+      /disposed to background with no transparent colour.*magick .* -coalesce -background white -alpha remove/s,
+    );
+    const first = join(dir, "r2-first.gif");
+    writeFileSync(
+      first,
+      encodeGif({
+        width: 40,
+        height: 40,
+        palette,
+        loop: 0,
+        frames: [{ pixels: 1, width: 4, height: 4 }, { pixels: 1 }],
+      }),
+    );
+    await assert.rejects(
+      scanVideo({ file: first, out: join(dir, "r2-first.frames") }),
+      /does not cover the 40x40 logical screen/,
+    );
+    // Its aspect byte is not applied: a browser lays a GIF out at its pixel size.
+    const aspect = join(dir, "r2-aspect.gif");
+    writeFileSync(
+      aspect,
+      encodeGif({ width: 40, height: 30, palette, loop: 0, aspectByte: 113, frames: [{ pixels: 0 }, { pixels: 1 }] }),
+    );
+    const scanned = await scanVideo({ file: aspect, out: join(dir, "r2-aspect.frames") });
+    assert.deepEqual(scanned.manifest.source.viewport, { width: 40, height: 30 });
+    assert.equal(scanned.manifest.source.video!.sampleAspect, undefined);
+    // A span with no end on a forever loop runs a pass and a second past its start.
+    const open = await scanVideo({
+      file: aspect,
+      out: join(dir, "r2-open.frames"),
+      selection: { kind: "span", fromMs: 500 },
+    });
+    const selection = open.manifest.source.video!.selection;
+    assert.equal(selection.kind === "span" && selection.toMs, 500 + 200 + 1000);
+    assert.equal(open.manifest.frames[0]!.atMs, 500);
+    assert.equal(open.manifest.frames[open.manifest.frames.length - 1]!.atMs, 1700);
+  });
+
+  test("an APNG named .png is sniffed by its acTL, however large its first frame or what comes before", async () => {
+    // A noisy 800x800 first frame deflates to more than 1 MiB, so the second fcTL is past it.
+    let seed = 7;
+    const noise = {
+      width: 800,
+      height: 800,
+      data: new Uint8Array(800 * 800 * 4).map((_, i) =>
+        i % 4 === 3 ? 255 : (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 24,
+      ),
+    };
+    const big = join(dir, "r2-big.png");
+    writeFileSync(big, encodeApng([noise, level(800, 800, 0)], { delaysMs: [100, 100], loops: 0 }));
+    assert.ok(readFileSync(big).indexOf(Buffer.from("fcTL", "latin1"), 1 << 20) > 0, "the second fcTL is past 1 MiB");
+    assert.ok(isVideoFile(big));
+    assert.equal(apngDeclaredFrames(big), 2);
+    // A large text chunk before acTL.
+    const small = Buffer.from(encodeApng([level(4, 4, 0), level(4, 4, 255)], { loops: 0 }));
+    const text = pngChunk("tEXt", new Uint8Array(1_100_000).fill(0x61));
+    const withText = join(dir, "r2-text.png");
+    writeFileSync(withText, Buffer.concat([small.subarray(0, 33), text, small.subarray(33)]));
+    assert.ok(isVideoFile(withText));
+    const still = join(dir, "r2-still.png");
+    writeFileSync(still, encodeApng([level(4, 4, 0)]));
+    assert.equal(isVideoFile(still), false);
+    // acTL declaring fewer frames than it holds: a browser plays the declared ones.
+    const three = Buffer.from(
+      encodeApng([level(8, 8, 0), level(8, 8, 255), level(8, 8, 128)], { delaysMs: [100, 100, 3000], loops: 0 }),
+    );
+    const actl = three.indexOf(Buffer.from("acTL", "latin1"));
+    three.writeUInt32BE(2, actl + 4);
+    three.writeUInt32BE(pngCrc(three.subarray(actl, actl + 12)), actl + 12);
+    const declared = join(dir, "r2-declared.apng");
+    writeFileSync(declared, three);
+    const two = await scanVideo({ file: declared, out: join(dir, "r2-declared.frames") });
+    assert.equal(two.manifest.source.video!.loop!.passMs, 200);
+    assert.ok(two.manifest.frames.every((f) => centre(join(dir, "r2-declared.frames", f.file)) !== 128));
+    assert.ok(two.manifest.source.video!.notes?.some((n) => /acTL declares 2 of the 3/.test(n)));
+  });
+
+  test("interlaced with non-square pixels: the line-doubling's doubled SAR is undone", async () => {
+    const dv = join(dir, "r2-sd-il.mp4");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=s=720x480:r=30000/1001:d=0.2,setsar=8/9,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      dv,
+    );
+    const r = await scanVideo({ file: dv, out: join(dir, "r2-sd-il.frames") });
+    assert.equal(r.manifest.source.video!.fields, true);
+    assert.deepEqual(r.manifest.source.viewport, { width: 720, height: 540 });
+  });
+
+  test("fields are split frame by frame, by each frame's own flag, not the stream's tag", async () => {
+    // 2s progressive grey, then 2s of an interlaced 50-field black/white strobe, in one mkv.
+    const a = join(dir, "r2-segA.ts");
+    const b = join(dir, "r2-segB.ts");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=gray:s=64x48:r=25:d=1",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-pix_fmt",
+      "yuv444p",
+      "-bf",
+      "0",
+      a,
+    );
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x48:r=50:d=1,geq=lum='16+219*mod(N\\,2)':cb=128:cr=128,tinterlace=mode=interleave_top,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-pix_fmt",
+      "yuv444p",
+      "-bf",
+      "0",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      "-output_ts_offset",
+      "1",
+      b,
+    );
+    const ts = join(dir, "r2-mixed.ts");
+    writeFileSync(ts, Buffer.concat([readFileSync(a), readFileSync(b)]));
+    const mixed = join(dir, "r2-mixed.mkv");
+    ffmpeg("-i", ts, "-c", "copy", mixed);
+    const out = join(dir, "r2-mixed.frames");
+    const r = await scanVideo({ file: mixed, out });
+    const frames = r.manifest.frames;
+    // 25 progressive frames, one row each; 25 interlaced ones, two rows each.
+    assert.equal(frames.length, 25 + 50);
+    assert.ok(r.manifest.source.video!.notes?.some((n) => /25 of 50 frames flagged interlaced/.test(n)));
+    const levels = frames.slice(25, 35).map((f) => centre(join(out, f.file)));
+    assert.deepEqual(levels, [0, 255, 0, 255, 0, 255, 0, 255, 0, 255], "the strobe is at field rate");
+    // A field-order tag over frames coded progressive: 1px stripes stay still, not a field-rate strobe.
+    const stripes = join(dir, "r2-stripes-tagged.mkv");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x48:r=25:d=0.4,geq=lum='16+219*mod(Y\\,2)':cb=128:cr=128",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-pix_fmt",
+      "yuv444p",
+      "-field_order",
+      "tt",
+      stripes,
+    );
+    const tagged = await scanVideo({ file: stripes, out: join(dir, "r2-stripes.frames") });
+    assert.equal(tagged.manifest.source.video!.fields, undefined);
+    assert.equal(tagged.manifest.frames.length, 10);
+    assert.ok(
+      tagged.manifest.source.video!.notes?.some((n) =>
+        /tagged tt, but h264 decodes every frame as progressive/.test(n),
+      ),
+    );
+  });
+
+  test("interlaced and turned: split first, then turned, so a field-rate strobe survives a quarter turn", async () => {
+    const strobe = join(dir, "r2-il-strobe.mp4");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=64x48:r=50:d=0.4,geq=lum='16+219*mod(N\\,2)':cb=128:cr=128,tinterlace=mode=interleave_top,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-pix_fmt",
+      "yuv444p",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      strobe,
+    );
+    const turned = join(dir, "r2-il-strobe-90.mp4");
+    ffmpeg("-display_rotation", "90", "-i", strobe, "-c", "copy", turned);
+    const out = join(dir, "r2-il-90.frames");
+    const r = await scanVideo({ file: turned, out });
+    assert.deepEqual(r.manifest.source.viewport, { width: 48, height: 64 });
+    const levels = r.manifest.frames.slice(0, 6).map((f) => centre(join(out, f.file)));
+    assert.deepEqual(levels, [0, 255, 0, 255, 0, 255]);
+  });
+
+  test("a YUV codec's grey frames are limited-range luma, expanded as a player expands them", async () => {
+    const mono = join(dir, "r2-mono.mp4");
+    ffmpeg(
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=16x16:r=10:d=0.2,format=gray,geq=lum='if(mod(N\\,2)\\,235\\,16)'",
+      "-c:v",
+      "libx265",
+      "-pix_fmt",
+      "gray",
+      "-x265-params",
+      "lossless=1:log-level=error",
+      "-color_range",
+      "tv",
+      mono,
+    );
+    const out = join(dir, "r2-mono.frames");
+    const r = await scanVideo({ file: mono, out });
+    assert.deepEqual(
+      r.manifest.frames.map((f) => centre(join(out, f.file))),
+      [0, 255],
+    );
+    assert.equal(r.manifest.source.video!.color!.matrix, "gray");
+    const full = await scanVideo({ file: mono, out: join(dir, "r2-mono-pc.frames"), colorRange: "pc" });
+    assert.deepEqual(
+      full.manifest.frames.map((f) => centre(join(dir, "r2-mono-pc.frames", f.file))),
+      [16, 235],
+    );
+  });
+});
+
+const SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"] as const;

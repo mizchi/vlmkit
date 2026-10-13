@@ -4,6 +4,8 @@ import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
 import {
   chooseFrames,
   colorPlan,
+  recordingEndMs,
+  rotationFilters,
   displayGeometry,
   filterChain,
   frameAt,
@@ -50,8 +52,31 @@ test("chooseFrames: all, a span by what was on screen, and instants once per fra
   );
   assert.throws(
     () => chooseFrames(rows, { kind: "span", fromMs: 5000, toMs: 6000 }),
-    (e: unknown) => e instanceof UsageError && /after the recording's last frame/.test((e as Error).message),
+    (e: unknown) => e instanceof UsageError && /after the recording ends/.test((e as Error).message),
   );
+  // An instant while the last frame is still on screen is in the recording; no end is to the end.
+  const last = rows[rows.length - 1]!.atMs;
+  assert.deepEqual(
+    chooseFrames(rows, { kind: "span", fromMs: last + 20, toMs: last + 30 }).map((r) => r.index),
+    [29],
+  );
+  assert.equal(recordingEndMs(rows), last + (last - rows[28]!.atMs));
+  assert.deepEqual(
+    chooseFrames(rows, { kind: "span", fromMs: 900 }).map((r) => r.index),
+    [26, 27, 28, 29],
+  );
+});
+
+test("rotationFilters: what ffmpeg 6.1's autorotate inserts, from the display matrix", () => {
+  const m = (a: number, b: number, c: number, d: number) => [a, b, 0, c, d, 0, 0, 0, 1 << 30];
+  assert.deepEqual(rotationFilters({}), []);
+  // -display_rotation 90 (counter-clockwise): ffprobe's rotation 90, theta 270.
+  assert.deepEqual(rotationFilters({ rotation: 90, displayMatrix: m(0, -65536, 65536, 0) }), ["transpose=cclock"]);
+  assert.deepEqual(rotationFilters({ rotation: 90, displayMatrix: m(0, -65536, -65536, 0) }), ["transpose=clock_flip"]);
+  assert.deepEqual(rotationFilters({ rotation: -90, displayMatrix: m(0, 65536, -65536, 0) }), ["transpose=clock"]);
+  assert.deepEqual(rotationFilters({ rotation: 180, displayMatrix: m(-65536, 0, 0, -65536) }), ["hflip", "vflip"]);
+  assert.deepEqual(rotationFilters({ rotation: 180 }), ["hflip", "vflip"]);
+  assert.equal(rotationFilters({ rotation: 45 }), null);
 });
 
 test("displayGeometry: one frame pixel per CSS pixel, or the width it plays at", () => {
@@ -141,7 +166,7 @@ test("videoTimeline: a frame that shares its timestamp with the next is never sh
     [0, 40, 80].map((ticks, index) => ({ index, ticks, key: false })),
     { num: 1, den: 1000 },
     "a.mp4",
-    { fields: true },
+    { split: () => true },
   );
   assert.deepEqual(
     fields.rows.map((r) => [r.decoded, r.field, r.atMs]),
@@ -154,6 +179,23 @@ test("videoTimeline: a frame that shares its timestamp with the next is never sh
       [2, 1, 100],
     ],
   );
+  // A stream that mixes them: only the frames flagged interlaced are two rows.
+  const mixed = videoTimeline(
+    [0, 40, 80].map((ticks, index) => ({ index, ticks, key: false, ...(index === 1 ? { interlaced: true } : {}) })),
+    { num: 1, den: 1000 },
+    "a.mp4",
+    { split: (f) => f.interlaced === true },
+  );
+  assert.deepEqual(
+    mixed.rows.map((r) => [r.decoded, r.field, r.atMs]),
+    [
+      [0, undefined, 0],
+      [1, 0, 40],
+      [1, 1, 60],
+      [2, undefined, 80],
+    ],
+  );
+  assert.equal(mixed.splitFrames, 1);
   assert.throws(
     () =>
       videoTimeline(
@@ -198,6 +240,9 @@ test("filterChain: the measured order of every step", () => {
   const order = [
     "select=",
     "separatefields",
+    "scale=w=iw:h=ih*2:flags=neighbor",
+    // The doubling keeps the display aspect, so it doubled the SAR the expansion reads.
+    "setsar=r=sar/2",
     "scale=in_color_matrix",
     "format=rgba",
     "negate",
@@ -221,6 +266,34 @@ test("filterChain: the measured order of every step", () => {
       "format=rgba,premultiply=inplace=1,format=rgb24",
     ),
   );
+  // A turn the chain does itself comes after the field split; a named graph names its showinfo.
+  const turned = filterChain({
+    select: null,
+    fields: true,
+    rotate: ["transpose=clock"],
+    color,
+    sampleAspect: false,
+    name: "fields",
+  });
+  assert.ok(turned.indexOf("transpose=clock") > turned.indexOf("setsar=r=sar/2"));
+  assert.ok(turned.indexOf("transpose=clock") < turned.indexOf("scale=in_color_matrix"));
+  assert.ok(turned.endsWith("showinfo@fields=checksum=0"));
+});
+
+test("colorPlan: a YUV codec's grey frames are luma, limited unless tagged; a grey PNG is its own levels", () => {
+  const gray = { index: 0, codec: "av1", pixelFormat: "gray", width: 8, height: 8, timeBase: { num: 1, den: 1000 } };
+  const luma = colorPlan(gray, "a.webm");
+  assert.equal(luma.before, "format=yuv444p");
+  assert.match(luma.scale, /in_range=tv/);
+  assert.deepEqual(luma.color.assumed, ["range"]);
+  assert.match(colorPlan({ ...gray, colorRange: "pc" }, "a.webm").scale, /in_range=pc/);
+  assert.match(colorPlan(gray, "a.webm", { range: "pc" }).scale, /in_range=pc/);
+  assert.equal(colorPlan({ ...gray, pixelFormat: "gray10le" }, "a.webm").before, "format=yuv444p16le");
+  const png = colorPlan({ ...gray, codec: "png" }, "a.png");
+  assert.equal(png.scale, "");
+  assert.equal(png.color.matrix, "rgb");
+  const chain = filterChain({ select: null, fields: false, color: luma, sampleAspect: false });
+  assert.ok(chain.startsWith("format=yuv444p,scale=in_color_matrix=bt601:in_range=tv"));
 });
 
 test("colorPlan: a matrix tagged but not convertible is refused, not called untagged", () => {
@@ -258,5 +331,27 @@ test("parseShowinfoLine: only showinfo's own lines, whatever a recording's metad
       "[Parsed_showinfo_3 @ 000001F2A3B4C5D0] n:  12 pts:2000033 pts_time:2000.03 duration:  512 fmt:rgb24 sar:1/1 s:64x48 i:P iskey:0 type:B",
     ),
     { frame: { n: 12, pts: 2000033, width: 64, height: 48, key: false } },
+  );
+  // Two named graphs in one run, each line carrying its level (`-loglevel level+info`).
+  assert.deepEqual(parseShowinfoLine("[showinfo@fields @ 0x55aa] [info] config in time_base: 1/25, frame_rate: 25/1"), {
+    timeBase: { num: 1, den: 25 },
+    instance: "fields",
+  });
+  assert.deepEqual(
+    parseShowinfoLine("[showinfo@frames @ 0x55ab] [info] n:   0 pts:      7 pts_time:0.28 s:64x48 i:P iskey:1 type:I"),
+    { frame: { instance: "frames", n: 0, pts: 7, width: 64, height: 48, key: true } },
+  );
+  assert.equal(parseShowinfoLine("[info]     title           : [showinfo@x @ 0x1] n: 0 pts: 0 s:1x1"), null);
+});
+
+test("imageTimeline: an APNG plays the frames its acTL declares", () => {
+  const decoded = [0, 1, 2].map((index) => ({ index, ticks: index, key: true }));
+  const line = imageTimeline(decoded, { format: "apng", storedMs: [100, 100, 3000], plays: null, declaredFrames: 2 });
+  assert.ok(line);
+  assert.equal(line.loop!.passMs, 200);
+  assert.ok(line.rows.every((r) => r.decoded !== 2));
+  assert.equal(
+    imageTimeline(decoded, { format: "apng", storedMs: [100, 100, 100], plays: null, declaredFrames: 4 }),
+    null,
   );
 });

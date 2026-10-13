@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { encodeApng } from "./apng.ts";
-import { browserDelayMs, imageTiming } from "./image-timing.ts";
+import { encodeGif } from "./gif.ts";
+import { browserDelayMs, gifCompositingProblem, imageTiming } from "./image-timing.ts";
 
 /** The two-frame GIF of fixtures/flash/animated-gif.html (black, then white, 100ms each, looping). */
 const TWO_FRAMES = Buffer.from(
@@ -12,7 +13,9 @@ const TWO_FRAMES = Buffer.from(
 const frame = (level: number) => ({ width: 2, height: 2, data: new Uint8Array(16).fill(level) });
 
 test("imageTiming: a GIF's delays and NETSCAPE loop count", () => {
-  assert.deepEqual(imageTiming(TWO_FRAMES), { format: "gif", storedMs: [100, 100], plays: null });
+  const two = imageTiming(TWO_FRAMES)!;
+  assert.deepEqual([two.format, two.storedMs, two.plays], ["gif", [100, 100], null]);
+  assert.deepEqual(two.gif!.screen, { width: 2, height: 2 });
   // Loop count 3 is played 4 times; no NETSCAPE block at all is once.
   const three = Buffer.from(TWO_FRAMES);
   const at = three.indexOf(Buffer.from("NETSCAPE2.0", "latin1")) + 11 + 2;
@@ -20,7 +23,7 @@ test("imageTiming: a GIF's delays and NETSCAPE loop count", () => {
   assert.equal(imageTiming(three)?.plays, 4);
   const start = TWO_FRAMES.indexOf(Buffer.from([0x21, 0xff]));
   const once = Buffer.concat([TWO_FRAMES.subarray(0, start), TWO_FRAMES.subarray(start + 19)]);
-  assert.deepEqual(imageTiming(once), { format: "gif", storedMs: [100, 100], plays: 1 });
+  assert.equal(imageTiming(once)!.plays, 1);
 });
 
 test("imageTiming: an APNG's delays and plays; a still PNG and a video are not animations", () => {
@@ -29,6 +32,7 @@ test("imageTiming: an APNG's delays and plays; a still PNG and a video are not a
   assert.equal(t?.format, "apng");
   assert.equal(t?.plays, null);
   assert.equal(t?.storedMs.length, 3);
+  assert.equal(t?.declaredFrames, 3);
   assert.ok(Math.abs(t!.storedMs[0]! - 20) < 1 && t!.storedMs[1]! <= 10, `stored ${t?.storedMs}`);
   assert.equal(imageTiming(encodeApng([frame(0), frame(255)], { loops: 2 }))?.plays, 2);
   assert.equal(imageTiming(Buffer.from("not an image")), null);
@@ -51,4 +55,50 @@ test("imageTiming: ANIMEXTS1.0 is a loop block too (Chromium loops it), and APNG
   const stored = imageTiming(apng)!.storedMs;
   assert.ok(stored[0]! <= 10, `stored ${stored[0]}`);
   assert.equal(browserDelayMs(stored[0]!), 100);
+});
+
+test("gifCompositingProblem: where ffmpeg paints the background colour and a browser leaves the page", () => {
+  const palette = [
+    [0, 0, 0],
+    [255, 255, 255],
+  ] as const;
+  const timing = (frames: Parameters<typeof encodeGif>[0]["frames"], background = 0) =>
+    imageTiming(encodeGif({ width: 20, height: 20, palette, background, loop: 0, frames }))!;
+  // Disposed to background with no transparent colour, then a frame that paints one pixel.
+  const disposed = timing([
+    { pixels: 0, disposal: 2 },
+    { pixels: 1, x: 0, y: 0, width: 1, height: 1 },
+  ]);
+  assert.deepEqual(
+    disposed.gif!.images.map((i) => [i.x, i.y, i.width, i.height, i.disposal, i.transparent]),
+    [
+      [0, 0, 20, 20, 2, false],
+      [0, 0, 1, 1, 0, false],
+    ],
+  );
+  assert.match(gifCompositingProblem(disposed)!, /image 0 is disposed to background/);
+  // The same disposal with a transparent colour (ffmpeg clears to transparent too), or a next frame
+  // that paints over all of it opaquely, composites as a browser does.
+  assert.equal(gifCompositingProblem(timing([{ pixels: 0, disposal: 2, transparent: 1 }, { pixels: 1 }])), null);
+  assert.equal(gifCompositingProblem(timing([{ pixels: 0, disposal: 2 }, { pixels: 1 }])), null);
+  assert.match(
+    gifCompositingProblem(
+      timing([
+        { pixels: 0, disposal: 2 },
+        { pixels: 1, transparent: 0 },
+      ]),
+    )!,
+    /does not paint over all of it/,
+  );
+  // A first image that does not cover the logical screen, or reaches past it.
+  assert.match(gifCompositingProblem(timing([{ pixels: 1, width: 1, height: 1 }, { pixels: 1 }]))!, /does not cover/);
+  assert.match(
+    gifCompositingProblem(
+      imageTiming(
+        encodeGif({ width: 10, height: 10, palette, frames: [{ pixels: 0, width: 20, height: 20 }, { pixels: 1 }] }),
+      )!,
+    )!,
+    /reaches past/,
+  );
+  assert.equal(gifCompositingProblem(imageTiming(TWO_FRAMES)!), null);
 });

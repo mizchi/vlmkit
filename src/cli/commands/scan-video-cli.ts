@@ -22,8 +22,8 @@ import {
   scanVideo,
   type ScanVideoResult,
 } from "@mizchi/vlmkit-core/video-decode.ts";
-import { COLOR_MATRICES } from "@mizchi/vlmkit-core/video-frames.ts";
-import { formatInstant, parseInstants, type FramesManifest, type VideoSelection } from "@mizchi/vlmkit-judge/frames.ts";
+import { COLOR_MATRICES, type SelectionRequest } from "@mizchi/vlmkit-core/video-frames.ts";
+import { formatInstant, parseInstants, type FramesManifest } from "@mizchi/vlmkit-judge/frames.ts";
 
 function usage(): string {
   return [
@@ -36,17 +36,18 @@ function usage(): string {
     "Decodes a recording (mp4, webm, mov, mkv, gif, …) into numbered PNGs and a frames.json",
     "(vlmkit-frames/1) giving each frame its presentation time, with YOUR ffmpeg and ffprobe:",
     "vlmkit ships no decoder. Then: vlmkit check flash <dir>/frames.json, snapshot strip --manifest,",
-    "snapshot storyboard (lossless recordings only).",
+    "snapshot storyboard (lossless recordings, or --lossy).",
     "",
     "Options:",
     "  --out <dir>            Where to write (default: <recording>.frames/ beside it, e.g. rec.mp4.frames/)",
-    "  --from <t>, --to <t>   Only the frames on screen during that span (1.5s, 1500, 00:01.500)",
+    "  --from <t>, --to <t>   Only the frames on screen during that span (1.5s, 1500, 00:01.500); no",
+    "                         --to is to the end (a looping GIF / APNG: a pass and a second past --from)",
     "  --at <list>            Only the frame on screen at each instant (0,250,1s or 0..2s/100ms)",
     "  --display-width <px>   The width the video plays at, in CSS px: check flash measures its field",
     "                         and area limit in CSS px (default: one frame pixel per CSS px)",
     `  --max-frames <n>       Refuse more than n frames (default ${DEFAULT_MAX_FRAMES}, at most ${MAX_SCAN_FRAMES})`,
-    "  --stream <index>       Which video stream, by its index in the file (default the first that is",
-    "                         not cover art)",
+    "  --stream <index>       Which video stream, by its index in the file (default the one marked",
+    "                         default, else the largest; never cover art)",
     "  --color-matrix <m>     The YUV matrix to convert with: bt601, bt709, bt2020, … (default the",
     "                         stream's tag, else bt601 — what ffmpeg, Chromium's VP9 and recorders assume)",
     "  --color-range <r>      tv (limited) or pc (full); default the stream's tag, else tv",
@@ -60,8 +61,9 @@ function usage(): string {
     "                         passthrough writes them all); without it a pass on them is not backed",
     "  --json                 Print frames.json to stdout",
     "",
-    "Another decoder works too — write every frame and its time, then import them:",
-    "  ffmpeg -i rec.mp4 -fps_mode passthrough frames/%06d.png",
+    "Another decoder works too — write every frame and its time, then import them (both name the",
+    "same stream, v:0; left to itself ffmpeg writes the largest, and its times would be another's):",
+    "  ffmpeg -i rec.mp4 -map 0:v:0 -fps_mode passthrough frames/%06d.png",
     "  ffprobe -v error -select_streams v:0 -show_entries frame=best_effort_timestamp_time -of csv=p=0 rec.mp4 > frames/pts.txt",
     "  vlmkit scan video frames --pts frames/pts.txt --every-frame",
     "",
@@ -78,7 +80,7 @@ export interface ScanVideoArgs {
   colorRange?: "tv" | "pc";
   background?: "white" | "black";
   out?: string;
-  selection: VideoSelection;
+  selection: SelectionRequest;
   displayWidth?: number;
   maxFrames?: number;
   stream?: number;
@@ -212,11 +214,12 @@ export function parseArgs(argv: string[]): ScanVideoArgs {
     throw new UsageError("--at picks instants and --from / --to a span: give one or the other");
   }
   if (from !== undefined && to !== undefined && to < from) throw new UsageError("--to is before --from");
-  const selection: VideoSelection =
+  // No --to is to the end: a video's last frame, a looping image's first pass and a second past --from.
+  const selection: SelectionRequest =
     at !== undefined
       ? { kind: "at", atMs: at }
       : from !== undefined || to !== undefined
-        ? { kind: "span", fromMs: from ?? 0, toMs: to ?? Number.MAX_SAFE_INTEGER }
+        ? { kind: "span", fromMs: from ?? 0, ...(to !== undefined ? { toMs: to } : {}) }
         : { kind: "all" };
   const isDir = existsSync(source) && statSync(source).isDirectory();
   const imported = out.pts !== undefined || out.fps !== undefined;

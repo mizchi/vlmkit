@@ -5,7 +5,7 @@
  * their output here.
  */
 import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
-import type { FramesVideo, VideoSelection } from "@mizchi/vlmkit-judge/frames.ts";
+import type { FramesVideo } from "@mizchi/vlmkit-judge/frames.ts";
 import { browserDelayMs, type ImageTiming } from "./image-timing.ts";
 
 /**
@@ -36,10 +36,11 @@ export const LOSSLESS_CODECS: ReadonlySet<string> = new Set([
   "flashsv2",
 ]);
 
-/** A decoded frame of the stream: its position, when it is shown (from the first frame) and whether it is a keyframe. */
+/** A decoded frame of the stream: its position, when it is shown and whether it is a keyframe. */
 export interface FrameRow {
   /** Position among the frames the recording shows. */
   index: number;
+  /** When it is shown, on the stream's own timeline (a stream that starts 1.25s in has its first frame at 1250). */
   atMs: number;
   key: boolean;
   /** Which decoded frame it is (its index in the decoder's output), when that differs from `index`. */
@@ -55,6 +56,16 @@ export interface ChosenFrame extends FrameRow {
 
 /** A time within this of a frame's start is that frame's: decimal input against a rational timestamp. */
 const ON_FRAME_MS = 1e-6;
+
+/**
+ * Which frames to keep, as asked: a span with no `toMs` runs to the end (a looping image's end is
+ * the frame on screen a pass and a second past `fromMs`: every window from there on repeats one
+ * before it). `scanVideo` records the end it reached in the manifest's `VideoSelection`.
+ */
+export type SelectionRequest =
+  | { kind: "all" }
+  | { kind: "span"; fromMs: number; toMs?: number; leadInMs?: number }
+  | { kind: "at"; atMs: number[] };
 
 /** The frame on screen at `t`: the last one that began at or before it, or the first frame before any began. */
 export function frameAt(rows: readonly FrameRow[], t: number): number {
@@ -74,18 +85,19 @@ export function frameAt(rows: readonly FrameRow[], t: number): number {
  * The frames a selection keeps, in order. `span` keeps every frame on screen at some moment of
  * [from, to]; `at` keeps the frame on screen at each instant, once, with the instants it answers.
  */
-export function chooseFrames(rows: readonly FrameRow[], selection: VideoSelection): ChosenFrame[] {
+export function chooseFrames(rows: readonly FrameRow[], selection: SelectionRequest, endMs?: number): ChosenFrame[] {
   if (rows.length === 0) return [];
   if (selection.kind === "all") return rows.map((r) => ({ ...r }));
   if (selection.kind === "span") {
-    const last = rows[rows.length - 1]!;
-    if (selection.fromMs > last.atMs + ON_FRAME_MS) {
+    const end = recordingEndMs(rows, endMs);
+    if (selection.fromMs > end + ON_FRAME_MS) {
       throw new UsageError(
-        `--from ${selection.fromMs}ms is after the recording's last frame (${Number(last.atMs.toFixed(3))}ms)`,
+        `--from ${selection.fromMs}ms is after the recording ends (its last frame is on screen until ${Number(end.toFixed(3))}ms)`,
       );
     }
     const from = frameAt(rows, Math.max(0, selection.fromMs - (selection.leadInMs ?? 0)));
-    return rows.slice(from, frameAt(rows, selection.toMs) + 1).map((r) => ({ ...r }));
+    const to = selection.toMs === undefined ? rows.length - 1 : frameAt(rows, selection.toMs);
+    return rows.slice(from, to + 1).map((r) => ({ ...r }));
   }
   const byFrame = new Map<number, number[]>();
   for (const t of selection.atMs) {
@@ -93,6 +105,16 @@ export function chooseFrames(rows: readonly FrameRow[], selection: VideoSelectio
     byFrame.set(k, [...(byFrame.get(k) ?? []), t]);
   }
   return [...byFrame.entries()].sort((a, b) => a[0] - b[0]).map(([k, instants]) => ({ ...rows[k]!, instants }));
+}
+
+/**
+ * When the last frame leaves the screen: `endMs` when the stream says how long it is shown, else
+ * as long after it began as the gap before it (the rate it was shown at), or at once for one frame.
+ */
+export function recordingEndMs(rows: readonly FrameRow[], endMs?: number): number {
+  const last = rows[rows.length - 1]!;
+  if (endMs !== undefined && endMs > last.atMs) return endMs;
+  return rows.length > 1 ? last.atMs + (last.atMs - rows[rows.length - 2]!.atMs) : last.atMs;
 }
 
 /** The largest side a recording is judged at, in CSS px: the judge keeps several arrays per CSS px. */
@@ -129,6 +151,28 @@ export function displayGeometry(
   return { viewport, deviceScaleFactor };
 }
 
+/**
+ * The filters ffmpeg 6.1's own autorotate inserts for a stream's display matrix
+ * (`fftools/ffmpeg_filter.c`), for a chain that has to turn the frames itself — after splitting an
+ * interlaced frame into its fields, which autorotate would otherwise turn first (a quarter turn
+ * makes rows of columns, and a half turn reverses the field order). `[]` for none; null for a turn
+ * that is not a quarter one, which ffmpeg does with `rotate` and black corners.
+ */
+export function rotationFilters(stream: Pick<VideoStream, "rotation" | "displayMatrix">): string[] | null {
+  const m = stream.displayMatrix;
+  if (stream.rotation === undefined && !m) return [];
+  // get_rotation(): the matrix's counter-clockwise angle, negated, in [0, 360).
+  let theta = -Math.round(stream.rotation ?? 0);
+  theta -= 360 * Math.floor(theta / 360 + 0.9 / 360);
+  if (Math.abs(theta - 90) < 1) return [`transpose=${m && m[3]! > 0 ? "cclock_flip" : "clock"}`];
+  if (Math.abs(theta - 180) < 1) {
+    return [...(!m || m[0]! < 0 ? ["hflip"] : []), ...(!m || m[4]! < 0 ? ["vflip"] : [])];
+  }
+  if (Math.abs(theta - 270) < 1) return [`transpose=${m && m[3]! < 0 ? "clock_flip" : "cclock"}`];
+  if (Math.abs(theta) > 1) return null;
+  return m && m[4]! < 0 ? ["vflip"] : [];
+}
+
 /** What ffprobe says about the one video stream that is decoded. */
 export interface VideoStream {
   /** The stream's index in the file (ffprobe's `index`), which `-map 0:<index>` names. */
@@ -149,6 +193,10 @@ export interface VideoStream {
   fieldOrder?: string;
   /** Degrees, from the display matrix (side data) or the legacy `rotate` tag. */
   rotation?: number;
+  /** The display matrix's nine entries (16.16 fixed point, row by row), when the stream has one. */
+  displayMatrix?: number[];
+  /** How long the stream says it lasts (its own duration, or Matroska's DURATION tag), in ms. */
+  durationMs?: number;
   container?: string;
   /**
    * The stream carries transparency: a pixel format with alpha, or a VP8/VP9 WebM whose
@@ -172,9 +220,10 @@ interface ProbeStream {
   color_transfer?: string;
   color_primaries?: string;
   field_order?: string;
+  duration?: string;
   disposition?: { attached_pic?: number; default?: number };
   tags?: Record<string, string>;
-  side_data_list?: { side_data_type?: string; rotation?: number }[];
+  side_data_list?: { side_data_type?: string; rotation?: number; displaymatrix?: string }[];
 }
 
 const stated = (value: string | undefined): string | undefined =>
@@ -192,8 +241,9 @@ const ALPHA_FORMAT = /^(yuva|rgba|bgra|argb|abgr|gbrap|ya8|ya16|pal8$)/;
 
 /**
  * The video stream to decode from `ffprobe -show_streams -show_format -of json`: the one asked for
- * by index, else the one ffmpeg itself would pick (measured): not cover art (`attached_pic`), with
- * a size, the default-disposition one first, then the largest. It is mapped by its absolute index:
+ * by index, else not cover art (`attached_pic`), with a size, the default-disposition one first,
+ * then the largest. That is not ffmpeg's own choice — ffmpeg 6.1 takes a larger non-default stream
+ * over a smaller default one (measured) — but the stream a file marks as the one to play. It is mapped by its absolute index:
  * `-map 0:v:0` is the first by index, which in an mkv can be a one-frame cover track. Refuses a
  * file with none, listing what it holds.
  */
@@ -244,6 +294,24 @@ export function pickVideoStream(probeJson: string, file: string, wanted?: number
   );
   const rotateTag = stream.tags?.rotate !== undefined ? Number(stream.tags.rotate) : undefined;
   const rotation = matrix?.rotation ?? (Number.isFinite(rotateTag) ? rotateTag : undefined);
+  // ffprobe prints it as three `00000000:  a  b  u` rows.
+  const entries = (matrix?.displaymatrix ?? "")
+    .split("\n")
+    .flatMap((row) =>
+      row
+        .replace(/^\s*[0-9a-f]+:/i, "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean),
+    )
+    .map(Number);
+  const displayMatrix = entries.length === 9 && entries.every(Number.isFinite) ? entries : undefined;
+  const tagged = stream.tags?.DURATION?.match(/^(\d+):(\d+):(\d+(?:\.\d+)?)$/);
+  const seconds = tagged
+    ? Number(tagged[1]) * 3600 + Number(tagged[2]) * 60 + Number(tagged[3])
+    : stream.duration !== undefined
+      ? Number(stream.duration)
+      : Number.NaN;
   const pixelFormat = stream.pix_fmt ?? "unknown";
   const alpha =
     stream.tags?.alpha_mode === "1" && (stream.codec_name === "vp9" || stream.codec_name === "vp8")
@@ -268,6 +336,8 @@ export function pickVideoStream(probeJson: string, file: string, wanted?: number
     ...(stated(stream.color_primaries) ? { colorPrimaries: stream.color_primaries } : {}),
     ...(stated(stream.field_order) && stream.field_order !== "progressive" ? { fieldOrder: stream.field_order } : {}),
     ...(rotation ? { rotation } : {}),
+    ...(displayMatrix ? { displayMatrix } : {}),
+    ...(Number.isFinite(seconds) && seconds > 0 ? { durationMs: seconds * 1000 } : {}),
     ...(probe.format?.format_name ? { container: probe.format.format_name } : {}),
     ...(alpha ? { alpha } : {}),
   };
@@ -284,6 +354,8 @@ export interface ProbedFrame {
   /** Its decoded size, before rotation. */
   width?: number;
   height?: number;
+  /** How long it is shown, in the stream's time base, when the stream says (a packet duration). */
+  durationTicks?: number;
 }
 
 /**
@@ -297,6 +369,8 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
     frames?: {
       best_effort_timestamp?: number;
       pts?: number;
+      duration?: number;
+      pkt_duration?: number;
       key_frame?: number;
       interlaced_frame?: number;
       width?: number;
@@ -324,6 +398,7 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
       key: f.key_frame === 1,
       ...(f.interlaced_frame === 1 ? { interlaced: true } : {}),
       ...(f.width && f.height ? { width: f.width, height: f.height } : {}),
+      ...((f.duration ?? f.pkt_duration ?? 0) > 0 ? { durationTicks: (f.duration ?? f.pkt_duration)! } : {}),
     };
   });
 }
@@ -336,8 +411,12 @@ export interface StreamTimeline {
   /** A GIF / APNG: its frames held as a browser holds them, and looped as it loops. */
   timing?: "browser";
   loop?: { plays: number | null; passFrames: number; passMs: number; passes: number };
-  /** Interlaced: every decoded frame is two rows, its fields, at twice the frame rate. */
+  /** Interlaced: each split frame is two rows, its fields, at twice the frame rate. */
   fields?: boolean;
+  /** How many decoded frames were split (a stream can mix progressive and interlaced frames). */
+  splitFrames?: number;
+  /** When the last frame leaves the screen, when the stream says how long it is shown. */
+  endMs?: number;
 }
 
 /**
@@ -346,14 +425,15 @@ export interface StreamTimeline {
  * 1.0s, not frame 30), so `--at 1s` is the frame a player shows at 1s. A frame is dropped when the
  * next one begins at the same instant (the one on screen then is the later; measured:
  * `-fps_mode passthrough` keeps both, and a recording with 0, 0, 0, 33, 33ms exists). Timestamps
- * that go back are refused. With `fields`, each frame is its two fields: the second halfway to the
- * next frame, so a flicker at field rate is in the sequence (woven, it was a still comb, measured).
+ * that go back are refused. A frame `split` says is interlaced is its two fields: the second
+ * halfway to the next frame, so a flicker at field rate is in the sequence (woven, it was a still
+ * comb, measured); a progressive one, in the same stream, is one row.
  */
 export function videoTimeline(
   frames: readonly ProbedFrame[],
   timeBase: { num: number; den: number },
   file: string,
-  options: { fields?: boolean } = {},
+  options: { split?: (frame: ProbedFrame) => boolean } = {},
 ): StreamTimeline {
   const ms = (ticks: number) => (ticks * 1000 * timeBase.num) / timeBase.den;
   // A timeline that would start before 0 (negative timestamps) is moved to start at 0.
@@ -373,17 +453,27 @@ export function videoTimeline(
     }
     shown.push({ f, at: ms(f.ticks) - origin });
   }
-  const fields = options.fields === true && shown.length > 1;
+  const split = shown.length > 1 ? options.split : undefined;
+  let splitFrames = 0;
   const rows: FrameRow[] = [];
   for (const [k, { f, at }] of shown.entries()) {
+    const fields = split?.(f) === true;
     rows.push({ index: rows.length, atMs: at, key: f.key, decoded: f.index, ...(fields ? { field: 0 as const } : {}) });
     if (fields) {
+      splitFrames++;
       // Halfway to the next frame; the last frame's second field is as far after it as the gap before.
       const gap = k + 1 < shown.length ? shown[k + 1]!.at - at : at - shown[k - 1]!.at;
       rows.push({ index: rows.length, atMs: at + gap / 2, key: false, decoded: f.index, field: 1 });
     }
   }
-  return { rows, hidden, ...(fields ? { fields: true } : {}) };
+  const last = shown[shown.length - 1]!;
+  const endMs = last.f.durationTicks !== undefined ? last.at + ms(last.f.durationTicks) : undefined;
+  return {
+    rows,
+    hidden,
+    ...(splitFrames > 0 ? { fields: true, splitFrames } : {}),
+    ...(endMs !== undefined ? { endMs } : {}),
+  };
 }
 
 /** Rows a looping image is unrolled to at most: past that, an instant is too far into the loop to write out. */
@@ -394,17 +484,21 @@ export const MAX_LOOP_ROWS = 100_000;
  * when that is 10ms or less (Chromium 141 and 149, measured), and the animation repeated as the
  * browser repeats it, as long as it plays. Unrolled up to `untilMs` — by default one pass and a
  * second more, which holds every one-second window of a loop — so an instant or a span further on
- * is the frame the loop has reached there, never the last one written. Null when the file's own
- * frame count is not the decoder's.
+ * is the frame the loop has reached there, never the last one written. An APNG plays the frames
+ * its `acTL` declares, when it holds more (measured: Chromium never showed a third `fcTL` frame of
+ * an `acTL` saying two). Null when the file's own frame count is not the decoder's, or an APNG
+ * declares more than it holds.
  */
 export function imageTimeline(
   decoded: readonly ProbedFrame[],
   timing: ImageTiming,
   untilMs?: number,
 ): StreamTimeline | null {
-  const n = decoded.length;
-  if (timing.storedMs.length !== n || n === 0) return null;
-  const delays = timing.storedMs.map(browserDelayMs);
+  if (timing.storedMs.length !== decoded.length || decoded.length === 0) return null;
+  const declared = timing.declaredFrames;
+  if (declared !== undefined && (declared < 1 || declared > decoded.length)) return null;
+  const n = declared ?? decoded.length;
+  const delays = timing.storedMs.slice(0, n).map(browserDelayMs);
   const passMs = delays.reduce((a, b) => a + b, 0);
   const until = n > 1 ? Math.max(untilMs ?? 0, passMs + 1000) : 0;
   const plays = timing.plays ?? Number.POSITIVE_INFINITY;
@@ -434,6 +528,8 @@ export function imageTimeline(
 
 /** One `showinfo` line: the frame the filter graph handed on, as written. */
 export interface ShowinfoFrame {
+  /** The instance's name (`showinfo@<name>`), when the graph named it. */
+  instance?: string;
   n: number;
   pts: number;
   width: number;
@@ -443,22 +539,27 @@ export interface ShowinfoFrame {
 
 /** showinfo's own prefix: a recording's metadata printed at info level must not read as a frame. */
 // The pointer is printed with %p: `0x55…` on glibc, bare uppercase hex on Windows.
-const SHOWINFO_LINE = /^\[Parsed_showinfo_\d+ @ (?:0x)?[0-9a-fA-F]+\] (.*)$/;
+// With `-loglevel level+info`, the level follows the prefix: `[showinfo@frames @ 0x…] [info] n: …`.
+const SHOWINFO_LINE = /^\[(?:Parsed_showinfo_\d+|showinfo@(\w+)) @ (?:0x)?[0-9a-fA-F]+\] (?:\[info\] )?(.*)$/;
 const SHOWINFO_FRAME = /^n:\s*(\d+)\s+pts:\s*(-?\d+)\b.*?\bs:(\d+)x(\d+)(?:.*?\biskey:([01]))?/;
 const SHOWINFO_CONFIG = /^config in time_base:\s*(\d+)\/(\d+)/;
 
 /** A line of ffmpeg's stderr: a showinfo frame, the time base showinfo counts in, or neither. */
 export function parseShowinfoLine(
   line: string,
-): { frame: ShowinfoFrame } | { timeBase: { num: number; den: number } } | null {
-  const body = line.match(SHOWINFO_LINE)?.[1];
-  if (body === undefined) return null;
+): { frame: ShowinfoFrame } | { timeBase: { num: number; den: number }; instance?: string } | null {
+  const prefix = line.match(SHOWINFO_LINE);
+  if (!prefix) return null;
+  const instance = prefix[1];
+  const body = prefix[2]!;
+  const named = instance !== undefined ? { instance } : {};
   const config = body.match(SHOWINFO_CONFIG);
-  if (config) return { timeBase: { num: Number(config[1]), den: Number(config[2]) } };
+  if (config) return { timeBase: { num: Number(config[1]), den: Number(config[2]) }, ...named };
   const m = body.match(SHOWINFO_FRAME);
   if (!m) return null;
   return {
     frame: {
+      ...named,
       n: Number(m[1]),
       pts: Number(m[2]),
       width: Number(m[3]),
@@ -491,9 +592,21 @@ const SRGB_PRIMARIES = new Set(["bt709", "smpte170m"]);
 const isRgbFormat = (pixelFormat: string) =>
   /^(rgb|bgr|argb|abgr|rgba|bgra|gbr|pal8|gray|ya|monob|monow|x?rgb)/.test(pixelFormat);
 
+/**
+ * Codecs whose grey frames are a YUV stream's luma alone (AV1 Main 4:0:0, HEVC RExt, H.264 High
+ * 4:0:0): limited range unless tagged otherwise, as their colour is. A grey PNG, GIF or FFV1 frame
+ * is a picture's own grey levels.
+ */
+const LUMA_GRAY_CODECS = new Set(["h264", "hevc", "av1", "vvc", "vp9", "mpeg4", "jpeg2000"]);
+
 export interface ColorPlan {
   /** `scale` options for the YUV to RGB step (matrix, range, and the rounding that holds them to ±1); empty for RGB frames. */
   scale: string;
+  /**
+   * A filter before that step: luma-only frames become YUV with neutral chroma first, since
+   * swscale converts grey to RGB without applying a range (measured: limited 16 stayed 16).
+   */
+  before?: string;
   color: NonNullable<FramesVideo["color"]>;
   /** What the conversion did not do, for the reader. */
   notes: string[];
@@ -537,6 +650,23 @@ export function colorPlan(
     ...(stream.colorTransfer ? { transfer: stream.colorTransfer } : {}),
     ...(stream.colorPrimaries ? { primaries: stream.colorPrimaries } : {}),
   };
+  const lumaOnly = /^gray/.test(stream.pixelFormat) && LUMA_GRAY_CODECS.has(stream.codec);
+  if (lumaOnly) {
+    const assumedRange: string[] = [];
+    let range: "tv" | "pc";
+    if (override.range) range = override.range;
+    else if (stream.colorRange === "pc" || stream.colorRange === "tv") range = stream.colorRange;
+    else {
+      range = "tv";
+      assumedRange.push("range");
+    }
+    return {
+      before: /^gray$/.test(stream.pixelFormat) ? "format=yuv444p" : "format=yuv444p16le",
+      scale: `in_color_matrix=bt601:in_range=${range}:flags=accurate_rnd+full_chroma_int`,
+      color: { matrix: "gray", range, ...extra, assumed: assumedRange },
+      notes,
+    };
+  }
   if (isRgbFormat(stream.pixelFormat)) {
     return { scale: "", color: { matrix: "rgb", range: "pc", ...extra, assumed: [] }, notes };
   }
@@ -577,6 +707,10 @@ export interface FilterPlan {
   select: string | null;
   /** Split each frame into its two fields, each line-doubled back to the frame's height. */
   fields: boolean;
+  /** Turn the frames (after the field split), for a decode that runs with `-autorotate 0`. */
+  rotate?: readonly string[];
+  /** The showinfo instance's name, so two graphs in one run are told apart. */
+  name?: string;
   color: ColorPlan;
   /** Composite transparent pixels over this, not drop the alpha (which shows the colour under them). */
   alpha?: { background: "white" | "black" };
@@ -586,7 +720,9 @@ export interface FilterPlan {
 
 /**
  * The filter chain. Measured, each step's place: `select` first (it counts decoded frames);
- * fields split before the colour conversion; alpha composited after it, by premultiplying (over
+ * fields split before the colour conversion, and the line-doubling's doubled sample aspect undone
+ * (`scale` keeps the display aspect, so an 8:9 field came out 16:9 and the frame twice as wide);
+ * then the turn, if the chain does it; alpha composited after the conversion, by premultiplying (over
  * black) or by premultiplying the negative and negating back (over white), so every frame keeps its
  * timestamp — an `overlay` on a colour source would take that source's constant rate; the SAR
  * resample after RGB, nearest, since bicubic in YUV blended a red/blue edge into (197,0,52); the
@@ -602,7 +738,9 @@ export function filterChain(plan: FilterPlan): string {
     : [];
   return [
     plan.select,
-    ...(plan.fields ? ["separatefields", "scale=w=iw:h=ih*2:flags=neighbor"] : []),
+    ...(plan.fields ? ["separatefields", "scale=w=iw:h=ih*2:flags=neighbor", "setsar=r=sar/2:max=10000"] : []),
+    ...(plan.rotate ?? []),
+    plan.color.before ?? null,
     plan.color.scale ? `scale=${plan.color.scale}` : null,
     rgb,
     ...composite,
@@ -611,7 +749,7 @@ export function filterChain(plan: FilterPlan): string {
       : []),
     "setparams=color_primaries=unknown:color_trc=unknown:colorspace=unknown",
     "sidedata=mode=delete:type=ICC_PROFILE",
-    "showinfo=checksum=0",
+    plan.name ? `showinfo@${plan.name}=checksum=0` : "showinfo=checksum=0",
   ]
     .filter(Boolean)
     .join(",");

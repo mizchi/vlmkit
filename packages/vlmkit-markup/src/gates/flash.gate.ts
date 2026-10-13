@@ -8,9 +8,19 @@ import { defineGate, type Finding } from "@mizchi/vlmkit-core/plugin/contract.ts
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { firstPositional, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { parseInstants, type VideoSelection } from "@mizchi/vlmkit-judge/frames.ts";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
 import { isVideoFile, MAX_SCAN_FRAMES } from "@mizchi/vlmkit-core/video-decode.ts";
-import { COLOR_MATRICES } from "@mizchi/vlmkit-core/video-frames.ts";
+import { COLOR_MATRICES, type SelectionRequest } from "@mizchi/vlmkit-core/video-frames.ts";
+
+const isFramesDir = (source: string): boolean => {
+  try {
+    return statSync(source).isDirectory() && existsSync(join(source, "frames.json"));
+  } catch {
+    return false;
+  }
+};
 import {
   flashHeadline,
   flashRate,
@@ -156,9 +166,10 @@ function videoFlags(argv: readonly string[]): FlashCheckOptions["video"] | undef
   if (colorRange !== undefined && colorRange !== "tv" && colorRange !== "pc") {
     throw new UsageError(`--color-range is tv (limited) or pc (full), got ${colorRange}`);
   }
-  const selection: VideoSelection | undefined =
+  // No --to is to the end: a video's last frame, a looping image's first pass and a second past --from.
+  const selection: SelectionRequest | undefined =
     from !== undefined || to !== undefined
-      ? { kind: "span", fromMs: from ?? 0, toMs: to ?? Number.MAX_SAFE_INTEGER }
+      ? { kind: "span", fromMs: from ?? 0, ...(to !== undefined ? { toMs: to } : {}) }
       : undefined;
   const out = {
     ...(selection ? { selection } : {}),
@@ -209,7 +220,8 @@ ffprobe (vlmkit ships no decoder; --ffmpeg or VLMKIT_FFMPEG point at them) and
 every frame it holds is judged at its own presentation time — the same as
 \`vlmkit scan video\` then \`check flash <dir>/frames.json\`. Its area is in CSS
 px: one frame pixel per CSS px unless \`--display-width px\` says how wide it
-plays; \`--from\` / \`--to\` judge a span.
+plays; \`--from\` / \`--to\` judge the windows ending in a span, counted from the 3s
+before it (no \`--to\` is to the end).
 
 \`--window ms\` (default from the page's animations and timers, 2-10s; 1-60s when
 given) sets the span swept;
@@ -371,7 +383,8 @@ A pass is "no flash measured under these criteria", not a certification.`,
     const viewport = viewportFlag(argv);
     if (viewport && (viewport.width < 1 || viewport.height < 1))
       throw new UsageError(`--viewport must be at least 1x1 (got ${viewport.width}x${viewport.height})`);
-    const fromFrames = /\.json$/i.test(source);
+    // A frames.json, or a frames directory (scan video's <recording>.frames/), judged by its frames.json.
+    const fromFrames = /\.json$/i.test(source) || isFramesDir(source);
     if (fromFrames && (windowMs !== undefined || framesDir || viewport)) {
       throw new UsageError(
         "a frames.json is judged as it was captured: --window, --frames and --viewport are for a page",

@@ -675,3 +675,52 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
     );
   });
 });
+
+describe("judgeFromMs: only the windows ending at or after it", () => {
+  // 400x300 at 10fps: black, seven alternations at 1.2-1.8s (black/white), then white.
+  const level = (t: number) => (t < 1150 ? 0 : t < 1850 ? (Math.round((t - 1200) / 100) % 2 === 0 ? 255 : 0) : 255);
+  const run = (judgeFromMs: number | undefined, frames = 40) => {
+    const w = 400;
+    const h = 300;
+    const judge = createFlashJudge({ width: w, height: h, ...(judgeFromMs !== undefined ? { judgeFromMs } : {}) });
+    const cache = new Map<number, FlashFrame>();
+    for (let k = 0; k < frames; k++) {
+      const v = level(k * 100);
+      let f = cache.get(v);
+      if (!f) {
+        f = flashFrame(
+          rgba(w, h, () => [v, v, v]),
+          w,
+          h,
+        );
+        cache.set(v, f);
+      }
+      judge.push(k, k * 100, f);
+    }
+    return judge.result().general;
+  };
+
+  test("the window ending at the judged start counts, though nothing transitions there", () => {
+    const whole = run(undefined);
+    assert.equal(whole.peak.transitions, 7);
+    assert.ok(whole.failingWindows > 0);
+    for (const from of [1800, 1900, 2000, 2100, 2150]) {
+      const r = run(from);
+      assert.equal(r.peak.transitions, 7, `from ${from}`);
+      assert.ok(r.failingWindows >= 1, `from ${from}: the window ending at it holds seven`);
+      assert.ok(r.worst && r.worst.atMs >= from - 1e-6, `from ${from}: the worst window ends in the span`);
+    }
+  });
+
+  test("a start past the last frame still judges the window ending at it", () => {
+    const r = run(2100, 21); // frames to 2.0s; the window ending at 2.1s holds 1.2-1.8s
+    assert.equal(r.peak.transitions, 7);
+    assert.ok(r.failingWindows >= 1);
+  });
+
+  test("windows that end before the judged start are not judged", () => {
+    const r = run(2850);
+    assert.equal(r.failingWindows, 0);
+    assert.equal(r.peak.transitions, 0);
+  });
+});

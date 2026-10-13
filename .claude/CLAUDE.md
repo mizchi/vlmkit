@@ -650,7 +650,16 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   white / black by premultiplying (the negative, for white), so every frame keeps its timestamp — an
   `overlay` on a colour source takes that source's constant rate; dropping alpha showed the colour under
   transparent pixels (a hidden strobe, or a visible one hidden). Interlaced: split into fields at twice
-  the rate (woven, a field-rate strobe was a still comb; bwdif missed it too).
+  the rate (woven, a field-rate strobe was a still comb; bwdif missed it too) — **frame by frame, by each
+  frame's own flag**, in one decode with two named graphs (`showinfo@fields`, `showinfo@frames`): a
+  broadcast capture that turns interlaced after 2s read as one still comb when the first 30 frames
+  decided, and a container's `tt` tag over progressive x264 frames strobed every 1px row. Only a codec
+  that flags no frame is split by the tag. The line-doubling `scale` keeps the display aspect, so it
+  doubled the SAR (NTSC 8:9 → 16:9, frames 1280 wide): `setsar=sar/2` undoes it. A turned interlaced
+  stream runs with `-autorotate 0` and the chain turns it after the split (`rotationFilters`, ffmpeg
+  6.1's own mapping): autorotate turned it first, so 90° split columns and 180° reversed the fields.
+- **A YUV codec's grey frames are luma** (AV1 4:0:0, HEVC RExt): limited unless tagged, and converted
+  through `format=yuv444p` — swscale's grey → RGB applies no range (16 stayed 16, measured).
 - **HDR is refused**: ffmpeg passes PQ / HLG code values through as SDR, no tone map, no gamut map.
 - **A GIF / APNG is timed and looped as a browser plays it**, not as ffmpeg decodes it. Chromium 141 and
   149 hold any frame of 10ms or less for 100ms — computed on whole ms, so an APNG 1/95s frame is 10 and
@@ -661,13 +670,26 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   reach, and by default to the frame on screen one second past one pass (whole extra passes made a
   2000-frame GIF 4000), each decoded frame decoded once and copied. ffmpeg's GIF demuxer merges an image
   with no graphic control extension into the one before (Chromium shows both): refused, never judged on
-  fewer frames. An APNG's own extension is `.png`; `check flash` sniffs it.
+  fewer frames. So is a GIF ffmpeg composites otherwise (`gifCompositingProblem`): a frame disposed to
+  background with no transparent index is filled opaque with the background colour where Chromium
+  clears it (a black/white strobe passed, a static white GIF failed), and a first image that does not
+  cover the logical screen, or is larger (Chromium grows the canvas, ffmpeg crops); the refusal carries
+  an ImageMagick coalesce recipe. A GIF's aspect byte and a PNG's pHYs are not applied (a browser lays
+  an image out at its pixel size). An APNG plays the frames its `acTL` declares, and its own extension
+  is `.png`: `check flash` sniffs it by walking chunk headers to `acTL` (a first frame over 1 MiB hid
+  the second `fcTL`). A span with no `--to` on a forever loop runs a pass and a second past `--from`.
 - **A recording's frames are its whole content only when they are all of it.** `check flash` counts
   consecutive indices from the first frame to the last as whole: a pass on 25fps is a real pass, and at
-  6fps or less nothing can fail. A span is not: judged as whole, a 0.5s span of a 5 Hz strobe passed. So
-  `check flash rec.mp4 --from/--to` decodes the second before the span (`selection.leadInMs`) and judges
-  only the windows that end inside it (`createFlashJudge`'s `judgeFromMs`); a span without that second
-  is `flash-undersampled`. An import is complete only with `--every-frame` (a `-vf fps=5` export of a
+  6fps or less nothing can fail — nor in a span decoded with its history (`coverage.complete`, not
+  `whole`, decides; a 6fps span read NOT JUDGEABLE). A span is not whole: judged as whole, a 0.5s span
+  of a 5 Hz strobe passed. So `check flash rec.mp4 --from/--to` decodes `SPAN_HISTORY_MS` (3s) before the
+  span (`selection.leadInMs`) and judges only the windows that end inside it (`createFlashJudge`'s
+  `judgeFromMs`) — **the window ending at the start is judged even with no transition on it** (it holds
+  the most; a strobe stopping just before `--from` passed). The history is 3s, not 1: a pixel's count
+  depends on whether the change it is in was already counted, and with one second a 0 → 0.06 → 0.12
+  step lost its first transition (both a false pass and a false fail, measured). Warmed for two more,
+  a difference needs one slow change through all three, and a verdict one transition decides says so
+  (`report.history`). A span without its history is `flash-undersampled`. An import is complete only with `--every-frame` (a `-vf fps=5` export of a
   strobe passed as whole). `check flash rec.mp4` and `scan video` + `check flash frames.json` give the
   same report (a test holds it). The area is CSS px: `--display-width` (a 160x120 strobe passes at its
   size, fails at 320 wide); at most 4096 a side.
@@ -677,15 +699,24 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   made dense static text fail on its own (said when a failing lossy stream has > 3 keyframes a second).
   The red track's real hole was near-black: a codec decodes black as (1,0,0), red's own chromaticity,
   and a 148x148 red strobe passed at crf 35 and 45; `flash.ts` now treats luminance ≤ 0.001 as black for
-  chromaticity. Not fixed, found here: a 1D grating (16px bars, 32px period) moving 4px a frame reads as
-  flash even losslessly, against `flash-motion.ts`'s "a grating moving less than half its period reads
-  as motion".
+  chromaticity. Not fixed, found here: a 1D grating whose bars are as wide as a 16px block (32px
+  period) moving 4px a frame reads as flash even losslessly (`flash-motion.ts` says so; 8px bars read
+  as motion).
 - **The output directory** is `<recording>.frames/` (`clip.mp4` and `clip.webm` shared `clip.frames/`
   and the second scan deleted the first), cleared of the previous scan only once the new frames are
   decoded and checked (a failed re-scan had deleted the last good one), never of the recording itself
-  (an APNG named `0000-t000000.png` was), and refused when another tool's `frames.json` is in it. A
-  killed run's ffmpeg is killed too (it kept writing gigabytes as an orphan), and its work directory is
-  removed by the next run.
+  (an APNG named `0000-t000000.png` was overwritten by its own frame 0: such a name is refused, through
+  symlinks too), and refused when another tool's `frames.json` is in it — by an import as well, which
+  had replaced a `check flash` manifest and disarmed that check. A lock file names the scan writing
+  there (two scans into one directory deleted each other's work); a dead one's is taken over. A
+  killed run's ffmpeg is killed too (it kept writing gigabytes as an orphan), by signal listeners that
+  exist only while a decoder runs (left installed, they swallowed Ctrl-C for the minute a judge holds
+  the event loop); its work directory, and `check flash`'s pid-named temp frames, are removed by the
+  next run. The decoder's errors are kept by level (`-loglevel level+info`, error or worse, from the
+  demuxer and decoder): a keyword list missed Matroska's `File ended prematurely` and HEVC's damage,
+  and caught a title with "Truncated" in it. A stream whose frames end well before its stated
+  duration says the file may be cut short. On PATH only absolute entries are searched, POSIX for an
+  executable file, Windows for the `.com` / `.exe` a shell-less spawn runs.
 - **`snapshot storyboard` refuses a lossy recording without `--lossy`**: it compares pixels exactly and
   has no noise floor; with `--lossy` SUMMARY.md names the events that begin on a keyframe. A lossless
   one (ffv1, png, qtrle; not rpza, a vector quantizer) is segmented like any capture: a planted glitch

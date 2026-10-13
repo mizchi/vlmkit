@@ -7,12 +7,12 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import { scanVideo } from "@mizchi/vlmkit-core/video-decode.ts";
-import { runFlashCheck, type FlashReport } from "./flash-check.ts";
+import { chromaSubsampled, runFlashCheck, SPAN_HISTORY_MS, type FlashReport } from "./flash-check.ts";
 
 let dir: string;
 
@@ -110,10 +110,14 @@ describe("check flash on a recording", () => {
 
   test("judging the recording is judging scan video's frames.json", async () => {
     const file = strobe("same.mp4", { hz: 5, fps: 25, seconds: 1.6 });
-    // A span through check flash is decoded with the second before it, so scan video is asked the same.
+    // A span through check flash is decoded with the seconds before it, so scan video is asked the same.
     const span = { kind: "span" as const, fromMs: 1200, toMs: 1500 };
     const direct = await runFlashCheck({ source: file, video: { selection: span } });
-    const scanned = await scanVideo({ file, out: join(dir, "same"), selection: { ...span, leadInMs: 1000 } });
+    const scanned = await scanVideo({
+      file,
+      out: join(dir, "same"),
+      selection: { ...span, leadInMs: SPAN_HISTORY_MS },
+    });
     const again = await runFlashCheck({ source: scanned.manifestPath });
     const strip = (r: FlashReport) => ({
       ...r,
@@ -259,10 +263,14 @@ describe("check flash on a recording", () => {
       file,
     ]);
     assert.equal((await runFlashCheck({ source: file })).general.verdict, "fail");
+    // The window ending at --from holds seven of the strobe's eight transitions (0.625s-1.375s),
+    // though nothing transitions at 1.55s or 1.6s.
     for (const [fromMs, toMs] of [
       [1000, 3000],
       [1000, 1700],
       [1400, 1400],
+      [1550, 3000],
+      [1600, 3000],
     ]) {
       const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs, toMs } } });
       assert.equal(r.general.verdict, "fail", `--from ${fromMs} --to ${toMs}`);
@@ -361,5 +369,84 @@ describe("check flash on a recording", () => {
       /judged over its own frames/,
     );
     await assert.rejects(runFlashCheck({ source: "page.html", video: { displayWidth: 100 } }), /are for a recording/);
+  });
+
+  test("a complete span of a recording under 7 frames a second is a real pass, as the whole recording is", async () => {
+    const file = strobe("six.mkv", { hz: 3, fps: 6, seconds: 5, codec: ["-c:v", "ffv1"] });
+    assert.deepEqual(verdicts(await runFlashCheck({ source: file })), ["pass", "pass"]);
+    const span = await runFlashCheck({
+      source: file,
+      video: { selection: { kind: "span", fromMs: 2000, toMs: 4000 } },
+    });
+    assert.equal(span.sampling.complete, true);
+    assert.deepEqual(verdicts(span), ["pass", "pass"]);
+  });
+
+  test("a span counted from history that misses the recording's start says when one transition decides it", async () => {
+    // Six transitions at 4.5s-5.125s of a 7s recording: the window ending at 5.2s holds all six.
+    const file = join(dir, "six-transitions.mkv");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=24:d=7,geq=lum='if(between(N\\,108\\,125)*mod(floor((N-108)/3)+1\\,2)\\,235\\,16)':cb=128:cr=128",
+      "-c:v",
+      "ffv1",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs: 5200, toMs: 6000 } } });
+    assert.equal(r.general.verdict, "pass");
+    assert.equal(r.general.peakTransitions, 6);
+    assert.match(r.history ?? "", /general: decided by one transition.*3\.000s of history/);
+    assert.equal(SPAN_HISTORY_MS, 3000);
+    // From the start, the history is the whole recording's: nothing to say.
+    const early = await runFlashCheck({
+      source: file,
+      video: { selection: { kind: "span", fromMs: 2000, toMs: 6000 } },
+    });
+    assert.equal(early.history, undefined);
+  });
+
+  test("a frames directory refuses what only a page sweep reads, as its frames.json does", async () => {
+    const scanned = await scanVideo({ file: strobe("dir-flags.mp4", { hz: 1, fps: 30 }) });
+    const frames = join(scanned.manifestPath, "..");
+    await assert.rejects(runFlashCheck({ source: frames, windowMs: 5000 }), /judged as it was captured/);
+    await assert.rejects(runFlashCheck({ source: frames, framesDir: join(dir, "x") }), /judged as it was captured/);
+    await assert.rejects(
+      runFlashCheck({ source: scanned.manifestPath, video: { displayWidth: 100 } }),
+      /judged as it was decoded/,
+    );
+  });
+
+  test("chroma subsampling is read from the pixel format's layout, not a 4:2:0 prefix", () => {
+    for (const f of [
+      "yuv420p",
+      "yuvj420p",
+      "yuv422p10le",
+      "yuv411p",
+      "yuv440p",
+      "yuva420p",
+      "nv12",
+      "nv21",
+      "p010le",
+      "yuyv422",
+      "uyvy422",
+    ]) {
+      assert.equal(chromaSubsampled(f), true, f);
+    }
+    for (const f of ["yuv444p", "yuv444p10le", "gbrp", "rgb24", "bgra", "gray", "pal8", "nv24"]) {
+      assert.equal(chromaSubsampled(f), false, f);
+    }
+  });
+
+  test("an interrupted run's temporary frames are removed by the next one", async () => {
+    const stale = join(tmpdir(), "vlmkit-flash-video-999999999-left");
+    mkdirSync(join(stale, ".scan-video-x"), { recursive: true });
+    await runFlashCheck({ source: strobe("sweep.mp4", { hz: 1, fps: 30, seconds: 1 }) });
+    assert.equal(existsSync(stale), false);
   });
 });

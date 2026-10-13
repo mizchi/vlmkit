@@ -1626,7 +1626,7 @@ vlmkit scan video rec.mp4                            # every frame → rec.mp4.f
 vlmkit scan video rec.mp4 --from 10s --to 20s        # the frames on screen during that span
 vlmkit scan video rec.webm --at 0..3s/250ms --out k  # the frame on screen at each instant
 vlmkit check flash rec.mp4 --display-width 1280      # = scan video, then check flash rec.mp4.frames/frames.json
-vlmkit check flash rec.mp4 --from 10s --to 12s       # windows ending in the span, the second before it decoded too
+vlmkit check flash rec.mp4 --from 10s --to 12s       # windows ending in the span, the 3s before it decoded as history
 vlmkit check flash anim.gif                          # a GIF / APNG timed and looped as a browser plays it
 vlmkit snapshot strip --manifest rec.mp4.frames/frames.json --max-frames 8 --out sheet.png
 vlmkit scan video frames/ --pts frames/pts.txt --every-frame   # frames another decoder wrote, with their times
@@ -1639,8 +1639,10 @@ MJPEG only. `scan video` runs **your** ffmpeg and ffprobe, **5.1 or later**
 `--ffmpeg` / `--ffprobe`, else `VLMKIT_FFMPEG` / `VLMKIT_FFPROBE`, else the
 ffprobe beside a given ffmpeg (or beside what a symlink points to), else both
 found on `PATH` — never in the working directory, which Windows would search
-first. They run as separate processes with arguments, never a shell, are killed
-if vlmkit is, and when missing the error says how to install them. Any other
+first (only absolute entries; on POSIX an executable file, on Windows the `.com`
+/ `.exe` a spawn without a shell runs). They run as separate processes with
+arguments, never a shell, are killed if vlmkit is, and when missing the error
+says how to install them. Any other
 decoder works through the import form: numbered PNGs (named so they sort in
 order) plus one timestamp in seconds per line, or `--fps` for a constant rate;
 `--every-frame` says the directory holds every frame (the recipe's passthrough
@@ -1672,11 +1674,19 @@ GIF counts); `key` marks keyframes.
 What `check flash` makes of it: the frames of a whole recording are its whole
 content, so consecutive indices from the first frame to the last are complete —
 a pass on 25fps is a real pass, and a recording with no 7 frames inside any one
-second (6fps or less) cannot fail at all. A span is not the whole recording:
-`check flash rec.mp4 --from/--to` decodes the second before the span too and
-judges only the windows that end inside it, so a strobe in a short span still
-fails; a span `scan video` wrote without that second is reported as not backed
-(`flash-undersampled`), and `--at` leaves gaps.
+second (6fps or less) cannot fail at all — nor can a span decoded with its
+history. A span is not the whole recording: `check flash rec.mp4 --from/--to`
+decodes the 3 seconds before the span too and judges only the windows that end
+inside it — the one ending at `--from` included, whether or not anything
+transitions on it — so a strobe in a short span still fails, and one that stops
+just before `--from` fails too. No `--to` is to the end (a looping GIF / APNG: a
+pass and a second past `--from`). Those 3 seconds are history, not the whole
+past: a pixel's count depends on whether the change it is in was already counted,
+so a pixel in one slow change through all of them can count one transition
+differently from the whole recording, and a span verdict that one transition
+decides says so (judge the whole recording for the exact count; a span whose
+history reaches the start is exact). A span `scan video` wrote without its
+history is reported as not backed (`flash-undersampled`), and `--at` leaves gaps.
 
 What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
 `docs/reports/2026-10-13-scan-video-v1.md`):
@@ -1708,9 +1718,19 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   measures its 341x256 field and 21,824 px² limit in those CSS px, so a 160x120
   strobe passes at its own size and fails played at 320px wide. Rotation is
   ffmpeg's autorotate, recorded. Non-square pixels are resampled square after the
-  RGB conversion, nearest, and expanded, never shrunk, as Chromium plays them.
-- **Interlaced** streams are split into their fields, line-doubled, at twice the
-  frame rate: woven, a field-rate strobe is a still comb that nothing flags.
+  RGB conversion, nearest, and expanded, never shrunk, as Chromium plays a video
+  (a GIF's aspect byte and a PNG's pHYs are not: a browser lays an image out at
+  its pixel size).
+- **Interlaced** frames are split into their fields, line-doubled, at twice the
+  frame rate: woven, a field-rate strobe is a still comb that nothing flags. Each
+  frame's own flag decides, so a stream that mixes progressive and interlaced
+  frames splits only the interlaced ones, and a container's field-order tag over
+  frames coded progressive splits none (it is said); only a codec whose frames
+  carry no flag is split by the tag. The doubled sample aspect the line-doubling
+  leaves is undone, and a turned interlaced stream is split first and turned
+  after (ffmpeg's autorotate would turn it first: a quarter turn splits columns).
+- **Grey** frames of a YUV codec (AV1 4:0:0, HEVC RExt) are luma, limited range
+  unless tagged; a grey PNG or GIF is its own levels.
 - **Alpha** is composited over `--background` white (default) or black, never
   dropped: dropping it shows whatever colour sits under transparent pixels, which
   can be a strobe nobody sees, or hide one they do. A WebM's alpha is decoded with
@@ -1722,9 +1742,14 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   reaches, and by default to the frame on screen one second past one pass, which
   holds every one-second window of the loop. ffmpeg decodes one pass: a two-frame
   black/white GIF looping at 100ms is five flashes a second on screen and one
-  transition in that pass. A `.png` that is an animated PNG is a recording. A GIF
-  whose images ffmpeg merges (an image with no graphic control extension) is
-  refused, with a recipe: fewer frames than the browser shows can only miss a flash.
+  transition in that pass. A `.png` that is an animated PNG (its `acTL`, found
+  by walking chunk headers) is a recording; an APNG plays the frames its `acTL`
+  declares. A GIF whose images ffmpeg merges (an image with no graphic control
+  extension) is refused, with a recipe: fewer frames than the browser shows can
+  only miss a flash. So is one ffmpeg composites otherwise: a frame disposed to
+  background with no transparent colour (ffmpeg paints the background colour where
+  a browser clears to transparent), and a first image that does not cover the
+  logical screen, or is larger than it.
 - **Lossy recordings.** Codec noise does not invent or hide a full-field strobe
   (measured at crf 23/35/45 and Playwright's VP8), but `check flash` says when a
   lossy or chroma-subsampled recording's area is within 5% of the limit (4:2:0 took
@@ -1739,11 +1764,17 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   stream: re-encode it at its rate) or out of order, anything the decoder cannot
   read, and more frames than `--max-frames` (3600 by default, at most 9999: the
   files are numbered in four digits). A truncated file decodes what it holds and
-  exits 0, so the decoder's error lines are kept in `source.video.decodeErrors`.
+  exits 0, so the decoder's error lines — those it logs at error level from the
+  demuxer and decoder, never the metadata — are kept in
+  `source.video.decodeErrors`, and frames that end well before the stream's stated
+  duration are noted.
 - **The output directory** is `<recording>.frames/` (`rec.mp4.frames/`, so
   `clip.mp4` and `clip.webm` do not share one), cleared of the previous scan only
-  once the new frames are decoded and checked, never of the recording itself; a
-  directory holding another tool's `frames.json` is refused.
+  once the new frames are decoded and checked, never of the recording itself (a
+  recording named like a frame, in the directory it is scanned into, is refused);
+  a directory holding another tool's `frames.json` is refused, by an import too;
+  a lock file keeps two scans out of one directory; a path that is a file is
+  refused before anything is decoded.
 
 `snapshot storyboard` compares pixels exactly and has no noise floor yet, so it
 refuses frames from a lossy codec (`lossless: false`) unless given `--lossy`, and

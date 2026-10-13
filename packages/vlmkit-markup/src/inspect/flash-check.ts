@@ -21,7 +21,7 @@
  * A failing window is never animated in the output: a strip is one still image, because a
  * flipbook of a failing window is itself a strobe for whoever opens the review.
  */
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -177,6 +177,17 @@ export interface FlashTrackReport {
   animations?: FlashAttribution[];
 }
 
+/**
+ * The history a span is decoded with: the second its first window covers, and two more to warm each
+ * pixel's count. A pixel's state at the window's start depends on everything before it (whether
+ * the change it is in was already counted), and a count started cold some way back can differ by
+ * one transition from the whole recording's (measured: a pixel stepping 0 → 0.06 → 0.12 just
+ * before a strobe lost the first step with one second of history). Warmed for two seconds, a
+ * difference needs one slow change running through all three, and a verdict decided by one
+ * transition says so (`report.history`); a history from the recording's start is exact.
+ */
+export const SPAN_HISTORY_MS = 3000;
+
 export interface FlashReport {
   format: typeof FLASH_FORMAT;
   source: {
@@ -228,7 +239,7 @@ export interface FlashReport {
     navigations: number;
     /** A recording's frames that are not all of it: why a pass on them is not backed. */
     partial?: string;
-    /** A span decoded with its second of history: the windows judged end from here. */
+    /** A span decoded with its history: the windows judged end from here. */
     judgedFromMs?: number;
   };
   general: FlashTrackReport;
@@ -245,6 +256,8 @@ export interface FlashReport {
    * of an edge, a keyframe cadence that pumps): what that makes of this verdict.
    */
   lossy?: string[];
+  /** A span counted from a history that does not reach the recording's start, whose verdict one transition decides. */
+  history?: string;
   timingMs: { capture: number; judge: number; classify: number };
 }
 
@@ -1027,7 +1040,7 @@ function judge(
   times: readonly number[],
   cssPerPx: number,
   unmeasured: readonly UnmeasuredRegion[],
-  sampling: { still: boolean; wholeStream?: boolean },
+  sampling: { still: boolean; complete?: boolean },
 ): {
   general: FlashTrackReport;
   red: FlashTrackReport;
@@ -1046,9 +1059,10 @@ function judge(
     counted.blocks,
   );
   const maxGapMs = times.slice(1).reduce((m, t, i) => Math.max(m, t - times[i]!), 0);
-  // A failure needs 7 transitions inside one window, so 7 frames inside one. A recording with
-  // fewer frames than that in every second cannot show a failure at all: its pass is real.
-  let judgeable = sampling.still || sampling.wholeStream === true;
+  // A failure needs 7 transitions inside one window, so 7 frames inside one. A recording's frames
+  // with none left out (the whole of it, or a span with its history) and fewer than that in every
+  // second cannot show a failure at all: their pass is real.
+  let judgeable = sampling.still || sampling.complete === true;
   for (let k = MAX_TRANSITIONS; k < times.length && !judgeable; k++) {
     if (times[k]! - times[k - MAX_TRANSITIONS]! < WINDOW_MS - 1e-6) judgeable = true;
   }
@@ -1088,12 +1102,20 @@ export function manifestComplete(manifest: FramesManifest): boolean {
 }
 
 export interface StreamCoverage {
-  /** Every frame of the recording between the first window judged and the last frame is here. */
+  /**
+   * Every frame of the recording from the start of the first window judged to the last frame is
+   * here: under 7 frames in every second, nothing can fail, so a pass is real.
+   */
   complete: boolean;
-  /** The whole recording: under 7 frames in every second, nothing can fail, so a pass is real. */
+  /** The whole recording. */
   whole: boolean;
-  /** A span decoded with its second of history: judge only the windows ending inside it. */
+  /** A span decoded with its history: judge only the windows ending inside it. */
   judgeFromMs?: number;
+  /**
+   * That history reaches back to the recording's first frame, so each pixel is counted as the whole
+   * recording counts it. Otherwise it starts cold some seconds before (`SPAN_HISTORY_MS`).
+   */
+  fromStart?: boolean;
   /** Why it is not complete, for the reader. */
   partial?: string;
 }
@@ -1132,7 +1154,7 @@ export function streamCoverage(manifest: FramesManifest): StreamCoverage {
     for (const f of frames) if (f.atMs <= selection.fromMs + 1e-6) from = f.atMs;
     if (from > frames[0]!.atMs) judgeFromMs = from;
   }
-  const at = judgeFromMs !== undefined ? { judgeFromMs } : {};
+  const at = judgeFromMs !== undefined ? { judgeFromMs, fromStart: first === 0 } : {};
   if (whole) return { complete: true, whole: true, ...at };
   if (selection?.kind === "span" && (selection.leadInMs ?? 0) >= WINDOW_MS - 1e-6) {
     return { complete: true, whole: false, ...at };
@@ -1143,6 +1165,20 @@ export function streamCoverage(manifest: FramesManifest): StreamCoverage {
     whole: false,
     partial: `the frames begin ${Number(frames[0]!.atMs.toFixed(1))}ms into the recording with no second before them, so a window ending in their first second is missing its start (check flash on the recording with --from decodes it)`,
   };
+}
+
+/** A saved sequence is judged as it was captured: what only a page sweep reads is refused, not dropped. */
+function refusePageFlags(options: FlashCheckOptions): void {
+  if (options.windowMs !== undefined || options.framesDir || options.viewport) {
+    throw new UsageError(
+      "a frames.json is judged as it was captured: --window, --frames and --viewport are for a page",
+    );
+  }
+  if (options.video) {
+    throw new UsageError(
+      "a frames.json is judged as it was decoded: --from, --to, --display-width and the other recording flags are for the recording itself",
+    );
+  }
 }
 
 /** The track whose window the strip shows: a failing one, else one motion excused, else any that flashed. */
@@ -1159,12 +1195,18 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
   if (options.stripPath && !/\.png$/i.test(options.stripPath)) {
     throw new UsageError("--strip writes one still PNG (never an animation of a failing window): name it .png");
   }
-  if (/\.json$/i.test(options.source)) return judgeManifest(options);
+  if (/\.json$/i.test(options.source)) {
+    refusePageFlags(options);
+    return judgeManifest(options);
+  }
   if (isVideoFile(options.source)) return judgeVideo(options);
   if (existsSync(options.source) && statSync(options.source).isDirectory()) {
     // A frames directory (scan video's <recording>.frames/): its frames.json, not a file listing in Chromium.
     const manifest = join(options.source, "frames.json");
-    if (existsSync(manifest)) return judgeManifest({ ...options, source: manifest });
+    if (existsSync(manifest)) {
+      refusePageFlags(options);
+      return judgeManifest({ ...options, source: manifest });
+    }
     throw new UsageError(
       `${options.source} is a directory with no frames.json: to judge frames another tool wrote, import them first (vlmkit scan video ${options.source} --pts <file> --every-frame)`,
     );
@@ -1258,6 +1300,29 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
   return options.browser ? run(options.browser) : withBrowser(run);
 }
 
+const TEMP_PREFIX = "vlmkit-flash-video-";
+
+/** The temporary frames of earlier runs whose process is gone (interrupted: a signal skips `finally`). */
+async function sweepStaleTemp(): Promise<void> {
+  let names: string[];
+  try {
+    names = await readdir(tmpdir());
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    const pid = Number(name.slice(TEMP_PREFIX.length).match(/^(\d+)-/)?.[1]);
+    if (!name.startsWith(TEMP_PREFIX) || !Number.isSafeInteger(pid) || pid === process.pid) continue;
+    try {
+      process.kill(pid, 0);
+      continue; // still running
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EPERM") continue;
+    }
+    await rm(join(tmpdir(), name), { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 /**
  * Decode a recording with the user's own ffmpeg (`scanVideo`) and judge its frames as a saved
  * sequence: `check flash rec.mp4` is `scan video rec.mp4` then `check flash rec.mp4.frames/frames.json`,
@@ -1270,12 +1335,15 @@ async function judgeVideo(options: FlashCheckOptions): Promise<FlashReport> {
     );
   }
   const keep = options.framesDir ? resolve(options.framesDir) : null;
-  const dir = keep ?? (await mkdtemp(join(tmpdir(), "vlmkit-flash-video-")));
+  // Named for this process: a run killed mid-decode cannot remove its own, so the next one does.
+  if (!keep) await sweepStaleTemp();
+  const dir = keep ?? (await mkdtemp(join(tmpdir(), `${TEMP_PREFIX}${process.pid}-`)));
   try {
     const t0 = performance.now();
-    // A span is decoded with the second before it: a window ending at its start needs that history.
+    // A span is decoded with the seconds before it: a window ending at its start needs that history.
     const video = options.video ?? {};
-    const selection = video.selection?.kind === "span" ? { ...video.selection, leadInMs: WINDOW_MS } : video.selection;
+    const selection =
+      video.selection?.kind === "span" ? { ...video.selection, leadInMs: SPAN_HISTORY_MS } : video.selection;
     const scanned = await scanVideo({ file: options.source, out: dir, ...video, ...(selection ? { selection } : {}) });
     const decodeMs = performance.now() - t0;
     const report = await judgeManifest(
@@ -1322,8 +1390,7 @@ async function judgeManifest(
   const t0 = performance.now();
   const counted = countFiles(files, times, cssPerPx, unmeasured, coverage?.judgeFromMs);
   const countMs = performance.now() - t0;
-  const wholeStream = coverage?.whole === true;
-  const judged = judge(counted, files, times, cssPerPx, unmeasured, { still, wholeStream });
+  const judged = judge(counted, files, times, cssPerPx, unmeasured, { still, complete: coverage?.complete === true });
   const video = manifest.source.video;
   const report: FlashReport = {
     format: FLASH_FORMAT,
@@ -1364,6 +1431,18 @@ async function judgeManifest(
     const lossy = lossyNotes(video, manifest, report);
     if (lossy.length > 0) report.lossy = lossy;
   }
+  if (coverage?.judgeFromMs !== undefined && !coverage.fromStart) {
+    const history = (manifest.frames.find((f) => f.atMs >= coverage.judgeFromMs! - 1e-6)?.atMs ?? 0) - times[0]!;
+    const byOne = (["general", "red"] as const).filter((track) => {
+      const t = report[track];
+      return t.verdict === "fail"
+        ? (t.worst?.transitions ?? 0) <= MAX_TRANSITIONS + 1
+        : t.peakTransitions === MAX_TRANSITIONS;
+    });
+    if (byOne.length > 0) {
+      report.history = `${byOne.join(" and ")}: decided by one transition, and the span was counted from ${secs(history)} of history, not the recording's start: a pixel in one slow change through all of it can count one transition differently. Judge the whole recording (no --from) for the exact count`;
+    }
+  }
   if (options.stripPath) {
     const worst = stripTrack(report)?.worst;
     if (worst) {
@@ -1372,6 +1451,18 @@ async function judgeManifest(
     } else report.stripSkipped = NO_STRIP;
   }
   return report;
+}
+
+/**
+ * Whether a pixel format stores chroma at less than full resolution: 4:2:0, 4:2:2, 4:1:1, 4:4:0,
+ * the semi-planar nv / p0xx layouts, the packed 4:2:2 ones and Bayer mosaics. 4:4:4, RGB, grey and
+ * palettes keep every pixel's colour.
+ */
+export function chromaSubsampled(pixelFormat: string): boolean {
+  if (/^(yuv|yuvj|yuva)4(20|22|11|10|40)/.test(pixelFormat)) return true;
+  if (/^(nv1[26]|nv2[01]|nv24|nv42|p01[026]|p2[01]0|p21[06])/.test(pixelFormat))
+    return pixelFormat.match(/^nv(24|42)/) === null;
+  return /^(yuyv|uyvy|yvyu|uyyvyy|y210|y212|bayer_)/.test(pixelFormat);
 }
 
 /** Within this share of the area limit, a lossy or chroma-subsampled recording does not decide the verdict. */
@@ -1391,7 +1482,7 @@ function lossyNotes(
   manifest: FramesManifest,
   report: Pick<FlashReport, "general" | "red" | "criteria">,
 ): string[] {
-  const subsampled = video.pixelFormat !== undefined && /^yuv(j)?4[12][01]/.test(video.pixelFormat);
+  const subsampled = video.pixelFormat !== undefined && chromaSubsampled(video.pixelFormat);
   if (video.lossless && !subsampled) return [];
   const why = video.lossless ? `chroma subsampled (${video.pixelFormat})` : `${video.codec}, lossy`;
   const limit = report.criteria.areaLimitCss2;
@@ -1514,9 +1605,10 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
               ]
             : []),
           ...(report.lossy ?? []).map((n) => `recording: ${n}`),
+          ...(report.history ? [`recording: ${report.history}`] : []),
         ]
       : []),
-    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : `incomplete${s.partial ? ` (${s.partial})` : ""}`}${s.judgedFromMs !== undefined ? `; windows judged from ${secs(s.judgedFromMs)}, the second before decoded as their history` : ""}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${formatInstant(s.windowMs)}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
+    `sampling: ${s.frames} frame(s), ${(s.spanMs / 1000).toFixed(3)}s, largest gap ${s.maxGapMs.toFixed(1)}ms, ${s.complete ? "complete" : `incomplete${s.partial ? ` (${s.partial})` : ""}`}${s.judgedFromMs !== undefined ? `; windows judged from ${secs(s.judgedFromMs)}, the frames before decoded as their history` : ""}${s.unstableFrames ? `, ${s.unstableFrames} unstable` : ""}; window ${formatInstant(s.windowMs)}ms (${s.windowFrom})${s.truncated ? `, cut at the ${MAX_WINDOW_MS / 1000}s cap: the page's later motion was not swept` : ""}${s.navigations ? `; the page navigated ${s.navigations} time(s)` : ""}`,
     ...describeTrack("general", report.general, report.criteria.areaLimitCss2, rules),
     ...describeTrack("red", report.red, report.criteria.areaLimitCss2, rules),
   ];

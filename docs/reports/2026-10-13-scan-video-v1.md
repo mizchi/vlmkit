@@ -78,7 +78,7 @@ decoder can write numbered PNGs and one timestamp per line, which `scan video <d
 | Interlaced frames decoded plainly are woven: a 50-field black/white strobe became 25 identical combs. bwdif misses it too | `separatefields` plus line doubling, at twice the frame rate |
 | `format=rgb24` drops alpha and shows the colour stored under transparent pixels: hidden toggles became a full-field flash, and a visible one was hidden. VP8/VP9 alpha is only in a tag, and only libvpx decodes it | Composited over `--background` (white default) by premultiplying, which keeps timestamps; libvpx chosen for a WebM's alpha |
 | A truncated faststart mp4 decodes 36 of 75 frames and exits 0 | The decoder's error lines are kept in `source.video.decodeErrors` |
-| ffmpeg's default stream choice prefers the default disposition, then the largest area; `-map 0:v:0` can pick a one-frame cover track | The same rule, mapped by absolute index; cover art excluded |
+| `-map 0:v:0` can pick a one-frame cover track; ffmpeg's own choice takes a larger non-default stream over a smaller default one | The stream the file marks default, else the largest, mapped by absolute index; cover art excluded (not ffmpeg's rule, said so) |
 
 ### PNG output
 
@@ -143,7 +143,7 @@ decoder can write numbered PNGs and one timestamp per line, which `scan video <d
   - a looping GIF fails and the same GIF played once passes;
   - an interlaced field-rate strobe;
   - the lossy red box, "not decisive";
-  - spans judged with the second before them;
+  - spans judged with their history, the window ending at `--from` included;
   - a thinned import is not a pass;
   - a frames directory;
   - an APNG named `.png`.
@@ -170,6 +170,39 @@ step that squeezed full range, alpha (three findings) and iCCP. The rest:
 | SAR below 1 shrank frames; a tagged-but-unsupported matrix was called untagged; rpza was "lossless"; a huge `--display-width` crashed; a manifest without viewport crashed the report | Expanded; refused; removed; bounded at 4096; validated |
 | Docs: "under 7fps nothing can fail" (6.5fps can), `index` documented as decoded position, the cited report missing, comments describing a rejected design | Corrected (this report) |
 
+## What the second review found
+
+A second round of six reviewers (span semantics, GIF/APNG against Chromium, the filter chain,
+decoder process and file safety, CLI and gate, docs) raised 39 findings, each with a reproduction;
+four were duplicates of another. All are fixed, each held by a test:
+
+| Finding | Fix |
+|---|---|
+| The judge evaluated a window only where a transition landed, so the window ending at `--from` was never judged: a strobe stopping just before `--from` passed (`--from 1.6s` on the burst; a crf 23 H.264 strobe) | The first judged window is judged whether or not anything transitions on it, every pixel's count raised into the peak (`openAt`); a start between frames, or past the last, too |
+| A complete span of a 6fps recording was NOT JUDGEABLE (exit 1) where the whole recording passed | `coverage.complete` decides, not `whole` |
+| A span's one second of history started every pixel cold: a 0 → 0.06 → 0.12 step before a strobe lost a transition (false pass), and a leg counted before the window counted again (false fail) | `SPAN_HISTORY_MS` 3s; a verdict that one transition decides says the span was counted from that history (`report.history`); a history from the start is exact |
+| `--from` without `--to` on a looping GIF was refused with "9007199254740991ms" (three reports) | No `--to` is carried as none: a video to its end, a loop a pass and a second past `--from` |
+| `--from` inside the last frame's display time was "after the recording's last frame" | Allowed to the recording's end (`recordingEndMs`) |
+| GIF disposal to background with no transparent index, and a first image smaller or larger than the logical screen, are composited by ffmpeg otherwise than by Chromium (a false pass and a false fail) | Refused (`gifCompositingProblem`) with an ImageMagick coalesce + pts recipe |
+| An APNG named `.png` with a first frame over 1 MiB, or a large text chunk first, was not sniffed (three reports) | Chunk headers walked to `acTL` (`apngDeclaredFrames`) |
+| A GIF's aspect byte and a PNG's pHYs were applied as SAR (a 120x120 strobe judged at 240x120) | Not applied to images |
+| An APNG with more `fcTL` than its `acTL` declares played the extras | The declared frames, as Chromium plays them |
+| Interlaced + SAR: the line-doubling doubled the SAR (NTSC DV came out 1280x480; a PAL box failed at twice its area) | `setsar=r=sar/2` after the doubling |
+| The field split was decided by the stream's tag and the first 30 frames: a stream turning interlaced later stayed woven (strobe passed); progressive frames under a `tt` tag were split (1px stripes failed) | Per frame, by each frame's flag, in one decode with two named graphs; the tag decides only for codecs that flag nothing |
+| Interlaced + rotation: autorotate turned the frame before the split (90° split columns, 180° reversed the fields) | `-autorotate 0` and ffmpeg's own mapping applied after the split (`rotationFilters`) |
+| Grey (AV1 4:0:0, HEVC RExt) was read as full-range RGB; `--color-range` ignored | Luma: through `format=yuv444p`, since swscale's grey → RGB applies no range |
+| Decode errors by keyword: a truncated WebM (`File ended prematurely`) and HEVC damage had none, and a path or title with "corrupt" / "Truncated" had one | By level (`-loglevel level+info`), error or worse, demuxer and decoder only; frames ending well before the stated duration noted |
+| The reaper's signal listeners stayed installed, so Ctrl-C did nothing during a minute-long judge | Listeners only while a decoder runs |
+| A recording named like frame 0 was overwritten by it (the old test checked existence only), and a symlinked `--out` unlinked one | Refused up front, on realpaths; the test compares bytes |
+| Two scans into one directory deleted each other's work dirs | A lock file naming the live scan; a dead one's taken over |
+| `onPath` took non-executable files, `./` resolved in the working directory, npm shims and `.cmd` on Windows, quoted entries missed | Absolute entries only; X_OK on POSIX; `.com` / `.exe` on Windows, unquoted |
+| An interrupted `check flash` left its decoded frames in the temp dir | Pid-named, swept by the next run |
+| An import overwrote another tool's `frames.json`, which then let a decode clear its frames | Refused |
+| `check flash <dir>` dropped `--window` / `--frames` / `--viewport`; `--out` naming a file crashed with EEXIST after the whole probe | Refused as for a `.json`; checked before decoding |
+| The help's import recipe decoded one stream and timed it by another, then `--every-frame` backed a false pass | Both halves name `v:0` |
+| The "not decisive" note missed nv12, 4:2:2 and other subsampled formats | `chromaSubsampled` reads the layout |
+| Stale comments (fieldOrder "decoded as frames", `atMs` "from the first frame", colour "notes"), the CLAUDE.md grating clause, the storyboard line in the help, BLACK_BELOW_Y's (15,0,0) | Corrected |
+
 ## Cost (this sandbox, 4 cores)
 
 - `scan video`, 10s 720p H.264: 3.4s for flat UI-like content (6 MB of PNGs) and 4.6s for `testsrc2` (77 MB).
@@ -183,4 +216,6 @@ step that squeezed full range, alpha (three findings) and iCCP. The rest:
 - HDR is refused, not judged.
 - A 1D grating whose bars are a 16px block wide or more, moving across, reads as flash even losslessly. A block inside a bar is flat, so nothing matches its motion. This was found here and is in the motion re-count; the docs that claimed such gratings read as motion now say which do.
 - A recording's area depends on how wide it plays (`--display-width`); one frame pixel per CSS px is only the default.
+- A span is counted from 3 seconds of history, not the whole past. A pixel in one slow change through all of them can count one transition differently from the whole recording, and a verdict that one transition decides says so.
+- A GIF that ffmpeg composites otherwise than a browser is refused, not judged. The recipe writes it through ImageMagick, one pass, without the loop's seam.
 - A storyboard of a lossy recording has no noise floor yet. That is the next item in the research's order.

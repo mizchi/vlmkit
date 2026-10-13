@@ -104,9 +104,9 @@ export type VideoSelection =
   | { kind: "all" }
   /**
    * The frames on screen at some moment of [fromMs, toMs]: the one showing at `fromMs` through the
-   * one at `toMs`. `leadInMs`: the frames of that much time before `fromMs` are in the sequence too,
-   * as the history a one-second window ending at `fromMs` needs (`check flash` judges only the
-   * windows that end inside the span).
+   * one at `toMs` (as far as the recording went, when asked for more). `leadInMs`: the frames of
+   * that much time before `fromMs` are in the sequence too, as the history the windows ending
+   * inside the span need (`check flash` judges only those, counted from that history).
    */
   | { kind: "span"; fromMs: number; toMs: number; leadInMs?: number }
   /** The frame on screen at each instant (the last one that began at or before it). */
@@ -142,10 +142,10 @@ export interface FramesVideo {
   loop?: { plays: number | null; passFrames: number; passMs: number; passes: number };
   selection: VideoSelection;
   /**
-   * The conversion to 8-bit sRGB the frames were written with: the YUV matrix (swscale's name, or
-   * `rgb` for frames stored as RGB) and range, the stream's transfer and primaries as tagged, which
-   * of matrix and range the stream did not state (so the value is the convention, BT.601 limited,
-   * not the stream's own word), and what the conversion did not do.
+   * The conversion to 8-bit sRGB the frames were written with: the YUV matrix (swscale's name,
+   * `rgb` for frames stored as RGB, `gray` for a YUV codec's luma-only frames) and range, the
+   * stream's transfer and primaries as tagged, and which of matrix and range the stream did not
+   * state (so the value is the convention, BT.601 limited, not the stream's own word).
    */
   color?: {
     matrix: string;
@@ -156,7 +156,11 @@ export interface FramesVideo {
   };
   /** The stream's pixel format (`yuv420p`: chroma at half resolution, so a 1px colour edge is not exact). */
   pixelFormat?: string;
-  /** Interlaced: each frame was split into its two fields, the sequence at twice the frame rate. */
+  /**
+   * Interlaced: the frames the decoder flagged interlaced (or, for a codec that flags none, every
+   * frame of a stream tagged interlaced) were each split into their two fields, line-doubled, at
+   * twice the frame rate; the progressive ones stay one frame each.
+   */
   fields?: boolean;
   /** Transparent pixels were composited over this colour (the page behind them is not known). */
   background?: "white" | "black";
@@ -168,7 +172,7 @@ export interface FramesVideo {
   rotation?: number;
   /** A sample aspect ratio other than 1:1, resampled to square pixels (`2:1` doubled each row). */
   sampleAspect?: string;
-  /** `tt`, `bb`, `tb`, `bt`: interlaced. Frames are decoded as frames, not fields. */
+  /** `tt`, `bb`, `tb`, `bt`: the stream's field order as tagged. Which frames were split is `fields`'s. */
   fieldOrder?: string;
 }
 
