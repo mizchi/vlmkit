@@ -101,8 +101,13 @@ import type { Box } from "./storyboard.ts";
 export const MOTION_BLOCK = 16;
 /** Largest displacement searched per frame, in CSS px (a carousel slide moves ~90px a frame at its fastest). */
 export const MOTION_SEARCH = 160;
-/** Frames before a run's first window that the re-count starts from, so a pixel's state is warm. */
-export const MOTION_LEAD_MS = 250;
+/**
+ * Frames before a run's first window that the re-count starts from, so a pixel's state is warm: as
+ * long as a span's history beyond its first window (2s). 250ms started it cold, and a still field
+ * that had stepped 0 → 0.06 → 0.12 before a strobe lost that step's transition, which a small object
+ * moving elsewhere then let read as "motion flicker".
+ */
+export const MOTION_LEAD_MS = 2000;
 /** Frames re-counted per track at most; a run past it is not excused. */
 export const MOTION_MAX_FRAMES = 1200;
 /** A displacement this much larger than its source's motion is a jump, not travel. */
@@ -195,7 +200,7 @@ export function classifyFlash(
   seq: FlashSequence,
   track: FlashTrack,
   runs: readonly FlashRun[],
-  options: { field?: { width: number; height: number }; areaLimit?: number } = {},
+  options: { field?: { width: number; height: number }; areaLimit?: number; judgeFromMs?: number } = {},
 ): MotionVerdict {
   const segments: MotionSegment[] = [];
   let budget = MOTION_MAX_FRAMES;
@@ -263,7 +268,7 @@ function recountSpan(
   seq: FlashSequence,
   track: FlashTrack,
   span: Span,
-  options: { field?: { width: number; height: number }; areaLimit?: number },
+  options: { field?: { width: number; height: number }; areaLimit?: number; judgeFromMs?: number },
 ): { segment: MotionSegment; fieldFails: boolean; residualFails: boolean } {
   const { times } = seq;
   const { k0, k1 } = span;
@@ -276,7 +281,13 @@ function recountSpan(
   // 1. Each failing field's mean colour, as one pixel.
   let fieldTransitions = 0;
   for (const field of spanFields(span)) {
-    const mean = createFlashJudge({ width: 1, height: 1, areaLimit: 0 });
+    // Only the windows the first pass judged: frames before a span's start are history here too.
+    const mean = createFlashJudge({
+      width: 1,
+      height: 1,
+      areaLimit: 0,
+      ...(options.judgeFromMs !== undefined ? { judgeFromMs: options.judgeFromMs } : {}),
+    });
     for (let k = k0; k <= k1; k++) {
       const blocks = seq.blocks?.(k);
       mean.push(
@@ -320,7 +331,7 @@ function recountSpan(
     return motions[k - k0 - 1]!;
   };
   const count = () => {
-    const tracker = createTracker(track, region, first, times, limit, field, searchBox);
+    const tracker = createTracker(track, region, first, times, limit, field, searchBox, options.judgeFromMs);
     const vx: number[] = [];
     const vy: number[] = [];
     let moved = 0;
@@ -422,6 +433,7 @@ function createTracker(
   limit: number,
   field: { width: number; height: number },
   sb: Box,
+  judgeFrom?: number,
 ) {
   const W = region.width;
   const H = region.height;
@@ -994,7 +1006,14 @@ function createTracker(
       const swapCols = stCols;
       stCols = nxCols;
       nxCols = swapCols;
-      if (any || placed) evaluate(k);
+      if (judgeFrom === undefined || times[k]! >= judgeFrom - EPS) {
+        // The first frame on the judged start is judged whatever stepped there; after it, as usual.
+        const first = judgeFrom !== undefined && (k === 0 || times[k - 1]! < judgeFrom - EPS);
+        if (any || placed || first) evaluate(k);
+      } else if (k + 1 >= times.length || times[k + 1]! > judgeFrom + EPS) {
+        // The judged start falls after this frame, before the next: its window holds what this frame's state does.
+        evaluate(k, judgeFrom);
+      }
     },
     result() {
       return { failing, worstArea, explainedShare: changed === 0 ? 0 : explained / changed };
@@ -1031,8 +1050,8 @@ function createTracker(
     return false;
   }
 
-  function evaluate(k: number) {
-    const from = times[k]! - WINDOW_MS + EPS;
+  function evaluate(k: number, end = times[k]!) {
+    const from = end - WINDOW_MS + EPS;
     const back = MAX_TRANSITIONS + 1;
     // Two frames of reference, two areas: what flashes on the content as it moves, and what
     // flashes at a place on the screen. Measured together, the solitaire deal's stock (a place)

@@ -1693,8 +1693,9 @@ so a pixel in one slow change through all of them can count one transition
 differently from the whole recording, and a span verdict that one transition
 decides says so, by area (judge the whole recording for the exact count; a span
 whose history reaches the start counts each pixel as the whole recording does).
-The motion re-count of a failing run starts shortly before it, so one that
-explains no step by motion never excuses the run. A span `scan video` wrote without its
+The motion re-count of a failing run starts 2s before its first window, the
+same warm-up, judges only the windows ending in the span, and never excuses a
+run it explained no step of. A damaged span is still judged only from its start. A span `scan video` wrote without its
 history is reported as not backed (`flash-undersampled`), and `--at` leaves gaps.
 
 What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
@@ -1742,8 +1743,8 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   quarter turn splits columns). HEVC field pictures (one field per decoded frame)
   are line-doubled, never split again. Still fine detail in interlaced frames (a
   text slide, PsF) twitters at field rate once split, which the woven frames cannot
-  tell from a field-rate strobe: a fail that a frame-at-a-time count does not repeat
-  is said not to be decisive.
+  tell from a field-rate strobe: a fail that neither field parity repeats, judged a
+  frame at a time, is said not to be decisive (a strobe on one parity fails it).
 - **Grey** frames of a YUV codec (AV1 4:0:0, HEVC RExt), and any grey tagged
   limited or given `--color-range`, are luma, limited range unless tagged, the
   range kept through the conversion; an untagged grey PNG or GIF is its own levels.
@@ -1768,7 +1769,8 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   with no transparent colour (else ffmpeg fills transparent, as a browser does): a
   first image larger than the logical screen, or smaller and opaque; a frame
   disposed to background, opaque, that the next image does not paint over; and
-  restore-to-previous over ffmpeg's background fill. The recipe's import repeats
+  restore-to-previous over ffmpeg's background fill (a sprite restored over an
+  opaque first frame is not: both restore that frame). The recipe's import repeats
   the loop (`--loop`). After a finite animation's last pass its last frame stays on
   screen, so a span there is in the recording.
 - **Lossy recordings.** Codec noise does not invent or hide a full-field strobe
@@ -1789,8 +1791,10 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   demuxer and decoder, never the metadata, plus the warnings that say a packet
   was corrupt or lost — are kept in `source.video.decodeErrors`. A lost packet
   makes the recording `damaged`: frames may be missing, so a pass on it is not
-  backed. Frames that end well before the stream's stated end are noted (cut
-  short, or a last frame held to the end, which a span may reach).
+  backed. Frames that end well before the stream's stated end are a last frame
+  held to it when the file decoded cleanly (a span may reach it), and a file cut
+  short when the decoder reported errors (damaged; a span in the lost part is
+  refused).
 - **The output directory** is `<recording>.frames/` (`rec.mp4.frames/`, so
   `clip.mp4` and `clip.webm` do not share one), cleared of the previous scan only
   once the new frames are decoded and checked, never of the recording itself (a

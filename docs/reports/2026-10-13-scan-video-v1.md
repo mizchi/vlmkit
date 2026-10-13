@@ -231,6 +231,23 @@ a test except the held-last-frame case, which needs a hand-edited MP4:
 | `--from` after a finite GIF's last pass was refused | Its last frame stays on screen |
 | The help's recipe named `v:0` (can be a cover track) and backed false passes on interlaced and looping input | It names the stream scan video judges (`source.video.stream`) and says what it does not hold for; a test runs it on a cover-first mkv |
 
+## What the fourth look found
+
+The same five groups re-ran each third-round reproduction exactly: 16 fixed, 3 partly, and 7 new
+defects confirmed (two more reported), all narrower than the round before. Fixed, each held by a test:
+
+| Finding | Fix |
+|---|---|
+| The re-count's guard ("explained nothing") was beaten by a 32x32 object moving beside the still field: 0.7% explained, and the cold-start loss excused it | `MOTION_LEAD_MS` 250 → 2000: the re-count starts as warm as a span's history; no fixture page changed verdict |
+| A span's re-count judged windows ending before `--from`: a strobe in the history failed a still span | The field-mean judge and the residual tracker get the span's start |
+| The restore-to-previous rule never cleared its fill flag: every sprite GIF over an opaque first frame was refused, hiding real strobes | The fill is tracked frame by frame and cleared when an opaque image covers the screen |
+| HEVC field pictures needed strict top/bottom alternation: a splice sent the stream back to the double split (areas halved) | Any HEVC stream of frames all flagged interlaced is field pictures; each frame carries its parity |
+| The "not decisive" note judged only first fields: a 5 Hz strobe on second fields was called undecided | Both parities are judged; the note needs both to pass |
+| A damaged span lost its start and was judged over its history | Coverage carries the start whatever else it says |
+| A truncated MKV's header duration was taken as a held last frame: a span in its lost part passed as complete | The stated end extends a last frame only when the file decoded cleanly; cut short with errors, the recording is damaged |
+| A held last frame without errors read "may be cut short" | It says the frame is held to the stated end |
+| `scan video` called a damaged recording "every frame of the recording" | "every frame the decoder recovered" |
+
 ## Cost (this sandbox, 4 cores)
 
 - `scan video`, 10s 720p H.264: 3.4s for flat UI-like content (6 MB of PNGs) and 4.6s for `testsrc2` (77 MB).

@@ -644,4 +644,106 @@ describe("check flash on a recording", () => {
     assert.equal(r.general.verdict, "pass");
     assert.equal(r.history, undefined);
   });
+
+  test("a strobe on one field parity (5 Hz at 50i) fails with no 'not decisive' note", async () => {
+    const file = join(dir, "xenon5-i.mp4");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x120:r=50:d=3,format=yuv420p,geq=lum='if(eq(mod(N\\,10)\\,3)\\,235\\,16)':cb=128:cr=128,tinterlace=mode=merge,setsar=1,setfield=tff",
+      "-c:v",
+      "libx264",
+      "-qp",
+      "0",
+      "-flags",
+      "+ilme+ildct",
+      "-x264opts",
+      "tff=1",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.general.verdict, "fail");
+    assert.equal(r.fieldDetail, undefined);
+  });
+
+  test("a damaged span is still judged only from its start: a strobe in its history does not fail it", async () => {
+    const file = join(dir, "span-dmg.ts");
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:r=25:d=6,format=yuv420p",
+      "-vf",
+      "geq=lum='if(lt(N\\,25)*mod(floor(N/2)\\,2)\\,235\\,if(lt(N\\,25)\\,16\\,128))':cb=128:cr=128",
+      "-c:v",
+      "mpeg2video",
+      "-g",
+      "1",
+      "-q:v",
+      "2",
+      file,
+    ]);
+    const ts = readFileSync(file);
+    const keep: Buffer[] = [];
+    let starts = -1;
+    for (let at = 0; at + 188 <= ts.length; at += 188) {
+      const pid = ((ts[at + 1]! & 0x1f) << 8) | ts[at + 2]!;
+      if (pid === 0x100 && ts[at + 1]! & 0x40) starts++;
+      if (pid === 0x100 && starts === 130) continue;
+      keep.push(ts.subarray(at, at + 188));
+    }
+    const dropped = join(dir, "span-dmg-drop.ts");
+    writeFileSync(dropped, Buffer.concat(keep));
+    const start = (await scanVideo({ file: dropped, out: join(dir, "span-dmg.frames") })).manifest.frames[0]!.atMs;
+    const r = await runFlashCheck({
+      source: dropped,
+      video: { selection: { kind: "span", fromMs: start + 3500, toMs: start + 4000 } },
+    });
+    assert.equal(r.sampling.complete, false);
+    assert.equal(r.sampling.judgedFromMs, start + 3500);
+    assert.equal(r.general.verdict, "pass");
+  });
+
+  test("a span's motion re-count judges only the windows ending in the span: a strobe in its history is history", async () => {
+    // A 4px-cell texture scrolling 2px a frame (fails per pixel, motion explains it), with a
+    // full-field strobe at 2.25-2.48s only; the span from 3.5s holds none of it.
+    const file = join(dir, "prestrobe.mkv");
+    const t = "gt(mod(abs(sin(floor((X-2*N)/4)*12.9898+floor(Y/4)*78.233))*43758.5453\\,1)\\,0.5)*255";
+    const e = `if(between(N\\,135\\,149)\\,if(mod(N\\,2)\\,255\\,0)\\,${t})`;
+    execFileSync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=black:s=320x240:r=60:d=4.2,format=rgb24,geq=r='${e}':g='${e}':b='${e}'`,
+      "-c:v",
+      "ffv1",
+      "-pix_fmt",
+      "bgr0",
+      file,
+    ]);
+    const r = await runFlashCheck({ source: file, video: { selection: { kind: "span", fromMs: 3500, toMs: 4000 } } });
+    assert.notEqual(r.general.verdict, "fail", `${r.general.verdict} ${r.general.reason}`);
+  });
+
+  test("a still field that steps before it strobes is a flash, whatever small thing moves beside it", async () => {
+    const f = "if(lt(N\\,30)\\,0\\,if(lt(N\\,45)\\,70\\,if(gt(N\\,51)\\,98\\,if(mod(N\\,2)\\,98\\,0))))";
+    const obj = "between(X-20-2*N\\,0\\,31)*between(Y\\,100\\,131)";
+    const ov = "if(mod(floor((X-20-2*N)/4)+floor(Y/4)\\,2)\\,255\\,0)";
+    const file = grey("step2mov.mkv", `if(${obj}\\,${ov}\\,${f})`, 7);
+    const r = await runFlashCheck({ source: file });
+    assert.equal(r.general.verdict, "fail");
+  });
 });

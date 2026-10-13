@@ -913,7 +913,7 @@ describe("scanVideo: what the second review found, held", () => {
       JSON.stringify(truncated.manifest.source.video!.decodeErrors),
     );
     assert.ok(
-      truncated.manifest.source.video!.notes?.some((n) => /says it runs to 2s .* may be cut short/.test(n)),
+      truncated.manifest.source.video!.notes?.some((n) => /says it runs to 2s, .* the file is cut short/.test(n)),
       JSON.stringify(truncated.manifest.source.video!.notes),
     );
     mkdirSync(join(dir, "corrupt-cases"), { recursive: true });
@@ -1361,7 +1361,8 @@ describe("scanVideo: what the third look found, held", () => {
       file,
     );
     const r = await scanVideo({ file, out: join(dir, "r3-hevc.frames") });
-    assert.equal(r.manifest.source.video!.fields, undefined);
+    // Fields, each its own frame: `fields` and each frame's parity, so a frame-at-a-time count can pair them.
+    assert.equal(r.manifest.source.video!.fields, true);
     assert.deepEqual(r.manifest.source.viewport, { width: 64, height: 48 });
     assert.equal(r.manifest.frames.length, 20, "one row per field picture, at the field rate");
     assert.ok(r.manifest.source.video!.notes?.some((n) => /HEVC field pictures/.test(n)));
@@ -1450,5 +1451,56 @@ describe("scanVideo: what the third look found, held", () => {
     );
     const r = await scanVideo({ file, out: join(dir, "r3-once.frames"), selection: { kind: "span", fromMs: 2500 } });
     assert.equal(r.manifest.frames[r.manifest.frames.length - 1]!.atMs, 100);
+  });
+});
+
+describe("scanVideo: what the fourth look found, held", () => {
+  test("HEVC field pictures spliced so two top fields meet are still line-doubled one by one, each with its parity", async () => {
+    const part = (name: string, range: string) => {
+      const f = join(dir, name);
+      ffmpeg(
+        "-f",
+        "lavfi",
+        "-i",
+        `color=c=gray:s=64x48:r=25:d=0.4,format=yuv420p,setfield=tff,separatefields,${range}`,
+        "-c:v",
+        "libx265",
+        "-x265-params",
+        "interlace=tff:qp=0:log-level=error",
+        f,
+      );
+      return f;
+    };
+    const a = part("r4-partA.mkv", "trim=end_frame=9");
+    const b = part("r4-partB.mkv", "trim=start_frame=9,setpts=PTS-STARTPTS");
+    const list = join(dir, "r4-list.txt");
+    writeFileSync(list, `file '${a}'\nfile '${b}'\n`);
+    const spliced = join(dir, "r4-spliced.mkv");
+    ffmpeg("-f", "concat", "-safe", "0", "-i", list, "-c", "copy", spliced);
+    const r = await scanVideo({ file: spliced, out: join(dir, "r4-spliced.frames") });
+    assert.deepEqual(r.manifest.source.viewport, { width: 64, height: 48 });
+    assert.equal(r.manifest.source.video!.fields, true);
+    assert.ok(r.manifest.frames.every((f) => f.field === 0 || f.field === 1));
+    assert.ok(r.manifest.source.video!.notes?.some((n) => /HEVC field pictures/.test(n)));
+  });
+
+  test("a file cut short is not a held last frame: a span in its lost part is refused, the rest is damaged", async () => {
+    const whole = join(dir, "r4-strobe.mkv");
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=160x120:r=25:d=6", "-c:v", "libx264", "-g", "25", whole);
+    const bytes = readFileSync(whole);
+    const cut = join(dir, "r4-cut.mkv");
+    writeFileSync(cut, bytes.subarray(0, Math.floor(bytes.length * 0.4)));
+    const r = await scanVideo({ file: cut, out: join(dir, "r4-cut.frames") });
+    const last = r.manifest.frames[r.manifest.frames.length - 1]!.atMs;
+    assert.ok(last < 4000, `the frames end at ${last}`);
+    assert.equal(r.manifest.source.video!.damaged, true);
+    await assert.rejects(
+      scanVideo({
+        file: cut,
+        out: join(dir, "r4-cut-span.frames"),
+        selection: { kind: "span", fromMs: 5000, toMs: 5500 },
+      }),
+      /after the recording ends/,
+    );
   });
 });

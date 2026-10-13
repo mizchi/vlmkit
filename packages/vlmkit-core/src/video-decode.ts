@@ -742,13 +742,18 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   const rows = timeline.rows;
   // A span with no end, or one past the end, is recorded as far as the recording goes.
   // Where the stream says it ends: a last frame held to then is on screen until then (an MP4 with
-  // B-frames gives the hold to a frame in decode order, so the frames alone end early).
+  // B-frames gives the hold to a frame in decode order, so the frames alone end early) — when the
+  // file decoded cleanly. A file cut short keeps its header's duration and says so as an error
+  // (`File ended prematurely`): its lost part is not a held frame, and judged as one it passed.
   const statedEnd =
     !image && stream.durationMs !== undefined && (stream.startMs ?? 0) >= 0
       ? (stream.startMs ?? 0) + stream.durationMs
       : undefined;
   const framesEnd = recordingEndMs(rows, timeline.endMs);
-  const endMs = image ? until! : Math.max(framesEnd, statedEnd ?? 0);
+  const tableErrors = table.stderr.some((l) => l.trim() !== "");
+  const gapBefore = rows.length > 1 ? rows[rows.length - 1]!.atMs - rows[rows.length - 2]!.atMs : 0;
+  const endsShort = statedEnd !== undefined && framesEnd < statedEnd - Math.max(500, 2 * gapBefore);
+  const endMs = image ? until! : tableErrors ? framesEnd : Math.max(framesEnd, statedEnd ?? 0);
   const spanEnd = (toMs: number | undefined, fromMs: number) =>
     Math.max(fromMs, Math.min(toMs ?? Number.POSITIVE_INFINITY, endMs));
   const request: SelectionRequest =
@@ -899,6 +904,14 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     };
     const lastUse = new Map<string, number>();
     chosen.forEach((f, n) => lastUse.set(workFile(f), n));
+    // A field picture's parity: the first field's parity is field 0, as a split frame's first field is.
+    const firstParity = probedFrames[0]!.topFieldFirst === true;
+    const fieldOfPicture = (f: { decoded?: number; index: number }): 0 | 1 | undefined =>
+      fieldPlan?.lineDouble
+        ? (probedFrames[decodedOf(f)]!.topFieldFirst === true) === firstParity
+          ? 0
+          : 1
+        : undefined;
     const frames: FrameEntry[] = [];
     for (const [n, f] of chosen.entries()) {
       const name = frameFileName(n, f.atMs);
@@ -913,18 +926,26 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         stable: true,
         index: f.index,
         key: f.key,
-        ...(f.field !== undefined ? { field: f.field } : {}),
+        ...(f.field !== undefined
+          ? { field: f.field }
+          : fieldOfPicture(f) !== undefined
+            ? { field: fieldOfPicture(f)! }
+            : {}),
         ...(l ? { label: l } : {}),
       });
     }
     const errors = [...new Set([...table.stderr.map((l) => l.trim()).filter(Boolean), ...decodeErrors(stderrAll)])];
-    const damaged = errors.some((l) => CORRUPT_PACKET.test(l));
-    // Frames that end well before the stream's stated end: cut short, or a last frame held to the end
-    // (which the frames alone cannot tell apart; a span may reach the stated end either way).
-    const gap = rows.length > 1 ? rows[rows.length - 1]!.atMs - rows[rows.length - 2]!.atMs : 0;
-    if (statedEnd !== undefined && framesEnd < statedEnd - Math.max(500, 2 * gap)) {
+    // Frames that end well before the stream's stated end, with the decoder reporting errors: cut
+    // short, so what is missing is not judged (decoded cleanly, the last frame is held to the end).
+    const cutShort = endsShort && errors.length > 0;
+    const damaged = cutShort || errors.some((l) => CORRUPT_PACKET.test(l));
+    if (cutShort) {
       notes.push(
-        `the stream says it runs to ${Number((statedEnd / 1000).toFixed(3))}s and its frames end at ${Number((framesEnd / 1000).toFixed(3))}s: the file may be cut short, or its last frame is held to the end`,
+        `the stream says it runs to ${Number((statedEnd! / 1000).toFixed(3))}s, its frames end at ${Number((framesEnd / 1000).toFixed(3))}s and the decoder reported errors: the file is cut short`,
+      );
+    } else if (endsShort && !image) {
+      notes.push(
+        `its last frame is held to the stream's stated end, ${Number((statedEnd! / 1000).toFixed(3))}s (the frames alone end at ${Number((framesEnd / 1000).toFixed(3))}s)`,
       );
     }
     const video: FramesVideo = {
@@ -939,7 +960,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
       ...(timeline.hidden ? { hidden: timeline.hidden } : {}),
       ...(timeline.timing ? { timing: timeline.timing } : {}),
       ...(timeline.loop ? { loop: timeline.loop } : {}),
-      ...(timeline.fields ? { fields: true } : {}),
+      ...(timeline.fields || fieldPlan?.lineDouble ? { fields: true } : {}),
       ...(stream.alpha ? { background } : {}),
       ...(stream.rotation ? { rotation: stream.rotation } : {}),
       ...(sampleAspect ? { sampleAspect } : {}),
@@ -1005,16 +1026,11 @@ function fieldSplit(
   stream: VideoStream,
 ): { split?: (f: ProbedFrame) => boolean; order?: "tff" | "bff"; lineDouble?: boolean; note?: string } {
   const flagged = frames.filter((f) => f.interlaced).length;
-  // HEVC field pictures: the decoder hands each field over as its own half-height frame, flagged
-  // interlaced, top and bottom alternating. Split, each one instant became two pseudo-fields and
-  // every area was halved (a 30,000 px² box passed at 15,200); each is line-doubled instead.
-  const interlacedFrames = frames.filter((f) => f.interlaced);
-  if (
-    stream.codec === "hevc" &&
-    interlacedFrames.length === frames.length &&
-    interlacedFrames.length > 1 &&
-    interlacedFrames.every((f, i) => i === 0 || f.topFieldFirst !== interlacedFrames[i - 1]!.topFieldFirst)
-  ) {
+  // HEVC field pictures: ffmpeg's decoder hands each field over as its own half-height frame and
+  // flags only those interlaced (a frame's pic_struct is not flagged). Split, each one instant
+  // became two pseudo-fields and every area was halved (a 30,000 px² box passed at 15,200); each is
+  // line-doubled instead — per frame, so a splice where two top fields meet changes nothing.
+  if (stream.codec === "hevc" && flagged === frames.length) {
     return {
       lineDouble: true,
       note: "HEVC field pictures: each decoded frame is one field, line-doubled to the picture's height, at the field rate",

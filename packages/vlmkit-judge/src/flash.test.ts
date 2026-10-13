@@ -664,13 +664,14 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
   test("runs are re-counted whole, from a second and a lead before each, merged where they meet", () => {
     const box = { x: 0, y: 0, width: 1, height: 1 };
     const run = (from: number, to: number) => ({ from, to, area: 30_000, field: box, region: box, windows: [] });
-    const times = Array.from({ length: 600 }, (_, k) => frameTimeMs(k));
-    const spans = runSpans(times, [run(200, 260), run(80, 120), run(300, 590)]);
+    // A second and a 2s lead before each run's first window: 180 frames at 60fps.
+    const times = Array.from({ length: 1200 }, (_, k) => frameTimeMs(k));
+    const spans = runSpans(times, [run(200, 260), run(80, 120), run(600, 1190)]);
     assert.deepEqual(
       spans.map((s) => [s.k0, s.k1, s.runs.length]),
       [
-        [5, 120, 1],
-        [125, 590, 2],
+        [0, 260, 2],
+        [420, 1190, 1],
       ],
     );
   });

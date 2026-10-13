@@ -282,7 +282,11 @@ function rate(manifest: FramesManifest): string {
 function describeSelection(manifest: FramesManifest, streamFrames: number | undefined): string {
   const s = manifest.source.video!.selection;
   const n = manifest.frames.length;
-  if (s.kind === "all") return `every frame of the recording`;
+  if (s.kind === "all") {
+    return manifest.source.video!.damaged
+      ? "every frame the decoder recovered (packets were lost or the file is cut short: frames may be missing)"
+      : "every frame of the recording";
+  }
   if (s.kind === "span") return `of ${streamFrames ?? "?"}: those on screen during the span`;
   return `the frame on screen at each of ${s.atMs.length} instants`;
 }

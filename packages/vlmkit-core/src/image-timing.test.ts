@@ -152,3 +152,21 @@ test("gifCompositingProblem: only where ffmpeg paints its opaque background, whi
   );
   assert.equal(at([{ pixels: 0, disposal: 3 }, { pixels: 1 }]), null);
 });
+
+test("gifCompositingProblem: a sprite restored to previous over an opaque first frame restores that frame, as a browser does", () => {
+  const palette = [
+    [0, 0, 0],
+    [255, 255, 255],
+  ] as const;
+  const at = (frames: Parameters<typeof encodeGif>[0]["frames"]) =>
+    gifCompositingProblem(imageTiming(encodeGif({ width: 20, height: 20, palette, loop: 0, frames }))!);
+  const sprites = [
+    { pixels: 1, disposal: 1 },
+    { pixels: 0, x: 0, y: 0, width: 15, height: 15, disposal: 3 },
+    { pixels: 0, x: 19, y: 19, width: 1, height: 1, disposal: 3 },
+    { pixels: 0, x: 0, y: 0, width: 15, height: 15, disposal: 3 },
+  ];
+  assert.equal(at(sprites), null);
+  // An opaque frame disposed to background and painted over, then a frame that covers the screen: the fill is gone.
+  assert.equal(at([{ pixels: 0, disposal: 2 }, { pixels: 1, disposal: 1 }, ...sprites.slice(1)]), null);
+});

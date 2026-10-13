@@ -664,8 +664,11 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   HEVC field pictures (each decoded frame one field, top and bottom alternating) are line-doubled
   as they are, never split again (split, a 30,000 px² box was judged at 15,200). Still fine detail
   in frames flagged interlaced (a text slide, PsF) is line-doubled into a field-rate twitter that the
-  woven frames cannot tell from a field-rate strobe, so a fail that a frame-at-a-time count does not
-  repeat says it is not decisive (`report.fieldDetail`).
+  woven frames cannot tell from a field-rate strobe, so a fail that neither field parity repeats
+  judged a frame at a time says it is not decisive (`report.fieldDetail`); a strobe on one parity
+  (5 Hz at 50i, every tenth field) fails that parity and gets no such note. HEVC field pictures are
+  detected per frame (a splice where two top fields meet had sent a stream back to the double split)
+  and carry `fields` and each frame's parity.
 - **A YUV codec's grey frames are luma** (AV1 4:0:0, HEVC RExt; any grey tagged limited, or given
   `--color-range`): limited unless tagged, and converted through YUV — swscale's grey → RGB applies no
   range (16 stayed 16, measured), and the step to YUV is `scale=in_range=R:out_range=R` first, since
@@ -686,7 +689,8 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   so refused: a first image larger than the screen (Chromium grows the canvas, ffmpeg crops); one
   smaller, opaque; a frame disposed to background, opaque, that the next does not paint over (a
   black/white strobe passed, a static white GIF failed); and restore-to-previous over that fill
-  (ffmpeg restores it, Chromium a cleared canvas). The refusal carries an ImageMagick coalesce recipe
+  (ffmpeg restores it, Chromium a cleared canvas) — tracked frame by frame: a sprite restored over an
+  opaque first frame restores that frame's pixels in both, and refusing it hid a real strobe. The refusal carries an ImageMagick coalesce recipe
   whose import repeats the loop (`scan video <dir> --loop`: its pts end with the pass's end); one
   pass marked `--every-frame` was the false pass again. A GIF's aspect byte and a PNG's pHYs are not
   applied (a browser lays an image out at its pixel size). An APNG plays the frames its `acTL`
@@ -710,9 +714,11 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   one transition decides says so (`report.history`) — decided by area (`margins` in the judge: the
   best field of the pixels one short, ≥ 6, in windows that hold a seventh frame, and of those one to
   spare, ≥ 8), not by the peak, which a small region strobing more hid. The motion re-count of a run
-  starts cold too (250ms before it), so a re-count that explained no step by motion never excuses a
-  run (a still field read "motion flicker" at 0% explained). A span without its history is
-  `flash-undersampled`. An import is complete only with `--every-frame` (a `-vf fps=5` export of a
+  starts `MOTION_LEAD_MS` (2s) before its first window, the same warm-up as a span's history (at
+  250ms a still field read "motion flicker", and a small object moving beside it hid the guard), a
+  re-count that explained no step never excuses a run, and in a span it judges only the windows
+  ending in it (a strobe in the history had failed the span). A span without its history, or of a
+  damaged recording, is `flash-undersampled` — and still judged only from its start. An import is complete only with `--every-frame` (a `-vf fps=5` export of a
   strobe passed as whole). `check flash rec.mp4` and `scan video` + `check flash frames.json` give the
   same report (a test holds it). The area is CSS px: `--display-width` (a 160x120 strobe passes at its
   size, fails at 320 wide); at most 4096 a side.
@@ -747,7 +753,10 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   a second scan into the same directory in one process is refused. The recording is guarded as it
   resolves too (a symlink elsewhere to a frame-named file in `--out`) and against the work-dir sweep's
   `.scan-video-*` names. A stream's stated end (start + duration) is where its last frame is on screen
-  until: an MP4 with B-frames gives a held last frame's duration to a frame in decode order.
+  until when it decoded cleanly: an MP4 with B-frames gives a held last frame's duration to a frame in
+  decode order. A file that ends short with decoder errors (`File ended prematurely`) is cut short,
+  not held: a span in its lost part is refused, and the recording is `damaged` (judged as a held
+  frame, a truncated strobe passed as complete).
 - **`snapshot storyboard` refuses a lossy recording without `--lossy`**: it compares pixels exactly and
   has no noise floor; with `--lossy` SUMMARY.md names the events that begin on a keyframe. A lossless
   one (ffv1, png, qtrle; not rpza, a vector quantizer) is segmented like any capture: a planted glitch

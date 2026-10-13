@@ -147,19 +147,25 @@ export function gifCompositingProblem(timing: ImageTiming): string | null {
   }
   const paintsOver = (b: GifImage, a: GifImage) =>
     !b.transparent && b.x <= a.x && b.y <= a.y && b.x + b.width >= a.x + a.width && b.y + b.height >= a.y + a.height;
-  // Whether ffmpeg's canvas under image i holds its opaque background fill: the keyframe's, under an
-  // opaque first image, or an earlier opaque frame's disposal to background.
-  let filled = !first.transparent;
+  const screenRect: GifImage = { x: 0, y: 0, ...screen, disposal: 0, transparent: false };
+  // Whether ffmpeg's canvas, as image i is drawn on it, still holds its opaque background fill
+  // anywhere: the keyframe's under an opaque first image (which paints over all of it, the check
+  // above saw to that), and an opaque frame's disposal to background, until an opaque image
+  // paints over the whole screen. A sprite restored to previous over a first frame restores that
+  // frame's pixels in ffmpeg as in a browser (measured, pixel for pixel), so it is no fill.
+  let fillBefore = !first.transparent;
   for (let i = 0; i + 1 < images.length; i++) {
     const a = images[i]!;
     const b = images[i + 1]!;
     if (a.disposal === 2 && !a.transparent && !paintsOver(b, a)) {
       return `image ${i} is disposed to background with no transparent colour, and image ${i + 1} does not paint over all of it opaquely: a browser clears it to transparent, ffmpeg fills it with the background colour`;
     }
-    if (a.disposal === 3 && filled && !paintsOver(b, a)) {
+    if (a.disposal === 3 && fillBefore && !paintsOver(b, a)) {
       return `image ${i} is restored to the canvas before it, which ffmpeg filled with the background colour, and image ${i + 1} does not paint over all of it opaquely: a browser restores a transparent canvas`;
     }
-    if (a.disposal === 2 && !a.transparent) filled = true;
+    // The canvas as image i + 1 is drawn: image i drawn (an opaque whole screen covers any fill), then disposed.
+    const afterDraw = fillBefore && !paintsOver(a, screenRect);
+    fillBefore = a.disposal === 3 ? fillBefore : a.disposal === 2 && !a.transparent ? true : afterDraw;
   }
   return null;
 }

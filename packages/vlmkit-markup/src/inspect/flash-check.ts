@@ -1055,7 +1055,7 @@ function judge(
   times: readonly number[],
   cssPerPx: number,
   unmeasured: readonly UnmeasuredRegion[],
-  sampling: { still: boolean; complete?: boolean },
+  sampling: { still: boolean; complete?: boolean; judgeFromMs?: number },
 ): {
   general: FlashTrackReport;
   red: FlashTrackReport;
@@ -1087,7 +1087,9 @@ function judge(
   for (const track of ["general", "red"] as const) {
     const r = trackOf(result[track], times, maxGapMs, fieldArea);
     if (result[track].runs.length > 0) {
-      const verdict = classifyFlash(seq, track, result[track].runs);
+      const verdict = classifyFlash(seq, track, result[track].runs, {
+        ...(sampling.judgeFromMs !== undefined ? { judgeFromMs: sampling.judgeFromMs } : {}),
+      });
       r.classification = verdict.classification;
       r.reason = verdict.reason;
       r.motion = verdict.segments;
@@ -1145,37 +1147,46 @@ export interface StreamCoverage {
 export function streamCoverage(manifest: FramesManifest): StreamCoverage {
   const frames = manifest.frames;
   const video = manifest.source.video;
+  const first = frames[0]!.index ?? 0;
+  const selection = video?.selection;
+  // A span asked for with its history: only the windows ending at or after its start are judged —
+  // the start asked for, not the start of the frame on screen then, whose window can end seconds
+  // before it in a held frame (measured: a strobe that stopped before a 3s hold failed a span in it).
+  // Whatever else the coverage says: an incomplete span is still judged only from its start
+  // (a damaged one had been judged over its history, and failed on a strobe before it).
+  let judgeFromMs: number | undefined;
+  if (selection?.kind === "span" && selection.leadInMs !== undefined && selection.fromMs > frames[0]!.atMs + 1e-6) {
+    judgeFromMs = selection.fromMs;
+  }
+  const at = judgeFromMs !== undefined ? { judgeFromMs, fromStart: first === 0 } : {};
   const consecutive =
     frames.every((f) => f.stable) && frames.every((f, i) => f.index !== undefined && f.index === frames[0]!.index! + i);
   if (!consecutive) {
-    return { complete: false, whole: false, partial: "frames of the recording are left out between the ones here" };
+    return {
+      complete: false,
+      whole: false,
+      ...at,
+      partial: "frames of the recording are left out between the ones here",
+    };
   }
   if (video?.damaged) {
     return {
       complete: false,
       whole: false,
-      partial: "the demuxer reported corrupt or lost packets, so frames may be missing between the ones here",
+      ...at,
+      partial: "the decoder reported corrupt or lost packets, or the file cut short, so frames may be missing",
     };
   }
   if (video?.decoder === "import" && video.streamFrames === undefined) {
     return {
       complete: false,
       whole: false,
+      ...at,
       partial: "imported frames another tool wrote, not marked as every frame (scan video <dir> --every-frame)",
     };
   }
-  const first = frames[0]!.index!;
   const last = frames[frames.length - 1]!.index!;
   const whole = first === 0 && video?.streamFrames !== undefined && last === video.streamFrames - 1;
-  const selection = video?.selection;
-  // A span asked for with its history: only the windows ending at or after its start are judged —
-  // the start asked for, not the start of the frame on screen then, whose window can end seconds
-  // before it in a held frame (measured: a strobe that stopped before a 3s hold failed a span in it).
-  let judgeFromMs: number | undefined;
-  if (selection?.kind === "span" && selection.leadInMs !== undefined && selection.fromMs > frames[0]!.atMs + 1e-6) {
-    judgeFromMs = selection.fromMs;
-  }
-  const at = judgeFromMs !== undefined ? { judgeFromMs, fromStart: first === 0 } : {};
   if (whole) return { complete: true, whole: true, ...at };
   if (selection?.kind === "span" && (selection.leadInMs ?? 0) >= WINDOW_MS - 1e-6) {
     return { complete: true, whole: false, ...at };
@@ -1184,6 +1195,7 @@ export function streamCoverage(manifest: FramesManifest): StreamCoverage {
   return {
     complete: false,
     whole: false,
+    ...at,
     partial: `the frames begin ${Number(frames[0]!.atMs.toFixed(1))}ms into the recording with no second before them, so a window ending in their first second is missing its start (check flash on the recording with --from decodes it)`,
   };
 }
@@ -1423,7 +1435,11 @@ async function judgeManifest(
   const coldHistory = coverage?.judgeFromMs !== undefined && !coverage.fromStart;
   const counted = countFiles(files, times, cssPerPx, unmeasured, coverage?.judgeFromMs, coldHistory);
   const countMs = performance.now() - t0;
-  const judged = judge(counted, files, times, cssPerPx, unmeasured, { still, complete: coverage?.complete === true });
+  const judged = judge(counted, files, times, cssPerPx, unmeasured, {
+    still,
+    complete: coverage?.complete === true,
+    ...(coverage?.judgeFromMs !== undefined ? { judgeFromMs: coverage.judgeFromMs } : {}),
+  });
   const video = manifest.source.video;
   const report: FlashReport = {
     format: FLASH_FORMAT,
@@ -1465,24 +1481,39 @@ async function judgeManifest(
     if (lossy.length > 0) report.lossy = lossy;
   }
   if (video?.fields && (judged.general.verdict === "fail" || judged.red.verdict === "fail")) {
-    // The frame-rate sequence: each frame's first field (or the frame itself, when not split).
-    const keep = manifest.frames.map((f, i) => (f.field === 1 ? -1 : i)).filter((i) => i >= 0);
-    if (keep.length < files.length && keep.length > 1) {
+    // Each field parity on its own, at frame rate (a frame not split is in both). A fail neither
+    // repeats is carried only between the two fields of single frames: still fine detail split
+    // into fields, or a field-rate flicker. A strobe on one parity alone (5 Hz at 50i is every tenth
+    // field) fails that parity, so it is never called undecided.
+    const parity = (drop: 0 | 1) => {
+      const keep = manifest.frames.map((f, i) => (f.field === drop ? -1 : i)).filter((i) => i >= 0);
+      if (keep.length === files.length || keep.length < 2) return null;
       const subFiles = keep.map((i) => files[i]!);
       const subTimes = keep.map((i) => times[i]!);
-      const sub = judge(
+      return judge(
         countFiles(subFiles, subTimes, cssPerPx, unmeasured, coverage?.judgeFromMs),
         subFiles,
         subTimes,
         cssPerPx,
         unmeasured,
-        { still, complete: coverage?.complete === true },
+        {
+          still,
+          complete: coverage?.complete === true,
+          ...(coverage?.judgeFromMs !== undefined ? { judgeFromMs: coverage.judgeFromMs } : {}),
+        },
       );
+    };
+    const firsts = parity(1);
+    const seconds = firsts ? parity(0) : null;
+    if (firsts && seconds) {
       const notes = (["general", "red"] as const)
-        .filter((track) => judged[track].verdict === "fail" && sub[track].verdict !== "fail")
+        .filter(
+          (track) =>
+            judged[track].verdict === "fail" && firsts[track].verdict !== "fail" && seconds[track].verdict !== "fail",
+        )
         .map(
           (track) =>
-            `${track}: fails only between the two fields of the same frames; judged a frame at a time it does not. A field-rate flicker and still fine detail split into its fields (a text slide, PsF) are the same woven frames, so this fail is not decisive`,
+            `${track}: fails only between the two fields of the same frames; each field parity judged a frame at a time does not. A field-rate flicker and still fine detail split into its fields (a text slide, PsF) are the same woven frames, so this fail is not decisive`,
         );
       if (notes.length > 0) report.fieldDetail = notes;
     }
