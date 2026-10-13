@@ -2,9 +2,9 @@
 
 2026-10-12. `vlmkit check flash` is the first gate that judges a frame sequence: every 60fps frame of
 2-10s of page time, shot on the held clock, counted per pixel, and re-counted with motion compensated
-where that fails. This round is what it measures, the known answers it was built against, what an
-adversarial review of the first version found (50 findings, every one confirmed) and what changed for
-each, and what it costs.
+where that fails. This round is what it measures, the known answers it was built against, what two
+adversarial reviews found (50 findings in the first version, every one confirmed; 17 more in what
+fixed them, of 19 raised) and what changed for each, and what it costs.
 
 ## Why
 
@@ -54,19 +54,21 @@ Synthetic (`packages/vlmkit-judge/src/flash.test.ts`, 400x300 frames at 60fps, n
 | four quadrants lit in turn, once a second each | pass, 2 transitions |
 
 On the page (`fixtures/flash/`, `expected.json`, 400x300, a 1.5s window unless the page's own default
-is the point; `flash-check.test.ts`), 28 pages:
+is the point; `flash-check.test.ts`), 38 pages:
 
 | Pages | Answer |
 |---|---|
 | `strobe-4hz`, `box-148`, `raf-5hz` (a rAF loop), `interval` (a 125ms `setInterval`), `scale-strobe` (`transform: scale(1)↔scale(0)`), `ticker-strobe` (field), `teleport-drift` | general fail |
 | `late-strobe` (begins 2.5s in), `timer-strobe` (a timer starts it 2.5s in) | general fail, on the window the page asks for |
 | `iframe`, `shadow`, `smil`, `playback-rate` (2 Hz at rate 2), `revive` (a highlight replayed every 250ms) | general fail: each was a pass, or not judgeable, before the held clock held it |
+| `waapi-chain` (a strobe begun when `await fade.finished` resolves), `reverse-rate` (a strobe at rate -1), `chain-anim` (begun on an `animationend` 2s in), `chain-timer` (a timer's timer), `iframe-late` (a delayed strobe inside an iframe) | general fail: each passed after the first review |
 | `red-grey`, `faded-red` | red fail only |
 | `strobe-3hz`, `box-144`, `testbed-div` (the testbed's 250x250 red/white every 250ms: 2 flashes a second), `quadrants`, `page-paused` (the page holds it) | pass |
 | `scroll-text` | motion flicker |
 | `navigate` (leaves for another page 500ms in) | pass, 1 navigation followed |
 | `still` | one frame |
-| `video`, `animated-gif`, `background-gif` (the GIF as a CSS background), `late-video` (added 1s in) | not judgeable |
+| `video`, `animated-gif`, `background-gif` (the GIF as a CSS background), `late-video` (added 1s in), `iframe-video`, `three-videos` (one style path for three), `video-beside-strobe` (each under the limit, over it together) | not judgeable |
+| `blob-image`, `svg-percent` (a still image through a `blob:` URL; inline SVG with a raw `%`) | pass: both read as unreadable, so not judgeable, after the first review |
 
 The saved frames of `strobe-4hz` judged again give the live answer; every other frame of them still
 fails; one frame in twelve is not judgeable.
@@ -101,15 +103,17 @@ Measured at 1280x720, default window, after every fix below:
 Synthetic cases (400x300) hold the rest: text scrolling 5px and 2.5px a frame (antialiased) and an
 eased carousel are motion; a textured teleport, stripes moved by half their period, a strobe beside
 scrolling text, a light strobe (ΔL 0.106) and a smooth 4 Hz pulse behind 60%-ink scrolling text, a
-40px teleport while drifting, a 20px shake, 8px stripes inverting and a texture that inverts as it moves
-6px a frame are all flashes.
+40px teleport while drifting, a 20px shake (back and forth, or around a square), 8px stripes inverting,
+a texture that inverts as it moves 6px a frame, the light strobe and the smooth pulse behind text moving
+2.5 or 1.5px a frame, text that steps 4px four times a second over a 6 Hz strobe, and a stationary
+strobe box under scrolling text are all flashes.
 
 What may establish motion is narrow, because every excuse is a way to pass a strobe. A block's
 displacement must reproduce it (texture, mean residual ≤ 0.04 in encoded luminance and under half of
 not moving, on the part of the block whose source is in the frame), and is refused when a level change
 in place explains it as well, when the opposite displacement matches too (no direction), when it
-jumps more than 24px beyond how the content was moving, and when the block reverses more than six
-times within a second. DOM attribution decides nothing: the three transform-only strobes above are
+jumps more than 24px beyond how the content was moving, and when the block reverses (turns a quarter
+turn or more) more than six times within a second. DOM attribution decides nothing: the three transform-only strobes above are
 real flashes, so animations are only named.
 
 ### What the review changed, each measured
@@ -184,6 +188,29 @@ sweep's own decisions in `source.sweep`) so a re-judge masks the same, and when 
 the limit in one field — alone or with what flashes beside them — the verdict is `not-judgeable` with
 `flash-unmeasured` as a suspect, never a pass.
 
+## The second review
+
+The fixes above were reviewed again the same way: four reviewers by area, each finding handed to a
+skeptic told to refute it. 19 were raised; 2 were refuted (one documented behaviour, one too minor),
+and 17 reproduced on the branch.
+
+| Found | Changed |
+|---|---|
+| between pixels the residual was the range of the 2-4 source pixels: beside ink a strobe's step toward the darker level fell inside it, and the light strobe behind text moving 2.5 or 1.5px a frame (and the smooth pulse at 2.5) was motion | a step is checked against the forward and backward predictions the matcher uses, within 0.01; a state keeps where in its pixel its content is (`Math.round(2.5)` slid every state half a pixel a frame along what it counted). All three are flashes now; a pure blended 2.5px scroll still leaves nothing |
+| dwell trimming dropped the in-place steps it trimmed: a 6 Hz strobe behind text that steps 4px four times a second left 0 | a screen-fixed place ring holds them, and level steps taken under travelling content: flash. Content and places are two areas; as one, the deal came within 3,688 px² of the limit |
+| a stationary strobe box that scrolling text crosses was carried out of the box on the text | the place ring holds the box's steps: flash (with text sparse enough to see it; dense text hiding each pixel more than one step in eight is a limit, below) |
+| a reversal needed a turn past 90°: a 20px shake around a square path was motion | a quarter turn or more counts: flash |
+| a `<video>` inside an iframe was paused and never reported | media found in every frame, in the page's coordinates |
+| three sibling videos shared one style path and were one region | told apart by element |
+| unmeasured pixels under the limit alone but over it with the flashing beside them were not judgeable, and exited 0 | a suspect, as alone |
+| the window was fixed at load: a strobe an `animationend` or a later timer started was never reached | reconsidered at its end with what the page began |
+| an iframe's animations and timers did not count for the window | every frame's do |
+| a held animation never finished, so `await anim.finished` / `onfinish` chains never ran | ended natively at its end; what the page begins from it starts at that end |
+| an iframe inserted after 0 ran its first second in one step | each frame on its own offset |
+| an animation real time had finished during load was frozen at its end | real time spent loading is page time 0 |
+| a negative playback rate was frozen by the hold's own pause | placed from an anchor, any rate but 0 |
+| every `blob:` image was unreadable; a raw `%` in a `data:` URL threw | read through the frame, and as the URL standard reads them |
+
 ## The repository's own pages
 
 The 21 pages the design's corpus named (six dogfood-animation pages, solitaire, the landing page, the
@@ -226,6 +253,10 @@ from 16s to 3s on the scroll. `--window` and `--viewport` are the levers.
 ## Limits
 
 - A pass is "no flash measured under these criteria", not a certification.
+- A strobe behind content dense enough to hide each pixel at more than about one strobe step in
+  eight flashes there fewer times than the strobe does, and can read as motion (text at one mark per
+  240 px² over a 4 Hz box left 16,522 of its 32,000 px²). A shake that turns by less than a quarter
+  turn a frame, as a smooth orbit does, reads as motion.
 - A flash that moves between places inside one field (two spots lit alternately) passes per pixel.
 - A red pulse that never reaches black (dark red ↔ red) changes no chromaticity, and is not a red flash
   under WCAG 2.2's working definition; under IRIS's (R − G − B) delta it would be.

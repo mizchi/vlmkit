@@ -1586,21 +1586,26 @@ times a second. Otherwise it is `motion-flicker` (warn).
 | `general-flash` | suspect | the general track fails, not explained by motion |
 | `red-flash` | suspect | the red track fails, not explained by motion |
 | `motion-flicker` | warn | per-pixel flicker over the limit that motion explains (the solitaire deal, a carousel, a ticker) |
-| `flash-unmeasured` | suspect / info | a `<video>` (paused at load, and searched for again during the sweep), an animated image (GIF / APNG / WebP / AVIF, sniffed from its frames, wherever it is drawn: `<img>`, a CSS background, mask, border image, list marker, pseudo-element content, SVG `<image>`, inside shadow roots), an image whose bytes could not be read, or pixels that change with the clock held; suspect when they — alone, or with what flashes beside them — cover more than the limit in one field, which makes the verdict "not judgeable" |
+| `flash-unmeasured` | suspect / info | a `<video>` (paused at load, and searched for again during the sweep), an animated image (GIF / APNG / WebP / AVIF, sniffed from its frames, wherever it is drawn: `<img>`, a CSS background, mask, border image, list marker, pseudo-element content, SVG `<image>`, inside shadow roots and in every frame of the page), an image whose bytes could not be read, or pixels that change with the clock held; suspect when they — alone, or with what flashes beside them — cover more than the limit in one field, which makes the verdict "not judgeable" |
 | `flash-unjudgeable` | suspect | a sequence where no 1s window holds 7 frames |
 | `flash-undersampled` | warn | a pass on a sequence that is not every frame of its span (a saved sequence thinned, or a live sweep with frames that never held still), or one cut at the 10s cap |
 
 What the held clock holds: `requestAnimationFrame`, timers (nested zero-delay
 ones at 4ms, as browsers clamp them), `Date`, `performance.now`, every CSS and
-Web Animation (at its own playback rate, never one the page paused or
-cancelled), inside open shadow roots and in every frame of the page, SMIL on
+Web Animation (at its own playback rate, forwards or back, never one the page
+paused or cancelled; one the seek takes to its end is ended, so `finished` and
+`onfinish` run and what a page chains on them begins), inside open shadow roots
+and in every frame of the page (each from when its document appeared), SMIL on
 each SVG's own timeline, and pages that draw on `vlmkit:seek`. A page that
 navigates during the sweep is followed onto the new document.
 
 The window defaults to each finite animation's end; for one that repeats
 forever, one period past its start and a second more; for timers pending at
 load, two seconds past the latest; at least 3s when something repeats or runs by
-script; between 2s and 10s (`--window` takes 1s to 60s). A page where nothing
+script; between 2s and 10s (`--window` takes 1s to 60s). Every frame's
+animations and timers count, and at the window's end what the page began during
+the sweep (an animation an `animationend` or a later timer started, an interval
+set up late) extends it the same way. A page where nothing
 can move under the held clock is one frame, unless `--window` is given. `--strip`
 is always one still PNG of the track that carries the verdict — an animation of
 a failing window would itself strobe for whoever opens it — and says so when

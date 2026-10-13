@@ -283,10 +283,12 @@ one 60fps frame at a time with timers in order; `HOLD_TIMELINE_SCRIPT` pauses ev
 begins and seeks them all to one page time. `--timeline` runs integrity's layout judges at each
 instant and tiers by persistence (`tierByPersistence`, `@mizchi/vlmkit-judge/persistence.ts`).
 `seek-ineffective` (suspect) says when an animation's frames do not measure it. Since `check flash`
-the hold also covers iframes, open shadow roots, SMIL, `playbackRate`, animations the page paused or
-cancelled (left to the page, never revived), nested zero-delay timers (clamped to 4ms past six levels,
-as Chromium 141 does) and a page that navigates mid-sweep (`navigations()`); `held-timeline.test.ts`
-plants each. Measured building them, not to re-learn:
+the hold also covers iframes (each on its own offset), open shadow roots, SMIL, `playbackRate` (from an
+anchor, negative rates too), animations the page paused or cancelled (left to the page, never
+revived), ones found finished at clock 0, nested zero-delay timers (clamped to 4ms past six levels, as
+Chromium 141 does) and a page that navigates mid-sweep (`navigations()`); a held animation the seek
+takes to its end is ended natively, so `finished` / `onfinish` chains run, and `animations()` /
+`pending()` read every frame. `held-timeline.test.ts` plants each. Measured building them, not to re-learn:
 
 - **A replay mismatch is not enough.** A capture can land before the compositor applies a seek: one
   replay flagged a pure-CSS `alternate infinite` badge in 2 runs of 30. Only three mutually
@@ -502,6 +504,12 @@ closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) an
   run is not excused). What this replaced, each a measured hole: a 3x3 envelope that accepted a
   strobe's falling step as an antialiased blend; a reset on every explained step, so a smooth pulse
   behind moving text never added up; a 2s cap that excused a strobe beginning later in a run.
+- **Between pixels, a step is checked against predictions, never a range.** The range of the 2-4
+  source pixels explained a light strobe behind text moving 2.5px a frame (beside ink, the step toward
+  the darker level lands inside it). The two predictions are the matcher's: forward (previous frame
+  resampled) and backward (a half-pixel layer renders blurred and only the sharp frame resampled gives
+  it), bilinear in encoded luminance, 0.01 tolerance. A state also keeps where in its pixel its content
+  is: `Math.round(2.5)` always rounds up, so states slid half a pixel a frame along what they counted.
 - **What may establish motion is narrow, and every gate was a hole first.** A match: texture ≥ 0.03,
   mean residual ≤ 0.04 encoded and under half of not moving, on the part of the block whose source is
   in the frame (at least half). Without that, the frame's edge column never matched while text
@@ -510,13 +518,22 @@ closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) an
   matches — 20px stripes moved 20px are counterphase); it jumps > 24px beyond the source block's OR this
   block's own last motion (the second reference is what lets a carousel's entering band be trusted);
   it reverses > 6 times within a second, untrusted over the whole cluster (applied as it went, a 20px
-  shake was untrusted only after seven excused reversals, too late for the window to see it).
+  shake was untrusted only after seven excused reversals, too late for the window to see it). A
+  reversal is a quarter turn or more (dot ≤ 0): a shake around a square path never reversed past 90°.
 - **A state carries only what is the content's.** Steps a state took in place before its last one stay
   with the place: a stock that card after card appears on filled every card's ring, and the deal read
   flash at 23,341 px²; trimmed, 13,187. Content replaced under motion — what was at a pixel moved on by
   trusted motion and what is there now moves on by the next frame's — starts fresh: a slide's entering
   band. A separate location layer for untrusted steps was tried and lost a teleport while drifting: at
   a fixed place, its returns no longer line up; on the drifting content they do.
+- **…and the place keeps what is the place's.** A screen-fixed ring beside the content state holds the
+  in-place steps a moving state leaves behind, and level steps taken under content that travels on (a
+  block untrusted between two trusted frames). Without it, text that steps across a strobe now and
+  then, or scrolls through a stationary strobe box, carried the strobe out on itself (residual 0).
+  Content and places are TWO areas, each closed and measured in its best field: measured as one, the
+  deal's stock and its cards came to 18,136, 3,688 under the limit; apart, 15,825. Fed from every
+  in-place step, the place made the deal a flash (26,390), so motion untrusted throughout feeds it
+  nothing.
 - **A sum stopped at the best ties.** The coarse search left its sum at 0 once an exact match was
   found, so every later offset tied and the shortest, (0, 0), won: a carousel's 64px frame unmatched.
 - **Entering content has no history**, so a strobe behind content that crosses the view in under ~1.75s
@@ -531,12 +548,26 @@ closed 3x3 and measured in the best 341x256 field, 21,824 CSS px² the limit) an
   shots 150ms apart aliased with a 6.7 Hz strobe), and every 10th changed frame shot again 50ms later
   (something unheld that moves makes every frame "new", which counted real time as page time).
   Unmeasured pixels count beside measured flashing (`withUnknown`): two sub-limit halves are no pass.
-- **The held clock now holds** iframes (every frame advanced), open shadow roots, SMIL (each SVG's own
-  timeline), animations at their own `playbackRate`, never one the page paused or cancelled (a seek
-  revives a cancelled one, which kept a replayed highlight from replaying), nested zero-delay timers
-  clamped to 4ms (a `setTimeout(f, 0)` loop spun the clock's guard every frame), and a page that
-  navigates mid-sweep. The one-frame `still` shortcut never applies with `--window`, iframes, timers or
-  `vlmkit:seek` listeners, and the sweep's decisions are written into the manifest (`source.sweep`).
+- **The held clock now holds** iframes (every frame advanced, each on its own offset from when its
+  document appeared: an iframe inserted at 1s ran its first second in one step), open shadow roots,
+  SMIL (each SVG's own timeline), animations at their own `playbackRate` from an anchor the page's own
+  setters move (a strobe set to rate -1 never moved), never one the page paused or cancelled (a seek
+  revives a cancelled one, which kept a replayed highlight from replaying), one found finished while
+  the clock is still at 0 (real time spent loading is page time 0), nested zero-delay timers clamped
+  to 4ms (a `setTimeout(f, 0)` loop spun the clock's guard every frame), and a page that navigates
+  mid-sweep. **A held animation the seek takes to its end is ended natively** (`finish()`), so
+  `await anim.finished` and `onfinish` run: a paused animation never finishes, and a strobe chained on
+  an intro was never created. `onfinish` fires only at the next rendering, so the step waits for one.
+- **The window comes from every frame and is reconsidered at its end.** An iframe's animations and
+  timers count (`timeline.pending()`, `animations()`), and what the page began during the sweep — an
+  animation an `animationend` or a later timer started, an interval set up late — extends it. The
+  one-frame `still` shortcut never applies with `--window`, iframes, timers or `vlmkit:seek`
+  listeners, and the sweep's decisions are written into the manifest (`source.sweep`).
+- **Media is found in every frame and told apart by element**, not by style path (three videos in
+  one grid were one region). `blob:` images are read through the frame that shows them, and `data:`
+  URLs as the URL standard reads them (a stray `%` in inline SVG threw). Unmeasured pixels over the
+  limit together with the flashing beside them are a suspect, as alone: a not-judgeable verdict
+  exited 0.
 - **Capture cost was the gate's cost.** pngjs's decode took 19 of 24s of judging 181 frames; a decoder
   for RGB/RGBA rows (`@mizchi/vlmkit-core/png-decode.ts`) plus CDP `captureScreenshot` with
   `optimizeForSpeed` (rows filtered "up" only) halved capture (93 → 40ms) and decode. A frame that
