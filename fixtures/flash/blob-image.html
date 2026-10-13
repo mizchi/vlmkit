@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: blob-image</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A still 400x300 image shown through a blob: URL the page made: its bytes are read through the page, so it is not unmeasured, and the page passes. -->
+    <style>html,body{margin:0;overflow:hidden;background:#fff}img{display:block;width:400px;height:300px}</style>
+  </head>
+  <body>
+    <img alt="" id="i">
+    <script>
+      const bytes = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGM4AQYMEAoAQa4JYQOnncMAAAAASUVORK5CYII="), (c) => c.charCodeAt(0));
+      document.getElementById("i").src = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+    </script>
+  </body>
+</html>

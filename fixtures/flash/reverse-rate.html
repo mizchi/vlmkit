@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: reverse-rate</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A 2s black/white strobe (200ms x 10) played backwards from its end at playbackRate -1: seeked by its own rate, it strobes at 5 Hz. -->
+    <style>html,body{margin:0;overflow:hidden;background:#000}#s{position:fixed;inset:0;background:#000}</style>
+  </head>
+  <body>
+    <div id="s"></div>
+    <script>
+      const kf = [{ background: "#000" }, { background: "#000", offset: 0.5 }, { background: "#fff", offset: 0.5 }, { background: "#fff" }];
+      const a = document.getElementById("s").animate(kf, { duration: 200, iterations: 10 });
+      a.currentTime = 2000;
+      a.playbackRate = -1;
+    </script>
+  </body>
+</html>

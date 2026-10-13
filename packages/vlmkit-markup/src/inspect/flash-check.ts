@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import type { Browser, Page } from "playwright";
+import type { Browser, Frame, Page } from "playwright";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import type { PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
@@ -258,14 +258,26 @@ const MEDIA_JS = `(() => {
   const CSS_IMAGES = ["background-image", "border-image-source", "list-style-image", "mask-image", "-webkit-mask-image", "content"];
   const out = [];
   const seen = new Set();
+  // Elements are told apart by identity, kept across scans: a path names siblings alike, and three
+  // videos in one grid are three regions.
+  const ids = window.__vlmkitMediaIds || (window.__vlmkitMediaIds = new WeakMap());
+  const idOf = (el) => {
+    let id = ids.get(el);
+    if (id === undefined) {
+      id = window.__vlmkitMediaNext = (window.__vlmkitMediaNext || 0) + 1;
+      ids.set(el, id);
+    }
+    return id;
+  };
   const add = (kind, el, src) => {
     const rect = clip(el.getBoundingClientRect());
     if (!rect) return;
-    const p = path(el);
-    const key = kind + "|" + p + "|" + (src || "");
+    const id = idOf(el);
+    const key = kind + "|" + id + "|" + (src || "");
     if (seen.has(key)) return;
     seen.add(key);
-    out.push(src ? { kind, path: p, rect, src } : { kind, path: p, rect });
+    const p = path(el);
+    out.push(src ? { kind, id, path: p, rect, src } : { kind, id, path: p, rect });
   };
   const visit = (root) => {
     for (const el of root.querySelectorAll("*")) {
@@ -482,19 +494,42 @@ async function screenshotter(page: Page): Promise<() => Promise<Buffer>> {
 }
 
 /**
+ * A `data:` URL's body as bytes, as the URL standard reads it: `%XX` is that byte and anything else
+ * — a stray `%` in inline SVG's `width='100%'` — is itself; decodeURIComponent threw on it, which
+ * made a static background unreadable.
+ */
+export function dataUrlBytes(src: string): Buffer {
+  const comma = src.indexOf(",");
+  const meta = src.slice(5, comma);
+  const body = src.slice(comma + 1);
+  const out: number[] = [];
+  for (let i = 0; i < body.length; i++) {
+    const c = body.charCodeAt(i);
+    if (c === 0x25 && /^[0-9a-f]{2}$/i.test(body.slice(i + 1, i + 3))) {
+      out.push(parseInt(body.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else if (c < 0x80) {
+      out.push(c);
+    } else {
+      // A character past ASCII is its UTF-8 bytes (a surrogate pair is one character).
+      const ch = String.fromCodePoint(body.codePointAt(i)!);
+      out.push(...Buffer.from(ch, "utf8"));
+      i += ch.length - 1;
+    }
+  }
+  const bytes = Buffer.from(out);
+  return /;base64$/i.test(meta) ? Buffer.from(bytes.toString("latin1"), "base64") : bytes;
+}
+
+/**
  * An image's bytes (the first 8MB), `"missing"` when there are none to draw (a 404, a missing
  * file: nothing is drawn, so nothing animates), or null when they could not be read — which says
- * nothing about whether it animates. Same-origin and CORS images are read by the page; others by
- * the browser context's own request, which no page policy blocks.
+ * nothing about whether it animates. Same-origin, CORS and `blob:` images are read by the frame
+ * that shows them; others by the browser context's own request, which no page policy blocks.
  */
-async function imageBytes(page: Page, src: string): Promise<Uint8Array | "missing" | null> {
+async function imageBytes(frame: Frame, src: string): Promise<Uint8Array | "missing" | null> {
   try {
-    if (src.startsWith("data:")) {
-      const comma = src.indexOf(",");
-      const meta = src.slice(5, comma);
-      const body = src.slice(comma + 1);
-      return meta.endsWith(";base64") ? Buffer.from(body, "base64") : Buffer.from(decodeURIComponent(body), "latin1");
-    }
+    if (src.startsWith("data:")) return dataUrlBytes(src).subarray(0, 8 << 20);
     if (src.startsWith("file:")) {
       try {
         return (await readFile(fileURLToPath(src))).subarray(0, 8 << 20);
@@ -502,8 +537,7 @@ async function imageBytes(page: Page, src: string): Promise<Uint8Array | "missin
         return (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : null;
       }
     }
-    if (src.startsWith("blob:")) return null;
-    const b64 = await page.evaluate(async (url) => {
+    const b64 = await frame.evaluate(async (url) => {
       try {
         const response = await fetch(url);
         if (response.status === 404 || response.status === 410) return "missing";
@@ -518,7 +552,8 @@ async function imageBytes(page: Page, src: string): Promise<Uint8Array | "missin
     }, src);
     if (b64 === "missing") return "missing";
     if (b64 !== null) return Buffer.from(b64, "base64");
-    const response = await page.context().request.get(src, { timeout: 10_000 });
+    if (src.startsWith("blob:")) return null;
+    const response = await frame.page().context().request.get(src, { timeout: 10_000 });
     if (response.status() === 404 || response.status() === 410) return "missing";
     if (!response.ok()) return null;
     return (await response.body()).subarray(0, 8 << 20);
@@ -561,9 +596,8 @@ async function sweepPage(
   const timeline = await openHeldTimeline(page, url, options);
   await timeline.at(0);
   const held = await timeline.animations();
-  const pending = (await page.evaluate(() =>
-    (window as unknown as { __vlmkitClock: { pending(): unknown } }).__vlmkitClock.pending(),
-  )) as ClockPending;
+  // Every frame's: an iframe's delayed strobe or pending timer sets the window as the page's would.
+  const pending: ClockPending = await timeline.pending();
   // A page that draws only when told the time (`vlmkit:seek`) moves under the held clock too.
   const scripted = pending.timers > 0 || pending.frames > 0 || (pending.seekListeners ?? 0) > 0;
   const take = await screenshotter(page);
@@ -579,29 +613,56 @@ async function sweepPage(
   const unmeasured: UnmeasuredRegion[] = [];
   const known = new Set<string>();
   const animatedBySrc = new Map<string, boolean | null>();
+  const frameNo = new Map<Frame, number>();
+  const viewport = page.viewportSize() ?? { width: 0, height: 0 };
+  // Every frame's media, in the page's coordinates and clipped to the frame that shows it: a
+  // video inside an iframe is paused by the same init script and must be reported as one.
   const findMedia = async () => {
-    let media: Array<{ kind: "video" | "image"; path: string; rect: Box; src?: string }>;
-    try {
-      media = (await page.evaluate(MEDIA_JS)) as typeof media;
-    } catch {
-      return;
-    }
-    for (const m of media) {
-      const key = `${m.kind}|${m.path}|${m.src ?? ""}`;
-      if (known.has(key)) continue;
-      known.add(key);
-      if (m.kind === "video") {
-        unmeasured.push({ reason: "video", rect: m.rect, path: m.path });
+    for (const frame of page.frames()) {
+      if (frame.isDetached()) continue;
+      if (!frameNo.has(frame)) frameNo.set(frame, frameNo.size);
+      let box: Box = { x: 0, y: 0, width: viewport.width, height: viewport.height };
+      if (frame !== page.mainFrame()) {
+        const element = await frame.frameElement().catch(() => null);
+        const b = element ? await element.boundingBox().catch(() => null) : null;
+        if (!b) continue;
+        box = { x: b.x, y: b.y, width: b.width, height: b.height };
+      }
+      let media: Array<{ kind: "video" | "image"; id: number; path: string; rect: Box; src?: string }>;
+      try {
+        media = (await frame.evaluate(MEDIA_JS)) as typeof media;
+      } catch {
         continue;
       }
-      let animated = animatedBySrc.get(m.src!);
-      if (animated === undefined) {
-        const bytes = await imageBytes(page, m.src!);
-        animated = bytes === "missing" ? false : bytes ? sniffImageAnimation(bytes).animated : null;
-        animatedBySrc.set(m.src!, animated);
+      for (const m of media) {
+        const key = `${frameNo.get(frame)}|${m.kind}|${m.id}|${m.src ?? ""}`;
+        if (known.has(key)) continue;
+        const x0 = Math.max(0, box.x, m.rect.x + box.x);
+        const y0 = Math.max(0, box.y, m.rect.y + box.y);
+        const x1 = Math.min(viewport.width, box.x + box.width, m.rect.x + box.x + m.rect.width);
+        const y1 = Math.min(viewport.height, box.y + box.height, m.rect.y + box.y + m.rect.height);
+        if (!(x1 > x0 && y1 > y0)) continue;
+        known.add(key);
+        const rect = {
+          x: Math.floor(x0),
+          y: Math.floor(y0),
+          width: Math.ceil(x1) - Math.floor(x0),
+          height: Math.ceil(y1) - Math.floor(y0),
+        };
+        const where = frame === page.mainFrame() ? m.path : `iframe ${m.path}`;
+        if (m.kind === "video") {
+          unmeasured.push({ reason: "video", rect, path: where });
+          continue;
+        }
+        let animated = animatedBySrc.get(m.src!);
+        if (animated === undefined) {
+          const bytes = await imageBytes(frame, m.src!);
+          animated = bytes === "missing" ? false : bytes ? sniffImageAnimation(bytes).animated : null;
+          animatedBySrc.set(m.src!, animated);
+        }
+        if (animated === null) unmeasured.push({ reason: "unreadable-image", rect, path: where });
+        else if (animated) unmeasured.push({ reason: "animated-image", rect, path: where });
       }
-      if (animated === null) unmeasured.push({ reason: "unreadable-image", rect: m.rect, path: m.path });
-      else if (animated) unmeasured.push({ reason: "animated-image", rect: m.rect, path: m.path });
     }
   };
   await findMedia();
@@ -617,8 +678,8 @@ async function sweepPage(
   }
 
   const chosen = chooseWindow(held, scripted, pending.latestTimerMs ?? null);
-  const windowMs = still ? 0 : (options.windowMs ?? chosen.windowMs);
-  const truncated = !still && options.windowMs === undefined && chosen.truncated;
+  let windowMs = still ? 0 : (options.windowMs ?? chosen.windowMs);
+  let truncated = !still && options.windowMs === undefined && chosen.truncated;
   const windowFrom: Captured["windowFrom"] = still
     ? "still"
     : options.windowMs !== undefined
@@ -633,7 +694,7 @@ async function sweepPage(
     ...facts,
     clock: "held",
   });
-  const last = Math.round((windowMs * 60) / 1000);
+  let last = Math.round((windowMs * 60) / 1000);
   const files: string[] = [];
   const times: number[] = [];
   // Counted while shooting, with what was found unmeasured before the sweep painted out; a region
@@ -654,6 +715,20 @@ async function sweepPage(
     times.push(atMs);
     counter.add(k, atMs, decodePngPixels(shot.png));
     if (k > 0 && k % MEDIA_EVERY === 0) await findMedia();
+    if (k === last && !still && options.windowMs === undefined) {
+      // What the page began during the sweep — an animation an animationend or a chained timer
+      // started, an interval set up late — sets the window as what was there at load did.
+      const more = chooseWindow(await timeline.animations(), scripted, null);
+      const now = await timeline.pending();
+      let want = more.windowMs;
+      if ((now.intervals ?? 0) > (pending.intervals ?? 0)) want = Math.max(want, atMs + 2 * WINDOW_MS);
+      const capped = Math.min(MAX_WINDOW_MS, Math.ceil(want / 100) * 100);
+      if (capped > windowMs) {
+        truncated ||= more.truncated || want > MAX_WINDOW_MS;
+        windowMs = capped;
+        last = Math.round((windowMs * 60) / 1000);
+      }
+    }
   }
   await findMedia();
   const written = await writer.finish();

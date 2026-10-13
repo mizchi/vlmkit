@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>check flash: waapi-chain</title>
+    <!-- Known answer for `check flash` (fixtures/flash/expected.json): A 300ms fade, then (await its finished promise) a full-viewport 5 Hz strobe: a held animation the seek puts past its end is finished, so the page's chain runs. -->
+    <style>html,body{margin:0;overflow:hidden;background:#000}#s{position:fixed;inset:0;background:#000}</style>
+  </head>
+  <body>
+    <div id="s"></div>
+    <script>
+      const kf = [{ background: "#000" }, { background: "#000", offset: 0.5 }, { background: "#fff", offset: 0.5 }, { background: "#fff" }];
+      const s = document.getElementById("s");
+      (async () => {
+        await s.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 300 }).finished;
+        s.animate(kf, { duration: 200, iterations: Infinity });
+      })();
+    </script>
+  </body>
+</html>

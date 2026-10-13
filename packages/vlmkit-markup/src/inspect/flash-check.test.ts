@@ -12,7 +12,14 @@ import { join } from "node:path";
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import type { FramesManifest } from "@mizchi/vlmkit-judge/frames.ts";
-import { chooseWindow, manifestComplete, mergeUncontrolled, runFlashCheck, type FlashReport } from "./flash-check.ts";
+import {
+  chooseWindow,
+  dataUrlBytes,
+  manifestComplete,
+  mergeUncontrolled,
+  runFlashCheck,
+  type FlashReport,
+} from "./flash-check.ts";
 
 const fixtures = join(import.meta.dirname, "../../../../fixtures/flash");
 interface Expected {
@@ -163,6 +170,15 @@ describe("check flash: what the held clock does not hold", () => {
     );
     const video = { reason: "video" as const, rect: { x: 0, y: 0, width: 10, height: 10 } };
     assert.deepEqual(mergeUncontrolled([video, at(5, 5)])[0], video, "media regions are kept as they are");
+  });
+});
+
+describe("check flash: an image's bytes", () => {
+  test("a data: URL is read as the URL standard reads it: a stray % is itself, %XX a byte", () => {
+    assert.equal(dataUrlBytes("data:image/svg+xml;utf8,<svg width='100%'/>").toString("latin1"), "<svg width='100%'/>");
+    assert.deepEqual([...dataUrlBytes("data:image/png,%89PNG")], [0x89, 0x50, 0x4e, 0x47]);
+    assert.equal(dataUrlBytes("data:text/plain;charset=utf-8,é").toString("utf8"), "é");
+    assert.equal(dataUrlBytes("data:image/gif;base64,R0lGODlh").toString("latin1"), "GIF89a");
   });
 });
 

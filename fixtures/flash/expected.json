@@ -30,6 +30,16 @@
     "faded-red": { "general": "pass", "red": "fail", "redClassification": "flash" },
     "background-gif": { "general": "not-judgeable", "red": "not-judgeable", "still": true, "unmeasured": ["animated-image"], "windowMs": "default" },
     "late-video": { "general": "not-judgeable", "red": "not-judgeable", "unmeasured": ["video"] },
-    "navigate": { "general": "pass", "red": "pass", "navigations": 1 }
+    "navigate": { "general": "pass", "red": "pass", "navigations": 1 },
+    "iframe-video": { "general": "not-judgeable", "red": "not-judgeable", "unmeasured": ["video"] },
+    "three-videos": { "general": "not-judgeable", "red": "not-judgeable", "unmeasured": ["video"], "windowMs": "default", "still": true },
+    "video-beside-strobe": { "general": "not-judgeable", "red": "pass", "unmeasured": ["video"] },
+    "chain-anim": { "general": "fail", "red": "pass", "classification": "flash", "windowMs": "default" },
+    "chain-timer": { "general": "fail", "red": "pass", "classification": "flash", "windowMs": "default" },
+    "iframe-late": { "general": "fail", "red": "pass", "classification": "flash", "windowMs": "default" },
+    "waapi-chain": { "general": "fail", "red": "pass", "classification": "flash" },
+    "reverse-rate": { "general": "fail", "red": "pass", "classification": "flash" },
+    "blob-image": { "general": "pass", "red": "pass", "still": true, "windowMs": "default" },
+    "svg-percent": { "general": "pass", "red": "pass", "still": true, "windowMs": "default" }
   }
 }

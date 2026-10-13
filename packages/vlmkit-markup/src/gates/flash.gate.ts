@@ -88,12 +88,15 @@ function findings(report: FlashReport): Finding[] {
       message: `pass on the first ${(s.windowMs / 1000).toFixed(1)}s only: the page's motion runs past the 10s cap, and what comes after it was not swept (--window up to 60s sweeps more)`,
     });
   }
+  const limit = report.criteria.areaLimitCss2;
+  // Over the limit alone, or together with the flashing beside it: either way no pass is possible.
+  const together = Math.max(report.general.withUnknownCss2 ?? 0, report.red.withUnknownCss2 ?? 0);
   for (const u of report.unmeasured) {
-    const large = report.unmeasuredAreaCss2 > report.criteria.areaLimitCss2;
+    const large = report.unmeasuredAreaCss2 > limit || together > limit;
     out.push({
       rule: "flash-unmeasured",
       severity: large ? "suspect" : "info",
-      message: `${UNMEASURED[u.reason] ?? u.reason}, ${u.rect.width}x${u.rect.height} at (${u.rect.x},${u.rect.y}): not judged${large ? `; ${report.unmeasuredAreaCss2.toLocaleString("en-US")} CSS px² of one field unmeasured, over the 21,824 limit, so no pass is possible` : ""}`,
+      message: `${UNMEASURED[u.reason] ?? u.reason}, ${u.rect.width}x${u.rect.height} at (${u.rect.x},${u.rect.y}): not judged${large ? (report.unmeasuredAreaCss2 > limit ? `; ${report.unmeasuredAreaCss2.toLocaleString("en-US")} CSS px² of one field unmeasured, over the 21,824 limit, so no pass is possible` : `; with the flashing beside it, ${together.toLocaleString("en-US")} CSS px² of one field, over the 21,824 limit, so no pass is possible`) : ""}`,
       ...(u.path ? { selector: u.path } : {}),
       evidence: { ...u },
     });

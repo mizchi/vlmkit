@@ -193,6 +193,21 @@ describe("check flash: findings", () => {
     assert.equal(named(0.3), undefined, "a bystander in the field is not the finding");
   });
 
+  it("unmeasured pixels under the limit alone but over it with the flashing beside them are a suspect", () => {
+    const f = findingsOf(
+      report({
+        general: track({ verdict: "not-judgeable", withUnknownCss2: 34_600, largestBelowCss2: 19_600 }),
+        unmeasured: [{ reason: "video", rect: { x: 0, y: 0, width: 150, height: 100 }, path: "video" }],
+        unmeasuredAreaCss2: 15_000,
+      }),
+    );
+    assert.deepEqual(
+      f.map((x) => [x.rule, x.severity]),
+      [["flash-unmeasured", "suspect"]],
+    );
+    assert.match(f[0]!.message, /with the flashing beside it, 34,600 CSS px²/);
+  });
+
   it("an image whose bytes could not be read is reported as one that may animate", () => {
     const f = findingsOf(
       report({ unmeasured: [{ reason: "unreadable-image", rect: { x: 0, y: 0, width: 32, height: 32 } }] }),
