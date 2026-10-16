@@ -1030,6 +1030,12 @@ vlmkit heal selector <html|url> ".broken-selector"
 vlmkit inspect interact <html|url> --sequence <path.json>   # a "frames" step records what an action set moving
 vlmkit inspect explore  <html|url>             # Auto-discover declared actions and diff each
 vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke test
+vlmkit inspect locate   <screenshot.png> "the Save button"   # where a described element is, no DOM
+  # TypeSafe Jev (TYPESAFEAI_API_KEY): presence + box, then a box on a magnified crop.
+  # Exit 0 found / 1 not found / 2 usage. --json, --mark out.png (box outlined: look at it),
+  # --dpr N (box in CSS px too), --threshold 0.5, --no-presence, --no-refine, --model <id>.
+  # In an interact sequence: { "action": "click", "describe": "the Save button" } clicks it,
+  # for a canvas app (Flutter web) whose DOM is not what is drawn.
 
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)

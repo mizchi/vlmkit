@@ -19,12 +19,14 @@
  *            (text / colour / position, and the direction of a shift) on a magnified crop.
  *   regions  `diff png --kind` end to end: the regions compareScreenshots finds, each labelled by
  *            `labelRegionKinds` (four options, + appear/disappear cases planted by hiding a target).
+ *   locate   `locateByDescription` end to end on every target and as many decoys: presence, then
+ *            a box, then a box on the magnified crop, as `inspect locate` runs it.
  *
  * Usage:
  *   node --experimental-strip-types src/experiments/benchmark/jev-box/jev-box.ts \
  *     [--model jev-1.14.0] [--fixtures page,dashboard] [--per-fixture 12] [--seed 1] \
  *     [--out test-results/jev-box] [--md report.md] [--executable-path /path/to/chromium] \
- *     [--only ground,refine,present,diff,classify,regions] [--rescore]
+ *     [--only ground,refine,present,diff,classify,regions,locate] [--rescore]
  *
  * Environment: TYPESAFEAI_API_KEY. `--rescore` reads saved answers and needs no key or browser.
  */
@@ -48,6 +50,7 @@ import { buildCases } from "../zoom-accuracy/cases.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
 import { jevRegionKindAsker, labelRegionKinds, type RegionKindOutcome } from "@mizchi/vlmkit-ai/region-kind.ts";
+import { locateByDescription, type JevAsk, type LocateResult } from "@mizchi/vlmkit-ai/locate.ts";
 import {
   buildGround,
   buildPresenceCases,
@@ -76,7 +79,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const FIXTURE_DIR = join(ROOT, "fixtures/css-challenge");
-const STAGES = ["ground", "refine", "present", "diff", "classify", "regions"] as const;
+const STAGES = ["ground", "refine", "present", "diff", "classify", "regions", "locate"] as const;
 type Stage = (typeof STAGES)[number];
 
 interface Call {
@@ -112,6 +115,8 @@ interface Saved {
     kind: DiffCase["kind"];
     regions: { region: DiffRegion; outcome: RegionKindOutcome }[];
   }[];
+  /** `locateByDescription` end to end: every target, and as many decoys (other fixtures' labels). */
+  locate?: { fixture: string; targetId: string; decoy: boolean; result: LocateResult }[];
   calls: Call[];
 }
 
@@ -342,6 +347,36 @@ async function runRegions(model: string, cases: DiffCase[], calls: Call[]) {
     out.push({ caseId: c.id, kind: c.kind, regions: regions.map((region, i) => ({ region, outcome: outcomes[i]! })) });
   }
   return out;
+}
+
+/**
+ * The shipped path (`locateByDescription`): presence + box, then a box on the crop. Targets must
+ * come back found with the refined centre on them; decoys must come back not found.
+ */
+async function runLocate(model: string, shots: GroundShot[], calls: Call[]) {
+  const ask: JevAsk = async (req) =>
+    record(calls, "locate", "", await askJev(req), Object.keys(req.questions).length) as never;
+  const all = shots.flatMap((s) => s.targets);
+  const jobs = shots.flatMap((shot) => {
+    const here = new Set(shot.targets.map((t) => t.label.toLowerCase()));
+    const decoys = all.filter((t) => t.fixture !== shot.fixture && !here.has(t.label.toLowerCase()));
+    const step = Math.max(1, Math.floor(decoys.length / Math.max(1, shot.targets.length)));
+    return [
+      ...shot.targets.map((t) => ({ shot, t, decoy: false })),
+      ...decoys
+        .filter((_, i) => i % step === 0)
+        .slice(0, shot.targets.length)
+        .map((t) => ({ shot, t, decoy: true })),
+    ];
+  });
+  const pngs = new Map<string, Uint8Array>();
+  for (const s of shots) pngs.set(s.fixture, await readFile(s.imagePath));
+  return pool(jobs, 4, async ({ shot, t, decoy }) => ({
+    fixture: shot.fixture,
+    targetId: t.id,
+    decoy,
+    result: await locateByDescription(pngs.get(shot.fixture)!, t.description, { model, ask }),
+  }));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -653,6 +688,51 @@ export function report(saved: Saved): string {
     out.push("");
   }
 
+  if (saved.locate) {
+    const truthOf = new Map<string, GroundTarget>();
+    for (const g of saved.ground ?? []) for (const t of g.shot.targets) truthOf.set(t.id, t);
+    const real = saved.locate.filter((l) => !l.decoy);
+    const decoys = saved.locate.filter((l) => l.decoy);
+    const pxBox = (b: { x: number; y: number; width: number; height: number }) => ({
+      x1: b.x,
+      y1: b.y,
+      x2: b.x + b.width,
+      y2: b.y + b.height,
+    });
+    const scored = real
+      .filter((l) => l.result.found && truthOf.has(l.targetId))
+      .map((l) => ({ l, s: scoreBox(pxBox(l.result.box), truthOf.get(l.targetId)!.box) }));
+    const missed = real.filter((l) => !l.result.found);
+    const end = scored.filter((x) => x.s.clickHit).length;
+    out.push(
+      "## Locate: `locateByDescription` end to end",
+      "",
+      "Presence (`noul`) and a first `box` in one request, then a `box` on the magnified crop. What a caller of the shipped function gets.",
+      "",
+      `- Targets found: **${real.length - missed.length}/${real.length}**; of those, the click point on the target **${end}/${scored.length}**. End to end (found and on target): **${pct(end / real.length)}**.`,
+      `- Decoys reported not found: **${decoys.filter((d) => !d.result.found).length}/${decoys.length}**.`,
+      `- Median edge error of found targets: ${f1(median(scored.map((x) => x.s.edgeErrorPx)))}px; median IoU ${f2(median(scored.map((x) => x.s.iou)))}.`,
+      "",
+    );
+    if (missed.length)
+      out.push(
+        `Not found: ${missed.map((l) => `${truthOf.get(l.targetId)?.description ?? l.targetId} on ${l.fixture} (${f2(l.result.presence ?? NaN)})`).join("; ")}.`,
+        "",
+      );
+    const wrong = scored.filter((x) => !x.s.clickHit);
+    if (wrong.length)
+      out.push(
+        `Found but off target: ${wrong.map((x) => `${truthOf.get(x.l.targetId)!.description} on ${x.l.fixture} (IoU ${f2(x.s.iou)})`).join("; ")}.`,
+        "",
+      );
+    const fp = decoys.filter((d) => d.result.found);
+    if (fp.length)
+      out.push(
+        `Decoys found: ${fp.map((d) => `${truthOf.get(d.targetId)?.description} on ${d.fixture} (${f2(d.result.presence ?? NaN)})`).join("; ")}.`,
+        "",
+      );
+  }
+
   out.push(
     "## Cost and latency",
     "",
@@ -746,7 +826,8 @@ async function main() {
     console.log(
       `${shots.reduce((a, s) => a + s.targets.length, 0)} targets on ${shots.length} fixtures; ${diffCases.length} diff cases`,
     );
-    if (only.has("ground") || only.has("refine")) saved.ground = await runGround(model, shots, saved.calls);
+    if (only.has("ground") || only.has("refine") || only.has("locate"))
+      saved.ground = await runGround(model, shots, saved.calls);
     if (only.has("refine")) saved.refine = await runRefine(model, saved.ground!, saved.calls);
     if (only.has("present")) saved.present = await runPresent(model, shots, saved.calls);
     if (only.has("diff")) saved.diff = await runDiff(model, diffCases, saved.calls);
@@ -755,6 +836,7 @@ async function main() {
       saved.diffCases = [...diffCases, ...presenceCases];
       saved.regions = await runRegions(model, saved.diffCases, saved.calls);
     }
+    if (only.has("locate")) saved.locate = await runLocate(model, shots, saved.calls);
     await writeFile(savedPath, JSON.stringify(saved, null, 2));
   }
   const md = report(saved);

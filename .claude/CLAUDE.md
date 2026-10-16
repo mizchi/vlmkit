@@ -224,6 +224,22 @@ to `--kind-limit` (12). Without a key it exits 2 before measuring anything. End-
 - Captures of different sizes are skipped, not labelled: after a reflow one window shows two
   different pieces of content.
 
+**Shipped as `inspect locate` and `click` with `describe`** (`@mizchi/vlmkit-ai/locate.ts`
+`locateByDescription`; `packages/vlmkit-markup/src/inspect/locate-cli.ts`; the `describe` target in
+`interact.ts`). Presence (`noul`) and a `box` in one request, then a `box` on the original's pixels
+around it, magnified. Measured end to end (`docs/reports/2026-10-16-jev-locate.md`, bench
+`jev-box.ts --only locate`), not to re-learn:
+
+- 81/85 targets found and 80 of them with the point on the target (94% end to end); 85/85 decoys
+  not found. All 4 misses were the presence question: 3 fields described by their placeholder,
+  which `noul` reads as not shown, and 1 two-line dropdown label. Describe a field by its label;
+  `--no-presence` returns the box anyway.
+- Interact screenshots at `scale: "css"`, so the point is already in `mouse.click` coordinates.
+  A 2x capture is shrunk for the first look only: the crop is cut from the original pixels.
+- A `describe` click is refused before the browser starts without a key, or with both or neither
+  of `selector` and `describe`. A not-found target is a step failure quoting presence, with no
+  selector suggestions.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
