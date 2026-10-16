@@ -42,6 +42,12 @@ export const TRANSIENT_MS = 5000;
 /** A change ends at the first run of byte-identical frames lasting this long. */
 export const SETTLE_MS = 100;
 /**
+ * The noise band `--lossy` compares through (`NoiseFloor`), measured on known answers: the planted
+ * events captured lossless and encoded with H.264, HEVC, VP8, VP9, AV1 and MJPEG at several
+ * qualities (docs/reports/2026-10-16-storyboard-noise-floor-v1.md).
+ */
+export const LOSSY_NOISE: NoiseFloor = { radius: 1, still: 24, floor: 32, keyframe: 48 };
+/**
  * Durations are differences of instants, and instants on the 60fps grid are binary fractions:
  * frame 10 minus frame 4 is 99.99999999999999, so a 100ms hold of seven frames read as too short.
  * A comparison within this of its bound is on it, as `parseInstants` snaps.
@@ -63,33 +69,117 @@ export interface FramePixels {
 }
 
 export interface FrameDelta {
-  /** No byte differs (outside the ignored boxes). */
+  /** No byte differs (outside the ignored boxes) — or, given `still`, no channel moves by more than it. */
   identical: boolean;
   /** Pixels one of whose channels moved by more than the floor. */
   over: number;
   /** Their bounding box; null when there are none. */
   box: Box | null;
-  /** The bounding box of every pixel that differs at all; null when the frames are identical. */
+  /** The bounding box of every pixel that differs at all (by more than `still`); null when identical. */
   changed: Box | null;
   /** The largest channel delta of any pixel, 0-255. */
   maxDelta: number;
 }
 
 /**
- * One byte per pixel, 1 inside any of `boxes`: pixels no comparison looks at. A box that does not
- * sit on whole pixels covers every pixel it touches.
+ * How frames decoded from a lossy codec are compared. A codec does not give back the picture it
+ * was given: the same screen decodes a little differently frame to frame, most of all at sharp
+ * edges, and very differently across a keyframe. So each frame is compared as the mean of every
+ * pixel's neighbourhood — a codec's error is mostly high-frequency ringing, which the mean cancels,
+ * and what a viewer sees change is not — with two thresholds where a lossless sequence has one:
+ * frames within `still` of each other everywhere show one picture (a hold, a return), and a pixel
+ * differs from the state when its mean moves by more than `floor`. Between the two is what the
+ * codec does to a still picture.
  */
-export function ignoreMask(width: number, height: number, boxes: readonly Box[]): Uint8Array | null {
+export interface NoiseFloor {
+  /** Each frame is compared as the mean of every pixel's (2 * radius + 1)² neighbourhood. */
+  radius: number;
+  /** Frames whose means all stay within this of each other (0-255) show one picture. */
+  still: number;
+  /** A pixel differs when a channel of its mean moves by more than this (0-255). */
+  floor: number;
+  /**
+   * A keyframe that departs from the state while the step into it moves no mean by more than this
+   * (0-255, above `floor`) is the codec re-quantizing the picture, not a change: the state is
+   * compared against that keyframe from then on (`Storyboard.reread`). Absent: keyframes are frames.
+   */
+  keyframe?: number;
+}
+
+/**
+ * One byte per pixel, 1 inside any of `boxes`: pixels no comparison looks at. A box that does not
+ * sit on whole pixels covers every pixel it touches; `grow` widens every box by that many pixels on
+ * each side, for comparisons of neighbourhood means, which carry a box's content `grow` pixels out.
+ */
+export function ignoreMask(width: number, height: number, boxes: readonly Box[], grow = 0): Uint8Array | null {
   if (boxes.length === 0) return null;
   const mask = new Uint8Array(width * height);
   for (const b of boxes) {
-    const x0 = Math.max(0, Math.floor(b.x));
-    const y0 = Math.max(0, Math.floor(b.y));
-    const x1 = Math.min(width, Math.ceil(b.x + b.width));
-    const y1 = Math.min(height, Math.ceil(b.y + b.height));
+    const x0 = Math.max(0, Math.floor(b.x) - grow);
+    const y0 = Math.max(0, Math.floor(b.y) - grow);
+    const x1 = Math.min(width, Math.ceil(b.x + b.width) + grow);
+    const y1 = Math.min(height, Math.ceil(b.y + b.height) + grow);
     for (let y = y0; y < y1; y++) mask.fill(1, y * width + x0, y * width + Math.max(x0, x1));
   }
   return mask;
+}
+
+/**
+ * Each channel of each pixel as the mean of its (2 * radius + 1)² neighbourhood, rounded; at the
+ * frame's edge, of the part of it inside the frame. Two passes of running sums.
+ */
+export function boxMean(rgba: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  if (radius === 0) return rgba;
+  const row = new Uint32Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const base = y * width * 4;
+    for (let c = 0; c < 4; c++) {
+      let sum = 0;
+      // The window [x - r, x + r] clipped to the row: add what enters, drop what leaves.
+      for (let x = 0; x < Math.min(radius, width); x++) sum += rgba[base + x * 4 + c]!;
+      for (let x = 0; x < width; x++) {
+        if (x + radius < width) sum += rgba[base + (x + radius) * 4 + c]!;
+        if (x - radius - 1 >= 0) sum -= rgba[base + (x - radius - 1) * 4 + c]!;
+        row[base + x * 4 + c] = sum;
+      }
+    }
+  }
+  const out = new Uint8Array(width * height * 4);
+  for (let x = 0; x < width; x++) {
+    const cx = Math.min(width - 1, x + radius) - Math.max(0, x - radius) + 1;
+    for (let c = 0; c < 4; c++) {
+      let sum = 0;
+      for (let y = 0; y < Math.min(radius, height); y++) sum += row[(y * width + x) * 4 + c]!;
+      for (let y = 0; y < height; y++) {
+        if (y + radius < height) sum += row[((y + radius) * width + x) * 4 + c]!;
+        if (y - radius - 1 >= 0) sum -= row[((y - radius - 1) * width + x) * 4 + c]!;
+        const cy = Math.min(height - 1, y + radius) - Math.max(0, y - radius) + 1;
+        out[(y * width + x) * 4 + c] = Math.round(sum / (cx * cy));
+      }
+    }
+  }
+  return out;
+}
+
+/** `pixels` as neighbourhood means, the last `capacity` frames kept. */
+export function meanFrames(pixels: FramePixels, radius: number, capacity = 16): FramePixels {
+  const cache = new Map<number, Uint8Array>();
+  return {
+    width: pixels.width,
+    height: pixels.height,
+    pixels(i: number): Uint8Array {
+      const hit = cache.get(i);
+      if (hit) {
+        cache.delete(i);
+        cache.set(i, hit);
+        return hit;
+      }
+      const mean = boxMean(pixels.pixels(i), pixels.width, pixels.height, radius);
+      cache.set(i, mean);
+      if (cache.size > capacity) cache.delete(cache.keys().next().value!);
+      return mean;
+    },
+  };
 }
 
 /**
@@ -108,7 +198,7 @@ export function frameDelta(
   b: Uint8Array,
   width: number,
   height: number,
-  options: { floor?: number; mask?: Uint8Array | null } = {},
+  options: { floor?: number; mask?: Uint8Array | null; still?: number } = {},
 ): FrameDelta {
   const size = width * height;
   if (a.length !== size * 4 || b.length !== size * 4) {
@@ -116,6 +206,9 @@ export function frameDelta(
   }
   const floor = options.floor ?? CHANNEL_FLOOR;
   const mask = options.mask ?? null;
+  // Without `still`, any byte that differs is a difference: -1 is below every delta of a pixel
+  // whose bytes differ.
+  const still = options.still ?? -1;
   const wa = words(a);
   const wb = words(b);
   let identical = true;
@@ -131,13 +224,6 @@ export function frameDelta(
   let cy1 = -1;
   for (let p = 0; p < size; p++) {
     if (wa[p] === wb[p] || (mask !== null && mask[p] === 1)) continue;
-    identical = false;
-    const py = (p / width) | 0;
-    const px = p - py * width;
-    if (px < cx0) cx0 = px;
-    if (px > cx1) cx1 = px;
-    if (py < cy0) cy0 = py;
-    if (py > cy1) cy1 = py;
     const i = p << 2;
     const d = Math.max(
       Math.abs(a[i]! - b[i]!),
@@ -146,6 +232,14 @@ export function frameDelta(
       Math.abs(a[i + 3]! - b[i + 3]!),
     );
     if (d > maxDelta) maxDelta = d;
+    if (d <= still) continue;
+    identical = false;
+    const py = (p / width) | 0;
+    const px = p - py * width;
+    if (px < cx0) cx0 = px;
+    if (px > cx1) cx1 = px;
+    if (py < cy0) cy0 = py;
+    if (py > cy1) cy1 = py;
     if (d <= floor) continue;
     over++;
     if (px < x0) x0 = px;
@@ -277,10 +371,22 @@ export interface Storyboard {
     /** Positions of frames whose capture never agreed. */
     unstable: number[];
   };
-  rules: { channelFloor: number; transientMs: number; settleMs: number; ignore: Box[] };
+  rules: {
+    channelFloor: number;
+    transientMs: number;
+    settleMs: number;
+    ignore: Box[];
+    /** Present when the frames were compared as neighbourhood means (a lossy recording). */
+    noise?: { radius: number; still: number; keyframe?: number };
+  };
   states: StoryState[];
   events: StoryEvent[];
   timeline: TimelineSpan[];
+  /**
+   * Keyframes at which the state's picture was read again (`NoiseFloor.keyframe`): each departed
+   * from the state, but the step into it moved no mean by more than the keyframe band.
+   */
+  reread?: (FrameRef & { state: string })[];
 }
 
 export interface StoryboardOptions {
@@ -289,6 +395,8 @@ export interface StoryboardOptions {
   settleMs?: number;
   /** Boxes, in the frames' pixels, no comparison looks at: a video, a clock the capture cannot hold. */
   ignore?: readonly Box[];
+  /** Compare as neighbourhood means with a noise band (a lossy recording); its floor replaces `floor`. */
+  noise?: NoiseFloor;
 }
 
 /** The gaps between consecutive instants. */
@@ -307,11 +415,13 @@ export function sampling(atMs: readonly number[]): Sampling {
  * `pixels` reads each one; the frames must all be `pixels.width x pixels.height`.
  */
 export function buildStoryboard(
-  entries: readonly Pick<FrameEntry, "n" | "atMs" | "stable">[],
+  entries: readonly Pick<FrameEntry, "n" | "atMs" | "stable" | "key">[],
   pixels: FramePixels,
   options: StoryboardOptions = {},
 ): Storyboard {
-  const floor = options.floor ?? CHANNEL_FLOOR;
+  const noise = options.noise ?? null;
+  const floor = noise ? noise.floor : (options.floor ?? CHANNEL_FLOOR);
+  const still = noise?.still;
   const transientMs = options.transientMs ?? TRANSIENT_MS;
   const settleMs = options.settleMs ?? SETTLE_MS;
   const ignore = [...(options.ignore ?? [])];
@@ -325,16 +435,39 @@ export function buildStoryboard(
     }
   });
   const { width, height } = pixels;
-  const mask = ignoreMask(width, height, ignore);
+  if (noise) {
+    for (const [name, v] of [
+      ["radius", noise.radius],
+      ["still", noise.still],
+      ["floor", noise.floor],
+    ] as const) {
+      if (!Number.isInteger(v) || v < 0 || v > 255)
+        throw new UsageError(`noise ${name} must be a whole number 0-255, got ${v}`);
+    }
+    if (noise.still >= noise.floor) {
+      throw new UsageError(`noise still (${noise.still}) must be below its floor (${noise.floor})`);
+    }
+    if (noise.keyframe !== undefined) {
+      if (!Number.isInteger(noise.keyframe) || noise.keyframe <= noise.floor || noise.keyframe > 255) {
+        throw new UsageError(
+          `noise keyframe band must be a whole number above the floor (${noise.floor}) and at most 255, got ${noise.keyframe}`,
+        );
+      }
+    }
+  }
+  // Every comparison reads the same frames: as decoded, or as their neighbourhood means.
+  const frames = noise ? meanFrames(pixels, noise.radius) : pixels;
+  const mask = ignoreMask(width, height, ignore, noise?.radius ?? 0);
   const delta = (i: number, j: number) =>
-    frameDelta(pixels.pixels(i), pixels.pixels(j), width, height, { floor, mask });
+    frameDelta(frames.pixels(i), frames.pixels(j), width, height, { floor, mask, still });
   const ref = (i: number): FrameRef => ({ n: i, atMs: entries[i]!.atMs });
 
   // Frame j against frame j-1: independent of the anchor, so computed once.
   const steps: (FrameDelta | undefined)[] = [];
   const step = (j: number): FrameDelta => (steps[j] ??= delta(j - 1, j));
   // Frame j against the anchor, recomputed only when the anchor moves. A frame identical to the
-  // one before it differs from the anchor exactly as that one did.
+  // one before it differs from the anchor exactly as that one did — byte for byte only: within the
+  // noise of the frame before is not within the same distance of the anchor.
   let anchor = 0;
   let vs: (FrameDelta | undefined)[] = [];
   const vsAnchor = (j: number): FrameDelta => {
@@ -344,7 +477,7 @@ export function buildStoryboard(
     const d =
       j === anchor
         ? { identical: true, over: 0, box: null, changed: null, maxDelta: 0 }
-        : prior && steps[j]?.identical
+        : !noise && prior && steps[j]?.identical
           ? prior
           : delta(anchor, j);
     vs[j] = d;
@@ -361,8 +494,23 @@ export function buildStoryboard(
   let state = "S0";
   let spanStart = 0;
 
-  /** The first k >= s whose frames stay byte-identical for `settleMs`, or to the last frame. */
+  /**
+   * The first k >= s whose frames stay byte-identical for `settleMs`, or to the last frame. With a
+   * noise band, frames within `still` of frame k: each against the hold's first frame, never only
+   * the one before, or a fade slower than the band would be one long hold.
+   */
   const settleFrom = (s: number): number => {
+    if (noise) {
+      for (let k = s; k < count - 1; k++) {
+        let m = k;
+        while (m + 1 < count && delta(k, m + 1).identical) {
+          m++;
+          if (entries[m]!.atMs - entries[k]!.atMs >= settleMs - EPSILON_MS) return k;
+        }
+        if (m === count - 1 && m > k) return k;
+      }
+      return -1;
+    }
     for (let k = s; k < count - 1; k++) {
       let m = k;
       while (m + 1 < count && step(m + 1).identical) {
@@ -376,9 +524,12 @@ export function buildStoryboard(
   };
 
   /** Which state frame k is: an earlier one it is within the floor of, or a new one. */
+  // The frame each state is compared against: its first, or the keyframe it was last read again at.
+  const pictureOf = new Map<string, number>();
+  const picture = (st: StoryState) => pictureOf.get(st.id) ?? st.frame.n;
   const stateOf = (k: number): string => {
     for (const st of states) {
-      if (delta(st.frame.n, k).over === 0) {
+      if (delta(picture(st), k).over === 0) {
         st.visits++;
         return st.id;
       }
@@ -389,13 +540,53 @@ export function buildStoryboard(
   };
 
   /** Box, peak and unstable count over frames [from, to] against the anchor. */
+  /**
+   * With a noise band, a frame's box as the decoded pixels draw it. The means find a change but
+   * draw its box wrong both ways: a 1px caret's mean moves past the floor 1px either side of it,
+   * and of a glyph's thin strokes only the core does. So inside the means' box grown by twice the
+   * radius, the decoded pixels that moved past the floor against the anchor's — or the means' box
+   * when none did (a broad, faint change).
+   */
+  const drawn = (m: number, box: Box | null): Box | null => {
+    if (!noise || box === null) return box;
+    const grow = 2 * noise.radius;
+    const x0 = Math.max(0, box.x - grow);
+    const y0 = Math.max(0, box.y - grow);
+    const x1 = Math.min(width, box.x + box.width + grow);
+    const y1 = Math.min(height, box.y + box.height + grow);
+    const a = pixels.pixels(anchor);
+    const b = pixels.pixels(m);
+    let bx0 = width;
+    let by0 = height;
+    let bx1 = -1;
+    let by1 = -1;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const p = y * width + x;
+        if (mask !== null && mask[p] === 1) continue;
+        const i = p << 2;
+        const d = Math.max(
+          Math.abs(a[i]! - b[i]!),
+          Math.abs(a[i + 1]! - b[i + 1]!),
+          Math.abs(a[i + 2]! - b[i + 2]!),
+          Math.abs(a[i + 3]! - b[i + 3]!),
+        );
+        if (d <= floor) continue;
+        if (x < bx0) bx0 = x;
+        if (x > bx1) bx1 = x;
+        if (y < by0) by0 = y;
+        if (y > by1) by1 = y;
+      }
+    }
+    return bx1 < 0 ? box : { x: bx0, y: by0, width: bx1 - bx0 + 1, height: by1 - by0 + 1 };
+  };
   const measure = (from: number, to: number) => {
     let box: Box | null = null;
     let peak = from;
     let unstable = 0;
     for (let m = from; m <= to; m++) {
       const d = vsAnchor(m);
-      box = unionBox(box, d.box);
+      box = unionBox(box, drawn(m, d.box));
       if (d.over > vsAnchor(peak).over) peak = m;
       if (entries[m]!.stable === false) unstable++;
     }
@@ -411,8 +602,8 @@ export function buildStoryboard(
       // Inside the box a step is never larger than across the frame, and one whose changed pixels
       // miss the box is nothing inside it.
       if (st.identical || st.maxDelta <= max || !meets(st.changed!, box)) continue;
-      const a = pixels.pixels(m - 1);
-      const b = pixels.pixels(m);
+      const a = frames.pixels(m - 1);
+      const b = frames.pixels(m);
       for (let y = box.y; y < box.y + box.height; y++) {
         for (let p = y * width + box.x, end = p + box.width; p < end; p++) {
           if (mask !== null && mask[p] === 1) continue;
@@ -423,7 +614,8 @@ export function buildStoryboard(
             Math.abs(a[i + 2]! - b[i + 2]!),
             Math.abs(a[i + 3]! - b[i + 3]!),
           );
-          if (d > max) max = d;
+          // Within the noise band a step is no step: what the codec does to a still picture.
+          if (d > max && (still === undefined || d > still)) max = d;
         }
       }
     }
@@ -438,8 +630,27 @@ export function buildStoryboard(
     if (m === anchor) return true;
     const changed = vsAnchor(m).changed;
     if (changed === null || !meets(changed, box)) return true;
-    const a = words(pixels.pixels(anchor));
-    const b = words(pixels.pixels(m));
+    if (still !== undefined) {
+      // Within the noise band of the anchor, as `changed` is.
+      const a = frames.pixels(anchor);
+      const b = frames.pixels(m);
+      for (let y = box.y; y < box.y + box.height; y++) {
+        for (let p = y * width + box.x, end = p + box.width; p < end; p++) {
+          if (mask !== null && mask[p] === 1) continue;
+          const i = p << 2;
+          const d = Math.max(
+            Math.abs(a[i]! - b[i]!),
+            Math.abs(a[i + 1]! - b[i + 1]!),
+            Math.abs(a[i + 2]! - b[i + 2]!),
+            Math.abs(a[i + 3]! - b[i + 3]!),
+          );
+          if (d > still) return false;
+        }
+      }
+      return true;
+    }
+    const a = words(frames.pixels(anchor));
+    const b = words(frames.pixels(m));
     for (let y = box.y; y < box.y + box.height; y++) {
       for (let p = y * width + box.x, end = p + box.width; p < end; p++) {
         if (a[p] !== b[p] && (mask === null || mask[p] !== 1)) return false;
@@ -460,9 +671,10 @@ export function buildStoryboard(
     const known = searched.get(key);
     let result = -1;
     // A frame byte-identical to the one after it has that one's answer: no decode for a hold.
+    // Within the noise of it is not: the two can sit on either side of the band.
     let next: boolean | undefined;
     for (let m = s - 1; m >= (known ? known.upTo : visitStart); m--) {
-      const same = next !== undefined && steps[m + 1]?.identical ? next : sameInBox(m, box);
+      const same = !noise && next !== undefined && steps[m + 1]?.identical ? next : sameInBox(m, box);
       if (same) {
         result = m;
         break;
@@ -485,6 +697,7 @@ export function buildStoryboard(
 
   let visitStart = 0;
   let searched = new Map<string, { upTo: number; result: number }>();
+  const reread: (FrameRef & { state: string })[] = [];
   let j = 1;
   while (j < count) {
     // The step too, while both frames are fresh: a later search back over a hold reads it.
@@ -493,6 +706,26 @@ export function buildStoryboard(
     if (d.over === 0) {
       j++;
       continue;
+    }
+    // A keyframe re-quantizes the whole picture: on a still one its step can cross the floor
+    // without anything on screen changing. The frame before it is in the state (the loop got
+    // here through it), so when the step into it stays within the keyframe band the state is read
+    // again there, and nothing happened.
+    if (noise?.keyframe !== undefined && entries[j]!.key === true) {
+      const into = frameDelta(frames.pixels(j - 1), frames.pixels(j), width, height, {
+        floor: noise.keyframe,
+        mask,
+        still,
+      });
+      if (into.over === 0) {
+        reread.push({ ...ref(j), state });
+        pictureOf.set(state, j);
+        reanchor(j);
+        visitStart = j;
+        searched = new Map();
+        j++;
+        continue;
+      }
     }
     const s = j;
     timeline.push({ state, from: ref(spanStart), to: ref(s - 1) });
@@ -564,7 +797,7 @@ export function buildStoryboard(
     // The anchor is the state's own frame, on a return to an earlier state too: anchored on the
     // hold instead, a hold within the floor of S0's frame was S0 once and a new state the next
     // time, and a fade measured from the hold called "identical to S0" a frame that was not.
-    reanchor(states.find((st) => st.id === to)!.frame.n);
+    reanchor(picture(states.find((st) => st.id === to)!));
     spanStart = settled;
     visitStart = settled;
     searched = new Map();
@@ -583,10 +816,25 @@ export function buildStoryboard(
       sampling: sampling(entries.map((e) => e.atMs)),
       unstable: entries.flatMap((e, i) => (e.stable === false ? [i] : [])),
     },
-    rules: { channelFloor: floor, transientMs, settleMs, ignore },
+    rules: {
+      channelFloor: floor,
+      transientMs,
+      settleMs,
+      ignore,
+      ...(noise
+        ? {
+            noise: {
+              radius: noise.radius,
+              still: noise.still,
+              ...(noise.keyframe !== undefined ? { keyframe: noise.keyframe } : {}),
+            },
+          }
+        : {}),
+    },
     states,
     events,
     timeline,
+    ...(noise?.keyframe !== undefined ? { reread } : {}),
   };
 }
 
@@ -669,7 +917,9 @@ export function storyboardSummary(
     sourceLine(source),
     "",
     `${f.count} frame${f.count === 1 ? "" : "s"} of ${f.width}x${f.height} px from ${ms(f.fromMs)} to ${ms(f.toMs)} ms, ${samplingText(story, source)}.`,
-    `A pixel differs when one of its channels moves by more than ${r.channelFloor} of 255. A departure from the state that comes back within ${ms(r.transientMs)} ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first ${ms(r.settleMs)} ms of identical frames (a drift when no step between two frames, inside its box, crosses the floor).`,
+    r.noise
+      ? `Compared as the mean of each pixel's ${2 * r.noise.radius + 1}x${2 * r.noise.radius + 1} neighbourhood, for a lossy recording: a pixel differs when a channel of its mean moves by more than ${r.channelFloor} of 255, and frames whose means all stay within ${r.noise.still} of each other show one picture. A departure from the state that comes back within ${ms(r.transientMs)} ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first ${ms(r.settleMs)} ms of frames within ${r.noise.still} of the first of them (a drift when no step between two frames, inside its box, crosses the floor).`
+      : `A pixel differs when one of its channels moves by more than ${r.channelFloor} of 255. A departure from the state that comes back within ${ms(r.transientMs)} ms is one event (a glitch when it lasts one frame, a transient otherwise); one that does not is a change, which ends at the first ${ms(r.settleMs)} ms of identical frames (a drift when no step between two frames, inside its box, crosses the floor).`,
     ...(r.ignore.length > 0 ? [`Not compared: ${r.ignore.map(boxText).join("; ")} px.`] : []),
     "",
     "## Events",
@@ -748,6 +998,13 @@ export function storyboardSummary(
     }
     if (e.unstable > 0) notes.push(`${e.id}: ${e.unstable} of its frames never captured the same twice.`);
   }
+  const reread = story.reread ?? [];
+  if (reread.length > 0) {
+    const listed = reread.slice(0, 12).map((k) => `${ms(k.atMs)} ms (n ${k.n}, ${k.state})`);
+    notes.push(
+      `Read again at keyframe${reread.length === 1 ? "" : "s"} ${listed.join(", ")}${reread.length > 12 ? ` and ${reread.length - 12} more` : ""}: ${reread.length === 1 ? "it" : "each"} departed from the state, but the step into it moved no ${2 * r.noise!.radius + 1}x${2 * r.noise!.radius + 1} mean by more than ${r.noise!.keyframe}, as a keyframe re-quantizing a still picture does, so the state was compared against it from then on. A change on screen that small, landing on a keyframe, is not seen.`,
+    );
+  }
   const video = source.video;
   // On the stream clock, consecutive indices are every frame the recording holds between them.
   const wholeStream =
@@ -756,8 +1013,15 @@ export function storyboardSummary(
     entries.every((e, i) => i === 0 || e.index === entries[i - 1]!.index! + 1);
   if (video && !video.lossless) {
     const onKey = story.events.filter((e) => entries[e.first.n]?.key === true).map((e) => e.id);
+    const keyText =
+      onKey.length > 0
+        ? `; ${onKey.join(", ")} ${onKey.length === 1 ? "begins" : "begin"} on a keyframe, where the codec re-quantizes the whole picture`
+        : "";
+    const what = video.decoder === "import" ? "frames not marked lossless" : `${video.codec}, a lossy codec`;
     notes.push(
-      `Decoded from ${video.decoder === "import" ? "frames not marked lossless" : `${video.codec}, a lossy codec`} (read with --lossy): an event can be codec noise rather than a change on screen${onKey.length > 0 ? `; ${onKey.join(", ")} ${onKey.length === 1 ? "begins" : "begin"} on a keyframe, where the codec re-quantizes the whole picture` : ""}.`,
+      r.noise
+        ? `Decoded from ${what} (read with --lossy): what the codec does to a still picture stays inside the noise band, so a change on screen smaller than the floor, over a ${2 * r.noise.radius + 1}x${2 * r.noise.radius + 1} mean, is not seen, and a codec that blurs a change in or out over several frames moves where it begins and ends${keyText}.`
+        : `Decoded from ${what}, compared exactly: an event can be codec noise rather than a change on screen${keyText}.`,
     );
   }
   if (wholeStream && f.count > 1) {

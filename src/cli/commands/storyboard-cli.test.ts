@@ -32,6 +32,35 @@ describe("snapshot storyboard args", () => {
       },
     );
     assert.equal(parseArgs(["f/frames.json", "--lossy"]).lossy, true);
+    assert.equal(parseArgs(["f/frames.json", "--lossy"]).noise, undefined, "--lossy alone: the default band");
+    assert.deepEqual(parseArgs(["f/frames.json", "--noise", "16,40"]), {
+      manifest: "f/frames.json",
+      ignore: [],
+      maxEvents: 20,
+      lossy: true,
+      noise: { still: 16, floor: 40, radius: 1 },
+      json: false,
+    });
+    assert.deepEqual(parseArgs(["f/frames.json", "--noise", "8, 24, 2"]).noise, { still: 8, floor: 24, radius: 2 });
+  });
+
+  test("--noise refuses a band it cannot use, naming its form", () => {
+    for (const bad of [
+      "",
+      "16",
+      "32,32",
+      "40,16",
+      "16,256",
+      "-1,8",
+      "8,16,17",
+      "a,b",
+      "1.5,8",
+      "8,16,2,3",
+      "0x10,32",
+    ]) {
+      assert.throws(() => parseArgs(["f.json", "--noise", bad]), /--noise expects still,floor\[,radius\]/, bad);
+    }
+    assert.throws(() => parseArgs(["f.json", "--noise"]), /--noise expects/);
   });
 
   test("refuses what it cannot read, naming the flag", () => {

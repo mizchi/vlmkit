@@ -38,11 +38,13 @@ import {
   boxText,
   buildStoryboard,
   eventKeyframes,
+  LOSSY_NOISE,
   storyboardBrief,
   storyboardSummary,
   type BriefImage,
   type Box,
   type FramePixels,
+  type NoiseFloor,
   type Storyboard,
   type StoryEvent,
 } from "@mizchi/vlmkit-judge/storyboard.ts";
@@ -50,7 +52,8 @@ import {
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--max-events N] [--lossy] [--json]",
+    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--max-events N]",
+    "                             [--lossy | --noise still,floor[,radius]] [--json]",
     "",
     "Segments a vlmkit-frames/1 sequence into still states and events, from the pixels alone:",
     "  glitch     one frame off the state, then back",
@@ -66,12 +69,14 @@ function usage(): string {
     "  --ignore <x,y,w,h>   A box, in the frames' pixels, no comparison looks at — a video, a clock the",
     "                       capture cannot hold. Repeatable",
     "  --max-events <n>     Events on the sheet and in the brief (default 20); SUMMARY.md has them all",
-    "  --lossy              Segment frames decoded from a lossy recording anyway (scan video): codec",
-    "                       noise is then events too, most of all at keyframes, which SUMMARY.md names",
+    `  --lossy              Frames decoded from a lossy recording (scan video): compare each pixel as the`,
+    `                       mean of its ${2 * LOSSY_NOISE.radius + 1}x${2 * LOSSY_NOISE.radius + 1} neighbourhood, frames within ${LOSSY_NOISE.still} of each other are one picture,`,
+    `                       and a pixel differs past ${LOSSY_NOISE.floor} — what a codec does to a still picture stays below`,
+    "  --noise <s,f[,r]>    --lossy with your own band: still s, floor f (s < f), neighbourhood radius r",
     "  --json               Print story.json to stdout",
     "",
-    "The input must be lossless: frames vlmkit captured (two shots that agree), or a recording in a",
-    "lossless codec (ffv1, png, qtrle, …) decoded by scan video. There is no noise floor for a lossy one yet.",
+    "Frames vlmkit captured (two shots that agree), or a recording in a lossless codec (ffv1, png,",
+    "qtrle, …), are compared exactly. A lossy recording is refused without --lossy or --noise.",
     "",
     "Examples:",
     "  vlmkit check animation page.html --at 0..1s/1f --frames out/f",
@@ -86,6 +91,8 @@ export interface StoryboardArgs {
   ignore: Box[];
   maxEvents: number;
   lossy: boolean;
+  /** --noise: the band to compare through (implies lossy). */
+  noise?: NoiseFloor;
   json: boolean;
 }
 
@@ -108,12 +115,29 @@ function parseBox(raw: string | undefined): Box {
   return { x, y, width, height };
 }
 
+function parseNoise(raw: string | undefined): NoiseFloor {
+  const parts = (raw ?? "").split(",").map((p) => p.trim());
+  const nums = parts.map(whole);
+  if (
+    (parts.length !== 2 && parts.length !== 3) ||
+    nums.some((n) => n === null || n > 255) ||
+    nums[0]! >= nums[1]! ||
+    (nums[2] !== undefined && nums[2]! > 16)
+  ) {
+    throw new UsageError(
+      `--noise expects still,floor[,radius] in whole levels 0-255 with still below floor (radius 0-16), got "${raw ?? ""}"`,
+    );
+  }
+  return { still: nums[0]!, floor: nums[1]!, radius: nums[2] ?? LOSSY_NOISE.radius };
+}
+
 export function parseArgs(argv: string[]): StoryboardArgs {
   let manifest: string | undefined;
   let out: string | undefined;
   const ignore: Box[] = [];
   let maxEvents = 20;
   let lossy = false;
+  let noise: NoiseFloor | undefined;
   let json = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -137,6 +161,10 @@ export function parseArgs(argv: string[]): StoryboardArgs {
       case "--lossy":
         lossy = true;
         break;
+      case "--noise":
+        noise = parseNoise(argv[++i]);
+        lossy = true;
+        break;
       case "--json":
         json = true;
         break;
@@ -152,7 +180,15 @@ export function parseArgs(argv: string[]): StoryboardArgs {
     }
   }
   if (manifest === undefined) throw new UsageError(`no frames.json given.\n\n${usage()}`);
-  return { manifest, ...(out !== undefined ? { out } : {}), ignore, maxEvents, lossy, json };
+  return {
+    manifest,
+    ...(out !== undefined ? { out } : {}),
+    ignore,
+    maxEvents,
+    lossy,
+    ...(noise ? { noise } : {}),
+    json,
+  };
 }
 
 /** pngjs's sync reader, because the segmentation reads frames from inside a pure, synchronous loop. */
@@ -293,23 +329,27 @@ export interface StoryboardWritten {
 /** Segment `manifestPath`'s sequence and write the four outputs. */
 export async function writeStoryboard(
   manifestPath: string,
-  options: { out?: string; ignore?: Box[]; maxEvents?: number; lossy?: boolean } = {},
+  options: { out?: string; ignore?: Box[]; maxEvents?: number; lossy?: boolean; noise?: NoiseFloor } = {},
 ): Promise<StoryboardWritten> {
   const manifestFile = resolve(manifestPath);
   if (!existsSync(manifestFile)) throw new UsageError(`no such frames.json: ${manifestPath}`);
   const manifest = parseFramesManifest(readFileSync(manifestFile, "utf8"));
   const video = manifest.source.video;
-  if (video && !video.lossless && !options.lossy) {
+  const lossy = options.lossy === true || options.noise !== undefined;
+  if (video && !video.lossless && !lossy) {
     throw new UsageError(
       `${manifestPath} was ${video.decoder === "import" ? "imported without --lossless" : `decoded from ${video.codec}, a lossy codec`}: ` +
-        "codec noise makes frames that showed one picture differ (most of all across a keyframe), and a storyboard compares pixels exactly — it has no noise floor yet. " +
-        "Record in a lossless codec (ffv1, png, qtrle), or pass --lossy to segment it anyway with keyframe-aligned events named in SUMMARY.md.",
+        "codec noise makes frames that showed one picture differ (most of all across a keyframe), and without a noise band a storyboard compares pixels exactly. " +
+        "Pass --lossy to compare through the noise band (or --noise for your own), or record in a lossless codec (ffv1, png, qtrle).",
     );
   }
   const dir = dirname(manifestFile);
   const paths = manifest.frames.map((f) => resolve(dir, f.file));
   const pixels = framesOnDisk(paths);
-  const story = buildStoryboard(manifest.frames, pixels, { ignore: options.ignore ?? [] });
+  const story = buildStoryboard(manifest.frames, pixels, {
+    ignore: options.ignore ?? [],
+    ...(lossy ? { noise: options.noise ?? LOSSY_NOISE } : {}),
+  });
   const outDir = resolve(options.out ?? join(dir, "storyboard"));
   await mkdir(join(outDir, "narrate"), { recursive: true });
   await clearPrevious(outDir);
@@ -331,6 +371,7 @@ export async function writeStoryboard(
       keyframes: eventKeyframes(e).map((k) => ({ roles: k.roles, ...k.frame, file: manifest.frames[k.frame.n]!.file })),
     })),
     timeline: story.timeline,
+    ...(story.reread ? { reread: story.reread } : {}),
   };
   const files = {
     story: join(outDir, "story.json"),
@@ -448,6 +489,7 @@ async function main(): Promise<void> {
     ignore: args.ignore,
     maxEvents: args.maxEvents,
     lossy: args.lossy,
+    ...(args.noise ? { noise: args.noise } : {}),
   });
   if (args.json) {
     console.log(JSON.stringify(written.json, null, 2));

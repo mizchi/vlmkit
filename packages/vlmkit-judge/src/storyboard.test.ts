@@ -3,14 +3,18 @@ import { describe, test } from "vite-plus/test";
 import { frameTimeMs } from "./frames.ts";
 import { createRng } from "./pbt.ts";
 import {
+  boxMean,
   buildStoryboard,
   CHANNEL_FLOOR,
   eventKeyframes,
   frameDelta,
   ignoreMask,
+  LOSSY_NOISE,
+  meanFrames,
   storyboardBrief,
   storyboardSummary,
   type Box,
+  type NoiseFloor,
   type StoryEvent,
 } from "./storyboard.ts";
 
@@ -950,3 +954,214 @@ S0 0–33.33 · E1 50 · S0 66.67–316.67 · E2 333.33–383.33 · S1 383.33–
 - E3: the hold it settled in is the sequence's last 33.33 ms, shorter than 100 ms; it may still have been moving.
 - E3: only 50 ms followed its first frame; a return later than that is not in the sequence.
 `;
+
+/** `f` with every channel of every pixel moved by a seeded value in [-amp, amp], clamped. */
+function noisy(f: Uint8Array, seed: number, amp: number): Uint8Array {
+  const rng = createRng(seed);
+  const out = new Uint8Array(f);
+  for (let i = 0; i < out.length; i++) {
+    if (i % 4 === 3) continue;
+    out[i] = Math.max(0, Math.min(255, out[i]! + Math.round((rng.next() * 2 - 1) * amp)));
+  }
+  return out;
+}
+
+/** Every channel of every pixel moved by `by` (a codec's re-quantized keyframe, in the extreme). */
+const shifted = (f: Uint8Array, by: number) => f.map((v, i) => (i % 4 === 3 ? v : Math.max(0, Math.min(255, v + by))));
+
+const lossyStory = (
+  frames: readonly Uint8Array[],
+  noise: NoiseFloor = LOSSY_NOISE,
+  keys: readonly number[] = [],
+  ignore: Box[] = [],
+) => {
+  const s = sequence(frames);
+  const entries = s.entries.map((e) => ({ ...e, key: keys.includes(e.n) }));
+  return buildStoryboard(entries, s.pixels, { noise, ignore });
+};
+
+describe("the noise band (lossy recordings)", () => {
+  test("boxMean: each channel the rounded mean of the neighbourhood inside the frame", () => {
+    const one = frame([{ x: 10, y: 10, w: 1, h: 1, rgb: [0, 0, 0] }]);
+    assert.equal(boxMean(one, W, H, 0), one, "radius 0 is the frame itself");
+    const mean = boxMean(one, W, H, 1);
+    const at = (x: number, y: number) => mean[(y * W + x) * 4]!;
+    assert.equal(at(10, 10), Math.round((255 * 8) / 9));
+    assert.equal(at(11, 11), Math.round((255 * 8) / 9), "a neighbour shares the dark pixel's window");
+    assert.equal(at(12, 12), 255, "two away it does not");
+    assert.equal(mean[(10 * W + 10) * 4 + 3], 255, "alpha is averaged too");
+    // A corner pixel's window is the four pixels of the frame around it.
+    const corner = frame([{ x: 0, y: 0, w: 1, h: 1, rgb: [0, 0, 0] }]);
+    assert.equal(boxMean(corner, W, H, 1)[0], Math.round((255 * 3) / 4));
+    // A larger radius than the frame: every pixel is the mean of the whole frame.
+    const tiny = new Uint8Array([0, 0, 0, 255, 255, 255, 255, 255]);
+    assert.deepEqual([...boxMean(tiny, 2, 1, 5)], [128, 128, 128, 255, 128, 128, 128, 255]);
+  });
+
+  test("meanFrames: computed once per frame while it is kept", () => {
+    const s = sequence([blank, frame([dot])]);
+    const means = meanFrames(s.pixels, 1, 1);
+    means.pixels(0);
+    means.pixels(0);
+    assert.equal(s.reads(), 1, "the second read is the kept mean");
+    means.pixels(1);
+    means.pixels(0);
+    assert.equal(s.reads(), 3, "a capacity of one evicts frame 0 for frame 1");
+  });
+
+  test("frameDelta with still: deltas inside the band are no difference", () => {
+    const by = (d: number) => frame([{ ...dot, rgb: [255 - d, 255, 255] }]);
+    assert.deepEqual(frameDelta(blank, by(10), W, H, { still: 10, floor: 20 }), {
+      identical: true,
+      over: 0,
+      box: null,
+      changed: null,
+      maxDelta: 10,
+    });
+    const mid = frameDelta(blank, by(15), W, H, { still: 10, floor: 20 });
+    assert.equal(mid.identical, false);
+    assert.equal(mid.over, 0, "between the band and the floor: moving, not differing");
+    assert.deepEqual(mid.changed, { x: 5, y: 6, width: 4, height: 3 });
+    const over = frameDelta(blank, by(21), W, H, { still: 10, floor: 20 });
+    assert.equal(over.over, 12);
+    assert.deepEqual(over.box, { x: 5, y: 6, width: 4, height: 3 });
+  });
+
+  test("ignoreMask grows each box for means, inside the frame", () => {
+    const mask = ignoreMask(W, H, [{ x: 0, y: 2, width: 3, height: 2 }], 1)!;
+    const rows = Array.from({ length: 6 }, (_, y) => [...mask.subarray(y * W, y * W + 6)].join(""));
+    assert.deepEqual(rows, ["000000", "111100", "111100", "111100", "111100", "000000"]);
+  });
+
+  test("a still picture under codec-sized noise is no event; compared exactly, every frame is one", () => {
+    const base = frame([dot, { x: 20, y: 10, w: 12, h: 8, rgb: [40, 90, 200] }]);
+    const frames = Array.from({ length: 40 }, (_, n) => noisy(base, n + 1, 20));
+    assert.deepEqual(lossyStory(frames).events, []);
+    assert.ok(story(frames).events.length > 0, "the exact comparison calls the noise events");
+  });
+
+  test("a glitch and a change under noise are where they were planted, their boxes as drawn", () => {
+    const base = frame([]);
+    const box: Paint = { x: 14, y: 9, w: 7, h: 5, rgb: [20, 20, 20] };
+    const frames = Array.from({ length: 50 }, (_, n) => noisy(n === 12 || n >= 30 ? frame([box]) : base, 100 + n, 16));
+    const events = lossyStory(frames).events;
+    assert.deepEqual(
+      events.map((e) => [e.kind, e.first.n, e.back?.n ?? e.settled?.n]),
+      [
+        ["glitch", 12, 13],
+        ["change", 30, 30],
+      ],
+    );
+    for (const e of events) assert.deepEqual(e.box, { x: 14, y: 9, width: 7, height: 5 }, e.id);
+  });
+
+  test("a 1px line: the means find it, the decoded pixels draw it", () => {
+    const line: Paint = { x: 10, y: 4, w: 1, h: 12, rgb: [0, 0, 0] };
+    const frames = [...repeat(blank, 10), ...repeat(frame([line]), 20)];
+    const [e] = lossyStory(frames).events;
+    assert.deepEqual(e!.box, { x: 10, y: 4, width: 1, height: 12 });
+  });
+
+  test("a hold is measured from its first frame, so a ramp below the band is not still", () => {
+    // 10 levels a frame for 12 frames: every step is inside the band (24), the ramp is 120.
+    const level = (n: number) =>
+      frame([
+        { x: 8, y: 8, w: 16, h: 12, rgb: Array(3).fill(255 - 10 * Math.min(12, Math.max(0, n - 5))) as unknown as Rgb },
+      ]);
+    const frames = Array.from({ length: 40 }, (_, n) => level(n));
+    const [e, ...rest] = lossyStory(frames).events;
+    assert.equal(rest.length, 0);
+    assert.equal(e!.first.n, 9, "past the floor (32) at 40 levels, frame 9");
+    assert.equal(e!.settled!.n, 15, "the hold begins where the ramp stops, not at the first quiet step");
+    assert.equal(e!.kind, "drift", "no step crosses the floor");
+  });
+
+  test("a keyframe that re-quantizes a still picture is read again, not an event", () => {
+    const base = frame([dot]);
+    const frames = [...repeat(base, 10), ...repeat(shifted(base, -40), 30)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(s.events, []);
+    assert.deepEqual(s.reread, [{ n: 10, atMs: frameTimeMs(10), state: "S0" }]);
+    // The same step on a frame that is not a keyframe is a change: 40 is past the floor.
+    assert.deepEqual(
+      lossyStory(frames, LOSSY_NOISE, [0]).events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+    );
+    // Without a keyframe band keyframes are frames.
+    const { keyframe: _, ...noBand } = LOSSY_NOISE;
+    assert.equal(lossyStory(frames, noBand, [0, 10]).events.length, 1);
+    assert.equal(lossyStory(frames, noBand, [0, 10]).reread, undefined);
+  });
+
+  test("a change that lands on a keyframe, past the keyframe band, is still a change", () => {
+    const frames = [...repeat(blank, 10), ...repeat(frame([{ ...dot, rgb: [0, 0, 0] }]), 30)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+    );
+    assert.deepEqual(s.reread, []);
+  });
+
+  test("after a re-read, a return to the state is measured against the re-read picture", () => {
+    const base = frame([]);
+    const requant = shifted(base, -40);
+    const toast = frame([{ x: 20, y: 20, w: 12, h: 6, rgb: [30, 30, 30] }], [215, 215, 215]);
+    const frames = [...repeat(base, 10), ...repeat(requant, 10), ...repeat(toast, 6), ...repeat(requant, 20)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 20, 26]],
+    );
+    assert.deepEqual(
+      s.states.map((st) => st.id),
+      ["S0"],
+    );
+  });
+
+  test("an ignored box is grown by the radius, so a clock beside a still picture is no event", () => {
+    const clock = (n: number) => frame([{ x: 30, y: 2, w: 6, h: 4, rgb: n % 2 ? [0, 0, 0] : [120, 120, 120] }]);
+    const frames = Array.from({ length: 30 }, (_, n) => clock(Math.floor(n / 5)));
+    assert.deepEqual(lossyStory(frames, LOSSY_NOISE, [], [{ x: 30, y: 2, width: 6, height: 4 }]).events, []);
+  });
+
+  test("a band it cannot use is refused", () => {
+    const s = sequence([blank]);
+    for (const [noise, re] of [
+      [{ radius: 1, still: 32, floor: 32 }, /still \(32\) must be below its floor/],
+      [{ radius: 1, still: 8, floor: 32, keyframe: 32 }, /keyframe band must be a whole number above the floor/],
+      [{ radius: -1, still: 8, floor: 32 }, /radius must be a whole number/],
+      [{ radius: 1, still: 8.5, floor: 32 }, /still must be a whole number/],
+    ] as const) {
+      assert.throws(() => buildStoryboard(s.entries, s.pixels, { noise }), re);
+    }
+  });
+
+  test("SUMMARY.md states the band and every keyframe it read again", () => {
+    const base = frame([dot]);
+    const frames = [...repeat(base, 10), ...repeat(shifted(base, -40), 10)];
+    const st = lossyStory(frames, LOSSY_NOISE, [0, 10]);
+    const source = {
+      tool: "scan video",
+      url: "file:///rec.mp4",
+      viewport: { width: W, height: H },
+      deviceScaleFactor: 1,
+      clock: "stream" as const,
+      video: { file: "rec.mp4", decoder: "ffmpeg", codec: "h264", lossless: false },
+    };
+    const entries = frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n, key: n === 0 || n === 10 }));
+    const md = storyboardSummary(st, source as never, entries);
+    assert.match(
+      md,
+      /Compared as the mean of each pixel's 3x3 neighbourhood, for a lossy recording: a pixel differs when a channel of its mean moves by more than 32 of 255, and frames whose means all stay within 24 of each other show one picture\./,
+    );
+    assert.match(
+      md,
+      /Read again at keyframe 166\.67 ms \(n 10, S0\): it departed from the state, but the step into it moved no 3x3 mean by more than 48/,
+    );
+    assert.match(
+      md,
+      /Decoded from h264, a lossy codec \(read with --lossy\): what the codec does to a still picture stays inside the noise band/,
+    );
+  });
+});
