@@ -135,6 +135,7 @@ const SPECS: Record<string, Spec> = {
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
   strip: spec("strip-cli", () => import("./commands/strip-cli.ts")),
   storyboard: spec("storyboard-cli", () => import("./commands/storyboard-cli.ts")),
+  scanVideo: spec("scan-video-cli", () => import("./commands/scan-video-cli.ts")),
   recordHar: spec("record-har-cli", () => import("./commands/record-har-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
   presenceMatrix: spec("presence-matrix", () => import("./commands/presence-matrix-cli.ts")),
@@ -198,6 +199,10 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     mock: {
       spec: SPECS.mockScan,
       desc: "Mock-image intake: infer @2x/@3x scale, write normalized @1x target, extraction sanity",
+    },
+    video: {
+      spec: SPECS.scanVideo,
+      desc: "Decode a recording into numbered frames + frames.json with your own ffmpeg (no decoder bundled)",
     },
   },
   build: {

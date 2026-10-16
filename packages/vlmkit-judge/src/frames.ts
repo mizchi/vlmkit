@@ -43,6 +43,17 @@ export interface FrameEntry {
   stable: boolean;
   /** Wall clock only: when the frame was actually shot, in ms after the sequence's anchor. */
   shotMs?: number;
+  /**
+   * Stream clock only: the frame's position among the frames the recording shows, from 0 — a
+   * decoded frame hidden behind a successor with its timestamp is not counted, an interlaced
+   * frame's two fields are two, and every pass of a looped GIF / APNG counts. Consecutive frames
+   * whose indices are consecutive leave nothing of the recording out.
+   */
+  index?: number;
+  /** Stream clock only: the decoder marked the frame a keyframe (where a lossy codec re-quantizes). */
+  key?: boolean;
+  /** Stream clock only: which field of an interlaced frame this is (0 first in time), line-doubled. */
+  field?: 0 | 1;
 }
 
 export interface FramesSource {
@@ -60,8 +71,13 @@ export interface FramesSource {
    * `wall`: ms after an action, in real time. CSS and Web Animations are held and seeked to that
    *   offset, so their frames are exact; scripts run on the real clock and are wherever they were
    *   when the frame was shot (`shotMs`).
+   * `stream`: a recording's own presentation timestamps (`scan video`). A frame is shown from its
+   *   `atMs` until the next frame's, and 0 is the recording's first frame. The frames are the whole
+   *   content: nothing happened between two consecutive ones that the recording holds.
    */
-  clock: "held" | "wall";
+  clock: FramesClock;
+  /** `scan video`: the recording the frames were decoded from, and how. */
+  video?: FramesVideo;
   /** `inspect interact`: the `frames` step this sequence records. */
   step?: string;
   /**
@@ -81,6 +97,89 @@ export interface FramesSource {
    * chosen for.
    */
   sweep?: FramesSweep;
+}
+
+export type FramesClock = "held" | "wall" | "stream";
+
+/** How `scan video` chose its frames from the recording. */
+export type VideoSelection =
+  | { kind: "all" }
+  /**
+   * The frames on screen at some moment of [fromMs, toMs]: the one showing at `fromMs` through the
+   * one at `toMs` (as far as the recording went, when asked for more). `leadInMs`: the frames of
+   * that much time before `fromMs` are in the sequence too, as the history the windows ending
+   * inside the span need (`check flash` judges only those, counted from that history).
+   */
+  | { kind: "span"; fromMs: number; toMs: number; leadInMs?: number }
+  /** The frame on screen at each instant (the last one that began at or before it). */
+  | { kind: "at"; atMs: number[] };
+
+export interface FramesVideo {
+  /** The recording, as given. */
+  file: string;
+  /** What decoded it: the user's own `ffmpeg x.y`, spawned, or `import` for frames another decoder wrote. */
+  decoder: string;
+  /** The stream's codec as the decoder names it (`h264`, `vp8`, `ffv1`); `unknown` for an import. */
+  codec: string;
+  /**
+   * The codec reproduces what it was given exactly (png, ffv1, qtrle, ...). False when it is lossy or
+   * not known to be lossless: two frames that showed one picture can then differ by codec noise,
+   * most of all across a keyframe, and comparing them byte for byte is comparing the codec.
+   */
+  lossless: boolean;
+  /**
+   * Frames the recording shows (a looped GIF / APNG: as far as it was written), when it was read to
+   * its end. An import has it only when told the directory holds every frame (`--every-frame`):
+   * without it, nothing says another tool did not thin them.
+   */
+  streamFrames?: number;
+  /** Decoded frames never on screen: each shared its timestamp with the next, which replaced it at once. */
+  hidden?: number;
+  /**
+   * `browser`: a GIF / APNG timed as a browser plays it — each frame held for its stored delay, or
+   * 100ms when that is 10ms or less (Chromium) — rather than by the decoder's timestamps.
+   */
+  timing?: "browser";
+  /** A GIF / APNG's looping: how many times it plays (`null` forever), one pass, and how many passes are written. */
+  loop?: { plays: number | null; passFrames: number; passMs: number; passes: number };
+  selection: VideoSelection;
+  /**
+   * The conversion to 8-bit sRGB the frames were written with: the YUV matrix (swscale's name,
+   * `rgb` for frames stored as RGB, `gray` for a YUV codec's luma-only frames) and range, the
+   * stream's transfer and primaries as tagged, and which of matrix and range the stream did not
+   * state (so the value is the convention, BT.601 limited, not the stream's own word).
+   */
+  color?: {
+    matrix: string;
+    range: "tv" | "pc";
+    transfer?: string;
+    primaries?: string;
+    assumed: string[];
+  };
+  /** The stream's pixel format (`yuv420p`: chroma at half resolution, so a 1px colour edge is not exact). */
+  pixelFormat?: string;
+  /**
+   * Interlaced: the frames the decoder flagged interlaced (or, for a codec that flags none, every
+   * frame of a stream tagged interlaced) were each split into their two fields, line-doubled, at
+   * twice the frame rate; the progressive ones stay one frame each.
+   */
+  fields?: boolean;
+  /** Transparent pixels were composited over this colour (the page behind them is not known). */
+  background?: "white" | "black";
+  /** What the decoding did not do or could not vouch for, for the reader. */
+  notes?: string[];
+  /** The decoder's own error lines (a truncated file decodes what it holds and exits 0). */
+  decodeErrors?: string[];
+  /** The demuxer reported corrupt or lost packets: frames may be missing between the ones here. */
+  damaged?: boolean;
+  /** The decoded stream's index in the file (`-map 0:<stream>`, `-select_streams <stream>`). */
+  stream?: number;
+  /** Degrees the frames were turned to stand upright, from the stream's display matrix. */
+  rotation?: number;
+  /** A sample aspect ratio other than 1:1, resampled to square pixels (`2:1` doubled each row). */
+  sampleAspect?: string;
+  /** `tt`, `bb`, `tb`, `bt`: the stream's field order as tagged. Which frames were split is `fields`'s. */
+  fieldOrder?: string;
 }
 
 export interface FramesSweep {
@@ -106,6 +205,7 @@ export type UnmeasuredReason = "video" | "animated-image" | "unreadable-image" |
 
 const UNMEASURED_REASONS: readonly UnmeasuredReason[] = ["video", "animated-image", "unreadable-image", "uncontrolled"];
 const SWEEP_WINDOW_FROM: readonly FramesSweep["windowFrom"][] = ["option", "animations", "default", "still"];
+const FRAMES_CLOCKS: readonly FramesClock[] = ["held", "wall", "stream"];
 
 export interface FramesManifest {
   format: typeof FRAMES_FORMAT;
@@ -279,6 +379,33 @@ export function parseFramesManifest(text: string): FramesManifest {
   const source = (manifest.source ?? {}) as Partial<FramesSource>;
   if (source.unmeasured !== undefined) checkUnmeasured(source.unmeasured);
   if (source.sweep !== undefined) checkSweep(source.sweep);
+  if (source.clock !== undefined) oneOf("source.clock", source.clock, FRAMES_CLOCKS);
+  // Read by every judge of the frames; a malformed one crashed check flash's report mid-format.
+  if (source.viewport !== undefined) {
+    const vp = source.viewport as unknown;
+    if (!isObject(vp) || !finite(vp.width) || !finite(vp.height) || vp.width <= 0 || vp.height <= 0) {
+      refuse("source.viewport", "must be { width, height } in CSS px, both > 0");
+    }
+  }
+  if (source.deviceScaleFactor !== undefined && (!finite(source.deviceScaleFactor) || source.deviceScaleFactor <= 0)) {
+    refuse("source.deviceScaleFactor", "must be a finite number > 0");
+  }
+  if (source.video !== undefined) checkVideo(source.video);
+  if (source.clock === "stream") {
+    // What `check flash` reads to decide the sequence leaves nothing out: unchecked, a missing
+    // index read as a gap and a repeated one as nothing missing.
+    manifest.frames.forEach((frame, i) => {
+      if (!Number.isSafeInteger(frame.index) || frame.index! < 0) {
+        refuse(`frames[${i}].index`, "must be a whole number >= 0 on the stream clock");
+      }
+      if (i > 0 && !(frame.index! > manifest.frames![i - 1]!.index!)) {
+        refuse(`frames[${i}].index`, `must be greater than frame ${i - 1}'s`);
+      }
+      if (frame.key !== undefined && typeof frame.key !== "boolean") refuse(`frames[${i}].key`, "must be a boolean");
+      if (frame.field !== undefined && frame.field !== 0 && frame.field !== 1)
+        refuse(`frames[${i}].field`, "must be 0 or 1");
+    });
+  }
   return manifest as FramesManifest;
 }
 
@@ -320,4 +447,73 @@ function checkSweep(sweep: unknown): void {
   if (!finite(sweep.windowMs) || sweep.windowMs < 0) refuse("source.sweep.windowMs", "must be a finite number >= 0");
   oneOf("source.sweep.windowFrom", sweep.windowFrom, SWEEP_WINDOW_FROM);
   if (typeof sweep.truncated !== "boolean") refuse("source.sweep.truncated", "must be a boolean");
+}
+
+function checkVideo(video: unknown): void {
+  if (!isObject(video)) refuse("source.video", "must be an object");
+  for (const key of ["file", "decoder", "codec"]) {
+    if (typeof video[key] !== "string" || video[key] === "") refuse(`source.video.${key}`, "must be a string");
+  }
+  if (typeof video.lossless !== "boolean") refuse("source.video.lossless", "must be a boolean");
+  if (
+    video.streamFrames !== undefined &&
+    (!Number.isSafeInteger(video.streamFrames) || (video.streamFrames as number) < 1)
+  ) {
+    refuse("source.video.streamFrames", "must be a whole number >= 1");
+  }
+  const selection = video.selection;
+  if (!isObject(selection)) refuse("source.video.selection", "must be an object");
+  oneOf("source.video.selection.kind", selection.kind, ["all", "span", "at"]);
+  if (selection.kind === "span") {
+    if (selection.leadInMs !== undefined && (!finite(selection.leadInMs) || (selection.leadInMs as number) < 0)) {
+      refuse("source.video.selection.leadInMs", "must be a finite number >= 0");
+    }
+    for (const key of ["fromMs", "toMs"]) {
+      if (!finite(selection[key]) || (selection[key] as number) < 0) {
+        refuse(`source.video.selection.${key}`, "must be a finite number >= 0");
+      }
+    }
+  }
+  if (
+    selection.kind === "at" &&
+    (!Array.isArray(selection.atMs) || !selection.atMs.every((t) => finite(t) && t >= 0))
+  ) {
+    refuse("source.video.selection.atMs", "must be an array of finite numbers >= 0");
+  }
+  if (video.color !== undefined) {
+    const color = video.color;
+    if (!isObject(color)) refuse("source.video.color", "must be an object");
+    if (typeof color.matrix !== "string") refuse("source.video.color.matrix", "must be a string");
+    oneOf("source.video.color.range", color.range, ["tv", "pc"]);
+    for (const key of ["assumed", "notes"]) {
+      const list = color[key];
+      if (
+        (key === "assumed" || list !== undefined) &&
+        (!Array.isArray(list) || !list.every((a) => typeof a === "string"))
+      ) {
+        refuse(`source.video.color.${key}`, "must be an array of strings");
+      }
+    }
+  }
+  if (video.rotation !== undefined && !finite(video.rotation)) refuse("source.video.rotation", "must be a number");
+  if (video.hidden !== undefined && (!Number.isSafeInteger(video.hidden) || (video.hidden as number) < 0)) {
+    refuse("source.video.hidden", "must be a whole number >= 0");
+  }
+  if (video.timing !== undefined) oneOf("source.video.timing", video.timing, ["browser"]);
+  if (video.loop !== undefined) {
+    const loop = video.loop;
+    if (!isObject(loop)) refuse("source.video.loop", "must be an object");
+    if (loop.plays !== null && (!Number.isSafeInteger(loop.plays) || (loop.plays as number) < 1)) {
+      refuse("source.video.loop.plays", "must be a whole number >= 1, or null for forever");
+    }
+    for (const key of ["passFrames", "passes"]) {
+      if (!Number.isSafeInteger(loop[key]) || (loop[key] as number) < 1)
+        refuse(`source.video.loop.${key}`, "must be a whole number >= 1");
+    }
+    if (!finite(loop.passMs) || (loop.passMs as number) <= 0)
+      refuse("source.video.loop.passMs", "must be a finite number > 0");
+  }
+  for (const key of ["sampleAspect", "fieldOrder"]) {
+    if (video[key] !== undefined && typeof video[key] !== "string") refuse(`source.video.${key}`, "must be a string");
+  }
 }

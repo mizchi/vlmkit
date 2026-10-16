@@ -237,3 +237,78 @@ test("parseFramesManifest: a malformed sweep is a UsageError naming the field", 
   refusesNaming({ sweep: { ...sweep, windowFrom: "manifest" } }, "source.sweep.windowFrom");
   refusesNaming({ sweep: { still: false, windowMs: 0, windowFrom: "still" } }, "source.sweep.truncated");
 });
+
+const VIDEO = {
+  file: "rec.mp4",
+  decoder: "ffmpeg 6.1.1",
+  codec: "h264",
+  lossless: false,
+  streamFrames: 90,
+  selection: { kind: "all" },
+  color: { matrix: "bt709", range: "tv", assumed: [] },
+};
+
+/** A stream-clock manifest: the frames carry their index in the recording. */
+const streamManifest = (frames: Record<string, unknown>[], video: Record<string, unknown> = VIDEO) =>
+  JSON.stringify({
+    format: FRAMES_FORMAT,
+    source: {
+      tool: "scan video",
+      url: "file:///rec.mp4",
+      viewport: { width: 10, height: 10 },
+      deviceScaleFactor: 1,
+      clock: "stream",
+      video,
+    },
+    frames: frames.map((f, n) => ({
+      n,
+      file: `${String(n).padStart(4, "0")}-t.png`,
+      atMs: n * 33,
+      stable: true,
+      ...f,
+    })),
+  });
+
+test("parseFramesManifest: a stream-clock sequence carries each frame's index in the recording", () => {
+  const got = parseFramesManifest(streamManifest([{ index: 0, key: true }, { index: 1 }, { index: 5 }]));
+  assert.deepEqual(
+    got.frames.map((f) => f.index),
+    [0, 1, 5],
+  );
+  assert.equal(got.source.video?.codec, "h264");
+  for (const selection of [
+    { kind: "span", fromMs: 0, toMs: 1000 },
+    { kind: "at", atMs: [0, 150] },
+  ]) {
+    parseFramesManifest(streamManifest([{ index: 0 }], { ...VIDEO, selection }));
+  }
+  const refuses = (frames: Record<string, unknown>[], field: string, video?: Record<string, unknown>) =>
+    assert.throws(
+      () => parseFramesManifest(streamManifest(frames, video)),
+      (error: unknown) => error instanceof UsageError && error.message.includes(`"${field}"`),
+      `${JSON.stringify({ frames, video })} names ${field}`,
+    );
+  // Unchecked, a missing index read as a gap and a repeated one as nothing left out.
+  refuses([{ index: 0 }, {}], "frames[1].index");
+  refuses([{ index: 0 }, { index: 0 }], "frames[1].index");
+  refuses([{ index: 2 }, { index: 1 }], "frames[1].index");
+  refuses([{ index: -1 }], "frames[0].index");
+  refuses([{ index: 0.5 }], "frames[0].index");
+  refuses([{ index: 0, key: "yes" }], "frames[0].key");
+  refuses([{ index: 0 }], "source.video.codec", { ...VIDEO, codec: 7 });
+  refuses([{ index: 0 }], "source.video.lossless", { ...VIDEO, lossless: "no" });
+  refuses([{ index: 0 }], "source.video.streamFrames", { ...VIDEO, streamFrames: 0 });
+  refuses([{ index: 0 }], "source.video.selection.kind", { ...VIDEO, selection: { kind: "some" } });
+  refuses([{ index: 0 }], "source.video.selection.fromMs", { ...VIDEO, selection: { kind: "span", toMs: 1 } });
+  refuses([{ index: 0 }], "source.video.selection.atMs", { ...VIDEO, selection: { kind: "at", atMs: [-1] } });
+  refuses([{ index: 0 }], "source.video.color.range", {
+    ...VIDEO,
+    color: { matrix: "bt709", range: "full", assumed: [] },
+  });
+  refuses([{ index: 0 }], "source.video.color.assumed", { ...VIDEO, color: { matrix: "bt709", range: "tv" } });
+  refuses([{ index: 0 }], "source.video.color.notes", {
+    ...VIDEO,
+    color: { matrix: "bt709", range: "tv", assumed: [], notes: "x" },
+  });
+  refusesNaming({ clock: "page" }, "source.clock");
+});

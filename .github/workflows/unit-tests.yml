@@ -77,6 +77,12 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      # `scan video` and `check flash <video>` decode with the user's own ffmpeg and ffprobe
+      # (vlmkit ships no decoder), so their tests need one on PATH, as a user would. Without it
+      # those tests fail naming the missing binary rather than skipping.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - run: pnpm build:packages
 
       - run: pnpm test
