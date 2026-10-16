@@ -61,7 +61,8 @@ const CODECS: Record<string, string[]> = {
   "av1-crf50": ["-c:v", "libsvtav1", "-crf", "50", "-preset", "8", "-pix_fmt", "yuv420p"],
 };
 
-const KINDS = ["static", "glitch&at=30", "caret", "digit&at=30", "cursor", "scroll", "toast", "slide"] as const;
+// The digit at frame 33, off every keyframe of the 10-frame GOP; a test below puts it on one.
+const KINDS = ["static", "glitch&at=30", "caret", "digit&at=33", "cursor", "scroll", "toast", "slide"] as const;
 
 let browser: Browser;
 let dir: string;
@@ -182,6 +183,22 @@ describe("snapshot storyboard --lossy: planted events through codecs", () => {
   );
 
   test(
+    "a digit changing on a keyframe is a change: a re-encoding's noise is spread, a glyph's is not",
+    { timeout: 60_000 },
+    async () => {
+      const lossless = await capture("digit&at=30");
+      const truth = segment(lossless, false);
+      // x264 crf 23, one keyframe: frame 30 is an ordinary frame.
+      sameStory(truth, segment(await throughCodec(lossless, "x264-crf23"), true), "digit crf23");
+      // crf 28 with keyframes every 10 frames: frame 30 is a keyframe, and the digit's change is
+      // within the keyframe band, but it moves past the band only where the glyph is.
+      const harsh = segment(await throughCodec(lossless, "x264-crf28-key10"), true);
+      sameStory(truth, harsh, "digit crf28-key10");
+      assert.ok(!(harsh.reread ?? []).some((r) => r.n === 30), JSON.stringify(harsh.reread));
+    },
+  );
+
+  test(
     "the CLI path: a lossy recording refused without --lossy, the band in story.json and SUMMARY.md",
     { timeout: 60_000 },
     async () => {
@@ -189,15 +206,15 @@ describe("snapshot storyboard --lossy: planted events through codecs", () => {
       await assert.rejects(writeStoryboard(lossy), /decoded from h264, a lossy codec: .*Pass --lossy/);
       const w = await writeStoryboard(lossy, { lossy: true });
       assert.equal(w.story.rules.channelFloor, 32, "the band's floor is the floor");
-      assert.deepEqual(w.story.rules.noise, { radius: 1, still: 24, keyframe: 48 });
+      assert.deepEqual(w.story.rules.noise, { radius: 1, still: 24, holdMean: 3, keyframe: { block: 24, pixel: 96 } });
       assert.deepEqual(
         w.story.events.map((e) => [e.kind, e.first.n]),
         [["glitch", 30]],
       );
       assert.ok((w.story.reread ?? []).length > 0, "keyframes 10, 20, … read again");
       const summary = readFileSync(w.files.summary, "utf8");
-      assert.match(summary, /Compared as the mean of each pixel's 3x3 neighbourhood, for a lossy recording/);
-      assert.match(summary, /Read again at keyframes /);
+      assert.match(summary, /Compared as the mean of each pixel's 3x3 neighbourhood, through a noise band/);
+      assert.match(summary, /Read again at [\d.]+ ms \(n \d+, S0, a keyframe\)/);
       const json = JSON.parse(readFileSync(w.files.story, "utf8"));
       assert.deepEqual(json.reread, JSON.parse(JSON.stringify(w.story.reread)));
     },

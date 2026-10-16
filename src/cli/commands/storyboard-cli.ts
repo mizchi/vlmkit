@@ -60,6 +60,8 @@ function usage(): string {
     "  transient  more than one frame off, back within 5000 ms (whatever it held in between)",
     "  change     not back within 5000 ms; ends at the first 100 ms of identical frames (the next state)",
     "  drift      a change no frame-to-frame step of which, inside its box, moves a channel by more than 8 of 255",
+    `             (--lossy: one picture is every 3x3 mean within ${LOSSY_NOISE.still} of the hold's first frame and the`,
+    `             mean over the change's box within ${LOSSY_NOISE.holdMean}; a step reaches back 50 ms and differs past ${LOSSY_NOISE.floor})`,
     "",
     "Writes story.json, SUMMARY.md, sheet.png and narrate/BRIEF.md (keyframes and a magnified crop",
     "of each event's box, for your own vision to say what changed). Exits 0: it reports, it does not judge.",
@@ -70,13 +72,16 @@ function usage(): string {
     "                       capture cannot hold. Repeatable",
     "  --max-events <n>     Events on the sheet and in the brief (default 20); SUMMARY.md has them all",
     `  --lossy              Frames decoded from a lossy recording (scan video): compare each pixel as the`,
-    `                       mean of its ${2 * LOSSY_NOISE.radius + 1}x${2 * LOSSY_NOISE.radius + 1} neighbourhood, frames within ${LOSSY_NOISE.still} of each other are one picture,`,
-    `                       and a pixel differs past ${LOSSY_NOISE.floor} — what a codec does to a still picture stays below`,
-    "  --noise <s,f[,r]>    --lossy with your own band: still s, floor f (s < f), neighbourhood radius r",
+    `                       mean of its ${2 * LOSSY_NOISE.radius + 1}x${2 * LOSSY_NOISE.radius + 1} neighbourhood, a pixel differs past ${LOSSY_NOISE.floor}, and a keyframe that only`,
+    `                       re-quantizes the picture (8x8 means within ${LOSSY_NOISE.keyframe!.block}, 3x3 means within ${LOSSY_NOISE.keyframe!.pixel}) is no change.`,
+    "                       Frames that are not from a lossy recording are compared exactly, --lossy or not",
+    "  --noise <s,f[,r]>    A band of your own, on any frames: still s, floor f (s < f), neighbourhood radius",
+    "                       r (0: the decoded pixels), with --lossy's hold and keyframe bands",
     "  --json               Print story.json to stdout",
     "",
     "Frames vlmkit captured (two shots that agree), or a recording in a lossless codec (ffv1, png,",
-    "qtrle, …), are compared exactly. A lossy recording is refused without --lossy or --noise.",
+    "qtrle, …), are compared exactly. A lossy recording is refused without --lossy or --noise, and",
+    "SUMMARY.md then says what the band cannot see.",
     "",
     "Examples:",
     "  vlmkit check animation page.html --at 0..1s/1f --frames out/f",
@@ -128,7 +133,23 @@ function parseNoise(raw: string | undefined): NoiseFloor {
       `--noise expects still,floor[,radius] in whole levels 0-255 with still below floor (radius 0-16), got "${raw ?? ""}"`,
     );
   }
-  return { still: nums[0]!, floor: nums[1]!, radius: nums[2] ?? LOSSY_NOISE.radius };
+  return noiseBand(nums[0]!, nums[1]!, nums[2] ?? LOSSY_NOISE.radius);
+}
+
+/**
+ * Your still, floor and radius with --lossy's hold and keyframe bands, kept valid: the region band
+ * at most still, the keyframe pixel band above the floor. Without them a band of the default
+ * numbers gave a different storyboard from --lossy.
+ */
+export function noiseBand(still: number, floor: number, radius: number): NoiseFloor {
+  const kf = LOSSY_NOISE.keyframe!;
+  return {
+    radius,
+    still,
+    floor,
+    holdMean: Math.min(LOSSY_NOISE.holdMean!, still),
+    ...(floor < 255 ? { keyframe: { block: kf.block, pixel: Math.min(255, Math.max(kf.pixel, floor + 1)) } } : {}),
+  };
 }
 
 export function parseArgs(argv: string[]): StoryboardArgs {
@@ -313,6 +334,8 @@ async function clearPrevious(outDir: string): Promise<void> {
 
 export interface StoryboardWritten {
   story: Storyboard;
+  /** --lossy was given for frames that are not from a lossy recording, so it changed nothing. */
+  lossyIgnored: boolean;
   manifest: FramesManifest;
   outDir: string;
   files: { story: string; summary: string; sheet: string; brief: string };
@@ -334,8 +357,9 @@ export async function writeStoryboard(
   if (!existsSync(manifestFile)) throw new UsageError(`no such frames.json: ${manifestPath}`);
   const manifest = parseFramesManifest(readFileSync(manifestFile, "utf8"));
   const video = manifest.source.video;
+  const lossyFrames = video !== undefined && !video.lossless;
   const lossy = options.lossy === true || options.noise !== undefined;
-  if (video && !video.lossless && !lossy) {
+  if (lossyFrames && !lossy) {
     throw new UsageError(
       `${manifestPath} was ${video.decoder === "import" ? "imported without --lossless" : `decoded from ${video.codec}, a lossy codec`}: ` +
         "codec noise makes frames that showed one picture differ (most of all across a keyframe), and without a noise band a storyboard compares pixels exactly. " +
@@ -347,7 +371,9 @@ export async function writeStoryboard(
   const pixels = framesOnDisk(paths);
   const story = buildStoryboard(manifest.frames, pixels, {
     ignore: options.ignore ?? [],
-    ...(lossy ? { noise: options.noise ?? LOSSY_NOISE } : {}),
+    // --lossy is for lossy frames: on vlmkit's own captures and lossless recordings it changes
+    // nothing, as before it had a band to apply. --noise is a band asked for, on any frames.
+    ...(options.noise ? { noise: options.noise } : options.lossy && lossyFrames ? { noise: LOSSY_NOISE } : {}),
   });
   const outDir = resolve(options.out ?? join(dir, "storyboard"));
   await mkdir(join(outDir, "narrate"), { recursive: true });
@@ -459,6 +485,7 @@ export async function writeStoryboard(
 
   return {
     story,
+    lossyIgnored: options.lossy === true && options.noise === undefined && !lossyFrames,
     manifest,
     outDir,
     files,
@@ -501,8 +528,18 @@ async function main(): Promise<void> {
   console.log(
     `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame && written.manifest.source.clock !== "stream" ? ", every 60 fps frame" : ""}${RESET}`,
   );
+  if (written.lossyIgnored) {
+    console.log(
+      `  ${DIM}--lossy: these frames are not from a lossy recording, so they were compared exactly (--noise applies a band to any frames)${RESET}`,
+    );
+  }
   if (story.events.length === 0) {
-    console.log(`  No events: every frame is within the floor of frame 0.`);
+    const again = story.reread?.length ?? 0;
+    console.log(
+      again > 0
+        ? `  No events: every frame is within the floor of ${story.states[0]!.id}'s picture, read again at ${plural(again, "frame")} (see SUMMARY.md).`
+        : `  No events: every frame is within the floor of frame 0.`,
+    );
   } else {
     console.log(`  ${plural(story.events.length, "event")}, ${plural(story.states.length, "state")}:`);
     for (const e of story.events) console.log(`    ${eventLine(e)}`);

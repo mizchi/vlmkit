@@ -966,8 +966,19 @@ function noisy(f: Uint8Array, seed: number, amp: number): Uint8Array {
   return out;
 }
 
-/** Every channel of every pixel moved by `by` (a codec's re-quantized keyframe, in the extreme). */
-const shifted = (f: Uint8Array, by: number) => f.map((v, i) => (i % 4 === 3 ? v : Math.max(0, Math.min(255, v + by))));
+const GREY: Rgb = [180, 180, 180];
+
+/**
+ * `f` as another GOP might encode it: every pixel moved by `amp`, up in four columns and down in
+ * the next four, so 3x3 means move by `amp` and 8x8 block means not at all — ringing, at its most
+ * regular. On a grey frame, so nothing clamps.
+ */
+const requant = (f: Uint8Array, amp: number) =>
+  f.map((v, i) => {
+    if (i % 4 === 3) return v;
+    const x = (i >> 2) % W;
+    return Math.max(0, Math.min(255, v + (Math.floor(x / 4) % 2 === 0 ? amp : -amp)));
+  });
 
 const lossyStory = (
   frames: readonly Uint8Array[],
@@ -1072,17 +1083,17 @@ describe("the noise band (lossy recordings)", () => {
     const [e, ...rest] = lossyStory(frames).events;
     assert.equal(rest.length, 0);
     assert.equal(e!.first.n, 9, "past the floor (32) at 40 levels, frame 9");
-    assert.equal(e!.settled!.n, 15, "the hold begins where the ramp stops, not at the first quiet step");
+    assert.equal(e!.settled!.n, 17, "the hold begins where the ramp stops, not at the first quiet step");
     assert.equal(e!.kind, "drift", "no step crosses the floor");
   });
 
   test("a keyframe that re-quantizes a still picture is read again, not an event", () => {
-    const base = frame([dot]);
-    const frames = [...repeat(base, 10), ...repeat(shifted(base, -40), 30)];
+    const base = frame([dot], GREY);
+    const frames = [...repeat(base, 10), ...repeat(requant(base, 50), 30)];
     const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
     assert.deepEqual(s.events, []);
-    assert.deepEqual(s.reread, [{ n: 10, atMs: frameTimeMs(10), state: "S0" }]);
-    // The same step on a frame that is not a keyframe is a change: 40 is past the floor.
+    assert.deepEqual(s.reread, [{ n: 10, atMs: frameTimeMs(10), state: "S0", as: "keyframe" }]);
+    // The same step on a frame that is not a keyframe is a change: its means move by 50.
     assert.deepEqual(
       lossyStory(frames, LOSSY_NOISE, [0]).events.map((e) => [e.kind, e.first.n]),
       [["change", 10]],
@@ -1091,9 +1102,48 @@ describe("the noise band (lossy recordings)", () => {
     const { keyframe: _, ...noBand } = LOSSY_NOISE;
     assert.equal(lossyStory(frames, noBand, [0, 10]).events.length, 1);
     assert.equal(lossyStory(frames, noBand, [0, 10]).reread, undefined);
+    // A keyframe that moves means past the pixel band (96) is a change even when the blocks hold.
+    assert.equal(
+      lossyStory([...repeat(base, 10), ...repeat(requant(base, 100), 30)], LOSSY_NOISE, [0, 10]).events.length,
+      1,
+    );
   });
 
-  test("a change that lands on a keyframe, past the keyframe band, is still a change", () => {
+  test("the limit: a small change landing on a keyframe whose noise is spread is read again with it", () => {
+    const base = frame([], GREY);
+    const mark = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 10; y < 15; y++) for (let x = 20; x < 23; x++) out.set([110, 110, 110, 255], (y * W + x) * 4);
+      return out;
+    };
+    // Keyframe 10 re-encodes everything (±50, spread) and a 3x5 mark appears with it: within both
+    // bands, so it is the keyframe's re-quantization, and SUMMARY.md lists the frame read again.
+    const s = lossyStory([...repeat(base, 10), ...repeat(mark(requant(base, 50)), 30)], LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(s.events, []);
+    assert.deepEqual(
+      s.reread?.map((r) => [r.n, r.as]),
+      [[10, "keyframe"]],
+    );
+    // On a keyframe that re-encodes nothing visibly, the same mark is a change.
+    const quiet = lossyStory([...repeat(base, 10), ...repeat(mark(base), 30)], LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(
+      quiet.events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+    );
+  });
+
+  test("a keyframe at the sequence's end is read again on the frames there are", () => {
+    const base = frame([dot], GREY);
+    const frames = [...repeat(base, 20), requant(base, 50), requant(base, 50)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 20]);
+    assert.deepEqual(s.events, []);
+    assert.deepEqual(
+      s.reread?.map((r) => r.n),
+      [20],
+    );
+  });
+
+  test("a change that lands on a keyframe is still a change, past the floor and moving its blocks", () => {
     const frames = [...repeat(blank, 10), ...repeat(frame([{ ...dot, rgb: [0, 0, 0] }]), 30)];
     const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
     assert.deepEqual(
@@ -1101,22 +1151,198 @@ describe("the noise band (lossy recordings)", () => {
       [["change", 10]],
     );
     assert.deepEqual(s.reread, []);
+    // A region 40 levels darker for a second (between the floor and the old keyframe band of 48),
+    // its onset on a keyframe: its blocks move by 40, so it is not a re-quantization.
+    const dim = frame([{ x: 8, y: 6, w: 20, h: 10, rgb: [140, 140, 140] }], GREY);
+    const toast = lossyStory(
+      [...repeat(frame([], GREY), 10), ...repeat(dim, 30), ...repeat(frame([], GREY), 20)],
+      LOSSY_NOISE,
+      [0, 10],
+    );
+    assert.deepEqual(
+      toast.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 10, 40]],
+    );
+    assert.deepEqual(
+      toast.states.map((st) => st.id),
+      ["S0"],
+    );
   });
 
-  test("after a re-read, a return to the state is measured against the re-read picture", () => {
-    const base = frame([]);
-    const requant = shifted(base, -40);
-    const toast = frame([{ x: 20, y: 20, w: 12, h: 6, rgb: [30, 30, 30] }], [215, 215, 215]);
-    const frames = [...repeat(base, 10), ...repeat(requant, 10), ...repeat(toast, 6), ...repeat(requant, 20)];
-    const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
+  test("a fade already moving below the floor is not read again where it crosses on a keyframe", () => {
+    // A panel 1 level a frame darker from frame 7; its means pass the floor at frame 40, a keyframe.
+    const level = (n: number) =>
+      frame(
+        [{ x: 4, y: 4, w: 30, h: 20, rgb: Array(3).fill(180 - Math.max(0, Math.min(60, n - 7))) as unknown as Rgb }],
+        GREY,
+      );
+    const frames = Array.from({ length: 80 }, (_, n) => level(n));
+    const keys = [0, 10, 20, 30, 40, 50, 60, 70];
+    const s = lossyStory(frames, LOSSY_NOISE, keys);
+    assert.equal(s.events.length, 1, JSON.stringify(s.events.map((e) => [e.kind, e.first.n])));
+    assert.equal(s.events[0]!.kind, "drift");
+    assert.ok(!(s.reread ?? []).some((r) => r.n === 40), "not read again on the crossing keyframe");
+  });
+
+  test("a toast fading in from a keyframe is one transient and leaves no state behind", () => {
+    const base = frame([], GREY);
+    const toast = (a: number) =>
+      frame([{ x: 10, y: 8, w: 20, h: 10, rgb: Array(3).fill(Math.round(180 - 150 * a)) as unknown as Rgb }], GREY);
+    const frames = [
+      ...repeat(base, 20),
+      ...Array.from({ length: 8 }, (_, i) => toast((i + 1) / 8)),
+      ...repeat(toast(1), 30),
+      ...Array.from({ length: 8 }, (_, i) => toast(1 - (i + 1) / 8)),
+      ...repeat(base, 30),
+    ];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 20, 40, 60, 80]);
     assert.deepEqual(
-      s.events.map((e) => [e.kind, e.first.n, e.back?.n]),
-      [["transient", 20, 26]],
+      s.events.map((e) => e.kind),
+      ["transient"],
     );
     assert.deepEqual(
       s.states.map((st) => st.id),
       ["S0"],
     );
+  });
+
+  test("a keyframe inside a transient: the page after it is the state re-quantized, a return", () => {
+    const base = frame([], GREY);
+    const toast = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 20; y < 26; y++) for (let x = 20; x < 32; x++) out.set([30, 30, 30, 255], (y * W + x) * 4);
+      return out;
+    };
+    const after = requant(base, 50);
+    // The toast from 10 to 30; keyframe 20 re-quantizes everything under and around it.
+    const frames = [...repeat(base, 10), ...repeat(toast(base), 10), ...repeat(toast(after), 10), ...repeat(after, 30)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 20]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 10, 30]],
+    );
+    assert.deepEqual(
+      s.states.map((st) => st.id),
+      ["S0"],
+    );
+    assert.deepEqual(s.reread, [{ n: 30, atMs: frameTimeMs(30), state: "S0", as: "return" }]);
+  });
+
+  test("a caret still on after a keyframe is not a return: it is nearer itself than the state", () => {
+    const base = frame([], GREY);
+    const caret = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 6; y < 20; y++) out.set([0, 0, 0, 255], (y * W + 13) * 4);
+      return out;
+    };
+    const after = requant(base, 50);
+    const frames = [...repeat(base, 20), ...repeat(caret(base), 10), ...repeat(caret(after), 16), ...repeat(after, 30)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 30]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 20, 46]],
+    );
+    assert.deepEqual(
+      s.states.map((st) => st.id),
+      ["S0"],
+    );
+  });
+
+  test("a small change that settles in a later GOP is a new state, not the old one re-quantized", () => {
+    const base = frame([], GREY);
+    const mark = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 10; y < 15; y++) for (let x = 20; x < 23; x++) out.set([40, 40, 40, 255], (y * W + x) * 4);
+      return out;
+    };
+    const after = requant(base, 50);
+    const frames = [...repeat(base, 25), ...repeat(after, 5), ...repeat(mark(after), 40)];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 25]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.from, e.to]),
+      [["change", 30, "S0", "S1"]],
+    );
+    assert.deepEqual(
+      s.reread?.map((r) => [r.n, r.as]),
+      [[25, "keyframe"]],
+    );
+  });
+
+  test("a return to a state in another GOP is that state, read again, never a new one", () => {
+    const base = frame([], GREY);
+    const panel = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 10; y < 18; y++) for (let x = 10; x < 26; x++) out.set([20, 20, 20, 255], (y * W + x) * 4);
+      return out;
+    };
+    // GOP A as drawn, B re-quantized, then A again; a panel open from 20 for 7s, closed at 450.
+    const frames = [
+      ...repeat(base, 10),
+      ...repeat(requant(base, 50), 10),
+      ...repeat(panel(requant(base, 50)), 10),
+      ...repeat(panel(base), 420),
+      ...repeat(base, 30),
+    ];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 10, 30]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.from, e.to]),
+      [
+        ["change", "S0", "S1"],
+        ["change", "S1", "S0"],
+      ],
+    );
+    assert.deepEqual(
+      s.states.map((st) => st.id),
+      ["S0", "S1"],
+    );
+  });
+
+  test("a fade slower than the band per hold is one drift, not a run of holds", () => {
+    for (const perFrame of [1.7, 4]) {
+      const level = (n: number) =>
+        frame([
+          {
+            x: 4,
+            y: 4,
+            w: 30,
+            h: 20,
+            rgb: Array(3).fill(Math.round(255 - Math.min(100, Math.max(0, n - 10) * perFrame))) as unknown as Rgb,
+          },
+        ]);
+      const frames = Array.from({ length: 120 }, (_, n) => level(n));
+      const s = lossyStory(frames);
+      assert.equal(
+        s.events.length,
+        1,
+        `${perFrame}/frame: ${JSON.stringify(s.events.map((e) => [e.kind, e.first.n, e.settled?.n]))}`,
+      );
+      assert.equal(s.events[0]!.kind, "drift");
+      // The last levels of a fade (within the hold's region band of 3) are its end.
+      const end = 10 + Math.ceil(100 / perFrame);
+      assert.ok(
+        s.events[0]!.settled!.n >= end - 2,
+        `settles where the fade stops (${perFrame}/frame): ${s.events[0]!.settled!.n} for ${end}`,
+      );
+    }
+  });
+
+  test("an instant change a codec smears over four frames is a change, not a drift", () => {
+    // Steps of 16 (inside the band of 24) four frames in a row: 64 in 67ms.
+    const level = (n: number) =>
+      frame([
+        { x: 8, y: 8, w: 12, h: 10, rgb: Array(3).fill(255 - 16 * Math.min(4, Math.max(0, n - 9))) as unknown as Rgb },
+      ]);
+    const [e, ...rest] = lossyStory(Array.from({ length: 40 }, (_, n) => level(n))).events;
+    assert.equal(rest.length, 0);
+    assert.equal(e!.kind, "change");
+  });
+
+  test("boxes and counts beside an ignored box are drawn from the decoded pixels it does not cover", () => {
+    const line = (x: number) => frame([{ x, y: 4, w: 1, h: 14, rgb: [0, 0, 0] }]);
+    const frames = [...repeat(blank, 10), ...repeat(line(20), 20)];
+    const [e] = lossyStory(frames, LOSSY_NOISE, [], [{ x: 10, y: 2, width: 10, height: 20 }]).events;
+    assert.deepEqual(e!.box, { x: 20, y: 4, width: 1, height: 14 });
+    assert.equal(e!.peak.over, 14, "the peak counts the pixels its box is drawn from");
   });
 
   test("an ignored box is grown by the radius, so a clock beside a still picture is no event", () => {
@@ -1129,7 +1355,15 @@ describe("the noise band (lossy recordings)", () => {
     const s = sequence([blank]);
     for (const [noise, re] of [
       [{ radius: 1, still: 32, floor: 32 }, /still \(32\) must be below its floor/],
-      [{ radius: 1, still: 8, floor: 32, keyframe: 32 }, /keyframe band must be a whole number above the floor/],
+      [
+        { radius: 1, still: 8, floor: 32, keyframe: { block: 24, pixel: 32 } },
+        /keyframe pixel band must be a whole number above the floor/,
+      ],
+      [
+        { radius: 1, still: 8, floor: 32, keyframe: { block: -1, pixel: 96 } },
+        /keyframe block band must be a whole number/,
+      ],
+      [{ radius: 1, still: 8, floor: 32, holdMean: 9 }, /holdMean must be a whole number 0 to still \(8\)/],
       [{ radius: -1, still: 8, floor: 32 }, /radius must be a whole number/],
       [{ radius: 1, still: 8.5, floor: 32 }, /still must be a whole number/],
     ] as const) {
@@ -1137,9 +1371,9 @@ describe("the noise band (lossy recordings)", () => {
     }
   });
 
-  test("SUMMARY.md states the band and every keyframe it read again", () => {
-    const base = frame([dot]);
-    const frames = [...repeat(base, 10), ...repeat(shifted(base, -40), 10)];
+  test("SUMMARY.md states the band and every frame it read again", () => {
+    const base = frame([dot], GREY);
+    const frames = [...repeat(base, 10), ...repeat(requant(base, 50), 10)];
     const st = lossyStory(frames, LOSSY_NOISE, [0, 10]);
     const source = {
       tool: "scan video",
@@ -1153,15 +1387,24 @@ describe("the noise band (lossy recordings)", () => {
     const md = storyboardSummary(st, source as never, entries);
     assert.match(
       md,
-      /Compared as the mean of each pixel's 3x3 neighbourhood, for a lossy recording: a pixel differs when a channel of its mean moves by more than 32 of 255, and frames whose means all stay within 24 of each other show one picture\./,
+      /Compared as the mean of each pixel's 3x3 neighbourhood, through a noise band: a pixel differs when a channel of its mean moves by more than 32 of 255, and frames show one picture while every mean stays within 24 of the first of them and the mean over a change's box within 3\./,
+    );
+    assert.match(md, /None: every frame is within the floor of S0's picture, read again at 1 frame\./);
+    assert.match(
+      md,
+      /Read again at 166\.67 ms \(n 10, S0, a keyframe\): the picture there differed from the state's only as a codec re-quantizes one — no 8x8 block's mean moved by more than 24, no 3x3 mean by more than 96/,
     );
     assert.match(
       md,
-      /Read again at keyframe 166\.67 ms \(n 10, S0\): it departed from the state, but the step into it moved no 3x3 mean by more than 48/,
+      /Decoded from h264, a lossy codec, compared through the noise band: what the codec does to a still picture stays inside it/,
     );
+    // Radius 0 compares the decoded pixels; the sentence says so.
+    const raw = buildStoryboard(sequence(frames).entries, sequence(frames).pixels, {
+      noise: { radius: 0, still: 8, floor: 32 },
+    });
     assert.match(
-      md,
-      /Decoded from h264, a lossy codec \(read with --lossy\): what the codec does to a still picture stays inside the noise band/,
+      storyboardSummary(raw, source as never, entries),
+      /Compared pixel by pixel as decoded, through a noise band/,
     );
   });
 });

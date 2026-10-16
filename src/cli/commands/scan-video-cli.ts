@@ -374,7 +374,7 @@ async function main(): Promise<void> {
   );
   if (!v.lossless) {
     console.log(
-      `  ${DIM}${v.decoder === "import" ? "not marked lossless (--lossless)" : `${v.codec} is lossy`}: snapshot storyboard compares pixels exactly and needs --lossy to read it${RESET}`,
+      `  ${DIM}${v.decoder === "import" ? "not marked lossless (--lossless)" : `${v.codec} is lossy`}: snapshot storyboard needs --lossy to read it (a noise band; exactly, codec noise is events)${RESET}`,
     );
   }
   console.log();
