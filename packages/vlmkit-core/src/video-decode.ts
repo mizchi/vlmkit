@@ -502,33 +502,43 @@ async function claimOut(outDir: string, file: string, shown: string): Promise<{ 
       `another scan in this process is writing into ${outDir}: wait for it, or give --out another directory`,
     );
   }
-  const id = processIdentity();
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await writeFile(lockPath, `${JSON.stringify({ pid: process.pid, id })}\n`, { flag: "wx" });
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST" || attempt > 0) throw error;
-      let owner: { pid?: unknown; id?: unknown } = {};
-      try {
-        owner = JSON.parse(readFileSync(lockPath, "utf8")) as typeof owner;
-      } catch {
-        // unreadable: judged by its age below
-      }
-      const pid = typeof owner.pid === "number" ? owner.pid : Number.NaN;
-      const ours = owner.id === id;
-      const old = Date.now() - statSync(lockPath).mtimeMs > STALE_UNKNOWN_MS;
-      if (ours ? pid !== process.pid && alive(pid) : !old) {
-        throw new UsageError(
-          ours
-            ? `another scan (pid ${pid}) is writing into ${outDir}: wait for it, or give --out another directory`
-            : `a scan from another host or container may be writing into ${outDir} (${lockPath}): wait for it, or remove that file if none runs`,
-        );
-      }
-      await rm(lockPath, { force: true });
-    }
-  }
+  // Reserved before the first await. Added only after the lock file was written, a second scan in
+  // this process passed the check above while the first was still writing, found a lock with this
+  // pid, took it for a crashed scan's and removed it: both then wrote into one directory (measured:
+  // 2 of 8 runs of the same-directory test, its ffmpeg failing with an I/O error).
   heldLocks.add(lockPath);
+  const id = processIdentity();
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await writeFile(lockPath, `${JSON.stringify({ pid: process.pid, id })}\n`, { flag: "wx" });
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST" || attempt > 0) throw error;
+        let owner: { pid?: unknown; id?: unknown } = {};
+        try {
+          owner = JSON.parse(readFileSync(lockPath, "utf8")) as typeof owner;
+        } catch {
+          // unreadable: judged by its age below
+        }
+        const pid = typeof owner.pid === "number" ? owner.pid : Number.NaN;
+        const ours = owner.id === id;
+        const old = Date.now() - statSync(lockPath).mtimeMs > STALE_UNKNOWN_MS;
+        if (ours ? pid !== process.pid && alive(pid) : !old) {
+          throw new UsageError(
+            ours
+              ? `another scan (pid ${pid}) is writing into ${outDir}: wait for it, or give --out another directory`
+              : `a scan from another host or container may be writing into ${outDir} (${lockPath}): wait for it, or remove that file if none runs`,
+          );
+        }
+        await rm(lockPath, { force: true });
+      }
+    }
+  } catch (error) {
+    // The lock file was not written, so it is not ours to remove: only the reservation goes.
+    heldLocks.delete(lockPath);
+    throw error;
+  }
   const release = async () => {
     heldLocks.delete(lockPath);
     await rm(lockPath, { force: true });
