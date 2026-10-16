@@ -1538,8 +1538,9 @@ until a bench shows narration adds something the table does not. Limits:
 
 - **A lossy recording goes through a noise band, which has a floor of its own.**
   vlmkit's own captures and lossless recordings are compared exactly. Frames a lossy
-  codec decoded are refused without `--lossy` (below), and with it a change smaller
-  than the band's floor is not seen.
+  codec decoded are refused without `--lossy`, and with it the rules above are read
+  through the band (below): a pixel differs past 32 of its 3x3 mean, not 8, and a
+  change smaller than that is not seen.
 - **What nothing holds never settles.** A `<video>`, an animated image or a
   spinner the clock does not drive makes every frame differ, and one change
   swallows the rest of the sequence. `--ignore x,y,w,h` (the frames' pixels,
@@ -1824,19 +1825,23 @@ lossy recording was one change that never settled:
 | Rule | `--lossy` (`LOSSY_NOISE`) |
 |---|---|
 | what is compared | each pixel as the mean of its 3x3 neighbourhood (a codec's error is mostly ringing, which the mean cancels) |
-| one picture (holds, returns) | every mean within 24 of the hold's first frame (never only the frame before, or a slow ramp is one long hold) |
-| differs | a mean moves by more than 32 |
-| keyframe | one that departs from a still state while the step into it moves no mean past 48 is the codec re-quantizing the picture: the state is read again there (`reread` in story.json, named in SUMMARY.md) |
-| box | drawn from the decoded pixels past the floor inside the means' box grown by 2 px, so a 1 px caret is 1 px wide |
+| in the state, back, an earlier state | no mean more than 32 from the state's picture |
+| one picture (a hold) | every mean within 24 of the hold's first frame, and the mean over the change's box within 3 of it (never only the frame before, or a slow ramp is one long hold) |
+| drift | a change no step of which, between frames up to 50 ms apart and inside its box, moves a mean past 32 (a step inside 24 is none) |
+| keyframe | one after a predicted frame that is the state's picture re-quantized (no 8x8 block mean moved past 24, no mean past 96) and whose noise is spread over the picture or moves no mean past 40: the state is read again there. Inside a run of keyframes (MJPEG, an intra-only encode) only when the page then holds. Also at a return in a later GOP (nearer the state than the event's own picture, held after) and at a change that settles back into a state there. Each is in `reread` in story.json and named in SUMMARY.md |
+| box | the decoded pixels past 32 inside the means' box grown by 2 px, each frame against the state's picture in its GOP: a 1 px caret is drawn 1 px wide on 10 of 13 encodings (2-4 px on the others), not the 3 px the means give |
 
-`--noise still,floor[,radius]` sets a band of one's own. The band was chosen on known
-answers: `fixtures/storyboard/planted-ui.html` captured lossless and encoded with x264,
-x265, VP8 (as Playwright records), VP9, AV1 and MJPEG at several qualities, each
-storyboard scored event by event against the lossless one
-(`docs/reports/2026-10-16-storyboard-noise-floor-v1.md`). What it cannot see, said in
-SUMMARY.md: a change smaller than the floor over a 3x3 mean (a 6% fade), a change that
-small landing on a keyframe it reads again, and a recording a codec has destroyed
-(x264 crf 45).
+`--lossy` on frames that are not from a lossy recording changes nothing, and says so.
+`--noise still,floor[,radius]` applies a band of one's own to any frames, with
+`--lossy`'s hold and keyframe bands. The band was chosen on known answers:
+`fixtures/storyboard/planted-ui.html` captured lossless and encoded with x264, x265, VP8
+(as Playwright records), VP9, AV1 and MJPEG at several qualities, each storyboard scored
+event by event against the lossless one
+(`docs/reports/2026-10-16-storyboard-noise-floor-v1.md`). What it cannot see, which the
+output does not detect: a change smaller than the floor over a 3x3 mean (a 6% fade), one
+that small landing on a keyframe it reads again (SUMMARY.md lists every frame read
+again), and a recording a codec has destroyed (x264 crf 45). SUMMARY.md does say when
+keyframes fell inside an event that never settled, whose box then holds their noise.
 
 #### Visualizing the VRT process — flipbooks + video
 

@@ -10,7 +10,12 @@ import {
   frameDelta,
   ignoreMask,
   LOSSY_NOISE,
+  beginsGop,
+  blockSignature,
+  blockSignatures,
   meanFrames,
+  meansApartIn,
+  signaturesApart,
   storyboardBrief,
   storyboardSummary,
   type Box,
@@ -1009,6 +1014,82 @@ describe("the noise band (lossy recordings)", () => {
     assert.deepEqual([...boxMean(tiny, 2, 1, 5)], [128, 128, 128, 255, 128, 128, 128, 255]);
   });
 
+  test("meansApartIn answers as the frames' means compared over the box, on random frames", () => {
+    const rng = createRng(7);
+    for (let t = 0; t < 300; t++) {
+      const w = rng.int(1, 24);
+      const h = rng.int(1, 18);
+      const radius = rng.int(0, 3);
+      const a = new Uint8Array(w * h * 4).map(() => rng.int(0, 255));
+      const b = new Uint8Array(a).map((v) => (rng.next() < 0.3 ? rng.int(0, 255) : v));
+      const box = { x: rng.int(0, w - 1), y: rng.int(0, h - 1), width: rng.int(1, w), height: rng.int(1, h) };
+      const floor = rng.int(0, 80);
+      const mask =
+        rng.next() < 0.5
+          ? ignoreMask(w, h, [{ x: rng.int(0, w - 1), y: rng.int(0, h - 1), width: 3, height: 3 }])
+          : null;
+      // The full comparison, restricted to the box.
+      const ma = boxMean(a, w, h, radius);
+      const mb = boxMean(b, w, h, radius);
+      let want = false;
+      for (let y = box.y; y < Math.min(h, box.y + box.height) && !want; y++) {
+        for (let x = box.x; x < Math.min(w, box.x + box.width) && !want; x++) {
+          if (mask && mask[y * w + x] === 1) continue;
+          for (let c = 0; c < 4; c++)
+            if (Math.abs(ma[(y * w + x) * 4 + c]! - mb[(y * w + x) * 4 + c]!) > floor) want = true;
+        }
+      }
+      assert.equal(meansApartIn(a, b, w, h, radius, box, floor, mask), want, `case ${t}`);
+    }
+  });
+
+  test("signatures that are apart past t prove a pixel past t, on random frames and masks", () => {
+    const rng = createRng(11);
+    let proved = 0;
+    for (let t = 0; t < 400; t++) {
+      const w = rng.int(1, 40);
+      const h = rng.int(1, 40);
+      const a = new Uint8Array(w * h * 4).map(() => rng.int(0, 255));
+      // Mostly small moves, so the threshold sits near the differences.
+      const b = new Uint8Array(a).map((v) => Math.max(0, Math.min(255, v + rng.int(-20, 20))));
+      const mask =
+        rng.next() < 0.5
+          ? ignoreMask(w, h, [
+              { x: rng.int(0, w - 1), y: rng.int(0, h - 1), width: rng.int(1, 20), height: rng.int(1, 20) },
+            ])
+          : null;
+      const th = rng.int(0, 20);
+      for (const block of [8, 16]) {
+        if (!signaturesApart(blockSignature(a, w, h, mask, block), blockSignature(b, w, h, mask, block), th)) continue;
+        proved++;
+        assert.equal(
+          frameDelta(a, b, w, h, { still: th, floor: 255, mask }).identical,
+          false,
+          `case ${t}, ${block}px blocks`,
+        );
+      }
+    }
+    assert.ok(proved > 50, `the shortcut answered ${proved} times`);
+  });
+
+  test("blockSignatures equals blockSignature at 8 and at 16, bit for bit, on random frames and masks", () => {
+    const rng = createRng(13);
+    for (let t = 0; t < 200; t++) {
+      const w = rng.int(1, 50);
+      const h = rng.int(1, 50);
+      const a = new Uint8Array(w * h * 4).map(() => rng.int(0, 255));
+      const mask =
+        rng.next() < 0.5
+          ? ignoreMask(w, h, [
+              { x: rng.int(0, w - 1), y: rng.int(0, h - 1), width: rng.int(1, 30), height: rng.int(1, 30) },
+            ])
+          : null;
+      const both = blockSignatures(a, w, h, mask);
+      assert.deepEqual([...both.fine], [...blockSignature(a, w, h, mask, 8)], `case ${t}, 8x8`);
+      assert.deepEqual([...both.coarse], [...blockSignature(a, w, h, mask, 16)], `case ${t}, 16x16`);
+    }
+  });
+
   test("meanFrames: computed once per frame while it is kept", () => {
     const s = sequence([blank, frame([dot])]);
     const means = meanFrames(s.pixels, 1, 1);
@@ -1132,6 +1213,102 @@ describe("the noise band (lossy recordings)", () => {
     );
   });
 
+  test("a run of keyframes is one GOP: inside it a step is read again only when the page then holds", () => {
+    const base = frame([dot], GREY);
+    const every = Array.from({ length: 40 }, (_, n) => n);
+    // The pattern of `requant`, moved a pixel a frame: within the band of the state at every frame,
+    // never one picture with the frame before — a scroll's steps, on MJPEG.
+    const moving = (phase: number) =>
+      base.map((v, i) => {
+        if (i % 4 === 3) return v;
+        const x = (i >> 2) % W;
+        return Math.max(0, Math.min(255, v + (Math.floor((x + phase) / 4) % 2 === 0 ? 50 : -50)));
+      });
+    const scroll = [...repeat(base, 10), ...Array.from({ length: 30 }, (_, n) => moving(n))];
+    assert.deepEqual(
+      lossyStory(scroll, LOSSY_NOISE, every).events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+      "every frame a keyframe: the scroll is a change, not the page re-quantized",
+    );
+    // The same first step, then held: an intra-only encoder whose quality moved (x264's rate
+    // control between its first two frames), read again.
+    const held = lossyStory([...repeat(base, 10), ...repeat(requant(base, 50), 30)], LOSSY_NOISE, every);
+    assert.deepEqual(held.events, []);
+    assert.deepEqual(
+      held.reread?.map((r) => [r.n, r.as]),
+      [[10, "keyframe"]],
+    );
+    const entries = (keys: number[]) => every.map((n) => ({ key: keys.includes(n) }));
+    assert.deepEqual(
+      every.filter((n) => beginsGop(entries(every), n)),
+      [],
+    );
+    assert.deepEqual(
+      every.filter((n) => beginsGop(entries([0, 10, 11, 20, 22]), n)),
+      [10, 20, 22],
+      "a keyframe after a predicted frame begins one",
+    );
+  });
+
+  test("blinks a frame apart across a keyframe are each a transient: back once the page rests", () => {
+    const base = frame([], GREY);
+    const after = requant(base, 50);
+    const blink = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 20; y < 26; y++) for (let x = 20; x < 32; x++) out.set([30, 30, 30, 255], (y * W + x) * 4);
+      return out;
+    };
+    // Back at the keyframe (10) for one frame, then on again: required to hold 100ms, the three
+    // were one transient from 8 to 16.
+    const frames = [
+      ...repeat(base, 8),
+      ...repeat(blink(base), 2),
+      after,
+      ...repeat(blink(after), 2),
+      after,
+      ...repeat(blink(after), 2),
+      ...repeat(after, 30),
+    ];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [
+        ["transient", 8, 10],
+        ["transient", 11, 13],
+        ["transient", 14, 16],
+      ],
+    );
+    assert.deepEqual(
+      s.reread?.map((r) => [r.n, r.as]),
+      [[10, "return"]],
+    );
+  });
+
+  test("a keyframe that pushes a mean or two just past the floor, and nothing else, is read again", () => {
+    const base = frame([], GREY);
+    const spot = (by: number) => {
+      const out = new Uint8Array(base);
+      for (let y = 10; y < 13; y++)
+        for (let x = 20; x < 23; x++) out.set([180 - by, 180 - by, 180 - by, 255], (y * W + x) * 4);
+      return out;
+    };
+    // 3x3 pixels 35 darker: one mean past the floor (32) by 3, within the band's width (8) of it.
+    const noise = lossyStory([...repeat(base, 10), ...repeat(spot(35), 30)], LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(noise.events, []);
+    assert.deepEqual(
+      noise.reread?.map((r) => [r.n, r.as]),
+      [[10, "keyframe"]],
+    );
+    // 50 darker is past the floor by more than the band's width: a change, keyframe or not.
+    assert.deepEqual(
+      lossyStory([...repeat(base, 10), ...repeat(spot(50), 30)], LOSSY_NOISE, [0, 10]).events.map((e) => [
+        e.kind,
+        e.first.n,
+      ]),
+      [["change", 10]],
+    );
+  });
+
   test("a keyframe at the sequence's end is read again on the frames there are", () => {
     const base = frame([dot], GREY);
     const frames = [...repeat(base, 20), requant(base, 50), requant(base, 50)];
@@ -1226,6 +1403,45 @@ describe("the noise band (lossy recordings)", () => {
       ["S0"],
     );
     assert.deepEqual(s.reread, [{ n: 30, atMs: frameTimeMs(30), state: "S0", as: "return" }]);
+  });
+
+  test("a transient across two keyframes: its box is the toast's, not what the keyframes re-encoded", () => {
+    // Text at the top left, where a keyframe's ringing is (its 8x8 means do not move); a toast at
+    // the bottom right.
+    const text = { x: 0, y: 0, width: 16, height: 8 };
+    const ring = (f: Uint8Array, amp: number) =>
+      f.map((v, i) => {
+        const p = i >> 2;
+        const x = p % W;
+        const y = Math.floor(p / W);
+        if (i % 4 === 3 || x >= text.width || y >= text.height) return v;
+        return Math.max(0, Math.min(255, v + (Math.floor(x / 4) % 2 === 0 ? amp : -amp)));
+      });
+    const base = frame([], GREY);
+    const toast = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 18; y < 24; y++) for (let x = 24; x < 36; x++) out.set([30, 30, 30, 255], (y * W + x) * 4);
+      return out;
+    };
+    // GOP 1 (20-29) has no frame of the state to measure against; GOP 2 has the return, at 40.
+    const frames = [
+      ...repeat(base, 10),
+      ...repeat(toast(base), 10),
+      ...repeat(toast(ring(base, 50)), 10),
+      ...repeat(toast(ring(base, 40)), 10),
+      ...repeat(ring(base, 40), 30),
+    ];
+    const s = lossyStory(frames, LOSSY_NOISE, [0, 20, 30]);
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 10, 40]],
+    );
+    // Measured against the anchor, GOP 1's ringing at the text was part of the box.
+    assert.deepEqual(s.events[0]!.box, { x: 24, y: 18, width: 12, height: 6 });
+    assert.deepEqual(
+      s.reread?.map((r) => [r.n, r.as]),
+      [[40, "return"]],
+    );
   });
 
   test("a caret still on after a keyframe is not a return: it is nearer itself than the state", () => {

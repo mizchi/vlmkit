@@ -211,7 +211,7 @@ describe("snapshot storyboard --lossy: planted events through codecs", () => {
         w.story.events.map((e) => [e.kind, e.first.n]),
         [["glitch", 30]],
       );
-      assert.ok((w.story.reread ?? []).length > 0, "keyframes 10, 20, … read again");
+      assert.ok((w.story.reread ?? []).length > 0, "the keyframes whose noise crosses the floor read again");
       const summary = readFileSync(w.files.summary, "utf8");
       assert.match(summary, /Compared as the mean of each pixel's 3x3 neighbourhood, through a noise band/);
       assert.match(summary, /Read again at [\d.]+ ms \(n \d+, S0, a keyframe\)/);
