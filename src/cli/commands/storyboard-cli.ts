@@ -50,7 +50,7 @@ import {
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--max-events N] [--json]",
+    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--max-events N] [--lossy] [--json]",
     "",
     "Segments a vlmkit-frames/1 sequence into still states and events, from the pixels alone:",
     "  glitch     one frame off the state, then back",
@@ -66,9 +66,12 @@ function usage(): string {
     "  --ignore <x,y,w,h>   A box, in the frames' pixels, no comparison looks at — a video, a clock the",
     "                       capture cannot hold. Repeatable",
     "  --max-events <n>     Events on the sheet and in the brief (default 20); SUMMARY.md has them all",
+    "  --lossy              Segment frames decoded from a lossy recording anyway (scan video): codec",
+    "                       noise is then events too, most of all at keyframes, which SUMMARY.md names",
     "  --json               Print story.json to stdout",
     "",
-    "The input must be lossless: frames vlmkit captured (two shots that agree), not a decoded video.",
+    "The input must be lossless: frames vlmkit captured (two shots that agree), or a recording in a",
+    "lossless codec (ffv1, png, qtrle, …) decoded by scan video. There is no noise floor for a lossy one yet.",
     "",
     "Examples:",
     "  vlmkit check animation page.html --at 0..1s/1f --frames out/f",
@@ -82,6 +85,7 @@ export interface StoryboardArgs {
   out?: string;
   ignore: Box[];
   maxEvents: number;
+  lossy: boolean;
   json: boolean;
 }
 
@@ -109,6 +113,7 @@ export function parseArgs(argv: string[]): StoryboardArgs {
   let out: string | undefined;
   const ignore: Box[] = [];
   let maxEvents = 20;
+  let lossy = false;
   let json = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -129,6 +134,9 @@ export function parseArgs(argv: string[]): StoryboardArgs {
         }
         break;
       }
+      case "--lossy":
+        lossy = true;
+        break;
       case "--json":
         json = true;
         break;
@@ -144,7 +152,7 @@ export function parseArgs(argv: string[]): StoryboardArgs {
     }
   }
   if (manifest === undefined) throw new UsageError(`no frames.json given.\n\n${usage()}`);
-  return { manifest, ...(out !== undefined ? { out } : {}), ignore, maxEvents, json };
+  return { manifest, ...(out !== undefined ? { out } : {}), ignore, maxEvents, lossy, json };
 }
 
 /** pngjs's sync reader, because the segmentation reads frames from inside a pure, synchronous loop. */
@@ -285,11 +293,19 @@ export interface StoryboardWritten {
 /** Segment `manifestPath`'s sequence and write the four outputs. */
 export async function writeStoryboard(
   manifestPath: string,
-  options: { out?: string; ignore?: Box[]; maxEvents?: number } = {},
+  options: { out?: string; ignore?: Box[]; maxEvents?: number; lossy?: boolean } = {},
 ): Promise<StoryboardWritten> {
   const manifestFile = resolve(manifestPath);
   if (!existsSync(manifestFile)) throw new UsageError(`no such frames.json: ${manifestPath}`);
   const manifest = parseFramesManifest(readFileSync(manifestFile, "utf8"));
+  const video = manifest.source.video;
+  if (video && !video.lossless && !options.lossy) {
+    throw new UsageError(
+      `${manifestPath} was ${video.decoder === "import" ? "imported without --lossless" : `decoded from ${video.codec}, a lossy codec`}: ` +
+        "codec noise makes frames that showed one picture differ (most of all across a keyframe), and a storyboard compares pixels exactly — it has no noise floor yet. " +
+        "Record in a lossless codec (ffv1, png, qtrle), or pass --lossy to segment it anyway with keyframe-aligned events named in SUMMARY.md.",
+    );
+  }
   const dir = dirname(manifestFile);
   const paths = manifest.frames.map((f) => resolve(dir, f.file));
   const pixels = framesOnDisk(paths);
@@ -431,6 +447,7 @@ async function main(): Promise<void> {
     ...(args.out !== undefined ? { out: args.out } : {}),
     ignore: args.ignore,
     maxEvents: args.maxEvents,
+    lossy: args.lossy,
   });
   if (args.json) {
     console.log(JSON.stringify(written.json, null, 2));
@@ -441,7 +458,7 @@ async function main(): Promise<void> {
   console.log();
   console.log(`${BOLD}${CYAN}Storyboard${RESET}`);
   console.log(
-    `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame ? ", every 60 fps frame" : ""}${RESET}`,
+    `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame && written.manifest.source.clock !== "stream" ? ", every 60 fps frame" : ""}${RESET}`,
   );
   if (story.events.length === 0) {
     console.log(`  No events: every frame is within the floor of frame 0.`);

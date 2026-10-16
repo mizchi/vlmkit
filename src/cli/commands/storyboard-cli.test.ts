@@ -27,9 +27,11 @@ describe("snapshot storyboard args", () => {
           { x: 0, y: 0, width: 10, height: 10 },
         ],
         maxEvents: 3,
+        lossy: false,
         json: false,
       },
     );
+    assert.equal(parseArgs(["f/frames.json", "--lossy"]).lossy, true);
   });
 
   test("refuses what it cannot read, naming the flag", () => {

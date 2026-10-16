@@ -264,6 +264,19 @@ describe("flash judge: the red track", () => {
     assert.ok(result.red.failing.length > 0);
   });
 
+  test("red against a lossy codec's near-black (1,0,0) / (3,1,0) still fails red: near-black is black", () => {
+    // A codec decodes black as (1,0,0)-ish, which has red's own chromaticity: read as a colour,
+    // the move to red is no u′v′ step, and a 148x148 strobe passed at crf 35 (measured).
+    for (const dark of [
+      [1, 0, 0],
+      [3, 1, 0],
+      [12, 0, 0],
+    ] as const) {
+      const { result } = sequence(W, H, 90, strobe([253, 0, 0], dark, 4), twoState(4));
+      assert.ok(result.red.failing.length > 0, `${dark} ↔ red`);
+    }
+  });
+
   test("near-black tints are below the red floor and pass", () => {
     for (const [a, b] of [
       [BLACK, [1, 0, 0]],
@@ -651,14 +664,110 @@ describe("flash motion: flicker motion explains is told apart from flashing", ()
   test("runs are re-counted whole, from a second and a lead before each, merged where they meet", () => {
     const box = { x: 0, y: 0, width: 1, height: 1 };
     const run = (from: number, to: number) => ({ from, to, area: 30_000, field: box, region: box, windows: [] });
-    const times = Array.from({ length: 600 }, (_, k) => frameTimeMs(k));
-    const spans = runSpans(times, [run(200, 260), run(80, 120), run(300, 590)]);
+    // A second and a 2s lead before each run's first window: 180 frames at 60fps.
+    const times = Array.from({ length: 1200 }, (_, k) => frameTimeMs(k));
+    const spans = runSpans(times, [run(200, 260), run(80, 120), run(600, 1190)]);
     assert.deepEqual(
       spans.map((s) => [s.k0, s.k1, s.runs.length]),
       [
-        [5, 120, 1],
-        [125, 590, 2],
+        [0, 260, 2],
+        [420, 1190, 1],
       ],
     );
+  });
+});
+
+describe("judgeFromMs: only the windows ending at or after it", () => {
+  // 400x300 at 10fps: black, seven alternations at 1.2-1.8s (black/white), then white.
+  const level = (t: number) => (t < 1150 ? 0 : t < 1850 ? (Math.round((t - 1200) / 100) % 2 === 0 ? 255 : 0) : 255);
+  const run = (judgeFromMs: number | undefined, frames = 40) => {
+    const w = 400;
+    const h = 300;
+    const judge = createFlashJudge({ width: w, height: h, ...(judgeFromMs !== undefined ? { judgeFromMs } : {}) });
+    const cache = new Map<number, FlashFrame>();
+    for (let k = 0; k < frames; k++) {
+      const v = level(k * 100);
+      let f = cache.get(v);
+      if (!f) {
+        f = flashFrame(
+          rgba(w, h, () => [v, v, v]),
+          w,
+          h,
+        );
+        cache.set(v, f);
+      }
+      judge.push(k, k * 100, f);
+    }
+    return judge.result().general;
+  };
+
+  test("the window ending at the judged start counts, though nothing transitions there", () => {
+    const whole = run(undefined);
+    assert.equal(whole.peak.transitions, 7);
+    assert.ok(whole.failingWindows > 0);
+    for (const from of [1800, 1900, 2000, 2100, 2150]) {
+      const r = run(from);
+      assert.equal(r.peak.transitions, 7, `from ${from}`);
+      assert.ok(r.failingWindows >= 1, `from ${from}: the window ending at it holds seven`);
+      assert.ok(r.worst && r.worst.atMs >= from - 1e-6, `from ${from}: the worst window ends in the span`);
+    }
+  });
+
+  test("a start past the last frame still judges the window ending at it", () => {
+    const r = run(2100, 21); // frames to 2.0s; the window ending at 2.1s holds 1.2-1.8s
+    assert.equal(r.peak.transitions, 7);
+    assert.ok(r.failingWindows >= 1);
+  });
+
+  test("windows that end before the judged start are not judged", () => {
+    const r = run(2850);
+    assert.equal(r.failingWindows, 0);
+    assert.equal(r.peak.transitions, 0);
+  });
+});
+
+describe("margins: how far a verdict is from one transition either way", () => {
+  // A full field alternating `n` times at 10fps from 1.0s, then still, 400x300.
+  const run = (n: number, fps = 10) => {
+    const w = 400;
+    const h = 300;
+    const judge = createFlashJudge({ width: w, height: h, margins: true });
+    const black = flashFrame(
+      rgba(w, h, () => [0, 0, 0]),
+      w,
+      h,
+    );
+    const white = flashFrame(
+      rgba(w, h, () => [255, 255, 255]),
+      w,
+      h,
+    );
+    const step = 1000 / fps;
+    for (let k = 0; k < 4 * fps; k++) {
+      const i = k - fps; // transitions at frames fps .. fps + n - 1
+      judge.push(
+        k,
+        k * step,
+        i >= 0 && i < n && i % 2 === 0 ? white : i >= 0 && i < n ? black : i >= n && n % 2 === 1 ? white : black,
+      );
+    }
+    return judge.result().general;
+  };
+  test("six transitions over the field is a pass one transition from failing", () => {
+    const r = run(6);
+    assert.equal(r.failingWindows, 0);
+    assert.ok(r.margins!.below > AREA_LIMIT_CSS2);
+  });
+  test("seven is a fail one transition from passing; nine has two to spare", () => {
+    const seven = run(7);
+    assert.ok(seven.failingWindows > 0);
+    assert.ok(seven.margins!.above <= AREA_LIMIT_CSS2);
+    const nine = run(9);
+    assert.ok(nine.margins!.above > AREA_LIMIT_CSS2);
+  });
+  test("at 6 frames a second no window can hold a seventh transition: nothing below to reach", () => {
+    const r = run(6, 6);
+    assert.equal(r.failingWindows, 0);
+    assert.equal(r.margins!.below, 0);
   });
 });

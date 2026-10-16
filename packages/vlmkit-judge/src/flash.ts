@@ -58,6 +58,15 @@ export const RED_UV_STEP = 0.2;
 export const RED_FLOOR = 20 / 320;
 /** Black has no chromaticity; it takes the D65 white point. */
 export const WHITE_UV = [0.1978, 0.4683] as const;
+/**
+ * At or below this luminance a colour is black for its chromaticity, and takes the white point too.
+ * A lossy codec decodes black as (1,0,0)-ish, which has red's own chromaticity, so the move to
+ * red was no u′v′ step at all: a 148x148 red/black strobe passed at crf 35 and 45 (measured, 16,385
+ * and 153 CSS px² where the lossless file has 21,904). Anything this dark is far under the red
+ * floor, so it can only be the other end of a red transition. 0.0002 already restored both; this
+ * is just under (15,0,0) red and (4,4,4) grey: (14,0,0) (Y 0.00093) and (3,3,3) (0.00091) are black.
+ */
+export const BLACK_BELOW_Y = 0.001;
 
 /** Transition times kept per pixel: a window's count is reported up to this many (7 is all a verdict needs). */
 export const TRANSITIONS_KEPT = 16;
@@ -252,7 +261,7 @@ function writePixel(out: FlashFrame, p: number, r: number, g: number, b: number)
   const Y = 0.2126729 * r + 0.7151522 * g + 0.072175 * b;
   const Z = 0.0193339 * r + 0.119192 * g + 0.9503041 * b;
   const d = X + 15 * Y + 3 * Z;
-  if (d < 1e-12) {
+  if (d < 1e-12 || Y <= BLACK_BELOW_Y) {
     out.u[p] = WHITE_UV[0];
     out.v[p] = WHITE_UV[1];
   } else {
@@ -380,6 +389,14 @@ export interface FlashTrackResult {
    * cannot be had.
    */
   withUnknown: number;
+  /**
+   * With `margins`: how far the verdict is from a one-transition change in every pixel's count.
+   * `below`: the largest area, over the windows judged that hold at least seven frames, of the pixels
+   * one transition short of flashing (≥ 6). `above`: the largest area of the pixels with one to
+   * spare (≥ 8). A pass whose `below` exceeds the limit, or a fail whose `above` does not, is
+   * decided by one transition.
+   */
+  margins?: { below: number; above: number };
 }
 
 /** Consecutive failing windows: what a motion re-count takes as one stretch. */
@@ -408,6 +425,16 @@ export interface FlashJudgeOptions {
    * (`withUnknown`). Frame-sized, 1 = unknown.
    */
   unknown?: Uint8Array;
+  /**
+   * Judge only the windows (t − 1s, t] that end at or after this instant. The frames before it are
+   * still counted, as the history those windows need: a span cut out of a recording is judged with
+   * the seconds before it decoded, and nothing that ended before it. The window ending at this
+   * instant is judged whether or not a transition lands on it: it holds every transition of the
+   * history's last second, which no later window before the next transition exceeds.
+   */
+  judgeFromMs?: number;
+  /** Also measure `margins`: the areas one transition either side of the verdict (a second mask per window). */
+  margins?: boolean;
 }
 
 /** The ring of a pixel's last transition frames, per track. */
@@ -443,6 +470,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
   const fw = Math.min(options.field?.width ?? FIELD_CSS.width, width);
   const fh = Math.min(options.field?.height ?? FIELD_CSS.height, height);
   const limit = options.areaLimit ?? AREA_LIMIT_CSS2;
+  const judgeFrom = options.judgeFromMs;
   const times: number[] = [];
 
   // General track: leg start (A) and extreme (E), direction, whether the leg was counted.
@@ -469,6 +497,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
     peak: { transitions: 0, frame: 0, x: 0, y: 0 },
     runs: [],
     withUnknown: 0,
+    ...(options.margins ? { margins: { below: 0, above: 0 } } : {}),
   });
   const results: Record<FlashTrack, FlashTrackResult> = { general: empty(), red: empty() };
   const unknown = options.unknown;
@@ -539,16 +568,43 @@ export function createFlashJudge(options: FlashJudgeOptions) {
     return counted[p] === 1;
   };
 
-  const transitionsInWindow = (t: Transitions, p: number, k: number): number => {
+  /** Pixel p's transitions in the window ending at `end` (those recorded so far). */
+  const transitionsInWindow = (t: Transitions, p: number, end: number): number => {
     let c = 0;
-    while (c < t.count[p]! && times[k]! - times[t.at(p, c + 1)]! < WINDOW_MS - EPS) c++;
+    while (c < t.count[p]! && end - times[t.at(p, c + 1)]! < WINDOW_MS - EPS) c++;
     return c;
   };
+
+  /**
+   * The first judged window, ending at `end` with the frames up to k: judged whether or not anything
+   * transitioned there, and every pixel's count in it raised into the peak — the windows after it,
+   * until the next transition, hold a subset of what it holds.
+   */
+  const openAt = (k: number, end: number) => {
+    for (const track of ["general", "red"] as const) {
+      const t = tracks[track];
+      const peak = results[track].peak;
+      for (let p = 0; p < n; p++) {
+        if (t.count[p]! <= peak.transitions) continue;
+        const c = transitionsInWindow(t, p, end);
+        if (c > peak.transitions) {
+          peak.transitions = c;
+          peak.frame = k;
+          peak.x = p % width;
+          peak.y = Math.floor(p / width);
+        }
+      }
+      evaluate(track, k, end);
+    }
+  };
+  /** Whether the first judged window has been judged (always, without `judgeFromMs`). */
+  let opened = judgeFrom === undefined;
 
   /** A transition of pixel p at frame k: raise the track's peak if p now has more in a window. */
   const transition = (track: FlashTrack, p: number, k: number) => {
     const t = tracks[track];
     t.push(p, k);
+    if (judgeFrom !== undefined && times[k]! < judgeFrom - EPS) return;
     const peak = results[track].peak;
     let raised = false;
     while (peak.transitions < t.count[p]! && times[k]! - times[t.at(p, peak.transitions + 1)]! < WINDOW_MS - EPS) {
@@ -562,9 +618,44 @@ export function createFlashJudge(options: FlashJudgeOptions) {
     }
   };
 
-  const evaluate = (track: FlashTrack, k: number) => {
+  /** The best-field area of the pixels with at least `back` transitions in the window after `from`. */
+  const areaOf = (t: Transitions, back: number, from: number): number => {
+    let x0 = width;
+    let y0 = height;
+    let x1 = -1;
+    let y1 = -1;
+    const mask = new Uint8Array(n);
+    for (let p = 0; p < n; p++) {
+      if (t.count[p]! < back || times[t.at(p, back)]! <= from) continue;
+      mask[p] = 1;
+      const y = (p / width) | 0;
+      const x = p - y * width;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+    if (x1 < 0) return 0;
+    return bestField(closeMask(mask, width, height, x0, y0, x1, y1), width, height, fw, fh, x0, y0, x1, y1).area;
+  };
+  /** Frames in the window ending at `end`, up to frame k. */
+  const framesIn = (k: number, end: number): number => {
+    let c = 0;
+    while (k - c >= 0 && end - times[k - c]! < WINDOW_MS - EPS) c++;
+    return c;
+  };
+
+  /** The window ending at `end` (frame k's time, or a judged span's start after frame k). */
+  const evaluate = (track: FlashTrack, k: number, end = times[k]!) => {
     const t = tracks[track];
     const res = results[track];
+    if (res.margins) {
+      const from = end - WINDOW_MS + EPS;
+      // One more transition is possible only where a window holds a seventh frame.
+      if (framesIn(k, end) > MAX_TRANSITIONS)
+        res.margins.below = Math.max(res.margins.below, areaOf(t, MAX_TRANSITIONS, from));
+      res.margins.above = Math.max(res.margins.above, areaOf(t, MAX_TRANSITIONS + 2, from));
+    }
     // The flashing pixels and their box.
     let x0 = width;
     let y0 = height;
@@ -573,7 +664,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
     let count = 0;
     const mask = new Uint8Array(n);
     const back = MAX_TRANSITIONS + 1;
-    const from = times[k]! - WINDOW_MS + EPS;
+    const from = end - WINDOW_MS + EPS;
     for (let p = 0; p < n; p++) {
       if (t.count[p]! < back || times[t.at(p, back)]! <= from) continue;
       mask[p] = 1;
@@ -624,18 +715,19 @@ export function createFlashJudge(options: FlashJudgeOptions) {
       const last = res.failing[res.failing.length - 1];
       const larger = !res.worst || best.area > res.worst.area;
       const tie = !!res.worst && best.area === res.worst.area;
-      if (!last || larger || tie || times[k]! - last.atMs >= WINDOW_MS - EPS) {
-        const ev = describe(t, k, closed, best.field, maskBox, best.area);
+      if (!last || larger || tie || end - last.atMs >= WINDOW_MS - EPS) {
+        const ev = describe(t, k, end, closed, best.field, maskBox, best.area);
         // Of windows over the same area, the worst is the one with the most transitions in it.
         const more = tie && ev.maxTransitions > res.worst!.maxTransitions;
-        if (!last || larger || more || times[k]! - last.atMs >= WINDOW_MS - EPS) res.failing.push(ev);
+        if (!last || larger || more || end - last.atMs >= WINDOW_MS - EPS) res.failing.push(ev);
         if (larger || more) res.worst = ev;
       }
       return;
     }
     inRun[track] = false;
     res.largestBelow = Math.max(res.largestBelow, best.area);
-    if (!res.worst || best.area > res.worst.area) res.worst = describe(t, k, closed, best.field, maskBox, best.area);
+    if (!res.worst || best.area > res.worst.area)
+      res.worst = describe(t, k, end, closed, best.field, maskBox, best.area);
     if (unknown && ux1 >= 0) {
       // The flashing pixels with the unknown ones: could they together exceed the limit?
       const union = new Uint8Array(n);
@@ -652,6 +744,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
   const describe = (
     t: Transitions,
     k: number,
+    end: number,
     mask: Uint8Array,
     f: Box,
     maskBox: Box,
@@ -671,7 +764,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
         if (x > bx1) bx1 = x;
         if (y < by0) by0 = y;
         if (y > by1) by1 = y;
-        const c = transitionsInWindow(t, p, k);
+        const c = transitionsInWindow(t, p, end);
         if (c > maxTransitions) {
           maxTransitions = c;
           peak = p;
@@ -682,7 +775,7 @@ export function createFlashJudge(options: FlashJudgeOptions) {
     for (let back = maxTransitions; back >= 1; back--) frames.push(t.at(peak, back));
     return {
       frame: k,
-      atMs: times[k]!,
+      atMs: end,
       area,
       field: f,
       bbox:
@@ -717,7 +810,16 @@ export function createFlashJudge(options: FlashJudgeOptions) {
         av.set(frame.v);
         asat.set(frame.sat);
         prev = frame;
+        // No history before the first frame: its window holds nothing.
+        if (!opened && atMs >= judgeFrom! - EPS) opened = true;
         return;
+      }
+      // The first frame at or past the judged start: the window ending at that start, between
+      // frames, is what the frames before this one hold.
+      const crossing = !opened && atMs >= judgeFrom! - EPS;
+      if (crossing && atMs > judgeFrom! + EPS) {
+        opened = true;
+        openAt(index - 1, judgeFrom!);
       }
       let general = false;
       let red = false;
@@ -770,6 +872,13 @@ export function createFlashJudge(options: FlashJudgeOptions) {
         }
       }
       prev = frame;
+      if (!opened) {
+        if (!crossing) return;
+        // A frame on the judged start: its own window is the first judged.
+        opened = true;
+        openAt(index, atMs);
+        return;
+      }
       if (general) evaluate("general", index);
       if (red) evaluate("red", index);
     },
@@ -778,6 +887,11 @@ export function createFlashJudge(options: FlashJudgeOptions) {
       field: { width: number; height: number };
       areaLimit: number;
     } {
+      // A judged start past the last frame: its window holds what the frames up to the last do.
+      if (!opened && times.length > 0) {
+        opened = true;
+        openAt(times.length - 1, Math.max(judgeFrom!, times[times.length - 1]!));
+      }
       return { ...results, frames: times.length, field: { width: fw, height: fh }, areaLimit: limit };
     },
   };
