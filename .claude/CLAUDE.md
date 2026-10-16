@@ -510,10 +510,58 @@ not to re-learn:
 Known answers: `fixtures/storyboard/planted.html?kind=…` (static, glitch, blinks, toast, slide, fade,
 spinner), each required back on its frames in `storyboard-cli.test.ts`.
 
-Not built yet, in the order the research put them: a noise floor for lossy storyboards, which this
-one deliberately does not have (until then it refuses a lossy recording without `--lossy`).
-(`check flash` and external recordings through the user's own decoder, `scan video`, the first two in
-that list, are below.)
+(`check flash` and external recordings through the user's own decoder, `scan video`, the first two of
+the research's list, are below; the third, a noise floor for lossy storyboards, is the next section.)
+
+### Lossy recordings: the noise band (`snapshot storyboard --lossy`)
+
+```bash
+vlmkit scan video rec.mp4 && vlmkit snapshot storyboard rec.mp4.frames/frames.json --lossy
+vlmkit snapshot storyboard rec.mp4.frames/frames.json --noise 16,40     # a band of your own: still,floor[,radius]
+```
+
+A codec does not give back the picture it was given, so `--lossy` compares through a band
+(`LOSSY_NOISE`, `NoiseFloor` in `storyboard.ts`): each frame as the 3x3 mean of every pixel; frames
+whose means stay within 24 of the hold's first frame are one picture; a mean past 32 differs; a
+keyframe that departs from a still state while the step into it moves no mean past 48 re-reads the
+state (`reread`). Lossless input is compared exactly, as before, byte for byte. Known answers:
+`fixtures/storyboard/planted-ui.html` (the planted kinds on an application-like page, plus caret,
+digit, cursor, scroll), held through five encodings by `storyboard-lossy.test.ts`. Round:
+`docs/reports/2026-10-16-storyboard-noise-floor-v1.md`. Measured choosing it, not to re-learn:
+
+- **Exact comparison never settles a lossy recording**: on VideoCUA's H.264 desktop recordings 9 of
+  562 consecutive pairs were identical, so one change ran the whole clip.
+- **The band was chosen by the storyboard over known answers, not by pair statistics.** 18 lossless
+  captures x 14 encodings (x264 crf 18-45, a 10-frame GOP, 4:4:4, x265, VP8 as Playwright records,
+  VP9, AV1, MJPEG) x 108 bands, each scored event by event against the lossless storyboard: the
+  default gets 208 of the 208 cases outside two limits. Pair statistics misled because VP8 keeps
+  refining a picture for frames after a change, which reads as noise between frames the capture had
+  as identical.
+- **Ringing is high-frequency, so 3x3 is the size.** Still text decodes up to 64 levels apart per
+  pixel (x264 crf 18) and ~16 as 3x3 means; a 12px digit's change is ~148 raw, ~63 as 3x3 means and
+  4-5 as 8x8 block means (lost). A 5x5 mean lost the digit on four encodings.
+- **Keyframes get their own band, the floor does not rise to them.** x264 crf 28 with a keyframe
+  every 10 frames moved still 11-13px text's means by 36 at each keyframe (real 1080p screen
+  recordings: 4-22). A floor of 48 absorbed that but read a spinner 357 degrees round as back.
+- **A hold is measured from its first frame**: against the frame before, a ramp slower than the band
+  was one long hold.
+- **Boxes come from the decoded pixels** past the floor inside the means' box grown by 2·radius: the
+  means drew a 1px caret 3px wide and a glyph as its core (IoU 0.33 → 1.00 and 0.13 → 0.57).
+- **A frame's means were the cost.** 250ms a 1920x910 frame walking columns, 75ms in memory order
+  with a division table; the CLI's reader is the fast PNG decoder (47 → 26ms); a 16x16 block
+  signature per frame, kept for the sequence, answers "these two are apart" without re-reading a
+  frame (sound: a mean of differences is never larger than the largest). 563 frames: > 10 min →
+  128 s.
+- Not seen, and said so in SUMMARY.md: a change smaller than the floor over a 3x3 mean (a 6% fade),
+  one that small landing on a keyframe read again, keyframe noise inside an event that never settles
+  (`--ignore` the spinner), and x264 crf 45 (the codec destroyed the content).
+
+On real recordings with labels, every logged click and key of eight VideoCUA desktop tasks
+(H.264, 1080p) was followed by an event, 9 of 10 within 1s. Their other events looked at are real
+changes (carets blinking, typed characters, a widget refreshing once a second), and none needed a
+keyframe read again. It is not a shot detector: inside a moving shot a change never settles and
+runs on through the next cut (AutoShot: 5 events for 18 cuts; every cut reached in a state did
+begin one).
 
 ## Flashing (`check flash`, WCAG 2.3.1)
 
@@ -797,11 +845,11 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   decode order. A file that ends short with decoder errors (`File ended prematurely`) is cut short,
   not held: a span in its lost part is refused, and the recording is `damaged` (judged as a held
   frame, a truncated strobe passed as complete).
-- **`snapshot storyboard` refuses a lossy recording without `--lossy`**: it compares pixels exactly and
-  has no noise floor; with `--lossy` SUMMARY.md names the events that begin on a keyframe. A lossless
-  one (ffv1, png, qtrle; not rpza, a vector quantizer) is segmented like any capture: a planted glitch
-  and transient come back on their frames. On the stream clock 16.67ms gaps are a recording's rate,
-  never "every 60 fps frame".
+- **`snapshot storyboard` refuses a lossy recording without `--lossy`**, which compares it through the
+  noise band (above); SUMMARY.md names the events that begin on a keyframe and the keyframes it read
+  again. A lossless one (ffv1, png, qtrle; not rpza, a vector quantizer) is segmented exactly like any
+  capture: a planted glitch and transient come back on their frames. On the stream clock 16.67ms gaps
+  are a recording's rate, never "every 60 fps frame".
 
 ## Responsive layout as a property-based test (`check responsive`)
 

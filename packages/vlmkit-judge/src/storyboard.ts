@@ -126,43 +126,108 @@ export function ignoreMask(width: number, height: number, boxes: readonly Box[],
 
 /**
  * Each channel of each pixel as the mean of its (2 * radius + 1)² neighbourhood, rounded; at the
- * frame's edge, of the part of it inside the frame. Two passes of running sums.
+ * frame's edge, of the part of it inside the frame. Two passes of running sums, both in memory
+ * order: walking columns took 250ms a 1920x910 frame, rows take a tenth of that.
  */
 export function boxMean(rgba: Uint8Array, width: number, height: number, radius: number): Uint8Array {
   if (radius === 0) return rgba;
-  const row = new Uint32Array(width * height * 4);
+  const stride = width * 4;
+  // Each row's horizontal window sums, channel by channel.
+  const rows = new Uint32Array(stride * height);
   for (let y = 0; y < height; y++) {
-    const base = y * width * 4;
-    for (let c = 0; c < 4; c++) {
-      let sum = 0;
-      // The window [x - r, x + r] clipped to the row: add what enters, drop what leaves.
-      for (let x = 0; x < Math.min(radius, width); x++) sum += rgba[base + x * 4 + c]!;
-      for (let x = 0; x < width; x++) {
-        if (x + radius < width) sum += rgba[base + (x + radius) * 4 + c]!;
-        if (x - radius - 1 >= 0) sum -= rgba[base + (x - radius - 1) * 4 + c]!;
-        row[base + x * 4 + c] = sum;
+    const base = y * stride;
+    let s0 = 0;
+    let s1 = 0;
+    let s2 = 0;
+    let s3 = 0;
+    for (let x = 0; x < Math.min(radius, width); x++) {
+      const i = base + x * 4;
+      s0 += rgba[i]!;
+      s1 += rgba[i + 1]!;
+      s2 += rgba[i + 2]!;
+      s3 += rgba[i + 3]!;
+    }
+    for (let x = 0; x < width; x++) {
+      if (x + radius < width) {
+        const i = base + (x + radius) * 4;
+        s0 += rgba[i]!;
+        s1 += rgba[i + 1]!;
+        s2 += rgba[i + 2]!;
+        s3 += rgba[i + 3]!;
       }
+      if (x - radius - 1 >= 0) {
+        const i = base + (x - radius - 1) * 4;
+        s0 -= rgba[i]!;
+        s1 -= rgba[i + 1]!;
+        s2 -= rgba[i + 2]!;
+        s3 -= rgba[i + 3]!;
+      }
+      const o = base + x * 4;
+      rows[o] = s0;
+      rows[o + 1] = s1;
+      rows[o + 2] = s2;
+      rows[o + 3] = s3;
     }
   }
-  const out = new Uint8Array(width * height * 4);
-  for (let x = 0; x < width; x++) {
-    const cx = Math.min(width - 1, x + radius) - Math.max(0, x - radius) + 1;
-    for (let c = 0; c < 4; c++) {
-      let sum = 0;
-      for (let y = 0; y < Math.min(radius, height); y++) sum += row[(y * width + x) * 4 + c]!;
-      for (let y = 0; y < height; y++) {
-        if (y + radius < height) sum += row[((y + radius) * width + x) * 4 + c]!;
-        if (y - radius - 1 >= 0) sum -= row[((y - radius - 1) * width + x) * 4 + c]!;
-        const cy = Math.min(height - 1, y + radius) - Math.max(0, y - radius) + 1;
-        out[(y * width + x) * 4 + c] = Math.round(sum / (cx * cy));
-      }
+  // How many columns each pixel's window holds.
+  const across = new Uint32Array(width);
+  for (let x = 0; x < width; x++) across[x] = Math.min(width - 1, x + radius) - Math.max(0, x - radius) + 1;
+  // The vertical window, as a running sum of whole rows.
+  const column = new Uint32Array(stride);
+  for (let y = 0; y < Math.min(radius, height); y++) {
+    for (let i = 0, b = y * stride; i < stride; i++) column[i] += rows[b + i]!;
+  }
+  const out = new Uint8Array(stride * height);
+  for (let y = 0; y < height; y++) {
+    if (y + radius < height) {
+      for (let i = 0, b = (y + radius) * stride; i < stride; i++) column[i] += rows[b + i]!;
+    }
+    if (y - radius - 1 >= 0) {
+      for (let i = 0, b = (y - radius - 1) * stride; i < stride; i++) column[i] -= rows[b + i]!;
+    }
+    const down = Math.min(height - 1, y + radius) - Math.max(0, y - radius) + 1;
+    const base = y * stride;
+    // Every pixel whose window is whole across divides by one count: by table when it is small.
+    const x0 = Math.min(width, radius);
+    const x1 = Math.max(x0, width - radius);
+    const table = (2 * radius + 1) * down <= MEAN_TABLE_MAX ? meanTable((2 * radius + 1) * down) : null;
+    if (table) {
+      for (let i = x0 * 4, end = x1 * 4; i < end; i++) out[base + i] = table[column[i]!]!;
+    } else {
+      const n = (2 * radius + 1) * down;
+      for (let i = x0 * 4, end = x1 * 4; i < end; i++) out[base + i] = Math.round(column[i]! / n);
+    }
+    // The columns at either edge, whose windows are cut by the frame.
+    for (let x = 0; x < width; x++) {
+      if (x === x0) x = x1;
+      if (x >= width) break;
+      const n = across[x]! * down;
+      for (let i = x * 4, end = i + 4; i < end; i++) out[base + i] = Math.round(column[i]! / n);
     }
   }
   return out;
 }
 
-/** `pixels` as neighbourhood means, the last `capacity` frames kept. */
-export function meanFrames(pixels: FramePixels, radius: number, capacity = 16): FramePixels {
+/** Windows of up to this many pixels divide by table: a division a channel was most of the cost. */
+const MEAN_TABLE_MAX = 81;
+const meanTables = new Map<number, Uint8Array>();
+/** `Math.round(sum / n)` for every sum of `n` bytes. */
+function meanTable(n: number): Uint8Array {
+  let table = meanTables.get(n);
+  if (!table) {
+    table = new Uint8Array(255 * n + 1);
+    for (let v = 0; v < table.length; v++) table[v] = Math.round(v / n);
+    meanTables.set(n, table);
+  }
+  return table;
+}
+
+/** `pixels` as neighbourhood means, the last `capacity` frames kept (by default, 256 MB of them). */
+export function meanFrames(
+  pixels: FramePixels,
+  radius: number,
+  capacity = Math.max(16, Math.floor((256 * 1024 * 1024) / (pixels.width * pixels.height * 4))),
+): FramePixels {
   const cache = new Map<number, Uint8Array>();
   return {
     width: pixels.width,
@@ -180,6 +245,50 @@ export function meanFrames(pixels: FramePixels, radius: number, capacity = 16): 
       return mean;
     },
   };
+}
+
+/** Signature blocks are this many pixels a side. */
+const SIGNATURE_BLOCK = 16;
+
+/**
+ * Each 16x16 block's mean per channel, over the pixels no comparison ignores (NaN: none). Two
+ * frames whose signatures differ by more than t in some channel of some block differ by more than
+ * t in some pixel of it — a mean of differences is never larger than the largest — so a
+ * comparison that only has to learn whether they do is answered from a few thousand numbers.
+ */
+export function blockSignature(rgba: Uint8Array, width: number, height: number, mask: Uint8Array | null): Float32Array {
+  const bw = Math.ceil(width / SIGNATURE_BLOCK);
+  const bh = Math.ceil(height / SIGNATURE_BLOCK);
+  const sums = new Float64Array(bw * bh * 4);
+  const counts = new Uint32Array(bw * bh);
+  for (let y = 0; y < height; y++) {
+    const row = ((y / SIGNATURE_BLOCK) | 0) * bw;
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      if (mask !== null && mask[p] === 1) continue;
+      const b = row + ((x / SIGNATURE_BLOCK) | 0);
+      const i = p << 2;
+      sums[b * 4] += rgba[i]!;
+      sums[b * 4 + 1] += rgba[i + 1]!;
+      sums[b * 4 + 2] += rgba[i + 2]!;
+      sums[b * 4 + 3] += rgba[i + 3]!;
+      counts[b]++;
+    }
+  }
+  const out = new Float32Array(bw * bh * 4);
+  for (let b = 0; b < bw * bh; b++) {
+    for (let c = 0; c < 4; c++) out[b * 4 + c] = counts[b] === 0 ? Number.NaN : sums[b * 4 + c]! / counts[b]!;
+  }
+  return out;
+}
+
+/** Some channel of some block of `a` and `b` differs by more than `t`: so some pixel does. */
+export function signaturesApart(a: Float32Array, b: Float32Array, t: number): boolean {
+  for (let i = 0; i < a.length; i++) {
+    // Float32 means of the same bytes round the same way; the margin covers the rounding of two.
+    if (Math.abs(a[i]! - b[i]!) > t + 1e-3) return true;
+  }
+  return false;
 }
 
 /**
@@ -460,6 +569,28 @@ export function buildStoryboard(
   const mask = ignoreMask(width, height, ignore, noise?.radius ?? 0);
   const delta = (i: number, j: number) =>
     frameDelta(frames.pixels(i), frames.pixels(j), width, height, { floor, mask, still });
+  // With a noise band most comparisons only have to learn that two frames are apart — a window
+  // scanned for a return, a hold that does not form, a state a frame is not — and on a 1080p
+  // recording each read of a frame's means was a decode and 75ms of arithmetic. Each frame's
+  // signature is kept (130 KB at 1080p, 64 MB of them: every frame of a 5s window at 60fps), so
+  // a frame seen once is apart from another without being read again.
+  const signatures = new Map<number, Float32Array>();
+  const signatureBytes = Math.ceil(width / SIGNATURE_BLOCK) * Math.ceil(height / SIGNATURE_BLOCK) * 16;
+  const keptSignatures = Math.max(64, Math.floor((64 * 1024 * 1024) / signatureBytes));
+  const signature = (i: number) => {
+    let sig = signatures.get(i);
+    if (sig) {
+      signatures.delete(i);
+      signatures.set(i, sig);
+      return sig;
+    }
+    sig = blockSignature(frames.pixels(i), width, height, mask);
+    signatures.set(i, sig);
+    if (signatures.size > keptSignatures) signatures.delete(signatures.keys().next().value!);
+    return sig;
+  };
+  /** Frames i and j differ by more than t somewhere, proved from their signatures (false: maybe not). */
+  const apart = (i: number, j: number, t: number) => noise !== null && signaturesApart(signature(i), signature(j), t);
   const ref = (i: number): FrameRef => ({ n: i, atMs: entries[i]!.atMs });
 
   // Frame j against frame j-1: independent of the anchor, so computed once.
@@ -503,7 +634,7 @@ export function buildStoryboard(
     if (noise) {
       for (let k = s; k < count - 1; k++) {
         let m = k;
-        while (m + 1 < count && delta(k, m + 1).identical) {
+        while (m + 1 < count && !apart(k, m + 1, still!) && delta(k, m + 1).identical) {
           m++;
           if (entries[m]!.atMs - entries[k]!.atMs >= settleMs - EPSILON_MS) return k;
         }
@@ -529,7 +660,7 @@ export function buildStoryboard(
   const picture = (st: StoryState) => pictureOf.get(st.id) ?? st.frame.n;
   const stateOf = (k: number): string => {
     for (const st of states) {
-      if (delta(picture(st), k).over === 0) {
+      if (!apart(picture(st), k, floor) && delta(picture(st), k).over === 0) {
         st.visits++;
         return st.id;
       }
@@ -700,10 +831,10 @@ export function buildStoryboard(
   const reread: (FrameRef & { state: string })[] = [];
   let j = 1;
   while (j < count) {
-    // The step too, while both frames are fresh: a later search back over a hold reads it.
-    step(j);
-    const d = vsAnchor(j);
-    if (d.over === 0) {
+    // The step too, while both frames are fresh: a later search back over a hold reads it (a
+    // byte-identical one only, so not with a noise band).
+    if (!noise) step(j);
+    if (!apart(anchor, j, floor) && vsAnchor(j).over === 0) {
       j++;
       continue;
     }
@@ -711,7 +842,7 @@ export function buildStoryboard(
     // without anything on screen changing. The frame before it is in the state (the loop got
     // here through it), so when the step into it stays within the keyframe band the state is read
     // again there, and nothing happened.
-    if (noise?.keyframe !== undefined && entries[j]!.key === true) {
+    if (noise?.keyframe !== undefined && entries[j]!.key === true && !apart(j - 1, j, noise.keyframe)) {
       const into = frameDelta(frames.pixels(j - 1), frames.pixels(j), width, height, {
         floor: noise.keyframe,
         mask,
@@ -736,7 +867,11 @@ export function buildStoryboard(
       // The step first: it does not depend on the anchor, so when this window is scanned again
       // after a change re-anchors, a frame identical to the one before it is answered without
       // decoding either — the cache holds a few dozen frames and the window is 300 at 60fps.
-      step(m);
+      // With a noise band that answer is never taken (within the band of the frame before is not
+      // within it of the anchor); the signatures answer instead.
+      if (noise) {
+        if (apart(anchor, m, floor)) continue;
+      } else step(m);
       if (vsAnchor(m).over === 0) {
         back = m;
         break;

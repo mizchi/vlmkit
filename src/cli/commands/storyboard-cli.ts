@@ -20,7 +20,6 @@
 import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { PNG } from "pngjs";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import {
@@ -31,6 +30,7 @@ import {
   strokeOutside,
   type FilmstripLayout,
 } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { decodePngBuffer } from "@mizchi/vlmkit-core/png-decode.ts";
 import { cropRegion, encodePng, type PngData } from "@mizchi/vlmkit-core/png-utils.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { formatInstant, parseFramesManifest, type FramesManifest } from "@mizchi/vlmkit-judge/frames.ts";
@@ -191,14 +191,13 @@ export function parseArgs(argv: string[]): StoryboardArgs {
   };
 }
 
-/** pngjs's sync reader, because the segmentation reads frames from inside a pure, synchronous loop. */
+/**
+ * A synchronous reader, because the segmentation reads frames from inside a pure, synchronous
+ * loop: the screenshot-shaped fast path, pngjs for any other PNG (`png-decode.ts`). pngjs alone
+ * took 47ms a 1920x910 frame, the fast path 26.
+ */
 function decode(path: string): PngData {
-  const png = PNG.sync.read(readFileSync(path));
-  return {
-    width: png.width,
-    height: png.height,
-    data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.length),
-  };
+  return decodePngBuffer(readFileSync(path));
 }
 
 /**

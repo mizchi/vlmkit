@@ -1497,6 +1497,7 @@ fires `transitionend`, so the page's own handler runs between frames.
 vlmkit check animation page.html --at 0..1s/1f --frames out/f   # every frame of the first second
 vlmkit snapshot storyboard out/f/frames.json                     # → out/f/storyboard/
 vlmkit snapshot storyboard out/f/frames.json --ignore 960,40,320,180 --out story   # a video in that box
+vlmkit snapshot storyboard rec.mp4.frames/frames.json --lossy    # a lossy recording (scan video), through the noise band
 ```
 
 Reads any `vlmkit-frames/1` sequence and says, from the pixels alone, where the
@@ -1535,8 +1536,10 @@ What it does not do: name what changed — that is the brief's — or pass a ver
 It is an artifact command, not a gate, and exits 0; a narrative gate stays off
 until a bench shows narration adds something the table does not. Limits:
 
-- **Lossless input only.** vlmkit's own captures, two shots that agree; a decoded
-  video would need a noise floor this does not have.
+- **A lossy recording goes through a noise band, which has a floor of its own.**
+  vlmkit's own captures and lossless recordings are compared exactly. Frames a lossy
+  codec decoded are refused without `--lossy` (below), and with it a change smaller
+  than the band's floor is not seen.
 - **What nothing holds never settles.** A `<video>`, an animated image or a
   spinner the clock does not drive makes every frame differ, and one change
   swallows the rest of the sequence. `--ignore x,y,w,h` (the frames' pixels,
@@ -1810,11 +1813,30 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   abandoned only after a day; a path that is a file is refused before anything
   is decoded.
 
-`snapshot storyboard` compares pixels exactly and has no noise floor yet, so it
-refuses frames from a lossy codec (`lossless: false`) unless given `--lossy`, and
-then names the events that begin on a keyframe. A lossless recording (ffv1, png,
-qtrle, …) is segmented like any capture: a planted one-frame glitch and a
-four-frame transient come back on their frames.
+`snapshot storyboard` compares a lossless recording (ffv1, png, qtrle, …) exactly,
+like any capture: a planted one-frame glitch and a four-frame transient come back on
+their frames. Frames from a lossy codec (`lossless: false`) are refused unless given
+`--lossy`, which compares them through a noise band, because a codec does not give
+back the picture it was given — the same still screen decodes differently frame to
+frame, most of all at sharp edges and across a keyframe, and compared exactly a
+lossy recording was one change that never settled:
+
+| Rule | `--lossy` (`LOSSY_NOISE`) |
+|---|---|
+| what is compared | each pixel as the mean of its 3x3 neighbourhood (a codec's error is mostly ringing, which the mean cancels) |
+| one picture (holds, returns) | every mean within 24 of the hold's first frame (never only the frame before, or a slow ramp is one long hold) |
+| differs | a mean moves by more than 32 |
+| keyframe | one that departs from a still state while the step into it moves no mean past 48 is the codec re-quantizing the picture: the state is read again there (`reread` in story.json, named in SUMMARY.md) |
+| box | drawn from the decoded pixels past the floor inside the means' box grown by 2 px, so a 1 px caret is 1 px wide |
+
+`--noise still,floor[,radius]` sets a band of one's own. The band was chosen on known
+answers: `fixtures/storyboard/planted-ui.html` captured lossless and encoded with x264,
+x265, VP8 (as Playwright records), VP9, AV1 and MJPEG at several qualities, each
+storyboard scored event by event against the lossless one
+(`docs/reports/2026-10-16-storyboard-noise-floor-v1.md`). What it cannot see, said in
+SUMMARY.md: a change smaller than the floor over a 3x3 mean (a 6% fade), a change that
+small landing on a keyframe it reads again, and a recording a codec has destroyed
+(x264 crf 45).
 
 #### Visualizing the VRT process — flipbooks + video
 
