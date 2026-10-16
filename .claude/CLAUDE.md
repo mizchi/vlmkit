@@ -208,6 +208,22 @@ rejected, not resized. Measured 2026-10-16 (`docs/reports/2026-10-16-jev-box-ben
 - The image is read once per request, and each extra question on a shared state costs about 20
   tokens. A 1280x800 screenshot is about 3.1k tokens ($0.00013) and answers in about 0.2s.
 
+**Shipped as `diff png --kind`** (`@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
+`png-diff.ts`). It puts `regions[].kind = {label: text|color|position|presence, confidence,
+uncertain, model}` on the regions the pixel diff found, one request per region, largest first up
+to `--kind-limit` (12). Without a key it exits 2 before measuring anything. End-to-end round on real
+`compareScreenshots` regions (`docs/reports/2026-10-16-jev-region-kind.md`, bench
+`jev-box.ts --only regions`), not to re-learn:
+
+- Text 14/14, colour 18/18, presence 17/17. Shifts of 1-6px were 11/16, and every miss was read as
+  colour. **Confidence matters for a `choice`** (AUROC 0.97): all 5 misses were below 0.6, which is
+  `REGION_KIND_SURE`, the `uncertain` flag. Re-measure it when the model changes.
+- **Score a region against the planted kind only if it touches the planted element.** A digit
+  that widens a badge moves every tab after it, and those `position` labels are right. Counting
+  them as text errors was the scorer's bug.
+- Captures of different sizes are skipped, not labelled: after a reflow one window shows two
+  different pieces of content.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with

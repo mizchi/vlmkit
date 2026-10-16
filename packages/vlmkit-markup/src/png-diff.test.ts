@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { parsePngDiffArgs, runPngDiff, runPngDiffCli } from "./png-diff.ts";
+import { attachRegionKinds, parsePngDiffArgs, runPngDiff, runPngDiffCli } from "./png-diff.ts";
 import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
+import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "png-diff-test");
 
@@ -468,5 +469,92 @@ describe("png-diff", () => {
     } finally {
       await rm(TMP, { recursive: true, force: true });
     }
+  });
+});
+
+describe("png-diff --kind", () => {
+  const withKey = <T>(value: string | undefined, f: () => T): T => {
+    const saved = { a: process.env.TYPESAFEAI_API_KEY, b: process.env.TYPESAFE_API_KEY };
+    if (value === undefined) delete process.env.TYPESAFEAI_API_KEY;
+    else process.env.TYPESAFEAI_API_KEY = value;
+    delete process.env.TYPESAFE_API_KEY;
+    try {
+      return f();
+    } finally {
+      for (const [k, v] of [
+        ["TYPESAFEAI_API_KEY", saved.a],
+        ["TYPESAFE_API_KEY", saved.b],
+      ] as const) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  };
+
+  it("refuses --kind without a key, and the kind options without --kind, as usage errors", () => {
+    const exitOf = (args: string[]) => {
+      try {
+        parsePngDiffArgs(args);
+        return "parsed";
+      } catch (e) {
+        return (e as { exitCode?: number }).exitCode;
+      }
+    };
+    withKey(undefined, () => assert.equal(exitOf(["a.png", "b.png", "--kind"]), 2));
+    withKey("k", () => {
+      assert.deepEqual(
+        { ...parsePngDiffArgs(["a.png", "b.png", "--kind", "--kind-limit", "3", "--kind-model", "jev-preview"]) },
+        {
+          ...parsePngDiffArgs(["a.png", "b.png"]),
+          kind: true,
+          kindLimit: 3,
+          kindModel: "jev-preview",
+        },
+      );
+      assert.equal(exitOf(["a.png", "b.png", "--kind-limit", "3"]), 2);
+      assert.equal(exitOf(["a.png", "b.png", "--kind", "--kind-limit", "0"]), 2);
+    });
+  });
+
+  it("labels regions largest first, shows the model crops Jev accepts, and skips past the limit", async () => {
+    const dir = join(TMP, "kind");
+    await mkdir(dir, { recursive: true });
+    const { baselinePath, currentPath } = await writeNoisyFramePair(dir);
+    const { diff } = await runPngDiff({
+      baselinePath,
+      currentPath,
+      outputDir: dir,
+      threshold: 0.1,
+      skipHeatmap: true,
+      json: true,
+    });
+    assert.equal(diff.regions.length, 1);
+    const { PNG } = await import("pngjs");
+    const seen: { width: number; height: number }[] = [];
+    const summary = await attachRegionKinds(diff.regions, baselinePath, currentPath, {
+      ask: async (b, c) => {
+        for (const png of [b, c]) {
+          const img = PNG.sync.read(Buffer.from(png));
+          seen.push({ width: img.width, height: img.height });
+        }
+        return { label: "color", confidence: 0.9, uncertain: false, probabilities: { color: 0.9 }, model: "fake" };
+      },
+    });
+    assert.deepEqual(diff.regions[0]!.kind, { label: "color", confidence: 0.9, uncertain: false, model: "fake" });
+    assert.equal(summary.labelled, 1);
+    // A 160px frame is magnified to Jev's 280px floor, never sent below it.
+    for (const s of seen) assert.ok(s.width >= 280 && s.height >= 280, JSON.stringify(s));
+
+    const regions: DiffRegion[] = [
+      { x: 0, y: 0, width: 8, height: 8, diffPixelCount: 5 },
+      { x: 40, y: 40, width: 8, height: 8, diffPixelCount: 50 },
+    ];
+    const capped = await attachRegionKinds(regions, baselinePath, currentPath, {
+      limit: 1,
+      ask: async () => ({ label: "text", confidence: 0.3, uncertain: true, probabilities: {}, model: "fake" }),
+    });
+    assert.equal(regions[1]!.kind?.label, "text");
+    assert.match(regions[0]!.kindSkipped!, /--kind-limit 1/);
+    assert.deepEqual([capped.labelled, capped.uncertain, capped.skipped], [1, 1, 1]);
   });
 });

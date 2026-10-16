@@ -188,8 +188,8 @@ export async function buildGround(browser: Browser, o: GroundOptions): Promise<G
 export interface DiffCase {
   id: string;
   fixture: string;
-  kind: BuiltCase["expected"]["kind"];
-  expected: BuiltCase["expected"];
+  kind: BuiltCase["expected"]["kind"] | "presence";
+  expected: BuiltCase["expected"] | { kind: "presence" };
   baselinePath: string;
   currentPath: string;
   width: number;
@@ -241,4 +241,69 @@ export async function windowDiffCase(c: BuiltCase, outDir: string, maxHeight = 9
     targetBox: shift(c.targetBox),
     windowY: y,
   };
+}
+
+/**
+ * Appear / disappear cases, which zoom-accuracy does not plant: one grounding target per case
+ * is hidden (`visibility: hidden`, so nothing reflows and the change is that element alone).
+ * Even-numbered cases hide it in `current` (disappeared), odd ones in `baseline` (appeared).
+ */
+export async function buildPresenceCases(browser: Browser, o: GroundOptions, perFixture = 2): Promise<DiffCase[]> {
+  const out: DiffCase[] = [];
+  for (const fixture of o.fixtures) {
+    const name = basename(fixture).replace(/\.html?$/, "");
+    const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+    try {
+      await page.goto(`file://${fixture}`, { waitUntil: "load" });
+      await settlePage(page);
+      const shot = () => page.screenshot({ animations: "disabled", caret: "hide" });
+      const collected = await page.evaluate(collectTargets);
+      const chosen = seededShuffle(collected, caseSeed(o.seed, `${name}-presence`)).slice(0, perFixture);
+      for (const [i, c] of chosen.entries()) {
+        const id = `${name}-presence${i === 0 ? "" : `-${i + 1}`}`;
+        const shown = await shot();
+        await page.evaluate((box) => {
+          const el = document.elementFromPoint((box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2);
+          // The collector's hit test accepted the element or a descendant at its centre; walk
+          // up to the box the target was measured as, so the whole target goes.
+          let e = el as HTMLElement | null;
+          while (e && e.parentElement) {
+            const r = e.getBoundingClientRect();
+            if (Math.abs(r.left - box.x1) < 0.5 && Math.abs(r.top - box.y1) < 0.5 && Math.abs(r.right - box.x2) < 0.5)
+              break;
+            e = e.parentElement;
+          }
+          if (e) e.style.setProperty("visibility", "hidden", "important");
+          (window as unknown as { __hidden?: HTMLElement | null }).__hidden = e;
+        }, c.box);
+        const hidden = await shot();
+        await page.evaluate(() =>
+          (window as unknown as { __hidden?: HTMLElement | null }).__hidden?.style.removeProperty("visibility"),
+        );
+        const [base, cur] = i % 2 === 0 ? [shown, hidden] : [hidden, shown];
+        const dir = join(o.outDir, "presence", id);
+        await mkdir(dir, { recursive: true });
+        const baselinePath = join(dir, "baseline.png");
+        const currentPath = join(dir, "current.png");
+        await writeFile(baselinePath, base);
+        await writeFile(currentPath, cur);
+        out.push({
+          id,
+          fixture: name,
+          kind: "presence",
+          expected: { kind: "presence" },
+          baselinePath,
+          currentPath,
+          width: o.viewport.width,
+          height: o.viewport.height,
+          diffBox: c.box,
+          targetBox: c.box,
+          windowY: 0,
+        });
+      }
+    } finally {
+      await page.close();
+    }
+  }
+  return out;
 }

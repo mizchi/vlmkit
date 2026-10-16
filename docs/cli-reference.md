@@ -223,6 +223,11 @@ vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
   #                      (32 at >=720px short side, 16 at >=480, else 8)
   # --elements-top <N>   report N attribution candidates per region, not just the winner
   # --ignore-region "<x>,<y>,<w>x<h>"   repeatable; area never measured
+  # --kind               name each region text / color / position / presence with
+  #                      TypeSafe Jev on its magnified crop (TYPESAFEAI_API_KEY,
+  #                      ~$0.0003 a region); the only model-made field, marked
+  #                      uncertain below 0.6 confidence. --kind-limit <N> (12),
+  #                      --kind-model <id> (jev-1.14.0)
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table

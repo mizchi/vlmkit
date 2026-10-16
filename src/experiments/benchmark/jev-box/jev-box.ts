@@ -17,12 +17,14 @@
  *            "where", scored against the changed pixels.
  *   classify the vlmkit split: the pixel diff gives the region, Jev a `choice` of what changed
  *            (text / colour / position, and the direction of a shift) on a magnified crop.
+ *   regions  `diff png --kind` end to end: the regions compareScreenshots finds, each labelled by
+ *            `labelRegionKinds` (four options, + appear/disappear cases planted by hiding a target).
  *
  * Usage:
  *   node --experimental-strip-types src/experiments/benchmark/jev-box/jev-box.ts \
  *     [--model jev-1.14.0] [--fixtures page,dashboard] [--per-fixture 12] [--seed 1] \
  *     [--out test-results/jev-box] [--md report.md] [--executable-path /path/to/chromium] \
- *     [--only ground,refine,present,diff,classify] [--rescore]
+ *     [--only ground,refine,present,diff,classify,regions] [--rescore]
  *
  * Environment: TYPESAFEAI_API_KEY. `--rescore` reads saved answers and needs no key or browser.
  */
@@ -43,7 +45,17 @@ import {
 } from "@mizchi/vlmkit-ai/jev-client.ts";
 import { cropImage, decodeImage, encodePngImage, resample } from "@mizchi/vlmkit-ai/zoom-image.ts";
 import { buildCases } from "../zoom-accuracy/cases.ts";
-import { buildGround, windowDiffCase, type DiffCase, type GroundShot, type GroundTarget } from "./cases.ts";
+import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
+import { jevRegionKindAsker, labelRegionKinds, type RegionKindOutcome } from "@mizchi/vlmkit-ai/region-kind.ts";
+import {
+  buildGround,
+  buildPresenceCases,
+  windowDiffCase,
+  type DiffCase,
+  type GroundShot,
+  type GroundTarget,
+} from "./cases.ts";
 import {
   auroc,
   centre,
@@ -64,7 +76,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const FIXTURE_DIR = join(ROOT, "fixtures/css-challenge");
-const STAGES = ["ground", "refine", "present", "diff", "classify"] as const;
+const STAGES = ["ground", "refine", "present", "diff", "classify", "regions"] as const;
 type Stage = (typeof STAGES)[number];
 
 interface Call {
@@ -92,6 +104,13 @@ interface Saved {
     caseId: string;
     kind: Extract<JevAnswer, { type: "choice" }>;
     direction?: Extract<JevAnswer, { type: "choice" }>;
+  }[];
+  /** The cases the `regions` stage ran on, with their planted element's box. */
+  diffCases?: DiffCase[];
+  regions?: {
+    caseId: string;
+    kind: DiffCase["kind"];
+    regions: { region: DiffRegion; outcome: RegionKindOutcome }[];
   }[];
   calls: Call[];
 }
@@ -289,6 +308,40 @@ async function runClassify(model: string, cases: DiffCase[], calls: Call[]) {
       direction: r.answers.direction as Extract<JevAnswer, { type: "choice" }> | undefined,
     };
   });
+}
+
+/**
+ * End to end, as `diff png --kind` runs it: the regions `compareScreenshots` finds (not the
+ * planted box), each labelled by `labelRegionKinds`. Unchanged cases must yield no region.
+ */
+async function runRegions(model: string, cases: DiffCase[], calls: Call[]) {
+  const ask = jevRegionKindAsker({
+    model,
+    onResponse: (r) => record(calls, "regions", r.model, r, 1),
+  });
+  const out: NonNullable<Saved["regions"]> = [];
+  for (const c of cases) {
+    const diff = await compareScreenshots(
+      {
+        testId: c.id,
+        testTitle: c.id,
+        projectName: "jev-box",
+        screenshotPath: c.currentPath,
+        baselinePath: c.baselinePath,
+        status: "changed",
+      },
+      { skipHeatmap: true, threshold: 0.1 },
+    );
+    const regions = diff?.regions ?? [];
+    const outcomes = await labelRegionKinds(
+      decodeImage(await readFile(c.baselinePath)),
+      decodeImage(await readFile(c.currentPath)),
+      regions,
+      ask,
+    );
+    out.push({ caseId: c.id, kind: c.kind, regions: regions.map((region, i) => ({ region, outcome: outcomes[i]! })) });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -507,6 +560,99 @@ export function report(saved: Saved): string {
     out.push("");
   }
 
+  if (saved.regions) {
+    const truth = (k: string) => (k === "offset" ? "position" : k);
+    const LABELS = ["text", "color", "position", "presence"] as const;
+    const caseOf = new Map((saved.diffCases ?? []).map((c) => [c.id, c]));
+    const planted = saved.regions.filter((r) => r.kind !== "none");
+    const none = saved.regions.filter((r) => r.kind === "none");
+    const label = (o: RegionKindOutcome) => ("kind" in o ? o.kind.label : null);
+    const conf = (o: RegionKindOutcome) => ("kind" in o ? o.kind.confidence : NaN);
+    // A region is scored against the planted kind only when it touches the planted element.
+    // A digit that widens a badge moves every tab after it: those regions are real position
+    // changes, and counting them as mislabelled text was this scorer's error, not Jev's.
+    const onTarget = (caseId: string, g: DiffRegion) => {
+      const t = caseOf.get(caseId)?.targetBox;
+      if (!t) return true;
+      return g.x < t.x2 && g.x + g.width > t.x1 && g.y < t.y2 && g.y + g.height > t.y1;
+    };
+    const all = planted.flatMap((c) => c.regions.map((r) => ({ c, r, on: onTarget(c.caseId, r.region) })));
+    const labelled = all.filter((x) => "kind" in x.r.outcome);
+    const scored = labelled.filter((x) => x.on);
+    const collateral = labelled.filter((x) => !x.on);
+    out.push(
+      "## Regions: `diff png --kind` end to end",
+      "",
+      `The regions \`compareScreenshots\` finds on each case (not the planted box), each labelled on its own crop with four options. ${planted.length} planted cases gave ${all.length} regions (${labelled.length} labelled, ${all.length - labelled.length} skipped); ${none.length} unchanged cases gave ${none.reduce((a, c) => a + c.regions.length, 0)} regions. ${scored.length} regions touch the planted element and are scored; ${collateral.length} are collateral (the change moved something else) and listed apart.`,
+      "",
+      "Per region on the planted element:",
+      "",
+      "| planted | regions | → text | → color | → position | → presence | right | right at conf ≥ 0.6 |",
+      "|---|---:|---:|---:|---:|---:|---:|---|",
+    );
+    for (const kind of ["text", "color", "offset", "presence"] as const) {
+      const sub = scored.filter((x) => x.c.kind === kind);
+      if (!sub.length) continue;
+      const n = (l: string) => sub.filter((x) => label(x.r.outcome) === l).length;
+      const sure = sub.filter((x) => conf(x.r.outcome) >= 0.6);
+      const sureOk = sure.filter((x) => label(x.r.outcome) === truth(kind)).length;
+      out.push(
+        `| ${kind} | ${sub.length} | ${LABELS.map((l) => n(l)).join(" | ")} | **${pct(n(truth(kind)) / sub.length)}** | ${sureOk}/${sure.length} |`,
+      );
+    }
+    const ok = scored.filter((x) => label(x.r.outcome) === truth(x.c.kind));
+    const bad = scored.filter((x) => label(x.r.outcome) !== truth(x.c.kind));
+    const below = (xs: typeof scored) => xs.filter((x) => conf(x.r.outcome) < 0.6).length;
+    out.push(
+      "",
+      `Confidence: ${below(bad)}/${bad.length} wrong labels and ${below(ok)}/${ok.length} right ones are below 0.6. AUROC of confidence for a right label ${f2(auroc(scored.map((x) => ({ score: conf(x.r.outcome), positive: label(x.r.outcome) === truth(x.c.kind) }))) ?? NaN)}.`,
+      "",
+      "Per case, the label of its largest region on the planted element:",
+      "",
+      "| planted | cases | right |",
+      "|---|---:|---:|",
+    );
+    for (const kind of ["text", "color", "offset", "presence"] as const) {
+      const sub = planted
+        .filter((c) => c.kind === kind)
+        .map((c) => c.regions.filter((r) => onTarget(c.caseId, r.region)))
+        .filter((rs) => rs.length > 0);
+      if (!sub.length) continue;
+      const right = sub.filter((rs) => {
+        const top = [...rs].sort((a, b) => b.region.diffPixelCount - a.region.diffPixelCount)[0]!;
+        return label(top.outcome) === truth(kind);
+      }).length;
+      out.push(`| ${kind} | ${sub.length} | **${right}/${sub.length}** |`);
+    }
+    const table = (title: string, rows: typeof labelled) => {
+      if (!rows.length) return;
+      out.push(
+        "",
+        `<details><summary>${title}</summary>`,
+        "",
+        "| case | region | px | regionType | shift | label (conf) |",
+        "|---|---|---:|---|---|---|",
+      );
+      for (const w of rows) {
+        const g = w.r.region;
+        const k = (w.r.outcome as { kind: { label: string; confidence: number } }).kind;
+        out.push(
+          `| ${w.c.caseId} | ${g.x},${g.y} ${g.width}x${g.height} | ${g.diffPixelCount} | ${g.regionType ?? ""} | ${g.shift ? `${g.shift.dx},${g.shift.dy}` : ""} | ${k.label} (${f2(k.confidence)}) |`,
+        );
+      }
+      out.push("", "</details>");
+    };
+    table("Mislabelled regions on the planted element", bad);
+    table("Collateral regions (off the planted element), as labelled", collateral);
+    const skipped = all.filter((x) => "skipped" in x.r.outcome);
+    if (skipped.length)
+      out.push(
+        "",
+        `Skipped: ${skipped.map((x) => `${x.c.caseId} (${(x.r.outcome as { skipped: string }).skipped})`).join("; ")}.`,
+      );
+    out.push("");
+  }
+
   out.push(
     "## Cost and latency",
     "",
@@ -550,7 +696,7 @@ async function main() {
     saved = JSON.parse(await readFile(savedPath, "utf8"));
   } else {
     const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
-    const { shots, diffCases } = await withBrowser(
+    const { shots, diffCases, presenceCases } = await withBrowser(
       async (browser) => {
         const shots = await buildGround(browser, {
           fixtures,
@@ -560,7 +706,16 @@ async function main() {
           outDir,
         });
         let diffCases: DiffCase[] = [];
-        if (only.has("diff")) {
+        const presenceCases = only.has("regions")
+          ? await buildPresenceCases(browser, {
+              fixtures,
+              seed,
+              perFixture,
+              viewport: { width: 1280, height: 800 },
+              outDir,
+            })
+          : [];
+        if (only.has("diff") || only.has("regions")) {
           // Per fixture: buildCases refuses a fixture whose unchanged captures differ (at DPR 1,
           // ecommerce-catalog has a 2x6px region that does), and that should drop that fixture only.
           for (const fixture of fixtures) {
@@ -583,7 +738,7 @@ async function main() {
             }
           }
         }
-        return { shots, diffCases };
+        return { shots, diffCases, presenceCases };
       },
       executablePath ? { launch: { executablePath } } : {},
     );
@@ -596,6 +751,10 @@ async function main() {
     if (only.has("present")) saved.present = await runPresent(model, shots, saved.calls);
     if (only.has("diff")) saved.diff = await runDiff(model, diffCases, saved.calls);
     if (only.has("classify") && only.has("diff")) saved.classify = await runClassify(model, diffCases, saved.calls);
+    if (only.has("regions")) {
+      saved.diffCases = [...diffCases, ...presenceCases];
+      saved.regions = await runRegions(model, saved.diffCases, saved.calls);
+    }
     await writeFile(savedPath, JSON.stringify(saved, null, 2));
   }
   const md = report(saved);

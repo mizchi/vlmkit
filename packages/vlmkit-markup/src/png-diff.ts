@@ -13,6 +13,7 @@ import {
   type RegionElementsViewport,
 } from "./region-selector-match.ts";
 import type { DiffIgnoreRegion, DiffRegion, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
+import type { AskRegionKind } from "@mizchi/vlmkit-ai/region-kind.ts";
 
 export interface PngDiffCliOptions {
   baselinePath: string;
@@ -54,6 +55,24 @@ export interface PngDiffCliOptions {
    * forgive.
    */
   ignoreRegions?: DiffIgnoreRegion[];
+  /**
+   * Name what changed in each region (text / color / position / presence) with TypeSafe's Jev,
+   * one typed `choice` on the region's crop. Needs TYPESAFEAI_API_KEY. The only non-deterministic
+   * field in the output, and the only network call: off unless asked for.
+   */
+  kind?: boolean;
+  /** Jev model id for --kind (default jev-1.14.0). */
+  kindModel?: string;
+  /** Most regions labelled, largest first (default 12); the rest get `kindSkipped`. */
+  kindLimit?: number;
+}
+
+export interface PngDiffKindSummary {
+  model: string;
+  labelled: number;
+  uncertain: number;
+  skipped: number;
+  costUsd: number;
 }
 
 export interface PngDiffRegionCrop {
@@ -99,6 +118,15 @@ Options:
                         the cause. Lower it for small frames with fine detail.
   --elements-top <N>    Report the top N attribution candidates per region
                         (default 1) instead of only the winner
+  --kind                Name what changed in each region: text, color, position
+                        or presence. One TypeSafe Jev call per region on its
+                        magnified crop (TYPESAFEAI_API_KEY; ~$0.0003 and ~0.2s a
+                        region). The region, shift and colours stay measured;
+                        only the label is a model's. Labels below 0.6
+                        confidence are marked uncertain — 1-2px shifts read as
+                        color are the usual case, so check region.shift
+  --kind-limit <N>      Label at most N regions, largest first (default 12)
+  --kind-model <id>     Jev model for --kind (default jev-1.14.0)
   --ignore-region "<x>,<y>,<w>x<h>"
                         Never measure this rectangle. Repeatable. For areas that
                         are non-deterministic by construction (particles, noise,
@@ -122,6 +150,9 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
   let elementsHtml: string | undefined;
   let elementsViewport: RegionElementsViewport | undefined;
   let cropRegions: string | undefined;
+  let kind = false;
+  let kindModel: string | undefined;
+  let kindLimit: number | undefined;
   const ignoreRegions: DiffIgnoreRegion[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -138,6 +169,24 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
           // would report a diff the caller believes they excluded.
           throw new PngDiffCliError(`--ignore-region: ${(error as Error).message}`, 2);
         }
+        break;
+      }
+      case "--kind":
+        kind = true;
+        break;
+      case "--kind-model": {
+        const value = args[++i];
+        if (!value) throw new PngDiffCliError(`Missing value for ${arg}\n\n${formatPngDiffUsage()}`, 1);
+        kindModel = value;
+        break;
+      }
+      case "--kind-limit": {
+        const value = args[++i];
+        const parsed = Number(value);
+        if (!value || !Number.isInteger(parsed) || parsed < 1) {
+          throw new PngDiffCliError(`--kind-limit requires a positive integer, got: ${value ?? "(missing)"}`, 2);
+        }
+        kindLimit = parsed;
         break;
       }
       case "--crop-regions": {
@@ -220,6 +269,18 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
     throw new PngDiffCliError(formatPngDiffUsage(), 1);
   }
 
+  if ((kindModel || kindLimit !== undefined) && !kind) {
+    throw new PngDiffCliError("--kind-model / --kind-limit have no effect without --kind", 2);
+  }
+  // Refused before anything is measured: a run that silently left out the labels it was
+  // asked for would read as "no region could be named".
+  if (kind && !process.env.TYPESAFEAI_API_KEY && !process.env.TYPESAFE_API_KEY) {
+    throw new PngDiffCliError(
+      "--kind needs TYPESAFEAI_API_KEY (a TypeSafe key, console.typesafe.ai/keys). Without one, --crop-regions writes the crops for you to look at.",
+      2,
+    );
+  }
+
   const [baselinePath, currentPath] = positional;
   return {
     baselinePath,
@@ -235,6 +296,60 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
     ...(regionGrid !== undefined ? { regionGrid } : {}),
     ...(elementsTop !== undefined ? { elementsTop } : {}),
     ...(ignoreRegions.length > 0 ? { ignoreRegions } : {}),
+    ...(kind ? { kind } : {}),
+    ...(kindModel ? { kindModel } : {}),
+    ...(kindLimit !== undefined ? { kindLimit } : {}),
+  };
+}
+
+/**
+ * Label regions in place, largest first up to the limit (the order of `regions` is kept).
+ * `ask` is injectable so tests run without the network.
+ */
+export async function attachRegionKinds(
+  regions: DiffRegion[],
+  baselinePath: string,
+  currentPath: string,
+  options: { model?: string; limit?: number; ask?: AskRegionKind },
+): Promise<PngDiffKindSummary> {
+  const { jevRegionKindAsker, labelRegionKinds } = await import("@mizchi/vlmkit-ai/region-kind.ts");
+  const { decodeImage } = await import("@mizchi/vlmkit-ai/zoom-image.ts");
+  const { JEV_DEFAULT_MODEL } = await import("@mizchi/vlmkit-ai/jev-client.ts");
+  let costUsd = 0;
+  const ask =
+    options.ask ??
+    jevRegionKindAsker({
+      ...(options.model ? { model: options.model } : {}),
+      onResponse: (r) => (costUsd += r.costUsd),
+    });
+  const limit = options.limit ?? 12;
+  const order = regions.map((_, i) => i).sort((a, b) => regions[b]!.diffPixelCount - regions[a]!.diffPixelCount);
+  const asked = order.slice(0, limit);
+  for (const i of order.slice(limit)) regions[i]!.kindSkipped = `over --kind-limit ${limit} (largest regions first)`;
+  const [baseline, current] = await Promise.all([readFile(baselinePath), readFile(currentPath)]);
+  const outcomes = await labelRegionKinds(
+    decodeImage(baseline),
+    decodeImage(current),
+    asked.map((i) => regions[i]!),
+    ask,
+  );
+  let model = options.model ?? JEV_DEFAULT_MODEL;
+  asked.forEach((ri, k) => {
+    const o = outcomes[k]!;
+    if ("kind" in o) {
+      const { label, confidence, uncertain } = o.kind;
+      model = o.kind.model;
+      regions[ri]!.kind = { label, confidence, uncertain, model: o.kind.model };
+    } else {
+      regions[ri]!.kindSkipped = o.skipped;
+    }
+  });
+  return {
+    model,
+    labelled: regions.filter((r) => r.kind).length,
+    uncertain: regions.filter((r) => r.kind?.uncertain).length,
+    skipped: regions.filter((r) => r.kindSkipped).length,
+    costUsd,
   };
 }
 
@@ -323,6 +438,14 @@ export async function runPngDiff(options: PngDiffCliOptions) {
     attachSelectorCandidates(diff.regions, elements, options.elementsTop ?? 1);
   }
 
+  const kindSummary =
+    options.kind && diff.regions.length > 0
+      ? await attachRegionKinds(diff.regions, options.baselinePath, options.currentPath, {
+          ...(options.kindModel ? { model: options.kindModel } : {}),
+          ...(options.kindLimit !== undefined ? { limit: options.kindLimit } : {}),
+        })
+      : undefined;
+
   const semantic = classifyVisualDiff(diff);
 
   let crops: PngDiffRegionCrop[] | undefined;
@@ -330,7 +453,7 @@ export async function runPngDiff(options: PngDiffCliOptions) {
     crops = await writeRegionCrops(options, diff.regions, diff.heatmapPath);
   }
 
-  return { diff, semantic, baselineSize, currentSize, sizeDelta, crops };
+  return { diff, semantic, baselineSize, currentSize, sizeDelta, crops, kindSummary };
 }
 
 /**
@@ -402,6 +525,7 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       summary: result.semantic.summary,
       changes: result.semantic.changes,
       ...(result.crops ? { crops: result.crops } : {}),
+      ...(result.kindSummary ? { kind: result.kindSummary } : {}),
     };
 
     if (options.json) {
@@ -470,7 +594,12 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
           region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0)
             ? ` shift(${region.shift.dx >= 0 ? "+" : ""}${region.shift.dx},${region.shift.dy >= 0 ? "+" : ""}${region.shift.dy})`
             : "";
-        console.log(`    (${region.x},${region.y}) ${region.width}x${region.height}${type}${color}${shift}`);
+        const kind = region.kind
+          ? ` kind:${region.kind.label}(${region.kind.confidence.toFixed(2)}${region.kind.uncertain ? ", uncertain" : ""})`
+          : region.kindSkipped && options.kind
+            ? " kind:—"
+            : "";
+        console.log(`    (${region.x},${region.y}) ${region.width}x${region.height}${type}${color}${shift}${kind}`);
       }
       if (output.regions.length > 15) {
         console.log(`    … ${output.regions.length - 15} more (use --json for all)`);
@@ -484,6 +613,16 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
         console.log(
           `    (${region.x},${region.y}) ${region.width}x${region.height} -> ${c.selector} (${c.confidence}, coverage ${c.regionCoverage})`,
         );
+      }
+    }
+    if (output.kind) {
+      const k = output.kind;
+      console.log(
+        `  kind:     ${k.labelled} labelled by ${k.model} (${k.uncertain} uncertain, ${k.skipped} skipped), $${k.costUsd.toFixed(5)}` +
+          " — a model's label on each crop, not a measurement",
+      );
+      for (const region of output.regions.filter((r) => r.kindSkipped).slice(0, 3)) {
+        console.log(`    (${region.x},${region.y}) ${region.width}x${region.height} skipped: ${region.kindSkipped}`);
       }
     }
     console.log(`  summary:  ${output.summary}`);
