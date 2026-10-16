@@ -1,0 +1,6864 @@
+{
+  "model": "jev-1.14.0",
+  "calls": [
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 361.39566899999045,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 356.1230440000072,
+      "inputTokens": 9204,
+      "costUsd": 0.000386568,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 333.14036799999303,
+      "inputTokens": 7348,
+      "costUsd": 0.000308616,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 219.6416859999881,
+      "inputTokens": 9204,
+      "costUsd": 0.000386568,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 182.0471190000244,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 192.69552599999588,
+      "inputTokens": 7348,
+      "costUsd": 0.000308616,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 207.51238199998625,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 211.04914600000484,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 221.41440000000875,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 219.71799100001226,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 213.301403999998,
+      "inputTokens": 7348,
+      "costUsd": 0.000308616,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 230.5409000000218,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 324.05102300000726,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 253.5982710000244,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 166.50785200000973,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 167.58535599999595,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 173.8717229999893,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 171.23571300000185,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 210.0617370000109,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 623.4953709999972,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 273.06924899999285,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 215.00928599998588,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 266.608745000005,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 348.0823260000034,
+      "inputTokens": 7348,
+      "costUsd": 0.000308616,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 231.81453699999838,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 179.5017719999887,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 237.134384999983,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 141.80059299999266,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 377.3947090000147,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 226.12939400001778,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 171.9786679999961,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 208.4108090000227,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 167.3733320000174,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 154.895079000009,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 174.35846099999617,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 183.57526599999983,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 159.37261200000648,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 204.22516600001836,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 260.2153610000096,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 227.73498100001598,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 1407.4783860000025,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 1068.4199910000025,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 272.03445700000157,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 762.1246399999945,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 181.44035199997597,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 627.0515950000263,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 1093.277258999995,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 1507.796176999982,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 188.74899399999413,
+      "inputTokens": 6676,
+      "costUsd": 0.00028039199999999997,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 201.13926399999764,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 202.59010699999635,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 219.46848900002078,
+      "inputTokens": 9204,
+      "costUsd": 0.000386568,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 196.5712539999804,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 165.744995999994,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 178.95625099999597,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 291.4474409999966,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 237.9914470000076,
+      "inputTokens": 9204,
+      "costUsd": 0.000386568,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 205.53070400000433,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 263.04861399999936,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 293.7070440000098,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 246.15580000000773,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 195.4255450000055,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 180.45883600000525,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 150.89404600000125,
+      "inputTokens": 3316,
+      "costUsd": 0.000139272,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 199.00411499998881,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 336.89981299999636,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 174.4086289999832,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 335.1858190000057,
+      "inputTokens": 7764,
+      "costUsd": 0.000326088,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 252.57269500000984,
+      "inputTokens": 9204,
+      "costUsd": 0.000386568,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 289.36841399999685,
+      "inputTokens": 8244,
+      "costUsd": 0.000346248,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 181.17989199998556,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "regions",
+      "key": "jev-1.14.0",
+      "latencyMs": 197.93278100001044,
+      "inputTokens": 6804,
+      "costUsd": 0.000285768,
+      "questions": 1,
+      "servedModel": "jev-1.14.0"
+    }
+  ],
+  "diffCases": [
+    {
+      "id": "admin-panel-text",
+      "fixture": "admin-panel.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "Up 6% from yesterday",
+        "newText": "Up 1% from yesterday",
+        "oldToken": "6%",
+        "newToken": "1%"
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 326,
+        "y1": 266,
+        "x2": 447,
+        "y2": 279
+      },
+      "targetBox": {
+        "x1": 305,
+        "y1": 261.5,
+        "x2": 494,
+        "y2": 281
+      },
+      "windowY": 0
+    },
+    {
+      "id": "admin-panel-text-2",
+      "fixture": "admin-panel.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "9 active operators across 3 shifts",
+        "newText": "4 active operators across 3 shifts",
+        "oldToken": "9",
+        "newToken": "4"
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 35,
+        "y1": 123,
+        "x2": 203,
+        "y2": 136
+      },
+      "targetBox": {
+        "x1": 35,
+        "y1": 118.5,
+        "x2": 225,
+        "y2": 157.5
+      },
+      "windowY": 0
+    },
+    {
+      "id": "admin-panel-color",
+      "fixture": "admin-panel.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#64748b",
+        "newColor": "#b6e052"
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 917,
+        "y1": 376,
+        "x2": 1148,
+        "y2": 389
+      },
+      "targetBox": {
+        "x1": 917,
+        "y1": 372,
+        "x2": 1148.640625,
+        "y2": 391.5
+      },
+      "windowY": 0
+    },
+    {
+      "id": "admin-panel-color-2",
+      "fixture": "admin-panel.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#162033",
+        "newColor": "#ad272a"
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 917,
+        "y1": 700,
+        "x2": 1069,
+        "y2": 712
+      },
+      "targetBox": {
+        "x1": 917,
+        "y1": 695,
+        "x2": 1176.21875,
+        "y2": 716
+      },
+      "windowY": 331
+    },
+    {
+      "id": "admin-panel-offset",
+      "fixture": "admin-panel.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": -2,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 550,
+        "y1": 266,
+        "x2": 661,
+        "y2": 279
+      },
+      "targetBox": {
+        "x1": 552,
+        "y1": 261.5,
+        "x2": 741,
+        "y2": 281
+      },
+      "windowY": 0
+    },
+    {
+      "id": "admin-panel-offset-2",
+      "fixture": "admin-panel.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": 3
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 917,
+        "y1": 784,
+        "x2": 1142,
+        "y2": 841
+      },
+      "targetBox": {
+        "x1": 917,
+        "y1": 778.5,
+        "x2": 1177,
+        "y2": 842.5
+      },
+      "windowY": 331
+    },
+    {
+      "id": "admin-panel-none",
+      "fixture": "admin-panel.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/admin-panel-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/admin-panel-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "blog-magazine-text",
+      "fixture": "blog-magazine.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "7 min read",
+        "newText": "2 min read",
+        "oldToken": "7",
+        "newToken": "2"
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 939,
+        "y1": 683,
+        "x2": 946,
+        "y2": 692
+      },
+      "targetBox": {
+        "x1": 939,
+        "y1": 680.078125,
+        "x2": 994.59375,
+        "y2": 695.078125
+      },
+      "windowY": 445
+    },
+    {
+      "id": "blog-magazine-text-2",
+      "fixture": "blog-magazine.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "8 min read",
+        "newText": "3 min read",
+        "oldToken": "8",
+        "newToken": "3"
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 65,
+        "y1": 768,
+        "x2": 71,
+        "y2": 778
+      },
+      "targetBox": {
+        "x1": 65,
+        "y1": 761.53125,
+        "x2": 120.59375,
+        "y2": 782.96875
+      },
+      "windowY": 445
+    },
+    {
+      "id": "blog-magazine-color",
+      "fixture": "blog-magazine.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#6b7280",
+        "newColor": "#75a113"
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 1007,
+        "y1": 282,
+        "x2": 1091,
+        "y2": 294
+      },
+      "targetBox": {
+        "x1": 1007,
+        "y1": 278.609375,
+        "x2": 1090.421875,
+        "y2": 293.609375
+      },
+      "windowY": 0
+    },
+    {
+      "id": "blog-magazine-color-2",
+      "fixture": "blog-magazine.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#6b7280",
+        "newColor": "#d4a90e"
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 153,
+        "y1": 444,
+        "x2": 219,
+        "y2": 455
+      },
+      "targetBox": {
+        "x1": 152.0625,
+        "y1": 437.546875,
+        "x2": 218.9375,
+        "y2": 460.640625
+      },
+      "windowY": 114
+    },
+    {
+      "id": "blog-magazine-offset",
+      "fixture": "blog-magazine.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": -2
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 44,
+        "y1": 438,
+        "x2": 269,
+        "y2": 461
+      },
+      "targetBox": {
+        "x1": 44,
+        "y1": 427.640625,
+        "x2": 267.625,
+        "y2": 473.828125
+      },
+      "windowY": 204
+    },
+    {
+      "id": "blog-magazine-offset-2",
+      "fixture": "blog-magazine.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": 3
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 497,
+        "y1": 576,
+        "x2": 560,
+        "y2": 617
+      },
+      "targetBox": {
+        "x1": 497,
+        "y1": 576.4375,
+        "x2": 560,
+        "y2": 613.875
+      },
+      "windowY": 445
+    },
+    {
+      "id": "blog-magazine-none",
+      "fixture": "blog-magazine.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/blog-magazine-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/blog-magazine-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "dashboard-text",
+      "fixture": "dashboard.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "↑ 12.5% from last month",
+        "newText": "↑ 12.0% from last month",
+        "oldToken": "12.5%",
+        "newToken": "12.0%"
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 316,
+        "y1": 187,
+        "x2": 436,
+        "y2": 198
+      },
+      "targetBox": {
+        "x1": 284,
+        "y1": 181.59375,
+        "x2": 480,
+        "y2": 202.390625
+      },
+      "windowY": 0
+    },
+    {
+      "id": "dashboard-text-2",
+      "fixture": "dashboard.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "↑ 12.5% from last month",
+        "newText": "↑ 17.5% from last month",
+        "oldToken": "12.5%",
+        "newToken": "17.5%"
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 304,
+        "y1": 187,
+        "x2": 435,
+        "y2": 198
+      },
+      "targetBox": {
+        "x1": 284,
+        "y1": 181.59375,
+        "x2": 480,
+        "y2": 202.390625
+      },
+      "windowY": 0
+    },
+    {
+      "id": "dashboard-color",
+      "fixture": "dashboard.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#94a3b8",
+        "newColor": "#961e5a"
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 897,
+        "y1": 608,
+        "x2": 946,
+        "y2": 618
+      },
+      "targetBox": {
+        "x1": 876.40625,
+        "y1": 591.390625,
+        "x2": 1095.453125,
+        "y2": 635.078125
+      },
+      "windowY": 34
+    },
+    {
+      "id": "dashboard-color-2",
+      "fixture": "dashboard.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#f8fafc",
+        "newColor": "#512591"
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 715,
+        "y1": 652,
+        "x2": 770,
+        "y2": 666
+      },
+      "targetBox": {
+        "x1": 694.875,
+        "y1": 635.078125,
+        "x2": 876.40625,
+        "y2": 683.265625
+      },
+      "windowY": 34
+    },
+    {
+      "id": "dashboard-offset",
+      "fixture": "dashboard.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": -2,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 282,
+        "y1": 608,
+        "x2": 343,
+        "y2": 618
+      },
+      "targetBox": {
+        "x1": 264,
+        "y1": 591.390625,
+        "x2": 448.34375,
+        "y2": 635.078125
+      },
+      "windowY": 34
+    },
+    {
+      "id": "dashboard-offset-2",
+      "fixture": "dashboard.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 3,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 29,
+        "y1": 330,
+        "x2": 110,
+        "y2": 346
+      },
+      "targetBox": {
+        "x1": 16,
+        "y1": 316.953125,
+        "x2": 223,
+        "y2": 355.34375
+      },
+      "windowY": 0
+    },
+    {
+      "id": "dashboard-none",
+      "fixture": "dashboard.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/dashboard-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/dashboard-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "ecommerce-catalog-text",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "4.7 stars",
+        "newText": "4.2 stars",
+        "oldToken": "4.7",
+        "newToken": "4.2"
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 866,
+        "y1": 445,
+        "x2": 885,
+        "y2": 455
+      },
+      "targetBox": {
+        "x1": 866.21875,
+        "y1": 440.765625,
+        "x2": 919,
+        "y2": 460.265625
+      },
+      "windowY": 493
+    },
+    {
+      "id": "ecommerce-catalog-text-2",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "$40 to $220",
+        "newText": "$40 to $270",
+        "oldToken": "$220",
+        "newToken": "$270"
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 137,
+        "y1": 270,
+        "x2": 1206,
+        "y2": 381
+      },
+      "targetBox": {
+        "x1": 206.421875,
+        "y1": 364.5,
+        "x2": 283,
+        "y2": 384
+      },
+      "windowY": 0
+    },
+    {
+      "id": "ecommerce-catalog-color",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#ffffff",
+        "newColor": "#1f6b9b"
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 559,
+        "y1": 443,
+        "x2": 666,
+        "y2": 456
+      },
+      "targetBox": {
+        "x1": 539.53125,
+        "y1": 423.515625,
+        "x2": 684.703125,
+        "y2": 473.515625
+      },
+      "windowY": 7
+    },
+    {
+      "id": "ecommerce-catalog-color-2",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#64748b",
+        "newColor": "#7f38f3"
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 469,
+        "y1": 41,
+        "x2": 1206,
+        "y2": 859
+      },
+      "targetBox": {
+        "x1": 468.65625,
+        "y1": 844.265625,
+        "x2": 603,
+        "y2": 863.765625
+      },
+      "windowY": 229
+    },
+    {
+      "id": "ecommerce-catalog-offset",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": -6
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 665,
+        "y1": 780,
+        "x2": 891,
+        "y2": 821
+      },
+      "targetBox": {
+        "x1": 664.328125,
+        "y1": 781.015625,
+        "x2": 919.65625,
+        "y2": 823.015625
+      },
+      "windowY": 504
+    },
+    {
+      "id": "ecommerce-catalog-offset-2",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 2,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 45,
+        "y1": 442,
+        "x2": 173,
+        "y2": 458
+      },
+      "targetBox": {
+        "x1": 45,
+        "y1": 438,
+        "x2": 171.375,
+        "y2": 460.5
+      },
+      "windowY": 107
+    },
+    {
+      "id": "ecommerce-catalog-none",
+      "fixture": "ecommerce-catalog.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/ecommerce-catalog-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/ecommerce-catalog-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "form-app-text",
+      "fixture": "form-app.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "6+ years of experience",
+        "newText": "1+ years of experience",
+        "oldToken": "6+",
+        "newToken": "1+"
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 348,
+        "y1": 443,
+        "x2": 479,
+        "y2": 456
+      },
+      "targetBox": {
+        "x1": 348,
+        "y1": 439.5,
+        "x2": 479.53125,
+        "y2": 457.5
+      },
+      "windowY": 729
+    },
+    {
+      "id": "form-app-text-2",
+      "fixture": "form-app.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "6+ years of experience",
+        "newText": "1+ years of experience",
+        "oldToken": "6+",
+        "newToken": "1+"
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 348,
+        "y1": 443,
+        "x2": 479,
+        "y2": 456
+      },
+      "targetBox": {
+        "x1": 348,
+        "y1": 439.5,
+        "x2": 479.53125,
+        "y2": 457.5
+      },
+      "windowY": 729
+    },
+    {
+      "id": "form-app-color",
+      "fixture": "form-app.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#ffffff",
+        "newColor": "#20aed1"
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 715,
+        "y1": 443,
+        "x2": 807,
+        "y2": 457
+      },
+      "targetBox": {
+        "x1": 695.21875,
+        "y1": 429.5,
+        "x2": 827.0625,
+        "y2": 467.5
+      },
+      "windowY": 879
+    },
+    {
+      "id": "form-app-color-2",
+      "fixture": "form-app.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#6b7280",
+        "newColor": "#6ab516"
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 348,
+        "y1": 443,
+        "x2": 479,
+        "y2": 456
+      },
+      "targetBox": {
+        "x1": 348,
+        "y1": 439.5,
+        "x2": 479.53125,
+        "y2": 457.5
+      },
+      "windowY": 729
+    },
+    {
+      "id": "form-app-offset",
+      "fixture": "form-app.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": -1
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 348,
+        "y1": 443,
+        "x2": 479,
+        "y2": 457
+      },
+      "targetBox": {
+        "x1": 348,
+        "y1": 440.5,
+        "x2": 479.53125,
+        "y2": 458.5
+      },
+      "windowY": 728
+    },
+    {
+      "id": "form-app-offset-2",
+      "fixture": "form-app.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": -5,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 343,
+        "y1": 444,
+        "x2": 390,
+        "y2": 456
+      },
+      "targetBox": {
+        "x1": 348,
+        "y1": 438.5,
+        "x2": 484.15625,
+        "y2": 459.5
+      },
+      "windowY": 601
+    },
+    {
+      "id": "form-app-none",
+      "fixture": "form-app.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/form-app-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/form-app-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-text",
+      "fixture": "grid-complex.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "↑ 23%",
+        "newText": "↑ 73%",
+        "oldToken": "23%",
+        "newToken": "73%"
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 315,
+        "y1": 155,
+        "x2": 340,
+        "y2": 165
+      },
+      "targetBox": {
+        "x1": 301,
+        "y1": 151,
+        "x2": 498,
+        "y2": 169
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-text-2",
+      "fixture": "grid-complex.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "app-server-01",
+        "newText": "app-server-51",
+        "oldToken": "app-server-01",
+        "newToken": "app-server-51"
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 375,
+        "y1": 316,
+        "x2": 388,
+        "y2": 327
+      },
+      "targetBox": {
+        "x1": 285,
+        "y1": 299,
+        "x2": 485,
+        "y2": 344
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-color",
+      "fixture": "grid-complex.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#38bdf8",
+        "newColor": "#d2477b"
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 1029,
+        "y1": 16,
+        "x2": 1115,
+        "y2": 240
+      },
+      "targetBox": {
+        "x1": 1079.609375,
+        "y1": 223,
+        "x2": 1118.953125,
+        "y2": 249
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-color-2",
+      "fixture": "grid-complex.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#94a3b8",
+        "newColor": "#1d9ed2"
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 24,
+        "y1": 236,
+        "x2": 78,
+        "y2": 244
+      },
+      "targetBox": {
+        "x1": 16,
+        "y1": 231.5,
+        "x2": 243,
+        "y2": 248
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-offset",
+      "fixture": "grid-complex.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": 4
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 303,
+        "y1": 119,
+        "x2": 386,
+        "y2": 145
+      },
+      "targetBox": {
+        "x1": 301,
+        "y1": 111,
+        "x2": 498,
+        "y2": 147
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-offset-2",
+      "fixture": "grid-complex.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": -6,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 19,
+        "y1": 378,
+        "x2": 105,
+        "y2": 394
+      },
+      "targetBox": {
+        "x1": 16,
+        "y1": 367,
+        "x2": 243,
+        "y2": 404
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-none",
+      "fixture": "grid-complex.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/grid-complex-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/grid-complex-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "landing-product-color",
+      "fixture": "landing-product.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#2563eb",
+        "newColor": "#3bbf2e"
+      },
+      "baselinePath": "test-results/jev-regions/diff/landing-product-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/landing-product-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 883,
+        "y1": 445,
+        "x2": 916,
+        "y2": 455
+      },
+      "targetBox": {
+        "x1": 872.328125,
+        "y1": 434.1875,
+        "x2": 926.734375,
+        "y2": 466.78125
+      },
+      "windowY": 964
+    },
+    {
+      "id": "landing-product-color-2",
+      "fixture": "landing-product.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#eff6ff",
+        "newColor": "#83ef27"
+      },
+      "baselinePath": "test-results/jev-regions/diff/landing-product-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/landing-product-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 787,
+        "y1": 443,
+        "x2": 828,
+        "y2": 456
+      },
+      "targetBox": {
+        "x1": 786.640625,
+        "y1": 440.203125,
+        "x2": 828.65625,
+        "y2": 456.203125
+      },
+      "windowY": 60
+    },
+    {
+      "id": "landing-product-offset",
+      "fixture": "landing-product.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": -5,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/landing-product-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/landing-product-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 74,
+        "y1": 63,
+        "x2": 193,
+        "y2": 80
+      },
+      "targetBox": {
+        "x1": 78,
+        "y1": 54.34375,
+        "x2": 193.046875,
+        "y2": 88.4375
+      },
+      "windowY": 0
+    },
+    {
+      "id": "landing-product-none",
+      "fixture": "landing-product.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/landing-product-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/landing-product-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "page-text",
+      "fixture": "page.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "5",
+        "newText": "0",
+        "oldToken": "5",
+        "newToken": "0"
+      },
+      "baselinePath": "test-results/jev-regions/diff/page-text/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/page-text/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 185,
+        "y1": 161,
+        "x2": 681,
+        "y2": 176
+      },
+      "targetBox": {
+        "x1": 179.171875,
+        "y1": 161,
+        "x2": 198.46875,
+        "y2": 176
+      },
+      "windowY": 0
+    },
+    {
+      "id": "page-text-2",
+      "fixture": "page.html",
+      "kind": "text",
+      "expected": {
+        "kind": "text",
+        "oldText": "5",
+        "newText": "0",
+        "oldToken": "5",
+        "newToken": "0"
+      },
+      "baselinePath": "test-results/jev-regions/diff/page-text-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/page-text-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 185,
+        "y1": 161,
+        "x2": 681,
+        "y2": 176
+      },
+      "targetBox": {
+        "x1": 179.171875,
+        "y1": 161,
+        "x2": 198.46875,
+        "y2": 176
+      },
+      "windowY": 0
+    },
+    {
+      "id": "page-color",
+      "fixture": "page.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#1f2328",
+        "newColor": "#bb7415"
+      },
+      "baselinePath": "test-results/jev-regions/diff/page-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/page-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 64,
+        "y1": 498,
+        "x2": 335,
+        "y2": 515
+      },
+      "targetBox": {
+        "x1": 81,
+        "y1": 493,
+        "x2": 903,
+        "y2": 517
+      },
+      "windowY": 347
+    },
+    {
+      "id": "page-color-2",
+      "fixture": "page.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#1f2328",
+        "newColor": "#09b091"
+      },
+      "baselinePath": "test-results/jev-regions/diff/page-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/page-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 961,
+        "y1": 348,
+        "x2": 1021,
+        "y2": 360
+      },
+      "targetBox": {
+        "x1": 960,
+        "y1": 343,
+        "x2": 1256,
+        "y2": 364
+      },
+      "windowY": 0
+    },
+    {
+      "id": "page-offset",
+      "fixture": "page.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 4,
+        "dy": 0
+      },
+      "baselinePath": "test-results/jev-regions/diff/page-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/page-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 960,
+        "y1": 348,
+        "x2": 1066,
+        "y2": 399
+      },
+      "targetBox": {
+        "x1": 960,
+        "y1": 343,
+        "x2": 1256,
+        "y2": 399
+      },
+      "windowY": 0
+    },
+    {
+      "id": "page-none",
+      "fixture": "page.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/page-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/page-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "stacking-context-color",
+      "fixture": "stacking-context.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#64748b",
+        "newColor": "#bf971d"
+      },
+      "baselinePath": "test-results/jev-regions/diff/stacking-context-color/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/stacking-context-color/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 602,
+        "y1": 436,
+        "x2": 744,
+        "y2": 450
+      },
+      "targetBox": {
+        "x1": 601.953125,
+        "y1": 432.609375,
+        "x2": 744.828125,
+        "y2": 449.609375
+      },
+      "windowY": 0
+    },
+    {
+      "id": "stacking-context-color-2",
+      "fixture": "stacking-context.html",
+      "kind": "color",
+      "expected": {
+        "kind": "color",
+        "oldColor": "#374151",
+        "newColor": "#59b431"
+      },
+      "baselinePath": "test-results/jev-regions/diff/stacking-context-color-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/stacking-context-color-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 707,
+        "y1": 527,
+        "x2": 749,
+        "y2": 539
+      },
+      "targetBox": {
+        "x1": 689.390625,
+        "y1": 516.390625,
+        "x2": 766.984375,
+        "y2": 550.390625
+      },
+      "windowY": 0
+    },
+    {
+      "id": "stacking-context-offset",
+      "fixture": "stacking-context.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": 2
+      },
+      "baselinePath": "test-results/jev-regions/diff/stacking-context-offset/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/stacking-context-offset/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 775,
+        "y1": 516,
+        "x2": 856,
+        "y2": 552
+      },
+      "targetBox": {
+        "x1": 774.984375,
+        "y1": 516.390625,
+        "x2": 856,
+        "y2": 550.390625
+      },
+      "windowY": 0
+    },
+    {
+      "id": "stacking-context-offset-2",
+      "fixture": "stacking-context.html",
+      "kind": "offset",
+      "expected": {
+        "kind": "offset",
+        "dx": 0,
+        "dy": -2
+      },
+      "baselinePath": "test-results/jev-regions/diff/stacking-context-offset-2/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/stacking-context-offset-2/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": {
+        "x1": 689,
+        "y1": 514,
+        "x2": 767,
+        "y2": 550
+      },
+      "targetBox": {
+        "x1": 689.390625,
+        "y1": 516.390625,
+        "x2": 766.984375,
+        "y2": 550.390625
+      },
+      "windowY": 0
+    },
+    {
+      "id": "stacking-context-none",
+      "fixture": "stacking-context.html",
+      "kind": "none",
+      "expected": {
+        "kind": "none"
+      },
+      "baselinePath": "test-results/jev-regions/diff/stacking-context-none/baseline.png",
+      "currentPath": "test-results/jev-regions/diff/stacking-context-none/current.png",
+      "width": 1280,
+      "height": 900,
+      "diffBox": null,
+      "targetBox": null,
+      "windowY": 0
+    },
+    {
+      "id": "admin-panel-presence",
+      "fixture": "admin-panel",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/admin-panel-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/admin-panel-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 789.015625,
+        "y1": 84,
+        "x2": 909.765625,
+        "y2": 134
+      },
+      "targetBox": {
+        "x1": 789.015625,
+        "y1": 84,
+        "x2": 909.765625,
+        "y2": 134
+      },
+      "windowY": 0
+    },
+    {
+      "id": "admin-panel-presence-2",
+      "fixture": "admin-panel",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/admin-panel-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/admin-panel-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 917,
+        "y1": 345,
+        "x2": 1148.640625,
+        "y2": 372
+      },
+      "targetBox": {
+        "x1": 917,
+        "y1": 345,
+        "x2": 1148.640625,
+        "y2": 372
+      },
+      "windowY": 0
+    },
+    {
+      "id": "blog-magazine-presence",
+      "fixture": "blog-magazine",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/blog-magazine-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/blog-magazine-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 874.453125,
+        "y1": 54.171875,
+        "x2": 946.015625,
+        "y2": 100.5625
+      },
+      "targetBox": {
+        "x1": 874.453125,
+        "y1": 54.171875,
+        "x2": 946.015625,
+        "y2": 100.5625
+      },
+      "windowY": 0
+    },
+    {
+      "id": "blog-magazine-presence-2",
+      "fixture": "blog-magazine",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/blog-magazine-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/blog-magazine-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 939,
+        "y1": 202.75,
+        "x2": 1213,
+        "y2": 232.4375
+      },
+      "targetBox": {
+        "x1": 939,
+        "y1": 202.75,
+        "x2": 1213,
+        "y2": 232.4375
+      },
+      "windowY": 0
+    },
+    {
+      "id": "dashboard-presence",
+      "fixture": "dashboard",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/dashboard-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/dashboard-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 284,
+        "y1": 579.59375,
+        "x2": 394.828125,
+        "y2": 605.1875
+      },
+      "targetBox": {
+        "x1": 284,
+        "y1": 579.59375,
+        "x2": 394.828125,
+        "y2": 605.1875
+      },
+      "windowY": 0
+    },
+    {
+      "id": "dashboard-presence-2",
+      "fixture": "dashboard",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/dashboard-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/dashboard-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 16,
+        "y1": 359.34375,
+        "x2": 223,
+        "y2": 397.734375
+      },
+      "targetBox": {
+        "x1": 16,
+        "y1": 359.34375,
+        "x2": 223,
+        "y2": 397.734375
+      },
+      "windowY": 0
+    },
+    {
+      "id": "ecommerce-catalog-presence",
+      "fixture": "ecommerce-catalog",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/ecommerce-catalog-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/ecommerce-catalog-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 819.21875,
+        "y1": 61.5,
+        "x2": 941.53125,
+        "y2": 105.5
+      },
+      "targetBox": {
+        "x1": 819.21875,
+        "y1": 61.5,
+        "x2": 941.53125,
+        "y2": 105.5
+      },
+      "windowY": 0
+    },
+    {
+      "id": "ecommerce-catalog-presence-2",
+      "fixture": "ecommerce-catalog",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/ecommerce-catalog-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/ecommerce-catalog-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 45,
+        "y1": 256.5,
+        "x2": 160.109375,
+        "y2": 298.5
+      },
+      "targetBox": {
+        "x1": 45,
+        "y1": 256.5,
+        "x2": 160.109375,
+        "y2": 298.5
+      },
+      "windowY": 0
+    },
+    {
+      "id": "form-app-presence",
+      "fixture": "form-app",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/form-app-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/form-app-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 320,
+        "y1": 502.5,
+        "x2": 960,
+        "y2": 540.5
+      },
+      "targetBox": {
+        "x1": 320,
+        "y1": 502.5,
+        "x2": 960,
+        "y2": 540.5
+      },
+      "windowY": 0
+    },
+    {
+      "id": "form-app-presence-2",
+      "fixture": "form-app",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/form-app-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/form-app-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 420,
+        "y1": 255.5,
+        "x2": 546.84375,
+        "y2": 293.5
+      },
+      "targetBox": {
+        "x1": 420,
+        "y1": 255.5,
+        "x2": 546.84375,
+        "y2": 293.5
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-presence",
+      "fixture": "grid-complex",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/grid-complex-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/grid-complex-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 16,
+        "y1": 330,
+        "x2": 243,
+        "y2": 367
+      },
+      "targetBox": {
+        "x1": 16,
+        "y1": 330,
+        "x2": 243,
+        "y2": 367
+      },
+      "windowY": 0
+    },
+    {
+      "id": "grid-complex-presence-2",
+      "fixture": "grid-complex",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/grid-complex-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/grid-complex-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 1016,
+        "y1": 9,
+        "x2": 1256,
+        "y2": 38
+      },
+      "targetBox": {
+        "x1": 1016,
+        "y1": 9,
+        "x2": 1256,
+        "y2": 38
+      },
+      "windowY": 0
+    },
+    {
+      "id": "landing-product-presence",
+      "fixture": "landing-product",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/landing-product-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/landing-product-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 241.984375,
+        "y1": 522.734375,
+        "x2": 374.84375,
+        "y2": 577.53125
+      },
+      "targetBox": {
+        "x1": 241.984375,
+        "y1": 522.734375,
+        "x2": 374.84375,
+        "y2": 577.53125
+      },
+      "windowY": 0
+    },
+    {
+      "id": "landing-product-presence-2",
+      "fixture": "landing-product",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/landing-product-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/landing-product-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 86,
+        "y1": 522.734375,
+        "x2": 229.984375,
+        "y2": 577.53125
+      },
+      "targetBox": {
+        "x1": 86,
+        "y1": 522.734375,
+        "x2": 229.984375,
+        "y2": 577.53125
+      },
+      "windowY": 0
+    },
+    {
+      "id": "page-presence",
+      "fixture": "page",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/page-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/page-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 314,
+        "y1": 379,
+        "x2": 486.421875,
+        "y2": 396
+      },
+      "targetBox": {
+        "x1": 314,
+        "y1": 379,
+        "x2": 486.421875,
+        "y2": 396
+      },
+      "windowY": 0
+    },
+    {
+      "id": "page-presence-2",
+      "fixture": "page",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/page-presence-2/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/page-presence-2/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 24,
+        "y1": 149,
+        "x2": 112.859375,
+        "y2": 188
+      },
+      "targetBox": {
+        "x1": 24,
+        "y1": 149,
+        "x2": 112.859375,
+        "y2": 188
+      },
+      "windowY": 0
+    },
+    {
+      "id": "stacking-context-presence",
+      "fixture": "stacking-context",
+      "kind": "presence",
+      "expected": {
+        "kind": "presence"
+      },
+      "baselinePath": "test-results/jev-regions/presence/stacking-context-presence/baseline.png",
+      "currentPath": "test-results/jev-regions/presence/stacking-context-presence/current.png",
+      "width": 1280,
+      "height": 800,
+      "diffBox": {
+        "x1": 689.390625,
+        "y1": 466.390625,
+        "x2": 766.984375,
+        "y2": 500.390625
+      },
+      "targetBox": {
+        "x1": 689.390625,
+        "y1": 466.390625,
+        "x2": 766.984375,
+        "y2": 500.390625
+      },
+      "windowY": 0
+    }
+  ],
+  "regions": [
+    {
+      "caseId": "admin-panel-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 320,
+            "y": 256,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 593,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 149,
+                "g": 212,
+                "b": 191,
+                "hex": "#95d4bf"
+              },
+              "current": {
+                "r": 153,
+                "g": 214,
+                "b": 194,
+                "hex": "#99d6c2"
+              },
+              "distance": 5,
+              "peak": {
+                "baseline": {
+                  "r": 15,
+                  "g": 159,
+                  "b": 110,
+                  "hex": "#0f9f6e"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 296
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 32,
+            "y": 96,
+            "width": 192,
+            "height": 64,
+            "diffPixelCount": 161,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 92,
+                "g": 97,
+                "b": 107,
+                "hex": "#5c616b"
+              },
+              "current": {
+                "r": 91,
+                "g": 96,
+                "b": 107,
+                "hex": "#5b606b"
+              },
+              "distance": 1,
+              "peak": {
+                "baseline": {
+                  "r": 31,
+                  "g": 37,
+                  "b": 51,
+                  "hex": "#1f2533"
+                },
+                "current": {
+                  "r": 165,
+                  "g": 168,
+                  "b": 175,
+                  "hex": "#a5a8af"
+                },
+                "distance": 225
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 896,
+            "y": 352,
+            "width": 256,
+            "height": 64,
+            "diffPixelCount": 374,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 172,
+                "g": 181,
+                "b": 193,
+                "hex": "#acb5c1"
+              },
+              "current": {
+                "r": 214,
+                "g": 238,
+                "b": 158,
+                "hex": "#d6ee9e"
+              },
+              "distance": 79,
+              "peak": {
+                "baseline": {
+                  "r": 100,
+                  "g": 116,
+                  "b": 139,
+                  "hex": "#64748b"
+                },
+                "current": {
+                  "r": 182,
+                  "g": 224,
+                  "b": 82,
+                  "hex": "#b6e052"
+                },
+                "distance": 147
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 1,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 896,
+            "y": 672,
+            "width": 192,
+            "height": 64,
+            "diffPixelCount": 428,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 107,
+                "g": 113,
+                "b": 125,
+                "hex": "#6b717d"
+              },
+              "current": {
+                "r": 202,
+                "g": 115,
+                "b": 117,
+                "hex": "#ca7375"
+              },
+              "distance": 95,
+              "peak": {
+                "baseline": {
+                  "r": 22,
+                  "g": 32,
+                  "b": 51,
+                  "hex": "#162033"
+                },
+                "current": {
+                  "r": 173,
+                  "g": 39,
+                  "b": 42,
+                  "hex": "#ad272a"
+                },
+                "distance": 151
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.99,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 544,
+            "y": 256,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 531,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 142,
+                "g": 210,
+                "b": 187,
+                "hex": "#8ed2bb"
+              },
+              "current": {
+                "r": 142,
+                "g": 210,
+                "b": 187,
+                "hex": "#8ed2bb"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 15,
+                  "g": 159,
+                  "b": 110,
+                  "hex": "#0f9f6e"
+                },
+                "distance": 296
+              }
+            },
+            "shift": {
+              "dx": -2,
+              "dy": 0,
+              "confidence": 0.963
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.35,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.06,
+                "color": 0.38,
+                "position": 0.51,
+                "presence": 0.05
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 896,
+            "y": 768,
+            "width": 256,
+            "height": 96,
+            "diffPixelCount": 1418,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 190,
+                "g": 195,
+                "b": 202,
+                "hex": "#bec3ca"
+              },
+              "current": {
+                "r": 190,
+                "g": 195,
+                "b": 202,
+                "hex": "#bec3ca"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 22,
+                  "g": 32,
+                  "b": 51,
+                  "hex": "#162033"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 382
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.61,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.03,
+                "color": 0.24,
+                "position": 0.71,
+                "presence": 0.02
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "blog-magazine-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 928,
+            "y": 672,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 10,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 211,
+                "g": 212,
+                "b": 217,
+                "hex": "#d3d4d9"
+              },
+              "current": {
+                "r": 198,
+                "g": 200,
+                "b": 206,
+                "hex": "#c6c8ce"
+              },
+              "distance": 21,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "distance": 241
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 64,
+            "y": 768,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 4,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 189,
+                "g": 193,
+                "b": 199,
+                "hex": "#bdc1c7"
+              },
+              "current": {
+                "r": 208,
+                "g": 210,
+                "b": 215,
+                "hex": "#d0d2d7"
+              },
+              "distance": 30,
+              "peak": {
+                "baseline": {
+                  "r": 115,
+                  "g": 121,
+                  "b": 135,
+                  "hex": "#737987"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 228
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 992,
+            "y": 256,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 97,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 179,
+                "g": 183,
+                "b": 190,
+                "hex": "#b3b7be"
+              },
+              "current": {
+                "r": 184,
+                "g": 206,
+                "b": 133,
+                "hex": "#b8ce85"
+              },
+              "distance": 62,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 117,
+                  "g": 161,
+                  "b": 19,
+                  "hex": "#75a113"
+                },
+                "distance": 119
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.99,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 128,
+            "y": 416,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 88,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 185,
+                "g": 189,
+                "b": 195,
+                "hex": "#b9bdc3"
+              },
+              "current": {
+                "r": 234,
+                "g": 214,
+                "b": 139,
+                "hex": "#ead68b"
+              },
+              "distance": 78,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 212,
+                  "g": 169,
+                  "b": 14,
+                  "hex": "#d4a90e"
+                },
+                "distance": 164
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.99,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 32,
+            "y": 416,
+            "width": 256,
+            "height": 64,
+            "diffPixelCount": 1084,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 160,
+                "g": 163,
+                "b": 167,
+                "hex": "#a0a3a7"
+              },
+              "current": {
+                "r": 160,
+                "g": 163,
+                "b": 167,
+                "hex": "#a0a3a7"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 31,
+                  "g": 41,
+                  "b": 55,
+                  "hex": "#1f2937"
+                },
+                "current": {
+                  "r": 252,
+                  "g": 250,
+                  "b": 248,
+                  "hex": "#fcfaf8"
+                },
+                "distance": 360
+              }
+            },
+            "shift": {
+              "dx": 0,
+              "dy": -2,
+              "confidence": 0.971
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.41,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.08,
+                "color": 0.56,
+                "position": 0.35,
+                "presence": 0.01
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 480,
+            "y": 576,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 105,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 227,
+                "g": 224,
+                "b": 219,
+                "hex": "#e3e0db"
+              },
+              "current": {
+                "r": 231,
+                "g": 229,
+                "b": 227,
+                "hex": "#e7e5e3"
+              },
+              "distance": 10,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 244,
+                  "g": 239,
+                  "b": 230,
+                  "hex": "#f4efe6"
+                },
+                "distance": 212
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.31,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.02,
+                "color": 0.46,
+                "position": 0.48,
+                "presence": 0.04
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "dashboard-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 288,
+            "y": 160,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 48,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 31,
+                "g": 113,
+                "b": 75,
+                "hex": "#1f714b"
+              },
+              "current": {
+                "r": 31,
+                "g": 114,
+                "b": 75,
+                "hex": "#1f724b"
+              },
+              "distance": 1,
+              "peak": {
+                "baseline": {
+                  "r": 34,
+                  "g": 197,
+                  "b": 94,
+                  "hex": "#22c55e"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 160
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 288,
+            "y": 160,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 518,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 31,
+                "g": 93,
+                "b": 70,
+                "hex": "#1f5d46"
+              },
+              "current": {
+                "r": 31,
+                "g": 92,
+                "b": 70,
+                "hex": "#1f5c46"
+              },
+              "distance": 1,
+              "peak": {
+                "baseline": {
+                  "r": 34,
+                  "g": 197,
+                  "b": 94,
+                  "hex": "#22c55e"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 160
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 896,
+            "y": 608,
+            "width": 64,
+            "height": 32,
+            "diffPixelCount": 121,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 106,
+                "g": 120,
+                "b": 140,
+                "hex": "#6a788c"
+              },
+              "current": {
+                "r": 106,
+                "g": 33,
+                "b": 78,
+                "hex": "#6a214e"
+              },
+              "distance": 107,
+              "peak": {
+                "baseline": {
+                  "r": 147,
+                  "g": 162,
+                  "b": 183,
+                  "hex": "#93a2b7"
+                },
+                "current": {
+                  "r": 149,
+                  "g": 29,
+                  "b": 89,
+                  "hex": "#951d59"
+                },
+                "distance": 163
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.98,
+                "position": 0.02,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 704,
+            "y": 640,
+            "width": 64,
+            "height": 32,
+            "diffPixelCount": 110,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 146,
+                "g": 152,
+                "b": 162,
+                "hex": "#9298a2"
+              },
+              "current": {
+                "r": 55,
+                "g": 38,
+                "b": 102,
+                "hex": "#372666"
+              },
+              "distance": 158,
+              "peak": {
+                "baseline": {
+                  "r": 248,
+                  "g": 250,
+                  "b": 252,
+                  "hex": "#f8fafc"
+                },
+                "current": {
+                  "r": 81,
+                  "g": 37,
+                  "b": 145,
+                  "hex": "#512591"
+                },
+                "distance": 291
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.99,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 256,
+            "y": 608,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 259,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 85,
+                "g": 98,
+                "b": 118,
+                "hex": "#556276"
+              },
+              "current": {
+                "r": 85,
+                "g": 98,
+                "b": 118,
+                "hex": "#556276"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 148,
+                  "g": 163,
+                  "b": 184,
+                  "hex": "#94a3b8"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 211
+              }
+            },
+            "shift": {
+              "dx": -2,
+              "dy": 0,
+              "confidence": 0.946
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.41,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.03,
+                "color": 0.36,
+                "position": 0.56,
+                "presence": 0.05
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 0,
+            "y": 320,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 286,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 72,
+                "g": 89,
+                "b": 108,
+                "hex": "#48596c"
+              },
+              "current": {
+                "r": 72,
+                "g": 89,
+                "b": 108,
+                "hex": "#48596c"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 148,
+                  "g": 163,
+                  "b": 184,
+                  "hex": "#94a3b8"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 211
+              }
+            },
+            "shift": {
+              "dx": 3,
+              "dy": 0,
+              "confidence": 1
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.83,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0.11,
+                "position": 0.87,
+                "presence": 0.01
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "ecommerce-catalog-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 864,
+            "y": 448,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 24,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 251,
+                "g": 219,
+                "b": 164,
+                "hex": "#fbdba4"
+              },
+              "current": {
+                "r": 250,
+                "g": 211,
+                "b": 144,
+                "hex": "#fad390"
+              },
+              "distance": 22,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 245,
+                  "g": 158,
+                  "b": 11,
+                  "hex": "#f59e0b"
+                },
+                "distance": 263
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 128,
+            "y": 352,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 6,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 219,
+                "g": 234,
+                "b": 254,
+                "hex": "#dbeafe"
+              },
+              "current": {
+                "r": 37,
+                "g": 99,
+                "b": 235,
+                "hex": "#2563eb"
+              },
+              "distance": 227
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 0.96,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.97,
+                "color": 0.01,
+                "position": 0.02,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 192,
+            "y": 352,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 109,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 191,
+                "g": 198,
+                "b": 208,
+                "hex": "#bfc6d0"
+              },
+              "current": {
+                "r": 192,
+                "g": 199,
+                "b": 209,
+                "hex": "#c0c7d1"
+              },
+              "distance": 2,
+              "peak": {
+                "baseline": {
+                  "r": 100,
+                  "g": 116,
+                  "b": 139,
+                  "hex": "#64748b"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 238
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 544,
+            "y": 416,
+            "width": 128,
+            "height": 64,
+            "diffPixelCount": 492,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 173,
+                "g": 183,
+                "b": 208,
+                "hex": "#adb7d0"
+              },
+              "current": {
+                "r": 38,
+                "g": 92,
+                "b": 147,
+                "hex": "#265c93"
+              },
+              "distance": 174,
+              "peak": {
+                "baseline": {
+                  "r": 254,
+                  "g": 254,
+                  "b": 255,
+                  "hex": "#fefeff"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 106,
+                  "b": 155,
+                  "hex": "#1e6a9b"
+                },
+                "distance": 286
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 1,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 448,
+            "y": 832,
+            "width": 160,
+            "height": 32,
+            "diffPixelCount": 182,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 173,
+                "g": 182,
+                "b": 194,
+                "hex": "#adb6c2"
+              },
+              "current": {
+                "r": 188,
+                "g": 151,
+                "b": 249,
+                "hex": "#bc97f9"
+              },
+              "distance": 65,
+              "peak": {
+                "baseline": {
+                  "r": 100,
+                  "g": 116,
+                  "b": 139,
+                  "hex": "#64748b"
+                },
+                "current": {
+                  "r": 127,
+                  "g": 56,
+                  "b": 243,
+                  "hex": "#7f38f3"
+                },
+                "distance": 123
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.91,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.93,
+                "position": 0.07,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 640,
+            "y": 768,
+            "width": 256,
+            "height": 64,
+            "diffPixelCount": 1486,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 208,
+                "g": 213,
+                "b": 220,
+                "hex": "#d0d5dc"
+              },
+              "current": {
+                "r": 208,
+                "g": 213,
+                "b": 220,
+                "hex": "#d0d5dc"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 100,
+                  "g": 116,
+                  "b": 139,
+                  "hex": "#64748b"
+                },
+                "distance": 238
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.36,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.07,
+                "color": 0.52,
+                "position": 0.38,
+                "presence": 0.03
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 32,
+            "y": 416,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 688,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 152,
+                "g": 156,
+                "b": 164,
+                "hex": "#989ca4"
+              },
+              "current": {
+                "r": 152,
+                "g": 156,
+                "b": 164,
+                "hex": "#989ca4"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 23,
+                  "g": 32,
+                  "b": 51,
+                  "hex": "#172033"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 381
+              }
+            },
+            "shift": {
+              "dx": 2,
+              "dy": 0,
+              "confidence": 0.987
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.51,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.11,
+                "color": 0.63,
+                "position": 0.25,
+                "presence": 0.01
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "form-app-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 320,
+            "y": 416,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 446,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 203,
+                "g": 205,
+                "b": 210,
+                "hex": "#cbcdd2"
+              },
+              "current": {
+                "r": 205,
+                "g": 207,
+                "b": 212,
+                "hex": "#cdcfd4"
+              },
+              "distance": 3,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 241
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.99,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 320,
+            "y": 416,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 446,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 203,
+                "g": 205,
+                "b": 210,
+                "hex": "#cbcdd2"
+              },
+              "current": {
+                "r": 205,
+                "g": 207,
+                "b": 212,
+                "hex": "#cdcfd4"
+              },
+              "distance": 3,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 241
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.99,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 704,
+            "y": 416,
+            "width": 128,
+            "height": 64,
+            "diffPixelCount": 218,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 152,
+                "g": 182,
+                "b": 246,
+                "hex": "#98b6f6"
+              },
+              "current": {
+                "r": 34,
+                "g": 137,
+                "b": 222,
+                "hex": "#2289de"
+              },
+              "distance": 129,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 32,
+                  "g": 174,
+                  "b": 209,
+                  "hex": "#20aed1"
+                },
+                "distance": 242
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 1,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 352,
+            "y": 416,
+            "width": 128,
+            "height": 64,
+            "diffPixelCount": 160,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 180,
+                "g": 184,
+                "b": 191,
+                "hex": "#b4b8bf"
+              },
+              "current": {
+                "r": 179,
+                "g": 217,
+                "b": 136,
+                "hex": "#b3d988"
+              },
+              "distance": 64,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 106,
+                  "g": 181,
+                  "b": 22,
+                  "hex": "#6ab516"
+                },
+                "distance": 125
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.98,
+                "position": 0.02,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 320,
+            "y": 416,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 291,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 200,
+                "g": 202,
+                "b": 208,
+                "hex": "#c8cad0"
+              },
+              "current": {
+                "r": 200,
+                "g": 202,
+                "b": 208,
+                "hex": "#c8cad0"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 108,
+                  "g": 115,
+                  "b": 129,
+                  "hex": "#6c7381"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 239
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.79,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.03,
+                "color": 0.07,
+                "position": 0.84,
+                "presence": 0.06
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 320,
+            "y": 416,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 152,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 182,
+                "g": 185,
+                "b": 191,
+                "hex": "#b6b9bf"
+              },
+              "current": {
+                "r": 182,
+                "g": 185,
+                "b": 191,
+                "hex": "#b6b9bf"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 55,
+                  "g": 65,
+                  "b": 81,
+                  "hex": "#374151"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 326
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.76,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.04,
+                "color": 0.12,
+                "position": 0.82,
+                "presence": 0.02
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "grid-complex-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 288,
+            "y": 128,
+            "width": 64,
+            "height": 64,
+            "diffPixelCount": 34,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 47,
+                "g": 114,
+                "b": 87,
+                "hex": "#2f7257"
+              },
+              "current": {
+                "r": 46,
+                "g": 110,
+                "b": 85,
+                "hex": "#2e6e55"
+              },
+              "distance": 5,
+              "peak": {
+                "baseline": {
+                  "r": 74,
+                  "g": 222,
+                  "b": 128,
+                  "hex": "#4ade80"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 199
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 352,
+            "y": 288,
+            "width": 32,
+            "height": 64,
+            "diffPixelCount": 19,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 116,
+                "g": 124,
+                "b": 137,
+                "hex": "#747c89"
+              },
+              "current": {
+                "r": 116,
+                "g": 124,
+                "b": 136,
+                "hex": "#747c88"
+              },
+              "distance": 1,
+              "peak": {
+                "baseline": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "current": {
+                  "r": 241,
+                  "g": 245,
+                  "b": 249,
+                  "hex": "#f1f5f9"
+                },
+                "distance": 350
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 1088,
+            "y": 224,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 44,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 44,
+                "g": 128,
+                "b": 172,
+                "hex": "#2c80ac"
+              },
+              "current": {
+                "r": 125,
+                "g": 66,
+                "b": 105,
+                "hex": "#7d4269"
+              },
+              "distance": 122,
+              "peak": {
+                "baseline": {
+                  "r": 55,
+                  "g": 187,
+                  "b": 245,
+                  "hex": "#37bbf5"
+                },
+                "current": {
+                  "r": 206,
+                  "g": 70,
+                  "b": 122,
+                  "hex": "#ce467a"
+                },
+                "distance": 227
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0.99,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 0,
+            "y": 224,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 129,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 104,
+                "g": 118,
+                "b": 138,
+                "hex": "#68768a"
+              },
+              "current": {
+                "r": 29,
+                "g": 114,
+                "b": 153,
+                "hex": "#1d7299"
+              },
+              "distance": 77,
+              "peak": {
+                "baseline": {
+                  "r": 148,
+                  "g": 163,
+                  "b": 184,
+                  "hex": "#94a3b8"
+                },
+                "current": {
+                  "r": 29,
+                  "g": 158,
+                  "b": 210,
+                  "hex": "#1d9ed2"
+                },
+                "distance": 122
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.98,
+                "position": 0.02,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 288,
+            "y": 96,
+            "width": 128,
+            "height": 64,
+            "diffPixelCount": 394,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 123,
+                "g": 131,
+                "b": 143,
+                "hex": "#7b838f"
+              },
+              "current": {
+                "r": 123,
+                "g": 131,
+                "b": 143,
+                "hex": "#7b838f"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 241,
+                  "g": 245,
+                  "b": 249,
+                  "hex": "#f1f5f9"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 350
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.51,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.14,
+                "color": 0.19,
+                "position": 0.63,
+                "presence": 0.04
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 0,
+            "y": 352,
+            "width": 128,
+            "height": 64,
+            "diffPixelCount": 376,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 74,
+                "g": 92,
+                "b": 111,
+                "hex": "#4a5c6f"
+              },
+              "current": {
+                "r": 74,
+                "g": 92,
+                "b": 111,
+                "hex": "#4a5c6f"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 31,
+                  "g": 42,
+                  "b": 61,
+                  "hex": "#1f2a3d"
+                },
+                "current": {
+                  "r": 178,
+                  "g": 221,
+                  "b": 228,
+                  "hex": "#b2dde4"
+                },
+                "distance": 286
+              }
+            },
+            "shift": {
+              "dx": -6,
+              "dy": 0,
+              "confidence": 0.974
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.01,
+                "position": 0.99,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "landing-product-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 864,
+            "y": 416,
+            "width": 64,
+            "height": 64,
+            "diffPixelCount": 86,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 111,
+                "g": 152,
+                "b": 243,
+                "hex": "#6f98f3"
+              },
+              "current": {
+                "r": 124,
+                "g": 209,
+                "b": 124,
+                "hex": "#7cd17c"
+              },
+              "distance": 133,
+              "peak": {
+                "baseline": {
+                  "r": 37,
+                  "g": 99,
+                  "b": 235,
+                  "hex": "#2563eb"
+                },
+                "current": {
+                  "r": 59,
+                  "g": 191,
+                  "b": 46,
+                  "hex": "#3bbf2e"
+                },
+                "distance": 211
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 1,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "landing-product-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 768,
+            "y": 416,
+            "width": 64,
+            "height": 64,
+            "diffPixelCount": 82,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 127,
+                "g": 147,
+                "b": 185,
+                "hex": "#7f93b9"
+              },
+              "current": {
+                "r": 95,
+                "g": 166,
+                "b": 84,
+                "hex": "#5fa654"
+              },
+              "distance": 108,
+              "peak": {
+                "baseline": {
+                  "r": 187,
+                  "g": 201,
+                  "b": 223,
+                  "hex": "#bbc9df"
+                },
+                "current": {
+                  "r": 131,
+                  "g": 239,
+                  "b": 39,
+                  "hex": "#83ef27"
+                },
+                "distance": 196
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.99,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "landing-product-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 64,
+            "y": 32,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 763,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 131,
+                "g": 140,
+                "b": 158,
+                "hex": "#838c9e"
+              },
+              "current": {
+                "r": 131,
+                "g": 140,
+                "b": 158,
+                "hex": "#838c9e"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 15,
+                  "g": 25,
+                  "b": 48,
+                  "hex": "#0f1930"
+                },
+                "current": {
+                  "r": 239,
+                  "g": 246,
+                  "b": 255,
+                  "hex": "#eff6ff"
+                },
+                "distance": 377
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.53,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.06,
+                "color": 0.25,
+                "position": 0.65,
+                "presence": 0.04
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "landing-product-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "page-text",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 160,
+            "y": 160,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 10,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 176,
+                "g": 180,
+                "b": 184,
+                "hex": "#b0b4b8"
+              },
+              "current": {
+                "r": 175,
+                "g": 178,
+                "b": 182,
+                "hex": "#afb2b6"
+              },
+              "distance": 3,
+              "peak": {
+                "baseline": {
+                  "r": 232,
+                  "g": 232,
+                  "b": 232,
+                  "hex": "#e8e8e8"
+                },
+                "current": {
+                  "r": 106,
+                  "g": 113,
+                  "b": 122,
+                  "hex": "#6a717a"
+                },
+                "distance": 205
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 224,
+            "y": 160,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 93,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 183,
+                "g": 187,
+                "b": 191,
+                "hex": "#b7bbbf"
+              },
+              "current": {
+                "r": 183,
+                "g": 187,
+                "b": 191,
+                "hex": "#b7bbbf"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 174,
+                  "g": 179,
+                  "b": 183,
+                  "hex": "#aeb3b7"
+                },
+                "distance": 132
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.99,
+                "color": 0.01,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 352,
+            "y": 160,
+            "width": 160,
+            "height": 32,
+            "diffPixelCount": 95,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 184,
+                "g": 188,
+                "b": 192,
+                "hex": "#b8bcc0"
+              },
+              "current": {
+                "r": 184,
+                "g": 188,
+                "b": 192,
+                "hex": "#b8bcc0"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 150,
+                  "g": 156,
+                  "b": 162,
+                  "hex": "#969ca2"
+                },
+                "current": {
+                  "r": 233,
+                  "g": 234,
+                  "b": 236,
+                  "hex": "#e9eaec"
+                },
+                "distance": 136
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.39,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.02,
+                "color": 0.34,
+                "position": 0.54,
+                "presence": 0.1
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 544,
+            "y": 160,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 122,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 181,
+                "g": 185,
+                "b": 190,
+                "hex": "#b5b9be"
+              },
+              "current": {
+                "r": 181,
+                "g": 185,
+                "b": 189,
+                "hex": "#b5b9bd"
+              },
+              "distance": 1,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 170,
+                  "g": 175,
+                  "b": 179,
+                  "hex": "#aaafb3"
+                },
+                "distance": 139
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.27,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.03,
+                "color": 0.42,
+                "position": 0.45,
+                "presence": 0.1
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-text-2",
+      "kind": "text",
+      "regions": [
+        {
+          "region": {
+            "x": 160,
+            "y": 160,
+            "width": 32,
+            "height": 32,
+            "diffPixelCount": 10,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 176,
+                "g": 180,
+                "b": 184,
+                "hex": "#b0b4b8"
+              },
+              "current": {
+                "r": 175,
+                "g": 178,
+                "b": 182,
+                "hex": "#afb2b6"
+              },
+              "distance": 3,
+              "peak": {
+                "baseline": {
+                  "r": 232,
+                  "g": 232,
+                  "b": 232,
+                  "hex": "#e8e8e8"
+                },
+                "current": {
+                  "r": 106,
+                  "g": 113,
+                  "b": 122,
+                  "hex": "#6a717a"
+                },
+                "distance": 205
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 1,
+                "color": 0,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 224,
+            "y": 160,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 93,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 183,
+                "g": 187,
+                "b": 191,
+                "hex": "#b7bbbf"
+              },
+              "current": {
+                "r": 183,
+                "g": 187,
+                "b": 191,
+                "hex": "#b7bbbf"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 174,
+                  "g": 179,
+                  "b": 183,
+                  "hex": "#aeb3b7"
+                },
+                "distance": 132
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "text",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.99,
+                "color": 0.01,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 352,
+            "y": 160,
+            "width": 160,
+            "height": 32,
+            "diffPixelCount": 95,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 184,
+                "g": 188,
+                "b": 192,
+                "hex": "#b8bcc0"
+              },
+              "current": {
+                "r": 184,
+                "g": 188,
+                "b": 192,
+                "hex": "#b8bcc0"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 150,
+                  "g": 156,
+                  "b": 162,
+                  "hex": "#969ca2"
+                },
+                "current": {
+                  "r": 233,
+                  "g": 234,
+                  "b": 236,
+                  "hex": "#e9eaec"
+                },
+                "distance": 136
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.55,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.02,
+                "color": 0.28,
+                "position": 0.66,
+                "presence": 0.04
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        },
+        {
+          "region": {
+            "x": 544,
+            "y": 160,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 122,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 181,
+                "g": 185,
+                "b": 190,
+                "hex": "#b5b9be"
+              },
+              "current": {
+                "r": 181,
+                "g": 185,
+                "b": 189,
+                "hex": "#b5b9bd"
+              },
+              "distance": 1,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 170,
+                  "g": 175,
+                  "b": 179,
+                  "hex": "#aaafb3"
+                },
+                "distance": 139
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.45,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.02,
+                "color": 0.26,
+                "position": 0.59,
+                "presence": 0.13
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 64,
+            "y": 480,
+            "width": 288,
+            "height": 32,
+            "diffPixelCount": 473,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 124,
+                "g": 127,
+                "b": 131,
+                "hex": "#7c7f83"
+              },
+              "current": {
+                "r": 211,
+                "g": 171,
+                "b": 116,
+                "hex": "#d3ab74"
+              },
+              "distance": 99,
+              "peak": {
+                "baseline": {
+                  "r": 31,
+                  "g": 35,
+                  "b": 40,
+                  "hex": "#1f2328"
+                },
+                "current": {
+                  "r": 187,
+                  "g": 116,
+                  "b": 21,
+                  "hex": "#bb7415"
+                },
+                "distance": 177
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 1,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 960,
+            "y": 320,
+            "width": 64,
+            "height": 64,
+            "diffPixelCount": 218,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 118,
+                "g": 122,
+                "b": 125,
+                "hex": "#767a7d"
+              },
+              "current": {
+                "r": 100,
+                "g": 204,
+                "b": 185,
+                "hex": "#64ccb9"
+              },
+              "distance": 103,
+              "peak": {
+                "baseline": {
+                  "r": 31,
+                  "g": 35,
+                  "b": 40,
+                  "hex": "#1f2328"
+                },
+                "current": {
+                  "r": 9,
+                  "g": 176,
+                  "b": 145,
+                  "hex": "#09b091"
+                },
+                "distance": 177
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.98,
+                "position": 0.02,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 960,
+            "y": 320,
+            "width": 128,
+            "height": 96,
+            "diffPixelCount": 623,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 176,
+                "g": 186,
+                "b": 198,
+                "hex": "#b0bac6"
+              },
+              "current": {
+                "r": 176,
+                "g": 186,
+                "b": 198,
+                "hex": "#b0bac6"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 31,
+                  "g": 35,
+                  "b": 40,
+                  "hex": "#1f2328"
+                },
+                "current": {
+                  "r": 246,
+                  "g": 248,
+                  "b": 250,
+                  "hex": "#f6f8fa"
+                },
+                "distance": 368
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "position",
+              "confidence": 0.93,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.03,
+                "position": 0.95,
+                "presence": 0.02
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "stacking-context-color",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 576,
+            "y": 416,
+            "width": 192,
+            "height": 32,
+            "diffPixelCount": 405,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 154,
+                "g": 165,
+                "b": 180,
+                "hex": "#9aa5b4"
+              },
+              "current": {
+                "r": 213,
+                "g": 187,
+                "b": 108,
+                "hex": "#d5bb6c"
+              },
+              "distance": 96,
+              "peak": {
+                "baseline": {
+                  "r": 100,
+                  "g": 116,
+                  "b": 139,
+                  "hex": "#64748b"
+                },
+                "current": {
+                  "r": 191,
+                  "g": 151,
+                  "b": 29,
+                  "hex": "#bf971d"
+                },
+                "distance": 147
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 1,
+                "position": 0,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "stacking-context-color-2",
+      "kind": "color",
+      "regions": [
+        {
+          "region": {
+            "x": 704,
+            "y": 512,
+            "width": 64,
+            "height": 32,
+            "diffPixelCount": 79,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 151,
+                "g": 156,
+                "b": 164,
+                "hex": "#979ca4"
+              },
+              "current": {
+                "r": 167,
+                "g": 215,
+                "b": 146,
+                "hex": "#a7d792"
+              },
+              "distance": 64,
+              "peak": {
+                "baseline": {
+                  "r": 55,
+                  "g": 65,
+                  "b": 81,
+                  "hex": "#374151"
+                },
+                "current": {
+                  "r": 89,
+                  "g": 180,
+                  "b": 49,
+                  "hex": "#59b431"
+                },
+                "distance": 124
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.99,
+                "position": 0.01,
+                "presence": 0
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "stacking-context-offset",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 768,
+            "y": 512,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 433,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 141,
+                "g": 182,
+                "b": 250,
+                "hex": "#8db6fa"
+              },
+              "current": {
+                "r": 141,
+                "g": 182,
+                "b": 250,
+                "hex": "#8db6fa"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 59,
+                  "g": 130,
+                  "b": 246,
+                  "hex": "#3b82f6"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 233
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.27,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.09,
+                "color": 0.45,
+                "position": 0.43,
+                "presence": 0.03
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "stacking-context-offset-2",
+      "kind": "offset",
+      "regions": [
+        {
+          "region": {
+            "x": 672,
+            "y": 512,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 440,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 215,
+                "g": 218,
+                "b": 221,
+                "hex": "#d7dadd"
+              },
+              "current": {
+                "r": 215,
+                "g": 218,
+                "b": 221,
+                "hex": "#d7dadd"
+              },
+              "distance": 0,
+              "peak": {
+                "baseline": {
+                  "r": 55,
+                  "g": 65,
+                  "b": 81,
+                  "hex": "#374151"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 326
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "color",
+              "confidence": 0.32,
+              "uncertain": true,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0.49,
+                "position": 0.46,
+                "presence": 0.04
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "stacking-context-none",
+      "kind": "none",
+      "regions": []
+    },
+    {
+      "caseId": "admin-panel-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 768,
+            "y": 64,
+            "width": 160,
+            "height": 96,
+            "diffPixelCount": 430,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 242,
+                "g": 243,
+                "b": 244,
+                "hex": "#f2f3f4"
+              },
+              "current": {
+                "r": 247,
+                "g": 250,
+                "b": 254,
+                "hex": "#f7fafe"
+              },
+              "distance": 13,
+              "peak": {
+                "baseline": {
+                  "r": 22,
+                  "g": 32,
+                  "b": 51,
+                  "hex": "#162033"
+                },
+                "current": {
+                  "r": 248,
+                  "g": 251,
+                  "b": 255,
+                  "hex": "#f8fbff"
+                },
+                "distance": 375
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.87,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.1,
+                "presence": 0.9
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "admin-panel-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 896,
+            "y": 352,
+            "width": 192,
+            "height": 32,
+            "diffPixelCount": 622,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "current": {
+                "r": 92,
+                "g": 99,
+                "b": 112,
+                "hex": "#5c6370"
+              },
+              "distance": 267,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 21,
+                  "g": 31,
+                  "b": 50,
+                  "hex": "#151f32"
+                },
+                "distance": 383
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0,
+                "position": 0,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 864,
+            "y": 64,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 203,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 183,
+                "g": 183,
+                "b": 186,
+                "hex": "#b7b7ba"
+              },
+              "current": {
+                "r": 254,
+                "g": 248,
+                "b": 241,
+                "hex": "#fef8f1"
+              },
+              "distance": 111,
+              "peak": {
+                "baseline": {
+                  "r": 107,
+                  "g": 114,
+                  "b": 128,
+                  "hex": "#6b7280"
+                },
+                "current": {
+                  "r": 254,
+                  "g": 249,
+                  "b": 241,
+                  "hex": "#fef9f1"
+                },
+                "distance": 229
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.81,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0,
+                "position": 0.13,
+                "presence": 0.86
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "blog-magazine-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 928,
+            "y": 192,
+            "width": 64,
+            "height": 32,
+            "diffPixelCount": 188,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "current": {
+                "r": 116,
+                "g": 123,
+                "b": 131,
+                "hex": "#747b83"
+              },
+              "distance": 228,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 31,
+                  "g": 41,
+                  "b": 55,
+                  "hex": "#1f2937"
+                },
+                "distance": 369
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0,
+                "position": 0,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 256,
+            "y": 576,
+            "width": 160,
+            "height": 32,
+            "diffPixelCount": 329,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 173,
+                "g": 178,
+                "b": 185,
+                "hex": "#adb2b9"
+              },
+              "current": {
+                "r": 30,
+                "g": 41,
+                "b": 59,
+                "hex": "#1e293b"
+              },
+              "distance": 235,
+              "peak": {
+                "baseline": {
+                  "r": 248,
+                  "g": 250,
+                  "b": 252,
+                  "hex": "#f8fafc"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 358
+              }
+            },
+            "shift": {
+              "dx": 0,
+              "dy": 53,
+              "confidence": 0.737
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "dashboard-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 0,
+            "y": 352,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 268,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 30,
+                "g": 41,
+                "b": 59,
+                "hex": "#1e293b"
+              },
+              "current": {
+                "r": 108,
+                "g": 112,
+                "b": 108,
+                "hex": "#6c706c"
+              },
+              "distance": 116,
+              "peak": {
+                "baseline": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "current": {
+                  "r": 188,
+                  "g": 184,
+                  "b": 127,
+                  "hex": "#bcb87f"
+                },
+                "distance": 224
+              }
+            },
+            "shift": {
+              "dx": 0,
+              "dy": 42,
+              "confidence": 0.943
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.02,
+                "presence": 0.98
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 832,
+            "y": 64,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 195,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 162,
+                "g": 172,
+                "b": 186,
+                "hex": "#a2acba"
+              },
+              "current": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "distance": 142,
+              "peak": {
+                "baseline": {
+                  "r": 100,
+                  "g": 116,
+                  "b": 139,
+                  "hex": "#64748b"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 238
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.75,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0.01,
+                "color": 0,
+                "position": 0.18,
+                "presence": 0.81
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "ecommerce-catalog-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 32,
+            "y": 256,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 303,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "current": {
+                "r": 195,
+                "g": 216,
+                "b": 251,
+                "hex": "#c3d8fb"
+              },
+              "distance": 72
+            },
+            "shift": {
+              "dx": 0,
+              "dy": -52,
+              "confidence": 0.805
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.96,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.02,
+                "position": 0.01,
+                "presence": 0.97
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 320,
+            "y": 480,
+            "width": 640,
+            "height": 64,
+            "diffPixelCount": 1483,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 191,
+                "g": 195,
+                "b": 201,
+                "hex": "#bfc3c9"
+              },
+              "current": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "distance": 103,
+              "peak": {
+                "baseline": {
+                  "r": 17,
+                  "g": 24,
+                  "b": 39,
+                  "hex": "#111827"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 396
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "form-app-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 416,
+            "y": 256,
+            "width": 160,
+            "height": 64,
+            "diffPixelCount": 447,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "current": {
+                "r": 178,
+                "g": 182,
+                "b": 189,
+                "hex": "#b2b6bd"
+              },
+              "distance": 125,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 55,
+                  "g": 65,
+                  "b": 81,
+                  "hex": "#374151"
+                },
+                "distance": 326
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 0,
+            "y": 320,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 198,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 60,
+                "g": 112,
+                "b": 159,
+                "hex": "#3c709f"
+              },
+              "current": {
+                "r": 30,
+                "g": 41,
+                "b": 59,
+                "hex": "#1e293b"
+              },
+              "distance": 126,
+              "peak": {
+                "baseline": {
+                  "r": 148,
+                  "g": 163,
+                  "b": 184,
+                  "hex": "#94a3b8"
+                },
+                "current": {
+                  "r": 30,
+                  "g": 41,
+                  "b": 59,
+                  "hex": "#1e293b"
+                },
+                "distance": 211
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "grid-complex-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 1024,
+            "y": 0,
+            "width": 96,
+            "height": 32,
+            "diffPixelCount": 136,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 30,
+                "g": 41,
+                "b": 59,
+                "hex": "#1e293b"
+              },
+              "current": {
+                "r": 24,
+                "g": 32,
+                "b": 51,
+                "hex": "#182033"
+              },
+              "distance": 13
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.02,
+                "presence": 0.98
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "landing-product-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 224,
+            "y": 512,
+            "width": 160,
+            "height": 96,
+            "diffPixelCount": 799,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 64,
+                "g": 90,
+                "b": 147,
+                "hex": "#405a93"
+              },
+              "current": {
+                "r": 25,
+                "g": 56,
+                "b": 125,
+                "hex": "#19387d"
+              },
+              "distance": 56,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 24,
+                  "g": 54,
+                  "b": 120,
+                  "hex": "#183678"
+                },
+                "distance": 335
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.99,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.01,
+                "presence": 0.99
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "landing-product-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 64,
+            "y": 512,
+            "width": 192,
+            "height": 96,
+            "diffPixelCount": 6239,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 23,
+                "g": 50,
+                "b": 109,
+                "hex": "#17326d"
+              },
+              "current": {
+                "r": 236,
+                "g": 237,
+                "b": 239,
+                "hex": "#ecedef"
+              },
+              "distance": 312,
+              "peak": {
+                "baseline": {
+                  "r": 21,
+                  "g": 46,
+                  "b": 100,
+                  "hex": "#152e64"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 350
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 1,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0,
+                "presence": 1
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 288,
+            "y": 352,
+            "width": 224,
+            "height": 64,
+            "diffPixelCount": 315,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 169,
+                "g": 174,
+                "b": 180,
+                "hex": "#a9aeb4"
+              },
+              "current": {
+                "r": 246,
+                "g": 248,
+                "b": 250,
+                "hex": "#f6f8fa"
+              },
+              "distance": 128,
+              "peak": {
+                "baseline": {
+                  "r": 101,
+                  "g": 109,
+                  "b": 118,
+                  "hex": "#656d76"
+                },
+                "current": {
+                  "r": 246,
+                  "g": 248,
+                  "b": 250,
+                  "hex": "#f6f8fa"
+                },
+                "distance": 240
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.02,
+                "presence": 0.98
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "page-presence-2",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 0,
+            "y": 160,
+            "width": 128,
+            "height": 32,
+            "diffPixelCount": 323,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "current": {
+                "r": 189,
+                "g": 160,
+                "b": 156,
+                "hex": "#bda09c"
+              },
+              "distance": 152,
+              "peak": {
+                "baseline": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "current": {
+                  "r": 31,
+                  "g": 35,
+                  "b": 40,
+                  "hex": "#1f2328"
+                },
+                "distance": 381
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.95,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0.03,
+                "position": 0.01,
+                "presence": 0.96
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "stacking-context-presence",
+      "kind": "presence",
+      "regions": [
+        {
+          "region": {
+            "x": 672,
+            "y": 448,
+            "width": 96,
+            "height": 64,
+            "diffPixelCount": 257,
+            "regionType": "content",
+            "colorSample": {
+              "baseline": {
+                "r": 184,
+                "g": 188,
+                "b": 195,
+                "hex": "#b8bcc3"
+              },
+              "current": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "hex": "#ffffff"
+              },
+              "distance": 115,
+              "peak": {
+                "baseline": {
+                  "r": 55,
+                  "g": 65,
+                  "b": 81,
+                  "hex": "#374151"
+                },
+                "current": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "hex": "#ffffff"
+                },
+                "distance": 326
+              }
+            }
+          },
+          "outcome": {
+            "kind": {
+              "label": "presence",
+              "confidence": 0.97,
+              "uncertain": false,
+              "probabilities": {
+                "text": 0,
+                "color": 0,
+                "position": 0.02,
+                "presence": 0.98
+              },
+              "model": "jev-1.14.0"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

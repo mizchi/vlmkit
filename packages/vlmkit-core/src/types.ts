@@ -133,6 +133,22 @@ export interface DiffRegion {
   shift?: DiffRegionShift;
   /** Deterministic DOM hit-test result for this region's bbox (diff png --elements-*). */
   selectorCandidate?: DiffRegionSelectorCandidate;
+  /**
+   * What changed, named by a model on this region's magnified crop (diff png --kind). The
+   * region, shift and colours stay the pixels'; this is the one field that is not measured.
+   */
+  kind?: DiffRegionKind;
+  /** Why --kind left this region unlabelled (over --kind-limit, a size Jev rejects, an API error). */
+  kindSkipped?: string;
+}
+
+export interface DiffRegionKind {
+  label: "text" | "color" | "position" | "presence";
+  confidence: number;
+  /** Below the measured threshold (0.6): every wrong label in the 2026-10-16 round was below it. */
+  uncertain: boolean;
+  /** The model that answered, as served (e.g. `jev-1.14.0`). */
+  model: string;
 }
 
 export interface DiffRegionShift {

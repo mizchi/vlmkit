@@ -184,6 +184,46 @@ look's 48/58: 10 fixed, 0 broken, p = 0.002**. The whole gain is exact values �
 Cost ~1.4x tokens, ~3x time. So: turn zoom on when the answer is a measurement, not to notice a change.
 No provider model has run it yet.
 
+## Jev (TypeSafe System One): typed answers, `box` grounding (`@mizchi/vlmkit-ai/jev-client.ts`)
+
+```bash
+node --experimental-strip-types src/experiments/benchmark/jev-box/jev-box.ts --out test-results/jev-box --md r.md  # TYPESAFEAI_API_KEY, ~$0.045
+node --experimental-strip-types src/experiments/benchmark/jev-box/jev-box.ts --rescore --out docs/reports/data/2026-10-16-jev-box
+```
+
+Jev writes no prose. You send a `state` and typed questions (`box` / `noul` / `choice` / `score`)
+and get typed answers back. Images are asset keys referenced from strings and need
+`TypeSafe-Danger-Zone-Images: true`. Each edge must be 280-1568px, and an image outside that is
+rejected, not resized. Measured 2026-10-16 (`docs/reports/2026-10-16-jev-box-bench.md`), not to re-learn:
+
+- **Box edges are two decimals** (12.8px on 1280). A single look gives 89% click hit with a 12px
+  median edge error. A second `box` on a crop around it, magnified 4x, gives 96% and 5px. Pad
+  before cropping.
+- **`box.confidence` is uninformative** (AUROC 0.56 for a hit), and `box` has no "not found":
+  ask presence as a `noul` (AUROC 0.98, 0/85 decoys accepted). The exception is placeholder text,
+  which reads as not shown.
+- **Pixels say where, Jev says what.** On a pixel-diff region's magnified crop, a `choice` of
+  text / colour / position was 48/48. On the whole screenshot, Jev detected only 31% of 1-6px
+  shifts, and it got shift direction from the crop only 8/16. Take values from the pixels.
+- The image is read once per request, and each extra question on a shared state costs about 20
+  tokens. A 1280x800 screenshot is about 3.1k tokens ($0.00013) and answers in about 0.2s.
+
+**Shipped as `diff png --kind`** (`@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
+`png-diff.ts`). It puts `regions[].kind = {label: text|color|position|presence, confidence,
+uncertain, model}` on the regions the pixel diff found, one request per region, largest first up
+to `--kind-limit` (12). Without a key it exits 2 before measuring anything. End-to-end round on real
+`compareScreenshots` regions (`docs/reports/2026-10-16-jev-region-kind.md`, bench
+`jev-box.ts --only regions`), not to re-learn:
+
+- Text 14/14, colour 18/18, presence 17/17. Shifts of 1-6px were 11/16, and every miss was read as
+  colour. **Confidence matters for a `choice`** (AUROC 0.97): all 5 misses were below 0.6, which is
+  `REGION_KIND_SURE`, the `uncertain` flag. Re-measure it when the model changes.
+- **Score a region against the planted kind only if it touches the planted element.** A digit
+  that widens a badge moves every tab after it, and those `position` labels are right. Counting
+  them as text errors was the scorer's bug.
+- Captures of different sizes are skipped, not labelled: after a reflow one window shows two
+  different pieces of content.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
@@ -1200,6 +1240,7 @@ VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page -
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
+| `TYPESAFEAI_API_KEY` | TypeSafe Jev API key (`jev-client.ts`, `jev-box` bench) | — |
 | `VLMKIT_IMAGE_MODEL` | Image-generation model (any OpenRouter id, or `gpt-image-2` for api.openai.com) | openai/gpt-image-2.5-flare |
 | `DEBUG_VLMKIT` | Enable debug logs | — |
 
