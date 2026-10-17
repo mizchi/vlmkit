@@ -353,8 +353,10 @@ fixed. What changed:
   against the state's picture from before the opening (read again frame by frame, x265 bringing a
   digit in over three leading frames absorbed it a few levels at a time), and a GOP is known only
   from its keyframe on. SUMMARY.md's "begins on a keyframe" uses the opening too. Of the
-  reviewer's 51 open-GOP encodes (x264 `open-gop` and x265, crf 23-32, keyint 12-60), 50 give the
-  lossless number and kinds of events; the other is x265's last keyframe at crf 30 (below).
+  reviewer's 51 open-GOP encodes (x264 `open-gop` and x265, crf 23-32, keyint 12-60), 50 gave the
+  lossless number and kinds of events; the other is x265's last keyframe at crf 30 (below). The
+  fourth review found what that set did not plant: a change landing on an x265 keyframe (next
+  section).
 - **SUMMARY.md's keyframe notes** are said only of a lossy recording (a held-clock capture given
   `--noise` was told its keyframes were not known), say "every frame is a keyframe" of a run
   instead of the intra-refresh caveat MJPEG got, and say of a recording with only frame 0 marked
@@ -507,11 +509,18 @@ The output does not detect these.
   over 1.5s 9 frames before.
 - **A change the keyframe test admits, landing on a GOP's opening, is absorbed**: no 8x8 block
   mean past 24, no 16x16 block mean past 12 and no mean past 40 (past 48 only where the means past
-  the floor are spread like a re-encoding's, a quarter at most past 40). That is a band, not only
-  what is under the floor: a label recoloured 40% at a 30-frame GOP's keyframe is lost on x264,
-  VP9 and AV1 where the same change mid-GOP is reported. A 12px digit moves its means by 62 or more
-  at crf 28; a lighter one may not. SUMMARY.md names the first 12 frames read again and story.json
+  the floor are spread like a re-encoding's or lie in one spot whose 8x8 means barely moved, a
+  quarter at most past 40). That is a band, not only what is under the floor: a label recoloured
+  40% at a 30-frame GOP's keyframe is lost on x264, VP9 and AV1, where the same change mid-GOP is
+  reported on x264 (VP9 at crf 33 codes it under the floor mid-GOP too). Changes made at once in
+  several places count as spread: two labels recoloured 45% on a keyframe are lost. In a run of
+  keyframes a spread change is lost on any frame. A 12px digit moves its means by 62 or more at
+  crf 28; a lighter one may not. SUMMARY.md names the first 12 frames read again and story.json
   all of them.
+- **A change made elsewhere while an event that spans a keyframe is up**, inside the re-encoding
+  band (a label blended 30% toward white under a toast), is admitted by the return across the GOP.
+- **Blinks whose off-time is at most the 100ms hold merge** when the first begins on a noisy
+  opening: its return across the GOP needs the page to hold.
 - **An oscillation can hold at a turning point.** A spring's overshoot slows enough near each turn
   for 100ms within the band, so it settles there and its next swing is a second event (a drift).
 - **x264 at crf 45 destroys the content.** The digit change never appears, and frame 1 departs from
@@ -553,7 +562,8 @@ three times.
     localized step inside a run of keyframes, are changes;
   - a run of keyframes (MJPEG; x264 intra-only's one re-quantization; a fade a level a frame);
   - GOP numbers (`beginsGop`) and an open GOP's opening (`opensGop`): a still page re-quantized over
-    its leading frames and keyframe is read again, and a change brought in over them is a change;
+    its leading frames and keyframe is read again, a change brought in over them is a change, and a
+    leading frame's pre-echo of a change on its keyframe is the change's start;
   - an event that begins on a keyframe that re-quantizes text elsewhere: a toast returns, a badge
     stays, each boxed alone;
   - returns across GOPs (a transient, blinks, a caret that is no return, a toast fading out across
