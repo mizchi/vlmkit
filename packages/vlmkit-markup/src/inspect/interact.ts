@@ -73,6 +73,12 @@ import { formatInstant, MAX_FRAMES, parseInstants, type FramesSource } from "@mi
 export type SequenceAction =
   | { action: "snapshot"; name: string }
   | { action: "click"; selector: string }
+  /**
+   * Click what a description names ("the Save button"), found on a screenshot of the page with no
+   * selector: for a canvas app (Flutter web) or any UI whose DOM is not what is drawn. Located by
+   * TypeSafe Jev (`@mizchi/vlmkit-ai/locate.ts`; TYPESAFEAI_API_KEY), clicked at the box's centre.
+   */
+  | { action: "click"; describe: string }
   | { action: "hover"; selector: string }
   | { action: "focus"; selector: string }
   | { action: "blur"; selector: string }
@@ -210,6 +216,18 @@ export interface FrameSequenceEntry extends FramesWritten {
   cancelled: number;
 }
 
+/** Where a `click` with `describe` landed, so the run says what it clicked. */
+export interface LocatedClick {
+  stepIndex: number;
+  describe: string;
+  /** CSS px of the page. */
+  point: { x: number; y: number };
+  box: { x: number; y: number; width: number; height: number };
+  /** Jev's "the screenshot shows …" (0-1). */
+  presence: number | null;
+  costUsd: number;
+}
+
 export interface InteractReport {
   source: string;
   viewport: { width: number; height: number };
@@ -221,6 +239,8 @@ export interface InteractReport {
   healAllFindings?: HealAllFinding[];
   /** Steps that threw, in sequence order. Empty when every step ran. */
   stepFailures: StepFailure[];
+  /** One per `click` step with `describe` that found its target, in sequence order. */
+  locatedClicks?: LocatedClick[];
 }
 
 function parseArgs(argv: string[]) {
@@ -251,7 +271,7 @@ function summarizeAction(a: SequenceAction): string {
     case "snapshot":
       return `snapshot "${a.name}"`;
     case "click":
-      return `click \`${a.selector}\``;
+      return "describe" in a ? `click "${a.describe}"` : `click \`${a.selector}\``;
     case "hover":
       return `hover \`${a.selector}\``;
     case "focus":
@@ -314,11 +334,31 @@ export function framesOffsets(step: FramesAction, stepIndex: number): number[] {
   return parseInstants(`0..${span}/${every}`, where);
 }
 
-async function executeStep(page: Page, step: SequenceAction): Promise<void> {
+type Located = Omit<LocatedClick, "stepIndex" | "describe">;
+
+/**
+ * Screenshot the viewport at CSS scale (so the box is in the coordinates `mouse.click` takes),
+ * locate the description, click its centre. Not found is a step failure that names Jev's answer.
+ */
+async function clickDescribed(page: Page, describe: string): Promise<Located> {
+  const { locateByDescription } = await import("@mizchi/vlmkit-ai/locate.ts");
+  const png = await page.screenshot({ type: "png", scale: "css" });
+  const r = await locateByDescription(new Uint8Array(png), describe);
+  if (!r.found) {
+    throw new Error(
+      `nothing on screen matches "${describe}" (Jev presence ${(r.presence ?? 0).toFixed(2)}): describe it by the text drawn on it, or check the screen with a snapshot step before this one`,
+    );
+  }
+  await page.mouse.click(r.point.x, r.point.y);
+  return { point: r.point, box: r.box, presence: r.presence, costUsd: r.costUsd };
+}
+
+async function executeStep(page: Page, step: SequenceAction): Promise<Located | void> {
   switch (step.action) {
     case "snapshot":
       return; // handled by caller
     case "click":
+      if ("describe" in step) return clickDescribed(page, step.describe);
       await page.click(step.selector, { timeout: 5000 });
       return;
     case "hover":
@@ -955,7 +995,26 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     }
   }
 
+  // A click names exactly one target, and a described one needs the key: refused before the
+  // browser starts rather than as a failure at every such step.
+  for (const [index, step] of sequence.steps.entries()) {
+    if (step.action !== "click") continue;
+    const hasSelector = typeof (step as { selector?: unknown }).selector === "string";
+    const hasDescribe = typeof (step as { describe?: unknown }).describe === "string";
+    if (hasSelector === hasDescribe) {
+      throw new UsageError(
+        `step ${index}: a click step takes either "selector" or "describe", not ${hasSelector ? "both" : "neither"}.`,
+      );
+    }
+    if (hasDescribe && !process.env.TYPESAFEAI_API_KEY && !process.env.TYPESAFE_API_KEY) {
+      throw new UsageError(
+        `step ${index}: a click with "describe" is located on a screenshot by TypeSafe Jev, which needs TYPESAFEAI_API_KEY (console.typesafe.ai/keys). Use a "selector" where the DOM has one.`,
+      );
+    }
+  }
+
   const snapshots: SnapshotEntry[] = [];
+  const locatedClicks: LocatedClick[] = [];
   const frameSequences: FrameSequenceEntry[] = [];
   const healAllFindings: HealAllFinding[] = [];
   const stepFailures: StepFailure[] = [];
@@ -984,7 +1043,10 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
       } else {
         let stepFailed = false;
         try {
-          await executeStep(page, step);
+          const located = await executeStep(page, step);
+          if (located && step.action === "click" && "describe" in step) {
+            locatedClicks.push({ stepIndex, describe: step.describe, ...located });
+          }
         } catch (error) {
           stepFailed = true;
           const msg = String(error instanceof Error ? error.message : error);
@@ -1111,6 +1173,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     transitions,
     stepFailures,
     healAllFindings: options.healAll ? healAllFindings : undefined,
+    ...(locatedClicks.length > 0 ? { locatedClicks } : {}),
   });
   await writeFile(reportPath, md);
 
@@ -1123,6 +1186,8 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     reportPath,
     stepFailures,
     healAllFindings: options.healAll ? healAllFindings : undefined,
+    // Absent unless a step used `describe`, so a run without one reports the shape it always did.
+    ...(locatedClicks.length > 0 ? { locatedClicks } : {}),
   };
 }
 
@@ -1149,6 +1214,11 @@ export function formatInteractReport(
     `  ${DIM}captured ${report.snapshots.length} snapshot(s), ${report.transitions.length} transition(s)` +
       `${report.frameSequences && report.frameSequences.length > 0 ? `, ${report.frameSequences.length} frame sequence(s)` : ""}${RESET}`,
   );
+  for (const c of report.locatedClicks ?? []) {
+    lines.push(
+      `  ${DIM}step ${c.stepIndex}: "${c.describe}" located at (${Math.round(c.point.x)}, ${Math.round(c.point.y)})${c.presence === null ? "" : `, presence ${c.presence.toFixed(2)}`}${RESET}`,
+    );
+  }
   for (const f of report.stepFailures) {
     lines.push(`  ${YELLOW}step ${f.stepIndex} failed (${summarizeAction(f.action)}): ${f.message}${RESET}`);
     for (const c of f.suggestions ?? []) {
@@ -1262,6 +1332,24 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
           `  - did you mean \`${c.selector}\`? _(${(c.confidence * 100).toFixed(0)}% confidence${c.text ? `, "${c.text}"` : ""})_`,
         );
       }
+    }
+    lines.push("");
+  }
+
+  if (r.locatedClicks && r.locatedClicks.length > 0) {
+    lines.push("## Clicks located by description");
+    lines.push("");
+    lines.push(
+      "Found on a screenshot by TypeSafe Jev and clicked at the box's centre: a model's answer, " +
+        "not a selector. Check the snapshot after each one shows the click landing where it should.",
+    );
+    lines.push("");
+    for (const c of r.locatedClicks) {
+      const b = c.box;
+      lines.push(
+        `- **step ${c.stepIndex}** — "${c.describe}" → (${Math.round(c.point.x)}, ${Math.round(c.point.y)}), box ${Math.round(b.x)},${Math.round(b.y)} ${Math.round(b.width)}x${Math.round(b.height)}` +
+          (c.presence === null ? "" : `, presence ${c.presence.toFixed(2)}`),
+      );
     }
     lines.push("");
   }
@@ -1437,6 +1525,8 @@ export async function runInteractCli(cliArgs: readonly string[], options: { cwd?
     console.log("                   // ... + frames.json (vlmkit-frames/1), recorded on a page of its own: the steps");
     console.log("                   // before it run again there, so snapshots are as they are without it.");
     console.log("  click | hover    { selector: string }");
+    console.log('  click            { describe: string }   // e.g. "the Save button": found on a screenshot');
+    console.log("                   // by TypeSafe Jev (TYPESAFEAI_API_KEY), clicked at its centre; for canvas apps");
     console.log("  focus | blur     { selector: string }");
     console.log('  press            { selector?: string, key: string }   // e.g. "Enter", "Escape", "Tab"');
     console.log("  type             { selector: string, text: string }   // appends text");
