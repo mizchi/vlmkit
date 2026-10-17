@@ -394,9 +394,10 @@ to refute (the first four per lens), eight reproduced as reported. The other fou
 this round's first commit before the verifier ran (the reviewers had run a build from before it),
 and the narrower cases two of those verifiers found instead are fixed too: a span inside the first
 GOP was called shorter than one GOP, and one sentence of this report still described the old
-spread test. The rest were reproduced here before being fixed or written down as limits. The docs lens found the lossless path unchanged (story.json and SUMMARY.md
-identical on 21,500 random sequences, open and closed GOPs included) and no cost regression on
-366-frame 1080p recordings. What changed:
+spread test. The rest were reproduced here before being fixed or written down as limits. The docs
+lens found the lossless path unchanged (story.json and SUMMARY.md identical on 21,500 random
+sequences, open and closed GOPs included) and no cost regression on 366-frame 1080p recordings.
+What changed:
 
 - **A leading frame is read again only when its keyframe is too.** x265's leading B-frames are
   predicted from the keyframe after them, so they show part of a change that lands on it: a digit
