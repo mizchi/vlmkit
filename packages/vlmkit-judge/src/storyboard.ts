@@ -47,6 +47,14 @@ export const SMEAR_MS = 50;
 export const SMEAR_FRAMES = 3;
 /** A keyframe read again moved no 16x16 block's mean by more than this (0-255): a fade does. */
 export const KEYFRAME_REGION = 12;
+/**
+ * A re-encoding is spread over the picture: its means past the floor lie in at least this many
+ * separate spots (8-connected runs of 16x16 blocks), together across a quarter of the frame's
+ * width or height — or across a quarter of both, however many. A change is one region: a label
+ * recoloured 40-45% was one or two spots inside 96x16px; x264's last keyframe, coded coarser, 5-8
+ * spots across the page, and its intra-only rate-control step 521x301.
+ */
+export const REENCODING_SPOTS = 3;
 /** A hold is confirmed this far after its first frame: no block of the page creeping away from it. */
 export const HOLD_CONFIRM_MS = 1000;
 /** …by more than this on a 16x16 block's mean (0-255), without a sharp step. */
@@ -679,6 +687,26 @@ export function beginsGop(entries: readonly Pick<FrameEntry, "key" | "gop">[], i
 }
 
 /**
+ * Frame i is in its GOP's opening: from the GOP's first frame up to and including its keyframe.
+ * An open GOP's leading B-frames are shown before its keyframe and counted in its GOP (they are
+ * decoded after it), so its re-quantization arrives over those frames, part of it on each, and
+ * all of it on the keyframe. Read again only where the GOP number changed, a still page through
+ * x264 open-gop or x265 (whose default GOPs are open) was within the floor on the leading frames,
+ * which made the GOP known, and past it on the keyframe: an event at every keyframe.
+ */
+export function opensGop(entries: readonly Pick<FrameEntry, "key" | "gop">[], i: number): boolean {
+  if (i <= 0 || i >= entries.length) return false;
+  let start = i;
+  while (start > 0 && !beginsGop(entries, start)) start--;
+  for (let k = start; k < i; k++) if (entries[k]!.key === true) return false;
+  if (i === start) return true;
+  for (let k = i; k < entries.length && (k === i || !beginsGop(entries, k)); k++) {
+    if (entries[k]!.key === true) return true;
+  }
+  return false;
+}
+
+/**
  * Segment a sequence. `entries` are the manifest's frames in order (strictly increasing `atMs`),
  * `pixels` reads each one; the frames must all be `pixels.width x pixels.height`.
  */
@@ -818,11 +846,9 @@ export function buildStoryboard(
     return a !== undefined && b !== undefined && signaturesApart(a, b, t);
   };
   /**
-   * Frame b is frame a's picture as another GOP encoded it: they are in different GOPs, no 8x8
-   * block's mean moved by more than the keyframe band's block and no mean by more than its pixel.
+   * Frame b can be frame a's picture as another keyframe encoded it: no 8x8 block's mean moved by
+   * more than the keyframe band's block and no mean by more than its pixel.
    */
-  const requantized = (a: number, b: number): boolean => gop[a] !== gop[b] && requantizedPicture(a, b);
-  /** The same test without the GOPs: b is within the keyframe band of a. */
   const requantizedPicture = (a: number, b: number): boolean => requantBlocks(a, b) && requantMeans(a, b);
   /**
    * Its block half, from the signatures alone. A 16x16 block's mean is its 8x8 blocks' weighted
@@ -876,18 +902,24 @@ export function buildStoryboard(
    * moved 15-17 means past the floor and 1-3 of them past 40, to 46; the digit moved 5, 4 of them
    * past 40, to 62.
    */
-  const reencodes = (a: number, b: number): boolean => {
+  const reencodes = (a: number, b: number, spreadOnly = false): boolean => {
     if (signaturesApartBy(signature(a), signature(b)) > KEYFRAME_REGION) return false;
-    return tailFits(a, b, mask);
+    return tailFits(a, b, mask, spreadOnly);
   };
   /**
-   * Of the means of b past the floor of a's (outside `m`), none is past it by more than twice the
-   * default band's width (16), and no more than a quarter of them by more than its width (8).
+   * Of the means of b past the floor of a's (outside `m`), none is past it by more than the
+   * default band's width (8) — or, spread over the picture (`REENCODING_SPOTS`), none by more than
+   * twice that (16) and no more than a quarter of them by more than 8. With `spreadOnly`, only
+   * spread. The tail without the spread absorbed a label recoloured 45% (39 means past the floor,
+   * to 41, all inside it) on x264, AV1 and MJPEG, where a frame later in the GOP reported it.
    */
-  const tailFits = (a: number, b: number, m: Uint8Array | null): boolean => {
+  const tailFits = (a: number, b: number, m: Uint8Array | null, spreadOnly = false): boolean => {
     const w = LOSSY_NOISE.floor - LOSSY_NOISE.still;
     const fa = frames.pixels(a);
     const fb = frames.pixels(b);
+    const cw = Math.ceil(width / SIGNATURE_BLOCK);
+    const ch = Math.ceil(height / SIGNATURE_BLOCK);
+    const spot = new Uint8Array(cw * ch);
     let past = 0;
     let wide = 0;
     for (let p = 0, n = width * height; p < n; p++) {
@@ -903,8 +935,46 @@ export function buildStoryboard(
       if (d > floor + 2 * w) return false;
       past++;
       if (d > floor + w) wide++;
+      const y = (p / width) | 0;
+      spot[((y / SIGNATURE_BLOCK) | 0) * cw + (((p - y * width) / SIGNATURE_BLOCK) | 0)] = 1;
     }
-    return wide * 4 <= past;
+    if (wide === 0 && !spreadOnly) return true;
+    return wide * 4 <= past && spread(spot, cw, ch);
+  };
+  /** The marked blocks (`cw` x `ch`) are a re-encoding's spots, not one region (`REENCODING_SPOTS`). */
+  const spread = (spot: Uint8Array, cw: number, ch: number): boolean => {
+    let spots = 0;
+    let x0 = cw;
+    let y0 = ch;
+    let x1 = -1;
+    let y1 = -1;
+    const stack: number[] = [];
+    for (let b = 0; b < cw * ch; b++) {
+      if (spot[b] !== 1) continue;
+      spots++;
+      spot[b] = 2;
+      stack.push(b);
+      while (stack.length > 0) {
+        const q = stack.pop()!;
+        const qx = q % cw;
+        const qy = (q / cw) | 0;
+        x0 = Math.min(x0, qx);
+        x1 = Math.max(x1, qx);
+        y0 = Math.min(y0, qy);
+        y1 = Math.max(y1, qy);
+        for (let y = Math.max(0, qy - 1); y <= Math.min(ch - 1, qy + 1); y++) {
+          for (let x = Math.max(0, qx - 1); x <= Math.min(cw - 1, qx + 1); x++) {
+            if (spot[y * cw + x] === 1) {
+              spot[y * cw + x] = 2;
+              stack.push(y * cw + x);
+            }
+          }
+        }
+      }
+    }
+    const across = (x1 - x0 + 1) * SIGNATURE_BLOCK * 4 >= width;
+    const down = (y1 - y0 + 1) * SIGNATURE_BLOCK * 4 >= height;
+    return (across && down) || (spots >= REENCODING_SPOTS && (across || down));
   };
   /**
    * Some mean inside `box` moved past the floor between frames a and b, computed there from the
@@ -950,6 +1020,18 @@ export function buildStoryboard(
   entries.forEach((_, i) => {
     if (gopStart[gop[i]!] === undefined) gopStart[gop[i]!] = i;
   });
+  // And its keyframe: in an open GOP, after the leading frames (`opensGop`). Where no frame of
+  // the GOP says it is one, its first frame.
+  const gopKey: number[] = [];
+  entries.forEach((e, i) => {
+    if (e.key === true && gopKey[gop[i]!] === undefined) gopKey[gop[i]!] = i;
+  });
+  const keyOf = (g: number) => gopKey[g] ?? gopStart[g]!;
+  /** Frame i is in its GOP's opening (`opensGop`), from the arrays above. */
+  const opening = (i: number) =>
+    i > 0 && (i === gopStart[gop[i]!] || (gopKey[gop[i]!] !== undefined && i <= gopKey[gop[i]!]!));
+  /** Frame i is shown at or after its GOP's keyframe: only then does it show how that GOP codes the picture. */
+  const coded = (i: number) => i >= keyOf(gop[i]!);
   /**
    * Frame m no longer shows the event inside `box`: no 8x8 block there that moved past the floor
    * from the state's picture a is, over its means, less than half as far from the event's first
@@ -995,8 +1077,9 @@ export function buildStoryboard(
   };
   /**
    * Outside `around` (grown by 2·radius + 8px), frames k and m of one GOP are one picture within the
-   * floor. The GOP's first frame k shows the state there, as that GOP codes it, when nothing but the
-   * event changed: a change made elsewhere while the event was up stays a change.
+   * floor. The GOP's keyframe k (its first frame, unless the GOP is open) shows the state there,
+   * as that GOP codes it, when nothing but the event changed: a change made elsewhere while the
+   * event was up stays a change.
    */
   const agreesOutside = (k: number, m: number, around: Box): boolean => {
     if (k === m) return true;
@@ -1036,11 +1119,19 @@ export function buildStoryboard(
   // picture as that GOP codes it is not known — only there can a codec's re-quantization pass for
   // the state come back. Taken anywhere, a frame after the toast with a new count in it read as
   // the state re-quantized (a counter lost behind every toast).
-  let valid = new Set<number>([gop[0]!]);
+  // Where a frame of a GOP's opening was read again: the GOP, and the state's picture before it.
+  // Every later frame of that opening is tested against that picture, never against the frame read
+  // again: x265 brings a changed digit in over its leading frames, and read again frame by frame
+  // the change was absorbed a few levels at a time.
+  let openedFrom: { g: number; from: number } | null = null;
+  // (Never from frames shown before their GOP's keyframe: an open GOP's leading frames carry only
+  // part of its re-quantization.)
+  let valid = new Set<number>(coded(0) ? [gop[0]!] : []);
   const reanchor = (k: number) => {
     anchor = k;
     vs = [];
-    valid = new Set([gop[k]!]);
+    valid = new Set(coded(k) ? [gop[k]!] : []);
+    openedFrom = null;
   };
 
   const states: StoryState[] = [{ id: "S0", frame: ref(0), visits: 1 }];
@@ -1211,7 +1302,9 @@ export function buildStoryboard(
     for (let f = s + 1; f < m && f < gopStart[gop[m]!]!; f++) {
       if (valid.has(gop[f]!)) extent = unionBox(extent, vsAnchor(f).box)!;
     }
-    if (!agreesOutside(gopStart[gop[m]!]!, m, extent)) return false;
+    // Against the GOP's keyframe once it is shown: an open GOP's leading frames are part-way to it.
+    const g = gop[m]!;
+    if (!agreesOutside(m >= keyOf(g) ? keyOf(g) : gopStart[g]!, m, extent)) return false;
     return !hold || heldAfter(m, extent);
   };
 
@@ -1347,14 +1440,16 @@ export function buildStoryboard(
    * outside it): 452x297 for 150x32.
    */
   const noisy = (g: number, from: number, region: Box | null): boolean => {
-    const k = gopStart[g]!;
+    // The keyframe, after an open GOP's leading frames; the event began before the GOP or in it.
+    const k = keyOf(g);
     if (k === 0) return false;
-    const ev = k - 1 >= from ? (region ?? vsAnchor(from).box) : null;
+    const beganBefore = gopStart[g]! - 1 >= from;
+    const ev = beganBefore ? (region ?? vsAnchor(from).box) : null;
     const key = `${g},${from},${anchor},${ev ? boxText(ev) : ""}`;
     const known = noisyGops.get(key);
     if (known !== undefined) return known;
     let result: boolean;
-    if (k - 1 >= from) {
+    if (beganBefore) {
       const pad = 2 * noise!.radius + 8;
       const outside = ev
         ? ignoreMask(
@@ -1625,7 +1720,7 @@ export function buildStoryboard(
     // byte-identical one only, so not with a noise band).
     if (!noise) step(j);
     if (!apart(anchor, j, floor) && vsAnchor(j).over === 0) {
-      valid.add(gop[j]!);
+      if (coded(j)) valid.add(gop[j]!);
       j++;
       continue;
     }
@@ -1636,24 +1731,28 @@ export function buildStoryboard(
     // was lost) the state is read again there and nothing happened. Anything more is an event,
     // keyframe or not, and SUMMARY.md says it begins on one: a codec that re-encodes a still page
     // past that (x264 crf 35 with a 1s GOP moved means by 90) shows its keyframes as events, rather
-    // than a real change landing on one being lost. Where a GOP begins, or inside a run of
+    // than a real change landing on one being lost. Where a GOP begins (`opensGop`: through an open
+    // GOP's leading frames to its keyframe), or inside a run of
     // keyframes (MJPEG, ProRes, an intra-only encode) only when the page then holds: there each
     // frame is coded alone like the one before it, and MJPEG and ProRes decode a still page byte
     // for byte, but x264's rate control re-quantizes an intra-only stream once, between its first
     // two frames, and without a re-read every such recording of a still page began with a
     // page-wide change. Taken without the hold, a fade a level or two a frame was read again at
     // every frame and lost.
+    const opens = opening(j);
+    const against: number = opens && openedFrom?.g === gop[j] ? openedFrom.from : anchor;
     const reencoded =
-      (gop[j] !== gop[j - 1]
-        ? requantized(anchor, j)
+      (opens
+        ? requantizedPicture(against, j)
         : entries[j]!.key === true && entries[j - 1]!.key === true && requantizedPicture(anchor, j)) &&
-      reencodes(anchor, j) &&
-      (gop[j] !== gop[j - 1] || heldAfter(j, null));
+      reencodes(against, j, !opens) &&
+      (opens || heldAfter(j, null));
     if (reencoded) {
       reread.push({ ...ref(j), state, as: "keyframe" });
       pictureOf.set(state, j);
       pin(j);
       reanchor(j);
+      if (opens) openedFrom = { g: gop[j]!, from: against };
       visitStart = j;
       searched = new Map();
       j++;
@@ -1698,7 +1797,7 @@ export function buildStoryboard(
       }
       if (exact) {
         back = m;
-        valid.add(gop[m]!);
+        if (coded(m)) valid.add(gop[m]!);
         break;
       }
       // In a GOP that began during the event, the state's picture as that GOP codes it is not
@@ -2023,17 +2122,18 @@ export function storyboardSummary(
     const as = new Set(reread.map((k) => k.as));
     const how: string[] = [];
     if (as.has("keyframe")) {
+      const w = LOSSY_NOISE.floor - LOSSY_NOISE.still;
       how.push(
-        `at a keyframe, no 8x8 block's mean moved by more than ${band.block}, no 16x16 block's by more than ${KEYFRAME_REGION}, no ${mean} past ${r.channelFloor + 2 * (LOSSY_NOISE.floor - LOSSY_NOISE.still)} and no more than a quarter of those past the floor past ${r.channelFloor + (LOSSY_NOISE.floor - LOSSY_NOISE.still)}`,
+        `at a keyframe, no 8x8 block's mean moved by more than ${band.block}, no 16x16 block's by more than ${KEYFRAME_REGION} and no ${mean} past ${r.channelFloor + w} (to ${r.channelFloor + 2 * w}, a quarter at most past ${r.channelFloor + w}, where those past the floor were spread over the picture as a re-encoding's are)`,
       );
     }
     if (as.has("return") || as.has("settle")) {
       how.push(
-        `on a return or a settle in a GOP that began during the event, no 8x8 block's mean moved by more than ${band.block} and no ${mean} by more than ${band.pixel}, the event's box was nearer the state than the event, and the rest of the frame was one picture with its GOP's first frame${as.has("return") ? " (and, for a return, the page then held)" : ""}`,
+        `on a return or a settle in a GOP that began during the event, no 8x8 block's mean moved by more than ${band.block} and no ${mean} by more than ${band.pixel}, the event's box was nearer the state than the event, and the rest of the frame was one picture with its GOP's keyframe${as.has("return") ? " (and, for a return, the page then held)" : ""}`,
       );
     }
     notes.push(
-      `Read again at ${listed.join(", ")}${reread.length > 12 ? ` and ${reread.length - 12} more (story.json's \`reread\` lists them all)` : ""}: the picture there differed from the state's only as a codec re-quantizes one — ${how.join("; ")} — so the state was compared against it from then on. A change that small, landing on a frame read again, is not seen.`,
+      `Read again at ${listed.join(", ")}${reread.length > 12 ? ` and ${reread.length - 12} more (story.json's \`reread\` lists them all)` : ""}: the picture there differed from the state's only as a codec re-quantizes one — ${how.join("; ")} — so the state was compared against it from then on. A change within those bands, landing on a frame read again, is not seen.`,
     );
   }
   if (r.noise) {
@@ -2054,7 +2154,7 @@ export function storyboardSummary(
     !(video?.decoder === "import" && video.streamFrames === undefined) &&
     entries.every((e, i) => i === 0 || e.index === entries[i - 1]!.index! + 1);
   if (video && !video.lossless) {
-    const onKey = story.events.filter((e) => beginsGop(entries, e.first.n)).map((e) => e.id);
+    const onKey = story.events.filter((e) => opensGop(entries, e.first.n)).map((e) => e.id);
     const keyText =
       onKey.length > 0
         ? `; ${onKey.join(", ")} ${onKey.length === 1 ? "begins" : "begin"} on a keyframe, where the codec re-quantizes the whole picture`
@@ -2070,8 +2170,9 @@ export function storyboardSummary(
       `Compared through a noise band, though the frames are not from a lossy recording: a change smaller than the floor, over a ${mean}, is not seen.`,
     );
   }
-  if (r.noise?.keyframe && f.count > 1) {
-    // Where the GOPs are is what lets a keyframe be read again; said when it is not known.
+  if (r.noise?.keyframe && f.count > 1 && video && !video.lossless) {
+    // Where the GOPs are is what lets a keyframe be read again; said, for a lossy recording, when
+    // it is not known.
     const flagged = entries.some((e) => e.key !== undefined || e.gop !== undefined);
     const numbered = entries.every((e) => e.gop !== undefined);
     const thinned = !entries.every(
@@ -2079,15 +2180,19 @@ export function storyboardSummary(
     );
     if (!flagged) {
       notes.push(
-        "No frame says whether it is a keyframe (an import whose timestamp file has no key_frame column, or frames not from `scan video`): every frame is compared as one GOP, so a keyframe that re-quantizes a still page can read as a change.",
+        "No frame says whether it is a keyframe (an import whose timestamp file has no key_frame column): every frame is compared as one GOP, so a keyframe that re-quantizes a still page can read as a change.",
       );
     } else if (thinned && !numbered) {
       notes.push(
         "The frames are a selection without GOP numbers: a GOP that begins on a frame left out is not seen, so the frame after it can read as a change.",
       );
+    } else if (entries.every((e) => e.key === true)) {
+      notes.push(
+        "Every frame is a keyframe (MJPEG, ProRes, an intra-only encode): the run is one GOP, and a frame is read again only where its step from the state is spread over the picture as a re-encoding's is and the page then holds.",
+      );
     } else if (!entries.some((e, i) => i > 0 && beginsGop(entries, i))) {
       notes.push(
-        "No GOP begins after the first frame: a codec that refreshes its picture a band at a time (intra refresh) re-quantizes it without a keyframe, and that reads as events.",
+        "Only the first frame is marked a keyframe: the recording is shorter than one GOP (x264 and x265 put one every 250 frames unless told otherwise), or its codec refreshes the picture a band at a time (intra refresh), which re-quantizes it without a keyframe and reads as events.",
       );
     }
     if (story.states.length > 2) {

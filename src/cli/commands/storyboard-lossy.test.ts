@@ -5,8 +5,8 @@
  * lossless capture's events — the same kinds, beginning within a few frames, ending no earlier
  * and not much later (a codec blurs a change in over several frames) — and a still page none.
  *
- * Needs ffmpeg and ffprobe on PATH with libx264, libvpx and libsvtav1 (Ubuntu's ffmpeg has all
- * three); CI installs it. The bench that chose the band ran 18 fixtures through 14 encodings:
+ * Needs ffmpeg and ffprobe on PATH with libx264, libx265, libvpx and libsvtav1 (Ubuntu's ffmpeg
+ * has all four); CI installs it. The bench that chose the band ran 18 fixtures through 14 encodings:
  * docs/reports/2026-10-16-storyboard-noise-floor-v1.md.
  */
 import assert from "node:assert/strict";
@@ -59,6 +59,33 @@ const CODECS: Record<string, string[]> = {
   ],
   "vp9-crf50-key30": ["-c:v", "libvpx-vp9", "-crf", "50", "-b:v", "0", "-g", "30", "-pix_fmt", "yuv420p"],
   "av1-crf50": ["-c:v", "libsvtav1", "-crf", "50", "-preset", "8", "-pix_fmt", "yuv420p"],
+};
+
+/**
+ * Open GOPs: leading B-frames shown before each keyframe and decoded after it (x264 `open-gop`;
+ * x265 opens its GOPs by default). Not in `CODECS`, whose stories every kind is held to.
+ */
+const OPEN_GOP: Record<string, string[]> = {
+  "x264-open-gop-crf28-key12": [
+    "-c:v",
+    "libx264",
+    "-crf",
+    "28",
+    "-x264-params",
+    "open-gop=1:keyint=12:min-keyint=12:scenecut=0",
+    "-pix_fmt",
+    "yuv420p",
+  ],
+  "x265-crf28-key12": [
+    "-c:v",
+    "libx265",
+    "-crf",
+    "28",
+    "-x265-params",
+    "keyint=12:min-keyint=12:scenecut=0:log-level=error",
+    "-pix_fmt",
+    "yuv420p",
+  ],
 };
 
 // The digit at frame 33, off every keyframe of the 10-frame GOP; a test below puts it on one.
@@ -116,7 +143,7 @@ async function throughCodec(manifest: string, codec: string): Promise<string> {
     "glob",
     "-i",
     join(src, "[0-9]*.png"),
-    ...CODECS[codec]!,
+    ...(CODECS[codec] ?? OPEN_GOP[codec]!),
     video,
   ]);
   const out = `${video}.frames`;
@@ -166,6 +193,29 @@ describe("snapshot storyboard --lossy: planted events through codecs", () => {
       }
     });
   }
+
+  test(
+    "an open GOP's re-quantization arrives over its leading frames and its keyframe: the lossless story",
+    { timeout: 120_000 },
+    async () => {
+      // Read again only where the GOP number changed (the first leading frame, within the floor),
+      // each keyframe of a still page was an event, and a toast across one was three changes.
+      for (const kind of ["static", "toast", "caret", "digit&at=33"]) {
+        const lossless = await capture(kind);
+        const truth = segment(lossless, false);
+        for (const codec of Object.keys(OPEN_GOP)) {
+          const decoded = await throughCodec(lossless, codec);
+          const frames = parseFramesManifest(readFileSync(decoded, "utf8")).frames;
+          // The GOP number changes before the keyframe: the leading frames are in its GOP.
+          assert.ok(
+            frames.some((f, i) => i > 0 && f.gop !== frames[i - 1]!.gop && f.key !== true),
+            `${codec}: no leading frame`,
+          );
+          sameStory(truth, segment(decoded, true), `${kind} ${codec}`);
+        }
+      }
+    },
+  );
 
   test(
     "a fade below the floor is not seen: the limit the band sets, said rather than hidden",

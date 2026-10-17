@@ -11,6 +11,7 @@ import {
   ignoreMask,
   LOSSY_NOISE,
   beginsGop,
+  opensGop,
   blockSignature,
   blockSignatures,
   meanFrames,
@@ -1294,6 +1295,64 @@ describe("the noise band (lossy recordings)", () => {
     );
   });
 
+  test("an open GOP's leading frames and its keyframe are one opening: a still page re-quantized over them is read again", () => {
+    // Frames 9-11 are the next GOP's leading B-frames (decoded after keyframe 12, so counted in its
+    // GOP), part-way to its re-quantization and within the floor; 12 is the keyframe, past it.
+    const base = frame([], GREY);
+    const frames = [...repeat(base, 9), ...repeat(requant(base, 22), 3), ...repeat(requant(base, 36), 41)];
+    const s = sequence(frames);
+    const entries = s.entries.map((e) => ({ ...e, key: e.n === 0 || e.n === 12, gop: e.n < 9 ? 0 : 1 }));
+    const story = buildStoryboard(entries, s.pixels, { noise: LOSSY_NOISE });
+    // Read again only where the GOP number changed, the keyframe was a drift at 12.
+    assert.deepEqual(story.events, []);
+    assert.deepEqual(
+      story.reread?.map((r) => [r.n, r.as]),
+      [[12, "keyframe"]],
+    );
+    // A change that begins on the keyframe is flagged as beginning on one.
+    const toast = frame([{ x: 20, y: 20, w: 12, h: 6, rgb: [30, 30, 30] }], GREY);
+    const changed = sequence([...repeat(base, 9), ...repeat(requant(base, 22), 3), ...repeat(requant(toast, 36), 41)]);
+    const story2 = buildStoryboard(
+      changed.entries.map((e) => ({ ...e, key: e.n === 0 || e.n === 12, gop: e.n < 9 ? 0 : 1 })),
+      changed.pixels,
+      { noise: LOSSY_NOISE },
+    );
+    assert.deepEqual(
+      story2.events.map((e) => [e.kind, e.first.n]),
+      [["change", 12]],
+    );
+    assert.ok(opensGop(entries, 12) && opensGop(entries, 9) && opensGop(entries, 10) && !opensGop(entries, 13));
+    // A change brought in over the opening (x265 brings a digit in over its leading frames), 38
+    // levels a frame: each step is within the band of the frame before, the whole of it is not.
+    // Each frame of the opening is tested against the state's picture before it, so it is a change.
+    const dot = (by: number) => frame([{ x: 20, y: 12, w: 4, h: 3, rgb: [180 - by, 180 - by, 180 - by] }], GREY);
+    const creeping = sequence([...repeat(base, 9), dot(38), dot(76), dot(114), ...repeat(dot(150), 41)]);
+    const story3 = buildStoryboard(
+      creeping.entries.map((e) => ({ ...e, key: e.n === 0 || e.n === 12, gop: e.n < 9 ? 0 : 1 })),
+      creeping.pixels,
+      { noise: LOSSY_NOISE },
+    );
+    assert.deepEqual(
+      story3.events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+      JSON.stringify(story3.reread),
+    );
+    const source = {
+      tool: "scan video",
+      url: "file:///rec.mp4",
+      viewport: { width: W, height: H },
+      deviceScaleFactor: 1,
+      clock: "stream" as const,
+      video: { file: "rec.mp4", decoder: "ffmpeg", codec: "h264", lossless: false },
+    };
+    const md = storyboardSummary(
+      story2,
+      source as never,
+      entries.map((e, n) => ({ ...e, index: n })),
+    );
+    assert.match(md, /E1 begins on a keyframe/);
+  });
+
   test("blinks a frame apart across a keyframe are each a transient: back once the page rests", () => {
     const base = frame([], GREY);
     const after = requant(base, 36);
@@ -1680,6 +1739,55 @@ describe("the noise band (lossy recordings)", () => {
     );
   });
 
+  test("a re-encoding is spread: a label recoloured on a keyframe, or anywhere in a run of keyframes, is a change", () => {
+    // A label 36 levels darker with a core 46 (its antialiased edges give it a tail of its own),
+    // in one region and nowhere else: within the bands, but not spread like a re-encoding. On a
+    // page-sized frame: on the 40x30 one any region spans a quarter of it.
+    const w = 320;
+    const h = 200;
+    const base = new Uint8Array(w * h * 4).fill(180);
+    for (let p = 3; p < base.length; p += 4) base[p] = 255;
+    const label = (by: number, core: number) => {
+      const out = new Uint8Array(base);
+      // Strokes 3px wide with 3px between, as text covers its blocks: 8x8 means move by 14.
+      for (let y = 41; y < 47; y++) {
+        for (let x = 40; x < 88; x++) {
+          if (x % 6 >= 3) continue;
+          const extra = x >= 54 && x < 63 && y >= 42 && y < 46 ? core : 0;
+          for (let c = 0; c < 3; c++) out[(y * w + x) * 4 + c]! -= by + extra;
+        }
+      }
+      return out;
+    };
+    const run = (frames: Uint8Array[], keys: (n: number) => boolean) =>
+      buildStoryboard(
+        frames.map((_, n) => ({ n, atMs: frameTimeMs(n), stable: true, key: keys(n) })),
+        { width: w, height: h, pixels: (i: number) => frames[i]! },
+        { noise: LOSSY_NOISE },
+      );
+    // On a GOP start, with a tail: read again, it was lost (a label recoloured 45% at x264's
+    // keyframe 60, on AV1 and on MJPEG).
+    const tailed = run([...repeat(base, 10), ...repeat(label(36, 10), 30)], (n) => n === 0 || n === 10);
+    assert.deepEqual(
+      tailed.events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+    );
+    assert.deepEqual(tailed.reread, []);
+    // Inside a run of keyframes, any re-read that is not spread: a localized step there is a
+    // change, however small (MJPEG decodes a still page byte for byte).
+    const every = run([...repeat(base, 10), ...repeat(label(36, 0), 30)], () => true);
+    assert.deepEqual(
+      every.events.map((e) => [e.kind, e.first.n]),
+      [["change", 10]],
+    );
+    assert.deepEqual(every.reread, []);
+    // On a GOP start without the tail, within 40, it is read again: the limit the band sets.
+    assert.deepEqual(
+      run([...repeat(base, 10), ...repeat(label(36, 0), 30)], (n) => n === 0 || n === 10).reread?.map((r) => r.n),
+      [10],
+    );
+  });
+
   test("a counter that ticks while a toast is up is a change, not the page back re-quantized", () => {
     // The page, a toast across a keyframe, then the page without it but with a new count: the
     // count's 8x8 means move by a few levels, inside the re-quantization band; its means by 60.
@@ -1948,11 +2056,16 @@ describe("the noise band (lossy recordings)", () => {
     assert.match(md, /None: every frame is within the floor of S0's picture, read again at 1 frame\./);
     assert.match(
       md,
-      /Read again at 166\.67 ms \(n 10, S0, a keyframe\): the picture there differed from the state's only as a codec re-quantizes one — at a keyframe, no 8x8 block's mean moved by more than 24, no 16x16 block's by more than 12, no 3x3 mean past 48 and no more than a quarter of those past the floor past 40 —/,
+      /Read again at 166\.67 ms \(n 10, S0, a keyframe\): the picture there differed from the state's only as a codec re-quantizes one — at a keyframe, no 8x8 block's mean moved by more than 24, no 16x16 block's by more than 12 and no 3x3 mean past 40 \(to 48, a quarter at most past 40, where those past the floor were spread over the picture as a re-encoding's are\) —/,
     );
-    assert.doesNotMatch(md, /No frame says whether it is a keyframe|without GOP numbers|No GOP begins after/);
+    assert.match(md, /A change within those bands, landing on a frame read again, is not seen\./);
+    assert.doesNotMatch(
+      md,
+      /No frame says whether it is a keyframe|without GOP numbers|Only the first frame|Every frame is/,
+    );
     // Where the GOPs are not known, it says so: no flags at all (an import), a selection without
-    // GOP numbers, or no GOP after the first frame (intra refresh).
+    // GOP numbers, or only frame 0 marked (shorter than a GOP, or intra refresh); and when every
+    // frame is a keyframe, that it is a run.
     const say = (e: { atMs: number; index?: number; key?: boolean; gop?: number }[]) =>
       storyboardSummary(lossyStory(frames.slice(0, e.length), LOSSY_NOISE, []), source as never, e);
     assert.match(
@@ -1965,8 +2078,20 @@ describe("the noise band (lossy recordings)", () => {
     );
     assert.match(
       say(frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n, key: n === 0, gop: 0 }))),
-      /No GOP begins after the first frame/,
+      /Only the first frame is marked a keyframe: the recording is shorter than one GOP/,
     );
+    const run = say(frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n, key: true, gop: 0 })));
+    assert.match(run, /Every frame is a keyframe \(MJPEG, ProRes, an intra-only encode\)/);
+    assert.doesNotMatch(run, /Only the first frame|intra refresh/);
+    // Frames not from a lossy recording (a held-clock capture given --noise) get no keyframe notes.
+    const capture = { ...source, tool: "check animation", clock: "held" as const, video: undefined };
+    const plain = storyboardSummary(
+      lossyStory(frames, LOSSY_NOISE, []),
+      capture as never,
+      frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n })),
+    );
+    assert.match(plain, /though the frames are not from a lossy recording/);
+    assert.doesNotMatch(plain, /No frame says whether it is a keyframe|Only the first frame|Every frame is a keyframe/);
     assert.match(
       md,
       /Decoded from h264, a lossy codec, compared through the noise band: what the codec does to a still picture stays inside it/,
