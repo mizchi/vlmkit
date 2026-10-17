@@ -1698,8 +1698,10 @@ export function buildStoryboard(
         noisy(gop[m]!, from, before, lead ? m : keyOf(gop[m]!));
       const out = drawn(m, d.box, d.over, base, restrict);
       // The event's parts no block of which moved past re-quantization (a 1px rule beside a
-      // label) are its own, as its first frame and each keyframe in it shows them.
-      if (restrict && (m === from || m === keyOf(gop[m]!))) {
+      // label) are its own, as its first frame shows them. Only there: at a keyframe later in the
+      // event, what it began as is already drawn, and a spot of that keyframe's noise past 40 was
+      // taken for the event (a spinner boxed 573x25 for 24x24).
+      if (restrict && m === from) {
         const own = drawn(m, eventClusters(m).event, 1, base);
         if (own.box !== null) return { box: unionBox(out.box, own.box), over: Math.max(out.over, own.over) };
       }
