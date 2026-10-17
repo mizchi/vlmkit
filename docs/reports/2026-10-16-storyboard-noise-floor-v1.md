@@ -324,8 +324,10 @@ fixed. What changed:
   quarter of the frame": a 100x30 badge with a spot of text re-quantized 240px above was drawn
   whole, 103x273, and a 1px shift of a 240x75 block, its own pixels the quarter, was cut to a
   sliver. It is now asked of the means past the floor: is there a cluster of them apart from the
-  event's own (`noiseBesideEvent`)? Every one of the reviewer's 52 encodes of these cases now gives
-  the lossless story and box, except where x264's last keyframe is coded past the test (below).
+  event's own (`noiseBesideEvent`)? Of the reviewer's 57 encodes of these cases, 40 give the
+  lossless story with its box; the other 17 are limits below: a fade beside the event beginning
+  late by its part inside the floor (10), and x264's last keyframe at crf 30-33 read as a change
+  (7).
 - **The re-encoding tail only where the means are spread like a re-encoding's.** The tail clause
   (means to 48 when a quarter at most pass 40) was measured on x264's last keyframe, whose 15-17
   means past the floor lie in 5-8 spots across the page. A label recoloured 40-45% has a tail of its
