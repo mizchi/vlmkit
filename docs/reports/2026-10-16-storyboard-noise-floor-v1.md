@@ -281,13 +281,13 @@ lossless sequence:
 
 | Lens the cases came from | Right | Kinds of the matched events | Box IoU median (under 0.5) |
 |---|---|---|---|
-| holds | 87 of 132 | 128 of 133 | 1.00 (6 of 133) |
+| holds | 87 of 132 | 128 of 134 | 1.00 (7 of 134) |
 | keyframes | 72 of 95 | 62 of 62 | 0.99 (1 of 62) |
 | boxes | 32 of 48 | 42 of 43 | 0.98 (8 of 43) |
 | CLI (text pages, thinned and imported frames) | 43 of 43 | 43 of 43 | 1.00 (0 of 43) |
 | the first review's 30 | 27 of 30 | 44 of 44 | 1.00 (0 of 44) |
 | verifiers' holds and keyframes | 27 of 27 | 27 of 27 | 1.00 (2 of 27) |
-| all 375 | 288 | 346 of 352 | |
+| all 375 | 288 | 346 of 353 | |
 
 Every one of the 87 misses is a limit below, and none is another kind:
 - 52 fades, each beginning late or ending early by the part of it inside the floor (two slow ones
@@ -296,7 +296,7 @@ Every one of the 87 misses is a limit below, and none is another kind:
 - 7 intra-only streams' first frame, 6 intra-refresh encodes, and 6 springs whose overshoot held at
   a turning point.
 
-The six kinds that differ are fades the codec decoded as jumps (a drift read as a change).
+The kinds that differ are fades the codec decoded as jumps (a drift read as a change).
 
 The weak boxes are the six of the first round and two at crf 45. Against the first round's code
 this round lost the 3 crf 35 cases and the 6 intra-only ones, each to an extra event the codec
@@ -341,10 +341,14 @@ made, flagged as beginning on a keyframe; no event of a lossless storyboard was 
 
 ## Real recordings
 
-All decoded by `scan video` and storyboarded by the CLI with `--lossy`, with no `--ignore`, three at
-a time. The first design and the final code agree on every count below, and on all 137 events'
-kinds and first frames. 12 of their boxes differ, 11 of them by at most 18 pixels a side (the
-twelfth, cua-41768 E4, by 44). The times are the final code's.
+All decoded by `scan video` and storyboarded by the CLI with `--lossy`, with no `--ignore`. The
+first design and the code after the first review agreed on every count below, and on all 137
+events' kinds and first frames; 12 of their boxes differed, 11 of them by at most 18 pixels a side
+(the twelfth, cua-41768 E4, by 44). After the second review one count moved: on OnlyOffice 41765 a
+4x9 change at frame 237 and a 108x23 one four frames later are one change now (24 events → 23).
+Three small events at 30fps read as changes where they were drifts (a step now reaches back 3
+frames, not one), and 10 boxes differ. The times are the first review's code, three at a time; the
+second review's runs shared the machine with other work and are not comparable.
 
 **VideoCUA (ServiceNow)** records human desktop tasks. Each task logs its actions on the video's
 timeline (MIT on the dataset card, though the LICENSE file the card links to does not exist). Eight
@@ -358,7 +362,7 @@ at 1918x908 to 1920x1080 (two at 1366x716 and 1362x722), with keyframes every 30
 | Conky 106653 | 589 | 1920x1080 | 191 s | 21 | (moves only) | |
 | Conky 106670 | 146 | 1920x912 | 44 s | 8 | (moves only) | |
 | Conky 106687 | 257 | 1918x908 | 76 s | 9 | (moves only) | |
-| OnlyOffice 41765 | 587 | 1920x1080 | 206 s | 24 | 3/4 (the fourth at 1033ms) | 833, 500, 433 |
+| OnlyOffice 41765 | 587 | 1920x1080 | 206 s | 23 | 3/4 (the fourth at 1033ms) | 833, 500, 433 |
 | OnlyOffice 41768 | 506 | 1362x722 | 90 s | 13 | 1/1 | 467 |
 | GrassGIS 45264 | 263 | 1920x1080 | 84 s | 7 | 1/1 | 33 |
 | GrassGIS 46646 | 163 | 1366x716 | 29 s | 9 | 1/1 | 330 |
@@ -369,7 +373,7 @@ at 1918x908 to 1920x1080 (two at 1366x716 and 1362x722), with keyframes every 30
   7.4 of 10, and 9 or more with P = 0.21. With the events near any logged action left out of the
   chance count (they are the ones the actions cause), chance gives 5.0, and 9 or more with
   P = 0.009. The truth lies between the two.
-- **The labels are actions, not changes, so most events have none.** Only 33 of the 118 events fall
+- **The labels are actions, not changes, so most events have none.** Only 32 of the 117 events fall
   within 1.5s of an action.
 - **The unlabelled events looked at are real changes on screen:**
   - On Conky 106644 they are a terminal's block cursor blinking (12x24 transients), each typed
