@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { cp, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,7 +10,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, test } from "vite-plus/test";
 import { captureTimelineFrames } from "@mizchi/vlmkit-animation-eval/frames-capture.ts";
 import { FRAMES_FORMAT, frameFileName, frameTimeMs, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
-import { eventKeyframes, type Box, type StoryEvent } from "@mizchi/vlmkit-judge/storyboard.ts";
+import { eventKeyframes, LOSSY_NOISE, type Box, type StoryEvent } from "@mizchi/vlmkit-judge/storyboard.ts";
 import { boxOnSheet } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { framesOnDisk, parseArgs, writeStoryboard, type StoryboardWritten } from "./storyboard-cli.ts";
 
@@ -32,6 +33,51 @@ describe("snapshot storyboard args", () => {
       },
     );
     assert.equal(parseArgs(["f/frames.json", "--lossy"]).lossy, true);
+    assert.equal(parseArgs(["f/frames.json", "--lossy"]).noise, undefined, "--lossy alone: the default band");
+    assert.deepEqual(parseArgs(["f/frames.json", "--noise", "16,40"]), {
+      manifest: "f/frames.json",
+      ignore: [],
+      maxEvents: 20,
+      lossy: true,
+      noise: { still: 16, floor: 40, radius: 1, holdMean: 3, keyframe: { block: 24, pixel: 96 } },
+      json: false,
+    });
+    assert.deepEqual(parseArgs(["f/frames.json", "--noise", "8, 24, 2"]).noise, {
+      still: 8,
+      floor: 24,
+      radius: 2,
+      holdMean: 3,
+      keyframe: { block: 24, pixel: 96 },
+    });
+    // The default numbers are --lossy's band, keyframes and all.
+    assert.deepEqual(parseArgs(["f/frames.json", "--noise", "24,32,1"]).noise, LOSSY_NOISE);
+    // Kept valid: the region band at most still, the keyframe pixel band above the floor.
+    assert.deepEqual(parseArgs(["f/frames.json", "--noise", "2,120"]).noise, {
+      still: 2,
+      floor: 120,
+      radius: 1,
+      holdMean: 2,
+      keyframe: { block: 24, pixel: 121 },
+    });
+  });
+
+  test("--noise refuses a band it cannot use, naming its form", () => {
+    for (const bad of [
+      "",
+      "16",
+      "32,32",
+      "40,16",
+      "16,256",
+      "-1,8",
+      "8,16,17",
+      "a,b",
+      "1.5,8",
+      "8,16,2,3",
+      "0x10,32",
+    ]) {
+      assert.throws(() => parseArgs(["f.json", "--noise", bad]), /--noise expects still,floor\[,radius\]/, bad);
+    }
+    assert.throws(() => parseArgs(["f.json", "--noise"]), /--noise expects/);
   });
 
   test("refuses what it cannot read, naming the flag", () => {
@@ -83,6 +129,46 @@ async function writeSequence(dir: string, boxes: (Box | undefined)[], size = { w
 }
 
 describe("writeStoryboard", () => {
+  test("--lossy on frames that are not from a lossy recording changes nothing, and says so", async () => {
+    const boxes: (Box | undefined)[] = Array.from({ length: 30 }, () => undefined);
+    // A faint 1-level box: a difference exactly, nothing through a band.
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-lossy-noop-"));
+    const manifest = await writeSequence(dir, boxes);
+    const faint = join(dir, frameFileName(12, frameTimeMs(12)));
+    const png = PNG.sync.read(readFileSync(faint));
+    for (let i = 0; i < 4 * 6; i += 4) png.data[i] = 200;
+    await writeFile(faint, PNG.sync.write(png));
+    const exact = await writeStoryboard(manifest);
+    const asked = await writeStoryboard(manifest, { lossy: true });
+    assert.equal(asked.lossyIgnored, true);
+    assert.equal(asked.story.rules.noise, undefined);
+    assert.deepEqual(asked.story.events, exact.story.events);
+    assert.equal(asked.story.events.length, 1, "the 55-level glitch on one row is an event exactly");
+    // --noise is a band asked for, on any frames.
+    const banded = await writeStoryboard(manifest, { noise: { radius: 1, still: 24, floor: 32 } });
+    assert.equal(banded.lossyIgnored, false);
+    assert.deepEqual(banded.story.events, [], "a 6-pixel line of 55 is below a 3x3 floor of 32");
+    assert.match(readFileSync(banded.files.summary, "utf8"), /though the frames are not from a lossy recording/);
+    // With --json the note goes to stderr: stdout is story.json alone.
+    const run = spawnSync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        "--no-warnings",
+        resolve("src/cli/commands/storyboard-cli.ts"),
+        manifest,
+        "--lossy",
+        "--json",
+        "--out",
+        join(dir, "json"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).format, asked.story.format);
+    assert.match(run.stderr, /--lossy: these frames are not from a lossy recording, so they were compared exactly/);
+  });
+
   test("frames of two sizes are refused, naming the frame", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-size-"));
     const manifest = await writeSequence(dir, [undefined, undefined]);

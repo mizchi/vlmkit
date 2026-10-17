@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Storyboard planted events on a UI</title>
+    <!--
+      The known answers of planted.html on a page that looks like an application — text in three
+      sizes, a photo-like texture, a gradient — so a lossy codec has something to ring around. Same
+      clock rules: every event is timed by the rAF timestamp (frame n is at n * 1000 / 60 ms) or by
+      a timer, so which frames show it is known before the capture. 640x400 CSS px.
+
+        ?kind=static                         nothing moves                         0 events
+        ?kind=glitch&at=30                   the box on frame 30 only              1 glitch, frame 30
+        ?kind=blinks&k=3&on=2&off=1&start=20 k runs of `on` frames, `off` apart    k events of `on` frames
+        ?kind=caret&k=2&on=6&off=6&start=20  the text field's 1px caret blinking   k events of `on` frames
+        ?kind=digit&at=30                    "Items 12" reads "Items 13" from 30   1 change, settled at 30
+        ?kind=cursor                         a pointer moves from frame 12 to 30   1 change, settled at 30
+        ?kind=scroll                         the article scrolls 1px a frame 10-40 1 change, settled at 40
+        ?kind=toast                          a toast from 300 to 700 ms (timers)   1 transient, frames 18-41
+        ?kind=slide                          a panel in from frame 12 to 30        1 change, settled at 30
+        ?kind=fade                           6% black over frames 10-55            1 drift, no step over 1
+        ?kind=spinner                        a spinner turning every frame         ends in motion, unless ignored
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 640px;
+        height: 400px;
+        overflow: hidden;
+        background: #fff;
+        color: #1e293b;
+        font: 13px/1.45 sans-serif;
+      }
+      .abs {
+        position: absolute;
+      }
+      header {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 640px;
+        height: 40px;
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      header h1 {
+        margin: 0;
+        position: absolute;
+        left: 16px;
+        top: 9px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      header small {
+        position: absolute;
+        right: 48px;
+        top: 13px;
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      nav {
+        position: absolute;
+        left: 0;
+        top: 40px;
+        width: 140px;
+        height: 360px;
+        background: #f1f5f9;
+        border-right: 1px solid #e2e8f0;
+      }
+      nav a {
+        display: block;
+        padding: 6px 16px;
+        color: #334155;
+        text-decoration: none;
+      }
+      nav a.on {
+        background: #e2e8f0;
+        font-weight: 600;
+      }
+      #clip {
+        position: absolute;
+        left: 160px;
+        top: 52px;
+        width: 240px;
+        height: 180px;
+        overflow: hidden;
+      }
+      #article p {
+        margin: 0 0 8px;
+      }
+      #article h2 {
+        margin: 0 0 6px;
+        font-size: 15px;
+      }
+      #photo {
+        position: absolute;
+        left: 420px;
+        top: 56px;
+      }
+      #gradient {
+        position: absolute;
+        left: 420px;
+        top: 190px;
+        width: 200px;
+        height: 22px;
+        background: linear-gradient(90deg, #0ea5e9, #a855f7 55%, #f97316);
+        border-radius: 4px;
+      }
+      #field {
+        position: absolute;
+        left: 160px;
+        top: 250px;
+        width: 200px;
+        height: 24px;
+        border: 1px solid #94a3b8;
+        border-radius: 4px;
+        color: #64748b;
+        box-sizing: border-box;
+        padding: 3px 8px;
+        font-size: 12px;
+      }
+      #caret {
+        position: absolute;
+        left: 214px;
+        top: 255px;
+        width: 1px;
+        height: 14px;
+        background: #0f172a;
+        visibility: hidden;
+      }
+      #count {
+        position: absolute;
+        left: 160px;
+        top: 290px;
+        font-size: 12px;
+        color: #475569;
+      }
+      table {
+        position: absolute;
+        left: 420px;
+        top: 232px;
+        width: 200px;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+      td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 3px 4px;
+      }
+      td:last-child {
+        text-align: right;
+      }
+      #box {
+        position: absolute;
+        left: 180px;
+        top: 320px;
+        width: 60px;
+        height: 30px;
+        background: #111;
+        visibility: hidden;
+      }
+      #cursor {
+        position: absolute;
+        left: 300px;
+        top: 300px;
+        width: 12px;
+        height: 18px;
+      }
+      #toast {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        width: 150px;
+        height: 32px;
+        background: #1f2937;
+        color: #fff;
+        font-size: 12px;
+        line-height: 32px;
+        text-indent: 12px;
+        border-radius: 6px;
+        display: none;
+      }
+      #panel {
+        position: absolute;
+        left: 0;
+        top: 40px;
+        width: 200px;
+        height: 360px;
+        background: #2563eb;
+        color: #fff;
+        transform: translateX(-200px);
+      }
+      #panel p {
+        margin: 16px;
+      }
+      #fade {
+        position: absolute;
+        left: 160px;
+        top: 60px;
+        width: 160px;
+        height: 80px;
+        background: #000;
+        opacity: 0;
+      }
+      #spinner {
+        position: absolute;
+        right: 12px;
+        top: 8px;
+        width: 24px;
+        height: 24px;
+        /* No rotational symmetry, and 7 degrees a frame: no frame of the first 360 is the first. */
+        background: conic-gradient(#f8fafc 0 25%, #475569 0);
+        border-radius: 50%;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Orders · Week 41</h1>
+      <small>Synced 09:41</small>
+    </header>
+    <nav>
+      <a class="on">Overview</a>
+      <a>Orders</a>
+      <a>Customers</a>
+      <a>Inventory</a>
+      <a>Reports</a>
+      <a>Settings</a>
+    </nav>
+    <div id="clip">
+      <div id="article">
+        <h2>Shipping notes</h2>
+        <p>
+          Parcels packed before noon leave the same day. Larger crates go out on the evening van, and a
+          tracking number is mailed once the carrier scans them at the depot.
+        </p>
+        <p>
+          Returns are checked within two working days. A refund is issued to the original payment
+          method, and store credit is offered when the item was a gift.
+        </p>
+        <p>
+          Fragile goods are wrapped twice. If a box arrives damaged, keep the packaging and send a
+          photo of the label so the claim can be filed with the courier.
+        </p>
+        <p>
+          Bulk orders above forty units ship on pallets. Delivery slots are booked by phone, and the
+          driver calls half an hour before arriving.
+        </p>
+      </div>
+    </div>
+    <canvas id="photo" width="200" height="120"></canvas>
+    <div id="gradient"></div>
+    <div id="field">Search orders</div>
+    <div id="caret"></div>
+    <div id="count">Items 12 · 3 pending</div>
+    <table>
+      <tr><td>North depot</td><td>214</td></tr>
+      <tr><td>Harbour road</td><td>87</td></tr>
+      <tr><td>Airport annex</td><td>1,302</td></tr>
+      <tr><td>Old mill</td><td>45</td></tr>
+    </table>
+    <div id="box"></div>
+    <svg id="cursor" viewBox="0 0 12 18" aria-hidden="true">
+      <path d="M0.5 0.5 L0.5 15 L4 11.5 L6.5 17 L8.5 16 L6 10.5 L11 10.5 Z" fill="#000" stroke="#fff" />
+    </svg>
+    <div id="toast">Saved</div>
+    <div id="panel"><p>Filters</p></div>
+    <div id="fade"></div>
+    <div id="spinner"></div>
+    <script>
+      const q = new URLSearchParams(location.search);
+      const kind = q.get("kind") || "static";
+      const num = (name, fallback) => Number(q.get(name) ?? fallback);
+      const $ = (id) => document.getElementById(id);
+      const frameOf = (ts) => Math.round((ts * 60) / 1000);
+
+      // A photo-like texture, drawn once and identically every load: a seeded noise field under
+      // soft blobs, so a codec has fine detail and smooth gradients to quantize.
+      (() => {
+        const c = $("photo");
+        const g = c.getContext("2d");
+        let seed = 12345;
+        const rand = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296);
+        const img = g.createImageData(c.width, c.height);
+        for (let y = 0; y < c.height; y++) {
+          for (let x = 0; x < c.width; x++) {
+            const i = (y * c.width + x) * 4;
+            const base =
+              90 +
+              60 * Math.sin(x / 23) * Math.cos(y / 17) +
+              40 * Math.exp(-((x - 140) ** 2 + (y - 40) ** 2) / 900) * 2;
+            const n = (rand() - 0.5) * 50;
+            img.data[i] = Math.max(0, Math.min(255, base + n + 30));
+            img.data[i + 1] = Math.max(0, Math.min(255, base * 0.9 + n + 10));
+            img.data[i + 2] = Math.max(0, Math.min(255, base * 0.7 + n));
+            img.data[i + 3] = 255;
+          }
+        }
+        g.putImageData(img, 0, 0);
+      })();
+
+      const blinking = (n, el) => {
+        const k = num("k", el === "caret" ? 2 : 3);
+        const on = num("on", el === "caret" ? 6 : 2);
+        const off = num("off", el === "caret" ? 6 : 1);
+        const i = n - num("start", 20);
+        return i >= 0 && Math.floor(i / (on + off)) < k && i % (on + off) < on;
+      };
+
+      if (kind === "toast") {
+        setTimeout(() => ($("toast").style.display = "block"), 300);
+        setTimeout(() => ($("toast").style.display = "none"), 700);
+      }
+      if (kind === "spinner") $("spinner").style.display = "block";
+
+      function render(n) {
+        if (kind === "glitch") {
+          $("box").style.visibility = n === num("at", 30) ? "visible" : "hidden";
+        } else if (kind === "blinks") {
+          $("box").style.visibility = blinking(n, "box") ? "visible" : "hidden";
+        } else if (kind === "caret") {
+          $("caret").style.visibility = blinking(n, "caret") ? "visible" : "hidden";
+        } else if (kind === "digit") {
+          $("count").textContent = `Items ${n >= num("at", 30) ? 13 : 12} · 3 pending`;
+        } else if (kind === "cursor") {
+          const p = Math.min(1, Math.max(0, (n - 12) / 18));
+          $("cursor").style.transform = `translate(${60 * p}px, ${-30 * p}px)`;
+        } else if (kind === "scroll") {
+          const d = Math.min(30, Math.max(0, n - 10));
+          $("article").style.transform = `translateY(${-d}px)`;
+        } else if (kind === "slide") {
+          const p = Math.min(1, Math.max(0, (n - 12) / 18));
+          $("panel").style.transform = `translateX(${-200 + 200 * (1 - (1 - p) ** 2)}px)`;
+        } else if (kind === "fade") {
+          const p = Math.min(1, Math.max(0, (n - 10) / 45));
+          $("fade").style.opacity = String(0.06 * p);
+        } else if (kind === "spinner") {
+          $("spinner").style.transform = `rotate(${n * 7}deg)`;
+        }
+      }
+      render(0);
+      requestAnimationFrame(function tick(ts) {
+        render(frameOf(ts));
+        requestAnimationFrame(tick);
+      });
+    </script>
+  </body>
+</html>

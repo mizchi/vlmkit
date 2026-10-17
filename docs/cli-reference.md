@@ -1503,6 +1503,7 @@ fires `transitionend`, so the page's own handler runs between frames.
 vlmkit check animation page.html --at 0..1s/1f --frames out/f   # every frame of the first second
 vlmkit snapshot storyboard out/f/frames.json                     # → out/f/storyboard/
 vlmkit snapshot storyboard out/f/frames.json --ignore 960,40,320,180 --out story   # a video in that box
+vlmkit snapshot storyboard rec.mp4.frames/frames.json --lossy    # a lossy recording (scan video), through the noise band
 ```
 
 Reads any `vlmkit-frames/1` sequence and says, from the pixels alone, where the
@@ -1541,8 +1542,11 @@ What it does not do: name what changed — that is the brief's — or pass a ver
 It is an artifact command, not a gate, and exits 0; a narrative gate stays off
 until a bench shows narration adds something the table does not. Limits:
 
-- **Lossless input only.** vlmkit's own captures, two shots that agree; a decoded
-  video would need a noise floor this does not have.
+- **A lossy recording goes through a noise band, which has a floor of its own.**
+  vlmkit's own captures and lossless recordings are compared exactly. Frames a lossy
+  codec decoded are refused without `--lossy`, and with it the rules above are read
+  through the band (below): a pixel differs past 32 of its 3x3 mean, not 8, and a
+  change smaller than that is not seen.
 - **What nothing holds never settles.** A `<video>`, an animated image or a
   spinner the clock does not drive makes every frame differ, and one change
   swallows the rest of the sequence. `--ignore x,y,w,h` (the frames' pixels,
@@ -1640,7 +1644,7 @@ vlmkit check flash rec.mp4 --display-width 1280      # = scan video, then check 
 vlmkit check flash rec.mp4 --from 10s --to 12s       # windows ending in the span, the 3s before it decoded as history
 vlmkit check flash anim.gif                          # a GIF / APNG timed and looped as a browser plays it
 vlmkit snapshot strip --manifest rec.mp4.frames/frames.json --max-frames 8 --out sheet.png
-vlmkit scan video frames/ --pts frames/pts.txt --every-frame   # frames another decoder wrote, with their times
+vlmkit scan video frames/ --pts frames/pts.txt --every-frame   # frames another decoder wrote, with their times (and keyframes)
 ```
 
 vlmkit ships, depends on and downloads **no video decoder**: the ffmpeg builds on
@@ -1672,7 +1676,12 @@ frame until then, and `--at 1s` is the frame a player shows at 1s); a frame is
 shown until the next one's `atMs`; `index` is its position among the frames the
 recording shows (a decoded frame hidden behind a successor with its timestamp is
 not counted, an interlaced frame's two fields are two, every pass of a looped
-GIF counts); `key` marks keyframes.
+GIF counts); `key` marks keyframes, and `gop` is the GOP a frame was coded in, counted in
+decode order (ffprobe's `pkt_pos`) from 0: a keyframe after a predicted frame begins one, a run
+of keyframes is one, and an open GOP's leading B-frames (shown before its keyframe, decoded after
+it and predicted from it) are counted in it. Every frame carries it, so a selection (`--at`, a
+span) that skips a keyframe still says where the codec re-quantized. An import has both when its
+timestamp file is ffprobe's `key_frame,best_effort_timestamp_time,pkt_pos` (the `--help` recipe).
 
 ```json
 { "format": "vlmkit-frames/1",
@@ -1683,8 +1692,8 @@ GIF counts); `key` marks keyframes.
                          "streamFrames": 300, "selection": { "kind": "all" }, "pixelFormat": "yuv420p",
                          "color": { "matrix": "bt709", "range": "tv", "transfer": "bt709",
                                     "primaries": "bt709", "assumed": [] } } },
-  "frames": [ { "n": 0, "file": "0000-t000000.png", "atMs": 0, "stable": true, "index": 0, "key": true },
-              { "n": 1, "file": "0001-t000033.png", "atMs": 33.36666666666667, "stable": true, "index": 1, "key": false } ] }
+  "frames": [ { "n": 0, "file": "0000-t000000.png", "atMs": 0, "stable": true, "index": 0, "key": true, "gop": 0 },
+              { "n": 1, "file": "0001-t000033.png", "atMs": 33.36666666666667, "stable": true, "index": 1, "key": false, "gop": 0 } ] }
 ```
 
 What `check flash` makes of it: the frames of a whole recording are its whole
@@ -1816,11 +1825,50 @@ What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
   abandoned only after a day; a path that is a file is refused before anything
   is decoded.
 
-`snapshot storyboard` compares pixels exactly and has no noise floor yet, so it
-refuses frames from a lossy codec (`lossless: false`) unless given `--lossy`, and
-then names the events that begin on a keyframe. A lossless recording (ffv1, png,
-qtrle, …) is segmented like any capture: a planted one-frame glitch and a
-four-frame transient come back on their frames.
+`snapshot storyboard` compares a lossless recording (ffv1, png, qtrle, …) exactly,
+like any capture: a planted one-frame glitch and a four-frame transient come back on
+their frames. Frames from a lossy codec (`lossless: false`) are refused unless given
+`--lossy`, which compares them through a noise band, because a codec does not give
+back the picture it was given — the same still screen decodes differently frame to
+frame, most of all at sharp edges and across a keyframe, and compared exactly a
+lossy recording was one change that never settled:
+
+| Rule | `--lossy` (`LOSSY_NOISE`) |
+|---|---|
+| what is compared | each pixel as the mean of its 3x3 neighbourhood (a codec's error is mostly ringing, which the mean cancels) |
+| in the state, back, an earlier state | no mean more than 32 from the state's picture |
+| return across a GOP | in a GOP that began during the event, a frame within the re-quantization bands of the state (no 8x8 block mean moved past 24, no mean past 96), nearer it than the event inside the event's first box and clear of the event there, away from that box a keyframe's re-encoding (as the keyframe row), the rest of the frame one picture with its GOP's keyframe (its first frame, before the keyframe is shown; outside everything past the floor where the event began on a keyframe), and the page holding after it; the event's box and picture taken over the codec's smear (3 frames or 50 ms): dated back to the first frame of its GOP within 24 of it, and the state read again at the frame that holds |
+| one picture (a hold) | every mean within 24 of the hold's first frame, and the mean over the change's box within 3 of it (never only the frame before, or a slow ramp is one long hold) |
+| drift | a change no step of which, between frames up to 50 ms or 3 frames apart and inside its box, moves a mean past 32 (a step inside 24 is none) |
+| keyframe | on a GOP's opening (where it begins, by frames.json `gop`, else a keyframe after a predicted frame, through its keyframe: an open GOP's leading B-frames come first), a frame that is the state's picture as a keyframe re-encodes it: no 8x8 block mean moved past 24, no 16x16 block mean past 12 and no mean past 40 — or no mean past 48 and no more than a quarter of the means past the floor past 40, spread like a re-encoding (three separate spots across a quarter of the frame's width or height, or spots whose box spans a quarter of both) or in one spot whose 8x8 means moved by 12 at most. Each frame of an opening is tested against the state's picture from before it, and a leading frame only when its keyframe passes too. The state is read again there. Inside a run of keyframes (MJPEG, an intra-only encode) only spread, and only when the page then holds. A GOP whose keyframe a selection left out is opening throughout. Each re-read, and each return and settle read again, is in `reread` in story.json; SUMMARY.md names the first 12 and how each was judged |
+| box | the decoded pixels past 32 inside the means' box grown by 2 px, each frame against the state's picture in its GOP: a 1 px caret is drawn 1 px wide on 10 of 13 encodings (3-4 px on the others), not the 3 px the means give. In a GOP where that picture is not known and whose keyframe (for a leading frame, the frame itself) moved a mean past the floor away from the event, only near blocks past re-quantization (an 8x8 mean past 24 or a 3x3 mean past 48), with the event's parts that do not look like a re-encoding (a 1px rule beside a label) |
+
+`--lossy` on frames that are not from a lossy recording changes nothing, and says so.
+`--noise still,floor[,radius]` applies a band of one's own to any frames, with
+`--lossy`'s hold and keyframe bands. The band was chosen on known answers:
+`fixtures/storyboard/planted-ui.html` captured lossless and encoded with x264, x265, VP8
+(as Playwright records), VP9, AV1 and MJPEG at several qualities, each storyboard scored
+event by event against the lossless one
+(`docs/reports/2026-10-16-storyboard-noise-floor-v1.md`). What it cannot see, which the
+output does not detect: a change smaller than the floor over a 3x3 mean (a 6% fade: a fade
+begins late and ends early by the part of it inside the floor); a change the keyframe row
+admits — means past the floor by at most 8, or by 16 where spread (several changes made at once
+count) or in one spot whose blocks barely moved, no block moved — landing on a GOP's opening, or
+anywhere in a run of keyframes when spread, where it reads as the page re-encoded (a label
+recoloured 40% at a keyframe; the same change mid-GOP is reported on x264); a change within that
+band made elsewhere while an event spanning a keyframe is up; blinks whose off-time is at most
+the 100 ms hold, the first on a noisy opening, which merge; an oscillation (a spring's overshoot) that holds at a slow turning point and
+swings on as a second event; and a recording a codec has destroyed (x264 crf 45). What it
+reports and is wrong about, flagged as beginning on a keyframe: a keyframe that re-encodes a
+still page past the keyframe row — x264 at crf 35 and above, the last keyframe of an x264 or
+x265 stream (coded coarser) from crf 30 — and the codec refreshing a band at a time with no
+keyframe (intra refresh); x264's first two frames of an intra-only stream (means 56 apart,
+16x16 blocks 14) are said by the run note. For a lossy recording, SUMMARY.md says when no frame
+is marked a keyframe, when a selection has no GOP numbers or left out a GOP's keyframe, when only
+frame 0 is marked (a recording shorter than one GOP, or intra refresh; or frames inside one GOP)
+and when every frame is (a run of keyframes); it names a leading frame read again as one; it says when keyframes
+fell inside an event that never settled, and that from those GOPs the box takes only blocks
+that moved past re-quantization.
 
 #### Visualizing the VRT process — flipbooks + video
 
