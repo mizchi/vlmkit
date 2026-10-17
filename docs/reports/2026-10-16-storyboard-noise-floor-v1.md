@@ -6,6 +6,8 @@ noise band instead of byte for byte. This round covers:
 - how the band was chosen, on known answers;
 - what two adversarial reviews and the bench found wrong with the first design, and what replaced it;
 - what a second review of that redesign found, on 375 cases of its own, and what changed again;
+- what a third and a fourth review found in keyframe re-reads, open GOPs and boxes, the fourth on
+  432 open-GOP encodes;
 - what it does on real recordings with labels;
 - what it still cannot see.
 
@@ -383,6 +385,98 @@ On the real recordings every one of the 136 events has the same kind and first f
 second review, no keyframe is read again, and three boxes on changes that begin on keyframes are
 1-4px narrower: the keyframe's noise beside them is no longer drawn in. Lossless input still gives
 main's story.json and SUMMARY.md byte for byte, on 1500 random sequences and the 18 captures.
+
+## The fourth review
+
+A fourth review read the third round's fixes through three lenses (keyframe re-reads, returns and
+boxes, docs and cost) and reported 21 findings, 3 of them high. Of the twelve a second agent tried
+to refute (the first four per lens), eight reproduced as reported. The other four had been fixed by
+this round's first commit before the verifier ran (the reviewers had run a build from before it),
+and the narrower cases two of those verifiers found instead are fixed too: a span inside the first
+GOP was called shorter than one GOP, and one sentence of this report still described the old
+spread test. The rest were reproduced here before being fixed or written down as limits. The docs lens found the lossless path unchanged (story.json and SUMMARY.md
+identical on 21,500 random sequences, open and closed GOPs included) and no cost regression on
+366-frame 1080p recordings. What changed:
+
+- **A leading frame is read again only when its keyframe is too.** x265's leading B-frames are
+  predicted from the keyframe after them, so they show part of a change that lands on it: a digit
+  37 off on frame 28, 71 on keyframe 30 (x265 crf 28, keyint 15). The third round let any frame of
+  an opening be read again, so frame 28 became the state's picture, the rest of the digit was 34
+  from it, and frame 57 at 32 read as its return: a lasting change reported as a transient. On the
+  reviewer's 432 open-GOP encodes the third round lost 14 of 156 planted changes on x265, where the
+  round before lost 7. Now the leading frame's pre-echo is where the change begins.
+- **Past re-quantization is a block or a mean.** Judged by 8x8 means alone (past 24), a 2x2 mark
+  or a digit glitch beginning on a noisy keyframe had no departure of its own and never came back
+  (a change boxed 36x215 for a 7x9 digit), and a 1px rule beside a label (3x3 means 46-49, 8x8
+  means 17) was cut from its box. A 3x3 mean past 48 now counts too (a still page's keyframe moves
+  one by 36 at most up to crf 28), and a cluster past 40 in one spot is the event's, not the
+  keyframe's noise: on six encodes the label and its rule were boxed 30x8 for 63x12.
+- **A return compares the rest of the frame outside everything the event's first frame showed.**
+  Where the rule was faint enough to read as noise (x264 crf 30), the keyframe still showed it
+  outside the event's box and refused every return in its GOP: a toast with a rule beside it was
+  two changes and three states.
+- **A leading frame is asked on its own whether its GOP is noisy.** It is predicted from both
+  GOPs and carried the previous one's re-quantized spot where its keyframe did not: a toast boxed
+  415x240 for 150x32 on x264 open-gop keyint 6.
+- **The departure is taken over the codec's smear.** x265 brings a digit in over 3-4 frames, so
+  its first frame departed as one pixel and a return in a later GOP was tested only there: a
+  lasting digit read as a transient on keyint 9.
+- **A keyframe's tail in one spot is read again where its 8x8 means barely moved.** Requiring the
+  tail to be spread made a keyframe whose only tail was one cursor (8x8 means moved by 10, against
+  a recoloured label's 23) an event at crf 23, and a still page through x264 open-gop crf 32 one.
+- **A selection that skipped a GOP's keyframe** made the GOP known from its first selected frame,
+  a leading one part-way to the keyframe, and the next frame was an event. Such a GOP is now
+  opening throughout and never known, and SUMMARY.md says so.
+- **SUMMARY.md** names a leading frame read again as one (it said "a keyframe"); says "every frame
+  is a keyframe" only of a real run, with x264's intra-only rate-control step in it; and says of
+  frames inside one GOP that no keyframe among them is read again, not that the recording is
+  short.
+- **The docs** stated the band as "at most 8 past the floor"; it is 16 where spread or in one quiet
+  spot, two labels recoloured at once count as spread, and in a run of keyframes a spread change
+  is lost on any frame. "One region across a quarter of both" was the box of all the spots. A
+  label recoloured 40% mid-GOP is reported on x264, not on VP9 crf 33, which codes it under the
+  floor. Two limits are added: a change in the band made elsewhere while an event spanning a
+  keyframe is up, and blinks whose off-time is at most the hold, the first on a noisy opening.
+
+The reviewer's own sweep is the measure here: 432 open-GOP encodes (x265 and x264 `open-gop` at crf
+23, 28 and 32, keyint 10, 12, 15 and 30, the nine planted UI kinds and a digit change spliced onto
+nine frames around an opening), each scored against its lossless storyboard.
+
+| Code | x265 (216) | x264 open-gop (216) |
+|---|---|---|
+| before the third review (44c4d23b) | 71 | 56 |
+| after the third review | 186 | 145 |
+| after the fourth | 177 | 145 |
+
+Every miss but one is at crf 32 (the other: a digit x265 shows on its leading frames 4 frames
+before the lossless change, at crf 28). 81 of the 110 are the last keyframe alone, coded coarser,
+its opening an event and flagged as beginning on a keyframe; with the last GOP set aside, 403 of
+the 432 give the lossless story. The other 29 were wrong under both earlier versions too: changes
+the codec codes under the floor until a later GOP, and x264 open-gop at crf 32 keyint 15. Against
+the third round, 19 x265 cases at crf 32 are now that last-keyframe event: it got them right by
+reading the last GOP's opening again frame by frame, the same chain that lost the digit, and 10
+others are now right. Of the planted changes through x265, one goes unreported (crf 32, keyint 30).
+
+On the code after the fourth review, every earlier set gives the verdicts it gave after the third:
+
+| Set | Right | Kinds of the matched events | Box IoU against the lossless box |
+|---|---|---|---|
+| the 252 known answers | 215: all 208 outside the two limits | 261 of 261 | median 1.00; under 0.5 for 8 of 261 |
+| the first review's 30 harsher encodes | 27 | 44 of 44 | median 1.00; none under 0.5 |
+| x264 intra-only and two-frame GOPs (12) | 6 | 12 of 12 | median 0.22 |
+| the second review's 375 | 288, every case as before | 346 of 353 | median 1.00; 15 under 0.5 |
+| the third review's 51 open-GOP encodes | 50, the same 50 | | |
+| the third review's 68 recolour cases | 24, the same 24 | | |
+| the fourth review's 432 open-GOP encodes | 322 (above) | | |
+
+Every case of the 252, the 30 and the 12 has the same verdict and box IoU as after the third review.
+Of the 375, five boxes moved: a digit changed beside a never-settling spinner, through x264's
+10-frame GOP and through VP9, is boxed again (IoU 0 → 0.99 and 1.00), and so are the two jumps on
+x264 crf 35 keyint 60 (0.50 and 0.95 → 1.00); a fade's box went from 0.79 to 0.76. On the real
+recordings every one of the 136 events keeps its kind and first frame, no keyframe is read again,
+and five boxes grew by 1-4px (four window changes on Conky 106687, 464-476px wide, three of them
+beginning on keyframes; one on GrassGIS 46646). Lossless input still gives main's story.json and SUMMARY.md byte for byte, on 1500 random
+sequences and the 18 captures with and without `--ignore`.
 
 ## Three things the implementation needed
 
