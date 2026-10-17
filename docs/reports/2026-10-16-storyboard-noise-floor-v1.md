@@ -334,7 +334,7 @@ fixed. What changed:
   own from its antialiased edges (39 means past the floor, 2 to 41, all in one 64x16 region), and
   it was read as the page re-encoded at a GOP start on x264 crf 18 and 23 and AV1, and anywhere in
   an MJPEG recording, where the commit before reported it. The tail now needs three separate spots
-  across a quarter of the frame's width or height, or one region across a quarter of both
+  across a quarter of the frame's width or height, or spots whose box spans a quarter of both
   (`REENCODING_SPOTS`); without it the bound is 40. Inside a run of keyframes a frame is read again
   only spread, since a run has no re-quantization to read but rate control's. On the reviewer's 68
   recolour cases, the changes the tail had absorbed are reported again (x264, AV1, MJPEG and

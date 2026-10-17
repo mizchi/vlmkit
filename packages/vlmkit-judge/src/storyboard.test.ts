@@ -2202,6 +2202,16 @@ describe("the noise band (lossy recordings)", () => {
       say(frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n, key: n === 0, gop: 0 }))),
       /Only the first frame is marked a keyframe: the recording is shorter than one GOP/,
     );
+    // A span of a longer recording that ends inside its first GOP is no shorter recording.
+    const span = { ...source, video: { ...source.video, selection: { kind: "span", fromMs: 0, toMs: 300 } } };
+    assert.match(
+      storyboardSummary(
+        lossyStory(frames, LOSSY_NOISE, []),
+        span as never,
+        frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n, key: n === 0, gop: 0 })),
+      ),
+      /No GOP begins after the first frame: the frames lie inside one GOP/,
+    );
     const run = say(frames.map((_, n) => ({ atMs: frameTimeMs(n), index: n, key: true, gop: 0 })));
     assert.match(run, /Every frame is a keyframe \(MJPEG, ProRes, an intra-only encode\)/);
     assert.doesNotMatch(run, /Only the first frame|intra refresh/);

@@ -2405,7 +2405,10 @@ export function storyboardSummary(
         "Every frame is a keyframe (MJPEG, ProRes, an intra-only encode): the run is one GOP, and a frame is read again only where its step from the state is spread over the picture as a re-encoding's is and the page then holds. x264 re-quantizes an intra-only stream once, between its first two frames, past what that reads again: an event there can be the codec's.",
       );
     } else if (!entries.some((e, i) => i > 0 && beginsGop(entries, i))) {
-      const whole = entries[0]!.key === true && (entries[0]!.index ?? 0) === 0 && !thinned;
+      // The whole recording, not a span or instants of it (a span from frame 0 that ends inside
+      // the first GOP is no shorter recording).
+      const selected = video.selection !== undefined && video.selection.kind !== "all";
+      const whole = !selected && entries[0]!.key === true && (entries[0]!.index ?? 0) === 0 && !thinned;
       notes.push(
         whole
           ? "Only the first frame is marked a keyframe: the recording is shorter than one GOP (x264 and x265 put one every 250 frames unless told otherwise), or its codec refreshes the picture a band at a time (intra refresh), which re-quantizes it without a keyframe and reads as events."
