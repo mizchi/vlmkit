@@ -298,14 +298,87 @@ Every one of the 87 misses is a limit below, and none is another kind:
 
 The kinds that differ are fades the codec decoded as jumps (a drift read as a change).
 
-Of the 252 known answers' weak boxes, six are the first round's and two at crf 45. The 17 of the
+Of the 252 known answers' weak boxes, six are the first round's and two at crf 45. The 18 of the
 second review's cases are documented limits too: a spinner across keyframes that never settles (its
-box takes only blocks past re-quantization, 0.005), a digit flashing under a 20-level row inside
-the floor (0.01-0.43), carets and digits drawn as decoded (0.32-0.41), and a 1px jump at crf 35.
+box takes only blocks past re-quantization, 0.005, twice), a digit flashing under a 20-level row
+inside the floor (0.01-0.43, six), carets and digits drawn as decoded (0.32-0.41, eight), a fade on
+an intra-only stream (0.07) and a 1px jump at crf 35 (0.50).
 
 Against the first round's code this round lost the 3 crf 35 cases and the 6 intra-only ones, each
 to an extra event the codec made, flagged as beginning on a keyframe; no event of the 252 known
 answers' lossless storyboards was lost.
+
+## The third review
+
+A third review read the second round's fixes through three lenses (re-reads and returns, boxes and
+holds, GOPs and imports) and reported 8 findings, 4 of them high; each was reproduced before it was
+fixed. What changed:
+
+- **An event that begins on a keyframe comes back.** When the keyframe an event began on also
+  pushed a spot of text elsewhere past the floor, that spot was "still the event" in every later
+  frame of the GOP: a toast that appeared on a 10-frame GOP's keyframe at crf 28 never returned
+  (two changes, three states), and a caret blinking on a keyframe became a change boxed 183x257.
+  There the event's departure is now the event as drawn past re-quantization, and the rest of the
+  frame is held to a keyframe's re-encoding by `reencodedOutside`, as it already was.
+- **…and is boxed alone.** Whether such a keyframe is noisy was asked as "the step into it spans a
+  quarter of the frame": a 100x30 badge with a spot of text re-quantized 240px above was drawn
+  whole, 103x273, and a 1px shift of a 240x75 block, its own pixels the quarter, was cut to a
+  sliver. It is now asked of the means past the floor: is there a cluster of them apart from the
+  event's own (`noiseBesideEvent`)? Every one of the reviewer's 52 encodes of these cases now gives
+  the lossless story and box, except where x264's last keyframe is coded past the test (below).
+- **The re-encoding tail only where the means are spread like a re-encoding's.** The tail clause
+  (means to 48 when a quarter at most pass 40) was measured on x264's last keyframe, whose 15-17
+  means past the floor lie in 5-8 spots across the page. A label recoloured 40-45% has a tail of its
+  own from its antialiased edges (39 means past the floor, 2 to 41, all in one 64x16 region), and
+  it was read as the page re-encoded at a GOP start on x264 crf 18 and 23 and AV1, and anywhere in
+  an MJPEG recording, where the commit before reported it. The tail now needs three separate spots
+  across a quarter of the frame's width or height, or one region across a quarter of both
+  (`REENCODING_SPOTS`); without it the bound is 40. Inside a run of keyframes a frame is read again
+  only spread, since a run has no re-quantization to read but rate control's. On the reviewer's 68
+  recolour cases, the changes the tail had absorbed are reported again (x264, AV1, MJPEG and
+  intra-only x264, at and away from keyframes): 24 of the 68 give the lossless story against
+  d37e3e8b's 18, and 21 of the 47 the reviewed commit ran against its 12. None that either got
+  right is lost; the rest are at the band's edge (a 40-50% recolour moves its means by 33-42), and
+  no version reads them as the lossless change.
+- **An open GOP's re-quantization arrives over its opening.** With GOP numbers in decode order the
+  boundary is at an open GOP's first leading B-frame, part-way to the keyframe's picture (means
+  22-27 against the keyframe's 34 on x264 `open-gop` crf 28). Read again only where the number
+  changed, those leading frames made the GOP known within the floor, and the keyframe, past it, was
+  an event at every keyframe: a still page through x264 `open-gop` or x265 (whose GOPs are open by
+  default) read as a transient over 165 frames, and the reviewed commit gave the lossless number of
+  events on 17 of the reviewer's 39 open-GOP encodes (36 with key flags alone). A GOP's opening is
+  now its first frame through its keyframe (`opensGop`): any frame of it may be read again, each
+  against the state's picture from before the opening (read again frame by frame, x265 bringing a
+  digit in over three leading frames absorbed it a few levels at a time), and a GOP is known only
+  from its keyframe on. SUMMARY.md's "begins on a keyframe" uses the opening too. Of the
+  reviewer's 51 open-GOP encodes (x264 `open-gop` and x265, crf 23-32, keyint 12-60), 50 give the
+  lossless number and kinds of events; the other is x265's last keyframe at crf 30 (below).
+- **SUMMARY.md's keyframe notes** are said only of a lossy recording (a held-clock capture given
+  `--noise` was told its keyframes were not known), say "every frame is a keyframe" of a run
+  instead of the intra-refresh caveat MJPEG got, and say of a recording with only frame 0 marked
+  that it is shorter than one GOP or refreshes without keyframes.
+- **The docs** said the keyframe test was "never a step band" and its re-read "never changes
+  lost". For a frame on a GOP's opening it is a band: a change whose means pass the floor by at
+  most 8, with no block moved, is read as the page re-encoded — a label recoloured 40% at a
+  keyframe is lost where the same change mid-GOP is reported. The limits now say so, and that the
+  last keyframe of an x264 or x265 stream re-encodes a still page past the test from crf 30, not
+  35: at crf 32 x264's moved 134 means past the floor, 26 of them past 40, to 60.
+
+On the code after the third review, the sets above are unchanged:
+
+| Set | Right | Kinds of the matched events | Box IoU against the lossless box |
+|---|---|---|---|
+| the 252 known answers | 215: all 208 outside the two limits | 261 of 261 | median 1.00; under 0.5 for 8 of 261 |
+| the first review's 30 harsher encodes | 27 | 44 of 44 | median 1.00; none under 0.5 |
+| x264 intra-only and two-frame GOPs (12) | 6 | 12 of 12 | median 0.22 |
+| the second review's 375 | 288, every case as before | 346 of 353 | median 1.00; 18 under 0.5 |
+| the reviewer's 51 open-GOP encodes | 50 | | |
+| the reviewer's 68 recolour cases | 24 | | |
+
+On the real recordings every one of the 136 events has the same kind and first frame as after the
+second review, no keyframe is read again, and three boxes on changes that begin on keyframes are
+1-4px narrower: the keyframe's noise beside them is no longer drawn in. Lossless input still gives
+main's story.json and SUMMARY.md byte for byte, on 1500 random sequences and the 18 captures.
 
 ## Three things the implementation needed
 
