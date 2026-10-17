@@ -1798,6 +1798,24 @@ describe("the noise band (lossy recordings)", () => {
     assert.ok(s.events[0]!.settled!.n >= 48, `settles where the dim stops, at ${s.events[0]!.settled!.n}`);
   });
 
+  test("a fade that begins after a change has held is a new event, not the change still moving", () => {
+    // A panel appears at once at 10 and holds; 15 frames (250ms) later a tooltip fades in over 20
+    // frames elsewhere, 3 levels a frame.
+    const fade = (n: number) => Math.round(Math.min(60, Math.max(0, n - 25) * 3));
+    const at = (n: number) =>
+      frame([
+        ...(n >= 10 ? [{ x: 2, y: 2, w: 10, h: 8, rgb: [30, 30, 30] as Rgb }] : []),
+        { x: 18, y: 16, w: 18, h: 10, rgb: Array(3).fill(255 - fade(n)) as unknown as Rgb },
+      ]);
+    const s = lossyStory(Array.from({ length: 90 }, (_, n) => at(n)));
+    assert.deepEqual(
+      s.events.map((e) => [e.kind, e.first.n, e.settled?.n]).slice(0, 1),
+      [["change", 10, 10]],
+      JSON.stringify(s.events.map((e) => [e.kind, e.first.n, e.settled?.n])),
+    );
+    assert.equal(s.events.length, 2, "the panel, then the tooltip");
+  });
+
   test("a fade of 20 levels a second is one drift: no run of one-frame drifts through made-up states", () => {
     const level = (n: number) =>
       frame([

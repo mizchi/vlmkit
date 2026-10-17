@@ -52,6 +52,11 @@ export const HOLD_CONFIRM_MS = 1000;
 /** …by more than this on a 16x16 block's mean (0-255), without a sharp step. */
 export const HOLD_CREEP = 16;
 /**
+ * …and only when the block was already moving that way: by more than this (0-255) in the second
+ * before the hold or inside it. What starts after the hold is a new event.
+ */
+export const HOLD_ONGOING = 4;
+/**
  * The noise band `--lossy` compares through (`NoiseFloor`), measured on known answers: the planted
  * events captured lossless and encoded with H.264, HEVC, VP8, VP9, AV1 and MJPEG at several
  * qualities (docs/reports/2026-10-16-storyboard-noise-floor-v1.md).
@@ -1099,18 +1104,36 @@ export function buildStoryboard(
    * slow fade 3. A block that gets there by a step some 3x3 mean takes past `still` within
    * `SMEAR_FRAMES` is a new event there (the next typed character), and the hold stands. Measured
    * on whole blocks, not on the change's box: a dialog that appeared at once settled on its first
-   * frame while the page behind it dimmed for 700ms outside that box.
+   * frame while the page behind it dimmed for 700ms outside that box. And only a drift that was
+   * already under way (`HOLD_ONGOING`, the same way, in the second before the hold or inside it):
+   * a tooltip that began fading in 250ms after a change had settled kept that change from
+   * settling, and four changes of an office app ran together into one.
    */
   const creeps = (k: number): boolean => {
     const sk = signature(k);
-    const sharp = new Set<number>();
+    let p = k;
+    while (p > 0 && entries[k]!.atMs - entries[p - 1]!.atMs <= HOLD_CONFIRM_MS + EPSILON_MS) p--;
+    let q = k;
+    while (q + 1 < count && entries[q + 1]!.atMs - entries[k]!.atMs <= settleMs + EPSILON_MS) q++;
+    const sp = signature(p);
+    const sq = signature(q);
+    const ongoing = (i: number, later: number) => {
+      const before = sk[i]! - sp[i]!;
+      const inside = sq[i]! - sk[i]!;
+      return (
+        (Math.abs(before) > HOLD_ONGOING && Math.sign(before) === Math.sign(later)) ||
+        (Math.abs(inside) > HOLD_ONGOING && Math.sign(inside) === Math.sign(later))
+      );
+    };
+    const settled = new Set<number>();
     for (let m = k + 1; m < count && entries[m]!.atMs - entries[k]!.atMs <= HOLD_CONFIRM_MS + EPSILON_MS; m++) {
       const sm = signature(m);
       for (let i = 0; i < sk.length; i++) {
         if (i % 4 === 3) continue;
         const b = i >> 2;
-        if (sharp.has(b) || !(Math.abs(sm[i]! - sk[i]!) > HOLD_CREEP)) continue;
-        if (stepsSharply(b, k, m)) sharp.add(b);
+        const later = sm[i]! - sk[i]!;
+        if (settled.has(b) || !(Math.abs(later) > HOLD_CREEP)) continue;
+        if (!ongoing(i, later) || stepsSharply(b, k, m)) settled.add(b);
         else return true;
       }
     }
