@@ -1036,6 +1036,12 @@ vlmkit inspect locate   <screenshot.png> "the Save button"   # where a described
   # --dpr N (box in CSS px too), --threshold 0.5, --no-presence, --no-refine, --model <id>.
   # In an interact sequence: { "action": "click", "describe": "the Save button" } clicks it,
   # for a canvas app (Flutter web) whose DOM is not what is drawn.
+vlmkit inspect claims   <html|url|shot.png> --forbid "an error message" --expect "a login form"
+  # Advisory yes/no checks of what a screenshot visibly shows: one TypeSafe Jev noul per
+  # statement, all in one request (~$0.0002, ~0.2s; TYPESAFEAI_API_KEY). Exit 0 all hold /
+  # 1 one does not / 2 usage. --claims file.json, --viewport WxH, --save out.png, --threshold,
+  # --json. Answers within 0.3 of the threshold are marked uncertain. Gate on the
+  # deterministic checks; this is a model's reading of the pixels.
 
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)

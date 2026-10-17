@@ -21,12 +21,14 @@
  *            `labelRegionKinds` (four options, + appear/disappear cases planted by hiding a target).
  *   locate   `locateByDescription` end to end on every target and as many decoys: presence, then
  *            a box, then a box on the magnified crop, as `inspect locate` runs it.
+ *   claims   `checkClaims` on each fixture clean and with five planted defects (error banner,
+ *            modal, broken image, overlapping text, loading): caught, and false alarms.
  *
  * Usage:
  *   node --experimental-strip-types src/experiments/benchmark/jev-box/jev-box.ts \
  *     [--model jev-1.14.0] [--fixtures page,dashboard] [--per-fixture 12] [--seed 1] \
  *     [--out test-results/jev-box] [--md report.md] [--executable-path /path/to/chromium] \
- *     [--only ground,refine,present,diff,classify,regions,locate] [--rescore]
+ *     [--only ground,refine,present,diff,classify,regions,locate,claims] [--rescore]
  *
  * Environment: TYPESAFEAI_API_KEY. `--rescore` reads saved answers and needs no key or browser.
  */
@@ -51,9 +53,14 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
 import { jevRegionKindAsker, labelRegionKinds, type RegionKindOutcome } from "@mizchi/vlmkit-ai/region-kind.ts";
 import { locateByDescription, type JevAsk, type LocateResult } from "@mizchi/vlmkit-ai/locate.ts";
+import { checkClaims } from "@mizchi/vlmkit-ai/claims.ts";
 import {
+  buildClaimShots,
   buildGround,
   buildPresenceCases,
+  CLAIM_PLANTS,
+  type ClaimPlant,
+  type ClaimShot,
   windowDiffCase,
   type DiffCase,
   type GroundShot,
@@ -79,7 +86,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const FIXTURE_DIR = join(ROOT, "fixtures/css-challenge");
-const STAGES = ["ground", "refine", "present", "diff", "classify", "regions", "locate"] as const;
+const STAGES = ["ground", "refine", "present", "diff", "classify", "regions", "locate", "claims"] as const;
 type Stage = (typeof STAGES)[number];
 
 interface Call {
@@ -117,6 +124,8 @@ interface Saved {
   }[];
   /** `locateByDescription` end to end: every target, and as many decoys (other fixtures' labels). */
   locate?: { fixture: string; targetId: string; decoy: boolean; result: LocateResult }[];
+  /** One `checkClaims` per screenshot: every claim on the clean page and on each plant. */
+  claims?: { shot: ClaimShot; nouls: Record<ClaimPlant, number> }[];
   calls: Call[];
 }
 
@@ -377,6 +386,38 @@ async function runLocate(model: string, shots: GroundShot[], calls: Call[]) {
     decoy,
     result: await locateByDescription(pngs.get(shot.fixture)!, t.description, { model, ask }),
   }));
+}
+
+/** The statement each plant should make true, worded as `inspect claims --forbid` takes it. */
+export const CLAIM_STATEMENTS: Record<ClaimPlant, string> = {
+  "error-banner": "an error message or error banner",
+  modal: "a modal dialog open over the page",
+  "broken-image": "a broken or missing image",
+  overlap: "text overlapping other text so that it is hard to read",
+  loading: "a loading spinner or loading indicator covering the page",
+};
+
+/** Fixtures that show a claim's subject before anything is planted, each confirmed by looking. */
+export const CLAIM_NATIVE: Record<string, ClaimPlant[]> = {
+  // "Username must be at least 3 characters." under a red-bordered field.
+  "form-app": ["error-banner"],
+  // A "Confirm Purchase" dialog open over a blurred page.
+  "stacking-context": ["modal"],
+};
+
+/** Every claim on every screenshot, in one request each, as `inspect claims` asks them. */
+async function runClaims(model: string, shots: ClaimShot[], calls: Call[]) {
+  const ask: JevAsk = async (req) =>
+    record(calls, "claims", "", await askJev(req), Object.keys(req.questions).length) as never;
+  return pool(shots, 4, async (shot) => {
+    const r = await checkClaims(
+      await readFile(shot.imagePath),
+      CLAIM_PLANTS.map((k) => ({ statement: CLAIM_STATEMENTS[k], expect: "absent" as const })),
+      { model, ask },
+    );
+    const nouls = Object.fromEntries(CLAIM_PLANTS.map((k, i) => [k, r.results[i]!.noul])) as Record<ClaimPlant, number>;
+    return { shot, nouls };
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -733,6 +774,49 @@ export function report(saved: Saved): string {
       );
   }
 
+  if (saved.claims) {
+    const rows = saved.claims;
+    // What a fixture shows before anything is planted counts as true for its claim. Each was
+    // found as a "false alarm" and then looked at: the claim was right.
+    const truth = (r: (typeof rows)[number], k: ClaimPlant) =>
+      r.shot.plant === k || (CLAIM_NATIVE[r.shot.fixture] ?? []).includes(k);
+    out.push(
+      "## Claims: one `noul` per statement, all in one request per screenshot",
+      "",
+      `${rows.length} screenshots: each fixture clean and with each of ${CLAIM_PLANTS.length} plants. A claim is true on its own plant and on a fixture that natively shows it (${Object.entries(
+        CLAIM_NATIVE,
+      )
+        .map(([f, ks]) => `${f}: ${ks.join(", ")}`)
+        .join("; ")}, looked at).`,
+      "",
+      "| claim (statement) | caught (true cases) | false alarm, clean pages | false alarm, other plants | AUROC | median noul true / false |",
+      "|---|---:|---:|---:|---:|---|",
+    );
+    for (const k of CLAIM_PLANTS) {
+      const pos = rows.filter((r) => truth(r, k));
+      const negClean = rows.filter((r) => !truth(r, k) && r.shot.plant === "none");
+      const negOther = rows.filter((r) => !truth(r, k) && r.shot.plant !== "none");
+      const at = (xs: typeof rows) => xs.filter((r) => r.nouls[k] >= 0.5).length;
+      const auc = auroc(rows.map((r) => ({ score: r.nouls[k], positive: truth(r, k) })));
+      out.push(
+        `| ${k}: "${CLAIM_STATEMENTS[k]}" | **${at(pos)}/${pos.length}** | ${at(negClean)}/${negClean.length} | ${at(negOther)}/${negOther.length} | ${f2(auc ?? NaN)} | ${f2(median(pos.map((r) => r.nouls[k])))} / ${f2(median([...negClean, ...negOther].map((r) => r.nouls[k])))} |`,
+      );
+    }
+    const alarms = rows.flatMap((r) =>
+      CLAIM_PLANTS.filter((k) => !truth(r, k) && r.nouls[k] >= 0.5).map(
+        (k) => `${k} on ${r.shot.fixture}/${r.shot.plant} (${f2(r.nouls[k])})`,
+      ),
+    );
+    const misses = rows.flatMap((r) =>
+      CLAIM_PLANTS.filter((k) => truth(r, k) && r.nouls[k] < 0.5).map(
+        (k) => `${k} on ${r.shot.fixture}/${r.shot.plant} (${f2(r.nouls[k])})`,
+      ),
+    );
+    out.push("");
+    if (misses.length) out.push(`Missed: ${misses.join(", ")}.`, "");
+    if (alarms.length) out.push(`False alarms: ${alarms.join(", ")}.`, "");
+  }
+
   out.push(
     "## Cost and latency",
     "",
@@ -776,7 +860,7 @@ async function main() {
     saved = JSON.parse(await readFile(savedPath, "utf8"));
   } else {
     const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
-    const { shots, diffCases, presenceCases } = await withBrowser(
+    const { shots, diffCases, presenceCases, claimShots } = await withBrowser(
       async (browser) => {
         const shots = await buildGround(browser, {
           fixtures,
@@ -818,7 +902,16 @@ async function main() {
             }
           }
         }
-        return { shots, diffCases, presenceCases };
+        const claimShots = only.has("claims")
+          ? await buildClaimShots(browser, {
+              fixtures,
+              seed,
+              perFixture,
+              viewport: { width: 1280, height: 800 },
+              outDir,
+            })
+          : [];
+        return { shots, diffCases, presenceCases, claimShots };
       },
       executablePath ? { launch: { executablePath } } : {},
     );
@@ -837,6 +930,7 @@ async function main() {
       saved.regions = await runRegions(model, saved.diffCases, saved.calls);
     }
     if (only.has("locate")) saved.locate = await runLocate(model, shots, saved.calls);
+    if (only.has("claims")) saved.claims = await runClaims(model, claimShots, saved.calls);
     await writeFile(savedPath, JSON.stringify(saved, null, 2));
   }
   const md = report(saved);

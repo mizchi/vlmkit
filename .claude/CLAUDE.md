@@ -240,6 +240,21 @@ around it, magnified. Measured end to end (`docs/reports/2026-10-16-jev-locate.m
   of `selector` and `describe`. A not-found target is a step failure quoting presence, with no
   selector suggestions.
 
+**Shipped as `inspect claims`** (`@mizchi/vlmkit-ai/claims.ts` `checkClaims`;
+`packages/vlmkit-markup/src/inspect/claims-cli.ts`). Each `--forbid` / `--expect` statement is one
+`noul` in one shared request. An `inspect` leaf, not a gate: it is a model's reading of the pixels,
+so it never gates and the gate registry stays deterministic. Measured
+(`docs/reports/2026-10-17-jev-claims.md`, bench `jev-box.ts --only claims`: 9 fixtures, clean and
+with an error banner, modal, broken image, overlapping text or loading overlay planted), not to re-learn:
+
+- 54 of 55 true cases caught (the miss: one loading overlay at 0.49), and **0 false alarms on 43
+  clean-page cases**. Two "false alarms" on the clean fixtures were right: form-app shows a
+  validation error, and stacking-context has a modal open. They are `CLAIM_NATIVE`, verified by looking.
+  Look at a clean page's alarm before calling it wrong.
+- The cross-plant alarms (11 of 172) are mostly `overlap` firing on plants that cover page text.
+  The `uncertain` band (within 0.3 of the threshold) held 10 of the 12 wrong answers and 22 of the
+  258 right ones: outside it, 236 right and 2 wrong.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
