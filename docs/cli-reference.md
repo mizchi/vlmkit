@@ -1672,7 +1672,9 @@ recording shows (a decoded frame hidden behind a successor with its timestamp is
 not counted, an interlaced frame's two fields are two, every pass of a looped
 GIF counts); `key` marks keyframes, and `gop` is the GOP a frame was coded in, counted in
 decode order (ffprobe's `pkt_pos`) from 0: a keyframe after a predicted frame begins one, a run
-of keyframes is one, and an open GOP's leading B-frames (shown before its keyframe, decoded after
+of keyframes is one (only keyframes shown one after another: x264 `--open-gop` with a GOP no longer
+than its B-frames decodes two keyframes back to back with frames shown between them), and an open
+GOP's leading B-frames (shown before its keyframe, decoded after
 it and predicted from it) are counted in it. Every frame carries it, so a selection (`--at`, a
 span) that skips a keyframe still says where the codec re-quantized. An import has both when its
 timestamp file is ffprobe's `key_frame,best_effort_timestamp_time,pkt_pos` (the `--help` recipe).
@@ -1831,11 +1833,11 @@ lossy recording was one change that never settled:
 |---|---|
 | what is compared | each pixel as the mean of its 3x3 neighbourhood (a codec's error is mostly ringing, which the mean cancels) |
 | in the state, back, an earlier state | no mean more than 32 from the state's picture |
-| return across a GOP | in a GOP that began during the event, a frame within the re-quantization bands of the state (no 8x8 block mean moved past 24, no mean past 96), nearer it than the event inside the event's first box and clear of the event there, away from that box a keyframe's re-encoding (as the keyframe row), the rest of the frame one picture with its GOP's keyframe (its first frame, before the keyframe is shown; outside everything past the floor where the event began on a keyframe), and the page holding after it; the event's box and picture taken over the codec's smear (3 frames or 50 ms): dated back to the first frame of its GOP within 24 of it, and the state read again at the frame that holds |
-| one picture (a hold) | every mean within 24 of the hold's first frame, and the mean over the change's box within 3 of it (never only the frame before, or a slow ramp is one long hold) |
+| return across a GOP | in a GOP that began during the event, a frame within the re-quantization bands of the state (no 8x8 block mean moved past 24, no mean past 96), nearer it than the event inside the event's first box and clear of the event there, away from that box a keyframe's re-encoding (as the keyframe row), the rest of the frame one picture with its GOP's keyframe (its first frame, before the keyframe is shown; outside everything past the floor where the event began on a keyframe), nothing inside the box 56 or more from both the state's picture and the event's (something new there: a counter that ticked inside a toast's box), and the page holding after it; the event's box and picture taken over the codec's smear (3 frames or 50 ms): dated back to the first frame of its GOP within 24 of it, and the state read again at the frame that holds. A settle across a GOP is judged the same way on the box it measured |
+| one picture (a hold) | every mean within 24 of the hold's first frame, and the mean over the change's box (a line's thin side grown to whole 8x8 blocks, a codec's) within 3 of it (never only the frame before, or a slow ramp is one long hold) |
 | drift | a change no step of which, between frames up to 50 ms or 3 frames apart and inside its box, moves a mean past 32 (a step inside 24 is none) |
-| keyframe | on a GOP's opening (where it begins, by frames.json `gop`, else a keyframe after a predicted frame, through its keyframe: an open GOP's leading B-frames come first), a frame that is the state's picture as a keyframe re-encodes it: no 8x8 block mean moved past 24, no 16x16 block mean past 12 and no mean past 40 — or no mean past 48 and no more than a quarter of the means past the floor past 40, spread like a re-encoding (three separate spots across a quarter of the frame's width or height, or spots whose box spans a quarter of both) or in one spot whose 8x8 means moved by 12 at most. Each frame of an opening is tested against the state's picture from before it, and a leading frame only when its keyframe passes too. The state is read again there. Inside a run of keyframes (MJPEG, an intra-only encode) only spread, and only when the page then holds. A GOP whose keyframe a selection left out is opening throughout. Each re-read, and each return and settle read again, is in `reread` in story.json; SUMMARY.md names the first 12 and how each was judged |
-| box | the decoded pixels past 32 inside the means' box grown by 2 px, each frame against the state's picture in its GOP: a 1 px caret is drawn 1 px wide on 10 of 13 encodings (3-4 px on the others), not the 3 px the means give. In a GOP where that picture is not known and whose keyframe (for a leading frame, the frame itself) moved a mean past the floor away from the event, only near blocks past re-quantization (an 8x8 mean past 24 or a 3x3 mean past 48), with the event's parts that do not look like a re-encoding (a 1px rule beside a label) |
+| keyframe | on a GOP's opening (where it begins, by frames.json `gop`, else a keyframe after a predicted frame, through its keyframe: an open GOP's leading B-frames come first), a frame that is the state's picture as a keyframe re-encodes it: no 8x8 block mean moved past 24, no 16x16 block mean past 12 and no mean past 40 — or no mean past 48 and no more than a quarter of the means past the floor past 40, spread like a re-encoding (three separate spots across a quarter of the frame's width or height, or spots whose box spans a quarter of both) or in two or more spots apart whose 8x8 means moved by 12 at most, never one spot (a letter changed on a keyframe is one). Where the state's picture changed since its GOP's keyframe (it was coded by prediction, and the next keyframe codes it afresh), means to 56 in 8x8 blocks that moved by 12 at most. Each frame of an opening is tested against the state's picture from before it. The state is read again there — except on a leading frame whose keyframe fails and moves a mean past 40 where the leading frame departs: that is the change's pre-echo, held (neither read again nor an event), so the change begins on the keyframe. Inside a run of keyframes (MJPEG, an intra-only encode) only spread, and only when the page then holds. A GOP whose keyframe a selection left out is opening throughout. Each re-read, and each return and settle read again, is in `reread` in story.json; SUMMARY.md names the first 12 and how each was judged |
+| box | the decoded pixels past 32 inside the means' box grown by 2 px, each frame against the state's picture in its GOP: a 1 px caret is drawn 1 px wide on 10 of 13 encodings (3-4 px on the others), not the 3 px the means give. In a GOP where that picture is not known and whose keyframe (for a leading frame, the frame itself) moved a mean past the floor away from the event, only near blocks past re-quantization (an 8x8 mean past 24, or 3x3 means past 48 — two of them around a block, not a lone one), with the event's parts that do not look like a re-encoding (a 1px rule beside a label: past 40 with its 8x8 means moved), those on its first frame |
 
 `--lossy` on frames that are not from a lossy recording changes nothing, and says so.
 `--noise still,floor[,radius]` applies a band of one's own to any frames, with
@@ -1847,20 +1849,27 @@ event by event against the lossless one
 output does not detect: a change smaller than the floor over a 3x3 mean (a 6% fade: a fade
 begins late and ends early by the part of it inside the floor); a change the keyframe row
 admits — means past the floor by at most 8, or by 16 where spread (several changes made at once
-count) or in one spot whose blocks barely moved, no block moved — landing on a GOP's opening, or
+count) or in spots apart whose blocks barely moved, by 24 where the picture changed since its
+GOP's keyframe, no block moved — landing on a GOP's opening, or
 anywhere in a run of keyframes when spread, where it reads as the page re-encoded (a label
 recoloured 40% at a keyframe; the same change mid-GOP is reported on x264); a change within that
 band made elsewhere while an event spanning a keyframe is up; blinks whose off-time is at most
-the 100 ms hold, the first on a noisy opening, which merge; an oscillation (a spring's overshoot) that holds at a slow turning point and
-swings on as a second event; and a recording a codec has destroyed (x264 crf 45). What it
-reports and is wrong about, flagged as beginning on a keyframe: a keyframe that re-encodes a
-still page past the keyframe row — x264 at crf 35 and above, the last keyframe of an x264 or
-x265 stream (coded coarser) from crf 30 — and the codec refreshing a band at a time with no
-keyframe (intra refresh); x264's first two frames of an intra-only stream (means 56 apart,
-16x16 blocks 14) are said by the run note. For a lossy recording, SUMMARY.md says when no frame
+the 100 ms hold, the first on a noisy opening, which merge, and a change inside an event's box
+that settles within 100 ms of a keyframe, which merges with the event; an oscillation (a spring's
+overshoot) that holds at a slow turning point and swings on as a second event; and a recording a
+codec has destroyed (x264 crf 45). A faint part of an event that looks like a keyframe's
+re-encoding on the keyframe it began on is cut from its box. What it reports and is wrong about,
+flagged as beginning on a keyframe: a keyframe that re-encodes a still page past the keyframe row
+— x264 at crf 35 and above, x264 `open-gop` at crf 32, a 1080p page at x264 crf 32, the last
+keyframe of an x264 or x265 stream (coded coarser) from crf 27-29 — and the codec refreshing a
+band at a time with no keyframe (intra refresh); an x265 leading frame's pre-echo past the band
+that is gone before the keyframe, as a glitch before the change; x264's first two frames of an
+intra-only stream (means 56 apart at crf 28, 16x16 blocks 14) are said by the run note when an
+event begins there. For a lossy recording, SUMMARY.md says when no frame
 is marked a keyframe, when a selection has no GOP numbers or left out a GOP's keyframe, when only
 frame 0 is marked (a recording shorter than one GOP, or intra refresh; or frames inside one GOP)
-and when every frame is (a run of keyframes); it names a leading frame read again as one; it says when keyframes
+and when every frame is (a run of keyframes); it names a leading frame read again, and an event
+that begins on one, as what it is; it says when keyframes
 fell inside an event that never settled, and that from those GOPs the box takes only blocks
 that moved past re-quantization.
 
