@@ -1338,12 +1338,13 @@ export function buildStoryboard(
   /**
    * GOP g codes the state's picture past the floor of the anchor's away from the event: its
    * keyframe against the anchor, outside `region` (the event as drawn before the GOP began, grown
-   * by 2·radius + 8px) — or, for an event that begins on the keyframe, the step into it spread over
-   * a quarter of the frame. Only then are frames of g drawn near the blocks that moved past
-   * re-quantization; where it re-quantized nothing past the floor they are drawn whole, and a 1px
-   * diagonal shift kept its box (cut to a 24x19 sliver otherwise). Asked of the step from the frame
-   * before instead, outside that frame's departure, a toast's box took in the spot the previous
-   * keyframe had pushed past the floor (in that departure, so never outside it): 452x297 for 150x32.
+   * by 2·radius + 8px) — or, for an event that begins on the keyframe, a cluster of means past the
+   * floor apart from the event's own (`noiseBesideEvent`). Only then are frames of g drawn near
+   * the blocks that moved past re-quantization; where it re-quantized nothing past the floor they
+   * are drawn whole, and a 1px diagonal shift kept its box (cut to a 24x19 sliver otherwise).
+   * Asked of the step from the frame before instead, outside that frame's departure, a toast's box
+   * took in the spot the previous keyframe had pushed past the floor (in that departure, so never
+   * outside it): 452x297 for 150x32.
    */
   const noisy = (g: number, from: number, region: Box | null): boolean => {
     const k = gopStart[g]!;
@@ -1366,13 +1367,71 @@ export function buildStoryboard(
       result =
         frameDelta(frames.pixels(anchor), frames.pixels(k), width, height, { floor, mask: outside, still }).over > 0;
     } else {
-      const b = delta(k - 1, k).box;
-      result = b !== null && b.width * 4 >= width && b.height * 4 >= height;
+      result = noiseBesideEvent(k);
     }
     noisyGops.set(key, result);
     return result;
   };
   const noisyGops = new Map<string, boolean>();
+  /**
+   * For an event that begins on keyframe k: the 8x8 blocks where a mean of k is past the floor of
+   * the anchor's, gathered into clusters (gaps of up to two blocks bridged). The event is every
+   * cluster holding a block whose mean moved past the keyframe band; any other cluster is the
+   * keyframe's own re-quantization. Asked as "the step into k spans a quarter of the frame", a
+   * badge with a spot of text re-quantized 240px away was drawn whole (103x273 for 100x30), and a
+   * 1px shift of a 240x75 block, its own pixels the quarter, was cut to a 24x19 sliver.
+   */
+  const noiseBesideEvent = (k: number): boolean => {
+    const band = noise!.keyframe!.block;
+    const fa = fineOf(anchor);
+    const fk = fineOf(k);
+    const bw = Math.ceil(width / 8);
+    const bh = Math.ceil(height / 8);
+    const past = new Uint8Array(bw * bh);
+    const ma = frames.pixels(anchor);
+    const mk = frames.pixels(k);
+    for (let p = 0, n = width * height; p < n; p++) {
+      if (mask !== null && mask[p] === 1) continue;
+      const i = p << 2;
+      const d = Math.max(
+        Math.abs(ma[i]! - mk[i]!),
+        Math.abs(ma[i + 1]! - mk[i + 1]!),
+        Math.abs(ma[i + 2]! - mk[i + 2]!),
+        Math.abs(ma[i + 3]! - mk[i + 3]!),
+      );
+      if (d > floor) {
+        const y = (p / width) | 0;
+        past[(y >> 3) * bw + ((p - y * width) >> 3)] = 1;
+      }
+    }
+    const seen = new Uint8Array(bw * bh);
+    const stack: number[] = [];
+    for (let b = 0; b < bw * bh; b++) {
+      if (past[b] !== 1) continue;
+      let moved = false;
+      for (let c = 0; c < 4 && !moved; c++) moved = Math.abs(fa[b * 4 + c]! - fk[b * 4 + c]!) > band;
+      if (moved) {
+        seen[b] = 1;
+        stack.push(b);
+      }
+    }
+    while (stack.length > 0) {
+      const b = stack.pop()!;
+      const bx = b % bw;
+      const by = (b / bw) | 0;
+      for (let y = Math.max(0, by - 2); y <= Math.min(bh - 1, by + 2); y++) {
+        for (let x = Math.max(0, bx - 2); x <= Math.min(bw - 1, bx + 2); x++) {
+          const q = y * bw + x;
+          if (past[q] === 1 && seen[q] === 0) {
+            seen[q] = 1;
+            stack.push(q);
+          }
+        }
+      }
+    }
+    for (let b = 0; b < bw * bh; b++) if (past[b] === 1 && seen[b] === 0) return true;
+    return false;
+  };
   const measure = (from: number, to: number, reread = -1) => {
     // Each frame against the state's picture as its GOP encodes it. A return read again in another
     // GOP is that picture there: against the anchor, what its keyframe re-quantized across the page
@@ -1417,7 +1476,7 @@ export function buildStoryboard(
     for (let m = from; m <= to; m++) if (entries[m]!.stable === false) unstable++;
     // Never no box: an event's first frame departed from the anchor past the floor, so its means
     // say where. (Drawn against a return read again, every frame of an event can be within the
-    // floor of it: \`snapshot storyboard\` threw on a one-frame flash before a new count.)
+    // floor of it: `snapshot storyboard` threw on a one-frame flash before a new count.)
     const box = drawnOver.box ?? vsAnchor(from).box ?? vsAnchor(from).changed ?? { x: 0, y: 0, width, height };
     return { box, peak: { ...ref(drawnOver.peak), over: Math.max(0, drawnOver.peakOver) }, unstable };
   };
@@ -1608,7 +1667,17 @@ export function buildStoryboard(
     // A return across a GOP is read again at the frame found holding, never at an earlier one it
     // was dated back to: there a fade-out can still be on its way to it.
     let held = -1;
-    const departed = noise ? vsAnchor(s).box : null;
+    // Where the event departed. In a GOP the state's picture is not known in (the event began on
+    // its keyframe), the means past the floor are the event and whatever that keyframe
+    // re-quantized anywhere on the page: a spot of text 240px above a toast was "still the event"
+    // in every later frame, so the toast never came back (two changes, three states). So there,
+    // the event as drawn past re-quantization; the rest of the frame is held to a keyframe's
+    // re-encoding by `reencodedOutside`, which is what still catches a counter changed under it.
+    const departed = noise
+      ? noise.keyframe && !valid.has(gop[s]!)
+        ? (drawn(s, vsAnchor(s).box, vsAnchor(s).over, anchor, true).box ?? vsAnchor(s).box)
+        : vsAnchor(s).box
+      : null;
     for (let m = s + 1; m < count && entries[m]!.atMs - entries[s]!.atMs <= transientMs + EPSILON_MS; m++) {
       // The step first: it does not depend on the anchor, so when this window is scanned again
       // after a change re-anchors, a frame identical to the one before it is answered without

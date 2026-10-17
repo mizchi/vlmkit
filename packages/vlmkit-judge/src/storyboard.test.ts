@@ -1489,6 +1489,53 @@ describe("the noise band (lossy recordings)", () => {
     );
   });
 
+  test("an event that begins on a keyframe re-quantizing text elsewhere: the toast returns, the badge stays, each boxed alone", () => {
+    // Text at the top right whose 3x3 means a keyframe moves past the floor (its 8x8 means do not
+    // move); a toast or a badge below it, more than two blocks away (what `noiseBesideEvent`
+    // bridges), appears on that keyframe. One column wide, so the step into the keyframe does not
+    // span a quarter of the frame's width: asked that, the badge was drawn whole.
+    const text = { x: 32, y: 0, width: 8, height: 8 };
+    const ring = (f: Uint8Array, amp: number) =>
+      f.map((v, i) => {
+        const p = i >> 2;
+        const x = p % W;
+        const y = Math.floor(p / W);
+        if (i % 4 === 3 || x < text.x || y >= text.height) return v;
+        return Math.max(0, Math.min(255, v + (Math.floor(x / 4) % 2 === 0 ? amp : -amp)));
+      });
+    const base = frame([], GREY);
+    const badge = (f: Uint8Array) => {
+      const out = new Uint8Array(f);
+      for (let y = 25; y < 30; y++) for (let x = 32; x < 40; x++) out.set([30, 30, 30, 255], (y * W + x) * 4);
+      return out;
+    };
+    const after = ring(base, 40);
+    // The toast: on keyframe 10, gone at 30, in the same GOP. Measured outside the event's means
+    // past the floor, the text was "still the event" in every later frame and the toast never
+    // came back: two changes, three states.
+    const toast = lossyStory(
+      [...repeat(base, 10), ...repeat(badge(after), 20), ...repeat(after, 40)],
+      LOSSY_NOISE,
+      [0, 10],
+    );
+    assert.deepEqual(
+      toast.events.map((e) => [e.kind, e.first.n, e.back?.n]),
+      [["transient", 10, 30]],
+    );
+    assert.deepEqual(
+      toast.states.map((st) => st.id),
+      ["S0"],
+    );
+    assert.deepEqual(toast.events[0]!.box, { x: 32, y: 25, width: 8, height: 5 });
+    // The badge stays: one change, boxed alone (drawn whole, the text took it to 8x30).
+    const stays = lossyStory([...repeat(base, 10), ...repeat(badge(after), 40)], LOSSY_NOISE, [0, 10]);
+    assert.deepEqual(
+      stays.events.map((e) => [e.kind, e.first.n, e.settled?.n]),
+      [["change", 10, 10]],
+    );
+    assert.deepEqual(stays.events[0]!.box, { x: 32, y: 25, width: 8, height: 5 });
+  });
+
   test("a frame near the state in a later GOP with nothing after it is no return: no hold shows it", () => {
     const base = frame([], GREY);
     const dotAt = (x: number) => frame([{ x, y: 12, w: 4, h: 4, rgb: [20, 20, 20] }], GREY);
