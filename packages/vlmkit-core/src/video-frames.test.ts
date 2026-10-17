@@ -383,6 +383,16 @@ test("gopNumbers: counted in decode order, a run of keyframes one GOP, shown ord
     gopNumbers(shown.map((f) => ({ ...f, key: [0, 1, 4, 5].includes(f.index) }))),
     [0, 0, 0, 0, 1, 1, 1, 1],
   );
+  // x264 --open-gop, keyint 3: the IDR and the next keyframe decoded back to back (I0 I3 B1 B2 I6
+  // B4 B5), the B-frames shown between them. Not a run: keyframe 3 begins GOP 1, its leading
+  // frames 1-2 in it.
+  const short = [0, 1, 2, 3, 4, 5, 6].map((index) => ({
+    index,
+    ticks: index,
+    key: index % 3 === 0,
+    pos: [0, 2, 3, 1, 5, 6, 4][index]! * 100,
+  }));
+  assert.deepEqual(gopNumbers(short), [0, 1, 1, 1, 2, 2, 2]);
   // videoTimeline carries them onto its rows, both fields of a split frame included.
   const t = videoTimeline(
     closed.map((f) => ({ ...f, ticks: f.index * 40 })),

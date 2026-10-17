@@ -428,6 +428,10 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
  * predicted from it, so they carry its re-quantization (measured on x264 --open-gop: the frame
  * shown 17ms before the keyframe stepped 42 levels on a still page, the keyframe 18 after it).
  * A run of keyframes is one GOP: an intra-only codec codes a still picture the same every frame.
+ * Only keyframes shown one after another are a run: x264 --open-gop with a GOP no longer than its
+ * B-frames decodes the IDR and the next keyframe back to back, the B-frames shown between them
+ * after both, and counted as a run that keyframe was in GOP 0 — neither an opening nor a run as
+ * shown, so its re-quantization was a 55-frame transient that swallowed every caret blink in it.
  */
 export function gopNumbers(frames: readonly ProbedFrame[]): number[] {
   const order = frames.every((f) => f.pos !== undefined)
@@ -436,7 +440,8 @@ export function gopNumbers(frames: readonly ProbedFrame[]): number[] {
   const gop = new Array<number>(frames.length).fill(0);
   let g = 0;
   order.forEach((i, k) => {
-    if (k > 0 && frames[i]!.key && !frames[order[k - 1]!]!.key) g++;
+    const prev = k > 0 ? order[k - 1]! : -1;
+    if (k > 0 && frames[i]!.key && (!frames[prev]!.key || i !== prev + 1)) g++;
     gop[i] = g;
   });
   return gop;
