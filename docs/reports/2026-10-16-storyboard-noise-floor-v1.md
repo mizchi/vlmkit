@@ -260,8 +260,8 @@ changed:
   from them; BRIEF.md's no-events line counts the frames read again; `--lossy --json` on frames that
   are not lossy says so on stderr.
 
-What the conservative re-read costs is events the codec makes, never changes lost. They are
-reported and flagged as beginning on a keyframe:
+What the conservative re-read costs is mostly events the codec makes, reported and flagged as
+beginning on a keyframe (the third review found changes it lost too: below):
 - x264 re-quantizes an intra-only stream once, between its first two frames: 56 in the means and 14
   in a 16x16 block on the planted page;
 - x264 at crf 35 and above re-encodes a still page past the test at most keyframes;
@@ -298,9 +298,14 @@ Every one of the 87 misses is a limit below, and none is another kind:
 
 The kinds that differ are fades the codec decoded as jumps (a drift read as a change).
 
-The weak boxes are the six of the first round and two at crf 45. Against the first round's code
-this round lost the 3 crf 35 cases and the 6 intra-only ones, each to an extra event the codec
-made, flagged as beginning on a keyframe; no event of a lossless storyboard was lost.
+Of the 252 known answers' weak boxes, six are the first round's and two at crf 45. The 17 of the
+second review's cases are documented limits too: a spinner across keyframes that never settles (its
+box takes only blocks past re-quantization, 0.005), a digit flashing under a 20-level row inside
+the floor (0.01-0.43), carets and digits drawn as decoded (0.32-0.41), and a 1px jump at crf 35.
+
+Against the first round's code this round lost the 3 crf 35 cases and the 6 intra-only ones, each
+to an extra event the codec made, flagged as beginning on a keyframe; no event of the 252 known
+answers' lossless storyboards was lost.
 
 ## Three things the implementation needed
 
@@ -425,10 +430,13 @@ The output does not detect these.
 - **A fade is seen only past the floor.** It begins late and ends early by the part of it inside
   the floor: a toast fading out over a second ends 6 frames before the lossless one does, a fade-out
   over 1.5s 9 frames before.
-- **A change that small landing on a frame read again is absorbed**: within the re-encoding test of
-  a keyframe — no 8x8 block mean past 24, no 16x16 block mean past 12, no mean past 48, at most a
-  quarter of the means past the floor past 40. A 12px digit moves its means by 62 or more at crf 28;
-  a lighter one may not. SUMMARY.md names the first 12 frames read again and story.json all of them.
+- **A change the keyframe test admits, landing on a GOP's opening, is absorbed**: no 8x8 block
+  mean past 24, no 16x16 block mean past 12 and no mean past 40 (past 48 only where the means past
+  the floor are spread like a re-encoding's, a quarter at most past 40). That is a band, not only
+  what is under the floor: a label recoloured 40% at a 30-frame GOP's keyframe is lost on x264,
+  VP9 and AV1 where the same change mid-GOP is reported. A 12px digit moves its means by 62 or more
+  at crf 28; a lighter one may not. SUMMARY.md names the first 12 frames read again and story.json
+  all of them.
 - **An oscillation can hold at a turning point.** A spring's overshoot slows enough near each turn
   for 100ms within the band, so it settles there and its next swing is a second event (a drift).
 - **x264 at crf 45 destroys the content.** The digit change never appears, and frame 1 departs from
@@ -439,10 +447,13 @@ The output does not detect these.
 These it reports, and they are wrong; each is flagged as beginning on a keyframe:
 - x264's intra-only re-quantization between its first two frames;
 - x264 at crf 35 and above, whose keyframes re-encode a still page past the test;
-- intra refresh, which re-quantizes a band at a time with no keyframe (SUMMARY.md says when no GOP
-  begins after frame 0).
+- the last keyframe of an x264 or x265 stream, coded coarser, from crf 30 (x264 crf 32: 134 means
+  past the floor, 26 of them past 40, to 60);
+- intra refresh, which re-quantizes a band at a time with no keyframe (SUMMARY.md says when only
+  frame 0 is marked a keyframe: shorter than one GOP, or intra refresh).
 
-SUMMARY.md also says when no frame is marked a keyframe and when a selection has no GOP numbers.
+For a lossy recording SUMMARY.md also says when no frame is marked a keyframe, when a selection has
+no GOP numbers and when every frame is one.
 For an event that never settles it says when keyframes fell inside it: from those GOPs its box takes
 only the blocks that moved past re-quantization, so a keyframe that moved a block further is in it
 (`--ignore` what never settles, as on a lossless capture).
@@ -463,15 +474,21 @@ three times.
   - the smeared step at 60, 30 and 25fps;
   - holds that creep (a dialog over a dimming page);
   - keyframes read again, the tail test, and changes on a keyframe that stay changes;
+  - a re-encoding is spread: a label recoloured with a tail of its own on a keyframe, and a
+    localized step inside a run of keyframes, are changes;
   - a run of keyframes (MJPEG; x264 intra-only's one re-quantization; a fade a level a frame);
-  - GOP numbers (`beginsGop`);
+  - GOP numbers (`beginsGop`) and an open GOP's opening (`opensGop`): a still page re-quantized over
+    its leading frames and keyframe is read again, and a change brought in over them is a change;
+  - an event that begins on a keyframe that re-quantizes text elsewhere: a toast returns, a badge
+    stays, each boxed alone;
   - returns across GOPs (a transient, blinks, a caret that is no return, a toast fading out across
     a keyframe, a counter that ticks while a toast is up);
   - a transient's box across two keyframes;
   - settling in a later GOP;
   - refused bands;
   - property tests for the region check and the signatures;
-  - SUMMARY.md's sentences, and its notes where keyframes are not known.
+  - SUMMARY.md's sentences, and its notes where keyframes are not known (only for a lossy
+    recording), for a run of keyframes and for a recording with only frame 0 marked.
 - `packages/vlmkit-core`: `gopNumbers` (decode order, an open GOP, a run of keyframes),
   `parseFrameTable`'s `pkt_pos`, the timestamp file's `key_frame` and `pkt_pos` columns, and through
   ffmpeg an open-GOP encode whose leading B-frames are counted in the next GOP, a selection that
@@ -484,8 +501,10 @@ three times.
   - VP9 crf 50 with a keyframe every 30;
   - AV1 crf 50.
 
-  Each must give the lossless story. It also holds the fade limit, a digit on a keyframe, and the
-  CLI path: refusal without `--lossy`, the band in story.json, keyframes read again.
+  Each must give the lossless story. It also holds the fade limit, a digit on a keyframe, open
+  GOPs (a still page, a toast, a caret and a digit through x264 `open-gop` and x265, keyint 12: the
+  lossless story, with the GOP number changing on a leading frame), and the CLI path: refusal
+  without `--lossy`, the band in story.json, keyframes read again.
 - The lossless path is unchanged. The existing storyboard tests pass. On 1500 random sequences (half
   with keyframe flags) and the 18 lossless captures, story.json and SUMMARY.md equal origin/main's
   byte for byte.

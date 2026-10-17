@@ -536,21 +536,28 @@ and keeps `--lossy`'s hold and keyframe bands. The rules, all on each pixel's 3x
 - **GOPs** come from frames.json `gop` (`scan video` counts them in decode order by `pkt_pos`, so
   an open GOP's leading B-frames are in the GOP they are decoded in, and a `--at` selection keeps
   them); without it a keyframe after a predicted frame begins one. A run of keyframes is one GOP.
-- **Keyframes** (`reencodes`): where a GOP begins, the state is read again (`reread`) when the
+  A GOP's opening is its first frame through its keyframe (`opensGop`), and a GOP is known for the
+  state only from its keyframe on.
+- **Keyframes** (`reencodes`): on a GOP's opening, the state is read again (`reread`) when the
   frame is its picture as a keyframe re-encodes it — no 8x8 block mean past 24, no 16x16 block
-  mean past `KEYFRAME_REGION` (12), no mean past 48, and no more than a quarter of the means past
-  the floor past 40 (`tailFits`: a re-encoding has a tail, a change a core). Inside a run of
-  keyframes only when the page then holds.
+  mean past `KEYFRAME_REGION` (12) and no mean past 40; or, spread like a re-encoding
+  (`REENCODING_SPOTS`: three separate spots together across a quarter of the frame's width or
+  height, or one region across a quarter of both), no mean past 48 and no more than a quarter of
+  the means past the floor past 40 (`tailFits`). Inside a run of keyframes only spread, and only
+  when the page then holds.
 - **Returns and settles across a GOP** only in a GOP that began during the event (`valid` holds
   the GOPs the state's picture is known in): within the bands (8x8 ≤ 24, means ≤ 96), nearer the
   state than the event inside its first box and clear of it there (`leftEvent`, per 8x8 block),
   away from that box a keyframe's re-encoding (`reencodedOutside`), the rest of the frame one
-  picture with its GOP's first frame (`agreesOutside`), and for a return the page holding after
+  picture with its GOP's keyframe (`agreesOutside`), and for a return the page holding after
   it. Dated back to the first frame of the GOP within `still` of the hold, read again at the hold.
 - **Boxes** are the decoded pixels past the floor inside the means' box grown by 2·radius, each
   frame against the state's picture in its own GOP. In a GOP where that picture is not known and
   whose keyframe moved a mean past the floor of the anchor away from the event as drawn so far
-  (`noisy`), only within a block of the 8x8 blocks that moved past 24.
+  (`noisy`; for an event that begins on the keyframe, a cluster of means past the floor apart from
+  the event's own), only within a block of the 8x8 blocks that moved past 24. An event that begins
+  on such a keyframe has departed only where it is drawn so: the rest of the frame is held to a
+  re-encoding by `reencodedOutside`.
 
 Known answers: `fixtures/storyboard/planted-ui.html` (the planted kinds on an application-like page,
 plus caret, digit, cursor, scroll), five encodings held by `storyboard-lossy.test.ts`. Rounds:
@@ -574,19 +581,35 @@ plus caret, digit, cursor, scroll), five encodings held by `storyboard-lossy.tes
 - **Per pixel alone, a fade is a run of holds.** A fade slower than 24 levels per 100ms stayed within
   `still` of each hold's first frame: one fade became one-frame drifts through made-up states. The
   region mean (`holdMean`) is what moves; a codec's noise cancels over the box.
-- **Keyframes are a re-encoding test, never a step band, and never "spread".** A step band (no mean
-  past 48) swallowed real 33-48 level changes and fired on a fade's first frame. "Noise spread over
-  a quarter of the frame" counted the change's own pixels: 24 counters, a 1px scroll, a 1px text
-  shift and a 16-level tint all read as the page re-encoded. Planted exactly on a forced keyframe
-  through x264, x265, VP9 and AV1, a still page's keyframe moved means by 36 at most up to crf 28
-  (54 at crf 35), a digit by 64-73, a caret by ~80, counters 71-78, a scroll or a shift 73-94, and a
-  16-level tint moved 16x16 blocks by 16-20 against a keyframe's 8. x264's last keyframe in a stream
-  is coded coarser (41-46, with 1-3 of 15-17 means past 40): hence the tail test, not a bound of 40.
+- **The keyframe test is a band, so it is kept narrow.** What it admits is not seen: a change
+  whose means pass the floor by at most 8, with no 8x8 block past 24 and no 16x16 block past 12,
+  is read as the page re-encoded where it lands on a GOP's opening — a label recoloured 40% at a
+  30-frame GOP's keyframe was lost, the same change mid-GOP reported. A wider band (no mean past
+  48) swallowed real 33-48 level changes and fired on a fade's first frame; "noise spread over a
+  quarter of the frame" alone counted the change's own pixels (24 counters, a 1px scroll, a 1px
+  text shift and a 16-level tint read as the page re-encoded). Planted exactly on a forced
+  keyframe through x264, x265, VP9 and AV1, a still page's keyframe moved means by 36 at most up to
+  crf 28 (54 at crf 35), a digit by 64-73, a caret by ~80, counters 71-78, a scroll or a shift
+  73-94, and a 16-level tint moved 16x16 blocks by 16-20 against a keyframe's 8. x264's last
+  keyframe in a stream is coded coarser (41-46, with 1-3 of 15-17 means past 40, in 5-8 spots
+  across the page): hence a tail to 48 — but only spread, since a label recoloured 45% has one too
+  (39 means past the floor, 2 to 41, one 64x16 region) and was lost at a GOP start on x264, AV1 and
+  MJPEG.
 - **A run of keyframes is one GOP.** MJPEG decodes a still picture byte-identically 61 frames of 61.
   x264 at one keyframe a frame re-quantizes once, between its first two frames (rate control) — 56
   in the means and 14 in a 16x16 block on the planted page, past the keyframe test, so an intra-only
   x264 stream of a still page begins with a flagged change. Read again freely inside a run, a fade a
-  level a frame was lost at every frame; hence "only when the page then holds".
+  level a frame was lost at every frame; hence "only when the page then holds". And only spread: a
+  run has no re-quantization to read again but rate control's (MJPEG decodes a still page byte for
+  byte), so a localized step there is a change, and a label recoloured on MJPEG or an intra-only
+  x264 stream, which holds, was read again as the page.
+- **An open GOP's re-quantization arrives over its opening.** Its leading B-frames are decoded after
+  the keyframe and counted in its GOP, so the GOP number changes on the first of them, which is
+  part-way to the keyframe's picture (means 22-27 against 34 on x264 open-gop crf 28). Read again
+  only where the number changed, those frames made the GOP known within the floor and the keyframe,
+  past it, was an event at every keyframe (x264 `open-gop`, x265's default CRA): a still page read
+  as a transient over 165 frames. Any frame of the opening may be read again now, and only frames
+  from the keyframe on make a GOP known.
 - **A return across a GOP needs the GOP to have begun during the event, and the frame outside the
   event to be the state.** Tested in any other GOP, a counter that ticked while a toast was up read
   as the page come back (its 8x8 means move by 5): lost on default x264, x265, VP9 and AV1. Where
@@ -606,15 +629,17 @@ plus caret, digit, cursor, scroll), five encodings held by `storyboard-lossy.tes
   state's picture is pinned (a ticking counter cost 4665 means for 80 states at 1080p with them
   evicted). 563 frames at 1920x910: > 10 min → about 2 min.
 - Not seen (the output does not say which): a change smaller than the floor over a 3x3 mean (a 6%
-  fade; fades begin late and end early by their part inside the floor); one that small landing on
-  a frame read again; an oscillation that holds at a slow turning point (a spring: its next swing is
-  a second event); x264 crf 45, where the codec destroys the content. Reported and wrong, flagged as
-  beginning on a keyframe: x264 at crf 35 and above, the intra-only first frame, intra refresh.
-  SUMMARY.md says when keyframes are not known (an import without ffprobe's `key_frame`, a
-  selection without GOP numbers, no GOP after frame 0), names the first 12 frames read again and
-  how each was judged (story.json's `reread` has them all), and says when keyframes fell inside an
-  event that never settled (its box takes from those GOPs only blocks past re-quantization:
-  `--ignore` what never settles).
+  fade; fades begin late and end early by their part inside the floor); a change inside the
+  keyframe test's band that lands on a GOP's opening (above); an oscillation that holds at a slow
+  turning point (a spring: its next swing is a second event); x264 crf 45, where the codec
+  destroys the content. Reported and wrong, flagged as beginning on a keyframe: x264 at crf 35 and
+  above, the last keyframe of an x264 or x265 stream (coded coarser) from crf 30, the intra-only
+  first frame, intra refresh. For a lossy recording SUMMARY.md says when keyframes are not known
+  (an import without ffprobe's `key_frame`, a selection without GOP numbers, only frame 0 marked:
+  shorter than one GOP, or intra refresh) and when every frame is one (a run), names the first 12
+  frames read again and how each was judged (story.json's `reread` has them all), and says when
+  keyframes fell inside an event that never settled (its box takes from those GOPs only blocks
+  past re-quantization: `--ignore` what never settles).
 
 On eight VideoCUA desktop tasks (H.264, 1366x716 to 1920x1080) 9 of 10 logged clicks and keys are
 followed by an event within 1s. That is weak evidence on its own: an event begins within that window

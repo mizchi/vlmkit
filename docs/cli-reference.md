@@ -1831,10 +1831,10 @@ lossy recording was one change that never settled:
 |---|---|
 | what is compared | each pixel as the mean of its 3x3 neighbourhood (a codec's error is mostly ringing, which the mean cancels) |
 | in the state, back, an earlier state | no mean more than 32 from the state's picture |
-| return across a GOP | in a GOP that began during the event, a frame within the re-quantization bands of the state (no 8x8 block mean moved past 24, no mean past 96), nearer it than the event inside the event's first box and clear of the event there, away from that box a keyframe's re-encoding (as the keyframe row), the rest of the frame one picture with its GOP's first frame, and the page holding after it: dated back to the first frame of its GOP within 24 of it, and the state read again at the frame that holds |
+| return across a GOP | in a GOP that began during the event, a frame within the re-quantization bands of the state (no 8x8 block mean moved past 24, no mean past 96), nearer it than the event inside the event's first box and clear of the event there, away from that box a keyframe's re-encoding (as the keyframe row), the rest of the frame one picture with its GOP's keyframe, and the page holding after it: dated back to the first frame of its GOP within 24 of it, and the state read again at the frame that holds |
 | one picture (a hold) | every mean within 24 of the hold's first frame, and the mean over the change's box within 3 of it (never only the frame before, or a slow ramp is one long hold) |
 | drift | a change no step of which, between frames up to 50 ms or 3 frames apart and inside its box, moves a mean past 32 (a step inside 24 is none) |
-| keyframe | where a GOP begins (frames.json `gop`, else a keyframe after a predicted frame), a frame that is the state's picture as a keyframe re-encodes it: no 8x8 block mean moved past 24, no 16x16 block mean past 12, no mean past 48, and no more than a quarter of the means past the floor past 40 — a re-encoding has a tail, a change a core. The state is read again there. Inside a run of keyframes (MJPEG, an intra-only encode) only when the page then holds. Each re-read, and each return and settle read again, is in `reread` in story.json; SUMMARY.md names the first 12 and how each was judged |
+| keyframe | on a GOP's opening (where it begins, by frames.json `gop`, else a keyframe after a predicted frame, through its keyframe: an open GOP's leading B-frames come first), a frame that is the state's picture as a keyframe re-encodes it: no 8x8 block mean moved past 24, no 16x16 block mean past 12 and no mean past 40 — or, spread like a re-encoding (three separate spots across a quarter of the frame's width or height, or one region across a quarter of both), no mean past 48 and no more than a quarter of the means past the floor past 40. The state is read again there. Inside a run of keyframes (MJPEG, an intra-only encode) only spread, and only when the page then holds. Each re-read, and each return and settle read again, is in `reread` in story.json; SUMMARY.md names the first 12 and how each was judged |
 | box | the decoded pixels past 32 inside the means' box grown by 2 px, each frame against the state's picture in its GOP: a 1 px caret is drawn 1 px wide on 10 of 13 encodings (3-4 px on the others), not the 3 px the means give. In a GOP where that picture is not known and whose keyframe moved a mean past the floor away from the event, only near the 8x8 blocks that moved past 24 |
 
 `--lossy` on frames that are not from a lossy recording changes nothing, and says so.
@@ -1845,16 +1845,20 @@ lossy recording was one change that never settled:
 event by event against the lossless one
 (`docs/reports/2026-10-16-storyboard-noise-floor-v1.md`). What it cannot see, which the
 output does not detect: a change smaller than the floor over a 3x3 mean (a 6% fade: a fade
-begins late and ends early by the part of it inside the floor), one that small landing on a
-frame it reads again, an oscillation (a spring's overshoot) that holds at a slow turning
-point and swings on as a second event, and a recording a codec has destroyed (x264 crf 45).
-What it reports and is wrong about, flagged as beginning on a keyframe: a keyframe that
-re-encodes a still page past the keyframe row — x264 at crf 35 and above, x264's first two
-frames of an intra-only stream (means 56 apart, 16x16 blocks 14) — and the codec refreshing a
-band at a time with no keyframe (intra refresh). SUMMARY.md says when no frame is marked a
-keyframe, when a selection has no GOP numbers, and when no GOP begins after frame 0; it says
-when keyframes fell inside an event that never settled, and that from those GOPs the box takes
-only blocks that moved past re-quantization.
+begins late and ends early by the part of it inside the floor); a change the keyframe row
+admits — means past the floor by at most 8, no block moved — landing on a GOP's opening, where
+it reads as the page re-encoded (a label recoloured 40% at a keyframe; the same change mid-GOP
+is reported); an oscillation (a spring's overshoot) that holds at a slow turning point and
+swings on as a second event; and a recording a codec has destroyed (x264 crf 45). What it
+reports and is wrong about, flagged as beginning on a keyframe: a keyframe that re-encodes a
+still page past the keyframe row — x264 at crf 35 and above, the last keyframe of an x264 or
+x265 stream (coded coarser) from crf 30, x264's first two frames of an intra-only stream
+(means 56 apart, 16x16 blocks 14) — and the codec refreshing a band at a time with no keyframe
+(intra refresh). For a lossy recording, SUMMARY.md says when no frame is marked a keyframe,
+when a selection has no GOP numbers, when only frame 0 is marked (a recording shorter than one
+GOP, or intra refresh) and when every frame is (a run of keyframes); it says when keyframes
+fell inside an event that never settled, and that from those GOPs the box takes only blocks
+that moved past re-quantization.
 
 #### Visualizing the VRT process — flipbooks + video
 
