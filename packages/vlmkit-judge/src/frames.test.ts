@@ -295,6 +295,26 @@ test("parseFramesManifest: a stream-clock sequence carries each frame's index in
   refuses([{ index: -1 }], "frames[0].index");
   refuses([{ index: 0.5 }], "frames[0].index");
   refuses([{ index: 0, key: "yes" }], "frames[0].key");
+  refuses([{ index: 0, gop: -1 }], "frames[0].gop");
+  refuses([{ index: 0, gop: 1.5 }], "frames[0].gop");
+  refuses(
+    [
+      { index: 0, gop: 2 },
+      { index: 1, gop: 1 },
+    ],
+    "frames[1].gop",
+  );
+  assert.deepEqual(
+    parseFramesManifest(
+      streamManifest([
+        { index: 0, gop: 0 },
+        { index: 4, gop: 0 },
+        { index: 9, gop: 2 },
+      ]),
+    ).frames.map((f) => f.gop),
+    [0, 0, 2],
+    "a GOP number repeats, and a selection can skip one",
+  );
   refuses([{ index: 0 }], "source.video.codec", { ...VIDEO, codec: 7 });
   refuses([{ index: 0 }], "source.video.lossless", { ...VIDEO, lossless: "no" });
   refuses([{ index: 0 }], "source.video.streamFrames", { ...VIDEO, streamFrames: 0 });

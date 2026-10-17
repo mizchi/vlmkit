@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { cp, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -148,6 +149,24 @@ describe("writeStoryboard", () => {
     assert.equal(banded.lossyIgnored, false);
     assert.deepEqual(banded.story.events, [], "a 6-pixel line of 55 is below a 3x3 floor of 32");
     assert.match(readFileSync(banded.files.summary, "utf8"), /though the frames are not from a lossy recording/);
+    // With --json the note goes to stderr: stdout is story.json alone.
+    const run = spawnSync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        "--no-warnings",
+        resolve("src/cli/commands/storyboard-cli.ts"),
+        manifest,
+        "--lossy",
+        "--json",
+        "--out",
+        join(dir, "json"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).format, asked.story.format);
+    assert.match(run.stderr, /--lossy: these frames are not from a lossy recording, so they were compared exactly/);
   });
 
   test("frames of two sizes are refused, naming the frame", async () => {

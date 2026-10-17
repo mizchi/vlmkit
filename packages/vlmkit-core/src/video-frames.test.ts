@@ -9,7 +9,9 @@ import {
   displayGeometry,
   filterChain,
   frameAt,
+  gopNumbers,
   imageTimeline,
+  parseFrameTable,
   parseShowinfoLine,
   pickVideoStream,
   videoTimeline,
@@ -361,5 +363,59 @@ test("imageTimeline: an APNG plays the frames its acTL declares", () => {
   assert.equal(
     imageTimeline(decoded, { format: "apng", storedMs: [100, 100, 100], plays: null, declaredFrames: 4 }),
     null,
+  );
+});
+
+test("gopNumbers: counted in decode order, a run of keyframes one GOP, shown order without positions", () => {
+  // Shown order K B B P K B B P; decoded K P B B K P B B (closed GOPs): numbered by keyframe.
+  const shown = [0, 1, 2, 3, 4, 5, 6, 7].map((index) => ({ index, ticks: index, key: index % 4 === 0 }));
+  const closed = shown.map((f, i) => ({ ...f, pos: [0, 2, 3, 1, 4, 6, 7, 5][i]! * 100 }));
+  assert.deepEqual(gopNumbers(closed), [0, 0, 0, 0, 1, 1, 1, 1]);
+  // Open GOP: frames 2 and 3 are shown before keyframe 4 but decoded after it (positions 5, 6).
+  const open = shown.map((f, i) => ({ ...f, pos: [0, 1, 5, 6, 4, 7, 8, 9][i]! }));
+  assert.deepEqual(gopNumbers(open), [0, 0, 1, 1, 1, 1, 1, 1]);
+  // A position missing anywhere: the order shown.
+  assert.deepEqual(gopNumbers(open.map((f, i) => (i === 3 ? { ...f, pos: undefined } : f))), [0, 0, 0, 0, 1, 1, 1, 1]);
+  // Every frame a keyframe (MJPEG, intra-only): one GOP.
+  assert.deepEqual(gopNumbers(shown.map((f) => ({ ...f, key: true }))), [0, 0, 0, 0, 0, 0, 0, 0]);
+  // A keyframe after a run of them still begins one after a predicted frame.
+  assert.deepEqual(
+    gopNumbers(shown.map((f) => ({ ...f, key: [0, 1, 4, 5].includes(f.index) }))),
+    [0, 0, 0, 0, 1, 1, 1, 1],
+  );
+  // videoTimeline carries them onto its rows, both fields of a split frame included.
+  const t = videoTimeline(
+    closed.map((f) => ({ ...f, ticks: f.index * 40 })),
+    { num: 1, den: 1000 },
+    "a.mp4",
+    { split: (f) => f.index === 4 },
+  );
+  assert.deepEqual(
+    t.rows.map((r) => [r.decoded, r.gop]),
+    [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [4, 1],
+      [4, 1],
+      [5, 1],
+      [6, 1],
+      [7, 1],
+    ],
+  );
+});
+
+test("parseFrameTable: pkt_pos as ffprobe prints it, a string, and -1 when unknown", () => {
+  const table = JSON.stringify({
+    frames: [
+      { best_effort_timestamp: 0, key_frame: 1, pkt_pos: "48" },
+      { best_effort_timestamp: 1, key_frame: 0, pkt_pos: "-1" },
+      { best_effort_timestamp: 2, key_frame: 0 },
+    ],
+  });
+  assert.deepEqual(
+    parseFrameTable(table, "a.mkv").map((f) => f.pos),
+    [48, undefined, undefined],
   );
 });

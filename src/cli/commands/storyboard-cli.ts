@@ -225,8 +225,10 @@ function decode(path: string): PngData {
  * The frames, decoded on demand and kept in a least-recently-used cache bounded by bytes: holding
  * every frame of a 1000-frame 2x capture would be 15 GB. The segmentation reads them in order and,
  * after a change, goes back over up to `TRANSIENT_MS` of them (300 at 60fps) — more than the cache
- * holds, so what serves that look-back is the storyboard's own record of which frames are
- * identical to the one before, which needs no pixels the second time.
+ * holds. Compared exactly, what serves that look-back is the storyboard's own record of which
+ * frames are identical to the one before, which needs no pixels the second time. Through a noise
+ * band that record does not apply: the signatures answer most of it, and a frame they cannot
+ * answer is decoded again (a 2x2 dot at 720p: 404 decodes exactly, 702 with --lossy).
  */
 export function framesOnDisk(
   paths: readonly string[],
@@ -518,6 +520,12 @@ async function main(): Promise<void> {
     ...(args.noise ? { noise: args.noise } : {}),
   });
   if (args.json) {
+    // The note beside it, not in it: stdout is story.json alone.
+    if (written.lossyIgnored) {
+      console.error(
+        "--lossy: these frames are not from a lossy recording, so they were compared exactly (--noise applies a band to any frames)",
+      );
+    }
     console.log(JSON.stringify(written.json, null, 2));
     return;
   }
