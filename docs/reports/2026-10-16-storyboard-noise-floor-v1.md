@@ -275,6 +275,29 @@ On the code after the second review:
 | the first review's 30 harsher encodes | 27 (the other 3: a crf 35 keyframe on a still page) | 44 of 44 | median 1.00; none under 0.5 |
 | x264 intra-only and two-frame GOPs (12) | 6: every two-frame GOP; no intra-only one (its first frame) | 12 of 12 | median 0.22 |
 
+The second review's own cases are harsher: fades, holds and keyframes made to break the rules, at
+up to 260 frames and down to 300 kb/s. Each is scored the same way, event for event against its
+lossless sequence:
+
+| Lens the cases came from | Right | Kinds of the matched events | Box IoU median (under 0.5) |
+|---|---|---|---|
+| holds | 87 of 132 | 128 of 133 | 1.00 (6 of 133) |
+| keyframes | 72 of 95 | 62 of 62 | 0.99 (1 of 62) |
+| boxes | 32 of 48 | 42 of 43 | 0.98 (8 of 43) |
+| CLI (text pages, thinned and imported frames) | 43 of 43 | 43 of 43 | 1.00 (0 of 43) |
+| the first review's 30 | 27 of 30 | 44 of 44 | 1.00 (0 of 44) |
+| verifiers' holds and keyframes | 27 of 27 | 27 of 27 | 1.00 (2 of 27) |
+| all 375 | 288 | 346 of 352 | |
+
+Every one of the 87 misses is a limit below, and none is another kind:
+- 52 fades, each beginning late or ending early by the part of it inside the floor (two slow ones
+  at 24 levels a second also cross the floor once and come back before they stay past it);
+- 16 at x264 crf 35 and above, or at 300 kb/s, whose keyframes re-encode a still page past the test;
+- 7 intra-only streams' first frame, 6 intra-refresh encodes, and 6 springs whose overshoot held at
+  a turning point.
+
+The six kinds that differ are fades the codec decoded as jumps (a drift read as a change).
+
 The weak boxes are the six of the first round and two at crf 45. Against the first round's code
 this round lost the 3 crf 35 cases and the 6 intra-only ones, each to an extra event the codec
 made, flagged as beginning on a keyframe; no event of a lossless storyboard was lost.

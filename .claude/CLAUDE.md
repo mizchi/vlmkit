@@ -565,7 +565,8 @@ plus caret, digit, cursor, scroll), five encodings held by `storyboard-lossy.tes
   ones: right on all 208 cases outside the two limits (fades, crf 45), with every matched event's
   kind right (261 of 261), 27 of the 30 (the other 3 a crf 35 keyframe) and 6 of the 12 (the
   intra-only first frame); box IoU median 1.00 (intra-only x264 aside: the codec re-codes around a
-  change, 0.22).
+  change, 0.22). The second review's 375 harsher cases: 288 right, and every miss a limit below (52
+  fades, 16 at crf ≥ 35 or 300 kb/s, 7 intra-only first frames, 6 intra refresh, 6 springs).
 - **Ringing is high-frequency, so 3x3 is the size.** Still text decodes up to 64 levels apart per
   pixel (x264 crf 18) and ~16 as 3x3 means; a 12px digit's change is ~148 raw, 64-73 as 3x3 means on
   a keyframe at crf ≤ 28 (x265 crf 28 brings it in over the next two frames) and 4-5 as 8x8 block
