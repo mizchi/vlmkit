@@ -42,8 +42,8 @@ import { captureRegionElementsFromHtml, type RegionElementRect } from "../region
 // The kickback text and the terminal report live in `markup-verify-report.ts`:
 // pure string building, and previously stuck behind this module's 627ms of
 // orchestrator imports. Re-exported because callers and tests resolve them here.
-import { kickbackForComposition } from "./markup-verify-report.ts";
-export { formatMarkupVerifyReport, kickbackForComposition } from "./markup-verify-report.ts";
+import { kickbackForComposition, trendNumbers } from "./markup-verify-report.ts";
+export { formatMarkupVerifyReport, kickbackForComposition, trendNumbers } from "./markup-verify-report.ts";
 export type { KickbackContext } from "./markup-verify-report.ts";
 
 import type { AnyGateDefinition } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -179,6 +179,10 @@ export interface VerifyTrendPoint {
   targetsPassed: number;
   /** Total missing + extra + ordering violations across targets. */
   residuals: number;
+  /** Suspects across the dynamic gates. Absent on ledger entries written before it was recorded. */
+  gateSuspects?: number;
+  /** The worst target's rest-pose pixel diff, 0..1. Absent on older ledger entries. */
+  pixelDiff?: number;
 }
 
 export interface VerifyTrend {
@@ -196,14 +200,22 @@ export interface VerifyTrend {
  * signal.
  */
 export function computeTrend(previous: VerifyTrendPoint, current: VerifyTrendPoint): VerifyTrend {
-  const direction =
-    current.targetsPassed < previous.targetsPassed ||
-    (current.targetsPassed === previous.targetsPassed && current.residuals > previous.residuals)
-      ? "regressed"
-      : current.targetsPassed > previous.targetsPassed ||
-          (current.targetsPassed === previous.targetsPassed && current.residuals < previous.residuals)
-        ? "improved"
-        : "flat";
+  // Compared in order, the first that differs decides. Gate suspects and pixel diff count too:
+  // on composition alone, a run fixed from 1 gate suspect and a 1.2% diff to DONE read "flat",
+  // and so did the NOT DONE run before it (dynamic-markup round, 2026-10-18).
+  const keys: [number | undefined, number | undefined, number][] = [
+    [-previous.targetsPassed, -current.targetsPassed, 0],
+    [previous.residuals, current.residuals, 0],
+    [previous.gateSuspects, current.gateSuspects, 0],
+    // A tenth of a percent is rendering noise, not a change of the attempt.
+    [previous.pixelDiff, current.pixelDiff, 0.001],
+  ];
+  let direction: VerifyTrend["direction"] = "flat";
+  for (const [before, after, tolerance] of keys) {
+    if (before === undefined || after === undefined || Math.abs(after - before) <= tolerance) continue;
+    direction = after > before ? "regressed" : "improved";
+    break;
+  }
   return { previous, current, direction };
 }
 
@@ -226,7 +238,7 @@ function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPo
       const entry = JSON.parse(line) as {
         tool?: string;
         source?: string;
-        headline?: { targetsPassed?: number; residuals?: number };
+        headline?: { targetsPassed?: number; residuals?: number; gateSuspects?: number; pixelDiff?: number };
       };
       if (
         entry.tool === "verify-markup" &&
@@ -234,7 +246,13 @@ function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPo
         typeof entry.headline?.targetsPassed === "number" &&
         typeof entry.headline?.residuals === "number"
       ) {
-        return { targetsPassed: entry.headline.targetsPassed, residuals: entry.headline.residuals };
+        const { gateSuspects, pixelDiff } = entry.headline;
+        return {
+          targetsPassed: entry.headline.targetsPassed,
+          residuals: entry.headline.residuals,
+          ...(typeof gateSuspects === "number" ? { gateSuspects } : {}),
+          ...(typeof pixelDiff === "number" ? { pixelDiff } : {}),
+        };
       }
     }
   } catch {
@@ -504,12 +522,14 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
   const currentPoint: VerifyTrendPoint = {
     targetsPassed: passing.length,
     residuals: targets.reduce((n, t) => n + t.missingBlocking + t.extraBlocking + t.orderViolations, 0),
+    gateSuspects: gates.reduce((n, g) => n + g.suspects, 0),
+    pixelDiff: Math.max(0, ...targets.map((t) => t.pixelDiffRatio)),
   };
   const previous = previousTrendPoint(options.attempt);
   const trend = previous ? computeTrend(previous, currentPoint) : undefined;
   if (trend?.direction === "regressed") {
     kickback.unshift(
-      `REGRESSION — this attempt measures WORSE than your previous verify run (targets passed ${trend.previous.targetsPassed} -> ${trend.current.targetsPassed}, residuals ${trend.previous.residuals} -> ${trend.current.residuals}). REVERT your last change before trying anything else.`,
+      `REGRESSION — this attempt measures WORSE than your previous verify run (${trendNumbers(trend)}). REVERT your last change before trying anything else.`,
     );
   }
 
@@ -522,7 +542,8 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       targetsPassed: currentPoint.targetsPassed,
       targetsTotal: targets.length,
       residuals: currentPoint.residuals,
-      gateSuspects: gates.reduce((n, g) => n + g.suspects, 0),
+      gateSuspects: currentPoint.gateSuspects,
+      pixelDiff: currentPoint.pixelDiff,
     },
   });
   return { attempt: options.attempt, targets, gates, done, ...(trend ? { trend } : {}), kickback };

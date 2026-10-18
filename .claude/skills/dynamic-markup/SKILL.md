@@ -169,6 +169,14 @@ Evaluates every authored animation by rendered frames:
   one-frame glitch, a transient that comes back, a change and where it settles,
   each timed between two frames with its box — and `--at 0..1s/1f` gives it
   every frame to read.
+- **Frames are `--viewport`'s size, 1280x720 unless given.** Pass the
+  target's (`--viewport 1280x800`) before diffing a frame against it: at
+  the default, a toast's 1500ms frame differed from its 1280x800 target by
+  11% with nothing wrong. A target drawn mid-motion (the toast in its hold)
+  is compared this way, not with `verify markup`, whose pixel diff is of
+  the rest pose. `--frames-reduced-motion` captures the same frames with
+  `prefers-reduced-motion: reduce` emulated, so the reduced-motion brief is
+  checked by looking, not by a hand-written Playwright script.
 - **Defects that exist only mid-motion** are `check integrity`'s, not this
   gate's: `vlmkit check integrity page.html --timeline` judges the layout at
   instants of the entrance with the clock and animations held. A finding held
@@ -408,6 +416,13 @@ round — it is the machine-checkable form of the brief's layout section.
   DONE at 1280 — turned out to overflow 67px at 375 (`div.plans`),
   invisible to every reference-full gate because no 375 target existed.
   Multi-viewport integrity is exactly the net for that class.
+- **A brief with one viewport still has to pass 768 and 375.** Pages
+  are opened on phones whatever size the target was drawn at, and what
+  the sweep finds there is real (S8 above; the 2026-10-18 stat-cards
+  agent's 123px overflow at 375 was a fixed three-column grid). Narrow
+  it with `--viewports 1280` only when the brief rules other widths out
+  in so many words — a fixed-size embed, a kiosk — and say so in the
+  report.
 
 ## Budget & stopping
 

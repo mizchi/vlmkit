@@ -23,6 +23,7 @@ import {
   type MarkupVerifyReport,
   formatMarkupVerifyReport,
   runMarkupVerify,
+  trendNumbers,
 } from "../verify/markup-verify.ts";
 import { type Flow, type FlowVerifyReport, formatFlowReport, runFlowVerify } from "../inspect/flow-verify.ts";
 import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
@@ -36,7 +37,16 @@ export const verifyMarkupGate = defineGate<MarkupVerifyReport, MarkupVerifyOptio
   category: "verdict",
   usage: `One-shot done-condition verdict: composition per target viewport +
 dynamic gates + rest-pose pixel diff, with a paste-ready kickback
-listing every residual. Add --reference to print the calibration floor.`,
+listing every residual. Add --reference to print the calibration floor.
+
+The rest pose is the full page with every finite animation at its end and
+infinite ones at their start. A target captured mid-motion (a toast during
+its hold) is not that instant: diff a frame from \`check animation --at <ms>
+--frames <dir> --viewport WxH\` against it with \`diff png\` instead.
+
+The trend compares against the previous verify run of the same attempt:
+targets passed, then composition residuals, then gate suspects, then the
+worst target's pixel diff (changes under 0.1 points are flat).`,
   rules: [
     {
       id: "target-failed",
@@ -115,10 +125,7 @@ listing every residual. Add --reference to print the calibration floor.`,
       findings.push({
         rule: "regressed",
         severity: "suspect",
-        message:
-          `worse than the previous run (targets passed ${report.trend.previous.targetsPassed}` +
-          ` -> ${report.trend.current.targetsPassed}, residuals ${report.trend.previous.residuals}` +
-          ` -> ${report.trend.current.residuals})`,
+        message: `worse than the previous run (${trendNumbers(report.trend)})`,
         evidence: { trend: report.trend },
       });
     }

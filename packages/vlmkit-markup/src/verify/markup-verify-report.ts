@@ -19,7 +19,7 @@ import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { kindLabel } from "../component/component-classify.ts";
 import type { PageComponent, PageComposition, PageMatch } from "../component/page-compose-diff.ts";
 import { matchRegionBboxToElement, type RegionElementRect } from "../region-selector-match.ts";
-import type { MarkupVerifyReport } from "./markup-verify.ts";
+import type { MarkupVerifyReport, VerifyTrend } from "./markup-verify.ts";
 
 /** "[text] " style prefix when the pixel-stat kind is informative. */
 function kindTag(c: PageComponent): string {
@@ -181,6 +181,22 @@ export function kickbackForComposition(label: string, c: PageComposition, contex
   return lines;
 }
 
+/** What the trend compared, previous -> current, for the report and the regression kickback. */
+export function trendNumbers(t: VerifyTrend): string {
+  const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+  const parts = [
+    `targets passed ${t.previous.targetsPassed} -> ${t.current.targetsPassed}`,
+    `composition residuals ${t.previous.residuals} -> ${t.current.residuals}`,
+  ];
+  if (t.previous.gateSuspects !== undefined && t.current.gateSuspects !== undefined) {
+    parts.push(`gate suspects ${t.previous.gateSuspects} -> ${t.current.gateSuspects}`);
+  }
+  if (t.previous.pixelDiff !== undefined && t.current.pixelDiff !== undefined) {
+    parts.push(`worst pixel diff ${pct(t.previous.pixelDiff)} -> ${pct(t.current.pixelDiff)}`);
+  }
+  return parts.join(", ");
+}
+
 export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: RuleView): string {
   const lines: string[] = [];
   // This gate states a verdict over three rules, so rule-blindness showed up here as the
@@ -216,9 +232,7 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: Rul
         : t.direction === "improved"
           ? `${GREEN}improved${RESET}`
           : `${DIM}flat${RESET}`;
-    lines.push(
-      `trend vs previous run: ${label} (targets passed ${t.previous.targetsPassed} -> ${t.current.targetsPassed}, residuals ${t.previous.residuals} -> ${t.current.residuals})`,
-    );
+    lines.push(`trend vs previous run: ${label} (${trendNumbers(t)})`);
   }
   lines.push("");
   lines.push("Targets:");
@@ -236,9 +250,15 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: Rul
       (demoted > 0 ? ` ${DIM}(+${demoted} pixel-confirmed, not blocking)${RESET}` : "") +
       (t.degraded ? ` ${DIM}[degraded-capture tolerances]${RESET}` : "");
     lines.push(
-      `  - ${basename(t.target)} ${t.width}x${t.height}: ${mark} — matched ${t.matched}, missing ${t.missingBlocking}, extra ${t.extraBlocking}, ordering ${t.orderViolations}, pixel diff ${(t.pixelDiffRatio * 100).toFixed(2)}%, rendered height ${t.renderedHeight}px${demotedNote}${cal}`,
+      `  - ${basename(t.target)} ${t.width}x${t.height}: ${mark} — matched ${t.matched}, missing ${t.missingBlocking}, extra ${t.extraBlocking}, ordering ${t.orderViolations}, rest-pose pixel diff ${(t.pixelDiffRatio * 100).toFixed(2)}%, rendered height ${t.renderedHeight}px${demotedNote}${cal}`,
     );
   }
+  // Which instant the diff is of: a toast's target was its hold, its rest pose had no toast, and
+  // the agent could not tell which one 0.99% measured (dynamic-markup round, 2026-10-18).
+  lines.push(
+    `${DIM}  rest pose: the full page with every finite animation at its end and infinite ones at their start.` +
+      ` For a target captured mid-motion, diff a frame: vlmkit check animation <attempt> --at <ms> --frames <dir> --viewport WxH${RESET}`,
+  );
   lines.push("");
   lines.push("Gates:");
   for (const g of report.gates) {
