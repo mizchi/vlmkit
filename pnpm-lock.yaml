@@ -106,6 +106,9 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
+      '@mizchi/vlmkit-judge':
+        specifier: workspace:*
+        version: link:../vlmkit-judge
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0

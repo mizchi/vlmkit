@@ -1,0 +1,125 @@
+[
+  {
+    "file": "snap-back--intact.html",
+    "id": "snap-back",
+    "broken": false,
+    "target": "the green dot on the progress track",
+    "selector": ".dot",
+    "expectEasing": "ease-in-out",
+    "expect": null
+  },
+  {
+    "file": "snap-back--broken.html",
+    "id": "snap-back",
+    "broken": true,
+    "target": "the green dot on the progress track",
+    "selector": ".dot",
+    "expectEasing": "ease-in-out",
+    "expect": "snap-back",
+    "note": "the final keyframe is not held: animation-fill-mode is missing"
+  },
+  {
+    "file": "keyframe-gap--intact.html",
+    "id": "keyframe-gap",
+    "broken": false,
+    "target": "the 'Upgrade to Pro' card",
+    "selector": ".promo",
+    "expect": null
+  },
+  {
+    "file": "keyframe-gap--broken.html",
+    "id": "keyframe-gap",
+    "broken": true,
+    "target": "the 'Upgrade to Pro' card",
+    "selector": ".promo",
+    "expect": "jump",
+    "note": "two keyframes 1% apart carry the card 100px in one frame"
+  },
+  {
+    "file": "clipped--intact.html",
+    "id": "clipped",
+    "broken": false,
+    "target": "the 'Design review' task card",
+    "selector": ".task",
+    "expect": null
+  },
+  {
+    "file": "clipped--broken.html",
+    "id": "clipped",
+    "broken": true,
+    "target": "the 'Design review' task card",
+    "selector": ".task",
+    "expect": "absent-at-rest",
+    "note": "the card moves to the Done column but stays a child of an overflow: hidden column"
+  },
+  {
+    "file": "covered--intact.html",
+    "id": "covered",
+    "broken": false,
+    "target": "the account dropdown menu with 'Sign out'",
+    "selector": ".menu",
+    "expect": null
+  },
+  {
+    "file": "covered--broken.html",
+    "id": "covered",
+    "broken": true,
+    "target": "the account dropdown menu with 'Sign out'",
+    "selector": ".menu",
+    "expect": "absent-at-rest",
+    "note": "the menu opens beneath the next card: it has no stacking order above it"
+  },
+  {
+    "file": "overlap-rest--intact.html",
+    "id": "overlap-rest",
+    "broken": false,
+    "target": "the 'Welcome back, Alice' heading",
+    "selector": ".hello",
+    "expect": null
+  },
+  {
+    "file": "overlap-rest--broken.html",
+    "id": "overlap-rest",
+    "broken": true,
+    "target": "the 'Welcome back, Alice' heading",
+    "selector": ".hello",
+    "expect": "forbid-at-rest",
+    "note": "the heading's end keyframe lands it on the paragraph"
+  },
+  {
+    "file": "fade-reversed--intact.html",
+    "id": "fade-reversed",
+    "broken": false,
+    "target": "the yellow 'Trial ends in 3 days' notice",
+    "selector": ".notice",
+    "expect": null
+  },
+  {
+    "file": "fade-reversed--broken.html",
+    "id": "fade-reversed",
+    "broken": true,
+    "target": "the yellow 'Trial ends in 3 days' notice",
+    "selector": ".notice",
+    "expect": "absent-at-rest",
+    "note": "a fade-in written as a fade-out: the keyframes run 1 → 0 and are held"
+  },
+  {
+    "file": "easing-wrong--intact.html",
+    "id": "easing-wrong",
+    "broken": false,
+    "target": "the blue slider handle",
+    "selector": ".handle",
+    "expectEasing": "ease-out",
+    "expect": null
+  },
+  {
+    "file": "easing-wrong--broken.html",
+    "id": "easing-wrong",
+    "broken": true,
+    "target": "the blue slider handle",
+    "selector": ".handle",
+    "expectEasing": "ease-out",
+    "expect": "easing-mismatch",
+    "note": "the spec says ease-out; the CSS says ease-in"
+  }
+]

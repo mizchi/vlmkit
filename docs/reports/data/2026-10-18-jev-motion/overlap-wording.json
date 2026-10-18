@@ -1,0 +1,272 @@
+[
+ {
+  "file": "admin-panel-broken-image.png",
+  "a": 0.61,
+  "b": 0.11
+ },
+ {
+  "file": "admin-panel-error-banner.png",
+  "a": 0.5,
+  "b": 0.19
+ },
+ {
+  "file": "admin-panel-loading.png",
+  "a": 0.72,
+  "b": 0.36
+ },
+ {
+  "file": "admin-panel-modal.png",
+  "a": 0.16,
+  "b": 0.08
+ },
+ {
+  "file": "admin-panel-none.png",
+  "a": 0.12,
+  "b": 0.04
+ },
+ {
+  "file": "admin-panel-overlap.png",
+  "a": 0.91,
+  "b": 0.83
+ },
+ {
+  "file": "blog-magazine-broken-image.png",
+  "a": 0.06,
+  "b": 0.03
+ },
+ {
+  "file": "blog-magazine-error-banner.png",
+  "a": 0.31,
+  "b": 0.05
+ },
+ {
+  "file": "blog-magazine-loading.png",
+  "a": 0.06,
+  "b": 0.03
+ },
+ {
+  "file": "blog-magazine-modal.png",
+  "a": 0.03,
+  "b": 0.04
+ },
+ {
+  "file": "blog-magazine-none.png",
+  "a": 0.04,
+  "b": 0.04
+ },
+ {
+  "file": "blog-magazine-overlap.png",
+  "a": 0.91,
+  "b": 0.82
+ },
+ {
+  "file": "dashboard-broken-image.png",
+  "a": 0.55,
+  "b": 0.15
+ },
+ {
+  "file": "dashboard-error-banner.png",
+  "a": 0.17,
+  "b": 0.02
+ },
+ {
+  "file": "dashboard-loading.png",
+  "a": 0.08,
+  "b": 0.02
+ },
+ {
+  "file": "dashboard-modal.png",
+  "a": 0.05,
+  "b": 0.02
+ },
+ {
+  "file": "dashboard-none.png",
+  "a": 0.05,
+  "b": 0.02
+ },
+ {
+  "file": "dashboard-overlap.png",
+  "a": 0.95,
+  "b": 0.87
+ },
+ {
+  "file": "ecommerce-catalog-broken-image.png",
+  "a": 0.7,
+  "b": 0.18
+ },
+ {
+  "file": "ecommerce-catalog-error-banner.png",
+  "a": 0.08,
+  "b": 0.02
+ },
+ {
+  "file": "ecommerce-catalog-loading.png",
+  "a": 0.61,
+  "b": 0.23
+ },
+ {
+  "file": "ecommerce-catalog-modal.png",
+  "a": 0.2,
+  "b": 0.12
+ },
+ {
+  "file": "ecommerce-catalog-none.png",
+  "a": 0.03,
+  "b": 0.04
+ },
+ {
+  "file": "ecommerce-catalog-overlap.png",
+  "a": 0.92,
+  "b": 0.81
+ },
+ {
+  "file": "form-app-broken-image.png",
+  "a": 0.6,
+  "b": 0.04
+ },
+ {
+  "file": "form-app-error-banner.png",
+  "a": 0.07,
+  "b": 0.04
+ },
+ {
+  "file": "form-app-loading.png",
+  "a": 0.05,
+  "b": 0.02
+ },
+ {
+  "file": "form-app-modal.png",
+  "a": 0.06,
+  "b": 0.02
+ },
+ {
+  "file": "form-app-none.png",
+  "a": 0.03,
+  "b": 0.01
+ },
+ {
+  "file": "form-app-overlap.png",
+  "a": 0.99,
+  "b": 0.95
+ },
+ {
+  "file": "grid-complex-broken-image.png",
+  "a": 0.47,
+  "b": 0.08
+ },
+ {
+  "file": "grid-complex-error-banner.png",
+  "a": 0.33,
+  "b": 0.02
+ },
+ {
+  "file": "grid-complex-loading.png",
+  "a": 0.1,
+  "b": 0.03
+ },
+ {
+  "file": "grid-complex-modal.png",
+  "a": 0.33,
+  "b": 0.07
+ },
+ {
+  "file": "grid-complex-none.png",
+  "a": 0.04,
+  "b": 0.03
+ },
+ {
+  "file": "grid-complex-overlap.png",
+  "a": 0.66,
+  "b": 0.57
+ },
+ {
+  "file": "landing-product-broken-image.png",
+  "a": 0.6,
+  "b": 0.18
+ },
+ {
+  "file": "landing-product-error-banner.png",
+  "a": 0.3,
+  "b": 0.03
+ },
+ {
+  "file": "landing-product-loading.png",
+  "a": 0.08,
+  "b": 0.04
+ },
+ {
+  "file": "landing-product-modal.png",
+  "a": 0.09,
+  "b": 0.06
+ },
+ {
+  "file": "landing-product-none.png",
+  "a": 0.04,
+  "b": 0.04
+ },
+ {
+  "file": "landing-product-overlap.png",
+  "a": 0.95,
+  "b": 0.68
+ },
+ {
+  "file": "page-broken-image.png",
+  "a": 0.7,
+  "b": 0.1
+ },
+ {
+  "file": "page-error-banner.png",
+  "a": 0.04,
+  "b": 0.02
+ },
+ {
+  "file": "page-loading.png",
+  "a": 0.07,
+  "b": 0.02
+ },
+ {
+  "file": "page-modal.png",
+  "a": 0.13,
+  "b": 0.02
+ },
+ {
+  "file": "page-none.png",
+  "a": 0.03,
+  "b": 0.02
+ },
+ {
+  "file": "page-overlap.png",
+  "a": 0.87,
+  "b": 0.75
+ },
+ {
+  "file": "stacking-context-broken-image.png",
+  "a": 0.04,
+  "b": 0.02
+ },
+ {
+  "file": "stacking-context-error-banner.png",
+  "a": 0.02,
+  "b": 0.01
+ },
+ {
+  "file": "stacking-context-loading.png",
+  "a": 0.59,
+  "b": 0.21
+ },
+ {
+  "file": "stacking-context-modal.png",
+  "a": 0.29,
+  "b": 0.11
+ },
+ {
+  "file": "stacking-context-none.png",
+  "a": 0.03,
+  "b": 0.01
+ },
+ {
+  "file": "stacking-context-overlap.png",
+  "a": 0.77,
+  "b": 0.68
+ }
+]

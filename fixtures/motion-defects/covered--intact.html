@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>covered intact</title><style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f8fafc;color:#0f172a;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{height:64px;display:flex;align-items:center;gap:24px;padding:0 32px;background:#fff;border-bottom:1px solid #e2e8f0}
+header strong{font-size:18px}
+main{max-width:880px;margin:32px auto;padding:0 24px}
+h1{font-size:28px;margin:0 0 12px}
+p{margin:0 0 12px;color:#334155}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px}
+.wrap{position:relative;height:40px}
+.menu{position:absolute;right:0;top:0;width:260px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:8px 0;box-shadow:0 8px 24px rgba(15,23,42,.15);z-index:10;animation:drop 500ms ease-out both}
+.menu div{padding:8px 16px}
+@keyframes drop{from{transform:translateY(-120px);opacity:0}to{transform:translateY(48px);opacity:1}}
+.panel{position:relative;z-index:auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;height:280px}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms!important}}
+</style></head><body>
+<header><strong>Acme</strong><span>Projects</span><span>Billing</span></header>
+<main>
+<div class="wrap"><div class="menu"><div>Profile</div><div>Settings</div><div>Sign out</div></div></div><section class="panel"><h1>Account</h1><p>Your workspace keeps every project, its members and its billing in one place. Invite a teammate to share a board, or archive a project you no longer use.</p>
+<p>Changes are saved automatically. The activity log below lists what changed and who changed it, for the last thirty days.</p></section>
+</main></body></html>

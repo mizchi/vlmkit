@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>snap-back broken</title><style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f8fafc;color:#0f172a;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{height:64px;display:flex;align-items:center;gap:24px;padding:0 32px;background:#fff;border-bottom:1px solid #e2e8f0}
+header strong{font-size:18px}
+main{max-width:880px;margin:32px auto;padding:0 24px}
+h1{font-size:28px;margin:0 0 12px}
+p{margin:0 0 12px;color:#334155}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px}
+.track{position:relative;height:40px;margin:24px 0;border-radius:20px;background:#e2e8f0}
+.dot{position:absolute;left:4px;top:4px;width:32px;height:32px;border-radius:50%;background:#16a34a;animation:go 900ms ease-in-out}
+@keyframes go{to{transform:translateX(560px)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms!important}}
+</style></head><body>
+<header><strong>Acme</strong><span>Projects</span><span>Billing</span></header>
+<main>
+<section class="card"><h1>Upload progress</h1><p>Step 3 of 4: checking files.</p><div class="track"><div class="dot"></div></div></section><p>Your workspace keeps every project, its members and its billing in one place. Invite a teammate to share a board, or archive a project you no longer use.</p>
+<p>Changes are saved automatically. The activity log below lists what changed and who changed it, for the last thirty days.</p>
+</main></body></html>

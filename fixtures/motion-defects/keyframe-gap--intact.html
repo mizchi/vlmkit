@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>keyframe-gap intact</title><style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f8fafc;color:#0f172a;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{height:64px;display:flex;align-items:center;gap:24px;padding:0 32px;background:#fff;border-bottom:1px solid #e2e8f0}
+header strong{font-size:18px}
+main{max-width:880px;margin:32px auto;padding:0 24px}
+h1{font-size:28px;margin:0 0 12px}
+p{margin:0 0 12px;color:#334155}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px}
+.promo{background:#1e3a8a;color:#fff;border-radius:12px;padding:24px;width:360px;animation:rise 1000ms linear both}
+.promo h2{margin:0 0 8px;font-size:22px}.promo p{color:#dbeafe;margin:0}
+@keyframes rise{from{transform:translateY(240px)}to{transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms!important}}
+</style></head><body>
+<header><strong>Acme</strong><span>Projects</span><span>Billing</span></header>
+<main>
+<p>Your workspace keeps every project, its members and its billing in one place. Invite a teammate to share a board, or archive a project you no longer use.</p>
+<p>Changes are saved automatically. The activity log below lists what changed and who changed it, for the last thirty days.</p><div class="promo"><h2>Upgrade to Pro</h2><p>Unlimited projects and members.</p></div>
+</main></body></html>
