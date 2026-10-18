@@ -244,7 +244,15 @@ export interface AnimationEvalReport {
    * `--frames`: the viewport, uncropped, at each instant of its own time, clock and animations held, as a
    * `vlmkit-frames/1` sequence (numbered PNGs + `frames.json`).
    */
-  frames?: { dir: string; manifest: string; count: number; unstable: number; instants: number[] };
+  frames?: {
+    dir: string;
+    manifest: string;
+    count: number;
+    unstable: number;
+    instants: number[];
+    /** Captured with `prefers-reduced-motion: reduce` emulated. */
+    reducedMotion?: boolean;
+  };
   /** Written when `stripPath` was given: one image holding every sampled frame. */
   strip?: {
     path: string;
@@ -299,6 +307,8 @@ export interface AnimationEvalOptions extends PageLoadOptions {
    * own with the clock held, so script-driven motion is at the instant too, `virtualTime` or not.
    */
   framesDir?: string;
+  /** Capture `framesDir` with `prefers-reduced-motion: reduce` emulated: what that visitor sees. */
+  framesReducedMotion?: boolean;
   /**
    * Instants of page time, in ms: the frames `framesDir` writes and the strip's columns. Without
    * it the strip's columns divide its window evenly.
@@ -1328,9 +1338,17 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           dir: resolve(options.framesDir),
           tool: "check animation",
           ...(options.at ? { instants: options.at } : {}),
+          ...(options.framesReducedMotion ? { reducedMotion: true } : {}),
         });
         const { dir, manifest, count, unstable, instants } = written;
-        frames = { dir, manifest, count, unstable, instants };
+        frames = {
+          dir,
+          manifest,
+          count,
+          unstable,
+          instants,
+          ...(options.framesReducedMotion ? { reducedMotion: true } : {}),
+        };
         framePaths.push(...written.files);
       } finally {
         await framesPage.close();
@@ -1564,9 +1582,12 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
       f.instants.length <= 12
         ? f.instants.map(formatInstant).join("/")
         : `${formatInstant(f.instants[0]!)}–${formatInstant(f.instants.at(-1)!)}`;
+    // The viewport is named because it is easy to miss: a target at 1280x800 compared with
+    // frames at the default 1280x720 differed by 11% before anything else was looked at.
     lines.push(
       `Frames: ${f.count} written to ${f.dir} at ${at}ms of page time` +
-        ` (clock and animations held), manifest ${f.manifest}`,
+        ` (clock and animations held${f.reducedMotion ? ", prefers-reduced-motion: reduce" : ""}),` +
+        ` ${report.viewport.width}x${report.viewport.height} (--viewport WxH to match a target), manifest ${f.manifest}`,
     );
     lines.push(`${DIM}  What they show happening: vlmkit snapshot storyboard ${f.manifest}${RESET}`);
     if (f.unstable > 0) {

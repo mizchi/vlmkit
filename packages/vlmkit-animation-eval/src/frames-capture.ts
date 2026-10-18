@@ -474,8 +474,10 @@ export async function frameWriter(dir: string, source: FramesSource) {
 export async function captureTimelineFrames(
   page: Page,
   url: string,
-  options: PageLoadOptions & { dir: string; tool: string; instants?: readonly number[] },
+  options: PageLoadOptions & { dir: string; tool: string; instants?: readonly number[]; reducedMotion?: boolean },
 ): Promise<FramesWritten & { instants: number[] }> {
+  // Before load, so the page's first style already matches `(prefers-reduced-motion: reduce)`.
+  if (options.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
   const timeline = await openHeldTimeline(page, url, options);
   const instants =
     options.instants && options.instants.length > 0
@@ -487,6 +489,7 @@ export async function captureTimelineFrames(
     viewport: page.viewportSize() ?? { width: 0, height: 0 },
     ...(await frameSourceFacts(page)),
     clock: "held",
+    ...(options.reducedMotion ? { reducedMotion: true } : {}),
   });
   for (const atMs of instants) {
     await timeline.at(atMs);
