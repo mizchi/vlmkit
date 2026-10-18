@@ -548,7 +548,8 @@ and keeps `--lossy`'s hold and keyframe bands. The rules, all on each pixel's 3x
   (`REENCODING_SPOTS`: three separate spots together across a quarter of the frame's width or
   height, or spots whose box spans a quarter of both) or in two or more spots apart whose 8x8
   means moved by `KEYFRAME_REGION` at most — never one spot (around an event, for a return's
-  `reencodedOutside`, one spot too). Where the state's picture was predicted (`predicted`: what
+  `reencodedOutside`, one spot too; on a leading frame whose keyframe passes and shows that spot,
+  `shownBy`, the keyframe's re-quantization arriving early). Where the state's picture was predicted (`predicted`: what
   differs past the floor from its GOP's keyframe, a change made after it, out to whole 8x8 blocks)
   a keyframe codes it afresh: there, from the keyframe on (not on leading frames), means past 40
   to 56 (`recodedTop`), however many, in 8x8 blocks that moved by 12 at most. Every frame of an
@@ -628,7 +629,11 @@ plus caret, digit, cursor, scroll), five encodings held by `storyboard-lossy.tes
   means past the floor, 2 to 41, one 64x16 region, 8x8 means 23) and was lost at a GOP start on
   x264, AV1 and MJPEG. Never in one spot: a letter changed on a keyframe (means to 44-48, 13 past
   the floor, 2-3 past 40, 8x8 means 7-9) is one, and taken for a keyframe's tail it was lost on
-  x264, VP9 and AV1 where the same change mid-GOP was reported.
+  x264, VP9 and AV1 where the same change mid-GOP was reported. Except on a leading frame whose
+  keyframe passes and shows the same spot: x264 `open-gop` at crf 32 brings a keyframe's
+  re-quantization in on the frame before it (6 means past the floor, one to 42, 8x8 means 3.4; the
+  keyframe, four spots), and refused as one spot, every such opening of a still page was a change
+  (11 of the 432 open-GOP encodes, right before).
 - **A keyframe re-codes what prediction coded.** "A still page's keyframe moves means by 36 at most
   up to crf 28" holds for a page a keyframe had coded before. A change made mid-GOP is coded only
   by prediction until the next keyframe codes it afresh: a glyph changed mid-GOP was re-coded to

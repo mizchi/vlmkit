@@ -916,16 +916,23 @@ export function buildStoryboard(
    * moved 15-17 means past the floor and 1-3 of them past 40, to 46; the digit moved 5, 4 of them
    * past 40, to 62.
    */
-  const reencodes = (a: number, b: number, spreadOnly = false, recoded: Box | null = null): boolean => {
+  const reencodes = (
+    a: number,
+    b: number,
+    spreadOnly = false,
+    recoded: Box | null = null,
+    oneSpot = false,
+  ): boolean => {
     if (signaturesApartBy(signature(a), signature(b)) > KEYFRAME_REGION) return false;
-    return tailFits(a, b, mask, spreadOnly, recoded);
+    return tailFits(a, b, mask, spreadOnly, recoded, oneSpot);
   };
   /**
    * Of the means of b past the floor of a's (outside `m`), none is past it by more than the
    * default band's width (8) — or none by more than twice that (16) and no more than a quarter of
-   * them by more than 8, spread over the picture (`REENCODING_SPOTS`). With `spreadOnly`, only
-   * spread. Inside `recoded` (where a's picture was predicted: `predicted`) to three times the width
-   * (24), however many, in 8x8 blocks whose means moved by `KEYFRAME_REGION` at most: there a
+   * them by more than 8, spread over the picture (`REENCODING_SPOTS`) or in two spots or more apart
+   * whose 8x8 means barely moved (one with `oneSpot`). With `spreadOnly`, only spread. Inside
+   * `recoded` (where a's picture was predicted: `predicted`) to three times the width (24),
+   * however many, in 8x8 blocks whose means moved by `KEYFRAME_REGION` at most: there a
    * keyframe codes afresh what only prediction had coded, as it never does a page it has coded
    * before. The tail anywhere absorbed a label recoloured 45% (39 means past the floor, to 41, all
    * inside it, its 8x8 means moved by 23) on x264, AV1 and MJPEG; in one spot whose 8x8 means barely
@@ -1900,6 +1907,40 @@ export function buildStoryboard(
     }
     return false;
   };
+  /**
+   * Every mean of j past the floor of a's lies where k's are, by 8x8 block and its neighbours: j
+   * shows only what k re-quantized.
+   */
+  const shownBy = (j: number, k: number, a: number): boolean => {
+    const fa = frames.pixels(a);
+    const fk = frames.pixels(k);
+    const fj = frames.pixels(j);
+    const bw = Math.ceil(width / 8);
+    const bh = Math.ceil(height / 8);
+    const near = new Uint8Array(bw * bh);
+    const most = (f: Uint8Array, i: number) =>
+      Math.max(
+        Math.abs(fa[i]! - f[i]!),
+        Math.abs(fa[i + 1]! - f[i + 1]!),
+        Math.abs(fa[i + 2]! - f[i + 2]!),
+        Math.abs(fa[i + 3]! - f[i + 3]!),
+      );
+    for (let p = 0, n = width * height; p < n; p++) {
+      if ((mask !== null && mask[p] === 1) || most(fk, p << 2) <= floor) continue;
+      const y = (p / width) | 0;
+      const bx = (p - y * width) >> 3;
+      const by = y >> 3;
+      for (let yy = Math.max(0, by - 1); yy <= Math.min(bh - 1, by + 1); yy++) {
+        near.fill(1, yy * bw + Math.max(0, bx - 1), yy * bw + Math.min(bw - 1, bx + 1) + 1);
+      }
+    }
+    for (let p = 0, n = width * height; p < n; p++) {
+      if (mask !== null && mask[p] === 1) continue;
+      const y = (p / width) | 0;
+      if (near[(y >> 3) * bw + ((p - y * width) >> 3)] !== 1 && most(fj, p << 2) > floor) return false;
+    }
+    return true;
+  };
   /** Box, peak and unstable count over frames [from, to] against the anchor. */
   const measure = (from: number, to: number, reread = -1) => {
     // Each frame against the state's picture as its GOP encodes it. A return read again in another
@@ -2155,11 +2196,22 @@ export function buildStoryboard(
     // leading frame is shown before it, and taken as one a counter that ticked there, inside the
     // last tick's box (means to 49), was read again as the page.
     const recoded = opens ? predicted(against) : null;
+    const requant = opens
+      ? requantizedPicture(against, j)
+      : entries[j]!.key === true && entries[j - 1]!.key === true && requantizedPicture(anchor, j);
+    // A leading frame whose tail is one spot is its keyframe's re-quantization arriving early when
+    // the keyframe passes and shows that spot: x264 `open-gop` at crf 32 brought one in on the frame
+    // before the keyframe (6 means past the floor, one to 42, 8x8 means 3.4; the keyframe, four
+    // spots), and never read again as one spot, every such opening of a still page was a change.
     const reencoded =
-      (opens
-        ? requantizedPicture(against, j)
-        : entries[j]!.key === true && entries[j - 1]!.key === true && requantizedPicture(anchor, j)) &&
-      reencodes(against, j, !opens, j >= key ? recoded : null) &&
+      requant &&
+      (reencodes(against, j, !opens, j >= key ? recoded : null) ||
+        (opens &&
+          j < key &&
+          reencodes(against, j, false, null, true) &&
+          requantizedPicture(against, key) &&
+          reencodes(against, key, false, recoded) &&
+          shownBy(j, key, against))) &&
       (opens || heldAfter(j, null));
     // A leading frame of an open GOP that shows part of what its keyframe brings past the band is
     // that change's pre-echo (`echoes`): neither read again nor an event, so the change begins on
@@ -2600,7 +2652,7 @@ export function storyboardSummary(
     if (as.has("keyframe")) {
       const w = LOSSY_NOISE.floor - LOSSY_NOISE.still;
       how.push(
-        `at a keyframe, no 8x8 block's mean moved by more than ${band.block}, no 16x16 block's by more than ${KEYFRAME_REGION} and no ${mean} past ${r.channelFloor + w} (to ${r.channelFloor + 2 * w}, a quarter at most past ${r.channelFloor + w}, where those past the floor were spread over the picture as a re-encoding's are; to ${r.channelFloor + 3 * w} where the state's picture had changed since its GOP's keyframe, in 8x8 blocks whose means moved by ${KEYFRAME_REGION} at most)`,
+        `at a keyframe, no 8x8 block's mean moved by more than ${band.block}, no 16x16 block's by more than ${KEYFRAME_REGION} and no ${mean} past ${r.channelFloor + w} (to ${r.channelFloor + 2 * w}, a quarter at most past ${r.channelFloor + w}, where those past the floor were spread over the picture as a re-encoding's are, or in two spots or more apart whose 8x8 means moved by ${KEYFRAME_REGION} at most, or, before the keyframe, in one the keyframe shows too; to ${r.channelFloor + 3 * w} where the state's picture had changed since its GOP's keyframe, in 8x8 blocks whose means moved by ${KEYFRAME_REGION} at most)`,
       );
     }
     if (as.has("return") || as.has("settle")) {

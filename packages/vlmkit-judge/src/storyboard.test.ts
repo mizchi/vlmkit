@@ -2156,6 +2156,41 @@ describe("the noise band (lossy recordings)", () => {
       cursor.reread?.map((r) => r.n),
       [12],
     );
+    // A leading frame (9) whose tail is that one spot, before a keyframe (10) that shows it and a
+    // second spot apart: the keyframe's re-quantization arriving early (x264 `open-gop` crf 32), read
+    // again. With the keyframe showing the spot alone, it fails, and so does the leading frame.
+    const spotAt = (f: Uint8Array, x0: number, y0: number) => {
+      const out = new Uint8Array(f);
+      for (let y = y0; y < y0 + 8; y++) {
+        for (let x = x0; x < x0 + 16; x++) {
+          const v = (Math.floor(x / 4) % 2 === 0 ? 38 : -38) + (x === x0 + 9 && y === y0 + 3 ? 60 : 0);
+          for (let c = 0; c < 3; c++)
+            out[(y * w + x) * 4 + c] = Math.max(0, Math.min(255, out[(y * w + x) * 4 + c]! + v));
+        }
+      }
+      return out;
+    };
+    const opening = (frames: Uint8Array[]) =>
+      buildStoryboard(
+        frames.map((_, n) => ({ n, atMs: frameTimeMs(n), stable: true, key: n === 0 || n === 10, gop: n < 9 ? 0 : 1 })),
+        { width: w, height: h, pixels: (i: number) => frames[i]! },
+        { noise: LOSSY_NOISE },
+      );
+    const early = opening([
+      ...repeat(base, 9),
+      spotAt(base, 40, 40),
+      ...repeat(spotAt(spotAt(base, 40, 40), 200, 136), 30),
+    ]);
+    assert.deepEqual(early.events, []);
+    assert.deepEqual(
+      early.reread?.map((r) => r.n),
+      [9, 10],
+    );
+    const alone = opening([...repeat(base, 9), ...repeat(spotAt(base, 40, 40), 31)]);
+    assert.deepEqual(
+      alone.events.map((e) => [e.kind, e.first.n]),
+      [["change", 9]],
+    );
     // On a GOP start without the tail, within 40, it is read again: the limit the band sets.
     assert.deepEqual(
       run([...repeat(base, 10), ...repeat(label(36, 0), 30)], (n) => n === 0 || n === 10).reread?.map((r) => r.n),
@@ -2431,7 +2466,7 @@ describe("the noise band (lossy recordings)", () => {
     assert.match(md, /None: every frame is within the floor of S0's picture, read again at 1 frame\./);
     assert.match(
       md,
-      /Read again at 166\.67 ms \(n 10, S0, a keyframe\): the picture there differed from the state's only as a codec re-quantizes one — at a keyframe, no 8x8 block's mean moved by more than 24, no 16x16 block's by more than 12 and no 3x3 mean past 40 \(to 48, a quarter at most past 40, where those past the floor were spread over the picture as a re-encoding's are; to 56 where the state's picture had changed since its GOP's keyframe, in 8x8 blocks whose means moved by 12 at most\) —/,
+      /Read again at 166\.67 ms \(n 10, S0, a keyframe\): the picture there differed from the state's only as a codec re-quantizes one — at a keyframe, no 8x8 block's mean moved by more than 24, no 16x16 block's by more than 12 and no 3x3 mean past 40 \(to 48, a quarter at most past 40, where those past the floor were spread over the picture as a re-encoding's are, or in two spots or more apart whose 8x8 means moved by 12 at most, or, before the keyframe, in one the keyframe shows too; to 56 where the state's picture had changed since its GOP's keyframe, in 8x8 blocks whose means moved by 12 at most\) —/,
     );
     assert.match(md, /A change within those bands, landing on a frame read again, is not seen\./);
     assert.doesNotMatch(
