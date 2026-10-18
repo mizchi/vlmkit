@@ -248,8 +248,11 @@ describe("composed built-in registry", () => {
     //       explains, and three that say when a verdict cannot be had — `flash-unmeasured`
     //       (media and pixels the held clock cannot hold), `flash-unjudgeable` and
     //       `flash-undersampled` (a saved sequence too sparse to fail, or to back a pass).
+    // 217 → 218: `check animation` / `undefined-keyframes` (suspect) — an animation-name with
+    //       no @keyframes runs nothing; a reduced-motion rule naming one read as "honored"
+    //       while the toast it was meant to hide never left (a dynamic-markup run).
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 217);
+    assert.equal(total, 218);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

@@ -914,3 +914,41 @@ test(
     assert.ok(!report.issues.some((i) => i.kind === "seek-ineffective"));
   },
 );
+
+// From dynamic-markup runs on a save toast: an entrance and an exit on one element, and the
+// reduced-motion rules an agent wrote for it.
+const TOAST = `
+  @keyframes in { from { transform: translateX(300px); } to { transform: none; } }
+  @keyframes out { to { transform: translateX(300px); opacity: 0; visibility: hidden; } }
+  @keyframes cut { to { visibility: hidden; } }
+  #a { animation: in 500ms ease-out both, out 300ms ease-in 1500ms forwards; }`;
+
+test(
+  "runAnimationEval: an entrance is visible though a later animation on the element ends hidden",
+  { timeout: 120_000 },
+  async () => {
+    const report = await evaluate(TOAST + "@media (prefers-reduced-motion: reduce) { #a { animation: none; } }");
+    const byName = Object.fromEntries(report.evaluated.map((a) => [a.name, a.visible]));
+    assert.deepEqual(byName, { in: true, out: true });
+  },
+);
+
+test(
+  "runAnimationEval: reduced motion with a visibility step is honoured, with a missing @keyframes is reported",
+  { timeout: 120_000 },
+  async () => {
+    const step = await evaluate(
+      TOAST + "@media (prefers-reduced-motion: reduce) { #a { animation: cut 1500ms steps(1, end) forwards; } }",
+    );
+    assert.equal(step.reducedMotion?.remainingCount, 0);
+    assert.equal(
+      step.issues.some((i) => i.kind === "undefined-keyframes"),
+      false,
+    );
+    const missing = await evaluate(
+      TOAST + "@media (prefers-reduced-motion: reduce) { #a { animation: gone 0s 1500ms forwards; } }",
+    );
+    assert.deepEqual(missing.undefinedKeyframes, [{ selector: "#a", name: "gone", reducedMotion: true }]);
+    assert.ok(missing.issues.some((i) => i.kind === "undefined-keyframes" && i.severity === "suspect"));
+  },
+);

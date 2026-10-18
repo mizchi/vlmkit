@@ -51,9 +51,9 @@ behaviour under emulation and does not depend on CSS text.`,
     },
     {
       id: "running-animation",
-      title: "Animation still running at measurement time",
+      title: "Infinite animation running at measurement time",
       severity: "warn",
-      docs: "Non-settling motion makes every downstream pixel diff nondeterministic.",
+      docs: "Non-settling motion makes every downstream pixel diff nondeterministic. Finite animations (an entrance) settle and are not reported; `check animation` measures when.",
     },
   ],
   inputs: [

@@ -82,6 +82,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "The page cancelled or replaced the animation, or replaying a sample did not reproduce its frame — its pixels are not a measurement of it, so it is reported neither visible nor dead.",
     },
     {
+      id: "undefined-keyframes",
+      title: "animation-name names no @keyframes",
+      severity: "suspect",
+      docs: "Nothing runs under a name with no @keyframes. Checked on the page and under prefers-reduced-motion: reduce, where a misnamed rule meant to hide or settle something silently does nothing (and reduced motion would otherwise read as honoured).",
+    },
+    {
       id: "clock-motion-unsettled",
       title: "Script-driven motion still changing at the end of the virtual-time window",
       severity: "warn",

@@ -34,6 +34,29 @@ describe("analyzeMotionSamples", () => {
     assert.ok(report.issues.some((issue) => issue.kind === "running-animation"));
   });
 
+  it("does not call a finite entrance running at load non-settling", () => {
+    const sample = (count: string) => ({
+      selector: ".hero",
+      tagName: "H1",
+      animationName: "rise-in",
+      animationDuration: "500ms",
+      animationDelay: "0s",
+      animationPlayState: "running",
+      animationIterationCount: count,
+      transitionProperty: "all",
+      transitionDuration: "0s",
+      transitionDelay: "0s",
+    });
+    const cssText = "@media (prefers-reduced-motion: reduce) { * { animation: none; } }";
+    const finite = analyzeMotionSamples({ source: "inline", cssText, samples: [sample("1")] });
+    assert.equal(
+      finite.issues.some((issue) => issue.kind === "running-animation"),
+      false,
+    );
+    const forever = analyzeMotionSamples({ source: "inline", cssText, samples: [sample("infinite")] });
+    assert.ok(forever.issues.some((issue) => issue.kind === "running-animation"));
+  });
+
   it("accepts motion when reduced-motion CSS is present", () => {
     const report = analyzeMotionSamples({
       source: "inline",

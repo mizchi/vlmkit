@@ -32,6 +32,8 @@ export interface MotionComputedSample {
   animationDuration: string;
   animationDelay: string;
   animationPlayState: string;
+  /** `animation-iteration-count`, comma-separated per animation; absent in older captures. */
+  animationIterationCount?: string;
   transitionProperty: string;
   transitionDuration: string;
   transitionDelay: string;
@@ -114,9 +116,13 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
   const hasReducedMotionRule = /@media[^{]*prefers-reduced-motion[^{]*reduce/i.test(input.cssText);
   const activeAnimationSamples = input.samples.filter(hasActiveAnimation);
   const activeTransitionSamples = input.samples.filter(hasActiveTransition);
-  const runningAnimationSamples = activeAnimationSamples.filter((sample) =>
-    sample.animationPlayState.split(",").some((state) => state.trim() === "running"),
-  );
+  // Only an animation that never ends is "non-settling": a finite entrance running at load
+  // settles, and `check animation` measures when (four 500ms entrances warned before).
+  const runningAnimationSamples = activeAnimationSamples.filter((sample) => {
+    const states = sample.animationPlayState.split(",").map((x) => x.trim());
+    const counts = (sample.animationIterationCount ?? "infinite").split(",").map((x) => x.trim());
+    return states.some((state, i) => state === "running" && (counts[i] ?? counts[counts.length - 1]) === "infinite");
+  });
   const pausedAnimationSamples = activeAnimationSamples.filter((sample) =>
     sample.animationPlayState.split(",").some((state) => state.trim() === "paused"),
   );
@@ -154,7 +160,7 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
       kind: "running-animation",
       severity: "warn",
       selector: sample.selector,
-      message: `${sample.selector} has running animation \`${sample.animationName}\` (${sample.animationDuration}).`,
+      message: `${sample.selector} has a running animation that never ends: \`${sample.animationName}\` (${sample.animationDuration}, infinite).`,
     });
   }
 
@@ -254,6 +260,7 @@ export async function runMotionDetection(options: MotionDetectionOptions): Promi
           animationDuration: style.animationDuration,
           animationDelay: style.animationDelay,
           animationPlayState: style.animationPlayState,
+          animationIterationCount: style.animationIterationCount,
           transitionProperty: style.transitionProperty,
           transitionDuration: style.transitionDuration,
           transitionDelay: style.transitionDelay,

@@ -3,6 +3,7 @@ import { describe, it } from "vite-plus/test";
 import {
   DEFAULT_MOTION_FORBID,
   motionInstants,
+  motionEasingOptions,
   motionPlan,
   MotionUsageError,
   parseMotionArgs,
@@ -14,14 +15,37 @@ describe("inspect motion arguments", () => {
     const o = parseMotionArgs(["page.html", "--target", "the blue square", "--expect-easing", "ease-out", "--exits"]);
     assert.deepEqual(o.targets, ["the blue square"]);
     assert.deepEqual(o.forbid, [DEFAULT_MOTION_FORBID]);
-    assert.deepEqual(o.expectEasing, ["ease-out"]);
+    assert.deepEqual(o.expectEasing, [["ease-out"]]);
     assert.deepEqual(parseMotionArgs(["p.html", "--target", "x", "--expect-easing", "ease-out,ease-in"]).expectEasing, [
-      "ease-out",
-      "ease-in",
+      ["ease-out", "ease-in"],
     ]);
     assert.equal(o.exits, true);
     assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--forbid", "a spinner"]).forbid, ["a spinner"]);
     assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--no-forbid"]).forbid, []);
+  });
+
+  it("reads one --expect-easing as every target's and several as the targets' in order", () => {
+    assert.deepEqual(motionEasingOptions([["ease-out", "ease-in"]]), { expectEasing: ["ease-out", "ease-in"] });
+    assert.deepEqual(
+      motionEasingOptions(
+        parseMotionArgs([
+          "p.html",
+          "--target",
+          "a",
+          "--expect-easing",
+          "ease-out",
+          "--target",
+          "b",
+          "--expect-easing",
+          "ease-in-out",
+        ]).expectEasing,
+      ),
+      { targetEasing: ["ease-out", "ease-in-out"] },
+    );
+    assert.throws(
+      () => parseMotionArgs(["p.html", "--target", "a", "--expect-easing", "linear", "--expect-easing", "ease"]),
+      MotionUsageError,
+    );
   });
 
   it("pairs each --selector with the --target in its position", () => {
@@ -43,7 +67,6 @@ describe("inspect motion arguments", () => {
       ["page.html", "--expect-easing", "bouncy", "--target", "x"],
       ["page.html", "--expect-easing", "linear"],
       ["out/frames.json", "--target", "x"],
-      ["page.html", "--target", "x", "--at", "0..500/100"],
       ["a.html", "b.html", "--target", "x"],
       ["page.html", "--target", "x", "--forbid", "y", "--no-forbid"],
     ];
@@ -71,6 +94,19 @@ describe("inspect motion arguments", () => {
     assert.equal(plan.motion.filter((t) => t <= 600).length, 11);
     assert.equal(plan.motion.filter((t) => t >= 2100).length, 11);
     assert.equal(plan.rest, 2700);
+  });
+
+  it("cuts a single animation's keyframe hold out of its span", () => {
+    // One 3300ms toast: in over 0-15%, held 15-90%, out 90-100%.
+    const plan = motionPlan([{ startMs: 0, durationMs: 3300, iterations: 1, holds: [[0.15, 0.9]] }]);
+    assert.deepEqual(
+      plan.segments.map((g) => [Math.round(g.startMs), Math.round(g.endMs)]),
+      [
+        [0, 495],
+        [2970, 3300],
+      ],
+    );
+    assert.equal(plan.motion.filter((t) => t <= 495).length, 11);
   });
 
   it("is refused without a key before a browser starts", async () => {

@@ -364,6 +364,24 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
     push(text, blockOf(el));
   }
   }
+  // What a text field shows is copy too: a profile form's "Alice Johnson" is its value, in no
+  // text node (a correct form failed its manifest). Passwords and hidden fields are not shown.
+  for (const scope of roots) {
+    if (!scope.querySelectorAll) continue;
+    for (const field of scope.querySelectorAll("input, textarea")) {
+      const type = (field.getAttribute("type") || "text").toLowerCase();
+      if (field.tagName === "INPUT" && !["text", "email", "search", "tel", "url", "number"].includes(type)) continue;
+      const value = field.value;
+      if (!value || !value.trim()) continue;
+      if (typeof field.checkVisibility === "function" &&
+        !field.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) {
+        invisible.push({ reason: "hidden", text: value });
+        continue;
+      }
+      lastBlock = null;
+      push(value, null);
+    }
+  }
   return { visible: parts.join(""), invisible };
 })()`;
 
@@ -394,7 +412,24 @@ export const COLLECT_RAW_TEXT = `(() => {
   };
   const body = document.body;
   walk(body || document);
+  // Field values are rendered text innerText leaves out (the visibility collector reads them too).
+  for (const field of (body || document).querySelectorAll("input, textarea")) {
+    const type = (field.getAttribute("type") || "text").toLowerCase();
+    if (field.tagName === "INPUT" && !["text", "email", "search", "tel", "url", "number"].includes(type)) continue;
+    if (field.value && field.value.trim()) extra.push(field.value);
+  }
   return [body ? body.innerText : ""].concat(extra).join("\\n");
+})()`;
+
+/** Finish every finite animation (an entrance lands at its last keyframe); returns how many. */
+export const LAND_FINITE_ANIMATIONS = `(() => {
+  let n = 0;
+  for (const a of document.getAnimations()) {
+    const end = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming().endTime : Infinity;
+    if (!Number.isFinite(Number(end))) continue;
+    try { a.finish(); n++; } catch {}
+  }
+  return n;
 })()`;
 
 /** The visible half of COLLECT_TEXT_VISIBILITY (the disclosure sweep only needs this). */
@@ -477,11 +512,24 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
+    type Visibility = { visible: string; invisible: { reason: string; text: string }[] };
     const pageText = (await page.evaluate(COLLECT_RAW_TEXT)) as string;
-    const { visible: visibleText, invisible: invisibleChunks } = (await page.evaluate(COLLECT_TEXT_VISIBILITY)) as {
-      visible: string;
-      invisible: { reason: string; text: string }[];
-    };
+    const onLoad = (await page.evaluate(COLLECT_TEXT_VISIBILITY)) as Visibility;
+    // Copy an entrance animation is still fading in reads hidden on load ("Start free" at
+    // opacity 0 until 700ms), and copy an exit removes reads hidden at rest (a toast). Read both:
+    // a line is shown if either shows it, and hidden only if hidden in both.
+    const landed = (await page.evaluate(LAND_FINITE_ANIMATIONS)) as number;
+    let visibleText = onLoad.visible;
+    let invisibleChunks = onLoad.invisible;
+    if (landed > 0) {
+      await page.evaluate(AWAIT_RENDER_COMMIT);
+      const atRest = (await page.evaluate(COLLECT_TEXT_VISIBILITY)) as Visibility;
+      visibleText = `${onLoad.visible}\n${atRest.visible}`;
+      const seen = (text: string) => onLoad.visible.includes(text.trim()) || atRest.visible.includes(text.trim());
+      invisibleChunks = [...onLoad.invisible, ...atRest.invisible].filter(
+        (c, i, all) => !seen(c.text) && all.findIndex((d) => d.text === c.text) === i,
+      );
+    }
     if (target) {
       blocks = ((await page.evaluate(COLLECT_TEXT_BLOCKS)) as TextBlock[]).filter(
         (b) => b.y < target.height && b.x < target.width,
