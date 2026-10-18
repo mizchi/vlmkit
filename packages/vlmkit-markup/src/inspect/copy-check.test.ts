@@ -482,3 +482,32 @@ test("inline runs join the way they read; blocks, <br> and cells still separate 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("copy an entrance is still fading in, an exit has removed, or a field shows is visible copy (E2E)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "copy-motion-"));
+  try {
+    // From dynamic-markup runs: a button fading in after a 700ms delay read copy-invisible on
+    // load, and a profile form's field values were missing.
+    const html = `<!doctype html><style>
+      @keyframes in { from { opacity: 0 } to { opacity: 1 } }
+      @keyframes out { from { opacity: 1 } to { opacity: 0 } }
+      .cta { animation: in 300ms ease-out 700ms both }
+      .toast { animation: out 300ms ease-in 2000ms both }
+      .never { opacity: 0 }
+    </style><body>
+      <a class="cta" href="#">Start free</a>
+      <div class="toast">Changes saved</div>
+      <input value="Alice Johnson"><input type="password" value="hunter2">
+      <p class="never">Never shown line</p>
+    </body>`;
+    const page = join(dir, "page.html");
+    const manifest = join(dir, "copy.txt");
+    await writeFile(page, html);
+    await writeFile(manifest, ["Start free", "Changes saved", "Alice Johnson", "Never shown line"].join("\n"));
+    const report = await runCopyCheck({ source: page, manifestPath: manifest });
+    assert.deepEqual(report.missingLines, []);
+    assert.deepEqual(report.invisibleLines, [{ line: "Never shown line", reason: "hidden" }]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
