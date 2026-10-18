@@ -33,11 +33,20 @@ instants and once at rest, and each frame asked of TypeSafe Jev
 whether each forbidden statement is. vlmkit judges the motion from that:
 
   target-lost      not shown between frames that show it (clipped, covered)
-  absent-at-rest   shown in motion, gone once it stops (--exits: meant to)
+  absent-at-rest   shown in motion, gone once it stops (unless --exits says it leaves)
   snap-back        back where it started once it stops (fill-mode missing)
   jump             one step far faster than its neighbours (keyframe gap)
   easing-mismatch  the path follows another easing than --expect-easing
   forbid           a statement seen at rest fails; only mid-motion, warns
+
+Frames: each span some finite animation runs in is a segment (an entrance, and
+after a hold an exit, are two), shot 11 times from its start to just inside its
+end (fewer each past 5 segments, 60 at most), plus one frame at rest 300ms after
+the last. Easings are fitted, and jumps looked for, inside one segment. Positions
+come from frames that surely show the target (presence 0.8+); a box cut by the
+viewport's edge is put back from the target's own size. So "travels" is the
+measured part of the path and can be shorter than the CSS distance; under 60px
+an easing is not fitted, and an --expect-easing there is a warn, not a pass.
 
   --target <words>        What moves, as you would point at it ("the blue Saved toast")
   --forbid <statement>    No frame may show it. Default, when none is given:
