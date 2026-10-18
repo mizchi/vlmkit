@@ -271,10 +271,17 @@ export function formatMotionReport(
   let fails = 0;
   let warns = 0;
   for (const t of r.targets) {
-    const fit =
-      "best" in t.easing
-        ? `follows ${t.easing.best} (${t.easing.margin.toFixed(1)}x ahead of the next)`
-        : `no easing fit: ${t.easing.skipped}`;
+    const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
+    let fit: string;
+    if (!("best" in t.easing)) fit = `no easing fit: ${t.easing.skipped}`;
+    else if (broken) fit = "no easing named: the path has a jump, so no curve describes it";
+    else {
+      const errors = t.easing.errors;
+      const next = Object.keys(errors)
+        .filter((k) => k !== (t.easing as { best: string }).best)
+        .sort((a, b) => errors[a as keyof typeof errors] - errors[b as keyof typeof errors])[0];
+      fit = `follows ${t.easing.best} (it fits ${t.easing.margin.toFixed(1)}x better than the next-best curve, ${next})`;
+    }
     lines.push(`  target ${JSON.stringify(t.target)}: travels ${Math.round(t.travelPx)}px, ${fit}`);
     for (const f of t.findings) {
       if (f.severity === "fail") fails++;
@@ -300,7 +307,9 @@ export function formatMotionReport(
   lines.push(
     `  ${fails === 0 ? "no fail" : `${fails} fail`}${warns ? `, ${warns} warn` : ""}; ${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — a model's reading of the pixels, not a measurement`,
   );
-  lines.push(`  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest}`);
+  lines.push(
+    `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3 --out ${join(dirname(captured.manifest), "strip.png")}`,
+  );
   return lines.join("\n");
 }
 
