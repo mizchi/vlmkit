@@ -192,4 +192,24 @@ describe("judgeMotionPath", () => {
     const r = judgeMotionPath(s, { startMs: 0, endMs: 640, expectEasing: "ease-out" });
     expect(r.findings).toEqual([]);
   });
+
+  it("with the element measured, a 'shown' boxed on another element is unknown, and not rendered is not shown", () => {
+    // The third card starts at 240ms; at 128ms the model says shown but boxes the first card.
+    const times = [0, 64, 128, 192, 256, 320, 384, 448, 512, 576, 639, 940];
+    const s = times.map((at) => {
+      const t = Math.min(1, Math.max(0, (at - 240) / 400));
+      const y = 200 + 24 * (1 - easingAt("ease-out", t));
+      const elsewhere = at === 128 || at === 448;
+      return {
+        atMs: at,
+        present: elsewhere ? 0.7 : t > 0.2 ? 0.9 : 0.02,
+        box: elsewhere ? box(100, 200) : box(900, y),
+        dom: { box: box(900, y), opacity: t, scale: 1, t },
+      };
+    });
+    // 128ms: not rendered yet (opacity 0), so not shown, and no "lost" in its delay. 448ms:
+    // rendered, but the box is elsewhere — unknown, a warn, never a target-lost.
+    const r = judgeMotionPath(s, { startMs: 0, endMs: 640, expectEasing: "ease-out" });
+    expect(r.findings.map((f) => [f.rule, f.atMs])).toEqual([["locate-unsure", 448]]);
+  });
 });

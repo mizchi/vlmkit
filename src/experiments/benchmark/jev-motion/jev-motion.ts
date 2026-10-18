@@ -266,7 +266,10 @@ function report(results: Result[]): string {
   for (const r of results) {
     const fs = [
       ...r.report.targets.flatMap((t) => t.findings.map((f) => `${f.severity} ${f.rule}@${Math.round(f.atMs)}`)),
-      ...r.report.forbidden.map((f) => `${f.severity} forbid@${f.frames.map((x) => Math.round(x.atMs)).join("/")}`),
+      ...r.report.forbidden.map(
+        (f) =>
+          `${f.severity} ${f.statement === OVERLAP ? "claims-wording-forbid" : "forbid"}@${f.frames.map((x) => Math.round(x.atMs)).join("/")}`,
+      ),
     ];
     lines.push(`- ${r.case.file}: ${fs.join("; ") || "none"}`);
   }

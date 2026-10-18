@@ -279,11 +279,14 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   for ease-out), and a half-visible frame read as lost. Within 1.25% of an edge (Jev's 1% steps
   put a box cut at 1280 at 1267) the centre is put back from the target's own size.
 - **One look is 12.8px steps; ask the box again on a magnified crop** of the region it moves
-  through (`refine`, default): centre error to the DOM 7.4 → 5.2px median.
+  through (`refine`, default): centre error to the DOM 7.4 → 4.4px median.
 - **Look-alike siblings get swapped** (three stat cards: one boxed 630px away and back). A box far
   off and back, or one two targets share, is `locate-unsure` (warn) and left out. `--selector`
   removes it: geometry, opacity, scale and the element's own `getComputedTiming()` time from the
-  page — the only way staggered siblings in one segment each fit their own curve.
+  page — the only way staggered siblings in one segment each fit their own curve. With it, a
+  target not rendered (opacity < 0.05) is not seen whatever Jev says, and a Jev "seen" whose box
+  misses the element is unknown: one such reading on a card still in its delay made a false
+  `target-lost`.
 - **The overlap statement must be narrow.** "text overlapping other text so that it is hard to
   read" fired on an open dropdown over a page; "two lines of text printed on top of each other,
   their letters crossing" (`DEFAULT_MOTION_FORBID`) caught the claims round's planted overlaps 9/9

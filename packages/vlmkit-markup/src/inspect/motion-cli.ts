@@ -86,11 +86,12 @@ viewport's edge is put back from the target's own size. So "travels" is the
 measured part of the path and can be shorter than the CSS distance; under 60px
 an easing is not fitted, and an --expect-easing there is a warn, not a pass.
 
-  --target <words>        What moves, as you would point at it ("the blue Saved toast")
+  --target <words>        What moves, by what only it shows: "the card labelled Users showing
+                          1,284", not "the Users card" (look-alike cards get swapped)
   --selector <css>        The element the --target in the same position names (repeat in order):
-                          its position, opacity and scale are measured from the page, exact,
-                          and Jev only says whether it can be seen. Use it whenever the page is
-                          yours: look-alike elements (three cards) make a model box the wrong one
+                          its position, opacity, scale and own animation time are measured from
+                          the page, and Jev only says whether it can be seen — a "seen" whose box
+                          misses the element is set aside. Use it whenever the page is yours
   --forbid <statement>    No frame may show it. Default, when none is given:
                           "${DEFAULT_MOTION_FORBID}"
   --no-forbid             Ask no statement (only the targets' motion)
@@ -398,7 +399,7 @@ export function formatMotionReport(
     const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
     if (t.segments.length <= 1) {
       lines.push(
-        `  target ${JSON.stringify(t.target)}: travels ${Math.round(t.travelPx)}px, ${fitText(t.easing, broken)}`,
+        `  target ${JSON.stringify(t.target)}: travels ${Math.round(t.travelPx)}px over the frames measured, ${fitText(t.easing, broken)}`,
       );
     } else {
       lines.push(`  target ${JSON.stringify(t.target)}: ${t.segments.length} segments`);

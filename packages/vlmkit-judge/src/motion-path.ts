@@ -237,7 +237,21 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     typeof options.expectEasing === "string" ? options.expectEasing : options.expectEasing?.[k];
   const sorted = [...samples].sort((a, b) => a.atMs - b.atMs);
   const isRest = (s: MotionSample) => s.atMs > options.endMs;
-  const shown = (s: MotionSample) => s.present >= thr && s.box !== null;
+  // What a frame says about being seen. Measured by the page, a target that is not rendered
+  // (opacity under 0.05) is not seen whatever the model says, and a "shown" whose box misses the
+  // element was about another element: unknown (null), not evidence either way. A model's box
+  // another target shares is unknown too.
+  const overlaps = (a: MotionBox, b: MotionBox) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const seen = (s: MotionSample): number | null => {
+    if (s.dom) {
+      if (s.dom.opacity < 0.05) return 0;
+      if (s.box && s.present >= thr && !overlaps(s.box, s.dom.box)) return null;
+      return s.present;
+    }
+    return s.unsure ? null : s.present;
+  };
+  const shown = (s: MotionSample) => (seen(s) ?? 0) >= thr && s.box !== null;
   const findings: MotionFinding[] = [];
 
   // Which sides of the frame a box touches: the target is partly outside the viewport there.
@@ -274,21 +288,24 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
 
   // Presence: absent between two frames that show it, or gone once it stops. A faint frame whose
   // box is at the viewport's edge is the target coming in or going out, not lost.
-  const firstShown = sorted.findIndex(shown);
-  const lastShown = sorted.length - 1 - [...sorted].reverse().findIndex(shown);
+  const judged = sorted.filter((s) => seen(s) !== null);
+  const firstShown = judged.findIndex(shown);
+  const lastShown = judged.length - 1 - [...judged].reverse().findIndex(shown);
   if (firstShown >= 0) {
     for (let i = firstShown + 1; i < lastShown; i++) {
-      const s = sorted[i]!;
+      const s = judged[i]!;
       if (!shown(s) && !atEdge(s)) {
+        const before = [...judged.slice(0, i)].reverse().find(shown)!;
+        const after = judged.slice(i + 1).find(shown)!;
         findings.push({
           rule: "target-lost",
           severity: "fail",
           atMs: s.atMs,
-          message: `not shown at ${ms(s.atMs)} (presence ${s.present.toFixed(2)}) between frames that show it: clipped, covered or hidden mid-motion`,
+          message: `not shown at ${ms(s.atMs)} (presence ${s.present.toFixed(2)}) though ${ms(before.atMs)} and ${ms(after.atMs)} show it: clipped, covered or hidden mid-motion — if it is not on screen yet at ${ms(before.atMs)}, that frame's reading is the wrong one; look at both`,
         });
       }
     }
-    const restSamples = sorted.filter(isRest);
+    const restSamples = judged.filter(isRest);
     const goneAtRest = restSamples.length > 0 && restSamples.every((s) => !shown(s));
     if (goneAtRest && motion.length > 0 && !options.exits) {
       findings.push({
@@ -319,7 +336,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const geoRest = all.filter((p) => p.rest);
 
   // A model's box that lands far off and is back the next frame is another element's, not a jump.
-  const unsureAt = sorted.filter((s) => s.unsure).map((s) => s.atMs);
+  const unsureAt = sorted.filter((s) => seen(s) === null).map((s) => s.atMs);
   if (!exact) {
     const out = new Set<number>();
     for (let k = 1; k < geo.length - 1; k++) {
@@ -337,12 +354,19 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       rule: "locate-unsure",
       severity: "warn",
       atMs: Math.min(...unsureAt),
-      message: `at ${[...new Set(unsureAt)]
-        .sort((a, b) => a - b)
-        .map(ms)
-        .join(
-          ", ",
-        )} the box is likely another element's (far off and back, or on another target), so those frames are not measured: describe the target by what only it shows, or pass --selector`,
+      message: exact
+        ? `at ${[...new Set(unsureAt)]
+            .sort((a, b) => a - b)
+            .map(ms)
+            .join(
+              ", ",
+            )} the model's "shown" was boxed off the element, so whether it can be seen there is unknown (its position is still measured): describe it by what only it shows (its label and value)`
+        : `at ${[...new Set(unsureAt)]
+            .sort((a, b) => a - b)
+            .map(ms)
+            .join(
+              ", ",
+            )} the box is likely another element's (far off and back, or on another target), so those frames are not measured: describe the target by what only it shows, or pass --selector`,
     });
   }
 
