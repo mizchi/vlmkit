@@ -1042,7 +1042,14 @@ vlmkit inspect claims   <html|url|shot.png> --forbid "an error message" --expect
   # 1 one does not / 2 usage. --claims file.json, --viewport WxH, --save out.png, --threshold,
   # --json. Answers within 0.3 of the threshold are marked uncertain. Gate on the
   # deterministic checks; this is a model's reading of the pixels.
-
+vlmkit inspect motion   <html|url> --target "the green Saved toast" [--selector .toast] [--expect-easing ease-out,ease-in] [--exits]
+  # Is a CSS animation visually broken? Frames on the held clock (11 per span of motion + rest),
+  # one TypeSafe Jev request each (TYPESAFEAI_API_KEY; ~$0.00013/frame, +1 per frame for the
+  # magnified second look): presence + box per target, a noul per --forbid (default: text printed
+  # over text). vlmkit judges target-lost, absent-at-rest, snap-back, jump, easing-mismatch,
+  # target-static, locate-unsure. --selector takes geometry, opacity, scale and the element's own
+  # animation time from the page (use it on your own page). Frames + motion-report.json in
+  # --frames (default test-results/inspect-motion). Exit 0 / 1 fail / 2 usage. Advisory.
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each

@@ -208,6 +208,31 @@ SMIL, iframes, shadow roots) and counts transitions at each pixel:
 - `--strip worst.png` is one still image of the worst window. Never make an
   animated preview of a failing window: it would strobe for whoever opens it.
 
+### B3c. `inspect motion attempt.html` — does the motion look right? (optional, `TYPESAFEAI_API_KEY`)
+
+The gates above measure that animations run and settle; none says the motion *looks* wrong. In
+the 2026-10-18 round (`docs/reports/2026-10-18-jev-motion.md`) `check animation` exited 0 on
+all seven broken animations, and `check integrity --timeline` named only three of them. With a
+key, judge your own motion before calling it done:
+
+```bash
+vlmkit inspect motion attempt.html --target "the green Saved toast" --selector .toast \
+  --expect-easing ease-out,ease-in --exits        # one --target (+ --selector) per element that moves
+```
+
+- **Always pass `--selector` on your own page.** Without it a model boxes the target, and
+  look-alike siblings (three stat cards) get swapped between frames; with it position, opacity,
+  scale and the element's own animation time come from the page, and Jev only says whether it
+  can be seen (and whether text is printed over text).
+- **Read the rule, then the frames.** `snap-back` = the final keyframe is not held
+  (fill-mode); `jump` = a keyframe gap; `target-lost` / `absent-at-rest` = clipped, covered or
+  faded for good (`--exits` when it is meant to leave); `easing-mismatch` = the timing function;
+  `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
+  prints the strip line to look at; open single frames for detail.
+- **What it does not judge**: fps or jank, a target it is not told about, and anything under
+  the 6px / 0.2-opacity floors with `--selector` (60px without it). A pass is "nothing looked
+  broken in these frames", not "matches the brief" — compare durations with B3's list.
+
 ### B4. `check motion attempt.html`
 
 Declaration-level cross-check: the reduced-motion *rule* exists in the

@@ -260,6 +260,36 @@ with an error banner, modal, broken image, overlapping text or loading overlay p
   The `uncertain` band (within 0.3 of the threshold) held 10 of the 12 wrong answers and 22 of the
   258 right ones: outside it, 236 right and 2 wrong.
 
+**Shipped as `inspect motion`** (`@mizchi/vlmkit-judge/motion-path.ts` `judgeMotionPath`, pure;
+`@mizchi/vlmkit-ai/motion-check.ts` `checkMotionFrames`; `packages/vlmkit-markup/src/inspect/motion-cli.ts`).
+Is a CSS animation visually broken, for an agent to judge its own: frames on the held clock, one Jev
+request per frame (presence + box per `--target`, a `noul` per `--forbid`), the motion judged from
+those — never asked. Known answers: `fixtures/motion-defects/` (7 mistakes × intact/broken,
+`build.mjs` writes them and `cases.json`); bench `src/experiments/benchmark/jev-motion/jev-motion.ts`.
+Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
+
+- 7/7 broken caught by the expected rule, 7/7 intact pass, with and without `--selector`.
+  `check animation` exited 0 on all 14; `check integrity --timeline` named 3 of the 7 by a rule
+  the intact page lacked. Every number here was found by agents using the tool on their own
+  pages (three rounds), not by the fixtures, which a first version already passed.
+- **Sample per segment, judge per segment.** 11 even frames over a 2.4s toast gave its 600ms
+  entrance 2-3, and hold frames as a step's neighbours read as a jump. Each span some finite
+  animation runs in gets its own 11 (`motionPlan`).
+- **A box cut by the viewport is the visible part.** Its centre moves at half speed (fits linear
+  for ease-out), and a half-visible frame read as lost. Within 1.25% of an edge (Jev's 1% steps
+  put a box cut at 1280 at 1267) the centre is put back from the target's own size.
+- **One look is 12.8px steps; ask the box again on a magnified crop** of the region it moves
+  through (`refine`, default): centre error to the DOM 7.4 → 5.2px median.
+- **Look-alike siblings get swapped** (three stat cards: one boxed 630px away and back). A box far
+  off and back, or one two targets share, is `locate-unsure` (warn) and left out. `--selector`
+  removes it: geometry, opacity, scale and the element's own `getComputedTiming()` time from the
+  page — the only way staggered siblings in one segment each fit their own curve.
+- **The overlap statement must be narrow.** "text overlapping other text so that it is hard to
+  read" fired on an open dropdown over a page; "two lines of text printed on top of each other,
+  their letters crossing" (`DEFAULT_MOTION_FORBID`) caught the claims round's planted overlaps 9/9
+  with 0/36 cross-plant alarms (the broad one 10/36), on screenshots it was not chosen on.
+- Positions from frames shown at ≥0.8 only: a fade's faint frames got boxes 40px off.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with
