@@ -110,7 +110,8 @@ and horizontal overflow at boundary widths.`,
       ...(issue.breakpoint !== undefined ? { viewport: issue.breakpoint } : {}),
     })),
   format: formatBreakpointCheckReport,
-  headline: (report) => `checked ${report.checkedValues.join(", ") || "none"}px`,
+  headline: (report) =>
+    report.checkedValues.length > 0 ? `checked ${report.checkedValues.join(", ")}px` : "no breakpoints declared",
   ledger: (report, options) => ({
     tool: "check-breakpoints",
     source: options.source,

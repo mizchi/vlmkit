@@ -571,6 +571,25 @@ export function unpinnedLiveInput(gate: AnyGateDefinition, argv: readonly string
 }
 
 /**
+ * Flags on the command line that neither the runner nor the gate declares. They were ignored
+ * without a word: an agent passed `verify markup --manifest copy.txt` and could not tell
+ * whether the copy was checked (it was not; `check copy --manifest` is the gate that does).
+ * Said, not refused: a gate whose `inputs` missed a flag it reads would otherwise break.
+ */
+export function unknownGateFlags(gate: AnyGateDefinition, argv: readonly string[]): string[] {
+  const known = new Set<string>([...SHARED_GATE_FLAGS, "--har"]);
+  for (const input of gate.inputs ?? []) {
+    known.add(`--${input.name}`);
+    known.add(`--no-${input.name}`);
+  }
+  const unknown = argv
+    .filter((arg) => arg.startsWith("--") && arg.length > 2)
+    .map((arg) => arg.split("=")[0]!)
+    .filter((flag) => !known.has(flag));
+  return [...new Set(unknown)];
+}
+
+/**
  * Announce a file this run brought into existence in an un-ignored spot.
  *
  * The run ledger has always been written to `.vlmkit/run-ledger.jsonl` with no
@@ -619,6 +638,12 @@ export async function runGateCli<Report, Options>(
   if (shared.listRules) {
     out(formatRuleTable(gate));
     return 0;
+  }
+  const unknown = unknownGateFlags(gate, argv);
+  if (unknown.length > 0) {
+    (options.err ?? ((text: string) => console.error(text)))(
+      `warn: ${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of vlmkit ${gateCommandString(gate)} and ${unknown.length === 1 ? "was" : "were"} ignored (--help lists its options)`,
+    );
   }
   const outcome = await runGate(gate, argv, options);
   // Say when warns did not fail the command, and name the flag that makes one fail.

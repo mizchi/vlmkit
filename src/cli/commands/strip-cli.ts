@@ -348,7 +348,13 @@ async function main(): Promise<void> {
     ...(parsed.gap !== undefined ? { gap: parsed.gap } : {}),
     ...(parsed.scale !== undefined ? { scale: parsed.scale } : {}),
     ...(cap > 0 ? { maxWidth: cap } : {}),
-    ...(parsed.labels.length > 0 ? { columnLabels: parsed.labels } : {}),
+    // More labels than columns are one per frame (a manifest's times on a wrapped grid): drawn
+    // above each cell, not as column heads, which labelled the first row only.
+    ...(parsed.labels.length > 0
+      ? parsed.columns !== undefined && parsed.labels.length > parsed.columns
+        ? { cellLabels: parsed.labels }
+        : { columnLabels: parsed.labels }
+      : {}),
     ...(parsed.rowLabels.length > 0 ? { rowLabels: parsed.rowLabels } : {}),
     ...(parsed.labelScale !== undefined ? { labelScale: parsed.labelScale } : {}),
   });

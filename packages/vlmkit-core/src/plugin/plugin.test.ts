@@ -631,6 +631,26 @@ describe("runGateCli", () => {
     assert.match(text, /--rule odd-thing=suspect/);
   });
 
+  it("says which flags it did not know, and runs anyway", async () => {
+    const errs: string[] = [];
+    const io = { out: () => {}, err: (t: string) => errs.push(t), ledger: false } as const;
+    await runGateCli(
+      fakeGate({ run: () => ({ source: "p.html", hits: [] }), findings: () => [] }),
+      ["p.html", "--strict", "--json", "--manifest", "copy.txt"],
+      io,
+    );
+    assert.deepEqual(errs, [
+      "warn: --manifest is not an option of vlmkit check fake and was ignored (--help lists its options)",
+    ]);
+    errs.length = 0;
+    await runGateCli(
+      fakeGate({ run: () => ({ source: "p.html", hits: [] }), findings: () => [] }),
+      ["p.html", "--strict", "--rule", "odd-thing=off"],
+      io,
+    );
+    assert.deepEqual(errs, []);
+  });
+
   it("stays quiet about warns when there are none, and under --json", async () => {
     const clean: string[] = [];
     await runGateCli(fakeGate({ run: () => ({ source: "p.html", hits: [] }), findings: () => [] }), ["p.html"], {
