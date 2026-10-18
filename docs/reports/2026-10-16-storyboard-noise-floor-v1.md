@@ -8,6 +8,7 @@ noise band instead of byte for byte. This round covers:
 - what a second review of that redesign found, on 375 cases of its own, and what changed again;
 - what a third and a fourth review found in keyframe re-reads, open GOPs and boxes, the fourth on
   432 open-GOP encodes;
+- what a fifth review found in leading frames, one-spot tails and returns, on 1030 planted cases;
 - what it does on real recordings with labels;
 - what it still cannot see.
 
@@ -479,6 +480,168 @@ and five boxes grew by 1-4px (four window changes on Conky 106687, 464-476px wid
 beginning on keyframes; one on GrassGIS 46646). Lossless input still gives main's story.json and SUMMARY.md byte for byte, on 1500 random
 sequences and the 18 captures with and without `--ignore`.
 
+## The fifth review
+
+A fifth review read the fourth round's fixes through four lenses: keyframe re-reads; returns and
+boxes; a differential of 1030 planted cases against the code before the fourth round (e45dd8de);
+and docs, SUMMARY.md and cost. It reported 26 findings, 5 of them high. A second agent tried to
+refute twelve of them. Ten held as reported, and two held in part: in the 1080p toast below the
+mechanism was not the one the reviewer named, and the quiet-cluster finding was narrower than
+claimed. The other fourteen were reproduced or read against the code here, then fixed or written
+down as limits. Most of the twelve are one rule seen from two sides. The fourth round read a
+leading frame again only when its keyframe passed too, and that was broader than the case it was
+made for. What changed:
+
+- **A leading frame's pre-echo is held; any other leading frame that passes is read again.**
+  Refusing a leading frame whose keyframe failed fixed the half-changed digit. It also made up
+  events in three ways:
+  - A pre-echo gone by the next leading frame was a glitch before the change. A blue focus ring
+    through x265 crf 28, keyint 15, gave glitch@28→29 and then change@30. A digit landing on an
+    x265 keyframe at crf 18-20 was right in 2 of 9 encodes, against 9 of 9 before.
+  - A leading frame that only re-quantized a spot elsewhere began the event there. The smear
+    joined that spot to a toast on the keyframe (509x363), and the toast never came back (x265
+    crf 30, keyint 6).
+  - A transient on an open-GOP keyframe, after a change that settled mid-GOP, became changes with
+    a page-wide box.
+
+  Now a leading frame that passes the test is held only when its keyframe moves a mean past 40
+  within the 8x8 neighbourhood of where the leading frame departs (`echoes`). A held frame is
+  neither read again nor an event, and the change's step is measured across the held frames, or
+  the pre-echo split it into steps under the floor and it read as a drift. Any other leading
+  frame that passes is read again. Two things were tried first and dropped. Merging a pre-echo
+  glitch into the keyframe's change merged blinks 3 frames apart. Reading the pre-echo again when
+  the keyframe was within the floor of it read the half-changed digit again.
+- **A keyframe's tail is never one spot.** The fourth round admitted a tail in one spot whose 8x8
+  means barely moved, to take in a cursor's tail (8x8 means 10-11). A letter changed on a keyframe
+  is also one such spot: 'Customers' became 'Csstomers' in 12px dark nav text, means to 44-48,
+  2-3 of them past 40, 8x8 means 7-9. It was lost on 7 of 16 encodes where the code before had
+  reported it. A tail must now be spread, or in two spots or more apart whose 8x8 means barely
+  moved. One spot is still accepted in two places:
+  - Around an event, by a return's `reencodedOutside`: without it a toast through x264 crf 32 did
+    not come back.
+  - On a leading frame whose keyframe passes and shows that spot (`shownBy`): there it is the
+    keyframe's re-quantization arriving early. Without this, x264 `open-gop` at crf 32, keyint
+    10, brought one spot in on the frame before each keyframe (6 means past the floor, one to 42,
+    8x8 means 3.4; the keyframe, four spots), and the first opening of eleven of the 432 open-GOP
+    encodes was a change, where the fourth round had read it again.
+- **A keyframe re-codes what prediction coded.** A glyph changed mid-GOP is coded by prediction
+  until the next keyframe codes it afresh. There its means moved by 45 (x265 crf 28: 6 past the
+  floor, 4 past 40, 8x8 means 7.5), and the next opening of a still state was an event
+  (drift@44→45). So inside what differs past the floor from the GOP's keyframe (`predicted`, out
+  to whole 8x8 blocks), means past 40 up to 56 (`recodedTop`) are admitted from the keyframe on,
+  in 8x8 blocks that moved by 12 at most. The shape was measured into place:
+  - Applied on leading frames too, it read a counter tick inside the last tick's box again.
+  - Applied within 40 too, a red badge's re-coding (8x8 means past 12) kept a toast over it from
+    coming back.
+- **A change inside an event's box while the event is up is something new** (`newInside`). A
+  counter ticking inside a toast's or a focus ring's box (3x3 means 66-74 from both the page and
+  the event, 8x8 means 4-5) passed `leftEvent` and the bands, and the state was read again at a
+  frame that showed the new count. The code before the fourth round did this too. A return is now
+  refused where a mean inside the box is more than 56 from both the state's picture and the
+  event's.
+- **A cluster is quiet as the keyframe test reads it.** `eventClusters` took a lone cluster
+  peaking at 41-48 for the event, where the keyframe test reads the same spot as
+  re-quantization. On x264 crf 32, keyint 6, a keyframe's own spot (41, 8x8 means 7.1) was boxed
+  with a toast (508x372 for 150x32), and a digit glitch on it never came back. A cluster is now
+  quiet when it peaks at:
+  - 40 or less;
+  - 48 or less and is spread or has 8x8 means that moved by 12 at most;
+  - 56 or less, has 8x8 means that moved by 12 at most, and is spread or inside the anchor's
+    predicted picture.
+- **Past re-quantization takes two means around a block** (`TAIL_RUN`). On a toast at 1080p
+  through x264 crf 32, a keyframe pushed two lone means far apart to 49. Taken for the event, they
+  drew the box over the page (1281x806, then 1337x338): two changes for one transient, and 31%
+  more time on a 366-frame recording. A block now counts only when it and its eight neighbours
+  hold two means past 48. Asking for three lost a digit decoded weakly beside a spinner.
+- **A line's thin side is grown to whole blocks for the hold's mean.** A 1px underline through
+  x264 crf 18, keyint 10, never settled: over its 3px-tall box the mean moved past 3 at every
+  keyframe. Only a line's: grown everywhere, a 16x12 ramp held a frame early, and a digit x265
+  brings in over four frames settled a frame early as a drift.
+- **Only keyframes shown one after another are a run** (`gopNumbers` in `scan video`). x264
+  `--open-gop` with a GOP no longer than its B-frames decodes the IDR and the next keyframe back
+  to back. Counted as a run, that keyframe was in GOP 0, and its re-quantization was a 55-frame
+  transient that swallowed every caret blink in it.
+- **SUMMARY.md** now:
+  - gives the keyframe test's whole band: two spots or more, one spot before the keyframe that the
+    keyframe shows too, and 56 where the state's picture had changed since its GOP's keyframe (it
+    called a re-read through any of these "spread over the picture");
+  - says an event that begins on a leading frame begins on the GOP's opening, before its keyframe
+    (it said "on a keyframe");
+  - says "no keyframe among them is read again" only when no keyframe is;
+  - adds the intra-only run note only when an event begins at frame 1.
+- **The docs**:
+  - The last keyframe's coarser coding is reported and wrong from x265 crf 27 and x264 crf 29,
+    not from crf 30.
+  - x264 `open-gop` at crf 32 and a 1080p page at x264 crf 32 are added to what is reported and
+    wrong; a still page's keyframes there move means past 48.
+  - A settle uses neither the smear nor the start-frame mask; only a return does.
+  - "One spot" is now what the code tests.
+  - Three limits are added: a faint part of an event cut from its box on a keyframe that
+    re-quantized nothing else; a change inside an event's box merged with the event when it
+    settles within 100ms of a keyframe; and a pre-echo past the band, gone before the keyframe,
+    as a glitch before the change.
+
+Tests for the fifth round, each failing on the code before it:
+- the pre-echo held (and the loud one that stays a glitch);
+- a keyframe re-coding a glyph changed mid-GOP;
+- a counter inside a focus ring's box;
+- a 1px line that settles;
+- a lone mean past the tail beside a toast;
+- the letter on a keyframe, and a leading frame's one spot that its keyframe shows;
+- a cursor moved mid-GOP;
+- the open-GOP run in `gopNumbers`.
+
+On the code after the fifth review:
+
+| Set | Right | Kinds of the matched events | Box IoU against the lossless box |
+|---|---|---|---|
+| the 252 known answers | 215: all 208 outside the two limits | 261 of 261 | median 1.00; under 0.5 for 8 of 261 |
+| the first review's 30 harsher encodes | 27 | 44 of 44 | median 1.00; none under 0.5 |
+| x264 intra-only and two-frame GOPs (12) | 6 | 12 of 12 | median 0.22 |
+| the second review's 375 | 290, every case as the code before this round gives on the same frames | 346 of 353 | median 1.00; 15 under 0.5 |
+| the third review's 51 open-GOP encodes | 50, the same 50 | | |
+| the third review's 68 recolour cases | 24, the same 24 | | |
+| the fourth review's 432 open-GOP encodes | 322 (below) | | |
+
+Every case of the 252, the 30 and the 12 has the same verdict and box IoU as before this round,
+and so does every box of the 375. On the fourth review's 432 open-GOP encodes:
+
+| Code | x265 (216) | x264 open-gop (216) |
+|---|---|---|
+| before the third review (44c4d23b) | 71 | 56 |
+| after the third (e45dd8de) | 186 | 145 |
+| after the fourth (fc680d47) | 177 | 145 |
+| after the fifth | 177 | 145 |
+
+Every miss is now at crf 32. The one the fourth round had at crf 28, a digit x265 shows on its
+leading frames 4 frames before the lossless change, is right. One case at crf 32 is newly wrong: a
+scroll through x265 keyint 30, whose last keyframe is now an event (drift@60), where the fourth
+round read its leading frame again. With the last GOP set aside, 81 of the 110 misses give the
+lossless story, as 81 of the fourth round's 110 did: 403 of the 432 either way.
+
+The fifth review's own differential, re-scored:
+
+| Code | 1030 planted cases | x265 (338) | x264 open-gop (208) | x264 (189) | VP9 (142) | AV1 (130) | MJPEG (23) |
+|---|---|---|---|---|---|---|---|
+| after the third review (e45dd8de) | 744 | 255 | 136 | 115 | 110 | 109 | 19 |
+| after the fourth (fc680d47) | 737 | 244 | 139 | 116 | 110 | 109 | 19 |
+| after the fifth | 749 | 253 | 141 | 116 | 111 | 109 | 19 |
+
+One case is worse than after the fourth round. A digit changed at frame 25 through x265 crf 29,
+keyint 10, now begins at frame 29, just before the next keyframe; the fourth round had it at 28,
+and the third round had it as a drift at 30. Nine cases that the third round got right are still
+wrong, the same nine the fourth round got wrong. They are all the last keyframe of an x265 stream
+at crf 27 and 32, reported as an event beginning on a keyframe. Of the 546 open-GOP cases among
+them (x265 and x264 open-gop), 394 are right. Applying the predicted allowance on leading frames
+too gave 393; the fourth round's code gives 383, and the third's 391.
+
+On the real recordings every one of the 136 events keeps its kind, first frame and box, and no
+keyframe is read again. Lossless input still gives main's story.json and SUMMARY.md byte for byte,
+on 1500 random sequences and the 18 captures with and without `--ignore`. On the 366-frame 1080p
+recording of the cost finding (x264 crf 32, keyframes forced on its events) the story is
+e45dd8de's again, with the same 836 decodes. It takes 125s against e45dd8de's 116s (two runs
+each, +8%); the fourth round's misread toast had made it +31%.
+
 ## Three things the implementation needed
 
 - **A hold is measured from its first frame.** A frame compared only with the one before is within
@@ -603,19 +766,25 @@ The output does not detect these.
   the floor: a toast fading out over a second ends 6 frames before the lossless one does, a fade-out
   over 1.5s 9 frames before.
 - **A change the keyframe test admits, landing on a GOP's opening, is absorbed**: no 8x8 block
-  mean past 24, no 16x16 block mean past 12 and no mean past 40 (past 48 only where the means past
-  the floor are spread like a re-encoding's or lie in one spot whose 8x8 means barely moved, a
-  quarter at most past 40). That is a band, not only what is under the floor: a label recoloured
+  mean past 24, no 16x16 block mean past 12 and no mean past 40 (to 48 only where the means past
+  the floor are spread like a re-encoding's or lie in two spots or more apart whose 8x8 means
+  barely moved, a quarter at most past 40; to 56 inside what changed since the GOP's keyframe, in
+  8x8 blocks that barely moved). That is a band, not only what is under the floor: a label recoloured
   40% at a 30-frame GOP's keyframe is lost on x264, VP9 and AV1, where the same change mid-GOP is
   reported on x264 (VP9 at crf 33 codes it under the floor mid-GOP too). Changes made at once in
   several places count as spread: two labels recoloured 45% on a keyframe are lost. In a run of
   keyframes a spread change is lost on any frame. A 12px digit moves its means by 62 or more at
   crf 28; a lighter one may not. SUMMARY.md names the first 12 frames read again and story.json
   all of them.
+- **Inside what changed since the GOP's keyframe, a change to 56 whose 8x8 means barely moved**,
+  landing on the next keyframe, is read as that keyframe re-coding the predicted picture.
 - **A change made elsewhere while an event that spans a keyframe is up**, inside the re-encoding
   band (a label blended 30% toward white under a toast), is admitted by the return across the GOP.
 - **Blinks whose off-time is at most the 100ms hold merge** when the first begins on a noisy
-  opening: its return across the GOP needs the page to hold.
+  opening: its return across the GOP needs the page to hold. So does a change inside an event's
+  box that settles within 100ms of a keyframe, which breaks the hold: it merges with the event.
+- **A faint part of an event is cut from its box** (a 2px underline far from a toast, means 39)
+  where it looks like a keyframe's re-encoding on the keyframe the event began on.
 - **An oscillation can hold at a turning point.** A spring's overshoot slows enough near each turn
   for 100ms within the band, so it settles there and its next swing is a second event (a drift).
 - **x264 at crf 45 destroys the content.** The digit change never appears, and frame 1 departs from
@@ -626,8 +795,12 @@ The output does not detect these.
 These it reports, and they are wrong; each is flagged as beginning on a keyframe:
 - x264's intra-only re-quantization between its first two frames;
 - x264 at crf 35 and above, whose keyframes re-encode a still page past the test;
-- the last keyframe of an x264 or x265 stream, coded coarser, from crf 30 (x264 crf 32: 134 means
-  past the floor, 26 of them past 40, to 60);
+- x264 `open-gop` at crf 32, and a 1080p page at x264 crf 32, whose still keyframes move means
+  past 48;
+- the last keyframe of an x264 or x265 stream, coded coarser, from x265 crf 27 and x264 crf 29
+  (x264 crf 32: 134 means past the floor, 26 of them past 40, to 60);
+- a pre-echo past the band on an x265 leading frame that is gone before the keyframe, as a
+  glitch before the change;
 - intra refresh, which re-quantizes a band at a time with no keyframe (SUMMARY.md says when only
   frame 0 is marked a keyframe: shorter than one GOP, or intra refresh).
 
@@ -659,6 +832,10 @@ three times.
   - GOP numbers (`beginsGop`) and an open GOP's opening (`opensGop`): a still page re-quantized over
     its leading frames and keyframe is read again, a change brought in over them is a change, and a
     leading frame's pre-echo of a change on its keyframe is the change's start;
+  - the fifth round's: a pre-echo held (and one past the band that stays a glitch), a keyframe
+    re-coding a glyph changed mid-GOP, a counter inside a focus ring's box, a 1px line that
+    settles, a lone mean past the tail beside a toast, a letter on a keyframe, a leading frame's
+    one spot that its keyframe shows, a cursor moved mid-GOP;
   - an event that begins on a keyframe that re-quantizes text elsewhere: a toast returns, a badge
     stays, each boxed alone;
   - returns across GOPs (a transient, blinks, a caret that is no return, a toast fading out across
@@ -669,7 +846,8 @@ three times.
   - property tests for the region check and the signatures;
   - SUMMARY.md's sentences, and its notes where keyframes are not known (only for a lossy
     recording), for a run of keyframes and for a recording with only frame 0 marked.
-- `packages/vlmkit-core`: `gopNumbers` (decode order, an open GOP, a run of keyframes),
+- `packages/vlmkit-core`: `gopNumbers` (decode order, an open GOP, a run of keyframes, and an
+  open GOP no longer than its B-frames, whose keyframes are not shown one after another),
   `parseFrameTable`'s `pkt_pos`, the timestamp file's `key_frame` and `pkt_pos` columns, and through
   ffmpeg an open-GOP encode whose leading B-frames are counted in the next GOP, a selection that
   skips every keyframe and keeps them, and an import that gets the same keyframes and GOPs as a scan.
