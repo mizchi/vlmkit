@@ -208,6 +208,11 @@ rejected, not resized. Measured 2026-10-16 (`docs/reports/2026-10-16-jev-box-ben
 - The image is read once per request, and each extra question on a shared state costs about 20
   tokens. A 1280x800 screenshot is about 3.1k tokens ($0.00013) and answers in about 0.2s.
 
+**Easing from frames** (`docs/reports/2026-10-18-jev-easing.md`, bench `jev-easing/jev-easing.ts`):
+asked as a `choice`, Jev named 7/21 from 11 frames and 4/21 from a contact sheet (chance 3/21),
+with confidence no higher when right. A `box` per frame and `fitEasing` on the centres got 21/21
+(6 frames too). Never ask Jev for an easing name: take positions from it and fit them.
+
 **Shipped as `diff png --kind`** (`@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
 `png-diff.ts`). It puts `regions[].kind = {label: text|color|position|presence, confidence,
 uncertain, model}` on the regions the pixel diff found, one request per region, largest first up
