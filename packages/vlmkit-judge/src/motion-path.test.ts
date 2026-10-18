@@ -78,7 +78,7 @@ describe("judgeMotionPath", () => {
       run((t) => 40 + 20 * t),
       { startMs: 0, endMs: 1000, expectEasing: "ease-out" },
     );
-    expect(short.findings).toEqual([]);
+    expect(short.findings.map((f) => [f.rule, f.severity])).toEqual([["easing-unchecked", "warn"]]);
     expect("skipped" in short.easing).toBe(true);
   });
 

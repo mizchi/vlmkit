@@ -151,7 +151,13 @@ export interface MotionPathOptions {
   minFitTravelPx?: number;
 }
 
-export type MotionRule = "target-lost" | "absent-at-rest" | "snap-back" | "jump" | "easing-mismatch";
+export type MotionRule =
+  | "target-lost"
+  | "absent-at-rest"
+  | "snap-back"
+  | "jump"
+  | "easing-mismatch"
+  | "easing-unchecked";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -245,13 +251,24 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const fit = fitEasingAffine(points);
     easing = { ...fit, ...(options.expectEasing ? { expected: options.expectEasing } : {}) };
     if (options.expectEasing && fit.best !== options.expectEasing) {
+      // Frames that show it only faintly, or not at all, are left out, and a box around the part
+      // that is not covered moves differently from the element: say so beside the mismatch.
+      const hidden = sorted.filter((x) => !isRest(x) && x.present < sure).length;
       findings.push({
         rule: "easing-mismatch",
         severity: "fail",
         atMs: options.startMs,
-        message: `the path follows ${fit.best} (${fit.margin.toFixed(1)}x ahead of the next), not ${options.expectEasing}`,
+        message: `the path follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${options.expectEasing}${hidden > 0 ? `; ${hidden} motion frame(s) show it faintly or not at all, so fix what hides it first and re-check` : ""}`,
       });
     }
+  }
+  if (options.expectEasing && "skipped" in easing && motion.length > 0) {
+    findings.push({
+      rule: "easing-unchecked",
+      severity: "warn",
+      atMs: options.startMs,
+      message: `${options.expectEasing} was expected but not checked: ${easing.skipped} (only frames shown at ${sure} or more are measured)`,
+    });
   }
 
   // Jumps inside the motion, unless it is meant to step.
