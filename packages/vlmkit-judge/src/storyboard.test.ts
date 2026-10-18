@@ -1933,11 +1933,11 @@ describe("the noise band (lossy recordings)", () => {
           recoded[(y * w + x) * 4 + c] = Math.max(0, Math.min(255, recoded[(y * w + x) * 4 + c]! + v));
       }
     }
-    for (const [key, leading] of [
-      [10, false],
-      [13, true],
-    ] as const) {
-      const frames = Array.from({ length: 40 }, (_, n) => (n < 3 ? page : n < (leading ? 10 : key) ? glyph : recoded));
+    // An open GOP's leading frames 10-12 barely re-code it (x265: one mean past the floor); its
+    // keyframe 13 does. A leading frame already showing the re-coding is an event (the limit: a
+    // counter that ticks there, inside the last tick's box, is the same picture, and was lost).
+    for (const key of [10, 13]) {
+      const frames = Array.from({ length: 40 }, (_, n) => (n < 3 ? page : n < key ? glyph : recoded));
       const s = buildStoryboard(
         frames.map((_, n) => ({
           n,

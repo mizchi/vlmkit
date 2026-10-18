@@ -547,11 +547,13 @@ and keeps `--lossy`'s hold and keyframe bands. The rules, all on each pixel's 3x
   quarter of the means past the floor past 40 (`tailFits`), spread like a re-encoding
   (`REENCODING_SPOTS`: three separate spots together across a quarter of the frame's width or
   height, or spots whose box spans a quarter of both) or in two or more spots apart whose 8x8
-  means moved by `KEYFRAME_REGION` at most — never one spot. Where the state's picture was
-  predicted (`predicted`: what differs past the floor from its GOP's keyframe, a change made after
-  it, out to whole 8x8 blocks) a keyframe codes it afresh: there means to 56 (`recodedTop`),
-  however many, in 8x8 blocks that moved by 12 at most. Every frame of an opening is tested against
-  the state's picture from before it. A leading frame that passes, whose keyframe does not and
+  means moved by `KEYFRAME_REGION` at most — never one spot (around an event, for a return's
+  `reencodedOutside`, one spot too). Where the state's picture was predicted (`predicted`: what
+  differs past the floor from its GOP's keyframe, a change made after it, out to whole 8x8 blocks)
+  a keyframe codes it afresh: there, from the keyframe on (not on leading frames), means past 40
+  to 56 (`recodedTop`), however many, in 8x8 blocks that moved by 12 at most. Every frame of an
+  opening is tested against the state's picture from before it. A leading frame that passes, whose
+  keyframe does not and
   moves a mean past 40 where the leading frame departs (`echoes`), is that change's pre-echo: held
   — neither read again nor an event — so the change begins on the keyframe. Inside a run of
   keyframes only spread, and only when the page then holds.
@@ -633,7 +635,11 @@ plus caret, digit, cursor, scroll), five encodings held by `storyboard-lossy.tes
   means of 45-49 there (x264 and x265 crf 28, 4-5 of 6 past 40, 8x8 means 7.5-9.9), and a cursor
   moved mid-GOP (8x8 means 10) — both read as changes of their own until the tail was widened
   there (`predicted`, `recodedTop`). Only there: the same tail on a page a keyframe had coded is
-  the letter above.
+  the letter above. Only from the keyframe on: a counter that ticked on a leading frame inside the
+  last tick's box (means to 49, as the glyph's re-coding) was read again as the page; on the 546
+  open-GOP planted cases, leaving leading frames out loses nothing. And only past 40: a red badge
+  re-coded within 40 moves its 8x8 means by more than 12, and tested as a re-coding it kept a
+  toast over it from coming back.
 - **A run of keyframes is one GOP.** MJPEG decodes a still picture byte-identically 61 frames of 61.
   x264 at one keyframe a frame re-quantizes once, between its first two frames (rate control) — 56
   in the means and 14 in a 16x16 block on the planted page, past the keyframe test, so an intra-only

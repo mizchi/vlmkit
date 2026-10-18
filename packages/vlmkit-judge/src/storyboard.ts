@@ -940,6 +940,7 @@ export function buildStoryboard(
     m: Uint8Array | null,
     spreadOnly = false,
     recoded: Box | null = null,
+    oneSpot = false,
   ): boolean => {
     const fa = frames.pixels(a);
     const fb = frames.pixels(b);
@@ -969,7 +970,10 @@ export function buildStoryboard(
       if (d <= floor) continue;
       const y = (p / width) | 0;
       const x = p - y * width;
-      if (r !== null && x >= rx0 && x < rx1 && y >= ry0 && y < ry1) {
+      // Inside `recoded`, a mean past 40 is tested as a re-coding (to `recodedTop`, its 8x8 block
+      // barely moved); one within 40 as anywhere else. Tested whole, a red badge re-coded within 40
+      // (its 8x8 means moved by more than 12) was no re-encoding, and a toast over it never came back.
+      if (r !== null && d > floor + tailWidth && x >= rx0 && x < rx1 && y >= ry0 && y < ry1) {
         if (d > recodedTop) return false;
         blocks[(y >> 3) * bw + (x >> 3)] = 1;
         anyRecoded = true;
@@ -989,8 +993,9 @@ export function buildStoryboard(
     if (spreadOnly) return false;
     // In two or more spots apart, their 8x8 means barely moved: x264's last keyframe in a stream,
     // coded coarser, can leave only two (5-8 means past the floor, one past 40, 8x8 means 5-11).
-    // Never one spot: a letter changed on a keyframe is one.
-    return shape.count >= 2 && barelyMoved(a, b, tailBlocks, m);
+    // One spot only with `oneSpot` (around an event, where a keyframe's tail outside it is one spot
+    // at crf 30): a letter changed on a keyframe is one, and read again as the page it was lost.
+    return (shape.count >= 2 || oneSpot) && barelyMoved(a, b, tailBlocks, m);
   };
   /** No marked 8x8 block's mean (over the pixels compared) moved by more than `KEYFRAME_REGION` from a to b. */
   const barelyMoved = (a: number, b: number, blocks: Uint8Array, m: Uint8Array | null): boolean => {
@@ -1415,7 +1420,7 @@ export function buildStoryboard(
       if (meets(at, grown)) continue;
       for (let c = 0; c < 3; c++) if (Math.abs(sa[i + c]! - sb[i + c]!) > KEYFRAME_REGION) return false;
     }
-    return tailFits(a, b, ignoreMask(width, height, [...ignore, grown], noise!.radius), false, predicted(a));
+    return tailFits(a, b, ignoreMask(width, height, [...ignore, grown], noise!.radius), false, predicted(a), true);
   };
   /**
    * Frame m, in a GOP that began during the event that departed at s (its first box `box`), is the
@@ -2146,12 +2151,15 @@ export function buildStoryboard(
     const opens = opening(j);
     const against: number = opens && openedFrom?.g === gop[j] ? openedFrom.from : anchor;
     const key = keyOf(gop[j]!);
+    // What the state's picture had predicted is coded afresh by the keyframe, and from it on: a
+    // leading frame is shown before it, and taken as one a counter that ticked there, inside the
+    // last tick's box (means to 49), was read again as the page.
     const recoded = opens ? predicted(against) : null;
     const reencoded =
       (opens
         ? requantizedPicture(against, j)
         : entries[j]!.key === true && entries[j - 1]!.key === true && requantizedPicture(anchor, j)) &&
-      reencodes(against, j, !opens, recoded) &&
+      reencodes(against, j, !opens, j >= key ? recoded : null) &&
       (opens || heldAfter(j, null));
     // A leading frame of an open GOP that shows part of what its keyframe brings past the band is
     // that change's pre-echo (`echoes`): neither read again nor an event, so the change begins on
