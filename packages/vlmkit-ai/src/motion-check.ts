@@ -29,9 +29,20 @@ import { firstLookScale } from "./locate.ts";
 import { regionKindScale, regionKindView, regionKindWindow } from "./region-kind.ts";
 import { decodeImage, encodePngImage, resample } from "./zoom-image.ts";
 
+/** A target measured by the page at a frame: border box (frame pixels), rendered opacity, transform scale. */
+export interface MotionDom {
+  box: { x: number; y: number; width: number; height: number };
+  opacity: number;
+  scale: number;
+  /** Its own animation's progress in time, 0-1 (delay and duration its own), when it has one. */
+  t?: number | null;
+}
+
 export interface MotionFrame {
   atMs: number;
   png: Uint8Array;
+  /** Per target, in order, when the page could measure it (`--selector`); null for one it could not. */
+  dom?: (MotionDom | null)[];
 }
 
 export interface MotionCheckOptions {
@@ -69,7 +80,13 @@ export interface MotionCheckOptions {
 export interface MotionFrameAnswer {
   atMs: number;
   rest: boolean;
-  targets: { present: number; box: { x: number; y: number; width: number; height: number }; refined?: boolean }[];
+  targets: {
+    present: number;
+    box: { x: number; y: number; width: number; height: number };
+    refined?: boolean;
+    /** Its box coincides with another target's in this frame: one of them is the wrong element. */
+    unsure?: boolean;
+  }[];
   forbid: number[];
 }
 
@@ -174,6 +191,7 @@ export async function checkMotionFrames(
   if (options.refine !== false && frameSize) {
     const size = frameSize;
     for (const [i, target] of options.targets.entries()) {
+      if (frames.every((f) => f.dom?.[i])) continue;
       const seen = answers.filter((f) => f.targets[i]!.present >= threshold);
       if (seen.length === 0) continue;
       const x1 = Math.min(...seen.map((f) => f.targets[i]!.box.x));
@@ -211,11 +229,30 @@ export async function checkMotionFrames(
     }
   }
 
+  // Two targets boxed on the same spot: one of them is the wrong element (look-alike cards).
+  const iou = (a: MotionFrameAnswer["targets"][number]["box"], b: MotionFrameAnswer["targets"][number]["box"]) => {
+    const w = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+    const h = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+    const inter = w * h;
+    return inter / Math.max(1e-9, a.width * a.height + b.width * b.height - inter);
+  };
+  for (const f of answers) {
+    for (let i = 0; i < f.targets.length; i++) {
+      for (let j = i + 1; j < f.targets.length; j++) {
+        const [a, b] = [f.targets[i]!, f.targets[j]!];
+        if (a.present >= threshold && b.present >= threshold && iou(a.box, b.box) > 0.5) a.unsure = b.unsure = true;
+      }
+    }
+  }
+  const domAt = new Map(frames.map((f) => [f.atMs, f.dom]));
+
   const targets = options.targets.map((target, i) => {
+    const measured = frames.every((f) => f.dom?.[i]);
     const samples: MotionSample[] = answers.map((f) => ({
       atMs: f.atMs,
       present: f.targets[i]!.present,
       box: f.targets[i]!.box,
+      ...(measured ? { dom: domAt.get(f.atMs)![i]! } : f.targets[i]!.unsure ? { unsure: true } : {}),
     }));
     return {
       target,

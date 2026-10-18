@@ -24,9 +24,9 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
-import { checkMotionFrames, type MotionCheckReport } from "@mizchi/vlmkit-ai/motion-check.ts";
+import { checkMotionFrames, type MotionCheckReport, type MotionFrame } from "@mizchi/vlmkit-ai/motion-check.ts";
 import type { EasingName } from "@mizchi/vlmkit-judge/motion-path.ts";
-import { DEFAULT_MOTION_FORBID, motionPlan } from "@mizchi/vlmkit-markup/inspect/motion-cli.ts";
+import { DEFAULT_MOTION_FORBID, measureTargets, motionPlan } from "@mizchi/vlmkit-markup/inspect/motion-cli.ts";
 
 const FIXTURES = resolve("fixtures/motion-defects");
 /** The claims round's measured wording, and a narrower one: letters over letters, not a menu over a page. */
@@ -63,6 +63,8 @@ interface Result {
   endMs: number;
   dom: DomFrame[];
   report: MotionCheckReport;
+  /** The same frames with the element measured by the page (`--selector`). */
+  measured?: MotionCheckReport;
   gates?: GateRun[];
 }
 
@@ -84,13 +86,13 @@ async function capture(c: Case, framesDir: string) {
         ...(await frameSourceFacts(page)),
         clock: "held",
       });
-      const frames: { atMs: number; png: Uint8Array }[] = [];
+      const frames: MotionFrame[] = [];
       const dom: DomFrame[] = [];
       for (const atMs of [...motion, rest]) {
         await timeline.at(atMs);
         const { png, stable } = await captureStable(page);
         await writer.add(png, { atMs, stable, ...(atMs > endMs ? { label: "rest" } : {}) });
-        frames.push({ atMs, png: new Uint8Array(png) });
+        frames.push({ atMs, png: new Uint8Array(png), dom: await measureTargets(page, [c.selector]) });
         dom.push({
           atMs,
           ...(await page.evaluate((sel) => {
@@ -190,6 +192,31 @@ function report(results: Result[]): string {
       `| ${id} | ${b?.case.expect} | ${b ? failRules(b.report).join(", ") || "pass" : "—"} | ${i ? failRules(i.report).join(", ") || "pass" : "—"} | ${fit(b)} / ${fit(i)} | ${gates(b)} | ${gates(i)} |`,
     );
   }
+  const m = results.filter((r) => r.measured);
+  if (m.length) {
+    const mb = m.filter((r) => r.case.broken);
+    const mi = m.filter((r) => !r.case.broken);
+    lines.push(
+      "",
+      `With \`--selector\` (positions, opacity and scale measured from the page; presence and the statement still Jev's): broken caught by the expected rule ${mb.filter((r) => failRules(r.measured!).includes(r.case.expect!)).length}/${mb.length}, intact passed ${mi.filter((r) => failRules(r.measured!).length === 0).length}/${mi.length}.`,
+      "",
+      "| case | measured: broken | measured: intact | easing (broken / intact) |",
+      "|---|---|---|---|",
+      ...[...new Set(m.map((r) => r.case.id))].map((id) => {
+        const b = mb.find((r) => r.case.id === id);
+        const i = mi.find((r) => r.case.id === id);
+        const e = (r?: Result) => {
+          const x = r?.measured?.targets[0]?.easing;
+          return !x
+            ? "—"
+            : "best" in x
+              ? `${x.best}${x.channel && x.channel !== "position" ? ` (${x.channel})` : ""}`
+              : "skipped";
+        };
+        return `| ${id} | ${b ? failRules(b.measured!).join(", ") || "pass" : "—"} | ${i ? failRules(i.measured!).join(", ") || "pass" : "—"} | ${e(b)} / ${e(i)} |`;
+      }),
+    );
+  }
   const g = (rs: Result[]) => rs.filter((r) => failRules(r.report, OVERLAP).length > 0);
   lines.push(
     "",
@@ -232,8 +259,8 @@ function report(results: Result[]): string {
     `- Box centre vs the DOM rect's centre, frames both call shown: median ${q(0.5)}px, p90 ${q(0.9)}px, max ${q(1)}px (n=${centreErr.length}).`,
   );
   if (disagreements.length) lines.push("", "Presence disagreements:", "", ...disagreements.map((d) => `- ${d}`));
-  const calls = results.reduce((s, r) => s + r.report.calls, 0);
-  const cost = results.reduce((s, r) => s + r.report.costUsd, 0);
+  const calls = results.reduce((s, r) => s + r.report.calls + (r.measured?.calls ?? 0), 0);
+  const cost = results.reduce((s, r) => s + r.report.costUsd + (r.measured?.costUsd ?? 0), 0);
   lines.push("", `Cost: ${calls} requests, $${cost.toFixed(4)} ($${(cost / results.length).toFixed(5)} per page).`);
   lines.push("", "Findings per page:", "");
   for (const r of results) {
@@ -262,7 +289,18 @@ async function main() {
     results = [];
     for (const c of cases.filter((x) => !only || only.includes(x.id))) {
       const cap = await capture(c, join(out, "frames", c.file.replace(/\.html$/, "")));
-      const report = await checkMotionFrames(cap.frames, {
+      const report = await checkMotionFrames(
+        cap.frames.map(({ atMs, png }) => ({ atMs, png })),
+        {
+          targets: [c.target],
+          forbid: [OVERLAP, OVERLAP_GLYPHS],
+          startMs: cap.startMs,
+          endMs: cap.endMs,
+          segments: cap.segments,
+          ...(c.expectEasing ? { expectEasing: c.expectEasing } : {}),
+        },
+      );
+      const measured = await checkMotionFrames(cap.frames, {
         targets: [c.target],
         forbid: [OVERLAP, OVERLAP_GLYPHS],
         startMs: cap.startMs,
@@ -270,7 +308,7 @@ async function main() {
         segments: cap.segments,
         ...(c.expectEasing ? { expectEasing: c.expectEasing } : {}),
       });
-      const r: Result = { case: c, startMs: cap.startMs, endMs: cap.endMs, dom: cap.dom, report };
+      const r: Result = { case: c, startMs: cap.startMs, endMs: cap.endMs, dom: cap.dom, report, measured };
       if (!hasFlag("--no-gates")) {
         const file = join(FIXTURES, c.file);
         r.gates = [

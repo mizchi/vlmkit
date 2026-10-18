@@ -15,7 +15,44 @@ import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { EASING_NAMES, type EasingName } from "@mizchi/vlmkit-judge/motion-path.ts";
 import { parseFramesManifest, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
-import type { MotionCheckReport } from "@mizchi/vlmkit-ai/motion-check.ts";
+import type { MotionCheckReport, MotionDom, MotionFrame } from "@mizchi/vlmkit-ai/motion-check.ts";
+
+/** Each selector's element as rendered: border box, opacity through its ancestors, transform scale. */
+export async function measureTargets(
+  page: import("playwright").Page,
+  selectors: readonly string[],
+): Promise<(MotionDom | null)[]> {
+  return page.evaluate(
+    (sels) =>
+      sels.map((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        let opacity = getComputedStyle(el).visibility === "hidden" ? 0 : 1;
+        for (let n: Element | null = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+        const transform = getComputedStyle(el).transform;
+        let scale = 1;
+        if (transform && transform !== "none") {
+          const m = new DOMMatrixReadOnly(transform);
+          scale = Math.hypot(m.a, m.b);
+        }
+        // The element's own animation time (its delay and duration, not the page's): the longest
+        // one running on it, as a 0-1 fraction of one iteration. Null when nothing animates it.
+        let t: number | null = null;
+        let longest = 0;
+        for (const a of el.getAnimations()) {
+          const c = a.effect?.getComputedTiming();
+          const d = Number(c?.duration);
+          if (!c || !Number.isFinite(d) || d <= longest || c.localTime === null) continue;
+          longest = d;
+          const local = Number(c.localTime) - Number(c.delay ?? 0);
+          t = Math.min(1, Math.max(0, local / d));
+        }
+        return { box: { x: r.x, y: r.y, width: r.width, height: r.height }, opacity, scale, t };
+      }),
+    selectors,
+  );
+}
 
 /**
  * Asked when no `--forbid` is given. Narrower than the claims round's "text overlapping other
@@ -37,6 +74,7 @@ whether each forbidden statement is. vlmkit judges the motion from that:
   snap-back        back where it started once it stops (fill-mode missing)
   jump             one step far faster than its neighbours (keyframe gap)
   easing-mismatch  the path follows another easing than --expect-easing
+  target-static    shown and still from the first frame (warn: not animating?)
   forbid           a statement seen at rest fails; only mid-motion, warns
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -49,6 +87,10 @@ measured part of the path and can be shorter than the CSS distance; under 60px
 an easing is not fitted, and an --expect-easing there is a warn, not a pass.
 
   --target <words>        What moves, as you would point at it ("the blue Saved toast")
+  --selector <css>        The element the --target in the same position names (repeat in order):
+                          its position, opacity and scale are measured from the page, exact,
+                          and Jev only says whether it can be seen. Use it whenever the page is
+                          yours: look-alike elements (three cards) make a model box the wrong one
   --forbid <statement>    No frame may show it. Default, when none is given:
                           "${DEFAULT_MOTION_FORBID}"
   --no-forbid             Ask no statement (only the targets' motion)
@@ -71,6 +113,7 @@ export class MotionUsageError extends Error {}
 export interface MotionCliOptions {
   source: string;
   targets: string[];
+  selectors: string[];
   forbid: string[];
   expectEasing?: EasingName[];
   exits: boolean;
@@ -86,6 +129,7 @@ export interface MotionCliOptions {
 export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const positional: string[] = [];
   const targets: string[] = [];
+  const selectors: string[] = [];
   const forbid: string[] = [];
   let expectEasing: EasingName[] | undefined;
   let at: number[] | undefined;
@@ -129,6 +173,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         expectEasing = names as EasingName[];
         break;
       }
+      case "--selector":
+        selectors.push(value(a, argv[++i]).trim());
+        break;
       case "--at":
         at = parseInstants(value(a, argv[++i]), a);
         break;
@@ -179,6 +226,13 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     throw new MotionUsageError("nothing to check: give --target, or drop --no-forbid");
   if (expectEasing && targets.length === 0) throw new MotionUsageError("--expect-easing needs a --target to follow");
   const fromFrames = /(^|\/)frames\.json$/.test(positional[0]!);
+  if (selectors.length > targets.length) {
+    throw new MotionUsageError(
+      `${selectors.length} --selector for ${targets.length} --target: each selector names the target given in the same position`,
+    );
+  }
+  if (selectors.length > 0 && fromFrames)
+    throw new MotionUsageError("--selector measures a live page: give the page, not frames.json");
   if ((fromFrames || at) && endMs === undefined) {
     throw new MotionUsageError(
       `${fromFrames ? "frames.json" : "--at"} needs --end <ms>: where the motion stops, so the frames after it are its rest`,
@@ -187,6 +241,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   return {
     source: positional[0]!,
     targets,
+    selectors,
     forbid,
     ...(expectEasing ? { expectEasing } : {}),
     exits,
@@ -237,7 +292,7 @@ export function motionPlan(animations: readonly { startMs: number; durationMs: n
 }
 
 interface Captured {
-  frames: { atMs: number; png: Uint8Array }[];
+  frames: MotionFrame[];
   startMs: number;
   endMs: number;
   segments: { startMs: number; endMs: number }[];
@@ -284,7 +339,16 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         await timeline.at(atMs);
         const { png, stable } = await captureStable(page);
         await writer.add(png, { atMs, stable, ...(atMs > endMs ? { label: "rest" } : {}) });
-        frames.push({ atMs, png: new Uint8Array(png) });
+        const frame: MotionFrame = { atMs, png: new Uint8Array(png) };
+        if (o.selectors.length > 0) {
+          const dom = await measureTargets(page, o.selectors);
+          const missing = o.selectors.filter((_, i) => dom[i] === null);
+          if (frames.length === 0 && missing.length > 0) {
+            throw new MotionUsageError(`--selector matches nothing on the page: ${missing.join(", ")}`);
+          }
+          frame.dom = [...dom, ...o.targets.slice(o.selectors.length).map(() => null)];
+        }
+        frames.push(frame);
       }
       const written = await writer.finish();
       return { frames, startMs, endMs, segments, manifest: written.manifest };
@@ -326,7 +390,9 @@ export function formatMotionReport(
     const next = Object.keys(e.errors)
       .filter((k) => k !== e.best)
       .sort((a, b) => e.errors[a as keyof typeof e.errors] - e.errors[b as keyof typeof e.errors])[0];
-    return `follows ${e.best} (it fits ${e.margin.toFixed(1)}x better than the next-best curve, ${next})`;
+    const on = e.channel && e.channel !== "position" ? ` in its ${e.channel}` : "";
+    if (e.margin >= 1000) return `follows ${e.best}${on} exactly (measured: no other curve comes close)`;
+    return `follows ${e.best}${on} (it fits ${e.margin.toFixed(1)}x better than the next-best curve, ${next})`;
   };
   for (const [i, t] of r.targets.entries()) {
     const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
@@ -366,7 +432,7 @@ export function formatMotionReport(
       .map((x) => `${Math.round(x.atMs)}ms ${x.noul.toFixed(2)}${x.uncertain ? "?" : ""}`)
       .join(", ");
     lines.push(
-      `  ${f.severity === "fail" ? "FAIL" : "warn"} forbid ${JSON.stringify(f.statement)}: seen ${f.atRest ? "at rest" : "mid-motion only"} (${seen})`,
+      `  ${f.severity === "fail" ? "FAIL" : "warn"} forbid ${JSON.stringify(f.statement)}: seen ${f.atRest ? "at rest" : "mid-motion only"} (${seen}${f.frames.some((x) => x.uncertain) ? "; ? = within 0.3 of the threshold, look at that frame" : ""})`,
     );
   }
   for (const statement of forbid) {
@@ -375,7 +441,7 @@ export function formatMotionReport(
     }
   }
   lines.push(
-    `  ${fails === 0 ? "no fail" : `${fails} fail`}${warns ? `, ${warns} warn` : ""}; ${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — a model's reading of the pixels, not a measurement`,
+    `  ${fails === 0 ? "no fail" : `${fails} fail`}${warns ? `, ${warns} warn` : ""}; ${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — ${captured.frames[0]?.dom?.some(Boolean) ? "positions measured from the page; whether it can be seen, and the statements, are a model's reading" : "a model's reading of the pixels, not a measurement"}`,
   );
   lines.push(
     `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3 --out ${join(dirname(captured.manifest), "strip.png")}`,

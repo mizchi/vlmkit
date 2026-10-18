@@ -133,6 +133,16 @@ export interface MotionSample {
   present: number;
   /** Where the target is, in the frame's pixels; ignored when it is not present. */
   box: MotionBox | null;
+  /**
+   * The element itself, measured by the page (its border box, the opacity it renders with, the
+   * scale of its transform). When every sample has it, geometry comes from here — exact, never
+   * another element's — and `present` only says whether a person can see it. `t` is the
+   * element's own animation time (0-1, its delay and duration): with it the easing is fitted on
+   * that, so staggered siblings in one segment each read their own curve.
+   */
+  dom?: { box: MotionBox; opacity: number; scale: number; t?: number | null };
+  /** The box may be another element's (it coincides with another target's): left out of geometry. */
+  unsure?: boolean;
 }
 
 export interface MotionSegment {
@@ -175,7 +185,9 @@ export type MotionRule =
   | "snap-back"
   | "jump"
   | "easing-mismatch"
-  | "easing-unchecked";
+  | "easing-unchecked"
+  | "target-static"
+  | "locate-unsure";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -185,7 +197,12 @@ export interface MotionFinding {
   message: string;
 }
 
-export type SegmentEasing = (EasingFit & { expected?: EasingName }) | { skipped: string; expected?: EasingName };
+/** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
+export type EasingChannel = "position" | "opacity" | "scale";
+
+export type SegmentEasing =
+  | (EasingFit & { expected?: EasingName; channel?: EasingChannel })
+  | { skipped: string; expected?: EasingName };
 
 export interface MotionPathReport {
   findings: MotionFinding[];
@@ -208,9 +225,11 @@ const median = (xs: number[]) => {
 export function judgeMotionPath(samples: readonly MotionSample[], options: MotionPathOptions): MotionPathReport {
   const thr = options.presenceThreshold ?? 0.5;
   const sure = options.surePresence ?? Math.max(thr, 0.8);
-  const floor = options.jumpFloorPx ?? 24;
+  // Measured by the page, positions are exact: the floors are a model's error otherwise.
+  const exact = samples.length > 0 && samples.every((x) => x.dom !== undefined);
+  const floor = options.jumpFloorPx ?? (exact ? 6 : 24);
   const ratio = options.jumpRatio ?? 3;
-  const minTravel = options.minFitTravelPx ?? 60;
+  const minTravel = options.minFitTravelPx ?? (exact ? 6 : 60);
   const segments = options.segments?.length
     ? [...options.segments]
     : [{ startMs: options.startMs, endMs: options.endMs }];
@@ -240,6 +259,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const fullW = median(whole.map((s) => s.box!.width));
   const fullH = median(whole.map((s) => s.box!.height));
   const position = (s: MotionSample) => {
+    if (s.dom) return { x: s.dom.box.x + s.dom.box.width / 2, y: s.dom.box.y + s.dom.box.height / 2 };
     const b = s.box!;
     const e = sides(b);
     let x = b.x + b.width / 2;
@@ -280,14 +300,58 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
   }
 
-  // Geometry from the frames that surely show it, and edge frames put back whole.
+  // Geometry: measured, every frame it is rendered in; from a model, the frames that surely show
+  // it, edge frames put back whole, and never a box that may be another element's.
   const surely = new Set(
     sorted
-      .filter((s) => s.box !== null && (s.present >= sure || (atEdge(s) && s.present >= thr && Number.isFinite(fullW))))
+      .filter((s) =>
+        s.dom
+          ? s.dom.opacity >= 0.05
+          : s.box !== null &&
+            !s.unsure &&
+            (s.present >= sure || (atEdge(s) && s.present >= thr && Number.isFinite(fullW))),
+      )
       .map((s) => s.atMs),
   );
-  const geo = motion.filter((p) => surely.has(p.atMs));
-  const geoRest = path.filter((p) => p.rest && surely.has(p.atMs));
+  const point = (s: MotionSample) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: !s.dom && atEdge(s) });
+  const all = sorted.filter((s) => surely.has(s.atMs)).map(point);
+  let geo = all.filter((p) => !p.rest);
+  const geoRest = all.filter((p) => p.rest);
+
+  // A model's box that lands far off and is back the next frame is another element's, not a jump.
+  const unsureAt = sorted.filter((s) => s.unsure).map((s) => s.atMs);
+  if (!exact) {
+    const out = new Set<number>();
+    for (let k = 1; k < geo.length - 1; k++) {
+      const [a, b, c] = [geo[k - 1]!, geo[k]!, geo[k + 1]!];
+      const away = Math.min(dist(a, b), dist(b, c));
+      if (away >= 3 * floor && dist(a, c) < Math.max(floor, away / 3)) out.add(b.atMs);
+    }
+    if (out.size > 0) {
+      geo = geo.filter((p) => !out.has(p.atMs));
+      unsureAt.push(...out);
+    }
+  }
+  if (unsureAt.length > 0) {
+    findings.push({
+      rule: "locate-unsure",
+      severity: "warn",
+      atMs: Math.min(...unsureAt),
+      message: `at ${[...new Set(unsureAt)]
+        .sort((a, b) => a - b)
+        .map(ms)
+        .join(
+          ", ",
+        )} the box is likely another element's (far off and back, or on another target), so those frames are not measured: describe the target by what only it shows, or pass --selector`,
+    });
+  }
+
+  // A sample's time fraction: the element's own animation time when measured, else its segment's.
+  const timeOf = (atMs: number, seg: MotionSegment) => {
+    const own = sorted.find((x) => x.atMs === atMs)?.dom?.t;
+    if (typeof own === "number") return own;
+    return Math.min(1, Math.max(0, (atMs - seg.startMs) / Math.max(seg.endMs - seg.startMs, 1)));
+  };
 
   const reports: MotionPathReport["segments"] = segments.map((seg, k) => {
     const expected = expectFor(k);
@@ -296,7 +360,30 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const travelPx = frames.length >= 2 ? dist(frames[0]!, frames[frames.length - 1]!) : 0;
     const tag = segments.length > 1 ? ` in ${ms(seg.startMs)}..${ms(seg.endMs)}` : "";
     let easing: SegmentEasing;
-    if (frames.length < 4) easing = { skipped: "fewer than 4 frames surely show the target" };
+    // Measured, a fade or a scale has an easing too: fit the channel that changes.
+    const channel = (key: "opacity" | "scale", least: number) => {
+      const xs = sorted.filter((x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs);
+      if (xs.length < 4) return null;
+      const v = xs.map((x) => x.dom![key]);
+      const delta = v[v.length - 1]! - v[0]!;
+      if (Math.abs(delta) < least) return null;
+      return xs.map((x, i) => ({ t: timeOf(x.atMs, seg), s: Math.sign(delta) * v[i]! }));
+    };
+    const opacityPoints = exact && travelPx < minTravel ? channel("opacity", 0.2) : null;
+    const fade = opacityPoints ?? (exact && travelPx < minTravel ? channel("scale", 0.02) : null);
+    const fadeName: EasingChannel = opacityPoints ? "opacity" : "scale";
+    if (fade) {
+      const fit = fitEasingAffine(fade);
+      easing = { ...fit, channel: fadeName };
+      if (expected && fit.best !== expected) {
+        findings.push({
+          rule: "easing-mismatch",
+          severity: "fail",
+          atMs: seg.startMs,
+          message: `the ${fadeName}${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}`,
+        });
+      }
+    } else if (frames.length < 4) easing = { skipped: "fewer than 4 frames surely show the target" };
     else if (travelPx < minTravel)
       easing = { skipped: `travel ${Math.round(travelPx)}px is under ${minTravel}px: too short to fit` };
     else {
@@ -308,23 +395,26 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       const z = restHeld ? r! : frames[frames.length - 1]!;
       const d = { x: z.x - a.x, y: z.y - a.y };
       const len = Math.max(Math.hypot(d.x, d.y), 1e-9);
-      const span = Math.max(seg.endMs - seg.startMs, 1);
       const points = frames.map((p) => ({
-        t: Math.min(1, Math.max(0, (p.atMs - seg.startMs) / span)),
+        t: timeOf(p.atMs, seg),
         s: ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / len,
       }));
       if (restHeld) points.push({ t: 1, s: ((r!.x - a.x) * d.x + (r!.y - a.y) * d.y) / len });
       const fit = fitEasingAffine(points);
-      easing = fit;
+      easing = { ...fit, channel: "position" };
       if (expected && fit.best !== expected) {
-        // Frames that show it only faintly, or not at all, are left out, and a box around the part
-        // that is not covered moves differently from the element: say so beside the mismatch.
-        const hidden = sorted.filter((x) => x.atMs >= seg.startMs && x.atMs <= seg.endMs && !surely.has(x.atMs)).length;
+        // A box around the part that is not covered moves differently from the element: when
+        // frames inside the segment show it not at all, say so beside the mismatch.
+        const hidden = exact
+          ? 0
+          : sorted.filter(
+              (x) => x.atMs >= seg.startMs && x.atMs <= seg.endMs && x.present < thr && x.atMs > (frames[0]?.atMs ?? 0),
+            ).length;
         findings.push({
           rule: "easing-mismatch",
           severity: "fail",
           atMs: seg.startMs,
-          message: `the path${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}${hidden > 0 ? `; ${hidden} frame(s) there show it faintly or not at all, so fix what hides it first and re-check` : ""}`,
+          message: `the path${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}${hidden > 0 ? `; in ${hidden} frame(s) there it is not seen at all — if something covers it, fix that first and re-check` : ""}`,
         });
       }
     }
@@ -334,7 +424,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "easing-unchecked",
         severity: "warn",
         atMs: seg.startMs,
-        message: `${expected} was expected${tag} but not checked: ${easing.skipped} (only frames shown at ${sure} or more, or put back from the viewport's edge, are measured)`,
+        message: `${expected} was expected${tag} but not checked: ${easing.skipped}${exact ? "" : ` (only frames shown at ${sure} or more, or put back from the viewport's edge, are measured; --selector measures the element itself)`}`,
       });
     }
 
@@ -392,6 +482,31 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
             },
       );
     }
+  }
+
+  // Shown surely from the first frame, never hidden, never moving: nothing about it animates.
+  const firstMotion = sorted.find((s) => !isRest(s));
+  if (
+    firstMotion &&
+    firstMotion.present >= sure &&
+    sorted.every((s) => shown(s)) &&
+    geo.length >= 2 &&
+    Math.max(...geo.map((p) => dist(p, geo[0]!))) < floor &&
+    !(
+      exact &&
+      sorted.some(
+        (x) =>
+          Math.abs(x.dom!.opacity - sorted[0]!.dom!.opacity) > 0.05 ||
+          Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01,
+      )
+    )
+  ) {
+    findings.push({
+      rule: "target-static",
+      severity: "warn",
+      atMs: firstMotion.atMs,
+      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${floor}px in every frame: if it is meant to animate, its animation is not applying (a dropped rule, a misspelt animation-name)`,
+    });
   }
 
   findings.sort((a, b) => a.atMs - b.atMs);

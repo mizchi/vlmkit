@@ -21,7 +21,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
-import { askJev, JEV_DEFAULT_MODEL, pngImage, type JevResponse } from "@mizchi/vlmkit-ai/jev-client.ts";
+import { askJev, JEV_DEFAULT_MODEL, pngImage, type JevAnswer, type JevResponse } from "@mizchi/vlmkit-ai/jev-client.ts";
 import { cropImage, decodeImage, encodePngImage, type RgbaImage } from "@mizchi/vlmkit-ai/zoom-image.ts";
 import { EASINGS, EASING_NAMES, fitEasing, type EasingName } from "./easing.ts";
 
@@ -250,7 +250,7 @@ async function ask(saved: Saved, model: string) {
         questions: { easing: { type: "choice", instructions: QUESTION_FRAMES, criteria } },
       }),
     );
-    const fa = fr.answers.easing;
+    const fa = fr.answers.easing as Extract<JevAnswer, { type: "choice" }>;
     a.frames = { choice: fa.choice, confidence: fa.confidence, probabilities: fa.probabilities };
 
     const sr = record(
@@ -264,7 +264,7 @@ async function ask(saved: Saved, model: string) {
         questions: { easing: { type: "choice", instructions: QUESTION_SHEET(v), criteria } },
       }),
     );
-    const sa = sr.answers.easing;
+    const sa = sr.answers.easing as Extract<JevAnswer, { type: "choice" }>;
     a.sheet = { choice: sa.choice, confidence: sa.confidence, probabilities: sa.probabilities };
 
     a.box = [];
@@ -280,7 +280,7 @@ async function ask(saved: Saved, model: string) {
           questions: { where: { type: "box", instructions: `${v.noun} in \`screenshot\`` } },
         }),
       );
-      const b = br.answers.where.box;
+      const b = (br.answers.where as Extract<JevAnswer, { type: "box" }>).box;
       a.box.push(
         v.axis === "x" ? ((b.left + b.right) / 2) * imgs[i]!.width : ((b.top + b.bottom) / 2) * imgs[i]!.height,
       );

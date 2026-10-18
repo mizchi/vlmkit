@@ -24,6 +24,19 @@ describe("inspect motion arguments", () => {
     assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--no-forbid"]).forbid, []);
   });
 
+  it("pairs each --selector with the --target in its position", () => {
+    const o = parseMotionArgs(["p.html", "--target", "a", "--selector", ".a", "--target", "b"]);
+    assert.deepEqual([o.targets, o.selectors], [["a", "b"], [".a"]]);
+    assert.throws(
+      () => parseMotionArgs(["p.html", "--target", "a", "--selector", ".a", "--selector", ".b"]),
+      MotionUsageError,
+    );
+    assert.throws(
+      () => parseMotionArgs(["f/frames.json", "--target", "a", "--selector", ".a", "--end", "500"]),
+      MotionUsageError,
+    );
+  });
+
   it("refuses what cannot be checked", () => {
     const bad: string[][] = [
       ["page.html", "--no-forbid"],

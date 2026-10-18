@@ -75,7 +75,7 @@ describe("judgeMotionPath", () => {
       ),
     ).toEqual(["easing-mismatch"]);
     const short = judgeMotionPath(
-      run((t) => 40 + 20 * t),
+      run((t) => 40 + 40 * t),
       { startMs: 0, endMs: 1000, expectEasing: "ease-out" },
     );
     expect(short.findings.map((f) => [f.rule, f.severity])).toEqual([["easing-unchecked", "warn"]]);
@@ -88,6 +88,12 @@ describe("judgeMotionPath", () => {
     fade[0]!.box = box(100);
     fade[1]!.box = box(260);
     expect(rules(fade, "ease-out")).toEqual([]);
+  });
+
+  it("warns when the target is fully shown and still from the first frame", () => {
+    expect(rules(run(() => 300))).toEqual(["target-static"]);
+    // A fade-in from nothing is not static, though it does not move.
+    expect(rules(run(() => 300, { present: (t) => (t === 0 ? 0.02 : 0.95) }))).toEqual([]);
   });
 
   it("calls a rest that lands elsewhere a jump, not a snap-back", () => {
@@ -131,5 +137,59 @@ describe("judgeMotionPath", () => {
     // Without the edge put back, the clipped boxes' centres move at half speed and read linear.
     const naive = judgeMotionPath(samples, { startMs: 0, endMs: 2400, expectEasing: "ease-out", exits: true });
     expect(naive.findings.map((f) => f.rule)).not.toEqual([]);
+  });
+
+  it("reads a box that lands on another element and comes back as unsure, not as a jump", () => {
+    const s = run((t) => 40 + 480 * easingAt("ease-out", t));
+    s[5]!.box = box(1100); // another card, one frame
+    const r = judgeMotionPath(s, { startMs: 0, endMs: 1000, expectEasing: "ease-out" });
+    expect(r.findings.map((f) => f.rule)).toEqual(["locate-unsure"]);
+  });
+
+  it("measures the element itself when the page gives it: a 24px rise and a fade have easings", () => {
+    const seg = [...Array.from({ length: 10 }, (_, i) => i * 40), 399, 700];
+    const rise = seg.map((t) => {
+      const e = easingAt("ease-out", Math.min(1, t / 400));
+      const y = 200 + 24 * (1 - e);
+      return {
+        atMs: t,
+        present: t === 0 ? 0.1 : 0.9,
+        box: box(300, y),
+        dom: { box: box(300, y), opacity: e, scale: 1 },
+      };
+    });
+    const r = judgeMotionPath(rise, { startMs: 0, endMs: 400, expectEasing: "ease-out" });
+    expect(r.findings).toEqual([]);
+    expect("best" in r.easing && [r.easing.best, r.easing.channel]).toEqual(["ease-out", "position"]);
+    // A fade in place: the opacity is what eases.
+    const fade = seg.map((t) => {
+      const e = easingAt("ease-in", Math.min(1, t / 400));
+      return {
+        atMs: t,
+        present: e > 0.3 ? 0.9 : 0.2,
+        box: box(300),
+        dom: { box: box(300), opacity: e, scale: 0.92 + 0.08 * e },
+      };
+    });
+    const f = judgeMotionPath(fade, { startMs: 0, endMs: 400, expectEasing: "ease-out" });
+    expect(f.findings.map((x) => x.rule)).toEqual(["easing-mismatch"]);
+    expect("best" in f.easing && [f.easing.best, f.easing.channel]).toEqual(["ease-in", "opacity"]);
+  });
+
+  it("fits each staggered sibling on its own animation time when the page gives it", () => {
+    // One segment 0..640ms; this card's own animation is 240..640ms (a 240ms delay).
+    const times = [...Array.from({ length: 10 }, (_, i) => i * 64), 639, 940];
+    const s = times.map((at) => {
+      const t = Math.min(1, Math.max(0, (at - 240) / 400));
+      const y = 200 + 24 * (1 - easingAt("ease-out", t));
+      return {
+        atMs: at,
+        present: t > 0.2 ? 0.9 : 0.3,
+        box: box(900, y),
+        dom: { box: box(900, y), opacity: t, scale: 1, t },
+      };
+    });
+    const r = judgeMotionPath(s, { startMs: 0, endMs: 640, expectEasing: "ease-out" });
+    expect(r.findings).toEqual([]);
   });
 });
