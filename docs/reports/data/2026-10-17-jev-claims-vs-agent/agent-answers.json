@@ -1,0 +1,815 @@
+{
+ "arm": "agent (Claude Code subagent, own vision, blind packet)",
+ "rows": [
+  {
+   "id": "016c9f",
+   "shot": {
+    "fixture": "landing-product",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/landing-product-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "09e452",
+   "shot": {
+    "fixture": "page",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/page-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.02,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "120869",
+   "shot": {
+    "fixture": "stacking-context",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/stacking-context-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.95,
+    "broken-image": 0.05,
+    "overlap": 0.9,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "14f518",
+   "shot": {
+    "fixture": "form-app",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/form-app-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.55,
+    "modal": 0.97,
+    "broken-image": 0.03,
+    "overlap": 0.05,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "168bcc",
+   "shot": {
+    "fixture": "stacking-context",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/stacking-context-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.96,
+    "broken-image": 0.03,
+    "overlap": 0.08,
+    "loading": 0.03
+   }
+  },
+  {
+   "id": "17ef70",
+   "shot": {
+    "fixture": "grid-complex",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/grid-complex-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.15,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "1fda2b",
+   "shot": {
+    "fixture": "stacking-context",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/stacking-context-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.98,
+    "broken-image": 0.03,
+    "overlap": 0.15,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "20a29b",
+   "shot": {
+    "fixture": "landing-product",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/landing-product-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.05,
+    "broken-image": 0.96,
+    "overlap": 0.15,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "23741a",
+   "shot": {
+    "fixture": "dashboard",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/dashboard-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.02,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "2739d3",
+   "shot": {
+    "fixture": "landing-product",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/landing-product-none.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "289374",
+   "shot": {
+    "fixture": "page",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/page-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "2c7da9",
+   "shot": {
+    "fixture": "ecommerce-catalog",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.03,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "2d0e40",
+   "shot": {
+    "fixture": "grid-complex",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/grid-complex-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.05,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "49e4c5",
+   "shot": {
+    "fixture": "admin-panel",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/admin-panel-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "4a2258",
+   "shot": {
+    "fixture": "admin-panel",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/admin-panel-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.02,
+    "overlap": 0.04,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "4b4dd2",
+   "shot": {
+    "fixture": "grid-complex",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/grid-complex-none.png"
+   },
+   "answers": {
+    "error-banner": 0.1,
+    "modal": 0.01,
+    "broken-image": 0.02,
+    "overlap": 0.01,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "4e02aa",
+   "shot": {
+    "fixture": "page",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/page-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.05,
+    "broken-image": 0.96,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "4e8bca",
+   "shot": {
+    "fixture": "landing-product",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/landing-product-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.02,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "576c1c",
+   "shot": {
+    "fixture": "page",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/page-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.95,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "5a35f0",
+   "shot": {
+    "fixture": "admin-panel",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/admin-panel-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.95,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "5a7b13",
+   "shot": {
+    "fixture": "blog-magazine",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/blog-magazine-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.96,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "5db0a0",
+   "shot": {
+    "fixture": "ecommerce-catalog",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "60ab93",
+   "shot": {
+    "fixture": "blog-magazine",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/blog-magazine-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.03,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "624521",
+   "shot": {
+    "fixture": "ecommerce-catalog",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.05,
+    "broken-image": 0.96,
+    "overlap": 0.15,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "6aa87b",
+   "shot": {
+    "fixture": "form-app",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/form-app-none.png"
+   },
+   "answers": {
+    "error-banner": 0.8,
+    "modal": 0.01,
+    "broken-image": 0.03,
+    "overlap": 0.01,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "6b1238",
+   "shot": {
+    "fixture": "landing-product",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/landing-product-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.02,
+    "overlap": 0.04,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "6d5275",
+   "shot": {
+    "fixture": "blog-magazine",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/blog-magazine-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.02,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "7682fa",
+   "shot": {
+    "fixture": "dashboard",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/dashboard-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.05,
+    "broken-image": 0.94,
+    "overlap": 0.2,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "7ccd48",
+   "shot": {
+    "fixture": "form-app",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/form-app-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.55,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.96,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "7dca40",
+   "shot": {
+    "fixture": "ecommerce-catalog",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.96,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "7ddc7c",
+   "shot": {
+    "fixture": "ecommerce-catalog",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.05,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "9165b0",
+   "shot": {
+    "fixture": "landing-product",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/landing-product-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.95,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "927cd8",
+   "shot": {
+    "fixture": "form-app",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/form-app-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.8,
+    "modal": 0.05,
+    "broken-image": 0.96,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "a05904",
+   "shot": {
+    "fixture": "form-app",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/form-app-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.03,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "a68d46",
+   "shot": {
+    "fixture": "page",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/page-none.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "ad5f3c",
+   "shot": {
+    "fixture": "dashboard",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/dashboard-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.03,
+    "broken-image": 0.03,
+    "overlap": 0.95,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "b06daf",
+   "shot": {
+    "fixture": "stacking-context",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/stacking-context-none.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.98,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "b8a6d4",
+   "shot": {
+    "fixture": "stacking-context",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/stacking-context-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.75,
+    "broken-image": 0.03,
+    "overlap": 0.15,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "c410b3",
+   "shot": {
+    "fixture": "admin-panel",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/admin-panel-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.02,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "c47781",
+   "shot": {
+    "fixture": "form-app",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/form-app-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.3,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "c49393",
+   "shot": {
+    "fixture": "grid-complex",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/grid-complex-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.02,
+    "overlap": 0.04,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "c64495",
+   "shot": {
+    "fixture": "blog-magazine",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/blog-magazine-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.05,
+    "broken-image": 0.96,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "ca8963",
+   "shot": {
+    "fixture": "admin-panel",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/admin-panel-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.05,
+    "broken-image": 0.96,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "cbbd80",
+   "shot": {
+    "fixture": "dashboard",
+    "plant": "modal",
+    "imagePath": "test-results/jev-claims/claims/dashboard-modal.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.97,
+    "broken-image": 0.02,
+    "overlap": 0.04,
+    "loading": 0.02
+   }
+  },
+  {
+   "id": "d759f8",
+   "shot": {
+    "fixture": "blog-magazine",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/blog-magazine-none.png"
+   },
+   "answers": {
+    "error-banner": 0.01,
+    "modal": 0.01,
+    "broken-image": 0.02,
+    "overlap": 0.01,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "d86ba1",
+   "shot": {
+    "fixture": "dashboard",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/dashboard-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.04,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "e7f867",
+   "shot": {
+    "fixture": "grid-complex",
+    "plant": "overlap",
+    "imagePath": "test-results/jev-claims/claims/grid-complex-overlap.png"
+   },
+   "answers": {
+    "error-banner": 0.05,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.8,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "e84de2",
+   "shot": {
+    "fixture": "ecommerce-catalog",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-none.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "ee719b",
+   "shot": {
+    "fixture": "grid-complex",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/grid-complex-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.05,
+    "modal": 0.05,
+    "broken-image": 0.95,
+    "overlap": 0.1,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "ee9ca8",
+   "shot": {
+    "fixture": "admin-panel",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/admin-panel-none.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.01,
+    "broken-image": 0.02,
+    "overlap": 0.01,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "f8551a",
+   "shot": {
+    "fixture": "stacking-context",
+    "plant": "broken-image",
+    "imagePath": "test-results/jev-claims/claims/stacking-context-broken-image.png"
+   },
+   "answers": {
+    "error-banner": 0.03,
+    "modal": 0.9,
+    "broken-image": 0.96,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "f870f1",
+   "shot": {
+    "fixture": "dashboard",
+    "plant": "none",
+    "imagePath": "test-results/jev-claims/claims/dashboard-none.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.02,
+    "broken-image": 0.02,
+    "overlap": 0.02,
+    "loading": 0.01
+   }
+  },
+  {
+   "id": "fb3a50",
+   "shot": {
+    "fixture": "page",
+    "plant": "loading",
+    "imagePath": "test-results/jev-claims/claims/page-loading.png"
+   },
+   "answers": {
+    "error-banner": 0.02,
+    "modal": 0.05,
+    "broken-image": 0.02,
+    "overlap": 0.03,
+    "loading": 0.96
+   }
+  },
+  {
+   "id": "fc423e",
+   "shot": {
+    "fixture": "blog-magazine",
+    "plant": "error-banner",
+    "imagePath": "test-results/jev-claims/claims/blog-magazine-error-banner.png"
+   },
+   "answers": {
+    "error-banner": 0.97,
+    "modal": 0.03,
+    "broken-image": 0.02,
+    "overlap": 0.05,
+    "loading": 0.01
+   }
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>easing-wrong intact</title><style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f8fafc;color:#0f172a;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{height:64px;display:flex;align-items:center;gap:24px;padding:0 32px;background:#fff;border-bottom:1px solid #e2e8f0}
+header strong{font-size:18px}
+main{max-width:880px;margin:32px auto;padding:0 24px}
+h1{font-size:28px;margin:0 0 12px}
+p{margin:0 0 12px;color:#334155}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px}
+.rail{position:relative;height:8px;margin:40px 0;border-radius:4px;background:#cbd5e1}
+.handle{position:absolute;left:0;top:-16px;width:40px;height:40px;border-radius:50%;background:#2563eb;animation:to 1000ms ease-out forwards}
+@keyframes to{to{transform:translateX(600px)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms!important}}
+</style></head><body>
+<header><strong>Acme</strong><span>Projects</span><span>Billing</span></header>
+<main>
+<section class="card"><h1>Volume</h1><p>Drag the handle to set the level.</p><div class="rail"><div class="handle"></div></div></section><p>Your workspace keeps every project, its members and its billing in one place. Invite a teammate to share a board, or archive a project you no longer use.</p>
+<p>Changes are saved automatically. The activity log below lists what changed and who changed it, for the last thirty days.</p>
+</main></body></html>

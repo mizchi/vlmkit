@@ -1,0 +1,1249 @@
+{
+  "model": "jev-1.14.0",
+  "calls": [
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 378.8898140000092,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 281.6489569999976,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 621.9234299999953,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 468.98939599998994,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 204.29961899999762,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 235.98406499999692,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 347.94811900000786,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 318.90765499998815,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 256.92330599999696,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 375.0973410000006,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 331.12897299999895,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 298.11229699999967,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 183.5888100000011,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 171.9273150000081,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 170.64292700000806,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 171.60203900000488,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 178.71556599999894,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 131.89765199999965,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 193.8596169999946,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 161.90941900000325,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 160.92863399999624,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 259.40541599999415,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 182.94886000000406,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 171.64177799999015,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 187.66251100000227,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 163.83627699999488,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 169.10235900001135,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 273.89706200000364,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 238.02550000000338,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 197.94760800000222,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 184.63815199999954,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 149.51444099999208,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 155.51642299999367,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 175.20787199999904,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 191.36923500000557,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 185.36833900000784,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 284.96347999999125,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 208.58535399999528,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 181.77474399999483,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 225.31580700000632,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 172.06822000000102,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 144.54878500000632,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 341.1892949999892,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 168.0082470000052,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 164.8038649999944,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 164.38753599999472,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 137.0067479999998,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 166.22208600000886,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 333.1031010000006,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 172.0433469999989,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 213.03950600000098,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 141.26418600000034,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 162.51663199999894,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    },
+    {
+      "stage": "claims",
+      "key": "",
+      "latencyMs": 239.49296299999696,
+      "inputTokens": 3047,
+      "costUsd": 0.000127974,
+      "questions": 5,
+      "servedModel": "jev-1.14.0"
+    }
+  ],
+  "claims": [
+    {
+      "shot": {
+        "fixture": "admin-panel",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/admin-panel-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.07,
+        "modal": 0.01,
+        "broken-image": 0.03,
+        "overlap": 0.11,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "admin-panel",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/admin-panel-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 1,
+        "modal": 0.02,
+        "broken-image": 0.03,
+        "overlap": 0.47,
+        "loading": 0
+      }
+    },
+    {
+      "shot": {
+        "fixture": "admin-panel",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/admin-panel-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.03,
+        "modal": 0.99,
+        "broken-image": 0.03,
+        "overlap": 0.14,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "admin-panel",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/admin-panel-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.05,
+        "modal": 0.06,
+        "broken-image": 0.98,
+        "overlap": 0.56,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "admin-panel",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/admin-panel-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.06,
+        "modal": 0.01,
+        "broken-image": 0.03,
+        "overlap": 0.91,
+        "loading": 0
+      }
+    },
+    {
+      "shot": {
+        "fixture": "admin-panel",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/admin-panel-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.02,
+        "modal": 0.37,
+        "broken-image": 0.08,
+        "overlap": 0.75,
+        "loading": 0.78
+      }
+    },
+    {
+      "shot": {
+        "fixture": "blog-magazine",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/blog-magazine-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.01,
+        "broken-image": 0.22,
+        "overlap": 0.05,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "blog-magazine",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/blog-magazine-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0.05,
+        "broken-image": 0.16,
+        "overlap": 0.27,
+        "loading": 0.02
+      }
+    },
+    {
+      "shot": {
+        "fixture": "blog-magazine",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/blog-magazine-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.1,
+        "overlap": 0.03,
+        "loading": 0
+      }
+    },
+    {
+      "shot": {
+        "fixture": "blog-magazine",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/blog-magazine-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.03,
+        "modal": 0.03,
+        "broken-image": 0.96,
+        "overlap": 0.06,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "blog-magazine",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/blog-magazine-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.03,
+        "modal": 0.03,
+        "broken-image": 0.27,
+        "overlap": 0.89,
+        "loading": 0.02
+      }
+    },
+    {
+      "shot": {
+        "fixture": "blog-magazine",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/blog-magazine-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.22,
+        "broken-image": 0.84,
+        "overlap": 0.06,
+        "loading": 0.52
+      }
+    },
+    {
+      "shot": {
+        "fixture": "dashboard",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/dashboard-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.02,
+        "modal": 0.01,
+        "broken-image": 0.05,
+        "overlap": 0.05,
+        "loading": 0
+      }
+    },
+    {
+      "shot": {
+        "fixture": "dashboard",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/dashboard-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0.11,
+        "broken-image": 0.05,
+        "overlap": 0.13,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "dashboard",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/dashboard-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.05,
+        "overlap": 0.05,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "dashboard",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/dashboard-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.04,
+        "modal": 0.55,
+        "broken-image": 0.98,
+        "overlap": 0.59,
+        "loading": 0.04
+      }
+    },
+    {
+      "shot": {
+        "fixture": "dashboard",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/dashboard-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.03,
+        "modal": 0.03,
+        "broken-image": 0.08,
+        "overlap": 0.95,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "dashboard",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/dashboard-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.03,
+        "modal": 0.14,
+        "broken-image": 0.18,
+        "overlap": 0.08,
+        "loading": 0.86
+      }
+    },
+    {
+      "shot": {
+        "fixture": "ecommerce-catalog",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.01,
+        "broken-image": 0.12,
+        "overlap": 0.04,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "ecommerce-catalog",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0.01,
+        "broken-image": 0.08,
+        "overlap": 0.09,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "ecommerce-catalog",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0,
+        "modal": 0.99,
+        "broken-image": 0.06,
+        "overlap": 0.22,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "ecommerce-catalog",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.02,
+        "modal": 0.02,
+        "broken-image": 0.98,
+        "overlap": 0.69,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "ecommerce-catalog",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.01,
+        "broken-image": 0.23,
+        "overlap": 0.95,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "ecommerce-catalog",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/ecommerce-catalog-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.2,
+        "broken-image": 0.23,
+        "overlap": 0.58,
+        "loading": 0.82
+      }
+    },
+    {
+      "shot": {
+        "fixture": "form-app",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/form-app-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0,
+        "broken-image": 0.09,
+        "overlap": 0.03,
+        "loading": 0
+      }
+    },
+    {
+      "shot": {
+        "fixture": "form-app",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/form-app-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0.02,
+        "broken-image": 0.09,
+        "overlap": 0.08,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "form-app",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/form-app-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.7,
+        "modal": 0.99,
+        "broken-image": 0.1,
+        "overlap": 0.06,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "form-app",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/form-app-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.98,
+        "modal": 0.11,
+        "broken-image": 0.97,
+        "overlap": 0.45,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "form-app",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/form-app-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.98,
+        "modal": 0.02,
+        "broken-image": 0.21,
+        "overlap": 0.98,
+        "loading": 0
+      }
+    },
+    {
+      "shot": {
+        "fixture": "form-app",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/form-app-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.87,
+        "modal": 0.09,
+        "broken-image": 0.12,
+        "overlap": 0.06,
+        "loading": 0.95
+      }
+    },
+    {
+      "shot": {
+        "fixture": "grid-complex",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/grid-complex-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.16,
+        "modal": 0.01,
+        "broken-image": 0.04,
+        "overlap": 0.04,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "grid-complex",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/grid-complex-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0.12,
+        "broken-image": 0.04,
+        "overlap": 0.36,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "grid-complex",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/grid-complex-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.04,
+        "overlap": 0.26,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "grid-complex",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/grid-complex-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.18,
+        "modal": 0.84,
+        "broken-image": 0.97,
+        "overlap": 0.45,
+        "loading": 0.05
+      }
+    },
+    {
+      "shot": {
+        "fixture": "grid-complex",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/grid-complex-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.15,
+        "modal": 0.02,
+        "broken-image": 0.06,
+        "overlap": 0.66,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "grid-complex",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/grid-complex-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.06,
+        "modal": 0.21,
+        "broken-image": 0.08,
+        "overlap": 0.11,
+        "loading": 0.87
+      }
+    },
+    {
+      "shot": {
+        "fixture": "landing-product",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/landing-product-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.01,
+        "broken-image": 0.07,
+        "overlap": 0.04,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "landing-product",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/landing-product-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 1,
+        "modal": 0.03,
+        "broken-image": 0.06,
+        "overlap": 0.34,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "landing-product",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/landing-product-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.04,
+        "overlap": 0.09,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "landing-product",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/landing-product-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.02,
+        "modal": 0.15,
+        "broken-image": 0.98,
+        "overlap": 0.66,
+        "loading": 0.03
+      }
+    },
+    {
+      "shot": {
+        "fixture": "landing-product",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/landing-product-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.02,
+        "modal": 0.01,
+        "broken-image": 0.06,
+        "overlap": 0.95,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "landing-product",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/landing-product-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.03,
+        "broken-image": 0.12,
+        "overlap": 0.08,
+        "loading": 0.49
+      }
+    },
+    {
+      "shot": {
+        "fixture": "page",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/page-none.png"
+      },
+      "nouls": {
+        "error-banner": 0,
+        "modal": 0.01,
+        "broken-image": 0.12,
+        "overlap": 0.04,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "page",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/page-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 1,
+        "modal": 0.02,
+        "broken-image": 0.09,
+        "overlap": 0.03,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "page",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/page-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.08,
+        "overlap": 0.11,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "page",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/page-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.16,
+        "broken-image": 0.83,
+        "overlap": 0.58,
+        "loading": 0.02
+      }
+    },
+    {
+      "shot": {
+        "fixture": "page",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/page-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0,
+        "broken-image": 0.27,
+        "overlap": 0.85,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "page",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/page-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.05,
+        "broken-image": 0.09,
+        "overlap": 0.06,
+        "loading": 0.97
+      }
+    },
+    {
+      "shot": {
+        "fixture": "stacking-context",
+        "plant": "none",
+        "imagePath": "test-results/jev-claims/claims/stacking-context-none.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.11,
+        "overlap": 0.03,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "stacking-context",
+        "plant": "error-banner",
+        "imagePath": "test-results/jev-claims/claims/stacking-context-error-banner.png"
+      },
+      "nouls": {
+        "error-banner": 0.99,
+        "modal": 0.99,
+        "broken-image": 0.08,
+        "overlap": 0.02,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "stacking-context",
+        "plant": "modal",
+        "imagePath": "test-results/jev-claims/claims/stacking-context-modal.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.08,
+        "overlap": 0.31,
+        "loading": 0.09
+      }
+    },
+    {
+      "shot": {
+        "fixture": "stacking-context",
+        "plant": "broken-image",
+        "imagePath": "test-results/jev-claims/claims/stacking-context-broken-image.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.97,
+        "broken-image": 0.97,
+        "overlap": 0.04,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "stacking-context",
+        "plant": "overlap",
+        "imagePath": "test-results/jev-claims/claims/stacking-context-overlap.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.08,
+        "overlap": 0.8,
+        "loading": 0.01
+      }
+    },
+    {
+      "shot": {
+        "fixture": "stacking-context",
+        "plant": "loading",
+        "imagePath": "test-results/jev-claims/claims/stacking-context-loading.png"
+      },
+      "nouls": {
+        "error-banner": 0.01,
+        "modal": 0.99,
+        "broken-image": 0.13,
+        "overlap": 0.53,
+        "loading": 0.96
+      }
+    }
+  ]
+}

@@ -125,6 +125,8 @@ const SPECS: Record<string, Spec> = {
   migrationCompare: spec("migration-compare", () => import("../experiments/migration/migration-compare.ts")),
   pngDiff: spec("png-diff", () => import("@mizchi/vlmkit-markup/png-diff.ts")),
   locate: spec("locate", () => import("@mizchi/vlmkit-markup/inspect/locate-cli.ts")),
+  claims: spec("claims", () => import("@mizchi/vlmkit-markup/inspect/claims-cli.ts")),
+  motion: spec("motion", () => import("@mizchi/vlmkit-markup/inspect/motion-cli.ts")),
   cssBench: spec("css-challenge-bench", () => import("../experiments/css-challenge/css-challenge-bench.ts")),
   detectionReport: spec("detection-report", () => import("../experiments/detection/detection-report.ts")),
   snapshot: spec("snapshot", () => import("../vrt/snapshot/snapshot.ts")),
@@ -191,6 +193,11 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     explore: { spec: SPECS.explore, desc: "Auto-discover declared actions and diff each" },
     smoke: { spec: SPECS.smokeRunner, desc: "A11y-driven exploratory smoke test" },
     locate: { spec: SPECS.locate, desc: "Find a described element on a screenshot, no DOM (Jev; TYPESAFEAI_API_KEY)" },
+    claims: { spec: SPECS.claims, desc: "Advisory yes/no checks of what a screenshot shows (Jev; TYPESAFEAI_API_KEY)" },
+    motion: {
+      spec: SPECS.motion,
+      desc: "Is an animation visually broken? Frames asked of Jev, motion judged (TYPESAFEAI_API_KEY)",
+    },
   },
   scan: {
     component: { spec: SPECS.componentExtract, desc: "Detect components in a screenshot; crop to standalone PNGs" },

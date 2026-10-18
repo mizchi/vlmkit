@@ -307,3 +307,89 @@ export async function buildPresenceCases(browser: Browser, o: GroundOptions, per
   }
   return out;
 }
+
+export const CLAIM_PLANTS = ["error-banner", "modal", "broken-image", "overlap", "loading"] as const;
+export type ClaimPlant = (typeof CLAIM_PLANTS)[number];
+
+export interface ClaimShot {
+  fixture: string;
+  plant: ClaimPlant | "none";
+  imagePath: string;
+}
+
+/**
+ * Runs in the page: plant one defect a person would notice at a glance, in the viewport, on top
+ * of the fixture as it is. Each is the common shape of the defect, not a hard case: the bench asks
+ * whether a claim notices it at all and, as much, whether it stays quiet on the clean pages.
+ */
+function plantClaimDefect(kind: string): void {
+  const el = (html: string) => {
+    const t = document.createElement("template");
+    t.innerHTML = html.trim();
+    return t.content.firstElementChild as HTMLElement;
+  };
+  const font = "font: 15px/1.4 system-ui, sans-serif;";
+  if (kind === "error-banner") {
+    document.body.append(
+      el(
+        `<div style="position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:99999;${font}background:#fde8e8;color:#9b1c1c;border:1px solid #f05252;border-radius:8px;padding:12px 18px;box-shadow:0 4px 12px rgba(0,0,0,.15)">⚠ Something went wrong. We couldn't save your changes. Please try again.</div>`,
+      ),
+    );
+  } else if (kind === "modal") {
+    document.body.append(
+      el(
+        `<div style="position:fixed;inset:0;z-index:99999;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center"><div style="${font}background:#fff;color:#111;border-radius:12px;padding:24px 28px;width:380px;box-shadow:0 20px 40px rgba(0,0,0,.3)"><div style="font-weight:600;font-size:18px;margin-bottom:8px">Delete this project?</div><div style="color:#555;margin-bottom:20px">This cannot be undone.</div><div style="display:flex;gap:10px;justify-content:flex-end"><button style="${font}padding:8px 14px">Cancel</button><button style="${font}padding:8px 14px;background:#dc2626;color:#fff;border:0;border-radius:6px">Delete</button></div></div></div>`,
+      ),
+    );
+  } else if (kind === "broken-image") {
+    // A real missing file: Chromium draws its own broken-image icon and the alt text.
+    document.body.append(
+      el(
+        `<img src="./definitely-missing-hero.png" alt="Product hero image" width="360" height="200" style="position:fixed;top:160px;left:420px;z-index:99999;border:1px solid #ccc;background:#fff">`,
+      ),
+    );
+  } else if (kind === "overlap") {
+    // Text set over the page's own text, 6px off: the classic absolute-position collision.
+    const target = [...document.querySelectorAll("h1, h2, h3, p")].find((e) => {
+      const r = e.getBoundingClientRect();
+      return r.width > 150 && r.height > 14 && r.top > 40 && r.bottom < innerHeight - 40 && r.left >= 0;
+    });
+    const r = target ? target.getBoundingClientRect() : { left: 80, top: 200, width: 400 };
+    document.body.append(
+      el(
+        `<div style="position:fixed;left:${r.left + 6}px;top:${r.top + 5}px;width:${Math.max(200, r.width)}px;z-index:99999;${font}font-size:17px;font-weight:600;color:#222">Limited offer: 30% off all annual plans this week only</div>`,
+      ),
+    );
+  } else if (kind === "loading") {
+    document.body.append(
+      el(
+        `<div style="position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;${font}color:#374151"><div style="width:44px;height:44px;border-radius:50%;border:5px solid #d1d5db;border-top-color:#2563eb"></div>Loading…</div>`,
+      ),
+    );
+  }
+}
+
+export async function buildClaimShots(browser: Browser, o: GroundOptions): Promise<ClaimShot[]> {
+  const out: ClaimShot[] = [];
+  await mkdir(join(o.outDir, "claims"), { recursive: true });
+  for (const fixture of o.fixtures) {
+    const name = basename(fixture).replace(/\.html?$/, "");
+    for (const plant of ["none", ...CLAIM_PLANTS] as const) {
+      const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+      try {
+        await page.goto(`file://${fixture}`, { waitUntil: "load" });
+        await settlePage(page);
+        if (plant !== "none") {
+          await page.evaluate(plantClaimDefect, plant);
+          await page.waitForTimeout(150);
+        }
+        const imagePath = join(o.outDir, "claims", `${name}-${plant}.png`);
+        await page.screenshot({ path: imagePath, animations: "disabled", caret: "hide" });
+        out.push({ fixture: name, plant, imagePath });
+      } finally {
+        await page.close();
+      }
+    }
+  }
+  return out;
+}

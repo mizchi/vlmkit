@@ -1,0 +1,3432 @@
+{
+ "model": "jev-1.14.0",
+ "cases": [
+  {
+   "variant": "square",
+   "easing": "linear",
+   "frames": [
+    "test-results/jev-easing/frames/square-linear-t0000.png",
+    "test-results/jev-easing/frames/square-linear-t0100.png",
+    "test-results/jev-easing/frames/square-linear-t0200.png",
+    "test-results/jev-easing/frames/square-linear-t0300.png",
+    "test-results/jev-easing/frames/square-linear-t0400.png",
+    "test-results/jev-easing/frames/square-linear-t0500.png",
+    "test-results/jev-easing/frames/square-linear-t0600.png",
+    "test-results/jev-easing/frames/square-linear-t0700.png",
+    "test-results/jev-easing/frames/square-linear-t0800.png",
+    "test-results/jev-easing/frames/square-linear-t0900.png",
+    "test-results/jev-easing/frames/square-linear-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-linear-sheet.png"
+  },
+  {
+   "variant": "square",
+   "easing": "ease",
+   "frames": [
+    "test-results/jev-easing/frames/square-ease-t0000.png",
+    "test-results/jev-easing/frames/square-ease-t0100.png",
+    "test-results/jev-easing/frames/square-ease-t0200.png",
+    "test-results/jev-easing/frames/square-ease-t0300.png",
+    "test-results/jev-easing/frames/square-ease-t0400.png",
+    "test-results/jev-easing/frames/square-ease-t0500.png",
+    "test-results/jev-easing/frames/square-ease-t0600.png",
+    "test-results/jev-easing/frames/square-ease-t0700.png",
+    "test-results/jev-easing/frames/square-ease-t0800.png",
+    "test-results/jev-easing/frames/square-ease-t0900.png",
+    "test-results/jev-easing/frames/square-ease-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-ease-sheet.png"
+  },
+  {
+   "variant": "square",
+   "easing": "ease-in",
+   "frames": [
+    "test-results/jev-easing/frames/square-ease-in-t0000.png",
+    "test-results/jev-easing/frames/square-ease-in-t0100.png",
+    "test-results/jev-easing/frames/square-ease-in-t0200.png",
+    "test-results/jev-easing/frames/square-ease-in-t0300.png",
+    "test-results/jev-easing/frames/square-ease-in-t0400.png",
+    "test-results/jev-easing/frames/square-ease-in-t0500.png",
+    "test-results/jev-easing/frames/square-ease-in-t0600.png",
+    "test-results/jev-easing/frames/square-ease-in-t0700.png",
+    "test-results/jev-easing/frames/square-ease-in-t0800.png",
+    "test-results/jev-easing/frames/square-ease-in-t0900.png",
+    "test-results/jev-easing/frames/square-ease-in-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-ease-in-sheet.png"
+  },
+  {
+   "variant": "square",
+   "easing": "ease-out",
+   "frames": [
+    "test-results/jev-easing/frames/square-ease-out-t0000.png",
+    "test-results/jev-easing/frames/square-ease-out-t0100.png",
+    "test-results/jev-easing/frames/square-ease-out-t0200.png",
+    "test-results/jev-easing/frames/square-ease-out-t0300.png",
+    "test-results/jev-easing/frames/square-ease-out-t0400.png",
+    "test-results/jev-easing/frames/square-ease-out-t0500.png",
+    "test-results/jev-easing/frames/square-ease-out-t0600.png",
+    "test-results/jev-easing/frames/square-ease-out-t0700.png",
+    "test-results/jev-easing/frames/square-ease-out-t0800.png",
+    "test-results/jev-easing/frames/square-ease-out-t0900.png",
+    "test-results/jev-easing/frames/square-ease-out-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-ease-out-sheet.png"
+  },
+  {
+   "variant": "square",
+   "easing": "ease-in-out",
+   "frames": [
+    "test-results/jev-easing/frames/square-ease-in-out-t0000.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0100.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0200.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0300.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0400.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0500.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0600.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0700.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0800.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t0900.png",
+    "test-results/jev-easing/frames/square-ease-in-out-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-ease-in-out-sheet.png"
+  },
+  {
+   "variant": "square",
+   "easing": "steps",
+   "frames": [
+    "test-results/jev-easing/frames/square-steps-t0000.png",
+    "test-results/jev-easing/frames/square-steps-t0100.png",
+    "test-results/jev-easing/frames/square-steps-t0200.png",
+    "test-results/jev-easing/frames/square-steps-t0300.png",
+    "test-results/jev-easing/frames/square-steps-t0400.png",
+    "test-results/jev-easing/frames/square-steps-t0500.png",
+    "test-results/jev-easing/frames/square-steps-t0600.png",
+    "test-results/jev-easing/frames/square-steps-t0700.png",
+    "test-results/jev-easing/frames/square-steps-t0800.png",
+    "test-results/jev-easing/frames/square-steps-t0900.png",
+    "test-results/jev-easing/frames/square-steps-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-steps-sheet.png"
+  },
+  {
+   "variant": "square",
+   "easing": "overshoot",
+   "frames": [
+    "test-results/jev-easing/frames/square-overshoot-t0000.png",
+    "test-results/jev-easing/frames/square-overshoot-t0100.png",
+    "test-results/jev-easing/frames/square-overshoot-t0200.png",
+    "test-results/jev-easing/frames/square-overshoot-t0300.png",
+    "test-results/jev-easing/frames/square-overshoot-t0400.png",
+    "test-results/jev-easing/frames/square-overshoot-t0500.png",
+    "test-results/jev-easing/frames/square-overshoot-t0600.png",
+    "test-results/jev-easing/frames/square-overshoot-t0700.png",
+    "test-results/jev-easing/frames/square-overshoot-t0800.png",
+    "test-results/jev-easing/frames/square-overshoot-t0900.png",
+    "test-results/jev-easing/frames/square-overshoot-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/square-overshoot-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "linear",
+   "frames": [
+    "test-results/jev-easing/frames/circle-linear-t0000.png",
+    "test-results/jev-easing/frames/circle-linear-t0100.png",
+    "test-results/jev-easing/frames/circle-linear-t0200.png",
+    "test-results/jev-easing/frames/circle-linear-t0300.png",
+    "test-results/jev-easing/frames/circle-linear-t0400.png",
+    "test-results/jev-easing/frames/circle-linear-t0500.png",
+    "test-results/jev-easing/frames/circle-linear-t0600.png",
+    "test-results/jev-easing/frames/circle-linear-t0700.png",
+    "test-results/jev-easing/frames/circle-linear-t0800.png",
+    "test-results/jev-easing/frames/circle-linear-t0900.png",
+    "test-results/jev-easing/frames/circle-linear-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-linear-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "ease",
+   "frames": [
+    "test-results/jev-easing/frames/circle-ease-t0000.png",
+    "test-results/jev-easing/frames/circle-ease-t0100.png",
+    "test-results/jev-easing/frames/circle-ease-t0200.png",
+    "test-results/jev-easing/frames/circle-ease-t0300.png",
+    "test-results/jev-easing/frames/circle-ease-t0400.png",
+    "test-results/jev-easing/frames/circle-ease-t0500.png",
+    "test-results/jev-easing/frames/circle-ease-t0600.png",
+    "test-results/jev-easing/frames/circle-ease-t0700.png",
+    "test-results/jev-easing/frames/circle-ease-t0800.png",
+    "test-results/jev-easing/frames/circle-ease-t0900.png",
+    "test-results/jev-easing/frames/circle-ease-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-ease-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "ease-in",
+   "frames": [
+    "test-results/jev-easing/frames/circle-ease-in-t0000.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0100.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0200.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0300.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0400.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0500.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0600.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0700.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0800.png",
+    "test-results/jev-easing/frames/circle-ease-in-t0900.png",
+    "test-results/jev-easing/frames/circle-ease-in-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-ease-in-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "ease-out",
+   "frames": [
+    "test-results/jev-easing/frames/circle-ease-out-t0000.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0100.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0200.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0300.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0400.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0500.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0600.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0700.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0800.png",
+    "test-results/jev-easing/frames/circle-ease-out-t0900.png",
+    "test-results/jev-easing/frames/circle-ease-out-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-ease-out-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "ease-in-out",
+   "frames": [
+    "test-results/jev-easing/frames/circle-ease-in-out-t0000.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0100.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0200.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0300.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0400.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0500.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0600.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0700.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0800.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t0900.png",
+    "test-results/jev-easing/frames/circle-ease-in-out-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-ease-in-out-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "steps",
+   "frames": [
+    "test-results/jev-easing/frames/circle-steps-t0000.png",
+    "test-results/jev-easing/frames/circle-steps-t0100.png",
+    "test-results/jev-easing/frames/circle-steps-t0200.png",
+    "test-results/jev-easing/frames/circle-steps-t0300.png",
+    "test-results/jev-easing/frames/circle-steps-t0400.png",
+    "test-results/jev-easing/frames/circle-steps-t0500.png",
+    "test-results/jev-easing/frames/circle-steps-t0600.png",
+    "test-results/jev-easing/frames/circle-steps-t0700.png",
+    "test-results/jev-easing/frames/circle-steps-t0800.png",
+    "test-results/jev-easing/frames/circle-steps-t0900.png",
+    "test-results/jev-easing/frames/circle-steps-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-steps-sheet.png"
+  },
+  {
+   "variant": "circle",
+   "easing": "overshoot",
+   "frames": [
+    "test-results/jev-easing/frames/circle-overshoot-t0000.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0100.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0200.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0300.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0400.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0500.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0600.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0700.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0800.png",
+    "test-results/jev-easing/frames/circle-overshoot-t0900.png",
+    "test-results/jev-easing/frames/circle-overshoot-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/circle-overshoot-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "linear",
+   "frames": [
+    "test-results/jev-easing/frames/pill-linear-t0000.png",
+    "test-results/jev-easing/frames/pill-linear-t0100.png",
+    "test-results/jev-easing/frames/pill-linear-t0200.png",
+    "test-results/jev-easing/frames/pill-linear-t0300.png",
+    "test-results/jev-easing/frames/pill-linear-t0400.png",
+    "test-results/jev-easing/frames/pill-linear-t0500.png",
+    "test-results/jev-easing/frames/pill-linear-t0600.png",
+    "test-results/jev-easing/frames/pill-linear-t0700.png",
+    "test-results/jev-easing/frames/pill-linear-t0800.png",
+    "test-results/jev-easing/frames/pill-linear-t0900.png",
+    "test-results/jev-easing/frames/pill-linear-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-linear-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "ease",
+   "frames": [
+    "test-results/jev-easing/frames/pill-ease-t0000.png",
+    "test-results/jev-easing/frames/pill-ease-t0100.png",
+    "test-results/jev-easing/frames/pill-ease-t0200.png",
+    "test-results/jev-easing/frames/pill-ease-t0300.png",
+    "test-results/jev-easing/frames/pill-ease-t0400.png",
+    "test-results/jev-easing/frames/pill-ease-t0500.png",
+    "test-results/jev-easing/frames/pill-ease-t0600.png",
+    "test-results/jev-easing/frames/pill-ease-t0700.png",
+    "test-results/jev-easing/frames/pill-ease-t0800.png",
+    "test-results/jev-easing/frames/pill-ease-t0900.png",
+    "test-results/jev-easing/frames/pill-ease-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-ease-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "ease-in",
+   "frames": [
+    "test-results/jev-easing/frames/pill-ease-in-t0000.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0100.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0200.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0300.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0400.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0500.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0600.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0700.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0800.png",
+    "test-results/jev-easing/frames/pill-ease-in-t0900.png",
+    "test-results/jev-easing/frames/pill-ease-in-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-ease-in-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "ease-out",
+   "frames": [
+    "test-results/jev-easing/frames/pill-ease-out-t0000.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0100.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0200.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0300.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0400.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0500.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0600.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0700.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0800.png",
+    "test-results/jev-easing/frames/pill-ease-out-t0900.png",
+    "test-results/jev-easing/frames/pill-ease-out-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-ease-out-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "ease-in-out",
+   "frames": [
+    "test-results/jev-easing/frames/pill-ease-in-out-t0000.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0100.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0200.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0300.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0400.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0500.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0600.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0700.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0800.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t0900.png",
+    "test-results/jev-easing/frames/pill-ease-in-out-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-ease-in-out-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "steps",
+   "frames": [
+    "test-results/jev-easing/frames/pill-steps-t0000.png",
+    "test-results/jev-easing/frames/pill-steps-t0100.png",
+    "test-results/jev-easing/frames/pill-steps-t0200.png",
+    "test-results/jev-easing/frames/pill-steps-t0300.png",
+    "test-results/jev-easing/frames/pill-steps-t0400.png",
+    "test-results/jev-easing/frames/pill-steps-t0500.png",
+    "test-results/jev-easing/frames/pill-steps-t0600.png",
+    "test-results/jev-easing/frames/pill-steps-t0700.png",
+    "test-results/jev-easing/frames/pill-steps-t0800.png",
+    "test-results/jev-easing/frames/pill-steps-t0900.png",
+    "test-results/jev-easing/frames/pill-steps-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-steps-sheet.png"
+  },
+  {
+   "variant": "pill",
+   "easing": "overshoot",
+   "frames": [
+    "test-results/jev-easing/frames/pill-overshoot-t0000.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0100.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0200.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0300.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0400.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0500.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0600.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0700.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0800.png",
+    "test-results/jev-easing/frames/pill-overshoot-t0900.png",
+    "test-results/jev-easing/frames/pill-overshoot-t1000.png"
+   ],
+   "sheet": "test-results/jev-easing/frames/pill-overshoot-sheet.png"
+  }
+ ],
+ "calls": [
+  {
+   "arm": "frames",
+   "key": "square-ease",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 445.1934770000007
+  },
+  {
+   "arm": "frames",
+   "key": "square-linear",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 634.382873999999
+  },
+  {
+   "arm": "frames",
+   "key": "square-ease-in",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 383.311103
+  },
+  {
+   "arm": "sheet",
+   "key": "square-ease",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 113.04960500000016
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 126.12674400000105
+  },
+  {
+   "arm": "sheet",
+   "key": "square-ease-in",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 229.0251640000024
+  },
+  {
+   "arm": "sheet",
+   "key": "square-linear",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 249.53687999999966
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 85.16281499999968
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 117.3910020000003
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 128.77227499999935
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 108.17912400000205
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 104.08932300000015
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 116.02830800000083
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 107.88669300000038
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 124.41726200000267
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 150.13149200000043
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 110.55412700000306
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 204.31023300000015
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 109.75354399999924
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 144.522782
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 123.48298200000136
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 147.64070699999866
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 112.32413200000155
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 122.49307500000214
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 118.11744399999952
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 99.28967600000033
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 82.21414200000072
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 92.47098999999798
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 97.88415900000109
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 109.97109000000273
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 145.05703599999833
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 110.27028399999836
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 94.800983000001
+  },
+  {
+   "arm": "box",
+   "key": "square-ease#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 98.97548000000097
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 118.70898300000044
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 165.61916900000142
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 129.600269999999
+  },
+  {
+   "arm": "box",
+   "key": "square-linear#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 138.2345060000007
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 142.93021099999896
+  },
+  {
+   "arm": "frames",
+   "key": "square-ease-out",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 354.6234970000005
+  },
+  {
+   "arm": "sheet",
+   "key": "square-ease-out",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 101.71421399999963
+  },
+  {
+   "arm": "frames",
+   "key": "square-ease-in-out",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 275.81956699999864
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 149.64505800000188
+  },
+  {
+   "arm": "frames",
+   "key": "square-steps",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 280.13834599999973
+  },
+  {
+   "arm": "sheet",
+   "key": "square-ease-in-out",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 104.74065500000142
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 113.21228299999711
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 140.2216399999961
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.58615400000417
+  },
+  {
+   "arm": "sheet",
+   "key": "square-steps",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 208.29169399999955
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 84.64017700000113
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 128.8495649999968
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 95.7517250000019
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 88.26247199999489
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 105.79920700000366
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 93.14619500000117
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 86.56977100000222
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 90.2142709999971
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 139.85851900000125
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.74015299999883
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 83.72247299999435
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 100.33066699999472
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 89.70057200000156
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 97.66860699999961
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 120.30671799999982
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.05396199999814
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 115.7943080000041
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 113.65902099999948
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 159.00916500000312
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 133.70041599999968
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 97.34764699999505
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 111.31699899999512
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 103.95736900000338
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-out#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 159.82014999999956
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 201.5429060000024
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 203.44899300000543
+  },
+  {
+   "arm": "box",
+   "key": "square-ease-in-out#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 100.58695499999885
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 276.99626900000294
+  },
+  {
+   "arm": "frames",
+   "key": "square-overshoot",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 288.9910799999998
+  },
+  {
+   "arm": "box",
+   "key": "square-steps#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 77.55590099999972
+  },
+  {
+   "arm": "frames",
+   "key": "circle-linear",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 272.7403940000004
+  },
+  {
+   "arm": "sheet",
+   "key": "square-overshoot",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 240.50113599999895
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-linear",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 96.32910699999775
+  },
+  {
+   "arm": "frames",
+   "key": "circle-ease",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 139.33517800000118
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 109.78175300000294
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-ease",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 140.60582599999907
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 260.4279499999975
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 127.24935499999992
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 97.39114300000074
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 108.12689300000056
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 89.35367799999949
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 122.1593220000068
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 84.80300600000191
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 129.5216470000014
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 132.32890800000314
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 125.64643200000137
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 88.059537000001
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 81.36645499999577
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 105.32080500000302
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 139.7567160000035
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 117.65773099999933
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 107.11774499999592
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 129.713410999997
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 94.07354399999895
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 110.30612100000144
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 88.08207799999946
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 94.48812799999723
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.7637109999996
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 102.64225699999952
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 91.93724900000234
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 124.81155600000056
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 149.91142399999808
+  },
+  {
+   "arm": "box",
+   "key": "circle-linear#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.6997909999991
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 240.02239199999894
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 146.89674699999887
+  },
+  {
+   "arm": "box",
+   "key": "square-overshoot#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 83.6813140000013
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 214.3792390000017
+  },
+  {
+   "arm": "frames",
+   "key": "circle-ease-in",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 282.046789
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 83.2366450000045
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-ease-in",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 145.30881199999567
+  },
+  {
+   "arm": "frames",
+   "key": "circle-ease-out",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 238.72449600000255
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 131.0488850000038
+  },
+  {
+   "arm": "frames",
+   "key": "circle-ease-in-out",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 162.47876099999849
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 103.6350190000012
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-ease-in-out",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 125.65363300000172
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-ease-out",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 267.3711270000058
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 80.12095199999749
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 102.61558100000548
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 158.05245200000354
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 95.18359399999463
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 101.75049199999921
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 93.27715499999613
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 82.20064899999852
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 97.07397199999832
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 106.00782299999992
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 115.465200000006
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.62861200000043
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 126.59183199999825
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 116.84451299999637
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 126.90706100000534
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 178.03520500000013
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 96.82939500000066
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 89.59215000000404
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 98.56628099999944
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 92.59519499999442
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 127.18473899999663
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 98.43704399999842
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 95.62373499999376
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 119.47004300000117
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 106.5190569999977
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 108.87327799999912
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 225.96132699999725
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 251.2870219999968
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 94.82409899999766
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 101.00249299999996
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-in-out#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 71.76484399999754
+  },
+  {
+   "arm": "frames",
+   "key": "circle-steps",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 303.45613199999934
+  },
+  {
+   "arm": "box",
+   "key": "circle-ease-out#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 187.4440140000006
+  },
+  {
+   "arm": "frames",
+   "key": "circle-overshoot",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 179.20910999999614
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-overshoot",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 154.60748500000045
+  },
+  {
+   "arm": "sheet",
+   "key": "circle-steps",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 336.7154070000033
+  },
+  {
+   "arm": "frames",
+   "key": "pill-linear",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 270.9670280000064
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 94.78872399999818
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#0",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 110.84750099999656
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 101.56065500000113
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-linear",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 162.98286599999847
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#1",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 120.67233000000124
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 81.33862599999702
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 89.26937300000282
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#2",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 123.25008199999866
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 99.03084499999386
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 139.3100160000031
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#3",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 128.04214600000705
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 108.52609200000006
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 104.47755000000325
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#4",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 143.428863000001
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 117.43727200000285
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 134.35739900000044
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#5",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 146.30306700000074
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 84.71223800000007
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 102.16484299999865
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#6",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 89.07062500000029
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 89.45882400000119
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 122.5523749999993
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 83.80476400000043
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#7",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 139.42223899999954
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 113.61427800000092
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 105.2102739999973
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#8",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 120.07254900000407
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 92.78088599999319
+  },
+  {
+   "arm": "box",
+   "key": "circle-steps#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 116.17479599999933
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#9",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 205.60108399999444
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 187.2870830000029
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 80.88568599999417
+  },
+  {
+   "arm": "box",
+   "key": "circle-overshoot#10",
+   "inputTokens": 1397,
+   "costUsd": 5.8674e-05,
+   "latencyMs": 115.93922799999564
+  },
+  {
+   "arm": "box",
+   "key": "pill-linear#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 124.17565900000045
+  },
+  {
+   "arm": "frames",
+   "key": "pill-ease",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 319.1607470000017
+  },
+  {
+   "arm": "frames",
+   "key": "pill-ease-in",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 207.82699699999648
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-ease",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 150.77512800000113
+  },
+  {
+   "arm": "frames",
+   "key": "pill-ease-out",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 199.4157269999996
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 97.89990299999772
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-ease-out",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 121.41705199999706
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-ease-in",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 211.65549699999974
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 138.71557900000334
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 135.29794199999742
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 140.0911699999997
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 103.946947000004
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 78.8258679999999
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 128.26168000000325
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 76.08334399999876
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 112.27334300000075
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 120.29990299999918
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 109.99720399999933
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 140.29052699999738
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 90.72832299999573
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 77.39330599999812
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 86.96810800000094
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 93.09243699999934
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 100.7225860000035
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 113.68613200000254
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 97.77741499999684
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 126.7124760000006
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 103.84439200000634
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 99.05756900000415
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 102.44248900000093
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 114.68647999999666
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 105.2861200000043
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 100.1364190000022
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 107.45586699999694
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 96.42932400000427
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 257.8277999999991
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 262.02187299999787
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 87.96180599999934
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 252.20180200000323
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-out#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 154.88886700000148
+  },
+  {
+   "arm": "frames",
+   "key": "pill-ease-in-out",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 233.7365920000011
+  },
+  {
+   "arm": "frames",
+   "key": "pill-overshoot",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 203.974463999999
+  },
+  {
+   "arm": "frames",
+   "key": "pill-steps",
+   "inputTokens": 6879,
+   "costUsd": 0.000288918,
+   "latencyMs": 383.92575300000317
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-ease-in-out",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 277.3627370000031
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 141.4903639999975
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-overshoot",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 243.82981200000359
+  },
+  {
+   "arm": "sheet",
+   "key": "pill-steps",
+   "inputTokens": 2955,
+   "costUsd": 0.00012411,
+   "latencyMs": 231.5045820000014
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 115.67639000000054
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 125.43475299999409
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#0",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 93.01351900000009
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 102.70690100000502
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 101.8639949999997
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#1",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 123.5074850000019
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 99.22860500000388
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 90.97235999999975
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#2",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 87.94692799999757
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 97.66242899999634
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 113.86258899999666
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#3",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 112.31795599999896
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 104.47793000000092
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 94.18737600000168
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#4",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 129.80004599999666
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 106.26568199999747
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 109.86428299999534
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 84.08131799999683
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 74.55802599999879
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#5",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 124.15597600000183
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 95.94944199999736
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#6",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 91.93565800000215
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 126.02697900000203
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 97.15273300000263
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 109.37598299999809
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#7",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 149.25673700000334
+  },
+  {
+   "arm": "box",
+   "key": "pill-ease-in-out#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 131.60248400000273
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 79.9941220000037
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#8",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 85.97210899999482
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#9",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 96.32122099999833
+  },
+  {
+   "arm": "box",
+   "key": "pill-overshoot#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 157.488397000001
+  },
+  {
+   "arm": "box",
+   "key": "pill-steps#10",
+   "inputTokens": 1400,
+   "costUsd": 5.88e-05,
+   "latencyMs": 114.67747999999847
+  }
+ ],
+ "answers": {
+  "square-linear": {
+   "pixels": [
+    63.5,
+    111.5,
+    159.5,
+    207.5,
+    255.5,
+    303.5,
+    351.5,
+    399.5,
+    447.5,
+    495.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.28,
+    "probabilities": {
+     "linear": 0.38,
+     "ease": 0.04,
+     "ease-in": 0.13,
+     "ease-out": 0.31,
+     "ease-in-out": 0.12,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.81,
+    "probabilities": {
+     "linear": 0.84,
+     "ease": 0.01,
+     "ease-in": 0.09,
+     "ease-out": 0.03,
+     "ease-in-out": 0.03,
+     "steps": 0,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    64,
+    115.19999999999999,
+    160,
+    207.99999999999997,
+    265.6,
+    304,
+    361.59999999999997,
+    396.8,
+    448,
+    486.4,
+    540.8
+   ]
+  },
+  "square-ease": {
+   "pixels": [
+    63.5,
+    109,
+    205.0689952565761,
+    310,
+    391.01034037052995,
+    448.51971954425943,
+    488.5,
+    515,
+    531.9409482758621,
+    540.9409482758621,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.6,
+    "probabilities": {
+     "linear": 0.17,
+     "ease": 0.07,
+     "ease-in": 0.03,
+     "ease-out": 0.66,
+     "ease-in-out": 0.06,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "sheet": {
+    "choice": "ease-out",
+    "confidence": 0.3,
+    "probabilities": {
+     "linear": 0.34,
+     "ease": 0.05,
+     "ease-in": 0.17,
+     "ease-out": 0.4,
+     "ease-in-out": 0.02,
+     "steps": 0.02,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    64,
+    112,
+    204.8,
+    310.4,
+    393.6,
+    448,
+    483.2,
+    508.79999999999995,
+    528,
+    540.8,
+    537.6
+   ]
+  },
+  "square-ease-in": {
+   "pixels": [
+    63.5,
+    71.51971954425942,
+    93.5,
+    125.51971954425942,
+    166.51971954425943,
+    214.98965962947005,
+    269.5,
+    329.94094827586207,
+    395.5,
+    466.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.23,
+    "probabilities": {
+     "linear": 0.34,
+     "ease": 0.06,
+     "ease-in": 0.2,
+     "ease-out": 0.18,
+     "ease-in-out": 0.2,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.78,
+    "probabilities": {
+     "linear": 0.8099999999999999,
+     "ease": 0.01,
+     "ease-in": 0.11,
+     "ease-out": 0.04,
+     "ease-in-out": 0.02,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    57.599999999999994,
+    73.60000000000001,
+    96,
+    124.80000000000001,
+    169.60000000000002,
+    214.39999999999998,
+    275.2,
+    329.6,
+    393.6,
+    467.2,
+    540.8
+   ]
+  },
+  "square-ease-out": {
+   "pixels": [
+    63.5,
+    140.5,
+    211.5,
+    277.0689952565761,
+    337.5,
+    392.0383290267011,
+    440.49013590530467,
+    481.48028045574057,
+    513.5,
+    535.4901359053047,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.33,
+    "probabilities": {
+     "linear": 0.33,
+     "ease": 0.05,
+     "ease-in": 0.09,
+     "ease-out": 0.43,
+     "ease-in-out": 0.08,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.7,
+    "probabilities": {
+     "linear": 0.74,
+     "ease": 0.02,
+     "ease-in": 0.12,
+     "ease-out": 0.1,
+     "ease-in-out": 0.02,
+     "steps": 0,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    64,
+    137.60000000000002,
+    211.2,
+    281.6,
+    342.4,
+    393.6,
+    438.40000000000003,
+    480,
+    505.6,
+    531.2,
+    540.8
+   ]
+  },
+  "square-ease-in-out": {
+   "pixels": [
+    63.5,
+    73,
+    102.51971954425942,
+    153.5,
+    222.94094827586207,
+    303.5,
+    384.0689952565761,
+    453.5,
+    504.48028045574057,
+    534,
+    543.5
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.19,
+    "probabilities": {
+     "linear": 0.31,
+     "ease": 0.06,
+     "ease-in": 0.17,
+     "ease-out": 0.3,
+     "ease-in-out": 0.14,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.63,
+    "probabilities": {
+     "linear": 0.68,
+     "ease": 0.02,
+     "ease-in": 0.15,
+     "ease-out": 0.1,
+     "ease-in-out": 0.04,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    64,
+    73.60000000000001,
+    108.79999999999998,
+    153.60000000000002,
+    220.79999999999998,
+    304,
+    387.2,
+    454.4,
+    499.20000000000005,
+    531.2,
+    540.8
+   ]
+  },
+  "square-steps": {
+   "pixels": [
+    63.5,
+    63.5,
+    63.5,
+    183.5,
+    183.5,
+    303.5,
+    303.5,
+    303.5,
+    423.5,
+    423.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-in-out",
+    "confidence": 0.1,
+    "probabilities": {
+     "linear": 0.16,
+     "ease": 0.1,
+     "ease-in": 0.2,
+     "ease-out": 0.08,
+     "ease-in-out": 0.23,
+     "steps": 0.22,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.33,
+    "probabilities": {
+     "linear": 0.43,
+     "ease": 0.05,
+     "ease-in": 0.14,
+     "ease-out": 0.09,
+     "ease-in-out": 0.1,
+     "steps": 0.18,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    60.8,
+    60.8,
+    64,
+    182.40000000000003,
+    182.40000000000003,
+    304,
+    304,
+    304,
+    422.4,
+    419.20000000000005,
+    540.8
+   ]
+  },
+  "square-overshoot": {
+   "pixels": [
+    63.5,
+    257.5,
+    401,
+    499,
+    558,
+    585.5,
+    589.9896596294701,
+    579.9896596294701,
+    563.9896596294701,
+    549.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.61,
+    "probabilities": {
+     "linear": 0.12,
+     "ease": 0.11,
+     "ease-in": 0.02,
+     "ease-out": 0.67,
+     "ease-in-out": 0.04,
+     "steps": 0.02,
+     "overshoot": 0.02
+    }
+   },
+   "sheet": {
+    "choice": "ease-out",
+    "confidence": 0.48,
+    "probabilities": {
+     "linear": 0.23,
+     "ease": 0.06,
+     "ease-in": 0.13,
+     "ease-out": 0.55,
+     "ease-in-out": 0.01,
+     "steps": 0.02,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    64,
+    265.6,
+    396.8,
+    489.6,
+    556.8,
+    585.6,
+    592,
+    579.2,
+    563.2,
+    544,
+    540.8
+   ]
+  },
+  "circle-linear": {
+   "pixels": [
+    63.5,
+    111.5,
+    159.5,
+    207.5,
+    255.5,
+    303.5,
+    351.5,
+    399.5,
+    447.5,
+    495.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.26,
+    "probabilities": {
+     "linear": 0.37,
+     "ease": 0.04,
+     "ease-in": 0.24,
+     "ease-out": 0.28,
+     "ease-in-out": 0.05,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.81,
+    "probabilities": {
+     "linear": 0.84,
+     "ease": 0.01,
+     "ease-in": 0.07,
+     "ease-out": 0.07,
+     "ease-in-out": 0.01,
+     "steps": 0,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    60.8,
+    105.60000000000001,
+    156.8,
+    204.8,
+    256,
+    304,
+    355.19999999999993,
+    396.8,
+    451.20000000000005,
+    502.4,
+    547.2
+   ]
+  },
+  "circle-ease": {
+   "pixels": [
+    63.5,
+    109.04375667022411,
+    205.1959205582394,
+    309.9626467449306,
+    391.0683760683761,
+    448.60949298813375,
+    488.4725990233315,
+    515.0683760683761,
+    531.8098553829673,
+    540.7839142091153,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.51,
+    "probabilities": {
+     "linear": 0.2,
+     "ease": 0.05,
+     "ease-in": 0.14,
+     "ease-out": 0.58,
+     "ease-in-out": 0.03,
+     "steps": 0,
+     "overshoot": 0
+    }
+   },
+   "sheet": {
+    "choice": "ease-out",
+    "confidence": 0.88,
+    "probabilities": {
+     "linear": 0.03,
+     "ease": 0.03,
+     "ease-in": 0.01,
+     "ease-out": 0.9,
+     "ease-in-out": 0.01,
+     "steps": 0.02,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    60.8,
+    102.4,
+    198.4,
+    310.4,
+    390.4,
+    454.4,
+    496,
+    518.4000000000001,
+    534.4,
+    544,
+    547.2
+   ]
+  },
+  "circle-ease-in": {
+   "pixels": [
+    63.5,
+    71.60949298813377,
+    93.47259902333153,
+    125.70974690360796,
+    166.60949298813375,
+    214.89507494646682,
+    269.5,
+    329.8098553829673,
+    395.5,
+    466.4725990233315,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-in",
+    "confidence": 0.3,
+    "probabilities": {
+     "linear": 0.29,
+     "ease": 0.05,
+     "ease-in": 0.39999999999999997,
+     "ease-out": 0.15,
+     "ease-in-out": 0.09,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.58,
+    "probabilities": {
+     "linear": 0.64,
+     "ease": 0.02,
+     "ease-in": 0.27,
+     "ease-out": 0.03,
+     "ease-in-out": 0.03,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    57.599999999999994,
+    64,
+    83.2,
+    124.80000000000001,
+    163.2,
+    211.2,
+    268.8,
+    326.4,
+    396.8,
+    467.2,
+    547.2
+   ]
+  },
+  "circle-ease-out": {
+   "pixels": [
+    63.5,
+    140.54545454545453,
+    211.5,
+    277.1959205582394,
+    337.5,
+    392.121585431173,
+    440.3989189189189,
+    481.3153638814016,
+    513.5454545454545,
+    535.3989189189189,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.3,
+    "probabilities": {
+     "linear": 0.28,
+     "ease": 0.05,
+     "ease-in": 0.22,
+     "ease-out": 0.39999999999999997,
+     "ease-in-out": 0.04,
+     "steps": 0,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "ease-out",
+    "confidence": 0.8,
+    "probabilities": {
+     "linear": 0.1,
+     "ease": 0.03,
+     "ease-in": 0.02,
+     "ease-out": 0.83,
+     "ease-in-out": 0.01,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    57.599999999999994,
+    137.6,
+    211.2,
+    278.4,
+    335.99999999999994,
+    390.4,
+    444.80000000000007,
+    486.4,
+    518.4000000000001,
+    540.8,
+    547.2
+   ]
+  },
+  "circle-ease-in-out": {
+   "pixels": [
+    63.5,
+    72.99414270500533,
+    102.70974690360796,
+    153.5,
+    222.80985538296733,
+    303.5,
+    384.1959205582394,
+    453.5,
+    504.3153638814016,
+    534.0437566702241,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-in",
+    "confidence": 0.19,
+    "probabilities": {
+     "linear": 0.27,
+     "ease": 0.05,
+     "ease-in": 0.31,
+     "ease-out": 0.3,
+     "ease-in-out": 0.06,
+     "steps": 0,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "ease-out",
+    "confidence": 0.32,
+    "probabilities": {
+     "linear": 0.35,
+     "ease": 0.05,
+     "ease-in": 0.09,
+     "ease-out": 0.42,
+     "ease-in-out": 0.07,
+     "steps": 0.02,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    57.599999999999994,
+    64,
+    96,
+    150.4,
+    217.59999999999997,
+    307.2,
+    387.2,
+    457.6,
+    512,
+    534.4,
+    547.2
+   ]
+  },
+  "circle-steps": {
+   "pixels": [
+    63.5,
+    63.5,
+    63.5,
+    183.5,
+    183.5,
+    303.5,
+    303.5,
+    303.5,
+    423.5,
+    423.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-in",
+    "confidence": 0.3,
+    "probabilities": {
+     "linear": 0.23,
+     "ease": 0.09,
+     "ease-in": 0.4,
+     "ease-out": 0.13,
+     "ease-in-out": 0.1,
+     "steps": 0.04,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.32,
+    "probabilities": {
+     "linear": 0.42,
+     "ease": 0.07,
+     "ease-in": 0.12,
+     "ease-out": 0.09,
+     "ease-in-out": 0.1,
+     "steps": 0.19,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    60.8,
+    57.599999999999994,
+    54.39999999999999,
+    179.20000000000002,
+    179.20000000000002,
+    307.2,
+    307.2,
+    307.2,
+    428.79999999999995,
+    432,
+    547.2
+   ]
+  },
+  "circle-overshoot": {
+   "pixels": [
+    63.5,
+    257.4725990233315,
+    400.99414270500534,
+    499.0437566702241,
+    557.9941427050053,
+    585.5,
+    589.8436830835118,
+    579.8950749464668,
+    563.9626467449307,
+    549.5,
+    543.5
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.71,
+    "probabilities": {
+     "linear": 0.12,
+     "ease": 0.05,
+     "ease-in": 0.03,
+     "ease-out": 0.75,
+     "ease-in-out": 0.01,
+     "steps": 0,
+     "overshoot": 0.04
+    }
+   },
+   "sheet": {
+    "choice": "ease-out",
+    "confidence": 0.87,
+    "probabilities": {
+     "linear": 0.01,
+     "ease": 0.05,
+     "ease-in": 0.01,
+     "ease-out": 0.89,
+     "ease-in-out": 0.01,
+     "steps": 0.02,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    57.599999999999994,
+    256,
+    400,
+    505.6,
+    563.2,
+    592,
+    595.1999999999999,
+    585.6,
+    569.6,
+    550.4,
+    547.2
+   ]
+  },
+  "pill-linear": {
+   "pixels": [
+    583.5318379160636,
+    535.5318379160636,
+    487.5318379160637,
+    439.5318379160637,
+    391.5318379160637,
+    343.5318379160637,
+    295.5318379160637,
+    247.53183791606367,
+    199.53183791606367,
+    151.53183791606367,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.51,
+    "probabilities": {
+     "linear": 0.58,
+     "ease": 0.07,
+     "ease-in": 0.08,
+     "ease-out": 0.18,
+     "ease-in-out": 0.08,
+     "steps": 0,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.86,
+    "probabilities": {
+     "linear": 0.88,
+     "ease": 0.01,
+     "ease-in": 0.02,
+     "ease-out": 0.04,
+     "ease-in-out": 0.04,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    585.6,
+    534.4,
+    483.19999999999993,
+    438.40000000000003,
+    390.4000000000001,
+    348.79999999999995,
+    294.40000000000003,
+    246.4,
+    198.4,
+    153.6,
+    102.4
+   ]
+  },
+  "pill-ease": {
+   "pixels": [
+    583.5318379160636,
+    538.023163228375,
+    441.7172812725958,
+    337.1791153009427,
+    255.86726943942134,
+    198.42671009771988,
+    158.56874095513749,
+    131.9050724637681,
+    115.30065123010131,
+    106.33478103510677,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.52,
+    "probabilities": {
+     "linear": 0.26,
+     "ease": 0.08,
+     "ease-in": 0.02,
+     "ease-out": 0.59,
+     "ease-in-out": 0.04,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.61,
+    "probabilities": {
+     "linear": 0.67,
+     "ease": 0.03,
+     "ease-in": 0.05,
+     "ease-out": 0.17,
+     "ease-in-out": 0.05,
+     "steps": 0.02,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    585.6,
+    537.6,
+    441.59999999999997,
+    339.20000000000005,
+    256,
+    195.2,
+    160,
+    131.20000000000002,
+    115.19999999999999,
+    105.60000000000001,
+    105.60000000000001
+   ]
+  },
+  "pill-ease-in": {
+   "pixels": [
+    583.5318379160636,
+    575.4344677769732,
+    553.5687409551375,
+    521.4209192906261,
+    480.4534925805284,
+    432.1931859369337,
+    377.5318379160637,
+    317.3006512301013,
+    251.53183791606367,
+    180.56962025316454,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.52,
+    "probabilities": {
+     "linear": 0.59,
+     "ease": 0.07,
+     "ease-in": 0.08,
+     "ease-out": 0.15,
+     "ease-in-out": 0.1,
+     "steps": 0,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.77,
+    "probabilities": {
+     "linear": 0.8,
+     "ease": 0.01,
+     "ease-in": 0.05,
+     "ease-out": 0.08,
+     "ease-in-out": 0.05,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    585.6,
+    576,
+    553.6,
+    518.4000000000001,
+    476.80000000000007,
+    432,
+    380.79999999999995,
+    316.8,
+    249.60000000000002,
+    179.20000000000002,
+    105.60000000000001
+   ]
+  },
+  "pill-ease-out": {
+   "pixels": [
+    583.5318379160636,
+    506.49620253164557,
+    435.51971066907777,
+    369.752078062884,
+    309.534008683068,
+    254.853579175705,
+    206.60751716660644,
+    165.62916063675831,
+    133.48134733792105,
+    111.62916063675831,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.35,
+    "probabilities": {
+     "linear": 0.41,
+     "ease": 0.06,
+     "ease-in": 0.03,
+     "ease-out": 0.44,
+     "ease-in-out": 0.05,
+     "steps": 0,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.72,
+    "probabilities": {
+     "linear": 0.76,
+     "ease": 0.02,
+     "ease-in": 0.04,
+     "ease-out": 0.12,
+     "ease-in-out": 0.03,
+     "steps": 0.02,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    585.6,
+    499.20000000000005,
+    432,
+    374.4,
+    307.2,
+    256,
+    208,
+    163.2,
+    131.20000000000002,
+    112,
+    105.60000000000001
+   ]
+  },
+  "pill-ease-in-out": {
+   "pixels": [
+    583.5318379160636,
+    574.0851449275362,
+    544.4209192906261,
+    493.56037599421546,
+    424.3006512301013,
+    343.5318379160637,
+    262.752078062884,
+    193.49620253164557,
+    142.62916063675831,
+    112.94132560666425,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.44,
+    "probabilities": {
+     "linear": 0.52,
+     "ease": 0.08,
+     "ease-in": 0.1,
+     "ease-out": 0.21,
+     "ease-in-out": 0.07,
+     "steps": 0.01,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.77,
+    "probabilities": {
+     "linear": 0.8,
+     "ease": 0.02,
+     "ease-in": 0.04,
+     "ease-out": 0.1,
+     "ease-in-out": 0.03,
+     "steps": 0.01,
+     "overshoot": 0
+    }
+   },
+   "box": [
+    585.6,
+    572.8,
+    544,
+    489.5999999999999,
+    422.4,
+    348.79999999999995,
+    265.59999999999997,
+    195.2,
+    144,
+    112,
+    105.60000000000001
+   ]
+  },
+  "pill-steps": {
+   "pixels": [
+    583.5318379160636,
+    583.5318379160636,
+    583.5318379160636,
+    463.5318379160637,
+    463.5318379160637,
+    343.5318379160637,
+    343.5318379160637,
+    343.5318379160637,
+    223.53183791606367,
+    223.53183791606367,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "linear",
+    "confidence": 0.24,
+    "probabilities": {
+     "linear": 0.35,
+     "ease": 0.13,
+     "ease-in": 0.1,
+     "ease-out": 0.15,
+     "ease-in-out": 0.15,
+     "steps": 0.11,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.4,
+    "probabilities": {
+     "linear": 0.49,
+     "ease": 0.06,
+     "ease-in": 0.12,
+     "ease-out": 0.12,
+     "ease-in-out": 0.15,
+     "steps": 0.05,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    585.6,
+    585.6,
+    585.6,
+    460.79999999999995,
+    460.79999999999995,
+    348.79999999999995,
+    348.79999999999995,
+    348.79999999999995,
+    224,
+    224,
+    105.60000000000001
+   ]
+  },
+  "pill-overshoot": {
+   "pixels": [
+    583.5318379160636,
+    389.579746835443,
+    246.08514492753622,
+    147.94132560666426,
+    89.01774719304599,
+    61.56037599421548,
+    57.2212966316552,
+    67.19318593693367,
+    83.17911530094271,
+    97.49620253164557,
+    103.53183791606368
+   ],
+   "frames": {
+    "choice": "ease-out",
+    "confidence": 0.66,
+    "probabilities": {
+     "linear": 0.14,
+     "ease": 0.09,
+     "ease-in": 0.01,
+     "ease-out": 0.71,
+     "ease-in-out": 0.02,
+     "steps": 0.02,
+     "overshoot": 0.01
+    }
+   },
+   "sheet": {
+    "choice": "linear",
+    "confidence": 0.54,
+    "probabilities": {
+     "linear": 0.61,
+     "ease": 0.03,
+     "ease-in": 0.07,
+     "ease-out": 0.22,
+     "ease-in-out": 0.04,
+     "steps": 0.02,
+     "overshoot": 0.01
+    }
+   },
+   "box": [
+    585.6,
+    390.4000000000001,
+    246.4,
+    147.2,
+    92.8,
+    60.8,
+    54.39999999999999,
+    67.2,
+    86.4,
+    99.2,
+    105.60000000000001
+   ]
+  }
+ }
+}

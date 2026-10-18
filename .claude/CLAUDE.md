@@ -208,6 +208,11 @@ rejected, not resized. Measured 2026-10-16 (`docs/reports/2026-10-16-jev-box-ben
 - The image is read once per request, and each extra question on a shared state costs about 20
   tokens. A 1280x800 screenshot is about 3.1k tokens ($0.00013) and answers in about 0.2s.
 
+**Easing from frames** (`docs/reports/2026-10-18-jev-easing.md`, bench `jev-easing/jev-easing.ts`):
+asked as a `choice`, Jev named 7/21 from 11 frames and 4/21 from a contact sheet (chance 3/21),
+with confidence no higher when right. A `box` per frame and `fitEasing` on the centres got 21/21
+(6 frames too). Never ask Jev for an easing name: take positions from it and fit them.
+
 **Shipped as `diff png --kind`** (`@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
 `png-diff.ts`). It puts `regions[].kind = {label: text|color|position|presence, confidence,
 uncertain, model}` on the regions the pixel diff found, one request per region, largest first up
@@ -239,6 +244,54 @@ around it, magnified. Measured end to end (`docs/reports/2026-10-16-jev-locate.m
 - A `describe` click is refused before the browser starts without a key, or with both or neither
   of `selector` and `describe`. A not-found target is a step failure quoting presence, with no
   selector suggestions.
+
+**Shipped as `inspect claims`** (`@mizchi/vlmkit-ai/claims.ts` `checkClaims`;
+`packages/vlmkit-markup/src/inspect/claims-cli.ts`). Each `--forbid` / `--expect` statement is one
+`noul` in one shared request. An `inspect` leaf, not a gate: it is a model's reading of the pixels,
+so it never gates and the gate registry stays deterministic. Measured
+(`docs/reports/2026-10-17-jev-claims.md`, bench `jev-box.ts --only claims`: 9 fixtures, clean and
+with an error banner, modal, broken image, overlapping text or loading overlay planted), not to re-learn:
+
+- 54 of 55 true cases caught (the miss: one loading overlay at 0.49), and **0 false alarms on 43
+  clean-page cases**. Two "false alarms" on the clean fixtures were right: form-app shows a
+  validation error, and stacking-context has a modal open. They are `CLAIM_NATIVE`, verified by looking.
+  Look at a clean page's alarm before calling it wrong.
+- The cross-plant alarms (11 of 172) are mostly `overlap` firing on plants that cover page text.
+  The `uncertain` band (within 0.3 of the threshold) held 10 of the 12 wrong answers and 22 of the
+  258 right ones: outside it, 236 right and 2 wrong.
+
+**Shipped as `inspect motion`** (`@mizchi/vlmkit-judge/motion-path.ts` `judgeMotionPath`, pure;
+`@mizchi/vlmkit-ai/motion-check.ts` `checkMotionFrames`; `packages/vlmkit-markup/src/inspect/motion-cli.ts`).
+Is a CSS animation visually broken, for an agent to judge its own: frames on the held clock, one Jev
+request per frame (presence + box per `--target`, a `noul` per `--forbid`), the motion judged from
+those — never asked. Known answers: `fixtures/motion-defects/` (7 mistakes × intact/broken,
+`build.mjs` writes them and `cases.json`); bench `src/experiments/benchmark/jev-motion/jev-motion.ts`.
+Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
+
+- 7/7 broken caught by the expected rule, 7/7 intact pass, with and without `--selector`.
+  `check animation` exited 0 on all 14; `check integrity --timeline` named 3 of the 7 by a rule
+  the intact page lacked. Every number here was found by agents using the tool on their own
+  pages (three rounds), not by the fixtures, which a first version already passed.
+- **Sample per segment, judge per segment.** 11 even frames over a 2.4s toast gave its 600ms
+  entrance 2-3, and hold frames as a step's neighbours read as a jump. Each span some finite
+  animation runs in gets its own 11 (`motionPlan`).
+- **A box cut by the viewport is the visible part.** Its centre moves at half speed (fits linear
+  for ease-out), and a half-visible frame read as lost. Within 1.25% of an edge (Jev's 1% steps
+  put a box cut at 1280 at 1267) the centre is put back from the target's own size.
+- **One look is 12.8px steps; ask the box again on a magnified crop** of the region it moves
+  through (`refine`, default): centre error to the DOM 7.4 → 4.4px median.
+- **Look-alike siblings get swapped** (three stat cards: one boxed 630px away and back). A box far
+  off and back, or one two targets share, is `locate-unsure` (warn) and left out. `--selector`
+  removes it: geometry, opacity, scale and the element's own `getComputedTiming()` time from the
+  page — the only way staggered siblings in one segment each fit their own curve. With it, a
+  target not rendered (opacity < 0.05) is not seen whatever Jev says, and a Jev "seen" whose box
+  misses the element is unknown: one such reading on a card still in its delay made a false
+  `target-lost`.
+- **The overlap statement must be narrow.** "text overlapping other text so that it is hard to
+  read" fired on an open dropdown over a page; "two lines of text printed on top of each other,
+  their letters crossing" (`DEFAULT_MOTION_FORBID`) caught the claims round's planted overlaps 9/9
+  with 0/36 cross-plant alarms (the broad one 10/36), on screenshots it was not chosen on.
+- Positions from frames shown at ≥0.8 only: a fade's faint frames got boxes 40px off.
 
 ## Generated figures (raster images)
 

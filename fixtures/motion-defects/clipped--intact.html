@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>clipped intact</title><style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#f8fafc;color:#0f172a;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{height:64px;display:flex;align-items:center;gap:24px;padding:0 32px;background:#fff;border-bottom:1px solid #e2e8f0}
+header strong{font-size:18px}
+main{max-width:880px;margin:32px auto;padding:0 24px}
+h1{font-size:28px;margin:0 0 12px}
+p{margin:0 0 12px;color:#334155}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px}
+.board{display:flex;gap:24px}
+.col{width:300px;min-height:260px;background:#e2e8f0;border-radius:12px;padding:16px;position:relative}
+.col h2{font-size:16px;margin:0 0 12px}
+.task{position:absolute;left:16px;top:52px;width:268px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px;z-index:1;animation:move 800ms ease-in-out both}
+@keyframes move{to{transform:translateX(324px)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms!important}}
+</style></head><body>
+<header><strong>Acme</strong><span>Projects</span><span>Billing</span></header>
+<main>
+<h1>Sprint board</h1><div class="board"><div class="col"><h2>In progress</h2><div class="task"><strong>Design review</strong><br>Due Friday</div></div><div class="col"><h2>Done</h2></div></div>
+</main></body></html>
