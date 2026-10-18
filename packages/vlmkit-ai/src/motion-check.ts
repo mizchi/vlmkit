@@ -59,6 +59,8 @@ export interface MotionCheckOptions {
   exits?: boolean;
   /** The timing function the author meant, for every segment or per segment in order. */
   expectEasing?: EasingName | readonly EasingName[];
+  /** Per target, in order, overriding `expectEasing` for that target (cards ease-out, a bar ease-in-out). */
+  targetEasing?: readonly (EasingName | readonly EasingName[] | undefined)[];
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -263,7 +265,9 @@ export async function checkMotionFrames(
         ...(frameSize ? { frame: frameSize } : {}),
         presenceThreshold: threshold,
         ...(options.exits ? { exits: true } : {}),
-        ...(options.expectEasing ? { expectEasing: options.expectEasing } : {}),
+        ...((options.targetEasing?.[i] ?? options.expectEasing)
+          ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
+          : {}),
       }),
     };
   });

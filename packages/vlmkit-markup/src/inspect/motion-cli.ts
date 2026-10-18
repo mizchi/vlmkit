@@ -85,6 +85,9 @@ come from frames that surely show the target (presence 0.8+); a box cut by the
 viewport's edge is put back from the target's own size. So "travels" is the
 measured part of the path and can be shorter than the CSS distance; under 60px
 an easing is not fitted, and an --expect-easing there is a warn, not a pass.
+With --selector every frame is measured from the page, the floor is 6px, and
+opacity (a change of 0.2+) and scale (0.02+) are fitted as well as position:
+an easing is checked on each channel that changes.
 
   --target <words>        What moves, by what only it shows: "the card labelled Users showing
                           1,284", not "the Users card" (look-alike cards get swapped)
@@ -95,11 +98,14 @@ an easing is not fitted, and an --expect-easing there is a warn, not a pass.
   --forbid <statement>    No frame may show it. Default, when none is given:
                           "${DEFAULT_MOTION_FORBID}"
   --no-forbid             Ask no statement (only the targets' motion)
-  --expect-easing <name>  ${EASING_NAMES.join(" | ")}; one per segment, comma-separated
-                          ("ease-out,ease-in" for an entrance and an exit), or one for all
+  --expect-easing <name>  ${EASING_NAMES.join(" | ")}. Given once, for every target; repeated,
+                          paired with the --target in the same position (cards ease-out, a bar
+                          ease-in-out). Comma-separated, one per segment: "ease-out,ease-in" for
+                          an entrance and an exit
   --exits                 The targets are meant to leave (gone at rest is their end)
-  --at <instants>         Frames to shoot (default: 11 across the animations + rest)
-  --start <ms> --end <ms> The motion's span, when --at is given or frames.json is read
+  --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
+                          the page's own spans of motion
+  --start <ms> --end <ms> The motion's span (needed for frames.json): one segment
   --viewport <WxH>        Default 1280x800
   --frames <dir>          Where the frames go (default test-results/inspect-motion)
   --threshold <0-1>       A statement is true at or above this (default 0.5)
@@ -116,7 +122,8 @@ export interface MotionCliOptions {
   targets: string[];
   selectors: string[];
   forbid: string[];
-  expectEasing?: EasingName[];
+  /** Each --expect-easing given, in order: one for every target, or one per target. */
+  expectEasing?: EasingName[][];
   exits: boolean;
   at?: number[];
   startMs?: number;
@@ -132,7 +139,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const targets: string[] = [];
   const selectors: string[] = [];
   const forbid: string[] = [];
-  let expectEasing: EasingName[] | undefined;
+  let expectEasing: EasingName[][] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
   let endMs: number | undefined;
@@ -171,7 +178,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
             `--expect-easing takes ${EASING_NAMES.join(", ")} (comma-separated per segment); got ${bad.join(", ")}`,
           );
         }
-        expectEasing = names as EasingName[];
+        (expectEasing ??= []).push(names as EasingName[]);
         break;
       }
       case "--selector":
@@ -226,6 +233,11 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   if (targets.length === 0 && noForbid)
     throw new MotionUsageError("nothing to check: give --target, or drop --no-forbid");
   if (expectEasing && targets.length === 0) throw new MotionUsageError("--expect-easing needs a --target to follow");
+  if (expectEasing && expectEasing.length > 1 && expectEasing.length > targets.length) {
+    throw new MotionUsageError(
+      `${expectEasing.length} --expect-easing for ${targets.length} --target: give one for every target, or one per target in order`,
+    );
+  }
   const fromFrames = /(^|\/)frames\.json$/.test(positional[0]!);
   if (selectors.length > targets.length) {
     throw new MotionUsageError(
@@ -234,9 +246,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   }
   if (selectors.length > 0 && fromFrames)
     throw new MotionUsageError("--selector measures a live page: give the page, not frames.json");
-  if ((fromFrames || at) && endMs === undefined) {
+  // On a page the span comes from its animations, --at or not; saved frames carry none.
+  if (fromFrames && endMs === undefined) {
     throw new MotionUsageError(
-      `${fromFrames ? "frames.json" : "--at"} needs --end <ms>: where the motion stops, so the frames after it are its rest`,
+      "frames.json needs --end <ms>: where the motion stops, so the frames after it are its rest",
     );
   }
   return {
@@ -273,10 +286,40 @@ export const MOTION_MAX_FRAMES = 60;
  * a hold an exit, are two), and instants across each: 11 per segment, fewer when there are many
  * (at least 5), so a 600ms entrance beside a 2s hold is not sampled by 2 of 11 frames.
  */
-export function motionPlan(animations: readonly { startMs: number; durationMs: number; iterations: number | null }[]) {
+/**
+ * A finite animation's span, with the parts its keyframes hold still cut out: one 3300ms toast
+ * animation that enters (0-15%), holds (15-90%) and exits (90-100%) is two spans of motion, so
+ * its 495ms entrance is not sampled by 2 of 11 frames.
+ */
+export interface PlannedAnimation {
+  startMs: number;
+  durationMs: number;
+  iterations: number | null;
+  /** Offsets (0-1 of one iteration) between which consecutive keyframes are equal. */
+  holds?: readonly [number, number][];
+}
+
+/** The spans of one iteration that move: [0,1] less the holds. */
+function movingSpans(holds: readonly [number, number][] = []): [number, number][] {
+  const out: [number, number][] = [];
+  let from = 0;
+  for (const [a, b] of [...holds].sort((x, y) => x[0] - y[0])) {
+    if (a > from + 1e-6) out.push([from, a]);
+    from = Math.max(from, b);
+  }
+  if (from < 1 - 1e-6) out.push([from, 1]);
+  return out;
+}
+
+export function motionPlan(animations: readonly PlannedAnimation[]) {
   const spans = animations
     .filter((a) => a.iterations !== null && a.durationMs > 0)
-    .map((a) => ({ startMs: a.startMs, endMs: a.startMs + a.durationMs * (a.iterations ?? 1) }))
+    .flatMap((a) => {
+      const iterations = a.iterations ?? 1;
+      // Holds are cut out of single-run animations; a repeating one keeps its whole span.
+      const parts: [number, number][] = iterations === 1 ? movingSpans(a.holds) : [[0, iterations]];
+      return parts.map(([f, t]) => ({ startMs: a.startMs + f * a.durationMs, endMs: a.startMs + t * a.durationMs }));
+    })
     .sort((a, b) => a.startMs - b.startMs);
   const segments: { startMs: number; endMs: number }[] = [];
   for (const s of spans) {
@@ -290,6 +333,34 @@ export function motionPlan(animations: readonly { startMs: number; durationMs: n
   );
   const endMs = Math.max(...segments.map((g) => g.endMs));
   return { segments, motion, rest: endMs + 300, startMs: segments[0]?.startMs ?? 0, endMs };
+}
+
+/**
+ * Each held animation's keyframe holds, read from the page: offsets between consecutive keyframes
+ * whose values are equal. Matched to the held timings by start and duration.
+ */
+async function keyframeHolds(page: import("playwright").Page) {
+  return page.evaluate(() =>
+    document.getAnimations().map((a) => {
+      const effect = a.effect as KeyframeEffect | null;
+      const timing = effect?.getComputedTiming();
+      const frames = effect?.getKeyframes() ?? [];
+      const value = (k: ComputedKeyframe) =>
+        JSON.stringify(
+          Object.entries(k)
+            .filter(([key]) => !["offset", "computedOffset", "easing", "composite"].includes(key))
+            .sort(),
+        );
+      const holds: [number, number][] = [];
+      for (let i = 1; i < frames.length; i++) {
+        const a0 = frames[i - 1]!;
+        const a1 = frames[i]!;
+        if (value(a0) === value(a1) && a1.computedOffset > a0.computedOffset)
+          holds.push([a0.computedOffset, a1.computedOffset]);
+      }
+      return { delayMs: Number(timing?.delay ?? 0), durationMs: Number(timing?.duration ?? 0), holds };
+    }),
+  );
 }
 
 interface Captured {
@@ -310,7 +381,17 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
     const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
     try {
       const timeline = await openHeldTimeline(page, url);
-      const plan = motionPlan(await timeline.animations());
+      const held = await timeline.animations();
+      const holds = await keyframeHolds(page).catch(() => []);
+      const plan = motionPlan(
+        held.map((a) => {
+          const k = holds.find(
+            (h) =>
+              Math.abs(h.durationMs - a.durationMs) < 1 && Math.abs(h.delayMs - a.startMs) < 1 && h.holds.length > 0,
+          );
+          return k ? { ...a, holds: k.holds } : a;
+        }),
+      );
       if (o.endMs === undefined && plan.segments.length === 0) {
         throw new MotionUsageError(
           "no finite animation on the page to sample: give --at and --end (an infinite one never rests)",
@@ -319,6 +400,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       const given = o.endMs !== undefined;
       const endMs = o.endMs ?? plan.endMs;
       const startMs = o.startMs ?? (given ? 0 : plan.startMs);
+      // --at chooses the frames; the segments are still the page's own spans of motion.
       const segments = given ? [{ startMs, endMs }] : plan.segments;
       const instants = o.at
         ? [...new Set(o.at)].sort((a, b) => a - b)
@@ -385,15 +467,21 @@ export function formatMotionReport(
   );
   let fails = 0;
   let warns = 0;
+  type Fit = { best: string; margin: number; errors: Record<string, number>; channel?: string };
+  const oneFit = (e: Fit) => {
+    const next = Object.keys(e.errors)
+      .filter((k) => k !== e.best)
+      .sort((a, b) => e.errors[a]! - e.errors[b]!)[0];
+    const on = e.channel && e.channel !== "position" ? ` in its ${e.channel}` : "";
+    if (!Number.isFinite(e.margin) || e.margin >= 1000)
+      return `follows ${e.best}${on} exactly (measured: no other curve comes close)`;
+    return `follows ${e.best}${on} (it fits ${e.margin.toFixed(1)}x better than the next-best curve, ${next})`;
+  };
   const fitText = (e: MotionCheckReport["targets"][number]["easing"], broken: boolean) => {
     if (!("best" in e)) return `no easing fit: ${e.skipped}`;
     if (broken) return "no easing named: the path has a jump, so no curve describes it";
-    const next = Object.keys(e.errors)
-      .filter((k) => k !== e.best)
-      .sort((a, b) => e.errors[a as keyof typeof e.errors] - e.errors[b as keyof typeof e.errors])[0];
-    const on = e.channel && e.channel !== "position" ? ` in its ${e.channel}` : "";
-    if (e.margin >= 1000) return `follows ${e.best}${on} exactly (measured: no other curve comes close)`;
-    return `follows ${e.best}${on} (it fits ${e.margin.toFixed(1)}x better than the next-best curve, ${next})`;
+    const channels = (e.channels ?? [e]) as Fit[];
+    return channels.map(oneFit).join("; ");
   };
   for (const [i, t] of r.targets.entries()) {
     const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
@@ -450,6 +538,15 @@ export function formatMotionReport(
   return lines.join("\n");
 }
 
+const oneOrList = (names: EasingName[]) => (names.length === 1 ? names[0]! : names);
+
+/** One --expect-easing is every target's; several are the targets' in order. */
+export function motionEasingOptions(given: EasingName[][] | undefined) {
+  if (!given) return {};
+  if (given.length === 1) return { expectEasing: oneOrList(given[0]!) };
+  return { targetEasing: given.map(oneOrList) };
+}
+
 export async function runMotionCli(argv: string[]): Promise<number> {
   if (argv.includes("--help") || argv.includes("-h")) {
     console.log(MOTION_USAGE);
@@ -485,7 +582,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     segments: captured.segments,
     threshold: o.threshold,
     exits: o.exits,
-    ...(o.expectEasing ? { expectEasing: o.expectEasing.length === 1 ? o.expectEasing[0]! : o.expectEasing } : {}),
+    ...motionEasingOptions(o.expectEasing),
   });
   const json = {
     source: o.source,

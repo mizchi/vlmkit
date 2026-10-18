@@ -172,7 +172,8 @@ describe("judgeMotionPath", () => {
       };
     });
     const f = judgeMotionPath(fade, { startMs: 0, endMs: 400, expectEasing: "ease-out" });
-    expect(f.findings.map((x) => x.rule)).toEqual(["easing-mismatch"]);
+    // Opacity and scale ride the same keyframes: both read ease-in, both fail ease-out.
+    expect(f.findings.map((x) => x.rule)).toEqual(["easing-mismatch", "easing-mismatch"]);
     expect("best" in f.easing && [f.easing.best, f.easing.channel]).toEqual(["ease-in", "opacity"]);
   });
 
@@ -186,11 +187,13 @@ describe("judgeMotionPath", () => {
         atMs: at,
         present: t > 0.2 ? 0.9 : 0.3,
         box: box(900, y),
-        dom: { box: box(900, y), opacity: t, scale: 1, t },
+        dom: { box: box(900, y), opacity: easingAt("ease-out", t), scale: 1, t },
       };
     });
     const r = judgeMotionPath(s, { startMs: 0, endMs: 640, expectEasing: "ease-out" });
     expect(r.findings).toEqual([]);
+    // Measured, the travel is the whole 24px, including the frames before it can be seen.
+    expect(Math.round(r.travelPx)).toBe(24);
   });
 
   it("with the element measured, a 'shown' boxed on another element is unknown, and not rendered is not shown", () => {
@@ -204,12 +207,24 @@ describe("judgeMotionPath", () => {
         atMs: at,
         present: elsewhere ? 0.7 : t > 0.2 ? 0.9 : 0.02,
         box: elsewhere ? box(100, 200) : box(900, y),
-        dom: { box: box(900, y), opacity: t, scale: 1, t },
+        dom: { box: box(900, y), opacity: easingAt("ease-out", t), scale: 1, t },
       };
     });
     // 128ms: not rendered yet (opacity 0), so not shown, and no "lost" in its delay. 448ms:
     // rendered, but the box is elsewhere — unknown, a warn, never a target-lost.
     const r = judgeMotionPath(s, { startMs: 0, endMs: 640, expectEasing: "ease-out" });
     expect(r.findings.map((f) => [f.rule, f.atMs])).toEqual([["locate-unsure", 448]]);
+  });
+
+  it("fits a segment that is part of one animation on the animation's own time, rescaled", () => {
+    // One 3300ms animation; the entrance is 0-15% of its own time, eased ease-out within it.
+    const times = [...Array.from({ length: 10 }, (_, i) => i * 49.5), 494];
+    const s = times.map((at) => {
+      const own = at / 3300;
+      const x = 600 - 360 * easingAt("ease-out", Math.min(1, own / 0.15));
+      return { atMs: at, present: 0.9, box: box(x), dom: { box: box(x), opacity: 1, scale: 1, t: own } };
+    });
+    const r = judgeMotionPath(s, { startMs: 0, endMs: 495, expectEasing: "ease-out" });
+    expect(r.findings).toEqual([]);
   });
 });
