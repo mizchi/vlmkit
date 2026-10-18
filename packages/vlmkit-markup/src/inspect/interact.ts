@@ -342,7 +342,7 @@ type Located = Omit<LocatedClick, "stepIndex" | "describe">;
  */
 async function clickDescribed(page: Page, describe: string): Promise<Located> {
   const { locateByDescription } = await import("@mizchi/vlmkit-ai/locate.ts");
-  const png = await page.screenshot({ type: "png", scale: "css" });
+  const png = await liveShot(page, { type: "png", scale: "css" });
   const r = await locateByDescription(new Uint8Array(png), describe);
   if (!r.found) {
     throw new Error(
@@ -673,7 +673,9 @@ type InteractWindow = Window & { __vlmkitInteract?: InteractApi };
 
 // Not "Target page ... has been closed": a page that closed itself (window.close()) will not come
 // back, and retrying it as a navigation only delayed the failure.
-const NAVIGATED = /Execution context was destroyed|navigat|Cannot find context/i;
+// "Not attached to an active page": a screenshot that lands while the page swaps to the document
+// it forwards to (Chromium on CI, a splash page that `location.replace`s on a 0ms timer).
+const NAVIGATED = /Execution context was destroyed|navigat|Cannot find context|Not attached to an active page/i;
 
 /**
  * The script on the current document. It is also an init script, so a navigation brings it
@@ -687,6 +689,18 @@ async function ensureHold(page: Page): Promise<void> {
         await page.evaluate(INTERACTION_HOLD_SCRIPT);
       }
       return;
+    } catch (error) {
+      if (attempt >= 4 || !NAVIGATED.test(String(error))) throw error;
+      await page.waitForLoadState("load").catch(() => {});
+    }
+  }
+}
+
+/** `page.screenshot` that waits out a page forwarding itself under it, as `liveEval` does. */
+async function liveShot(page: Page, options: Parameters<Page["screenshot"]>[0]): Promise<Buffer> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await page.screenshot(options);
     } catch (error) {
       if (attempt >= 4 || !NAVIGATED.test(String(error))) throw error;
       await page.waitForLoadState("load").catch(() => {});
@@ -1033,7 +1047,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
       if (step.action === "snapshot") {
         const safeName = step.name.replace(/[^a-z0-9._-]+/gi, "_");
         const screenshotPath = join(outputDir, `${safeName}.png`);
-        await page.screenshot({ path: screenshotPath, fullPage: false });
+        await liveShot(page, { path: screenshotPath, fullPage: false });
         snapshots.push({
           name: step.name,
           screenshotPath,
