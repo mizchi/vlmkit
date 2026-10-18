@@ -58,6 +58,8 @@ export interface AnimationTimingSample {
   name: string;
   durationMs: number;
   delayMs: number;
+  /** The timing function: the effect's, or a CSS animation's keyframes' ("a / b" when they differ). */
+  easing?: string;
   /** null = infinite. */
   iterations: number | null;
   /** Play state as found on the page, captured BEFORE the evaluator pauses it. */
@@ -560,15 +562,20 @@ const ANIMATION_HELPERS_JS = `
   ${STABLE_SELECTOR_JS}
 
   function describeTiming(anim) {
-    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal" };
+    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal", easing: "linear" };
     try {
       const computed = anim.effect && anim.effect.getComputedTiming ? anim.effect.getComputedTiming() : null;
       if (computed) {
+        // A CSS animation's timing function lives on its keyframes (the effect's own easing is
+        // linear); a transition or el.animate() carries it on the effect.
+        const frames = anim.effect.getKeyframes ? anim.effect.getKeyframes().slice(0, -1) : [];
+        const keyed = [...new Set(frames.map((k) => k.easing).filter(Boolean))];
         timing = {
           duration: typeof computed.duration === "number" ? computed.duration : 0,
           delay: computed.delay || 0,
           iterations: computed.iterations,
           direction: computed.direction || "normal",
+          easing: computed.easing && computed.easing !== "linear" ? computed.easing : keyed.join(" / ") || "linear",
         };
       }
     } catch {}
@@ -587,11 +594,18 @@ const ANIMATION_HELPERS_JS = `
       const first = keyframes[0];
       const last = keyframes[keyframes.length - 1];
       const props = Object.keys(first).filter((k) => !skip.has(k));
+      const same = (a, b) => props.every((k) => String(a[k]) === String(b[k]));
+      // Out and back means mirrored: each keyframe at offset o has its twin at 1 - o. An
+      // enter / hold / exit (0%, 15%, 90%, 100%, first == last) is not, and read "leg 1650ms".
+      const mirrored = keyframes.every((k) =>
+        keyframes.some((m) => Math.abs(m.computedOffset - (1 - k.computedOffset)) < 0.011 && same(k, m))
+      );
       return props.length > 0
         && props.every((k) => k in last && String(first[k]) === String(last[k]))
         && keyframes.slice(1, -1).some((mid) =>
           props.some((k) => k in mid && String(mid[k]) !== String(first[k]))
-        );
+        )
+        && mirrored;
     } catch {}
     return false;
   }
@@ -696,6 +710,7 @@ ${ANIMATION_HELPERS_JS}
       name,
       durationMs: timing.duration,
       delayMs: timing.delay,
+      easing: timing.easing,
       iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
       playState,
       currentTimeMs,
@@ -1417,7 +1432,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
         ? ` (${anim.direction.startsWith("alternate") ? anim.direction : "palindromic keyframes"}, leg ${Math.round(osc.legMs)}ms)`
         : "";
       lines.push(
-        `  - ${anim.selector} \`${anim.name}\` ${Math.round(anim.durationMs)}ms x${anim.iterations ?? "∞"}${oscLabel}: ${visibility}, motion region ${bbox}, peak frame delta ${(anim.maxFrameRatio * 100).toFixed(2)}%`,
+        `  - ${anim.selector} \`${anim.name}\` ${Math.round(anim.durationMs)}ms${anim.delayMs ? ` after ${Math.round(anim.delayMs)}ms` : ""}${anim.easing ? ` ${anim.easing}` : ""} x${anim.iterations ?? "∞"}${oscLabel}: ${visibility}, motion region ${bbox}, peak frame delta ${(anim.maxFrameRatio * 100).toFixed(2)}%`,
       );
     }
   }
