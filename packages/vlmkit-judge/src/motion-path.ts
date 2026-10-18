@@ -15,8 +15,14 @@
  *                    keyframe discontinuity; suppressed when the path fits `steps()`
  *   easing-mismatch  the path fits another timing function than the one expected
  *
- * Easings are the CSS curves (`cubic-bezier` solved for x, `steps(4, end)`), fitted on progress
- * along the start → end line at each sample's time fraction.
+ * A page's motion is judged per segment — each span of page time some animation runs in (an
+ * entrance, then after a hold an exit): an easing is fitted, and jumps looked for, inside one
+ * segment, never across a hold. Easings are the CSS curves (`cubic-bezier` solved for x,
+ * `steps(4, end)`), fitted to positions at each sample's time fraction of its segment.
+ *
+ * A box at the frame's edge is the visible part of a target entering or leaving the viewport: its
+ * centre is put back from the far edge and the target's own size, and a faint answer on such a
+ * frame is not "lost".
  */
 
 export const EASINGS = {
@@ -129,25 +135,37 @@ export interface MotionSample {
   box: MotionBox | null;
 }
 
+export interface MotionSegment {
+  startMs: number;
+  endMs: number;
+}
+
 export interface MotionPathOptions {
   /** The motion runs over [startMs, endMs] of page time; samples past `endMs` are the rest. */
   startMs: number;
   endMs: number;
+  /** Spans some animation runs in, in order (default: one, startMs..endMs). */
+  segments?: readonly MotionSegment[];
+  /** The frames' size: a box touching its edge is a target partly outside the viewport. */
+  frame?: { width: number; height: number };
   presenceThreshold?: number;
   /**
    * Geometry (jumps, the easing, snap-back) is read only from frames shown at least this surely
    * (default 0.8): a faint frame of a fade gets a box 40px off, measured.
    */
   surePresence?: number;
-  /** The timing function the author meant. Without it the fit is reported, never failed. */
-  expectEasing?: EasingName;
+  /**
+   * The timing function the author meant — one for every segment, or one per segment in order.
+   * Without it the fit is reported, never failed.
+   */
+  expectEasing?: EasingName | readonly EasingName[];
   /** A step this long (px) at least can be a jump (default 24: a single look's edge error is ~12px). */
   jumpFloorPx?: number;
   /** …and it must exceed its larger neighbour step by this factor (default 3). */
   jumpRatio?: number;
   /** The target is meant to leave (a dismissed toast): gone at rest is then its end state. */
   exits?: boolean;
-  /** Below this travel (px) the path is too short to fit an easing to (default 60). */
+  /** Below this travel (px) a segment is too short to fit an easing to (default 60). */
   minFitTravelPx?: number;
 }
 
@@ -167,41 +185,81 @@ export interface MotionFinding {
   message: string;
 }
 
+export type SegmentEasing = (EasingFit & { expected?: EasingName }) | { skipped: string; expected?: EasingName };
+
 export interface MotionPathReport {
   findings: MotionFinding[];
-  /** Centres of the frames the target is present in, motion and rest. */
-  path: { atMs: number; x: number; y: number; rest: boolean }[];
-  /** Distance from the first present motion frame to the last, px. */
+  /** Positions of the frames the target is shown in, motion and rest; `edge` = put back from a clipped box. */
+  path: { atMs: number; x: number; y: number; rest: boolean; edge: boolean }[];
+  /** Per segment: its span, how far the target travels in it, the fit or why there is none. */
+  segments: (MotionSegment & { travelPx: number; easing: SegmentEasing })[];
+  /** The first segment's travel and fit (the whole motion when there is one segment). */
   travelPx: number;
-  /** The fit, or why there is none. */
-  easing: (EasingFit & { expected?: EasingName }) | { skipped: string };
+  easing: SegmentEasing;
 }
 
-const centre = (b: MotionBox) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 const ms = (t: number) => `${Math.round(t)}ms`;
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length === 0 ? NaN : s[s.length >> 1]!;
+};
 
 export function judgeMotionPath(samples: readonly MotionSample[], options: MotionPathOptions): MotionPathReport {
   const thr = options.presenceThreshold ?? 0.5;
+  const sure = options.surePresence ?? Math.max(thr, 0.8);
   const floor = options.jumpFloorPx ?? 24;
   const ratio = options.jumpRatio ?? 3;
   const minTravel = options.minFitTravelPx ?? 60;
+  const segments = options.segments?.length
+    ? [...options.segments]
+    : [{ startMs: options.startMs, endMs: options.endMs }];
+  const expectFor = (k: number): EasingName | undefined =>
+    typeof options.expectEasing === "string" ? options.expectEasing : options.expectEasing?.[k];
   const sorted = [...samples].sort((a, b) => a.atMs - b.atMs);
   const isRest = (s: MotionSample) => s.atMs > options.endMs;
   const shown = (s: MotionSample) => s.present >= thr && s.box !== null;
   const findings: MotionFinding[] = [];
 
-  const path = sorted.filter(shown).map((s) => ({ atMs: s.atMs, ...centre(s.box!), rest: isRest(s) }));
-  const motion = path.filter((p) => !p.rest);
-  const rest = path.filter((p) => p.rest);
+  // Which sides of the frame a box touches: the target is partly outside the viewport there.
+  // Within 1.25% of an edge: a model's box edges come in 1% steps, so a box cut at x = 1280 can
+  // come back at 1267.
+  const sides = (b: MotionBox | null) => {
+    const f = options.frame;
+    if (!b || !f) return { l: false, r: false, t: false, b: false };
+    const ex = Math.max(2, f.width * 0.0125);
+    const ey = Math.max(2, f.height * 0.0125);
+    return { l: b.x <= ex, r: b.x + b.width >= f.width - ex, t: b.y <= ey, b: b.y + b.height >= f.height - ey };
+  };
+  const atEdge = (s: MotionSample) => {
+    const e = sides(s.box);
+    return e.l || e.r || e.t || e.b;
+  };
+  // The target's own size, from frames that surely show all of it.
+  const whole = sorted.filter((s) => s.present >= sure && s.box && !atEdge(s));
+  const fullW = median(whole.map((s) => s.box!.width));
+  const fullH = median(whole.map((s) => s.box!.height));
+  const position = (s: MotionSample) => {
+    const b = s.box!;
+    const e = sides(b);
+    let x = b.x + b.width / 2;
+    let y = b.y + b.height / 2;
+    if (Number.isFinite(fullW) && e.l !== e.r) x = e.r ? b.x + fullW / 2 : b.x + b.width - fullW / 2;
+    if (Number.isFinite(fullH) && e.t !== e.b) y = e.b ? b.y + fullH / 2 : b.y + b.height - fullH / 2;
+    return { x, y };
+  };
 
-  // Presence: absent between two frames that show it, or gone once it stops.
+  const path = sorted.filter(shown).map((s) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: atEdge(s) }));
+  const motion = path.filter((p) => !p.rest);
+
+  // Presence: absent between two frames that show it, or gone once it stops. A faint frame whose
+  // box is at the viewport's edge is the target coming in or going out, not lost.
   const firstShown = sorted.findIndex(shown);
   const lastShown = sorted.length - 1 - [...sorted].reverse().findIndex(shown);
   if (firstShown >= 0) {
     for (let i = firstShown + 1; i < lastShown; i++) {
       const s = sorted[i]!;
-      if (!shown(s)) {
+      if (!shown(s) && !atEdge(s)) {
         findings.push({
           rule: "target-lost",
           severity: "fail",
@@ -222,87 +280,102 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
   }
 
-  // Geometry from the frames the target is surely shown in.
-  const sure = options.surePresence ?? Math.max(thr, 0.8);
-  const surely = new Set(sorted.filter((s) => s.present >= sure && s.box !== null).map((s) => s.atMs));
+  // Geometry from the frames that surely show it, and edge frames put back whole.
+  const surely = new Set(
+    sorted
+      .filter((s) => s.box !== null && (s.present >= sure || (atEdge(s) && s.present >= thr && Number.isFinite(fullW))))
+      .map((s) => s.atMs),
+  );
   const geo = motion.filter((p) => surely.has(p.atMs));
-  const geoRest = rest.filter((p) => surely.has(p.atMs));
+  const geoRest = path.filter((p) => p.rest && surely.has(p.atMs));
 
-  const travelPx = geo.length >= 2 ? dist(geo[0]!, geo[geo.length - 1]!) : 0;
-  let easing: MotionPathReport["easing"] = { skipped: "fewer than 4 motion frames surely show the target" };
-  if (geo.length >= 4 && travelPx < minTravel) {
-    easing = { skipped: `travel ${Math.round(travelPx)}px is under ${minTravel}px: too short to fit` };
-  } else if (geo.length >= 4) {
-    const a = geo[0]!;
-    const lastMotion = geo[geo.length - 1]!;
-    // Where it rests is the held final keyframe, progress 1 — unless it rests back near the start
-    // (a snap-back, judged below).
-    const r = geoRest[0];
-    const restHeld = r !== undefined && dist(r, a) > Math.max(floor, travelPx * 0.25);
-    const z = restHeld ? r! : lastMotion;
-    const d = { x: z.x - a.x, y: z.y - a.y };
-    const len = Math.max(Math.hypot(d.x, d.y), 1e-9);
-    const span = options.endMs - options.startMs;
-    const points = geo.map((p) => ({
-      t: Math.min(1, Math.max(0, (p.atMs - options.startMs) / span)),
-      s: ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / len,
-    }));
-    if (restHeld) points.push({ t: 1, s: ((r!.x - a.x) * d.x + (r!.y - a.y) * d.y) / len });
-    const fit = fitEasingAffine(points);
-    easing = { ...fit, ...(options.expectEasing ? { expected: options.expectEasing } : {}) };
-    if (options.expectEasing && fit.best !== options.expectEasing) {
-      // Frames that show it only faintly, or not at all, are left out, and a box around the part
-      // that is not covered moves differently from the element: say so beside the mismatch.
-      const hidden = sorted.filter((x) => !isRest(x) && x.present < sure).length;
-      findings.push({
-        rule: "easing-mismatch",
-        severity: "fail",
-        atMs: options.startMs,
-        message: `the path follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${options.expectEasing}${hidden > 0 ? `; ${hidden} motion frame(s) show it faintly or not at all, so fix what hides it first and re-check` : ""}`,
-      });
-    }
-  }
-  if (options.expectEasing && "skipped" in easing && motion.length > 0) {
-    findings.push({
-      rule: "easing-unchecked",
-      severity: "warn",
-      atMs: options.startMs,
-      message: `${options.expectEasing} was expected but not checked: ${easing.skipped} (only frames shown at ${sure} or more are measured)`,
-    });
-  }
-
-  // Jumps inside the motion, unless it is meant to step.
-  const stepping = "best" in easing && (easing.best === "steps" || options.expectEasing === "steps");
-  if (!stepping) {
-    // Compared as speeds, so frames the target was missing from do not read as a jump.
-    const steps = geo.slice(1).map((p, i) => ({
-      px: dist(p, geo[i]!),
-      speed: dist(p, geo[i]!) / Math.max(p.atMs - geo[i]!.atMs, 1),
-    }));
-    steps.forEach((s, i) => {
-      const neighbours = [steps[i - 1], steps[i + 1]].filter((x) => x !== undefined);
-      if (neighbours.length === 0) return;
-      const local = Math.max(...neighbours.map((n) => n.speed));
-      const times = s.speed / Math.max(local, 1e-3);
-      if (s.px >= floor && times > ratio) {
+  const reports: MotionPathReport["segments"] = segments.map((seg, k) => {
+    const expected = expectFor(k);
+    const last = k === segments.length - 1;
+    const frames = geo.filter((p) => p.atMs >= seg.startMs && p.atMs <= seg.endMs);
+    const travelPx = frames.length >= 2 ? dist(frames[0]!, frames[frames.length - 1]!) : 0;
+    const tag = segments.length > 1 ? ` in ${ms(seg.startMs)}..${ms(seg.endMs)}` : "";
+    let easing: SegmentEasing;
+    if (frames.length < 4) easing = { skipped: "fewer than 4 frames surely show the target" };
+    else if (travelPx < minTravel)
+      easing = { skipped: `travel ${Math.round(travelPx)}px is under ${minTravel}px: too short to fit` };
+    else {
+      const a = frames[0]!;
+      // Where it rests is the held final keyframe — unless it rests back near the start (a
+      // snap-back, judged below).
+      const r = last ? geoRest[0] : undefined;
+      const restHeld = r !== undefined && dist(r, a) > Math.max(floor, travelPx * 0.25);
+      const z = restHeld ? r! : frames[frames.length - 1]!;
+      const d = { x: z.x - a.x, y: z.y - a.y };
+      const len = Math.max(Math.hypot(d.x, d.y), 1e-9);
+      const span = Math.max(seg.endMs - seg.startMs, 1);
+      const points = frames.map((p) => ({
+        t: Math.min(1, Math.max(0, (p.atMs - seg.startMs) / span)),
+        s: ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / len,
+      }));
+      if (restHeld) points.push({ t: 1, s: ((r!.x - a.x) * d.x + (r!.y - a.y) * d.y) / len });
+      const fit = fitEasingAffine(points);
+      easing = fit;
+      if (expected && fit.best !== expected) {
+        // Frames that show it only faintly, or not at all, are left out, and a box around the part
+        // that is not covered moves differently from the element: say so beside the mismatch.
+        const hidden = sorted.filter((x) => x.atMs >= seg.startMs && x.atMs <= seg.endMs && !surely.has(x.atMs)).length;
         findings.push({
-          rule: "jump",
+          rule: "easing-mismatch",
           severity: "fail",
-          atMs: geo[i + 1]!.atMs,
-          message: `moves ${Math.round(s.px)}px between ${ms(geo[i]!.atMs)} and ${ms(geo[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity in the keyframes`,
+          atMs: seg.startMs,
+          message: `the path${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}${hidden > 0 ? `; ${hidden} frame(s) there show it faintly or not at all, so fix what hides it first and re-check` : ""}`,
         });
       }
-    });
-  }
+    }
+    if (expected) easing = { ...easing, expected };
+    if (expected && "skipped" in easing && motion.length > 0) {
+      findings.push({
+        rule: "easing-unchecked",
+        severity: "warn",
+        atMs: seg.startMs,
+        message: `${expected} was expected${tag} but not checked: ${easing.skipped} (only frames shown at ${sure} or more, or put back from the viewport's edge, are measured)`,
+      });
+    }
+
+    // Jumps inside the segment, unless it is meant to step. Compared as speeds, so frames the
+    // target was missing from do not read as a jump.
+    const stepping = ("best" in easing && easing.best === "steps") || expected === "steps";
+    if (!stepping) {
+      const steps = frames.slice(1).map((p, i) => ({
+        px: dist(p, frames[i]!),
+        speed: dist(p, frames[i]!) / Math.max(p.atMs - frames[i]!.atMs, 1),
+      }));
+      steps.forEach((st, i) => {
+        const neighbours = [steps[i - 1], steps[i + 1]].filter((x) => x !== undefined);
+        if (neighbours.length === 0) return;
+        const local = Math.max(...neighbours.map((n) => n.speed));
+        const times = st.speed / Math.max(local, 1e-3);
+        if (st.px >= floor && times > ratio) {
+          findings.push({
+            rule: "jump",
+            severity: "fail",
+            atMs: frames[i + 1]!.atMs,
+            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity in the keyframes`,
+          });
+        }
+      });
+    }
+    return { ...seg, travelPx, easing };
+  });
 
   // Once it stops: back where it began, or a jump off the last motion frame.
+  const lastExpected = expectFor(segments.length - 1);
+  const lastEasing = reports[reports.length - 1]!.easing;
+  const lastSteps = ("best" in lastEasing && lastEasing.best === "steps") || lastExpected === "steps";
   if (geoRest.length > 0 && geo.length >= 2) {
     const last = geo[geo.length - 1]!;
     const r = geoRest[0]!;
     const off = dist(r, last);
+    const travel = Math.max(...reports.map((x) => x.travelPx), dist(geo[0]!, last));
     // steps(…, end) takes its last step at the end itself.
-    if (off >= floor && !stepping) {
-      const backHome = travelPx >= floor && dist(r, geo[0]!) <= Math.max(floor, travelPx * 0.25);
+    if (off >= floor && !lastSteps) {
+      const backHome = travel >= floor && dist(r, geo[0]!) <= Math.max(floor, travel * 0.25);
       findings.push(
         backHome
           ? {
@@ -322,5 +395,6 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   }
 
   findings.sort((a, b) => a.atMs - b.atMs);
-  return { findings, path, travelPx, easing };
+  const first = reports.find((x) => "best" in x.easing) ?? reports[0]!;
+  return { findings, path, segments: reports, travelPx: first.travelPx, easing: first.easing };
 }

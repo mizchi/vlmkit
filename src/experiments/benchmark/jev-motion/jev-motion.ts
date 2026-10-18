@@ -26,12 +26,12 @@ import { promisify } from "node:util";
 import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
 import { checkMotionFrames, type MotionCheckReport } from "@mizchi/vlmkit-ai/motion-check.ts";
 import type { EasingName } from "@mizchi/vlmkit-judge/motion-path.ts";
-import { motionInstants } from "@mizchi/vlmkit-markup/inspect/motion-cli.ts";
+import { DEFAULT_MOTION_FORBID, motionPlan } from "@mizchi/vlmkit-markup/inspect/motion-cli.ts";
 
 const FIXTURES = resolve("fixtures/motion-defects");
 /** The claims round's measured wording, and a narrower one: letters over letters, not a menu over a page. */
 const OVERLAP = "text overlapping other text so that it is hard to read";
-const OVERLAP_GLYPHS = "two lines of text printed on top of each other, their letters crossing";
+const OVERLAP_GLYPHS = DEFAULT_MOTION_FORBID;
 
 interface Case {
   file: string;
@@ -76,10 +76,7 @@ async function capture(c: Case, framesDir: string) {
     async (browser) => {
       const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
       const timeline = await openHeldTimeline(page, url);
-      const finite = (await timeline.animations()).filter((a) => a.iterations !== null && a.durationMs > 0);
-      const startMs = Math.min(...finite.map((a) => a.startMs));
-      const endMs = Math.max(...finite.map((a) => a.startMs + a.durationMs * (a.iterations ?? 1)));
-      const { motion, rest } = motionInstants(startMs, endMs);
+      const { segments, motion, rest, startMs, endMs } = motionPlan(await timeline.animations());
       const writer = await frameWriter(framesDir, {
         tool: "jev-motion bench",
         url,
@@ -114,7 +111,7 @@ async function capture(c: Case, framesDir: string) {
       }
       await writer.finish();
       await page.close();
-      return { frames, dom, startMs, endMs };
+      return { frames, dom, startMs, endMs, segments };
     },
     getArg("--executable-path") ? { launch: { executablePath: getArg("--executable-path")! } } : {},
   );
@@ -160,7 +157,7 @@ function rulesOf(stdout: string): string[] {
 }
 
 /** The rules `inspect motion` reported as fails, with `forbid-at-rest` for a statement seen at rest. */
-function failRules(r: MotionCheckReport, statement = OVERLAP): string[] {
+function failRules(r: MotionCheckReport, statement = OVERLAP_GLYPHS): string[] {
   const rules = r.targets.flatMap((t) => t.findings.filter((f) => f.severity === "fail").map((f) => f.rule as string));
   if (r.forbidden.some((f) => f.statement === statement && f.severity === "fail")) rules.push("forbid-at-rest");
   return [...new Set(rules)].sort();
@@ -193,10 +190,10 @@ function report(results: Result[]): string {
       `| ${id} | ${b?.case.expect} | ${b ? failRules(b.report).join(", ") || "pass" : "—"} | ${i ? failRules(i.report).join(", ") || "pass" : "—"} | ${fit(b)} / ${fit(i)} | ${gates(b)} | ${gates(i)} |`,
     );
   }
-  const g = (rs: Result[]) => rs.filter((r) => failRules(r.report, OVERLAP_GLYPHS).length > 0);
+  const g = (rs: Result[]) => rs.filter((r) => failRules(r.report, OVERLAP).length > 0);
   lines.push(
     "",
-    `With the narrower overlap wording ("${OVERLAP_GLYPHS}") in place of the measured one: broken caught by the expected rule ${broken.filter((r) => failRules(r.report, OVERLAP_GLYPHS).includes(r.case.expect!)).length}/${broken.length}, intact with a fail ${g(intact).length}/${intact.length}${
+    `The table asks \`inspect motion\`'s default statement ("${OVERLAP_GLYPHS}"). With the claims round's wording ("${OVERLAP}") instead: broken caught by the expected rule ${broken.filter((r) => failRules(r.report, OVERLAP).includes(r.case.expect!)).length}/${broken.length}, intact with a fail ${g(intact).length}/${intact.length}${
       g(intact).length
         ? ` (${g(intact)
             .map((r) => r.case.id)
@@ -270,6 +267,7 @@ async function main() {
         forbid: [OVERLAP, OVERLAP_GLYPHS],
         startMs: cap.startMs,
         endMs: cap.endMs,
+        segments: cap.segments,
         ...(c.expectEasing ? { expectEasing: c.expectEasing } : {}),
       });
       const r: Result = { case: c, startMs: cap.startMs, endMs: cap.endMs, dom: cap.dom, report };

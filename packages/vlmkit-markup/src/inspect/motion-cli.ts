@@ -9,7 +9,7 @@
  * Exit 0 nothing fails, 1 a fail, 2 usage. Advisory: a model's reading of the pixels; the
  * deterministic motion checks (`check animation`, `check integrity --timeline`) are what to gate on.
  */
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -43,7 +43,8 @@ whether each forbidden statement is. vlmkit judges the motion from that:
   --forbid <statement>    No frame may show it. Default, when none is given:
                           "${DEFAULT_MOTION_FORBID}"
   --no-forbid             Ask no statement (only the targets' motion)
-  --expect-easing <name>  ${EASING_NAMES.join(" | ")}
+  --expect-easing <name>  ${EASING_NAMES.join(" | ")}; one per segment, comma-separated
+                          ("ease-out,ease-in" for an entrance and an exit), or one for all
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 across the animations + rest)
   --start <ms> --end <ms> The motion's span, when --at is given or frames.json is read
@@ -62,7 +63,7 @@ export interface MotionCliOptions {
   source: string;
   targets: string[];
   forbid: string[];
-  expectEasing?: EasingName;
+  expectEasing?: EasingName[];
   exits: boolean;
   at?: number[];
   startMs?: number;
@@ -77,7 +78,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const positional: string[] = [];
   const targets: string[] = [];
   const forbid: string[] = [];
-  let expectEasing: EasingName | undefined;
+  let expectEasing: EasingName[] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
   let endMs: number | undefined;
@@ -107,11 +108,16 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         break;
       }
       case "--expect-easing": {
-        const e = value(a, argv[++i]);
-        if (!(EASING_NAMES as string[]).includes(e)) {
-          throw new MotionUsageError(`--expect-easing takes ${EASING_NAMES.join(", ")}; got ${e}`);
+        const names = value(a, argv[++i])
+          .split(",")
+          .map((x) => x.trim());
+        const bad = names.filter((e) => !(EASING_NAMES as string[]).includes(e));
+        if (bad.length > 0 || names.length === 0) {
+          throw new MotionUsageError(
+            `--expect-easing takes ${EASING_NAMES.join(", ")} (comma-separated per segment); got ${bad.join(", ")}`,
+          );
         }
-        expectEasing = e as EasingName;
+        expectEasing = names as EasingName[];
         break;
       }
       case "--at":
@@ -185,17 +191,47 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   };
 }
 
-/** 11 instants from the first animation's start to just inside the last one's end, then rest. */
-export function motionInstants(startMs: number, endMs: number): { motion: number[]; rest: number } {
+/** `n` instants from `startMs` to just inside `endMs` (an instant at the end is already past it), then rest. */
+export function motionInstants(startMs: number, endMs: number, n = 11): { motion: number[]; rest: number } {
   const span = endMs - startMs;
-  const motion = Array.from({ length: 11 }, (_, i) => (i === 10 ? endMs - 1 : startMs + Math.round((span * i) / 10)));
+  const motion = Array.from({ length: n }, (_, i) =>
+    i === n - 1 ? endMs - 1 : startMs + Math.round((span * i) / (n - 1)),
+  );
   return { motion: [...new Set(motion)].filter((t) => t >= startMs), rest: endMs + 300 };
+}
+
+/** Frames this many at most, across every segment. */
+export const MOTION_MAX_FRAMES = 60;
+
+/**
+ * The spans the page's finite animations run in, overlapping ones merged (an entrance, then after
+ * a hold an exit, are two), and instants across each: 11 per segment, fewer when there are many
+ * (at least 5), so a 600ms entrance beside a 2s hold is not sampled by 2 of 11 frames.
+ */
+export function motionPlan(animations: readonly { startMs: number; durationMs: number; iterations: number | null }[]) {
+  const spans = animations
+    .filter((a) => a.iterations !== null && a.durationMs > 0)
+    .map((a) => ({ startMs: a.startMs, endMs: a.startMs + a.durationMs * (a.iterations ?? 1) }))
+    .sort((a, b) => a.startMs - b.startMs);
+  const segments: { startMs: number; endMs: number }[] = [];
+  for (const s of spans) {
+    const last = segments[segments.length - 1];
+    if (last && s.startMs <= last.endMs) last.endMs = Math.max(last.endMs, s.endMs);
+    else segments.push({ ...s });
+  }
+  const per = Math.max(5, Math.min(11, Math.floor(MOTION_MAX_FRAMES / Math.max(1, segments.length))));
+  const motion = [...new Set(segments.flatMap((g) => motionInstants(g.startMs, g.endMs, per).motion))].sort(
+    (a, b) => a - b,
+  );
+  const endMs = Math.max(...segments.map((g) => g.endMs));
+  return { segments, motion, rest: endMs + 300, startMs: segments[0]?.startMs ?? 0, endMs };
 }
 
 interface Captured {
   frames: { atMs: number; png: Uint8Array }[];
   startMs: number;
   endMs: number;
+  segments: { startMs: number; endMs: number }[];
   manifest: string;
 }
 
@@ -209,20 +245,24 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
     const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
     try {
       const timeline = await openHeldTimeline(page, url);
-      const finite = (await timeline.animations()).filter((a) => a.iterations !== null && a.durationMs > 0);
-      let startMs = o.startMs;
-      let endMs = o.endMs;
-      if (endMs === undefined) {
-        if (finite.length === 0) {
-          throw new MotionUsageError(
-            "no finite animation on the page to sample: give --at and --end (an infinite one never rests)",
-          );
-        }
-        endMs = Math.max(...finite.map((a) => a.startMs + a.durationMs * (a.iterations ?? 1)));
+      const plan = motionPlan(await timeline.animations());
+      if (o.endMs === undefined && plan.segments.length === 0) {
+        throw new MotionUsageError(
+          "no finite animation on the page to sample: give --at and --end (an infinite one never rests)",
+        );
       }
-      startMs ??= finite.length > 0 ? Math.min(...finite.map((a) => a.startMs)) : 0;
-      const { motion, rest } = motionInstants(startMs, endMs);
-      const instants = o.at ? [...new Set(o.at)].sort((a, b) => a - b) : [...motion, rest];
+      const given = o.endMs !== undefined;
+      const endMs = o.endMs ?? plan.endMs;
+      const startMs = o.startMs ?? (given ? 0 : plan.startMs);
+      const segments = given ? [{ startMs, endMs }] : plan.segments;
+      const instants = o.at
+        ? [...new Set(o.at)].sort((a, b) => a - b)
+        : given
+          ? (() => {
+              const m = motionInstants(startMs, endMs);
+              return [...m.motion, m.rest];
+            })()
+          : [...plan.motion, plan.rest];
       const writer = await frameWriter(resolve(o.frames), {
         tool: "inspect motion",
         url,
@@ -238,7 +278,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         frames.push({ atMs, png: new Uint8Array(png) });
       }
       const written = await writer.finish();
-      return { frames, startMs, endMs, manifest: written.manifest };
+      return { frames, startMs, endMs, segments, manifest: written.manifest };
     } finally {
       await page.close();
     }
@@ -254,7 +294,8 @@ async function readFrames(o: MotionCliOptions): Promise<Captured> {
       png: new Uint8Array(await readFile(join(dirname(path), f.file))),
     })),
   );
-  return { frames, startMs: o.startMs ?? frames[0]?.atMs ?? 0, endMs: o.endMs!, manifest: path };
+  const startMs = o.startMs ?? frames[0]?.atMs ?? 0;
+  return { frames, startMs, endMs: o.endMs!, segments: [{ startMs, endMs: o.endMs! }], manifest: path };
 }
 
 export function formatMotionReport(
@@ -270,19 +311,39 @@ export function formatMotionReport(
   );
   let fails = 0;
   let warns = 0;
-  for (const t of r.targets) {
+  const fitText = (e: MotionCheckReport["targets"][number]["easing"], broken: boolean) => {
+    if (!("best" in e)) return `no easing fit: ${e.skipped}`;
+    if (broken) return "no easing named: the path has a jump, so no curve describes it";
+    const next = Object.keys(e.errors)
+      .filter((k) => k !== e.best)
+      .sort((a, b) => e.errors[a as keyof typeof e.errors] - e.errors[b as keyof typeof e.errors])[0];
+    return `follows ${e.best} (it fits ${e.margin.toFixed(1)}x better than the next-best curve, ${next})`;
+  };
+  for (const [i, t] of r.targets.entries()) {
     const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
-    let fit: string;
-    if (!("best" in t.easing)) fit = `no easing fit: ${t.easing.skipped}`;
-    else if (broken) fit = "no easing named: the path has a jump, so no curve describes it";
-    else {
-      const errors = t.easing.errors;
-      const next = Object.keys(errors)
-        .filter((k) => k !== (t.easing as { best: string }).best)
-        .sort((a, b) => errors[a as keyof typeof errors] - errors[b as keyof typeof errors])[0];
-      fit = `follows ${t.easing.best} (it fits ${t.easing.margin.toFixed(1)}x better than the next-best curve, ${next})`;
+    if (t.segments.length <= 1) {
+      lines.push(
+        `  target ${JSON.stringify(t.target)}: travels ${Math.round(t.travelPx)}px, ${fitText(t.easing, broken)}`,
+      );
+    } else {
+      lines.push(`  target ${JSON.stringify(t.target)}: ${t.segments.length} segments`);
+      for (const g of t.segments) {
+        lines.push(
+          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px, ${fitText(g.easing, broken)}`,
+        );
+      }
     }
-    lines.push(`  target ${JSON.stringify(t.target)}: travels ${Math.round(t.travelPx)}px, ${fit}`);
+    // What was read per frame: presence, and the position judged (· = not shown, ~ = put back from the edge).
+    const pos = new Map(t.path.map((p) => [p.atMs, p]));
+    lines.push(
+      `    frames: ${r.frames
+        .map((f) => {
+          const p = pos.get(f.atMs);
+          const pr = f.targets[i]!.present.toFixed(2);
+          return `${Math.round(f.atMs)}ms ${pr}${p ? ` (${Math.round(p.x)},${Math.round(p.y)})${p.edge ? "~" : ""}` : " ·"}`;
+        })
+        .join(", ")}`,
+    );
     for (const f of t.findings) {
       if (f.severity === "fail") fails++;
       else warns++;
@@ -345,32 +406,29 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     forbid: o.forbid,
     startMs: captured.startMs,
     endMs: captured.endMs,
+    segments: captured.segments,
     threshold: o.threshold,
     exits: o.exits,
-    ...(o.expectEasing ? { expectEasing: o.expectEasing } : {}),
+    ...(o.expectEasing ? { expectEasing: o.expectEasing.length === 1 ? o.expectEasing[0]! : o.expectEasing } : {}),
   });
-  if (o.json) {
-    console.log(
-      JSON.stringify(
-        {
-          source: o.source,
-          frames: captured.manifest,
-          startMs: captured.startMs,
-          endMs: captured.endMs,
-          passed: r.passed,
-          targets: r.targets,
-          forbidden: r.forbidden,
-          answers: r.frames,
-          model: r.model,
-          costUsd: r.costUsd,
-        },
-        null,
-        2,
-      ),
-    );
-  } else {
-    console.log(formatMotionReport(o.source, captured, r, o.forbid));
-  }
+  const json = {
+    source: o.source,
+    frames: captured.manifest,
+    startMs: captured.startMs,
+    endMs: captured.endMs,
+    segments: captured.segments,
+    passed: r.passed,
+    targets: r.targets,
+    forbidden: r.forbidden,
+    answers: r.frames,
+    model: r.model,
+    costUsd: r.costUsd,
+  };
+  // Kept beside the frames: reading the verdict again must not ask the model again.
+  const saved = join(dirname(captured.manifest), "motion-report.json");
+  await writeFile(saved, `${JSON.stringify(json, null, 2)}\n`);
+  if (o.json) console.log(JSON.stringify(json, null, 2));
+  else console.log(`${formatMotionReport(o.source, captured, r, o.forbid)}\n  report: ${saved}`);
   return r.passed ? 0 : 1;
 }
 

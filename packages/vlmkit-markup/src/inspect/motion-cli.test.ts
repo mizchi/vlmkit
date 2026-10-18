@@ -3,6 +3,7 @@ import { describe, it } from "vite-plus/test";
 import {
   DEFAULT_MOTION_FORBID,
   motionInstants,
+  motionPlan,
   MotionUsageError,
   parseMotionArgs,
   runMotionCli,
@@ -13,7 +14,11 @@ describe("inspect motion arguments", () => {
     const o = parseMotionArgs(["page.html", "--target", "the blue square", "--expect-easing", "ease-out", "--exits"]);
     assert.deepEqual(o.targets, ["the blue square"]);
     assert.deepEqual(o.forbid, [DEFAULT_MOTION_FORBID]);
-    assert.equal(o.expectEasing, "ease-out");
+    assert.deepEqual(o.expectEasing, ["ease-out"]);
+    assert.deepEqual(parseMotionArgs(["p.html", "--target", "x", "--expect-easing", "ease-out,ease-in"]).expectEasing, [
+      "ease-out",
+      "ease-in",
+    ]);
     assert.equal(o.exits, true);
     assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--forbid", "a spinner"]).forbid, ["a spinner"]);
     assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--no-forbid"]).forbid, []);
@@ -37,6 +42,22 @@ describe("inspect motion arguments", () => {
     const { motion, rest } = motionInstants(0, 900);
     assert.equal(motion.length, 11);
     assert.deepEqual([motion[0], motion[5], motion[10], rest], [0, 450, 899, 1200]);
+  });
+
+  it("plans a segment per span of motion: an entrance and, after a hold, an exit", () => {
+    const plan = motionPlan([
+      { startMs: 0, durationMs: 600, iterations: 1 },
+      { startMs: 2100, durationMs: 300, iterations: 1 },
+      { startMs: 100, durationMs: 200, iterations: 1 },
+      { startMs: 0, durationMs: 1000, iterations: null },
+    ]);
+    assert.deepEqual(plan.segments, [
+      { startMs: 0, endMs: 600 },
+      { startMs: 2100, endMs: 2400 },
+    ]);
+    assert.equal(plan.motion.filter((t) => t <= 600).length, 11);
+    assert.equal(plan.motion.filter((t) => t >= 2100).length, 11);
+    assert.equal(plan.rest, 2700);
   });
 
   it("is refused without a key before a browser starts", async () => {

@@ -93,4 +93,43 @@ describe("judgeMotionPath", () => {
   it("calls a rest that lands elsewhere a jump, not a snap-back", () => {
     expect(rules(run((t) => 40 + 480 * t, { rest: 300 }))).toEqual(["jump"]);
   });
+
+  it("judges an entrance from off-screen, a hold and an exit as segments, edge boxes put back whole", () => {
+    // A 300x60 toast slides in from past the right edge of a 1280 frame (ease-out, 0..600),
+    // holds, then fades out and rises 16px (2100..2400). Boxes are cut at the frame's edge.
+    const W = 1280;
+    const left = (t: number) => {
+      if (t <= 600) return 956 + 324 * (1 - easingAt("ease-out", t / 600));
+      return 956;
+    };
+    const seg = (a: number, b: number) => [...Array.from({ length: 10 }, (_, i) => a + ((b - a) * i) / 10), b - 1];
+    const times = [...seg(0, 600), ...seg(2100, 2400), 2700];
+    const samples: MotionSample[] = times.map((t) => {
+      const x = left(t);
+      const visible = Math.max(0, Math.min(W, x + 300) - x);
+      const fading = t > 2100 ? Math.max(0, 1 - (t - 2100) / 300) : 1;
+      const y = 24 - (t > 2100 ? 16 * Math.min(1, (t - 2100) / 300) : 0);
+      return {
+        atMs: t,
+        present: visible === 0 || t > 2400 ? 0.02 : visible < 80 ? 0.42 : fading > 0.5 ? 0.95 : 0.6,
+        box: { x: Math.min(x, W), y, width: visible, height: 60 },
+      };
+    });
+    const r = judgeMotionPath(samples, {
+      startMs: 0,
+      endMs: 2400,
+      segments: [
+        { startMs: 0, endMs: 600 },
+        { startMs: 2100, endMs: 2400 },
+      ],
+      frame: { width: W, height: 800 },
+      expectEasing: ["ease-out"],
+      exits: true,
+    });
+    expect(r.findings).toEqual([]);
+    expect("best" in r.segments[0]!.easing && r.segments[0]!.easing.best).toBe("ease-out");
+    // Without the edge put back, the clipped boxes' centres move at half speed and read linear.
+    const naive = judgeMotionPath(samples, { startMs: 0, endMs: 2400, expectEasing: "ease-out", exits: true });
+    expect(naive.findings.map((f) => f.rule)).not.toEqual([]);
+  });
 });

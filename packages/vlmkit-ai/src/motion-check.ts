@@ -19,12 +19,14 @@ import {
   type EasingName,
   type MotionPathReport,
   type MotionSample,
+  type MotionSegment,
 } from "@mizchi/vlmkit-judge/motion-path.ts";
 import { askJev, JEV_DEFAULT_MODEL, JEV_IMAGE_LIMITS, jevBoxToPixels, pngImage } from "./jev-client.ts";
 import type { JevAnswer, JevClientOptions, JevQuestion } from "./jev-client.ts";
 import { claimInstruction } from "./claims.ts";
 import type { JevAsk } from "./locate.ts";
 import { firstLookScale } from "./locate.ts";
+import { regionKindScale, regionKindView, regionKindWindow } from "./region-kind.ts";
 import { decodeImage, encodePngImage, resample } from "./zoom-image.ts";
 
 export interface MotionFrame {
@@ -40,10 +42,12 @@ export interface MotionCheckOptions {
   /** The motion runs over [startMs, endMs]; frames after `endMs` show it at rest. */
   startMs: number;
   endMs: number;
+  /** Spans some animation runs in (entrance, exit…): each is fitted and searched for jumps alone. */
+  segments?: readonly MotionSegment[];
   /** The targets are meant to leave by the end (a dismissed toast): gone at rest is not a fail. */
   exits?: boolean;
-  /** The timing function the author meant; fails `easing-mismatch` when the path follows another. */
-  expectEasing?: EasingName;
+  /** The timing function the author meant, for every segment or per segment in order. */
+  expectEasing?: EasingName | readonly EasingName[];
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -51,6 +55,13 @@ export interface MotionCheckOptions {
   model?: string;
   ask?: JevAsk;
   client?: JevClientOptions;
+  /**
+   * Ask each target's box a second time on a magnified crop of the region it moves through
+   * (default true): a first look's edges are 1% steps, 12.8px on a 1280px frame, which is a jump's
+   * size on a short travel; magnified, they were ~5px in the jev-box bench. One more request per
+   * frame that shows a target.
+   */
+  refine?: boolean;
   /** Requests in flight at once (default 4). */
   concurrency?: number;
 }
@@ -58,7 +69,7 @@ export interface MotionCheckOptions {
 export interface MotionFrameAnswer {
   atMs: number;
   rest: boolean;
-  targets: { present: number; box: { x: number; y: number; width: number; height: number } }[];
+  targets: { present: number; box: { x: number; y: number; width: number; height: number }; refined?: boolean }[];
   forbid: number[];
 }
 
@@ -113,9 +124,12 @@ export async function checkMotionFrames(
   let costUsd = 0;
   let inputTokens = 0;
   let served = model;
+  let frameSize: { width: number; height: number } | undefined;
+  let calls = 0;
 
   const answers = await pool(frames, options.concurrency ?? 4, async (frame): Promise<MotionFrameAnswer> => {
     const img = decodeImage(Buffer.from(frame.png));
+    frameSize ??= { width: img.width, height: img.height };
     const scale = firstLookScale(img.width, img.height);
     if (scale === null) {
       throw new Error(
@@ -137,6 +151,7 @@ export async function checkMotionFrames(
       questions[`f${i}`] = { type: "noul", instructions: claimInstruction(f) };
     });
     const r = await ask({ model, state: { screenshot: "SHOT" }, assets: { SHOT: pngImage(shown) }, questions });
+    calls++;
     costUsd += r.costUsd;
     inputTokens += r.usage.input_tokens;
     served = r.model;
@@ -154,6 +169,48 @@ export async function checkMotionFrames(
     };
   });
 
+  // Second look: each target's box again, on the region it moves through, cut from the original
+  // and magnified. The same window for every frame, so positions stay on one grid.
+  if (options.refine !== false && frameSize) {
+    const size = frameSize;
+    for (const [i, target] of options.targets.entries()) {
+      const seen = answers.filter((f) => f.targets[i]!.present >= threshold);
+      if (seen.length === 0) continue;
+      const x1 = Math.min(...seen.map((f) => f.targets[i]!.box.x));
+      const y1 = Math.min(...seen.map((f) => f.targets[i]!.box.y));
+      const x2 = Math.max(...seen.map((f) => f.targets[i]!.box.x + f.targets[i]!.box.width));
+      const y2 = Math.max(...seen.map((f) => f.targets[i]!.box.y + f.targets[i]!.box.height));
+      const win = regionKindWindow({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, size);
+      const scale = regionKindScale(win.x2 - win.x1, win.y2 - win.y1);
+      // Not magnified at all: the first look already saw it at full size.
+      if (scale === null || scale <= 1.05) continue;
+      const byTime = new Map(frames.map((f) => [f.atMs, f]));
+      await pool(seen, options.concurrency ?? 4, async (f) => {
+        const view = regionKindView(decodeImage(Buffer.from(byTime.get(f.atMs)!.png)), win, scale);
+        const r = await ask({
+          model,
+          state: { screenshot: "SHOT" },
+          assets: { SHOT: pngImage(encodePngImage(view)) },
+          questions: { b: { type: "box", instructions: `${target.trim().replace(/[.\s]+$/, "")} in \`screenshot\`` } },
+        });
+        calls++;
+        costUsd += r.costUsd;
+        inputTokens += r.usage.input_tokens;
+        const b = (r.answers as Record<string, JevAnswer>).b as Extract<JevAnswer, { type: "box" }>;
+        // The view is the whole window resampled, so its fractions are the window's.
+        const w = win.x2 - win.x1;
+        const h = win.y2 - win.y1;
+        f.targets[i]!.box = {
+          x: win.x1 + b.box.left * w,
+          y: win.y1 + b.box.top * h,
+          width: (b.box.right - b.box.left) * w,
+          height: (b.box.bottom - b.box.top) * h,
+        };
+        f.targets[i]!.refined = true;
+      });
+    }
+  }
+
   const targets = options.targets.map((target, i) => {
     const samples: MotionSample[] = answers.map((f) => ({
       atMs: f.atMs,
@@ -165,6 +222,8 @@ export async function checkMotionFrames(
       ...judgeMotionPath(samples, {
         startMs: options.startMs,
         endMs: options.endMs,
+        ...(options.segments ? { segments: options.segments } : {}),
+        ...(frameSize ? { frame: frameSize } : {}),
         presenceThreshold: threshold,
         ...(options.exits ? { exits: true } : {}),
         ...(options.expectEasing ? { expectEasing: options.expectEasing } : {}),
@@ -185,5 +244,5 @@ export async function checkMotionFrames(
   const passed =
     targets.every((t) => t.findings.every((f) => f.severity !== "fail")) &&
     forbidden.every((f) => f.severity !== "fail");
-  return { frames: answers, targets, forbidden, passed, model: served, calls: frames.length, costUsd, inputTokens };
+  return { frames: answers, targets, forbidden, passed, model: served, calls, costUsd, inputTokens };
 }
