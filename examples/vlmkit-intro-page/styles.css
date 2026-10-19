@@ -1491,6 +1491,98 @@ html[data-theme="dark"] .principle-art .principle-art-dark {
   font-size: 13px;
 }
 
+/* The optional model's table (TypeSafe Jev). A real table above 900px; below it each row is a
+   block and each cell carries its own column label, which is display:none while the header shows. */
+.jev {
+  margin-top: clamp(70px, 10vw, 130px);
+}
+
+.jev-intro h3 {
+  max-width: 760px;
+  margin-top: 14px;
+  font-size: clamp(24px, 2.6vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.jev-intro > p:last-child {
+  max-width: 680px;
+  margin-top: 14px;
+  color: var(--surface-muted-strong);
+  font-size: 15px;
+}
+
+.jev-table {
+  width: 100%;
+  margin-top: 32px;
+  border-collapse: collapse;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  text-align: left;
+}
+
+.jev-table th,
+.jev-table td {
+  padding: 18px 20px 18px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.jev-table thead th {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  color: var(--surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jev-table tbody th {
+  width: 24%;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.jev-table tbody th code {
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 8px;
+  padding: 4px 7px;
+  background: var(--surface-3);
+  color: var(--surface-muted-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.jev-table tbody th > span {
+  display: block;
+}
+
+.jev-table td {
+  color: var(--surface-muted-strong);
+}
+
+.jev-table td:last-child {
+  color: var(--surface-text);
+  font-weight: 600;
+}
+
+.jev-cell-label {
+  display: none;
+}
+
+.jev-note {
+  max-width: 760px;
+  margin-top: 20px;
+  color: var(--surface-muted);
+  font-size: 12px;
+}
+
 .skills {
   background: var(--surface-2);
   color: var(--surface-text);
@@ -2028,6 +2120,46 @@ html[data-theme="dark"] .skill-command {
 
   .principle-grid {
     gap: 44px;
+  }
+
+  .jev-table thead {
+    display: none;
+  }
+
+  /* tbody th named as above: the desktop rule's 24% outranked a bare th here (D39). */
+  .jev-table,
+  .jev-table tbody,
+  .jev-table tr,
+  .jev-table tbody th,
+  .jev-table td {
+    display: block;
+    width: auto;
+  }
+
+  .jev-table tr {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .jev-table th,
+  .jev-table td {
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .jev-table td {
+    margin-top: 12px;
+  }
+
+  .jev-cell-label {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--surface-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .skills-layout {

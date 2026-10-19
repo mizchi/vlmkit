@@ -621,3 +621,15 @@ test("the feature-gallery link counts the demos the gallery has", async () => {
   assert.match(messages.en["demo.features"], en);
   assert.ok(messages.ja["demo.features"].startsWith(`${DEMOS.length}の機能`), messages.ja["demo.features"]);
 });
+
+test("the TypeSafe Jev table names the same four commands as the README", async () => {
+  // The page and the README carry the same table; a command renamed in one and not the other
+  // should fail here rather than ship a page naming a command the CLI no longer has.
+  const [html, readme] = await Promise.all([read("index.html"), readFile(join(exampleDir, "../../README.md"), "utf8")]);
+  const table = html.slice(html.indexOf('data-testid="jev-features"'), html.indexOf('class="jev-note"'));
+  const commands = [...table.matchAll(/<code>([^<]+)<\/code>/g)].map((m) => m[1]);
+  assert.deepEqual(commands, ["diff png --kind", "inspect locate", "inspect claims", "inspect motion"]);
+  const section = readme.slice(readme.indexOf("## With a key: TypeSafe Jev"), readme.indexOf("## The workspace"));
+  for (const command of commands)
+    assert.ok(section.includes(`\`${command}`), `${command} is missing from the README table`);
+});

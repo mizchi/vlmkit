@@ -46,6 +46,13 @@ Prove it again
 # Principle
 Vision proposes.
 Measurements decide.
+The model says what and where.
+The page gives the values.
+Classify each diff region
+Find an element from a description
+Check statements about a screen
+Is an animation visibly broken?
+7/7 broken caught, 7/7 intact passed; about $0.002 a page
 
 # Agent skill
 Install once.
