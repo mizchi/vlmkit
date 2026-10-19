@@ -150,6 +150,7 @@ vlmkit check responsive page.html              # Property-based widths per media
 vlmkit check breakpoints page.html --sweep     # B-1 / B / B+1 per breakpoint, widths in between
 vlmkit check scroll page.html                  # Sticky / fixed / snap actually behave
 vlmkit check animation page.html               # Animations run, settle, respect reduced motion
+vlmkit inspect motion page.html --selector .toast # Does the motion look broken? Lost, clipped, covered, snap-back, jump, easing — from the page
 vlmkit scan handlers page.html                 # Clickable divs, pointer-only controls, unfireable drag and drop
 vlmkit verify flow page.html --flow flow.json  # A scripted flow reaches its post-conditions
 ```
@@ -166,6 +167,19 @@ vlmkit diff png a.png b.png --elements-html page.html   # Two screenshots; selec
 vlmkit snapshot <url>...                                # URL → baseline + diff
 vlmkit contract introspect|scaffold|validate ...        # UI Contract IR
 vlmkit heal selector page.html ".broken"                # Selector replacement candidates
+```
+
+### Optional: TypeSafe Jev (`TYPESAFEAI_API_KEY`)
+
+A model's typed answers (where, whether shown, which kind), never a gate. Where a
+command works without it, nothing asks Jev unless `--jev` is given; the commands
+with no other engine need only the key.
+
+```bash
+vlmkit diff png a.png b.png --jev                       # Each changed region named: text / color / position / presence
+vlmkit inspect motion page.html --jev --target "the green Saved toast" --selector .toast   # + Jev per frame, and the --forbid statements
+vlmkit inspect claims page.html --forbid "an error banner"  # Yes/no statements about what a screenshot shows
+vlmkit inspect locate shot.png "the Save button"        # A described element's box and click point, on a screenshot
 ```
 
 ## Developing vlmkit itself (source repository only)
