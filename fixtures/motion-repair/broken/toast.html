@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Settings</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f6f8f7; color: #18211d; }
+  main { max-width: 720px; margin: 48px auto; padding: 0 32px; }
+  label { display: block; margin: 16px 0 6px; font-weight: 600; }
+  input { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid #c9d3cf; border-radius: 6px; }
+  .toast { position: fixed; right: 24px; bottom: 24px; width: 300px; padding: 14px 18px; pointer-events: none;
+           background: #17643f; color: #fff; border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.2);
+           transform: translateX(calc(100% + 40px));
+           animation: toast-in 360ms ease-in 300ms, toast-out 300ms ease-in 2660ms forwards; }
+  @keyframes toast-in { from { transform: translateX(calc(100% + 40px)); } to { transform: translateX(0); } }
+  @keyframes toast-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(0); opacity: 0; } }
+</style></head>
+<body>
+  <main>
+    <h1>Profile settings</h1>
+    <label for="n">Display name</label><input id="n" value="Ada Okafor">
+    <label for="e">Email</label><input id="e" value="ada@example.com">
+  </main>
+  <div class="toast" role="status">Settings saved</div>
+</body></html>
